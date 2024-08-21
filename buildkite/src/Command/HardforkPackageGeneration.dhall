@@ -227,7 +227,7 @@ let pipeline
                     , deps =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
                     , service = "mina-rosetta"
-                    , network = network
+                    , network = network_name
                     , deb_repo = DebianRepo.Type.Local
                     , deb_codename = "${DebianVersions.lowerName debVersion}"
                     , step_key =
