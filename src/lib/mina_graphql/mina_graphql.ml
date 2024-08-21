@@ -2206,8 +2206,8 @@ struct
           [ arg "publicKey" ~doc:"Public key of account to check"
               ~typ:(non_null Types.Input.PublicKey.arg_typ)
           ; arg "token" ~doc:"Token id of the account to check"
-              ~typ:(non_null Types.Input.TokenId.arg_typ)
-          ; arg "state_hash" ~doc:"Hash of the snarked ledger to check"
+              ~typ:(Types.Input.TokenId.arg_typ)
+          ; arg "stateHash" ~doc:"Hash of the snarked ledger to check"
               ~typ:(non_null string)
           ]
       ~typ:(non_null Types.SnarkedLedgerMembership.obj)
@@ -2227,6 +2227,7 @@ struct
                    ("Failed to get snarked ledger: " ^ Error.to_string_hum err)
                 )
         in
+        let token = Option.value ~default:Token_id.default token in
         let account_id = Account_id.create pk token in
         let location = Ledger.location_of_account ledger account_id in
         match location with
