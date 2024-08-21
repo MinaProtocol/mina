@@ -162,6 +162,7 @@ case "${SERVICE}" in
         ;;
 esac
 
+export_base_image
 export_suffixes
 export_docker_tag
 
