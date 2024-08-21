@@ -9,6 +9,7 @@
       "global_slot_since_genesis": 445860
     }
   },
+  "daemon": { "network_id": "devnet" },
   "ledger": {
     "add_genesis_winner": false,
     "hash": "jy1wjiJgTkzXr7yL8r5x4ikaNJuikibsRMnkjdH6uqGCsDmR2sf",
