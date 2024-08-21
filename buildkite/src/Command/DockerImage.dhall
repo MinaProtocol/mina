@@ -83,7 +83,6 @@ let generateStep =
                 ++  " --version ${spec.version}"
                 ++  " --network ${spec.network}"
                 ++  " --deb-codename ${spec.deb_codename}"
-                ++  " --deb-release ${spec.deb_release}"
                 ++  " --deb-version ${spec.deb_version}"
                 ++  " --deb-profile ${Profiles.lowerName spec.deb_profile}"
                 ++  " --deb-build-flags ${BuildFlags.lowerName
