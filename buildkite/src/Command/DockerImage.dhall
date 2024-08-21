@@ -99,6 +99,7 @@ let generateStep =
                           ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                           ++  " && "
                           ++  buildDockerCmd
+                          ++  " && "
                           ++  releaseDockerCmd
                         )
                     ]
@@ -110,6 +111,7 @@ let generateStep =
                           ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                           ++  " && "
                           ++  buildDockerCmd
+                          ++  " && "
                           ++  releaseDockerCmd
                           ++  " && ./scripts/debian/aptly.sh stop"
                         )
