@@ -792,8 +792,8 @@ module SnarkedLedgerMembership = struct
         ; field "proof"
             ~args:Arg.[]
             ~doc:"Membership proof"
-            ~typ:(list (non_null merkle_path_element))
-            ~resolve:(fun _ { proof; _ } -> Some proof)
+            ~typ:(non_null (list (non_null merkle_path_element)))
+            ~resolve:(fun _ { proof; _ } -> proof)
         ] )
 end
 

@@ -2227,9 +2227,21 @@ struct
                    ("Failed to get snarked ledger: " ^ Error.to_string_hum err)
                 )
         in
+        (* print out that we got the ledger with the ledger size*)
+        let depth = Ledger.depth ledger in 
+        Logger.info (Mina_lib.top_level_logger mina)
+          "Got snarked ledger with depth $depth"
+          ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("depth", `Int depth)] ;
         let token = Option.value ~default:Token_id.default token in
         let account_id = Account_id.create pk token in
+        (* print out the account_id for debugging purposes*)
+        Logger.info (Mina_lib.top_level_logger mina)
+          "Got account_id $account_id"
+          ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("account_id", Account_id.to_yojson account_id)] ;
         let location = Ledger.location_of_account ledger account_id in
+        (* print out location *)
         match location with
         | None ->
             raise (Failure "Account not found in snarked ledger")
@@ -2239,10 +2251,21 @@ struct
             | None ->
                 raise (Failure "Account not found in snarked ledger")
             | Some account ->
+              (* print out the account for debugging purposes *)
+              Logger.info (Mina_lib.top_level_logger mina)
+                "Got account $account"
+                ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("account", Account.to_yojson account)] ;
+
                 let account_balance = account.balance in
                 let timing_info = account.timing in
                 let nonce = account.nonce in
                 let proof = Ledger.merkle_path ledger location in
+                (* print out proof *)
+                Logger.info (Mina_lib.top_level_logger mina)
+                  "Got proof $proof"
+                  ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata:[("proof", `Int (List.length proof))] ;
                 let membership =
                   { Types.SnarkedLedgerMembership.account_balance
                   ; timing_info
@@ -2250,6 +2273,16 @@ struct
                   ; proof
                   }
                 in
+                Logger.info (Mina_lib.top_level_logger mina)
+  "Returning membership: balance=$balance, timing=$timing, nonce=$nonce, proof_length=$proof_length"
+  ~module_:__MODULE__ ~location:__LOC__
+  ~metadata:[
+    ("balance", Currency.Balance.to_yojson account_balance);
+    ("timing", Account_timing.to_yojson timing_info);
+    ("nonce", Account.Nonce.to_yojson nonce);
+    ("proof_length", `Int (List.length proof))
+  ];
+
                 Ok membership |> Deferred.return ) )
 
   let genesis_constants =
