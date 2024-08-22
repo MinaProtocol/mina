@@ -3,12 +3,14 @@ open Async
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 
+(*
 let genesis_constants = Genesis_constants.For_unit_tests.t
 
 let constraint_constants =
   Genesis_constants.For_unit_tests.Constraint_constants.t
 
-let proof_level = Genesis_constants.For_unit_tests.Proof_level.t
+let proof_level = Genesis_constants.Proof_level.Full
+*)
 
 let underToCamel s = String.lowercase s |> Mina_graphql.Reflection.underToCamel
 
@@ -29,7 +31,7 @@ let parse_field_element_or_hash_string s ~f =
   | Error e1 ->
       Error.raise (Error.tag ~tag:"Expected a field element" e1)
 
-let vk_and_prover =
+let vk_and_prover ~constraint_constants =
   lazy
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
@@ -51,7 +53,10 @@ let get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
   in
   second_pass_ledger
 
-let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
+let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t)
+    ~(genesis_constants : Genesis_constants.t)
+    ~(proof_level : Genesis_constants.Proof_level.t)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
   let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
   let _v =
     let id =
@@ -65,7 +70,9 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
   let open Async.Deferred.Let_syntax in
   let%bind () =
     Option.value_map zkapp_account ~default:(Deferred.return ()) ~f:(fun pk ->
-        let `VK vk, `Prover _ = Lazy.force vk_and_prover in
+        let `VK vk, `Prover _ =
+          Lazy.force @@ vk_and_prover ~constraint_constants
+        in
         let%map vk = vk in
         let id = Account_id.create pk Token_id.default in
         Ledger.get_or_create_account ledger id
@@ -148,7 +155,8 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
   ()
 
 let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
-    ~zkapp_kp =
+    ~zkapp_kp ~(genesis_constants : Genesis_constants.t) ~proof_level
+    ~constraint_constants =
   let open Deferred.Let_syntax in
   let receiver =
     Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
@@ -327,6 +335,12 @@ module Util = struct
 end
 
 let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
+  let constraint_constants =
+    Genesis_constants_compiled.compiled_config.constraint_constants
+  in
+  let genesis_constants =
+    Genesis_constants_compiled.compiled_config.genesis_constants
+  in
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_kp = Util.snapp_keypair_of_file zkapp_keyfile in
@@ -350,10 +364,17 @@ let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
     in
     Lazy.force (Genesis_ledger.Packed.t packed)
   in
-  generate_zkapp_txn keypair ledger ~zkapp_kp
+  generate_zkapp_txn keypair ledger ~zkapp_kp ~constraint_constants
+    ~proof_level:Full ~genesis_constants
 
 let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
     ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo =
+  let constraint_constants =
+    Genesis_constants_compiled.compiled_config.constraint_constants
+  in
+  let genesis_constants =
+    Genesis_constants_compiled.compiled_config.genesis_constants
+  in
   let open Deferred.Let_syntax in
   let%bind sender_keypair = Util.keypair_of_file sender ~which:"Sender" in
   let%bind fee_payer_keypair = Util.fee_payer_keypair_of_file fee_payer in
@@ -376,11 +397,17 @@ let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
     Transaction_snark.For_tests.deploy_snapp
       ~permissions:Permissions.user_default ~constraint_constants spec
   in
-  let%map () = if debug then gen_proof zkapp_command else return () in
+  let%map () =
+    if debug then
+      gen_proof ~genesis_constants ~constraint_constants ~proof_level:Full
+        zkapp_command
+    else return ()
+  in
   zkapp_command
 
 let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-    ~verification_key ~zkapp_uri ~auth =
+    ~constraint_constants ~genesis_constants ~verification_key ~zkapp_uri ~auth
+    =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_account_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
@@ -414,13 +441,16 @@ let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     }
   in
   let%bind zkapp_command =
-    let `VK vk, `Prover prover = Lazy.force vk_and_prover in
+    let `VK vk, `Prover prover =
+      Lazy.force @@ vk_and_prover ~constraint_constants
+    in
     Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk:(prover, vk)
       ~constraint_constants spec
   in
   let%map () =
     if debug then
-      gen_proof zkapp_command
+      gen_proof zkapp_command ~constraint_constants ~genesis_constants
+        ~proof_level:Full
         ~zkapp_account:
           (Some
              (Signature_lib.Public_key.compress zkapp_account_keypair.public_key)
@@ -430,7 +460,7 @@ let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
   zkapp_command
 
 let transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer ~fee_payer_nonce
-    ~memo ~receivers =
+    ~memo ~receivers ~genesis_constants ~constraint_constants =
   let open Deferred.Let_syntax in
   let%bind receivers = receivers in
   let amount =
@@ -462,11 +492,15 @@ let transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer ~fee_payer_nonce
         Genesis_constants.For_unit_tests.Constraint_constants.t spec
   in
   let%map () =
-    if debug then gen_proof zkapp_command ~zkapp_account:None else return ()
+    if debug then
+      gen_proof zkapp_command ~zkapp_account:None ~genesis_constants
+        ~constraint_constants ~proof_level:Full
+    else return ()
   in
   zkapp_command
 
-let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state =
+let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
+    ~genesis_constants ~constraint_constants =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
@@ -489,13 +523,16 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state =
     }
   in
   let%bind zkapp_command =
-    let `VK vk, `Prover prover = Lazy.force vk_and_prover in
+    let `VK vk, `Prover prover =
+      Lazy.force @@ vk_and_prover ~constraint_constants
+    in
     Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk:(prover, vk)
       ~constraint_constants spec
   in
   let%map () =
     if debug then
-      gen_proof zkapp_command
+      gen_proof zkapp_command ~genesis_constants ~constraint_constants
+        ~proof_level:Full
         ~zkapp_account:
           (Some (Signature_lib.Public_key.compress zkapp_keypair.public_key))
     else return ()
@@ -503,7 +540,7 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state =
   zkapp_command
 
 let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
-    ~auth =
+    ~auth ~constraint_constants ~genesis_constants =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
@@ -526,13 +563,16 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
     }
   in
   let%bind zkapp_command =
-    let `VK vk, `Prover prover = Lazy.force vk_and_prover in
+    let `VK vk, `Prover prover =
+      Lazy.force @@ vk_and_prover ~constraint_constants
+    in
     Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk:(prover, vk)
       ~constraint_constants spec
   in
   let%map () =
     if debug then
-      gen_proof zkapp_command
+      gen_proof zkapp_command ~genesis_constants ~constraint_constants
+        ~proof_level:Full
         ~zkapp_account:
           (Some
              (Signature_lib.Public_key.compress zkapp_account_keypair.public_key)
@@ -542,7 +582,7 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
   zkapp_command
 
 let update_action_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-    ~action_state =
+    ~action_state ~genesis_constants ~constraint_constants =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
@@ -565,13 +605,16 @@ let update_action_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     }
   in
   let%bind zkapp_command =
-    let `VK vk, `Prover prover = Lazy.force vk_and_prover in
+    let `VK vk, `Prover prover =
+      Lazy.force @@ vk_and_prover ~constraint_constants
+    in
     Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk:(prover, vk)
       ~constraint_constants spec
   in
   let%map () =
     if debug then
-      gen_proof zkapp_command
+      gen_proof zkapp_command ~genesis_constants ~constraint_constants
+        ~proof_level:Full
         ~zkapp_account:
           (Some (Signature_lib.Public_key.compress zkapp_keypair.public_key))
     else return ()
@@ -579,7 +622,7 @@ let update_action_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
   zkapp_command
 
 let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-    ~token_symbol ~auth =
+    ~token_symbol ~auth ~genesis_constants ~constraint_constants =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
@@ -602,13 +645,16 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     }
   in
   let%bind zkapp_command =
-    let `VK vk, `Prover prover = Lazy.force vk_and_prover in
+    let `VK vk, `Prover prover =
+      Lazy.force @@ vk_and_prover ~constraint_constants
+    in
     Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk:(prover, vk)
       ~constraint_constants spec
   in
   let%map () =
     if debug then
-      gen_proof zkapp_command
+      gen_proof zkapp_command ~genesis_constants ~constraint_constants
+        ~proof_level:Full
         ~zkapp_account:
           (Some
              (Signature_lib.Public_key.compress zkapp_account_keypair.public_key)
@@ -618,7 +664,7 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   zkapp_command
 
 let update_snapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~snapp_update
-    ~current_auth =
+    ~current_auth ~genesis_constants ~constraint_constants =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
@@ -640,14 +686,17 @@ let update_snapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~snapp_update
     }
   in
   let%bind zkapp_command =
-    let `VK vk, `Prover prover = Lazy.force vk_and_prover in
+    let `VK vk, `Prover prover =
+      Lazy.force @@ vk_and_prover ~constraint_constants
+    in
     Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk:(prover, vk)
       ~constraint_constants spec
   in
   (*Util.print_snapp_transaction zkapp_command ;*)
   let%map () =
     if debug then
-      gen_proof zkapp_command
+      gen_proof zkapp_command ~genesis_constants ~constraint_constants
+        ~proof_level:Full
         ~zkapp_account:
           (Some (Signature_lib.Public_key.compress zkapp_keypair.public_key))
     else return ()

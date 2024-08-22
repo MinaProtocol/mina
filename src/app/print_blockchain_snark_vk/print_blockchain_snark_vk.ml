@@ -7,7 +7,7 @@ let () =
         let constraint_constants =
           Genesis_constants_compiled.compiled_config.constraint_constants
 
-        let proof_level = Genesis_constants_compiled.compiled_config.proof_level
+        let proof_level = Genesis_constants.Proof_level.Full
       end) in
       let () = Format.eprintf "Generating blockchain snark circuit..@." in
       let before = Time.now () in
