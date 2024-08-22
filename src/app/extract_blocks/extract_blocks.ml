@@ -466,7 +466,8 @@ let check_state_hash ~logger state_hash_opt =
               ] ;
           Core.exit 1 )
 
-let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
+let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks
+    ~output_folder ~network ~include_block_height_in_name () =
   ( match (start_state_hash_opt, end_state_hash_opt, all_blocks) with
   | None, None, true | None, Some _, false | Some _, Some _, false ->
       ()
@@ -620,8 +621,21 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
             [%log info] "Writing block with $state_hash"
               ~metadata:
                 [ ("state_hash", State_hash.to_yojson block.state_hash) ] ;
+
+            let network_prefix =
+              network
+              |> Option.map ~f:(fun network -> network ^ "-")
+              |> Option.value ~default:""
+            in
+            let height_prefix =
+              if include_block_height_in_name then
+                Unsigned.UInt32.to_string block.height ^ "-"
+              else ""
+            in
             let output_file =
-              State_hash.to_base58_check block.state_hash ^ ".json"
+              output_folder ^ "/" ^ network_prefix ^ height_prefix
+              ^ State_hash.to_base58_check block.state_hash
+              ^ ".json"
             in
             (* use Latest.to_yojson to get versioned JSON *)
             Async_unix.Writer.with_file output_file ~f:(fun writer ->
@@ -660,6 +674,17 @@ let () =
          and all_blocks =
            Param.flag "--all-blocks" Param.no_arg
              ~doc:"Extract all blocks in the archive database"
+         and output_folder =
+           Param.flag "--output-folder" ~doc:"Output folder for blocks jsons"
+             Param.(optional_with_default "." string)
+         and network =
+           Param.flag "--network"
+             ~doc:"Network name which will be a prefix of each individual file"
+             Param.(optional string)
+         and include_block_height_in_name =
+           Param.flag "--include-block-height-in-name"
+             ~doc:"Includes block height in block name" Param.no_arg
          in
+
          main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks
-        )))
+           ~output_folder ~network ~include_block_height_in_name )))
