@@ -44,7 +44,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-codename) INPUT_CODENAME="$2"; shift;;
   --deb-release) INPUT_RELEASE="$2"; shift;;
   --deb-version) INPUT_VERSION="$2"; shift;;
-  --deb-profile) INPUT_PROFILE="$2"; shift;;
+  --deb-profile) DEB_PROFILE="$2"; shift;;
   --deb-repo) INPUT_REPO="$2"; shift;;
   --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
