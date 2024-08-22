@@ -4,9 +4,8 @@ open Core_kernel
 open Async
 open Archive_lib
 
-let main ~(genesis_config : Genesis_constants_compiled.t) ~archive_uri
-    ~precomputed ~extensional ~success_file ~failure_file ~log_successes ~files
-    () =
+let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
+    ~extensional ~success_file ~failure_file ~log_successes ~files () =
   let output_file_line path =
     match path with
     | Some path ->
@@ -59,10 +58,8 @@ let main ~(genesis_config : Genesis_constants_compiled.t) ~archive_uri
               Error (Error.to_string_hum err)
         in
         make_add_block of_yojson
-          (Processor.add_block_aux_precomputed
-             ~genesis_constants:genesis_config.genesis_constants
-             ~constraint_constants:genesis_config.constraint_constants ~logger
-             ~pool ~delete_older_than:None )
+          (Processor.add_block_aux_precomputed ~genesis_constants
+             ~constraint_constants ~pool ~delete_older_than:None ~logger )
       in
       let add_extensional_block =
         (* allow use of older-versioned blocks *)
@@ -76,8 +73,7 @@ let main ~(genesis_config : Genesis_constants_compiled.t) ~archive_uri
               Error (Error.to_string_hum err)
         in
         make_add_block of_yojson
-          (Processor.add_block_aux_extensional
-             ~genesis_constants:genesis_config.genesis_constants ~logger ~pool
+          (Processor.add_block_aux_extensional ~genesis_constants ~logger ~pool
              ~delete_older_than:None )
       in
       Deferred.List.iter files ~f:(fun file ->
@@ -103,7 +99,12 @@ let main ~(genesis_config : Genesis_constants_compiled.t) ~archive_uri
 
 let () =
   Command.(
-    let genesis_config = Genesis_constants_compiled.compiled_config in
+    let genesis_constants =
+      Genesis_constants_compiled.compiled_config.genesis_constants
+    in
+    let constraint_constants =
+      Genesis_constants_compiled.compiled_config.constraint_constants
+    in
     run
       (let open Let_syntax in
       async ~summary:"Write blocks to an archive database"
@@ -135,5 +136,5 @@ let () =
                 processed successfully"
              (Flag.optional_with_default true Param.bool)
          and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
-         main ~genesis_config ~archive_uri ~precomputed ~extensional
-           ~success_file ~failure_file ~log_successes ~files )))
+         main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
+           ~extensional ~success_file ~failure_file ~log_successes ~files )))

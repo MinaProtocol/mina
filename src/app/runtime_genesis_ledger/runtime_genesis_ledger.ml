@@ -118,12 +118,11 @@ let load_config_exn config_file =
   , Option.map ~f:extract_accounts_exn staking_ledger
   , Option.map ~f:extract_accounts_exn next_ledger )
 
-let main ~(genesis_config : Genesis_constants_compiled.t) ~config_file
-    ~genesis_dir ~hash_output_file () =
+let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~config_file ~genesis_dir ~hash_output_file () =
   let%bind accounts, staking_accounts_opt, next_accounts_opt =
     load_config_exn config_file
   in
-  let constraint_constants = genesis_config.constraint_constants in
   let ledger = load_ledger ~constraint_constants accounts in
   let staking_ledger : Ledger.t =
     Option.value_map ~default:ledger
@@ -142,7 +141,9 @@ let main ~(genesis_config : Genesis_constants_compiled.t) ~config_file
     ~contents:(Yojson.Safe.to_string (Hash_json.to_yojson hash_json))
 
 let () =
-  let genesis_config = Genesis_constants_compiled.compiled_config in
+  let constraint_constants =
+    Genesis_constants_compiled.compiled_config.constraint_constants
+  in
   Command.run
     (Command.async
        ~summary:
@@ -169,4 +170,4 @@ let () =
                "PATH path to the file where the hashes of the ledgers are to \
                 be saved"
          in
-         main ~genesis_config ~config_file ~genesis_dir ~hash_output_file) )
+         main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file) )

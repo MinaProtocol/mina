@@ -628,15 +628,13 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
         [ ("max_canonical_slot", `String (Int64.to_string max_canonical_slot)) ] ;
     Deferred.unit )
 
-let main ~(genesis_config : Genesis_constants_compiled.t) ~input_file
-    ~output_file_opt ~archive_uri ~continue_on_error ~checkpoint_interval
+let main ~constraint_constants ~proof_level ~input_file ~output_file_opt
+    ~archive_uri ~continue_on_error ~checkpoint_interval
     ~checkpoint_output_folder_opt ~checkpoint_file_prefix ~genesis_dir_opt
     ~log_json ~log_level () =
   Cli_lib.Stdout_log.setup log_json log_level ;
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
-  let proof_level = genesis_config.proof_level in
-  let constraint_constants = genesis_config.constraint_constants in
   let input =
     match input_of_yojson json with
     | Ok inp ->
@@ -1680,7 +1678,10 @@ let main ~(genesis_config : Genesis_constants_compiled.t) ~input_file
                 exit 1 ) ) )
 
 let () =
-  let genesis_config = Genesis_constants_compiled.compiled_config in
+  let constraint_constants =
+    Genesis_constants_compiled.compiled_config.constraint_constants
+  in
+  let proof_level = Genesis_constants_compiled.compiled_config.proof_level in
   Command.(
     run
       (let open Let_syntax in
@@ -1720,6 +1721,7 @@ let () =
              Param.(optional_with_default "replayer" string)
          and log_json = Cli_lib.Flag.Log.json
          and log_level = Cli_lib.Flag.Log.level in
-         main ~genesis_config ~input_file ~output_file_opt ~archive_uri
-           ~checkpoint_interval ~continue_on_error ~checkpoint_output_folder_opt
-           ~checkpoint_file_prefix ~genesis_dir_opt ~log_json ~log_level )))
+         main ~constraint_constants ~proof_level ~input_file ~output_file_opt
+           ~archive_uri ~checkpoint_interval ~continue_on_error
+           ~checkpoint_output_folder_opt ~checkpoint_file_prefix
+           ~genesis_dir_opt ~log_json ~log_level )))
