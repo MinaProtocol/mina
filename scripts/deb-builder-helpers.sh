@@ -27,8 +27,6 @@ SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
 
 SUGGESTED_DEPS="jq, curl, wget"
 
-ARCHIVE_MIGRATION_DEPS="jq, google-cloud-sdk"
-
 TEST_EXECUTIVE_DEPS=", mina-logproc, python3, nodejs, yarn, google-cloud-sdk, kubectl, google-cloud-sdk-gke-gcloud-auth-plugin, terraform, helm"
 
 case "${MINA_DEB_CODENAME}" in
@@ -153,33 +151,12 @@ copy_common_daemon_configs() {
 
   # Copy shared binaries
   cp ../src/app/libp2p_helper/result/bin/libp2p_helper "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
-  # cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
   cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/mina-create-genesis"
   cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
   cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
 
   # Copy signature-based Binaries (based on signature type $2 passed into the function)
   cp ./default/src/app/cli/src/mina_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
-  
-  # Copy rosetta-based Binaries 
-  cp ./default/src/app/rosetta/rosetta_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
-  cp ./default/src/app/rosetta/ocaml-signer/signer_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
- 
-  mkdir -p "${BUILDDIR}/etc/mina/rosetta"
-  mkdir -p "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
-  mkdir -p "${BUILDDIR}/etc/mina/rosetta/archive"
-  mkdir -p "${BUILDDIR}/etc/mina/rosetta/genesis_ledgers"
-  mkdir -p "${BUILDDIR}/etc/mina/rosetta/scripts"
-
-  # --- Copy artifacts
-  cp ../src/app/rosetta/scripts/* "${BUILDDIR}/etc/mina/rosetta/scripts"
-  cp ../scripts/archive/download-missing-blocks.sh "${BUILDDIR}/etc/mina/rosetta/scripts"
-
-  cp ../src/app/rosetta/rosetta-cli-config/*.json "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
-  cp ../src/app/rosetta/rosetta-cli-config/*.ros "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
-  cp ./default/src/app/rosetta/indexer_test/indexer_test.exe "${BUILDDIR}/usr/local/bin/mina-rosetta-indexer-test"
-  cp ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/rosetta/archive"
-  cp -r ../genesis_ledgers/* ${BUILDDIR}/etc/mina/rosetta/genesis_ledgers/
 
   # Copy over Build Configs (based on $2)
   mkdir -p "${BUILDDIR}/etc/coda/build_config"
@@ -278,6 +255,64 @@ build_functional_test_suite_deb() {
 }
 ##################################### END TEST SUITE PACKAGE #######################################
 
+function copy_common_rosetta_configs () {
+ 
+  # Copy rosetta-based Binaries 
+  cp ./default/src/app/rosetta/rosetta_${1}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+  cp ./default/src/app/rosetta/ocaml-signer/signer_${1}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
+ 
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta"
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/scripts"
+
+  # --- Copy artifacts
+  cp ../src/app/rosetta/scripts/* "${BUILDDIR}/etc/mina/rosetta/scripts"
+  cp ../src/app/rosetta/rosetta-cli-config/*.json "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  cp ../src/app/rosetta/rosetta-cli-config/*.ros "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  cp ./default/src/app/rosetta/indexer_test/indexer_test.exe "${BUILDDIR}/usr/local/bin/mina-rosetta-indexer-test"
+ 
+}
+
+##################################### ROSETTA MAINNET PACKAGE #######################################
+build_rosetta_mainnet_deb() {
+ 
+  echo "------------------------------------------------------------"
+  echo "--- Building mainnet rosetta deb"
+
+  create_control_file mina-rosetta-mainnet "${SHARED_DEPS}" 'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
+
+  copy_common_rosetta_configs "mainnet"
+  
+  build_deb mina-rosetta-mainnet
+}
+
+##################################### ROSETTA MAINNET PACKAGE #######################################
+build_rosetta_devnet_deb() {
+ 
+  echo "------------------------------------------------------------"
+  echo "--- Building devnet rosetta deb"
+
+  create_control_file mina-rosetta-devnet "${SHARED_DEPS}" 'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
+
+  copy_common_rosetta_configs "testnet"
+  
+  build_deb mina-rosetta-devnet
+}
+
+##################################### ROSETTA BERKELEY PACKAGE #######################################
+build_rosetta_berkeley_deb() {
+ 
+  echo "------------------------------------------------------------"
+  echo "--- Building rosetta berkeley deb"
+
+  create_control_file mina-rosetta-berkeley "${SHARED_DEPS}" 'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
+
+  copy_common_rosetta_configs "testnet"
+  
+  build_deb mina-rosetta-berkeley
+}
+
+
 ##################################### MAINNET PACKAGE #######################################
 build_daemon_mainnet_deb() {
  
@@ -336,39 +371,18 @@ build_archive_deb () {
   cp ./default/src/app/archive_blocks/archive_blocks.exe "${BUILDDIR}/usr/local/bin/mina-archive-blocks"
   cp ./default/src/app/extract_blocks/extract_blocks.exe "${BUILDDIR}/usr/local/bin/mina-extract-blocks"
   
-  cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
-  
   mkdir -p "${BUILDDIR}/etc/mina/archive"
-  cp ../scripts/archive/download-missing-blocks.sh "${BUILDDIR}/etc/mina/archive"
+  cp ../scripts/archive/missing-blocks-guardian.sh "${BUILDDIR}/etc/mina/archive"
   
   cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILDDIR}/usr/local/bin/mina-missing-blocks-auditor"
   cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-replayer"
-  cp ./default/src/app/swap_bad_balances/swap_bad_balances.exe "${BUILDDIR}/usr/local/bin/mina-swap-bad-balances"
-
-  cp ../src/app/archive/create_schema.sql "${BUILDDIR}/etc/mina/archive"
   
+  cp ../src/app/archive/create_schema.sql "${BUILDDIR}/etc/mina/archive"
+  cp ../src/app/archive/drop_tables.sql "${BUILDDIR}/etc/mina/archive"
+
   build_deb "$ARCHIVE_DEB"
 
 }
-
-##################################### ARCHIVE PACKAGE ##########################################
-build_archive_migration_deb () {
-ARCHIVE_MIGRATION_DEB=mina-archive-migration${DEB_SUFFIX}
-
-  echo "------------------------------------------------------------"
-  echo "--- Building archive migration deb"
-
-  create_control_file "$ARCHIVE_MIGRATION_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
- Compatible with Mina Daemon'
-
-  cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
-  cp ./default/src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration-verifier"
-  cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-migration-replayer"
-  cp ../scripts/archive/migration/berkeley_migration.sh "${BUILDDIR}/usr/local/bin/mina-berkeley-migration-script"
-  
-  build_deb "$ARCHIVE_MIGRATION_DEB"
-}
-##################################### END ARCHIVE PACKAGE ######################################
 
 ##################################### ZKAPP TEST TXN #######################################
 build_zkapp_test_transaction_deb () {

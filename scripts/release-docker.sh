@@ -10,7 +10,8 @@ set -x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive' 'mina-archive-migration' 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-test-executive' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator')
+
+VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard'  'itn-orchestrator')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -111,10 +112,6 @@ mina-archive)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
   DOCKER_CONTEXT="dockerfiles/"
   ;;
-mina-archive-migration)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive-migration"
-  DOCKER_CONTEXT="dockerfiles/"
-  ;;
 bot)
   DOCKERFILE_PATH="frontend/bot/Dockerfile"
   DOCKER_CONTEXT="frontend/bot"
@@ -126,11 +123,6 @@ mina-daemon)
   ;;
 mina-toolchain)
   DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
-  ;;
-mina-test-executive)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-test-executive"
-  DOCKER_CONTEXT="dockerfiles/"
-  VERSION="${VERSION}-${NETWORK##*=}"
   ;;
 mina-batch-txn)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-txn-burst"
@@ -147,14 +139,6 @@ mina-zkapp-test-transaction)
 leaderboard)
   DOCKERFILE_PATH="frontend/leaderboard/Dockerfile"
   DOCKER_CONTEXT="frontend/leaderboard"
-  ;;
-delegation-backend)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend"
-  DOCKER_CONTEXT="src/app/delegation_backend"
-  ;;
-delegation-backend-toolchain)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend-toolchain"
-  DOCKER_CONTEXT="src/app/delegation_backend"
   ;;
 itn-orchestrator)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-itn-orchestrator"

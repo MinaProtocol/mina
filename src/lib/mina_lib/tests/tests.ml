@@ -42,7 +42,16 @@ let%test_module "Epoch ledger sync tests" =
           { daemon = None
           ; genesis = None
           ; proof = None
-          ; ledger = None
+          ; ledger =
+              Some
+                { base = Named "test"
+                ; num_accounts = None
+                ; balances = []
+                ; hash = None
+                ; s3_data_hash = None
+                ; name = None
+                ; add_genesis_winner = None
+                }
           ; epoch_data = None
           }
         in
@@ -76,6 +85,8 @@ let%test_module "Epoch ledger sync tests" =
         let precomputed_values = precomputed_values
 
         let trust_system = trust_system
+
+        let commit_id = "not specified for unit test"
       end in
       return (module Context : CONTEXT)
 
@@ -90,7 +101,7 @@ let%test_module "Epoch ledger sync tests" =
           Verifier.create ~logger ~proof_level:precomputed_values.proof_level
             ~constraint_constants:precomputed_values.constraint_constants ~pids
             ~conf_dir:(Some (make_dirname "verifier"))
-            () )
+            ~commit_id:"not specified for unit tests" () )
 
     let make_empty_ledger (module Context : CONTEXT) =
       Mina_ledger.Ledger.create
@@ -307,11 +318,17 @@ let%test_module "Epoch ledger sync tests" =
       let tr_tm0 = Unix.gettimeofday () in
       let _valid_transitions, initialization_finish_signal =
         let notify_online () = Deferred.unit in
-        let most_recent_valid_block =
+        let most_recent_valid_block_reader, most_recent_valid_block_writer =
           Broadcast_pipe.create
             ( Mina_block.genesis ~precomputed_values
             |> Mina_block.Validation.reset_frontier_dependencies_validation
             |> Mina_block.Validation.reset_staged_ledger_diff_validation )
+        in
+        let get_current_frontier () =
+          Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+        in
+        let get_most_recent_valid_block () =
+          Broadcast_pipe.Reader.peek most_recent_valid_block_reader
         in
         (* we're going to set and sync the epoch ledgers in the test
            so router should not do a sync
@@ -325,11 +342,12 @@ let%test_module "Epoch ledger sync tests" =
           ~persistent_root_location:(make_dirname "persistent_root_location")
           ~persistent_frontier_location:
             (make_dirname "persistent_frontier_location")
-          ~frontier_broadcast_pipe:
-            (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
+          ~get_current_frontier
+          ~frontier_broadcast_writer:frontier_broadcast_pipe_w
           ~get_completed_work:(Fn.const None) ~catchup_mode:`Normal
           ~network_transition_reader:block_reader ~producer_transition_reader
-          ~most_recent_valid_block ~notify_online ()
+          ~get_most_recent_valid_block ~most_recent_valid_block_writer
+          ~notify_online ()
       in
       let%bind () = Ivar.read initialization_finish_signal in
       let tr_tm1 = Unix.gettimeofday () in

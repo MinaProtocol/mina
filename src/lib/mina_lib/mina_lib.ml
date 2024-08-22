@@ -791,7 +791,7 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
   | None ->
       let open Participating_state.Option.Let_syntax in
       let%map account = get_account t account_id in
-      account.Account.Poly.nonce
+      account.Account.nonce
 
 let snark_job_state t = t.snark_job_state
 
@@ -920,7 +920,7 @@ let get_current_nonce t aid =
       let ledger_nonce =
         Participating_state.active (get_account t aid)
         |> Option.join
-        |> Option.map ~f:(fun { Account.Poly.nonce; _ } -> nonce)
+        |> Option.map ~f:(fun { Account.nonce; _ } -> nonce)
         |> Option.value ~default:nonce
       in
       Ok (`Min ledger_nonce, nonce)
@@ -1227,9 +1227,11 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val commit_id : string
 end
 
-let context (config : Config.t) : (module CONTEXT) =
+let context ~commit_id (config : Config.t) : (module CONTEXT) =
   ( module struct
     let logger = config.logger
 
@@ -1238,9 +1240,12 @@ let context (config : Config.t) : (module CONTEXT) =
     let consensus_constants = precomputed_values.consensus_constants
 
     let constraint_constants = precomputed_values.constraint_constants
+
+    let commit_id = commit_id
   end )
 
-let start t =
+let start ~commit_id t =
+  let commit_id_short = String.sub ~pos:0 ~len:8 commit_id in
   let set_next_producer_timing timing consensus_state =
     let block_production_status, next_producer_timing =
       let generated_from_consensus_at :
@@ -1303,7 +1308,8 @@ let start t =
     not
       (Keypair.And_compressed_pk.Set.is_empty t.config.block_production_keypairs)
   then
-    Block_producer.run ~context:(context t.config)
+    Block_producer.run
+      ~context:(context ~commit_id t.config)
       ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
       ~set_next_producer_timing ~prover:t.processes.prover
       ~trust_system:t.config.trust_system
@@ -1334,8 +1340,8 @@ let start t =
             @@ Keypair.And_compressed_pk.Set.choose
                  t.config.block_production_keypairs
           in
-          Node_status_service.start_simplified ~logger:t.config.logger
-            ~node_status_url ~network:t.components.net
+          Node_status_service.start_simplified ~commit_id
+            ~logger:t.config.logger ~node_status_url ~network:t.components.net
             ~chain_id:t.config.chain_id
             ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
             ~slot_duration:
@@ -1344,8 +1350,8 @@ let start t =
                    .slot_duration_ms )
             ~block_producer_public_key_base58
         else
-          Node_status_service.start ~logger:t.config.logger ~node_status_url
-            ~network:t.components.net
+          Node_status_service.start ~commit_id ~logger:t.config.logger
+            ~node_status_url ~network:t.components.net
             ~transition_frontier:t.components.transition_frontier
             ~sync_status:t.sync_status ~chain_id:t.config.chain_id
             ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
@@ -1358,8 +1364,7 @@ let start t =
         ()
   in
   let built_with_commit_sha =
-    if t.config.uptime_send_node_commit then Some Mina_version.commit_id_short
-    else None
+    if t.config.uptime_send_node_commit then Some commit_id_short else None
   in
   Uptime_service.start ~logger:t.config.logger ~uptime_url:t.config.uptime_url
     ~snark_worker_opt:t.processes.uptime_snark_worker_opt
@@ -1374,16 +1379,17 @@ let start t =
   stop_long_running_daemon t ;
   Snark_worker.start t
 
-let start_with_precomputed_blocks t blocks =
+let start_with_precomputed_blocks ~commit_id t blocks =
   let%bind () =
-    Block_producer.run_precomputed ~context:(context t.config)
+    Block_producer.run_precomputed
+      ~context:(context ~commit_id t.config)
       ~verifier:t.processes.verifier ~trust_system:t.config.trust_system
       ~time_controller:t.config.time_controller
       ~frontier_reader:t.components.transition_frontier
       ~transition_writer:t.pipes.producer_transition_writer
       ~precomputed_blocks:blocks
   in
-  start t
+  start ~commit_id t
 
 let send_resource_pool_diff_or_wait ~rl ~diff_score ~max_per_15_seconds diff =
   (* HACK: Pretend we're a remote peer so that we can rate limit
@@ -1454,8 +1460,9 @@ let start_filtered_log
       ~transport:(Logger.Transport.raw handle) ;
     Ok () )
 
-let create ?wallets (config : Config.t) =
-  let module Context = (val context config) in
+let create ~commit_id ?wallets (config : Config.t) =
+  let module Context = (val context ~commit_id config) in
+  let commit_id_short = String.sub ~pos:0 ~len:8 commit_id in
   let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
@@ -1498,7 +1505,7 @@ let create ?wallets (config : Config.t) =
               (fun () ->
                 O1trace.thread "manage_prover_subprocess" (fun () ->
                     let%bind prover =
-                      Prover.create ~logger:config.logger
+                      Prover.create ~commit_id ~logger:config.logger
                         ~enable_internal_tracing:
                           (Internal_tracing.is_enabled ())
                         ~internal_trace_filename:"prover-internal-trace.jsonl"
@@ -1523,7 +1530,7 @@ let create ?wallets (config : Config.t) =
               (fun () ->
                 O1trace.thread "manage_verifier_subprocess" (fun () ->
                     let%bind verifier =
-                      Verifier.create ~logger:config.logger
+                      Verifier.create ~commit_id ~logger:config.logger
                         ~enable_internal_tracing:
                           (Internal_tracing.is_enabled ())
                         ~internal_trace_filename:"verifier-internal-trace.jsonl"
@@ -1618,9 +1625,12 @@ let create ?wallets (config : Config.t) =
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
             Broadcast_pipe.create None
           in
+          let get_current_frontier () =
+            Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+          in
           Exit_handlers.register_async_shutdown_handler ~logger:config.logger
             ~description:"Close transition frontier, if exists" (fun () ->
-              match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
+              match get_current_frontier () with
               | None ->
                   Deferred.unit
               | Some frontier ->
@@ -1631,9 +1641,7 @@ let create ?wallets (config : Config.t) =
                 Deferred.return
                 @@
                 let open Option.Let_syntax in
-                let%bind frontier =
-                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                in
+                let%bind frontier = get_current_frontier () in
                 f ~frontier input )
           in
           (* knot-tying hacks so we can pass a get_node_status function before net, Mina_lib.t created *)
@@ -1675,9 +1683,7 @@ let create ?wallets (config : Config.t) =
                       let ( protocol_state_hash
                           , best_tip_opt
                           , k_block_hashes_and_timestamps ) =
-                        match
-                          Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                        with
+                        match get_current_frontier () with
                         | None ->
                             ( config.precomputed_values
                                 .protocol_state_with_hashes
@@ -1728,7 +1734,7 @@ let create ?wallets (config : Config.t) =
                         Trust_system.Peer_trust.peer_statuses
                           config.trust_system
                       in
-                      let git_commit = Mina_version.commit_id_short in
+                      let git_commit = commit_id_short in
                       let uptime_minutes =
                         let now = Time.now () in
                         let minutes_float =
@@ -1861,9 +1867,7 @@ let create ?wallets (config : Config.t) =
                         Deferred.return
                         @@
                         let open Option.Let_syntax in
-                        let%bind frontier =
-                          Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                        in
+                        let%bind frontier = get_current_frontier () in
                         let%map ( scan_state
                                 , expected_merkle_root
                                 , pending_coinbases
@@ -1946,10 +1950,7 @@ let create ?wallets (config : Config.t) =
                     O1trace.thread "handle_request_get_transition_knowledge"
                       (fun () ->
                         return
-                          ( match
-                              Broadcast_pipe.Reader.peek
-                                frontier_broadcast_pipe_r
-                            with
+                          ( match get_current_frontier () with
                           | None ->
                               []
                           | Some frontier ->
@@ -2000,11 +2001,14 @@ let create ?wallets (config : Config.t) =
                           User_command.Zkapp_command zkapp_command )
                     , result_cb ) )
           |> Deferred.don't_wait_for ;
-          let ((most_recent_valid_block_reader, _) as most_recent_valid_block) =
+          let most_recent_valid_block_reader, most_recent_valid_block_writer =
             Broadcast_pipe.create
               ( Mina_block.genesis ~precomputed_values:config.precomputed_values
               |> Validation.reset_frontier_dependencies_validation
               |> Validation.reset_staged_ledger_diff_validation )
+          in
+          let get_most_recent_valid_block () =
+            Broadcast_pipe.Reader.peek most_recent_valid_block_reader
           in
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
@@ -2015,10 +2019,11 @@ let create ?wallets (config : Config.t) =
               ~consensus_local_state:config.consensus_local_state
               ~persistent_root_location:config.persistent_root_location
               ~persistent_frontier_location:config.persistent_frontier_location
-              ~frontier_broadcast_pipe:
-                (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
-              ~catchup_mode ~network_transition_reader:block_reader
-              ~producer_transition_reader ~most_recent_valid_block
+              ~get_current_frontier
+              ~frontier_broadcast_writer:frontier_broadcast_pipe_w ~catchup_mode
+              ~network_transition_reader:block_reader
+              ~producer_transition_reader ~get_most_recent_valid_block
+              ~most_recent_valid_block_writer
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
               ~notify_online ()

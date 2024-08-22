@@ -639,7 +639,6 @@ module Accounts = struct
 
     let to_account (a : t) : Mina_base.Account.t =
       let open Signature_lib in
-      let open Mina_base.Account.Poly in
       let timing =
         let open Mina_base.Account_timing.Poly in
         match a.timing with
@@ -1513,11 +1512,12 @@ let ledger_of_accounts accounts =
     ; add_genesis_winner = Some false
     }
 
-let make_fork_config ~staged_ledger ~global_slot ~state_hash ~blockchain_length
-    ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger ~next_epoch_seed =
+let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
+    ~blockchain_length ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
+    ~next_epoch_seed =
   let open Async.Deferred.Result.Let_syntax in
   let global_slot_since_genesis =
-    Mina_numbers.Global_slot_since_hard_fork.to_int global_slot
+    Mina_numbers.Global_slot_since_genesis.to_int global_slot_since_genesis
   in
   let blockchain_length = Unsigned.UInt32.to_int blockchain_length in
   let yield () =

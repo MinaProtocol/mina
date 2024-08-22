@@ -767,7 +767,7 @@ let apply_transactions txns accounts =
         | None ->
             failwith "sender not found"
         | Some a ->
-            let open Account.Poly in
+            let open Account in
             let nonce = Account.Nonce.succ a.nonce in
             let balance =
               let amt =
@@ -857,7 +857,7 @@ let transaction_replacement () =
       in
       assert_pool_consistency pool ;
       let queue, _ =
-        let open Account.Poly in
+        let open Account in
         Public_key.decompress sender.public_key
         |> Option.value_exn |> Account_id.of_public_key
         |> Account_id.Map.find_exn (Indexed_pool.For_tests.all_by_sender pool')

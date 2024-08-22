@@ -12,9 +12,7 @@ in  Pipeline.build
           , artifacts =
             [ Artifacts.Type.Daemon
             , Artifacts.Type.Archive
-            , Artifacts.Type.ArchiveMigration
             , Artifacts.Type.BatchTxn
-            , Artifacts.Type.TestExecutive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
             ]

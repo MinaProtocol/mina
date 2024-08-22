@@ -67,7 +67,11 @@ let runInDockerWithPostgresConn
 
           let outerDir
               : Text
-              = "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
+              = "\\\$BUILDKITE_BUILD_CHECKOUT_PATH${networkOrDefault}"
+
+          let minaDockerTag
+              : Text
+              = "\\\$MINA_DOCKER_TAG"
 
           in  Cmd.chain
                 [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
@@ -76,7 +80,7 @@ let runInDockerWithPostgresConn
                 , "sleep 5"
                 , "docker exec ${postgresDockerName} psql ${pg_conn} -f /workdir/${initScript}"
                 , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --entrypoint bash ${envVars} gcr.io/o1labs-192920/${Artifacts.dockerName
-                                                                                                                                                    docker}:\\\$MINA_DOCKER_TAG${networkOrDefault} ${innerScript}"
+                                                                                                                                                    docker}:${minaDockerTag} ${innerScript}"
                 ]
 
 in  { runInDockerWithPostgresConn = runInDockerWithPostgresConn }

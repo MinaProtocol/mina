@@ -38,7 +38,7 @@ The relationship between the branches is as presented: `master ‚äÜ compatible ‚ä
 - When merely a new feature is introduced, it should aim at the exact target branch. This place depends on the feature, e.g. `compatible` for softfork features, `develop` for more experimental/next release, etc. And then the merged feature is back-propagated downstream (to the right).
 
 
-![Illustration of the branching strategy](docs/res/branching_flow_david_wong.png)
+![Illustration of the branching strategy](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/branching_flow_david_wong.png)
 
 
 

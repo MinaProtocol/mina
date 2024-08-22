@@ -760,9 +760,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let eval = T.eval
 
       module Precomputed = struct
-        let keypairs = Lazy.force Key_gen.Sample_keypairs.keypairs
-
-        let genesis_winner = keypairs.(0)
+        let genesis_winner = Key_gen.Sample_keypairs.genesis_winner
 
         let genesis_stake_proof :
             genesis_epoch_ledger:Mina_ledger.Ledger.t Lazy.t -> Stake_proof.t =
@@ -1146,8 +1144,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       let of_global_slot ~(constants : Constants.t) slot =
         of_slot_number ~constants slot
     end
-
-    [%%if true]
 
     module Min_window_density = struct
       (* Three cases for updating the densities of sub-windows
@@ -1620,25 +1616,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                   (slots, min_window_densities, constants) )
         end )
     end
-
-    [%%else]
-
-    module Min_window_density = struct
-      let update_min_window_density ~constants:_ ~prev_global_slot:_
-          ~next_global_slot:_ ~prev_sub_window_densities
-          ~prev_min_window_density =
-        (prev_min_window_density, prev_sub_window_densities)
-
-      module Checked = struct
-        let update_min_window_density ~constants:_ ~prev_global_slot:_
-            ~next_global_slot:_ ~prev_sub_window_densities
-            ~prev_min_window_density =
-          Tick.Checked.return
-            (prev_min_window_density, prev_sub_window_densities)
-      end
-    end
-
-    [%%endif]
 
     (* We have a list of state hashes. When we extend the blockchain,
        we see if the **previous** state should be saved as a checkpoint.
