@@ -12,7 +12,7 @@ ifeq ($(DUNE_PROFILE),)
 DUNE_PROFILE := dev
 endif
 
-ifeq ($(OPAMSWITCH)$(IN_NIX_SHELL),)
+ifeq ($(OPAMSWITCH)$(IN_NIX_SHELL)$(CI)$(BUILDKITE),)
 # Sometimes opam replaces these env variables in shell with
 # an explicit mention of a particular switch (dereferenced from the value)
 OPAM_SWITCH_PREFIX := $(PWD)/_opam

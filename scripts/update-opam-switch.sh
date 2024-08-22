@@ -4,7 +4,7 @@ SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd "$SCRIPT_DIR/.."
 
 # Don't do anything if we're in a nix shell
-[[ "$IN_NIX_SHELL" == "" ]] || exit 0
+[[ "$IN_NIX_SHELL$CI$BUILDKITE" == "" ]] || exit 0
 
 sum="$(cksum opam.export | grep -oE '^\S*')"
 switch_dir=opam_switches/"$sum"
