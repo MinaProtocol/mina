@@ -187,7 +187,7 @@ module Get_some_initial_peers = struct
     include Register (T')
   end
 
-  let receipt_trust_action_message _ = Some ("Get_some_initial_peers query", [])
+  let receipt_trust_action_message _ = ("Get_some_initial_peers query", [])
 
   let log_request_received ~logger ~sender () =
     [%log trace] "Sending some initial peers to $peer"
@@ -284,9 +284,8 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
   end
 
   let receipt_trust_action_message hash =
-    Some
-      ( "Staged ledger and pending coinbases at hash: $hash"
-      , [ ("hash", State_hash.to_yojson hash) ] )
+    ( "Staged ledger and pending coinbases at hash: $hash"
+    , [ ("hash", State_hash.to_yojson hash) ] )
 
   let log_request_received ~logger:_ ~sender:_ _request = ()
 
@@ -322,7 +321,9 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
           Trust_system.(
             record_envelope_sender trust_system logger
               (Envelope.Incoming.sender request)
-              Actions.(Requested_unknown_item, receipt_trust_action_message hash))
+              Actions.
+                ( Requested_unknown_item
+                , Some (receipt_trust_action_message hash) ))
     in
     result
 
@@ -407,9 +408,8 @@ module Answer_sync_ledger_query = struct
   end
 
   let receipt_trust_action_message (_, query) =
-    Some
-      ( "Answer_sync_ledger_query: $query"
-      , [ ("query", Sync_ledger.Query.to_yojson query) ] )
+    ( "Answer_sync_ledger_query: $query"
+    , [ ("query", Sync_ledger.Query.to_yojson query) ] )
 
   let log_request_received ~logger:_ ~sender:_ _request = ()
 
@@ -527,9 +527,7 @@ module Get_transition_chain = struct
   end
 
   let receipt_trust_action_message query =
-    Some
-      ( "Get_transition_chain query: $query"
-      , [ ("query", query_to_yojson query) ] )
+    ("Get_transition_chain query: $query", [ ("query", query_to_yojson query) ])
 
   let log_request_received ~logger ~sender _request =
     [%log info] "Sending transition_chain to $peer"
@@ -559,7 +557,8 @@ module Get_transition_chain = struct
             record_envelope_sender trust_system logger
               (Envelope.Incoming.sender request)
               Actions.
-                (Requested_unknown_item, receipt_trust_action_message hashes))
+                ( Requested_unknown_item
+                , Some (receipt_trust_action_message hashes) ))
         in
         None
 
@@ -634,9 +633,8 @@ module Get_transition_knowledge = struct
   end
 
   let receipt_trust_action_message query =
-    Some
-      ( "Get_transition_knowledge query: $query"
-      , [ ("query", query_to_yojson query) ] )
+    ( "Get_transition_knowledge query: $query"
+    , [ ("query", query_to_yojson query) ] )
 
   let log_request_received ~logger ~sender _request =
     [%log info] "Sending transition_knowledge to $peer"
@@ -724,9 +722,8 @@ module Get_transition_chain_proof = struct
   end
 
   let receipt_trust_action_message query =
-    Some
-      ( "Get_transition_chain_proof query: $query"
-      , [ ("query", query_to_yojson query) ] )
+    ( "Get_transition_chain_proof query: $query"
+    , [ ("query", query_to_yojson query) ] )
 
   let log_request_received ~logger ~sender _request =
     [%log info] "Sending transition_chain_proof to $peer"
@@ -746,7 +743,8 @@ module Get_transition_chain_proof = struct
         Trust_system.(
           record_envelope_sender trust_system logger
             (Envelope.Incoming.sender request)
-            Actions.(Requested_unknown_item, receipt_trust_action_message hash))
+            Actions.
+              (Requested_unknown_item, Some (receipt_trust_action_message hash)))
       else return ()
     in
     result
@@ -836,7 +834,7 @@ module Get_ancestry = struct
   end
 
   let receipt_trust_action_message query =
-    Some ("Get_ancestry query: $query", [ ("query", query_to_yojson query) ])
+    ("Get_ancestry query: $query", [ ("query", query_to_yojson query) ])
 
   let log_request_received ~logger ~sender _request =
     [%log debug] "Sending root proof to $peer"
@@ -862,7 +860,8 @@ module Get_ancestry = struct
               (Envelope.Incoming.sender request)
               Actions.
                 ( Requested_unknown_item
-                , receipt_trust_action_message consensus_state_with_hash ))
+                , Some (receipt_trust_action_message consensus_state_with_hash)
+                ))
         in
         None
     | Some { proof = _, block; _ } ->
@@ -944,7 +943,7 @@ module Ban_notify = struct
     include Register (T')
   end
 
-  let receipt_trust_action_message _request = None
+  let receipt_trust_action_message _request = ("Ban_notify query", [])
 
   let log_request_received ~logger ~sender ban_until =
     [%log warn] "Node banned by peer $peer until $ban_until"
@@ -1035,7 +1034,7 @@ module Get_best_tip = struct
     include Register (T')
   end
 
-  let receipt_trust_action_message _request = Some ("Get_best_tip query", [])
+  let receipt_trust_action_message _request = ("Get_best_tip query", [])
 
   let log_request_received ~logger ~sender _request =
     [%log debug] "Sending best_tip to $peer"
@@ -1061,7 +1060,8 @@ module Get_best_tip = struct
           Trust_system.(
             record_envelope_sender trust_system logger
               (Envelope.Incoming.sender request)
-              Actions.(Requested_unknown_item, receipt_trust_action_message ()))
+              Actions.
+                (Requested_unknown_item, Some (receipt_trust_action_message ())))
         in
         None
     | Some { data = data_block; proof = _, proof_block } ->

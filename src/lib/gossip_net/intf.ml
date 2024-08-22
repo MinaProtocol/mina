@@ -46,9 +46,8 @@ module type RPC_IMPLEMENTATION = sig
 
   val log_request_received : logger:Logger.t -> sender:Peer.t -> query -> unit
 
-  (* TODO: make this non-optional *)
   val receipt_trust_action_message :
-    query -> (string * (string, Yojson.Safe.t) List.Assoc.t) option
+    query -> string * (string, Yojson.Safe.t) List.Assoc.t
 
   val handle_request : ctx -> (query, response) rpc_fn
 

@@ -174,15 +174,11 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                 in
                 let sender = Envelope.Incoming.sender request_env in
                 let%bind () =
-                  (* TODO: don't have optional rpc actions (only needed because Ban_notify doesn't log an action) *)
-                  match Impl.receipt_trust_action_message request with
-                  | None ->
-                      return ()
-                  | Some msg ->
-                      (* TODO: kill trust system *)
-                      Trust_system.(
-                        record_envelope_sender trust_system logger sender
-                          Actions.(Made_request, Some msg))
+                  let msg = Impl.receipt_trust_action_message request in
+                  (* TODO: kill trust system *)
+                  Trust_system.(
+                    record_envelope_sender trust_system logger sender
+                      Actions.(Made_request, Some msg))
                 in
                 let%map response =
                   (* TODO: kill this additional thread *)
