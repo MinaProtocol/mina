@@ -47,7 +47,7 @@ module Network_config = struct
   [@@deriving to_yojson]
 
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
-      ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
+      ~(images : Test_config.Container_images.t) ~constants 
       =
     let _ = cli_inputs in
     let ({ genesis_ledger
@@ -71,7 +71,7 @@ module Network_config = struct
          ; _
          }
           : Test_config.t ) =
-      test_config
+      (Test_config.default ~constants)
     in
     let git_commit = Mina_version.commit_id_short in
     let stack_name = "it-" ^ git_commit ^ "-" ^ test_name in
@@ -144,7 +144,7 @@ module Network_config = struct
     let genesis_ledger_accounts = add_accounts genesis_accounts_and_keys in
     let constraint_constants =
       Genesis_ledger_helper.make_constraint_constants
-        ~default:Genesis_constants_compiled.Constraint_constants.t proof_config
+        ~default:constants.constraint_constants proof_config
     in
     let ledger_is_prefix ledger1 ledger2 =
       List.is_prefix ledger2 ~prefix:ledger1
@@ -281,10 +281,10 @@ module Network_config = struct
     let genesis_constants =
       Or_error.ok_exn
         (Genesis_ledger_helper.make_genesis_constants ~logger
-           ~default:Genesis_constants_compiled.t runtime_config )
+           ~default:constants.genesis_constants runtime_config )
     in
     let constants : Test_config.constants =
-      { constraints = constraint_constants; genesis = genesis_constants }
+      { constraint_constants; genesis_constants }
     in
     let mk_net_keypair keypair_name (pk, sk) =
       let keypair =

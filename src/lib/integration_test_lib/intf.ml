@@ -28,6 +28,7 @@ module Engine = struct
       type t
 
       val term : t Cmdliner.Term.t
+
     end
 
     type t
@@ -37,8 +38,8 @@ module Engine = struct
       -> test_name:string
       -> cli_inputs:Cli_inputs.t
       -> debug:bool
-      -> test_config:Test_config.t
       -> images:Test_config.Container_images.t
+      -> constants:Test_config.constants
       -> t
   end
 
@@ -264,7 +265,7 @@ module Dsl = struct
       -> t
 
     val ledger_proofs_emitted_since_genesis :
-      constraint_constants:Genesis_constants.Constraint_constants.t -> test_config:Test_config.t -> num_proofs:int -> t
+      test_config:Test_config.t -> num_proofs:int -> t
 
     val zkapp_to_be_included_in_frontier :
       has_failures:bool -> zkapp_command:Mina_base.Zkapp_command.t -> t
@@ -340,7 +341,9 @@ module Test = struct
 
     type dsl
 
-    val config : Test_config.t
+    val config : 
+      constants:Test_config.constants ->
+      Test_config.t
 
     val run : network -> dsl -> unit Malleable_error.t
   end

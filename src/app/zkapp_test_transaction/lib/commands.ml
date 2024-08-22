@@ -3,9 +3,11 @@ open Async
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 
-let constraint_constants = Genesis_constants_compiled.Constraint_constants.t
+let genesis_constants = Genesis_constants.For_unit_tests.t
 
-let proof_level = Genesis_constants_compiled.Proof_level.Full
+let constraint_constants = Genesis_constants.For_unit_tests.Constraint_constants.t
+
+let proof_level = Genesis_constants.For_unit_tests.Proof_level.t
 
 let underToCamel s = String.lowercase s |> Mina_graphql.Reflection.underToCamel
 
@@ -81,7 +83,7 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
   in
   let consensus_constants =
     Consensus.Constants.create ~constraint_constants
-      ~protocol_constants:Genesis_constants_compiled.t.protocol
+      ~protocol_constants:genesis_constants.protocol
   in
   let state_body =
     let compile_time_genesis =
@@ -160,7 +162,7 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   in
   let consensus_constants =
     Consensus.Constants.create ~constraint_constants
-      ~protocol_constants:Genesis_constants_compiled.t.protocol
+      ~protocol_constants:genesis_constants.protocol
   in
   let open Staged_ledger_diff in
   let compile_time_genesis =

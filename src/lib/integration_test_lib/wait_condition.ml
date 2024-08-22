@@ -255,7 +255,7 @@ struct
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
 
-  let ledger_proofs_emitted_since_genesis ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~test_config ~num_proofs =
+  let ledger_proofs_emitted_since_genesis ~test_config ~num_proofs =
     let open Network_state in
     let check () (state : Network_state.t) =
       if state.snarked_ledgers_generated >= num_proofs then Predicate_passed
@@ -266,7 +266,7 @@ struct
     in
     let slots_for_first_proof =
       Test_config.(
-        slots_for_blocks @@ blocks_for_first_ledger_proof ~constraint_constants test_config)
+        slots_for_blocks @@ blocks_for_first_ledger_proof test_config)
     in
     let slots_for_additional_proofs =
       Test_config.slots_for_blocks (num_proofs - 1)
