@@ -12,6 +12,14 @@ ifeq ($(DUNE_PROFILE),)
 DUNE_PROFILE := dev
 endif
 
+ifeq ($(OPAMSWITCH)$(IN_NIX_SHELL),)
+# Sometimes opam replaces these env variables in shell with
+# an explicit mention of a particular switch (dereferenced from the value)
+OPAM_SWITCH_PREFIX := $(PWD)/_opam
+OCAML_TOPLEVEL_PATH := $(OPAM_SWITCH_PREFIX)/lib/toplevel
+PATH := $(OPAM_SWITCH_PREFIX)/bin:$(PATH)
+endif
+
 # Temp directory
 TMPDIR ?= /tmp
 
@@ -43,18 +51,21 @@ clean:
 	@rm -rf src/$(COVERAGE_DIR)
 	@rm -rf src/app/libp2p_helper/result src/libp2p_ipc/libp2p_ipc.capnp.go
 
+switch:
+	./scripts/update-opam-switch.sh
+
 # enforces the OCaml version being used
-ocaml_version:
+ocaml_version: switch
 	@if ! ocamlopt -config | grep "version:" | grep $(OCAML_VERSION); then echo "incorrect OCaml version, expected version $(OCAML_VERSION)" ; exit 1; fi
 
 # enforce machine word size
-ocaml_word_size:
+ocaml_word_size: switch
 	@if ! ocamlopt -config | grep "word_size:" | grep $(WORD_SIZE); then echo "invalid machine word size, expected $(WORD_SIZE)" ; exit 1; fi
 
 
 # Checks that the current opam switch contains the packages from opam.export at the same version.
 # This check is disabled in the pure nix environment (that does not use opam).
-check_opam_switch:
+check_opam_switch: switch
 ifneq ($(DISABLE_CHECK_OPAM_SWITCH), true)
     ifeq (, $(shell which check_opam_switch))
 	$(warning The check_opam_switch binary was not found in the PATH.)
@@ -64,7 +75,7 @@ ifneq ($(DISABLE_CHECK_OPAM_SWITCH), true)
     endif
 endif
 
-ocaml_checks: ocaml_version ocaml_word_size check_opam_switch
+ocaml_checks: switch ocaml_version ocaml_word_size check_opam_switch
 
 libp2p_helper:
 ifeq (, $(MINA_LIBP2P_HELPER_PATH))
@@ -325,4 +336,4 @@ ml-docs: ocaml_checks
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
 
-.PHONY: all build check-format clean deb dev mina-docker reformat doc_diagrams ml-docs macos-setup macos-setup-download setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor extract_blocks archive_blocks genesis_ledger_from_tsv ocaml_version ocaml_word_size ocaml_checks
+.PHONY: all build check-format clean deb dev mina-docker reformat doc_diagrams ml-docs macos-setup macos-setup-download setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor extract_blocks archive_blocks genesis_ledger_from_tsv ocaml_version ocaml_word_size ocaml_checks switch
