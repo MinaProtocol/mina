@@ -41,12 +41,16 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-version) DEB_VERSION="--build-arg deb_version=$2"; shift;;
   --deb-profile) DEB_PROFILE="$2"; shift;;
   --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
+  --help) usage; exit 0;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
+export_version
 export_base_image
-export_suffixes
 export_docker_tag
+
+echo tag ${TAG}
+echo hash ${HASHTAG}
 
 # push to GCR
 docker push "${TAG}"

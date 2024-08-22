@@ -16,6 +16,14 @@ function export_base_image () {
     export IMAGE="--build-arg image=${IMAGE}"
 }
 
+function export_version () {
+    export VERSION="${VERSION}-${DEB_CODENAME##*=}"
+    case "${SERVICE}" in
+        mina-daemon|mina-batch-txn) export VERSION="${VERSION}-${NETWORK##*=}" ;;
+        *)  ;;
+esac
+}
+
 function export_suffixes () {
     # Determine suffix for mina name. Suffix is combined from profile and service name 
     # Possible outcomes:

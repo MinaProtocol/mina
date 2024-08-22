@@ -124,7 +124,6 @@ case "${SERVICE}" in
     mina-daemon)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
         DOCKER_CONTEXT="dockerfiles/"
-        VERSION="${VERSION}-${NETWORK##*=}"
         ;;
     mina-toolchain)
         DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
@@ -132,7 +131,6 @@ case "${SERVICE}" in
     mina-batch-txn)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-txn-burst"
         DOCKER_CONTEXT="dockerfiles/"
-        VERSION="${VERSION}-${NETWORK##*=}"
         ;;
     mina-rosetta)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
@@ -162,8 +160,8 @@ case "${SERVICE}" in
         ;;
 esac
 
+export_version
 export_base_image
-export_suffixes
 export_docker_tag
 
 BUILD_NETWORK="--network=host"

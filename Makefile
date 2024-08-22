@@ -74,9 +74,7 @@ endif
 ocaml_checks: switch ocaml_version ocaml_word_size check_opam_switch
 
 libp2p_helper:
-ifeq (, $(MINA_LIBP2P_HELPER_PATH))
 	make -C src/app/libp2p_helper
-endif
 
 genesis_ledger: ocaml_checks
 	$(info Building runtime_genesis_ledger)
@@ -89,12 +87,12 @@ check: ocaml_checks libp2p_helper
 
 build: ocaml_checks reformat-diff libp2p_helper
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe --profile=$(DUNE_PROFILE)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe src/app/generate_keypair/generate_keypair.exe src/app/validate_keypair/validate_keypair.exe src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
-build_all_sigs: ocaml_checks reformat-diff libp2p_helper
+build_all_sigs: ocaml_checks reformat-diff libp2p_helper build
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe src/app/cli/src/mina_testnet_signatures.exe src/app/cli/src/mina_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/cli/src/mina_testnet_signatures.exe src/app/cli/src/mina_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 build_archive: ocaml_checks reformat-diff
