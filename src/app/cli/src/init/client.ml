@@ -513,12 +513,13 @@ let send_payment_graphql =
     flag "--amount" ~aliases:[ "amount" ]
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
-  let genesis_constants = Genesis_constants_compiled.compiled_config.genesis_constants in
+  let genesis_constants =
+    Genesis_constants_compiled.compiled_config.genesis_constants
+  in
   let args =
     Args.zip3
       (Cli_lib.Flag.signed_command_common
-         ~minimum_user_command_fee:
-           genesis_constants.minimum_user_command_fee
+         ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
          ~default_transaction_fee:
            (Currency.Fee.of_mina_string_exn
               Mina_compile_config.default_transaction_fee_string ) )
@@ -550,12 +551,13 @@ let delegate_stake_graphql =
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
-  let genesis_constants = Genesis_constants_compiled.compiled_config.genesis_constants in
+  let genesis_constants =
+    Genesis_constants_compiled.compiled_config.genesis_constants
+  in
   let args =
     Args.zip2
       (Cli_lib.Flag.signed_command_common
-         ~minimum_user_command_fee:
-            genesis_constants.minimum_user_command_fee
+         ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
          ~default_transaction_fee:
            (Currency.Fee.of_mina_string_exn
               Mina_compile_config.default_transaction_fee_string ) )
@@ -824,7 +826,9 @@ let hash_ledger =
            (required string))
      and plaintext = Cli_lib.Flag.plaintext in
      fun () ->
-       let constraint_constants = Genesis_constants_compiled.compiled_config.constraint_constants in
+       let constraint_constants =
+         Genesis_constants_compiled.compiled_config.constraint_constants
+       in
        let process_accounts accounts =
          let packed_ledger =
            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
@@ -926,8 +930,12 @@ let currency_in_ledger =
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
     (Command.Param.return (fun () ->
-         let constraint_constants = Genesis_constants_compiled.compiled_config.constraint_constants in
-         let proof_level = Genesis_constants_compiled.compiled_config.proof_level in
+         let constraint_constants =
+           Genesis_constants_compiled.compiled_config.constraint_constants
+         in
+         let proof_level =
+           Genesis_constants_compiled.compiled_config.proof_level
+         in
          (* TODO: Allow these to be configurable. *)
          let all =
            Transaction_snark.constraint_system_digests ~constraint_constants ()
@@ -1792,8 +1800,12 @@ let add_peers_graphql =
                   } ) ) ) )
 
 let compile_time_constants =
-  let genesis_constants = Genesis_constants_compiled.compiled_config.genesis_constants in
-  let constraint_constants = Genesis_constants_compiled.compiled_config.constraint_constants in
+  let genesis_constants =
+    Genesis_constants_compiled.compiled_config.genesis_constants
+  in
+  let constraint_constants =
+    Genesis_constants_compiled.compiled_config.constraint_constants
+  in
   let proof_level = Genesis_constants_compiled.compiled_config.proof_level in
   Command.async
     ~summary:"Print a JSON map of the compile-time consensus parameters"
@@ -1819,8 +1831,8 @@ let compile_time_constants =
                    (`Assoc [ ("ledger", `Assoc [ ("accounts", `List []) ]) ])
            >>| Runtime_config.of_yojson >>| Result.ok
            >>| Option.value ~default:Runtime_config.default
-           >>= Genesis_ledger_helper.init_from_config_file ~genesis_constants ~constraint_constants
-                 ~logger:(Logger.null ()) ~proof_level
+           >>= Genesis_ledger_helper.init_from_config_file ~genesis_constants
+                 ~constraint_constants ~logger:(Logger.null ()) ~proof_level
                  ~genesis_dir
            >>| Or_error.ok_exn
          in
@@ -2292,9 +2304,14 @@ let itn_create_accounts =
         (required int)
     in
     let args = Args.zip5 privkey_path key_prefix num_accounts fee amount in
-    let genesis_constants = Genesis_constants_compiled.compiled_config.genesis_constants in
-    let constraint_constants = Genesis_constants_compiled.compiled_config.constraint_constants in
-    Cli_lib.Background_daemon.rpc_init args ~f:(Itn.create_accounts ~genesis_constants ~constraint_constants))
+    let genesis_constants =
+      Genesis_constants_compiled.compiled_config.genesis_constants
+    in
+    let constraint_constants =
+      Genesis_constants_compiled.compiled_config.constraint_constants
+    in
+    Cli_lib.Background_daemon.rpc_init args
+      ~f:(Itn.create_accounts ~genesis_constants ~constraint_constants))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
@@ -2416,7 +2433,7 @@ let advanced =
     ; ("set-coinbase-receiver", set_coinbase_receiver_graphql)
     ; ("chain-id-inputs", chain_id_inputs)
     ; ("runtime-config", runtime_config)
-    ; ( "vrf", Cli_lib.Commands.Vrf.command_group)
+    ; ("vrf", Cli_lib.Commands.Vrf.command_group)
     ; ("thread-graph", thread_graph)
     ; ("print-signature-kind", signature_kind)
     ]

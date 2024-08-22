@@ -400,8 +400,7 @@ let output_there_and_back_cmds ~(genesis_constants : Genesis_constants.t) =
            Mina_compile_config.default_transaction_fee_string
        in
        Cli_lib.Flag.fee_common
-         ~minimum_user_command_fee:
-           genesis_constants.minimum_user_command_fee
+         ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
          ~default_transaction_fee:default
      in
      there_and_back_again ~num_txn_per_acct ~txns_per_block ~txn_fee_option
@@ -411,11 +410,14 @@ let output_there_and_back_cmds ~(genesis_constants : Genesis_constants.t) =
        ~graphql_target_node_option ~minimum_user_command_fee )
 
 let () =
-  let genesis_constants = Genesis_constants_compiled.compiled_config.genesis_constants in
+  let genesis_constants =
+    Genesis_constants_compiled.compiled_config.genesis_constants
+  in
   Command.run
     (Command.group
        ~summary:"Generate public keys for sending batches of transactions"
        [ ("gen-keys", output_keys)
        ; ("gen-txns", output_cmds)
-       ; ("gen-there-and-back-txns", output_there_and_back_cmds ~genesis_constants)
+       ; ( "gen-there-and-back-txns"
+         , output_there_and_back_cmds ~genesis_constants )
        ] )

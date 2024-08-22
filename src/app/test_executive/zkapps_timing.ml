@@ -46,8 +46,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Network.block_producers network |> Core.String.Map.data
     in
     let node = List.hd_exn block_producer_nodes in
-    let constraint_constants = Network.constraint_constants network
-    in
+    let constraint_constants = Network.constraint_constants network in
     let block_window_duration_ms =
       constraint_constants.block_window_duration_ms
     in

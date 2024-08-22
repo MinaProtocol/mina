@@ -123,10 +123,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let constants : Test_config.constants = 
-       { genesis_constants = Network.genesis_constants network
-       ; constraint_constants = Network.constraint_constants network
-       }
+    let constants : Test_config.constants =
+      { genesis_constants = Network.genesis_constants network
+      ; constraint_constants = Network.constraint_constants network
+      }
     in
     let block_producer_nodes =
       Network.block_producers network |> Core.String.Map.data

@@ -54,7 +54,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let padding_payments ~constants () =
     let needed_for_padding =
-      Test_config.transactions_needed_for_ledger_proofs (config ~constants) ~num_proofs
+      Test_config.transactions_needed_for_ledger_proofs (config ~constants)
+        ~num_proofs
     in
     if !transactions_sent >= needed_for_padding then 0
     else needed_for_padding - !transactions_sent
@@ -88,10 +89,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let run network t =
     let open Malleable_error.Let_syntax in
-    let constants : Test_config.constants = {
-          genesis_constants = Network.genesis_constants network
-        ; constraint_constants = Network.constraint_constants network
-       }
+    let constants : Test_config.constants =
+      { genesis_constants = Network.genesis_constants network
+      ; constraint_constants = Network.constraint_constants network
+      }
     in
     let logger = Logger.create () in
     let block_producer_nodes =

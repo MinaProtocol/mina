@@ -153,7 +153,7 @@ module type S0 = sig
   end
 
   val command_from_rpcs :
-    (module Rpcs_versioned_S with type Work.ledger_proof = ledger_proof)
+       (module Rpcs_versioned_S with type Work.ledger_proof = ledger_proof)
     -> Command.t
 
   val arguments :

@@ -8,7 +8,8 @@ module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 module Statement = Transaction_snark.Statement
 
 (* TODO: Should be For_unit_tests *)
-let constraint_constants = Genesis_constants.For_unit_tests.Constraint_constants.t
+let constraint_constants =
+  Genesis_constants.For_unit_tests.Constraint_constants.t
 
 (* TODO: Should be For_unit_tests *)
 let genesis_constants = Genesis_constants.For_unit_tests.t

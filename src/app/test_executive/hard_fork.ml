@@ -481,9 +481,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~amount:Currency.Amount.one ~fee ~node:sender 10
          in
          let constants : Test_config.constants =
-          { genesis_constants = Network.genesis_constants network
-          ; constraint_constants = Network.constraint_constants network
-          }
+           { genesis_constants = Network.genesis_constants network
+           ; constraint_constants = Network.constraint_constants network
+           }
          in
          wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis

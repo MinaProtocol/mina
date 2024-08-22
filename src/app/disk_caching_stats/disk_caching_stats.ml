@@ -3,7 +3,7 @@ open Core
 (* number of operations to do when performing benchmarks *)
 let bench_count = 10_000
 
-type config = 
+type config =
   { constraint_constants : Genesis_constants.Constraint_constants.t
   ; genesis_constants : Genesis_constants.t
   }
@@ -262,7 +262,8 @@ module Values (S : Sample) = struct
   let ledger_mask ?(n = Params.max_accounts_modified_per_block) ~config () :
       Mina_ledger.Ledger.t =
     let ledger =
-      Mina_ledger.Ledger.create_ephemeral ~depth:config.constraint_constants.ledger_depth ()
+      Mina_ledger.Ledger.create_ephemeral
+        ~depth:config.constraint_constants.ledger_depth ()
     in
     List.init n ~f:Fn.id
     |> List.iter ~f:(fun i ->
@@ -616,7 +617,7 @@ let serial_bench (type a) ~(name : string)
   ; hash = Timer.average hash_timer
   }
 
-let compute_ram_usage  ~config (sizes : size_params) =
+let compute_ram_usage ~config (sizes : size_params) =
   let format_gb size = Int.to_float size /. (1024.0 **. 3.0) in
   (*
   let format_kb size = (Int.to_float size /. 1024.0) in
@@ -699,7 +700,8 @@ let compute_ram_usage  ~config (sizes : size_params) =
     in
     (* the size of delta references added by each full block in the frontier after the root *)
     let delta_referenced_size = referenced_size_per_squashed_tree in
-    root_referenced_size + ((Const.est_scan_states ~config - 1) * delta_referenced_size)
+    root_referenced_size
+    + ((Const.est_scan_states ~config - 1) * delta_referenced_size)
   in
   (* TODO: measure the actuall network pool memory footprint instead of estimating *)
   let transaction_pool = Params.max_txn_pool_size * sizes.zkapp_command in
@@ -722,19 +724,22 @@ let compute_ram_usage  ~config (sizes : size_params) =
 let () =
   Async.Thread_safe.block_on_async_exn
   @@ fun () ->
-  let genesis_constants = Genesis_constants_compiled.compiled_config.genesis_constants in
-  let constraint_constants = Genesis_constants_compiled.compiled_config.constraint_constants in
+  let genesis_constants =
+    Genesis_constants_compiled.compiled_config.genesis_constants
+  in
+  let constraint_constants =
+    Genesis_constants_compiled.compiled_config.constraint_constants
+  in
   let config = { constraint_constants; genesis_constants } in
   let%bind.Async_kernel.Deferred _, generated_zkapps =
     let num_updates = 1 in
-    Snark_profiler_lib.create_ledger_and_zkapps ~genesis_constants ~constraint_constants ~min_num_updates:num_updates
+    Snark_profiler_lib.create_ledger_and_zkapps ~genesis_constants
+      ~constraint_constants ~min_num_updates:num_updates
       ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
   in
   let%map.Async_kernel.Deferred vk =
     let `VK vk, `Prover _ =
-      Transaction_snark.For_tests.create_trivial_snapp
-        ~constraint_constants
-        ()
+      Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
     in
     vk
   in

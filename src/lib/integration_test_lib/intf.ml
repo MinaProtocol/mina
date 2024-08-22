@@ -28,7 +28,6 @@ module Engine = struct
       type t
 
       val term : t Cmdliner.Term.t
-
     end
 
     type t
@@ -341,9 +340,7 @@ module Test = struct
 
     type dsl
 
-    val config : 
-      constants:Test_config.constants ->
-      Test_config.t
+    val config : constants:Test_config.constants -> Test_config.t
 
     val run : network -> dsl -> unit Malleable_error.t
   end

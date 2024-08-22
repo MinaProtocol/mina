@@ -728,7 +728,7 @@ module Genesis_proof = struct
   let id_to_json x =
     `String (Sexp.to_string (Pickles.Verification_key.Id.sexp_of_t x))
 
-(*
+  (*
   let load_or_generate ~genesis_dir ~logger (inputs : Genesis_proof.Inputs.t) =
     let b, id =
       match (inputs.blockchain_proof_system_id, inputs.proof_level) with
@@ -906,8 +906,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     match config.proof with
     | None ->
         [%log info] "Using the compiled constraint constants" ;
-        ( constraint_constants
-        , Some (Pickles.Verification_key.Id.dummy ()) )
+        (constraint_constants, Some (Pickles.Verification_key.Id.dummy ()))
     | Some config ->
         [%log info] "Using the constraint constants from the configuration file" ;
         let blockchain_proof_system_id =
@@ -920,8 +919,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
           *)
           None
         in
-        ( make_constraint_constants
-            ~default:constraint_constants config
+        ( make_constraint_constants ~default:constraint_constants config
         , blockchain_proof_system_id )
   in
   let%bind genesis_ledger, ledger_config, ledger_file =
@@ -957,13 +955,13 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   (proof_inputs, config)
 
-let init_from_config_file ?genesis_dir ~genesis_constants ~constraint_constants ~logger ~proof_level ?overwrite_version
-    (config : Runtime_config.t) :
+let init_from_config_file ?genesis_dir ~genesis_constants ~constraint_constants
+    ~logger ~proof_level ?overwrite_version (config : Runtime_config.t) :
     (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
   let open Deferred.Or_error.Let_syntax in
   let%map inputs, config =
-    inputs_from_config_file ?genesis_dir ~genesis_constants ~constraint_constants ~logger ~proof_level ?overwrite_version
-      config
+    inputs_from_config_file ?genesis_dir ~genesis_constants
+      ~constraint_constants ~logger ~proof_level ?overwrite_version config
   in
   let values = Genesis_proof.create_values_no_proof inputs in
   (values, config)

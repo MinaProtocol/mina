@@ -23,7 +23,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let sender_account_prefix = "sender-account-"
 
-  let config  ~constants =
+  let config ~constants =
     let open Test_config in
     { (default ~constants) with
       requires_graphql = true

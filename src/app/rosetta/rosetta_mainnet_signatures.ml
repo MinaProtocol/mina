@@ -9,6 +9,4 @@ let () =
           ~account_creation_fee:
             genesis_config.constraint_constants.account_creation_fee
           ~minimum_user_command_fee:
-            genesis_config.genesis_constants.minimum_user_command_fee 
-        ) 
-    )
+            genesis_config.genesis_constants.minimum_user_command_fee ) )

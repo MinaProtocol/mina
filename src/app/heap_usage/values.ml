@@ -37,14 +37,17 @@ let zkapp_command ~genesis_constants ~constraint_constants =
   lazy
     (let num_updates = 16 in
      let%map.Async.Deferred _ledger, zkapp_commands =
-       Snark_profiler_lib.create_ledger_and_zkapps ~genesis_constants ~constraint_constants ~min_num_updates:num_updates
+       Snark_profiler_lib.create_ledger_and_zkapps ~genesis_constants
+         ~constraint_constants ~min_num_updates:num_updates
          ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
      in
      List.hd_exn zkapp_commands )
 
 let zkapp_proof ~genesis_constants ~constraint_constants =
   lazy
-    (let%map.Async.Deferred zkapp_command = Lazy.force (zkapp_command  ~genesis_constants ~constraint_constants) in
+    (let%map.Async.Deferred zkapp_command =
+       Lazy.force (zkapp_command ~genesis_constants ~constraint_constants)
+     in
      List.fold_until
        (Mina_base.Zkapp_command.all_account_updates_list zkapp_command)
        ~init:None
@@ -66,9 +69,7 @@ let dummy_vk = Mina_base.Side_loaded_verification_key.dummy
 let verification_key ~constraint_constants =
   lazy
     (let `VK vk, `Prover _ =
-       Transaction_snark.For_tests.create_trivial_snapp
-         ~constraint_constants
-         ()
+       Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
      in
      let%map.Async.Deferred vk = vk in
      With_hash.data vk )
@@ -76,7 +77,7 @@ let verification_key ~constraint_constants =
 let applied = Mina_base.Transaction_status.Applied
 
 let mk_scan_state_base_node
-    (varying : Mina_transaction_logic.Transaction_applied.Varying.t) 
+    (varying : Mina_transaction_logic.Transaction_applied.Varying.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) :
     Transaction_snark_scan_state.Transaction_with_witness.t Parallel_scan.Base.t
     =
@@ -92,8 +93,7 @@ let mk_scan_state_base_node
       Transaction_snark.Pending_coinbase_stack_state.Init_stack.Merge
     in
     let ledger_witness =
-      let depth = constraint_constants.ledger_depth
-      in
+      let depth = constraint_constants.ledger_depth in
       let account_access_statuses =
         match varying with
         | Command (Signed_command signed_cmd) ->
@@ -209,7 +209,9 @@ let scan_state_base_node_payment =
 
 let scan_state_base_node_zkapp ~genesis_constants ~constraint_constants =
   lazy
-    (let%map.Async.Deferred zkapp_command = Lazy.force (zkapp_command ~genesis_constants ~constraint_constants) in
+    (let%map.Async.Deferred zkapp_command =
+       Lazy.force (zkapp_command ~genesis_constants ~constraint_constants)
+     in
      let varying : Mina_transaction_logic.Transaction_applied.Varying.t =
        let zkapp_command_applied :
            Mina_transaction_logic.Transaction_applied.Zkapp_command_applied.t =
@@ -237,7 +239,7 @@ let scan_state_base_node_zkapp ~genesis_constants ~constraint_constants =
        in
        Command (Zkapp_command zkapp_command_applied)
      in
-     mk_scan_state_base_node varying ~constraint_constants)
+     mk_scan_state_base_node varying ~constraint_constants )
 
 let scan_state_merge_node :
     Transaction_snark_scan_state.Ledger_proof_with_sok_message.t
@@ -467,10 +469,10 @@ let protocol_state =
   in
   Mina_state.Protocol_state.value_of_yojson json |> Result.ok_or_failwith
 
-let pending_coinbase ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
+let pending_coinbase
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
   (* size is fixed, given a particular depth *)
-  let depth = constraint_constants.pending_coinbase_depth
-  in
+  let depth = constraint_constants.pending_coinbase_depth in
   Mina_base.Pending_coinbase.create ~depth () |> Or_error.ok_exn
 
 let staged_ledger_diff =
@@ -697,11 +699,10 @@ let staged_ledger_diff =
   in
   Staged_ledger_diff.of_yojson json |> Result.ok_or_failwith
 
-let merkle_path ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
+let merkle_path
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
   (* size is constant for a given length, assuming each hash is distinct *)
-  let ledger_depth =
-    constraint_constants.ledger_depth
-  in
+  let ledger_depth = constraint_constants.ledger_depth in
   let hashes =
     Quickcheck.random_value
     @@ Quickcheck.Generator.list_with_length ledger_depth

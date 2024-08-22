@@ -268,9 +268,11 @@ let main inputs =
    *)
   let logger = Logger.create () in
   let constants : Test_config.constants =
-      { genesis_constants = Genesis_constants_compiled.compiled_config.genesis_constants
-      ; constraint_constants = Genesis_constants_compiled.compiled_config.constraint_constants
-      }
+    { genesis_constants =
+        Genesis_constants_compiled.compiled_config.genesis_constants
+    ; constraint_constants =
+        Genesis_constants_compiled.compiled_config.constraint_constants
+    }
   in
   let images =
     { Test_config.Container_images.mina = inputs.mina_image

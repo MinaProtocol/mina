@@ -4729,8 +4729,8 @@ let run pool reader ~genesis_constants ~constraint_constants ~logger
 
 (* [add_genesis_accounts] is called when starting the archive process *)
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
-    ~(genesis_constants : Genesis_constants.t) ~(constraint_constants: Genesis_constants.Constraint_constants.t)
-    pool =
+    ~(genesis_constants : Genesis_constants.t)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) pool =
   match runtime_config_opt with
   | None ->
       Deferred.unit
@@ -4869,9 +4869,10 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
       go ()
 
 (* for running the archive process *)
-let setup_server ~(genesis_constants : Genesis_constants.t) ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~metrics_server_port
-    ~logger ~postgres_address ~server_port ~delete_older_than
-    ~runtime_config_opt ~missing_blocks_width =
+let setup_server ~(genesis_constants : Genesis_constants.t)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~metrics_server_port ~logger ~postgres_address ~server_port
+    ~delete_older_than ~runtime_config_opt ~missing_blocks_width =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -4901,18 +4902,16 @@ let setup_server ~(genesis_constants : Genesis_constants.t) ~(constraint_constan
       Deferred.unit
   | Ok pool ->
       let%bind () =
-        add_genesis_accounts pool ~logger ~genesis_constants ~constraint_constants ~runtime_config_opt
+        add_genesis_accounts pool ~logger ~genesis_constants
+          ~constraint_constants ~runtime_config_opt
       in
-      run ~constraint_constants
-          ~genesis_constants
-          pool reader ~logger
+      run ~constraint_constants ~genesis_constants pool reader ~logger
         ~delete_older_than
       |> don't_wait_for ;
       Strict_pipe.Reader.iter precomputed_block_reader
         ~f:(fun precomputed_block ->
           match%map
-            add_block_aux_precomputed ~logger ~pool 
-              ~genesis_constants
+            add_block_aux_precomputed ~logger ~pool ~genesis_constants
               ~constraint_constants ~delete_older_than precomputed_block
           with
           | Error e ->

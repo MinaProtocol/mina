@@ -5,7 +5,8 @@ module Ledger = Mina_ledger.Ledger
 
 let genesis_constants = Genesis_constants.For_unit_tests.t
 
-let constraint_constants = Genesis_constants.For_unit_tests.Constraint_constants.t
+let constraint_constants =
+  Genesis_constants.For_unit_tests.Constraint_constants.t
 
 let proof_level = Genesis_constants.For_unit_tests.Proof_level.t
 

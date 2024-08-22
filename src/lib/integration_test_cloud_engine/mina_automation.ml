@@ -109,9 +109,7 @@ module Network_config = struct
     assoc
 
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
-      ~(images : Test_config.Container_images.t)
-      ~constants
-      =
+      ~(images : Test_config.Container_images.t) ~constants =
     let ({ requires_graphql
          ; genesis_ledger
          ; epoch_data
@@ -134,7 +132,7 @@ module Network_config = struct
          ; _
          }
           : Test_config.t ) =
-      (Test_config.default ~constants)
+      Test_config.default ~constants
     in
     let user_from_env = Option.value (Unix.getenv "USER") ~default:"auto" in
     let user_sanitized =

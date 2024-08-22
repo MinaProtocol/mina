@@ -49,7 +49,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let epoch_ledger = next_accounts in
       { epoch_ledger; epoch_seed }
     in
-    { (default ~constants)  with
+    { (default ~constants) with
       requires_graphql = true
     ; epoch_data = Some { staking; next = Some next }
     ; genesis_ledger = next_accounts

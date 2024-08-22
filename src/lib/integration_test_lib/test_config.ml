@@ -112,7 +112,7 @@ let log_filter_of_event_type ev_existential =
 (* TODO: Do we need this? *)
 
 let default ~(constants : constants) =
-let {constraint_constants; genesis_constants} = constants in
+  let { constraint_constants; genesis_constants } = constants in
   { requires_graphql =
       true
       (* require_graphql maybe should just be phased out, because it always needs to be enable.  Now with the graphql polling engine, everything will definitely fail if graphql is not enabled.  But even before that, most tests relied on some sort of graphql interaction *)
@@ -141,14 +141,14 @@ let {constraint_constants; genesis_constants} = constants in
 
 let transaction_capacity_log_2 (config : t) =
   match config.proof_config.transaction_capacity with
-  | None -> config.transaction_capacity_log_2
+  | None ->
+      config.transaction_capacity_log_2
   | Some (Log_2 i) ->
       i
   | Some (Txns_per_second_x10 tps_goal_x10) ->
       let max_coinbases = 2 in
       let block_window_duration_ms =
-        Option.value
-          ~default:config.block_window_duration_ms
+        Option.value ~default:config.block_window_duration_ms
           config.proof_config.block_window_duration_ms
       in
       let max_user_commands_per_block =
@@ -172,8 +172,7 @@ let transaction_capacity config =
 
 let blocks_for_first_ledger_proof (config : t) =
   let work_delay =
-    Option.value
-      ~default:config.block_window_duration_ms
+    Option.value ~default:config.block_window_duration_ms
       config.proof_config.work_delay
   in
   let transaction_capacity_log_2 = transaction_capacity_log_2 config in

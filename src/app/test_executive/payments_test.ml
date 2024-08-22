@@ -378,10 +378,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                Malleable_error.soft_error_format ~value:()
                  "Payment failed for unexpected reason: %s" err_str ) )
     in
-    let constants: Test_config.constants = 
-          { genesis_constants = Network.genesis_constants network
-          ; constraint_constants = Network.constraint_constants network
-          }
+    let constants : Test_config.constants =
+      { genesis_constants = Network.genesis_constants network
+      ; constraint_constants = Network.constraint_constants network
+      }
     in
     let config = config ~constants in
     let%bind () =
