@@ -31,7 +31,7 @@
    mina_metrics.none
    logger.fake
  )
- (forbidden_libraries node_config)
+ (forbidden_libraries mina_node_config)
  (preprocess
   (pps ppx_version ppx_bin_prot ppxlib.metaquot))
  (instrumentation (backend bisect_ppx))
