@@ -6471,6 +6471,62 @@
           "possibleTypes": null
         },
         {
+          "kind": "INPUT_OBJECT",
+          "name": "AccountInput",
+          "description": "An account with a public key and a token id",
+          "fields": [
+            {
+              "name": "token",
+              "description": "Token id of the account",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "TokenId", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "publicKey",
+              "description": "Public key of the account",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PublicKey",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "token",
+              "description": "Token id of the account",
+              "type": { "kind": "SCALAR", "name": "TokenId", "ofType": null },
+              "defaultValue": null
+            },
+            {
+              "name": "publicKey",
+              "description": "Public key of the account",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PublicKey",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "MembershipInfo",
           "description": null,
@@ -15195,25 +15251,23 @@
                   "defaultValue": null
                 },
                 {
-                  "name": "token",
+                  "name": "accountInfos",
                   "description": "Token id of the account to check",
-                  "type": {
-                    "kind": "SCALAR",
-                    "name": "TokenId",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                },
-                {
-                  "name": "publicKey",
-                  "description": "Public key of account to check",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,
                     "ofType": {
-                      "kind": "SCALAR",
-                      "name": "PublicKey",
-                      "ofType": null
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "INPUT_OBJECT",
+                          "name": "AccountInput",
+                          "ofType": null
+                        }
+                      }
                     }
                   },
                   "defaultValue": null
@@ -15223,9 +15277,17 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "OBJECT",
-                  "name": "MembershipInfo",
-                  "ofType": null
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "MembershipInfo",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,

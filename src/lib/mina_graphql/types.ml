@@ -779,7 +779,8 @@ module SnarkedLedgerMembership = struct
     obj "MembershipInfo" ~fields:(fun _ ->
         [ field "accountBalance"
             ~args:Arg.[]
-            ~doc:"Account balance for a pk and token pair" ~typ:(non_null balance)
+            ~doc:"Account balance for a pk and token pair"
+            ~typ:(non_null balance)
             ~resolve:(fun _ { account_balance; _ } -> account_balance)
         ; field "timingInfo related to the account"
             ~args:Arg.[]
@@ -2443,6 +2444,21 @@ module Input = struct
               Error "Expected snarked ledger hash in Base58Check format" )
         ~to_json:(function
           | (h : input) -> `String (Frozen_ledger_hash.to_base58_check h) )
+  end
+
+  module AccountInfo = struct
+    let arg_typ :
+        ( (PublicKey.input * TokenId.input option) option
+        , (PublicKey.input * TokenId.input option) option )
+        arg_typ =
+      obj "AccountInput" ~doc:"An account with a public key and a token id"
+        ~coerce:(fun public_key token -> (public_key, token))
+        ~fields:
+          [ arg "publicKey" ~doc:"Public key of the account"
+              ~typ:(non_null PublicKey.arg_typ)
+          ; arg "token" ~doc:"Token id of the account" ~typ:TokenId.arg_typ
+          ]
+        ~split:(fun f (pk, token) -> f pk token)
   end
 
   module BlockTime = struct
