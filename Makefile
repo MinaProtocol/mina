@@ -67,12 +67,8 @@ ocaml_word_size: switch
 # This check is disabled in the pure nix environment (that does not use opam).
 check_opam_switch: switch
 ifneq ($(DISABLE_CHECK_OPAM_SWITCH), true)
-    ifeq (, $(shell which check_opam_switch))
-	$(warning The check_opam_switch binary was not found in the PATH.)
-	$(error The current opam switch should likely be updated by running: "opam switch import opam.export")
-    else
-	check_opam_switch opam.export
-    endif
+	@which check_opam_switch 2>/dev/null >/dev/null || ( echo "The check_opam_switch binary was not found in the PATH, try: opam switch import opam.export" >&2 && exit 1 )
+	@check_opam_switch opam.export
 endif
 
 ocaml_checks: switch ocaml_version ocaml_word_size check_opam_switch
