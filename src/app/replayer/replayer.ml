@@ -199,7 +199,7 @@ let update_epoch_ledger ~logger ~name ~ledger ~epoch_ledger epoch_ledger_hash =
     let epoch_ledger = Ledger.create ~depth:(Ledger.depth ledger) () in
     List.iter accounts ~f:(fun account ->
         let pk = Account.public_key account in
-        let token = Account.token account in
+        let token = Account.token_id account in
         let account_id = Account_id.create pk token in
         match Ledger.get_or_create_account epoch_ledger account_id account with
         | Ok (`Added, _loc) ->

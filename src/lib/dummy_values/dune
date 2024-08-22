@@ -9,8 +9,15 @@
    crypto_params
    snarky.backendless
    pickles
-)
+ )
  (ppx_runtime_libraries base)
  (preprocess
   (pps ppx_version ppx_jane ppxlib.metaquot))
  (instrumentation (backend bisect_ppx)))
+
+(rule
+ (targets dummy_values.ml)
+ (deps
+  (:< gen_values/gen_values.exe))
+ (action
+  (run %{<} %{targets})))

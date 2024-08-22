@@ -1,5 +1,4 @@
 #!/bin/bash
-set -eox pipefail
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
@@ -47,6 +46,8 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     echo "WARNING: AWS_ACCESS_KEY_ID not set, promote commands won't run"
     exit 0
 fi
+
+source buildkite/scripts/export-git-env-vars.sh
 
 echo "Promoting debs: ${PACKAGE}_${VERSION} to Release: ${TO_COMPONENT} and Codename: ${CODENAME}"
 # Promote the deb .
