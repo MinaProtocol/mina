@@ -16,5 +16,8 @@ echo " Includes mina daemon, archive-node, rosetta, generate keypair for berkele
 echo "--- Prepare debian packages"
 ./scripts/rebuild-deb.sh $@
 
+echo "--- Upload debs to amazon s3 repo"
+./buildkite/scripts/publish-deb.sh
+
 echo "--- Git diff after build is complete:"
 git diff --exit-code -- .
