@@ -12,7 +12,7 @@ module type S = sig
 
   type network
 
-  type ('q, 'r) rpc_mock = 'q Envelope.Incoming.t -> 'r Deferred.t
+  type ('q, 'r) rpc_mock = 'q Envelope.Incoming.t -> 'r rpc_response Deferred.t
 
   type rpc_mocks =
     { get_mock : 'q 'r. ('q, 'r) Rpc_interface.rpc -> ('q, 'r) rpc_mock option }
@@ -30,7 +30,7 @@ end
 
 module Make (Rpc_interface : RPC_INTERFACE) :
   S with module Rpc_interface := Rpc_interface = struct
-  type ('q, 'r) rpc_mock = 'q Envelope.Incoming.t -> 'r Deferred.t
+  type ('q, 'r) rpc_mock = 'q Envelope.Incoming.t -> 'r rpc_response Deferred.t
 
   type rpc_mocks =
     { get_mock : 'q 'r. ('q, 'r) Rpc_interface.rpc -> ('q, 'r) rpc_mock option }
@@ -109,22 +109,17 @@ module Make (Rpc_interface : RPC_INTERFACE) :
     let call_rpc :
         type q r.
            t
-        -> _
-        -> sender_id:Peer.Id.t
-        -> responder_id:Peer.Id.t
+        -> sender:Peer.t
+        -> responder:Peer.t
         -> (q, r) Rpc_interface.rpc
         -> q
-        -> r rpc_response Deferred.t =
-     fun t peer_table ~sender_id ~responder_id rpc query ->
-      let responder =
-        Option.value_exn
-          (Hashtbl.find peer_table responder_id)
-          ~error:
-            (Error.createf "failed to find peer %s in peer_table" responder_id)
-      in
+        -> r rpc_response connection_result Deferred.t =
+     fun t ~sender ~responder rpc query ->
       match get_interface (lookup_node t responder) with
       | Ok intf ->
-          intf.rpc_hook.hook sender_id rpc query
+          let%map response = intf.rpc_hook.hook sender.peer_id rpc query in
+          Connected
+            (Envelope.Incoming.wrap_peer ~data:response ~sender:responder)
       | Error e ->
           Deferred.return (Failed_to_connect e)
   end
@@ -166,11 +161,9 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                 |> Option.value_exn ~error:(Error.of_string "no versions?")
               in
               Impl.handle_request ctx ~version:latest_version query_env
+              >>| Result.map_error ~f:(fun err -> Rpc_returned_error err)
         in
-        let response_env =
-          Envelope.Incoming.wrap_peer ~data:(Ok response) ~sender:t.local_ip
-        in
-        Connected response_env
+        response
       in
       Network.{ hook }
 
@@ -243,8 +236,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       ban_notification_reader
 
     let query_peer ?heartbeat_timeout:_ ?timeout:_ t peer rpc query =
-      Network.call_rpc t.network t.peer_table ~sender_id:t.local_ip.peer_id
-        ~responder_id:peer rpc query
+      Network.call_rpc t.network ~sender:t.local_ip ~responder:peer rpc query
 
     let query_peer' ?how ?heartbeat_timeout ?timeout t peer rpc qs =
       let%map rs =
@@ -257,15 +249,11 @@ module Make (Rpc_interface : RPC_INTERFACE) :
               | Connected x ->
                   x.data
               | Failed_to_connect e ->
-                  return (Failed_to_connect e) )
-            |> Or_error.all
+                  return (Failed_to_connect e)
+              | Internal_exception exn ->
+                  raise exn )
           in
-          let sender =
-            Option.value_exn
-              (Hashtbl.find t.peer_table peer)
-              ~error:(Error.createf "failed to find peer %s in peer_table" peer)
-          in
-          Connected (Envelope.Incoming.wrap_peer ~data ~sender) )
+          Connected (Envelope.Incoming.wrap_peer ~data ~sender:peer) )
 
     let query_random_peers _ = failwith "TODO stub"
 

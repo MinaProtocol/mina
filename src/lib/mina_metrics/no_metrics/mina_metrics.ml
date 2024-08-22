@@ -188,6 +188,12 @@ module Network = struct
     end
   end
 
+  let rpc_outbound_connections_established : Counter.t = ()
+
+  let rpc_outbound_connections_failed : Counter.t = ()
+
+  let rpc_outbound_connections_internal_exceptions : Counter.t = ()
+
   let rpc_requests_received : Counter.t = ()
 
   let rpc_requests_sent : Counter.t = ()
@@ -299,8 +305,6 @@ module Network = struct
   let get_epoch_ledger_rpc_requests_failed : Counter.t = ()
 
   let get_epoch_ledger_rpc_responses_failed : Counter.t = ()
-
-  let rpc_connections_failed : Counter.t = ()
 
   module Ipc_latency_histogram = Histogram
   module Rpc_latency_histogram = Histogram

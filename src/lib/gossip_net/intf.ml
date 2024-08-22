@@ -8,20 +8,28 @@ type ban_creator = { banned_peer : Peer.t; banned_until : Time.t }
 
 type ban_notification = { banned_peer : Peer.t; banned_until : Time.t }
 
-type ('query, 'response) rpc_fn =
-  version:int -> 'query Envelope.Incoming.t -> 'response Deferred.t
+(* error types for specific rpc calls *)
+type rpc_error =
+  (* failure to perform rpc call (version negotiation, conversion/encoding errors) *)
+  | Rpc_call_error of Error.t
+  (* successfully performed rpc call, but the server responded with an error *)
+  | Rpc_returned_error of Error.t
 
-type 'r rpc_response =
+type 'r rpc_response = ('r, rpc_error) Result.t
+
+type 'r connection_result =
   | Failed_to_connect of Error.t
-  | Connected of 'r Or_error.t Envelope.Incoming.t
-[@@deriving sexp]
+  | Internal_exception of exn
+  | Connected of 'r Envelope.Incoming.t
 
 module type RPC_IMPLEMENTATION = sig
   type ctx
 
   type query
 
-  type response
+  type reply
+
+  type response = reply Or_error.t
 
   val name : string
 
@@ -50,32 +58,31 @@ module type RPC_IMPLEMENTATION = sig
   val receipt_trust_action_message :
     query -> string * (string, Yojson.Safe.t) List.Assoc.t
 
-  val handle_request : ctx -> (query, response) rpc_fn
-
-  val response_is_successful : response -> bool
+  val handle_request :
+    ctx -> version:int -> query Envelope.Incoming.t -> response Deferred.t
 
   val rate_limit_cost : query -> int
 
   val rate_limit_budget : int * [ `Per of Time.Span.t ]
 end
 
-type ('ctx, 'query, 'response) rpc_implementation =
+type ('ctx, 'query, 'reply) rpc_implementation =
   (module RPC_IMPLEMENTATION
      with type ctx = 'ctx
       and type query = 'query
-      and type response = 'response )
+      and type reply = 'reply )
 
 module type RPC_INTERFACE = sig
   type ctx
 
-  type ('query, 'response) rpc
+  type ('query, 'reply) rpc
 
-  type any_rpc = Rpc : ('query, 'response) rpc -> any_rpc
+  type any_rpc = Rpc : ('query, 'reply) rpc -> any_rpc
 
   val all_rpcs : any_rpc list
 
   val implementation :
-    ('query, 'response) rpc -> (ctx, 'query, 'response) rpc_implementation
+    ('query, 'reply) rpc -> (ctx, 'query, 'reply) rpc_implementation
 end
 
 module type GOSSIP_NET = sig
@@ -118,26 +125,26 @@ module type GOSSIP_NET = sig
     -> ?heartbeat_timeout:Time_ns.Span.t
     -> ?timeout:Time.Span.t
     -> t
-    -> Peer.Id.t
+    -> Peer.t
     -> ('q, 'r) Rpc_interface.rpc
     -> 'q list
-    -> 'r list rpc_response Deferred.t
+    -> 'r rpc_response list connection_result Deferred.t
 
   val query_peer :
        ?heartbeat_timeout:Time_ns.Span.t
     -> ?timeout:Time.Span.t
     -> t
-    -> Peer.Id.t
+    -> Peer.t
     -> ('q, 'r) Rpc_interface.rpc
     -> 'q
-    -> 'r rpc_response Deferred.t
+    -> 'r rpc_response connection_result Deferred.t
 
   val query_random_peers :
        t
     -> int
     -> ('q, 'r) Rpc_interface.rpc
     -> 'q
-    -> 'r rpc_response Deferred.t List.t Deferred.t
+    -> 'r rpc_response connection_result Deferred.t list Deferred.t
 
   val broadcast_state :
     ?origin_topic:string -> t -> Message.state_msg -> unit Deferred.t

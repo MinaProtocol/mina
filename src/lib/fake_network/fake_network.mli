@@ -39,35 +39,35 @@ include sig
   type 'a fn_with_mocks =
        ?get_some_initial_peers:
          ( Rpcs.Get_some_initial_peers.query
-         , Rpcs.Get_some_initial_peers.response )
+         , Rpcs.Get_some_initial_peers.reply )
          Gossip_net.Fake.rpc_mock
     -> ?get_staged_ledger_aux_and_pending_coinbases_at_hash:
          ( Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
-         , Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.response )
+         , Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.reply )
          Gossip_net.Fake.rpc_mock
     -> ?answer_sync_ledger_query:
          ( Rpcs.Answer_sync_ledger_query.query
-         , Rpcs.Answer_sync_ledger_query.response )
+         , Rpcs.Answer_sync_ledger_query.reply )
          Gossip_net.Fake.rpc_mock
     -> ?get_transition_chain:
          ( Rpcs.Get_transition_chain.query
-         , Rpcs.Get_transition_chain.response )
+         , Rpcs.Get_transition_chain.reply )
          Gossip_net.Fake.rpc_mock
     -> ?get_transition_knowledge:
          ( Rpcs.Get_transition_knowledge.query
-         , Rpcs.Get_transition_knowledge.response )
+         , Rpcs.Get_transition_knowledge.reply )
          Gossip_net.Fake.rpc_mock
     -> ?get_transition_chain_proof:
          ( Rpcs.Get_transition_chain_proof.query
-         , Rpcs.Get_transition_chain_proof.response )
+         , Rpcs.Get_transition_chain_proof.reply )
          Gossip_net.Fake.rpc_mock
     -> ?get_ancestry:
          ( Rpcs.Get_ancestry.query
-         , Rpcs.Get_ancestry.response )
+         , Rpcs.Get_ancestry.reply )
          Gossip_net.Fake.rpc_mock
     -> ?get_best_tip:
          ( Rpcs.Get_best_tip.query
-         , Rpcs.Get_best_tip.response )
+         , Rpcs.Get_best_tip.reply )
          Gossip_net.Fake.rpc_mock
     -> 'a
 end

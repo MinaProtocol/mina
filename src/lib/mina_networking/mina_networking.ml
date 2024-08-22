@@ -228,37 +228,32 @@ let find_map xs ~f =
   in
   Deferred.any (none_worked :: List.map ~f:(filter ~f:Or_error.is_ok) ds)
 
-let make_rpc_request ?heartbeat_timeout ?timeout ~rpc ~label t peer input =
+let make_rpc_request ?heartbeat_timeout ?timeout ~rpc t peer input =
   let open Deferred.Let_syntax in
-  match%map
-    query_peer ?heartbeat_timeout ?timeout t peer.Peer.peer_id rpc input
-  with
-  | Connected { data = Ok (Some response); _ } ->
+  match%map query_peer ?heartbeat_timeout ?timeout t peer rpc input with
+  | Connected { data = Ok response; _ } ->
       Ok response
-  | Connected { data = Ok None; _ } ->
-      Or_error.errorf
-        !"Peer %{sexp:Network_peer.Peer.Id.t} doesn't have the requested %s"
-        peer.peer_id label
-  | Connected { data = Error e; _ } ->
-      Error e
+  | Connected { data = Error (Rpc_returned_error e); _ } ->
+      Error (Error.tag e ~tag:"rpc-returned-error")
+  | Connected { data = Error (Rpc_call_error e); _ } ->
+      Error (Error.tag e ~tag:"rpc-call-error")
   | Failed_to_connect e ->
       Error (Error.tag e ~tag:"failed-to-connect")
+  | Internal_exception exn ->
+      Error (Error.tag (Error.of_exn exn) ~tag:"internal-exception")
 
 let get_transition_chain_proof ?heartbeat_timeout ?timeout t =
   make_rpc_request ?heartbeat_timeout ?timeout
-    ~rpc:Rpcs.Get_transition_chain_proof ~label:"transition chain proof" t
+    ~rpc:Rpcs.Get_transition_chain_proof t
 
 let get_transition_chain ?heartbeat_timeout ?timeout t =
-  make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_transition_chain
-    ~label:"chain of transitions" t
+  make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_transition_chain t
 
 let get_best_tip ?heartbeat_timeout ?timeout t peer =
-  make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_best_tip
-    ~label:"best tip" t peer ()
+  make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_best_tip t peer ()
 
 let ban_notify t peer banned_until =
-  query_peer t peer.Peer.peer_id Rpcs.Ban_notify banned_until
-  >>| Fn.const (Ok ())
+  query_peer t peer Rpcs.Ban_notify banned_until >>| Fn.const (Ok ())
 
 let try_non_preferred_peers (type b) t input peers ~rpc :
     b Envelope.Incoming.t Deferred.Or_error.t =
@@ -271,11 +266,9 @@ let try_non_preferred_peers (type b) t input peers ~rpc :
     else
       let current_peers, remaining_peers = List.split_n peers num_peers in
       find_map current_peers ~f:(fun peer ->
-          let%bind response_or_error =
-            query_peer t peer.Peer.peer_id rpc input
-          in
+          let%bind response_or_error = query_peer t peer rpc input in
           match response_or_error with
-          | Connected ({ data = Ok (Some data); _ } as envelope) ->
+          | Connected ({ data = Ok data; _ } as envelope) ->
               let%bind () =
                 Trust_system.(
                   record t.trust_system t.logger peer
@@ -285,8 +278,6 @@ let try_non_preferred_peers (type b) t input peers ~rpc :
                       ))
               in
               return (Ok (Envelope.Incoming.map envelope ~f:(Fn.const data)))
-          | Connected { data = Ok None; _ } ->
-              loop remaining_peers (2 * num_peers)
           | _ ->
               loop remaining_peers (2 * num_peers) )
   in
@@ -299,8 +290,9 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
     try_non_preferred_peers t input peers ~rpc
   in
   match%bind query_peer t peer_id rpc input with
-  | Connected { data = Ok (Some response); sender; _ } ->
+  | Connected { data = Ok response; sender; _ } ->
       let%bind () =
+        (* TODO: refactor this nonsense *)
         match sender with
         | Local ->
             return ()
@@ -312,21 +304,11 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
                   , Some ("Preferred peer returned valid response", []) ))
       in
       return (Ok (Envelope.Incoming.wrap ~data:response ~sender))
-  | Connected { data = Ok None; sender; _ } ->
-      let%bind () =
-        match sender with
-        | Remote peer ->
-            Trust_system.(
-              record t.trust_system t.logger peer
-                Actions.
-                  ( No_reply_from_preferred_peer
-                  , Some ("When querying preferred peer, got no response", [])
-                  ))
-        | Local ->
-            return ()
-      in
-      retry ()
-  | Connected { data = Error e; sender; _ } ->
+  | Connected { data = Error (Rpc_returned_error e); _ } ->
+      (* don't retry if the connection succeeded but responder returned and error *)
+      (* if we weren't retiring the trust system, we would want to track a trust action here *)
+      return (Error e)
+  | Connected { data = Error (Rpc_call_error e); sender; _ } ->
       (* FIXME #4094: determine if more specific actions apply here *)
       let%bind () =
         match sender with
@@ -342,7 +324,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
             return ()
       in
       retry ()
-  | Failed_to_connect _ ->
+  | Failed_to_connect _ | Internal_exception _ ->
       (* Since we couldn't connect, we have no IP to ban. *)
       retry ()
 
@@ -402,12 +384,14 @@ let glue_sync_ledger :
     let global_stop = Pipe_lib.Linear_pipe.closed query_reader in
     let knowledge h peer =
       match%map
-        query_peer ~heartbeat_timeout ~timeout:(Time.Span.of_sec 10.) t
-          peer.Peer.peer_id Rpcs.Answer_sync_ledger_query (h, Num_accounts)
+        query_peer ~heartbeat_timeout ~timeout:(Time.Span.of_sec 10.) t peer
+          Rpcs.Answer_sync_ledger_query (h, Num_accounts)
       with
       | Connected { data = Ok _; _ } ->
           `Call (fun (h', _) -> Ledger_hash.equal h' h)
-      | Failed_to_connect _ | Connected { data = Error _; _ } ->
+      | Failed_to_connect _
+      | Internal_exception _
+      | Connected { data = Error _; _ } ->
           `Some []
     in
     let%bind _ = Linear_pipe.values_available query_reader in
@@ -427,24 +411,22 @@ let glue_sync_ledger :
         let%map rs =
           query_peer' ~how:`Parallel ~heartbeat_timeout
             ~timeout:(Time.Span.of_sec (Float.of_int (List.length qs) *. 2.))
-            t peer.peer_id Rpcs.Answer_sync_ledger_query qs
+            t peer Rpcs.Answer_sync_ledger_query qs
         in
         match rs with
         | Failed_to_connect e ->
             Error e
+        | Internal_exception exn ->
+            Error (Error.of_exn exn)
         | Connected res -> (
-            match res.data with
-            | Error e ->
-                Error e
-            | Ok rs -> (
-                match List.zip qs rs with
-                | Unequal_lengths ->
-                    Or_error.error_string "mismatched lengths"
-                | Ok ps ->
-                    Ok
-                      (List.filter_map ps ~f:(fun (q, r) ->
-                           match r with Ok r -> Some (q, r) | Error _ -> None )
-                      ) ) ) )
+            match List.zip qs res.data with
+            | Unequal_lengths ->
+                Or_error.error_string "mismatched lengths"
+            | Ok ps ->
+                Ok
+                  (List.filter_map ps ~f:(fun (q, r) ->
+                       match r with Ok r -> Some (q, r) | Error _ -> None ) ) )
+        )
   in
   don't_wait_for
     (let%bind downloader = downloader in

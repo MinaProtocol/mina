@@ -485,12 +485,14 @@ let%test_module "Epoch ledger sync tests" =
       in
       let%map response =
         Mina_networking.query_peer test.network_info2.networking
-          test.network_info1.network_peer.peer_id
+          test.network_info1.network_peer
           Mina_networking.Rpcs.Answer_sync_ledger_query
           (staking_ledger_root, Num_accounts)
       in
       match response with
-      | Connected { data = Ok (Error err); _ } ->
+      | Connected { data = Ok _; _ } ->
+          failwith "unexpected successful RPC response"
+      | Connected { data = Error (Rpc_returned_error err); _ } ->
           if
             not
               (String.is_substring (Error.to_string_hum err)
@@ -498,10 +500,10 @@ let%test_module "Epoch ledger sync tests" =
           then
             failwithf "unexpected error returned from sync ledger RPC: %s"
               (Error.to_string_hum err) ()
-      | Connected { data = Ok (Ok _); _ } ->
-          failwith "unexpected successful RPC response"
-      | Connected { data = Error err; _ } ->
-          failwithf "unexpected RPC failure: %s" (Error.to_string_hum err) ()
+      | Connected { data = Error (Rpc_call_error err); _ } ->
+          failwithf "unexpected RPC call error: %s" (Error.to_string_hum err) ()
+      | Internal_exception exn ->
+          raise exn
       | Failed_to_connect err ->
           failwithf "unexpected connection failure: %s"
             (Error.to_string_hum err) ()

@@ -178,6 +178,12 @@ module Network : sig
     end
   end
 
+  val rpc_outbound_connections_established : Counter.t
+
+  val rpc_outbound_connections_failed : Counter.t
+
+  val rpc_outbound_connections_internal_exceptions : Counter.t
+
   val rpc_requests_received : Counter.t
 
   val rpc_requests_sent : Counter.t
@@ -285,8 +291,6 @@ module Network : sig
   val transaction_pool_diff_received : Gauge.t
 
   val transaction_pool_diff_broadcasted : Gauge.t
-
-  val rpc_connections_failed : Counter.t
 
   module Ipc_latency_histogram : Histogram
 

@@ -634,6 +634,22 @@ module Network = struct
         ()
   end
 
+  let rpc_outbound_connections_established : Counter.t =
+    let help = "# of established outbound connections for rpc requests" in
+    Counter.v "rpc_outbound_connections_established" ~help ~namespace ~subsystem
+
+  let rpc_outbound_connections_failed : Counter.t =
+    let help = "# of failed outbound connections for rpc requests" in
+    Counter.v "rpc_outbound_connections_failed" ~help ~namespace ~subsystem
+
+  let rpc_outbound_connections_internal_exceptions : Counter.t =
+    let help =
+      "# of outbound connections for rpc requests that raised internal \
+       exceptions"
+    in
+    Counter.v "rpc_outbound_connections_internal_exceptions" ~help ~namespace
+      ~subsystem
+
   let rpc_requests_received : Counter.t =
     let help = "# of rpc requests received" in
     Counter.v "rpc_requests_received" ~help ~namespace ~subsystem
@@ -922,10 +938,6 @@ module Network = struct
     let help = "# of Get_epoch_ledger rpc requests failed to respond" in
     Counter.v "get_epoch_ledger_rpc_responses_failed" ~help ~namespace
       ~subsystem
-
-  let rpc_connections_failed : Counter.t =
-    let help = "# of failed connections for rpc requests" in
-    Counter.v "rpc_connections_failed" ~help ~namespace ~subsystem
 
   module Gauge_map = Metric_map (struct
     type t = Gauge.t

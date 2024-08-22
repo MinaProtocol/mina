@@ -1737,13 +1737,15 @@ let%test_module "Ledger_catchup tests" =
       let attempt_counter = ref 0 in
       let impl_rpc :
              Mina_networking.Rpcs.Get_transition_chain.query Envelope.Incoming.t
-          -> Mina_networking.Rpcs.Get_transition_chain.response Deferred.t =
+          -> Mina_networking.Rpcs.Get_transition_chain.reply
+             Mina_networking.Gossip_net.rpc_response
+             Deferred.t =
        fun _ ->
         let () =
           attempt_counter := !attempt_counter + 1 ;
           if !attempt_counter > 1 then Ivar.fill_if_empty attempts_ivar true
         in
-        Deferred.return (Some [])
+        Deferred.Result.return []
       in
       Quickcheck.test ~trials:1
         Fake_network.Generator.(

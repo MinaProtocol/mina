@@ -1,11 +1,9 @@
 open Core
 open Async
+open Mina_stdlib
 open Network_peer
 open Pipe_lib
 open Intf
-
-type ('q, 'r) dispatch =
-  Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
 
 module Connection_with_state = struct
   type t = Banned | Allowed of Rpc.Connection.t Ivar.t
@@ -180,7 +178,8 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                 let%map response =
                   Impl.handle_request ctx ~version request_env
                 in
-                if not (Impl.response_is_successful response) then
+                (* TODO NOW: log error here *)
+                if Result.is_error response then
                   Mina_metrics.Counter.inc_one Impl.failed_response_counter ;
                 response )
       in
@@ -749,196 +748,188 @@ module Make (Rpc_interface : RPC_INTERFACE) :
         Hash_set.(diff (Peer.Hash_set.of_list peers) except |> to_list)
         n
 
-    let try_call_rpc_with_dispatch :
-        type r q.
+    let dispatch_rpc (type q r) (rpc : (q, r) Rpc_interface.rpc)
+        ~(logger : Logger.t) ~(peer : Peer.t) :
+        q -> Versioned_rpc.Connection_with_menu.t -> r rpc_response Deferred.t =
+     fun query menu ->
+      let (module Impl) = Rpc_interface.implementation rpc in
+      Mina_metrics.(Counter.inc_one Network.rpc_requests_sent) ;
+      Mina_metrics.(Counter.inc_one @@ fst Impl.sent_counter) ;
+      Mina_metrics.(Gauge.inc_one @@ snd Impl.sent_counter) ;
+      match%map
+        Monitor.try_with ~here:[%here] (fun () ->
+            Impl.dispatch_multi menu query )
+      with
+      (* full rpc success *)
+      | Ok (Ok (Ok x)) ->
+          Ok x
+      (* rpc success, error reply *)
+      | Ok (Ok (Error err)) ->
+          Mina_metrics.(Counter.inc_one Impl.failed_request_counter) ;
+          [%log debug] "Peer $peer returned error for $rpc: $error"
+            ~metadata:
+              [ ("rpc", `String Impl.name)
+              ; ("error", Error_json.error_to_yojson err)
+              ; ("peer", `String (Peer.to_string peer))
+              ] ;
+          Error (Rpc_returned_error err)
+      (* rpc protocol failure *)
+      | Ok (Error err) ->
+          Mina_metrics.(Counter.inc_one Impl.failed_request_counter) ;
+          [%log debug] "RPC call error for $rpc to $peer"
+            ~metadata:
+              [ ("rpc", `String Impl.name)
+              ; ("error", Error_json.error_to_yojson err)
+              ; ("peer", `String (Peer.to_string peer))
+              ] ;
+          Error (Rpc_call_error err)
+      (* internal exception raised *)
+      | Error exn ->
+          Mina_metrics.(Counter.inc_one Impl.failed_request_counter) ;
+          raise (Monitor.extract_exn exn)
+
+    let try_with_rpc_connection :
+        type r.
            ?heartbeat_timeout:Time_ns.Span.t
         -> ?timeout:Time.Span.t
-        -> rpc_counter:Mina_metrics.Counter.t * Mina_metrics.Gauge.t
-        -> rpc_failed_counter:Mina_metrics.Counter.t
-        -> rpc_name:string
         -> t
         -> Peer.t
-        -> Async.Rpc.Transport.t
-        -> (r, q) dispatch
-        -> r
-        -> q Deferred.Or_error.t =
-     fun ?heartbeat_timeout ?timeout ~rpc_counter ~rpc_failed_counter ~rpc_name
-         t peer transport dispatch query ->
-      let call () =
-        Monitor.try_with ~here:[%here] (fun () ->
-            (* Async_rpc_kernel takes a transport instead of a Reader.t *)
-            Async_rpc_kernel.Rpc.Connection.with_close
-              ~heartbeat_config:
-                (Async_rpc_kernel.Rpc.Connection.Heartbeat_config.create
-                   ~send_every:(Time_ns.Span.of_sec 10.)
-                   ~timeout:
-                     (Option.value ~default:(Time_ns.Span.of_sec 120.)
-                        heartbeat_timeout )
-                   () )
-              ~connection_state:(Fn.const ())
-              ~dispatch_queries:(fun conn ->
+        -> (Versioned_rpc.Connection_with_menu.t -> r Deferred.t)
+        -> r connection_result Deferred.t =
+     fun ?heartbeat_timeout ?timeout t peer dispatch ->
+      Monitor.try_with ~here:[%here] (fun () ->
+          let%bind net2 = !(t.net2) in
+          let%bind.Deferred.Or_error stream =
+            Mina_net2.open_stream net2 ~protocol:rpc_transport_proto
+              ~peer:peer.peer_id
+          in
+          let transport = prepare_stream_transport stream in
+          (* Async_rpc_kernel takes a transport instead of a Reader.t *)
+          Async_rpc_kernel.Rpc.Connection.with_close transport
+            ~heartbeat_config:
+              (Async_rpc_kernel.Rpc.Connection.Heartbeat_config.create
+                 ~send_every:(Time_ns.Span.of_sec 10.)
+                 ~timeout:
+                   (Option.value ~default:(Time_ns.Span.of_sec 120.)
+                      heartbeat_timeout )
+                 () )
+            ~connection_state:(Fn.const ())
+            ~dispatch_queries:(fun conn ->
+              let%bind.Deferred.Or_error conn' =
                 Versioned_rpc.Connection_with_menu.create conn
-                >>=? fun conn' ->
-                Mina_metrics.(Counter.inc_one Network.rpc_requests_sent) ;
-                Mina_metrics.(Counter.inc_one @@ fst rpc_counter) ;
-                Mina_metrics.(Gauge.inc_one @@ snd rpc_counter) ;
-                let d = dispatch conn' query in
-                match timeout with
-                | None ->
-                    d
-                | Some timeout ->
-                    Deferred.choose
-                      [ Deferred.choice d Fn.id
-                      ; choice (after timeout) (fun () ->
-                            Or_error.error_string "rpc timed out" )
-                      ] )
-              transport
-              ~on_handshake_error:
-                (`Call
-                  (fun exn ->
-                    let%map () =
-                      Trust_system.(
-                        record t.config.trust_system t.config.logger peer
-                          Actions.
-                            ( Outgoing_connection_error
-                            , Some
-                                ( "Handshake error: $exn"
-                                , [ ("exn", `String (Exn.to_string exn)) ] ) ))
-                    in
-                    Or_error.error_string "handshake error" ) ) )
-        >>= function
-        | Ok (Ok result) ->
-            (* call succeeded, result is valid *)
-            Deferred.return (Ok result)
-        | Ok (Error err) -> (
-            (* call succeeded, result is an error *)
-            [%log' warn t.config.logger] "RPC call error for $rpc"
-              ~metadata:
-                [ ("rpc", `String rpc_name)
-                ; ("error", Error_json.error_to_yojson err)
-                ] ;
-            Mina_metrics.(Counter.inc_one rpc_failed_counter) ;
-            match (Error.to_exn err, Error.sexp_of_t err) with
-            | ( _
-              , Sexp.List
-                  [ Sexp.List
-                      [ Sexp.Atom "rpc_error"
-                      ; Sexp.List [ Sexp.Atom "Connection_closed"; _ ]
-                      ]
-                  ; _connection_description
-                  ; _rpc_tag
-                  ; _rpc_version
-                  ] ) ->
-                Mina_metrics.(Counter.inc_one Network.rpc_connections_failed) ;
-                let%map () =
-                  Trust_system.(
-                    record t.config.trust_system t.config.logger peer
-                      Actions.
-                        ( Outgoing_connection_error
-                        , Some ("Closed connection", []) ))
-                in
-                Error err
+              in
+              Mina_metrics.(
+                Counter.inc_one Network.rpc_outbound_connections_established) ;
+              match timeout with
+              | None ->
+                  let%map result = dispatch conn' in
+                  Or_error.return result
+              | Some timeout ->
+                  Deferred.choose
+                    [ Deferred.choice (dispatch conn') Or_error.return
+                    ; choice (after timeout) (fun () ->
+                          Error (Error.of_string "rpc timed out") )
+                    ] )
+            ~on_handshake_error:
+              (`Call
+                (fun exn ->
+                  let%map () =
+                    Trust_system.(
+                      record t.config.trust_system t.config.logger peer
+                        Actions.
+                          ( Outgoing_connection_error
+                          , Some
+                              ( "Handshake error: $exn"
+                              , [ ("exn", `String (Exn.to_string exn)) ] ) ))
+                  in
+                  Error (Error.of_string "handshake error") ) ) )
+      >>= function
+      | Ok (Ok result) ->
+          Deferred.return
+            (Connected (Envelope.Incoming.wrap_peer ~data:result ~sender:peer))
+      | Ok (Error err) ->
+          [%log' debug t.config.logger]
+            "Error establishing RPC connection with $peer: $error"
+            ~metadata:
+              [ ("peer", Peer.to_yojson peer)
+              ; ("error", Error_json.error_to_yojson err)
+              ] ;
+          Mina_metrics.(Counter.inc_one Network.rpc_outbound_connections_failed) ;
+          let trust_action_msg =
+            match Error.sexp_of_t err with
+            | Sexp.List
+                [ Sexp.List
+                    [ Sexp.Atom "rpc_error"
+                    ; Sexp.List [ Sexp.Atom "Connection_closed"; _ ]
+                    ]
+                ; _connection_description
+                ; _rpc_tag
+                ; _rpc_version
+                ] ->
+                ("Closed connection", [])
             | _ ->
-                let%map () =
-                  Trust_system.(
-                    record t.config.trust_system t.config.logger peer
-                      Actions.
-                        ( Outgoing_connection_error
-                        , Some
-                            ( "RPC call failed, reason: $exn"
-                            , [ ("exn", Error_json.error_to_yojson err) ] ) ))
-                in
-                Error err )
-        | Error monitor_exn ->
-            (* call itself failed *)
-            (* TODO: learn what other exceptions are raised here *)
-            Mina_metrics.(Counter.inc_one rpc_failed_counter) ;
-            let exn = Monitor.extract_exn monitor_exn in
-            let () =
-              match Error.sexp_of_t (Error.of_exn exn) with
-              | Sexp.List (Sexp.Atom "connection attempt timeout" :: _) ->
-                  [%log' debug t.config.logger]
-                    "RPC call for $rpc raised an exception"
-                    ~metadata:
-                      [ ("rpc", `String rpc_name)
-                      ; ("exn", `String (Exn.to_string exn))
-                      ]
-              | _ ->
-                  [%log' warn t.config.logger]
-                    "RPC call for $rpc raised an exception"
-                    ~metadata:
-                      [ ("rpc", `String rpc_name)
-                      ; ("exn", `String (Exn.to_string exn))
-                      ]
-            in
-            Deferred.return (Or_error.of_exn exn)
-      in
-      call ()
+                ( "RPC call failed, reason: $exn"
+                , [ ("exn", Error_json.error_to_yojson err) ] )
+          in
+          let%map () =
+            Trust_system.(
+              record t.config.trust_system t.config.logger peer
+                (Actions.Outgoing_connection_error, Some trust_action_msg))
+          in
+          Failed_to_connect err
+      | Error monitor_exn ->
+          (* call itself failed *)
+          (* TODO: learn what other exceptions are raised here *)
+          Mina_metrics.(
+            Counter.inc_one Network.rpc_outbound_connections_internal_exceptions) ;
+          let exn = Monitor.extract_exn monitor_exn in
+          let () =
+            match Error.sexp_of_t (Error.of_exn exn) with
+            | Sexp.List (Sexp.Atom "connection attempt timeout" :: _) ->
+                [%log' debug t.config.logger]
+                  "RPC connection raised an exception"
+                  ~metadata:[ ("exn", `String (Exn.to_string exn)) ]
+            | _ ->
+                [%log' warn t.config.logger]
+                  "RPC connection raised an exception"
+                  ~metadata:[ ("exn", `String (Exn.to_string exn)) ]
+          in
+          Deferred.return (Internal_exception exn)
 
-    let try_call_rpc :
+    let query_peer :
         type q r.
            ?heartbeat_timeout:Time_ns.Span.t
         -> ?timeout:Time.Span.t
         -> t
         -> Peer.t
-        -> _
         -> (q, r) Rpc_interface.rpc
         -> q
-        -> r Deferred.Or_error.t =
-     fun ?heartbeat_timeout ?timeout t peer transport rpc query ->
-      let (module Impl) = Rpc_interface.implementation rpc in
-      try_call_rpc_with_dispatch ?heartbeat_timeout ?timeout
-        ~rpc_counter:Impl.sent_counter
-        ~rpc_failed_counter:Impl.failed_request_counter ~rpc_name:Impl.name t
-        peer transport Impl.dispatch_multi query
+        -> r rpc_response connection_result Deferred.t =
+     fun ?heartbeat_timeout ?timeout t peer rpc query ->
+      try_with_rpc_connection ?heartbeat_timeout ?timeout t peer
+        (dispatch_rpc rpc ~logger:t.config.logger ~peer query)
 
-    let query_peer ?heartbeat_timeout ?timeout t (peer_id : Peer.Id.t) rpc
-        rpc_input =
-      let%bind net2 = !(t.net2) in
-      match%bind
-        Mina_net2.open_stream net2 ~protocol:rpc_transport_proto ~peer:peer_id
-      with
-      | Ok stream ->
-          let peer = Mina_net2.Libp2p_stream.remote_peer stream in
-          let transport = prepare_stream_transport stream in
-          try_call_rpc ?heartbeat_timeout ?timeout t peer transport rpc
-            rpc_input
-          >>| fun data ->
-          Connected (Envelope.Incoming.wrap_peer ~data ~sender:peer)
-      | Error e ->
-          Mina_metrics.(Counter.inc_one Network.rpc_connections_failed) ;
-          return (Failed_to_connect e)
-
-    let query_peer' (type q r) ?how ?heartbeat_timeout ?timeout t
-        (peer_id : Peer.Id.t) (rpc : (q, r) Rpc_interface.rpc) (qs : q list) =
-      let%bind net2 = !(t.net2) in
-      match%bind
-        Mina_net2.open_stream net2 ~protocol:rpc_transport_proto ~peer:peer_id
-      with
-      | Ok stream ->
-          let peer = Mina_net2.Libp2p_stream.remote_peer stream in
-          let transport = prepare_stream_transport stream in
-          let (module Impl) = Rpc_interface.implementation rpc in
-          try_call_rpc_with_dispatch ?heartbeat_timeout ?timeout
-            ~rpc_counter:Impl.sent_counter
-            ~rpc_failed_counter:Impl.failed_request_counter ~rpc_name:Impl.name
-            t peer transport
-            (fun conn qs ->
-              Deferred.Or_error.List.map ?how qs ~f:(fun q ->
-                  Impl.dispatch_multi conn q ) )
-            qs
-          >>| fun data ->
-          Connected (Envelope.Incoming.wrap_peer ~data ~sender:peer)
-      | Error e ->
-          Mina_metrics.(Counter.inc_one Network.rpc_connections_failed) ;
-          return (Failed_to_connect e)
+    let query_peer' :
+        type q r.
+           ?how:Monad_sequence.how
+        -> ?heartbeat_timeout:Time_ns.Span.t
+        -> ?timeout:Time.Span.t
+        -> t
+        -> Peer.t
+        -> (q, r) Rpc_interface.rpc
+        -> q list
+        -> r rpc_response list connection_result Deferred.t =
+     fun ?how ?heartbeat_timeout ?timeout t peer rpc queries ->
+      try_with_rpc_connection ?heartbeat_timeout ?timeout t peer (fun menu ->
+          Deferred.List.map ?how queries ~f:(fun query ->
+              dispatch_rpc rpc ~logger:t.config.logger ~peer query menu ) )
 
     let query_random_peers t n rpc query =
       let%map peers = random_peers t n in
       [%log' trace t.config.logger]
         !"Querying random peers: %s"
         (Peer.pretty_list peers) ;
-      List.map peers ~f:(fun peer -> query_peer t peer.peer_id rpc query)
+      List.map peers ~f:(fun peer -> query_peer t peer rpc query)
 
     (* Do not broadcast to the topic from which message was originally received *)
     let guard_topic ?origin_topic topic f msg =

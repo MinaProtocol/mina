@@ -37,26 +37,35 @@ end
 
 type ctx = (module CONTEXT)
 
-let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender blocks =
-  let version_errors =
-    let invalid_current_versions =
-      List.filter blocks ~f:(fun block ->
-          Mina_block.header block |> Mina_block.Header.current_protocol_version
-          |> Protocol_version.is_valid |> not )
-    in
+let get_frontier (module Context : CONTEXT) =
+  let open Context in
+  get_transition_frontier ()
+  |> Result.of_option
+       ~error:(Error.of_string "transition frontier not initialized")
+  |> Deferred.return
 
-    let invalid_next_versions =
-      List.filter blocks ~f:(fun block ->
-          Mina_block.header block
-          |> Mina_block.Header.proposed_protocol_version_opt
-          |> Option.for_all ~f:Protocol_version.is_valid
-          |> not )
-    in
-    let current_version_mismatches =
-      List.filter blocks ~f:(fun block ->
-          Mina_block.header block |> Mina_block.Header.current_protocol_version
-          |> Protocol_version.compatible_with_daemon |> not )
-    in
+let validate_protocol_versions (module Context : CONTEXT) ~rpc_name
+    ~resource_name ~sender blocks =
+  let open Context in
+  let invalid_current_versions =
+    List.filter blocks ~f:(fun block ->
+        Mina_block.header block |> Mina_block.Header.current_protocol_version
+        |> Protocol_version.is_valid |> not )
+  in
+
+  let invalid_next_versions =
+    List.filter blocks ~f:(fun block ->
+        Mina_block.header block
+        |> Mina_block.Header.proposed_protocol_version_opt
+        |> Option.for_all ~f:Protocol_version.is_valid
+        |> not )
+  in
+  let current_version_mismatches =
+    List.filter blocks ~f:(fun block ->
+        Mina_block.header block |> Mina_block.Header.current_protocol_version
+        |> Protocol_version.compatible_with_daemon |> not )
+  in
+  let version_errors =
     List.map invalid_current_versions ~f:(fun x ->
         (`Invalid_current_version, x) )
     @ List.map invalid_next_versions ~f:(fun x -> (`Invalid_next_version, x))
@@ -64,8 +73,8 @@ let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender blocks =
           (`Current_version_mismatch, x) )
   in
   let%map () =
-    (* NB: these errors aren't always accurate... sometimes we are calling this when we were
-           requested to serve an outdated block (requested vs sent) *)
+    (* NB: These errors aren't always accurate... sometimes we are calling this when we were
+           requested to serve an outdated block (requested vs sent). *)
     Deferred.List.iter version_errors ~how:`Parallel
       ~f:(fun (version_error, block) ->
         let header = Mina_block.header block in
@@ -111,7 +120,43 @@ let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender blocks =
         Trust_system.record_envelope_sender trust_system logger sender
           (action, msg) )
   in
-  List.is_empty version_errors
+  let error_msg = function
+    | `Invalid_current_version ->
+        Printf.sprintf "at least one %s had an invalid current protocol version"
+          resource_name
+    | `Invalid_next_version ->
+        Printf.sprintf
+          "at least one %s had an invalid proposed next protocol version"
+          resource_name
+    | `Current_version_mismatch ->
+        Printf.sprintf "at least one %s had an unsupported protocol version"
+          resource_name
+  in
+  let errors =
+    List.filter_map ~f:Fn.id
+      [ Option.some_if
+          (not @@ List.is_empty invalid_current_versions)
+          `Invalid_current_version
+      ; Option.some_if
+          (not @@ List.is_empty invalid_next_versions)
+          `Invalid_next_version
+      ; Option.some_if
+          (not @@ List.is_empty current_version_mismatches)
+          `Current_version_mismatch
+      ]
+  in
+  match errors with
+  | [] ->
+      Ok ()
+  | [ error ] ->
+      Or_error.error_string (error_msg error)
+  | errors ->
+      let error_details =
+        String.concat ~sep:", " (List.map errors ~f:error_msg)
+      in
+      Or_error.errorf
+        !"encountered multiple protocol version errors: %s"
+        error_details
 
 [%%versioned_rpc
 module Get_some_initial_peers = struct
@@ -121,9 +166,11 @@ module Get_some_initial_peers = struct
     let name = "get_some_initial_peers"
 
     module T = struct
-      type query = unit [@@deriving sexp, yojson]
+      type query = unit
 
-      type response = Peer.t list [@@deriving sexp, yojson]
+      type reply = Peer.t list
+
+      type response = reply Or_error.t
     end
 
     module Caller = T
@@ -155,7 +202,11 @@ module Get_some_initial_peers = struct
     module T = struct
       type query = unit
 
-      type response = Network_peer.Peer.Stable.V1.t list
+      type response =
+        (( Network_peer.Peer.Stable.V1.t list
+         , Bounded_types.Wrapped_error.Stable.V1.t )
+         Result.t
+        [@version_asserted] )
 
       let query_of_caller_model = Fn.id
 
@@ -184,10 +235,10 @@ module Get_some_initial_peers = struct
     [%log trace] "Sending some initial peers to $peer"
       ~metadata:[ ("peer", Peer.to_yojson sender) ]
 
-  let response_is_successful peer_list = not (List.is_empty peer_list)
-
   let handle_request (module Context : CONTEXT) ~version:_ _request =
-    Context.list_peers ()
+    let open Context in
+    let%map peers = list_peers () in
+    Ok peers
 
   let rate_limit_budget = (1, `Per Time.Span.minute)
 
@@ -204,12 +255,13 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
     module T = struct
       type query = State_hash.t
 
-      type response =
-        ( Staged_ledger.Scan_state.t
+      type reply =
+        Staged_ledger.Scan_state.t
         * Ledger_hash.t
         * Pending_coinbase.t
-        * Mina_state.Protocol_state.value list )
-        option
+        * Mina_state.Protocol_state.value list
+
+      type response = reply Or_error.t
     end
 
     module Caller = T
@@ -247,11 +299,13 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       type query = State_hash.Stable.V1.t
 
       type response =
-        ( Staged_ledger.Scan_state.Stable.V2.t
-        * Ledger_hash.Stable.V1.t
-        * Pending_coinbase.Stable.V2.t
-        * Mina_state.Protocol_state.Value.Stable.V2.t list )
-        option
+        (( Staged_ledger.Scan_state.Stable.V2.t
+           * Ledger_hash.Stable.V1.t
+           * Pending_coinbase.Stable.V2.t
+           * Mina_state.Protocol_state.Value.Stable.V2.t list
+         , Bounded_types.Wrapped_error.Stable.V1.t )
+         Result.t
+        [@version_asserted] )
 
       let query_of_caller_model = Fn.id
 
@@ -280,42 +334,44 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
 
   let log_request_received ~logger:_ ~sender:_ _request = ()
 
-  let response_is_successful = Option.is_some
-
   let handle_request (module Context : CONTEXT) ~version:_ request =
     let open Context in
+    let open Deferred.Result.Let_syntax in
     let hash = Envelope.Incoming.data request in
-    let result =
-      let%bind.Option frontier = get_transition_frontier () in
-      Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier
-        hash
-    in
-    let%map () =
-      match result with
-      | Some
-          (scan_state, expected_merkle_root, pending_coinbases, _protocol_states)
-        ->
-          let staged_ledger_hash =
-            Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-              (Staged_ledger.Scan_state.hash scan_state)
-              expected_merkle_root pending_coinbases
-          in
-          [%log debug]
-            ~metadata:
-              [ ( "staged_ledger_hash"
-                , Staged_ledger_hash.to_yojson staged_ledger_hash )
-              ]
-            "sending scan state and pending coinbase" ;
-          Deferred.unit
+    let%bind frontier = get_frontier (module Context) in
+    let%bind data =
+      match
+        Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash
+          ~frontier hash
+      with
+      | Some data ->
+          return data
       | None ->
-          Trust_system.(
-            record_envelope_sender trust_system logger
-              (Envelope.Incoming.sender request)
-              Actions.
-                ( Requested_unknown_item
-                , Some (receipt_trust_action_message hash) ))
+          let%map.Deferred () =
+            Trust_system.(
+              record_envelope_sender trust_system logger
+                (Envelope.Incoming.sender request)
+                Actions.
+                  ( Requested_unknown_item
+                  , Some (receipt_trust_action_message hash) ))
+          in
+          (* TODO: is this message accurate? *)
+          Or_error.error_string "unknown state hash"
     in
-    result
+    let scan_state, expected_merkle_root, pending_coinbases, _protocol_states =
+      data
+    in
+    let staged_ledger_hash =
+      Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
+        (Staged_ledger.Scan_state.hash scan_state)
+        expected_merkle_root pending_coinbases
+    in
+    [%log debug]
+      ~metadata:
+        [ ("staged_ledger_hash", Staged_ledger_hash.to_yojson staged_ledger_hash)
+        ]
+      "Sending scan state and pending coinbase for $staged_ledger_hash" ;
+    return data
 
   let rate_limit_budget = (4, `Per Time.Span.minute)
 
@@ -332,11 +388,9 @@ module Answer_sync_ledger_query = struct
     module T = struct
       type query = Ledger_hash.t * Sync_ledger.Query.t
 
-      type response =
-        (( Sync_ledger.Answer.t
-         , Bounded_types.Wrapped_error.Stable.V1.t )
-         Result.t
-        [@version_asserted] )
+      type reply = Sync_ledger.Answer.t
+
+      type response = reply Or_error.t
     end
 
     module Caller = T
@@ -403,30 +457,26 @@ module Answer_sync_ledger_query = struct
 
   let log_request_received ~logger:_ ~sender:_ _request = ()
 
-  let response_is_successful = Result.is_ok
-
   let handle_request (module Context : CONTEXT) ~version:_ request =
     let open Context in
+    let open Deferred.Or_error.Let_syntax in
     let ledger_hash, _ = Envelope.Incoming.data request in
     let query = Envelope.Incoming.map request ~f:Tuple2.get2 in
-    let%bind answer =
-      let%bind.Deferred.Option frontier = return (get_transition_frontier ()) in
+    let%bind frontier = get_frontier (module Context) in
+    match%bind.Deferred
       Sync_handler.answer_query ~frontier ledger_hash query ~logger
         ~trust_system
-    in
-    let result =
-      Result.of_option answer
-        ~error:
-          (Error.createf
-             !"Refusing to answer sync ledger query for ledger_hash: \
-               %{sexp:Ledger_hash.t}"
-             ledger_hash )
-    in
-    let%map () =
-      match result with
-      | Ok _ ->
-          return ()
-      | Error err ->
+    with
+    | Some answer ->
+        return answer
+    | None ->
+        let err =
+          Error.createf
+            !"Refusing to answer sync ledger query for ledger_hash: \
+              %{sexp:Ledger_hash.t}"
+            ledger_hash
+        in
+        let%map.Deferred () =
           Trust_system.(
             record_envelope_sender trust_system logger
               (Envelope.Incoming.sender request)
@@ -442,8 +492,8 @@ module Answer_sync_ledger_query = struct
                             (Envelope.Incoming.data query) )
                       ; ("error", Error_json.error_to_yojson err)
                       ] ) ))
-    in
-    result
+        in
+        Error err
 
   let rate_limit_budget = (Int.pow 2 17, `Per Time.Span.minute)
 
@@ -458,9 +508,11 @@ module Get_transition_chain = struct
     let name = "get_transition_chain"
 
     module T = struct
-      type query = State_hash.t list [@@deriving sexp, to_yojson]
+      type query = State_hash.t list [@@deriving to_yojson]
 
-      type response = Mina_block.t list option
+      type reply = Mina_block.t list
+
+      type response = reply Or_error.t
     end
 
     module Caller = T
@@ -491,7 +543,11 @@ module Get_transition_chain = struct
     module T = struct
       type query = State_hash.Stable.V1.t list [@@deriving sexp]
 
-      type response = Mina_block.Stable.V2.t list option
+      type response =
+        (( Mina_block.Stable.V2.t list
+         , Bounded_types.Wrapped_error.Stable.V1.t )
+         Result.t
+        [@version_asserted] )
 
       let query_of_caller_model = Fn.id
 
@@ -521,34 +577,35 @@ module Get_transition_chain = struct
     [%log info] "Sending transition_chain to $peer"
       ~metadata:[ ("peer", Peer.to_yojson sender) ]
 
-  let response_is_successful = Option.is_some
-
   let handle_request (module Context : CONTEXT) ~version:_ request =
     let open Context in
+    let open Deferred.Or_error.Let_syntax in
     let hashes = Envelope.Incoming.data request in
-    let result =
-      let%bind.Option frontier = get_transition_frontier () in
-      Sync_handler.get_transition_chain ~frontier hashes
+    let%bind frontier = get_frontier (module Context) in
+    let%bind blocks =
+      match Sync_handler.get_transition_chain ~frontier hashes with
+      | Some blocks ->
+          return blocks
+      | None ->
+          let%map.Deferred () =
+            Trust_system.(
+              record_envelope_sender trust_system logger
+                (Envelope.Incoming.sender request)
+                Actions.
+                  ( Requested_unknown_item
+                  , Some (receipt_trust_action_message hashes) ))
+          in
+          (* TODO: is this message accurate? *)
+          Or_error.error_string "unknown transition chain"
     in
-    match result with
-    | Some blocks ->
-        let%map valid_versions =
-          validate_protocol_versions ~logger ~trust_system
-            ~rpc_name:"Get_transition_chain"
-            ~sender:(Envelope.Incoming.sender request)
-            blocks
-        in
-        Option.some_if valid_versions blocks
-    | None ->
-        let%map () =
-          Trust_system.(
-            record_envelope_sender trust_system logger
-              (Envelope.Incoming.sender request)
-              Actions.
-                ( Requested_unknown_item
-                , Some (receipt_trust_action_message hashes) ))
-        in
-        None
+    let%map () =
+      validate_protocol_versions
+        (module Context)
+        ~rpc_name:"Get_transition_chain" ~resource_name:"the requested blocks"
+        ~sender:(Envelope.Incoming.sender request)
+        blocks
+    in
+    blocks
 
   let rate_limit_budget = (1, `Per Time.Span.second)
 
@@ -563,9 +620,11 @@ module Get_transition_knowledge = struct
     let name = "Get_transition_knowledge"
 
     module T = struct
-      type query = unit [@@deriving sexp, to_yojson]
+      type query = unit
 
-      type response = State_hash.t list
+      type reply = State_hash.t list
+
+      type response = reply Or_error.t
     end
 
     module Caller = T
@@ -595,9 +654,13 @@ module Get_transition_knowledge = struct
 
   module V1 = struct
     module T = struct
-      type query = unit [@@deriving sexp]
+      type query = unit
 
-      type response = State_hash.Stable.V1.t list
+      type response =
+        (( State_hash.Stable.V1.t list
+         , Bounded_types.Wrapped_error.Stable.V1.t )
+         Result.t
+        [@version_asserted] )
 
       let query_of_caller_model = Fn.id
 
@@ -620,23 +683,20 @@ module Get_transition_knowledge = struct
     include Register (T')
   end
 
-  let receipt_trust_action_message query =
-    ( "Get_transition_knowledge query: $query"
-    , [ ("query", query_to_yojson query) ] )
+  let receipt_trust_action_message _query =
+    ("Get_transition_knowledge query", [])
 
   let log_request_received ~logger ~sender _request =
     [%log info] "Sending transition_knowledge to $peer"
       ~metadata:[ ("peer", Peer.to_yojson sender) ]
 
-  let response_is_successful hashes = not (List.is_empty hashes)
-
   let handle_request (module Context : CONTEXT) ~version:_ _request =
-    let open Context in
-    let result =
-      let%map.Option frontier = get_transition_frontier () in
-      Sync_handler.best_tip_path ~frontier
-    in
-    return (Option.value result ~default:[])
+    let open Deferred.Or_error.Let_syntax in
+    let%bind frontier = get_frontier (module Context) in
+    let path = Sync_handler.best_tip_path ~frontier in
+    if List.is_empty path then
+      Deferred.return (Or_error.error_string "this node is still bootstrapping")
+    else return path
 
   let rate_limit_budget = (1, `Per Time.Span.minute)
 
@@ -651,9 +711,11 @@ module Get_transition_chain_proof = struct
     let name = "get_transition_chain_proof"
 
     module T = struct
-      type query = State_hash.t [@@deriving sexp, to_yojson]
+      type query = State_hash.t
 
-      type response = (State_hash.t * State_body_hash.t list) option
+      type reply = State_hash.t * State_body_hash.t list
+
+      type response = reply Or_error.t
     end
 
     module Caller = T
@@ -683,10 +745,13 @@ module Get_transition_chain_proof = struct
 
   module V1 = struct
     module T = struct
-      type query = State_hash.Stable.V1.t [@@deriving sexp]
+      type query = State_hash.Stable.V1.t
 
       type response =
-        (State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list) option
+        (( State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
+         , Bounded_types.Wrapped_error.Stable.V1.t )
+         Result.t
+        [@version_asserted] )
 
       let query_of_caller_model = Fn.id
 
@@ -711,31 +776,30 @@ module Get_transition_chain_proof = struct
 
   let receipt_trust_action_message query =
     ( "Get_transition_chain_proof query: $query"
-    , [ ("query", query_to_yojson query) ] )
+    , [ ("query", State_hash.to_yojson query) ] )
 
   let log_request_received ~logger ~sender _request =
     [%log info] "Sending transition_chain_proof to $peer"
       ~metadata:[ ("peer", Peer.to_yojson sender) ]
 
-  let response_is_successful = Option.is_some
-
   let handle_request (module Context : CONTEXT) ~version:_ request =
     let open Context in
+    let open Deferred.Or_error.Let_syntax in
     let hash = Envelope.Incoming.data request in
-    let result =
-      let%bind.Option frontier = get_transition_frontier () in
-      Transition_chain_prover.prove ~frontier hash
-    in
-    let%map () =
-      if Option.is_none result then
-        Trust_system.(
-          record_envelope_sender trust_system logger
-            (Envelope.Incoming.sender request)
-            Actions.
-              (Requested_unknown_item, Some (receipt_trust_action_message hash)))
-      else return ()
-    in
-    result
+    let%bind frontier = get_frontier (module Context) in
+    match Transition_chain_prover.prove ~frontier hash with
+    | Some proof ->
+        return proof
+    | None ->
+        let%map.Deferred () =
+          Trust_system.(
+            record_envelope_sender trust_system logger
+              (Envelope.Incoming.sender request)
+              Actions.
+                ( Requested_unknown_item
+                , Some (receipt_trust_action_message hash) ))
+        in
+        Or_error.error_string "unknown state hash"
 
   let rate_limit_budget = (3, `Per Time.Span.minute)
 
@@ -753,13 +817,14 @@ module Get_ancestry = struct
       (** NB: The state hash sent in this query should not be trusted, as it can be forged. This is ok for how this RPC is implented, as we only use the state hash for tie breaking when checking whether or not the proof is worth serving. *)
       type query =
         (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
-      [@@deriving sexp, to_yojson]
+      [@@deriving to_yojson]
 
-      type response =
+      type reply =
         ( Mina_block.t
         , State_body_hash.t list * Mina_block.t )
         Proof_carrying_data.t
-        option
+
+      type response = reply Or_error.t
     end
 
     module Caller = T
@@ -792,13 +857,14 @@ module Get_ancestry = struct
         ( Consensus.Data.Consensus_state.Value.Stable.V2.t
         , State_hash.Stable.V1.t )
         With_hash.Stable.V1.t
-      [@@deriving sexp]
 
       type response =
-        ( Mina_block.Stable.V2.t
-        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
-        Proof_carrying_data.Stable.V1.t
-        option
+        (( ( Mina_block.Stable.V2.t
+           , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
+           Proof_carrying_data.Stable.V1.t
+         , Bounded_types.Wrapped_error.Stable.V1.t )
+         Result.t
+        [@version_asserted] )
 
       let query_of_caller_model = Fn.id
 
@@ -828,13 +894,12 @@ module Get_ancestry = struct
     [%log debug] "Sending root proof to $peer"
       ~metadata:[ ("peer", Peer.to_yojson sender) ]
 
-  let response_is_successful = Option.is_some
-
   let handle_request (module Context : CONTEXT) ~version:_ request =
     let open Context in
+    let open Deferred.Or_error.Let_syntax in
     let consensus_state_with_hash = Envelope.Incoming.data request in
+    let%bind frontier = get_frontier (module Context) in
     let result =
-      let%bind.Option frontier = get_transition_frontier () in
       consensus_state_with_hash
       |> With_hash.map_hash ~f:(fun state_hash ->
              { State_hash.State_hashes.state_hash; state_body_hash = None } )
@@ -842,7 +907,7 @@ module Get_ancestry = struct
     in
     match result with
     | None ->
-        let%map () =
+        let%map.Deferred () =
           Trust_system.(
             record_envelope_sender trust_system logger
               (Envelope.Incoming.sender request)
@@ -851,15 +916,17 @@ module Get_ancestry = struct
                 , Some (receipt_trust_action_message consensus_state_with_hash)
                 ))
         in
-        None
-    | Some { proof = _, block; _ } ->
-        let%map valid_versions =
-          validate_protocol_versions ~logger ~trust_system
-            ~rpc_name:"Get_ancestry"
+        Or_error.error_string "unknown state hash"
+    | Some proof ->
+        let { Proof_carrying_data.proof = _, block; _ } = proof in
+        let%map () =
+          validate_protocol_versions
+            (module Context)
+            ~rpc_name:"Get_ancestry" ~resource_name:"ancestor blocks"
             ~sender:(Envelope.Incoming.sender request)
             [ block ]
         in
-        if valid_versions then result else None
+        proof
 
   let rate_limit_budget = (5, `Per Time.Span.minute)
 
@@ -875,9 +942,11 @@ module Ban_notify = struct
 
     module T = struct
       (* banned until this time *)
-      type query = Core.Time.t [@@deriving sexp]
+      type query = Core.Time.t
 
-      type response = unit
+      type reply = unit
+
+      type response = reply Or_error.t
     end
 
     module Caller = T
@@ -908,7 +977,9 @@ module Ban_notify = struct
     module T = struct
       type query = Core.Time.Stable.V1.t [@@deriving sexp]
 
-      type response = unit
+      type response =
+        ((unit, Bounded_types.Wrapped_error.Stable.V1.t) Result.t
+        [@version_asserted] )
 
       let query_of_caller_model = Fn.id
 
@@ -941,9 +1012,7 @@ module Ban_notify = struct
           , `String (Time.to_string_abs ~zone:Time.Zone.utc ban_until) )
         ]
 
-  let response_is_successful = Fn.const true
-
-  let handle_request _ctx ~version:_ _request = Deferred.unit
+  let handle_request _ctx ~version:_ _request = Deferred.Or_error.return ()
 
   let rate_limit_budget = (1, `Per Time.Span.minute)
 
@@ -958,13 +1027,14 @@ module Get_best_tip = struct
     let name = "get_best_tip"
 
     module T = struct
-      type query = unit [@@deriving sexp, to_yojson]
+      type query = unit
 
-      type response =
+      type reply =
         ( Mina_block.t
         , State_body_hash.t list * Mina_block.t )
         Proof_carrying_data.t
-        option
+
+      type response = reply Or_error.t
     end
 
     module Caller = T
@@ -996,10 +1066,12 @@ module Get_best_tip = struct
       type query = unit [@@deriving sexp]
 
       type response =
-        ( Mina_block.Stable.V2.t
-        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
-        Proof_carrying_data.Stable.V1.t
-        option
+        (( ( Mina_block.Stable.V2.t
+           , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
+           Proof_carrying_data.Stable.V1.t
+         , Bounded_types.Wrapped_error.Stable.V1.t )
+         Result.t
+        [@version_asserted] )
 
       let query_of_caller_model = Fn.id
 
@@ -1028,14 +1100,11 @@ module Get_best_tip = struct
     [%log debug] "Sending best_tip to $peer"
       ~metadata:[ ("peer", Peer.to_yojson sender) ]
 
-  let response_is_successful = Option.is_some
-
   let handle_request (module Context : CONTEXT) ~version:_ request =
-    let open Context in
+    let open Deferred.Or_error.Let_syntax in
+    let%bind frontier = get_frontier (module Context) in
     let result =
-      let open Option.Let_syntax in
-      let%bind frontier = get_transition_frontier () in
-      let%map proof_with_data =
+      let%map.Option proof_with_data =
         Best_tip_prover.prove ~context:(module Context) frontier
       in
       (* strip hash from proof data *)
@@ -1043,53 +1112,51 @@ module Get_best_tip = struct
     in
     match result with
     | None ->
+        Deferred.return (Or_error.error_string "this node is still in catchup")
+    | Some proof ->
+        let { Proof_carrying_data.data = data_block; proof = _, proof_block } =
+          proof
+        in
         let%map () =
-          Trust_system.(
-            record_envelope_sender trust_system logger
-              (Envelope.Incoming.sender request)
-              Actions.
-                (Requested_unknown_item, Some (receipt_trust_action_message ())))
+          Deferred.Or_error.all_unit
+            [ validate_protocol_versions
+                (module Context)
+                ~rpc_name:"Get_best_tip (data)" ~resource_name:"best tip blocks"
+                ~sender:(Envelope.Incoming.sender request)
+                [ data_block ]
+            ; validate_protocol_versions
+                (module Context)
+                ~rpc_name:"Get_best_tip (proof)"
+                ~resource_name:"best tip proof blocks"
+                ~sender:(Envelope.Incoming.sender request)
+                [ proof_block ]
+            ]
         in
-        None
-    | Some { data = data_block; proof = _, proof_block } ->
-        let%map data_valid_versions =
-          validate_protocol_versions ~logger ~trust_system
-            ~rpc_name:"Get_best_tip (data)"
-            ~sender:(Envelope.Incoming.sender request)
-            [ data_block ]
-        and proof_valid_versions =
-          validate_protocol_versions ~logger ~trust_system
-            ~rpc_name:"Get_best_tip (proof)"
-            ~sender:(Envelope.Incoming.sender request)
-            [ proof_block ]
-        in
-        if data_valid_versions && proof_valid_versions then result else None
+        proof
 
   let rate_limit_budget = (3, `Per Time.Span.minute)
 
   let rate_limit_cost = Fn.const 1
 end]
 
-type ('query, 'response) rpc =
+type ('query, 'reply) rpc =
   | Get_some_initial_peers
-      : (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
+      : (Get_some_initial_peers.query, Get_some_initial_peers.reply) rpc
   | Get_staged_ledger_aux_and_pending_coinbases_at_hash
       : ( Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
-        , Get_staged_ledger_aux_and_pending_coinbases_at_hash.response )
+        , Get_staged_ledger_aux_and_pending_coinbases_at_hash.reply )
         rpc
   | Answer_sync_ledger_query
-      : (Answer_sync_ledger_query.query, Answer_sync_ledger_query.response) rpc
+      : (Answer_sync_ledger_query.query, Answer_sync_ledger_query.reply) rpc
   | Get_transition_chain
-      : (Get_transition_chain.query, Get_transition_chain.response) rpc
+      : (Get_transition_chain.query, Get_transition_chain.reply) rpc
   | Get_transition_knowledge
-      : (Get_transition_knowledge.query, Get_transition_knowledge.response) rpc
+      : (Get_transition_knowledge.query, Get_transition_knowledge.reply) rpc
   | Get_transition_chain_proof
-      : ( Get_transition_chain_proof.query
-        , Get_transition_chain_proof.response )
-        rpc
-  | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
-  | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
-  | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
+      : (Get_transition_chain_proof.query, Get_transition_chain_proof.reply) rpc
+  | Get_ancestry : (Get_ancestry.query, Get_ancestry.reply) rpc
+  | Ban_notify : (Ban_notify.query, Ban_notify.reply) rpc
+  | Get_best_tip : (Get_best_tip.query, Get_best_tip.reply) rpc
 
 type any_rpc = Rpc : ('q, 'r) rpc -> any_rpc
 

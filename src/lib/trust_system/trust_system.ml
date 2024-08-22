@@ -52,8 +52,6 @@ module Actions = struct
           date, etc.
       *)
     | Sent_old_gossip  (** Peer sent us a gossip item we already knew. *)
-    | No_reply_from_preferred_peer
-        (** A peer that should have had the response to a query did not provide it. *)
     | Unknown_rpc  (** A peer made an unknown RPC. *)
     | Decoding_failed  (** A gossip message could not be decoded. *)
   [@@deriving show]
@@ -124,8 +122,6 @@ module Actions = struct
     | Incoming_connection_error ->
         Trust_decrease 0.05
     | Outgoing_connection_error ->
-        Trust_decrease 0.05
-    | No_reply_from_preferred_peer ->
         Trust_decrease 0.05
     | Violated_protocol ->
         Insta_ban
