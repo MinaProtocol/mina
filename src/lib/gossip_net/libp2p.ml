@@ -136,20 +136,17 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       }
 
     (* TODO: should we share this with the Fake network impl? *)
-    let setup_rpc (type query response) ctx trust_system
+    let setup_rpc (type query response) ctx logger trust_system
         (rpc : (query, response) Rpc_interface.rpc) =
       let (module Impl) = Rpc_interface.implementation rpc in
-      (* TODO: should be passed in from the config.logger instance *)
-      let logger = Logger.create () in
       let log_rate_limiter_occasionally rl =
         let t = Time.Span.of_min 1. in
         every t (fun () ->
-            [%log' debug logger]
+            [%log debug]
               ~metadata:
                 [ ("rate_limiter", Network_pool.Rate_limiter.summary rl) ]
               !"%s $rate_limiter" Impl.name )
       in
-      (* TODO: kill rate limit *)
       let rl =
         Network_pool.Rate_limiter.create ~capacity:Impl.rate_limit_budget
       in
@@ -175,15 +172,13 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                 let sender = Envelope.Incoming.sender request_env in
                 let%bind () =
                   let msg = Impl.receipt_trust_action_message request in
-                  (* TODO: kill trust system *)
+                  (* TODO: kill trust system (#11723) *)
                   Trust_system.(
                     record_envelope_sender trust_system logger sender
                       Actions.(Made_request, Some msg))
                 in
                 let%map response =
-                  (* TODO: kill this additional thread *)
-                  O1trace.thread ("handle_request_" ^ Impl.name) (fun () ->
-                      Impl.handle_request ctx ~version request_env )
+                  Impl.handle_request ctx ~version request_env
                 in
                 if not (Impl.response_is_successful response) then
                   Mina_metrics.Counter.inc_one Impl.failed_response_counter ;
@@ -356,7 +351,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
             in
             let implementation_list =
               List.bind Rpc_interface.all_rpcs ~f:(fun (Rpc rpc) ->
-                  setup_rpc ctx config.trust_system rpc )
+                  setup_rpc ctx config.logger config.trust_system rpc )
             in
             let implementations =
               let handle_unknown_rpc conn_state ~rpc_tag ~version =

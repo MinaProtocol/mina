@@ -18,7 +18,6 @@ open Network_peer
 (* The common context passed into all rpc handlers. Add new things here to get them into the scope
    of an rpc handler. Notably, calls back into Gossip_net need to be expicitly wrapped at this
    layer in order to solve a recursive dependency between Gossip_net.Make and this module. *)
-(* TODO: we could fix the Gossip_net dependency loop with a better interface. *)
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -72,8 +71,8 @@ let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender blocks =
           (`Current_version_mismatch, x) )
   in
   let%map () =
-    (* TODO: these errors aren't always accurate... sometimes we are calling this when we were
-             requested to serve an outdated block (requested vs sent) *)
+    (* NB: these errors aren't always accurate... sometimes we are calling this when we were
+           requested to serve an outdated block (requested vs sent) *)
     Deferred.List.iter version_errors ~how:`Parallel
       ~f:(fun (version_error, block) ->
         let header = Mina_block.header block in
@@ -84,28 +83,27 @@ let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender blocks =
           Mina_block.Header.proposed_protocol_version_opt header
         in
         let action, error_msg, error_metadata =
-          (* TODO: update confusing metadata names *)
           match version_error with
           | `Invalid_current_version ->
               ( Trust_system.Actions.Sent_invalid_protocol_version
-              , "external transition with invalid current protocol version"
-              , [ ( "current_protocol_version"
+              , "block with invalid current protocol version"
+              , [ ( "block_current_protocol_version"
                   , `String (Protocol_version.to_string block_protocol_version)
                   )
                 ] )
           | `Invalid_next_version ->
               ( Trust_system.Actions.Sent_invalid_protocol_version
-              , "external transition with invalid proposed protocol version"
-              , [ ( "proposed_protocol_version"
+              , "block with invalid proposed protocol version"
+              , [ ( "block_proposed_protocol_version"
                   , `String
                       (Protocol_version.to_string
                          (Option.value_exn proposed_protocol_version) ) )
                 ] )
           | `Current_version_mismatch ->
               ( Sent_mismatched_protocol_version
-              , "current protocol version in external transition does not \
-                 match daemon current protocol version"
-              , [ ( "current_protocol_version"
+              , "current protocol version in block does not match daemon \
+                 current protocol version"
+              , [ ( "block_current_protocol_version"
                   , `String (Protocol_version.to_string block_protocol_version)
                   )
                 ; ( "daemon_current_protocol_version"
@@ -295,7 +293,6 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
     let open Context in
     let hash = Envelope.Incoming.data request in
     let result =
-      (* TODO: failure to access frontier should result in different trust system behavior *)
       let%bind.Option frontier = get_transition_frontier () in
       Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier
         hash
@@ -425,13 +422,11 @@ module Answer_sync_ledger_query = struct
         ~trust_system
     in
     let result =
-      (* TODO: should we really be returning an error for this RPC if there is only 1 kind of error?
-               (we could just wrap the error on the client side) *)
       Result.of_option answer
         ~error:
           (Error.createf
-             (* TODO: improve weird error message *)
-             !"Refused to answer_query for ledger_hash: %{sexp:Ledger_hash.t}"
+             !"Refusing to answer sync ledger query for ledger_hash: \
+               %{sexp:Ledger_hash.t}"
              ledger_hash )
     in
     let%map () =
@@ -1051,8 +1046,7 @@ module Get_best_tip = struct
         Best_tip_prover.prove ~context:(module Context) frontier
       in
       (* strip hash from proof data *)
-      (* TODO: Best_tip_prover shouldn't return with hash if we don't need it *)
-      { proof_with_data with data = With_hash.data proof_with_data.data }
+      Proof_carrying_data.map proof_with_data ~f:With_hash.data
     in
     match result with
     | None ->
