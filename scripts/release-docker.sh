@@ -10,7 +10,8 @@ set -x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator')
+
+VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard'  'itn-orchestrator')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -84,9 +85,11 @@ IMAGE="--build-arg image=${IMAGE}"
         *instrumented)
           DOCKER_DEB_SUFFIX="--build-arg deb_suffix=${DEB_PROFILE}-instrumented"
           BUILD_FLAG_SUFFIX="-instrumented"
+          DEB_PROFILE_SUFFIX="-${DEB_PROFILE}"
           ;;
         *)
           DOCKER_DEB_SUFFIX="--build-arg deb_suffix=${DEB_PROFILE}"
+          DEB_PROFILE_SUFFIX="-${DEB_PROFILE}"
           ;;
       esac
       ;;
@@ -128,6 +131,7 @@ mina-batch-txn)
   ;;
 mina-rosetta)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
+  VERSION="${VERSION}-${NETWORK##*=}"
   ;;
 mina-zkapp-test-transaction)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-zkapp-test-transaction"
@@ -135,14 +139,6 @@ mina-zkapp-test-transaction)
 leaderboard)
   DOCKERFILE_PATH="frontend/leaderboard/Dockerfile"
   DOCKER_CONTEXT="frontend/leaderboard"
-  ;;
-delegation-backend)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend"
-  DOCKER_CONTEXT="src/app/delegation_backend"
-  ;;
-delegation-backend-toolchain)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend-toolchain"
-  DOCKER_CONTEXT="src/app/delegation_backend"
   ;;
 itn-orchestrator)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-itn-orchestrator"
@@ -161,10 +157,10 @@ if [[ -z "${MINA_REPO}" ]]; then
 fi
 
 DOCKER_REGISTRY="gcr.io/o1labs-192920"
-TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}${BUILD_FLAG_SUFFIX}"
+TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}${DEB_PROFILE_SUFFIX}${BUILD_FLAG_SUFFIX}"
 # friendly, predictable tag
 GITHASH=$(git rev-parse --short=7 HEAD)
-HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}${BUILD_FLAG_SUFFIX}"
+HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}${DEB_PROFILE_SUFFIX}${BUILD_FLAG_SUFFIX}"
 BUILD_NETWORK="--network=host"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
@@ -179,9 +175,9 @@ if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
 
   # push to GCR
   docker push "${TAG}"
-
   # retag and push again to GCR
   docker tag "${TAG}" "${HASHTAG}"
   docker push "${HASHTAG}"
 
 fi
+

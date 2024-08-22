@@ -30,6 +30,8 @@ let DebianVersions = ../Constants/DebianVersions.dhall
 
 let DebianRepo = ../Constants/DebianRepo.dhall
 
+let Artifacts = ../Constants/Artifacts.dhall
+
 let Profiles = ../Constants/Profiles.dhall
 
 let Toolchain = ../Constants/Toolchain.dhall
@@ -157,7 +159,7 @@ let pipeline
                     DockerImage.ReleaseSpec::{
                     , deps =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
-                    , service = "mina-daemon"
+                    , service = Artifacts.dockerName Artifacts.Type.Daemon
                     , network = network_name
                     , deb_codename = "${DebianVersions.lowerName debVersion}"
                     , deb_profile = profile
@@ -212,7 +214,7 @@ let pipeline
                     DockerImage.ReleaseSpec::{
                     , deps =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
-                    , service = "mina-archive"
+                    , service = Artifacts.dockerName Artifacts.Type.Archive
                     , network = network_name
                     , deb_codename = "${DebianVersions.lowerName debVersion}"
                     , deb_profile = profile
@@ -226,7 +228,7 @@ let pipeline
                     DockerImage.ReleaseSpec::{
                     , deps =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
-                    , service = "mina-rosetta"
+                    , service = Artifacts.dockerName Artifacts.Type.Rosetta
                     , network = network_name
                     , deb_repo = DebianRepo.Type.Local
                     , deb_codename = "${DebianVersions.lowerName debVersion}"
