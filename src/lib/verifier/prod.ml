@@ -148,7 +148,7 @@ module Worker_state = struct
                    (id, result) )
 
              let verify_commands cs =
-               Internal_tracing.Context_logger.with_logger (Some logger)
+               Context_logger.with_logger (Some logger)
                @@ fun () ->
                Internal_tracing.Context_call.with_call_id
                @@ fun () ->
@@ -160,7 +160,7 @@ module Worker_state = struct
              let verify_blockchain_snarks = B.Proof.verify
 
              let verify_blockchain_snarks bs =
-               Internal_tracing.Context_logger.with_logger (Some logger)
+               Context_logger.with_logger (Some logger)
                @@ fun () ->
                Internal_tracing.Context_call.with_call_id
                @@ fun () ->
@@ -181,7 +181,7 @@ module Worker_state = struct
                    failwith "Verifier crashed"
 
              let verify_transaction_snarks ts =
-               Internal_tracing.Context_logger.with_logger (Some logger)
+               Context_logger.with_logger (Some logger)
                @@ fun () ->
                Internal_tracing.Context_call.with_call_id
                @@ fun () ->
