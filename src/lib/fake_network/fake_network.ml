@@ -148,10 +148,6 @@ include struct
          ( Rpcs.Get_transition_chain_proof.query
          , Rpcs.Get_transition_chain_proof.response )
          Gossip_net.Fake.rpc_mock
-    -> ?get_node_status:
-         ( Rpcs.Get_node_status.query
-         , Rpcs.Get_node_status.response )
-         Gossip_net.Fake.rpc_mock
     -> ?get_ancestry:
          ( Rpcs.Get_ancestry.query
          , Rpcs.Get_ancestry.response )
@@ -170,8 +166,8 @@ include struct
    fun ?get_some_initial_peers
        ?get_staged_ledger_aux_and_pending_coinbases_at_hash
        ?answer_sync_ledger_query ?get_transition_chain ?get_transition_knowledge
-       ?get_transition_chain_proof ?get_node_status ?get_ancestry ?get_best_tip
-       ~frontier ~consensus_local_state ->
+       ?get_transition_chain_proof ?get_ancestry ?get_best_tip ~frontier
+       ~consensus_local_state ->
     let rpc_mocks : Gossip_net.Fake.rpc_mocks =
       let get_mock (type q r) (rpc : (q, r) Rpcs.rpc) :
           (q, r) Gossip_net.Fake.rpc_mock option =
@@ -188,8 +184,6 @@ include struct
             get_transition_knowledge
         | Get_transition_chain_proof ->
             get_transition_chain_proof
-        | Get_node_status ->
-            get_node_status
         | Get_ancestry ->
             get_ancestry
         | Ban_notify ->
@@ -216,7 +210,7 @@ module Generator = struct
   let fresh_peer_custom_rpc ?get_some_initial_peers
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
       ?answer_sync_ledger_query ?get_transition_chain ?get_transition_knowledge
-      ?get_transition_chain_proof ?get_node_status ?get_ancestry ?get_best_tip
+      ?get_transition_chain_proof ?get_ancestry ?get_best_tip
       ~context:(module Context : CONTEXT) ~verifier ~max_frontier_length
       ~use_super_catchup =
     let open Context in
@@ -242,24 +236,23 @@ module Generator = struct
     make_peer_state ~frontier ~consensus_local_state
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
       ?get_some_initial_peers ?answer_sync_ledger_query ?get_ancestry
-      ?get_best_tip ?get_node_status ?get_transition_knowledge
-      ?get_transition_chain_proof ?get_transition_chain
+      ?get_best_tip ?get_transition_knowledge ?get_transition_chain_proof
+      ?get_transition_chain
 
   let fresh_peer ~context:(module Context : CONTEXT) ~verifier
       ~max_frontier_length ~use_super_catchup =
     fresh_peer_custom_rpc
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
       ?get_some_initial_peers:None ?answer_sync_ledger_query:None
-      ?get_ancestry:None ?get_best_tip:None ?get_node_status:None
-      ?get_transition_knowledge:None ?get_transition_chain_proof:None
-      ?get_transition_chain:None
+      ?get_ancestry:None ?get_best_tip:None ?get_transition_knowledge:None
+      ?get_transition_chain_proof:None ?get_transition_chain:None
       ~context:(module Context)
       ~verifier ~max_frontier_length ~use_super_catchup
 
   let peer_with_branch_custom_rpc ~frontier_branch_size ?get_some_initial_peers
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
       ?answer_sync_ledger_query ?get_transition_chain ?get_transition_knowledge
-      ?get_transition_chain_proof ?get_node_status ?get_ancestry ?get_best_tip
+      ?get_transition_chain_proof ?get_ancestry ?get_best_tip
       ~context:(module Context : CONTEXT) ~verifier ~max_frontier_length
       ~use_super_catchup =
     let open Context in
@@ -290,17 +283,16 @@ module Generator = struct
     make_peer_state ~frontier ~consensus_local_state
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
       ?get_some_initial_peers ?answer_sync_ledger_query ?get_ancestry
-      ?get_best_tip ?get_node_status ?get_transition_knowledge
-      ?get_transition_chain_proof ?get_transition_chain
+      ?get_best_tip ?get_transition_knowledge ?get_transition_chain_proof
+      ?get_transition_chain
 
   let peer_with_branch ~frontier_branch_size ~context:(module Context : CONTEXT)
       ~verifier ~max_frontier_length ~use_super_catchup =
     peer_with_branch_custom_rpc ~frontier_branch_size
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
       ?get_some_initial_peers:None ?answer_sync_ledger_query:None
-      ?get_ancestry:None ?get_best_tip:None ?get_node_status:None
-      ?get_transition_knowledge:None ?get_transition_chain_proof:None
-      ?get_transition_chain:None
+      ?get_ancestry:None ?get_best_tip:None ?get_transition_knowledge:None
+      ?get_transition_chain_proof:None ?get_transition_chain:None
       ~context:(module Context)
       ~verifier ~max_frontier_length ~use_super_catchup
 

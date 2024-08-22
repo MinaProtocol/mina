@@ -756,217 +756,6 @@ module Get_transition_chain_proof = struct
   let rate_limit_cost = Fn.const 1
 end]
 
-(* TODO: remove this unused RPC *)
-[%%versioned_rpc
-module Get_node_status = struct
-  type nonrec ctx = ctx
-
-  module Node_status = struct
-    [%%versioned
-    module Stable = struct
-      module V2 = struct
-        type t =
-          { node_ip_addr : Network_peer.Peer.Inet_addr.Stable.V1.t
-          ; node_peer_id : Network_peer.Peer.Id.Stable.V1.t
-                [@to_yojson fun peer_id -> `String peer_id]
-                [@of_yojson
-                  function `String s -> Ok s | _ -> Error "expected string"]
-          ; sync_status : Sync_status.Stable.V1.t
-          ; peers : Network_peer.Peer.Stable.V1.t list
-          ; block_producers :
-              Signature_lib.Public_key.Compressed.Stable.V1.t list
-          ; protocol_state_hash : State_hash.Stable.V1.t
-          ; ban_statuses :
-              ( Network_peer.Peer.Stable.V1.t
-              * Trust_system.Peer_status.Stable.V1.t )
-              list
-          ; k_block_hashes_and_timestamps :
-              (State_hash.Stable.V1.t * Bounded_types.String.Stable.V1.t) list
-          ; git_commit : Bounded_types.String.Stable.V1.t
-          ; uptime_minutes : int
-          ; block_height_opt : int option [@default None]
-          }
-        [@@deriving to_yojson, of_yojson]
-
-        let to_latest = Fn.id
-      end
-
-      module V1 = struct
-        type t =
-          { node_ip_addr : Network_peer.Peer.Inet_addr.Stable.V1.t
-          ; node_peer_id : Network_peer.Peer.Id.Stable.V1.t
-                [@to_yojson fun peer_id -> `String peer_id]
-                [@of_yojson
-                  function `String s -> Ok s | _ -> Error "expected string"]
-          ; sync_status : Sync_status.Stable.V1.t
-          ; peers : Network_peer.Peer.Stable.V1.t list
-          ; block_producers :
-              Signature_lib.Public_key.Compressed.Stable.V1.t list
-          ; protocol_state_hash : State_hash.Stable.V1.t
-          ; ban_statuses :
-              ( Network_peer.Peer.Stable.V1.t
-              * Trust_system.Peer_status.Stable.V1.t )
-              list
-          ; k_block_hashes_and_timestamps :
-              (State_hash.Stable.V1.t * Bounded_types.String.Stable.V1.t) list
-          ; git_commit : Bounded_types.String.Stable.V1.t
-          ; uptime_minutes : int
-          }
-        [@@deriving to_yojson, of_yojson]
-
-        let to_latest status : Latest.t =
-          { node_ip_addr = status.node_ip_addr
-          ; node_peer_id = status.node_peer_id
-          ; sync_status = status.sync_status
-          ; peers = status.peers
-          ; block_producers = status.block_producers
-          ; protocol_state_hash = status.protocol_state_hash
-          ; ban_statuses = status.ban_statuses
-          ; k_block_hashes_and_timestamps = status.k_block_hashes_and_timestamps
-          ; git_commit = status.git_commit
-          ; uptime_minutes = status.uptime_minutes
-          ; block_height_opt = None
-          }
-      end
-    end]
-  end
-
-  module Master = struct
-    let name = "get_node_status"
-
-    module T = struct
-      type query = unit [@@deriving sexp, to_yojson]
-
-      type response =
-        (Node_status.t, Bounded_types.Wrapped_error.Stable.V1.t) result
-    end
-
-    module Caller = T
-    module Callee = T
-  end
-
-  include Master.T
-
-  let sent_counter = Mina_metrics.Network.get_node_status_rpcs_sent
-
-  let received_counter = Mina_metrics.Network.get_node_status_rpcs_received
-
-  let failed_request_counter =
-    Mina_metrics.Network.get_node_status_rpc_requests_failed
-
-  let failed_response_counter =
-    Mina_metrics.Network.get_node_status_rpc_responses_failed
-
-  module M = Versioned_rpc.Both_convert.Plain.Make (Master)
-  include M
-
-  let response_to_yojson response =
-    match response with
-    | Ok status ->
-        Node_status.Stable.Latest.to_yojson status
-    | Error err ->
-        `Assoc [ ("error", Error_json.error_to_yojson err) ]
-
-  include Perf_histograms.Rpc.Plain.Extend (struct
-    include M
-    include Master
-  end)
-
-  module V2 = struct
-    module T = struct
-      type query = unit [@@deriving sexp]
-
-      type response =
-        (( Node_status.Stable.V2.t
-         , Bounded_types.Wrapped_error.Stable.V1.t )
-         Result.t
-        [@version_asserted] )
-
-      let query_of_caller_model = Fn.id
-
-      let callee_model_of_query = Fn.id
-
-      let response_of_callee_model = Fn.id
-
-      let caller_model_of_response = Fn.id
-    end
-
-    module T' =
-      Perf_histograms.Rpc.Plain.Decorate_bin_io
-        (struct
-          include M
-          include Master
-        end)
-        (T)
-
-    include T'
-    include Register (T')
-  end
-
-  module V1 = struct
-    module T = struct
-      type query = unit [@@deriving sexp]
-
-      type response =
-        (( Node_status.Stable.V1.t
-         , Bounded_types.Wrapped_error.Stable.V1.t )
-         Core_kernel.Result.t
-        [@version_asserted] )
-
-      let query_of_caller_model = Fn.id
-
-      let callee_model_of_query = Fn.id
-
-      let response_of_callee_model = function
-        | Error err ->
-            Error err
-        | Ok (status : Node_status.Stable.Latest.t) ->
-            Ok
-              { Node_status.Stable.V1.node_ip_addr = status.node_ip_addr
-              ; node_peer_id = status.node_peer_id
-              ; sync_status = status.sync_status
-              ; peers = status.peers
-              ; block_producers = status.block_producers
-              ; protocol_state_hash = status.protocol_state_hash
-              ; ban_statuses = status.ban_statuses
-              ; k_block_hashes_and_timestamps =
-                  status.k_block_hashes_and_timestamps
-              ; git_commit = status.git_commit
-              ; uptime_minutes = status.uptime_minutes
-              }
-
-      let caller_model_of_response = function
-        | Error err ->
-            Error err
-        | Ok (status : Node_status.Stable.V1.t) ->
-            Ok (Node_status.Stable.V1.to_latest status)
-    end
-
-    module T' =
-      Perf_histograms.Rpc.Plain.Decorate_bin_io
-        (struct
-          include M
-          include Master
-        end)
-        (T)
-
-    include T'
-    include Register (T')
-  end
-
-  let receipt_trust_action_message _request = failwith "TODO"
-
-  let log_request_received ~logger:_ ~sender:_ _request = failwith "TODO"
-
-  let response_is_successful _response = failwith "TODO"
-
-  let handle_request _ctx ~version:_ _request = failwith "TODO"
-
-  let rate_limit_budget = (1, `Per Time.Span.second)
-
-  let rate_limit_cost _ = failwith "TODO"
-end]
-
 [%%versioned_rpc
 module Get_ancestry = struct
   type nonrec ctx = ctx
@@ -1311,14 +1100,12 @@ type ('query, 'response) rpc =
       : ( Get_transition_chain_proof.query
         , Get_transition_chain_proof.response )
         rpc
-  | Get_node_status : (Get_node_status.query, Get_node_status.response) rpc
   | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
   | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
   | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
 
 type any_rpc = Rpc : ('q, 'r) rpc -> any_rpc
 
-(* TODO: we are intentially omitting Get_node_status from this list, since it wasn't being registered previously *)
 let all_rpcs =
   [ Rpc Get_some_initial_peers
   ; Rpc Get_staged_ledger_aux_and_pending_coinbases_at_hash
@@ -1345,8 +1132,6 @@ let implementation :
       (module Get_transition_knowledge)
   | Get_transition_chain_proof ->
       (module Get_transition_chain_proof)
-  | Get_node_status ->
-      (module Get_node_status)
   | Get_ancestry ->
       (module Get_ancestry)
   | Ban_notify ->

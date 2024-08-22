@@ -31,55 +31,10 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 end
 
-module Sinks : module type of Sinks
+module Node_status = Node_status
+module Sinks = Sinks
 
 module Gossip_net : Gossip_net.S with module Rpc_interface := Rpcs
-
-module Node_status : sig
-  [%%versioned:
-  module Stable : sig
-    module V2 : sig
-      type t = Rpcs.Get_node_status.Node_status.Stable.V2.t =
-        { node_ip_addr : Network_peer.Peer.Inet_addr.Stable.V1.t
-        ; node_peer_id : Network_peer.Peer.Id.Stable.V1.t
-        ; sync_status : Sync_status.Stable.V1.t
-        ; peers : Network_peer.Peer.Stable.V1.t list
-        ; block_producers : Signature_lib.Public_key.Compressed.Stable.V1.t list
-        ; protocol_state_hash : State_hash.Stable.V1.t
-        ; ban_statuses :
-            ( Network_peer.Peer.Stable.V1.t
-            * Trust_system.Peer_status.Stable.V1.t )
-            list
-        ; k_block_hashes_and_timestamps :
-            (State_hash.Stable.V1.t * Bounded_types.String.Stable.V1.t) list
-        ; git_commit : Bounded_types.String.Stable.V1.t
-        ; uptime_minutes : int
-        ; block_height_opt : int option
-        }
-      [@@deriving bin_io, yojson]
-    end
-
-    module V1 : sig
-      type t = Rpcs.Get_node_status.Node_status.Stable.V1.t =
-        { node_ip_addr : Network_peer.Peer.Inet_addr.Stable.V1.t
-        ; node_peer_id : Network_peer.Peer.Id.Stable.V1.t
-        ; sync_status : Sync_status.Stable.V1.t
-        ; peers : Network_peer.Peer.Stable.V1.t list
-        ; block_producers : Signature_lib.Public_key.Compressed.Stable.V1.t list
-        ; protocol_state_hash : State_hash.Stable.V1.t
-        ; ban_statuses :
-            ( Network_peer.Peer.Stable.V1.t
-            * Trust_system.Peer_status.Stable.V1.t )
-            list
-        ; k_block_hashes_and_timestamps :
-            (State_hash.Stable.V1.t * Bounded_types.String.Stable.V1.t) list
-        ; git_commit : Bounded_types.String.Stable.V1.t
-        ; uptime_minutes : int
-        }
-      [@@deriving bin_io, yojson]
-    end
-  end]
-end
 
 module Rpcs : sig
   module Get_some_initial_peers : sig
@@ -122,16 +77,6 @@ module Rpcs : sig
     type query = unit
 
     type response = State_hash.t list
-  end
-
-  module Get_node_status : sig
-    type query = unit
-
-    type response =
-      ( Node_status.Stable.Latest.t
-      , Bounded_types.Wrapped_error.Stable.V1.t )
-      result
-    [@@deriving to_yojson]
   end
 
   module Get_ancestry : sig
@@ -183,7 +128,6 @@ module Rpcs : sig
         : ( Get_transition_chain_proof.query
           , Get_transition_chain_proof.response )
           rpc
-    | Get_node_status : (Get_node_status.query, Get_node_status.response) rpc
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
@@ -214,6 +158,11 @@ val bandwidth_info :
 
 val get_peer_node_status :
   t -> Network_peer.Peer.t -> Node_status.t Deferred.Or_error.t
+
+val get_node_status_from_peers :
+     t
+  -> Mina_net2.Multiaddr.t list option
+  -> Node_status.t Or_error.t list Deferred.t
 
 val add_peer :
   t -> Network_peer.Peer.t -> is_seed:bool -> unit Deferred.Or_error.t
@@ -316,7 +265,5 @@ val create :
   -> Config.t
   -> sinks:Sinks.t
   -> get_transition_frontier:(unit -> Transition_frontier.t option)
-  -> get_node_status:
-       (   Rpcs.Get_node_status.query Envelope.Incoming.t
-        -> Rpcs.Get_node_status.response Deferred.t )
+  -> get_node_status:(unit -> Node_status.t Deferred.Or_error.t)
   -> t Deferred.t

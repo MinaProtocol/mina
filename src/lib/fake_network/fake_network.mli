@@ -61,10 +61,6 @@ include sig
          ( Rpcs.Get_transition_chain_proof.query
          , Rpcs.Get_transition_chain_proof.response )
          Gossip_net.Fake.rpc_mock
-    -> ?get_node_status:
-         ( Rpcs.Get_node_status.query
-         , Rpcs.Get_node_status.response )
-         Gossip_net.Fake.rpc_mock
     -> ?get_ancestry:
          ( Rpcs.Get_ancestry.query
          , Rpcs.Get_ancestry.response )

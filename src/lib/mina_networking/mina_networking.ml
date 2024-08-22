@@ -1,6 +1,7 @@
 open Core
 open Async
 open Mina_base
+open Mina_stdlib
 module Sync_ledger = Mina_ledger.Sync_ledger
 open Network_peer
 open Network_pool
@@ -43,10 +44,10 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 end
 
-module Sinks = Sinks
+module Node_status = Node_status
 module Rpcs = Rpcs
+module Sinks = Sinks
 module Gossip_net = Gossip_net.Make (Rpcs)
-module Node_status = Rpcs.Get_node_status.Node_status
 
 module Config = struct
   type log_gossip_heard =
@@ -71,9 +72,7 @@ type t =
 
 let create (module Context : CONTEXT) (config : Config.t) ~sinks
     ~(get_transition_frontier : unit -> Transition_frontier.t option)
-    ~(get_node_status :
-          Rpcs.Get_node_status.query Envelope.Incoming.t
-       -> Rpcs.Get_node_status.response Deferred.t ) =
+    ~(get_node_status : unit -> Node_status.t Deferred.Or_error.t) =
   let open Context in
   let gossip_net_ref = ref None in
   let module Rpc_context = struct
@@ -100,19 +99,14 @@ let create (module Context : CONTEXT) (config : Config.t) ~sinks
   (* The node status RPC is implemented directly in go, serving a string which
      is periodically updated. This is so that one can make this RPC on a node even
      if that node is at its connection limit. *)
-  let fake_time = Time.now () in
   Clock.every' (Time.Span.of_min 1.) (fun () ->
       O1trace.thread "update_node_status" (fun () ->
-          match%bind
-            get_node_status
-              { data = (); sender = Local; received_at = fake_time }
-          with
+          match%bind get_node_status () with
           | Error _ ->
               Deferred.unit
           | Ok data ->
               Gossip_net.Any.set_node_status gossip_net
-                ( Rpcs.Get_node_status.Node_status.to_yojson data
-                |> Yojson.Safe.to_string )
+                (Node_status.to_yojson data |> Yojson.Safe.to_string)
               >>| ignore ) ) ;
   don't_wait_for
     (Gossip_net.Any.on_first_connect gossip_net ~f:(fun () ->
@@ -145,9 +139,7 @@ include struct
     let open Deferred.Or_error.Let_syntax in
     let%bind s = get_peer_node_status t.gossip_net peer in
     Or_error.try_with (fun () ->
-        match
-          Rpcs.Get_node_status.Node_status.of_yojson (Yojson.Safe.from_string s)
-        with
+        match Node_status.of_yojson (Yojson.Safe.from_string s) with
         | Ok x ->
             x
         | Error e ->
@@ -180,6 +172,22 @@ include struct
   let set_connection_gating_config t ?clean_added_peers config =
     lift (set_connection_gating ?clean_added_peers) t config
 end
+
+let get_node_status_from_peers (t : t)
+    (addrs : Mina_net2.Multiaddr.t list option) =
+  let run = Deferred.List.map ~how:`Parallel ~f:(get_peer_node_status t) in
+  match addrs with
+  | None ->
+      peers t >>= run
+  | Some addrs -> (
+      match Option.all (List.map ~f:Mina_net2.Multiaddr.to_peer addrs) with
+      | Some peers ->
+          run peers
+      | None ->
+          Deferred.return
+            (List.map addrs ~f:(fun _ ->
+                 Or_error.error_string
+                   "Could not parse peers in node status request" ) ) )
 
 (* TODO: Have better pushback behavior *)
 let broadcast_state t state =
