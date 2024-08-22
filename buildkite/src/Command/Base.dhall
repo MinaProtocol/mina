@@ -124,13 +124,13 @@ let Config =
 let targetToAgent =
           \(target : Size)
       ->  merge
-            { XLarge = toMap { size = "generic" }
-            , Large = toMap { size = "generic" }
-            , Medium = toMap { size = "generic" }
-            , Small = toMap { size = "generic" }
-            , Integration = toMap { size = "integration" }
-            , QA = toMap { size = "qa" }
-            , Hardfork = toMap { size = "hardfork" }
+            { XLarge = toMap { size = "hetzner-rivendell-1" }
+            , Large = toMap { size = "hetzner-rivendell-1" }
+            , Medium = toMap { size = "hetzner-rivendell-1" }
+            , Small = toMap { size = "hetzner-rivendell-1" }
+            , Integration = toMap { size = "hetzner-rivendell-1" }
+            , QA = toMap { size = "hetzner-rivendell-1" }
+            , Hardfork = toMap { size = "hetzner-rivendell-1" }
             }
             target
 
