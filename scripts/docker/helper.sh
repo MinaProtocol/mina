@@ -17,7 +17,6 @@ function export_base_image () {
 }
 
 function export_version () {
-    export VERSION="${VERSION}-${DEB_CODENAME##*=}"
     case "${SERVICE}" in
         mina-daemon|mina-batch-txn) export VERSION="${VERSION}-${NETWORK##*=}" ;;
         *)  ;;
