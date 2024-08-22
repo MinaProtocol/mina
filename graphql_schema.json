@@ -6548,8 +6548,8 @@
               "deprecationReason": null
             },
             {
-              "name": "timingInfo related to the account",
-              "description": "Account timing info",
+              "name": "timingInfo",
+              "description": "Account timing according to chain state",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6564,8 +6564,8 @@
               "deprecationReason": null
             },
             {
-              "name": "current nonce related to the account",
-              "description": "Account nonce",
+              "name": "nonce",
+              "description": "current nonce related to the account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",

@@ -782,13 +782,13 @@ module SnarkedLedgerMembership = struct
             ~doc:"Account balance for a pk and token pair"
             ~typ:(non_null balance)
             ~resolve:(fun _ { account_balance; _ } -> account_balance)
-        ; field "timingInfo related to the account"
+        ; field "timingInfo"
             ~args:Arg.[]
-            ~doc:"Account timing info" ~typ:(non_null account_timing)
+            ~doc:"Account timing according to chain state" ~typ:(non_null account_timing)
             ~resolve:(fun _ { timing_info; _ } -> timing_info)
-        ; field "current nonce related to the account"
+        ; field "nonce"
             ~args:Arg.[]
-            ~doc:"Account nonce" ~typ:(non_null uint32)
+            ~doc:"current nonce related to the account" ~typ:(non_null uint32)
             ~resolve:(fun _ { nonce; _ } -> Account.Nonce.to_uint32 nonce)
         ; field "merklePath"
             ~args:Arg.[]
