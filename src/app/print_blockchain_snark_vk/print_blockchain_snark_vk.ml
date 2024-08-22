@@ -16,7 +16,7 @@ let () =
         let constraint_constants =
           Genesis_constants_compiled.compiled_config.constraint_constants
 
-        let proof_level = Genesis_constants_compiled.compiled_config.proof_level
+        let proof_level = Genesis_constants.Proof_level.Full
 
         let tag = Transaction_snark_instance.tag
       end) in

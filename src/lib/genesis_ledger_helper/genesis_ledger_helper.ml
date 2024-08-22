@@ -890,8 +890,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   let open Deferred.Or_error.Let_syntax in
   let proof_level =
     List.find_map_exn ~f:Fn.id
-      [ Some proof_level
-      ; Option.Let_syntax.(
+      [ Option.Let_syntax.(
           let%bind proof = config.proof in
           match%map proof.level with
           | Full ->
@@ -900,6 +899,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
               Check
           | None ->
               None)
+      ; Some proof_level
       ]
   in
   let constraint_constants, blockchain_proof_system_id =
