@@ -784,7 +784,8 @@ module SnarkedLedgerMembership = struct
             ~resolve:(fun _ { account_balance; _ } -> account_balance)
         ; field "timingInfo"
             ~args:Arg.[]
-            ~doc:"Account timing according to chain state" ~typ:(non_null account_timing)
+            ~doc:"Account timing according to chain state"
+            ~typ:(non_null account_timing)
             ~resolve:(fun _ { timing_info; _ } -> timing_info)
         ; field "nonce"
             ~args:Arg.[]
