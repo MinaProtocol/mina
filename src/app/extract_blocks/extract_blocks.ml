@@ -624,8 +624,7 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks
 
             let network_prefix =
               network
-              |> Option.map ~f:(fun network -> network ^ "-")
-              |> Option.value ~default:""
+              |> Option.value_map ~default:"" ~f:(fun network -> network ^ "-")
             in
             let height_prefix =
               if include_block_height_in_name then
