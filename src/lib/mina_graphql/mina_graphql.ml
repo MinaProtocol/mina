@@ -408,7 +408,7 @@ module Mutations = struct
         in
         let%bind accounts = Ledger.to_list best_tip_ledger in
         let constraint_constants =
-          Genesis_constants.Constraint_constants.compiled
+          Genesis_constants_compiled.Constraint_constants.t
         in
         let depth = constraint_constants.ledger_depth in
         let ledger = Ledger.create_ephemeral ~depth () in
@@ -417,7 +417,7 @@ module Mutations = struct
         *)
         List.iter accounts ~f:(fun account ->
             let pk = Account.public_key account in
-            let token = Account.token account in
+            let token = Account.token_id account in
             let account_id = Account_id.create pk token in
             match Ledger.get_or_create_account ledger account_id account with
             | Ok (`Added, _loc) ->
@@ -515,15 +515,16 @@ module Mutations = struct
         ~error:(sprintf "Invalid `fee` provided.")
     in
     let%bind () =
+      let minimum_fee = Genesis_constants_compiled.t.minimum_user_command_fee in
       Result.ok_if_true
-        Currency.Fee.(fee >= Signed_command.minimum_fee)
+        Currency.Fee.(fee >= minimum_fee)
         ~error:
           (* IMPORTANT! Do not change the content of this error without
            * updating Rosetta's construction API to handle the changes *)
           (sprintf
              !"Invalid user command. Fee %s is less than the minimum fee, %s."
              (Currency.Fee.to_mina_string fee)
-             (Currency.Fee.to_mina_string Signed_command.minimum_fee) )
+             (Currency.Fee.to_mina_string minimum_fee) )
     in
     let%map memo =
       Option.value_map memo ~default:(Ok Signed_command_memo.empty)
@@ -1591,12 +1592,8 @@ module Mutations = struct
   end
 end
 
-module Queries (Context : sig
-  val commit_id : string
-end) =
-struct
+module Queries = struct
   open Schema
-  open Context
 
   (* helper for pooledUserCommands, pooledZkappCommands *)
   let get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt =
@@ -1762,15 +1759,14 @@ struct
              agrees with status; see issue #8251
         *)
         let%map { sync_status; _ } =
-          Mina_commands.get_status ~commit_id ~flag:`Performance mina
+          Mina_commands.get_status ~flag:`Performance mina
         in
         Ok sync_status )
 
   let daemon_status =
     io_field "daemonStatus" ~doc:"Get running daemon status" ~args:[]
       ~typ:(non_null Types.DaemonStatus.t) ~resolve:(fun { ctx = mina; _ } () ->
-        Mina_commands.get_status ~commit_id ~flag:`Performance mina
-        >>| Result.return )
+        Mina_commands.get_status ~flag:`Performance mina >>| Result.return )
 
   let trust_status =
     field "trustStatus"
@@ -1796,7 +1792,7 @@ struct
     field "version" ~typ:string
       ~args:Arg.[]
       ~doc:"The version of the node (git commit hash)"
-      ~resolve:(fun _ _ -> Some commit_id)
+      ~resolve:(fun { ctx; _ } _ -> Some (Mina_lib.commit_id ctx))
 
   let get_filtered_log_entries =
     field "getFilteredLogEntries"
@@ -2387,7 +2383,7 @@ struct
                   Deferred.Result.fail "Daemon is bootstrapping"
               | `Active breadcrumb -> (
                   let txn_stop_slot_opt =
-                    Runtime_config.slot_tx_end_or_default runtime_config
+                    Runtime_config.slot_tx_end runtime_config
                   in
                   match txn_stop_slot_opt with
                   | None ->
@@ -2753,29 +2749,21 @@ struct
   end
 end
 
-let schema ~commit_id =
-  let module Q = Queries (struct
-    let commit_id = commit_id
-  end) in
+let schema =
   Graphql_async.Schema.(
-    schema Q.commands ~mutations:Mutations.commands
+    schema Queries.commands ~mutations:Mutations.commands
       ~subscriptions:Subscriptions.commands)
 
-let schema_limited ~commit_id =
-  let module Q = Queries (struct
-    let commit_id = commit_id
-  end) in
+let schema_limited =
   (* including version because that's the default query *)
   Graphql_async.Schema.(
     schema
-      [ Q.daemon_status; Q.block; Q.version ]
+      [ Queries.daemon_status; Queries.block; Queries.version ]
       ~mutations:[] ~subscriptions:[])
 
-let schema_itn ~commit_id : (bool * Mina_lib.t) Schema.schema =
-  let module Q = Queries (struct
-    let commit_id = commit_id
-  end) in
+let schema_itn : (bool * Mina_lib.t) Schema.schema =
   if Mina_compile_config.itn_features then
     Graphql_async.Schema.(
-      schema Q.Itn.commands ~mutations:Mutations.Itn.commands ~subscriptions:[])
+      schema Queries.Itn.commands ~mutations:Mutations.Itn.commands
+        ~subscriptions:[])
   else Graphql_async.Schema.(schema [] ~mutations:[] ~subscriptions:[])

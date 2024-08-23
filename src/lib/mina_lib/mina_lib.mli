@@ -23,6 +23,12 @@ type Structured_log_events.t +=
 module type CONTEXT = sig
   val logger : Logger.t
 
+  val time_controller : Block_time.Controller.t
+
+  val trust_system : Trust_system.t
+
+  val consensus_local_state : Consensus.Data.Local_state.t
+
   val precomputed_values : Precomputed_values.t
 
   val constraint_constants : Genesis_constants.Constraint_constants.t
@@ -43,6 +49,8 @@ exception Bootstrap_stuck_shutdown
 val time_controller : t -> Block_time.Controller.t
 
 val subscription : t -> Mina_subscriptions.t
+
+val commit_id : t -> string
 
 val daemon_start_time : Time_ns.t
 
@@ -170,13 +178,10 @@ val transaction_pool : t -> Network_pool.Transaction_pool.t
 
 val snark_pool : t -> Network_pool.Snark_pool.t
 
-val start : commit_id:string -> t -> unit Deferred.t
+val start : t -> unit Deferred.t
 
 val start_with_precomputed_blocks :
-     commit_id:string
-  -> t
-  -> Block_producer.Precomputed.t Sequence.t
-  -> unit Deferred.t
+  t -> Block_producer.Precomputed.t Sequence.t -> unit Deferred.t
 
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 

@@ -9,4 +9,4 @@ module Stable = struct
   end
 end]
 
-let map { data; proof } ~f1 ~f2 = { data = f1 data; proof = f2 proof }
+let map { data; proof } ~f = { data = f data; proof }
