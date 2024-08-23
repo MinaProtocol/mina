@@ -137,6 +137,8 @@ let
   granularBase =
     dune-nix.outputs' commonOverrides ./.. allDeps info packageHasSrcApp;
   vmOverlays = let
+    commit = inputs.self.sourceInfo.rev or "<dirty>";
+    commitShort = builtins.substring 0 8 commit;
     cmdLineTest = ''
       mina --version
       mv _build/default/src/test/command_line_tests/command_line_tests.exe tests.exe
@@ -145,6 +147,9 @@ let
       mkdir -p $TMPDIR
       export MINA_LIBP2P_PASS="naughty blue worm"
       export MINA_PRIVKEY_PASS="naughty blue worm"
+      export MINA_KEYS_PATH=genesis_ledgers
+      mkdir -p $MINA_KEYS_PATH
+      echo '{"ledger":{"accounts":[]}}' > $MINA_KEYS_PATH/config_${commitShort}.json
       ./tests.exe --mina-path mina
     '';
   in [
