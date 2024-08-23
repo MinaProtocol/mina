@@ -19,10 +19,12 @@ let main ~genesis_constants ~constraint_constants () =
     Lazy.force @@ zkapp_command ~genesis_constants ~constraint_constants
   in
   print_heap_usage "Zkapp_command.t" @@ zkapp_command ;
+  (*
   let%bind zkapp_proof =
     Lazy.force @@ zkapp_proof ~genesis_constants ~constraint_constants
   in
   print_heap_usage "Pickles.Side_loaded.Proof.t" zkapp_proof ;
+  *)
   let%bind verification_key =
     Lazy.force @@ verification_key ~constraint_constants
   in
@@ -36,13 +38,17 @@ let main ~genesis_constants ~constraint_constants () =
   print_heap_usage "Parallel_scan.Base.t (coinbase)"
     scan_state_base_node_coinbase ;
   print_heap_usage "Parallel_scan.Base.t (payment)" scan_state_base_node_payment ;
+  (*
   let%map scan_state_base_node_zkapp =
     Lazy.force
     @@ scan_state_base_node_zkapp ~genesis_constants ~constraint_constants
   in
+  *)
   print_heap_usage "Parallel_scan.Base.t (zkApp)" scan_state_base_node_zkapp ;
   print_heap_usage "Parallel_scan.Merge.t" scan_state_merge_node ;
-  print_heap_usage "Transaction_snark.Statement.t" transaction_snark_statement
+  print_heap_usage "Transaction_snark.Statement.t" transaction_snark_statement;
+  Async.return ()
+
 
 let () =
   let genesis_constants =
