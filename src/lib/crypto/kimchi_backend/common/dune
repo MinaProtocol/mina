@@ -29,7 +29,6 @@
   base.base_internalhash_types
   ;; local libraries
   tuple_lib
-  snarky.backendless
   key_cache
   pickles_types
   hex
