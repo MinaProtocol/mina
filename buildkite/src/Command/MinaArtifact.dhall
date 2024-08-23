@@ -146,20 +146,7 @@ let docker_step
                             }
                       )
                       networks
-                , TestExecutive =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = "mina-test-executive"
-                    , deb_codename = "${DebianVersions.lowerName debVersion}"
-                    , deb_profile = profile
-                    , build_flags = buildFlags
-                    , deb_repo = DebianRepo.Type.Local
-                    , step_key =
-                        "test-executive-${DebianVersions.lowerName
-                                            debVersion}${BuildFlags.toLabelSegment
-                                                           buildFlags}--docker-image"
-                    }
-                  ]
+                , TestExecutive = [] : List DockerImage.ReleaseSpec.Type
                 , BatchTxn =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
@@ -188,20 +175,6 @@ let docker_step
                                      debVersion}${Profiles.toLabelSegment
                                                     profile}${BuildFlags.toLabelSegment
                                                                 buildFlags}-docker-image"
-                    }
-                  ]
-                , ArchiveMigration =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = "mina-archive-migration"
-                    , deb_codename = "${DebianVersions.lowerName debVersion}"
-                    , build_flags = buildFlags
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_profile = profile
-                    , step_key =
-                        "archive-migration-${DebianVersions.lowerName
-                                               debVersion}${BuildFlags.toLabelSegment
-                                                              buildFlags}--docker-image"
                     }
                   ]
                 , Rosetta =

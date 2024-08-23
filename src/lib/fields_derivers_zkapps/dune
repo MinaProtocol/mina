@@ -28,12 +28,10 @@
  )
  (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
- (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps
    ppx_annot
    ppx_deriving_yojson
-   ppx_optcomp
    ppx_base
    ppx_fields_conv
    ppx_let

@@ -1591,8 +1591,12 @@ module Mutations = struct
   end
 end
 
-module Queries = struct
+module Queries (Context : sig
+  val commit_id : string
+end) =
+struct
   open Schema
+  open Context
 
   (* helper for pooledUserCommands, pooledZkappCommands *)
   let get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt =
@@ -1758,14 +1762,15 @@ module Queries = struct
              agrees with status; see issue #8251
         *)
         let%map { sync_status; _ } =
-          Mina_commands.get_status ~flag:`Performance mina
+          Mina_commands.get_status ~commit_id ~flag:`Performance mina
         in
         Ok sync_status )
 
   let daemon_status =
     io_field "daemonStatus" ~doc:"Get running daemon status" ~args:[]
       ~typ:(non_null Types.DaemonStatus.t) ~resolve:(fun { ctx = mina; _ } () ->
-        Mina_commands.get_status ~flag:`Performance mina >>| Result.return )
+        Mina_commands.get_status ~commit_id ~flag:`Performance mina
+        >>| Result.return )
 
   let trust_status =
     field "trustStatus"
@@ -1791,7 +1796,7 @@ module Queries = struct
     field "version" ~typ:string
       ~args:Arg.[]
       ~doc:"The version of the node (git commit hash)"
-      ~resolve:(fun _ _ -> Some Mina_version.commit_id)
+      ~resolve:(fun _ _ -> Some commit_id)
 
   let get_filtered_log_entries =
     field "getFilteredLogEntries"
@@ -2430,9 +2435,9 @@ module Queries = struct
         in
         let block = Transition_frontier.Breadcrumb.block breadcrumb in
         let blockchain_length = Mina_block.blockchain_length block in
-        let global_slot =
+        let global_slot_since_genesis =
           Mina_block.consensus_state block
-          |> Consensus.Data.Consensus_state.curr_global_slot
+          |> Consensus.Data.Consensus_state.global_slot_since_genesis
         in
         let staged_ledger =
           Transition_frontier.Breadcrumb.staged_ledger breadcrumb
@@ -2465,10 +2470,10 @@ module Queries = struct
           get_epoch_ledgers ~mina breadcrumb
         in
         let%bind new_config =
-          Runtime_config.make_fork_config ~staged_ledger ~global_slot
-            ~state_hash ~staking_ledger ~staking_epoch_seed
-            ~next_epoch_ledger:(Some next_epoch_ledger) ~next_epoch_seed
-            ~blockchain_length
+          Runtime_config.make_fork_config ~staged_ledger
+            ~global_slot_since_genesis ~state_hash ~staking_ledger
+            ~staking_epoch_seed ~next_epoch_ledger:(Some next_epoch_ledger)
+            ~next_epoch_seed ~blockchain_length
         in
         let%map () =
           let open Async.Deferred.Infix in
@@ -2591,6 +2596,65 @@ module Queries = struct
             (* Prefix string to disambiguate *)
             "other network: " ^ s )
 
+  let protocol_state =
+    io_field "protocolState"
+      ~doc:
+        "Get the protocol state for a given block, optionally encoded in Base64"
+      ~typ:(non_null string)
+      ~args:
+        Arg.
+          [ arg "stateHash" ~doc:"The state hash of the desired block"
+              ~typ:string
+          ; arg "height"
+              ~doc:"The height of the desired block in the best chain" ~typ:int
+          ; arg "encoding" ~doc:"Encoding format (JSON or BASE64)"
+              ~typ:
+                (enum "Encoding"
+                   ~values:
+                     [ enum_value "JSON" ~value:`JSON
+                     ; enum_value "BASE64" ~value:`BASE64
+                     ] )
+          ]
+      ~resolve:(fun { ctx = mina; _ } () state_hash_base58_opt height_opt
+                    encoding_opt ->
+        let open Deferred.Result.Let_syntax in
+        let%map breadcrumb =
+          match (state_hash_base58_opt, height_opt) with
+          | None, None -> (
+              match Mina_lib.best_tip mina with
+              | `Active best_tip ->
+                  Deferred.Result.return best_tip
+              | `Bootstrapping ->
+                  Deferred.Result.fail "Node is bootstrapping" )
+          | Some state_hash_base58, None ->
+              let%bind state_hash =
+                Deferred.return (State_hash.of_base58_check state_hash_base58)
+                |> Deferred.Result.map_error ~f:Error.to_string_hum
+              in
+              Deferred.return
+                (Mina_lib.best_chain_block_by_state_hash mina state_hash)
+          | None, Some height ->
+              let height_uint32 = Unsigned.UInt32.of_int height in
+              Deferred.return
+                (Mina_lib.best_chain_block_by_height mina height_uint32)
+          | Some _, Some _ ->
+              Deferred.Result.fail
+                "Must provide exactly one of state hash, height"
+        in
+        let protocol_state =
+          Transition_frontier.Breadcrumb.protocol_state breadcrumb
+        in
+        match encoding_opt with
+        | Some `BASE64 ->
+            Bin_prot.Writer.to_string
+              Mina_state.Protocol_state.Value.Stable.V2.bin_t.writer
+              protocol_state
+            |> Base64.encode_exn
+        | Some `JSON | None ->
+            (* Default to JSON if no encoding is specified *)
+            Mina_state.Protocol_state.value_to_yojson protocol_state
+            |> Yojson.Safe.to_string )
+
   let commands =
     [ sync_status
     ; daemon_status
@@ -2628,6 +2692,7 @@ module Queries = struct
     ; blockchain_verification_key
     ; network_id
     ; signature_kind
+    ; protocol_state
     ]
 
   module Itn = struct
@@ -2688,21 +2753,29 @@ module Queries = struct
   end
 end
 
-let schema =
+let schema ~commit_id =
+  let module Q = Queries (struct
+    let commit_id = commit_id
+  end) in
   Graphql_async.Schema.(
-    schema Queries.commands ~mutations:Mutations.commands
+    schema Q.commands ~mutations:Mutations.commands
       ~subscriptions:Subscriptions.commands)
 
-let schema_limited =
+let schema_limited ~commit_id =
+  let module Q = Queries (struct
+    let commit_id = commit_id
+  end) in
   (* including version because that's the default query *)
   Graphql_async.Schema.(
     schema
-      [ Queries.daemon_status; Queries.block; Queries.version ]
+      [ Q.daemon_status; Q.block; Q.version ]
       ~mutations:[] ~subscriptions:[])
 
-let schema_itn : (bool * Mina_lib.t) Schema.schema =
+let schema_itn ~commit_id : (bool * Mina_lib.t) Schema.schema =
+  let module Q = Queries (struct
+    let commit_id = commit_id
+  end) in
   if Mina_compile_config.itn_features then
     Graphql_async.Schema.(
-      schema Queries.Itn.commands ~mutations:Mutations.Itn.commands
-        ~subscriptions:[])
+      schema Q.Itn.commands ~mutations:Mutations.Itn.commands ~subscriptions:[])
   else Graphql_async.Schema.(schema [] ~mutations:[] ~subscriptions:[])
