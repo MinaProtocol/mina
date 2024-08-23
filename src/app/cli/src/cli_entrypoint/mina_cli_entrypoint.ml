@@ -99,6 +99,7 @@ let load_config_files ~logger ~conf_dir ~genesis_dir ~proof_level config_files =
   let%bind precomputed_values =
     match%map
       Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
+        ~compiled:(module Genesis_constants_compiled)
         ~proof_level config
     with
     | Ok (precomputed_values, _) ->
@@ -306,7 +307,9 @@ let setup_daemon logger =
         (sprintf
            "FEE Amount a worker wants to get compensated for generating a \
             snark proof (default: %d)"
-           (Currency.Fee.to_nanomina_int Currency.Fee.default_snark_worker_fee) )
+           ( Currency.Fee.to_nanomina_int
+           @@ Currency.Fee.of_mina_string_exn
+                Mina_compile_config.default_snark_worker_fee_string ) )
       (optional txn_fee)
   and work_reassignment_wait =
     flag "--work-reassignment-wait"
@@ -840,7 +843,10 @@ let setup_daemon logger =
               |> Option.map ~f:Currency.Fee.of_nanomina_int_exn
             in
             or_from_config json_to_currency_fee_option "snark-worker-fee"
-              ~default:Currency.Fee.default_snark_worker_fee snark_work_fee
+              ~default:
+                (Currency.Fee.of_mina_string_exn
+                   Mina_compile_config.default_snark_worker_fee_string )
+              snark_work_fee
           in
           let node_status_url =
             maybe_from_config YJ.Util.to_string_option "node-status-url"
@@ -1673,12 +1679,13 @@ let snark_hashes =
   Command.basic ~summary:"List hashes of proving and verification keys"
     [%map_open
       let json = Cli_lib.Flag.json in
-      let print = Core.printf "%s\n%!" in
-      fun () -> if json then print "[]\n"]
+      fun () -> if json then Core.printf "[]\n%!"]
 
 let internal_commands logger =
   [ ( Snark_worker.Intf.command_name
-    , Snark_worker.command ~commit_id:Mina_version.commit_id )
+    , Snark_worker.command ~proof_level:Genesis_constants_compiled.Proof_level.t
+        ~constraint_constants:Genesis_constants_compiled.Constraint_constants.t
+        ~commit_id:Mina_version.commit_id )
   ; ("snark-hashes", snark_hashes)
   ; ( "run-prover"
     , Command.async
@@ -1692,9 +1699,9 @@ let internal_commands logger =
                  [%log info] "Prover state being logged to %s" conf_dir ;
                  let%bind prover =
                    Prover.create ~commit_id:Mina_version.commit_id ~logger
-                     ~proof_level:Genesis_constants.Proof_level.compiled
+                     ~proof_level:Genesis_constants_compiled.Proof_level.t
                      ~constraint_constants:
-                       Genesis_constants.Constraint_constants.compiled
+                       Genesis_constants_compiled.Constraint_constants.t
                      ~pids:(Pid.Table.create ()) ~conf_dir ()
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
@@ -1720,9 +1727,9 @@ let internal_commands logger =
           | `Ok sexp -> (
               let%bind worker_state =
                 Snark_worker.Prod.Inputs.Worker_state.create
-                  ~proof_level:Genesis_constants.Proof_level.compiled
+                  ~proof_level:Genesis_constants_compiled.Proof_level.t
                   ~constraint_constants:
-                    Genesis_constants.Constraint_constants.compiled ()
+                    Genesis_constants_compiled.Constraint_constants.t ()
               in
               let sok_message =
                 { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
@@ -1836,9 +1843,9 @@ let internal_commands logger =
           in
           let%bind verifier =
             Verifier.create ~commit_id:Mina_version.commit_id ~logger
-              ~proof_level:Genesis_constants.Proof_level.compiled
+              ~proof_level:Genesis_constants_compiled.Proof_level.t
               ~constraint_constants:
-                Genesis_constants.Constraint_constants.compiled
+                Genesis_constants_compiled.Constraint_constants.t
               ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir) ()
           in
           let%bind result =

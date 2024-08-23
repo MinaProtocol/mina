@@ -408,7 +408,7 @@ module Mutations = struct
         in
         let%bind accounts = Ledger.to_list best_tip_ledger in
         let constraint_constants =
-          Genesis_constants.Constraint_constants.compiled
+          Genesis_constants_compiled.Constraint_constants.t
         in
         let depth = constraint_constants.ledger_depth in
         let ledger = Ledger.create_ephemeral ~depth () in
@@ -515,15 +515,16 @@ module Mutations = struct
         ~error:(sprintf "Invalid `fee` provided.")
     in
     let%bind () =
+      let minimum_fee = Genesis_constants_compiled.t.minimum_user_command_fee in
       Result.ok_if_true
-        Currency.Fee.(fee >= Signed_command.minimum_fee)
+        Currency.Fee.(fee >= minimum_fee)
         ~error:
           (* IMPORTANT! Do not change the content of this error without
            * updating Rosetta's construction API to handle the changes *)
           (sprintf
              !"Invalid user command. Fee %s is less than the minimum fee, %s."
              (Currency.Fee.to_mina_string fee)
-             (Currency.Fee.to_mina_string Signed_command.minimum_fee) )
+             (Currency.Fee.to_mina_string minimum_fee) )
     in
     let%map memo =
       Option.value_map memo ~default:(Ok Signed_command_memo.empty)
@@ -2382,7 +2383,7 @@ module Queries = struct
                   Deferred.Result.fail "Daemon is bootstrapping"
               | `Active breadcrumb -> (
                   let txn_stop_slot_opt =
-                    Runtime_config.slot_tx_end_or_default runtime_config
+                    Runtime_config.slot_tx_end runtime_config
                   in
                   match txn_stop_slot_opt with
                   | None ->

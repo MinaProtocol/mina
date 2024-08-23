@@ -459,19 +459,14 @@ exception Offline_shutdown
 
 exception Bootstrap_stuck_shutdown
 
-let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
-    ~transition_frontier_and_catchup_signal_incr ~online_status_incr
+let create_sync_status_observer ~logger ~genesis_timestamp ~is_seed ~demo_mode
+    ~net ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
   let open Mina_incremental.Status in
   let restart_delay = Time.Span.of_min 5. in
   let offline_shutdown_delay = Time.Span.of_min 25. in
-  let after_genesis =
-    let genesis_timestamp =
-      Genesis_constants.(
-        genesis_timestamp_of_string genesis_state_timestamp_string)
-    in
-    fun () -> Time.(( >= ) (now ())) genesis_timestamp
-  in
+  let genesis_timestamp = Genesis_constants.to_time genesis_timestamp in
+  let after_genesis () = Time.(( >= ) (now ())) genesis_timestamp in
   let incremental_status =
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
       first_connection_incr first_message_incr
@@ -1372,6 +1367,8 @@ let start t =
   Uptime_service.start ~logger:t.config.logger ~uptime_url:t.config.uptime_url
     ~snark_worker_opt:t.processes.uptime_snark_worker_opt
     ~transition_frontier:t.components.transition_frontier
+    ~constraint_constants:t.config.precomputed_values.constraint_constants
+    ~protocol_constants:t.config.precomputed_values.genesis_constants.protocol
     ~time_controller:t.config.time_controller
     ~block_produced_bvar:t.components.block_produced_bvar
     ~uptime_submitter_keypair:t.config.uptime_submitter_keypair
@@ -1610,6 +1607,8 @@ let create ~commit_id ?wallets (config : Config.t) =
                     O1trace.thread "manage_uptime_snark_worker_subprocess"
                       (fun () ->
                         Uptime_service.Uptime_snark_worker.create
+                          ~constraint_constants:
+                            config.precomputed_values.constraint_constants
                           ~logger:config.logger ~pids:config.pids ) )
                 >>| Result.ok )
           in
@@ -1792,7 +1791,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                     Mina_networking.peers net )
           in
           let slot_tx_end =
-            Runtime_config.slot_tx_end_or_default
+            Runtime_config.slot_tx_end
               config.Config.precomputed_values.runtime_config
           in
           let txn_pool_config =
@@ -2242,8 +2241,11 @@ let create ~commit_id ?wallets (config : Config.t) =
                 return None
           in
           let sync_status =
-            create_sync_status_observer ~logger:config.logger ~net
-              ~is_seed:config.is_seed ~demo_mode:config.demo_mode
+            create_sync_status_observer ~logger:config.logger
+              ~genesis_timestamp:
+                config.precomputed_values.genesis_constants.protocol
+                  .genesis_state_timestamp
+              ~net ~is_seed:config.is_seed ~demo_mode:config.demo_mode
               ~transition_frontier_and_catchup_signal_incr
               ~online_status_incr:(Var.watch @@ of_broadcast_pipe online_status)
               ~first_connection_incr:

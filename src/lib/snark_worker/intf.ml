@@ -154,6 +154,8 @@ module type S0 = sig
 
   val command_from_rpcs :
        commit_id:string
+    -> proof_level:Genesis_constants.Proof_level.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> (module Rpcs_versioned_S with type Work.ledger_proof = ledger_proof)
     -> Command.t
 
@@ -171,5 +173,9 @@ module type S = sig
   module Rpcs_versioned :
     Rpcs_versioned_S with type Work.ledger_proof = ledger_proof
 
-  val command : commit_id:string -> Command.t
+  val command :
+       commit_id:string
+    -> proof_level:Genesis_constants.Proof_level.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> Command.t
 end

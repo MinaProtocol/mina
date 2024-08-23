@@ -122,15 +122,17 @@ module Make (Inputs : Intf.Inputs_intf) :
     let%map res =
       Rpc.Connection.with_client
         ~handshake_timeout:
-          (Time.Span.of_sec Mina_compile_config.rpc_handshake_timeout_sec)
+          (Time.Span.of_sec
+             Node_config_unconfigurable_constants.rpc_handshake_timeout_sec )
         ~heartbeat_config:
           (Rpc.Connection.Heartbeat_config.create
              ~timeout:
                (Time_ns.Span.of_sec
-                  Mina_compile_config.rpc_heartbeat_timeout_sec )
+                  Node_config_unconfigurable_constants.rpc_heartbeat_timeout_sec )
              ~send_every:
                (Time_ns.Span.of_sec
-                  Mina_compile_config.rpc_heartbeat_send_every_sec )
+                  Node_config_unconfigurable_constants
+                  .rpc_heartbeat_send_every_sec )
              () )
         (Tcp.Where_to_connect.of_host_and_port address)
         (fun conn -> Rpc.Rpc.dispatch rpc conn query)
@@ -226,11 +228,7 @@ module Make (Inputs : Intf.Inputs_intf) :
   let main
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
         with type Work.ledger_proof = Inputs.Ledger_proof.t ) ~logger
-      ~proof_level daemon_address shutdown_on_disconnect =
-    let constraint_constants =
-      (* TODO: Make this configurable. *)
-      Genesis_constants.Constraint_constants.compiled
-    in
+      ~proof_level ~constraint_constants daemon_address shutdown_on_disconnect =
     let%bind state =
       Worker_state.create ~constraint_constants ~proof_level ()
     in
@@ -342,7 +340,8 @@ module Make (Inputs : Intf.Inputs_intf) :
     in
     go ()
 
-  let command_from_rpcs ~commit_id
+  let command_from_rpcs ~commit_id ~proof_level:default_proof_level
+      ~constraint_constants
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
         with type Work.ledger_proof = Inputs.Ledger_proof.t ) =
     Command.async ~summary:"Snark worker"
@@ -382,12 +381,11 @@ module Make (Inputs : Intf.Inputs_intf) :
               !"Received signal to terminate. Aborting snark worker process" ;
             Core.exit 0 ) ;
         let proof_level =
-          Option.value ~default:Genesis_constants.Proof_level.compiled
-            proof_level
+          Option.value ~default:default_proof_level proof_level
         in
         main
           (module Rpcs_versioned)
-          ~logger ~proof_level daemon_port
+          ~logger ~proof_level ~constraint_constants daemon_port
           (Option.value ~default:true shutdown_on_disconnect))
 
   let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect =
