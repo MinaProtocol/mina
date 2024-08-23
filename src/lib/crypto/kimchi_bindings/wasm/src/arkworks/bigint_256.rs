@@ -33,11 +33,20 @@ impl FromWasmAbi for WasmBigInteger256 {
     }
 }
 
+#[wasm_bindgen]
+extern "C" {
+    // Use `js_namespace` here to bind `console.log(..)` instead of just
+    // `log(..)`
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
+
 impl IntoWasmAbi for WasmBigInteger256 {
     type Abi = <Vec<u8> as FromWasmAbi>::Abi;
     fn into_abi(self) -> Self::Abi {
         let mut bytes: Vec<u8> = vec![];
         self.0.write(&mut bytes).unwrap();
+        log(&format!("bytes: {bytes:?}").as_str());
         bytes.into_abi()
     }
 }
