@@ -1,5 +1,6 @@
 open Core_kernel
 open Async
+module Mina_currency = Currency
 open Rosetta_lib
 module Rosetta_lib_block = Block
 open Rosetta_models
@@ -1029,6 +1030,7 @@ module Specific = struct
             Transaction_query.t -> (Transactions_info.t, Errors.t) M.t
         ; validate_network_choice :
                network_identifier:Network_identifier.t
+            -> minimum_user_command_fee:Mina_currency.Fee.t
             -> graphql_uri:Uri.t
             -> (unit, Errors.t) M.t
         }
@@ -1061,15 +1063,16 @@ module Specific = struct
 
     let handle :
            graphql_uri:Uri.t
+        -> minimum_user_command_fee:Mina_currency.Fee.t
         -> env:'gql Env.T(M).t
         -> Search_transactions_request.t
         -> (Search_transactions_response.t, Errors.t) M.t =
-     fun ~graphql_uri ~env req ->
+     fun ~graphql_uri ~minimum_user_command_fee ~env req ->
       let open M.Let_syntax in
       let%bind query = Query.of_search_transaction_request req in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
-          ~graphql_uri
+          ~graphql_uri ~minimum_user_command_fee
       in
       let%bind transactions_info = env.db_transactions query in
       let%bind internal_transactions =
@@ -1119,7 +1122,8 @@ module Specific = struct
   module Real = Impl (Deferred.Result)
 end
 
-let router ~graphql_uri ~logger ~with_db (route : string list) body =
+let router ~graphql_uri ~minimum_user_command_fee ~logger ~with_db
+    (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /search/ $route"
     ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
@@ -1133,7 +1137,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
             |> Errors.Lift.wrap
           in
           let%map res =
-            Specific.Real.handle ~graphql_uri
+            Specific.Real.handle ~graphql_uri ~minimum_user_command_fee
               ~env:(Specific.Env.real ~logger ~db)
               req
             |> Errors.Lift.wrap

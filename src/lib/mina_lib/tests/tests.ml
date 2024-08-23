@@ -58,6 +58,7 @@ let%test_module "Epoch ledger sync tests" =
         match%map
           Genesis_ledger_helper.init_from_config_file
             ~genesis_dir:(make_dirname "genesis_dir")
+            ~compiled:(module Genesis_constants.For_unit_tests)
             ~logger ~proof_level:None runtime_config
         with
         | Ok (precomputed_values, _) ->
@@ -68,7 +69,7 @@ let%test_module "Epoch ledger sync tests" =
       in
       let constraint_constants = precomputed_values.constraint_constants in
       let consensus_constants =
-        let genesis_constants = Genesis_constants.for_unit_tests in
+        let genesis_constants = Genesis_constants.For_unit_tests.t in
         Consensus.Constants.create ~constraint_constants
           ~protocol_constants:genesis_constants.protocol
       in
@@ -333,7 +334,7 @@ let%test_module "Epoch ledger sync tests" =
         (* we're going to set and sync the epoch ledgers in the test
            so router should not do a sync
         *)
-        Transition_router.run ~sync_local_state:false
+        Transition_router.run ~sync_local_state:false ~cache_exceptions:true
           ~context:(module Context)
           ~trust_system:config.trust_system ~verifier ~network:mina_networking
           ~is_seed:config.is_seed ~is_demo_mode:false
