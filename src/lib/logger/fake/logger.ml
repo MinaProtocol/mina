@@ -127,7 +127,7 @@ end
 module Consumer_registry = struct
   type id = string
 
-  let register ~id:_ ~processor:_ ~transport:_ = not_implemented ()
+  let register ?commit_id:_ ~id:_ ~processor:_ ~transport:_ = not_implemented
 end
 
 [%%versioned
