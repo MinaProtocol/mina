@@ -605,7 +605,7 @@ module Protocol_circuits = struct
   let proof_level = Genesis_constants.Proof_level.Full
 
   let constraint_constants =
-    Genesis_constants.For_unit_tests.Constraint_constants.t
+    Genesis_constants.Compiled.constraint_constants
 
   let print_hash print expected digest : unit =
     if print then (
