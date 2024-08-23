@@ -71,12 +71,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  (*
-  let `VK vk, `Prover prover =
-    Transaction_snark.For_tests.create_trivial_snapp
-      ~constraint_constants:Genesis_constants_compiled.Constraint_constants.t ()
-  *)
-
   let config ~constants =
     let open Test_config in
     { (default ~constants) with

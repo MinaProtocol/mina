@@ -178,7 +178,7 @@ let command =
      let constraint_constants =
        Genesis_constants_compiled.compiled_config.constraint_constants
      in
-     let proof_level = Genesis_constants_compiled.compiled_config.proof_level in
+     let proof_level = Genesis_constants.Proof_level.Full in
      if witness_only then
        witness ~genesis_constants ~constraint_constants ~proof_level
          ~max_num_updates ?min_num_updates num_transactions repeats preeval

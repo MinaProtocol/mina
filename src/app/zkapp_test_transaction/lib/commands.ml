@@ -3,15 +3,6 @@ open Async
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 
-(*
-let genesis_constants = Genesis_constants.For_unit_tests.t
-
-let constraint_constants =
-  Genesis_constants.For_unit_tests.Constraint_constants.t
-
-let proof_level = Genesis_constants.Proof_level.Full
-*)
-
 let underToCamel s = String.lowercase s |> Mina_graphql.Reflection.underToCamel
 
 let graphql_zkapp_command (zkapp_command : Zkapp_command.t) =

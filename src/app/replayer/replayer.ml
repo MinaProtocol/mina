@@ -1681,7 +1681,7 @@ let () =
   let constraint_constants =
     Genesis_constants_compiled.compiled_config.constraint_constants
   in
-  let proof_level = Genesis_constants_compiled.compiled_config.proof_level in
+  let proof_level = Genesis_constants.Proof_level.Full in
   Command.(
     run
       (let open Let_syntax in
