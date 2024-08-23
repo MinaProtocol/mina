@@ -17,6 +17,7 @@
    pickles
    pickles_types
    unsigned_extended
+   bounded_types
    key_cache.native
    mina_base
    mina_runtime_config
@@ -30,8 +31,8 @@
    pickles.backend
    logger
    snark_params
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    ppx_inline_test.config
    inline_test_quiet_logs
  )

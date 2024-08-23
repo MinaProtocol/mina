@@ -11,10 +11,10 @@ module TestRunner = struct
     Deferred.List.iter dirs ~f:(fun dir ->
         Deferred.ignore_m @@ Process.run_exn ~prog:"rm" ~args:[ "-rf"; dir ] () )
 
-  let run test_case =
+  let run test_case mina_exe =
     let test_failed = ref false in
     let open Deferred.Let_syntax in
-    let config = Config.default 1337 in
+    let config = Config.default 1337 mina_exe in
     let%bind () = ConfigDirs.generate_keys config.dirs in
     Monitor.protect
       ~finally:(fun () ->

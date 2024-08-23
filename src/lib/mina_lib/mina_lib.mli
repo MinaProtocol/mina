@@ -29,6 +29,7 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val catchup_config : Mina_intf.catchup_config
+  val commit_id : string
 end
 
 exception Snark_worker_error of int
@@ -156,20 +157,6 @@ val client_port : t -> int
 
 val validated_transitions : t -> Mina_block.Validated.t Strict_pipe.Reader.t
 
-module Root_diff : sig
-  [%%versioned:
-  module Stable : sig
-    module V2 : sig
-      type t =
-        { commands : User_command.Stable.V2.t With_status.Stable.V2.t list
-        ; root_length : int
-        }
-    end
-  end]
-end
-
-val root_diff : t -> Root_diff.t Strict_pipe.Reader.t
-
 val initialization_finish_signal : t -> unit Ivar.t
 
 val dump_tf : t -> string Or_error.t
@@ -183,14 +170,18 @@ val transaction_pool : t -> Network_pool.Transaction_pool.t
 
 val snark_pool : t -> Network_pool.Snark_pool.t
 
-val start : t -> unit Deferred.t
+val start : commit_id:string -> t -> unit Deferred.t
 
 val start_with_precomputed_blocks :
-  t -> Block_producer.Precomputed.t Sequence.t -> unit Deferred.t
+     commit_id:string
+  -> t
+  -> Block_producer.Precomputed.t Sequence.t
+  -> unit Deferred.t
 
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
-val create : ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
+val create :
+  commit_id:string -> ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
 
 val staged_ledger_ledger_proof : t -> Ledger_proof.t option
 
@@ -198,6 +189,9 @@ val transition_frontier :
   t -> Transition_frontier.t option Broadcast_pipe.Reader.t
 
 val get_ledger : t -> State_hash.t option -> Account.t list Deferred.Or_error.t
+
+val get_snarked_ledger_full :
+  t -> State_hash.t option -> Mina_ledger.Ledger.t Deferred.Or_error.t
 
 val get_snarked_ledger :
   t -> State_hash.t option -> Account.t list Deferred.Or_error.t
@@ -231,3 +225,9 @@ val vrf_evaluator : t -> Vrf_evaluator.t
 val genesis_ledger : t -> Mina_ledger.Ledger.t Lazy.t
 
 val vrf_evaluation_state : t -> Block_producer.Vrf_evaluation_state.t
+
+val best_chain_block_by_height :
+  t -> Unsigned.UInt32.t -> (Transition_frontier.Breadcrumb.t, string) Result.t
+
+val best_chain_block_by_state_hash :
+  t -> State_hash.t -> (Transition_frontier.Breadcrumb.t, string) Result.t

@@ -36,13 +36,15 @@ module Schema = struct
         [@@@no_toplevel_latest_type]
 
         module V1 = struct
-          type t = string * State_hash.Stable.V1.t
+          type t = Bounded_types.String.Stable.V1.t * State_hash.Stable.V1.t
 
           let to_latest = Fn.id
         end
       end]
     end
   end
+
+  [@@@warning "-22"]
 
   type _ t =
     | Db_version : int t
@@ -52,6 +54,8 @@ module Schema = struct
     | Best_tip : State_hash.Stable.V1.t t
     | Protocol_states_for_root_scan_state
         : Mina_state.Protocol_state.Value.Stable.V2.t list t
+
+  [@@@warning "+22"]
 
   let to_string : type a. a t -> string = function
     | Db_version ->
@@ -221,8 +225,6 @@ open Rocks
 
 type batch_t = Batch.t
 
-let mem db ~key = Option.is_some (get db ~key)
-
 let get_if_exists db ~default ~key =
   match get db ~key with Some x -> x | None -> default
 
@@ -319,14 +321,14 @@ let initialize t ~root_data =
 
 let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
     ~parent_hashes =
-  let f h = Some_key.Some_key (Arcs h) in
+  let f h = Rocks.Key.Some_key (Arcs h) in
   let values =
     get_batch t.db ~keys:(Some_key Root :: List.map parent_hashes ~f)
   in
   let populate res parent_hash arc_opt =
     let%bind.Result () = res in
     match arc_opt with
-    | Some (Some_key.Some_key_value (Arcs _, (data : State_hash.t list))) ->
+    | Some (Key.Some_key_value (Arcs _, (data : State_hash.t list))) ->
         State_hash.Table.set arcs_cache ~key:parent_hash ~data ;
         Result.return ()
     | _ ->

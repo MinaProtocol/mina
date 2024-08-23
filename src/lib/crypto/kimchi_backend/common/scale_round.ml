@@ -1,19 +1,14 @@
 open Core_kernel
 
-[%%versioned
-module Stable = struct
-  module V2 = struct
-    type 'a t =
-      { accs : ('a * 'a) array
-      ; bits : 'a array
-      ; ss : 'a array
-      ; base : 'a * 'a
-      ; n_prev : 'a
-      ; n_next : 'a
-      }
-    [@@deriving sexp, fields, hlist]
-  end
-end]
+type 'a t =
+  { accs : ('a * 'a) array
+  ; bits : 'a array
+  ; ss : 'a array
+  ; base : 'a * 'a
+  ; n_prev : 'a
+  ; n_next : 'a
+  }
+[@@deriving sexp, fields, hlist]
 
 let map { accs; bits; ss; base; n_prev; n_next } ~f =
   { accs = Array.map accs ~f:(fun (x, y) -> (f x, f y))

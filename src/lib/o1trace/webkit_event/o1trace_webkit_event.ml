@@ -5,14 +5,18 @@ module Scheduler = Async_kernel_scheduler
 
 let current_wr = ref None
 
-let emit_event =
+let emitted_since_cycle_ended = ref false
+
+let emit_event' =
   let buf = Bigstring.create 512 in
-  fun event ->
-    Option.iter !current_wr ~f:(fun wr ->
-        try Webkit_trace_event_binary_output.emit_event ~buf wr event
-        with exn ->
-          Writer.writef wr "failed to write o1trace event: %s\n"
-            (Exn.to_string exn) )
+  fun wr event ->
+    emitted_since_cycle_ended := true ;
+    try Webkit_trace_event_binary_output.emit_event ~buf wr event
+    with exn ->
+      Writer.writef wr "failed to write o1trace event: %s\n" (Exn.to_string exn)
+
+let emit_event event =
+  Option.iter !current_wr ~f:(fun wr -> emit_event' wr event)
 
 let timestamp () =
   Time_stamp_counter.now () |> Time_stamp_counter.to_int63 |> Int63.to_int_exn
@@ -28,22 +32,8 @@ let new_event (k : event_kind) : event =
   ; tid = 0
   }
 
-(* This will track ids per thread. If we need to track ids per fiber,
-   we will need to feed the fiber id into the plugin hooks. *)
-let id_of_thread =
-  let ids = String.Table.create () in
-  let next_id = ref 0 in
-  let alloc_id () =
-    let id = !next_id in
-    incr next_id ; id
-  in
-  fun thread_name -> Hashtbl.find_or_add ids thread_name ~default:alloc_id
-
-let new_thread_event ?(include_name = false) thread_name event_kind =
-  { (new_event event_kind) with
-    tid = id_of_thread thread_name
-  ; name = (if include_name then thread_name else "")
-  }
+let new_thread_event ?(include_name = "") tid event_kind =
+  { (new_event event_kind) with tid; name = include_name }
 
 (*
 
@@ -97,17 +87,22 @@ module T = struct
       end)
       ()
 
+  let most_recent_id = ref 0
+
   let on_job_enter (fiber : O1trace.Thread.Fiber.t) =
-    emit_event
-      (new_thread_event (O1trace.Thread.name fiber.thread) Thread_switch)
+    if fiber.id <> !most_recent_id then (
+      most_recent_id := fiber.id ;
+      emit_event (new_thread_event fiber.id Thread_switch) )
 
   let on_job_exit _fiber _time_elapsed = ()
 
-  (*
+  let on_new_fiber (fiber : O1trace.Thread.Fiber.t) =
+    let fullname = String.concat ~sep:"/" (O1trace.Thread.Fiber.key fiber) in
+    emit_event (new_thread_event ~include_name:fullname fiber.id New_thread)
+
   let on_cycle_end () =
-    let sch = Scheduler.t () in
-    emit_event (new_thread_event thread_name Cycle_end) ;
-  *)
+    if !emitted_since_cycle_ended then emit_event (new_event Cycle_end) ;
+    emitted_since_cycle_ended := false
 end
 
 let start_tracing wr =
@@ -116,11 +111,7 @@ let start_tracing wr =
   else (
     current_wr := Some wr ;
     emit_event (new_event Pid_is) ;
-    O1trace.Thread.iter_threads ~f:(fun thread ->
-        emit_event
-          (new_thread_event ~include_name:true
-             (O1trace.Thread.name thread)
-             New_thread ) ) ;
+    O1trace.Thread.iter_fibers ~f:T.on_new_fiber ;
     O1trace.Plugins.enable_plugin (module T) )
 
 let stop_tracing () =

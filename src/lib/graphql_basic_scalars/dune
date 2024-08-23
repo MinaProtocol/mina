@@ -18,6 +18,8 @@
    ppx_inline_test.config
    ;; local libraries
    graphql_wrapper
+   base_quickcheck
+   quickcheck_lib
    unix
  )
  (instrumentation (backend bisect_ppx))

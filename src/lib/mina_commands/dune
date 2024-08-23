@@ -15,6 +15,7 @@
    mina_base.import
    kimchi_backend
    mina_metrics
+   bounded_types
    transition_frontier
    sync_status
    pipe_lib
@@ -30,7 +31,6 @@
    mina_lib
    mina_base
    user_command_input
-   mina_version
    node_addrs_and_ports
    mina_numbers
    participating_state
@@ -45,8 +45,8 @@
    gossip_net
    data_hash_lib
    mina_ledger
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    pickles
    protocol_version
    random_oracle
@@ -54,5 +54,4 @@
    integers
  )
  (instrumentation (backend bisect_ppx))
- (preprocessor_deps ../../config.mlh)
- (preprocess (pps ppx_mina ppx_version ppx_let ppx_optcomp ppx_custom_printf ppx_compare)))
+ (preprocess (pps ppx_mina ppx_version ppx_let ppx_custom_printf ppx_compare)))

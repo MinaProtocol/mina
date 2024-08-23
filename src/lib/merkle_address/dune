@@ -15,6 +15,7 @@
   ;; local libraries
   direction
   ppx_version.runtime
+  bounded_types
   test_util)
  (preprocess
   (pps ppx_mina ppx_version ppx_jane ppx_hash ppx_compare ppx_deriving_yojson

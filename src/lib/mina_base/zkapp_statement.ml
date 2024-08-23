@@ -1,12 +1,5 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%endif]
 
 module Poly = struct
   [%%versioned
@@ -60,8 +53,6 @@ let zkapp_statements_of_forest (type account_update)
   Zkapp_command.Call_forest.mapi_with_trees forest
     ~f:(fun _i account_update tree -> (account_update, of_tree tree))
 
-[%%ifdef consensus_mechanism]
-
 module Checked = struct
   type t = Zkapp_command.Transaction_commitment.Checked.t Poly.t
 
@@ -82,5 +73,3 @@ let typ =
     Zkapp_command.Transaction_commitment.[ typ; typ ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
-
-[%%endif]

@@ -270,11 +270,7 @@ let start_custom :
       Deferred.Or_error.try_with ~here:[%here] (fun () -> Process.wait process)
     in
     [%log trace] "child process %s died" name ;
-    don't_wait_for
-      (let%bind () = after (Time.Span.of_sec 1.) in
-       let%bind () = Writer.close @@ Process.stdin process in
-       let%bind () = Reader.close @@ Process.stdout process in
-       Reader.close @@ Process.stderr process ) ;
+    don't_wait_for (Writer.close @@ Process.stdin process) ;
     let%bind () = Sys.remove lock_path in
     Ivar.fill terminated_ivar termination_status ;
     let log_bad_termination () =

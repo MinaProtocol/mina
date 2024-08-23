@@ -71,6 +71,7 @@ module Network_config = struct
           [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
     ; block_producer_configs : block_producer_config list
     ; log_precomputed_blocks : bool
+    ; start_filtered_logs : string list
     ; archive_node_count : int
     ; mina_archive_schema : string
     ; mina_archive_schema_aux_files : string list
@@ -110,21 +111,27 @@ module Network_config = struct
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
       =
-    let { requires_graphql
-        ; genesis_ledger
-        ; epoch_data
-        ; block_producers
-        ; snark_coordinator
-        ; snark_worker_fee
-        ; num_archive_nodes
-        ; log_precomputed_blocks (* ; num_plain_nodes *)
-        ; proof_config
-        ; Test_config.k
-        ; delta
-        ; slots_per_epoch
-        ; slots_per_sub_window
-        ; txpool_max_size
-        } =
+    let ({ requires_graphql
+         ; genesis_ledger
+         ; epoch_data
+         ; block_producers
+         ; snark_coordinator
+         ; snark_worker_fee
+         ; num_archive_nodes
+         ; log_precomputed_blocks (* ; num_plain_nodes *)
+         ; start_filtered_logs
+         ; proof_config
+         ; k
+         ; delta
+         ; slots_per_epoch
+         ; slots_per_sub_window
+         ; grace_period_slots
+         ; txpool_max_size
+         ; slot_tx_end
+         ; slot_chain_end
+         ; network_id
+         }
+          : Test_config.t ) =
       test_config
     in
     let user_from_env = Option.value (Unix.getenv "USER") ~default:"auto" in
@@ -178,7 +185,12 @@ module Network_config = struct
     let add_accounts accounts_and_keypairs =
       List.map accounts_and_keypairs
         ~f:(fun
-             ( { Test_config.Test_Account.balance; account_name; timing }
+             ( { Test_config.Test_account.balance
+               ; account_name
+               ; timing
+               ; permissions
+               ; zkapp
+               }
              , (pk, sk) )
            ->
           let timing = runtime_timing_of_timing timing in
@@ -192,6 +204,13 @@ module Network_config = struct
                 (* delegation currently unsupported *)
             ; delegate = None
             ; timing
+            ; permissions =
+                Option.map
+                  ~f:Runtime_config.Accounts.Single.Permissions.of_permissions
+                  permissions
+            ; zkapp =
+                Option.map
+                  ~f:Runtime_config.Accounts.Single.Zkapp_account.of_zkapp zkapp
             }
           in
           (account_name, account) )
@@ -206,8 +225,8 @@ module Network_config = struct
     let ledger_is_prefix ledger1 ledger2 =
       List.is_prefix ledger2 ~prefix:ledger1
         ~equal:(fun
-                 ({ account_name = name1; _ } : Test_config.Test_Account.t)
-                 ({ account_name = name2; _ } : Test_config.Test_Account.t)
+                 ({ account_name = name1; _ } : Test_config.Test_account.t)
+                 ({ account_name = name2; _ } : Test_config.Test_account.t)
                -> String.equal name1 name2 )
     in
     let runtime_config =
@@ -221,6 +240,10 @@ module Network_config = struct
             ; zkapp_transaction_cost_limit = None
             ; max_event_elements = None
             ; max_action_elements = None
+            ; zkapp_cmd_limit_hardcap = None
+            ; slot_tx_end
+            ; slot_chain_end
+            ; network_id
             }
       ; genesis =
           Some
@@ -228,6 +251,7 @@ module Network_config = struct
             ; delta = Some delta
             ; slots_per_epoch = Some slots_per_epoch
             ; slots_per_sub_window = Some slots_per_sub_window
+            ; grace_period_slots = Some grace_period_slots
             ; genesis_state_timestamp =
                 Some Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
             }
@@ -242,6 +266,7 @@ module Network_config = struct
             ; num_accounts = None
             ; balances = []
             ; hash = None
+            ; s3_data_hash = None
             ; name = None
             }
       ; epoch_data =
@@ -263,10 +288,12 @@ module Network_config = struct
                 |> Result.ok_or_failwith
               in
               let ledger_of_epoch_accounts
-                  (epoch_accounts : Test_config.Test_Account.t list) =
+                  (epoch_accounts : Test_config.Test_account.t list) =
                 let epoch_ledger_accounts =
                   List.map epoch_accounts
-                    ~f:(fun { account_name; balance; timing } ->
+                    ~f:(fun
+                         { account_name; balance; timing; permissions; zkapp }
+                       ->
                       let balance = Balance.of_mina_string_exn balance in
                       let timing = runtime_timing_of_timing timing in
                       let genesis_account =
@@ -281,7 +308,20 @@ module Network_config = struct
                               "Epoch ledger account %s not in genesis ledger"
                               account_name ()
                       in
-                      { genesis_account with balance; timing } )
+                      { genesis_account with
+                        balance
+                      ; timing
+                      ; permissions =
+                          Option.map
+                            ~f:
+                              Runtime_config.Accounts.Single.Permissions
+                              .of_permissions permissions
+                      ; zkapp =
+                          Option.map
+                            ~f:
+                              Runtime_config.Accounts.Single.Zkapp_account
+                              .of_zkapp zkapp
+                      } )
                 in
                 (* because we run integration tests with Proof_level = Full, the winner account
                    gets added to the genesis ledger
@@ -298,6 +338,7 @@ module Network_config = struct
                   ; num_accounts = None
                   ; balances = []
                   ; hash = None
+                  ; s3_data_hash = None
                   ; name = None
                   }
                   : Runtime_config.Ledger.t )
@@ -385,9 +426,7 @@ module Network_config = struct
       ^ "/src/app/archive/"
     in
     let mina_archive_schema_aux_files =
-      [ mina_archive_base_url ^ "create_schema.sql"
-      ; mina_archive_base_url ^ "zkapp_tables.sql"
-      ]
+      [ mina_archive_base_url ^ "create_schema.sql" ]
     in
     let genesis_keypairs =
       List.fold genesis_accounts_and_keys ~init:String.Map.empty
@@ -441,6 +480,7 @@ module Network_config = struct
         ; mina_archive_image = images.archive_node
         ; runtime_config = Runtime_config.to_yojson runtime_config
         ; block_producer_configs
+        ; start_filtered_logs
         ; log_precomputed_blocks
         ; archive_node_count = num_archive_nodes
         ; mina_archive_schema

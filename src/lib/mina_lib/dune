@@ -21,6 +21,7 @@
    result
    bin_prot.shape
    ;; local libraries
+   bounded_types
    transition_chain_prover
    best_tip_prover
    proof_carrying_data
@@ -56,7 +57,6 @@
    o1trace
    unix_timestamp
    filtered_external_transition
-   mina_version
    pipe_lib
    user_command_input
    logger
@@ -99,8 +99,8 @@
    pickles.backend
    pickles
    snark_params
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    mina_wire_types
    internal_tracing
    staged_ledger_diff

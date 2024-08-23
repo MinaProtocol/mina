@@ -48,11 +48,18 @@ func testPubsubMsgIdFun(t *testing.T, topic string) {
 
 	// Subscribe to the topic
 	testSubscribeDo(t, alice, topic, 21, 58)
+	// Timeouts between subscriptions are needed because otherwise each process would try to discover peers
+	// and will only find that no other peers are connected to the same topic.
+	// That said, pubsub's implementation is imperfect
+	time.Sleep(time.Second)
 	testSubscribeDo(t, bob, topic, 21, 58)
+	time.Sleep(time.Second)
 	testSubscribeDo(t, carol, topic, 21, 58)
+	time.Sleep(time.Second)
 
 	_ = testOpenStreamDo(t, bob, alice.P2p.Host, appAPort, 9900, string(newProtocol))
 	_ = testOpenStreamDo(t, carol, alice.P2p.Host, appAPort, 9900, string(newProtocol))
+
 	<-trapA.IncomingStream
 	<-trapA.IncomingStream
 
@@ -60,8 +67,7 @@ func testPubsubMsgIdFun(t *testing.T, topic string) {
 	testPublishDo(t, alice, topic, msg, 21)
 	testPublishDo(t, bob, topic, msg, 21)
 
-	time.Sleep(time.Millisecond * 100)
-
+	time.Sleep(time.Second)
 	n := 0
 loop:
 	for {

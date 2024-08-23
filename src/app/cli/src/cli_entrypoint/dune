@@ -41,6 +41,7 @@
    currency
    signature_lib
    mina_base
+   mina_base.import
    error_json
    genesis_ledger_helper
    consensus
@@ -52,6 +53,9 @@
    genesis_constants
    blake2
    mina_metrics
+   transaction_witness
+   snark_work_lib
+   transaction_snark
    mina_compile_config
    node_error_service
    mina_user_error
@@ -74,6 +78,5 @@
    itn_logger
    mina_intf
  )
- (preprocessor_deps ../../../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_mina ppx_version ppx_here ppx_let ppx_sexp_conv ppx_optcomp ppx_deriving_yojson)))
+ (preprocess (pps ppx_mina ppx_version ppx_here ppx_let ppx_sexp_conv ppx_deriving_yojson)))

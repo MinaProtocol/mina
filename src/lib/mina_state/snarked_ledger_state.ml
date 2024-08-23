@@ -549,6 +549,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       }
   end
 
+  let snarked_ledger_hash (t : _ Poly.t) = Registers.first_pass_ledger t.target
+
   let validate_ledgers_at_merge (type a error bool)
       (module L : Ledger_hash_intf
         with type t = a

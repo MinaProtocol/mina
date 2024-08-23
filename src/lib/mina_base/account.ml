@@ -1,7 +1,5 @@
 (* account.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base_util
 open Snark_params
@@ -63,8 +61,6 @@ module Index = struct
   let fold ~ledger_depth t =
     Fold.group3 ~default:false (fold_bits ~ledger_depth t)
 
-  [%%ifdef consensus_mechanism]
-
   module Unpacked = struct
     type var = Tick.Boolean.var list
 
@@ -79,8 +75,6 @@ module Index = struct
         (Typ.list ~length:ledger_depth Boolean.typ)
         ~there:(to_bits ~ledger_depth) ~back:of_bits
   end
-
-  [%%endif]
 end
 
 module Nonce = Account_nonce
@@ -90,7 +84,8 @@ module Token_symbol = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = string [@@deriving sexp, equal, compare, hash, yojson]
+        type t = Bounded_types.String.Stable.V1.t
+        [@@deriving sexp, equal, compare, hash, yojson]
 
         let to_latest = Fn.id
 
@@ -115,9 +110,9 @@ module Token_symbol = struct
 
       include
         Binable.Of_binable_without_uuid
-          (Core_kernel.String.Stable.V1)
+          (Bounded_types.String.Stable.V1)
           (struct
-            type t = string
+            type t = Bounded_types.String.Stable.V1.t
 
             let to_binable = Fn.id
 
@@ -162,8 +157,6 @@ module Token_symbol = struct
   let to_input (x : t) =
     Random_oracle_input.Chunked.packed (to_field x, num_bits)
 
-  [%%ifdef consensus_mechanism]
-
   type var = Field.Var.t
 
   let range_check (t : var) =
@@ -195,8 +188,6 @@ module Token_symbol = struct
   let var_to_input (x : var) = Random_oracle_input.Chunked.packed (x, num_bits)
 
   let if_ = Tick.Run.Field.if_
-
-  [%%endif]
 end
 
 (* the `token_symbol` describes a token id owned by the account id
@@ -378,8 +369,6 @@ let crypto_hash_prefix = Hash_prefix.account
 let crypto_hash t =
   Random_oracle.hash ~init:crypto_hash_prefix
     (Random_oracle.pack_input (to_input t))
-
-[%%ifdef consensus_mechanism]
 
 type var =
   ( Public_key.Compressed.var
@@ -606,8 +595,6 @@ module Checked = struct
           account.permissions.access ~signature_verifies
 end
 
-[%%endif]
-
 let digest = crypto_hash
 
 let empty =
@@ -626,7 +613,7 @@ let empty =
   ; zkapp = None
   }
 
-let empty_digest = digest empty
+let empty_digest = lazy (digest empty)
 
 let create account_id balance =
   let public_key = Account_id.public_key account_id in
@@ -702,7 +689,7 @@ let cliff_time Poly.{ timing; _ } =
 let cliff_amount Poly.{ timing; _ } =
   match timing with Timing.Untimed -> None | Timed t -> Some t.cliff_amount
 
-let vesting_increment Poly.{ timing } =
+let vesting_increment Poly.{ timing; _ } =
   match timing with
   | Timing.Untimed ->
       None

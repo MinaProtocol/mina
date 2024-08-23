@@ -9,13 +9,14 @@ let run ~user_command_profiler ~zkapp_profiler num_transactions ~max_num_updates
   let print n msg = printf !"[%i] %s\n%!" n msg in
   if use_zkapps then (
     let ledger, transactions =
-      create_ledger_and_zkapps ?min_num_updates ~max_num_updates ()
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          create_ledger_and_zkapps ?min_num_updates ~max_num_updates () )
     in
     Parallel.init_master () ;
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
+          Verifier.create ~commit_id:Mina_version.commit_id ~logger ~proof_level
+            ~constraint_constants ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
             () )
     in

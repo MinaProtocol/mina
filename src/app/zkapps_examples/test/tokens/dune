@@ -17,8 +17,8 @@
    genesis_constants
    pasta_bindings
    kimchi_backend
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    merkle_ledger
    mina_base
    mina_base.import
@@ -41,6 +41,7 @@
    with_hash
    zkapps_tokens
    zkapps_examples
+   bounded_types
    )
   (inline_tests (flags -verbose -show-counts))
   (preprocess

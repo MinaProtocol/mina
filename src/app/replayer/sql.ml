@@ -464,16 +464,3 @@ module Parent_block = struct
       epoch_ledgers_state_hash =
     Conn.find query_parent_state_hash epoch_ledgers_state_hash
 end
-
-module Balances = struct
-  let query_insert_nonce =
-    Caqti_request.exec
-      Caqti_type.(tup2 int int64)
-      {sql| UPDATE balances
-            SET nonce = $2
-            WHERE id = $1
-      |sql}
-
-  let insert_nonce (module Conn : Caqti_async.CONNECTION) ~id ~nonce =
-    Conn.exec query_insert_nonce (id, nonce)
-end

@@ -10,8 +10,8 @@
    ;; local libraries
    kimchi_backend
    pickles.backend
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    random_oracle_input
    signature_lib
    snark_params
@@ -20,7 +20,6 @@
    mina_signature_kind
    mina_base
  )
- (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_jane ppx_version ppx_inline_test))
  (synopsis "Schnorr signatures for strings"))

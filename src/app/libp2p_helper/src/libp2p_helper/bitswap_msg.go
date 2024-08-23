@@ -97,7 +97,7 @@ func fromTestDecodeBitswapBlocksReq(req ipcRpcRequest) (rpcRequest, error) {
 	return TestDecodeBitswapBlocksReq(i), err
 }
 
-func (m TestDecodeBitswapBlocksReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m TestDecodeBitswapBlocksReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	blocks, err := TestDecodeBitswapBlocksReqT(m).Blocks()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
@@ -156,7 +156,7 @@ func fromTestEncodeBitswapBlocksReq(req ipcRpcRequest) (rpcRequest, error) {
 	return TestEncodeBitswapBlocksReq(i), err
 }
 
-func (m TestEncodeBitswapBlocksReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m TestEncodeBitswapBlocksReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	mr := TestEncodeBitswapBlocksReqT(m)
 
 	data, err := mr.Data()

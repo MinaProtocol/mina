@@ -41,10 +41,6 @@ module Hex64 = struct
       let hi, lo = String.(f (sub h ~pos:0 ~len:8), f (sub h ~pos:8 ~len:8)) in
       (hi lsl 32) lor lo
 
-    let%test_unit "int64 hex" =
-      Quickcheck.test (Int64.gen_incl zero max_value) ~f:(fun x ->
-          assert (equal x (of_hex (to_hex x))) )
-
     let sexp_of_t = Fn.compose String.sexp_of_t to_hex
 
     let t_of_sexp = Fn.compose of_hex String.t_of_sexp
@@ -65,7 +61,7 @@ module Hex64 = struct
   end]
 end
 
-module Make (N : Vector.Nat_intf) = struct
+module Make (N : Pickles_types.Nat.Intf) = struct
   module A = Vector.With_length (N)
 
   let length = 64 * Nat.to_int N.n

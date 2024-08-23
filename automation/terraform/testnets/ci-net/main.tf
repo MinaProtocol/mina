@@ -62,6 +62,12 @@ variable "ci_artifact_path" {
   default = "/tmp"
 }
 
+variable "create_libp2p_files" {
+  type        = bool
+  description = "Whether to create LibP2P peer ID files"
+  default     = false
+}
+
 locals {
   seed_region = "us-west1"
   seed_zone   = "us-west1-b"
@@ -69,9 +75,11 @@ locals {
 
 
 module "ci_testnet" {
-  source    = "../../modules/o1-testnet"
+  source = "../../modules/o1-testnet"
 
   artifact_path = var.ci_artifact_path
+
+  create_libp2p_files = var.create_libp2p_files
 
   # TODO: remove obsolete cluster_name var + cluster region
   cluster_name   = "mina-integration-west1"
@@ -108,21 +116,23 @@ module "ci_testnet" {
 
   snark_coordinators = [
     {
-      snark_worker_replicas   = var.snark_worker_count
-      snark_worker_fee        = "0.025"
-      snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
-      snark_coordinators_host_port  = 10401
+      snark_coordinator_name       = "ci-net"
+      snark_worker_replicas        = var.snark_worker_count
+      snark_worker_fee             = "0.025"
+      snark_worker_public_key      = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
+      snark_coordinators_host_port = 10401
+      persist_working_dir          = false
     }
   ]
 
-  whales= [
-    for i in range(var.whale_count):{
+  whales = [
+    for i in range(var.whale_count) : {
       duplicates = 1
     }
   ]
-  
-  fishes= [
-    for i in range(var.fish_count):{
+
+  fishes = [
+    for i in range(var.fish_count) : {
       duplicates = 1
     }
   ]

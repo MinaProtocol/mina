@@ -27,10 +27,10 @@
    kimchi_bindings
    kimchi_types
    pasta_bindings
-   kimchi_backend.common
+   kimchi_backend_common
    kimchi_backend
    kimchi_pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta.basic
    mina_base
    mina_base.import
    mina_numbers
@@ -47,7 +47,8 @@
    snark_params
    unsigned_extended
    ppx_version.runtime
-   with_hash)
+   with_hash
+   bounded_types)
  (instrumentation (backend bisect_ppx))
  (preprocess
   (pps

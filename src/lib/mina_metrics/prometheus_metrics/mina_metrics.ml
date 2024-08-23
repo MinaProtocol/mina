@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 
 (* We re-export a constrained subset of prometheus to keep consumers of this
@@ -13,7 +11,7 @@ open Async_kernel
 
 let time_offset_sec = 1609459200.
 
-[%%inject "block_window_duration", block_window_duration]
+let block_window_duration = Node_config.block_window_duration
 
 (* textformat serialization and runtime metrics taken from github.com/mirage/prometheus:/app/prometheus_app.ml *)
 module TextFormat_0_0_4 = struct
@@ -1665,20 +1663,33 @@ let generic_server ?forward_uri ~port ~logger ~registry () =
     | `GET, "/metrics" ->
         let%bind other_data =
           match forward_uri with
-          | Some uri ->
-              let%bind resp, body = Client.get uri in
-              let status = Response.status resp in
-              if Code.is_success (Code.code_of_status status) then
-                let%map body = Body.to_string body in
-                Some body
-              else (
-                [%log error] "Could not forward request to $url, got: $status"
-                  ~metadata:
-                    [ ("url", `String (Uri.to_string uri))
-                    ; ("status_code", `Int (Code.code_of_status status))
-                    ; ("status", `String (Code.string_of_status status))
-                    ] ;
-                return None )
+          | Some uri -> (
+              Monitor.try_with ~here:[%here] (fun () ->
+                  let%bind resp, body = Client.get uri in
+                  let status = Response.status resp in
+                  if Code.is_success (Code.code_of_status status) then
+                    let%map body = Body.to_string body in
+                    Some body
+                  else (
+                    [%log error]
+                      "Could not forward request to $url, got: $status"
+                      ~metadata:
+                        [ ("url", `String (Uri.to_string uri))
+                        ; ("status_code", `Int (Code.code_of_status status))
+                        ; ("status", `String (Code.string_of_status status))
+                        ] ;
+                    return None ) )
+              >>| function
+              | Ok a ->
+                  a
+              | Error e ->
+                  [%log error]
+                    "Could not forward request to $url, got error: $error"
+                    ~metadata:
+                      [ ("url", `String (Uri.to_string uri))
+                      ; ("error", `String (Exn.to_string_mach e))
+                      ] ;
+                  None )
           | None ->
               return None
         in

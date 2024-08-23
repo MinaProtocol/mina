@@ -59,6 +59,17 @@ val add_path :
   -> Account.t
   -> t
 
+(** Same as [add_path], but using the hashes provided in the wide merkle path
+    instead of recomputing them.
+    This is unsafe: the hashes are not checked or recomputed.
+*)
+val add_wide_path_unsafe :
+     t
+  -> [ `Left of Field.t * Field.t | `Right of Field.t * Field.t ] list
+  -> Account_id.t
+  -> Account.t
+  -> t
+
 val iteri : t -> f:(Account.Index.t -> Account.t -> unit) -> unit
 
 val handler : t -> Handler.t Staged.t

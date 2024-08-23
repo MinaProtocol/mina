@@ -22,6 +22,7 @@
    ppx_inline_test.config
    uri
    ;;local libraries
+   bounded_types
    mina_wire_types
    kimchi_backend
    child_processes
@@ -31,8 +32,8 @@
    mina_runtime_config
    sgn
    mina_base.util
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    pickles
    random_oracle
    pipe_lib
@@ -69,12 +70,12 @@
    snark_params
    mina_transaction
    protocol_version
-   mina_version
    staged_ledger_diff
    error_json
    ppx_deriving_yojson.runtime
    ppx_version.runtime
    mina_intf
+   o1trace
  )
  (inline_tests (flags -verbose -show-counts))
  (modes native)

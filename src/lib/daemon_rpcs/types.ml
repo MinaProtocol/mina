@@ -7,7 +7,8 @@ module Git_sha = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = string [@@deriving sexp, to_yojson, equal]
+      type t = Bounded_types.String.Stable.V1.t
+      [@@deriving sexp, to_yojson, equal]
 
       let to_latest = Fn.id
     end

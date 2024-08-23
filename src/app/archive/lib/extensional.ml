@@ -24,7 +24,7 @@ module User_command = struct
       *)
       type t =
         { sequence_no : int
-        ; command_type : string
+        ; command_type : Bounded_types.String.Stable.V1.t
         ; fee_payer : Public_key.Compressed.Stable.V1.t
         ; source : Public_key.Compressed.Stable.V1.t
         ; receiver : Public_key.Compressed.Stable.V1.t
@@ -37,7 +37,7 @@ module User_command = struct
         ; hash : Transaction_hash.Stable.V1.t
               [@to_yojson Transaction_hash.to_yojson]
               [@of_yojson Transaction_hash.of_yojson]
-        ; status : string
+        ; status : Bounded_types.String.Stable.V1.t
         ; failure_reason : Transaction_status.Failure.Stable.V2.t option
         }
       [@@deriving yojson, equal]
@@ -45,6 +45,12 @@ module User_command = struct
       let to_latest = Fn.id
     end
   end]
+
+  (* fee_payer and source are always the same, so we omit the duplication here *)
+  let accounts_referenced { fee_payer; receiver; _ } =
+    [ Account_id.create fee_payer Token_id.default
+    ; Account_id.create receiver Token_id.default
+    ]
 end
 
 module Internal_command = struct
@@ -57,13 +63,13 @@ module Internal_command = struct
       type t =
         { sequence_no : int
         ; secondary_sequence_no : int
-        ; command_type : string
+        ; command_type : Bounded_types.String.Stable.V1.t
         ; receiver : Public_key.Compressed.Stable.V1.t
         ; fee : Currency.Fee.Stable.V1.t
         ; hash : Transaction_hash.Stable.V1.t
               [@to_yojson Transaction_hash.to_yojson]
               [@of_yojson Transaction_hash.of_yojson]
-        ; status : string
+        ; status : Bounded_types.String.Stable.V1.t
         ; failure_reason : Transaction_status.Failure.Stable.V2.t option
         }
       [@@deriving yojson, equal]
@@ -71,6 +77,9 @@ module Internal_command = struct
       let to_latest = Fn.id
     end
   end]
+
+  let account_referenced { receiver; _ } =
+    Account_id.create receiver Token_id.default
 end
 
 (* for fee payer and account updates, authorizations are omitted; signatures, proofs not in archive db *)
@@ -86,7 +95,7 @@ module Zkapp_command = struct
         ; hash : Transaction_hash.Stable.V1.t
               [@to_yojson Transaction_hash.to_yojson]
               [@of_yojson Transaction_hash.of_yojson]
-        ; status : string
+        ; status : Bounded_types.String.Stable.V1.t
         ; failure_reasons :
             Transaction_status.Failure.Collection.Display.Stable.V1.t option
         }
@@ -95,6 +104,11 @@ module Zkapp_command = struct
       let to_latest = Fn.id
     end
   end]
+
+  let accounts_referenced { fee_payer; account_updates; _ } =
+    Account_id.create fee_payer.public_key Token_id.default
+    :: List.map account_updates ~f:(fun { public_key; token_id; _ } ->
+           Account_id.create public_key token_id )
 end
 
 module Block = struct

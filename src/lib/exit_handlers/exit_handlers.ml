@@ -25,7 +25,7 @@ let register_handler ~logger ~description (f : unit -> unit) =
 (* register a Deferred.t thunk to be called at Async shutdown; log registration and execution *)
 let register_async_shutdown_handler ~logger ~description
     (f : unit -> unit Deferred.t) =
-  [%log info] "Registering async shutdown handler: $description"
+  [%log debug] "Registering async shutdown handler: $description"
     ~metadata:[ ("description", `String description) ] ;
   let logging_thunk () =
     [%log info] "Running async shutdown handler: $description"

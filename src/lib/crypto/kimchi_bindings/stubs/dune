@@ -1,20 +1,11 @@
 ;; src/ contains no dune-related files
+;; kimchi-stubs-vendors contains the vendors for Kimchi stubs
 
-(data_only_dirs src)
+(data_only_dirs src kimchi-stubs-vendors)
 
 ;; Ignore target if it exists locally
 
-(dirs :standard \ target)
-
-;; we first create a `dune-build-root` file that contains the dune workspace root
-
-(rule
- (target dune-build-root)
- (deps
-  ; no sandbox, we want the path to the _build directory
-  (sandbox none))
- (action
-  (system "printf \"%s\" $(realpath %{workspace_root}/..) > %{target}")))
+(dirs :standard .cargo \ target)
 
 ;;
 ;; Rules to set the optimisation flags for the rust compiler.
@@ -55,6 +46,8 @@
   Cargo.toml
   rust-toolchain.toml
   (source_tree src)
+  (source_tree kimchi-stubs-vendors)
+  (source_tree .cargo)
   (source_tree ../../proof-systems)
   (env_var MARLIN_PLONK_STUBS))
  (locks /cargo-lock) ;; lock for rustup
@@ -62,14 +55,14 @@
   (progn
    (setenv
     CARGO_TARGET_DIR
-    "%{read:dune-build-root}/cargo_kimchi_stubs"
+    "%{read:../dune-build-root}/cargo_kimchi_stubs"
     (setenv
      RUSTFLAGS
      %{read:rustflags.sexp}
-     (run cargo build --release)))
+     (run cargo build --release --offline)))
    (run
     cp
-    %{read:dune-build-root}/cargo_kimchi_stubs/release/libwires_15_stubs.a
+    %{read:../dune-build-root}/cargo_kimchi_stubs/release/libwires_15_stubs.a
     .))))
 
 ;; this is used by nix
@@ -96,6 +89,7 @@
  (modules kimchi_types)
  (instrumentation
   (backend bisect_ppx))
+ (libraries bounded_types)
  (inline_tests (flags -verbose -show-counts))
  (preprocess
   (pps ppx_version ppx_inline_test)))
@@ -104,7 +98,7 @@
  (public_name pasta_bindings)
  (name pasta_bindings)
  (modules pasta_bindings)
- (libraries kimchi_types pasta_bindings.backend)
+ (libraries kimchi_types pasta_bindings.backend bounded_types)
  (instrumentation
   (backend bisect_ppx))
  (inline_tests (flags -verbose -show-counts))
@@ -115,7 +109,7 @@
  (public_name kimchi_bindings)
  (name kimchi_bindings)
  (modules kimchi_bindings)
- (libraries pasta_bindings kimchi_types)
+ (libraries pasta_bindings kimchi_types bounded_types)
  (instrumentation
   (backend bisect_ppx))
  (inline_tests (flags -verbose -show-counts))
@@ -127,7 +121,11 @@
  (name pasta_bindings_backend_native)
  (modules pasta_bindings_backend)
  (foreign_archives wires_15_stubs)
+ (no_dynlink)
+ ; ^ Required for compilation of this library separately
+ ; from libraries that depend on it
  (c_library_flags :standard "-lpthread")
+ (libraries bounded_types)
  (instrumentation
   (backend bisect_ppx))
  (inline_tests (flags -verbose -show-counts))
@@ -151,6 +149,8 @@
   Cargo.toml
   rust-toolchain.toml
   (source_tree src)
+  (source_tree kimchi-stubs-vendors)
+  (source_tree .cargo)
   (source_tree ../../proof-systems)
   (env_var MARLIN_PLONK_STUBS))
  (locks /cargo-lock) ;; lock for rustup
@@ -160,8 +160,8 @@
    (run rm -f ./Cargo.lock)
    (setenv
     CARGO_TARGET_DIR
-    "%{read:dune-build-root}/cargo_kimchi_bindgen"
-    (run cargo run %{targets}))
+    "%{read:../dune-build-root}/cargo_kimchi_bindgen"
+    (run cargo run %{targets} --offline))
    (run ocamlformat -i %{targets}))))
 
 ;; this is used by nix

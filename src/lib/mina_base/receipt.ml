@@ -1,7 +1,5 @@
 (* receipt.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 module B58_lib = Base58_check
 open Snark_params.Tick
@@ -47,7 +45,7 @@ module Chain_hash = struct
 
   let equal = Stable.Latest.equal
 
-  let empty = of_hash Random_oracle.(salt "CodaReceiptEmpty" |> digest)
+  let empty = of_hash Random_oracle.Legacy.(salt "CodaReceiptEmpty" |> digest)
 
   let cons_signed_command_payload (e : Signed_command_elt.t) (t : t) =
     let open Random_oracle.Legacy in
@@ -74,8 +72,6 @@ module Chain_hash = struct
     |> pack_input
     |> hash ~init:Hash_prefix.receipt_chain_zkapp_command
     |> of_hash
-
-  [%%if defined consensus_mechanism]
 
   module Checked = struct
     module Signed_command_elt = struct
@@ -127,6 +123,4 @@ module Chain_hash = struct
                  append index_input (append x (field (var_to_hash_packed t)))) )
           |> var_of_hash_packed )
   end
-
-  [%%endif]
 end

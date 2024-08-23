@@ -21,7 +21,7 @@ let log_level =
              (*   |> String.concat ~sep:", " ) ; *)
              failwith "test"
          | Ok ll ->
-             ll ))
+             ll ) )
 
 let logger_setup log_json log_level =
   let stdout_log_processor =
@@ -29,9 +29,10 @@ let logger_setup log_json log_level =
     else
       Logger.Processor.pretty ~log_level
         ~config:
-          { Interpolator_lib.Interpolator.mode= Inline
-          ; max_interpolation_length= 50
-          ; pretty_print= true }
+          { Interpolator_lib.Interpolator.mode = Inline
+          ; max_interpolation_length = 50
+          ; pretty_print = true
+          }
   in
   Logger.Consumer_registry.register ~id:"default"
     ~processor:stdout_log_processor

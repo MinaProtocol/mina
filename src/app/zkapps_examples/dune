@@ -7,13 +7,14 @@
    async_kernel
    core_kernel
    ;; local libraries
+   mina_numbers
    crypto_params
    currency
    pasta_bindings
    kimchi_backend
    kimchi_backend_common
    kimchi_pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta.basic
    mina_base
    mina_base.import
    mina_ledger
@@ -24,6 +25,7 @@
    random_oracle_input
    snarky.backendless
    snark_params
+   bounded_types
    sgn
    signature_lib
    tuple_lib

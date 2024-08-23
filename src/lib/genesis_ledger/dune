@@ -14,7 +14,7 @@
    genesis_constants
    data_hash_lib
    mina_ledger
-   mina_base.import)
- (preprocessor_deps "../../config.mlh")
+   mina_base.import
+   bounded_types)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_optcomp ppx_let)))
+ (preprocess (pps ppx_version ppx_let)))

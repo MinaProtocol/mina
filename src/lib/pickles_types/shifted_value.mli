@@ -1,24 +1,43 @@
 module type Field_intf = sig
+  (** Represents an element of the field *)
   type t
 
+  (** The number of bits in the field's order, i.e.
+      [1 + log2(field_order)] *)
   val size_in_bits : int
 
+  (** [negate x] returns the unique value [y] such that [x + y = zero mod p]
+      where [p] is the order of the field *)
   val negate : t -> t
 
+  (** [a - b] returns the unique value [c] such that [a + c = b mod p] where
+      [p] is the order of the field *)
   val ( - ) : t -> t -> t
 
+  (** [a + b] returns the unique value [c] such that [a + b = c mod p] where
+      [p] is the order of the field *)
   val ( + ) : t -> t -> t
 
+  (** [a * b] returns the unique value [c] such that [a * b = c mod p] where
+      [p] is the order of the field *)
   val ( * ) : t -> t -> t
 
+  (** [a / b] returns the unique value [c] such that [a * c = b mod p] where
+      [p] is the order of the field *)
   val ( / ) : t -> t -> t
 
+  (** [inv x] returns the unique value [y] such that [x * y = one mod p]
+      where [p] is the order of the field *)
   val inv : t -> t
 
+  (** The identity element for the addition *)
   val zero : t
 
+  (** The identity element for the multiplication *)
   val one : t
 
+  (** [of_int x] builds an element of type [t]. [x] is the canonical
+      representation of the field element. *)
   val of_int : int -> t
 end
 
@@ -43,6 +62,7 @@ module type S = sig
 
     val create : (module Field_intf with type t = 'f) -> 'f t
 
+    (** [map x f] applies [f] on the value contained in [x] *)
     val map : 'a t -> f:('a -> 'b) -> 'b t
   end
 

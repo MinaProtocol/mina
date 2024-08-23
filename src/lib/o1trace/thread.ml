@@ -69,7 +69,8 @@ module Fiber = struct
 
   let next_id = ref 1
 
-  type t = { id : int; parent : t option; thread : thread } [@@deriving sexp_of]
+  type t = { id : int; parent : t option; thread : thread; key : string list }
+  [@@deriving sexp_of]
 
   let ctx_id : t Type_equal.Id.t = Type_equal.Id.create ~name:"fiber" sexp_of_t
 
@@ -87,7 +88,7 @@ module Fiber = struct
         fiber
     | None ->
         let thread = register name in
-        let fiber = { id = !next_id; parent; thread } in
+        let fiber = { id = !next_id; parent; thread; key } in
         incr next_id ;
         Hashtbl.set fibers ~key ~data:fiber ;
         Option.iter parent ~f:(fun p -> Graph.add_edge graph p.thread.name name) ;
@@ -98,8 +99,12 @@ module Fiber = struct
     Execution_context.with_local ctx ctx_id (Some t)
 
   let of_context ctx = Execution_context.find_local ctx ctx_id
+
+  let key { thread = { name; _ }; parent; _ } = fiber_key name parent
 end
 
 let of_context ctx =
   let%map.Option fiber = Fiber.of_context ctx in
   fiber.thread
+
+let iter_fibers ~f = Hashtbl.iter Fiber.fibers ~f

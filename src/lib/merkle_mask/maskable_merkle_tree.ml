@@ -25,6 +25,8 @@ module Make (Inputs : Inputs_intf) = struct
   open Inputs
   include Base
 
+  let logger = Logger.create ()
+
   (** Maps parent ledger UUIDs to child masks. *)
   let (registered_masks : Mask.Attached.t list Uuid.Table.t) =
     Uuid.Table.create ()
@@ -45,7 +47,7 @@ module Make (Inputs : Inputs_intf) = struct
       Visualization.display_prefix_of_string @@ Uuid.to_string
       @@ Mask.Attached.get_uuid mask
 
-    let name mask = sprintf !"\"%s \"" (format_uuid mask)
+    let name mask = sprintf !"%S" (format_uuid mask)
 
     let display_attached_mask mask =
       let root_hash = Mask.Attached.merkle_root mask in
@@ -107,42 +109,11 @@ module Make (Inputs : Inputs_intf) = struct
           Graphviz.output_graph output_channel graph )
   end
 
-  module Visualize = struct
-    module Summary = struct
-      type t = [ `Uuid of Uuid.t ] * [ `Hash of Hash.t ] [@@deriving sexp_of]
-    end
+  let unsafe_preload_accounts_from_parent =
+    Mask.Attached.unsafe_preload_accounts_from_parent
 
-    type t = Leaf of Summary.t | Node of Summary.t * t list
-    [@@deriving sexp_of]
-
-    module type Crawler_intf = sig
-      type t
-
-      val get_uuid : t -> Uuid.t
-
-      val merkle_root : t -> Hash.t
-    end
-
-    let rec _crawl : type a. (module Crawler_intf with type t = a) -> a -> t =
-     fun (module C) c ->
-      let summary =
-        let uuid = C.get_uuid c in
-        ( `Uuid uuid
-        , `Hash
-            ( try C.merkle_root c
-              with _ ->
-                Core.printf !"CAUGHT %{sexp: Uuid.t}\n%!" uuid ;
-                Hash.empty_account ) )
-      in
-      match Uuid.Table.find registered_masks (C.get_uuid c) with
-      | None ->
-          Leaf summary
-      | Some masks ->
-          Node (summary, List.map masks ~f:(_crawl (module Mask.Attached)))
-  end
-
-  let register_mask t mask =
-    let attached_mask = Mask.set_parent mask t in
+  let register_mask ?accumulated t mask =
+    let attached_mask = Mask.set_parent ?accumulated mask t in
     List.iter (Uuid.Table.data registered_masks) ~f:(fun ms ->
         List.iter ms ~f:(fun m ->
             [%test_result: bool]
@@ -154,77 +125,88 @@ module Make (Inputs : Inputs_intf) = struct
     Uuid.Table.add_multi registered_masks ~key:(get_uuid t) ~data:attached_mask ;
     attached_mask
 
-  let rec unregister_mask_exn ?(grandchildren = `Check) ~loc
-      (mask : Mask.Attached.t) : Mask.unattached =
+  let rec iter_descendants ~f uuid =
+    List.iter
+      (Hashtbl.find registered_masks uuid |> Option.value ~default:[])
+      ~f:(fun child_mask ->
+        iter_descendants ~f (Mask.Attached.get_uuid child_mask) ;
+        f child_mask )
+
+  let unregister_mask_error_msg ~uuid ~parent_uuid suffix =
+    sprintf "Couldn't unregister mask with UUID %s from parent %s, %s"
+      (Uuid.to_string_hum uuid)
+      (Uuid.to_string_hum parent_uuid)
+      suffix
+
+  let unregister_mask_exn_do ?trigger_signal mask =
+    let uuid = Mask.Attached.get_uuid mask in
     let parent_uuid = Mask.Attached.get_parent mask |> get_uuid in
-    let error_msg suffix =
-      sprintf "Couldn't unregister mask with UUID %s from parent %s, %s"
-        (Mask.Attached.get_uuid mask |> Uuid.to_string_hum)
-        (Uuid.to_string_hum parent_uuid)
-        suffix
-    in
-    let trigger_detach_signal =
-      match grandchildren with
-      | `Check | `Recursive ->
-          true
-      | `I_promise_I_am_reparenting_this_mask ->
-          false
-    in
-    ( match grandchildren with
-    | `Check -> (
-        match Hashtbl.find registered_masks (Mask.Attached.get_uuid mask) with
-        | Some children ->
-            failwith @@ error_msg
-            @@ sprintf
-                 !"mask has children that must be unregistered first: %{sexp: \
-                   Uuid.t list}"
-                 (List.map ~f:Mask.Attached.get_uuid children)
-        | None ->
-            () )
-    | `I_promise_I_am_reparenting_this_mask ->
-        ()
-    | `Recursive ->
-        (* You must not retain any references to children of the mask we're
-           unregistering if you pass `Recursive, so this is only used in
-           with_ephemeral_ledger. *)
-        List.iter
-          ( Hashtbl.find registered_masks (Mask.Attached.get_uuid mask)
-          |> Option.value ~default:[] )
-          ~f:(fun child_mask ->
-            ignore
-            @@ unregister_mask_exn ~loc ~grandchildren:`Recursive child_mask )
-    ) ;
+    let error_msg = unregister_mask_error_msg ~uuid ~parent_uuid in
     match Uuid.Table.find registered_masks parent_uuid with
     | None ->
         failwith @@ error_msg "parent not in registered_masks"
     | Some masks ->
-        ( match List.find masks ~f:(fun m -> phys_equal m mask) with
-        | None ->
-            failwith @@ error_msg "mask not registered with that parent"
-        | Some _ -> (
-            let bad, good =
-              List.partition_tf masks ~f:(fun m -> phys_equal m mask)
-            in
-            assert (List.length bad = 1) ;
-            match good with
-            | [] ->
-                (* no other masks for this maskable *)
-                Uuid.Table.remove registered_masks parent_uuid
-            | other_masks ->
-                Uuid.Table.set registered_masks ~key:parent_uuid
-                  ~data:other_masks ) ) ;
-        Mask.Attached.unset_parent ~trigger_signal:trigger_detach_signal ~loc
-          mask
+        let bad, good =
+          List.partition_tf masks ~f:(fun m -> phys_equal m mask)
+        in
+        if List.length bad <> 1 then
+          failwith @@ error_msg "mask not registered with that parent" ;
+        if List.is_empty good then
+          (* no other masks for this maskable *)
+          Uuid.Table.remove registered_masks parent_uuid
+        else Uuid.Table.set registered_masks ~key:parent_uuid ~data:good ;
+        Mask.Attached.unset_parent ?trigger_signal mask
+
+  let unregister_mask_exn ?(grandchildren = `Check) ~loc (mask : Mask.Attached.t)
+      : Mask.unattached =
+    let uuid = Mask.Attached.get_uuid mask in
+    let parent_uuid = Mask.Attached.get_parent mask |> get_uuid in
+    let error_msg = unregister_mask_error_msg ~uuid ~parent_uuid in
+    let trigger_signal =
+      match grandchildren with
+      | `Check -> (
+          match Hashtbl.find registered_masks (Mask.Attached.get_uuid mask) with
+          | Some children ->
+              failwith @@ error_msg
+              @@ sprintf
+                   !"mask has children that must be unregistered first: \
+                     %{sexp: Uuid.t list}"
+                   (List.map ~f:Mask.Attached.get_uuid children)
+          | None ->
+              true )
+      | `I_promise_I_am_reparenting_this_mask ->
+          false
+      | `Recursive ->
+          (* You must not retain any references to children of the mask we're
+             unregistering if you pass `Recursive, so this is only used in
+             with_ephemeral_ledger. *)
+          iter_descendants uuid ~f:(fun mask ->
+              ignore
+                ( unregister_mask_exn_do ~trigger_signal:true ~loc mask
+                  : Mask.unattached ) ) ;
+          true
+    in
+    unregister_mask_exn_do ~trigger_signal ~loc mask
 
   (** a set calls the Base implementation set, notifies registered mask childen *)
   let set t location account =
     Base.set t location account ;
-    match Uuid.Table.find registered_masks (get_uuid t) with
+    let uuid = get_uuid t in
+    match Uuid.Table.find registered_masks uuid with
     | None ->
         ()
     | Some masks ->
         List.iter masks ~f:(fun mask ->
-            Mask.Attached.parent_set_notify mask account )
+            if not (Mask.Attached.is_committing mask) then (
+              Mask.Attached.parent_set_notify mask account ;
+              let child_uuid = Mask.Attached.get_uuid mask in
+              Mask.Attached.drop_accumulated mask ;
+              iter_descendants child_uuid ~f:Mask.Attached.drop_accumulated ;
+              [%log error]
+                "Update of an account in parent %s conflicted with an account \
+                 in mask %s"
+                (Uuid.to_string_hum uuid)
+                (Uuid.to_string_hum child_uuid) ) )
 
   let remove_and_reparent_exn t t_as_mask =
     let parent = Mask.Attached.get_parent t_as_mask in
@@ -244,13 +226,23 @@ module Make (Inputs : Inputs_intf) = struct
         ignore (register_mask parent m : Mask.Attached.t) )
 
   let batch_notify_mask_children t accounts =
-    match Uuid.Table.find registered_masks (get_uuid t) with
+    let uuid = get_uuid t in
+    match Uuid.Table.find registered_masks uuid with
     | None ->
         ()
     | Some masks ->
         List.iter masks ~f:(fun mask ->
-            List.iter accounts ~f:(fun account ->
-                Mask.Attached.parent_set_notify mask account ) )
+            if not (Mask.Attached.is_committing mask) then (
+              let child_uuid = Mask.Attached.get_uuid mask in
+              Mask.Attached.drop_accumulated mask ;
+              iter_descendants child_uuid ~f:Mask.Attached.drop_accumulated ;
+              [%log error]
+                "Update of an account in parent %s conflicted with an account \
+                 in mask %s"
+                (Uuid.to_string_hum uuid)
+                (Uuid.to_string_hum child_uuid) ;
+              List.iter accounts ~f:(fun account ->
+                  Mask.Attached.parent_set_notify mask account ) ) )
 
   let set_batch t locations_and_accounts =
     Base.set_batch t locations_and_accounts ;

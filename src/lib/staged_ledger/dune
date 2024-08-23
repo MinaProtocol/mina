@@ -17,10 +17,12 @@
    async
    async_unix
    base.base_internalhash_types
+   integers
    ;; local libraries
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    random_oracle_input
+   bounded_types
    mina_base.import
    mina_ledger
    quickcheck_lib
@@ -58,6 +60,7 @@
    pickles
    pickles_types
    snark_params
+   snarky.backendless
    with_hash
    mina_generators
    random_oracle
@@ -67,10 +70,10 @@
    ppx_version.runtime
    mina_wire_types
    internal_tracing
+   cache_dir
  )
- (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
-               ppx_optcomp lens.ppx_deriving ppx_mina ppx_version ppx_bin_prot ppx_fields_conv ppx_sexp_conv ppx_compare ppx_deriving.make
+               lens.ppx_deriving ppx_mina ppx_version ppx_bin_prot ppx_fields_conv ppx_sexp_conv ppx_compare ppx_deriving.make
                ppx_deriving_yojson ppx_custom_printf ppx_let ppx_inline_test ppx_assert ppx_pipebang))
  (synopsis "Staged Ledger updates the current ledger with new transactions"))

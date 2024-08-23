@@ -146,7 +146,9 @@ module type S0 = sig
     module Failed_to_generate_snark :
       Rpc_master
         with type Master.T.query =
-          Error.t * Work.Spec.t * Signature_lib.Public_key.Compressed.t
+          Bounded_types.Wrapped_error.t
+          * Work.Spec.t
+          * Signature_lib.Public_key.Compressed.t
          and type Master.T.response = unit
   end
 

@@ -26,6 +26,7 @@ module Config = struct
     { constraint_constants : Genesis_constants.Constraint_constants.t
     ; consensus_constants : Consensus.Constants.t
     ; time_controller : Block_time.Controller.t
+    ; slot_tx_end : Mina_numbers.Global_slot_since_hard_fork.t option
     }
   [@@deriving sexp_of, equal, compare]
 end
@@ -209,14 +210,20 @@ module For_tests = struct
           key )
 end
 
-let empty ~constraint_constants ~consensus_constants ~time_controller : t =
+let empty ~constraint_constants ~consensus_constants ~time_controller
+    ~slot_tx_end : t =
   { applicable_by_fee = Currency.Fee_rate.Map.empty
   ; all_by_sender = Account_id.Map.empty
   ; all_by_fee = Currency.Fee_rate.Map.empty
   ; all_by_hash = Transaction_hash.Map.empty
   ; transactions_with_expiration = Global_slot_since_genesis.Map.empty
   ; size = 0
-  ; config = { constraint_constants; consensus_constants; time_controller }
+  ; config =
+      { constraint_constants
+      ; consensus_constants
+      ; time_controller
+      ; slot_tx_end
+      }
   }
 
 let size : t -> int = fun t -> t.size
@@ -259,12 +266,13 @@ let global_slot_since_genesis conf =
       |> to_global_slot)
   in
   match conf.constraint_constants.fork with
-  | Some { genesis_slot; _ } ->
+  | Some { global_slot_since_genesis; _ } ->
       let slot_span =
         Mina_numbers.Global_slot_since_hard_fork.to_uint32 current_slot
         |> Mina_numbers.Global_slot_span.of_uint32
       in
-      Mina_numbers.Global_slot_since_genesis.(add genesis_slot slot_span)
+      Mina_numbers.Global_slot_since_genesis.(
+        add global_slot_since_genesis slot_span)
   | None ->
       (* we're in the genesis "hard fork", so consider current slot as
          since-genesis
@@ -889,11 +897,27 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
          , Update.single
          , Command_error.t )
          M.t =
-   fun ~config:({ constraint_constants; _ } as config) cmd current_nonce balance
-       by_sender ->
+   fun ~config:
+         ( { constraint_constants
+           ; consensus_constants
+           ; time_controller
+           ; slot_tx_end
+           } as config ) cmd current_nonce balance by_sender ->
     let open Command_error in
-    let unchecked_cmd = Transaction_hash.User_command.of_checked cmd in
     let open M.Let_syntax in
+    let current_global_slot =
+      Consensus.Data.Consensus_time.(
+        to_global_slot
+          (of_time_exn ~constants:consensus_constants
+             (Block_time.now time_controller) ))
+    in
+    let%bind () =
+      M.of_result
+      @@ Result.ok_if_true ~error:After_slot_tx_end
+      @@ Option.value_map slot_tx_end ~default:true ~f:(fun slot_tx_end' ->
+             Global_slot_since_hard_fork.(current_global_slot < slot_tx_end') )
+    in
+    let unchecked_cmd = Transaction_hash.User_command.of_checked cmd in
     let unchecked = Transaction_hash.User_command.data unchecked_cmd in
     let fee = User_command.fee unchecked in
     let fee_per_wu = User_command.fee_per_wu unchecked in
@@ -1134,8 +1158,27 @@ let add_from_backtrack :
        t
     -> Transaction_hash.User_command_with_valid_signature.t
     -> (t, Command_error.t) Result.t =
- fun ({ config = { constraint_constants; _ }; _ } as t) cmd ->
+ fun ( { config =
+           { constraint_constants
+           ; consensus_constants
+           ; time_controller
+           ; slot_tx_end
+           ; _
+           }
+       ; _
+       } as t ) cmd ->
   let open Result.Let_syntax in
+  let current_global_slot =
+    Consensus.Data.Consensus_time.(
+      to_global_slot
+        (of_time_exn ~constants:consensus_constants
+           (Block_time.now time_controller) ))
+  in
+  let%bind () =
+    Result.ok_if_true ~error:Command_error.After_slot_tx_end
+    @@ Option.value_map slot_tx_end ~default:true ~f:(fun slot_tx_end' ->
+           Global_slot_since_hard_fork.(current_global_slot < slot_tx_end') )
+  in
   let unchecked =
     Transaction_hash.User_command_with_valid_signature.command cmd
   in

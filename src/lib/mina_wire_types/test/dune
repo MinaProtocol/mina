@@ -28,8 +28,8 @@
     sgn
     sgn_type
     data_hash_lib
-    kimchi_backend.pasta
-    kimchi_backend.pasta.basic
+    kimchi_pasta
+    kimchi_pasta.basic
     kimchi_backend
     pickles
     pickles.backend
@@ -37,6 +37,7 @@
     pasta_bindings
     blake2
     staged_ledger_diff
+    bounded_types
     )
   (preprocess (pps ppx_version))
   (instrumentation (backend bisect_ppx))

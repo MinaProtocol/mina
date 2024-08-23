@@ -674,21 +674,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         { Poly.hash = genesis_ledger_hash ~ledger
         ; total_currency = genesis_ledger_total_currency ~ledger
         }
-
-      let graphql_type () : ('ctx, Value.t option) Graphql_async.Schema.typ =
-        let open Graphql_async in
-        let open Schema in
-        obj "epochLedger" ~fields:(fun _ ->
-            [ field "hash"
-                ~typ:
-                  (non_null @@ Mina_base_unix.Graphql_scalars.LedgerHash.typ ())
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.hash; _ } -> hash)
-            ; field "totalCurrency"
-                ~typ:(non_null @@ Currency_unix.Graphql_scalars.Amount.typ ())
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.total_currency; _ } -> total_currency)
-            ] )
     end
 
     module Vrf = struct
@@ -775,9 +760,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let eval = T.eval
 
       module Precomputed = struct
-        let keypairs = Lazy.force Key_gen.Sample_keypairs.keypairs
-
-        let genesis_winner = keypairs.(0)
+        let genesis_winner = Key_gen.Sample_keypairs.genesis_winner
 
         let genesis_stake_proof :
             genesis_epoch_ledger:Mina_ledger.Ledger.t Lazy.t -> Stake_proof.t =
@@ -842,9 +825,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             | _ ->
                 respond
                   (Provide
-                     (Snarky_backendless.Request.Handler.run handlers
-                        [ "Ledger Handler"; "Pending Coinbase Handler" ]
-                        request ) )
+                     (Option.value_exn ~message:"unhandled request"
+                        (Snarky_backendless.Request.Handler.run handlers request) )
+                  )
       end
 
       let check ~intr_module:(module I : Interruptible.F)
@@ -938,12 +921,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
         val typ : (Mina_base.State_hash.var, t) Typ.t
 
-        type graphql_type
-
-        val graphql_type : unit -> ('ctx, graphql_type) Graphql_async.Schema.typ
-
-        val resolve : t -> graphql_type
-
         val to_input :
           t -> Snark_params.Tick.Field.t Random_oracle.Input.Chunked.t
 
@@ -973,37 +950,6 @@ module Make_str (A : Wire_types.Concrete) = struct
             ]
             ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
             ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
-
-        let graphql_type name =
-          let open Graphql_async in
-          let open Schema in
-          obj name ~fields:(fun _ ->
-              [ field "ledger"
-                  ~typ:(non_null @@ Epoch_ledger.graphql_type ())
-                  ~args:Arg.[]
-                  ~resolve:(fun _ { Poly.ledger; _ } -> ledger)
-              ; field "seed"
-                  ~typ:
-                    (non_null @@ Mina_base_unix.Graphql_scalars.EpochSeed.typ ())
-                  ~args:Arg.[]
-                  ~resolve:(fun _ { Poly.seed; _ } -> seed)
-              ; field "startCheckpoint"
-                  ~typ:
-                    (non_null @@ Mina_base_unix.Graphql_scalars.StateHash.typ ())
-                  ~args:Arg.[]
-                  ~resolve:(fun _ { Poly.start_checkpoint; _ } ->
-                    start_checkpoint )
-              ; field "lockCheckpoint"
-                  ~typ:(Lock_checkpoint.graphql_type ())
-                  ~args:Arg.[]
-                  ~resolve:(fun _ { Poly.lock_checkpoint; _ } ->
-                    Lock_checkpoint.resolve lock_checkpoint )
-              ; field "epochLength"
-                  ~typ:
-                    (non_null @@ Mina_numbers_unix.Graphql_scalars.Length.typ ())
-                  ~args:Arg.[]
-                  ~resolve:(fun _ { Poly.epoch_length; _ } -> epoch_length)
-              ] )
 
         let to_input
             ({ ledger; seed; start_checkpoint; lock_checkpoint; epoch_length } :
@@ -1045,15 +991,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           Random_oracle.Input.Chunked.field (t :> Tick.Field.t)
 
         let null = Mina_base.State_hash.(of_hash zero)
-
-        open Graphql_async
-        open Schema
-
-        type graphql_type = string
-
-        let graphql_type () = non_null string
-
-        let resolve = to_base58_check
       end
 
       module Staking = Make (T)
@@ -1209,8 +1146,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         of_slot_number ~constants slot
     end
 
-    [%%if true]
-
     module Min_window_density = struct
       (* Three cases for updating the densities of sub-windows
          - same sub-window, then add 1 to the sub-window densities
@@ -1254,7 +1189,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         let next_global_sub_window =
           Global_sub_window.of_global_slot ~constants next_global_slot
         in
-
         (*
           Compute the relative sub-window indexes in [0, sub_windows_per_window) needed for ring-shifting
          *)
@@ -1313,9 +1247,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let min_window_density =
           if
             same_sub_window
-            || UInt32.compare
-                 ( Mina_numbers.Global_slot_since_hard_fork.to_uint32
-                 @@ Global_slot.slot_number next_global_slot )
+            || Mina_numbers.Global_slot_since_hard_fork.compare
+                 (Global_slot.slot_number next_global_slot)
                  constants.grace_period_end
                < 0
           then prev_min_window_density
@@ -1413,9 +1346,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             let%bind in_grace_period =
               Global_slot.Checked.( < ) next_global_slot
                 (Global_slot.Checked.of_slot_number ~constants
-                   (Mina_numbers.Global_slot_since_hard_fork.Checked.Unsafe
-                    .of_field
-                      (Length.Checked.to_field constants.grace_period_end) ) )
+                   constants.grace_period_end )
             in
             if_
               Boolean.(same_sub_window ||| in_grace_period)
@@ -1480,9 +1411,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             let min_window_density =
               if
                 sub_window_diff = 0
-                || UInt32.compare
-                     ( Mina_numbers.Global_slot_since_hard_fork.to_uint32
-                     @@ Global_slot.slot_number next_global_slot )
+                || Mina_numbers.Global_slot_since_hard_fork.compare
+                     (Global_slot.slot_number next_global_slot)
                      constants.grace_period_end
                    < 0
               then prev_min_window_density
@@ -1688,25 +1618,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         end )
     end
 
-    [%%else]
-
-    module Min_window_density = struct
-      let update_min_window_density ~constants:_ ~prev_global_slot:_
-          ~next_global_slot:_ ~prev_sub_window_densities
-          ~prev_min_window_density =
-        (prev_min_window_density, prev_sub_window_densities)
-
-      module Checked = struct
-        let update_min_window_density ~constants:_ ~prev_global_slot:_
-            ~next_global_slot:_ ~prev_sub_window_densities
-            ~prev_min_window_density =
-          Tick.Checked.return
-            (prev_min_window_density, prev_sub_window_densities)
-      end
-    end
-
-    [%%endif]
-
     (* We have a list of state hashes. When we extend the blockchain,
        we see if the **previous** state should be saved as a checkpoint.
        This is because we have convenient access to the entire previous
@@ -1752,7 +1663,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               ; sub_window_densities : 'length list
               ; last_vrf_output : 'vrf_output
               ; total_currency : 'amount
-              ; curr_global_slot : 'global_slot
+              ; curr_global_slot_since_hard_fork : 'global_slot
               ; global_slot_since_genesis : 'global_slot_since_genesis
               ; staking_epoch_data : 'staking_epoch_data
               ; next_epoch_data : 'next_epoch_data
@@ -1844,7 +1755,7 @@ module Make_str (A : Wire_types.Concrete) = struct
            ; sub_window_densities
            ; last_vrf_output
            ; total_currency
-           ; curr_global_slot
+           ; curr_global_slot_since_hard_fork
            ; global_slot_since_genesis
            ; staking_epoch_data
            ; next_epoch_data
@@ -1864,7 +1775,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               (List.map ~f:Length.to_input sub_window_densities)
           ; Vrf.Output.Truncated.to_input last_vrf_output
           ; Amount.to_input total_currency
-          ; Global_slot.to_input curr_global_slot
+          ; Global_slot.to_input curr_global_slot_since_hard_fork
           ; Mina_numbers.Global_slot_since_genesis.to_input
               global_slot_since_genesis
           ; packed
@@ -1886,7 +1797,7 @@ module Make_str (A : Wire_types.Concrete) = struct
            ; sub_window_densities
            ; last_vrf_output
            ; total_currency
-           ; curr_global_slot
+           ; curr_global_slot_since_hard_fork
            ; global_slot_since_genesis
            ; staking_epoch_data
            ; next_epoch_data
@@ -1906,7 +1817,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               (List.map ~f:Length.Checked.to_input sub_window_densities)
           ; Vrf.Output.Truncated.var_to_input last_vrf_output
           ; Amount.var_to_input total_currency
-          ; Global_slot.Checked.to_input curr_global_slot
+          ; Global_slot.Checked.to_input curr_global_slot_since_hard_fork
           ; Mina_numbers.Global_slot_since_genesis.Checked.to_input
               global_slot_since_genesis
           ; packed
@@ -1919,7 +1830,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; Public_key.Compressed.Checked.to_input coinbase_receiver
           ]
 
-      let global_slot { Poly.curr_global_slot; _ } = curr_global_slot
+      let global_slot { Poly.curr_global_slot_since_hard_fork; _ } =
+        curr_global_slot_since_hard_fork
 
       let checkpoint_window ~(constants : Constants.t) (slot : Global_slot.t) =
         UInt32.Infix.(
@@ -1947,7 +1859,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let open Or_error.Let_syntax in
         let prev_epoch, prev_slot =
           Global_slot.to_epoch_and_slot
-            previous_consensus_state.curr_global_slot
+            previous_consensus_state.curr_global_slot_since_hard_fork
         in
         let next_global_slot =
           Global_slot.of_slot_number consensus_transition ~constants
@@ -1957,13 +1869,14 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         let%bind slot_diff =
           Global_slot.diff_slots next_global_slot
-            previous_consensus_state.curr_global_slot
+            previous_consensus_state.curr_global_slot_since_hard_fork
           |> Option.value_map
                ~default:
                  (Or_error.errorf
                     !"Next global slot %{sexp: Global_slot.t} smaller than \
                       current global slot %{sexp: Global_slot.t}"
-                    next_global_slot previous_consensus_state.curr_global_slot )
+                    next_global_slot
+                    previous_consensus_state.curr_global_slot_since_hard_fork )
                ~f:(fun diff -> Ok diff)
         in
         let%map total_currency =
@@ -1982,7 +1895,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             Consensus_transition.(
               equal consensus_transition Consensus_transition.genesis)
             || Global_slot.(
-                 previous_consensus_state.curr_global_slot < next_global_slot)
+                 previous_consensus_state.curr_global_slot_since_hard_fork
+                 < next_global_slot)
           then Ok ()
           else
             Or_error.errorf
@@ -2002,7 +1916,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let min_window_density, sub_window_densities =
           Min_window_density.update_min_window_density ~constants
             ~incr_window:true
-            ~prev_global_slot:previous_consensus_state.curr_global_slot
+            ~prev_global_slot:
+              previous_consensus_state.curr_global_slot_since_hard_fork
             ~next_global_slot
             ~prev_sub_window_densities:
               previous_consensus_state.sub_window_densities
@@ -2015,7 +1930,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; sub_window_densities
         ; last_vrf_output = Vrf.Output.truncate producer_vrf_result
         ; total_currency
-        ; curr_global_slot = next_global_slot
+        ; curr_global_slot_since_hard_fork = next_global_slot
         ; global_slot_since_genesis =
             Mina_numbers.Global_slot_since_genesis.add
               previous_consensus_state.global_slot_since_genesis slot_diff
@@ -2067,10 +1982,10 @@ module Make_str (A : Wire_types.Concrete) = struct
           match constraint_constants.fork with
           | None ->
               (Length.zero, Mina_numbers.Global_slot_since_genesis.zero)
-          | Some { previous_length; genesis_slot; _ } ->
+          | Some { blockchain_length; global_slot_since_genesis; _ } ->
               (*Note: global_slot_since_genesis at fork point is the same as global_slot_since_genesis in the new genesis. This value is used to check transaction validity and existence of locked tokens.
                 For reviewers, should this be incremented by 1 because it's technically a new block? we don't really know how many slots passed since the fork point*)
-              (previous_length, genesis_slot)
+              (blockchain_length, global_slot_since_genesis)
         in
         let default_epoch_data =
           Genesis_epoch_data.Data.
@@ -2092,7 +2007,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                  ~f:(Fn.const max_sub_window_density)
         ; last_vrf_output = Vrf.Output.Truncated.dummy
         ; total_currency = genesis_ledger_total_currency ~ledger:genesis_ledger
-        ; curr_global_slot = Global_slot.zero ~constants
+        ; curr_global_slot_since_hard_fork = Global_slot.zero ~constants
         ; global_slot_since_genesis
         ; staking_epoch_data =
             Epoch_data.Staking.genesis
@@ -2152,14 +2067,16 @@ module Make_str (A : Wire_types.Concrete) = struct
       (* Check that both epoch and slot are zero. *)
       let is_genesis_state (t : Value.t) =
         Mina_numbers.Global_slot_since_hard_fork.(
-          equal zero (Global_slot.slot_number t.curr_global_slot))
+          equal zero
+            (Global_slot.slot_number t.curr_global_slot_since_hard_fork))
 
       let is_genesis (global_slot : Global_slot.Checked.t) =
         let open Mina_numbers.Global_slot_since_hard_fork in
         Checked.equal (Checked.constant zero)
           (Global_slot.slot_number global_slot)
 
-      let is_genesis_state_var (t : var) = is_genesis t.curr_global_slot
+      let is_genesis_state_var (t : var) =
+        is_genesis t.curr_global_slot_since_hard_fork
 
       let epoch_count (t : Value.t) = t.epoch_count
 
@@ -2188,7 +2105,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         let%bind constants =
           Constants.Checked.create ~constraint_constants ~protocol_constants
         in
-        let { Poly.curr_global_slot = prev_global_slot; _ } = previous_state in
+        let { Poly.curr_global_slot_since_hard_fork = prev_global_slot; _ } =
+          previous_state
+        in
         let next_global_slot =
           Global_slot.Checked.of_slot_number ~constants transition_data
         in
@@ -2330,7 +2249,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; min_window_density
             ; sub_window_densities
             ; last_vrf_output = truncated_vrf_result
-            ; curr_global_slot = next_global_slot
+            ; curr_global_slot_since_hard_fork = next_global_slot
             ; global_slot_since_genesis
             ; total_currency = new_total_currency
             ; staking_epoch_data
@@ -2353,7 +2272,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       [@@deriving yojson]
 
       let display (t : Value.t) =
-        let epoch, slot = Global_slot.to_epoch_and_slot t.curr_global_slot in
+        let epoch, slot =
+          Global_slot.to_epoch_and_slot t.curr_global_slot_since_hard_fork
+        in
         { blockchain_length = Length.to_int t.blockchain_length
         ; epoch_count = Length.to_int t.epoch_count
         ; curr_epoch = Segment_id.to_int epoch
@@ -2364,7 +2285,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; total_currency = Amount.to_nanomina_int t.total_currency
         }
 
-      let curr_global_slot (t : Value.t) = t.curr_global_slot
+      let curr_global_slot (t : Value.t) = t.curr_global_slot_since_hard_fork
 
       let curr_ f = Fn.compose f curr_global_slot
 
@@ -2392,12 +2313,12 @@ module Make_str (A : Wire_types.Concrete) = struct
       let coinbase_receiver_var (t : var) = t.coinbase_receiver
 
       let curr_global_slot_var (t : var) =
-        Global_slot.slot_number t.curr_global_slot
+        Global_slot.slot_number t.curr_global_slot_since_hard_fork
 
       let curr_global_slot (t : Value.t) =
-        Global_slot.slot_number t.curr_global_slot
+        Global_slot.slot_number t.curr_global_slot_since_hard_fork
 
-      let consensus_time (t : Value.t) = t.curr_global_slot
+      let consensus_time (t : Value.t) = t.curr_global_slot_since_hard_fork
 
       let global_slot_since_genesis_var (t : var) = t.global_slot_since_genesis
 
@@ -2411,7 +2332,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         , block_stake_winner
         , last_vrf_output
         , block_creator
-        , coinbase_receiver )]
+        , coinbase_receiver
+        , has_ancestor_in_same_checkpoint_window )]
 
       module Unsafe = struct
         (* TODO: very unsafe, do not use unless you know what you are doing *)
@@ -2428,107 +2350,11 @@ module Make_str (A : Wire_types.Concrete) = struct
           in
           { t with
             epoch_count = new_epoch_count
-          ; curr_global_slot = Global_slot.add t.curr_global_slot slot_diff
+          ; curr_global_slot_since_hard_fork =
+              Global_slot.add t.curr_global_slot_since_hard_fork slot_diff
           ; global_slot_since_genesis = new_global_slot_since_genesis
           }
       end
-
-      let graphql_type () : ('ctx, Value.t option) Graphql_async.Schema.typ =
-        let open Graphql_async in
-        let open Signature_lib_unix.Graphql_scalars in
-        let public_key = PublicKey.typ () in
-        let open Schema in
-        let length = Mina_numbers_unix.Graphql_scalars.Length.typ () in
-        let amount = Currency_unix.Graphql_scalars.Amount.typ () in
-        obj "ConsensusState" ~fields:(fun _ ->
-            [ field "blockchainLength" ~typ:(non_null length)
-                ~doc:"Length of the blockchain at this block"
-                ~deprecated:(Deprecated (Some "use blockHeight instead"))
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.blockchain_length; _ } ->
-                  blockchain_length )
-            ; field "blockHeight" ~typ:(non_null length)
-                ~doc:"Height of the blockchain at this block"
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.blockchain_length; _ } ->
-                  blockchain_length )
-            ; field "epochCount" ~typ:(non_null length)
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.epoch_count; _ } -> epoch_count)
-            ; field "minWindowDensity" ~typ:(non_null length)
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.min_window_density; _ } ->
-                  min_window_density )
-            ; field "lastVrfOutput" ~typ:(non_null string)
-                ~args:Arg.[]
-                ~resolve:(fun (_ : 'ctx resolve_info)
-                              { Poly.last_vrf_output; _ } ->
-                  Vrf.Output.Truncated.to_base58_check last_vrf_output )
-            ; field "totalCurrency"
-                ~doc:"Total currency in circulation at this block"
-                ~typ:(non_null amount)
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.total_currency; _ } -> total_currency)
-            ; field "stakingEpochData"
-                ~typ:
-                  ( non_null
-                  @@ Epoch_data.Staking.graphql_type "StakingEpochData" )
-                ~args:Arg.[]
-                ~resolve:(fun (_ : 'ctx resolve_info)
-                              { Poly.staking_epoch_data; _ } ->
-                  staking_epoch_data )
-            ; field "nextEpochData"
-                ~typ:(non_null @@ Epoch_data.Next.graphql_type "NextEpochData")
-                ~args:Arg.[]
-                ~resolve:(fun (_ : 'ctx resolve_info)
-                              { Poly.next_epoch_data; _ } -> next_epoch_data )
-            ; field "hasAncestorInSameCheckpointWindow" ~typ:(non_null bool)
-                ~args:Arg.[]
-                ~resolve:(fun _
-                              { Poly.has_ancestor_in_same_checkpoint_window; _ } ->
-                  has_ancestor_in_same_checkpoint_window )
-            ; field "slot" ~doc:"Slot in which this block was created"
-                ~typ:(non_null @@ Graphql_scalars.Slot.typ ())
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.curr_global_slot; _ } ->
-                  Global_slot.slot curr_global_slot )
-            ; field "slotSinceGenesis"
-                ~doc:"Slot since genesis (across all hard-forks)"
-                ~typ:
-                  ( non_null
-                  @@ Mina_numbers_unix.Graphql_scalars.GlobalSlotSinceGenesis
-                     .typ () )
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.global_slot_since_genesis; _ } ->
-                  global_slot_since_genesis )
-            ; field "epoch" ~doc:"Epoch in which this block was created"
-                ~typ:(non_null @@ Graphql_scalars.Epoch.typ ())
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.curr_global_slot; _ } ->
-                  Global_slot.epoch curr_global_slot )
-            ; field "superchargedCoinbase" ~typ:(non_null bool)
-                ~doc:
-                  "Whether or not this coinbase was \"supercharged\", ie. \
-                   created by an account that has no locked tokens"
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.supercharge_coinbase; _ } ->
-                  supercharge_coinbase )
-            ; field "blockStakeWinner" ~typ:(non_null public_key)
-                ~doc:
-                  "The public key that is responsible for winning this block \
-                   (including delegations)"
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.block_stake_winner; _ } ->
-                  block_stake_winner )
-            ; field "blockCreator" ~typ:(non_null public_key)
-                ~doc:"The block producer public key that created this block"
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.block_creator; _ } -> block_creator)
-            ; field "coinbaseReceiever" ~typ:(non_null public_key)
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.coinbase_receiver; _ } ->
-                  coinbase_receiver )
-            ] )
     end
 
     module Prover_state = struct
@@ -2580,9 +2406,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           | _ ->
               respond
                 (Provide
-                   (Snarky_backendless.Request.Handler.run handlers
-                      [ "Ledger Handler"; "Pending Coinbase Handler" ]
-                      request ) )
+                   (Option.value_exn ~message:"unhandled request"
+                      (Snarky_backendless.Request.Handler.run handlers request) )
+                )
 
       let ledger_depth { ledger; _ } = ledger.depth
     end
@@ -2677,6 +2503,35 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~local_state
       in
       Data.Local_state.Snapshot.ledger snapshot
+
+    let get_epoch_ledgers_for_finalized_frontier_block
+        ~(root_consensus_state : Consensus_state.Value.t)
+        ~(target_consensus_state : Consensus_state.Value.t) ~local_state =
+      let root_epoch = Data.Consensus_state.curr_epoch root_consensus_state in
+      let target_epoch =
+        Data.Consensus_state.curr_epoch target_consensus_state
+      in
+      if Epoch.equal root_epoch target_epoch then
+        (* If we assume that the target state is finalized, then so is the
+           frontier's root state that it builds upon.
+           Hence, the next epoch snapshot is also finalized, and we can return
+           both ledgers.
+        *)
+        `Both
+          ( Data.Local_state.Snapshot.ledger
+              !local_state.Local_state.Data.staking_epoch_snapshot
+          , Data.Local_state.Snapshot.ledger
+              !local_state.Local_state.Data.next_epoch_snapshot )
+      else
+        (* Next epoch: the caller will need to manually compute the snarked
+           ledger for the parent block at the epoch boundary.
+        *)
+        let num_parents =
+          Length.to_int target_consensus_state.next_epoch_data.epoch_length
+        in
+        `Snarked_ledger
+          ( Data.Local_state.Snapshot.ledger !local_state.next_epoch_snapshot
+          , num_parents )
 
     type required_snapshot =
       { snapshot_id : Local_state.snapshot_identifier
@@ -3008,15 +2863,17 @@ module Make_str (A : Wire_types.Concrete) = struct
         (* The min window density if we imagine extending to the max slot of the two chains. *)
         (* TODO: You could argue that instead this should be imagine extending to the current consensus time. *)
         let max_slot =
-          Global_slot.max candidate.curr_global_slot existing.curr_global_slot
+          Global_slot.max candidate.curr_global_slot_since_hard_fork
+            existing.curr_global_slot_since_hard_fork
         in
         let virtual_min_window_density (s : Consensus_state.Value.t) =
-          if Global_slot.equal s.curr_global_slot max_slot then
+          if Global_slot.equal s.curr_global_slot_since_hard_fork max_slot then
             s.min_window_density
           else
             Min_window_density.update_min_window_density ~incr_window:false
               ~constants:consensus_constants
-              ~prev_global_slot:s.curr_global_slot ~next_global_slot:max_slot
+              ~prev_global_slot:s.curr_global_slot_since_hard_fork
+              ~next_global_slot:max_slot
               ~prev_sub_window_densities:s.sub_window_densities
               ~prev_min_window_density:s.min_window_density
             |> fst
@@ -3299,15 +3156,20 @@ module Make_str (A : Wire_types.Concrete) = struct
       let ((curr_epoch, curr_slot) as curr) =
         Epoch_and_slot.of_time_exn ~constants start_time
       in
-      let curr_global_slot = Global_slot.of_epoch_and_slot ~constants curr in
+      let curr_global_slot_since_hard_fork =
+        Global_slot.of_epoch_and_slot ~constants curr
+      in
       let consensus_state =
         let global_slot_since_genesis =
           (* for testing, consider slot-since-hard-fork as since-genesis *)
-          Global_slot.slot_number curr_global_slot
+          Global_slot.slot_number curr_global_slot_since_hard_fork
           |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
           |> Mina_numbers.Global_slot_since_genesis.of_uint32
         in
-        { negative_one with curr_global_slot; global_slot_since_genesis }
+        { negative_one with
+          curr_global_slot_since_hard_fork
+        ; global_slot_since_genesis
+        }
       in
       let too_early =
         (* TODO: Does this make sense? *)
@@ -3455,7 +3317,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       module For_tests = struct
         let gen_consensus_state
             ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-            ~constants ~(gen_slot_advancement : int Quickcheck.Generator.t) :
+            ~constants ~(slot_advancement : int) :
             (   previous_protocol_state:
                   Protocol_state.Value.t
                   Mina_base.State_hash.With_state_hashes.t
@@ -3471,7 +3333,6 @@ module Make_str (A : Wire_types.Concrete) = struct
             |> Mina_base.Frozen_ledger_hash.of_ledger_hash
           in
           let open Quickcheck.Let_syntax in
-          let%bind slot_advancement = gen_slot_advancement in
           let%map producer_vrf_result = Vrf.Output.gen in
           fun ~(previous_protocol_state :
                  Protocol_state.Value.t Mina_base.State_hash.With_state_hashes.t
@@ -3482,8 +3343,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                 (With_hash.data previous_protocol_state)
             in
             let blockchain_length = Length.succ prev.blockchain_length in
-            let curr_global_slot =
-              Global_slot.(prev.curr_global_slot + slot_advancement)
+            let curr_global_slot_since_hard_fork =
+              Global_slot.(
+                prev.curr_global_slot_since_hard_fork + slot_advancement)
             in
             let global_slot_since_genesis =
               Mina_numbers.Global_slot_since_genesis.add
@@ -3491,7 +3353,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 (Mina_numbers.Global_slot_span.of_int slot_advancement)
             in
             let curr_epoch, curr_slot =
-              Global_slot.to_epoch_and_slot curr_global_slot
+              Global_slot.to_epoch_and_slot curr_global_slot_since_hard_fork
             in
             let total_currency =
               Option.value_exn
@@ -3514,8 +3376,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             in
             let min_window_density, sub_window_densities =
               Min_window_density.update_min_window_density ~constants
-                ~incr_window:true ~prev_global_slot:prev.curr_global_slot
-                ~next_global_slot:curr_global_slot
+                ~incr_window:true
+                ~prev_global_slot:prev.curr_global_slot_since_hard_fork
+                ~next_global_slot:curr_global_slot_since_hard_fork
                 ~prev_sub_window_densities:prev.sub_window_densities
                 ~prev_min_window_density:prev.min_window_density
             in
@@ -3526,7 +3389,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; sub_window_densities
             ; last_vrf_output = Vrf.Output.truncate producer_vrf_result
             ; total_currency
-            ; curr_global_slot
+            ; curr_global_slot_since_hard_fork
             ; global_slot_since_genesis
             ; staking_epoch_data
             ; next_epoch_data
@@ -3593,12 +3456,12 @@ module Make_str (A : Wire_types.Concrete) = struct
         | Some fork ->
             assert (
               Mina_numbers.Global_slot_since_genesis.(
-                equal fork.genesis_slot
+                equal fork.global_slot_since_genesis
                   previous_consensus_state.global_slot_since_genesis) ) ;
             assert (
               Mina_numbers.Length.(
                 equal
-                  (succ fork.previous_length)
+                  (succ fork.blockchain_length)
                   previous_consensus_state.blockchain_length) ) ) ;
         let global_slot =
           Core_kernel.Time.now () |> Time.of_time
@@ -3639,7 +3502,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             let next_epoch, _ = Global_slot.to_epoch_and_slot global_slot in
             let prev_epoch, _ =
               Global_slot.to_epoch_and_slot
-                previous_consensus_state.curr_global_slot
+                previous_consensus_state.curr_global_slot_since_hard_fork
             in
             if UInt32.compare next_epoch prev_epoch > 0 then
               previous_consensus_state.next_epoch_data.seed
@@ -3669,17 +3532,17 @@ module Make_str (A : Wire_types.Concrete) = struct
             let slot_diff =
               Option.value_exn
                 (Global_slot.diff_slots global_slot
-                   previous_consensus_state.curr_global_slot )
+                   previous_consensus_state.curr_global_slot_since_hard_fork )
             in
             assert (
               Mina_numbers.Global_slot_since_genesis.(
                 equal
-                  (add fork.genesis_slot slot_diff)
+                  (add fork.global_slot_since_genesis slot_diff)
                   next_consensus_state.global_slot_since_genesis) ) ;
             assert (
               Mina_numbers.Length.(
                 equal
-                  (succ (succ fork.previous_length))
+                  (succ (succ fork.blockchain_length))
                   next_consensus_state.blockchain_length) ) ) ;
         (* build pieces needed to apply "update_var" *)
         let checked_computation =
@@ -3775,14 +3638,15 @@ module Make_str (A : Wire_types.Concrete) = struct
         let constraint_constants_with_fork =
           let fork_constants =
             Some
-              { Genesis_constants.Fork_constants.previous_state_hash =
+              { Genesis_constants.Fork_constants.state_hash =
                   Result.ok_or_failwith
                     (State_hash.of_yojson
                        (`String
                          "3NL3bc213VQEFx6XTLbc3HxHqHH9ANbhHxRxSnBcRzXcKgeFA6TY"
                          ) )
-              ; previous_length = Mina_numbers.Length.of_int 100
-              ; genesis_slot = Mina_numbers.Global_slot_since_genesis.of_int 200
+              ; blockchain_length = Mina_numbers.Length.of_int 100
+              ; global_slot_since_genesis =
+                  Mina_numbers.Global_slot_since_genesis.of_int 200
               }
           in
           { constraint_constants with fork = fork_constants }
@@ -4084,7 +3948,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let%bind next_staking_epoch_length = gen_next_epoch_length in
         let%bind curr_epoch_slot, curr_epoch_length = gen_curr_epoch_position in
         (* Compute state slot and length. *)
-        let curr_global_slot =
+        let curr_global_slot_since_hard_fork =
           Global_slot.of_epoch_and_slot ~constants (curr_epoch, curr_epoch_slot)
         in
         let blockchain_length =
@@ -4127,12 +3991,12 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; sub_window_densities
         ; last_vrf_output = vrf_output
         ; total_currency
-        ; curr_global_slot
+        ; curr_global_slot_since_hard_fork
         ; staking_epoch_data
         ; next_epoch_data = next_staking_epoch_data
         ; global_slot_since_genesis =
             (* OK if we're in genesis "hard fork" *)
-            Global_slot.slot_number curr_global_slot
+            Global_slot.slot_number curr_global_slot_since_hard_fork
             |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
             |> Mina_numbers.Global_slot_since_genesis.of_uint32
             (* These values are not used in selection, so we just set them to something. *)
@@ -4230,7 +4094,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           let ( gen_staking_epoch_length
               , gen_next_epoch_length
               , gen_curr_epoch_position ) =
-            let a_curr_epoch_slot = Global_slot.slot a.curr_global_slot in
+            let a_curr_epoch_slot =
+              Global_slot.slot a.curr_global_slot_since_hard_fork
+            in
             match blockchain_length_relativity with
             | Some `Equal ->
                 ( Some (return a.staking_epoch_data.epoch_length)

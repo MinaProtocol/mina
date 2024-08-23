@@ -1,7 +1,5 @@
 (* bits.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Fold_lib
 open Bitstring_lib
@@ -94,8 +92,6 @@ module UInt64 : Bits_intf.Convertible_bits with type t := Unsigned.UInt64.t =
 
 module UInt32 : Bits_intf.Convertible_bits with type t := Unsigned.UInt32.t =
   Vector.Make (Vector.UInt32)
-
-[%%ifdef consensus_mechanism]
 
 module type Big_int_intf = sig
   include Snarky_backendless.Bigint_intf.S
@@ -416,5 +412,3 @@ struct
 
   let typ : (var, value) Typ.t = Typ.list ~length:M.bit_length Boolean.typ
 end
-
-[%%endif]

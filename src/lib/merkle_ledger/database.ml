@@ -1,37 +1,12 @@
-open Core
-
-module type Inputs_intf = sig
-  include Base_inputs_intf.S
-
-  module Location : Location_intf.S
-
-  module Location_binable : Hashable.S_binable with type t := Location.t
-
-  module Kvdb : Intf.Key_value_database with type config := string
-
-  module Storage_locations : Intf.Storage_locations
-end
-
-module Make (Inputs : Inputs_intf) :
-  Database_intf.S
-    with module Location = Inputs.Location
-     and module Addr = Inputs.Location.Addr
-     and type key := Inputs.Key.t
-     and type token_id := Inputs.Token_id.t
-     and type token_id_set := Inputs.Token_id.Set.t
-     and type account := Inputs.Account.t
-     and type root_hash := Inputs.Hash.t
-     and type hash := Inputs.Hash.t
-     and type account_id := Inputs.Account_id.t
-     and type account_id_set := Inputs.Account_id.Set.t = struct
+module Make (Inputs : Intf.Inputs.DATABASE) = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   open Inputs
 
   module Db_error = struct
+    [@@@warning "-4"] (* due to deriving sexp below *)
+
     type t = Account_location_not_found | Out_of_leaves | Malformed_database
     [@@deriving sexp]
-
-    exception Db_exception of t
   end
 
   module Path = Merkle_path.Make (Hash)
@@ -69,6 +44,8 @@ module Make (Inputs : Inputs_intf) :
   let depth t = t.depth
 
   let create ?directory_name ~depth () =
+    let open Core in
+    (* for ^/ and Unix below *)
     assert (depth < 0xfe) ;
     let uuid = Uuid_unix.create () in
     let directory =
@@ -154,6 +131,16 @@ module Make (Inputs : Inputs_intf) :
     | None ->
         empty_hash (Location.height ~ledger_depth:mdb.depth location)
 
+  let get_hash_batch_exn mdb locations =
+    List.iter locations ~f:(fun location -> assert (Location.is_hash location)) ;
+    let hashes = get_bin_batch mdb locations Hash.bin_read_t in
+    List.map2_exn locations hashes ~f:(fun location hash ->
+        match hash with
+        | Some hash ->
+            hash
+        | None ->
+            empty_hash (Location.height ~ledger_depth:mdb.depth location) )
+
   let set_raw { kvdb; depth; _ } location bin =
     Kvdb.set kvdb
       ~key:(Location.serialize ~ledger_depth:depth location)
@@ -187,8 +174,6 @@ module Make (Inputs : Inputs_intf) :
   let set_inner_hash_at_addr_exn mdb address hash =
     assert (Addr.depth address <= mdb.depth) ;
     set_bin mdb (Location.Hash address) Hash.bin_size_t Hash.bin_write_t hash
-
-  let make_space_for _t _tot = ()
 
   let get_generic mdb location =
     assert (Location.is_generic location) ;
@@ -234,8 +219,6 @@ module Make (Inputs : Inputs_intf) :
       List.map keys ~f:build_location
       |> get_generic_batch mdb
       |> List.map ~f:(Option.bind ~f:parse_location)
-
-    let delete mdb key = delete_raw mdb (build_location key)
 
     let set mdb key location =
       set_raw mdb (build_location key)
@@ -286,25 +269,13 @@ module Make (Inputs : Inputs_intf) :
       Result.map location_result ~f:(fun location ->
           set mdb key location ; location )
 
-    let last_location_address mdb =
-      match
-        last_location_key () |> get_raw mdb |> Result.of_option ~error:()
-        |> Result.bind ~f:(Location.parse ~ledger_depth:mdb.depth)
-      with
-      | Error () ->
-          None
-      | Ok parsed_location ->
-          Some (Location.to_path_exn parsed_location)
-
     let last_location mdb =
-      match
-        last_location_key () |> get_raw mdb |> Result.of_option ~error:()
-        |> Result.bind ~f:(Location.parse ~ledger_depth:mdb.depth)
-      with
-      | Error () ->
-          None
-      | Ok parsed_location ->
-          Some parsed_location
+      last_location_key () |> get_raw mdb
+      |> Option.bind ~f:(fun data ->
+             Location.parse ~ledger_depth:mdb.depth data |> Result.ok )
+
+    let last_location_address mdb =
+      Option.map (last_location mdb) ~f:Location.to_path_exn
   end
 
   let get_at_index_exn mdb index =
@@ -350,9 +321,6 @@ module Make (Inputs : Inputs_intf) :
         set_bin mdb (build_location token_id)
           Account_id.Stable.Latest.bin_size_t
           Account_id.Stable.Latest.bin_write_t account_id
-
-      let remove (mdb : t) (token_id : Token_id.t) : unit =
-        delete_raw mdb (build_location token_id)
 
       let all_owners (t : t) : (Token_id.t * Account_id.t) Sequence.t =
         let deduped_tokens =
@@ -429,17 +397,9 @@ module Make (Inputs : Inputs_intf) :
          most accounts are not going to be managers. *)
       Owner.set mdb (Account_id.derive_token_id ~owner:aid) aid
 
-    let remove mdb pk tid = update mdb pk ~f:(fun tids -> Set.remove tids tid)
-
     let _remove_several mdb pk rem_tids =
       update mdb pk ~f:(fun tids ->
           Set.diff tids (Token_id.Set.of_list rem_tids) )
-
-    let remove_account (mdb : t) (aid : Account_id.t) : unit =
-      let token = Account_id.token_id aid in
-      let key = Account_id.public_key aid in
-      remove mdb key token ;
-      Owner.remove mdb (Account_id.derive_token_id ~owner:aid)
 
     (** Generate a batch of database changes to add the given tokens. *)
     let add_batch_create mdb pks_to_tokens =
@@ -597,7 +557,7 @@ module Make (Inputs : Inputs_intf) :
 
   let get_or_create_account mdb account_id account =
     match Account_location.get mdb account_id with
-    | Error Account_location_not_found -> (
+    | Error Db_error.Account_location_not_found -> (
         match Account_location.allocate mdb account_id with
         | Ok location ->
             set mdb location account ;
@@ -606,7 +566,7 @@ module Make (Inputs : Inputs_intf) :
         | Error err ->
             Error (Error.create "get_or_create_account" err Db_error.sexp_of_t)
         )
-    | Error err ->
+    | Error ((Db_error.Malformed_database | Db_error.Out_of_leaves) as err) ->
         Error (Error.create "get_or_create_account" err Db_error.sexp_of_t)
     | Ok location ->
         Ok (`Existed, location)
@@ -651,49 +611,68 @@ module Make (Inputs : Inputs_intf) :
 
   let merkle_root mdb = get_hash mdb Location.root_hash
 
-  let remove_accounts_exn t keys =
-    let locations =
-      (* if we don't have a location for all keys, raise an exception *)
-      let rec loop keys accum =
-        match keys with
-        | [] ->
-            accum (* no need to reverse *)
-        | key :: rest -> (
-            match Account_location.get t key with
-            | Ok loc ->
-                loop rest (loc :: accum)
-            | Error err ->
-                raise (Db_error.Db_exception err) )
-      in
-      loop keys []
-    in
-    (* N.B.: we're not using stack database here to make available newly-freed
-       locations *)
-    List.iter keys ~f:(Account_location.delete t) ;
-    List.iter keys ~f:(Tokens.remove_account t) ;
-    List.iter locations ~f:(fun loc -> delete_raw t loc) ;
-    (* recalculate hashes for each removed account *)
-    List.iter locations ~f:(fun loc ->
-        let hash_loc = Location.Hash (Location.to_path_exn loc) in
-        set_hash t hash_loc Hash.empty_account )
-
   let merkle_path mdb location =
     let location =
       if Location.is_account location then
         Location.Hash (Location.to_path_exn location)
       else location
     in
-    assert (Location.is_hash location) ;
-    let rec loop k =
-      if Location.height ~ledger_depth:mdb.depth k >= mdb.depth then []
-      else
-        let sibling = Location.sibling k in
-        let sibling_dir = Location.last_direction (Location.to_path_exn k) in
-        let hash = get_hash mdb sibling in
-        Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)
-        :: loop (Location.parent k)
+    let dependency_locs, dependency_dirs =
+      List.unzip (Location.merkle_path_dependencies_exn location)
     in
-    loop location
+    let dependency_hashes = get_hash_batch_exn mdb dependency_locs in
+    List.map2_exn dependency_dirs dependency_hashes ~f:(fun dir hash ->
+        Direction.map dir ~left:(`Left hash) ~right:(`Right hash) )
+
+  let path_batch_impl ~expand_query ~compute_path mdb locations =
+    let locations =
+      List.map locations ~f:(fun location ->
+          if Location.is_account location then
+            Location.Hash (Location.to_path_exn location)
+          else (
+            assert (Location.is_hash location) ;
+            location ) )
+    in
+    let list_of_dependencies =
+      List.map locations ~f:Location.merkle_path_dependencies_exn
+    in
+    let all_locs =
+      List.map list_of_dependencies ~f:(fun deps ->
+          List.map ~f:fst deps |> expand_query )
+      |> List.concat
+    in
+    let hashes = get_hash_batch_exn mdb all_locs in
+    snd @@ List.fold_map ~init:hashes ~f:compute_path list_of_dependencies
+
+  let merkle_path_batch =
+    path_batch_impl ~expand_query:ident
+      ~compute_path:(fun all_hashes loc_and_dir_list ->
+        let len = List.length loc_and_dir_list in
+        let sibling_hashes, rest_hashes = List.split_n all_hashes len in
+        let res =
+          List.map2_exn loc_and_dir_list sibling_hashes
+            ~f:(fun (_, direction) sibling_hash ->
+              Direction.map direction ~left:(`Left sibling_hash)
+                ~right:(`Right sibling_hash) )
+        in
+        (rest_hashes, res) )
+
+  let wide_merkle_path_batch =
+    path_batch_impl
+      ~expand_query:(fun sib_locs ->
+        sib_locs @ List.map sib_locs ~f:Location.sibling )
+      ~compute_path:(fun all_hashes loc_and_dir_list ->
+        let len = List.length loc_and_dir_list in
+        let sibling_hashes, rest_hashes = List.split_n all_hashes len in
+        let self_hashes, rest_hashes' = List.split_n rest_hashes len in
+        let res =
+          List.map3_exn loc_and_dir_list sibling_hashes self_hashes
+            ~f:(fun (_, direction) sibling_hash self_hash ->
+              Direction.map direction
+                ~left:(`Left (self_hash, sibling_hash))
+                ~right:(`Right (sibling_hash, self_hash)) )
+        in
+        (rest_hashes', res) )
 
   let merkle_path_at_addr_exn t addr = merkle_path t (Location.Hash addr)
 

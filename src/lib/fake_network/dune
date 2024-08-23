@@ -19,6 +19,7 @@
    genesis_constants
    signature_lib
    verifier
+   bounded_types
    precomputed_values
    block_time
    trust_system
@@ -41,8 +42,8 @@
    kimchi_bindings
    kimchi_types
    pasta_bindings
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    data_hash_lib
    network_pool
    mina_intf

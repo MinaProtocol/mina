@@ -1,12 +1,21 @@
 #!/bin/bash
 
-set -eo pipefail
+set -eox pipefail
 
-eval $(opam config env)
-export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
-export GO=/usr/lib/go/bin/go
+([ -z ${DUNE_PROFILE+x} ]) && echo "required env vars were not provided" && exit 1
+
+source ~/.profile
 
 MINA_COMMIT_SHA1=$(git rev-parse HEAD)
+
+# Somehow defining DUNE_INSTRUMENT_WITH in docker is not enough to propagate it to dune
+# That's why we are converting it to dune argument
+if [[ -v DUNE_INSTRUMENT_WITH ]]; then
+  INSTRUMENTED_PARAM="--instrument-with $DUNE_INSTRUMENT_WITH"
+else 
+  INSTRUMENTED_PARAM=""
+fi
+
 
 # TODO: Stop building lib_p2p multiple times by pulling from buildkite-agent artifacts or docker or somewhere
 echo "--- Build libp2p_helper TODO: use the previously uploaded build artifact"
@@ -15,10 +24,11 @@ make -C src/app/libp2p_helper
 MAINNET_TARGETS=""
 [[ ${MINA_BUILD_MAINNET} ]] && MAINNET_TARGETS="src/app/cli/src/mina_mainnet_signatures.exe src/app/rosetta/rosetta_mainnet_signatures.exe src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe"
 
-echo "--- Build all major tagets required for packaging"
+echo "--- Build all major targets required for packaging"
 echo "Building from Commit SHA: ${MINA_COMMIT_SHA1}"
 echo "Rust Version: $(rustc --version)"
-dune build "--profile=${DUNE_PROFILE}" \
+dune build "--profile=${DUNE_PROFILE}" $INSTRUMENTED_PARAM \
+  ${MAINNET_TARGETS} \
   src/app/logproc/logproc.exe \
   src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
   src/app/generate_keypair/generate_keypair.exe \
@@ -30,19 +40,9 @@ dune build "--profile=${DUNE_PROFILE}" \
   src/app/archive_blocks/archive_blocks.exe \
   src/app/batch_txn_tool/batch_txn_tool.exe \
   src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
-  src/app/swap_bad_balances/swap_bad_balances.exe \
   src/app/zkapp_test_transaction/zkapp_test_transaction.exe \
   src/app/rosetta/rosetta_testnet_signatures.exe \
+  src/app/rosetta/indexer_test/indexer_test.exe \
   src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe \
-  src/app/test_executive/test_executive.exe # 2>&1 | tee /tmp/buildocaml.log
-
-echo "--- Bundle all packages for Debian ${MINA_DEB_CODENAME}"
-echo " Includes mina daemon, archive-node, rosetta, generate keypair for berkeley"
-[[ ${MINA_BUILD_MAINNET} ]] && echo " MINA_BUILD_MAINNET is true so this includes the mainnet and devnet packages for mina-daemon as well"
-make deb
-
-echo "--- Upload debs to amazon s3 repo"
-make publish_debs
-
-echo "--- Git diff after build is complete:"
-git diff --exit-code
+  src/app/test_executive/test_executive.exe  \
+  src/test/command_line_tests/command_line_tests.exe # 2>&1 | tee /tmp/buildocaml.log
