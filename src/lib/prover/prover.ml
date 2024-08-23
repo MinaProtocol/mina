@@ -120,7 +120,7 @@ module Worker_state = struct
                   let txn_snark_statement, txn_snark_proof =
                     ledger_proof_opt next_state t
                   in
-                  Internal_tracing.Context_logger.with_logger (Some logger)
+                  Context_logger.with_logger (Some logger)
                   @@ fun () ->
                   let%map.Async.Deferred (), (), proof =
                     B.step
