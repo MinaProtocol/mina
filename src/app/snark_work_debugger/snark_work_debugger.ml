@@ -40,11 +40,9 @@ let cmd =
       in
       fun () ->
         let constraint_constants =
-          Genesis_constants_compiled.compiled_config.constraint_constants
+          Genesis_constants.Compiled.constraint_constants
         in
-        let proof_level =
-          Genesis_constants_compiled.compiled_config.proof_level
-        in
+        let proof_level = Genesis_constants.Compiled.proof_level in
         Obj.magic (main path ~constraint_constants ~proof_level))
 
 let () = Command.run cmd

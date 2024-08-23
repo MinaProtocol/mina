@@ -43,12 +43,8 @@ let main ~genesis_constants ~constraint_constants () =
   Async.return ()
 
 let () =
-  let genesis_constants =
-    Genesis_constants_compiled.compiled_config.genesis_constants
-  in
-  let constraint_constants =
-    Genesis_constants_compiled.compiled_config.constraint_constants
-  in
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
   Command.(
     run
       (async ~summary:"Print heap usage of selected Mina data structures"

@@ -20,7 +20,7 @@ let command =
      fun () ->
        let open Async in
        let constraint_constants =
-         Genesis_constants_compiled.compiled_config.constraint_constants
+         Genesis_constants.Compiled.constraint_constants
        in
        let%bind worker_state =
          Prod.Worker_state.create ~constraint_constants ~proof_level ()

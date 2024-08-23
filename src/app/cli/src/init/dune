@@ -60,7 +60,6 @@
    data_hash_lib
    currency
    genesis_constants
-   genesis_constants.compiled
    bash_colors
    graphql_lib
    node_status

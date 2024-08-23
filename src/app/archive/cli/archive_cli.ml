@@ -45,11 +45,9 @@ let command_run =
      in
      fun () ->
        let logger = Logger.create () in
-       let genesis_constants =
-         Genesis_constants_compiled.compiled_config.genesis_constants
-       in
+       let genesis_constants = Genesis_constants.Compiled.genesis_constants in
        let constraint_constants =
-         Genesis_constants_compiled.compiled_config.constraint_constants
+         Genesis_constants.Compiled.constraint_constants
        in
        Stdout_log.setup log_json log_level ;
        [%log info] "Starting archive process; built with commit $commit"

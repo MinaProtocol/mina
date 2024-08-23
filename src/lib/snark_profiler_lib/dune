@@ -26,7 +26,6 @@
    data_hash_lib
    currency
    genesis_constants
-   genesis_constants.compiled
    generated_graphql_queries
    mina_transaction
    mina_generators

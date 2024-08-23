@@ -141,9 +141,7 @@ let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~contents:(Yojson.Safe.to_string (Hash_json.to_yojson hash_json))
 
 let () =
-  let constraint_constants =
-    Genesis_constants_compiled.compiled_config.constraint_constants
-  in
+  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
   Command.run
     (Command.async
        ~summary:

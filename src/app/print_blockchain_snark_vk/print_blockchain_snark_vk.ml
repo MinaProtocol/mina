@@ -5,7 +5,7 @@ let () =
       let () = Format.eprintf "Generating transaction snark circuit..@." in
       let module Transaction_snark_instance = Transaction_snark.Make (struct
         let constraint_constants =
-          Genesis_constants_compiled.compiled_config.constraint_constants
+          Genesis_constants.Compiled.constraint_constants
 
         let proof_level = Genesis_constants.Proof_level.Full
       end) in
@@ -14,7 +14,7 @@ let () =
       let module Blockchain_snark_instance =
       Blockchain_snark.Blockchain_snark_state.Make (struct
         let constraint_constants =
-          Genesis_constants_compiled.compiled_config.constraint_constants
+          Genesis_constants.Compiled.constraint_constants
 
         let proof_level = Genesis_constants.Proof_level.Full
 

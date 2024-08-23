@@ -172,11 +172,9 @@ let command =
            (String.concat !incompatible_flags ~sep:", ") ;
          exit 1 ) ) ;
      let repeats = Option.value repeats ~default:1 in
-     let genesis_constants =
-       Genesis_constants_compiled.compiled_config.genesis_constants
-     in
+     let genesis_constants = Genesis_constants.Compiled.genesis_constants in
      let constraint_constants =
-       Genesis_constants_compiled.compiled_config.constraint_constants
+       Genesis_constants.Compiled.constraint_constants
      in
      let proof_level = Genesis_constants.Proof_level.Full in
      if witness_only then

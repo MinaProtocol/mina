@@ -310,9 +310,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   return ()
 
 let output_there_and_back_cmds =
-  let genesis_constants =
-    Genesis_constants_compiled.compiled_config.genesis_constants
-  in
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
   let open Command.Let_syntax in
   Command.async
     ~summary:

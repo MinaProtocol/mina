@@ -192,7 +192,7 @@ module Vrf = struct
       @@ fun () ->
       let env = Secrets.Keypair.env in
       let constraint_constants =
-        Genesis_constants_compiled.compiled_config.constraint_constants
+        Genesis_constants.Compiled.constraint_constants
       in
       if Option.is_some (Sys.getenv env) then
         eprintf "Using password from environment variable %s\n" env ;
@@ -258,7 +258,7 @@ module Vrf = struct
       Exceptions.handle_nicely
       @@ fun () ->
       let constraint_constants =
-        Genesis_constants_compiled.compiled_config.constraint_constants
+        Genesis_constants.Compiled.constraint_constants
       in
       let env = Secrets.Keypair.env in
       if Option.is_some (Sys.getenv env) then
@@ -323,7 +323,7 @@ module Vrf = struct
       @@ fun () ->
       let open Deferred.Let_syntax in
       let constraint_constants =
-        Genesis_constants_compiled.compiled_config.constraint_constants
+        Genesis_constants.Compiled.constraint_constants
       in
       (* TODO-someday: constraint constants from config file. *)
       let lexbuf = Lexing.from_channel In_channel.stdin in

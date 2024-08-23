@@ -31,7 +31,6 @@
    mina_base.import
    cli_lib
    genesis_constants
-   genesis_constants.compiled
    transaction_witness
    perf_histograms
    snark_work_lib

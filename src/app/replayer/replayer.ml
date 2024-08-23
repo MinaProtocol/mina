@@ -1678,9 +1678,7 @@ let main ~constraint_constants ~proof_level ~input_file ~output_file_opt
                 exit 1 ) ) )
 
 let () =
-  let constraint_constants =
-    Genesis_constants_compiled.compiled_config.constraint_constants
-  in
+  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
   let proof_level = Genesis_constants.Proof_level.Full in
   Command.(
     run

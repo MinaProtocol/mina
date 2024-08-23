@@ -774,14 +774,13 @@ let setup_daemon logger =
                   (config_file, `Must_exist) )
           in
           let genesis_constants =
-            Genesis_constants_compiled.compiled_config.genesis_constants
+            Genesis_constants.Compiled.genesis_constants
           in
           let constraint_constants =
-            Genesis_constants_compiled.compiled_config.constraint_constants
+            Genesis_constants.Compiled.constraint_constants
           in
           let proof_level =
-            Option.value
-              ~default:Genesis_constants_compiled.compiled_config.proof_level
+            Option.value ~default:Genesis_constants.Compiled.proof_level
               proof_level
           in
           let%bind precomputed_values, config_jsons, config =
@@ -1692,10 +1691,8 @@ let snark_hashes =
 
 let internal_commands logger =
   [ ( Snark_worker.Intf.command_name
-    , Snark_worker.command
-        ~proof_level:Genesis_constants_compiled.compiled_config.proof_level
-        ~constraint_constants:
-          Genesis_constants_compiled.compiled_config.constraint_constants
+    , Snark_worker.command ~proof_level:Genesis_constants.Compiled.proof_level
+        ~constraint_constants:Genesis_constants.Compiled.constraint_constants
         ~commit_id:Mina_version.commit_id )
   ; ("snark-hashes", snark_hashes)
   ; ( "run-prover"
@@ -1704,11 +1701,9 @@ let internal_commands logger =
         (Command.Param.return (fun () ->
              let logger = Logger.create () in
              let constraint_constants =
-               Genesis_constants_compiled.compiled_config.constraint_constants
+               Genesis_constants.Compiled.constraint_constants
              in
-             let proof_level =
-               Genesis_constants_compiled.compiled_config.proof_level
-             in
+             let proof_level = Genesis_constants.Compiled.proof_level in
              Parallel.init_master () ;
              match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
              | `Ok sexp ->
@@ -1734,11 +1729,9 @@ let internal_commands logger =
           let open Deferred.Let_syntax in
           let logger = Logger.create () in
           let constraint_constants =
-            Genesis_constants_compiled.compiled_config.constraint_constants
+            Genesis_constants.Compiled.constraint_constants
           in
-          let proof_level =
-            Genesis_constants_compiled.compiled_config.proof_level
-          in
+          let proof_level = Genesis_constants.Compiled.proof_level in
           Parallel.init_master () ;
           match%bind
             Reader.with_file filename ~f:(fun reader ->
@@ -1787,11 +1780,9 @@ let internal_commands logger =
           let open Async in
           let logger = Logger.create () in
           let constraint_constants =
-            Genesis_constants_compiled.compiled_config.constraint_constants
+            Genesis_constants.Compiled.constraint_constants
           in
-          let proof_level =
-            Genesis_constants_compiled.compiled_config.proof_level
-          in
+          let proof_level = Genesis_constants.Compiled.proof_level in
           Parallel.init_master () ;
           let%bind conf_dir = Unix.mkdtemp "/tmp/mina-verifier" in
           let mode =
@@ -1950,10 +1941,10 @@ let internal_commands logger =
           let logger = Logger.create () in
           let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
           let genesis_constants =
-            Genesis_constants_compiled.compiled_config.genesis_constants
+            Genesis_constants.Compiled.genesis_constants
           in
           let constraint_constants =
-            Genesis_constants_compiled.compiled_config.constraint_constants
+            Genesis_constants.Compiled.constraint_constants
           in
           let proof_level = Genesis_constants.Proof_level.Full in
           let config_files =

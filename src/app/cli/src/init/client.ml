@@ -513,9 +513,7 @@ let send_payment_graphql =
     flag "--amount" ~aliases:[ "amount" ]
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
-  let genesis_constants =
-    Genesis_constants_compiled.compiled_config.genesis_constants
-  in
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
   let args =
     Args.zip3
       (Cli_lib.Flag.signed_command_common
@@ -551,9 +549,7 @@ let delegate_stake_graphql =
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
-  let genesis_constants =
-    Genesis_constants_compiled.compiled_config.genesis_constants
-  in
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
   let args =
     Args.zip2
       (Cli_lib.Flag.signed_command_common
@@ -827,7 +823,7 @@ let hash_ledger =
      and plaintext = Cli_lib.Flag.plaintext in
      fun () ->
        let constraint_constants =
-         Genesis_constants_compiled.compiled_config.constraint_constants
+         Genesis_constants.Compiled.constraint_constants
        in
        let process_accounts accounts =
          let packed_ledger =
@@ -931,11 +927,9 @@ let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
     (Command.Param.return (fun () ->
          let constraint_constants =
-           Genesis_constants_compiled.compiled_config.constraint_constants
+           Genesis_constants.Compiled.constraint_constants
          in
-         let proof_level =
-           Genesis_constants_compiled.compiled_config.proof_level
-         in
+         let proof_level = Genesis_constants.Compiled.proof_level in
          (* TODO: Allow these to be configurable. *)
          let all =
            Transaction_snark.constraint_system_digests ~constraint_constants ()
@@ -1800,13 +1794,9 @@ let add_peers_graphql =
                   } ) ) ) )
 
 let compile_time_constants =
-  let genesis_constants =
-    Genesis_constants_compiled.compiled_config.genesis_constants
-  in
-  let constraint_constants =
-    Genesis_constants_compiled.compiled_config.constraint_constants
-  in
-  let proof_level = Genesis_constants_compiled.compiled_config.proof_level in
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let proof_level = Genesis_constants.Compiled.proof_level in
   Command.async
     ~summary:"Print a JSON map of the compile-time consensus parameters"
     (Command.Param.return (fun () ->
@@ -2304,11 +2294,9 @@ let itn_create_accounts =
         (required int)
     in
     let args = Args.zip5 privkey_path key_prefix num_accounts fee amount in
-    let genesis_constants =
-      Genesis_constants_compiled.compiled_config.genesis_constants
-    in
+    let genesis_constants = Genesis_constants.Compiled.genesis_constants in
     let constraint_constants =
-      Genesis_constants_compiled.compiled_config.constraint_constants
+      Genesis_constants.Compiled.constraint_constants
     in
     Cli_lib.Background_daemon.rpc_init args
       ~f:(Itn.create_accounts ~genesis_constants ~constraint_constants))

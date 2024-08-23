@@ -99,11 +99,9 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
 
 let () =
   Command.(
-    let genesis_constants =
-      Genesis_constants_compiled.compiled_config.genesis_constants
-    in
+    let genesis_constants = Genesis_constants.Compiled.genesis_constants in
     let constraint_constants =
-      Genesis_constants_compiled.compiled_config.constraint_constants
+      Genesis_constants.Compiled.constraint_constants
     in
     run
       (let open Let_syntax in

@@ -25,7 +25,6 @@
   stdio
   ;; local libraries
   genesis_constants
-  genesis_constants.compiled
   random_oracle
   pickles
   mina_numbers

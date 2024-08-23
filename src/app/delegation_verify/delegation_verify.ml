@@ -153,15 +153,11 @@ let filesystem_command =
       and config_file = config_flag in
       fun () ->
         let logger = Logger.create () in
-        let genesis_constants =
-          Genesis_constants_compiled.compiled_config.genesis_constants
-        in
+        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
         let constraint_constants =
-          Genesis_constants_compiled.compiled_config.constraint_constants
+          Genesis_constants.Compiled.constraint_constants
         in
-        let proof_level =
-          Genesis_constants_compiled.compiled_config.proof_level
-        in
+        let proof_level = Genesis_constants.Compiled.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level
@@ -196,15 +192,11 @@ let cassandra_command =
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
-        let genesis_constants =
-          Genesis_constants_compiled.compiled_config.genesis_constants
-        in
+        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
         let constraint_constants =
-          Genesis_constants_compiled.compiled_config.constraint_constants
+          Genesis_constants.Compiled.constraint_constants
         in
-        let proof_level =
-          Genesis_constants_compiled.compiled_config.proof_level
-        in
+        let proof_level = Genesis_constants.Compiled.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level
@@ -238,15 +230,11 @@ let stdin_command =
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
-        let genesis_constants =
-          Genesis_constants_compiled.compiled_config.genesis_constants
-        in
+        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
         let constraint_constants =
-          Genesis_constants_compiled.compiled_config.constraint_constants
+          Genesis_constants.Compiled.constraint_constants
         in
-        let proof_level =
-          Genesis_constants_compiled.compiled_config.proof_level
-        in
+        let proof_level = Genesis_constants.Compiled.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level
