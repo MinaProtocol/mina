@@ -84,6 +84,11 @@ type signed_command_common =
   ; memo : string option
   }
 
+val fee_common :
+     default_transaction_fee:Currency.Fee.t
+  -> minimum_user_command_fee:Currency.Fee.t
+  -> Currency.Fee.t Command.Param.t
+
 val signed_command_common :
      default_transaction_fee:Currency.Fee.t
   -> minimum_user_command_fee:Currency.Fee.t
