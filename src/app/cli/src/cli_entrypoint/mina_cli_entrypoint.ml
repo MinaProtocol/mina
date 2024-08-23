@@ -1692,8 +1692,10 @@ let snark_hashes =
 
 let internal_commands logger =
   [ ( Snark_worker.Intf.command_name
-    , Snark_worker.command ~proof_level:Genesis_constants_compiled.compiled_config.proof_level
-        ~constraint_constants:Genesis_constants_compiled.compiled_config.constraint_constants
+    , Snark_worker.command
+        ~proof_level:Genesis_constants_compiled.compiled_config.proof_level
+        ~constraint_constants:
+          Genesis_constants_compiled.compiled_config.constraint_constants
         ~commit_id:Mina_version.commit_id )
   ; ("snark-hashes", snark_hashes)
   ; ( "run-prover"

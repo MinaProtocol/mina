@@ -366,9 +366,7 @@ module Make (Inputs : Intf.Inputs_intf) :
           Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
         in
         let proof_level =
-          Option.value
-            ~default:default_proof_level
-            proof_level
+          Option.value ~default:default_proof_level proof_level
         in
         Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
             let logrotate_max_size = 1024 * 10 in
