@@ -14,6 +14,7 @@ let Filter
       | AllTests
       | Release
       | HardforkPackageGeneration
+      | Promote
       >
 
 let tags
@@ -32,6 +33,7 @@ let tags
               , Tag.Type.Hardfork
               ]
             , Release = [ Tag.Type.Release ]
+            , Promote = [ Tag.Type.Promote ]
             , HardforkPackageGeneration = [ Tag.Type.Hardfork ]
             }
             filter
@@ -47,6 +49,7 @@ let show
             , TearDownOnly = "TearDownOnly"
             , AllTests = "AllTests"
             , Release = "Release"
+            , Promote = "Promote"
             , HardforkPackageGeneration = "HardforkPackageGeneration"
             }
             filter

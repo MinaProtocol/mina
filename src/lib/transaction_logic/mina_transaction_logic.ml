@@ -607,8 +607,8 @@ let timing_error_to_user_command_status err =
         [`Insufficient_balance true].  In this scenario, this value MUST NOT be
         used, as it contains an incorrect placeholder value.
 *)
-let validate_timing_with_min_balance' ~account ~txn_amount ~txn_global_slot =
-  let open Account.Poly in
+let validate_timing_with_min_balance' ~(account : Account.t) ~txn_amount
+    ~txn_global_slot =
   let open Account.Timing.Poly in
   match account.timing with
   | Untimed -> (
@@ -661,7 +661,7 @@ let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
       !"For %s account, the requested transaction for amount %{sexp: Amount.t} \
         at global slot %{sexp: Global_slot_since_genesis.t}, the balance \
         %{sexp: Balance.t} is insufficient"
-      kind txn_amount txn_global_slot account.Account.Poly.balance
+      kind txn_amount txn_global_slot account.Account.balance
     |> Or_error.tag ~tag:nsf_tag
   in
   let min_balance_error min_balance =
@@ -2872,8 +2872,8 @@ module For_tests = struct
                   other did not"
                 a ()
             in
-            let hide_rc (a : _ Account.Poly.t) =
-              { a with receipt_chain_hash = () }
+            let hide_rc (a : Account.t) =
+              { (Account.to_poly a) with receipt_chain_hash = () }
             in
             match L.(location_of_account l1 a, location_of_account l2 a) with
             | None, None ->

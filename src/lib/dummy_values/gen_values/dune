@@ -20,7 +20,10 @@
    pickles_types
    pickles
    crypto_params
-)
+   mina_metrics.none
+   logger.fake
+ )
+ (forbidden_libraries node_config protocol_version)
  (preprocess
   (pps ppx_version ppx_jane ppxlib.metaquot))
  (instrumentation (backend bisect_ppx))
