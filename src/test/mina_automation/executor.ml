@@ -58,7 +58,7 @@ module Executor = struct
         | _ -> (
             match%bind Sys.file_exists t.official_name with
             | `Yes ->
-                [%log debug] "running from usr/bin "
+              | Some prefix ->  [%log debug] "running from %s" prefix
                   ~metadata:[ ("app", `String t.official_name) ] ;
                 run_from_debian t ~args ?env ()
             | _ ->
