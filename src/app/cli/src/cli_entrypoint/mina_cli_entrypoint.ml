@@ -1672,11 +1672,7 @@ let snark_hashes =
   Command.basic ~summary:"List hashes of proving and verification keys"
     [%map_open
       let json = Cli_lib.Flag.json in
-      let print = Core.printf "%s\n%!" in
-      fun () ->
-        let hashes = [] in
-        if json then print (Yojson.Safe.to_string (Hashes.to_yojson hashes))
-        else List.iter hashes ~f:print]
+      fun () -> if json then Core.printf "[]\n%!"]
 
 let internal_commands logger =
   [ ( Snark_worker.Intf.command_name
