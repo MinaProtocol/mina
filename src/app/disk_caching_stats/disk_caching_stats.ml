@@ -729,7 +729,8 @@ let () =
   let%map.Async_kernel.Deferred vk =
     let `VK vk, `Prover _ =
       Transaction_snark.For_tests.create_trivial_snapp
-        ~constraint_constants:Genesis_constants.Constraint_constants.compiled ()
+        ~constraint_constants:Genesis_constants_compiled.Constraint_constants.t
+        ()
     in
     vk
   in

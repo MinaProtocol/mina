@@ -849,7 +849,7 @@ module Protocol_state = struct
       let%bind start_checkpoint = Hash.gen State_hash.gen in
       let%bind lock_checkpoint = Hash.gen State_hash.gen in
       let min_epoch_length = 8 in
-      let max_epoch_length = Genesis_constants.slots_per_epoch in
+      let max_epoch_length = Genesis_constants.For_unit_tests.slots_per_epoch in
       let%map epoch_length =
         Numeric.gen
           (Length.gen_incl
@@ -990,8 +990,9 @@ module Protocol_state = struct
     let snarked_ledger_hash = Zkapp_basic.Or_ignore.Ignore in
     let%bind blockchain_length = Numeric.gen Length.gen Length.compare in
     let max_min_window_density =
-      Genesis_constants.for_unit_tests.protocol.slots_per_sub_window
-      * Genesis_constants.Constraint_constants.compiled.sub_windows_per_window
+      Genesis_constants.For_unit_tests.t.protocol.slots_per_sub_window
+      * Genesis_constants.For_unit_tests.Constraint_constants.t
+          .sub_windows_per_window
       - 1
       |> Length.of_int
     in

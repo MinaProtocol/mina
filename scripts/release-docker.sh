@@ -10,7 +10,8 @@ set -x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator')
+
+VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard'  'itn-orchestrator')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -135,14 +136,6 @@ mina-zkapp-test-transaction)
 leaderboard)
   DOCKERFILE_PATH="frontend/leaderboard/Dockerfile"
   DOCKER_CONTEXT="frontend/leaderboard"
-  ;;
-delegation-backend)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend"
-  DOCKER_CONTEXT="src/app/delegation_backend"
-  ;;
-delegation-backend-toolchain)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend-toolchain"
-  DOCKER_CONTEXT="src/app/delegation_backend"
   ;;
 itn-orchestrator)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-itn-orchestrator"

@@ -81,7 +81,7 @@ struct
       * auxiliary_value
       * (int, prevs_length) Vector.t )
       Promise.t =
-    let logger = Internal_tracing_context_logger.get () in
+    let logger = Context_logger.get () in
     [%log internal] "Pickles_step_proof" ;
     let _ = auxiliary_typ in
     (* unused *)

@@ -20,7 +20,7 @@
    snark_work_lib
    transaction_witness
    transaction_snark
-   genesis_constants
+   genesis_constants.compiled
    logger
    error_json
    transaction_protocol_state
