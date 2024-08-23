@@ -10,11 +10,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1721075915,
-        "narHash": "sha256-pj6C9Y9FP1VKLTtQFAJuaUbxxXvvIZ+kRN3K/9O5Rts=",
+        "lastModified": 1724407960,
+        "narHash": "sha256-pUKTVMYEtsD1AGlHFTdPourowt+tJ3htKhRu7VALFzc=",
         "owner": "o1-labs",
         "repo": "describe-dune",
-        "rev": "9aba48884359f9828a3ca68a7b91bf06c0ab8d16",
+        "rev": "be828239c05671209e979f9d5c2e3094e3be7a46",
         "type": "github"
       },
       "original": {
@@ -33,11 +33,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1722602583,
-        "narHash": "sha256-FwqfasHSL68pEMCtqbV/UvIcAOrV2fH3VDfJ6Hzr478=",
+        "lastModified": 1724418497,
+        "narHash": "sha256-HjTh7o02QhGXmbxmpE5HRWei3H/pyh/NKCMCnucDaYs=",
         "owner": "o1-labs",
         "repo": "dune-nix",
-        "rev": "5866c3e8e101059b5476de34f0d7630280ad2cca",
+        "rev": "26dc164a4c3976888e13eabd73a210b78505820f",
         "type": "github"
       },
       "original": {
