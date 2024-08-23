@@ -43,6 +43,7 @@ module Get_status =
 (** Open after GraphQL query, to avoid shadowing functions used by the PPX *)
 open Core_kernel
 
+module Mina_currency = Currency
 open Async
 open Rosetta_lib
 open Rosetta_models
@@ -56,19 +57,22 @@ module Get_status_t = struct
   module Get_genesis_block_identifier_memoized = struct
     let query =
       Memoize.build
-      @@ fun ~graphql_uri () ->
-      Graphql.query
+      @@ fun ~graphql_uri ~minimum_user_command_fee () ->
+      Graphql.query ~minimum_user_command_fee
         Get_genesis_block_identifier.(make @@ makeVariables ())
         graphql_uri
   end
 
-  let query ~graphql_uri () =
+  let query ~graphql_uri ~minimum_user_command_fee () =
     let open Deferred.Result.Let_syntax in
     let%bind genesis_block_identifier =
-      Get_genesis_block_identifier_memoized.query ~graphql_uri ()
+      Get_genesis_block_identifier_memoized.query ~graphql_uri
+        ~minimum_user_command_fee ()
     in
     let%map status =
-      Graphql.query Get_status.(make @@ makeVariables ()) graphql_uri
+      Graphql.query ~minimum_user_command_fee
+        Get_status.(make @@ makeVariables ())
+        graphql_uri
     in
     { genesis_block_identifier; status }
 end
@@ -134,15 +138,19 @@ module Get_network = [%graphql {|
 module Get_network_memoized = struct
   let query =
     Memoize.build
-    @@ fun ~graphql_uri () ->
-    Graphql.query Get_network.(make @@ makeVariables ()) graphql_uri
+    @@ fun ~graphql_uri ~minimum_user_command_fee () ->
+    Graphql.query ~minimum_user_command_fee
+      Get_network.(make @@ makeVariables ())
+      graphql_uri
 end
 
 module Validate_choice = struct
   module Real = struct
-    let validate ~network_identifier ~graphql_uri =
+    let validate ~network_identifier ~minimum_user_command_fee ~graphql_uri =
       let open Deferred.Result.Let_syntax in
-      let%bind gql_response = Get_network_memoized.query ~graphql_uri () in
+      let%bind gql_response =
+        Get_network_memoized.query ~graphql_uri ~minimum_user_command_fee ()
+      in
       let network_tag = gql_response.networkID in
       let requested_tag =
         Format.sprintf "%s:%s" network_identifier.Network_identifier.blockchain
@@ -155,7 +163,9 @@ module Validate_choice = struct
   end
 
   module Mock = struct
-    let succeed ~network_identifier:_ ~graphql_uri:_ = Result.return ()
+    let succeed ~network_identifier:_ ~minimum_user_command_fee:_ ~graphql_uri:_
+        =
+      Result.return ()
   end
 end
 
@@ -167,10 +177,12 @@ module List_ = struct
 
     module Real = Make (Deferred.Result)
 
-    let real ~graphql_uri : Real.t =
+    let real ~graphql_uri ~minimum_user_command_fee : Real.t =
      fun () ->
       let open Deferred.Result.Let_syntax in
-      let%map resp = Get_network_memoized.query ~graphql_uri () in
+      let%map resp =
+        Get_network_memoized.query ~graphql_uri ~minimum_user_command_fee ()
+      in
       resp.networkID
   end
 
@@ -207,6 +219,7 @@ module Status = struct
         ; db_latest_block : unit -> (int64 * string * int64, Errors.t) M.t
         ; validate_network_choice :
                network_identifier:Network_identifier.t
+            -> minimum_user_command_fee:Mina_currency.Fee.t
             -> graphql_uri:Uri.t
             -> (unit, Errors.t) M.t
         }
@@ -218,10 +231,13 @@ module Status = struct
     let oldest_block_ref = ref None
 
     let real :
-        db:(module Caqti_async.CONNECTION) -> graphql_uri:Uri.t -> 'gql Real.t =
-     fun ~db ~graphql_uri ->
+           db:(module Caqti_async.CONNECTION)
+        -> graphql_uri:Uri.t
+        -> minimum_user_command_fee:Mina_currency.Fee.t
+        -> 'gql Real.t =
+     fun ~db ~graphql_uri ~minimum_user_command_fee ->
       let (module Db : Caqti_async.CONNECTION) = db in
-      { gql = Get_status_t.query ~graphql_uri
+      { gql = Get_status_t.query ~graphql_uri ~minimum_user_command_fee
       ; db_oldest_block =
           (fun () ->
             match !oldest_block_ref with
@@ -244,12 +260,12 @@ module Status = struct
   end
 
   module Impl (M : Monad_fail.S) = struct
-    let handle ~graphql_uri ~(env : 'gql Env.T(M).t)
+    let handle ~graphql_uri ~minimum_user_command_fee ~(env : 'gql Env.T(M).t)
         (network : Network_request.t) =
       let open M.Let_syntax in
       let%bind res = env.gql () in
       let%bind () =
-        env.validate_network_choice ~graphql_uri
+        env.validate_network_choice ~graphql_uri ~minimum_user_command_fee
           ~network_identifier:network.network_identifier
       in
       let%bind latest_node_block =
@@ -351,6 +367,7 @@ module Status = struct
           ~actual:
             (Mock.handle
                ~graphql_uri:(Uri.of_string "https://minaprotocol.com")
+               ~minimum_user_command_fee:Mina_currency.Fee.one
                ~env:no_chain_info_env dummy_network_request )
           ~expected:(Result.fail (Errors.create `Chain_info_missing))
 
@@ -370,6 +387,7 @@ module Status = struct
           ~actual:
             (Mock.handle
                ~graphql_uri:(Uri.of_string "https://minaprotocol.com")
+               ~minimum_user_command_fee:Mina_currency.Fee.one
                ~env:oldest_block_is_genesis_env dummy_network_request )
           ~expected:
             ( Result.return
@@ -411,6 +429,7 @@ module Status = struct
           ~actual:
             (Mock.handle
                ~graphql_uri:(Uri.of_string "https://minaprotocol.com")
+               ~minimum_user_command_fee:Mina_currency.Fee.one
                ~env:oldest_block_is_different_env dummy_network_request )
           ~expected:
             ( Result.return
@@ -496,8 +515,8 @@ module Options = struct
     end )
 end
 
-let router ~get_graphql_uri_or_error ~logger ~with_db (route : string list) body
-    =
+let router ~get_graphql_uri_or_error ~logger ~with_db ~minimum_user_command_fee
+    (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /network/ $route"
     ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
@@ -510,7 +529,9 @@ let router ~get_graphql_uri_or_error ~logger ~with_db (route : string list) body
         |> Errors.Lift.wrap
       in
       let%map res =
-        List_.Real.handle ~env:(List_.Env.real ~graphql_uri) |> Errors.Lift.wrap
+        List_.Real.handle
+          ~env:(List_.Env.real ~graphql_uri ~minimum_user_command_fee)
+        |> Errors.Lift.wrap
       in
       Network_list_response.to_yojson res
   | [ "status" ] ->
@@ -521,8 +542,8 @@ let router ~get_graphql_uri_or_error ~logger ~with_db (route : string list) body
       in
       let%bind res =
         with_db (fun ~db ->
-            Status.Real.handle ~graphql_uri
-              ~env:(Status.Env.real ~graphql_uri ~db)
+            Status.Real.handle ~graphql_uri ~minimum_user_command_fee
+              ~env:(Status.Env.real ~graphql_uri ~minimum_user_command_fee ~db)
               network
             |> Errors.Lift.wrap )
       in

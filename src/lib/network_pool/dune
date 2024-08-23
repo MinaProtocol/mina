@@ -21,7 +21,6 @@
    integers
    ;; local libraries
    bounded_types
-   mina_compile_config
    mina_generators
    sgn
    sgn_type
@@ -47,7 +46,6 @@
    mina_transaction
    mina_state
    transaction_snark
-   transaction_snark_tests
    consensus
    network_peer
    currency
