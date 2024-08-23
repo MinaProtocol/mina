@@ -205,7 +205,11 @@ let block_producer_timing :
       ] )
 
 let merkle_path_element :
-    (_, [ `Left of Snark_params.Tick.Field.t | `Right of Snark_params.Tick.Field.t ] option) typ =
+    ( _
+    , [ `Left of Snark_params.Tick.Field.t
+      | `Right of Snark_params.Tick.Field.t ]
+      option )
+    typ =
   obj "MerklePathElement" ~fields:(fun _ ->
       [ field "left" ~typ:field_elem
           ~args:Arg.[]
