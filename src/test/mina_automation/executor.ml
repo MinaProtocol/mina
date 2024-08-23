@@ -56,7 +56,9 @@ module Executor = struct
               ~metadata:[ ("app", `String (built_name t)) ] ;
             run_from_local t ~args ?env ()
         | _ -> (
-            match%bind Sys.file_exists t.official_name with
+let paths = Option.value_map ~f:(String.split ~on:':') ~default:[] (Sys.getenv "PATH") in
+let exists_at_path prefix = match Sys.file_exists (prefix ^ "/" ^ t.official_name) with |`Yes -> Some prefix | _ -> None in
+match%bind Deferred.List.find_map ~f:exists_at_path paths with
             | `Yes ->
               | Some prefix ->  [%log debug] "running from %s" prefix
                   ~metadata:[ ("app", `String t.official_name) ] ;
