@@ -26,7 +26,7 @@ let graphql_error_to_string e =
 let query ~minimum_user_command_fee query_obj uri =
   let variables_string = Yojson.Basic.to_string query_obj#variables in
   let body_string =
-    String.substr_replace_all ~pattern:"\n" ~with_:""
+    String.substr_replace_all ~pattern:"\n" ~with_:" "
     @@ Printf.sprintf {|{"query": "%s", "variables": %s}|} query_obj#query
          variables_string
   in

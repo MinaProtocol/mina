@@ -602,41 +602,51 @@ let setup_daemon logger =
         Stdout_log.setup log_json log_level ;
         (* 512MB logrotate max size = 1GB max filesystem usage *)
         let logrotate_max_size = 1024 * 1024 * 10 in
-        Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
+        Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+          ~id:Logger.Logger_id.mina
           ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina.log" ~max_size:logrotate_max_size
-               ~num_rotate:file_log_rotations ) ;
+               ~num_rotate:file_log_rotations )
+          () ;
         let best_tip_diff_log_size = 1024 * 1024 * 5 in
-        Logger.Consumer_registry.register ~id:Logger.Logger_id.best_tip_diff
+        Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+          ~id:Logger.Logger_id.best_tip_diff
           ~processor:(Logger.Processor.raw ())
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-best-tip.log"
-               ~max_size:best_tip_diff_log_size ~num_rotate:1 ) ;
+               ~max_size:best_tip_diff_log_size ~num_rotate:1 )
+          () ;
         let rejected_blocks_log_size = 1024 * 1024 * 5 in
-        Logger.Consumer_registry.register ~id:Logger.Logger_id.rejected_blocks
+        Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+          ~id:Logger.Logger_id.rejected_blocks
           ~processor:(Logger.Processor.raw ())
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-rejected-blocks.log"
-               ~max_size:rejected_blocks_log_size ~num_rotate:50 ) ;
-        Logger.Consumer_registry.register ~id:Logger.Logger_id.oversized_logs
+               ~max_size:rejected_blocks_log_size ~num_rotate:50 )
+          () ;
+        Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+          ~id:Logger.Logger_id.oversized_logs
           ~processor:(Logger.Processor.raw ())
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-oversized-logs.log"
-               ~max_size:logrotate_max_size ~num_rotate:20 ) ;
+               ~max_size:logrotate_max_size ~num_rotate:20 )
+          () ;
         (* Consumer for `[%log internal]` logging used for internal tracing *)
         Itn_logger.set_message_postprocessor
           Internal_tracing.For_itn_logger.post_process_message ;
-        Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
+        Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+          ~id:Logger.Logger_id.mina
           ~processor:Internal_tracing.For_logger.processor
           ~transport:
             (Internal_tracing.For_logger.json_lines_rotate_transport
                ~directory:(conf_dir ^ "/internal-tracing")
-               () ) ;
+               () )
+          () ;
         let version_metadata = [ ("commit", `String Mina_version.commit_id) ] in
         [%log info]
           "Mina daemon is booting up; built with commit $commit on branch \
@@ -1462,8 +1472,8 @@ let daemon logger =
     (Command.Param.map (setup_daemon logger) ~f:(fun setup_daemon () ->
          (* Immediately disable updating the time offset. *)
          Block_time.Controller.disable_setting_offset () ;
-         let%bind coda = setup_daemon () in
-         let%bind () = Mina_lib.start ~commit_id:Mina_version.commit_id coda in
+         let%bind mina = setup_daemon () in
+         let%bind () = Mina_lib.start mina in
          [%log info] "Daemon ready. Clients can now connect" ;
          Async.never () ) )
 
@@ -1511,11 +1521,8 @@ let replay_blocks logger =
                    In_channel.close blocks_file ;
                    None )
          in
-         let%bind coda = setup_daemon () in
-         let%bind () =
-           Mina_lib.start_with_precomputed_blocks
-             ~commit_id:Mina_version.commit_id coda blocks
-         in
+         let%bind mina = setup_daemon () in
+         let%bind () = Mina_lib.start_with_precomputed_blocks mina blocks in
          [%log info]
            "Daemon is ready, replayed precomputed blocks. Clients can now \
             connect" ;
@@ -1673,16 +1680,13 @@ let snark_hashes =
     [%map_open
       let json = Cli_lib.Flag.json in
       let print = Core.printf "%s\n%!" in
-      fun () ->
-        let hashes = [] in
-        if json then print (Yojson.Safe.to_string (Hashes.to_yojson hashes))
-        else List.iter hashes ~f:print]
+      fun () -> if json then print "[]\n"]
 
 let internal_commands logger =
   [ ( Snark_worker.Intf.command_name
     , Snark_worker.command ~proof_level:Genesis_constants_compiled.Proof_level.t
         ~constraint_constants:Genesis_constants_compiled.Constraint_constants.t
-    )
+        ~commit_id:Mina_version.commit_id )
   ; ("snark-hashes", snark_hashes)
   ; ( "run-prover"
     , Command.async
