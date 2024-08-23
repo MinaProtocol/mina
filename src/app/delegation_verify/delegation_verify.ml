@@ -48,8 +48,9 @@ let instantiate_verify_functions ~logger = function
   | None ->
       Deferred.return
         (Verifier.verify_functions
-           ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-           ~proof_level:Genesis_constants.Proof_level.compiled () )
+           ~constraint_constants:
+             Genesis_constants_compiled.Constraint_constants.t
+           ~proof_level:Genesis_constants_compiled.Proof_level.t () )
   | Some config_file ->
       let%bind.Deferred precomputed_values =
         let%bind.Deferred.Or_error config_json =
@@ -61,6 +62,7 @@ let instantiate_verify_functions ~logger = function
           @@ Runtime_config.of_yojson config_json
         in
         Genesis_ledger_helper.init_from_config_file ~logger ~proof_level:None
+          ~compiled:(module Genesis_constants_compiled)
           config
       in
       let%map.Deferred precomputed_values =

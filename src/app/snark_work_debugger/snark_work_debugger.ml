@@ -20,7 +20,7 @@ let main (spec_path : string) =
   let%bind spec = Reader.load_sexp_exn spec_path Inputs.single_spec_of_sexp in
   let%bind worker =
     Inputs.Worker_state.create
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+      ~constraint_constants:Genesis_constants_compiled.Constraint_constants.t
       ~proof_level:Full ()
   in
   let message =

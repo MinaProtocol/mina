@@ -120,7 +120,7 @@ module Worker_state = struct
                   let txn_snark_statement, txn_snark_proof =
                     ledger_proof_opt next_state t
                   in
-                  Internal_tracing.Context_logger.with_logger (Some logger)
+                  Context_logger.with_logger (Some logger)
                   @@ fun () ->
                   let%map.Async.Deferred (), (), proof =
                     B.step
@@ -331,19 +331,21 @@ module Worker = struct
         let max_size = 256 * 1024 * 512 in
         let num_rotate = 1 in
         Logger.Consumer_registry.register ~id:"default"
-          ~processor:(Logger.Processor.raw ())
+          ~processor:(Logger.Processor.raw ()) ~commit_id
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
-               ~log_filename:"mina-prover.log" ~max_size ~num_rotate ) ;
+               ~log_filename:"mina-prover.log" ~max_size ~num_rotate )
+          () ;
         Option.iter internal_trace_filename ~f:(fun log_filename ->
             Itn_logger.set_message_postprocessor
               Internal_tracing.For_itn_logger.post_process_message ;
             Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
-              ~processor:Internal_tracing.For_logger.processor
+              ~processor:Internal_tracing.For_logger.processor ~commit_id
               ~transport:
                 (Internal_tracing.For_logger.json_lines_rotate_transport
                    ~directory:(conf_dir ^ "/internal-tracing")
-                   ~log_filename () ) ) ;
+                   ~log_filename () )
+              () ) ;
         if enable_internal_tracing then
           don't_wait_for @@ Internal_tracing.toggle ~commit_id ~logger `Enabled ;
         [%log info] "Prover started" ;
