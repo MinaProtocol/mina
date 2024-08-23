@@ -135,8 +135,7 @@ let coda_status coda_ref =
     ~default:
       (Deferred.return (`String "Shutdown before Coda instance was created"))
     ~f:(fun t ->
-      Mina_commands.get_status ~commit_id:Mina_version.commit_id
-        ~flag:`Performance t
+      Mina_commands.get_status ~flag:`Performance t
       >>| Daemon_rpcs.Types.Status.to_yojson )
 
 let make_report exn_json ~conf_dir ~top_logger coda_ref =
@@ -273,10 +272,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 aid
             |> Participating_state.active_error ) )
     ; implement_notrace Daemon_rpcs.Get_status.rpc (fun () flag ->
-          Mina_commands.get_status ~commit_id:Mina_version.commit_id ~flag mina )
+          Mina_commands.get_status ~flag mina )
     ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
-          Mina_commands.clear_hist_status ~commit_id:Mina_version.commit_id
-            ~flag mina )
+          Mina_commands.clear_hist_status ~flag mina )
     ; implement Daemon_rpcs.Get_ledger.rpc (fun () lh ->
           Mina_lib.get_ledger mina lh )
     ; implement Daemon_rpcs.Get_snarked_ledger.rpc (fun () lh ->
@@ -498,10 +496,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
         (fun ~body _sock req ->
           let uri = Cohttp.Request.uri req in
           let status flag =
-            let%bind status =
-              Mina_commands.get_status ~commit_id:Mina_version.commit_id ~flag
-                mina
-            in
+            let%bind status = Mina_commands.get_status ~flag mina in
             Server.respond_string
               ( status |> Daemon_rpcs.Types.Status.to_yojson
               |> Yojson.Safe.pretty_to_string )
@@ -544,9 +539,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             ~bind_to_address:
               Tcp.Bind_to_address.(
                 if insecure_rest_server then All_addresses else Localhost)
-            ~schema:(Mina_graphql.schema ~commit_id:Mina_version.commit_id)
-            ~server_description:"GraphQL server" ~require_auth:false
-            rest_server_port ) ) ;
+            ~schema:Mina_graphql.schema ~server_description:"GraphQL server"
+            ~require_auth:false rest_server_port ) ) ;
   (* Second graphql server with limited queries exposed *)
   Option.iter limited_graphql_port ~f:(fun rest_server_port ->
       O1trace.background_thread "serve_limited_graphql" (fun () ->
@@ -554,8 +548,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             ~bind_to_address:
               Tcp.Bind_to_address.(
                 if open_limited_graphql_port then All_addresses else Localhost)
-            ~schema:
-              (Mina_graphql.schema_limited ~commit_id:Mina_version.commit_id)
+            ~schema:Mina_graphql.schema_limited
             ~server_description:"GraphQL server with limited queries"
             ~require_auth:false rest_server_port ) ) ;
   if Mina_compile_config.itn_features then
@@ -568,8 +561,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               ~bind_to_address:
                 Tcp.Bind_to_address.(
                   if insecure_rest_server then All_addresses else Localhost)
-              ~schema:
-                (Mina_graphql.schema_itn ~commit_id:Mina_version.commit_id)
+              ~schema:Mina_graphql.schema_itn
               ~server_description:"GraphQL server for ITN queries"
               ~require_auth:true rest_server_port ) ) ;
   let where_to_listen =
