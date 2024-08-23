@@ -1,6 +1,6 @@
 use crate::caml::caml_bytes_string::CamlBytesString;
 use ark_ff::{BigInteger as ark_BigInteger, BigInteger256};
-use ark_serialize::Read;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use num_bigint::BigUint;
 use std::cmp::Ordering::{Equal, Greater, Less};
 use std::convert::{TryFrom, TryInto};
@@ -86,7 +86,9 @@ impl TryFrom<BigUint> for CamlBigInteger256 {
     type Error = String;
 
     fn try_from(x: BigUint) -> Result<Self, Self::Error> {
-        Ok(Self(BigInteger256::try_from(x).map_err(|()| "Biginteger was too big")?))
+        Ok(Self(
+            BigInteger256::try_from(x).map_err(|()| "Biginteger was too big")?,
+        ))
     }
 }
 
@@ -94,7 +96,9 @@ impl TryFrom<&BigUint> for CamlBigInteger256 {
     type Error = String;
 
     fn try_from(x: &BigUint) -> Result<Self, Self::Error> {
-        Ok(Self(BigInteger256::try_from(x.clone()).map_err(|()| "Biginteger was too big")?))
+        Ok(Self(
+            BigInteger256::try_from(x.clone()).map_err(|()| "Biginteger was too big")?,
+        ))
     }
 }
 
@@ -205,14 +209,7 @@ pub fn caml_bigint_256_to_bytes(
     x: ocaml::Pointer<CamlBigInteger256>,
 ) -> [u8; std::mem::size_of::<BigInteger256>()] {
     let mut res = [0u8; std::mem::size_of::<BigInteger256>()];
-    {
-        for (i, num) in x.as_ref().0.0.iter().enumerate() {
-            let bytes = num.to_le_bytes();
-            for (j, byte) in bytes.iter().enumerate() {
-                res[8*i+j] = *byte;
-            }
-        }
-    };
+    x.as_ref().0.serialize_compressed(&mut res[..]).unwrap();
     res
 }
 
@@ -223,14 +220,9 @@ pub fn caml_bigint_256_of_bytes(x: &[u8]) -> Result<CamlBigInteger256, ocaml::Er
     if x.len() != len {
         ocaml::Error::failwith("caml_bigint_256_of_bytes")?;
     };
-    let reader = &mut &*x;
-    let mut res = [0u64; 4];
-    for num in res.iter_mut() {
-        let mut bytes = [0u8; 8];
-        reader.read_exact(&mut bytes)?;
-        *num = u64::from_le_bytes(bytes);
-    }
-    Ok(CamlBigInteger256(BigInteger256::new(res)))
+    let result = BigInteger256::deserialize_compressed(&mut &*x)
+        .map_err(|_| ocaml::Error::Message("deserialization error"))?;
+    Ok(CamlBigInteger256(result))
 }
 
 #[ocaml_gen::func]
