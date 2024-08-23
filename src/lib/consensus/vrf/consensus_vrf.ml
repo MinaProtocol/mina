@@ -282,7 +282,7 @@ module Output = struct
 
   let%test_unit "hash unchecked vs. checked equality" =
     let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+      Genesis_constants.For_unit_tests.Constraint_constants.t
     in
     let gen_inner_curve_point =
       let open Quickcheck.Generator.Let_syntax in
@@ -634,7 +634,9 @@ module Layout = struct
 end
 
 let%test_unit "Standalone and integrates vrfs are consistent" =
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let constraint_constants =
+    Genesis_constants.For_unit_tests.Constraint_constants.t
+  in
   let module Standalone = Standalone (struct
     let constraint_constants = constraint_constants
   end) in
