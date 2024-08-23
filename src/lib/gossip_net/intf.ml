@@ -14,6 +14,7 @@ type ('query, 'response) rpc_fn =
 type 'r rpc_response =
   | Failed_to_connect of Error.t
   | Connected of 'r Or_error.t Envelope.Incoming.t
+[@@deriving sexp]
 
 module type RPC_IMPLEMENTATION = sig
   type ctx

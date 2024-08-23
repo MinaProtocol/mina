@@ -36,13 +36,6 @@ module type CONTEXT = sig
 end
 
 type ctx = (module CONTEXT)
-(*
-  { logger : Logger.t
-  ; trust_system : Trust_system.t
-  ; list_peers : unit -> Peer.t list
-  ; get_transition_frontier : unit -> Transition_frontier.t option
-  }
-*)
 
 let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender blocks =
   let version_errors =
