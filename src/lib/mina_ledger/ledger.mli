@@ -5,7 +5,7 @@ open Mina_base
 module Location : Merkle_ledger.Location_intf.S
 
 module Db :
-  Merkle_ledger.Database_intf.S
+  Merkle_ledger.Intf.Ledger.DATABASE
     with module Location = Location
     with module Addr = Location.Addr
     with type root_hash := Ledger_hash.t
@@ -18,7 +18,7 @@ module Db :
      and type account_id_set := Account_id.Set.t
 
 module Any_ledger :
-  Merkle_ledger.Any_ledger.S
+  Merkle_ledger.Intf.Ledger.ANY
     with module Location = Location
     with type account := Account.t
      and type key := Public_key.Compressed.t
@@ -56,6 +56,7 @@ module Maskable :
      and type root_hash := Ledger_hash.t
      and type unattached_mask := Mask.t
      and type attached_mask := Mask.Attached.t
+     and type accumulated_t := Mask.accumulated_t
      and type t := Any_ledger.M.t
 
 include
@@ -73,12 +74,16 @@ include
      and type t = Mask.Attached.t
      and type attached_mask = Mask.Attached.t
      and type unattached_mask = Mask.t
+     and type accumulated_t = Mask.accumulated_t
 
 (* We override the type of unregister_mask_exn that comes from
    Merkle_mask.Maskable_merkle_tree_intf.S because at this level callers aren't
    doing reparenting and shouldn't be able to turn off the check parameter.
 *)
 val unregister_mask_exn : loc:string -> Mask.Attached.t -> Mask.t
+
+val unsafe_preload_accounts_from_parent :
+  Mask.Attached.t -> Account_id.t list -> unit
 
 (* The maskable ledger is t = Mask.Attached.t because register/unregister
  * work off of this type *)
@@ -162,7 +167,8 @@ val gen_initial_ledger_state : init_state Quickcheck.Generator.t
 (** Apply a generated state to a blank, concrete ledger. *)
 val apply_initial_ledger_state : t -> init_state -> unit
 
-module Ledger_inner : Ledger_intf.S with type t = t
+module Ledger_inner :
+  Ledger_intf.S with type t = t and type location = Location.t
 
 module For_tests : sig
   open Currency

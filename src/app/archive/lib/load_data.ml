@@ -192,7 +192,8 @@ let update_of_id pool update_id =
                   ; access
                   ; set_delegate
                   ; set_permissions
-                  ; set_verification_key
+                  ; set_verification_key_auth
+                  ; set_verification_key_txn_version
                   ; set_zkapp_uri
                   ; edit_action_state
                   ; set_token_symbol
@@ -210,7 +211,10 @@ let update_of_id pool update_id =
               ; access
               ; set_delegate
               ; set_permissions
-              ; set_verification_key
+              ; set_verification_key =
+                  ( set_verification_key_auth
+                  , Mina_numbers.Txn_version.of_int
+                      set_verification_key_txn_version )
               ; set_zkapp_uri
               ; edit_action_state
               ; set_token_symbol
@@ -452,7 +456,8 @@ let get_account_update_body ~pool body_id =
       | _ ->
           failwith "Ill-formatted string for balance change"
     in
-    Currency.Amount.Signed.create ~magnitude ~sgn
+    (* amount might be negative zero *)
+    Currency.Amount.Signed.create_preserve_zero_sign ~magnitude ~sgn
   in
   let%bind events = load_events pool events_id in
   let%bind actions = load_events pool actions_id in
@@ -734,7 +739,8 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
             ; access
             ; set_delegate
             ; set_permissions
-            ; set_verification_key
+            ; set_verification_key_auth
+            ; set_verification_key_txn_version
             ; set_zkapp_uri
             ; edit_action_state
             ; set_token_symbol
@@ -750,7 +756,9 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
       ; access
       ; set_delegate
       ; set_permissions
-      ; set_verification_key
+      ; set_verification_key =
+          ( set_verification_key_auth
+          , Mina_numbers.Txn_version.of_int set_verification_key_txn_version )
       ; set_zkapp_uri
       ; edit_action_state
       ; set_token_symbol

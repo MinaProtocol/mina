@@ -16,6 +16,7 @@
    base.caml
    base.base_internalhash_types
    ;;local libraries
+   bounded_types
    mina_wire_types
    child_processes
    snark_worker
@@ -50,8 +51,8 @@
    parallel
    random_oracle
    kimchi_backend
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    pickles_types
    pickles
    pickles.backend

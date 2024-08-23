@@ -22,6 +22,7 @@
    async_unix
    bin_prot.shape
    ;; local libraries
+   bounded_types
    one_or_two
    mina_metrics
    logger
@@ -44,7 +45,7 @@
    mina_compile_config
    mina_state
    transaction_protocol_state
-   ppx_version_runtime
+   ppx_version.runtime
  )
  (preprocess
   (pps

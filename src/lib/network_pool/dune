@@ -20,6 +20,7 @@
    ppx_inline_test.config
    integers
    ;; local libraries
+   bounded_types
    mina_compile_config
    mina_generators
    sgn
@@ -74,17 +75,16 @@
    random_oracle_input
    kimchi_backend
    kimchi_backend_common
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
-   genesis_ledger
+   kimchi_pasta
+   kimchi_pasta.basic
+   coda_genesis_ledger
    staged_ledger_diff
    mina_wire_types
    mina_block
    perf_histograms
    internal_tracing
  )
- (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_base ppx_mina ppx_version ppx_register_event ppx_let ppx_assert ppx_pipebang ppx_deriving.std ppx_sexp_conv ppx_bin_prot ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky ppx_deriving_yojson ppx_fields_conv))
+ (preprocess (pps ppx_base ppx_mina ppx_version ppx_register_event ppx_let ppx_assert ppx_pipebang ppx_deriving.std ppx_sexp_conv ppx_bin_prot ppx_custom_printf ppx_inline_test ppx_snarky ppx_deriving_yojson ppx_fields_conv))
  (synopsis
    "Network pool is an interface that processes incoming diffs and then broadcasts them"))

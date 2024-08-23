@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 module Field = Snark_params.Tick.Field
 
@@ -355,10 +353,15 @@ module Make (Schema : Graphql_intf.Schema) = struct
         ~of_string:sign_of_string
     in
     let ( !. ) = ( !. ) ~t_fields_annots:Currency.Signed_poly.t_fields_annots in
-    Currency.Signed_poly.Fields.make_creator obj ~magnitude:!.amount
-      ~sgn:!.sign_deriver
-    |> finish "BalanceChange"
-         ~t_toplevel_annots:Currency.Signed_poly.t_toplevel_annots
+    let balance_change obj' =
+      Currency.Signed_poly.Fields.make_creator obj' ~magnitude:!.amount
+        ~sgn:!.sign_deriver
+      |> finish "BalanceChange"
+           ~t_toplevel_annots:Currency.Signed_poly.t_toplevel_annots
+    in
+    needs_custom_js
+      ~js_type:(js_leaf (Custom "BalanceChange"))
+      ~name:"BalanceChange" balance_change obj
 
   let to_json obj x = !(obj#to_json) @@ !(obj#contramap) x
 
@@ -539,8 +542,6 @@ module Derivers = Make (Fields_derivers_graphql.Schema)
 include Derivers
 module Js_layout = Fields_derivers_js.Js_layout
 
-[%%ifdef consensus_mechanism]
-
 let proof obj : _ Unified_input.t =
   let of_string s =
     match Pickles.Side_loaded.Proof.of_base64 s with
@@ -580,8 +581,6 @@ let%test_unit "verification key with hash, roundtrip json" =
   let v = { With_hash.data; hash = Field.one } in
   let o = verification_key_with_hash @@ o () in
   [%test_eq: (t, Field.t) With_hash.t] v (of_json o (to_json o v))
-
-[%%endif]
 
 let%test_module "Test" =
   ( module struct

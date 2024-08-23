@@ -18,12 +18,13 @@
    uri
    async.async_command
    ;; local libraries
-   consensus_vrf
+   consensus.vrf
    mina_wire_types
+   bounded_types
    mina_base
    mina_base.import
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    pasta_bindings
    pickles
    pickles_types
@@ -44,6 +45,5 @@
    with_hash
    error_json
  )
- (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_mina ppx_let ppx_hash ppx_compare ppx_sexp_conv h_list.ppx)))

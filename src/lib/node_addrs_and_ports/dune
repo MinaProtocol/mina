@@ -13,6 +13,7 @@
    ;; local libraries
    network_peer
    ppx_version.runtime
+   bounded_types
  )
  (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))

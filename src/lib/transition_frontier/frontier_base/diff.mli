@@ -1,5 +1,4 @@
 open Mina_base
-open Mina_block
 
 type full = Full
 

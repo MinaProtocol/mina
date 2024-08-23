@@ -1,3 +1,5 @@
+open Core_kernel
+
 module type Full = sig
   [%%versioned:
   module Stable : sig
@@ -5,6 +7,8 @@ module type Full = sig
       type t [@@deriving compare, equal, sexp, yojson]
     end
   end]
+
+  include Comparable.S with type t := t
 
   val transaction : t -> int
 

@@ -1,7 +1,5 @@
 (* protocol_version.ml *)
 
-[%%import "/src/config.mlh"]
-
 (* see RFC 0049 for details *)
 
 open Core_kernel
@@ -21,6 +19,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       let to_latest = Fn.id
     end
   end]
+
+  include Comparable.Make (Stable.V2)
 
   let create = Fields.create
 
@@ -45,11 +45,11 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let to_string t = sprintf "%u.%u.%u" t.transaction t.network t.patch
 
-  [%%inject "current_transaction", protocol_version_transaction]
+  let current_transaction = Node_config.protocol_version_transaction
 
-  [%%inject "current_network", protocol_version_network]
+  let current_network = Node_config.protocol_version_network
 
-  [%%inject "current_patch", protocol_version_patch]
+  let current_patch = Node_config.protocol_version_patch
 
   let current =
     { transaction = current_transaction
@@ -65,12 +65,13 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let compatible_with_daemon (t : t) =
     (* patch not considered for compatibility *)
-    t.transaction = current.transaction && t.network = current.network
+    Int.equal t.transaction current.transaction
+    && Int.equal t.network current.network
 
   (* when an external transition is deserialized, might contain
      negative numbers
   *)
-  let is_valid t = t.transaction >= 1 && t.network >= 0 && t.patch >= 0
+  let is_valid t = Int.(t.transaction >= 1 && t.network >= 0 && t.patch >= 0)
 end
 
 include Wire_types.Make (Make_sig) (Make_str)

@@ -20,6 +20,7 @@
    transition_frontier_base
    mina_metrics
    error_json
+   bounded_types
    with_hash
    mina_state
    inline_test_quiet_logs
@@ -61,8 +62,8 @@
    sgn_type
    sgn
    currency
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    mina_wire_types
    file_system
    lmdb_storage

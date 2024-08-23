@@ -1,15 +1,15 @@
 opam-version: "2.0"
+compiler: ["ocaml.4.14.0"]
 roots: [
   "alcotest.1.1.0"
+  "alcotest-async.1.1.0"
   "angstrom.0.15.0"
-  "async_ssl.v0.14.0"
-  "bignum.v0.14.0"
   "bisect_ppx.2.8.1"
   "bitstring.4.1.0"
+  "camlp-streams.5.0.1"
   "camlp4.4.14+1"
   "capnp.3.4.0"
   "check_opam_switch.~dev"
-  "cohttp-async.5.0.0"
   "core_extended.v0.14.0"
   "extlib.1.7.8"
   "graphql-async.0.13.0"
@@ -42,6 +42,7 @@ roots: [
 ]
 installed: [
   "alcotest.1.1.0"
+  "alcotest-async.1.1.0"
   "angstrom.0.15.0"
   "asetmap.0.8.1"
   "astring.0.8.5"
@@ -67,6 +68,7 @@ installed: [
   "bisect_ppx.2.8.1"
   "bitstring.4.1.0"
   "camlp4.4.14+1"
+  "camlp-streams.5.0.1"
   "camomile.1.0.2"
   "capnp.3.4.0"
   "caqti.1.5.0"
@@ -84,7 +86,6 @@ installed: [
   "conf-libffi.2.0.0"
   "conf-libssl.2"
   "conf-m4.1"
-  "conf-openssl.1"
   "conf-perl.1"
   "conf-pkg-config.1.1"
   "conf-postgresql.1"
@@ -441,6 +442,7 @@ Rpc_parallel offers an API to define various workers and protocols,
     "ppx_jane" {>= "v0.13" & < "v0.15"}
     "sexplib" {>= "v0.13" & < "v0.15"}
     "dune" {>= "2.0.0"}
+    "ctypes"
   ]
   build: ["dune" "build" "-p" name "-j" jobs]
   dev-repo: "git+https://github.com/janestreet/rpc_parallel.git"

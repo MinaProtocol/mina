@@ -501,7 +501,7 @@ module Snark_pool = struct
             Verifier.create ~logger ~proof_level ~constraint_constants
               ~conf_dir:None
               ~pids:(Child_processes.Termination.create_pid_table ())
-              () )
+              ~commit_id:"not specified for unit tests" () )
 
       let gen_proofs =
         let open Quickcheck.Generator.Let_syntax in
@@ -533,7 +533,7 @@ module Snark_pool = struct
           let message = Mina_base.Sok_message.create ~fee ~prover in
           ( One_or_two.map statements ~f:(fun statement ->
                 Ledger_proof.create ~statement ~sok_digest
-                  ~proof:Proof.transaction_dummy )
+                  ~proof:(Lazy.force Proof.transaction_dummy) )
           , message )
         in
         Envelope.Incoming.gen data_gen

@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params
 open Tick
@@ -83,10 +81,10 @@ end
 
 type as_record =
   ( bool
-  , Global_slot_since_genesis.Stable.V1.t
-  , Global_slot_span.Stable.V1.t
-  , Balance.Stable.V1.t
-  , Amount.Stable.V1.t )
+  , Global_slot_since_genesis.Stable.Latest.t
+  , Global_slot_span.Stable.Latest.t
+  , Balance.Stable.Latest.t
+  , Amount.Stable.Latest.t )
   As_record.t
 
 (* convert sum type to record format, useful for to_bits and typ *)
@@ -137,17 +135,6 @@ let of_record
       }
   else Untimed
 
-let of_record (r : as_record) : t =
-  if r.is_timed then
-    Timed
-      { initial_minimum_balance = r.initial_minimum_balance
-      ; cliff_time = r.cliff_time
-      ; cliff_amount = r.cliff_amount
-      ; vesting_period = r.vesting_period
-      ; vesting_increment = r.vesting_increment
-      }
-  else Untimed
-
 let to_input t =
   let As_record.
         { is_timed
@@ -168,8 +155,6 @@ let to_input t =
      ; Global_slot_span.to_input vesting_period
      ; Amount.to_input vesting_increment
     |]
-
-[%%ifdef consensus_mechanism]
 
 type var =
   ( Boolean.var
@@ -321,5 +306,3 @@ let if_ b ~(then_ : var) ~(else_ : var) =
 let deriver obj =
   let open Fields_derivers_zkapps in
   iso_record ~to_record ~of_record As_record.deriver obj
-
-[%%endif]

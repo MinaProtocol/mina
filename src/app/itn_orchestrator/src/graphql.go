@@ -218,3 +218,13 @@ func StopDaemonGql(config Config, nodeAddress NodeAddress, clean bool, delaySec 
 	}
 	return resp.(*stopDaemonResponse).StopDaemon, nil
 }
+
+func SetZkappSoftLimitGql(config Config, nodeAddress NodeAddress, limit *int) (*int, error) {
+	resp, err := wrapGqlRequest(config, nodeAddress, func(client graphql.Client) (any, error) {
+		return setZkappSoftLimit(config.Ctx, client, limit)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error setting zkapp soft limit on %s: %v", nodeAddress, err)
+	}
+	return resp.(*setZkappSoftLimitResponse).ZkAppCommandLimit, nil
+}

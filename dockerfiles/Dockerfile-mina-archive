@@ -5,10 +5,12 @@ FROM ${image}
 ARG deb_version
 ARG deb_codename=bullseye
 ARG deb_release=unstable
+ARG deb_repo="http://packages.o1test.net"
 ARG deb_profile
+ARG deb_suffix
 
-# if --build-arg deb_profile is defined, add hypen at beginning.
-ENV SUFFIX=${deb_profile:+-${deb_profile}}
+# if --build-arg deb_suffix is defined, add hypen at beginning.
+ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
 # construct mina debian package name based on network and suffix.
 # possible values:
 # - mina-archive
@@ -32,6 +34,7 @@ RUN apt-get update --quiet --yes \
         libssl1.1 \
         libgomp1 \
         libpq-dev \
+        gnupg2 \
         apt-transport-https \
         ca-certificates \
         dnsutils \
@@ -44,8 +47,18 @@ RUN apt-get update --quiet --yes \
 
 RUN mkdir /healthcheck && curl https://raw.githubusercontent.com/MinaProtocol/mina/develop/dockerfiles/scripts/healthcheck-utilities.sh -o /healthcheck/utilities.sh
 
+# Install google-cloud-sdk for mina dumps handling
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+  && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
+  && apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends google-cloud-sdk kubectl google-cloud-sdk-gke-gcloud-auth-plugin \
+  && rm -rf /var/lib/apt/lists/*
+
+ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
+
+
 # archive-node package
-RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
+RUN echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update --quiet --yes \
   && apt-get install --quiet --yes "${MINA_DEB}=$deb_version" \
   && rm -rf /var/lib/apt/lists/*

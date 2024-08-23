@@ -75,7 +75,8 @@ let validate_proofs_block ~verifier ~genesis_state_hash blocks =
   >>| List.zip_exn blocks >>| List.map ~f
 
 let verify_transition ~context:(module Context : CONTEXT) ~trust_system
-    ~frontier ~unprocessed_transition_cache enveloped_transition =
+    ~frontier ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
+    enveloped_transition =
   let open Context in
   let sender = Envelope.Incoming.sender enveloped_transition in
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
@@ -94,7 +95,7 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
     in
     Transition_handler.Validator.verify_transition_is_relevant
       ~context:(module Context)
-      ~frontier ~unprocessed_transition_cache
+      ~frontier ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
       enveloped_initially_validated_transition
   in
   let open Deferred.Let_syntax in
@@ -183,6 +184,10 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
       Error (Error.of_string "mismatched protocol version")
   | Error `Disconnected ->
       Deferred.Or_error.fail @@ Error.of_string "disconnected chain"
+  | Error `Non_empty_staged_ledger_diff_after_stop_slot ->
+      Deferred.Or_error.fail @@ Error.of_string "non empty staged ledger diff"
+  | Error `Block_after_after_stop_slot ->
+      Deferred.Or_error.fail @@ Error.of_string "block after stop slot"
 
 let rec fold_until ~(init : 'accum)
     ~(f :
@@ -540,13 +545,20 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
                 @@ diff verification_end_time verification_start_time) )
         ]
       "verification of proofs complete" ;
+    let slot_tx_end =
+      Runtime_config.slot_tx_end_or_default precomputed_values.runtime_config
+    in
+    let slot_chain_end =
+      Runtime_config.slot_chain_end_or_default precomputed_values.runtime_config
+    in
     fold_until (List.rev tvs) ~init:[]
       ~f:(fun acc transition ->
         let open Deferred.Let_syntax in
         match%bind
           verify_transition
             ~context:(module Context)
-            ~trust_system ~frontier ~unprocessed_transition_cache transition
+            ~trust_system ~frontier ~unprocessed_transition_cache ~slot_tx_end
+            ~slot_chain_end transition
         with
         | Error e ->
             List.iter acc ~f:(fun (node, gm) ->
@@ -900,7 +912,7 @@ let%test_module "Ledger_catchup tests" =
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            () )
+            ~commit_id:"not specified for unit tests" () )
 
     module Context = struct
       let logger = logger

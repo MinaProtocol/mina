@@ -16,6 +16,7 @@
    best_tip_prover
    transition_handler
    o1trace
+   bounded_types
    truth
    mina_net2
    consensus

@@ -587,7 +587,7 @@ let%test_module "Transition_handler.Processor tests" =
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            () )
+            ~commit_id:"not specified for unit tests" () )
 
     module Context = struct
       let logger = logger

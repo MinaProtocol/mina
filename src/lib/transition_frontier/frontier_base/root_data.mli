@@ -1,5 +1,4 @@
 open Mina_base
-open Mina_block
 
 (* Historical root data is similar to Limited root data, except that it also
  * contains a recording of some extra computed staged ledger properties that

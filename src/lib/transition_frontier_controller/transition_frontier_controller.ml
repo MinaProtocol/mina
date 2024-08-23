@@ -141,7 +141,7 @@ let run_with_normal_or_super_catchup ~context:(module Context : CONTEXT)
     ~context:(module Context)
     ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
     ~catchup_breadcrumbs_writer ~unprocessed_transition_cache ;
-  Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
+  upon (Strict_pipe.Reader.read clear_reader) (fun _ ->
       let open Strict_pipe.Writer in
       kill valid_transition_writer ;
       kill primary_transition_writer ;

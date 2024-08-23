@@ -16,6 +16,7 @@
    async_kernel
    mina_metrics
    ppx_version.runtime
+   bounded_types
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_compare ppx_mina ppx_version ppx_jane ppx_deriving_yojson)))

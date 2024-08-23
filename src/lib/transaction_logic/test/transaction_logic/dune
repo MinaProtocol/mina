@@ -18,14 +18,16 @@
    data_hash_lib
    genesis_constants
    kimchi_backend_common
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    mina_base
-   mina_base_import
+   mina_base.import
+   mina_base.test_helpers
    mina_transaction
    mina_transaction_logic
    mina_numbers
    mina_ledger
+   mina_ledger_test_helpers
    mina_wire_types
    monad_lib
    pasta_bindings

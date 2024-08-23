@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base_util
 open Fold_lib
@@ -24,7 +22,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = string [@@deriving sexp, equal, compare, hash]
+        type t = Bounded_types.String.Stable.V1.t
+        [@@deriving sexp, equal, compare, hash]
 
         let to_latest = Fn.id
 
@@ -107,7 +106,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = string [@@deriving sexp, equal, compare, hash]
+        type t = Bounded_types.String.Stable.V1.t
+        [@@deriving sexp, equal, compare, hash]
 
         let to_latest = Fn.id
 
@@ -213,16 +213,9 @@ module Make_str (A : Wire_types.Concrete) = struct
     let var_of_t t : var =
       List.map (Fold.to_list @@ fold t) ~f:Boolean.var_of_value
 
-    [%%if proof_level = "check"]
-
-    let warn_improper_transport () = ()
-
-    [%%else]
-
     let warn_improper_transport () =
-      printf "WARNING: improperly transporting staged-ledger-hash\n"
-
-    [%%endif]
+      if String.equal Node_config.proof_level "check" then ()
+      else printf "WARNING: improperly transporting staged-ledger-hash\n"
 
     let typ : (var, value) Typ.t =
       Typ.transport (Typ.list ~length:length_in_bits Boolean.typ)

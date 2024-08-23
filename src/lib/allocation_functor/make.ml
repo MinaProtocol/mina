@@ -120,7 +120,7 @@ module Versioned_v1 = struct
       module Latest = V1
     end
 
-    type t = Stable.V1.t
+    type t = Stable.Latest.t
   end
 
   module Sexp (M : Intf.Input.Versioned_v1.Sexp_intf) : sig
@@ -145,7 +145,7 @@ module Versioned_v1 = struct
       module Latest = V1
     end
 
-    type t = Stable.V1.t
+    type t = Stable.Latest.t
   end
 
   module Yojson (M : Intf.Input.Versioned_v1.Yojson_intf) : sig
@@ -170,7 +170,7 @@ module Versioned_v1 = struct
       module Latest = V1
     end
 
-    type t = Stable.V1.t
+    type t = Stable.Latest.t
   end
 
   module Full_compare_eq_hash
@@ -204,7 +204,7 @@ module Versioned_v1 = struct
       module Latest = V1
     end
 
-    type t = Stable.V1.t
+    type t = Stable.Latest.t
 
     let equal = M.equal
 
@@ -237,7 +237,7 @@ module Versioned_v1 = struct
       module Latest = V1
     end
 
-    type t = Stable.V1.t
+    type t = Stable.Latest.t
   end
 end
 
@@ -280,6 +280,6 @@ module Versioned_v2 = struct
       module Latest = V2
     end
 
-    type t = Stable.V2.t
+    type t = Stable.Latest.t
   end
 end

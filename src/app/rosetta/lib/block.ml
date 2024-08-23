@@ -1,40 +1,8 @@
-module Scalars = Graphql_lib.Scalars
-
-module Get_coinbase_and_genesis =
-[%graphql
-{|
-  query {
-    genesisBlock {
-      creatorAccount {
-        publicKey @ppxCustom(module: "Scalars.String_json")
-      }
-      winnerAccount {
-        publicKey @ppxCustom(module: "Scalars.String_json")
-      }
-      protocolState {
-        blockchainState {
-          date @ppxCustom(module: "Scalars.String_json")
-        }
-        consensusState {
-          blockHeight
-        }
-      }
-      stateHash @ppxCustom(module: "Scalars.String_json")
-    }
-    daemonStatus {
-      chainId
-    }
-    initialPeers
-  }
-|}]
-
-(* Avoid shadowing graphql_ppx functions *)
 open Core_kernel
 open Async
 open Rosetta_lib
 open Rosetta_models
-
-let account_id = User_command_info.account_id
+open Commands_common
 
 module Block_query = struct
   type t = ([ `Height of int64 ], [ `Hash of string ]) These.t option
@@ -56,16 +24,6 @@ module Block_query = struct
       of_partial_identifier
         (Option.value identifier
            ~default:{ Partial_block_identifier.index = None; hash = None } )
-
-    let is_genesis ~hash ~block_height = function
-      | Some (`This (`Height index)) ->
-          Int64.equal index block_height
-      | Some (`That (`Hash hash')) ->
-          String.equal hash hash'
-      | Some (`Those (`Height index, `Hash hash')) ->
-          Int64.equal index block_height && String.equal hash hash'
-      | None ->
-          false
   end
 
   let to_string : t -> string = function
@@ -77,317 +35,6 @@ module Block_query = struct
         sprintf "height = %Ld, hash = %s" height hash
     | None ->
         sprintf "(no height or hash given)"
-end
-
-module Op = User_command_info.Op
-
-(* TODO: Populate postgres DB with at least one of each kind of transaction and
- * then make sure ops make sense: #5501 *)
-
-module Internal_command_info = struct
-  module Kind = struct
-    type t = [ `Coinbase | `Fee_transfer | `Fee_transfer_via_coinbase ]
-    [@@deriving equal, to_yojson]
-
-    let to_string (t : t) =
-      match t with
-      | `Coinbase ->
-          "coinbase"
-      | `Fee_transfer ->
-          "fee_transfer"
-      | `Fee_transfer_via_coinbase ->
-          "fee_transfer_via_coinbase"
-  end
-
-  type t =
-    { kind : Kind.t
-    ; receiver : [ `Pk of string ]
-    ; receiver_account_creation_fee_paid : Unsigned_extended.UInt64.t option
-    ; fee : Unsigned_extended.UInt64.t
-    ; token : [ `Token_id of string ]
-    ; sequence_no : int
-    ; secondary_sequence_no : int
-    ; hash : string
-    }
-  [@@deriving to_yojson]
-
-  module T (M : Monad_fail.S) = struct
-    module Op_build = Op.T (M)
-
-    let to_operations ~coinbase_receiver (t : t) :
-        (Operation.t list, Errors.t) M.t =
-      (* We choose to represent the dec-side of fee transfers from txns from the
-       * canonical user command that created them so we are able consistently
-       * produce more balance changing operations in the mempool or a block.
-       * *)
-      let plan : 'a Op.t list =
-        let mk_account_creation_fee related =
-          match t.receiver_account_creation_fee_paid with
-          | None ->
-              []
-          | Some fee ->
-              [ { Op.label = `Account_creation_fee_via_fee_receiver fee
-                ; related_to = Some related
-                }
-              ]
-        in
-        match t.kind with
-        | `Coinbase ->
-            (* The coinbase transaction is really incrementing by the coinbase
-               * amount *)
-            [ { Op.label = `Coinbase_inc; related_to = None } ]
-            @ mk_account_creation_fee `Coinbase_inc
-        | `Fee_transfer ->
-            [ { Op.label = `Fee_receiver_inc; related_to = None } ]
-            @ mk_account_creation_fee `Fee_receiver_inc
-        | `Fee_transfer_via_coinbase ->
-            [ { Op.label = `Fee_receiver_inc; related_to = None }
-            ; { Op.label = `Fee_payer_dec; related_to = Some `Fee_receiver_inc }
-            ]
-            @ mk_account_creation_fee `Fee_receiver_inc
-      in
-      Op_build.build
-        ~a_eq:
-          [%equal:
-            [ `Coinbase_inc
-            | `Fee_payer_dec
-            | `Fee_receiver_inc
-            | `Account_creation_fee_via_fee_receiver of Unsigned.UInt64.t ]]
-        ~plan ~f:(fun ~related_operations ~operation_identifier op ->
-          (* All internal commands succeed if they're in blocks *)
-          let status = Some (Operation_statuses.name `Success) in
-          match op.label with
-          | `Coinbase_inc ->
-              M.return
-                { Operation.operation_identifier
-                ; related_operations
-                ; status
-                ; account =
-                    Some
-                      (account_id t.receiver
-                         (`Token_id Amount_of.Token_id.default) )
-                ; _type = Operation_types.name `Coinbase_inc
-                ; amount =
-                    Some
-                      (Amount_of.token (`Token_id Amount_of.Token_id.default)
-                         t.fee )
-                ; coin_change = None
-                ; metadata = None
-                }
-          | `Fee_receiver_inc ->
-              M.return
-                { Operation.operation_identifier
-                ; related_operations
-                ; status
-                ; account = Some (account_id t.receiver t.token)
-                ; _type = Operation_types.name `Fee_receiver_inc
-                ; amount = Some (Amount_of.token t.token t.fee)
-                ; coin_change = None
-                ; metadata = None
-                }
-          | `Fee_payer_dec ->
-              let open M.Let_syntax in
-              let%map coinbase_receiver =
-                match coinbase_receiver with
-                | Some r ->
-                    M.return r
-                | None ->
-                    M.fail
-                      (Errors.create
-                         ~context:
-                           "This operation existing (fee payer dec within \
-                            Internal_command) demands a coinbase receiver to \
-                            exist. Please report this bug."
-                         `Invariant_violation )
-              in
-              { Operation.operation_identifier
-              ; related_operations
-              ; status
-              ; account =
-                  Some
-                    (account_id coinbase_receiver
-                       (`Token_id Amount_of.Token_id.default) )
-              ; _type = Operation_types.name `Fee_payer_dec
-              ; amount = Some Amount_of.(negated (mina t.fee))
-              ; coin_change = None
-              ; metadata = None
-              }
-          | `Account_creation_fee_via_fee_receiver account_creation_fee ->
-              M.return
-                { Operation.operation_identifier
-                ; related_operations
-                ; status
-                ; account =
-                    Some
-                      (account_id t.receiver
-                         (`Token_id Amount_of.Token_id.default) )
-                ; _type =
-                    Operation_types.name `Account_creation_fee_via_fee_receiver
-                ; amount = Some Amount_of.(negated @@ mina account_creation_fee)
-                ; coin_change = None
-                ; metadata = None
-                } )
-  end
-
-  let dummies =
-    [ { kind = `Coinbase
-      ; receiver = `Pk "Eve"
-      ; receiver_account_creation_fee_paid = None
-      ; fee = Unsigned.UInt64.of_int 20_000_000_000
-      ; token = `Token_id Amount_of.Token_id.default
-      ; sequence_no = 1
-      ; secondary_sequence_no = 0
-      ; hash = "COINBASE_1"
-      }
-    ; { kind = `Fee_transfer
-      ; receiver = `Pk "Alice"
-      ; receiver_account_creation_fee_paid = None
-      ; fee = Unsigned.UInt64.of_int 30_000_000_000
-      ; token = `Token_id Amount_of.Token_id.default
-      ; sequence_no = 1
-      ; secondary_sequence_no = 0
-      ; hash = "FEE_TRANSFER"
-      }
-    ]
-end
-
-module Zkapp_account_update_info = struct
-  type t =
-    { authorization_kind : string
-    ; account : [ `Pk of string ]
-    ; balance_change : string
-    ; increment_nonce : bool
-    ; may_use_token : string
-    ; call_depth : Unsigned_extended.UInt64.t
-    ; use_full_commitment : bool
-    ; status : [ `Success | `Failed ]
-    ; token : [ `Token_id of string ]
-    }
-  [@@deriving to_yojson, equal]
-
-  let dummies =
-    [ { authorization_kind = "OK"
-      ; account = `Pk "Eve"
-      ; balance_change = "-1000000"
-      ; increment_nonce = false
-      ; may_use_token = "no"
-      ; call_depth = Unsigned.UInt64.of_int 10
-      ; use_full_commitment = true
-      ; status = `Success
-      ; token = `Token_id Amount_of.Token_id.default
-      }
-    ; { authorization_kind = "NOK"
-      ; account = `Pk "Alice"
-      ; balance_change = "20000000"
-      ; increment_nonce = true
-      ; may_use_token = "no"
-      ; call_depth = Unsigned.UInt64.of_int 20
-      ; use_full_commitment = false
-      ; status = `Failed
-      ; token = `Token_id Amount_of.Token_id.default
-      }
-    ]
-end
-
-module Zkapp_command_info = struct
-  type t =
-    { fee : Unsigned_extended.UInt64.t
-    ; fee_payer : [ `Pk of string ]
-    ; valid_until : Unsigned_extended.UInt32.t option
-    ; nonce : Unsigned_extended.UInt32.t
-    ; token : [ `Token_id of string ]
-    ; sequence_no : int
-    ; memo : string option
-    ; hash : string
-    ; failure_reasons : string list
-    ; account_updates : Zkapp_account_update_info.t list
-    }
-  [@@deriving to_yojson]
-
-  module T (M : Monad_fail.S) = struct
-    module Op_build = Op.T (M)
-
-    let to_operations (t : t) =
-      Op_build.build
-        ~a_eq:
-          [%equal:
-            [ `Zkapp_fee_payer_dec
-            | `Zkapp_account_update of Zkapp_account_update_info.t ]]
-        ~plan:
-          ( { Op.label = `Zkapp_fee_payer_dec; related_to = None }
-          :: List.map t.account_updates ~f:(fun upd ->
-                 { Op.label = `Zkapp_account_update upd; related_to = None } )
-          )
-        ~f:(fun ~related_operations ~operation_identifier op ->
-          match op.label with
-          | `Zkapp_fee_payer_dec ->
-              M.return
-                { Operation.operation_identifier
-                ; related_operations
-                ; status=Some (Operation_statuses.name `Success)
-                ; account =
-                    Some
-                      (account_id t.fee_payer
-                         (`Token_id Amount_of.Token_id.default) )
-                ; _type = Operation_types.name `Zkapp_fee_payer_dec
-                ; amount =
-                    Some
-                      (Amount_of.(negated @@ token (`Token_id Amount_of.Token_id.default)
-                         t.fee ))
-                ; coin_change = None
-                ; metadata = None
-                }
-          | `Zkapp_account_update upd ->
-              let status = Some (Operation_statuses.name upd.status) in
-              let amount =
-                match String.chop_prefix ~prefix:"-" upd.balance_change with
-                | Some amount ->
-                  Some
-                      Amount_of.(
-                        negated @@ token upd.token
-                        @@ Unsigned_extended.UInt64.of_string amount)
-                | None ->
-                  Some
-                      Amount_of.(
-                        token upd.token
-                        @@ Unsigned_extended.UInt64.of_string upd.balance_change)
-              in
-              M.return
-                { Operation.operation_identifier
-                ; related_operations
-                ; status
-                ; account = Some (account_id upd.account upd.token)
-                ; _type = Operation_types.name `Zkapp_balance_update
-                ; amount
-                ; coin_change = None
-                ; metadata = None
-                } )
-  end
-
-  let dummies =
-    [ { fee_payer = `Pk "Eve"
-      ; fee = Unsigned.UInt64.of_int 20_000_000_000
-      ; token = `Token_id Amount_of.Token_id.default
-      ; sequence_no = 1
-      ; hash = "COMMAND_1"
-      ; failure_reasons = []
-      ; valid_until = Some (Unsigned.UInt32.of_int 10_000)
-      ; nonce = Unsigned.UInt32.of_int 3
-      ; memo = Some "Hey"
-      ; account_updates = Zkapp_account_update_info.dummies
-      }
-    ; { fee_payer = `Pk "Alice"
-      ; fee = Unsigned.UInt64.of_int 10_000_000_000
-      ; token = `Token_id Amount_of.Token_id.default
-      ; sequence_no = 2
-      ; hash = "COMMAND_2"
-      ; failure_reasons = [ "Failure1" ]
-      ; valid_until = Some (Unsigned.UInt32.of_int 20_000)
-      ; nonce = Unsigned.UInt32.of_int 2
-      ; memo = None
-      ; account_updates = Zkapp_account_update_info.dummies
-      }
-    ]
 end
 
 module Block_info = struct
@@ -426,14 +73,35 @@ end
 module Sql = struct
   module Block = struct
     module Extras = struct
-      let creator (creator, _) = `Pk creator
+      type t = { creator : string; winner : string } [@@deriving hlist]
 
-      let winner (_, winner) = `Pk winner
+      let creator { creator; _ } = `Pk creator
 
-      let typ = Caqti_type.(tup2 string string)
+      let winner { winner; _ } = `Pk winner
+
+      let typ =
+        Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+          Caqti_type.[ string; string ]
     end
 
-    let typ = Caqti_type.(tup3 int Archive_lib.Processor.Block.typ Extras.typ)
+    type t =
+      { block_id : int
+      ; raw_block : Archive_lib.Processor.Block.t
+      ; block_extras : Extras.t
+      }
+    [@@deriving hlist]
+
+    let typ =
+      Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+        Caqti_type.[ int; Archive_lib.Processor.Block.typ; Extras.typ ]
+
+    let block_fields ?prefix () =
+      let names = Archive_lib.Processor.Block.Fields.names in
+      let fields =
+        Option.value_map prefix ~default:names ~f:(fun prefix ->
+            List.map ~f:(fun n -> prefix ^ n) names )
+      in
+      String.concat ~sep:"," fields
 
     let query_count_canonical_at_height =
       Caqti_request.find Caqti_type.int64 Caqti_type.int64
@@ -443,32 +111,15 @@ module Sql = struct
         |sql}
 
     let query_height_canonical =
+      let c_fields = block_fields ~prefix:"c." () in
       Caqti_request.find_opt Caqti_type.int64 typ
         (* The archive database will only reconcile the canonical columns for
          * blocks older than k + epsilon
          *)
-        {|
+        [%string
+          {|
          SELECT c.id,
-                c.state_hash,
-                c.parent_id,
-                c.parent_hash,
-                c.creator_id,
-                c.block_winner_id,
-                c.last_vrf_output,
-                c.snarked_ledger_hash_id,
-                c.staking_epoch_data_id,
-                c.next_epoch_data_id,
-                c.min_window_density,
-                c.sub_window_densities,
-                c.total_currency,
-                c.ledger_hash,
-                c.height,
-                c.global_slot_since_hard_fork,
-                c.global_slot_since_genesis,
-                c.protocol_version_id,
-                c.proposed_protocol_version_id,
-                c.timestamp,
-                c.chain_status,
+                %{c_fields},
                 pk.value as creator,
                 bw.value as winner
          FROM blocks c
@@ -478,9 +129,12 @@ module Sql = struct
            ON bw.id = c.block_winner_id
          WHERE c.height = ?
            AND c.chain_status = 'canonical'
-        |}
+        |}]
 
     let query_height_pending =
+      let fields = block_fields () in
+      let b_fields = block_fields ~prefix:"b." () in
+      let c_fields = block_fields ~prefix:"c." () in
       Caqti_request.find_opt Caqti_type.int64 typ
         (* According to the clarification of the Rosetta spec here
          * https://community.rosetta-api.org/t/querying-block-by-just-its-index/84/3 ,
@@ -494,57 +148,18 @@ module Sql = struct
          * + epsilon)
          * requests since recursive queries stress PostgreSQL.
          *)
-        {|
+        [%string
+          {|
          WITH RECURSIVE chain AS (
-           (SELECT id,
-                   state_hash,
-                   parent_id,
-                   parent_hash,
-                   creator_id,
-                   block_winner_id,
-                   last_vrf_output,
-                   snarked_ledger_hash_id,
-                   staking_epoch_data_id,
-                   next_epoch_data_id,
-                   min_window_density,
-                   sub_window_densities,
-                   total_currency,
-                   ledger_hash,
-                   height,
-                   global_slot_since_hard_fork,
-                   global_slot_since_genesis,
-                   protocol_version_id,
-                   proposed_protocol_version_id,
-                   timestamp,
-                   chain_status
-           FROM blocks b
+           (SELECT id, %{fields}
+           FROM blocks
            WHERE height = (select MAX(height) from blocks)
            ORDER BY timestamp ASC, state_hash ASC
            LIMIT 1)
 
          UNION ALL
 
-           SELECT b.id,
-                  b.state_hash,
-                  b.parent_id,
-                  b.parent_hash,
-                  b.creator_id,
-                  b.block_winner_id,
-                  b.last_vrf_output,
-                  b.snarked_ledger_hash_id,
-                  b.staking_epoch_data_id,
-                  b.next_epoch_data_id,
-                  b.min_window_density,
-                  b.sub_window_densities,
-                  b.total_currency,
-                  b.ledger_hash,
-                  b.height,
-                  b.global_slot_since_hard_fork,
-                  b.global_slot_since_genesis,
-                  b.protocol_version_id,
-                  b.proposed_protocol_version_id,
-                  b.timestamp,
-                  b.chain_status
+           SELECT b.id, %{b_fields}
            FROM blocks b
            INNER JOIN chain
              ON b.id = chain.parent_id
@@ -552,26 +167,7 @@ module Sql = struct
              AND chain.chain_status <> 'canonical')
 
          SELECT c.id,
-                c.state_hash,
-                c.parent_id,
-                c.parent_hash,
-                c.creator_id,
-                c.block_winner_id,
-                c.last_vrf_output,
-                c.snarked_ledger_hash_id,
-                c.staking_epoch_data_id,
-                c.next_epoch_data_id,
-                c.min_window_density,
-                c.sub_window_densities,
-                c.total_currency,
-                c.ledger_hash,
-                c.height,
-                c.global_slot_since_hard_fork,
-                c.global_slot_since_genesis,
-                c.protocol_version_id,
-                c.proposed_protocol_version_id,
-                c.timestamp,
-                c.chain_status,
+                %{c_fields},
                 pk.value as creator,
                 bw.value as winner
          FROM chain c
@@ -580,32 +176,15 @@ module Sql = struct
          INNER JOIN public_keys bw
            ON bw.id = c.block_winner_id
          WHERE c.height = ?
-       |}
+       |}]
 
     let query_hash =
+      let b_fields = block_fields ~prefix:"b." () in
       Caqti_request.find_opt Caqti_type.string typ
-        {|
+        [%string
+          {|
          SELECT b.id,
-                b.state_hash,
-                b.parent_id,
-                b.parent_hash,
-                b.creator_id,
-                b.block_winner_id,
-                b.last_vrf_output,
-                b.snarked_ledger_hash_id,
-                b.staking_epoch_data_id,
-                b.next_epoch_data_id,
-                b.min_window_density,
-                b.sub_window_densities,
-                b.total_currency,
-                b.ledger_hash,
-                b.height,
-                b.global_slot_since_hard_fork,
-                b.global_slot_since_genesis,
-                b.protocol_version_id,
-                b.proposed_protocol_version_id,
-                b.timestamp,
-                b.chain_status,
+                %{b_fields},
                 pk.value as creator,
                 bw.value as winner
          FROM blocks b
@@ -614,34 +193,17 @@ module Sql = struct
          INNER JOIN public_keys bw
          ON bw.id = b.block_winner_id
          WHERE b.state_hash = ?
-        |}
+        |}]
 
     let query_both =
+      let b_fields = block_fields ~prefix:"b." () in
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         typ
-        {|
+        [%string
+          {|
          SELECT b.id,
-                b.state_hash,
-                b.parent_id,
-                b.parent_hash,
-                b.creator_id,
-                b.block_winner_id,
-                b.last_vrf_output,
-                b.snarked_ledger_hash_id,
-                b.staking_epoch_data_id,
-                b.next_epoch_data_id,
-                b.min_window_density,
-                b.sub_window_densities,
-                b.total_currency,
-                b.ledger_hash,
-                b.height,
-                b.global_slot_since_hard_fork,
-                b.global_slot_since_genesis,
-                b.protocol_version_id,
-                b.proposed_protocol_version_id,
-                b.timestamp,
-                b.chain_status,
+                %{b_fields},
                 pk.value as creator,
                 bw.value as winner
          FROM blocks b
@@ -651,32 +213,15 @@ module Sql = struct
            ON bw.id = b.block_winner_id
          WHERE b.state_hash = ?
            AND b.height = ?
-        |}
+        |}]
 
     let query_by_id =
+      let b_fields = block_fields ~prefix:"b." () in
       Caqti_request.find_opt Caqti_type.int typ
-        {|
+        [%string
+          {|
          SELECT b.id,
-                b.state_hash,
-                b.parent_id,
-                b.parent_hash,
-                b.creator_id,
-                b.block_winner_id,
-                b.last_vrf_output,
-                b.snarked_ledger_hash_id,
-                b.staking_epoch_data_id,
-                b.next_epoch_data_id,
-                b.min_window_density,
-                b.sub_window_densities,
-                b.total_currency,
-                b.ledger_hash,
-                b.height,
-                b.global_slot_since_hard_fork,
-                b.global_slot_since_genesis,
-                b.protocol_version_id,
-                b.proposed_protocol_version_id,
-                b.timestamp,
-                b.chain_status,
+                %{b_fields},
                 pk.value as creator,
                 bw.value as winner
          FROM blocks b
@@ -685,32 +230,15 @@ module Sql = struct
          INNER JOIN public_keys bw
            ON bw.id = b.block_winner_id
          WHERE b.id = ?
-        |}
+        |}]
 
     let query_best =
+      let b_fields = block_fields ~prefix:"b." () in
       Caqti_request.find_opt Caqti_type.unit typ
-        {|
+        [%string
+          {|
          SELECT b.id,
-                b.state_hash,
-                b.parent_id,
-                b.parent_hash,
-                b.creator_id,
-                b.block_winner_id,
-                b.last_vrf_output,
-                b.snarked_ledger_hash_id,
-                b.staking_epoch_data_id,
-                b.next_epoch_data_id,
-                b.min_window_density,
-                b.sub_window_densities,
-                b.total_currency,
-                b.ledger_hash,
-                b.height,
-                b.global_slot_since_hard_fork,
-                b.global_slot_since_genesis,
-                b.protocol_version_id,
-                b.proposed_protocol_version_id,
-                b.timestamp,
-                b.chain_status,
+                %{b_fields},
                 pk.value as creator,
                 bw.value as winner
          FROM blocks b
@@ -721,7 +249,7 @@ module Sql = struct
          WHERE b.height = (select MAX(b.height) from blocks b)
          ORDER BY timestamp ASC, state_hash ASC
          LIMIT 1
-        |}
+        |}]
 
     let run_by_id (module Conn : Caqti_async.CONNECTION) id =
       Conn.find_opt query_by_id id
@@ -773,19 +301,13 @@ module Sql = struct
         ; failure_reason : string option
         ; account_creation_fee_paid : int64 option
         }
-      [@@deriving hlist]
+      [@@deriving hlist, fields]
 
       let fee_payer t = `Pk t.fee_payer
 
       let source t = `Pk t.source
 
       let receiver t = `Pk t.receiver
-
-      let status t = t.status
-
-      let failure_reason t = t.failure_reason
-
-      let account_creation_fee_paid t = t.account_creation_fee_paid
 
       let typ =
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
@@ -804,20 +326,20 @@ module Sql = struct
         tup3 int Archive_lib.Processor.User_command.Signed_command.typ
           Extras.typ)
 
+    let fields =
+      String.concat ~sep:","
+      @@ List.map
+           ~f:(fun n -> "u." ^ n)
+           Archive_lib.Processor.User_command.Signed_command.Fields.names
+
     let query =
-      Caqti_request.collect Caqti_type.int typ
-        {|
+      Caqti_request.collect
+        Caqti_type.(tup2 int string)
+        typ
+        [%string
+          {|
          SELECT u.id,
-                u.command_type,
-                u.fee_payer_id,
-                u.source_id,
-                u.receiver_id,
-                u.nonce,
-                u.amount,
-                u.fee,
-                u.valid_until,
-                u.memo,
-                u.hash,
+                %{fields},
                 pk_payer.value as fee_payer,
                 pk_source.value as source,
                 pk_receiver.value as receiver,
@@ -833,7 +355,7 @@ module Sql = struct
            ON pk_source.id = u.source_id
          INNER JOIN public_keys pk_receiver
            ON pk_receiver.id = u.receiver_id
-         INNER JOIN account_identifiers ai_receiver
+         LEFT JOIN account_identifiers ai_receiver
            ON ai_receiver.public_key_id = pk_receiver.id
         /* Account creation fees are attributed to the first successful command in the
            block that mentions the account with the following LEFT JOIN */
@@ -842,49 +364,77 @@ module Sql = struct
            AND ai_receiver.id = ac.account_identifier_id
            AND buc.status = 'applied'
            AND buc.sequence_no =
-             (SELECT MIN(buc2.sequence_no)
-              FROM blocks_user_commands buc2
-              INNER JOIN user_commands uc2
-                ON buc2.user_command_id = uc2.id
-                AND uc2.receiver_id = u.receiver_iD
-                AND buc2.block_id = buc.block_id)
+             (SELECT LEAST(
+                (SELECT min(bic2.sequence_no)
+                 FROM blocks_internal_commands bic2
+                 INNER JOIN internal_commands ic2
+                    ON bic2.internal_command_id = ic2.id
+                 WHERE ic2.receiver_id = u.receiver_id
+                    AND bic2.block_id = buc.block_id
+                    AND bic2.status = 'applied'),
+                 (SELECT min(buc2.sequence_no)
+                  FROM blocks_user_commands buc2
+                  INNER JOIN user_commands uc2
+                    ON buc2.user_command_id = uc2.id
+                  WHERE uc2.receiver_id = u.receiver_id
+                    AND buc2.block_id = buc.block_id
+                    AND buc2.status = 'applied')))
+         LEFT JOIN tokens t
+           ON t.id = ai_receiver.token_id
          WHERE buc.block_id = ?
-        |}
+           AND (t.value = ? OR t.id IS NULL)
+        |}]
 
     let run (module Conn : Caqti_async.CONNECTION) id =
-      Conn.collect_list query id
+      Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
   end
 
   module Internal_commands = struct
-    module Extras = struct
-      let receiver (_, x, _, _) = `Pk x
+    module Cte = struct
+      type t =
+        { internal_command_id : int
+        ; raw_internal_command : Archive_lib.Processor.Internal_command.t
+        ; receiver_account_creation_fee_paid : int64 option
+        ; receiver : string
+        ; sequence_no : int
+        ; secondary_sequence_no : int
+        }
+      [@@deriving hlist, fields]
 
-      let receiver_account_creation_fee_paid (fee, _, _, _) = fee
+      let fields' =
+        String.concat ~sep:","
+        @@ List.map
+             ~f:(fun n -> "i." ^ n)
+             Archive_lib.Processor.Internal_command.Fields.names
 
-      let sequence_no (_, _, seq_no, _) = seq_no
+      let fields =
+        String.concat ~sep:","
+          [ "i.id"
+          ; fields'
+          ; "ac.creation_fee"
+          ; "pk.value as receiver"
+          ; "bic.sequence_no"
+          ; "bic.secondary_sequence_no"
+          ]
 
-      let secondary_sequence_no (_, _, _, secondary_seq_no) = secondary_seq_no
+      let receiver t = `Pk t.receiver
 
-      let typ = Caqti_type.(tup4 (option int64) string int int)
-    end
+      let typ =
+        Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+          Caqti_type.
+            [ int
+            ; Archive_lib.Processor.Internal_command.typ
+            ; option int64
+            ; string
+            ; int
+            ; int
+            ]
 
-    let typ =
-      Caqti_type.(
-        tup3 int Archive_lib.Processor.Internal_command.typ Extras.typ)
-
-    let query =
-      Caqti_request.collect Caqti_type.int typ
-        {|
+      let query =
+        [%string
+          {|
          SELECT DISTINCT ON (i.hash,i.command_type,bic.sequence_no,bic.secondary_sequence_no)
-           i.id,
-           i.command_type,
-           i.receiver_id,
-           i.fee,
-           i.hash,
-           ac.creation_fee,
-           pk.value as receiver,
-           bic.sequence_no,
-           bic.secondary_sequence_no
+           %{fields}
          FROM internal_commands i
          INNER JOIN blocks_internal_commands bic
            ON bic.internal_command_id = i.id
@@ -894,19 +444,108 @@ module Sql = struct
            ON ai.public_key_id = receiver_id
          LEFT JOIN accounts_created ac
            ON ac.account_identifier_id = ai.id
+           AND ac.block_id = bic.block_id
+           AND bic.sequence_no =
+               (SELECT LEAST(
+                   (SELECT min(bic2.sequence_no)
+                    FROM blocks_internal_commands bic2
+                    INNER JOIN internal_commands ic2
+                       ON bic2.internal_command_id = ic2.id
+                    WHERE ic2.receiver_id = i.receiver_id
+                       AND bic2.block_id = bic.block_id
+                       AND bic2.status = 'applied'),
+                    (SELECT min(buc2.sequence_no)
+                     FROM blocks_user_commands buc2
+                     INNER JOIN user_commands uc2
+                       ON buc2.user_command_id = uc2.id
+                     WHERE uc2.receiver_id = i.receiver_id
+                       AND buc2.block_id = bic.block_id
+                       AND buc2.status = 'applied')))
+         INNER JOIN tokens t
+           ON t.id = ai.token_id
          WHERE bic.block_id = ?
-      |}
+          AND t.value = ?
+      |}]
+
+      let to_info ~coinbase_receiver ({ raw_internal_command = ic; _ } as t) =
+        let open Result.Let_syntax in
+        let%map kind =
+          match ic.Archive_lib.Processor.Internal_command.command_type with
+          | "fee_transfer" ->
+              return `Fee_transfer
+          | "coinbase" ->
+              return `Coinbase
+          | "fee_transfer_via_coinbase" ->
+              return `Fee_transfer_via_coinbase
+          | other ->
+              Result.fail
+                (Errors.create
+                   ~context:
+                     (sprintf
+                        "The archive database is storing internal commands \
+                         with %s; this is neither fee_transfer nor coinbase \
+                         not fee_transfer_via_coinbase. Please report a bug!"
+                        other )
+                   `Invariant_violation )
+        in
+        (* internal commands always use the default token *)
+        let token_id = Mina_base.Token_id.(to_string default) in
+        { Internal_command_info.kind
+        ; receiver = receiver t
+        ; receiver_account_creation_fee_paid =
+            Option.map
+              (receiver_account_creation_fee_paid t)
+              ~f:Unsigned.UInt64.of_int64
+        ; fee = Unsigned.UInt64.of_string ic.fee
+        ; token = `Token_id token_id
+        ; sequence_no = sequence_no t
+        ; secondary_sequence_no = secondary_sequence_no t
+        ; hash = ic.hash
+        ; coinbase_receiver
+        }
+    end
+
+    type t = { command : Cte.t; coinbase_receiver : string option }
+    [@@deriving hlist]
+
+    let fields =
+      String.concat ~sep:","
+        [ "ic.*"; "coinbase_receiver_pk.value as coinbase_receiver" ]
+
+    let coinbase_receiver t =
+      Option.map t.coinbase_receiver ~f:(fun pk -> `Pk pk)
+
+    let typ =
+      Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+        Caqti_type.[ Cte.typ; option string ]
+
+    let query =
+      [%string
+        {sql|
+          WITH internal_commands_cte AS (
+            %{Cte.query}
+          )
+          SELECT %{fields}
+          FROM internal_commands_cte ic
+          LEFT JOIN internal_commands_cte ic_coinbase_receiver
+            ON ic.command_type = 'fee_transfer_via_coinbase' AND ic_coinbase_receiver.command_type = 'coinbase'
+          LEFT JOIN public_keys coinbase_receiver_pk
+            ON ic_coinbase_receiver.receiver_id = coinbase_receiver_pk.id
+    |sql}]
 
     let run (module Conn : Caqti_async.CONNECTION) id =
-      Conn.collect_list query id
+      Conn.collect_list
+        (Caqti_request.collect Caqti_type.(tup2 int string) typ query)
+        (id, Mina_base.Token_id.(to_string default))
+
+    let to_info t =
+      Cte.to_info ~coinbase_receiver:(coinbase_receiver t) t.command
   end
 
   module Zkapp_commands = struct
     module Extras = struct
       type t =
-        { memo : string
-        ; hash : string
-        ; fee_payer : string
+        { fee_payer : string
         ; fee : string
         ; valid_until : int64 option
         ; nonce : int64
@@ -914,22 +553,27 @@ module Sql = struct
         ; status : string
         ; failure_reasons : string array option
         }
-      [@@deriving hlist]
+      [@@deriving hlist, fields]
 
-      let memo t = t.memo
-
-      let hash t = t.hash
+      let fields =
+        String.concat ~sep:","
+          [ "pk_fee_payer.value as fee_payer"
+          ; "zfpb.fee"
+          ; "zfpb.valid_until"
+          ; "zfpb.nonce"
+          ; "bzc.sequence_no"
+          ; "bzc.status"
+          ; "array(SELECT unnest(zauf.failures) FROM \
+             zkapp_account_update_failures zauf WHERE zauf.id = ANY \
+             (bzc.failure_reasons_ids))"
+          ]
 
       let fee_payer t = `Pk t.fee_payer
-
-      let fee t = t.fee
 
       let typ =
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
           Caqti_type.
             [ string
-            ; string
-            ; string
             ; string
             ; option int64
             ; int64
@@ -939,23 +583,74 @@ module Sql = struct
             ]
     end
 
-    let typ = Caqti_type.(tup2 int Extras.typ)
+    module Archive_zkapp_command = struct
+      type t = { memo : string; hash : string } [@@deriving fields, hlist]
 
-    let query =
-      Caqti_request.collect Caqti_type.int typ
+      let fields = String.concat ~sep:"," [ "zc.memo"; "zc.hash" ]
+
+      let typ =
+        Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+          Caqti_type.[ string; string ]
+    end
+
+    module Zkapp_account_update = struct
+      type t =
+        { body : Archive_lib.Processor.Zkapp_account_update_body.t
+        ; account : string
+        ; token : string
+        }
+      [@@deriving hlist]
+
+      let fields =
+        String.concat ~sep:","
+        @@ List.map Archive_lib.Processor.Zkapp_account_update_body.Fields.names
+             ~f:(fun n -> "zaub." ^ n)
+        @ [ "pk_update_body.value as account"
+          ; "token_update_body.value as token"
+          ]
+
+      let account t = `Pk t.account
+
+      let token t = `Token_id t.token
+
+      let typ =
+        Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+          Caqti_type.
+            [ Archive_lib.Processor.Zkapp_account_update_body.typ
+            ; string
+            ; string
+            ]
+    end
+
+    type t =
+      { zkapp_command_id : int
+      ; zkapp_command : Archive_zkapp_command.t
+      ; zkapp_command_extras : Extras.t
+      ; zkapp_account_update : Zkapp_account_update.t option
+      }
+    [@@deriving hlist]
+
+    let fields =
+      String.concat ~sep:","
+        [ "zc.id"
+        ; Archive_zkapp_command.fields
+        ; Extras.fields
+        ; Zkapp_account_update.fields
+        ]
+
+    let typ =
+      Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+        Caqti_type.
+          [ int
+          ; Archive_zkapp_command.typ
+          ; Extras.typ
+          ; option Zkapp_account_update.typ
+          ]
+
+    let query_string =
+      [%string
         {| 
-         SELECT zc.id,
-                zc.memo,
-                zc.hash,
-                pk_fee_payer.value as fee_payer,
-                zfpb.fee,
-                zfpb.valid_until,
-                zfpb.nonce,
-                bzc.sequence_no,
-                bzc.status,
-                array(SELECT unnest(zauf.failures)
-                      FROM zkapp_account_update_failures zauf
-                      WHERE zauf.id = ANY (bzc.failure_reasons_ids))
+         SELECT %{fields}
          FROM blocks_zkapp_commands bzc
          INNER JOIN zkapp_commands zc
            ON zc.id = bzc.zkapp_command_id
@@ -963,112 +658,175 @@ module Sql = struct
            ON zc.zkapp_fee_payer_body_id = zfpb.id
          INNER JOIN public_keys pk_fee_payer
            ON zfpb.public_key_id = pk_fee_payer.id
+         INNER JOIN blocks b
+           ON bzc.block_id = b.id
+         LEFT JOIN zkapp_account_update zau
+           ON zau.id = ANY (zc.zkapp_account_updates_ids)
+         LEFT JOIN zkapp_account_update_body zaub
+           ON zaub.id = zau.body_id
+         LEFT JOIN account_identifiers ai_update_body
+           ON zaub.account_identifier_id = ai_update_body.id
+         LEFT JOIN public_keys pk_update_body
+           ON ai_update_body.public_key_id = pk_update_body.id
+         LEFT JOIN tokens token_update_body
+           ON token_update_body.id = ai_update_body.token_id
          WHERE bzc.block_id = ?
-      |}
-
-    let run (module Conn : Caqti_async.CONNECTION) id =
-      Conn.collect_list query id
-  end
-
-  module Zkapp_account_update = struct
-    module Extras = struct
-      type t = { account : string; status : string } [@@deriving hlist]
-
-      let account t = `Pk t.account
-
-      let typ =
-        Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-          Caqti_type.[ string; string ]
-    end
-
-    let typ =
-      Caqti_type.(
-        tup2 Archive_lib.Processor.Zkapp_account_update_body.typ Extras.typ)
+          AND (token_update_body.value = ? OR token_update_body.id IS NULL)
+         ORDER BY zc.id, bzc.sequence_no
+      |}]
 
     let query =
-      Caqti_request.collect Caqti_type.int typ
-        {|
-         SELECT zaub.account_identifier_id,
-                zaub.id,
-                zaub.balance_change,
-                zaub.increment_nonce,
-                zaub.events_id,
-                zaub.actions_id,
-                zaub.call_data_id,
-                zaub.call_depth,
-                zaub.zkapp_network_precondition_id,
-                zaub.zkapp_account_precondition_id,
-                zaub.zkapp_valid_while_precondition_id,
-                zaub.use_full_commitment,
-                zaub.implicit_account_creation_fee,
-                zaub.may_use_token,
-                zaub.authorization_kind,
-                zaub.verification_key_hash_id,
-                pk.value as account,
-                bzc.status
-         FROM zkapp_commands zc
-         INNER JOIN blocks_zkapp_commands bzc
-           ON bzc.zkapp_command_id = zc.id
-         INNER JOIN zkapp_account_update zau
-           ON zau.id = ANY(zc.zkapp_account_updates_ids)
-         INNER JOIN zkapp_account_update_body zaub
-           ON zaub.id = zau.body_id
-         INNER JOIN account_identifiers ai
-           ON ai.id = zaub.account_identifier_id
-         INNER JOIN public_keys pk
-           ON ai.public_key_id = pk.id
-         WHERE zc.id = ?
-    |}
+      Caqti_request.collect Caqti_type.(tup2 int string) typ query_string
 
     let run (module Conn : Caqti_async.CONNECTION) id =
-      Conn.collect_list query id
+      Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
+
+    module Make_common (M : sig
+      type command
+
+      type account_update_info
+
+      type info
+
+      val is_same_command : command -> command -> bool
+
+      val to_account_update_info : command -> account_update_info option
+
+      val account_updates_and_command_to_info :
+        account_update_info list -> command -> info
+    end) =
+    struct
+      let to_command_info' command =
+        let rec f pending_account_updates = function
+          | command' :: t when M.is_same_command command' command ->
+              let account_update_info' = M.to_account_update_info command' in
+              let pending_account_updates' =
+                Option.value_map account_update_info'
+                  ~default:pending_account_updates
+                  ~f:(fun account_update_info ->
+                    account_update_info :: pending_account_updates )
+              in
+              f pending_account_updates' t
+          | ([] | _ :: _) as t ->
+              ( M.account_updates_and_command_to_info
+                  (List.rev pending_account_updates)
+                  command
+              , t )
+        in
+        f
+        @@ Option.value_map ~default:[] ~f:List.return
+        @@ M.to_account_update_info command
+
+      let to_command_infos =
+        let rec f acc = function
+          | [] ->
+              List.rev acc
+          | command :: t ->
+              let command_info, t' = to_command_info' command t in
+              f (command_info :: acc) t'
+        in
+        f []
+    end
+
+    let to_account_update_info
+        { zkapp_command_extras = cmd_extras; zkapp_account_update; _ } =
+      Option.map zkapp_account_update ~f:(fun upd ->
+          let status =
+            match cmd_extras.Extras.status with
+            | "applied" ->
+                `Success
+            | _ ->
+                `Failed
+          in
+          let body = upd.body in
+          { Zkapp_account_update_info.authorization_kind =
+              body
+                .Archive_lib.Processor.Zkapp_account_update_body
+                 .authorization_kind
+          ; account = Zkapp_account_update.account upd
+          ; balance_change = body.balance_change
+          ; increment_nonce = body.increment_nonce
+          ; may_use_token = body.may_use_token
+          ; call_depth = Unsigned.UInt64.of_int body.call_depth
+          ; use_full_commitment = body.use_full_commitment
+          ; status
+          ; token = Zkapp_account_update.token upd
+          } )
+
+    let account_updates_and_command_to_info account_updates
+        { zkapp_command = cmd; zkapp_command_extras = cmd_extras; _ } =
+      { Commands_common.Zkapp_command_info.fee =
+          Unsigned.UInt64.of_string @@ cmd_extras.Extras.fee
+      ; fee_payer = Extras.fee_payer cmd_extras
+      ; valid_until =
+          Option.map ~f:Unsigned.UInt32.of_int64 cmd_extras.valid_until
+      ; nonce = Unsigned.UInt32.of_int64 cmd_extras.nonce
+      ; sequence_no = cmd_extras.sequence_no
+      ; memo = (if String.equal cmd.memo "" then None else Some cmd.memo)
+      ; hash = cmd.hash
+      ; failure_reasons =
+          Option.value_map ~default:[] ~f:Array.to_list
+            cmd_extras.failure_reasons
+      ; account_updates
+      }
+
+    include Make_common (struct
+      type command = t
+
+      type account_update_info = Zkapp_account_update_info.t
+
+      type info = Zkapp_command_info.t
+
+      let is_same_command t_1 t_2 =
+        t_1.zkapp_command_id = t_2.zkapp_command_id
+        && t_1.zkapp_command_extras.sequence_no
+           = t_2.zkapp_command_extras.sequence_no
+
+      let to_account_update_info = to_account_update_info
+
+      let account_updates_and_command_to_info =
+        account_updates_and_command_to_info
+    end)
   end
 
   let run (module Conn : Caqti_async.CONNECTION) input =
-    let module M = struct
-      include Deferred.Result
+    let module Result = struct
+      include Result
 
       module List = struct
-        let map ~f =
-          List.fold ~init:(return []) ~f:(fun acc x ->
-              let open Let_syntax in
-              let%bind xs = acc in
-              let%map y = f x in
-              y :: xs )
+        let map ~f l =
+          map ~f:List.rev
+          @@ List.fold_result l ~init:[] ~f:(fun acc x ->
+                 f x >>| fun x -> x :: acc )
       end
     end in
-    let open M.Let_syntax in
+    let open Deferred.Result.Let_syntax in
     let%bind block_id, raw_block, block_extras =
       match%bind
         Block.run (module Conn) input
         |> Errors.Lift.sql ~context:"Finding block"
       with
       | None ->
-          M.fail (Errors.create @@ `Block_missing (Block_query.to_string input))
-      | Some (block_id, raw_block, block_extras) ->
-          M.return (block_id, raw_block, block_extras)
+          Deferred.Result.fail
+            (Errors.create @@ `Block_missing (Block_query.to_string input))
+      | Some { block_id; raw_block; block_extras } ->
+          return (block_id, raw_block, block_extras)
     in
-    let%bind parent_id =
-      Option.value_map raw_block.parent_id
-        ~default:
-          (M.fail
-             ( Errors.create
-             @@ `Block_missing
-                  (sprintf "parent block of: %s" (Block_query.to_string input))
-             ) )
-        ~f:M.return
-    in
-    let%bind raw_parent_block, _parent_block_extras =
-      match%bind
-        Block.run_by_id (module Conn) parent_id
-        |> Errors.Lift.sql ~context:"Finding parent block"
-      with
-      | None ->
-          M.fail
-            ( Errors.create ~context:"Parent block"
-            @@ `Block_missing (sprintf "parent_id = %d" parent_id) )
-      | Some (_, raw_parent_block, parent_block_extras) ->
-          M.return (raw_parent_block, parent_block_extras)
+    let%bind raw_parent_block =
+      (* if parent_id is null, this means this is the chain genesis block and
+         the block is its own parent *)
+      Option.value_map raw_block.parent_id ~default:(return raw_block)
+        ~f:(fun parent_id ->
+          match%bind
+            Block.run_by_id (module Conn) parent_id
+            |> Errors.Lift.sql ~context:"Finding parent block"
+          with
+          | None ->
+              Deferred.Result.fail
+                ( Errors.create ~context:"Parent block"
+                @@ `Block_missing (sprintf "parent_id = %d" parent_id) )
+          | Some { raw_block = raw_parent_block; _ } ->
+              return raw_parent_block )
     in
     let%bind raw_user_commands =
       User_commands.run (module Conn) block_id
@@ -1083,148 +841,73 @@ module Sql = struct
       |> Errors.Lift.sql ~context:"Finding zkapp commands within block"
     in
     let%bind internal_commands =
-      M.List.map raw_internal_commands ~f:(fun (_, ic, extras) ->
-          let%map kind =
-            match ic.Archive_lib.Processor.Internal_command.command_type with
-            | "fee_transfer" ->
-                M.return `Fee_transfer
-            | "coinbase" ->
-                M.return `Coinbase
-            | "fee_transfer_via_coinbase" ->
-                M.return `Fee_transfer_via_coinbase
-            | other ->
-                M.fail
-                  (Errors.create
-                     ~context:
-                       (sprintf
-                          "The archive database is storing internal commands \
-                           with %s; this is neither fee_transfer nor coinbase \
-                           not fee_transfer_via_coinbase. Please report a bug!"
-                          other )
-                     `Invariant_violation )
-          in
-          (* internal commands always use the default token *)
-          let token_id = Mina_base.Token_id.(to_string default) in
-          { Internal_command_info.kind
-          ; receiver = Internal_commands.Extras.receiver extras
-          ; receiver_account_creation_fee_paid =
-              Option.map
-                (Internal_commands.Extras.receiver_account_creation_fee_paid
-                   extras )
-                ~f:Unsigned.UInt64.of_int64
-          ; fee = Unsigned.UInt64.of_string ic.fee
-          ; token = `Token_id token_id
-          ; sequence_no = Internal_commands.Extras.sequence_no extras
-          ; secondary_sequence_no =
-              Internal_commands.Extras.secondary_sequence_no extras
-          ; hash = ic.hash
-          } )
+      Deferred.return
+      @@ Result.List.map raw_internal_commands ~f:Internal_commands.to_info
     in
-    let%bind user_commands =
-      M.List.map raw_user_commands ~f:(fun (_, uc, extras) ->
-          let open M.Let_syntax in
-          let%bind kind =
-            match
-              uc.Archive_lib.Processor.User_command.Signed_command.command_type
-            with
-            | "payment" ->
-                M.return `Payment
-            | "delegation" ->
-                M.return `Delegation
-            | other ->
-                M.fail
-                  (Errors.create
-                     ~context:
-                       (sprintf
-                          "The archive database is storing user commands with \
-                           %s; this is not a known type. Please report a bug!"
-                          other )
-                     `Invariant_violation )
-          in
-          (* TODO: do we want to mention tokens at all here? *)
-          let fee_token = Mina_base.Token_id.(to_string default) in
-          let token = Mina_base.Token_id.(to_string default) in
-          let%map failure_status =
-            match User_commands.Extras.failure_reason extras with
-            | None -> (
-                match User_commands.Extras.account_creation_fee_paid extras with
-                | None ->
-                    M.return
-                    @@ `Applied
-                         User_command_info.Account_creation_fees_paid.By_no_one
-                | Some receiver ->
-                    M.return
-                    @@ `Applied
-                         (User_command_info.Account_creation_fees_paid
-                          .By_receiver
-                            (Unsigned.UInt64.of_int64 receiver) ) )
-            | Some status ->
-                M.return @@ `Failed status
-          in
-          { User_command_info.kind
-          ; fee_payer = User_commands.Extras.fee_payer extras
-          ; source = User_commands.Extras.source extras
-          ; receiver = User_commands.Extras.receiver extras
-          ; fee_token = `Token_id fee_token
-          ; token = `Token_id token
-          ; nonce = Unsigned.UInt32.of_int64 uc.nonce
-          ; amount = Option.map ~f:Unsigned.UInt64.of_string uc.amount
-          ; fee = Unsigned.UInt64.of_string uc.fee
-          ; hash = uc.hash
-          ; failure_status = Some failure_status
-          ; valid_until = Option.map ~f:Unsigned.UInt32.of_int64 uc.valid_until
-          ; memo = (if String.equal uc.memo "" then None else Some uc.memo)
-          } )
+    let%map user_commands =
+      Deferred.return
+      @@ Result.List.map raw_user_commands ~f:(fun (_, uc, extras) ->
+             let open Result.Let_syntax in
+             let%bind kind =
+               match
+                 uc
+                   .Archive_lib.Processor.User_command.Signed_command
+                    .command_type
+               with
+               | "payment" ->
+                   return `Payment
+               | "delegation" ->
+                   return `Delegation
+               | other ->
+                   Result.fail
+                     (Errors.create
+                        ~context:
+                          (sprintf
+                             "The archive database is storing user commands \
+                              with %s; this is not a known type. Please report \
+                              a bug!"
+                             other )
+                        `Invariant_violation )
+             in
+             let fee_token = Mina_base.Token_id.(to_string default) in
+             let token = Mina_base.Token_id.(to_string default) in
+             let%map failure_status =
+               match User_commands.Extras.failure_reason extras with
+               | None -> (
+                   match
+                     User_commands.Extras.account_creation_fee_paid extras
+                   with
+                   | None ->
+                       return
+                       @@ `Applied
+                            User_command_info.Account_creation_fees_paid
+                            .By_no_one
+                   | Some receiver ->
+                       return
+                       @@ `Applied
+                            (User_command_info.Account_creation_fees_paid
+                             .By_receiver
+                               (Unsigned.UInt64.of_int64 receiver) ) )
+               | Some status ->
+                   return @@ `Failed status
+             in
+             { User_command_info.kind
+             ; fee_payer = User_commands.Extras.fee_payer extras
+             ; source = User_commands.Extras.source extras
+             ; receiver = User_commands.Extras.receiver extras
+             ; fee_token = `Token_id fee_token
+             ; token = `Token_id token
+             ; nonce = Unsigned.UInt32.of_int64 uc.nonce
+             ; amount = Option.map ~f:Unsigned.UInt64.of_string uc.amount
+             ; fee = Unsigned.UInt64.of_string uc.fee
+             ; hash = uc.hash
+             ; failure_status = Some failure_status
+             ; valid_until =
+                 Option.map ~f:Unsigned.UInt32.of_int64 uc.valid_until
+             ; memo = (if String.equal uc.memo "" then None else Some uc.memo)
+             } )
     in
-    let%map zkapp_commands =
-      M.List.map raw_zkapp_commands ~f:(fun (cmd_id, cmd) ->
-          (* TODO: check if this holds *)
-          let token = Mina_base.Token_id.(to_string default) in
-          let%bind raw_zkapp_account_update =
-            Zkapp_account_update.run (module Conn) cmd_id
-            |> Errors.Lift.sql
-                 ~context:"Finding zkapp account updates within command"
-          in
-          let%map account_updates =
-            M.List.map raw_zkapp_account_update ~f:(fun (upd, extras) ->
-                (* TODO: check if this holds *)
-                let token = Mina_base.Token_id.(to_string default) in
-                let status =
-                  match extras.Zkapp_account_update.Extras.status with
-                  | "applied" ->
-                      `Success
-                  | _ ->
-                      `Failed
-                in
-                M.return
-                  { Zkapp_account_update_info.authorization_kind =
-                      upd
-                        .Archive_lib.Processor.Zkapp_account_update_body
-                         .authorization_kind
-                  ; account = Zkapp_account_update.Extras.account extras
-                  ; balance_change = upd.balance_change
-                  ; increment_nonce = upd.increment_nonce
-                  ; may_use_token = upd.may_use_token
-                  ; call_depth = Unsigned.UInt64.of_int upd.call_depth
-                  ; use_full_commitment = upd.use_full_commitment
-                  ; status
-                  ; token = `Token_id token
-                  } )
-          in
-          { Zkapp_command_info.fee =
-              Unsigned.UInt64.of_string @@ Zkapp_commands.Extras.fee cmd
-          ; fee_payer = Zkapp_commands.Extras.fee_payer cmd
-          ; valid_until = Option.map ~f:Unsigned.UInt32.of_int64 cmd.valid_until
-          ; nonce = Unsigned.UInt32.of_int64 cmd.nonce
-          ; token = `Token_id token
-          ; sequence_no = cmd.sequence_no
-          ; memo = (if String.equal cmd.memo "" then None else Some cmd.memo)
-          ; hash = cmd.hash
-          ; failure_reasons =
-              Option.value_map ~default:[] ~f:Array.to_list cmd.failure_reasons
-          ; account_updates
-          } )
-    in
+    let zkapp_commands = Zkapp_commands.to_command_infos raw_zkapp_commands in
     { Block_info.block_identifier =
         { Block_identifier.index = raw_block.height
         ; hash = raw_block.state_hash
@@ -1247,8 +930,7 @@ module Specific = struct
     (* All side-effects go in the env so we can mock them out later *)
     module T (M : Monad_fail.S) = struct
       type 'gql t =
-        { gql : unit -> ('gql, Errors.t) M.t
-        ; logger : Logger.t
+        { logger : Logger.t
         ; db_block : Block_query.t -> (Block_info.t, Errors.t) M.t
         ; validate_network_choice :
                network_identifier:Network_identifier.t
@@ -1264,17 +946,9 @@ module Specific = struct
     module Mock = T (Result)
 
     let real :
-           logger:Logger.t
-        -> db:(module Caqti_async.CONNECTION)
-        -> graphql_uri:Uri.t
-        -> 'gql Real.t =
-     fun ~logger ~db ~graphql_uri ->
-      { gql =
-          ( Memoize.build
-          @@ fun ~graphql_uri () ->
-          Graphql.query (Get_coinbase_and_genesis.make ()) graphql_uri )
-            ~graphql_uri
-      ; logger
+        logger:Logger.t -> db:(module Caqti_async.CONNECTION) -> 'gql Real.t =
+     fun ~logger ~db ->
+      { logger
       ; db_block =
           (fun query ->
             let (module Conn : Caqti_async.CONNECTION) = db in
@@ -1284,17 +958,7 @@ module Specific = struct
 
     let mock : logger:Logger.t -> 'gql Mock.t =
      fun ~logger ->
-      { gql =
-          (fun () ->
-            Result.return
-            @@ object
-                 method genesisBlock =
-                   object
-                     method stateHash = "STATE_HASH_GENESIS"
-                   end
-               end )
-          (* TODO: Add variants to cover every branch *)
-      ; logger
+      { logger
       ; db_block = (fun _query -> Result.return @@ Block_info.dummy)
       ; validate_network_choice = Network.Validate_choice.Mock.succeed
       }
@@ -1314,89 +978,40 @@ module Specific = struct
       let open M.Let_syntax in
       let logger = env.logger in
       let%bind query = Query.of_partial_identifier req.block_identifier in
-      let%bind res = env.gql () in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~graphql_uri
       in
-      let genesisBlock = res.Get_coinbase_and_genesis.genesisBlock in
-      let block_height =
-        genesisBlock.protocolState.consensusState.blockHeight
-        |> Unsigned.UInt32.to_int64
-      in
-      let%bind block_info =
-        if Query.is_genesis ~block_height ~hash:genesisBlock.stateHash query
-        then
-          let genesis_block_identifier =
-            { Block_identifier.index = block_height
-            ; hash = genesisBlock.stateHash
-            }
-          in
-          M.return
-            { Block_info.block_identifier =
-                genesis_block_identifier
-                (* parent_block_identifier for genesis block should be the same as block identifier as described https://www.rosetta-api.org/docs/common_mistakes.html.correct-example *)
-            ; parent_block_identifier = genesis_block_identifier
-            ; creator = `Pk genesisBlock.creatorAccount.publicKey
-            ; winner = `Pk genesisBlock.winnerAccount.publicKey
-            ; timestamp =
-                Int64.of_string genesisBlock.protocolState.blockchainState.date
-            ; internal_info = []
-            ; user_commands = []
-            ; zkapp_commands = []
-            }
-        else env.db_block query
-      in
-      let coinbase_receiver =
-        List.find block_info.internal_info ~f:(fun info ->
-            Internal_command_info.Kind.equal info.Internal_command_info.kind
-              `Coinbase )
-        |> Option.map ~f:(fun cmd -> cmd.Internal_command_info.receiver)
-      in
+      let%bind block_info = env.db_block query in
       let%bind internal_transactions =
         List.fold block_info.internal_info ~init:(M.return [])
           ~f:(fun macc info ->
             let%bind acc = macc in
-            let%map operations =
-              Internal_command_info_ops.to_operations ~coinbase_receiver info
-            in
             [%log debug]
               ~metadata:[ ("info", Internal_command_info.to_yojson info) ]
               "Block internal received $info" ;
-            { Transaction.transaction_identifier =
-                (* prepend the sequence number, secondary sequence number and kind to the transaction hash
-                   duplicate hashes are possible in the archive database, with differing
-                   "type" fields, which correspond to the "kind" here
-                *)
-                { Transaction_identifier.hash =
-                    sprintf "%s:%s:%s:%s"
-                      (Internal_command_info.Kind.to_string info.kind)
-                      (Int.to_string info.sequence_no)
-                      (Int.to_string info.secondary_sequence_no)
-                      info.hash
-                }
-            ; operations
-            ; metadata = None
-            ; related_transactions = []
-            }
-            :: acc )
+            let%map transaction =
+              Internal_command_info_ops.to_transaction info
+            in
+            transaction :: acc )
         |> M.map ~f:List.rev
+      in
+      let user_transactions =
+        List.map block_info.user_commands ~f:(fun info ->
+            [%log debug]
+              ~metadata:[ ("info", User_command_info.to_yojson info) ]
+              "Block user received $info" ;
+            User_command_info.to_transaction info )
       in
       let%map zkapp_command_transactions =
         List.fold block_info.zkapp_commands ~init:(M.return [])
           ~f:(fun acc cmd ->
             let%bind acc = acc in
-            let%map operations = Zkapp_command_info_ops.to_operations cmd in
             [%log debug]
               ~metadata:[ ("info", Zkapp_command_info.to_yojson cmd) ]
               "Block zkapp received $info" ;
-            { Transaction.transaction_identifier =
-                { Transaction_identifier.hash = cmd.hash }
-            ; operations
-            ; metadata = None
-            ; related_transactions = []
-            }
-            :: acc )
+            let%map transaction = Zkapp_command_info_ops.to_transaction cmd in
+            transaction :: acc )
         |> M.map ~f:List.rev
       in
       { Block_response.block =
@@ -1405,27 +1020,7 @@ module Specific = struct
             ; parent_block_identifier = block_info.parent_block_identifier
             ; timestamp = block_info.timestamp
             ; transactions =
-                internal_transactions
-                @ List.map block_info.user_commands ~f:(fun info ->
-                      [%log debug]
-                        ~metadata:[ ("info", User_command_info.to_yojson info) ]
-                        "Block user received $info" ;
-                      { Transaction.transaction_identifier =
-                          { Transaction_identifier.hash = info.hash }
-                      ; operations = User_command_info.to_operations' info
-                      ; metadata =
-                          Option.bind info.memo ~f:(fun base58_check ->
-                              try
-                                let memo =
-                                  let open Mina_base.Signed_command_memo in
-                                  base58_check |> of_base58_check_exn
-                                  |> to_string_hum
-                                in
-                                if String.is_empty memo then None
-                                else Some (`Assoc [ ("memo", `String memo) ])
-                              with _ -> None )
-                      ; related_transactions = []
-                      } )
+                internal_transactions @ user_transactions
                 @ zkapp_command_transactions
             ; metadata = Some (Block_info.creator_metadata block_info)
             }
@@ -1468,7 +1063,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
           in
           let%map res =
             Specific.Real.handle ~graphql_uri
-              ~env:(Specific.Env.real ~logger ~db ~graphql_uri)
+              ~env:(Specific.Env.real ~logger ~db)
               req
             |> Errors.Lift.wrap
           in

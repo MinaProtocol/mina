@@ -1271,7 +1271,9 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                       permissions =
                         Set_or_keep.Set
                           { perm with
-                            set_verification_key = Auth_required.from ~auth_tag
+                            set_verification_key =
+                              ( Auth_required.from ~auth_tag
+                              , Mina_numbers.Txn_version.current )
                           }
                     }
                 | `Zkapp_uri ->
@@ -1741,6 +1743,8 @@ let%test_module _ =
     open Signature_lib
 
     let `VK vk, `Prover _ = Lazy.force U.trivial_zkapp
+
+    let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
 
     let mk_ledger ~num_of_unused_keys () =
       let keys = List.init 5 ~f:(fun _ -> Keypair.create ()) in

@@ -242,7 +242,7 @@ module type State_hooks = sig
     val gen_consensus_state :
          constraint_constants:Genesis_constants.Constraint_constants.t
       -> constants:Constants.t
-      -> gen_slot_advancement:int Quickcheck.Generator.t
+      -> slot_advancement:int
       -> (   previous_protocol_state:
                protocol_state Mina_base.State_hash.With_state_hashes.t
           -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
@@ -564,9 +564,9 @@ module type S = sig
 
       val next_epoch_data : Value.t -> Mina_base.Epoch_data.Value.t
 
-      val graphql_type : unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
-
       val curr_slot : Value.t -> Slot.t
+
+      val curr_epoch : Value.t -> Epoch.t
 
       val epoch_count : Value.t -> Length.t
 
@@ -588,6 +588,8 @@ module type S = sig
       val supercharge_coinbase_var : var -> Boolean.var
 
       val supercharge_coinbase : Value.t -> bool
+
+      val has_ancestor_in_same_checkpoint_window : Value.t -> bool
     end
 
     module Block_data : sig
@@ -731,6 +733,16 @@ module type S = sig
       -> consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
       -> Data.Local_state.Snapshot.Ledger_snapshot.t
+
+    val get_epoch_ledgers_for_finalized_frontier_block :
+         root_consensus_state:Consensus_state.Value.t
+      -> target_consensus_state:Consensus_state.Value.t
+      -> local_state:Local_state.t
+      -> [ `Both of
+           Data.Local_state.Snapshot.Ledger_snapshot.t
+           * Data.Local_state.Snapshot.Ledger_snapshot.t
+         | `Snarked_ledger of Data.Local_state.Snapshot.Ledger_snapshot.t * int
+         ]
 
     val epoch_end_time :
       constants:Constants.t -> Mina_numbers.Length.t -> Block_time.t

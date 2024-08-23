@@ -384,10 +384,11 @@ let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
       Async.Thread_safe.block_on_async_exn (fun () ->
           Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-          (*create a snapp account*)
-          Transaction_snark.For_tests.create_trivial_zkapp_account
-            ?permissions:snapp_permissions ~vk ~ledger snapp_pk ;
           let open Async.Deferred.Let_syntax in
+          (*create a snapp account*)
+          let%bind vk' = vk in
+          Transaction_snark.For_tests.create_trivial_zkapp_account
+            ?permissions:snapp_permissions ~vk:vk' ~ledger snapp_pk ;
           let%bind zkapp_command =
             let zkapp_prover_and_vk = (zkapp_prover, vk) in
             Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk
@@ -396,7 +397,9 @@ let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
           check_zkapp_command_with_merges_exn ?expected_failure ?state_body
             ledger [ zkapp_command ] ) )
 
-let permissions_from_update (update : Account_update.Update.t) ~auth =
+let permissions_from_update ~auth
+    ?(txn_version = Mina_numbers.Txn_version.current)
+    (update : Account_update.Update.t) =
   let default = Permissions.user_default in
   { default with
     edit_state =
@@ -412,7 +415,7 @@ let permissions_from_update (update : Account_update.Update.t) ~auth =
   ; set_verification_key =
       ( if Zkapp_basic.Set_or_keep.is_keep update.verification_key then
         default.set_verification_key
-      else auth )
+      else (auth, txn_version) )
   ; set_permissions =
       ( if Zkapp_basic.Set_or_keep.is_keep update.permissions then
         default.set_permissions

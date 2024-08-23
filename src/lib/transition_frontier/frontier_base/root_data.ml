@@ -1,6 +1,5 @@
 open Core_kernel
 open Mina_base
-open Mina_block
 
 module Common = struct
   [%%versioned

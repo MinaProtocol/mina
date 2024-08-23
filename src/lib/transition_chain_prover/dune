@@ -22,7 +22,7 @@
    pickles.backend
    snark_params
    pickles
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    transition_frontier_bit_catchup
 ))

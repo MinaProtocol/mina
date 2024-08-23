@@ -23,6 +23,7 @@
    mina_base.import
    mina_numbers
    currency
+   bounded_types
    data_hash_lib
    signature_lib
    merkle_ledger
@@ -47,8 +48,8 @@
    crypto_params
    kimchi_bindings
    kimchi_backend
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    pasta_bindings
    zkapp_command_builder
    transaction_snark_tests

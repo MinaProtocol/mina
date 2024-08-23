@@ -26,7 +26,6 @@
    ppx_inline_test.config
    async_unix
    stdio
-   extlib
    sexp_diff_kernel
    ;; local libraries
    key_gen
@@ -41,6 +40,7 @@
    mina_runtime_config
    mina_base
    mina_lib
+   bounded_types
    genesis_constants
    transition_router
    signature_lib
@@ -61,4 +61,5 @@
    transition_handler
    snark_worker
    one_or_two
+   error_json
 ))

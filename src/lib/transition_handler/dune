@@ -50,12 +50,14 @@
    pickles.backend
    snark_params
    pickles
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    internal_tracing
    transition_frontier_extensions
    mina_networking
    unix_timestamp
+   staged_ledger_diff
+   mina_runtime_config
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_jane)))

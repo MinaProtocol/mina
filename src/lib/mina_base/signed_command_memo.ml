@@ -1,7 +1,5 @@
 (* signed_command_memo.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params
 
@@ -18,7 +16,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
     module V1 = struct
       [@@@with_all_version_tags]
 
-      type t = string [@@deriving sexp, equal, compare, hash]
+      type t = Bounded_types.String.Tagged.Stable.V1.t
+      [@@deriving sexp, equal, compare, hash]
 
       let to_latest = Fn.id
 
@@ -218,8 +217,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
         | Error _ ->
             "(Invalid memo, neither text nor a digest)" )
 
-  [%%ifdef consensus_mechanism]
-
   module Boolean = Tick.Boolean
   module Typ = Tick.Typ
 
@@ -246,8 +243,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
       (Typ.array ~length:length_in_bits Boolean.typ)
       ~there:(fun (t : t) -> Blake2.string_to_bits (t :> string))
       ~back:(fun bs -> (Blake2.bits_to_string bs :> t))
-
-  [%%endif]
 
   let deriver obj =
     Fields_derivers_zkapps.iso_string obj ~name:"Memo" ~js_type:String
@@ -283,8 +278,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           false
         with Too_long_user_memo_input -> true
 
-      [%%ifdef consensus_mechanism]
-
       let%test_unit "typ is identity" =
         let s = "this is a string" in
         let memo = create_by_digesting_string_exn s in
@@ -309,8 +302,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           |> typ.value_of_fields
         in
         [%test_eq: string] memo memo_read
-
-      [%%endif]
     end )
 end
 

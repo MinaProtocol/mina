@@ -1,6 +1,8 @@
 open Core_kernel
 open Currency
 open Mina_base
+open Mina_base_test_helpers
+open Mina_ledger_test_helpers
 open Mina_numbers
 open Signature_lib
 open Helpers
@@ -30,9 +32,11 @@ let%test_module "Test transaction logic." =
     let run_zkapp_cmd ~fee_payer ~fee ~accounts txns =
       let open Result.Let_syntax in
       let cmd =
-        zkapp_cmd ~noncemap:(noncemap accounts) ~fee:(fee_payer, fee) txns
+        zkapp_cmd
+          ~noncemap:(Ledger_helpers.noncemap accounts)
+          ~fee:(fee_payer, fee) txns
       in
-      let%bind ledger = test_ledger accounts in
+      let%bind ledger = Ledger_helpers.ledger_of_accounts accounts in
       let%map txn, _ =
         Transaction_logic.apply_zkapp_command_unchecked ~constraint_constants
           ~global_slot:Global_slot_since_genesis.(of_int 120)
@@ -861,4 +865,90 @@ let%test_module "Test transaction logic." =
                  && Predicates.verify_balances_unchanged ~ledger ~txn accounts )
             )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+  end )
+
+(* This module tests Inputs.Stack *)
+let%test_module "Test stack module" =
+  ( module struct
+    module Stack = Transaction_logic.For_tests.Stack (Int)
+
+    let%test_unit "Ensure pop works on non-empty list." =
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%map stack = Generator.list_non_empty Generator.size in
+        let top = List.hd_exn stack in
+        let tail = List.tl_exn stack in
+        (stack, top, tail))
+        ~f:(fun (stack, top, tail) ->
+          match Stack.pop stack with
+          | Some (x, xs) ->
+              assert (Int.equal x top && List.equal Int.equal xs tail)
+          | None ->
+              assert false )
+
+    let%test_unit "Ensure pop works on empty list." =
+      match Stack.pop (Stack.empty ()) with
+      | Some _ ->
+          assert false
+      | None ->
+          assert true
+
+    let%test_unit "Ensure push functionality works." =
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%bind stack = Generator.list_non_empty Generator.size in
+        let%bind stack' = Generator.list_non_empty Generator.size in
+        let pushed =
+          List.fold_right stack' ~init:stack ~f:(fun x s ->
+              Stack.push x ~onto:s )
+        in
+        let pushed' = List.append stack' stack in
+        return (pushed, pushed'))
+        ~f:(fun (pushed, pushed') ->
+          assert (List.equal Int.equal pushed pushed') )
+  end )
+
+(* This module tests Inputs.Stack *)
+let%test_module "Test stack module" =
+  ( module struct
+    module Stack = Transaction_logic.For_tests.Stack (Int)
+
+    let%test_unit "Ensure pop works on non-empty list." =
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%map stack = Generator.list_non_empty Generator.size in
+        let top = List.hd_exn stack in
+        let tail = List.tl_exn stack in
+        (stack, top, tail))
+        ~f:(fun (stack, top, tail) ->
+          match Stack.pop stack with
+          | Some (x, xs) ->
+              assert (Int.equal x top && List.equal Int.equal xs tail)
+          | None ->
+              assert false )
+
+    let%test_unit "Ensure pop works on empty list." =
+      match Stack.pop (Stack.empty ()) with
+      | Some _ ->
+          assert false
+      | None ->
+          assert true
+
+    let%test_unit "Ensure push functionality works." =
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%bind stack = Generator.list_non_empty Generator.size in
+        let%bind stack' = Generator.list_non_empty Generator.size in
+        let pushed =
+          List.fold_right stack' ~init:stack ~f:(fun x s ->
+              Stack.push x ~onto:s )
+        in
+        let pushed' = List.append stack' stack in
+        return (pushed, pushed'))
+        ~f:(fun (pushed, pushed') ->
+          assert (List.equal Int.equal pushed pushed') )
   end )

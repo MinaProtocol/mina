@@ -1,6 +1,8 @@
+use crate::WithLagrangeBasis;
 use ark_poly::UVPolynomial;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
 use paste::paste;
+use poly_commitment::SRS as _;
 use poly_commitment::{
     commitment::{b_poly_coefficients, caml::CamlPolyComm},
     srs::SRS,
@@ -87,7 +89,7 @@ macro_rules! impl_srs {
                     // We're single-threaded, so it's safe to grab this pointer as mutable.
                     // Do not try this at home.
                     let srs = unsafe { &mut *((&**srs as *const SRS<$G>) as *mut SRS<$G>) as &mut SRS<$G> };
-                    srs.add_lagrange_basis(x_domain);
+                    srs.with_lagrange_basis(x_domain);
                 }
 
                 Ok(srs.lagrange_bases[&x_domain.size()][i as usize].clone().into())
@@ -102,7 +104,7 @@ macro_rules! impl_srs {
                 let ptr: &mut poly_commitment::srs::SRS<$G> =
                     unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
                 let domain = EvaluationDomain::<$F>::new(1 << (log2_size as usize)).expect("invalid domain size");
-                ptr.add_lagrange_basis(domain);
+                ptr.with_lagrange_basis(domain);
             }
 
             #[ocaml_gen::func]
@@ -121,7 +123,7 @@ macro_rules! impl_srs {
                 let evals = evals.into_iter().map(Into::into).collect();
                 let p = Evaluations::<$F>::from_vec_and_domain(evals, x_domain).interpolate();
 
-                Ok(srs.commit_non_hiding(&p, None).into())
+                Ok(srs.commit_non_hiding(&p, 1).into())
             }
 
             #[ocaml_gen::func]
@@ -134,7 +136,7 @@ macro_rules! impl_srs {
                 let coeffs = b_poly_coefficients(&chals);
                 let p = DensePolynomial::<$F>::from_coefficients_vec(coeffs);
 
-                Ok(srs.commit_non_hiding(&p, None).into())
+                Ok(srs.commit_non_hiding(&p, 1).into())
             }
 
             #[ocaml_gen::func]

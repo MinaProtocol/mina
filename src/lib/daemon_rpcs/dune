@@ -20,6 +20,7 @@
    ;; local libraries
    network_peer
    genesis_constants
+   bounded_types
    currency
    mina_net2
    transition_frontier

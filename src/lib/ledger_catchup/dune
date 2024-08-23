@@ -17,6 +17,7 @@
    ppx_inline_test.config
    async_unix
    ;; local libraries
+   bounded_types
    mina_wire_types
    genesis_constants
    mina_base.import
@@ -61,9 +62,10 @@
    transaction_snark_work
    pickles
    snark_params
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    o1trace
    mina_net2
    internal_tracing
+   mina_runtime_config
 ))

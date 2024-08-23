@@ -59,16 +59,18 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
       (Account.create id Currency.Balance.(of_mina_int_exn 1_000))
     |> Or_error.ok_exn
   in
-  let _v =
-    Option.value_map zkapp_account ~default:() ~f:(fun pk ->
+  let open Async.Deferred.Let_syntax in
+  let%bind () =
+    Option.value_map zkapp_account ~default:(Deferred.return ()) ~f:(fun pk ->
         let `VK vk, `Prover _ = Lazy.force vk_and_prover in
+        let%map vk = vk in
         let id = Account_id.create pk Token_id.default in
         Ledger.get_or_create_account ledger id
           { (Account.create id Currency.Balance.(of_mina_int_exn 1_000)) with
             permissions =
               { Permissions.user_default with
                 edit_state = Proof
-              ; set_verification_key = Proof
+              ; set_verification_key = (Proof, Mina_numbers.Txn_version.current)
               ; set_zkapp_uri = Proof
               ; set_token_symbol = Proof
               }
@@ -122,7 +124,6 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
         , zkapp_command )
       ]
   in
-  let open Async.Deferred.Let_syntax in
   let module T = Transaction_snark.Make (struct
     let constraint_constants = constraint_constants
 
@@ -368,7 +369,7 @@ let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
     ; authorization_kind = Signature
     }
   in
-  let zkapp_command =
+  let%bind zkapp_command =
     Transaction_snark.For_tests.deploy_snapp
       ~permissions:Permissions.user_default ~constraint_constants spec
   in

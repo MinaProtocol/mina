@@ -1,4 +1,4 @@
-(* archive_blocks.ml -- archive precomputed or extensional blocks to Postgresql *)
+(* archive_blocks.ml *)
 
 open Core_kernel
 open Async

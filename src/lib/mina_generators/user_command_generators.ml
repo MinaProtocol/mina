@@ -4,15 +4,13 @@
    Zkapp_command
 *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 include User_command.Gen
 
 (* using Precomputed_values depth introduces a cyclic dependency *)
-[%%inject "ledger_depth", ledger_depth]
+let ledger_depth = Node_config.ledger_depth
 
 let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
     ?num_keypairs ?max_account_updates ?max_token_updates ?account_state_tbl ?vk
@@ -113,7 +111,7 @@ let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
       ; send = Either
       ; set_delegate = Either
       ; set_permissions = Either
-      ; set_verification_key = Either
+      ; set_verification_key = (Either, Mina_numbers.Txn_version.current)
       ; set_zkapp_uri = Either
       ; edit_action_state = Either
       ; set_token_symbol = Either
@@ -133,21 +131,10 @@ let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
         if ndx mod 2 = 0 then account else snappify_account account )
   in
   let fee_payer_keypair = List.hd_exn new_keypairs in
-  let ledger = Ledger.create ~depth:ledger_depth () in
-  List.iter2_exn account_ids accounts ~f:(fun acct_id acct ->
-      match Ledger.get_or_create_account ledger acct_id acct with
-      | Error err ->
-          failwithf
-            "zkapp_command: error adding account for account id: %s, error: \
-             %s@."
-            (Account_id.to_yojson acct_id |> Yojson.Safe.to_string)
-            (Error.to_string_hum err) ()
-      | Ok (`Existed, _) ->
-          failwithf "zkapp_command: account for account id already exists: %s@."
-            (Account_id.to_yojson acct_id |> Yojson.Safe.to_string)
-            ()
-      | Ok (`Added, _) ->
-          () ) ;
+  let ledger = Ledger.create_ephemeral ~depth:ledger_depth () in
+  Ledger.set_batch_accounts ledger
+    (List.mapi accounts ~f:(fun i account ->
+         (Ledger.Addr.of_int_exn ~ledger_depth i, account) ) ) ;
   (* to keep track of account states across transactions *)
   let account_state_tbl =
     Option.value account_state_tbl ~default:(Account_id.Table.create ())
@@ -159,10 +146,11 @@ let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
   in
   let zkapp_command =
     Or_error.ok_exn
-      (Zkapp_command.Valid.to_valid ~status:Applied
+      (Zkapp_command.Valid.to_valid ~failed:false
          ~find_vk:
-           (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger ~get:Ledger.get
-              ~location_of_account:Ledger.location_of_account )
+           (Zkapp_command.Verifiable.load_vk_from_ledger
+              ~get:(Ledger.get ledger)
+              ~location_of_account:(Ledger.location_of_account ledger) )
          zkapp_command )
   in
   (* include generated ledger in result *)
@@ -208,11 +196,11 @@ let sequence_zkapp_command_with_ledger ?ledger_init_state ?max_account_updates
       in
       let valid_zkapp_command =
         Or_error.ok_exn
-          (Zkapp_command.Valid.to_valid ~status:Applied
+          (Zkapp_command.Valid.to_valid ~failed:false
              ~find_vk:
-               (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
-                  ~get:Ledger.get
-                  ~location_of_account:Ledger.location_of_account )
+               (Zkapp_command.Verifiable.load_vk_from_ledger
+                  ~get:(Ledger.get ledger)
+                  ~location_of_account:(Ledger.location_of_account ledger) )
              zkapp_command )
       in
       let zkapp_command_and_fee_payer_keypairs' =

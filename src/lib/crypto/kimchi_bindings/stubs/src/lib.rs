@@ -29,6 +29,9 @@ pub mod projective;
 /// SRS
 pub mod srs;
 
+pub mod lagrange_basis;
+pub use lagrange_basis::WithLagrangeBasis;
+
 /// Indexes
 pub mod pasta_fp_plonk_index;
 pub mod pasta_fq_plonk_index;
@@ -61,7 +64,9 @@ pub use {
         wires::caml::CamlWire,
     },
     kimchi::proof::caml::CamlProofEvaluations,
-    kimchi::prover::caml::{CamlLookupCommitments, CamlProverCommitments, CamlProverProof},
+    kimchi::prover::caml::{
+        CamlLookupCommitments, CamlProofWithPublic, CamlProverCommitments, CamlProverProof,
+    },
     mina_poseidon::sponge::caml::CamlScalarChallenge,
     poly_commitment::commitment::caml::{CamlOpeningProof, CamlPolyComm},
 };

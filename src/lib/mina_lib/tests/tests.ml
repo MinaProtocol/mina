@@ -42,7 +42,16 @@ let%test_module "Epoch ledger sync tests" =
           { daemon = None
           ; genesis = None
           ; proof = None
-          ; ledger = None
+          ; ledger =
+              Some
+                { base = Named "test"
+                ; num_accounts = None
+                ; balances = []
+                ; hash = None
+                ; s3_data_hash = None
+                ; name = None
+                ; add_genesis_winner = None
+                }
           ; epoch_data = None
           }
         in
@@ -63,7 +72,9 @@ let%test_module "Epoch ledger sync tests" =
         Consensus.Constants.create ~constraint_constants
           ~protocol_constants:genesis_constants.protocol
       in
-      let trust_system = Trust_system.create (make_dirname "trust_system") in
+      let%bind trust_system =
+        Trust_system.create (make_dirname "trust_system")
+      in
       let module Context = struct
         let logger = logger
 
@@ -74,6 +85,8 @@ let%test_module "Epoch ledger sync tests" =
         let precomputed_values = precomputed_values
 
         let trust_system = trust_system
+
+        let commit_id = "not specified for unit test"
       end in
       return (module Context : CONTEXT)
 
@@ -88,7 +101,7 @@ let%test_module "Epoch ledger sync tests" =
           Verifier.create ~logger ~proof_level:precomputed_values.proof_level
             ~constraint_constants:precomputed_values.constraint_constants ~pids
             ~conf_dir:(Some (make_dirname "verifier"))
-            () )
+            ~commit_id:"not specified for unit tests" () )
 
     let make_empty_ledger (module Context : CONTEXT) =
       Mina_ledger.Ledger.create
@@ -140,6 +153,7 @@ let%test_module "Epoch ledger sync tests" =
             ~trust_system
             ~pool_max_size:precomputed_values.genesis_constants.txpool_max_size
             ~genesis_constants:precomputed_values.genesis_constants
+            ~slot_tx_end:None
         in
         Network_pool.Transaction_pool.create ~config ~constraint_constants
           ~consensus_constants ~time_controller ~logger
@@ -226,7 +240,7 @@ let%test_module "Epoch ledger sync tests" =
           ; max_connections = Cli_lib.Default.max_connections
           ; validation_queue_size = Cli_lib.Default.validation_queue_size
           ; isolate = false
-          ; keypair = libp2p_keypair
+          ; keypair = Some libp2p_keypair
           ; all_peers_seen_metric = false
           ; known_private_ip_nets = []
           ; time_controller
@@ -346,10 +360,13 @@ let%test_module "Epoch ledger sync tests" =
     let run_test ?(timeout_min = default_timeout_min) (module Context : CONTEXT)
         ~name ~staking_epoch_ledger ~next_epoch_ledger ~starting_accounts
         ~test_number =
+      let%bind fresh_trust_system =
+        Trust_system.create (make_dirname "trust_system")
+      in
       let module Context2 = struct
         include Context
 
-        let trust_system = Trust_system.create (make_dirname "trust_system")
+        let trust_system = fresh_trust_system
       end in
       let test_finished = ref false in
       let cleanup () = test_finished := true in
