@@ -1,3 +1,7 @@
+(**
+Module for running replayer which checks datbase integrity of given database
+*)
+
 open Executor
 open Core
 

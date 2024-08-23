@@ -1,3 +1,7 @@
+(**
+Core module to run any defined app on various contexts
+*)
+
 open Integration_test_lib
 open Core_kernel
 open Async
@@ -56,11 +60,20 @@ module Executor = struct
               ~metadata:[ ("app", `String (built_name t)) ] ;
             run_from_local t ~args ?env ()
         | _ -> (
-let paths = Option.value_map ~f:(String.split ~on:':') ~default:[] (Sys.getenv "PATH") in
-let exists_at_path prefix = match Sys.file_exists (prefix ^ "/" ^ t.official_name) with |`Yes -> Some prefix | _ -> None in
-match%bind Deferred.List.find_map ~f:exists_at_path paths with
-            | `Yes ->
-              | Some prefix ->  [%log debug] "running from %s" prefix
+            let paths =
+              Option.value_map ~f:(String.split ~on:':') ~default:[]
+                (Sys.getenv "PATH")
+            in
+            let exists_at_path prefix =
+              match%bind Sys.file_exists (prefix ^ "/" ^ t.official_name) with
+              | `Yes ->
+                  Deferred.return (Some prefix)
+              | _ ->
+                  Deferred.return None
+            in
+            match%bind Deferred.List.find_map ~f:exists_at_path paths with
+            | Some prefix ->
+                [%log debug] "running from %s" prefix
                   ~metadata:[ ("app", `String t.official_name) ] ;
                 run_from_debian t ~args ?env ()
             | _ ->

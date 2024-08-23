@@ -1,3 +1,7 @@
+(**
+Module for psql tool automation. One can use it to create database schema
+*)
+
 open Integration_test_lib
 open Core
 open Async

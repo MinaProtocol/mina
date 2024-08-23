@@ -1,3 +1,7 @@
+(**
+Module to run missing_block_auditor scripts which finds gaps in given Postgresql database
+*)
+
 open Executor
 include Executor
 

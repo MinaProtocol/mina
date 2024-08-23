@@ -1,3 +1,7 @@
+(**
+Module to download precomputed blocks from o1labs official gcloud bucket.
+*)
+
 open Async
 
 let bucket_name = "mina-archive-dumps"

@@ -1,3 +1,7 @@
+(**
+Module to run extract_blocks utility for given archive PostgreSQL database.
+*)
+
 open Executor
 open Core
 include Executor

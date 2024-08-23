@@ -1,3 +1,7 @@
+(**
+Module to run docker command in given image.
+*)
+
 open Core
 open Integration_test_lib
 open Async

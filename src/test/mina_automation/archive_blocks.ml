@@ -1,4 +1,8 @@
+(**
+Module to run archive_blocks utility for the given list of block files and an archive PostgreSQL database.
+*)
 open Executor
+
 open Core
 include Executor
 

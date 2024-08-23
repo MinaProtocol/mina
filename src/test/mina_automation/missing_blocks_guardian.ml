@@ -1,3 +1,7 @@
+(**
+Module to run missing_block_guardian app which should fill any gaps in given archive database
+*)
+
 open Executor
 open Core
 include Executor
