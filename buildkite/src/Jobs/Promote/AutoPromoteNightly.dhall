@@ -44,7 +44,6 @@ let promotePackages =
       , codenames =
         [ DebianVersions.DebVersion.Bullseye
         , DebianVersions.DebVersion.Focal
-        , DebianVersions.DebVersion.Buster
         ]
       , from_channel = DebianChannel.Type.Unstable
       , to_channel = DebianChannel.Type.NightlyCompatible
@@ -71,7 +70,6 @@ let verifyPackages =
       , codenames =
         [ DebianVersions.DebVersion.Bullseye
         , DebianVersions.DebVersion.Focal
-        , DebianVersions.DebVersion.Buster
         ]
       , channel = DebianChannel.Type.NightlyCompatible
       , new_tags =
