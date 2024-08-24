@@ -42,9 +42,7 @@ let promotePackages =
       , profile = Profiles.Type.Standard
       , network = Network.Type.Devnet
       , codenames =
-        [ DebianVersions.DebVersion.Bullseye
-        , DebianVersions.DebVersion.Focal
-        ]
+        [ DebianVersions.DebVersion.Bullseye, DebianVersions.DebVersion.Focal ]
       , from_channel = DebianChannel.Type.Unstable
       , to_channel = DebianChannel.Type.NightlyCompatible
       , new_tags =
@@ -68,9 +66,7 @@ let verifyPackages =
       , profile = Profiles.Type.Standard
       , network = Network.Type.Devnet
       , codenames =
-        [ DebianVersions.DebVersion.Bullseye
-        , DebianVersions.DebVersion.Focal
-        ]
+        [ DebianVersions.DebVersion.Bullseye, DebianVersions.DebVersion.Focal ]
       , channel = DebianChannel.Type.NightlyCompatible
       , new_tags =
         [ "latest-compatible-nightly"
