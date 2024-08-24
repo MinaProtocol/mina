@@ -188,7 +188,7 @@ let docker_step
                     , step_key =
                         "batch-txn-${DebianVersions.lowerName
                                        spec.debVersion}${BuildFlags.toLabelSegment
-                                                           spec.buildFlags}--docker-image"
+                                                           spec.buildFlags}-docker-image"
                     }
                   ]
                 , Archive =
@@ -234,9 +234,9 @@ let docker_step
                         "${DebianVersions.lowerName spec.debVersion}"
                     , step_key =
                         "zkapp-test-transaction-${DebianVersions.lowerName
-                                                    spec.debVersion}${Profiles.toLabelSegment
-                                                                        spec.profile}${BuildFlags.toLabelSegment
-                                                                                         spec.buildFlags}--docker-image"
+                                                    debVersion}${Profiles.toLabelSegment
+                                                                   profile}${BuildFlags.toLabelSegment
+                                                                               buildFlags}-docker-image"
                     }
                   ]
                 , FunctionalTestSuite =
@@ -250,9 +250,9 @@ let docker_step
                     , deb_profile = spec.profile
                     , step_key =
                         "test-suite-${DebianVersions.lowerName
-                                        spec.debVersion}${Profiles.toLabelSegment
-                                                            spec.profile}${BuildFlags.toLabelSegment
-                                                                             spec.buildFlags}--docker-image"
+                                        debVersion}${Profiles.toLabelSegment
+                                                       profile}${BuildFlags.toLabelSegment
+                                                                   buildFlags}-docker-image"
                     , network = "berkeley"
                     }
                   ]

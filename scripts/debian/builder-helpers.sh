@@ -239,9 +239,14 @@ build_batch_txn_deb() {
 build_functional_test_suite_deb() {
   create_control_file mina-test-suite "${SHARED_DEPS}" 'Test suite apps for mina.'
 
+  mkdir -p "${BUILDDIR}/etc/mina/test/archive"
+
+  cp -r ../src/test/archive/* ${BUILDDIR}/etc/mina/test/archive/ 
+
   # Binaries
   cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
-  
+  cp ./default/src/test/archive/patch_archive_test/patch_archive_test.exe "${BUILDDIR}/usr/local/bin/mina-patch-archive-test"
+
   build_deb mina-test-suite
 
 }
