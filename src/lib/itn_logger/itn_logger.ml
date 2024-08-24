@@ -81,15 +81,18 @@ let dispatch_remote_log log =
       let%map res =
         Async.Rpc.Connection.with_client
           ~handshake_timeout:
-            (Time.Span.of_sec Mina_compile_config.rpc_handshake_timeout_sec)
+            (Time.Span.of_sec
+               Node_config_unconfigurable_constants.rpc_handshake_timeout_sec )
           ~heartbeat_config:
             (Async.Rpc.Connection.Heartbeat_config.create
                ~timeout:
                  (Time_ns.Span.of_sec
-                    Mina_compile_config.rpc_heartbeat_timeout_sec )
+                    Node_config_unconfigurable_constants
+                    .rpc_heartbeat_timeout_sec )
                ~send_every:
                  (Time_ns.Span.of_sec
-                    Mina_compile_config.rpc_heartbeat_send_every_sec )
+                    Node_config_unconfigurable_constants
+                    .rpc_heartbeat_send_every_sec )
                () )
           where_to_connect
           (fun conn -> Async.Rpc.Rpc.dispatch rpc conn log)

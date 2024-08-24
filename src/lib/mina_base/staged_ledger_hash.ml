@@ -213,18 +213,12 @@ module Make_str (A : Wire_types.Concrete) = struct
     let var_of_t t : var =
       List.map (Fold.to_list @@ fold t) ~f:Boolean.var_of_value
 
-    let warn_improper_transport () =
-      if String.equal Node_config.proof_level "check" then ()
-      else printf "WARNING: improperly transporting staged-ledger-hash\n"
-
     let typ : (var, value) Typ.t =
       Typ.transport (Typ.list ~length:length_in_bits Boolean.typ)
         ~there:(Fn.compose Fold.to_list fold) ~back:(fun _ ->
-          (* If we put a failwith here, we lose the ability to printf-inspect
-             * anything that uses staged-ledger-hashes from within Checked
-             * computations. It's useful when debugging to dump the protocol state
-             * and so we can just lie here instead. *)
-          warn_improper_transport () ; Lazy.force dummy )
+          (* TODO: We could just use a prover value. *)
+          printf "WARNING: improperly transporting staged-ledger-hash\n" ;
+          Lazy.force dummy )
   end
 
   module Poly = struct
