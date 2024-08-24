@@ -3,14 +3,12 @@
 -- NOTE: minaToolchainBullseye is also used for building Ubuntu Focal packages in CI
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
 { toolchainBase = "codaprotocol/ci-toolchain-base:v3"
-, minaToolchainBuster =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:d27c15e3143a99b86155ba57696020c00e2a296b388499b3e6fb364478ddda3a"
 , minaToolchainBullseye =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:966863de43c72c294e14762ae567404005f99654c54338a9a89b999476a36d1f"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:32b899019503f49d71231889e3bee002c641333c2e94d5ee4465423ad1a255ed"
 , minaToolchainBookworm =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:966863de43c72c294e14762ae567404005f99654c54338a9a89b999476a36d1f"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:32b899019503f49d71231889e3bee002c641333c2e94d5ee4465423ad1a255ed"
 , minaToolchain =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:966863de43c72c294e14762ae567404005f99654c54338a9a89b999476a36d1f"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:32b899019503f49d71231889e3bee002c641333c2e94d5ee4465423ad1a255ed"
 , elixirToolchain = "elixir:1.10-alpine"
 , nodeToolchain = "node:14.13.1-stretch-slim"
 , ubuntu2004 = "ubuntu:20.04"
