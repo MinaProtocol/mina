@@ -46,10 +46,6 @@ TESTNET_NAME="devnet"
 
 git config --global --add safe.directory /workdir
 
-echo "deb [trusted=yes] https://apt.releases.hashicorp.com $MINA_DEB_CODENAME main" | tee /etc/apt/sources.list.d/hashicorp.list
-apt-get update
-apt-get install -y "docker-compose-plugin"
-
 source buildkite/scripts/debian/install.sh "mina-test-executive"
 
 mina-test-executive local "$TEST_NAME" \
