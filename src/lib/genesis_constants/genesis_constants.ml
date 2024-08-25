@@ -27,6 +27,20 @@ module Fork_constants = struct
 end
 
 module Constraint_constants = struct
+
+  type inputs =
+    { scan_state_with_tps_goal : bool
+    ; scan_state_tps_goal_x10 : int option
+    ; block_window_duration : int
+    ; scan_state_transaction_capacity_log_2 : int option
+    ; supercharged_coinbase_factor : int
+    ; scan_state_work_delay : int
+    ; coinbase : string
+    ; account_creation_fee_int : string
+    ; ledger_depth : int
+    ; sub_windows_per_window : int
+    } [@@deriving yojson]
+
   type t =
     { sub_windows_per_window : int
     ; ledger_depth : int
@@ -40,6 +54,78 @@ module Constraint_constants = struct
     ; fork : Fork_constants.t option
     }
   [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
+
+  let make (inputs : inputs) : t =
+    (** All the proofs before the last [work_delay] blocks must be
+        completed to add transactions. [work_delay] is the minimum number
+        of blocks and will increase if the throughput is less.
+        - If [work_delay = 0], all the work that was added to the scan
+          state in the previous block is expected to be completed and
+          included in the current block if any transactions/coinbase are to
+          be included.
+        - [work_delay >= 1] means that there's at least two block times for
+          completing the proofs.
+    *)
+
+    let transaction_capacity_log_2 =
+      match
+        ( inputs.scan_state_with_tps_goal
+        , inputs.scan_state_tps_goal_x10 )
+      with
+      | true, Some tps_goal_x10 ->
+          let max_coinbases = 2 in
+
+          (* block_window_duration is in milliseconds, so divide by 1000 divide
+             by 10 again because we have tps * 10
+          *)
+          let max_user_commands_per_block =
+            tps_goal_x10 * inputs.block_window_duration / (1000 * 10)
+          in
+
+          (* Log of the capacity of transactions per transition.
+                - 1 will only work if we don't have prover fees.
+                - 2 will work with prover fees, but not if we want a transaction
+                  included in every block.
+                - At least 3 ensures a transaction per block and the staged-ledger
+                  unit tests pass.
+          *)
+          1
+          + Core_kernel.Int.ceil_log2
+              (max_user_commands_per_block + max_coinbases)
+      | _ -> (
+          match inputs.scan_state_transaction_capacity_log_2 with
+          | Some a ->
+              a
+          | None ->
+              failwith
+                "scan_state_transaction_capacity_log_2 must be set if \
+                 scan_state_with_tps_goal is false" )
+    in
+    let supercharged_coinbase_factor =
+      inputs.supercharged_coinbase_factor
+    in
+
+    let pending_coinbase_depth =
+      Core_kernel.Int.ceil_log2
+        ( (transaction_capacity_log_2 + 1)
+          * (inputs.scan_state_work_delay + 1)
+        + 1 )
+    in
+
+      { sub_windows_per_window = inputs.sub_windows_per_window
+      ; ledger_depth = inputs.ledger_depth
+      ; work_delay = inputs.scan_state_work_delay
+      ; block_window_duration_ms = inputs.block_window_duration
+      ; transaction_capacity_log_2
+      ; pending_coinbase_depth
+      ; coinbase_amount =
+          Currency.Amount.of_mina_string_exn inputs.coinbase
+      ; supercharged_coinbase_factor
+      ; account_creation_fee =
+          Currency.Fee.of_mina_string_exn
+            inputs.account_creation_fee_int
+      ; fork = None
+      }
 
   let to_snark_keys_header (t : t) : Snark_keys_header.Constraint_constants.t =
     { sub_windows_per_window = t.sub_windows_per_window
@@ -204,6 +290,25 @@ module Protocol = struct
 end
 
 module T = struct
+
+  type inputs =
+    { genesis_state_timestamp : string
+    ; k : int
+    ; slots_per_epoch : int
+    ; slots_per_sub_window : int
+    ; grace_period_slots : int
+    ; delta : int
+    ; pool_max_size : int
+    ; zkapp_proof_update_cost : float
+    ; zkapp_signed_single_update_cost : float
+    ; zkapp_signed_pair_update_cost : float
+    ; zkapp_transaction_cost_limit : float
+    ; max_event_elements : int
+    ; max_action_elements : int
+    ; zkapp_cmd_limit_hardcap : int
+    ; minimum_user_command_fee : string
+    } [@@deriving yojson]
+
   (* bin_io is for printing chain id inputs *)
   type t =
     { protocol : Protocol.Stable.Latest.t
@@ -406,6 +511,30 @@ module Make (Node_config : Node_config_intf.S) : S = struct
 
   let pool_max_size = Node_config.pool_max_size
 
+  let make (inputs : inputs) : t =
+    { protocol =
+        { k
+        ; slots_per_epoch
+        ; slots_per_sub_window
+        ; grace_period_slots
+        ; delta
+        ; genesis_state_timestamp =
+            genesis_timestamp_of_string genesis_state_timestamp_string
+            |> of_time
+        }
+    ; txpool_max_size = pool_max_size
+    ; num_accounts = None
+    ; zkapp_proof_update_cost = inputs.zkapp_proof_update_cost
+    ; zkapp_signed_single_update_cost =
+        inputs.zkapp_signed_single_update_cost
+    ; zkapp_signed_pair_update_cost = inputs.zkapp_signed_pair_update_cost
+    ; zkapp_transaction_cost_limit = inputs.zkapp_transaction_cost_limit
+    ; max_event_elements = inputs.max_event_elements
+    ; max_action_elements = inputs.max_action_elements
+    ; zkapp_cmd_limit_hardcap = inputs.zkapp_cmd_limit_hardcap
+    ; minimum_user_command_fee =
+        Currency.Fee.of_mina_string_exn inputs.minimum_user_command_fee
+    }
   let t : t =
     { protocol =
         { k
