@@ -28,7 +28,8 @@ end
 
 module Constraint_constants = struct
 
-  type inputs =
+  module Inputs = struct
+  type t =
     { scan_state_with_tps_goal : bool
     ; scan_state_tps_goal_x10 : int option
     ; block_window_duration : int
@@ -40,6 +41,7 @@ module Constraint_constants = struct
     ; ledger_depth : int
     ; sub_windows_per_window : int
     } [@@deriving yojson]
+  end
 
   type t =
     { sub_windows_per_window : int
@@ -55,7 +57,7 @@ module Constraint_constants = struct
     }
   [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
 
-  let make (inputs : inputs) : t =
+  let make (inputs : Inputs.t) : t =
     (** All the proofs before the last [work_delay] blocks must be
         completed to add transactions. [work_delay] is the minimum number
         of blocks and will increase if the throughput is less.
@@ -291,7 +293,8 @@ end
 
 module T = struct
 
-  type inputs =
+  module Inputs = struct
+  type t =
     { genesis_state_timestamp : string
     ; k : int
     ; slots_per_epoch : int
@@ -308,6 +311,7 @@ module T = struct
     ; zkapp_cmd_limit_hardcap : int
     ; minimum_user_command_fee : string
     } [@@deriving yojson]
+  end
 
   (* bin_io is for printing chain id inputs *)
   type t =
@@ -511,7 +515,8 @@ module Make (Node_config : Node_config_intf.S) : S = struct
 
   let pool_max_size = Node_config.pool_max_size
 
-  let make (inputs : inputs) : t =
+  (*
+  let make (inputs : Inputs.t) : t =
     { protocol =
         { k
         ; slots_per_epoch
@@ -535,6 +540,7 @@ module Make (Node_config : Node_config_intf.S) : S = struct
     ; minimum_user_command_fee =
         Currency.Fee.of_mina_string_exn inputs.minimum_user_command_fee
     }
+  *)
   let t : t =
     { protocol =
         { k
