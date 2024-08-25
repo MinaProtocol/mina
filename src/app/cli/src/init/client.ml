@@ -2273,7 +2273,7 @@ let test_ledger_application =
     (let%map_open.Command privkey_path = Cli_lib.Flag.privkey_read_path
      and prev_block_path =
        flag "--prev-block-path" ~doc:"FILE file with serialized block"
-         (required string)
+         (optional string)
      and ledger_path =
        flag "--ledger-path" ~doc:"FILE directory with ledger DB"
          (required string)
@@ -2313,7 +2313,7 @@ let test_ledger_application =
      let num_txs_per_round = Option.value ~default:3 num_txs_per_round in
      let rounds = Option.value ~default:580 rounds in
      let max_depth = Option.value ~default:290 max_depth in
-     Test_ledger_application.test ~privkey_path ~ledger_path ~prev_block_path
+     Test_ledger_application.test ~privkey_path ~ledger_path ?prev_block_path
        ~first_partition_slots ~no_new_stack ~has_second_partition
        ~num_txs_per_round ~rounds ~no_masks ~max_depth ~tracing num_txs )
 

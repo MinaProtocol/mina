@@ -61,6 +61,14 @@ let mk_tx ~(constraint_constants : Genesis_constants.Constraint_constants.t)
   in
   Transaction_snark.For_tests.multiple_transfers ~constraint_constants multispec
 
+let generate_protocol_state_stub ~consensus_constants ~constraint_constants
+    ledger =
+  let open Staged_ledger_diff in
+  Protocol_state.negative_one
+    ~genesis_ledger:(lazy ledger)
+    ~genesis_epoch_data:None ~constraint_constants ~consensus_constants
+    ~genesis_body_reference
+
 let apply_txs ~constraint_constants ~first_partition_slots ~no_new_stack
     ~has_second_partition ~num_txs ~prev_protocol_state
     ~(keypair : Signature_lib.Keypair.t) ~i ledger =
@@ -142,25 +150,38 @@ let apply_txs ~constraint_constants ~first_partition_slots ~no_new_stack
         (Staged_ledger.Staged_ledger_error.to_string e) ;
       exit 1
 
-let test ~privkey_path ~ledger_path ~prev_block_path ~first_partition_slots
+let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
     ~no_new_stack ~has_second_partition ~num_txs_per_round ~rounds ~no_masks
     ~max_depth ~tracing num_txs_final =
   O1trace.thread "mina"
   @@ fun () ->
+  let%bind keypair = read_privkey privkey_path in
   let constraint_constants =
     Genesis_constants_compiled.Constraint_constants.t
   in
-  let%bind keypair = read_privkey privkey_path in
   let init_ledger =
     Ledger.create ~directory_name:ledger_path
       ~depth:constraint_constants.ledger_depth ()
   in
-  let prev_block_data = In_channel.read_all prev_block_path in
-  let prev_block =
-    Binable.of_string (module Mina_block.Stable.Latest) prev_block_data
+  let prev_protocol_state =
+    let%map.Option prev_block_path = prev_block_path in
+    let prev_block_data = In_channel.read_all prev_block_path in
+    let prev_block =
+      Binable.of_string (module Mina_block.Stable.Latest) prev_block_data
+    in
+    Mina_block.header prev_block |> Mina_block.Header.protocol_state
+  in
+  let consensus_constants =
+    Consensus.Constants.create ~constraint_constants
+      ~protocol_constants:Genesis_constants_compiled.t.protocol
   in
   let prev_protocol_state =
-    Mina_block.header prev_block |> Mina_block.Header.protocol_state
+    match prev_protocol_state with
+    | None ->
+        generate_protocol_state_stub ~consensus_constants ~constraint_constants
+          init_ledger
+    | Some p ->
+        p
   in
   let apply =
     apply_txs ~constraint_constants ~first_partition_slots ~no_new_stack
