@@ -48,7 +48,7 @@ let mk_tx ~(constraint_constants : Genesis_constants.Constraint_constants.t)
           scale
             (of_fee constraint_constants.account_creation_fee)
             num_acc_updates)
-        |> Option.value_exn
+        |> Option.value_exn ~here:[%here]
     ; zkapp_account_keypairs
     ; memo = Signed_command_memo.empty
     ; new_zkapp_account
@@ -75,9 +75,10 @@ let apply_txs ~constraint_constants ~first_partition_slots ~no_new_stack
   let init_nonce =
     let account_id = Account_id.of_public_key keypair.public_key in
     let loc =
-      Ledger.location_of_account ledger account_id |> Option.value_exn
+      Ledger.location_of_account ledger account_id
+      |> Option.value_exn ~here:[%here]
     in
-    let account = Ledger.get ledger loc |> Option.value_exn in
+    let account = Ledger.get ledger loc |> Option.value_exn ~here:[%here] in
     account.nonce
   in
   let to_nonce =
