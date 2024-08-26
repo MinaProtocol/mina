@@ -830,6 +830,15 @@ module Make (Inputs : Inputs_intf.S) = struct
                 (Account_id.Set.of_list empty_keys)
           } ) ;
       let accounts = get_batch t non_empty_locations in
+      let empty_locations =
+        Option.value_map (last_filled t) ~default:[] ~f:(fun init ->
+            snd
+            @@ List.fold_map empty_keys ~init ~f:(fun loc _ ->
+                   Location.next loc
+                   |> Option.value_map ~default:(loc, loc) ~f:(fun loc' ->
+                          (loc', loc') ) ) )
+      in
+      let locations = empty_locations @ non_empty_locations in
       let all_hash_locations =
         let rec generate_locations account_locations acc =
           match account_locations with
@@ -850,7 +859,7 @@ module Make (Inputs : Inputs_intf.S) = struct
                   generate_locations account_locations
                     (Location.Hash address :: acc) )
         in
-        generate_locations non_empty_locations []
+        generate_locations locations []
       in
       let all_hashes = get_hash_batch_exn t all_hash_locations in
       (* Batch import merkle paths and self hashes. *)
