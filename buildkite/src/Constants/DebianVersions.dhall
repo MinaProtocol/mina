@@ -1,3 +1,7 @@
+let Prelude = ../External/Prelude.dhall
+
+let Optional/default = Prelude.Optional.default
+
 let Profiles = ./Profiles.dhall
 
 let BuildFlags = ./BuildFlags.dhall
@@ -27,13 +31,14 @@ let lowerName =
             debVersion
 
 let dependsOnStep =
-          \(debVersion : DebVersion)
+          \(prefix : Optional Text)
+      ->  \(debVersion : DebVersion)
       ->  \(profile : Profiles.Type)
       ->  \(buildFlag : BuildFlags.Type)
       ->  \(step : Text)
       ->  let profileSuffix = Profiles.toSuffixUppercase profile
 
-          let prefix = "MinaArtifact"
+          let prefix = Optional/default Text "MinaArtifact" prefix
 
           in  merge
                 { Bookworm =
@@ -73,7 +78,12 @@ let dependsOnStep =
 let dependsOn =
           \(debVersion : DebVersion)
       ->  \(profile : Profiles.Type)
-      ->  dependsOnStep debVersion profile BuildFlags.Type.None "build"
+      ->  dependsOnStep
+            (None Text)
+            debVersion
+            profile
+            BuildFlags.Type.None
+            "build"
 
 let minimalDirtyWhen =
       [ S.exactly "buildkite/src/Constants/DebianVersions" "dhall"
@@ -82,8 +92,10 @@ let minimalDirtyWhen =
       , S.exactly "buildkite/src/Command/MinaArtifact" "dhall"
       , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact")
       , S.strictlyStart (S.contains "dockerfiles/stages")
-      , S.exactly "scripts/rebuild-deb" "sh"
-      , S.exactly "scripts/release-docker" "sh"
+      , S.exactly "scripts/debian/build" "sh"
+      , S.exactly "scripts/debian/builder-helpers" "sh"
+      , S.exactly "scripts/docker/release" "sh"
+      , S.exactly "scripts/docker/build" "sh"
       , S.exactly "buildkite/scripts/build-artifact" "sh"
       , S.exactly "buildkite/scripts/build-hardfork-package" "sh"
       , S.exactly "buildkite/scripts/check-compatibility" "sh"

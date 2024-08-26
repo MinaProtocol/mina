@@ -146,9 +146,9 @@ Above definition one need to paste into steps edit box for given pipeline and th
 
 All list of available parameters: 
 
-- DEBIANS - The comma delimitered debian names. For example: `Daemon,Archive`. All available names are located in `buildkite/src/Constans/DebianPackage.dhall` files. Only CamelCase format is supported
+- DEBIANS - The comma delimited debian names. For example: `Daemon,Archive`. All available names are located in `buildkite/src/Constans/DebianPackage.dhall` files. Only CamelCase format is supported
 
-- DOCKERS - The comma delimitered docker names. For example: `Daemon,Archive`. All available names are located in `buildkite/src/Constans/Artifacts.dhall` files. Only CamelCase format is supported 
+- DOCKERS - The comma delimited docker names. For example: `Daemon,Archive`. All available names are located in `buildkite/src/Constans/Artifacts.dhall` files. Only CamelCase format is supported 
 
 - CODENAMES - The Debian codenames `Bullseye,Focal`. All available names are located in `buildkite/src/Constans/DebianVersions.dhall`. Only CamelCase format is supported
 
