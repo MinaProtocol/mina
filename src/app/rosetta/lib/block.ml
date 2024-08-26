@@ -105,7 +105,7 @@ module Sql = struct
       String.concat ~sep:"," fields
 
     let query_count_canonical_at_height =
-      Caqti_request.find Caqti_type.int64 Caqti_type.int64
+      Mina_caqti.find_req Caqti_type.int64 Caqti_type.int64
         {sql| SELECT COUNT(*) FROM blocks
               WHERE height = ?
               AND chain_status = 'canonical'
@@ -113,7 +113,7 @@ module Sql = struct
 
     let query_height_canonical =
       let c_fields = block_fields ~prefix:"c." () in
-      Caqti_request.find_opt Caqti_type.int64 typ
+      Mina_caqti.find_req_opt Caqti_type.int64 typ
         (* The archive database will only reconcile the canonical columns for
          * blocks older than k + epsilon
          *)
@@ -136,7 +136,7 @@ module Sql = struct
       let fields = block_fields () in
       let b_fields = block_fields ~prefix:"b." () in
       let c_fields = block_fields ~prefix:"c." () in
-      Caqti_request.find_opt Caqti_type.int64 typ
+      Mina_caqti.find_req_opt Caqti_type.int64 typ
         (* According to the clarification of the Rosetta spec here
          * https://community.rosetta-api.org/t/querying-block-by-just-its-index/84/3 ,
          * it is important to select only the block on the canonical chain for a
@@ -181,7 +181,7 @@ module Sql = struct
 
     let query_hash =
       let b_fields = block_fields ~prefix:"b." () in
-      Caqti_request.find_opt Caqti_type.string typ
+      Mina_caqti.find_req_opt Caqti_type.string typ
         [%string
           {|
          SELECT b.id,
@@ -198,8 +198,8 @@ module Sql = struct
 
     let query_both =
       let b_fields = block_fields ~prefix:"b." () in
-      Caqti_request.find_opt
-        Caqti_type.(tup2 string int64)
+      Mina_caqti.find_req_opt
+        Caqti_type.(t2 string int64)
         typ
         [%string
           {|
@@ -218,7 +218,7 @@ module Sql = struct
 
     let query_by_id =
       let b_fields = block_fields ~prefix:"b." () in
-      Caqti_request.find_opt Caqti_type.int typ
+      Mina_caqti.find_req_opt Caqti_type.int typ
         [%string
           {|
          SELECT b.id,
@@ -235,7 +235,7 @@ module Sql = struct
 
     let query_best =
       let b_fields = block_fields ~prefix:"b." () in
-      Caqti_request.find_opt Caqti_type.unit typ
+      Mina_caqti.find_req_opt Caqti_type.unit typ
         [%string
           {|
          SELECT b.id,
@@ -252,18 +252,17 @@ module Sql = struct
          LIMIT 1
         |}]
 
-    let run_by_id (module Conn : Caqti_async.CONNECTION) id =
+    let run_by_id (module Conn : Mina_caqti.CONNECTION) id =
       Conn.find_opt query_by_id id
 
-    let run_has_canonical_height (module Conn : Caqti_async.CONNECTION) ~height
-        =
+    let run_has_canonical_height (module Conn : Mina_caqti.CONNECTION) ~height =
       let open Deferred.Result.Let_syntax in
       let%map num_canonical_at_height =
         Conn.find query_count_canonical_at_height height
       in
       Int64.( > ) num_canonical_at_height Int64.zero
 
-    let run (module Conn : Caqti_async.CONNECTION) = function
+    let run (module Conn : Mina_caqti.CONNECTION) = function
       | Some (`This (`Height h)) ->
           let open Deferred.Result.Let_syntax in
           let%bind has_canonical_height =
@@ -273,7 +272,7 @@ module Sql = struct
           else
             let%bind max_height =
               Conn.find
-                (Caqti_request.find Caqti_type.unit Caqti_type.int64
+                (Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
                    {sql| SELECT MAX(height) FROM blocks |sql} )
                 ()
             in
@@ -324,8 +323,7 @@ module Sql = struct
 
     let typ =
       Caqti_type.(
-        tup3 int Archive_lib.Processor.User_command.Signed_command.typ
-          Extras.typ)
+        t3 int Archive_lib.Processor.User_command.Signed_command.typ Extras.typ)
 
     let fields =
       String.concat ~sep:","
@@ -334,8 +332,8 @@ module Sql = struct
            Archive_lib.Processor.User_command.Signed_command.Fields.names
 
     let query =
-      Caqti_request.collect
-        Caqti_type.(tup2 int string)
+      Mina_caqti.collect_req
+        Caqti_type.(t2 int string)
         typ
         [%string
           {|
@@ -386,7 +384,7 @@ module Sql = struct
            AND (t.value = ? OR t.id IS NULL)
         |}]
 
-    let run (module Conn : Caqti_async.CONNECTION) id =
+    let run (module Conn : Mina_caqti.CONNECTION) id =
       Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
   end
 
@@ -534,9 +532,9 @@ module Sql = struct
             ON ic_coinbase_receiver.receiver_id = coinbase_receiver_pk.id
     |sql}]
 
-    let run (module Conn : Caqti_async.CONNECTION) id =
+    let run (module Conn : Mina_caqti.CONNECTION) id =
       Conn.collect_list
-        (Caqti_request.collect Caqti_type.(tup2 int string) typ query)
+        (Mina_caqti.collect_req Caqti_type.(tup2 int string) typ query)
         (id, Mina_base.Token_id.(to_string default))
 
     let to_info t =
@@ -677,9 +675,9 @@ module Sql = struct
       |}]
 
     let query =
-      Caqti_request.collect Caqti_type.(tup2 int string) typ query_string
+      Mina_caqti.collect_req Caqti_type.(t2 int string) typ query_string
 
-    let run (module Conn : Caqti_async.CONNECTION) id =
+    let run (module Conn : Mina_caqti.CONNECTION) id =
       Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
 
     module Make_common (M : sig
@@ -790,7 +788,7 @@ module Sql = struct
     end)
   end
 
-  let run (module Conn : Caqti_async.CONNECTION) input =
+  let run (module Conn : Mina_caqti.CONNECTION) input =
     let module Result = struct
       include Result
 
@@ -948,12 +946,12 @@ module Specific = struct
     module Mock = T (Result)
 
     let real :
-        logger:Logger.t -> db:(module Caqti_async.CONNECTION) -> 'gql Real.t =
+        logger:Logger.t -> db:(module Mina_caqti.CONNECTION) -> 'gql Real.t =
      fun ~logger ~db ->
       { logger
       ; db_block =
           (fun query ->
-            let (module Conn : Caqti_async.CONNECTION) = db in
+            let (module Conn : Mina_caqti.CONNECTION) = db in
             Sql.run (module Conn) query )
       ; validate_network_choice = Network.Validate_choice.Real.validate
       }
