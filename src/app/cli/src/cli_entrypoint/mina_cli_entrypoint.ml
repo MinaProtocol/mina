@@ -648,9 +648,7 @@ let setup_daemon logger =
                () )
           () ;
         let version_metadata = [ ("commit", `String Mina_version.commit_id) ] in
-        [%log info]
-          "Mina daemon is booting up; built with commit $commit on branch \
-           $branch"
+        [%log info] "Mina daemon is booting up; built with commit $commit"
           ~metadata:version_metadata ;
         let%bind () =
           Mina_lib.Conf_dir.check_and_set_lockfile ~logger conf_dir
