@@ -20,7 +20,6 @@ in  { executeCloud =
               , label = "${testName} integration test"
               , key = "integration-test-${testName}"
               , target = Size.Integration
-              , depends_on = dependsOn
               }
     , executeLocal =
             \(testName : Text)
@@ -36,6 +35,5 @@ in  { executeCloud =
               , label = "${testName} integration test local"
               , key = "integration-test-${testName}-local"
               , target = Size.Integration
-              , depends_on = dependsOn
               }
     }
