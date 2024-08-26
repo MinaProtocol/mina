@@ -56,7 +56,7 @@ echo "Promoting debs: ${PACKAGE}_${VERSION} to Release: ${TO_COMPONENT} and Code
 if [[ -z "$NEW_VERSION" ]] || [[ "$NEW_VERSION" == "$VERSION" ]]; then
   deb-s3 copy --s3-region=us-west-2 --lock --bucket packages.o1test.net --preserve-versions --cache-control=max-age=120  $PACKAGE $CODENAME $TO_COMPONENT --versions $VERSION --arch $ARCH --component ${FROM_COMPONENT} --codename ${CODENAME}
 else
-  source scripts/reversion-deb.sh \
+  source scripts/debian/reversion.sh \
     --deb $PACKAGE  \
     --codename $CODENAME \
     --new-release $TO_COMPONENT \
