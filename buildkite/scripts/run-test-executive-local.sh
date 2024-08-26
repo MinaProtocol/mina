@@ -26,8 +26,8 @@ cleanup
 
 TEST_NAME="$1"
 
-MINA_IMAGE="gcr.io/o1labs-192920/mina-daemon:$MINA_DOCKER_TAG-berkeley"
-ARCHIVE_IMAGE="gcr.io/o1labs-192920/mina-archive:$MINA_DOCKER_TAG"
+MINA_IMAGE="gcr.io/o1labs-192920/mina-daemon:$MINA_DOCKER_TAG-berkeley-instrumented"
+ARCHIVE_IMAGE="gcr.io/o1labs-192920/mina-archive:$MINA_DOCKER_TAG-instrumented"
 
 if [[ "${TEST_NAME:0:15}" == "block-prod-prio" ]] && [[ "$RUN_OPT_TESTS" == "" ]]; then
   echo "Skipping $TEST_NAME"
@@ -53,5 +53,6 @@ source buildkite/scripts/debian/install.sh "mina-test-executive"
 mina-test-executive local "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
   --archive-image "$ARCHIVE_IMAGE" \
+  --generate-code-coverage true \
   | tee "$TEST_NAME.local.test.log" \
   | mina-logproc -i inline -f '!(.level in ["Debug", "Spam"])'
