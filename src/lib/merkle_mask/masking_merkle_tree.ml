@@ -630,8 +630,9 @@ module Make (Inputs : Inputs_intf.S) = struct
       let parent = get_parent t in
       let old_root_hash = merkle_root t in
       let account_data = Map.to_alist t.maps.accounts in
+      let hash_cache = t.maps.hashes in
       t.maps <- empty_maps ;
-      Base.set_batch parent account_data ;
+      Base.set_batch ~hash_cache parent account_data ;
       Debug_assert.debug_assert (fun () ->
           [%test_result: Hash.t]
             ~message:
