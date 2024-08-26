@@ -131,11 +131,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let nonce = Fn.compose Payload.nonce payload
 
-  (* for filtering *)
-  let minimum_fee = Currency.Fee.minimum_user_command_fee
-
-  let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
-
   let signer { Poly.signer; _ } = signer
 
   let fee_token (_ : t) = Token_id.default
@@ -192,9 +187,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   module Gen = struct
     let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
-        ?(nonce = Account_nonce.zero) ~fee_range create_body =
+        ?(nonce = Account_nonce.zero)
+        ?(min_fee = Genesis_constants.For_unit_tests.t.minimum_user_command_fee)
+        ~fee_range create_body =
       let open Quickcheck.Generator.Let_syntax in
-      let min_fee = Fee.to_nanomina_int Currency.Fee.minimum_user_command_fee in
+      let min_fee = Fee.to_nanomina_int min_fee in
       let max_fee = min_fee + fee_range in
       let%bind (signer : Signature_keypair.t), (receiver : Signature_keypair.t)
           =
@@ -218,8 +215,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     module Payment = struct
       let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
-          ?nonce ?(min_amount = 1) ~max_amount ~fee_range () =
-        gen_inner sign' ~key_gen ?nonce ~fee_range
+          ?nonce ?(min_amount = 1) ~max_amount ?min_fee ~fee_range () =
+        gen_inner sign' ~key_gen ?nonce ?min_fee ~fee_range
         @@ fun { public_key = receiver; _ } ->
         let open Quickcheck.Generator.Let_syntax in
         let%map amount =
@@ -237,22 +234,23 @@ module Make_str (_ : Wire_types.Concrete) = struct
             gen_inner sign
 
       let gen_with_random_participants ?sign_type ~keys ?nonce ?min_amount
-          ~max_amount ~fee_range =
+          ~max_amount ?min_fee ~fee_range =
         with_random_participants ~keys ~gen:(fun ~key_gen ->
-            gen ?sign_type ~key_gen ?nonce ?min_amount ~max_amount ~fee_range )
+            gen ?sign_type ~key_gen ?nonce ?min_amount ~max_amount ?min_fee
+              ~fee_range )
     end
 
     module Stake_delegation = struct
-      let gen ~key_gen ?nonce ~fee_range () =
-        gen_inner For_tests.fake_sign ~key_gen ?nonce ~fee_range
+      let gen ~key_gen ?nonce ?min_fee ~fee_range () =
+        gen_inner For_tests.fake_sign ~key_gen ?nonce ?min_fee ~fee_range
           (fun { public_key = new_delegate; _ } ->
             Quickcheck.Generator.return
             @@ Signed_command_payload.Body.Stake_delegation
                  (Set_delegate
                     { new_delegate = Public_key.compress new_delegate } ) )
 
-      let gen_with_random_participants ~keys ?nonce ~fee_range =
-        with_random_participants ~keys ~gen:(gen ?nonce ~fee_range)
+      let gen_with_random_participants ~keys ?nonce ?min_fee ~fee_range =
+        with_random_participants ~keys ~gen:(gen ?nonce ?min_fee ~fee_range)
     end
 
     let payment = Payment.gen

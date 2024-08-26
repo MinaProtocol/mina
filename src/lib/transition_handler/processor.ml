@@ -511,7 +511,10 @@ let%test_module "Transition_handler.Processor tests" =
                        (`Capacity branch_size, `Overflow (Drop_head ignore)) )
                 in
                 let clean_up_catchup_scheduler = Ivar.create () in
-                let cache = Unprocessed_transition_cache.create ~logger in
+                let cache =
+                  Unprocessed_transition_cache.create ~logger
+                    ~cache_exceptions:true
+                in
                 run
                   ~context:(module Context)
                   ~time_controller ~verifier ~get_completed_work:(Fn.const None)
