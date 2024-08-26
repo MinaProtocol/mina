@@ -80,6 +80,7 @@ automation/services/watchdog/check_libp2p/check_libp2p
 *.terraform.lock.hcl
 *gcloud-keyfile.json*
 _opam
+opam_switches
 
 target
 ./release
