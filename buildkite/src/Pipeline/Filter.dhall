@@ -39,6 +39,7 @@ let tags
             , Release = [ Tag.Type.Release ]
             , Promote = [ Tag.Type.Promote ]
             , HardforkPackageGeneration = [ Tag.Type.Hardfork ]
+            , IntegrationTest = [ Tag.Type.IntegrationTest ]
             }
             filter
 
@@ -57,6 +58,7 @@ let show
             , DebianBuild = "DebianBuild"
             , DockerBuild = "DockerBuild"
             , HardforkPackageGeneration = "HardforkPackageGeneration"
+            , IntegrationTest = "IntegrationTest"
             }
             filter
 

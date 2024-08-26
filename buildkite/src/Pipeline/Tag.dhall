@@ -21,6 +21,7 @@ let Tag
       | Debian
       | Hardfork
       | Promote
+      | IntegrationTest
       >
 
 let toNatural
@@ -38,8 +39,12 @@ let toNatural
             , Hardfork = 9
             , Stable = 10
             , Promote = 11
+<<<<<<< HEAD
             , Debian = 12
             , Docker = 13
+=======
+            , IntegrationTest = 12
+>>>>>>> 30e70b3437 (allow to run single test without deps)
             }
             tag
 
@@ -75,8 +80,12 @@ let capitalName =
             , Hardfork = "Hardfork"
             , Stable = "Stable"
             , Promote = "Promote"
+<<<<<<< HEAD
             , Docker = "Docker"
             , Debian = "Debian"
+=======
+            , IntegrationTest = "IntegrationTest"
+>>>>>>> 30e70b3437 (allow to run single test without deps)
             }
             tag
 
@@ -94,8 +103,12 @@ let lowerName =
             , Hardfork = "hardfork"
             , Stable = "stable"
             , Promote = "promote"
+<<<<<<< HEAD
             , Docker = "docker"
             , Debian = "debian"
+=======
+            , IntegrationTest = "integrationTest"
+>>>>>>> 30e70b3437 (allow to run single test without deps)
             }
             tag
 

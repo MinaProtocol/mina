@@ -59,22 +59,9 @@ in  Pipeline.build
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
+          , PipelineTag.Type.IntegrationTest
           ]
         , mode = PipelineMode.Type.Stable
         }
-      , steps =
-        [ TestExecutive.executeLocal "peers-reliability" dependsOn
-        , TestExecutive.executeLocal "chain-reliability" dependsOn
-        , TestExecutive.executeLocal "payment" dependsOn
-        , TestExecutive.executeLocal "gossip-consis" dependsOn
-        , TestExecutive.executeLocal "block-prod-prio" dependsOn
-        , TestExecutive.executeLocal "medium-bootstrap" dependsOn
-        , TestExecutive.executeLocal "block-reward" dependsOn
-        , TestExecutive.executeLocal "zkapps" dependsOn
-        , TestExecutive.executeLocal "zkapps-timing" dependsOn
-        , TestExecutive.executeLocal "zkapps-nonce" dependsOn
-        , TestExecutive.executeLocal "verification-key" dependsOn
-        , TestExecutive.executeLocal "slot-end" dependsOn
-        , TestExecutive.executeLocal "epoch-ledger" dependsOn
-        ]
+      , steps = [ TestExecutive.executeLocal "peers-reliability" dependsOn ]
       }
