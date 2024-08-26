@@ -408,7 +408,7 @@ let command_nonce (txn : Transaction_hash.User_command_with_valid_signature.t) =
 let dummy_state_view =
   let state_body =
     let consensus_constants =
-      let genesis_constants = Genesis_constants.for_unit_tests in
+      let genesis_constants = Genesis_constants.For_unit_tests.t in
       Consensus.Constants.create ~constraint_constants
         ~protocol_constants:genesis_constants.protocol
     in
@@ -581,7 +581,7 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
   Transaction_hash.User_command_with_valid_signature.create cmd
 
 let support_for_zkapp_command_commands () =
-  let fee = Fee.minimum_user_command_fee in
+  let fee = Genesis_constants.For_unit_tests.t.minimum_user_command_fee in
   let amount = Amount.of_nanomina_int_exn @@ Fee.to_nanomina_int fee in
   let balance = Option.value_exn (Amount.scale amount 100) in
   let kp1 =
@@ -614,7 +614,7 @@ let support_for_zkapp_command_commands () =
       () )
 
 let nonce_increment_side_effects () =
-  let fee = Fee.minimum_user_command_fee in
+  let fee = Genesis_constants.For_unit_tests.t.minimum_user_command_fee in
   let amount = Amount.of_nanomina_int_exn @@ Fee.to_nanomina_int fee in
   let balance = Option.value_exn (Amount.scale amount 100) in
   let kp1 =
@@ -647,7 +647,7 @@ let nonce_increment_side_effects () =
       () )
 
 let nonce_invariant_violation () =
-  let fee = Fee.minimum_user_command_fee in
+  let fee = Genesis_constants.For_unit_tests.t.minimum_user_command_fee in
   let amount = Amount.of_nanomina_int_exn @@ Fee.to_nanomina_int fee in
   let balance = Option.value_exn (Amount.scale amount 100) in
   let kp1 =

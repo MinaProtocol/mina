@@ -220,7 +220,7 @@ module Network_config = struct
     (* DAEMON CONFIG *)
     let constraint_constants =
       Genesis_ledger_helper.make_constraint_constants
-        ~default:Genesis_constants.Constraint_constants.compiled proof_config
+        ~default:Genesis_constants_compiled.Constraint_constants.t proof_config
     in
     let ledger_is_prefix ledger1 ledger2 =
       List.is_prefix ledger2 ~prefix:ledger1
@@ -243,6 +243,7 @@ module Network_config = struct
             ; zkapp_cmd_limit_hardcap = None
             ; slot_tx_end
             ; slot_chain_end
+            ; minimum_user_command_fee = None
             ; network_id
             }
       ; genesis =
@@ -376,7 +377,7 @@ module Network_config = struct
     let genesis_constants =
       Or_error.ok_exn
         (Genesis_ledger_helper.make_genesis_constants ~logger
-           ~default:Genesis_constants.compiled runtime_config )
+           ~default:Genesis_constants_compiled.t runtime_config )
     in
     let constants : Test_config.constants =
       { constraints = constraint_constants; genesis = genesis_constants }

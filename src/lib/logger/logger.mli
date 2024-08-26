@@ -122,7 +122,13 @@ end
 module Consumer_registry : sig
   type id = string
 
-  val register : id:id -> processor:Processor.t -> transport:Transport.t -> unit
+  val register :
+       ?commit_id:string
+    -> id:id
+    -> processor:Processor.t
+    -> transport:Transport.t
+    -> unit
+    -> unit
 end
 
 type 'a log_function =

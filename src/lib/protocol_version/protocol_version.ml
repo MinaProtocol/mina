@@ -45,11 +45,11 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let to_string t = sprintf "%u.%u.%u" t.transaction t.network t.patch
 
-  let current_transaction = Node_config.protocol_version_transaction
+  let current_transaction = Node_config_version.protocol_version_transaction
 
-  let current_network = Node_config.protocol_version_network
+  let current_network = Node_config_version.protocol_version_network
 
-  let current_patch = Node_config.protocol_version_patch
+  let current_patch = Node_config_version.protocol_version_patch
 
   let current =
     { transaction = current_transaction

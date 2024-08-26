@@ -64,7 +64,6 @@
    consensus
    genesis_constants
    genesis_ledger_helper.lib
-   mina_compile_config
    verifier
    quickcheck_lib
    snark_params

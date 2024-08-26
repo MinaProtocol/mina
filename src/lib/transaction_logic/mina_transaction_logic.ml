@@ -173,13 +173,16 @@ module Transaction_applied = struct
     | Coinbase c ->
         c.new_accounts
 
-  let supply_increase : t -> Currency.Amount.Signed.t Or_error.t =
-   fun t ->
+  let supply_increase :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> t
+      -> Currency.Amount.Signed.t Or_error.t =
+   fun ~constraint_constants t ->
     let open Or_error.Let_syntax in
     let burned_tokens = Currency.Amount.Signed.of_unsigned (burned_tokens t) in
     let account_creation_fees =
       let account_creation_fee_int =
-        Genesis_constants.Constraint_constants.compiled.account_creation_fee
+        constraint_constants.account_creation_fee
         |> Currency.Fee.to_nanomina_int
       in
       let num_accounts_created = List.length @@ new_accounts t in
@@ -323,7 +326,10 @@ module type S = sig
 
     val burned_tokens : t -> Currency.Amount.t
 
-    val supply_increase : t -> Currency.Amount.Signed.t Or_error.t
+    val supply_increase :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> t
+      -> Currency.Amount.Signed.t Or_error.t
 
     val transaction : t -> Transaction.t With_status.t
 

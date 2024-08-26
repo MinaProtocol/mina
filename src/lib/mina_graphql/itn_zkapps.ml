@@ -251,7 +251,10 @@ let send_zkapps ~fee_payer_array ~constraint_constants ~tm_end ~scheduler_tbl
                    ~ignore_sequence_events_precond:true ~no_token_accounts:true
                    ~limited:true ~fee_payer_keypair:fee_payer ~keymap
                    ~account_state_tbl ~generate_new_accounts ~ledger ~vk
-                   ~available_public_keys:unused_pks () )
+                   ~available_public_keys:unused_pks
+                   ~genesis_constants:Genesis_constants_compiled.t
+                   ~constraint_constants:
+                     Genesis_constants_compiled.Constraint_constants.t () )
                ~size:1
                ~random:(Splittable_random.State.create Random.State.default)
     in
