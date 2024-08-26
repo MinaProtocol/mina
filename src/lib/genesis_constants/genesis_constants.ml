@@ -1,7 +1,7 @@
 open Core_kernel
 
 module Proof_level = struct
-  type t = Full | Check | None [@@deriving bin_io_unversioned, equal]
+  type t = Full | Check | None [@@deriving bin_io_unversioned, equal, to_yojson]
 
   let to_string = function Full -> "full" | Check -> "check" | None -> "none"
 
@@ -374,8 +374,6 @@ module T = struct
     Blake2.digest_string str |> Blake2.to_hex
 end
 
-include T
-
 module type S = sig
   module Proof_level : sig
     include module type of Proof_level with type t = Proof_level.t
@@ -486,49 +484,76 @@ end
 
 (* TODO: Delete this module and construct these directly at the top level*)
 module Compiled : sig
-  val genesis_constants : t
+  module Inputs : sig
+
+    type t = {
+      genesis : T.Inputs.t
+    ; constraint_constants : Constraint_constants.Inputs.t
+    ; proof_level : string
+    }
+
+    val t : t
+
+    val to_yojson : t -> Yojson.Safe.t
+  end
+
+  val genesis_constants : T.t
 
   val constraint_constants : Constraint_constants.t
 
   val proof_level : Proof_level.t
+
 end = struct
 
-  let genesis_constants = 
-    let inputs = 
-      { T.Inputs.genesis_state_timestamp = Node_config.genesis_state_timestamp
-      ; k = Node_config.k
-      ; slots_per_epoch = Node_config.slots_per_epoch
-      ; slots_per_sub_window = Node_config.slots_per_sub_window
-      ; grace_period_slots = Node_config.grace_period_slots
-      ; delta = Node_config.delta
-      ; pool_max_size = Node_config.pool_max_size
-      ; zkapp_proof_update_cost = Node_config.zkapp_proof_update_cost
-      ; zkapp_signed_single_update_cost = Node_config.zkapp_signed_single_update_cost
-      ; zkapp_signed_pair_update_cost = Node_config.zkapp_signed_pair_update_cost
-      ; zkapp_transaction_cost_limit = Node_config.zkapp_transaction_cost_limit
-      ; max_event_elements = Node_config.max_event_elements
-      ; max_action_elements = Node_config.max_action_elements
-      ; zkapp_cmd_limit_hardcap = Node_config.zkapp_cmd_limit_hardcap
-      ; minimum_user_command_fee = Node_config.minimum_user_command_fee
-      }
-    in T.make inputs
+  module Inputs = struct
+    type t = {
+      genesis : T.Inputs.t
+    ; constraint_constants : Constraint_constants.Inputs.t
+    ; proof_level : string
+    } [@@deriving to_yojson]
 
-  let constraint_constants = 
-    let inputs = 
-      { Constraint_constants.Inputs.scan_state_with_tps_goal = Node_config.scan_state_with_tps_goal
-      ; scan_state_tps_goal_x10 = Node_config.scan_state_tps_goal_x10
-      ; block_window_duration = Node_config.block_window_duration
-      ; scan_state_transaction_capacity_log_2 = Node_config.scan_state_transaction_capacity_log_2
-      ; supercharged_coinbase_factor = Node_config.supercharged_coinbase_factor
-      ; scan_state_work_delay = Node_config.scan_state_work_delay
-      ; coinbase = Node_config.coinbase
-      ; account_creation_fee_int  = Node_config.account_creation_fee_int
-      ; ledger_depth = Node_config.ledger_depth
-      ; sub_windows_per_window = Node_config.sub_windows_per_window
-      } 
+    let genesis = 
+        { T.Inputs.genesis_state_timestamp = Node_config.genesis_state_timestamp
+        ; k = Node_config.k
+        ; slots_per_epoch = Node_config.slots_per_epoch
+        ; slots_per_sub_window = Node_config.slots_per_sub_window
+        ; grace_period_slots = Node_config.grace_period_slots
+        ; delta = Node_config.delta
+        ; pool_max_size = Node_config.pool_max_size
+        ; zkapp_proof_update_cost = Node_config.zkapp_proof_update_cost
+        ; zkapp_signed_single_update_cost = Node_config.zkapp_signed_single_update_cost
+        ; zkapp_signed_pair_update_cost = Node_config.zkapp_signed_pair_update_cost
+        ; zkapp_transaction_cost_limit = Node_config.zkapp_transaction_cost_limit
+        ; max_event_elements = Node_config.max_event_elements
+        ; max_action_elements = Node_config.max_action_elements
+        ; zkapp_cmd_limit_hardcap = Node_config.zkapp_cmd_limit_hardcap
+        ; minimum_user_command_fee = Node_config.minimum_user_command_fee
+        }
+
+    let constraint_constants = 
+        { Constraint_constants.Inputs.scan_state_with_tps_goal = Node_config.scan_state_with_tps_goal
+        ; scan_state_tps_goal_x10 = Node_config.scan_state_tps_goal_x10
+        ; block_window_duration = Node_config.block_window_duration
+        ; scan_state_transaction_capacity_log_2 = Node_config.scan_state_transaction_capacity_log_2
+        ; supercharged_coinbase_factor = Node_config.supercharged_coinbase_factor
+        ; scan_state_work_delay = Node_config.scan_state_work_delay
+        ; coinbase = Node_config.coinbase
+        ; account_creation_fee_int  = Node_config.account_creation_fee_int
+        ; ledger_depth = Node_config.ledger_depth
+        ; sub_windows_per_window = Node_config.sub_windows_per_window
+        } 
+
+    let proof_level = Node_config.proof_level
+
+    let t = { genesis; constraint_constants; proof_level }
+  end
     
-    in Constraint_constants.make inputs
-     
 
-  let proof_level = Proof_level.of_string Node_config.proof_level
+  let genesis_constants = T.make Inputs.genesis
+
+  let constraint_constants = Constraint_constants.make Inputs.constraint_constants
+
+  let proof_level = Proof_level.of_string Inputs.proof_level
+
+
 end

@@ -1,6 +1,7 @@
 (library
  (name genesis_constants)
  (public_name genesis_constants)
+ (modules genesis_constants)
  (library_flags -linkall)
  (inline_tests (flags -verbose -show-counts))
  (libraries
@@ -38,3 +39,11 @@
                h_list.ppx
                ppx_inline_test))
  (synopsis "Coda genesis constants"))
+
+(executable
+ (name gen_json)
+ (modules gen_json)
+ (modes native)
+ (libraries base core_kernel genesis_constants)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version)))
