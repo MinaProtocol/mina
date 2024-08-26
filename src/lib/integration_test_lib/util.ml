@@ -2,11 +2,21 @@ open Core
 open Async
 module Timeout = Timeout_lib.Core_time
 
-let run_cmd dir prog args =
+let run_cmd dir prog args ?env () =
+  let envs =
+    match env with
+    | Some (`Extend list) ->
+        List.map list ~f:(fun (key, value) -> `String (key ^ "=" ^ value))
+    | _ ->
+        []
+  in
   [%log' spam (Logger.create ())]
     "Running command (from %s): $command" dir
-    ~metadata:[ ("command", `String (String.concat (prog :: args) ~sep:" ")) ] ;
-  Process.create_exn ~working_dir:dir ~prog ~args ()
+    ~metadata:
+      [ ("command", `String (String.concat (prog :: args) ~sep:" "))
+      ; ("envs", `List envs)
+      ] ;
+  Process.create_exn ~working_dir:dir ~prog ~args ?env ()
   >>= Process.collect_output_and_wait
 
 let check_cmd_output ~prog ~args output =
@@ -59,19 +69,19 @@ let run_cmd_or_error_timeout ~timeout_seconds dir prog args =
   in
   res
 
-let run_cmd_or_error dir prog args =
-  let%bind output = run_cmd dir prog args in
+let run_cmd_or_error ?env dir prog args =
+  let%bind output = run_cmd dir prog args ?env () in
   check_cmd_output ~prog ~args output
 
-let run_cmd_exn dir prog args =
-  match%map run_cmd_or_error dir prog args with
+let run_cmd_exn ?env dir prog args =
+  match%map run_cmd_or_error ?env dir prog args with
   | Ok output ->
       output
   | Error error ->
       Error.raise error
 
-let run_cmd_or_hard_error ?exit_code dir prog args =
-  let%bind output = run_cmd dir prog args in
+let run_cmd_or_hard_error ?exit_code ?env dir prog args =
+  let%bind output = run_cmd dir prog args ?env () in
   Deferred.bind
     ~f:(Malleable_error.or_hard_error ?exit_code)
     (check_cmd_output ~prog ~args output)

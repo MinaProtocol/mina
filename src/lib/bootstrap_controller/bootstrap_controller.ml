@@ -694,7 +694,7 @@ let%test_module "Bootstrap_controller tests" =
     open Pipe_lib
 
     let max_frontier_length =
-      Transition_frontier.global_max_length Genesis_constants.compiled
+      Transition_frontier.global_max_length Genesis_constants.For_unit_tests.t
 
     let logger = Logger.create ()
 
@@ -718,7 +718,7 @@ let%test_module "Bootstrap_controller tests" =
       let precomputed_values = precomputed_values
 
       let constraint_constants =
-        Genesis_constants.Constraint_constants.for_unit_tests
+        Genesis_constants.For_unit_tests.Constraint_constants.t
 
       let consensus_constants = precomputed_values.consensus_constants
     end
@@ -806,7 +806,7 @@ let%test_module "Bootstrap_controller tests" =
               let sync_deferred =
                 sync_ledger bootstrap ~root_sync_ledger ~transition_graph
                   ~preferred:[] ~sync_ledger_reader
-                  ~genesis_constants:Genesis_constants.compiled
+                  ~genesis_constants:Genesis_constants.For_unit_tests.t
               in
               let%bind () =
                 Deferred.List.iter branch ~f:(fun breadcrumb ->

@@ -66,7 +66,7 @@ let add_to_balance balance amount =
       None
 
 let verify_balance_change ~balance_change orig updt =
-  let open Account.Poly in
+  let open Account in
   add_to_balance orig.balance balance_change
   |> Option.value_map ~default:false ~f:(Balance.equal updt.balance)
 

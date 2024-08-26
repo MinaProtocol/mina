@@ -18,7 +18,7 @@
 #          - "NETWORK=Devnet"
 #          - "FROM_VERSION=3.0.0devnet-tooling-dkijania-hardfork-package-gen-in-nightly-b37f50e"
 #          - "NEW_VERSION=3.0.0fake-ddb6fc4"
-#          - "CODENAMES=Focal,Buster,Bullseye"
+#          - "CODENAMES=Focal,Bullseye"
 #          - "FROM_CHANNEL=Unstable"
 #          - "TO_CHANNEL=Experimental"
 #        image: codaprotocol/ci-toolchain-base:v3
@@ -41,7 +41,7 @@ function usage() {
   fi
   echo "  DEBIANS                     The comma delimitered debian names. For example: 'Daemon,Archive' "
   echo "  DOCKERS                     The comma delimitered docker names. For example: 'Daemon,Archive' "
-  echo "  CODENAMES                   The Debian codenames (Bullseye, Buster etc.)"
+  echo "  CODENAMES                   The Debian codenames (Bullseye, Focal etc.)"
   echo "  FROM_VERSION                The Source Docker or Debian version "
   echo "  NEW_VERSION                 The new Debian version or new Docker tag"
   echo "  REMOVE_PROFILE_FROM_NAME    Should we remove profile suffix from debian name"

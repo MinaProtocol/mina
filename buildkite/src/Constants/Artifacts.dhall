@@ -11,6 +11,7 @@ let Network = ./Network.dhall
 let Artifact
     : Type
     = < Daemon
+      | LogProc
       | Archive
       | TestExecutive
       | BatchTxn
@@ -21,6 +22,7 @@ let Artifact
 
 let AllButTests =
       [ Artifact.Daemon
+      , Artifact.LogProc
       , Artifact.Archive
       , Artifact.BatchTxn
       , Artifact.TestExecutive
@@ -28,7 +30,8 @@ let AllButTests =
       , Artifact.ZkappTestTransaction
       ]
 
-let Main = [ Artifact.Daemon, Artifact.Archive, Artifact.Rosetta ]
+let Main =
+      [ Artifact.Daemon, Artifact.LogProc, Artifact.Archive, Artifact.Rosetta ]
 
 let All = AllButTests # [ Artifact.FunctionalTestSuite ]
 
@@ -36,6 +39,7 @@ let capitalName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "Daemon"
+            , LogProc = "LogProc"
             , Archive = "Archive"
             , TestExecutive = "TestExecutive"
             , BatchTxn = "BatchTxn"
@@ -49,6 +53,7 @@ let lowerName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "daemon"
+            , LogProc = "logproc"
             , Archive = "archive"
             , TestExecutive = "test_executive"
             , BatchTxn = "batch_txn"
@@ -64,6 +69,7 @@ let dockerName =
             { Daemon = "mina-daemon"
             , Archive = "mina-archive"
             , TestExecutive = "mina-test-executive"
+            , LogProc = "mina-logproc"
             , BatchTxn = "mina-batch-txn"
             , Rosetta = "mina-rosetta"
             , ZkappTestTransaction = "mina-zkapp-test-transaction"
@@ -76,10 +82,11 @@ let toDebianName =
       ->  \(network : Network.Type)
       ->  merge
             { Daemon = "daemon_${Network.lowerName network}"
+            , LogProc = "logproc"
             , Archive = "archive"
             , TestExecutive = "test_executive"
             , BatchTxn = "batch_txn"
-            , Rosetta = ""
+            , Rosetta = "rosetta_${Network.lowerName network}"
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             }
@@ -101,9 +108,17 @@ let toDebianNames =
                                 (\(n : Network.Type) -> toDebianName a n)
                                 networks
                           , Archive = [ "archive" ]
+                          , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
                           , BatchTxn = [ "batch_txn" ]
-                          , Rosetta = [ "" ]
+                          , Rosetta =
+                              Prelude.List.map
+                                Network.Type
+                                Text
+                                (     \(n : Network.Type)
+                                  ->  "rosetta_${Network.lowerName n}"
+                                )
+                                networks
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]
                           }
@@ -143,6 +158,7 @@ let dockerTag =
                     "${version_and_codename}-${Network.lowerName
                                                  network}${profile_part}"
                 , Archive = "${version_and_codename}"
+                , LogProc = "${version_and_codename}"
                 , TestExecutive = "${version_and_codename}"
                 , BatchTxn = "${version_and_codename}"
                 , Rosetta = "${version_and_codename}"
