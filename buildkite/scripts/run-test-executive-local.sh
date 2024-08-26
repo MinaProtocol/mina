@@ -26,13 +26,8 @@ cleanup
 
 TEST_NAME="$1"
 
-<<<<<<< HEAD
-MINA_IMAGE="gcr.io/o1labs-192920/mina-daemon:$MINA_DOCKER_TAG-devnet"
-ARCHIVE_IMAGE="gcr.io/o1labs-192920/mina-archive:$MINA_DOCKER_TAG"
-=======
 MINA_IMAGE="gcr.io/o1labs-192920/mina-daemon:3.0.0-develop-541f49f-focal-devnet"
 ARCHIVE_IMAGE="gcr.io/o1labs-192920/mina-archive:3.0.0-develop-541f49f-focal"
->>>>>>> 30e70b3437 (allow to run single test without deps)
 
 if [[ "${TEST_NAME:0:15}" == "block-prod-prio" ]] && [[ "$RUN_OPT_TESTS" == "" ]]; then
   echo "Skipping $TEST_NAME"
@@ -42,14 +37,14 @@ fi
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
 
-rm -f /etc/apt/sources.list.d/hashicorp.list
-
-apt-get update
-apt-get install -y git apt-transport-https ca-certificates
+apt-get update && apt-get install -y git apt-transport-https ca-certificates tzdata curl
 
 TESTNET_NAME="devnet"
 
 git config --global --add safe.directory /workdir
+
+echo "deb [trusted=yes] https://apt.releases.hashicorp.com $MINA_DEB_CODENAME main" | tee /etc/apt/sources.list.d/hashicorp.list
+apt-get update -y && apt-get install -y "terraform"
 
 source buildkite/scripts/debian/install.sh "mina-test-executive"
 
