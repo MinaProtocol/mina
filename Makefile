@@ -74,7 +74,9 @@ endif
 ocaml_checks: switch ocaml_version ocaml_word_size check_opam_switch
 
 libp2p_helper:
+ifeq (, $(MINA_LIBP2P_HELPER_PATH))
 	make -C src/app/libp2p_helper
+endif
 
 genesis_ledger: ocaml_checks
 	$(info Building runtime_genesis_ledger)
