@@ -134,7 +134,7 @@ steps:
           - "NETWORK=Devnet"
           - "FROM_VERSION=3.0.0devnet-tooling-dkijania-hardfork-package-gen-in-nightly-b37f50e"
           - "NEW_VERSION=3.0.0fake-ddb6fc4"
-          - "CODENAMES=Focal,Buster,Bullseye"
+          - "CODENAMES=Focal,Bullseye"
           - "FROM_CHANNEL=Unstable"
           - "TO_CHANNEL=Experimental"
         image: codaprotocol/ci-toolchain-base:v3
@@ -150,7 +150,7 @@ All list of available parameters:
 
 - DOCKERS - The comma delimitered docker names. For example: `Daemon,Archive`. All available names are located in `buildkite/src/Constans/Artifacts.dhall` files. Only CamelCase format is supported 
 
-- CODENAMES - The Debian codenames `Bullseye,Buster,Focal`. All available names are located in `buildkite/src/Constans/DebianVersions.dhall`. Only CamelCase format is supported
+- CODENAMES - The Debian codenames `Bullseye,Focal`. All available names are located in `buildkite/src/Constans/DebianVersions.dhall`. Only CamelCase format is supported
 
 - FROM_VERSION - The Source Docker or Debian version
 
@@ -187,7 +187,7 @@ Pipeline with create 6 jobs for each Docker and Debian component separately.
   - "FROM_VERSION=3.0.0devnet-tooling-dkijania-hardfork-package-gen-in-nightly-b37f50e"
   - "NEW_VERSION=3.0.0-ddb6fc4"
   - "PUBLISH"=1
-  - "CODENAMES=Focal,Buster,Bullseye"
+  - "CODENAMES=Focal,Bullseye"
   - "FROM_CHANNEL=Unstable"
   - "TO_CHANNEL=Devnet"
     
@@ -202,6 +202,6 @@ We want only to move dockers from gcr to dockerhub without changing version. Cur
   - "NETWORK=Devnet"
   - "FROM_VERSION=3.0.0-dc6bf78"
   - "NEW_VERSION=3.0.0-dc6bf78"
-  - "CODENAMES=Focal,Buster,Bullseye"
+  - "CODENAMES=Focal,Bullseye"
   - "PUBLISH=1"
 ```
