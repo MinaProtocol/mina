@@ -668,6 +668,7 @@ dependencies = [
  "rand",
  "rand_core",
  "rayon",
+ "rmp-serde 1.1.1",
  "serde",
  "serde_with",
  "sha2",
