@@ -14,11 +14,13 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let DebianRepo = ../../Constants/DebianRepo.dhall
 
+let Network = ../../Constants/Network.dhall
+
 let spec =
       DockerImage.ReleaseSpec::{
       , service = "itn-orchestrator"
       , step_key = "itn-orchestrator-docker-image"
-      , network = "devnet"
+      , network = "${Network.lowerName Network.Type.Devnet}"
       , deb_repo = DebianRepo.Type.Local
       , deps =
           DebianVersions.dependsOn
