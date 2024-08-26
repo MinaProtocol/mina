@@ -18,14 +18,13 @@ function usage() {
   if [[ -n "$1" ]]; then
     echo -e "${RED}☞  $1${CLEAR}\n";
   fi
-  echo "Usage: $0 [-n name] [-r release] [-v version] [-c codename]"
-  echo "  -n, --name          The Debian archive name"
-  echo "  --names             The Debians archive names"
+  echo "Usage: $0 -n names -r release -v version -c codename"
+  echo "  -n, --names         The Debians archive names"
   echo "  -r, --release       The Debian release"
   echo "  -v, --version       The Debian version"
   echo "  -c, --codename      The Debian codename"
   echo ""
-  echo "Example: $0 --name mina-archive_2.0.0berkeley-rc1-berkeley-48efea4 --release unstable --version 2.0.0berkeley-rc1-berkeley-48efea4 --codename bullseye "
+  echo "Example: $0 --name mina-archive --release unstable --version 2.0.0berkeley-rc1-berkeley-48efea4 --codename bullseye "
   exit 1
 }
 
@@ -45,6 +44,7 @@ S3_REGION_ARG='--s3-region=us-west-2'
 #>> Attempting to obtain a lock
 #/var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
 DEBS3_UPLOAD="deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
+  --fail-if-exists \
   --lock \
   --preserve-versions \
   --cache-control=max-age=120"
@@ -57,7 +57,7 @@ for i in {1..10}; do (
     --component "${DEB_RELEASE}" \
     --codename "${DEB_CODENAME}" \
     "${DEB_NAMES}"
-) && break || scripts/clear-deb-s3-lockfile.sh; done
+) && break || scripts/debian/clear-s3-lockfile.sh; done
 
 # Verify integrity of debs on remote repo
 function verify_o1test_repo_has_package {

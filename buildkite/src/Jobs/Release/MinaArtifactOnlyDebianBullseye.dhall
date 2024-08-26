@@ -1,21 +1,28 @@
 let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
-let DebianVersions = ../../Constants/DebianVersions.dhall
-
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
+let PipelineTag = ../../Pipeline/Tag.dhall
+
+let DebianChannel = ../../Constants/DebianChannel.dhall
+
 in  Pipeline.build
-      ( ArtifactPipelines.pipeline
+      ( ArtifactPipelines.onlyDebianPipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon
+            , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.BatchTxn
+            , Artifacts.Type.TestExecutive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
+            , Artifacts.Type.FunctionalTestSuite
             ]
-          , debVersion = DebianVersions.DebVersion.Buster
+          , tags = [ PipelineTag.Type.Debian ]
+          , channel = DebianChannel.Type.Experimental
+          , prefix = "MinaArtifactOnlyDebian"
           }
       )
