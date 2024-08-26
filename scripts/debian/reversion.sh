@@ -60,4 +60,4 @@ function rebuild_deb() {
 
 rebuild_deb
 
-source scripts/publish-deb.sh --names "${NEW_NAME}_${NEW_VERSION}.deb" --version ${NEW_VERSION} --codename ${CODENAME} --release ${NEW_RELEASE}
+source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}.deb" --version ${NEW_VERSION} --codename ${CODENAME} --release ${NEW_RELEASE}
