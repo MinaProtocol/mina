@@ -156,7 +156,7 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
     Deferred.return `Ignored
   else
     match%bind
-      Mina_networking.get_ancestry t.network sender.Peer.peer_id
+      Mina_networking.get_ancestry t.network sender
         (With_hash.map_hash candidate_consensus_state
            ~f:State_hash.State_hashes.state_hash )
     with
@@ -349,7 +349,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
             time_deferred
               (Mina_networking
                .get_staged_ledger_aux_and_pending_coinbases_at_hash t.network
-                 sender.peer_id hash )
+                 sender hash )
           in
           match staged_ledger_data_download_result with
           | Error err ->

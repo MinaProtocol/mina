@@ -1737,13 +1737,15 @@ let%test_module "Ledger_catchup tests" =
       let attempt_counter = ref 0 in
       let impl_rpc :
              Mina_networking.Rpcs.Get_transition_chain.query Envelope.Incoming.t
-          -> Mina_networking.Rpcs.Get_transition_chain.response Deferred.t =
+          -> Mina_networking.Rpcs.Get_transition_chain.reply
+             Mina_networking.Gossip_net.rpc_response
+             Deferred.t =
        fun _ ->
         let () =
           attempt_counter := !attempt_counter + 1 ;
           if !attempt_counter > 1 then Ivar.fill_if_empty attempts_ivar true
         in
-        Deferred.return (Some [])
+        Deferred.Result.return []
       in
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
@@ -1755,21 +1757,21 @@ let%test_module "Ledger_catchup tests" =
                 ~frontier_branch_size:(max_frontier_length / 2)
                 ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
                 ?get_some_initial_peers:None ?answer_sync_ledger_query:None
-                ?get_ancestry:None ?get_best_tip:None ?get_node_status:None
+                ?get_ancestry:None ?get_best_tip:None
                 ?get_transition_knowledge:None ?get_transition_chain_proof:None
                 ?get_transition_chain:(Some impl_rpc)
             ; peer_with_branch_custom_rpc
                 ~frontier_branch_size:(max_frontier_length / 2)
                 ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
                 ?get_some_initial_peers:None ?answer_sync_ledger_query:None
-                ?get_ancestry:None ?get_best_tip:None ?get_node_status:None
+                ?get_ancestry:None ?get_best_tip:None
                 ?get_transition_knowledge:None ?get_transition_chain_proof:None
                 ?get_transition_chain:(Some impl_rpc)
             ; peer_with_branch_custom_rpc
                 ~frontier_branch_size:(max_frontier_length / 2)
                 ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
                 ?get_some_initial_peers:None ?answer_sync_ledger_query:None
-                ?get_ancestry:None ?get_best_tip:None ?get_node_status:None
+                ?get_ancestry:None ?get_best_tip:None
                 ?get_transition_knowledge:None ?get_transition_chain_proof:None
                 ?get_transition_chain:(Some impl_rpc)
             ])
