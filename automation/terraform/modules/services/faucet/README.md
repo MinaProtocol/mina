@@ -63,14 +63,17 @@ The manual commands to release each container are the following:
 ### Mina-Daemon Container
 
 *(From the root of the `MinaProtocol/mina` repository)*
+`./scripts/docker/build.sh -s mina-daemon -v <major>.<minor>.<patch> --deb_version=<DEB_VERSION> --deb_release=<mina package release channel, e.g. alpha>"`
 
-`./scripts/release-docker.sh -s mina-daemon -v <major>.<minor>.<patch> --extra-args "--build-arg deb_version=<deb_version>"`
+and 
 
-### daemon Container
+`./scripts/docker/release.sh -s mina-daemon -v <major>.<minor>.<patch> -  --deb_version=<DEB_VERSION> --deb_release=<mina package release channel, e.g. alpha>"`
 
-*(From the root of the `MinaProtocol/mina/automation` repository)*
 
-`./scripts/release-docker.sh -s daemon -v <major>.<minor>.<patch> --extra-args "--build-arg base_image_tag=<docker tag created in first step>"`
+Example:
+`./scripts/docker/build.sh -s mina-daemon -v 0.0.10-beta4 --deb_version=0.0.10-beta4-fff3b856 --deb_release=alpha`
+
+`./scripts/docker/release.sh -s mina-daemon -v 0.0.10-beta4 --deb_version=0.0.10-beta4-fff3b856 --deb_release=alpha`
 
 The `--extra-args` argument is for passing additional parameters directly to the `docker build` command. It is used here to pass the required Dockerfile variable `base_image_tag` but can also be used to override Dockerfile variables with default values like so `--build-arg deb_repo=release`
 
@@ -80,5 +83,10 @@ The Faucet Dockerfile lives in the `MinaProtocol/mina` repository [here](https:/
 
 *(From the root of the `MinaProtocol/mina` repository)*
 
-`./scripts/release-docker.sh -s bot -v <major>.<minor>.<patch>`
+```
+./scripts/docker/build.sh -s bot -v <major>.<minor>.<patch>
+./scripts/docker/release.sh -s bot -v <major>.<minor>.<patch>
+```
+
+
 

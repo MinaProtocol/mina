@@ -250,6 +250,47 @@ dune exec src/app/cli/src/mina.exe -- -help
 
 The command line help is the place to learn about other options to the Mina CLI and how to connect to an existing network, such as Mainnet.
 
+## Building debian package locally
+
+Debian package can be build locally by using below commands:
+
+
+1. Build binaries
+```
+make build
+```
+2. Build debian for mina-devet (example for ubuntu 18.04):
+```
+./scripts/debian/build.sh daemon_devnet
+```
+
+## Building docker locally
+
+Prerequisites: 
+
+- debian package previously built
+- aptly app
+
+Steps:
+
+1. Start local debian repository
+```
+./scripts/debian/aptly.sh start -b -c focal -d _build/ -m unstable -l -p 8081
+```
+
+IMPORTANT: debians should be placed in _build folder
+
+2. Build docker:
+```
+./scripts/docker/build.sh --service mina-daemon -v 3.0.0-dkijania-local-debian-build-a099fc7 --network devnet --deb-codename focal --deb-version 3.0.0-dkijania-local-debian-build-a099fc7 
+```
+
+Where:
+
+`-v` - base docker tag
+`--deb-codename` - input debian codename (buster,bullseye etc.)
+`--deb-version` - version of debian which docker will host
+
 ## Using the Makefile
 
 The Makefile contains placeholder targets for all the common tasks that need to be done and automatically knows how to use Docker.
