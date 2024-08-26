@@ -310,14 +310,8 @@ module Vrf = struct
 
   let batch_check_witness =
 
-    let constraint_config_file =
-      Command.Param.flag "--config-file" ~aliases:[ "config-file" ]
-        ~doc:
-          "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
-           default: <config_dir>/daemon.json). Pass multiple times to override \
-           fields from earlier config files"
-        (Command.Param.optional Command.Param.string)
-    in
+    let open Command.Let_syntax in
+
     Command.async
       ~summary:
         "Check a batch of vrf evaluation witnesses read on stdin. Outputs the \
@@ -328,13 +322,20 @@ module Vrf = struct
          totalStake: 1000000000}. The threshold is not checked against a \
          ledger; this should be done manually to confirm whether threshold_met \
          in the output corresponds to an actual won block."
-      ( Command.Param.map constraint_config_file ~f:(fun constraint_config_file () -> (*@@ Exceptions.handle_nicely *)
-
+      (let%map_open constraint_config_file =
+        Command.Param.flag "--config-file" ~aliases:[ "config-file" ]
+          ~doc:
+            "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
+             default: <config_dir>/daemon.json). Pass multiple times to override \
+             fields from earlier config files"
+          (Command.Param.optional Command.Param.string)
+      in
+      fun () ->
       let open Deferred.Let_syntax in
       (* TODO-someday: constraint constants from config file. *)
       let lexbuf = Lexing.from_channel In_channel.stdin in
       let lexer = Yojson.init_lexer () in
-      let constraint_constants : Genesis_constants.Constraint_constants.t = 
+      let constraint_constants = 
         Yojson.Safe.from_file (Option.value_exn constraint_config_file) |> 
         Genesis_constants.Constraint_constants.Inputs.of_yojson |>
         Result.ok_or_failwith |>
@@ -370,7 +371,7 @@ module Vrf = struct
                      (Error_json.error_to_yojson err) ) ;
                 `Repeat () )
       in
-      exit 0 ))
+      exit 0 )
 
   let command_group =
     Command.group ~summary:"Commands for vrf evaluations"
