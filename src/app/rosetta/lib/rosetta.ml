@@ -4,7 +4,7 @@ open Rosetta_lib
 
 let router ~graphql_uri ~minimum_user_command_fee ~account_creation_fee
     ~(pool :
-       ( (Mina_caqti.connection, [> Caqti_error.connect ]) Mina_caqti.Pool.t
+       ( (Caqti_async.connection, [> Caqti_error.connect ]) Mina_caqti.Pool.t
        , [ `App of Errors.t ] )
        Deferred.Result.t
        lazy_t ) ~logger route body =
