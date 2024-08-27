@@ -113,7 +113,7 @@ module Sql = struct
 
     let query_height_canonical =
       let c_fields = block_fields ~prefix:"c." () in
-      Mina_caqti.find_req_opt Caqti_type.int64 typ
+      Mina_caqti.find_opt_req Caqti_type.int64 typ
         (* The archive database will only reconcile the canonical columns for
          * blocks older than k + epsilon
          *)
@@ -136,7 +136,7 @@ module Sql = struct
       let fields = block_fields () in
       let b_fields = block_fields ~prefix:"b." () in
       let c_fields = block_fields ~prefix:"c." () in
-      Mina_caqti.find_req_opt Caqti_type.int64 typ
+      Mina_caqti.find_opt_req Caqti_type.int64 typ
         (* According to the clarification of the Rosetta spec here
          * https://community.rosetta-api.org/t/querying-block-by-just-its-index/84/3 ,
          * it is important to select only the block on the canonical chain for a
@@ -181,7 +181,7 @@ module Sql = struct
 
     let query_hash =
       let b_fields = block_fields ~prefix:"b." () in
-      Mina_caqti.find_req_opt Caqti_type.string typ
+      Mina_caqti.find_opt_req Caqti_type.string typ
         [%string
           {|
          SELECT b.id,
@@ -198,7 +198,7 @@ module Sql = struct
 
     let query_both =
       let b_fields = block_fields ~prefix:"b." () in
-      Mina_caqti.find_req_opt
+      Mina_caqti.find_opt_req
         Caqti_type.(t2 string int64)
         typ
         [%string
@@ -218,7 +218,7 @@ module Sql = struct
 
     let query_by_id =
       let b_fields = block_fields ~prefix:"b." () in
-      Mina_caqti.find_req_opt Caqti_type.int typ
+      Mina_caqti.find_opt_req Caqti_type.int typ
         [%string
           {|
          SELECT b.id,
@@ -235,7 +235,7 @@ module Sql = struct
 
     let query_best =
       let b_fields = block_fields ~prefix:"b." () in
-      Mina_caqti.find_req_opt Caqti_type.unit typ
+      Mina_caqti.find_opt_req Caqti_type.unit typ
         [%string
           {|
          SELECT b.id,
@@ -534,7 +534,7 @@ module Sql = struct
 
     let run (module Conn : Mina_caqti.CONNECTION) id =
       Conn.collect_list
-        (Mina_caqti.collect_req Caqti_type.(tup2 int string) typ query)
+        (Mina_caqti.collect_req Caqti_type.(t2 int string) typ query)
         (id, Mina_base.Token_id.(to_string default))
 
     let to_info t =
