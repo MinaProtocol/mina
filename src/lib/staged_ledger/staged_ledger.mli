@@ -77,7 +77,7 @@ module Scan_state : sig
     -> Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
        Or_error.t
 
-  (** Apply transactions corresponding to the last emitted proof based on the 
+  (** Apply transactions corresponding to the last emitted proof based on the
     two-pass system to get snarked ledger- first pass includes legacy transactions and zkapp payments and the second pass includes account updates. This ignores any account updates if a blocks transactions were split among two trees.
     *)
   val get_snarked_ledger_sync :
@@ -104,7 +104,7 @@ module Scan_state : sig
     -> t
     -> unit Or_error.t
 
-  (** Apply transactions corresponding to the last emitted proof based on the 
+  (** Apply transactions corresponding to the last emitted proof based on the
     two-pass system to get snarked ledger- first pass includes legacy transactions and zkapp payments and the second pass includes account updates. This ignores any account updates if a blocks transactions were split among two trees.
     *)
   val get_snarked_ledger_async :
@@ -356,4 +356,28 @@ module Test_helpers : sig
        ?global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> unit
     -> Zkapp_precondition.Protocol_state.View.t
+
+  val update_coinbase_stack_and_get_data_impl :
+       logger:Logger.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
+    -> first_partition_slots:int
+    -> no_second_partition:bool
+    -> is_new_stack:bool
+    -> Ledger.t
+    -> Pending_coinbase.t
+    -> Transaction.t With_status.t list
+    -> Zkapp_precondition.Protocol_state.View.t
+    -> Frozen_ledger_hash.t * Frozen_ledger_hash.t
+    -> ( bool
+         * Transaction_snark_scan_state.Transaction_with_witness.t list
+         * Pending_coinbase.Update.Action.t
+         * [> `Update_none
+           | `Update_one of Pending_coinbase.Stack_versioned.t
+           | `Update_two of
+             Pending_coinbase.Stack_versioned.t
+             * Pending_coinbase.Stack_versioned.t ]
+         * [> `First_pass_ledger_end of Frozen_ledger_hash.t ]
+       , Staged_ledger_error.t )
+       Deferred.Result.t
 end
