@@ -222,7 +222,7 @@ let docker_step
                     , deps = deps
                     , service =
                         Artifacts.dockerName Artifacts.Type.FunctionalTestSuite
-                    , network = Network.lowerName Network.Type.Berkeley
+                    , network = Network.lowerName Network.Type.Devnet
                     , deb_codename =
                         "${DebianVersions.lowerName spec.debVersion}"
                     , build_flags = spec.buildFlags
@@ -233,7 +233,6 @@ let docker_step
                                         spec.debVersion}${Profiles.toLabelSegment
                                                             spec.profile}${BuildFlags.toLabelSegment
                                                                              spec.buildFlags}-docker-image"
-                    , network = "${Network.lowerName Network.Type.Devnet}"
                     }
                   ]
                 }
