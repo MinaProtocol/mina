@@ -1,26 +1,22 @@
 #!/bin/bash
+set -euox pipefail
+
+
+
+BUILD_URL=${BUILD_URL:-"local build from '$(hostname)' host"}
+MINA_DEB_CODENAME=${MINA_DEB_CODENAME:-"bullseye"}
+MINA_DEB_VERSION=${MINA_DEB_VERSION:-"0.0.0-experimental"}
+MINA_DEB_RELEASE=${MINA_DEB_RELEASE:-"unstable"}
 
 # Helper script to include when building deb archives.
 
 echo "--- Setting up the envrionment to build debian packages..."
 
-set -euo pipefail
-
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-cd "${SCRIPTPATH}/../_build"
+cd "${SCRIPTPATH}/../../_build"
 
 GITHASH=$(git rev-parse --short=7 HEAD)
 GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
-
-set +u
-BUILD_NUM=${BUILDKITE_BUILD_NUM}
-BUILD_URL=${BUILDKITE_BUILD_URL}
-set -u
-
-# Load in env vars for githash/branch/etc.
-source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
-
-cd "${SCRIPTPATH}/../_build"
 
 # Set dependencies based on debian release
 SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
@@ -36,10 +32,6 @@ case "${MINA_DEB_CODENAME}" in
     ;;
   bullseye|focal)
     DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
-    ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
-    ;;
-  buster)
-    DAEMON_DEPS=", libffi6, libjemalloc2, libpq-dev, libprocps7, mina-logproc"
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
   stretch|bionic)
@@ -66,7 +58,7 @@ case "${DUNE_PROFILE}" in
 esac
 
 
-#ADd suffix to debian to distinguish instrumented packages
+#Add suffix to debian to distinguish instrumented packages
 if [[ -v DUNE_INSTRUMENT_WITH ]]; then
     INSTRUMENTED_SUFFIX=instrumented
     MINA_DEB_NAME="${MINA_DEB_NAME}-${INSTRUMENTED_SUFFIX}"

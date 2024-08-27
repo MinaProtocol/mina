@@ -1,17 +1,20 @@
+let Prelude = ../External/Prelude.dhall
+
+let Optional/default = Prelude.Optional.default
+
 let Profiles = ./Profiles.dhall
 
 let BuildFlags = ./BuildFlags.dhall
 
 let S = ../Lib/SelectFiles.dhall
 
-let DebVersion = < Bookworm | Bullseye | Buster | Jammy | Focal >
+let DebVersion = < Bookworm | Bullseye | Jammy | Focal >
 
 let capitalName =
           \(debVersion : DebVersion)
       ->  merge
             { Bookworm = "Bookworm"
             , Bullseye = "Bullseye"
-            , Buster = "Buster"
             , Jammy = "Jammy"
             , Focal = "Focal"
             }
@@ -22,20 +25,20 @@ let lowerName =
       ->  merge
             { Bookworm = "bookworm"
             , Bullseye = "bullseye"
-            , Buster = "buster"
             , Jammy = "jammy"
             , Focal = "focal"
             }
             debVersion
 
 let dependsOnStep =
-          \(debVersion : DebVersion)
+          \(prefix : Optional Text)
+      ->  \(debVersion : DebVersion)
       ->  \(profile : Profiles.Type)
       ->  \(buildFlag : BuildFlags.Type)
       ->  \(step : Text)
       ->  let profileSuffix = Profiles.toSuffixUppercase profile
 
-          let prefix = "MinaArtifact"
+          let prefix = Optional/default Text "MinaArtifact" prefix
 
           in  merge
                 { Bookworm =
@@ -46,14 +49,6 @@ let dependsOnStep =
                     }
                   ]
                 , Bullseye =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      debVersion}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                                     buildFlag}"
-                    , key = "${step}-deb-pkg"
-                    }
-                  ]
-                , Buster =
                   [ { name =
                         "${prefix}${capitalName
                                       debVersion}${profileSuffix}${BuildFlags.toSuffixUppercase
@@ -83,7 +78,12 @@ let dependsOnStep =
 let dependsOn =
           \(debVersion : DebVersion)
       ->  \(profile : Profiles.Type)
-      ->  dependsOnStep debVersion profile BuildFlags.Type.None "build"
+      ->  dependsOnStep
+            (None Text)
+            debVersion
+            profile
+            BuildFlags.Type.None
+            "build"
 
 let minimalDirtyWhen =
       [ S.exactly "buildkite/src/Constants/DebianVersions" "dhall"
@@ -92,8 +92,10 @@ let minimalDirtyWhen =
       , S.exactly "buildkite/src/Command/MinaArtifact" "dhall"
       , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact")
       , S.strictlyStart (S.contains "dockerfiles/stages")
-      , S.exactly "scripts/rebuild-deb" "sh"
-      , S.exactly "scripts/release-docker" "sh"
+      , S.exactly "scripts/debian/build" "sh"
+      , S.exactly "scripts/debian/builder-helpers" "sh"
+      , S.exactly "scripts/docker/release" "sh"
+      , S.exactly "scripts/docker/build" "sh"
       , S.exactly "buildkite/scripts/build-artifact" "sh"
       , S.exactly "buildkite/scripts/build-hardfork-package" "sh"
       , S.exactly "buildkite/scripts/check-compatibility" "sh"
@@ -122,7 +124,6 @@ let dirtyWhen =
       ->  merge
             { Bookworm = minimalDirtyWhen
             , Bullseye = bullseyeDirtyWhen
-            , Buster = minimalDirtyWhen
             , Jammy = minimalDirtyWhen
             , Focal = minimalDirtyWhen
             }
