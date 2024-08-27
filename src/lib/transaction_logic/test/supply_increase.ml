@@ -48,5 +48,7 @@ let%test_module "supply_increase" =
       Quickcheck.test generator ~f:(fun payload ->
           [%test_eq: signed_amount Or_error.t]
             (Or_error.return @@ Currency.Amount.Signed.zero)
-            (supply_increase payload) )
+            (supply_increase
+               ~constraint_constants:
+                 Genesis_constants.For_unit_tests.Constraint_constants.t payload ) )
   end )

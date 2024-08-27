@@ -514,7 +514,14 @@ let send_payment_graphql =
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
   let args =
-    Args.zip3 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
+    Args.zip3
+      (Cli_lib.Flag.signed_command_common
+         ~minimum_user_command_fee:
+           Genesis_constants_compiled.t.minimum_user_command_fee
+         ~default_transaction_fee:
+           (Currency.Fee.of_mina_string_exn
+              Mina_compile_config.default_transaction_fee_string ) )
+      receiver_flag amount_flag
   in
   Command.async ~summary:"Send payment to an address"
     (Cli_lib.Background_daemon.graphql_init args
@@ -542,7 +549,16 @@ let delegate_stake_graphql =
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
-  let args = Args.zip2 Cli_lib.Flag.signed_command_common receiver_flag in
+  let args =
+    Args.zip2
+      (Cli_lib.Flag.signed_command_common
+         ~minimum_user_command_fee:
+           Genesis_constants_compiled.t.minimum_user_command_fee
+         ~default_transaction_fee:
+           (Currency.Fee.of_mina_string_exn
+              Mina_compile_config.default_transaction_fee_string ) )
+      receiver_flag
+  in
   Command.async ~summary:"Delegate your stake to another public key"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun
@@ -808,7 +824,7 @@ let hash_ledger =
      fun () ->
        let process_accounts accounts =
          let constraint_constants =
-           Genesis_constants.Constraint_constants.compiled
+           Genesis_constants_compiled.Constraint_constants.t
          in
          let packed_ledger =
            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
@@ -911,9 +927,9 @@ let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
     (Command.Param.return (fun () ->
          (* TODO: Allow these to be configurable. *)
-         let proof_level = Genesis_constants.Proof_level.compiled in
+         let proof_level = Genesis_constants_compiled.Proof_level.t in
          let constraint_constants =
-           Genesis_constants.Constraint_constants.compiled
+           Genesis_constants_compiled.Constraint_constants.t
          in
          let all =
            Transaction_snark.constraint_system_digests ~constraint_constants ()
@@ -1804,6 +1820,7 @@ let compile_time_constants =
            >>| Option.value ~default:Runtime_config.default
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_dir
                  ~logger:(Logger.null ()) ~proof_level:None
+                 ~compiled:(module Genesis_constants_compiled)
            >>| Or_error.ok_exn
          in
          let all_constants =
@@ -2396,7 +2413,10 @@ let advanced =
     ; ("set-coinbase-receiver", set_coinbase_receiver_graphql)
     ; ("chain-id-inputs", chain_id_inputs)
     ; ("runtime-config", runtime_config)
-    ; ("vrf", Cli_lib.Commands.Vrf.command_group)
+    ; ( "vrf"
+      , Cli_lib.Commands.Vrf.command_group
+          ~constraint_constants:
+            Genesis_constants_compiled.Constraint_constants.t )
     ; ("thread-graph", thread_graph)
     ; ("print-signature-kind", signature_kind)
     ]

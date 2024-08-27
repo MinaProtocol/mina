@@ -1,9 +1,9 @@
 open Core_kernel
 
 module Config = struct
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled
+  let constraint_constants = Genesis_constants_compiled.Constraint_constants.t
 
-  let proof_level = Genesis_constants.Proof_level.Full
+  let proof_level = Genesis_constants_compiled.Proof_level.Full
 end
 
 let () = Format.eprintf "Generating transaction snark circuit..@."

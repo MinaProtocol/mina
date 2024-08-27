@@ -24,8 +24,6 @@
    codable
    snark_params
    mina_debug
-   mina_node_config
-   mina_signature_kind
    blake2
    hash_prefix_states
    non_zero_curve_point
