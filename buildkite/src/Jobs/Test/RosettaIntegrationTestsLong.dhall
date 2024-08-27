@@ -26,7 +26,6 @@ let Artifacts = ../../Constants/Artifacts.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
-
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
       , S.exactly "buildkite/src/Jobs/Test/RosettaIntegrationTests" "dhall"
