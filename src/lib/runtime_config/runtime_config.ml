@@ -473,6 +473,7 @@ module Json_layout = struct
       ; zkapp_cmd_limit_hardcap : int option [@default None]
       ; slot_tx_end : int option [@default None]
       ; slot_chain_end : int option [@default None]
+      ; minimum_user_command_fee : Currency.Fee.t option
       ; network_id : string option [@default None]
       }
     [@@deriving yojson, fields]
@@ -1220,6 +1221,8 @@ module Daemon = struct
     ; zkapp_cmd_limit_hardcap : int option [@default None]
     ; slot_tx_end : int option [@default None]
     ; slot_chain_end : int option [@default None]
+    ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t option
+          [@default None]
     ; network_id : string option [@default None]
     }
   [@@deriving bin_io_unversioned]
@@ -1260,6 +1263,9 @@ module Daemon = struct
     ; slot_tx_end = opt_fallthrough ~default:t1.slot_tx_end t2.slot_tx_end
     ; slot_chain_end =
         opt_fallthrough ~default:t1.slot_chain_end t2.slot_chain_end
+    ; minimum_user_command_fee =
+        opt_fallthrough ~default:t1.minimum_user_command_fee
+          t2.minimum_user_command_fee
     ; network_id = opt_fallthrough ~default:t1.network_id t2.network_id
     }
 
@@ -1272,6 +1278,9 @@ module Daemon = struct
     let%bind zkapp_transaction_cost_limit = Float.gen_incl 0.0 100.0 in
     let%bind max_event_elements = Int.gen_incl 0 100 in
     let%bind zkapp_cmd_limit_hardcap = Int.gen_incl 0 1000 in
+    let%bind minimum_user_command_fee =
+      Currency.Fee.(gen_incl one (of_mina_int_exn 10))
+    in
     let%map max_action_elements = Int.gen_incl 0 1000 in
     { txpool_max_size = Some txpool_max_size
     ; peer_list_url = None
@@ -1284,6 +1293,7 @@ module Daemon = struct
     ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
     ; slot_tx_end = None
     ; slot_chain_end = None
+    ; minimum_user_command_fee = Some minimum_user_command_fee
     ; network_id = None
     }
 end
@@ -1582,14 +1592,12 @@ let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
       }
     ~proof:(Proof_keys.make ~fork ()) ()
 
-let slot_tx_end_or_default, slot_chain_end_or_default =
-  let f compile get_runtime t =
-    Option.map ~f:Mina_numbers.Global_slot_since_hard_fork.of_int
-    @@ Option.value_map t.daemon ~default:compile ~f:(fun daemon ->
-           Option.merge compile ~f:(fun _c r -> r) @@ get_runtime daemon )
+let slot_tx_end, slot_chain_end =
+  let f get_runtime t =
+    let open Option.Let_syntax in
+    t.daemon >>= get_runtime >>| Mina_numbers.Global_slot_since_hard_fork.of_int
   in
-  ( f Mina_compile_config.slot_tx_end (fun d -> d.slot_tx_end)
-  , f Mina_compile_config.slot_chain_end (fun d -> d.slot_chain_end) )
+  (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))
 
 module Test_configs = struct
   let bootstrap =

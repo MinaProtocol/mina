@@ -5,11 +5,11 @@ open Signature_lib
 open Mina_base
 open Mina_transaction
 
-let constraint_constants = Genesis_constants.Constraint_constants.compiled
+let constraint_constants = Genesis_constants_compiled.Constraint_constants.t
 
-let genesis_constants = Genesis_constants.compiled
+let genesis_constants = Genesis_constants_compiled.t
 
-let proof_level = Genesis_constants.Proof_level.compiled
+let proof_level = Genesis_constants_compiled.Proof_level.t
 
 (* We're just profiling, so okay to monkey-patch here *)
 module Sparse_ledger = struct
@@ -210,7 +210,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
           ~data:kp.private_key )
   in
   let balances =
-    let min_cmd_fee = Currency.Fee.minimum_user_command_fee in
+    let min_cmd_fee = genesis_constants.minimum_user_command_fee in
     let min_balance =
       Currency.Fee.to_nanomina_int min_cmd_fee
       |> Int.( + ) 1_000_000_000_000_000
@@ -456,7 +456,8 @@ let _create_ledger_and_zkapps_from_generator num_transactions :
   let cmd_infos, ledger =
     Quickcheck.random_value
       (Mina_generators.User_command_generators
-       .sequence_zkapp_command_with_ledger ~max_account_updates ~length ~vk () )
+       .sequence_zkapp_command_with_ledger ~max_account_updates ~length ~vk
+         ~constraint_constants ~genesis_constants () )
   in
   let zkapps =
     List.map cmd_infos ~f:(fun (user_cmd, _keypair, keymap) ->
@@ -509,12 +510,34 @@ let rec pair_up = function
   | _ ->
       failwith "Expected even length list"
 
-let precomputed_values = Precomputed_values.compiled_inputs
-
 let state_body =
-  Mina_state.(
-    Lazy.map precomputed_values ~f:(fun values ->
-        values.protocol_state_with_hashes.data |> Protocol_state.body ))
+  lazy
+    (let constraint_constants =
+       Genesis_constants_compiled.Constraint_constants.t
+     in
+     let genesis_constants = Genesis_constants_compiled.t in
+     let genesis_epoch_data = Consensus.Genesis_epoch_data.compiled in
+     let consensus_constants =
+       Consensus.Constants.create ~constraint_constants
+         ~protocol_constants:genesis_constants.protocol
+     in
+     (* TODO: Do we really need to create a whole ledger just to compute this?
+        Probably not..
+     *)
+     let module Test_genesis_ledger = struct
+       include Genesis_ledger.Make (struct
+         include Test_genesis_ledger
+
+         let directory = `Ephemeral
+
+         let depth =
+           Genesis_constants_compiled.Constraint_constants.t.ledger_depth
+       end)
+     end in
+     Mina_state.Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
+       ~genesis_epoch_data ~constraint_constants ~consensus_constants
+       ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
+     |> With_hash.data |> Mina_state.Protocol_state.body )
 
 let curr_state_view = Lazy.map state_body ~f:Mina_state.Protocol_state.Body.view
 
@@ -813,7 +836,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
              in
              let supply_increase =
                Mina_ledger.Ledger.Transaction_applied.supply_increase
-                 applied_txn
+                 ~constraint_constants applied_txn
                |> Or_error.ok_exn
              in
              let () =
@@ -870,7 +893,7 @@ let generate_base_snarks_witness sparse_ledger0
              in
              let supply_increase =
                Mina_ledger.Ledger.Transaction_applied.supply_increase
-                 applied_txn
+                 ~constraint_constants applied_txn
                |> Or_error.ok_exn
              in
              let () =

@@ -4,8 +4,8 @@ module Intf = Intf
 include Impl.Make (struct
   let msg = sprintf "cached item was not consumed (cache name = \"%s\")"
 
-  let handle_unconsumed_cache_item ~logger ~cache_name =
-    if Node_config.cache_exceptions then
+  let handle_unconsumed_cache_item ~logger ~cache_exceptions ~cache_name =
+    if cache_exceptions then
       let open Error in
       raise (of_string (msg cache_name))
     else

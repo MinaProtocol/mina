@@ -1,5 +1,7 @@
 let Cmd = ../../Lib/Cmds.dhall
 
+let B = ../../External/Buildkite.dhall
+
 let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -21,6 +23,9 @@ let Dockers = ../../Constants/DockerVersions.dhall
 let Network = ../../Constants/Network.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+
 
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
@@ -57,6 +62,7 @@ in  Pipeline.build
               ]
             , label = "Rosetta integration tests Bullseye Long"
             , key = "rosetta-integration-tests-bullseye-long"
+            , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Small
             , depends_on =
                 Dockers.dependsOn

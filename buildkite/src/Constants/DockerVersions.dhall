@@ -12,14 +12,13 @@ let Network = ./Network.dhall
 
 let Docker
     : Type
-    = < Bookworm | Bullseye | Buster | Jammy | Focal >
+    = < Bookworm | Bullseye | Jammy | Focal >
 
 let capitalName =
           \(docker : Docker)
       ->  merge
             { Bookworm = "Bookworm"
             , Bullseye = "Bullseye"
-            , Buster = "Buster"
             , Jammy = "Jammy"
             , Focal = "Focal"
             }
@@ -30,7 +29,6 @@ let lowerName =
       ->  merge
             { Bookworm = "bookworm"
             , Bullseye = "bullseye"
-            , Buster = "buster"
             , Jammy = "jammy"
             , Focal = "focal"
             }
@@ -64,11 +62,6 @@ let dependsOn =
                 { Bookworm =
                   [ { name = "${prefix}${profileSuffix}", key = key } ]
                 , Bullseye =
-                  [ { name = "${prefix}${capitalName docker}${profileSuffix}"
-                    , key = key
-                    }
-                  ]
-                , Buster =
                   [ { name = "${prefix}${capitalName docker}${profileSuffix}"
                     , key = key
                     }

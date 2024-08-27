@@ -248,7 +248,8 @@ let create_expected_statement ~constraint_constants
       |> Frozen_ledger_hash.of_ledger_hash
     in
     let%map supply_increase =
-      Ledger.Transaction_applied.supply_increase applied_transaction
+      Ledger.Transaction_applied.supply_increase ~constraint_constants
+        applied_transaction
     in
     ( target_first_pass_merkle_root
     , target_second_pass_merkle_root
