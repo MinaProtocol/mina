@@ -18,6 +18,8 @@ let DockerLogin = ../Command/DockerLogin/Type.dhall
 
 let DebianRepo = ../Constants/DebianRepo.dhall
 
+let Network = ../Constants/Network.dhall
+
 let ReleaseSpec =
       { Type =
           { deps : List Command.TaggedKey.Type
@@ -38,7 +40,7 @@ let ReleaseSpec =
           }
       , default =
           { deps = [] : List Command.TaggedKey.Type
-          , network = "devnet"
+          , network = "${Network.lowerName Network.Type.Devnet}"
           , version = "\\\${MINA_DOCKER_TAG}"
           , service = "\\\${MINA_SERVICE}"
           , branch = "\\\${BUILDKITE_BRANCH}"
