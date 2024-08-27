@@ -279,8 +279,9 @@ let publish_to_debian_repo =
                   , "AWS_SECRET_ACCESS_KEY"
                   , "MINA_DEB_CODENAME=${DebianVersions.lowerName
                                            spec.debVersion}"
+                  , "MINA_DEB_RELEASE=${DebianChannel.lowerName spec.channel}"
                   ]
-                  "./buildkite/scripts/publish-deb.sh"
+                  "./buildkite/scripts/debian/publish.sh"
             , label =
                 "Publish Mina for ${DebianVersions.capitalName
                                       spec.debVersion} ${Profiles.toSuffixUppercase
