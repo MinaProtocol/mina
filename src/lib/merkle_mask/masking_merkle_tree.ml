@@ -547,8 +547,9 @@ module Make (Inputs : Inputs_intf.S) = struct
         (Account_id.derive_token_id ~owner:account_id)
         account_id
 
-    (* a write writes only to the mask, parent is not involved need to update
-       both account and hash pieces of the mask *)
+    (* a write writes only to the mask, parent is not involved
+
+       need to update both account and hash pieces of the mask *)
     let set t location account =
       assert_is_attached t ;
       set_account_unsafe t location account ;
