@@ -22,7 +22,6 @@
    codable
    test_util
    unsigned_extended
-   mina_compile_config
    mina_numbers
    snark_bits
    sgn

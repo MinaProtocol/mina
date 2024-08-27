@@ -19,7 +19,7 @@ end
 
 let verify_heterogenous (ts : Instance.t list) =
   let module Tick_field = Backend.Tick.Field in
-  let logger = Internal_tracing_context_logger.get () in
+  let logger = Context_logger.get () in
   [%log internal] "Verify_heterogenous"
     ~metadata:[ ("count", `Int (List.length ts)) ] ;
   let tick_field : _ Plonk_checks.field = (module Tick_field) in

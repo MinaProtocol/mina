@@ -205,7 +205,11 @@ let block_producer_timing :
       ] )
 
 let merkle_path_element :
-    (_, [ `Left of Zkapp_basic.F.t | `Right of Zkapp_basic.F.t ] option) typ =
+    ( _
+    , [ `Left of Snark_params.Tick.Field.t
+      | `Right of Snark_params.Tick.Field.t ]
+      option )
+    typ =
   obj "MerklePathElement" ~fields:(fun _ ->
       [ field "left" ~typ:field_elem
           ~args:Arg.[]
@@ -653,13 +657,13 @@ let local_state : (Mina_lib.t, Mina_state.Local_state.t option) typ =
           ~args:Arg.[]
           ~doc:"Stack frame component of local state" ~typ:(non_null field_elem)
           ~resolve:(fun _ t ->
-            (M.stack_frame t : Stack_frame.Digest.t :> Zkapp_basic.F.Stable.V1.t)
+            (M.stack_frame t : Stack_frame.Digest.t :> Snark_params.Tick.Field.t)
             )
       ; field "callStack"
           ~args:Arg.[]
           ~doc:"Call stack component of local state" ~typ:(non_null field_elem)
           ~resolve:(fun _ t ->
-            (M.call_stack t : Call_stack_digest.t :> Zkapp_basic.F.Stable.V1.t)
+            (M.call_stack t : Call_stack_digest.t :> Snark_params.Tick.Field.t)
             )
       ; field "transactionCommitment"
           ~args:Arg.[]
@@ -1071,7 +1075,7 @@ module AccountObj = struct
       let%bind receipt_chain_hash = receipt_chain_hash in
       let%bind voting_for = voting_for in
       let%map permissions = permissions in
-      { Account.Poly.public_key
+      { Account.public_key
       ; token_id
       ; token_symbol
       ; nonce
@@ -1085,7 +1089,7 @@ module AccountObj = struct
       }
 
     let of_full_account ?breadcrumb
-        { Account.Poly.public_key
+        { Account.public_key
         ; token_id
         ; token_symbol
         ; nonce
@@ -1384,8 +1388,8 @@ module AccountObj = struct
                        |> Ledger.location_of_account staking_ledger
                        >>= Ledger.get staking_ledger
                      with
-                     | Some delegate_account ->
-                         let delegate_key = delegate_account.public_key in
+                     | Some account ->
+                         let%bind delegate_key = account.delegate in
                          Some (get_best_ledger_account_pk mina delegate_key)
                      | None ->
                          [%log' warn (Mina_lib.top_level_logger mina)]
@@ -1399,10 +1403,10 @@ module AccountObj = struct
                          Ledger.Db.index_of_account_exn staking_ledger
                            account_id
                        in
-                       let delegate_account =
+                       let account =
                          Ledger.Db.get_at_index_exn staking_ledger index
                        in
-                       let delegate_key = delegate_account.public_key in
+                       let%bind delegate_key = account.delegate in
                        Some (get_best_ledger_account_pk mina delegate_key)
                      with e ->
                        [%log' warn (Mina_lib.top_level_logger mina)]

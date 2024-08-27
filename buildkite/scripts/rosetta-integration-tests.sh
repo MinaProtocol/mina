@@ -30,7 +30,7 @@ export PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:54
 
 # Mina Archive variables
 export MINA_ARCHIVE_PORT=${MINA_ARCHIVE_PORT:=3086}
-export MINA_ARCHIVE_SQL_SCHEMA_PATH=${MINA_ARCHIVE_SQL_SCHEMA_PATH:=/etc/mina/rosetta/archive/create_schema.sql}
+export MINA_ARCHIVE_SQL_SCHEMA_PATH=${MINA_ARCHIVE_SQL_SCHEMA_PATH:=/etc/mina/archive/create_schema.sql}
 
 # Mina Rosetta variables
 export MINA_ROSETTA_ONLINE_PORT=${MINA_ROSETTA_ONLINE_PORT:=3087}
@@ -250,10 +250,12 @@ if [[ "$MODE" == "full" ]]; then
   send_zkapp_transactions &
 fi
 
-next_block_time=$(mina client status --json | jq '.next_block_production.timing[1].time' | tr -d '"') curr_time=$(date +%s%N | cut -b1-13)
-sleep_time=$((($next_block_time - $curr_time) / 1000))
+mina client status --json
+
+next_block_time=$(mina client status --json | jq '.next_block_production.timing[1]' | tr -d '"') curr_time=$(date +%s%N | cut -b1-13)
+sleep_time=$((($next_block_time - $curr_time) / 10000000))
 echo "Sleeping for ${sleep_time}s until next block is created..."
-sleep ${sleep_time}
+sleep $sleep_time
 
 # Mina Rosetta Checks (spec construction data perf)
 echo "============ ROSETTA CLI: VALIDATE CONF FILE ${ROSETTA_CONFIGURATION_FILE} =============="

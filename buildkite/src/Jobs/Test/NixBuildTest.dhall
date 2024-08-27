@@ -44,6 +44,7 @@ in  Pipeline.build
                   Cmd.Docker::{
                   , image = ContainerImages.nixos
                   , privileged = True
+                  , useBash = False
                   }
                   "./buildkite/scripts/test-nix.sh \$BUILDKITE_BRANCH"
               ]

@@ -29,6 +29,6 @@ let protocol_state : Zkapp_precondition.Protocol_state.View.t =
     }
 
 let constraint_constants =
-  { Genesis_constants.Constraint_constants.for_unit_tests with
+  { Genesis_constants.For_unit_tests.Constraint_constants.t with
     account_creation_fee = Fee.of_mina_int_exn 1
   }
