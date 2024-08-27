@@ -21,7 +21,7 @@ in  Pipeline.build
           , S.strictlyEnd (S.contains "rust-toolchain.toml")
           ]
         , path = "Release"
-        , name = "MinaToolchainArtifactFOcal"
+        , name = "MinaToolchainArtifactFocal"
         , tags = [ PipelineTag.Type.Toolchain ]
         }
       , steps =
