@@ -280,7 +280,7 @@ let publish_to_debian_repo =
                   , "MINA_DEB_CODENAME=${DebianVersions.lowerName
                                            spec.debVersion}"
                   ]
-                  "./buildkite/scripts/publish-deb.sh"
+                  "./buildkite/scripts/debian/publish.sh"
             , label =
                 "Publish Mina for ${DebianVersions.capitalName
                                       spec.debVersion} ${Profiles.toSuffixUppercase
