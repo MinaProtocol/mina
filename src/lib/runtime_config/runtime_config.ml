@@ -1570,6 +1570,8 @@ module Network_constants : sig
     ; constraint_constants : Genesis_constants.Constraint_constants.Inputs.t
     }
 
+  val of_string : string -> t
+
   val mainnet : t
 
   val dev : t
@@ -1647,6 +1649,15 @@ end = struct
         ; proof_level = "check"
         }
     }
+
+  let of_string n =
+    match n with
+    | "mainnet" ->
+        mainnet
+    | "dev" ->
+        dev
+    | _ ->
+        failwith @@ "Unrecognized network " ^ n
 end
 
 let of_json_layout ~(network_constants : Network_constants.t)

@@ -845,7 +845,7 @@ let load_config_json filename =
       Yojson.Safe.from_string json )
 
 let load_config_file filename
-    (network_constants : Runtime_config.Network_constants.t) =
+    ~(network_constants : Runtime_config.Network_constants.t) =
   let open Deferred.Or_error.Let_syntax in
   Monitor.try_with_join_or_error ~here:[%here] (fun () ->
       let%map json = load_config_json filename in
