@@ -14,8 +14,6 @@ if [[ ! -d "$switch_dir" ]]; then
   opam repository add --yes --all --set-default o1-labs https://github.com/o1-labs/opam-repository.git
   opam update
   opam switch import -y --switch . opam.export
-  opam pin -y add src/external/ocaml-sodium
-  opam pin -y add src/external/coda_base58
   mkdir -p opam_switches
   mv _opam "$switch_dir"
 fi
