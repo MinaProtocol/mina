@@ -235,8 +235,8 @@ let setup_daemon logger =
   and work_selection_method_flag =
     flag "--work-selection" ~aliases:[ "work-selection" ]
       ~doc:
-        "seq|rand Choose work sequentially (seq) or randomly (rand) (default: \
-         rand)"
+        "seq|rand|roffset Choose work sequentially (seq), randomly (rand), or \
+         sequentially with a random offset (roffset) (default: rand)"
       (optional work_selection_method)
   and libp2p_port = Flag.Port.Daemon.external_
   and client_port = Flag.Port.Daemon.client
