@@ -12,13 +12,15 @@ in  { step =
               Command.Config::{
               , commands =
                 [ RunWithPostgres.runInDockerWithPostgresConn
-                    ([] : List Text)
+                    [ "PATCH_ARCHIVE_TEST_APP=mina-patch-archive-test"
+                    , "NETWORK_DATA_FOLDER=/etc/mina/test/archive/sample_db"
+                    ]
                     "./src/test/archive/sample_db/archive_db.sql"
-                    Artifacts.Type.Archive
-                    "./scripts/replayer-test.sh -i src/test/archive/sample_db/replayer_input_file.json -a mina-replayer"
+                    Artifacts.Type.FunctionalTestSuite
+                    "./scripts/patch-archive-test.sh"
                 ]
-              , label = "Archive: Replayer test"
-              , key = "replayer-test"
+              , label = "Archive: Patch Archive test"
+              , key = "patch-archive-test"
               , target = Size.Large
               , depends_on = dependsOn
               }
