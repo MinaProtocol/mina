@@ -772,7 +772,35 @@ let snarked_ledger_state :
       ] )
 
   module SnarkedLedgerMembership = struct
-    
+    type t =
+    { account_balance : Currency.Balance.t
+    ; timing_info : Account_timing.t
+    ; nonce : Account.Nonce.t
+    ; proof : Ledger.path
+    }
+
+  let obj =
+    obj "MembershipInfo" ~fields:(fun _ ->
+        [ field "accountBalance"
+            ~args:Arg.[]
+            ~doc:"Account balance for a pk and token pair"
+            ~typ:(non_null balance)
+            ~resolve:(fun _ { account_balance; _ } -> account_balance)
+        ; field "timingInfo"
+            ~args:Arg.[]
+            ~doc:"Account timing according to chain state"
+            ~typ:(non_null account_timing)
+            ~resolve:(fun _ { timing_info; _ } -> timing_info)
+        ; field "nonce"
+            ~args:Arg.[]
+            ~doc:"current nonce related to the account" ~typ:(non_null uint32)
+            ~resolve:(fun _ { nonce; _ } -> Account.Nonce.to_uint32 nonce)
+        ; field "merklePath"
+            ~args:Arg.[]
+            ~doc:"Membership proof in the snarked ledger"
+            ~typ:(non_null (list (non_null merkle_path_element)))
+            ~resolve:(fun _ { proof; _ } -> proof)
+        ] ) 
   end
 
 let blockchain_state :
