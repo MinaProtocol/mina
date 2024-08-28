@@ -771,8 +771,8 @@ let snarked_ledger_state :
           ~resolve:(fun _ ({ sok_digest = _; _ } : _ M.t) -> None)
       ] )
 
-  module SnarkedLedgerMembership = struct
-    type t =
+module SnarkedLedgerMembership = struct
+  type t =
     { account_balance : Currency.Balance.t
     ; timing_info : Account_timing.t
     ; nonce : Account.Nonce.t
@@ -800,8 +800,8 @@ let snarked_ledger_state :
             ~doc:"Membership proof in the snarked ledger"
             ~typ:(non_null (list (non_null merkle_path_element)))
             ~resolve:(fun _ { proof; _ } -> proof)
-        ] ) 
-  end
+        ] )
+end
 
 let blockchain_state :
     ( Mina_lib.t
