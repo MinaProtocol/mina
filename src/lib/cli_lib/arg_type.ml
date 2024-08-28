@@ -119,14 +119,9 @@ let user_command =
           Error.tag err ~tag:"Couldn't decode transaction id" |> Error.raise )
 
 module Work_selection_method = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = Sequence | Random
+  type t = Sequence | Random
 
-      let to_latest = Fn.id
-    end
-  end]
+  let to_latest = Fn.id
 end
 
 let work_selection_method_val = function
