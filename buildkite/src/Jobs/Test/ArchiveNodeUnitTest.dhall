@@ -57,7 +57,6 @@ in  Pipeline.build
                   ( Prelude.Text.concatSep
                       " && "
                       [ "bash buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db}"
-                      , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql"
                       , WithCargo.withCargo
                           "eval \\\$(opam config env) && dune runtest src/app/archive && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
                       ]
