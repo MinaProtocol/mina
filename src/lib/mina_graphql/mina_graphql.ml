@@ -2192,6 +2192,8 @@ module Queries = struct
         let (module S) = Mina_lib.work_selection_method mina in
         S.pending_work_statements ~snark_pool ~fee_opt snark_job_state )
 
+  let snarked_ledger_account_membership = failwith "TODO"
+
   let genesis_constants =
     field "genesisConstants"
       ~doc:
