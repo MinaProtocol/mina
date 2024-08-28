@@ -2421,17 +2421,17 @@ module Input = struct
 
   module AccountInfo = struct
     let arg_typ :
-    ( (PublicKey.input * TokenId.input option) option
-    , (PublicKey.input * TokenId.input option) option )
-    arg_typ =
-  obj "AccountInput" ~doc:"An account with a public key and a token id"
-    ~coerce:(fun public_key token -> (public_key, token))
-          ~fields:
-      [ arg "publicKey" ~doc:"Public key of the account"
-          ~typ:(non_null PublicKey.arg_typ)
-      ; arg "token" ~doc:"Token id of the account" ~typ:TokenId.arg_typ
-      ]
-    ~split:(fun f (pk, token) -> f pk token) 
+        ( (PublicKey.input * TokenId.input option) option
+        , (PublicKey.input * TokenId.input option) option )
+        arg_typ =
+      obj "AccountInput" ~doc:"An account with a public key and a token id"
+        ~coerce:(fun public_key token -> (public_key, token))
+        ~fields:
+          [ arg "publicKey" ~doc:"Public key of the account"
+              ~typ:(non_null PublicKey.arg_typ)
+          ; arg "token" ~doc:"Token id of the account" ~typ:TokenId.arg_typ
+          ]
+        ~split:(fun f (pk, token) -> f pk token)
   end
 
   module BlockTime = struct
