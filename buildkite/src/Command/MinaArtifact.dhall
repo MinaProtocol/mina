@@ -234,9 +234,9 @@ let docker_step
                         "${DebianVersions.lowerName spec.debVersion}"
                     , step_key =
                         "zkapp-test-transaction-${DebianVersions.lowerName
-                                                    debVersion}${Profiles.toLabelSegment
-                                                                   profile}${BuildFlags.toLabelSegment
-                                                                               buildFlags}-docker-image"
+                                                    spec.debVersion}${Profiles.toLabelSegment
+                                                                        spec.profile}${BuildFlags.toLabelSegment
+                                                                                         spec.buildFlags}-docker-image"
                     }
                   ]
                 , FunctionalTestSuite =
@@ -250,9 +250,9 @@ let docker_step
                     , deb_profile = spec.profile
                     , step_key =
                         "test-suite-${DebianVersions.lowerName
-                                        debVersion}${Profiles.toLabelSegment
-                                                       profile}${BuildFlags.toLabelSegment
-                                                                   buildFlags}-docker-image"
+                                        spec.debVersion}${Profiles.toLabelSegment
+                                                            spec.profile}${BuildFlags.toLabelSegment
+                                                                             spec.buildFlags}-docker-image"
                     , network = "berkeley"
                     }
                   ]
