@@ -871,6 +871,10 @@ let blockchain_state :
             Mina_state.Blockchain_state.body_reference blockchain_state )
       ] )
 
+module AccountInfo = struct
+  
+end
+
 let protocol_state :
     ( Mina_lib.t
     , (Filtered_external_transition.Protocol_state.t * State_hash.t) option )
