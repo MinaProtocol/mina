@@ -280,11 +280,11 @@
     "o1-opam-repository": {
       "flake": false,
       "locked": {
-        "lastModified": 1715294616,
-        "narHash": "sha256-W2p9Vs8PqpKGvMByxVqpxAljjpEMqNcuNnjMBAAKicI=",
+        "lastModified": 1724862698,
+        "narHash": "sha256-ALt6nSFNFohha0vnoQMuAWHqT/KIHRXd032JHzyv8Co=",
         "owner": "o1-labs",
         "repo": "opam-repository",
-        "rev": "38d6995e307c82b3c0b3bc86a867213db724d1c5",
+        "rev": "dc07049c32bf43abcc981dbec60e9625fbe9c0a9",
         "type": "github"
       },
       "original": {
@@ -340,11 +340,11 @@
     "opam-repository": {
       "flake": false,
       "locked": {
-        "lastModified": 1708601497,
-        "narHash": "sha256-mDYINTjOiYLN4wT5fGlWTvHFQdWkzY46XUuZWKgmJxY=",
+        "lastModified": 1724838961,
+        "narHash": "sha256-7PL93+SjMt1VY37sN3mTzpbHZCV4r6uTpewQ3lgMTyE=",
         "owner": "ocaml",
         "repo": "opam-repository",
-        "rev": "90d8c520a4f0b035ac51e267a8b33739c5a78b5a",
+        "rev": "c7fcd25a10a06ad633cc075d08f1590a69f9432d",
         "type": "github"
       },
       "original": {

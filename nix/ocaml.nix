@@ -52,6 +52,9 @@ let
         lmdb = super.lmdb.overrideAttrs
           (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
 
+        core_bench = super.ctypes.overrideAttrs
+          (oa: { buildInputs = oa.buildInputs ++ [ self.ppx_compare ]; });
+
         # Doesn't have an explicit dependency on ctypes-foreign
         ctypes = super.ctypes.overrideAttrs
           (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
