@@ -771,6 +771,10 @@ let snarked_ledger_state :
           ~resolve:(fun _ ({ sok_digest = _; _ } : _ M.t) -> None)
       ] )
 
+  module SnarkedLedgerMembership = struct
+    
+  end
+
 let blockchain_state :
     ( Mina_lib.t
     , (Mina_state.Blockchain_state.Value.t * State_hash.t) option )
