@@ -85,19 +85,6 @@ type t =
   ; transaction_capacity_log_2 : int
   }
 
-let proof_config_default : Runtime_config.Proof_keys.t =
-  { level = Some Full
-  ; sub_windows_per_window = None
-  ; ledger_depth = None
-  ; work_delay = None
-  ; block_window_duration_ms = Some 120000
-  ; transaction_capacity = None
-  ; coinbase_amount = None
-  ; supercharged_coinbase_factor = None
-  ; account_creation_fee = None
-  ; fork = None
-  }
-
 let log_filter_of_event_type ev_existential =
   let open Event_type in
   let (Event_type ev_type) = ev_existential in
@@ -125,7 +112,7 @@ let default ~(constants : constants) =
   ; log_precomputed_blocks = false (* ; num_plain_nodes = 0 *)
   ; start_filtered_logs =
       List.bind ~f:log_filter_of_event_type Event_type.all_event_types
-  ; proof_config = proof_config_default
+  ; proof_config = constraint_constants
   ; k = genesis_constants.protocol.k
   ; slots_per_epoch = genesis_constants.protocol.slots_per_epoch
   ; slots_per_sub_window = genesis_constants.protocol.slots_per_sub_window
@@ -140,41 +127,14 @@ let default ~(constants : constants) =
   }
 
 let transaction_capacity_log_2 (config : t) =
-  match config.proof_config.transaction_capacity with
-  | None ->
-      config.transaction_capacity_log_2
-  | Some (Log_2 i) ->
-      i
-  | Some (Txns_per_second_x10 tps_goal_x10) ->
-      let max_coinbases = 2 in
-      let block_window_duration_ms =
-        Option.value ~default:config.block_window_duration_ms
-          config.proof_config.block_window_duration_ms
-      in
-      let max_user_commands_per_block =
-        (* block_window_duration is in milliseconds, so divide by 1000 divide
-           by 10 again because we have tps * 10
-        *)
-        tps_goal_x10 * block_window_duration_ms / (1000 * 10)
-      in
-      (* Log of the capacity of transactions per transition.
-          - 1 will only work if we don't have prover fees.
-          - 2 will work with prover fees, but not if we want a transaction
-            included in every block.
-          - At least 3 ensures a transaction per block and the staged-ledger
-            unit tests pass.
-      *)
-      1 + Core_kernel.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
+  config.proof_config.transaction_capacity_log_2
 
 let transaction_capacity config =
   let i = transaction_capacity_log_2 config in
   Int.pow 2 i
 
 let blocks_for_first_ledger_proof (config : t) =
-  let work_delay =
-    Option.value ~default:config.block_window_duration_ms
-      config.proof_config.work_delay
-  in
+  let work_delay = config.proof_config.work_delay in
   let transaction_capacity_log_2 = transaction_capacity_log_2 config in
   ((work_delay + 1) * (transaction_capacity_log_2 + 1)) + 1
 

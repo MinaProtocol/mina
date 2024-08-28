@@ -41,7 +41,8 @@ let yojson_rename_fields ~alternates = function
       json
 
 let opt_fallthrough ~default x2 =
-  Option.value_map ~default x2 ~f:(fun x -> Some x)
+  (* Option.value_map ~default x2 ~f:(fun x -> Some x) *)
+  match x2 with Some x -> Some x | None -> default
 
 let result_opt ~f x =
   match x with
@@ -436,12 +437,56 @@ module Json_layout = struct
       ; supercharged_coinbase_factor : int option [@default None]
       ; account_creation_fee : Currency.Fee.t option [@default None]
       ; fork : Fork_config.t option [@default None]
+      ; with_tps_goal : bool option [@default None]
       }
     [@@deriving yojson, fields]
 
     let fields = Fields.names |> Array.of_list
 
     let of_yojson json = of_yojson_generic ~fields of_yojson json
+
+    let override (t1 : Genesis_constants.Constraint_constants.Inputs.t) (t2 : t)
+        : Genesis_constants.Constraint_constants.Inputs.t =
+      let open Option.Let_syntax in
+      { scan_state_with_tps_goal =
+          Option.value ~default:t1.scan_state_with_tps_goal t2.with_tps_goal
+      ; scan_state_tps_goal_x10 =
+          opt_fallthrough ~default:t1.scan_state_tps_goal_x10
+            (t2.transaction_capacity >>= fun t -> t.txns_per_second_x10)
+      ; block_window_duration =
+          Option.value ~default:t1.block_window_duration
+            t2.block_window_duration_ms
+      ; scan_state_transaction_capacity_log_2 =
+          opt_fallthrough ~default:t1.scan_state_transaction_capacity_log_2
+            (t2.transaction_capacity >>= fun a -> a.log_2)
+      ; supercharged_coinbase_factor =
+          Option.value ~default:t1.supercharged_coinbase_factor
+            t2.supercharged_coinbase_factor
+      ; coinbase =
+          Option.value_map ~default:t1.coinbase ~f:Currency.Amount.to_string
+            t2.coinbase_amount
+      ; account_creation_fee_int =
+          Option.value_map ~default:t1.account_creation_fee_int
+            ~f:Currency.Fee.to_string t2.account_creation_fee
+      ; ledger_depth = Option.value ~default:t1.ledger_depth t2.ledger_depth
+      ; scan_state_work_delay =
+          Option.value ~default:t1.scan_state_work_delay t2.work_delay
+      ; sub_windows_per_window =
+          Option.value ~default:t1.sub_windows_per_window
+            t2.sub_windows_per_window
+      ; proof_level = Option.value ~default:t1.proof_level t2.level
+      ; fork =
+          Option.value_map ~default:t1.fork t2.fork ~f:(fun f ->
+              Some
+                { blockchain_length =
+                    Mina_numbers.Length.of_int f.blockchain_length
+                ; global_slot_since_genesis =
+                    Mina_numbers.Global_slot_since_genesis.of_int
+                      f.global_slot_since_genesis
+                ; state_hash =
+                    Mina_base.State_hash.of_base58_check_exn f.state_hash
+                } )
+      }
   end
 
   module Genesis = struct
@@ -452,18 +497,7 @@ module Json_layout = struct
       ; slots_per_sub_window : int option [@default None]
       ; grace_period_slots : int option [@default None]
       ; genesis_state_timestamp : string option [@default None]
-      }
-    [@@deriving yojson, fields]
-
-    let fields = Fields.names |> Array.of_list
-
-    let of_yojson json = of_yojson_generic ~fields of_yojson json
-  end
-
-  module Daemon = struct
-    type t =
-      { txpool_max_size : int option [@default None]
-      ; peer_list_url : string option [@default None]
+      ; pool_max_size : int option [@default None]
       ; zkapp_proof_update_cost : float option [@default None]
       ; zkapp_signed_single_update_cost : float option [@default None]
       ; zkapp_signed_pair_update_cost : float option [@default None]
@@ -471,9 +505,58 @@ module Json_layout = struct
       ; max_event_elements : int option [@default None]
       ; max_action_elements : int option [@default None]
       ; zkapp_cmd_limit_hardcap : int option [@default None]
+      ; minimum_user_command_fee : string option [@default None]
+      }
+    [@@deriving yojson, fields]
+
+    let fields = Fields.names |> Array.of_list
+
+    let of_yojson json = of_yojson_generic ~fields of_yojson json
+
+    let override (t1 : Genesis_constants.Inputs.t) (t2 : t) :
+        Genesis_constants.Inputs.t =
+      { k = Option.value ~default:t1.k t2.k
+      ; delta = Option.value ~default:t1.delta t2.delta
+      ; slots_per_epoch =
+          Option.value ~default:t1.slots_per_epoch t2.slots_per_epoch
+      ; slots_per_sub_window =
+          Option.value ~default:t1.slots_per_sub_window t2.slots_per_sub_window
+      ; grace_period_slots =
+          Option.value ~default:t1.grace_period_slots t2.grace_period_slots
+      ; genesis_state_timestamp =
+          Option.value ~default:t1.genesis_state_timestamp
+            t2.genesis_state_timestamp
+      ; pool_max_size = Option.value ~default:t1.pool_max_size t2.pool_max_size
+      ; zkapp_proof_update_cost =
+          Option.value ~default:t1.zkapp_proof_update_cost
+            t2.zkapp_proof_update_cost
+      ; zkapp_signed_single_update_cost =
+          Option.value ~default:t1.zkapp_signed_single_update_cost
+            t2.zkapp_signed_single_update_cost
+      ; zkapp_signed_pair_update_cost =
+          Option.value ~default:t1.zkapp_signed_pair_update_cost
+            t2.zkapp_signed_pair_update_cost
+      ; zkapp_transaction_cost_limit =
+          Option.value ~default:t1.zkapp_transaction_cost_limit
+            t2.zkapp_transaction_cost_limit
+      ; max_event_elements =
+          Option.value ~default:t1.max_event_elements t2.max_event_elements
+      ; max_action_elements =
+          Option.value ~default:t1.max_action_elements t2.max_action_elements
+      ; zkapp_cmd_limit_hardcap =
+          Option.value ~default:t1.zkapp_cmd_limit_hardcap
+            t2.zkapp_cmd_limit_hardcap
+      ; minimum_user_command_fee =
+          Option.value ~default:t1.minimum_user_command_fee
+            t2.minimum_user_command_fee
+      }
+  end
+
+  module Daemon = struct
+    type t =
+      { peer_list_url : string option [@default None]
       ; slot_tx_end : int option [@default None]
       ; slot_chain_end : int option [@default None]
-      ; minimum_user_command_fee : Currency.Fee.t option
       ; network_id : string option [@default None]
       }
     [@@deriving yojson, fields]
@@ -915,6 +998,7 @@ module Ledger = struct
 end
 
 module Proof_keys = struct
+  (*
   module Level = struct
     type t = Full | Check | None [@@deriving bin_io_unversioned, equal]
 
@@ -1002,117 +1086,26 @@ module Proof_keys = struct
 
     let medium : t = Log_2 3
   end
+  *)
 
-  type t =
-    { level : Level.t option
-    ; sub_windows_per_window : int option
-    ; ledger_depth : int option
-    ; work_delay : int option
-    ; block_window_duration_ms : int option
-    ; transaction_capacity : Transaction_capacity.t option
-    ; coinbase_amount : Currency.Amount.Stable.Latest.t option
-    ; supercharged_coinbase_factor : int option
-    ; account_creation_fee : Currency.Fee.Stable.Latest.t option
-    ; fork : Fork_config.t option
+  type t = Genesis_constants.Constraint_constants.t =
+    { sub_windows_per_window : int
+    ; ledger_depth : int
+    ; work_delay : int
+    ; block_window_duration_ms : int
+    ; transaction_capacity_log_2 : int
+    ; pending_coinbase_depth : int
+    ; coinbase_amount : Currency.Amount.Stable.Latest.t
+    ; supercharged_coinbase_factor : int
+    ; account_creation_fee : Currency.Fee.Stable.Latest.t
+    ; fork : Genesis_constants.Fork_constants.t option
+    ; proof_level : Genesis_constants.Proof_level.t
     }
   [@@deriving bin_io_unversioned]
 
-  let make ?level ?sub_windows_per_window ?ledger_depth ?work_delay
-      ?block_window_duration_ms ?transaction_capacity ?coinbase_amount
-      ?supercharged_coinbase_factor ?account_creation_fee ?fork () =
-    { level
-    ; sub_windows_per_window
-    ; ledger_depth
-    ; work_delay
-    ; block_window_duration_ms
-    ; transaction_capacity
-    ; coinbase_amount
-    ; supercharged_coinbase_factor
-    ; account_creation_fee
-    ; fork
-    }
+  let to_yojson = Genesis_constants.Constraint_constants.to_yojson
 
-  let to_json_layout
-      { level
-      ; sub_windows_per_window
-      ; ledger_depth
-      ; work_delay
-      ; block_window_duration_ms
-      ; transaction_capacity
-      ; coinbase_amount
-      ; supercharged_coinbase_factor
-      ; account_creation_fee
-      ; fork
-      } =
-    { Json_layout.Proof_keys.level = Option.map ~f:Level.to_json_layout level
-    ; sub_windows_per_window
-    ; ledger_depth
-    ; work_delay
-    ; block_window_duration_ms
-    ; transaction_capacity =
-        Option.map ~f:Transaction_capacity.to_json_layout transaction_capacity
-    ; coinbase_amount
-    ; supercharged_coinbase_factor
-    ; account_creation_fee
-    ; fork
-    }
-
-  let of_json_layout
-      { Json_layout.Proof_keys.level
-      ; sub_windows_per_window
-      ; ledger_depth
-      ; work_delay
-      ; block_window_duration_ms
-      ; transaction_capacity
-      ; coinbase_amount
-      ; supercharged_coinbase_factor
-      ; account_creation_fee
-      ; fork
-      } =
-    let open Result.Let_syntax in
-    let%map level = result_opt ~f:Level.of_json_layout level
-    and transaction_capacity =
-      result_opt ~f:Transaction_capacity.of_json_layout transaction_capacity
-    in
-    { level
-    ; sub_windows_per_window
-    ; ledger_depth
-    ; work_delay
-    ; block_window_duration_ms
-    ; transaction_capacity
-    ; coinbase_amount
-    ; supercharged_coinbase_factor
-    ; account_creation_fee
-    ; fork
-    }
-
-  let to_yojson x = Json_layout.Proof_keys.to_yojson (to_json_layout x)
-
-  let of_yojson json =
-    Result.bind ~f:of_json_layout (Json_layout.Proof_keys.of_yojson json)
-
-  let combine t1 t2 =
-    { level = opt_fallthrough ~default:t1.level t2.level
-    ; sub_windows_per_window =
-        opt_fallthrough ~default:t1.sub_windows_per_window
-          t2.sub_windows_per_window
-    ; ledger_depth = opt_fallthrough ~default:t1.ledger_depth t2.ledger_depth
-    ; work_delay = opt_fallthrough ~default:t1.work_delay t2.work_delay
-    ; block_window_duration_ms =
-        opt_fallthrough ~default:t1.block_window_duration_ms
-          t2.block_window_duration_ms
-    ; transaction_capacity =
-        opt_fallthrough ~default:t1.transaction_capacity t2.transaction_capacity
-    ; coinbase_amount =
-        opt_fallthrough ~default:t1.coinbase_amount t2.coinbase_amount
-    ; supercharged_coinbase_factor =
-        opt_fallthrough ~default:t1.supercharged_coinbase_factor
-          t2.supercharged_coinbase_factor
-    ; account_creation_fee =
-        opt_fallthrough ~default:t1.account_creation_fee t2.account_creation_fee
-    ; fork = opt_fallthrough ~default:t1.fork t2.fork
-    }
-
+  (*
   let gen =
     let open Quickcheck.Generator.Let_syntax in
     let%bind level = Level.gen in
@@ -1143,66 +1136,100 @@ module Proof_keys = struct
     ; account_creation_fee = Some account_creation_fee
     ; fork
     }
+*)
 end
 
 module Genesis = struct
-  type t = Json_layout.Genesis.t =
-    { k : int option (* the depth of finality constant (in slots) *)
-    ; delta : int option (* max permissible delay of packets (in slots) *)
-    ; slots_per_epoch : int option
-    ; slots_per_sub_window : int option
-    ; grace_period_slots : int option
-    ; genesis_state_timestamp : string option
+  type t = Genesis_constants.t =
+    { protocol : Genesis_constants.Protocol.Stable.Latest.t
+    ; txpool_max_size : int
+    ; zkapp_proof_update_cost : float
+    ; zkapp_signed_single_update_cost : float
+    ; zkapp_signed_pair_update_cost : float
+    ; zkapp_transaction_cost_limit : float
+    ; max_event_elements : int
+    ; max_action_elements : int
+    ; zkapp_cmd_limit_hardcap : int
+    ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t
     }
   [@@deriving bin_io_unversioned]
 
-  let to_json_layout : t -> Json_layout.Genesis.t = Fn.id
-
-  let of_json_layout : Json_layout.Genesis.t -> (t, string) Result.t =
-    Result.return
-
+  (*
+  let to_json_layout : t -> Json_layout.Genesis.t = 
+    let open Json_layout.Genesis in
+    fun { protocol
+        ; txpool_max_size
+        ; zkapp_proof_update_cost
+        ; zkapp_signed_single_update_cost
+        ; zkapp_signed_pair_update_cost
+        ; zkapp_transaction_cost_limit
+        ; max_event_elements
+        ; max_action_elements
+        ; zkapp_cmd_limit_hardcap
+        ; minimum_user_command_fee
+        } ->
+      { k = Some protocol.k
+      ; delta = Some protocol.delta
+      ; slots_per_epoch  = Some protocol.slots_per_epoch
+      ; slots_per_sub_window  = Some protocol.slots_per_sub_window
+      ; grace_period_slots = Some protocol.grace_period_slots
+      ; genesis_state_timestamp = Some (Genesis_constants.genesis_timestamp_to_string protocol.genesis_state_timestamp)
+      ; pool_max_size = Some txpool_max_size
+      ; zkapp_proof_update_cost = Some zkapp_proof_update_cost
+      ; zkapp_signed_single_update_cost = Some zkapp_signed_single_update_cost
+      ; zkapp_signed_pair_update_cost = Some zkapp_signed_pair_update_cost
+      ; zkapp_transaction_cost_limit = Some zkapp_transaction_cost_limit
+      ; max_event_elements  = Some max_event_elements
+      ; max_action_elements = Some max_action_elements
+      ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
+      ; minimum_user_command_fee = Some (Currency.Fee.to_string minimum_user_command_fee)
+      }
   let to_yojson x = Json_layout.Genesis.to_yojson (to_json_layout x)
+  *)
 
-  let of_yojson json =
-    Result.bind ~f:of_json_layout (Json_layout.Genesis.of_yojson json)
+  let to_yojson = Genesis_constants.to_yojson
 
-  let combine t1 t2 =
-    { k = opt_fallthrough ~default:t1.k t2.k
-    ; delta = opt_fallthrough ~default:t1.delta t2.delta
-    ; slots_per_epoch =
-        opt_fallthrough ~default:t1.slots_per_epoch t2.slots_per_epoch
-    ; slots_per_sub_window =
-        opt_fallthrough ~default:t1.slots_per_sub_window t2.slots_per_sub_window
-    ; grace_period_slots =
-        opt_fallthrough ~default:t1.grace_period_slots t2.grace_period_slots
-    ; genesis_state_timestamp =
-        opt_fallthrough ~default:t1.genesis_state_timestamp
-          t2.genesis_state_timestamp
-    }
-
-  let gen =
+  (*TODO check the new generator for realistic cases*)
+  let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     let%bind k = Int.gen_incl 0 1000 in
     let%bind delta = Int.gen_incl 0 1000 in
     let%bind slots_per_epoch = Int.gen_incl 1 1_000_000 in
     let%bind slots_per_sub_window = Int.gen_incl 1 1_000 in
-    let%bind grace_period_slots =
-      Quickcheck.Generator.union
-        [ return None
-        ; Quickcheck.Generator.map ~f:Option.some @@ Int.gen_incl 0 1000
-        ]
-    in
-    let%map genesis_state_timestamp =
+    let%bind grace_period_slots = Int.gen_incl 0 1000 in
+    let%bind genesis_state_timestamp =
       Time.(gen_incl epoch (of_string "2050-01-01 00:00:00Z"))
       |> Quickcheck.Generator.map ~f:Time.to_string
     in
-    { k = Some k
-    ; delta = Some delta
-    ; slots_per_epoch = Some slots_per_epoch
-    ; slots_per_sub_window = Some slots_per_sub_window
-    ; grace_period_slots
-    ; genesis_state_timestamp = Some genesis_state_timestamp
-    }
+    let%bind pool_max_size = Int.gen_incl 0 1000 in
+    let%bind zkapp_proof_update_cost = Float.gen_incl 0.0 100.0 in
+    let%bind zkapp_signed_single_update_cost = Float.gen_incl 0.0 100.0 in
+    let%bind zkapp_signed_pair_update_cost = Float.gen_incl 0.0 100.0 in
+    let%bind zkapp_transaction_cost_limit = Float.gen_incl 0.0 100.0 in
+    let%bind max_event_elements = Int.gen_incl 0 100 in
+    let%bind max_action_elements = Int.gen_incl 0 100 in
+    let%bind zkapp_cmd_limit_hardcap = Int.gen_incl 0 1000 in
+    let%bind minimum_user_command_fee =
+      Quickcheck.Generator.map ~f:Int.to_string @@ Int.gen_incl 1 10
+    in
+    Quickcheck.Generator.return
+    @@ Genesis_constants.make
+         { k
+         ; delta
+         ; slots_per_epoch
+         ; slots_per_sub_window
+         ; grace_period_slots
+         ; genesis_state_timestamp
+         ; pool_max_size
+         ; zkapp_proof_update_cost
+         ; zkapp_signed_single_update_cost
+         ; zkapp_signed_pair_update_cost
+         ; zkapp_transaction_cost_limit
+         ; max_event_elements
+         ; max_action_elements
+         ; zkapp_cmd_limit_hardcap
+         ; minimum_user_command_fee
+         }
 end
 
 module Daemon = struct
@@ -1210,19 +1237,9 @@ module Daemon = struct
      a command line argument. Putting it in the config makes the network explicitly
      rely on a certain number of nodes, reducing decentralisation. See #14766 *)
   type t = Json_layout.Daemon.t =
-    { txpool_max_size : int option
-    ; peer_list_url : string option
-    ; zkapp_proof_update_cost : float option [@default None]
-    ; zkapp_signed_single_update_cost : float option [@default None]
-    ; zkapp_signed_pair_update_cost : float option [@default None]
-    ; zkapp_transaction_cost_limit : float option [@default None]
-    ; max_event_elements : int option [@default None]
-    ; max_action_elements : int option [@default None]
-    ; zkapp_cmd_limit_hardcap : int option [@default None]
+    { peer_list_url : string option [@default None]
     ; slot_tx_end : int option [@default None]
     ; slot_chain_end : int option [@default None]
-    ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t option
-          [@default None]
     ; network_id : string option [@default None]
     }
   [@@deriving bin_io_unversioned]
@@ -1238,64 +1255,20 @@ module Daemon = struct
     Result.bind ~f:of_json_layout (Json_layout.Daemon.of_yojson json)
 
   let combine t1 t2 =
-    { txpool_max_size =
-        opt_fallthrough ~default:t1.txpool_max_size t2.txpool_max_size
-    ; peer_list_url = opt_fallthrough ~default:t1.peer_list_url t2.peer_list_url
-    ; zkapp_proof_update_cost =
-        opt_fallthrough ~default:t1.zkapp_proof_update_cost
-          t2.zkapp_proof_update_cost
-    ; zkapp_signed_single_update_cost =
-        opt_fallthrough ~default:t1.zkapp_signed_single_update_cost
-          t2.zkapp_signed_single_update_cost
-    ; zkapp_signed_pair_update_cost =
-        opt_fallthrough ~default:t1.zkapp_signed_pair_update_cost
-          t2.zkapp_signed_pair_update_cost
-    ; zkapp_transaction_cost_limit =
-        opt_fallthrough ~default:t1.zkapp_transaction_cost_limit
-          t2.zkapp_transaction_cost_limit
-    ; max_event_elements =
-        opt_fallthrough ~default:t1.max_event_elements t2.max_event_elements
-    ; max_action_elements =
-        opt_fallthrough ~default:t1.max_action_elements t2.max_action_elements
-    ; zkapp_cmd_limit_hardcap =
-        opt_fallthrough ~default:t1.zkapp_cmd_limit_hardcap
-          t2.zkapp_cmd_limit_hardcap
+    { peer_list_url = opt_fallthrough ~default:t1.peer_list_url t2.peer_list_url
     ; slot_tx_end = opt_fallthrough ~default:t1.slot_tx_end t2.slot_tx_end
     ; slot_chain_end =
         opt_fallthrough ~default:t1.slot_chain_end t2.slot_chain_end
-    ; minimum_user_command_fee =
-        opt_fallthrough ~default:t1.minimum_user_command_fee
-          t2.minimum_user_command_fee
     ; network_id = opt_fallthrough ~default:t1.network_id t2.network_id
     }
 
   let gen =
-    let open Quickcheck.Generator.Let_syntax in
-    let%bind txpool_max_size = Int.gen_incl 0 1000 in
-    let%bind zkapp_proof_update_cost = Float.gen_incl 0.0 100.0 in
-    let%bind zkapp_signed_single_update_cost = Float.gen_incl 0.0 100.0 in
-    let%bind zkapp_signed_pair_update_cost = Float.gen_incl 0.0 100.0 in
-    let%bind zkapp_transaction_cost_limit = Float.gen_incl 0.0 100.0 in
-    let%bind max_event_elements = Int.gen_incl 0 100 in
-    let%bind zkapp_cmd_limit_hardcap = Int.gen_incl 0 1000 in
-    let%bind minimum_user_command_fee =
-      Currency.Fee.(gen_incl one (of_mina_int_exn 10))
-    in
-    let%map max_action_elements = Int.gen_incl 0 1000 in
-    { txpool_max_size = Some txpool_max_size
-    ; peer_list_url = None
-    ; zkapp_proof_update_cost = Some zkapp_proof_update_cost
-    ; zkapp_signed_single_update_cost = Some zkapp_signed_single_update_cost
-    ; zkapp_signed_pair_update_cost = Some zkapp_signed_pair_update_cost
-    ; zkapp_transaction_cost_limit = Some zkapp_transaction_cost_limit
-    ; max_event_elements = Some max_event_elements
-    ; max_action_elements = Some max_action_elements
-    ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
-    ; slot_tx_end = None
-    ; slot_chain_end = None
-    ; minimum_user_command_fee = Some minimum_user_command_fee
-    ; network_id = None
-    }
+    Quickcheck.Generator.return
+      { peer_list_url = None
+      ; slot_tx_end = None
+      ; slot_chain_end = None
+      ; network_id = None
+      }
 end
 
 module Epoch_data = struct
@@ -1392,13 +1365,14 @@ end
 
 type t =
   { daemon : Daemon.t option
-  ; genesis : Genesis.t option
-  ; proof : Proof_keys.t option
+  ; genesis : Genesis.t
+  ; proof : Proof_keys.t
   ; ledger : Ledger.t option
   ; epoch_data : Epoch_data.t option
   }
-[@@deriving bin_io_unversioned]
+[@@deriving bin_io_unversioned, to_yojson]
 
+(*
 let make ?daemon ?genesis ?proof ?ledger ?epoch_data () =
   { daemon; genesis; proof; ledger; epoch_data }
 
@@ -1410,17 +1384,8 @@ let to_json_layout { daemon; genesis; proof; ledger; epoch_data } =
   ; epoch_data = Option.map ~f:Epoch_data.to_json_layout epoch_data
   }
 
-let of_json_layout { Json_layout.daemon; genesis; proof; ledger; epoch_data } =
-  let open Result.Let_syntax in
-  let%map daemon = result_opt ~f:Daemon.of_json_layout daemon
-  and genesis = result_opt ~f:Genesis.of_json_layout genesis
-  and proof = result_opt ~f:Proof_keys.of_json_layout proof
-  and ledger = result_opt ~f:Ledger.of_json_layout ledger
-  and epoch_data = result_opt ~f:Epoch_data.of_json_layout epoch_data in
-  { daemon; genesis; proof; ledger; epoch_data }
 
 let to_yojson x = Json_layout.to_yojson (to_json_layout x)
-
 let to_yojson_without_accounts x =
   let layout = to_json_layout x in
   let genesis_accounts =
@@ -1452,8 +1417,6 @@ let to_yojson_without_accounts x =
       (`Genesis genesis_accounts, `Staking staking_accounts, `Next next_accounts)
   )
 
-let of_yojson json = Result.bind ~f:of_json_layout (Json_layout.of_yojson json)
-
 let default =
   { daemon = None
   ; genesis = None
@@ -1462,27 +1425,10 @@ let default =
   ; epoch_data = None
   }
 
-let combine t1 t2 =
-  let merge ~combine t1 t2 =
-    match (t1, t2) with
-    | Some t1, Some t2 ->
-        Some (combine t1 t2)
-    | Some t, None | None, Some t ->
-        Some t
-    | None, None ->
-        None
-  in
-  { daemon = merge ~combine:Daemon.combine t1.daemon t2.daemon
-  ; genesis = merge ~combine:Genesis.combine t1.genesis t2.genesis
-  ; proof = merge ~combine:Proof_keys.combine t1.proof t2.proof
-  ; ledger = opt_fallthrough ~default:t1.ledger t2.ledger
-  ; epoch_data = opt_fallthrough ~default:t1.epoch_data t2.epoch_data
-  }
-
 let gen =
   let open Quickcheck.Generator.Let_syntax in
+  let%bind genesis = Genesis.gen in
   let%map daemon = Daemon.gen
-  and genesis = Genesis.gen
   and proof = Proof_keys.gen
   and ledger = Ledger.gen
   and epoch_data = Epoch_data.gen in
@@ -1492,6 +1438,7 @@ let gen =
   ; ledger = Some ledger
   ; epoch_data = Some epoch_data
   }
+*)
 
 let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
   let open Async.Deferred.Result.Let_syntax in
@@ -1522,9 +1469,11 @@ let ledger_of_accounts accounts =
     ; add_genesis_winner = Some false
     }
 
-let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
-    ~blockchain_length ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
-    ~next_epoch_seed =
+let make_fork_config ~staged_ledger:_ ~global_slot_since_genesis:_ ~state_hash:_
+    ~blockchain_length:_ ~staking_ledger:_ ~staking_epoch_seed:_
+    ~next_epoch_ledger:_ ~next_epoch_seed:_ =
+  failwith "TODO"
+(*
   let open Async.Deferred.Result.Let_syntax in
   let global_slot_since_genesis =
     Mina_numbers.Global_slot_since_genesis.to_int global_slot_since_genesis
@@ -1598,108 +1547,146 @@ let slot_tx_end, slot_chain_end =
     t.daemon >>= get_runtime >>| Mina_numbers.Global_slot_since_hard_fork.of_int
   in
   (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))
+*)
 
-module Test_configs = struct
-  let bootstrap =
-    lazy
-      ( (* test_postake_bootstrap *)
-        {json|
-  { "daemon":
-      { "txpool_max_size": 3000 }
-  , "genesis":
-      { "k": 6
-      , "delta": 0
-      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
-  , "proof":
-      { "level": "none"
-      , "sub_windows_per_window": 8
-      , "ledger_depth": 6
-      , "work_delay": 2
-      , "block_window_duration_ms": 1500
-      , "transaction_capacity": {"2_to_the": 3}
-      , "coinbase_amount": "20"
-      , "supercharged_coinbase_factor": 2
-      , "account_creation_fee": "1" }
-  , "ledger": { "name": "test", "add_genesis_winner": false } }
-      |json}
-      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
+let slot_chain_end config =
+  let open Option.Let_syntax in
+  let%bind daemon = config.daemon in
+  let%map a = daemon.slot_chain_end in
+  Mina_numbers.Global_slot_since_hard_fork.of_int a
 
-  let transactions =
-    lazy
-      ( (* test_postake_txns *)
-        {json|
-  { "daemon":
-      { "txpool_max_size": 3000 }
-  , "genesis":
-      { "k": 6
-      , "delta": 0
-      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
-  , "proof":
-      { "level": "check"
-      , "sub_windows_per_window": 8
-      , "ledger_depth": 6
-      , "work_delay": 2
-      , "block_window_duration_ms": 15000
-      , "transaction_capacity": {"2_to_the": 3}
-      , "coinbase_amount": "20"
-      , "supercharged_coinbase_factor": 2
-      , "account_creation_fee": "1" }
-  , "ledger":
-      { "name": "test_split_two_stakers"
-      , "add_genesis_winner": false } }
-      |json}
-      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
+let slot_tx_end config =
+  let open Option.Let_syntax in
+  let%bind daemon = config.daemon in
+  let%map a = daemon.slot_tx_end in
+  Mina_numbers.Global_slot_since_hard_fork.of_int a
 
-  let split_snarkless =
-    lazy
-      ( (* test_postake_split_snarkless *)
-        {json|
-  { "daemon":
-      { "txpool_max_size": 3000 }
-  , "genesis":
-      { "k": 24
-      , "delta": 0
-      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
-  , "proof":
-      { "level": "check"
-      , "sub_windows_per_window": 8
-      , "ledger_depth": 30
-      , "work_delay": 1
-      , "block_window_duration_ms": 10000
-      , "transaction_capacity": {"2_to_the": 2}
-      , "coinbase_amount": "20"
-      , "supercharged_coinbase_factor": 2
-      , "account_creation_fee": "1" }
-  , "ledger":
-      { "name": "test_split_two_stakers"
-      , "add_genesis_winner": false } }
-      |json}
-      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
+let default ~proof ~genesis =
+  { daemon = None; genesis; proof; ledger = None; epoch_data = None }
 
-  let delegation =
-    lazy
-      ( (* test_postake_delegation *)
-        {json|
-  { "daemon":
-      { "txpool_max_size": 3000 }
-  , "genesis":
-      { "k": 4
-      , "delta": 0
-      , "slots_per_epoch": 72
-      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
-  , "proof":
-      { "level": "check"
-      , "sub_windows_per_window": 4
-      , "ledger_depth": 6
-      , "work_delay": 1
-      , "block_window_duration_ms": 5000
-      , "transaction_capacity": {"2_to_the": 2}
-      , "coinbase_amount": "20"
-      , "supercharged_coinbase_factor": 2
-      , "account_creation_fee": "1" }
-  , "ledger":
-      { "name": "test_delegation"
-      , "add_genesis_winner": false } }
-      |json}
-      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
+module Network_constants : sig
+  type t =
+    { genesis_constants : Genesis_constants.Inputs.t
+    ; constraint_constants : Genesis_constants.Constraint_constants.Inputs.t
+    }
+
+  val mainnet : t
+
+  val dev : t
+end = struct
+  type t =
+    { genesis_constants : Genesis_constants.Inputs.t
+    ; constraint_constants : Genesis_constants.Constraint_constants.Inputs.t
+    }
+
+  let mainnet =
+    { genesis_constants =
+        { genesis_state_timestamp = "2024-06-05T00 =00 =00Z"
+        ; k = 290
+        ; slots_per_epoch = 7140
+        ; slots_per_sub_window = 7
+        ; grace_period_slots = 2160
+        ; delta = 0
+        ; pool_max_size = 3000
+        ; zkapp_proof_update_cost = 10.26
+        ; zkapp_signed_single_update_cost = 9.140000000000001
+        ; zkapp_signed_pair_update_cost = 10.08
+        ; zkapp_transaction_cost_limit = 69.45
+        ; max_event_elements = 100
+        ; max_action_elements = 100
+        ; zkapp_cmd_limit_hardcap = 128
+        ; minimum_user_command_fee = "0.001"
+        }
+    ; constraint_constants =
+        { scan_state_with_tps_goal = true
+        ; scan_state_tps_goal_x10 = Some 2
+        ; block_window_duration = 180000
+        ; scan_state_transaction_capacity_log_2 = None
+        ; supercharged_coinbase_factor = 1
+        ; scan_state_work_delay = 2
+        ; coinbase = "720"
+        ; account_creation_fee_int = "1.0"
+        ; ledger_depth = 35
+        ; sub_windows_per_window = 11
+        ; fork = None
+        ; proof_level = "full"
+        }
+    }
+
+  (*TODO: double check these*)
+  let dev =
+    { genesis_constants =
+        { genesis_state_timestamp = "2019-01-30 12:00:00-08:00"
+        ; k = 24
+        ; slots_per_epoch = 576
+        ; slots_per_sub_window = 2
+        ; grace_period_slots = 180
+        ; delta = 0
+        ; pool_max_size = 3000
+        ; zkapp_proof_update_cost = 10.26
+        ; zkapp_signed_single_update_cost = 9.140000000000001
+        ; zkapp_signed_pair_update_cost = 10.08
+        ; zkapp_transaction_cost_limit = 69.45
+        ; max_event_elements = 100
+        ; max_action_elements = 100
+        ; zkapp_cmd_limit_hardcap = 128
+        ; minimum_user_command_fee = "2"
+        }
+    ; constraint_constants =
+        { scan_state_with_tps_goal = false
+        ; scan_state_tps_goal_x10 = None
+        ; block_window_duration = 2000
+        ; scan_state_transaction_capacity_log_2 = None
+        ; supercharged_coinbase_factor = 1
+        ; scan_state_work_delay = 2
+        ; coinbase = "20"
+        ; account_creation_fee_int = "0.001"
+        ; ledger_depth = 10
+        ; sub_windows_per_window = 3
+        ; fork = None
+        ; proof_level = "check"
+        }
+    }
 end
+
+let of_json_layout ~(network_constants : Network_constants.t)
+    ~(json_config : Json_layout.t) =
+  let genesis =
+    Genesis_constants.make
+    @@ Option.value_map ~default:network_constants.genesis_constants
+         ~f:(fun a ->
+           Json_layout.Genesis.override network_constants.genesis_constants a )
+         json_config.genesis
+  in
+  let proof =
+    Genesis_constants.Constraint_constants.make
+    @@ Option.value_map ~default:network_constants.constraint_constants
+         ~f:(fun a ->
+           Json_layout.Proof_keys.override
+             network_constants.constraint_constants a )
+         json_config.proof
+    (* Monad transformer e.g. 'Either e Maybe' would be nicer*)
+  in
+  let open Result.Let_syntax in
+  let%bind daemon =
+    match json_config.daemon with
+    | None ->
+        Result.return None
+    | Some daemon ->
+        Result.map ~f:Option.some @@ Daemon.of_json_layout daemon
+  in
+  let%bind ledger =
+    match json_config.ledger with
+    | None ->
+        Result.return None
+    | Some ledger ->
+        Result.map ~f:Option.some @@ Ledger.of_json_layout ledger
+  in
+  let%map epoch_data =
+    match json_config.epoch_data with
+    | None ->
+        Result.return None
+    | Some epoch_data ->
+        Result.map ~f:Option.some @@ Epoch_data.of_json_layout epoch_data
+  in
+  { genesis; proof; daemon; ledger; epoch_data }

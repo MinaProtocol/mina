@@ -4729,16 +4729,14 @@ let run pool reader ~genesis_constants ~constraint_constants ~logger
 
 (* [add_genesis_accounts] is called when starting the archive process *)
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
-    ~(genesis_constants : Genesis_constants.t)
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t) pool =
+    pool =
   match runtime_config_opt with
   | None ->
       Deferred.unit
   | Some runtime_config -> (
       let%bind precomputed_values =
         match%map
-          Genesis_ledger_helper.init_from_config_file ~logger ~proof_level:None
-            ~genesis_constants ~constraint_constants runtime_config
+          Genesis_ledger_helper.init_from_config_file ~logger runtime_config
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
@@ -4765,7 +4763,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
             let%bind.Deferred.Result genesis_block_id =
               Block.add_if_doesn't_exist
                 (module Conn)
-                ~constraint_constants genesis_block
+                ~constraint_constants:runtime_config.proof genesis_block
             in
             let%bind.Deferred.Result { ledger_hash; _ } =
               Block.load (module Conn) ~id:genesis_block_id
@@ -4901,10 +4899,7 @@ let setup_server ~(genesis_constants : Genesis_constants.t)
         ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
       Deferred.unit
   | Ok pool ->
-      let%bind () =
-        add_genesis_accounts pool ~logger ~genesis_constants
-          ~constraint_constants ~runtime_config_opt
-      in
+      let%bind () = add_genesis_accounts pool ~logger ~runtime_config_opt in
       run ~constraint_constants ~genesis_constants pool reader ~logger
         ~delete_older_than
       |> don't_wait_for ;

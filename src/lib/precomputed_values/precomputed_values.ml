@@ -31,7 +31,10 @@ let for_unit_tests =
         ~consensus_constants:(Lazy.force Consensus.Constants.for_unit_tests)
         ~genesis_body_reference
     in
-    { runtime_config = Runtime_config.default
+    { runtime_config =
+        Runtime_config.default
+          ~proof:Genesis_constants.For_unit_tests.Constraint_constants.t
+          ~genesis:Genesis_constants.For_unit_tests.t
     ; constraint_constants =
         Genesis_constants.For_unit_tests.Constraint_constants.t
     ; proof_level = Genesis_constants.For_unit_tests.Proof_level.t

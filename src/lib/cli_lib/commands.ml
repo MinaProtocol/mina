@@ -309,9 +309,7 @@ module Vrf = struct
       exit 0)
 
   let batch_check_witness =
-
     let open Command.Let_syntax in
-
     Command.async
       ~summary:
         "Check a batch of vrf evaluation witnesses read on stdin. Outputs the \
@@ -323,55 +321,55 @@ module Vrf = struct
          ledger; this should be done manually to confirm whether threshold_met \
          in the output corresponds to an actual won block."
       (let%map_open constraint_config_file =
-        Command.Param.flag "--config-file" ~aliases:[ "config-file" ]
-          ~doc:
-            "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
-             default: <config_dir>/daemon.json). Pass multiple times to override \
-             fields from earlier config files"
-          (Command.Param.optional Command.Param.string)
-      in
-      fun () ->
-      let open Deferred.Let_syntax in
-      (* TODO-someday: constraint constants from config file. *)
-      let lexbuf = Lexing.from_channel In_channel.stdin in
-      let lexer = Yojson.init_lexer () in
-      let constraint_constants = 
-        Yojson.Safe.from_file (Option.value_exn constraint_config_file) |> 
-        Genesis_constants.Constraint_constants.Inputs.of_yojson |>
-        Result.ok_or_failwith |>
-        Genesis_constants.Constraint_constants.make
-        
-       
-      in
-      let%bind () =
-        Deferred.repeat_until_finished () (fun () ->
-            Deferred.Or_error.try_with ~here:[%here] (fun () ->
-                try
-                  let evaluation_json =
-                    Yojson.Safe.from_lexbuf ~stream:true lexer lexbuf
-                  in
-                  let open Consensus_vrf.Layout in
-                  let evaluation =
-                    Result.ok_or_failwith (Evaluation.of_yojson evaluation_json)
-                  in
-                  let evaluation =
-                    Evaluation.compute_vrf ~constraint_constants evaluation
-                  in
-                  Format.printf "%a@."
-                    (Yojson.Safe.pretty_print ?std:None)
-                    (Evaluation.to_yojson evaluation) ;
-                  Deferred.return (`Repeat ())
-                with Yojson.End_of_input -> return (`Finished ()) )
-            >>| function
-            | Ok x ->
-                x
-            | Error err ->
-                Format.eprintf "@[<v>Error:@,%s@,@]@."
-                  (Yojson.Safe.pretty_to_string
-                     (Error_json.error_to_yojson err) ) ;
-                `Repeat () )
-      in
-      exit 0 )
+         Command.Param.flag "--config-file" ~aliases:[ "config-file" ]
+           ~doc:
+             "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
+              default: <config_dir>/daemon.json). Pass multiple times to \
+              override fields from earlier config files"
+           (Command.Param.optional Command.Param.string)
+       in
+       fun () ->
+         let open Deferred.Let_syntax in
+         (* TODO-someday: constraint constants from config file. *)
+         let lexbuf = Lexing.from_channel In_channel.stdin in
+         let lexer = Yojson.init_lexer () in
+         let constraint_constants =
+           Yojson.Safe.from_file (Option.value_exn constraint_config_file)
+           |> Genesis_constants.Constraint_constants.Inputs.of_yojson
+           |> Result.ok_or_failwith
+           |> Genesis_constants.Constraint_constants.make
+         in
+
+         let%bind () =
+           Deferred.repeat_until_finished () (fun () ->
+               Deferred.Or_error.try_with ~here:[%here] (fun () ->
+                   try
+                     let evaluation_json =
+                       Yojson.Safe.from_lexbuf ~stream:true lexer lexbuf
+                     in
+                     let open Consensus_vrf.Layout in
+                     let evaluation =
+                       Result.ok_or_failwith
+                         (Evaluation.of_yojson evaluation_json)
+                     in
+                     let evaluation =
+                       Evaluation.compute_vrf ~constraint_constants evaluation
+                     in
+                     Format.printf "%a@."
+                       (Yojson.Safe.pretty_print ?std:None)
+                       (Evaluation.to_yojson evaluation) ;
+                     Deferred.return (`Repeat ())
+                   with Yojson.End_of_input -> return (`Finished ()) )
+               >>| function
+               | Ok x ->
+                   x
+               | Error err ->
+                   Format.eprintf "@[<v>Error:@,%s@,@]@."
+                     (Yojson.Safe.pretty_to_string
+                        (Error_json.error_to_yojson err) ) ;
+                   `Repeat () )
+         in
+         exit 0 )
 
   let command_group =
     Command.group ~summary:"Commands for vrf evaluations"
@@ -379,5 +377,4 @@ module Vrf = struct
       ; ("batch-generate-witness", batch_generate_witness)
       ; ("batch-check-witness", batch_check_witness)
       ]
-
 end

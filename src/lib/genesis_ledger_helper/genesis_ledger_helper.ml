@@ -844,16 +844,19 @@ let load_config_json filename =
       let%map json = Reader.file_contents filename in
       Yojson.Safe.from_string json )
 
-let load_config_file filename =
+let load_config_file filename
+    (network_constants : Runtime_config.Network_constants.t) =
   let open Deferred.Or_error.Let_syntax in
   Monitor.try_with_join_or_error ~here:[%here] (fun () ->
       let%map json = load_config_json filename in
-      match Runtime_config.of_yojson json with
-      | Ok config ->
-          Ok config
+      match Runtime_config.Json_layout.of_yojson json with
+      | Ok json_config ->
+          Result.map_error ~f:Error.of_string
+          @@ Runtime_config.of_json_layout ~network_constants ~json_config
       | Error err ->
           Or_error.error_string err )
 
+(*
 let print_config ~logger config =
   let ledger_name_json =
     Option.value ~default:`Null
@@ -881,47 +884,13 @@ let print_config ~logger config =
   in
   [%log info] "Initializing with runtime configuration. Ledger name: $name"
     ~metadata
-
+*)
 let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~(genesis_constants : Genesis_constants.t)
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~proof_level ?overwrite_version (config : Runtime_config.t) =
-  print_config ~logger config ;
+    ?overwrite_version (config : Runtime_config.t) =
+  (*print_config ~logger config ;*)
   let open Deferred.Or_error.Let_syntax in
-  let proof_level =
-    List.find_map_exn ~f:Fn.id
-      [ Option.Let_syntax.(
-          let%bind proof = config.proof in
-          match%map proof.level with
-          | Full ->
-              Genesis_constants.Proof_level.Full
-          | Check ->
-              Check
-          | None ->
-              None)
-      ; Some proof_level
-      ]
-  in
-  let constraint_constants, blockchain_proof_system_id =
-    match config.proof with
-    | None ->
-        [%log info] "Using the compiled constraint constants" ;
-        (constraint_constants, Some (Pickles.Verification_key.Id.dummy ()))
-    | Some config ->
-        [%log info] "Using the constraint constants from the configuration file" ;
-        let blockchain_proof_system_id =
-          (* We pass [None] here, which will force the constraint systems to be
-             set up and their hashes evaluated before we can calculate the
-             genesis proof's filename.
-             This adds no overhead if we are generating a genesis proof, since
-             we will do these evaluations anyway to load the blockchain proving
-             key. Otherwise, this will in a slight slowdown.
-          *)
-          None
-        in
-        ( make_constraint_constants ~default:constraint_constants config
-        , blockchain_proof_system_id )
-  in
+  let proof_level = config.proof.proof_level in
+  let constraint_constants = config.proof in
   let%bind genesis_ledger, ledger_config, ledger_file =
     match config.ledger with
     | Some ledger ->
@@ -934,7 +903,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   [%log info] "Loaded genesis ledger from $ledger_file"
     ~metadata:[ ("ledger_file", `String ledger_file) ] ;
-  let%bind genesis_epoch_data, genesis_epoch_data_config =
+  let%map genesis_epoch_data, genesis_epoch_data_config =
     Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
       config.epoch_data
   in
@@ -944,24 +913,20 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ; epoch_data = genesis_epoch_data_config
     }
   in
-  let%map genesis_constants =
-    Deferred.return
-    @@ make_genesis_constants ~logger ~default:genesis_constants config
-  in
+  let genesis_constants = config.genesis in
   let proof_inputs =
     Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
       ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
-      ~blockchain_proof_system_id ~genesis_epoch_data
+      ~blockchain_proof_system_id:None ~genesis_epoch_data
   in
   (proof_inputs, config)
 
-let init_from_config_file ?genesis_dir ~genesis_constants ~constraint_constants
-    ~logger ~proof_level ?overwrite_version (config : Runtime_config.t) :
+let init_from_config_file ?genesis_dir ~logger ?overwrite_version
+    (config : Runtime_config.t) :
     (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
   let open Deferred.Or_error.Let_syntax in
   let%map inputs, config =
-    inputs_from_config_file ?genesis_dir ~genesis_constants
-      ~constraint_constants ~logger ~proof_level ?overwrite_version config
+    inputs_from_config_file ?genesis_dir ~logger ?overwrite_version config
   in
   let values = Genesis_proof.create_values_no_proof inputs in
   (values, config)

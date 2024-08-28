@@ -2297,9 +2297,6 @@ let create ~commit_id ?wallets (config : Config.t) =
 
 let net { components = { net; _ }; _ } = net
 
-let runtime_config { config = { precomputed_values; _ }; _ } =
-  Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values
-
 let start_filtered_log
     ({ in_memory_reverse_structured_log_messages_for_integration_test
      ; commit_id
@@ -2364,3 +2361,5 @@ let best_chain_block_by_state_hash (t : t) hash =
        ~error:
          (sprintf "Block with state hash %s not found in transition frontier"
             (State_hash.to_base58_check hash) )
+
+let runtime_config t = t.config.Config.precomputed_values.runtime_config
