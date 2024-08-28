@@ -32,17 +32,21 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; token_owners : Account_id.t Token_id.Map.t
     ; hashes : Hash.t Addr.Map.t
     ; locations : Location.t Account_id.Map.t
+    ; non_existent_accounts : Account_id.Set.t
     }
   [@@deriving sexp]
 
   (** Merges second maps object into the first one,
       potentially overwriting some keys *)
-  let maps_merge base { accounts; token_owners; hashes; locations } =
+  let maps_merge base
+      { accounts; token_owners; hashes; locations; non_existent_accounts } =
     let combine ~key:_ _ v = v in
     { accounts = Map.merge_skewed ~combine base.accounts accounts
     ; token_owners = Map.merge_skewed ~combine base.token_owners token_owners
     ; hashes = Map.merge_skewed ~combine base.hashes hashes
     ; locations = Map.merge_skewed ~combine base.locations locations
+    ; non_existent_accounts =
+        Account_id.Set.union base.non_existent_accounts non_existent_accounts
     }
 
   (** Structure managing cache accumulated since the "base" ledger.
@@ -94,11 +98,12 @@ module Make (Inputs : Inputs_intf.S) = struct
 
   type unattached = t [@@deriving sexp]
 
-  let empty_maps () =
+  let empty_maps =
     { accounts = Location_binable.Map.empty
     ; token_owners = Token_id.Map.empty
     ; hashes = Addr.Map.empty
     ; locations = Account_id.Map.empty
+    ; non_existent_accounts = Account_id.Set.empty
     }
 
   let create ~depth () =
@@ -108,7 +113,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; current_location = None
     ; depth
     ; accumulated = None
-    ; maps = empty_maps ()
+    ; maps = empty_maps
     ; is_committing = false
     }
 
@@ -218,6 +223,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       update_maps t ~f:(fun maps ->
           { maps with
             locations = Map.set maps.locations ~key:account_id ~data:location
+          ; non_existent_accounts =
+              Set.remove maps.non_existent_accounts account_id
           } ) ;
       (* if account is at a hitherto-unused location, that
          becomes the current location
@@ -274,34 +281,36 @@ module Make (Inputs : Inputs_intf.S) = struct
           | _ ->
               None )
       in
-      let from_parent = lookup_parent ancestor not_found in
-      List.fold_map self_found_or_none ~init:from_parent
-        ~f:(fun from_parent (id, self_found) ->
-          match (self_found, from_parent) with
-          | None, r :: rest ->
-              (rest, r)
-          | Some acc_found_locally, _ ->
-              (from_parent, (id, acc_found_locally))
-          | _ ->
-              failwith "unexpected number of results from DB" )
-      |> snd
+      if List.is_empty not_found then
+        List.map ~f:(fun (a, x) -> (a, Option.value_exn x)) self_found_or_none
+      else
+        let from_parent = lookup_parent ancestor not_found in
+        List.fold_map self_found_or_none ~init:from_parent
+          ~f:(fun from_parent (id, self_found) ->
+            match (self_found, from_parent) with
+            | None, r :: rest ->
+                (rest, r)
+            | Some acc_found_locally, _ ->
+                (from_parent, (id, acc_found_locally))
+            | _ ->
+                failwith "unexpected number of results from DB" )
+        |> snd
 
     let get_batch t =
-      let self_find ~maps id =
-        let res = Map.find maps.accounts id in
-        let res =
-          if Option.is_none res then
-            let is_empty =
-              Option.value_map ~default:true t.current_location
-                ~f:(fun current_location ->
-                  let address = Location.to_path_exn id in
-                  let current_address = Location.to_path_exn current_location in
-                  Addr.is_further_right ~than:current_address address )
-            in
-            Option.some_if is_empty None
-          else Some res
-        in
-        (id, res)
+      let is_empty loc =
+        Option.value_map ~default:true t.current_location ~f:(fun cur_loc ->
+            let cur_addr = Location.to_path_exn cur_loc in
+            Addr.is_further_right ~than:cur_addr @@ Location.to_path_exn loc )
+      in
+      let self_find ~maps:{ accounts; _ } id =
+        ( id
+        , match Map.find accounts id with
+          | None when is_empty id ->
+              Some None
+          | None ->
+              None
+          | s ->
+              Some s )
       in
       self_find_or_batch_lookup self_find Base.get_batch t
 
@@ -538,8 +547,9 @@ module Make (Inputs : Inputs_intf.S) = struct
         (Account_id.derive_token_id ~owner:account_id)
         account_id
 
-    (* a write writes only to the mask, parent is not involved need to update
-       both account and hash pieces of the mask *)
+    (* a write writes only to the mask, parent is not involved
+
+       need to update both account and hash pieces of the mask *)
     let set t location account =
       assert_is_attached t ;
       set_account_unsafe t location account ;
@@ -622,12 +632,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       let old_root_hash = merkle_root t in
       let account_data = Map.to_alist t.maps.accounts in
       let hash_cache = t.maps.hashes in
-      t.maps <-
-        { accounts = Location_binable.Map.empty
-        ; hashes = Addr.Map.empty
-        ; token_owners = Token_id.Map.empty
-        ; locations = Account_id.Map.empty
-        } ;
+      t.maps <- empty_maps ;
       Base.set_batch ~hash_cache parent account_data ;
       Debug_assert.debug_assert (fun () ->
           [%test_result: Hash.t]
@@ -785,21 +790,23 @@ module Make (Inputs : Inputs_intf.S) = struct
               failwith "Expected mask current location to represent an account"
           )
 
+    let self_lookup_account ~maps account_id =
+      if Set.mem maps.non_existent_accounts account_id then Some None
+      else Option.map ~f:Option.some @@ Map.find maps.locations account_id
+
     let location_of_account t account_id =
       assert_is_attached t ;
       let maps, ancestor = maps_and_ancestor t in
-      let mask_result = Map.find maps.locations account_id in
-      match mask_result with
-      | Some _ ->
-          mask_result
+      match self_lookup_account ~maps account_id with
+      | Some r ->
+          r
       | None ->
           Base.location_of_account ancestor account_id
 
-    let location_of_account_batch t =
+    let location_of_account_batch =
       self_find_or_batch_lookup
-        (fun ~maps id ->
-          (id, Option.map ~f:Option.some @@ Map.find maps.locations id) )
-        Base.location_of_account_batch t
+        (fun ~maps id -> (id, self_lookup_account ~maps id))
+        Base.location_of_account_batch
 
     (* Adds specified accounts to the mask by laoding them from parent ledger.
 
@@ -811,8 +818,29 @@ module Make (Inputs : Inputs_intf.S) = struct
     let unsafe_preload_accounts_from_parent t account_ids =
       assert_is_attached t ;
       let locations = location_of_account_batch t account_ids in
-      let non_empty_locations = List.filter_map locations ~f:snd in
+      let non_empty_locations, empty_keys =
+        List.partition_map locations ~f:(function
+          | _, Some loc ->
+              First loc
+          | key, None ->
+              Second key )
+      in
+      update_maps t ~f:(fun maps ->
+          { maps with
+            non_existent_accounts =
+              Set.union maps.non_existent_accounts
+                (Account_id.Set.of_list empty_keys)
+          } ) ;
       let accounts = get_batch t non_empty_locations in
+      let empty_locations =
+        Option.value_map (last_filled t) ~default:[] ~f:(fun init ->
+            snd
+            @@ List.fold_map empty_keys ~init ~f:(fun loc _ ->
+                   Location.next loc
+                   |> Option.value_map ~default:(loc, loc) ~f:(fun loc' ->
+                          (loc', loc') ) ) )
+      in
+      let locations = empty_locations @ non_empty_locations in
       let all_hash_locations =
         let rec generate_locations account_locations acc =
           match account_locations with
@@ -833,7 +861,7 @@ module Make (Inputs : Inputs_intf.S) = struct
                   generate_locations account_locations
                     (Location.Hash address :: acc) )
         in
-        generate_locations non_empty_locations []
+        generate_locations locations []
       in
       let all_hashes = get_hash_batch_exn t all_hash_locations in
       (* Batch import merkle paths and self hashes. *)
@@ -842,11 +870,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           self_set_hash t address hash ) ;
       (* Batch import accounts. *)
       List.iter accounts ~f:(fun (location, account) ->
-          match account with
-          | None ->
-              ()
-          | Some account ->
-              set_account_unsafe t location account )
+          Option.iter account ~f:(set_account_unsafe t location) )
 
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
     let get_inner_hash_at_addr_exn t address =
@@ -858,12 +882,7 @@ module Make (Inputs : Inputs_intf.S) = struct
        as sometimes this is desired behavior *)
     let close t =
       assert_is_attached t ;
-      t.maps <-
-        { t.maps with
-          accounts = Location_binable.Map.empty
-        ; hashes = Addr.Map.empty
-        ; locations = Account_id.Map.empty
-        } ;
+      t.maps <- empty_maps ;
       Async.Ivar.fill_if_empty t.detached_parent_signal ()
 
     let index_of_account_exn t key =
@@ -970,31 +989,38 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t account_id account =
       assert_is_attached t ;
-      let maps, ancestor = maps_and_ancestor t in
-      match Map.find maps.locations account_id with
+      let { locations; non_existent_accounts; _ }, ancestor =
+        maps_and_ancestor t
+      in
+      let add_location () =
+        (* not in parent, create new location *)
+        let maybe_location =
+          match t.current_location with
+          | None ->
+              Some (first_location ~ledger_depth:t.depth)
+          | Some loc ->
+              Location.next loc
+        in
+        match maybe_location with
+        | None ->
+            Or_error.error_string "Db_error.Out_of_leaves"
+        | Some location ->
+            (* `set` calls `self_set_location`, which updates
+               the current location
+            *)
+            set t location account ;
+            Ok (`Added, location)
+      in
+      match Map.find locations account_id with
       | None -> (
-          (* not in mask, maybe in parent *)
-          match Base.location_of_account ancestor account_id with
-          | Some location ->
-              Ok (`Existed, location)
-          | None -> (
-              (* not in parent, create new location *)
-              let maybe_location =
-                match last_filled t with
-                | None ->
-                    Some (first_location ~ledger_depth:t.depth)
-                | Some loc ->
-                    Location.next loc
-              in
-              match maybe_location with
-              | None ->
-                  Or_error.error_string "Db_error.Out_of_leaves"
-              | Some location ->
-                  (* `set` calls `self_set_location`, which updates
-                     the current location
-                  *)
-                  set t location account ;
-                  Ok (`Added, location) ) )
+          if Set.mem non_existent_accounts account_id then add_location ()
+          else
+            (* not in mask, maybe in parent *)
+            match Base.location_of_account ancestor account_id with
+            | Some location ->
+                Ok (`Existed, location)
+            | None ->
+                add_location () )
       | Some location ->
           Ok (`Existed, location)
   end
