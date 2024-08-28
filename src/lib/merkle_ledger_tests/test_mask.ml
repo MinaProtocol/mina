@@ -65,11 +65,12 @@ module type Test_intf = sig
   (** Here we provide a base ledger and two layers of attached masks
           * one ontop another *)
   val with_chain :
-       (   Base.t
-        -> mask:Mask.Attached.t
-        -> mask_as_base:Base.t
-        -> mask2:Mask.Attached.t
-        -> 'a )
+       (   Base.t (* base ledger *)
+        -> mask:(Mask.Attached.t * Base.t) lazy_t
+        -> (* first mask on top of base ledger *)
+           mask2:Mask.Attached.t lazy_t
+        -> (* second mask on top of the first mask *)
+           'a )
     -> 'a
 end
 
@@ -234,22 +235,20 @@ module Make (Test : Test_intf) = struct
 
   let () =
     add_test "commit at layer2, dumps to layer1, not in base" (fun () ->
-        Test.with_chain (fun base ~mask:level1 ~mask_as_base:_ ~mask2:level2 ->
-            Mask.Attached.set level2 dummy_location dummy_account ;
+        Test.with_chain (fun base ~mask:m1_lazy ~mask2:m2_lazy ->
+            let m2 = Lazy.force m2_lazy in
+            let m1, _ = Lazy.force m1_lazy in
+            Mask.Attached.set m2 dummy_location dummy_account ;
             (* verify account is in the layer2 mask *)
-            assert (
-              Mask.Attached.For_testing.location_in_mask level2 dummy_location ) ;
-            Mask.Attached.commit level2 ;
+            assert (Mask.Attached.For_testing.location_in_mask m2 dummy_location) ;
+            Mask.Attached.commit m2 ;
             (* account is no longer in layer2 *)
             assert (
-              not
-                (Mask.Attached.For_testing.location_in_mask level2
-                   dummy_location ) ) ;
+              not (Mask.Attached.For_testing.location_in_mask m2 dummy_location) ) ;
             (* account is still not in base *)
             assert (Option.is_none @@ Maskable.get base dummy_location) ;
             (* account is present in layer1 *)
-            assert (
-              Mask.Attached.For_testing.location_in_mask level1 dummy_location ) ) )
+            assert (Mask.Attached.For_testing.location_in_mask m1 dummy_location) ) )
 
   let () =
     add_test "register and unregister mask" (fun () ->
@@ -389,7 +388,8 @@ module Make (Test : Test_intf) = struct
         "get_all_accounts should preserve the ordering of accounts by location \
          with noncontiguous updates of accounts on the mask" (fun () ->
           (* see similar test in test_database *)
-          Test.with_chain (fun _ ~mask:mask1 ~mask_as_base:_ ~mask2 ->
+          Test.with_chain (fun _ ~mask:mask1_lazy ~mask2:mask2_lazy ->
+              let mask1, _ = Lazy.force mask1_lazy in
               let num_accounts = 1 lsl Test.depth in
               let gen_values gen list_length =
                 Quickcheck.random_value
@@ -413,6 +413,7 @@ module Make (Test : Test_intf) = struct
                 |> List.unzip
               in
               let subset_balances = gen_values Balance.gen num_subset in
+              let mask2 = Lazy.force mask2_lazy in
               let subset_updated_accounts =
                 List.map2_exn subset_accounts subset_balances
                   ~f:(fun account balance ->
@@ -610,7 +611,7 @@ module Make (Test : Test_intf) = struct
 
   let () =
     add_test "mask reparenting works" (fun () ->
-        Test.with_chain (fun base ~mask:m1 ~mask_as_base ~mask2:m2 ->
+        Test.with_chain (fun base ~mask:m1_lazy ~mask2:m2_lazy ->
             let num_accounts = 3 in
             let account_ids = Account_id.gen_accounts num_accounts in
             let balances =
@@ -623,7 +624,9 @@ module Make (Test : Test_intf) = struct
             match accounts with
             | [ a1; a2; a3 ] ->
                 let loc1 = parent_create_new_account_exn base a1 in
+                let m1, m1_base = Lazy.force m1_lazy in
                 let loc2 = create_new_account_exn m1 a2 in
+                let m2 = Lazy.force m2_lazy in
                 let loc3 = create_new_account_exn m2 a3 in
                 let locs = [ (loc1, a1); (loc2, a2); (loc3, a3) ] in
                 (* all accounts are here *)
@@ -636,7 +639,7 @@ module Make (Test : Test_intf) = struct
                 Mask.Attached.commit m1 ;
                 [%test_result: Account.t option] ~message:"a2 is in base"
                   ~expect:(Some a2) (Test.Base.get base loc2) ;
-                Maskable.remove_and_reparent_exn mask_as_base m1 ;
+                Maskable.remove_and_reparent_exn m1_base m1 ;
                 [%test_result: Account.t option] ~message:"a1 is in base"
                   ~expect:(Some a1) (Test.Base.get base loc1) ;
                 [%test_result: Account.t option] ~message:"a2 is in base"
@@ -783,14 +786,17 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
 
   let with_chain f =
     with_instances (fun maskable mask ->
-        let attached1 = Maskable.register_mask maskable mask in
-        let attached1_as_base =
-          Any_base.cast (module Mask.Attached) attached1
+        let attached1 =
+          lazy
+            (let m = Maskable.register_mask maskable mask in
+             (m, Any_base.cast (module Mask.Attached) m) )
         in
-        let mask2 = Mask.create ~depth:Depth.depth () in
-        let attached2 = Maskable.register_mask attached1_as_base mask2 in
-        f maskable ~mask:attached1 ~mask_as_base:attached1_as_base
-          ~mask2:attached2 )
+        let attached2 =
+          lazy
+            ( Maskable.register_mask (snd @@ Lazy.force attached1)
+            @@ Mask.create ~depth:Depth.depth () )
+        in
+        f maskable ~mask:attached1 ~mask2:attached2 )
 end
 
 module Make_maskable_and_mask (Depth : Depth_S) =
