@@ -2194,59 +2194,59 @@ module Queries = struct
 
   let snarked_ledger_account_membership =
     io_field "snarkedLedgerAccountMembership"
-    ~doc:
-      "obtain a membership proof for an account in the snarked ledger along \
-       with the account's balance, timing information, and nonce"
-~args:
-      Arg.
-        [ arg "accountInfos" ~doc:"Token id of the account to check"
-            ~typ:(non_null (list (non_null Types.Input.AccountInfo.arg_typ)))
-        ; arg "stateHash" ~doc:"Hash of the snarked ledger to check"
-            ~typ:(non_null string)
-        ]
-    ~typ:(non_null (list (non_null Types.SnarkedLedgerMembership.obj)))
-~resolve:(fun { ctx = mina; _ } () account_infos state_hash ->
-      let open Deferred.Let_syntax in
-      let state_hash = State_hash.of_base58_check_exn state_hash in
-  let%bind ledger =
-        Mina_lib.get_snarked_ledger_full mina (Some state_hash)
-      in
-      let ledger =
-        match ledger with
-        | Ok ledger ->
-            ledger
-        | Error err ->
-            raise
-              (Failure
-                 ("Failed to get snarked ledger: " ^ Error.to_string_hum err)
-              )
-  in
-      let%map memberships =
-        Deferred.List.map account_infos ~f:(fun (pk, token) ->
-       let token = Option.value ~default:Token_id.default token in
-            let account_id = Account_id.create pk token in
-            let location = Ledger.location_of_account ledger account_id in
-            match location with
-            | None ->
-                raise (Failure "Account not found in snarked ledger")
-            | Some location -> (
-                let account = Ledger.get ledger location in
-                match account with
-                | None ->
-                    raise (Failure "Account not found in snarked ledger")
-                | Some account ->
-                    let account_balance = account.balance in
-                    let timing_info = account.timing in
-                    let nonce = account.nonce in
-                    let proof = Ledger.merkle_path ledger location in
-                    { Types.SnarkedLedgerMembership.account_balance
-                    ; timing_info
-                    ; nonce
-                    ; proof
-                    }
-                    |> Deferred.return ) )
-      in
-      Ok memberships )
+      ~doc:
+        "obtain a membership proof for an account in the snarked ledger along \
+         with the account's balance, timing information, and nonce"
+      ~args:
+        Arg.
+          [ arg "accountInfos" ~doc:"Token id of the account to check"
+              ~typ:(non_null (list (non_null Types.Input.AccountInfo.arg_typ)))
+          ; arg "stateHash" ~doc:"Hash of the snarked ledger to check"
+              ~typ:(non_null string)
+          ]
+      ~typ:(non_null (list (non_null Types.SnarkedLedgerMembership.obj)))
+      ~resolve:(fun { ctx = mina; _ } () account_infos state_hash ->
+        let open Deferred.Let_syntax in
+        let state_hash = State_hash.of_base58_check_exn state_hash in
+        let%bind ledger =
+          Mina_lib.get_snarked_ledger_full mina (Some state_hash)
+        in
+        let ledger =
+          match ledger with
+          | Ok ledger ->
+              ledger
+          | Error err ->
+              raise
+                (Failure
+                   ("Failed to get snarked ledger: " ^ Error.to_string_hum err)
+                )
+        in
+        let%map memberships =
+          Deferred.List.map account_infos ~f:(fun (pk, token) ->
+              let token = Option.value ~default:Token_id.default token in
+              let account_id = Account_id.create pk token in
+              let location = Ledger.location_of_account ledger account_id in
+              match location with
+              | None ->
+                  raise (Failure "Account not found in snarked ledger")
+              | Some location -> (
+                  let account = Ledger.get ledger location in
+                  match account with
+                  | None ->
+                      raise (Failure "Account not found in snarked ledger")
+                  | Some account ->
+                      let account_balance = account.balance in
+                      let timing_info = account.timing in
+                      let nonce = account.nonce in
+                      let proof = Ledger.merkle_path ledger location in
+                      { Types.SnarkedLedgerMembership.account_balance
+                      ; timing_info
+                      ; nonce
+                      ; proof
+                      }
+                      |> Deferred.return ) )
+        in
+        Ok memberships )
 
   let genesis_constants =
     field "genesisConstants"
