@@ -871,10 +871,6 @@ let blockchain_state :
             Mina_state.Blockchain_state.body_reference blockchain_state )
       ] )
 
-module AccountInfo = struct
-  
-end
-
 let protocol_state :
     ( Mina_lib.t
     , (Filtered_external_transition.Protocol_state.t * State_hash.t) option )
@@ -2421,6 +2417,10 @@ module Input = struct
               Error "Expected snarked ledger hash in Base58Check format" )
         ~to_json:(function
           | (h : input) -> `String (Frozen_ledger_hash.to_base58_check h) )
+  end
+
+  module AccountInfo = struct
+    
   end
 
   module BlockTime = struct
