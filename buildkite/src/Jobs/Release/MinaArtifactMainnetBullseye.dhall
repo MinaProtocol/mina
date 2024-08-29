@@ -21,7 +21,7 @@ in  Pipeline.build
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
             ]
-          , networks = [ Network.Type.Devnet, Network.Type.Mainnet ]
+          , networks = [ Network.Type.Mainnet ]
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release

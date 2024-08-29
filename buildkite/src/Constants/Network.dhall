@@ -25,9 +25,19 @@ let foldMinaBuildMainnetEnv =
 
           else  "MINA_BUILD_MAINNET=false"
 
+let foldNames =
+          \(networks : List Network)
+      ->  Prelude.List.fold
+            Network
+            networks
+            Text
+            (\(x : Network) -> \(y : Text) -> "${capitalName x}" ++ y)
+            ""
+
 in  { Type = Network
     , capitalName = capitalName
     , lowerName = lowerName
     , requiresMainnetBuild = requiresMainnetBuild
     , foldMinaBuildMainnetEnv = foldMinaBuildMainnetEnv
+    , foldNames = foldNames
     }

@@ -25,14 +25,14 @@ in  Pipeline.build
           , S.strictlyEnd (S.contains "rust-toolchain.toml")
           ]
         , path = "Release"
-        , name = "MinaToolchainArtifactBullseye"
+        , name = "MinaToolchainArtifactFocal"
         , tags = [ PipelineTag.Type.Toolchain ]
         }
       , steps =
         [ let toolchainBullseyeSpec =
                 DockerImage.ReleaseSpec::{
                 , service = Artifacts.Type.Toolchain
-                , deb_codename = DebianVersions.DebVersion.Bullseye
+                , deb_codename = DebianVersions.DebVersion.Focal
                 , no_cache = True
                 }
 
