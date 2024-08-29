@@ -889,8 +889,8 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ?overwrite_version (config : Runtime_config.t) =
   (*print_config ~logger config ;*)
   let open Deferred.Or_error.Let_syntax in
-  let proof_level = config.proof.proof_level in
-  let constraint_constants = config.proof in
+  let proof_level = config.constraint_constants.proof_level in
+  let constraint_constants = config.constraint_constants in
   let%bind genesis_ledger, ledger_config, ledger_file =
     match config.ledger with
     | Some ledger ->
@@ -913,7 +913,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ; epoch_data = genesis_epoch_data_config
     }
   in
-  let genesis_constants = config.genesis in
+  let genesis_constants = config.genesis_constants in
   let proof_inputs =
     Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
       ~ledger:genesis_ledger ~constraint_constants ~genesis_constants

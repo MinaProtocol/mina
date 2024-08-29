@@ -145,7 +145,7 @@ module Network_config = struct
     let runtime_config =
       { Runtime_config.daemon =
           Some { peer_list_url = None; slot_tx_end; slot_chain_end; network_id }
-      ; genesis =
+      ; genesis_constants =
           { constants.genesis_constants with
             protocol =
               { constants.genesis_constants.protocol with
@@ -155,7 +155,7 @@ module Network_config = struct
                   |> Genesis_constants.of_time
               }
           }
-      ; proof =
+      ; constraint_constants =
           constants.constraint_constants
           (* TODO: prebake ledger and only set hash *)
       ; ledger =

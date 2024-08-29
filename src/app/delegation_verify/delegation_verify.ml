@@ -17,6 +17,10 @@ let config_flag =
   let open Command.Param in
   flag "--config-file" ~doc:"FILE config file" (optional string)
 
+let network_arg =
+  let open Command.Param in
+  flag "--network" ~doc:"mainnet|testnet|dev" (required string)
+
 let keyspace_flag =
   let open Command.Param in
   flag "--keyspace" ~doc:"Name of the Cassandra keyspace" (required string)
@@ -44,23 +48,24 @@ let timestamp =
   let open Command.Param in
   anon ("timestamp" %: string)
 
-let instantiate_verify_functions ~logger ~genesis_constants
-    ~constraint_constants ~proof_level = function
+let instantiate_verify_functions ~logger ~network ~config_file =
+  let network_constants = Runtime_config.Network_constants.of_string network in
+  match config_file with
   | None ->
+      let constraint_constants =
+        Genesis_constants.Constraint_constants.make
+          network_constants.constraint_constants
+      in
       Deferred.return
-        (Verifier.verify_functions ~constraint_constants ~proof_level ())
+        (Verifier.verify_functions ~constraint_constants
+           ~proof_level:constraint_constants.proof_level () )
   | Some config_file ->
       let%bind.Deferred precomputed_values =
-        let%bind.Deferred.Or_error config_json =
-          Genesis_ledger_helper.load_config_json config_file
-        in
         let%bind.Deferred.Or_error config =
-          Deferred.return
-          @@ Result.map_error ~f:Error.of_string
-          @@ Runtime_config.of_yojson config_json
+          Genesis_ledger_helper.load_config_file config_file ~network_constants
+          |> Deferred.Or_error.ok_exn
         in
-        Genesis_ledger_helper.init_from_config_file ~logger ~proof_level
-          ~constraint_constants ~genesis_constants config
+        Genesis_ledger_helper.init_from_config_file ~logger config
       in
       let%map.Deferred precomputed_values =
         match precomputed_values with
@@ -150,17 +155,12 @@ let filesystem_command =
       let%map_open block_dir = block_dir_flag
       and inputs = anon (sequence ("filename" %: Filename.arg_type))
       and no_checks = no_checks_flag
+      and network = network_arg
       and config_file = config_flag in
       fun () ->
         let logger = Logger.create () in
-        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-        let constraint_constants =
-          Genesis_constants.Compiled.constraint_constants
-        in
-        let proof_level = Genesis_constants.Compiled.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger config_file ~genesis_constants
-            ~constraint_constants ~proof_level
+          instantiate_verify_functions ~logger ~config_file ~network
         in
         let submission_paths = get_filenames inputs in
         let module V = Make_verifier (struct
@@ -188,18 +188,13 @@ let cassandra_command =
       and config_file = config_flag
       and keyspace = keyspace_flag
       and period_start = timestamp
+      and network = network_arg
       and period_end = timestamp in
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
-        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-        let constraint_constants =
-          Genesis_constants.Compiled.constraint_constants
-        in
-        let proof_level = Genesis_constants.Compiled.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger config_file ~genesis_constants
-            ~constraint_constants ~proof_level
+          instantiate_verify_functions ~logger ~config_file ~network
         in
         let module V = Make_verifier (struct
           include Submission.Cassandra
@@ -226,18 +221,14 @@ let stdin_command =
   Command.async
     ~summary:"Verify submissions and blocks read from standard input"
     Command.Let_syntax.(
-      let%map_open config_file = config_flag and no_checks = no_checks_flag in
+      let%map_open config_file = config_flag
+      and no_checks = no_checks_flag
+      and network = network_arg in
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
-        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-        let constraint_constants =
-          Genesis_constants.Compiled.constraint_constants
-        in
-        let proof_level = Genesis_constants.Compiled.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger config_file ~genesis_constants
-            ~constraint_constants ~proof_level
+          instantiate_verify_functions ~logger ~config_file ~network
         in
         let module V = Make_verifier (struct
           include Submission.Stdin

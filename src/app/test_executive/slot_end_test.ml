@@ -54,12 +54,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; txpool_max_size = 10_000_000
     ; snark_worker_fee = "0.0002"
     ; num_archive_nodes = 0
-    ; proof_config =
-        { proof_config_default with
-          work_delay = Some 1
-        ; transaction_capacity =
-            Some Runtime_config.Proof_keys.Transaction_capacity.small
-        }
+    ; proof_config = constants.constraint_constants
     ; slot_tx_end = Some slot_tx_end
     ; slot_chain_end = Some slot_chain_end
     }

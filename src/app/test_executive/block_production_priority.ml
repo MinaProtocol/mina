@@ -50,12 +50,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           }
     ; txpool_max_size = 10_000_000
     ; snark_worker_fee = "0.0001"
-    ; proof_config =
-        { proof_config_default with
-          work_delay = Some 1
-        ; transaction_capacity =
-            Some Runtime_config.Proof_keys.Transaction_capacity.small
-        }
+    ; proof_config = constants.constraint_constants
     }
 
   let fee = Currency.Fee.of_nanomina_int_exn 10_000_000

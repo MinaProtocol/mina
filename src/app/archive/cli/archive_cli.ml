@@ -31,6 +31,7 @@ let command_run =
      and runtime_config_file =
        flag "--config-file" ~aliases:[ "-config-file" ] (optional string)
          ~doc:"PATH to the configuration file containing the genesis ledger"
+     and network = flag "--network" ~doc:"mainnet|testnet|dev" (required string)
      and delete_older_than =
        flag "--delete-older-than" ~aliases:[ "-delete-older-than" ]
          (optional int)
@@ -38,16 +39,28 @@ let command_run =
            "int Delete blocks that are more than n blocks lower than the \
             maximum seen block."
      in
+     let network_constants =
+       Runtime_config.Network_constants.of_string network
+     in
      let runtime_config_opt =
        Option.map runtime_config_file ~f:(fun file ->
-           Yojson.Safe.from_file file |> Runtime_config.of_yojson
+           Yojson.Safe.from_file file |> Runtime_config.Json_layout.of_yojson
+           |> Result.ok_or_failwith
+           |> fun json_config ->
+           Runtime_config.of_json_layout ~network_constants ~json_config
            |> Result.ok_or_failwith )
      in
      fun () ->
        let logger = Logger.create () in
-       let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
+       let genesis_constants, constraint_constants =
+         match runtime_config_opt with
+         | None ->
+             ( Genesis_constants.make network_constants.genesis_constants
+             , Genesis_constants.Constraint_constants.make
+                 network_constants.constraint_constants )
+         | Some runtime_config ->
+             ( runtime_config.genesis_constants
+             , runtime_config.constraint_constants )
        in
        Stdout_log.setup log_json log_level ;
        [%log info] "Starting archive process; built with commit $commit"

@@ -3,7 +3,7 @@ open Core_bench
 
 let load_daemon_cfg filename () =
   let json = Yojson.Safe.from_file filename in
-  match Runtime_config.of_yojson json with
+  match Runtime_config.Json_layout.of_yojson json with
   | Ok cfg ->
       cfg
   | Error err ->
@@ -23,7 +23,17 @@ let convert accounts () =
 
 let () =
   let runtime_config = Sys.getenv_exn "RUNTIME_CONFIG" in
-  let cfg = load_daemon_cfg runtime_config () in
+  let network_constants =
+    Option.value_map ~default:Runtime_config.Network_constants.dev
+      ~f:Runtime_config.Network_constants.of_string
+      (Sys.getenv "MINA_NETWORK")
+  in
+  let cfg =
+    load_daemon_cfg runtime_config ()
+    |> fun json_config ->
+    Runtime_config.of_json_layout ~network_constants ~json_config
+    |> Result.ok_or_failwith
+  in
   let accounts =
     match cfg.ledger with
     | None | Some { base = Named _; _ } | Some { base = Hash; _ } ->

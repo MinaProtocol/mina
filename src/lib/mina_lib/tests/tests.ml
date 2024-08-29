@@ -40,8 +40,9 @@ let%test_module "Epoch ledger sync tests" =
       let%bind precomputed_values =
         let runtime_config : Runtime_config.t =
           { daemon = None
-          ; genesis = Genesis_constants.For_unit_tests.t
-          ; proof = Genesis_constants.For_unit_tests.Constraint_constants.t
+          ; genesis_constants = Genesis_constants.For_unit_tests.t
+          ; constraint_constants =
+              Genesis_constants.For_unit_tests.Constraint_constants.t
           ; ledger =
               Some
                 { base = Named "test"

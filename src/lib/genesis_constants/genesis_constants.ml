@@ -298,6 +298,7 @@ module T = struct
       ; grace_period_slots : int
       ; delta : int
       ; pool_max_size : int
+      ; num_accounts : int option
       ; zkapp_proof_update_cost : float
       ; zkapp_signed_single_update_cost : float
       ; zkapp_signed_pair_update_cost : float
@@ -314,6 +315,7 @@ module T = struct
   type t =
     { protocol : Protocol.Stable.Latest.t
     ; txpool_max_size : int
+    ; num_accounts : int option
     ; zkapp_proof_update_cost : float
     ; zkapp_signed_single_update_cost : float
     ; zkapp_signed_pair_update_cost : float
@@ -337,6 +339,7 @@ module T = struct
             |> of_time
         }
     ; txpool_max_size = inputs.pool_max_size
+    ; num_accounts = inputs.num_accounts
     ; zkapp_proof_update_cost = inputs.zkapp_proof_update_cost
     ; zkapp_signed_single_update_cost = inputs.zkapp_signed_single_update_cost
     ; zkapp_signed_pair_update_cost = inputs.zkapp_signed_pair_update_cost
@@ -426,6 +429,7 @@ module For_unit_tests = struct
       ; grace_period_slots = Node_config_for_unit_tests.grace_period_slots
       ; delta = Node_config_for_unit_tests.delta
       ; pool_max_size = Node_config_for_unit_tests.pool_max_size
+      ; num_accounts = None
       ; zkapp_proof_update_cost =
           Node_config_for_unit_tests.zkapp_proof_update_cost
       ; zkapp_signed_single_update_cost =
@@ -529,6 +533,7 @@ end = struct
       ; grace_period_slots = Node_config.grace_period_slots
       ; delta = Node_config.delta
       ; pool_max_size = Node_config.pool_max_size
+      ; num_accounts = None
       ; zkapp_proof_update_cost = Node_config.zkapp_proof_update_cost
       ; zkapp_signed_single_update_cost =
           Node_config.zkapp_signed_single_update_cost

@@ -223,7 +223,7 @@ module Network_config = struct
     let runtime_config =
       { Runtime_config.daemon =
           Some { peer_list_url = None; slot_tx_end; slot_chain_end; network_id }
-      ; genesis =
+      ; genesis_constants =
           { constants.genesis_constants with
             protocol =
               { constants.genesis_constants.protocol with
@@ -233,8 +233,7 @@ module Network_config = struct
                   |> Genesis_constants.of_time
               }
           }
-      ; proof =
-          constraint_constants (* TODO: prebake ledger and only set hash *)
+      ; constraint_constants (* TODO: prebake ledger and only set hash *)
       ; ledger =
           Some
             { base =
@@ -352,7 +351,7 @@ module Network_config = struct
               ({ staking; next } : Runtime_config.Epoch_data.t) )
       }
     in
-    let genesis_constants = runtime_config.genesis in
+    let genesis_constants = runtime_config.genesis_constants in
     let constants : Test_config.constants =
       { constraint_constants; genesis_constants }
     in

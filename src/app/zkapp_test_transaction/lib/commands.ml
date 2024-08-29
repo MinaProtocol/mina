@@ -146,8 +146,7 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t)
   ()
 
 let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
-    ~zkapp_kp ~(genesis_constants : Genesis_constants.t) ~proof_level
-    ~constraint_constants =
+    ~zkapp_kp ~(genesis_constants : Genesis_constants.t) ~constraint_constants =
   let open Deferred.Let_syntax in
   let receiver =
     Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
@@ -233,7 +232,7 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   let module T = Transaction_snark.Make (struct
     let constraint_constants = constraint_constants
 
-    let proof_level = proof_level
+    let proof_level = constraint_constants.proof_level
   end) in
   let%map _ =
     Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)
@@ -325,18 +324,21 @@ module Util = struct
         failwith (sprintf "Invalid authorization: %s" s)
 end
 
-let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile ~network
+    ~config_file () =
+  let network_constants = Runtime_config.Network_constants.of_string network in
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_kp = Util.snapp_keypair_of_file zkapp_keyfile in
-  let%bind ledger =
-    let%map config_json = Genesis_ledger_helper.load_config_json config_file in
-    let runtime_config =
-      Or_error.ok_exn config_json
-      |> Runtime_config.of_yojson |> Result.ok_or_failwith
-    in
+  let%bind runtime_config =
+    Genesis_ledger_helper.load_config_file ~network_constants config_file
+  in
+  let runtime_config =
+    runtime_config
+    |> Result.map_error ~f:Error.to_string_hum
+    |> Result.ok_or_failwith |> Or_error.ok_exn
+  in
+  let ledger =
     let accounts =
       let config = Option.value_exn runtime_config.Runtime_config.ledger in
       match config.base with
@@ -347,12 +349,15 @@ let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
     in
     let packed =
       Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-        ~depth:constraint_constants.ledger_depth accounts
+        ~depth:runtime_config.constraint_constants.ledger_depth accounts
     in
     Lazy.force (Genesis_ledger.Packed.t packed)
   in
+  let constraint_constants =
+    { runtime_config.constraint_constants with proof_level = Full }
+  in
   generate_zkapp_txn keypair ledger ~zkapp_kp ~constraint_constants
-    ~proof_level:Full ~genesis_constants
+    ~genesis_constants:runtime_config.genesis_constants
 
 let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
     ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo =

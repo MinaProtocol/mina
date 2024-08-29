@@ -1794,9 +1794,6 @@ let add_peers_graphql =
                   } ) ) ) )
 
 let compile_time_constants =
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
-  let proof_level = Genesis_constants.Compiled.proof_level in
   Command.async
     ~summary:"Print a JSON map of the compile-time consensus parameters"
     (Command.Param.return (fun () ->
@@ -1805,6 +1802,13 @@ let compile_time_constants =
          let genesis_dir =
            let home = Core.Sys.home_directory () in
            home ^/ Cli_lib.Default.conf_dir_name
+         in
+         let network_constants =
+           match Sys.getenv "MINA_NETWORK" with
+           | Some network ->
+               Runtime_config.Network_constants.of_string network
+           | None ->
+               Runtime_config.Network_constants.dev
          in
          let config_file =
            match Sys.getenv "MINA_CONFIG_FILE" with
@@ -1819,11 +1823,22 @@ let compile_time_constants =
            >>| Option.value
                  ~default:
                    (`Assoc [ ("ledger", `Assoc [ ("accounts", `List []) ]) ])
-           >>| Runtime_config.of_yojson >>| Result.ok
-           >>| Option.value ~default:Runtime_config.default
-           >>= Genesis_ledger_helper.init_from_config_file ~genesis_constants
-                 ~constraint_constants ~logger:(Logger.null ()) ~proof_level
-                 ~genesis_dir
+           >>| Runtime_config.Json_layout.of_yojson >>| Result.ok
+           >>| Option.value_map
+                 ~default:
+                   (Runtime_config.default
+                      ~genesis_constants:
+                        (Genesis_constants.make
+                           network_constants.genesis_constants )
+                      ~constraint_constants:
+                        (Genesis_constants.Constraint_constants.make
+                           network_constants.constraint_constants ) )
+                 ~f:(fun json_config ->
+                   Result.ok_or_failwith
+                   @@ Runtime_config.of_json_layout ~network_constants
+                        ~json_config )
+           >>= Genesis_ledger_helper.init_from_config_file
+                 ~logger:(Logger.null ()) ~genesis_dir
            >>| Or_error.ok_exn
          in
          let all_constants =

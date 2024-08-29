@@ -99,15 +99,17 @@ let main ~(network_constants : Runtime_config.Network_constants.t) ~config_file
   let%bind accounts, staking_accounts_opt, next_accounts_opt, config =
     load_config_exn ~network_constants config_file
   in
-  let ledger = load_ledger ~constraint_constants:config.proof accounts in
+  let ledger =
+    load_ledger ~constraint_constants:config.constraint_constants accounts
+  in
   let staking_ledger : Ledger.t =
     Option.value_map ~default:ledger
-      ~f:(load_ledger ~constraint_constants:config.proof)
+      ~f:(load_ledger ~constraint_constants:config.constraint_constants)
       staking_accounts_opt
   in
   let next_ledger =
     Option.value_map ~default:staking_ledger
-      ~f:(load_ledger ~constraint_constants:config.proof)
+      ~f:(load_ledger ~constraint_constants:config.constraint_constants)
       next_accounts_opt
   in
   let%bind hash_json =
