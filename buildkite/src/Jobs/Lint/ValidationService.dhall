@@ -92,8 +92,8 @@ in  Pipeline.build
             Command.Config::{
             , commands = commands
             , label =
-                "Validation service lint steps; employs various forms static analysis on the elixir codebase"
-            , key = "lint"
+                "Lint: Validation service "
+            , key = "lint-validation-checks"
             , target = Size.Small
             , skip = Some
                 ( B/Skip.String

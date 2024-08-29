@@ -37,7 +37,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run "buildkite/scripts/check-compatibility.sh develop" ]
-            , label = "Test: develop compatibilty test"
+            , label = "Test: develop compatibilty"
             , key = "develop-compatibilty-test"
             , target = Size.XLarge
             , docker = None Docker.Type

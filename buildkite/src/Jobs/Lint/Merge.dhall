@@ -31,7 +31,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run "buildkite/scripts/merges-cleanly.sh compatible" ]
-            , label = "Check merges cleanly into compatible"
+            , label = "Merge: compatible"
             , key = "clean-merge-compatible"
             , target = Size.Small
             , docker = Some Docker::{
@@ -42,7 +42,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run "buildkite/scripts/merges-cleanly.sh develop" ]
-            , label = "Check merges cleanly into develop"
+            , label = "Merge: develop"
             , key = "clean-merge-develop"
             , target = Size.Small
             , docker = Some Docker::{
@@ -53,7 +53,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run "buildkite/scripts/merges-cleanly.sh master" ]
-            , label = "Check merges cleanly into master"
+            , label = "Merge: master"
             , key = "clean-merge-master"
             , target = Size.Small
             , docker = Some Docker::{
@@ -65,7 +65,7 @@ in  Pipeline.build
             , commands =
               [ Cmd.run "scripts/merged-to-proof-systems.sh compatible" ]
             , label =
-                "[proof-systems] Check merges cleanly into proof-systems compatible branch"
+                "[proof-systems] Merge: compatible"
             , key = "merged-to-proof-systems-compatible"
             , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Small
@@ -78,7 +78,7 @@ in  Pipeline.build
             , commands =
               [ Cmd.run "scripts/merged-to-proof-systems.sh berkeley" ]
             , label =
-                "[proof-systems] Check merges cleanly into proof-systems berkeley branch"
+                "[proof-systems] Merge: berkeley"
             , key = "merged-to-proof-systems-berkeley"
             , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Small
@@ -91,7 +91,7 @@ in  Pipeline.build
             , commands =
               [ Cmd.run "scripts/merged-to-proof-systems.sh develop" ]
             , label =
-                "[proof-systems] Check merges cleanly into proof-systems develop branch"
+                "[proof-systems] Merge: develop"
             , key = "merged-to-proof-systems-develop"
             , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Small
@@ -103,7 +103,7 @@ in  Pipeline.build
             Command.Config::{
             , commands = [ Cmd.run "scripts/merged-to-proof-systems.sh master" ]
             , label =
-                "[proof-systems] Check merges cleanly into proof-systems master branch"
+                "[proof-systems] Merge: master"
             , key = "merged-to-proof-systems-master"
             , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Small

@@ -45,7 +45,7 @@ in  Pipeline.build
                   }
                   "make -C src/app/libp2p_helper test"
               ]
-            , label = "libp2p unit-tests"
+            , label = "Test: Libp2p unit"
             , key = "libp2p-unit-tests"
             , target = Size.Large
             , docker = None Docker.Type
@@ -61,7 +61,7 @@ in  Pipeline.build
                   }
                   "make -C src/app/libp2p_helper test-bs-qc"
               ]
-            , label = "libp2p bitswap QuickCheck"
+            , label = "Test: Libp2p bitswap QuickCheck"
             , key = "libp2p-bs-qc"
             , target = Size.Large
             , docker = None Docker.Type

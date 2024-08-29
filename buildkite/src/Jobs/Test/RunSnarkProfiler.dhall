@@ -33,7 +33,7 @@ let buildTestCmd
                 RunInToolchain.runInToolchain
                   ([] : List Text)
                   "buildkite/scripts/run-snark-transaction-profiler.sh"
-            , label = "Snark Transaction Profiler"
+            , label = "Bench: Snark Transaction Profiler"
             , key = "snark-transaction-profiler"
             , target = cmd_target
             , docker = None Docker.Type

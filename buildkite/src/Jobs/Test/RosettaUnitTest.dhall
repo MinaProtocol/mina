@@ -27,7 +27,7 @@ let buildTestCmd
                     RunInToolchain.runInToolchain
                       [ "DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN" ]
                       "buildkite/scripts/unit-test.sh ${profile} ${path} && buildkite/scripts/upload-partial-coverage-data.sh ${key} dev"
-                , label = "Rosetta unit tests"
+                , label = "Test: Rosetta unit tests"
                 , key = key
                 , target = cmd_target
                 , docker = None Docker.Type

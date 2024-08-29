@@ -37,7 +37,7 @@ let buildTestCmd
                     RunInToolchain.runInToolchain
                       [ "DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN" ]
                       "buildkite/scripts/single-node-tests.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
-                , label = "single-node-tests"
+                , label = "Test: Single node"
                 , key = key
                 , target = cmd_target
                 , docker = None Docker.Type

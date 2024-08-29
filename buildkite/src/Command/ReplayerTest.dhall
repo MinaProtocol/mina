@@ -20,7 +20,7 @@ in  { step =
                     (None Network.Type)
                     "./buildkite/scripts/replayer-test.sh"
                 ]
-              , label = "Archive: Replayer test"
+              , label = "Test: Archive Replayer"
               , key = "replayer-test"
               , target = Size.Large
               , depends_on = dependsOn

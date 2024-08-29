@@ -35,7 +35,7 @@ let buildTestCmd
                 # RunInToolchain.runInToolchain
                     ([] : List Text)
                     "buildkite/scripts/version-linter.sh ${release_branch}"
-            , label = "Versioned type linter"
+            , label = "Lint: Version Type Shapes"
             , key = "version-linter"
             , target = cmd_target
             , docker = None Docker.Type

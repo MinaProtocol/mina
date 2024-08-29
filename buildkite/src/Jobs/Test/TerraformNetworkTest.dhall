@@ -24,7 +24,7 @@ let buildTestCmd
       ->  Command.build
             Command.Config::{
             , commands = [ Cmd.run "buildkite/scripts/terraform-test.sh" ]
-            , label = "Terraform: Test"
+            , label = "Test: Terraform unit"
             , key = "terraform-network-test"
             , target = cmd_target
             , docker = None Docker.Type
