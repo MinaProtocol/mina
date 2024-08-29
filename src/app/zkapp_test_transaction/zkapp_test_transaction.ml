@@ -52,13 +52,13 @@ module Flags = struct
       (keyfile, fee, nonce, memo, debug))
 end
 
-let create_zkapp_account =
+let create_zkapp_account ~genesis_constants ~constraint_constants =
   let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
       ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
       create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
-        ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo
+        ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ~genesis_constants ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()

@@ -513,11 +513,10 @@ let send_payment_graphql =
     flag "--amount" ~aliases:[ "amount" ]
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
   let args =
     Args.zip3
       (Cli_lib.Flag.signed_command_common
-         ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
+         ~minimum_user_command_fee:(failwith "TODO fix circular config") (*genesis_constants.minimum_user_command_fee*)
          ~default_transaction_fee:
            (Currency.Fee.of_mina_string_exn
               Mina_compile_config.default_transaction_fee_string ) )
@@ -549,11 +548,10 @@ let delegate_stake_graphql =
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
   let args =
     Args.zip2
       (Cli_lib.Flag.signed_command_common
-         ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
+         ~minimum_user_command_fee:(failwith "TODO fix circular config") (*genesis_constants.minimum_user_command_fee*)
          ~default_transaction_fee:
            (Currency.Fee.of_mina_string_exn
               Mina_compile_config.default_transaction_fee_string ) )
@@ -820,10 +818,22 @@ let hash_ledger =
          flag "--ledger-file"
            ~doc:"LEDGER-FILE File containing an exported ledger"
            (required string))
+      and network_constants = Command.Param.(
+         flag "--network"
+           ~doc:
+             "mainnet|testnet|lightnet|dev Set the configuration base according to \
+              the network"
+           (required
+              (Command.Arg_type.of_alist_exn
+                 [ ("mainnet", Runtime_config.Network_constants.mainnet)
+                 ; ("devnet", Runtime_config.Network_constants.devnet)
+                 ; ("lightnet", Runtime_config.Network_constants.lightnet)
+                 ; ("dev", Runtime_config.Network_constants.dev)
+                 ] ) ))
      and plaintext = Cli_lib.Flag.plaintext in
      fun () ->
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
+       let constraint_constants = Genesis_constants.Constraint_constants.make network_constants.constraint_constants
+         
        in
        let process_accounts accounts =
          let packed_ledger =

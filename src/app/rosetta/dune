@@ -6,7 +6,7 @@
  (modes native)
  (libraries lib async core_kernel base async.async_command core async_kernel genesis_constants)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
+ (preprocess (pps ppx_version ppx_let))
 )
 
 (executable

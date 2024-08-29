@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Async
 open Cmdliner
 open Pipe_lib
@@ -267,9 +267,18 @@ let main inputs =
    *   Exec.execute ~logger ~engine_cli_inputs ~images (module Test (Engine))
    *)
   let logger = Logger.create () in
+
+  let network_constants = 
+    Option.value_map 
+      ~default:Runtime_config.Network_constants.dev
+      (Core_kernel.Sys.getenv_opt "MINA_NETWORK")
+      ~f:Runtime_config.Network_constants.of_string
+  in 
+  let genesis_constants = Genesis_constants.make network_constants.genesis_constants in
+  let constraint_constants = Genesis_constants.Constraint_constants.make network_constants.constraint_constants in
   let constants : Test_config.constants =
-    { genesis_constants = Genesis_constants.Compiled.genesis_constants
-    ; constraint_constants = Genesis_constants.Compiled.constraint_constants
+    { genesis_constants
+    ; constraint_constants
     }
   in
   let images =

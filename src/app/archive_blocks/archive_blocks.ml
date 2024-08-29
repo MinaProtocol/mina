@@ -4,7 +4,7 @@ open Core_kernel
 open Async
 open Archive_lib
 
-let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
+let main ~(network_constants : Runtime_config.Network_constants.t) ~archive_uri ~precomputed
     ~extensional ~success_file ~failure_file ~log_successes ~files () =
   let output_file_line path =
     match path with
@@ -14,6 +14,8 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
     | None ->
         fun _line -> ()
   in
+  let genesis_constants = Genesis_constants.make network_constants.genesis_constants in
+  let constraint_constants = Genesis_constants.Constraint_constants.make network_constants.constraint_constants in
   let add_to_success_file = output_file_line success_file in
   let add_to_failure_file = output_file_line failure_file in
   let archive_uri = Uri.of_string archive_uri in
@@ -99,10 +101,6 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
 
 let () =
   Command.(
-    let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-    let constraint_constants =
-      Genesis_constants.Compiled.constraint_constants
-    in
     run
       (let open Let_syntax in
       async ~summary:"Write blocks to an archive database"
@@ -133,6 +131,18 @@ let () =
                "true/false Whether to log messages for files that were \
                 processed successfully"
              (Flag.optional_with_default true Param.bool)
-         and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
-         main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
+         and network_constants =
+         Param.flag "--network"
+           ~doc:
+             "mainnet|testnet|lightnet|dev Set the configuration base according to \
+              the network"
+           (Param.required
+              (Command.Arg_type.of_alist_exn
+                 [ ("mainnet", Runtime_config.Network_constants.mainnet)
+                 ; ("devnet", Runtime_config.Network_constants.devnet)
+                 ; ("lightnet", Runtime_config.Network_constants.lightnet)
+                 ; ("dev", Runtime_config.Network_constants.dev)
+                 ] ) )
+                and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
+         main ~network_constants ~archive_uri ~precomputed
            ~extensional ~success_file ~failure_file ~log_successes ~files )))

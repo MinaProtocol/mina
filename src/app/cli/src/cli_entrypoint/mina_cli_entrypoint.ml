@@ -457,10 +457,18 @@ let setup_daemon logger =
       ~aliases:[ "proposed-protocol-version" ]
       (optional string)
       ~doc:"NN.NN.NN Proposed protocol version to signal other nodes"
-  and network_arg =
-    flag "--network" ~aliases:[ "network" ]
-      ~doc:"mainnet|testnet|lightnet|dev Network to run the daemon on"
-      (required string)
+  and network_constants =
+    flag "--network"
+      ~doc:
+        "mainnet|testnet|lightnet|dev Set the configuration base according to \
+         the network"
+      (required
+         (Command.Arg_type.of_alist_exn
+            [ ("mainnet", Runtime_config.Network_constants.mainnet)
+            ; ("devnet", Runtime_config.Network_constants.devnet)
+            ; ("lightnet", Runtime_config.Network_constants.lightnet)
+            ; ("dev", Runtime_config.Network_constants.dev)
+            ] ) )
   and config_files =
     flag "--config-file" ~aliases:[ "config-file" ]
       ~doc:
@@ -774,9 +782,6 @@ let setup_daemon logger =
             @ (config_file_configdir :: Option.to_list config_file_envvar)
             @ List.map config_files ~f:(fun config_file ->
                   (config_file, `Must_exist) )
-          in
-          let network_constants =
-            Runtime_config.Network_constants.of_string network_arg
           in
           let%bind precomputed_values, config_jsons, config =
             load_config_files ~logger ~conf_dir ~genesis_dir config_files
@@ -1923,10 +1928,18 @@ let internal_commands logger =
                override fields from earlier config files"
             (listed string)
         and conf_dir = Cli_lib.Flag.conf_dir
-        and network_arg =
-          flag "--network" ~aliases:[ "network" ]
-            ~doc:"Network to use for genesis proof generation (default: devnet)"
-            (required string)
+        and network_constants =
+          flag "--network"
+            ~doc:
+              "mainnet|testnet|lightnet|dev Set the configuration base \
+               according to the network"
+            (required
+               (Command.Arg_type.of_alist_exn
+                  [ ("mainnet", Runtime_config.Network_constants.mainnet)
+                  ; ("devnet", Runtime_config.Network_constants.devnet)
+                  ; ("lightnet", Runtime_config.Network_constants.lightnet)
+                  ; ("dev", Runtime_config.Network_constants.dev)
+                  ] ) )
         and genesis_dir =
           flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
             ~doc:
@@ -1939,9 +1952,6 @@ let internal_commands logger =
           Parallel.init_master () ;
           let logger = Logger.create () in
           let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
-          let network_constants =
-            Runtime_config.Network_constants.of_string network_arg
-          in
           let config_files =
             List.map config_files ~f:(fun config_file ->
                 (config_file, `Must_exist) )

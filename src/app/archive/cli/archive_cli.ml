@@ -31,16 +31,25 @@ let command_run =
      and runtime_config_file =
        flag "--config-file" ~aliases:[ "-config-file" ] (optional string)
          ~doc:"PATH to the configuration file containing the genesis ledger"
-     and network = flag "--network" ~doc:"mainnet|testnet|dev" (required string)
+
+         and network_constants =
+         flag "--network"
+           ~doc:
+             "mainnet|testnet|lightnet|dev Set the configuration base according to \
+              the network"
+           (required
+              (Command.Arg_type.of_alist_exn
+                 [ ("mainnet", Runtime_config.Network_constants.mainnet)
+                 ; ("devnet", Runtime_config.Network_constants.devnet)
+                 ; ("lightnet", Runtime_config.Network_constants.lightnet)
+                 ; ("dev", Runtime_config.Network_constants.dev)
+                 ] ) )
      and delete_older_than =
        flag "--delete-older-than" ~aliases:[ "-delete-older-than" ]
          (optional int)
          ~doc:
            "int Delete blocks that are more than n blocks lower than the \
             maximum seen block."
-     in
-     let network_constants =
-       Runtime_config.Network_constants.of_string network
      in
      let runtime_config_opt =
        Option.map runtime_config_file ~f:(fun file ->

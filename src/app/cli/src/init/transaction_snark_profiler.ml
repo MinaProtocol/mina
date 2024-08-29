@@ -145,6 +145,18 @@ let command =
            "Minimum number of account updates per transaction (excluding the \
             fee payer). Minimum: 1 Default: 1 "
          (optional int)
+         and network_constants =
+         flag "--network"
+           ~doc:
+             "mainnet|testnet|lightnet|dev Set the configuration base according to \
+              the network"
+           (required
+              (Command.Arg_type.of_alist_exn
+                 [ ("mainnet", Runtime_config.Network_constants.mainnet)
+                 ; ("devnet", Runtime_config.Network_constants.devnet)
+                 ; ("lightnet", Runtime_config.Network_constants.lightnet)
+                 ; ("dev", Runtime_config.Network_constants.dev)
+                 ] ) )
      in
      let num_transactions =
        Option.map n ~f:(fun n -> `Count (Int.pow 2 n))
@@ -172,11 +184,9 @@ let command =
            (String.concat !incompatible_flags ~sep:", ") ;
          exit 1 ) ) ;
      let repeats = Option.value repeats ~default:1 in
-     let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-     let constraint_constants =
-       Genesis_constants.Compiled.constraint_constants
-     in
-     let proof_level = Genesis_constants.Proof_level.Full in
+     let genesis_constants = Genesis_constants.make network_constants.genesis_constants in
+     let constraint_constants = Genesis_constants.Constraint_constants.make network_constants.constraint_constants in
+     let proof_level = constraint_constants.proof_level in
      if witness_only then
        witness ~genesis_constants ~constraint_constants ~proof_level
          ~max_num_updates ?min_num_updates num_transactions repeats preeval

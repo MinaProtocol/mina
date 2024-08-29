@@ -8,10 +8,18 @@ let command =
     (let%map_open spec =
        flag "--spec-sexp" ~doc:""
          (required (sexp_conv Prod.single_spec_of_sexp))
-     and network_arg =
-       flag "--network" ~aliases:[ "network" ]
-         ~doc:"mainnet|testnet|lightnet|dev Network to run the daemon on"
-         (required string)
+     and network_constants =
+       flag "--network"
+         ~doc:
+           "mainnet|testnet|lightnet|dev Set the configuration base according \
+            to the network"
+         (required
+            (Command.Arg_type.of_alist_exn
+               [ ("mainnet", Runtime_config.Network_constants.mainnet)
+               ; ("devnet", Runtime_config.Network_constants.devnet)
+               ; ("lightnet", Runtime_config.Network_constants.lightnet)
+               ; ("dev", Runtime_config.Network_constants.dev)
+               ] ) )
      and proof_level =
        flag "--proof-level" ~doc:""
          (optional_with_default Genesis_constants.Proof_level.Full
@@ -23,9 +31,6 @@ let command =
      in
      fun () ->
        let open Async in
-       let network_constants =
-         Runtime_config.Network_constants.of_string network_arg
-       in
        let constraint_constants =
          { (Genesis_constants.Constraint_constants.make
               network_constants.constraint_constants )

@@ -2,7 +2,13 @@
 open Core_kernel
 
 let main () =
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let network_constants = 
+    Option.value_map 
+      ~default:Runtime_config.Network_constants.dev
+      (Sys.getenv_opt "MINA_NETWORK")
+      ~f:Runtime_config.Network_constants.of_string
+  in 
+  let genesis_constants = Genesis_constants.make network_constants.genesis_constants in
   let cost_limit = genesis_constants.zkapp_transaction_cost_limit in
   let max_event_elements = genesis_constants.max_event_elements in
   let max_action_elements = genesis_constants.max_action_elements in

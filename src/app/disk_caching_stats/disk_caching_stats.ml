@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 (* number of operations to do when performing benchmarks *)
 let bench_count = 10_000
@@ -724,8 +724,15 @@ let compute_ram_usage ~config (sizes : size_params) =
 let () =
   Async.Thread_safe.block_on_async_exn
   @@ fun () ->
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+
+  let network_constants = 
+    Option.value_map 
+      ~default:Runtime_config.Network_constants.dev
+      (Sys.getenv_opt "MINA_NETWORK")
+      ~f:Runtime_config.Network_constants.of_string
+  in 
+  let genesis_constants = Genesis_constants.make network_constants.genesis_constants in
+  let constraint_constants = Genesis_constants.Constraint_constants.make network_constants.constraint_constants in
   let config = { constraint_constants; genesis_constants } in
   let%bind.Async_kernel.Deferred _, generated_zkapps =
     let num_updates = 1 in

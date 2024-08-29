@@ -131,8 +131,18 @@ let () =
          let%map config_file =
            flag "--config-file" ~doc:"PATH path to the JSON configuration file"
              (required string)
-         and network =
-           flag "--network" ~doc:"mainnet|testnet|dev" (required string)
+         and network_constants =
+           flag "--network"
+             ~doc:
+               "mainnet|testnet|lightnet|dev Set the configuration base \
+                according to the network"
+             (required
+                (Command.Arg_type.of_alist_exn
+                   [ ("mainnet", Runtime_config.Network_constants.mainnet)
+                   ; ("devnet", Runtime_config.Network_constants.devnet)
+                   ; ("lightnet", Runtime_config.Network_constants.lightnet)
+                   ; ("dev", Runtime_config.Network_constants.dev)
+                   ] ) )
          and genesis_dir =
            flag "--genesis-dir"
              ~doc:
@@ -147,7 +157,4 @@ let () =
                "PATH path to the file where the hashes of the ledgers are to \
                 be saved"
          in
-         main
-           ~network_constants:
-             (Runtime_config.Network_constants.of_string network)
-           ~config_file ~genesis_dir ~hash_output_file) )
+         main ~network_constants ~config_file ~genesis_dir ~hash_output_file) )

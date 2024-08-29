@@ -17,9 +17,19 @@ let config_flag =
   let open Command.Param in
   flag "--config-file" ~doc:"FILE config file" (optional string)
 
-let network_arg =
+let network_constants =
   let open Command.Param in
-  flag "--network" ~doc:"mainnet|testnet|dev" (required string)
+  flag "--network"
+    ~doc:
+      "mainnet|testnet|lightnet|dev Set the configuration base according to \
+       the network"
+    (required
+       (Command.Arg_type.of_alist_exn
+          [ ("mainnet", Runtime_config.Network_constants.mainnet)
+          ; ("devnet", Runtime_config.Network_constants.devnet)
+          ; ("lightnet", Runtime_config.Network_constants.lightnet)
+          ; ("dev", Runtime_config.Network_constants.dev)
+          ] ) )
 
 let keyspace_flag =
   let open Command.Param in
@@ -48,8 +58,7 @@ let timestamp =
   let open Command.Param in
   anon ("timestamp" %: string)
 
-let instantiate_verify_functions ~logger ~network ~config_file =
-  let network_constants = Runtime_config.Network_constants.of_string network in
+let instantiate_verify_functions ~logger ~(network_constants : Runtime_config.Network_constants.t) ~config_file =
   match config_file with
   | None ->
       let constraint_constants =
@@ -155,12 +164,12 @@ let filesystem_command =
       let%map_open block_dir = block_dir_flag
       and inputs = anon (sequence ("filename" %: Filename.arg_type))
       and no_checks = no_checks_flag
-      and network = network_arg
+      and network_constants = network_constants
       and config_file = config_flag in
       fun () ->
         let logger = Logger.create () in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger ~config_file ~network
+          instantiate_verify_functions ~logger ~config_file ~network_constants
         in
         let submission_paths = get_filenames inputs in
         let module V = Make_verifier (struct
@@ -188,13 +197,13 @@ let cassandra_command =
       and config_file = config_flag
       and keyspace = keyspace_flag
       and period_start = timestamp
-      and network = network_arg
+      and network_constants = network_constants
       and period_end = timestamp in
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger ~config_file ~network
+          instantiate_verify_functions ~logger ~config_file ~network_constants
         in
         let module V = Make_verifier (struct
           include Submission.Cassandra
@@ -223,12 +232,12 @@ let stdin_command =
     Command.Let_syntax.(
       let%map_open config_file = config_flag
       and no_checks = no_checks_flag
-      and network = network_arg in
+      and network_constants = network_constants in
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger ~config_file ~network
+          instantiate_verify_functions ~logger ~config_file ~network_constants
         in
         let module V = Make_verifier (struct
           include Submission.Stdin

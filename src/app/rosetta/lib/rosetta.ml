@@ -153,7 +153,7 @@ let server_handler ~pool ~graphql_uri ~logger ~minimum_user_command_fee
       [%log warn] ~metadata "Error response: $error" ;
       respond_500 error
 
-let command ~minimum_user_command_fee ~account_creation_fee =
+let command =
   let open Command.Let_syntax in
   let%map_open archive_uri =
     flag "--archive-uri" ~aliases:[ "archive-uri" ]
@@ -168,6 +168,19 @@ let command ~minimum_user_command_fee ~account_creation_fee =
   and log_level =
     flag "--log-level" ~aliases:[ "log-level" ]
       ~doc:"Set log level (default: Info)" Cli.log_level
+  and
+        network_constants =
+             flag "--network"
+               ~doc:
+                 "mainnet|testnet|lightnet|dev Set the configuration base according to \
+                  the network"
+               (required
+                  (Command.Arg_type.of_alist_exn
+                     [ ("mainnet", Runtime_config.Network_constants.mainnet)
+                     ; ("devnet", Runtime_config.Network_constants.devnet)
+                     ; ("lightnet", Runtime_config.Network_constants.lightnet)
+                     ; ("dev", Runtime_config.Network_constants.dev)
+                     ] ) )
   and port =
     flag "--port" ~aliases:[ "port" ] ~doc:"Port to expose Rosetta server"
       (required int)
@@ -176,6 +189,15 @@ let command ~minimum_user_command_fee ~account_creation_fee =
   fun () ->
     let logger = Logger.create () in
     Cli.logger_setup log_json log_level ;
+    let minimum_user_command_fee = 
+      let genesis_constants = Genesis_constants.make network_constants.genesis_constants in
+      genesis_constants.minimum_user_command_fee 
+    in
+    let account_creation_fee = 
+
+      let constraint_constants = Genesis_constants.Constraint_constants.make network_constants.constraint_constants in
+      constraint_constants.account_creation_fee 
+    in
     let pool =
       lazy
         (let open Deferred.Result.Let_syntax in
