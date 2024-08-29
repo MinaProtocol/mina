@@ -115,7 +115,7 @@ let build_artifacts
                                                                       spec.debVersion}"
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
-            , key = "build${keySuffix spec}-deb-pkg"
+            , key = "build-deb-pkg"
             , target = Size.XLarge
             , retries =
               [ Command.Retry::{
@@ -276,7 +276,7 @@ let publish_to_debian_repo =
                   ]
                   "./buildkite/scripts/debian/publish.sh"
             , label = "Debian: Publish ${labelSuffix spec}"
-            , key = "publish${keySuffix spec}-deb-pkg"
+            , key = "publish-deb-pkg"
             , depends_on =
                 DebianVersions.dependsOnStep
                   (Some spec.prefix)
