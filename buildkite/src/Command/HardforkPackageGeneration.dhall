@@ -165,9 +165,9 @@ let pipeline
                     , deb_profile = profile
                     , deb_repo = DebianRepo.Type.Local
                     , step_key =
-                        "daemon-berkeley-${DebianVersions.lowerName
-                                             debVersion}${Profiles.toLabelSegment
-                                                            profile}-docker-image"
+                        "daemon-${network_name}-${DebianVersions.lowerName
+                                                    debVersion}${Profiles.toLabelSegment
+                                                                   profile}-docker-image"
                     }
                 , Command.build
                     Command.Config::{
@@ -183,9 +183,9 @@ let pipeline
                     , depends_on =
                       [ { name = pipelineName
                         , key =
-                            "daemon-berkeley-${DebianVersions.lowerName
-                                                 debVersion}${Profiles.toLabelSegment
-                                                                profile}-docker-image"
+                            "daemon-${network_name}-${DebianVersions.lowerName
+                                                        debVersion}${Profiles.toLabelSegment
+                                                                       profile}-docker-image"
                         }
                       ]
                     , if = None B/If
@@ -203,9 +203,9 @@ let pipeline
                     , depends_on =
                       [ { name = pipelineName
                         , key =
-                            "daemon-berkeley-${DebianVersions.lowerName
-                                                 debVersion}${Profiles.toLabelSegment
-                                                                profile}-docker-image"
+                            "daemon-${network_name}-${DebianVersions.lowerName
+                                                        debVersion}${Profiles.toLabelSegment
+                                                                       profile}-docker-image"
                         }
                       ]
                     , if = None B/If
