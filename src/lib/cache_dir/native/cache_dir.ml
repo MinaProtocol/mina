@@ -8,7 +8,7 @@ let s3_install_path = "/tmp/s3_cache_dir"
 let s3_keys_bucket_prefix =
   Option.value
     (Sys.getenv "MINA_LEDGER_S3_BUCKET")
-    ~default:"https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net"
+    ~default:"https://s3-us-west-2.amazonaws.com/snark-keys-ro.o1test.net"
 
 let manual_install_path = "/var/lib/coda"
 
@@ -55,7 +55,7 @@ let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
   @@ Monitor.try_with ~here:[%here] (fun () ->
          let each_uri (uri_string, file_path) =
            let open Deferred.Let_syntax in
-           [%log trace] "Downloading file from S3"
+           [%log trace] "Downloading file from S3: $url to $local_file_path"
              ~metadata:
                [ ("url", `String uri_string)
                ; ("local_file_path", `String file_path)

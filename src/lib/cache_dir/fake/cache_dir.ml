@@ -6,7 +6,7 @@ let autogen_path = "/tmp/coda_cache_dir"
 let s3_install_path = "/tmp/s3_cache_dir"
 
 let s3_keys_bucket_prefix =
-  "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net"
+  "https://s3-us-west-2.amazonaws.com/snark-keys-ro.o1test.net"
 
 let manual_install_path = "/var/lib/coda"
 
