@@ -17,6 +17,7 @@ in  { step =
                     ([] : List Text)
                     "./src/test/archive/sample_db/archive_db.sql"
                     Artifacts.Type.Archive
+                    (Some Network.Type.Devnet)
                     "./scripts/replayer-test.sh -i src/test/archive/sample_db/replayer_input_file.json -a mina-replayer"
                 ]
               , label = "Archive: Replayer test"

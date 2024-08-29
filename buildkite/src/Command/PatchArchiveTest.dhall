@@ -6,6 +6,8 @@ let Size = ./Size.dhall
 
 let RunWithPostgres = ./RunWithPostgres.dhall
 
+let Network = ../Constants/Network.dhall
+
 in  { step =
             \(dependsOn : List Command.TaggedKey.Type)
         ->  Command.build
@@ -17,6 +19,7 @@ in  { step =
                     ]
                     "./src/test/archive/sample_db/archive_db.sql"
                     Artifacts.Type.FunctionalTestSuite
+                    (Some Network.Type.Devnet)
                     "./scripts/patch-archive-test.sh"
                 ]
               , label = "Archive: Patch Archive test"
