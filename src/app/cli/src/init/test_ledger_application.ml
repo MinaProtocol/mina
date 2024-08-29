@@ -23,9 +23,7 @@ let read_privkey privkey_path =
 let generate_event =
   Snark_params.Tick.Field.gen |> Quickcheck.Generator.map ~f:(fun x -> [| x |])
 
-let mk_tx
-    ~genesis_constants:
-      ({ max_event_elements; max_action_elements; _ } : Genesis_constants.t)
+let mk_tx ~event_elements ~action_elements
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) keypair
     nonce =
   let num_acc_updates = 8 in
@@ -40,10 +38,10 @@ let mk_tx
            , Currency.Amount.zero )
       in
       let%bind events =
-        Quickcheck.Generator.list_with_length max_event_elements generate_event
+        Quickcheck.Generator.list_with_length event_elements generate_event
       in
       let%map actions =
-        Quickcheck.Generator.list_with_length max_action_elements generate_event
+        Quickcheck.Generator.list_with_length action_elements generate_event
       in
       (receivers, events, actions)
     in
@@ -87,9 +85,9 @@ let generate_protocol_state_stub ~consensus_constants ~constraint_constants
     ~genesis_epoch_data:None ~constraint_constants ~consensus_constants
     ~genesis_body_reference
 
-let apply_txs ~genesis_constants ~constraint_constants ~first_partition_slots
-    ~no_new_stack ~has_second_partition ~num_txs ~prev_protocol_state
-    ~(keypair : Signature_lib.Keypair.t) ~i ledger =
+let apply_txs ~action_elements ~event_elements ~constraint_constants
+    ~first_partition_slots ~no_new_stack ~has_second_partition ~num_txs
+    ~prev_protocol_state ~(keypair : Signature_lib.Keypair.t) ~i ledger =
   let init_nonce =
     let account_id = Account_id.of_public_key keypair.public_key in
     let loc =
@@ -102,7 +100,9 @@ let apply_txs ~genesis_constants ~constraint_constants ~first_partition_slots
   let to_nonce =
     Fn.compose (Unsigned.UInt32.add init_nonce) Unsigned.UInt32.of_int
   in
-  let mk_tx' = mk_tx ~genesis_constants ~constraint_constants keypair in
+  let mk_tx' =
+    mk_tx ~action_elements ~event_elements ~constraint_constants keypair
+  in
   let fork_slot =
     Option.value_map ~default:Mina_numbers.Global_slot_since_genesis.zero
       ~f:(fun f -> f.global_slot_since_genesis)
@@ -204,8 +204,8 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
         p
   in
   let apply =
-    apply_txs ~genesis_constants ~constraint_constants ~first_partition_slots
-      ~no_new_stack ~has_second_partition ~prev_protocol_state ~keypair
+    apply_txs ~constraint_constants ~first_partition_slots ~no_new_stack
+      ~has_second_partition ~prev_protocol_state ~keypair
   in
   let mask_handler ledger =
     if no_masks then Fn.const ledger
@@ -230,9 +230,12 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
       in
       List.hd (List.drop ledgers (max_depth - 1))
       |> Option.iter ~f:drop_old_ledger ;
-      apply ~num_txs:num_txs_per_round ~i ledger
+      apply ~action_elements:0 ~event_elements:0 ~num_txs:num_txs_per_round ~i
+        ledger
       >>| mask_handler ledger
       >>| Fn.flip Tuple2.create (ledger :: ledgers) )
   >>| fst
-  >>= apply ~num_txs:num_txs_final ~i:rounds
+  >>= apply ~num_txs:num_txs_final
+        ~action_elements:genesis_constants.max_action_elements
+        ~event_elements:genesis_constants.max_event_elements ~i:rounds
   >>| stop_tracing
