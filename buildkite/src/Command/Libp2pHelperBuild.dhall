@@ -31,9 +31,9 @@ let cmdConfig =
             Command.Config::{
             , commands = commands debVersion
             , label =
-                "Build Libp2p helper for ${DebianVersions.capitalName
-                                             debVersion} ${BuildFlags.toSuffixUppercase
-                                                             buildFlags}"
+                "Debian: Libp2p helper build for ${DebianVersions.capitalName
+                                                     debVersion} ${BuildFlags.toSuffixUppercase
+                                                                     buildFlags}"
             , key = "libp2p-helper${BuildFlags.toLabelSegment buildFlags}"
             , target = Size.Small
             }
