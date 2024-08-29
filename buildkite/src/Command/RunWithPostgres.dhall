@@ -67,7 +67,7 @@ let runInDockerWithPostgresConn
 
           let outerDir
               : Text
-              = "\\\$BUILDKITE_BUILD_CHECKOUT_PATH${networkOrDefault}"
+              = "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
 
           let minaDockerTag
               : Text
