@@ -72,6 +72,16 @@ let labelSuffix
                                                        spec.profile} ${BuildFlags.toSuffixUppercase
                                                                          spec.buildFlags}"
 
+let nameSuffix
+    : MinaBuildSpec.Type -> Text
+    =     \(spec : MinaBuildSpec.Type)
+      ->  "${DebianVersions.capitalName
+               spec.debVersion}${Network.foldNames
+                                    spec.networks}${Profiles.toSuffixUppercase
+                                                       spec.profile}${BuildFlags.toSuffixUppercase
+                                                                         spec.buildFlags}"
+
+
 let keySuffix
     : MinaBuildSpec.Type -> Text
     =     \(spec : MinaBuildSpec.Type)
@@ -295,7 +305,7 @@ let pipelineBuilder
           , spec = JobSpec::{
             , dirtyWhen = DebianVersions.dirtyWhen spec.debVersion
             , path = "Release"
-            , name = "${spec.prefix}--${labelSuffix spec}"
+            , name = "${spec.prefix}${nameSuffix spec}"
             , tags = spec.tags
             , mode = spec.mode
             }
