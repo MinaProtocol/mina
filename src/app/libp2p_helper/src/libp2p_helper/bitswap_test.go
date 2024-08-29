@@ -9,6 +9,7 @@ import (
 	ipc "libp2p_ipc"
 	"math/rand"
 	"reflect"
+	"strings"
 	"testing"
 	"testing/quick"
 	"time"
@@ -397,6 +398,7 @@ func (conf bitswapTestConfig) execute(nodes []testNode, delayBeforeDownload bool
 		err = at.downloadAndCheckResources(nodes, roots, func(p *bitswapTestNodeParams) []int {
 			return p.requests1
 		})
+
 		if err != nil {
 			return fmt.Errorf("Error downloading/checking resources: %v", err)
 		}
@@ -521,12 +523,12 @@ func testBitswap(t *testing.T, numNodes, numAttempts, numRequests, maxBlobSize i
 	// uncomment following lines to print a sed expression that will replace
 	// peer ids with node indexes in test logs (useful for debug of tests)
 
-	// seds := []string{}
-	// for ni, n := range nodes {
-	// 	pid := n.node.P2p.Me.String()
-	// 	seds = append(seds, fmt.Sprintf("sed 's/%s/node%d/g'", pid, ni))
-	// }
-	// fmt.Println(strings.Join(seds, " | "))
+	seds := []string{}
+	for ni, n := range nodes {
+		pid := n.node.P2p.Me.String()
+		seds = append(seds, fmt.Sprintf("sed 's/%s/node%d/g'", pid, ni))
+	}
+	fmt.Println(strings.Join(seds, " | "))
 
 	for ni := range nodes {
 		go func(ni int) {
@@ -540,7 +542,9 @@ func testBitswap(t *testing.T, numNodes, numAttempts, numRequests, maxBlobSize i
 	t.Logf("Seed: %d", seed)
 	r := rand.New(rand.NewSource(seed))
 	conf := initBitswapTestConfig(r, numNodes, numAttempts, numRequests, maxBlobSize)
+	t.Logf("Init the bitswap config %d", seed)
 	err := conf.execute(nodes, delayBeforeDownload)
+	t.Logf("Finished executing config %d", seed)
 	if err != nil {
 		printConnectionGraph(buildConnectionGraph(nodes))
 	}
