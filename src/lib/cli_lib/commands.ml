@@ -187,12 +187,20 @@ module Vrf = struct
         flag "--total-stake"
           ~doc:"AMOUNT The total balance of all accounts in the epoch ledger"
           (optional int)
+      and network_arg =
+        flag "--network" ~aliases:[ "network" ]
+          ~doc:"mainnet|testnet|lightnet|dev Network to run the daemon on"
+          (required string)
       in
       Exceptions.handle_nicely
       @@ fun () ->
       let env = Secrets.Keypair.env in
+      let network_constants =
+        Runtime_config.Network_constants.of_string network_arg
+      in
       let constraint_constants =
-        Genesis_constants.Compiled.constraint_constants
+        Genesis_constants.Constraint_constants.make
+          network_constants.constraint_constants
       in
       if Option.is_some (Sys.getenv env) then
         eprintf "Using password from environment variable %s\n" env ;
@@ -254,11 +262,21 @@ module Vrf = struct
          \"epochSeed\": _, \"delegatorIndex\": _} JSON message objects read on \
          stdin"
       (let open Command.Let_syntax in
-      let%map_open privkey_path = Flag.privkey_read_path in
+      let%map_open privkey_path = Flag.privkey_read_path
+      and network_arg =
+        Command.Param.(
+          flag "--network" ~aliases:[ "network" ]
+            ~doc:"mainnet|testnet|lightnet|dev Network to run the daemon on"
+            (required string))
+      in
       Exceptions.handle_nicely
       @@ fun () ->
+      let network_constants =
+        Runtime_config.Network_constants.of_string network_arg
+      in
       let constraint_constants =
-        Genesis_constants.Compiled.constraint_constants
+        Genesis_constants.Constraint_constants.make
+          network_constants.constraint_constants
       in
       let env = Secrets.Keypair.env in
       if Option.is_some (Sys.getenv env) then

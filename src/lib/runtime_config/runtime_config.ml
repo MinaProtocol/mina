@@ -1676,6 +1676,10 @@ module Network_constants : sig
   val mainnet : t
 
   val dev : t
+
+  val devnet : t
+
+  val lightnet : t
 end = struct
   type t =
     { genesis_constants : Genesis_constants.Inputs.t
@@ -1717,7 +1721,41 @@ end = struct
         }
     }
 
-  (*TODO: double check these*)
+  let devnet =
+    { genesis_constants =
+        { genesis_state_timestamp = "2021-09-24T00=00=00Z"
+        ; k = 290
+        ; slots_per_epoch = 7140
+        ; slots_per_sub_window = 7
+        ; grace_period_slots = 2160
+        ; delta = 0
+        ; pool_max_size = 3000
+        ; num_accounts = None
+        ; zkapp_proof_update_cost = 10.26
+        ; zkapp_signed_single_update_cost = 9.140000000000001
+        ; zkapp_signed_pair_update_cost = 10.08
+        ; zkapp_transaction_cost_limit = 69.45
+        ; max_event_elements = 100
+        ; max_action_elements = 100
+        ; zkapp_cmd_limit_hardcap = 128
+        ; minimum_user_command_fee = "0.001"
+        }
+    ; constraint_constants =
+        { scan_state_with_tps_goal = true
+        ; scan_state_tps_goal_x10 = Some 2
+        ; block_window_duration = 180000
+        ; scan_state_transaction_capacity_log_2 = None
+        ; supercharged_coinbase_factor = 1
+        ; scan_state_work_delay = 2
+        ; coinbase = "720"
+        ; account_creation_fee_int = "1.0"
+        ; ledger_depth = 35
+        ; sub_windows_per_window = 11
+        ; fork = None
+        ; proof_level = "full"
+        }
+    }
+
   let dev =
     { genesis_constants =
         { genesis_state_timestamp = "2019-01-30 12:00:00-08:00"
@@ -1741,7 +1779,7 @@ end = struct
         { scan_state_with_tps_goal = false
         ; scan_state_tps_goal_x10 = None
         ; block_window_duration = 2000
-        ; scan_state_transaction_capacity_log_2 = None
+        ; scan_state_transaction_capacity_log_2 = Some 3
         ; supercharged_coinbase_factor = 1
         ; scan_state_work_delay = 2
         ; coinbase = "20"
@@ -1753,12 +1791,51 @@ end = struct
         }
     }
 
+  let lightnet =
+    { genesis_constants =
+        { genesis_state_timestamp = "2020-09-16 03=15=00-07=00"
+        ; k = 30
+        ; slots_per_epoch = 720
+        ; slots_per_sub_window = 7
+        ; grace_period_slots = 200
+        ; delta = 0
+        ; pool_max_size = 3000
+        ; num_accounts = None
+        ; zkapp_proof_update_cost = 10.26
+        ; zkapp_signed_single_update_cost = 9.140000000000001
+        ; zkapp_signed_pair_update_cost = 10.08
+        ; zkapp_transaction_cost_limit = 69.45
+        ; max_event_elements = 100
+        ; max_action_elements = 100
+        ; zkapp_cmd_limit_hardcap = 128
+        ; minimum_user_command_fee = "0.001"
+        }
+    ; constraint_constants =
+        { scan_state_with_tps_goal = false
+        ; scan_state_tps_goal_x10 = None
+        ; block_window_duration = 20000
+        ; scan_state_transaction_capacity_log_2 = Some 3
+        ; supercharged_coinbase_factor = 1
+        ; scan_state_work_delay = 2
+        ; coinbase = "720"
+        ; account_creation_fee_int = "1.0"
+        ; ledger_depth = 35
+        ; sub_windows_per_window = 11
+        ; fork = None
+        ; proof_level = "none"
+        }
+    }
+
   let of_string n =
     match n with
     | "mainnet" ->
         mainnet
     | "dev" ->
         dev
+    | "devnet" ->
+        devnet
+    | "lightnet" ->
+        lightnet
     | _ ->
         failwith @@ "Unrecognized network " ^ n
 end

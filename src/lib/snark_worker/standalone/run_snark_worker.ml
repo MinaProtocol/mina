@@ -8,6 +8,10 @@ let command =
     (let%map_open spec =
        flag "--spec-sexp" ~doc:""
          (required (sexp_conv Prod.single_spec_of_sexp))
+     and network_arg =
+       flag "--network" ~aliases:[ "network" ]
+         ~doc:"mainnet|testnet|lightnet|dev Network to run the daemon on"
+         (required string)
      and proof_level =
        flag "--proof-level" ~doc:""
          (optional_with_default Genesis_constants.Proof_level.Full
@@ -19,8 +23,15 @@ let command =
      in
      fun () ->
        let open Async in
+       let network_constants =
+         Runtime_config.Network_constants.of_string network_arg
+       in
        let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
+         { (Genesis_constants.Constraint_constants.make
+              network_constants.constraint_constants )
+           with
+           proof_level
+         }
        in
        let%bind worker_state =
          Prod.Worker_state.create ~constraint_constants ~proof_level ()

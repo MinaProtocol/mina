@@ -459,7 +459,8 @@ let setup_daemon logger =
       ~doc:"NN.NN.NN Proposed protocol version to signal other nodes"
   and network_arg =
     flag "--network" ~aliases:[ "network" ]
-      ~doc:"mainnet|testnet|dev Network to run the daemon on" (required string)
+      ~doc:"mainnet|testnet|lightnet|dev Network to run the daemon on"
+      (required string)
   and config_files =
     flag "--config-file" ~aliases:[ "config-file" ]
       ~doc:
