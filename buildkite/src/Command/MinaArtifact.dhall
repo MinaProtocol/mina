@@ -66,19 +66,12 @@ let MinaBuildSpec =
 let labelSuffix
     : MinaBuildSpec.Type -> Text
     =     \(spec : MinaBuildSpec.Type)
-      ->  "${Network.foldNames
-               spec.networks}${DebianVersions.capitalName
-                                 spec.debVersion}${Profiles.toSuffixUppercase
-                                                     spec.profile}${BuildFlags.toSuffixUppercase
-                                                                      spec.buildFlags}"
+      ->  "${DebianVersions.capitalName spec.debVersion} ${Network.foldNames spec.networks} ${Profiles.toSuffixUppercase spec.profile} ${BuildFlags.toSuffixUppercase spec.buildFlags}"
 
 let keySuffix
     : MinaBuildSpec.Type -> Text
     =     \(spec : MinaBuildSpec.Type)
-      ->  "${DebianVersions.lowerName
-               spec.debVersion}${Profiles.toLabelSegment
-                                   spec.profile}${BuildFlags.toLabelSegment
-                                                    spec.buildFlags}"
+      ->  "${Profiles.toLabelSegment spec.profile}${BuildFlags.toLabelSegment spec.buildFlags}"
 
 let build_artifacts
     : MinaBuildSpec.Type -> Command.Type
@@ -108,7 +101,7 @@ let build_artifacts
                                                                       spec.debVersion}"
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
-            , key = "build-${keySuffix spec}"
+            , key = "build${keySuffix spec}-deb-pkg"
             , target = Size.XLarge
             , retries =
               [ Command.Retry::{
@@ -278,7 +271,7 @@ let publish_to_debian_repo =
                   ]
                   "./buildkite/scripts/debian/publish.sh"
             , label = "Debian: Publish ${labelSuffix spec}"
-            , key = "publish-${keySuffix spec}-deb-pkg"
+            , key = "publish${keySuffix spec}-deb-pkg"
             , depends_on =
                 DebianVersions.dependsOnStep
                   (Some spec.prefix)
