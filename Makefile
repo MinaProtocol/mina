@@ -89,12 +89,12 @@ check: ocaml_checks libp2p_helper
 
 build: ocaml_checks reformat-diff libp2p_helper
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe --profile=$(DUNE_PROFILE)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe src/app/generate_keypair/generate_keypair.exe src/app/validate_keypair/validate_keypair.exe src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
-build_all_sigs: ocaml_checks reformat-diff libp2p_helper
+build_all_sigs: ocaml_checks reformat-diff libp2p_helper build
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe src/app/cli/src/mina_testnet_signatures.exe src/app/cli/src/mina_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/cli/src/mina_testnet_signatures.exe src/app/cli/src/mina_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 build_archive: ocaml_checks reformat-diff
@@ -102,9 +102,9 @@ build_archive: ocaml_checks reformat-diff
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
-build_archive_all_sigs: ocaml_checks reformat-diff
+build_archive_utils: ocaml_checks reformat-diff
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/archive/archive_testnet_signatures.exe src/app/archive/archive_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/replayer/replayer.exe src/app/archive_blocks/archive_blocks.exe src/app/extract_blocks/extract_blocks.exe src/app/missing_blocks_auditor/missing_blocks_auditor.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 build_rosetta: ocaml_checks
@@ -208,14 +208,7 @@ publish-macos:
 	@./scripts/publish-macos.sh
 
 deb:
-	./scripts/rebuild-deb.sh
-	./scripts/archive/build-release-archives.sh
-	@mkdir -p /tmp/artifacts
-	@cp _build/mina*.deb /tmp/artifacts/.
-
-deb_optimized:
-	./scripts/rebuild-deb.sh "optimized"
-	./scripts/archive/build-release-archives.sh
+	./scripts/debian/builder.sh
 	@mkdir -p /tmp/artifacts
 	@cp _build/mina*.deb /tmp/artifacts/.
 
@@ -229,13 +222,11 @@ build_or_download_pv_keys: ocaml_checks
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
 	$(info Keys built)
 
-publish_debs:
-	@./buildkite/scripts/publish-deb.sh
-
 genesiskeys:
 	@mkdir -p /tmp/artifacts
 	@cp _build/default/src/lib/key_gen/sample_keypairs.ml /tmp/artifacts/.
 	@cp _build/default/src/lib/key_gen/sample_keypairs.json /tmp/artifacts/.
+
 
 ##############################################
 ## Genesis ledger in OCaml from running daemon
