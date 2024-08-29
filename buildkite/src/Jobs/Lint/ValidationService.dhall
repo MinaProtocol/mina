@@ -91,8 +91,7 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands = commands
-            , label =
-                "Lint: Validation service "
+            , label = "Lint: Validation service "
             , key = "lint-validation-checks"
             , target = Size.Small
             , skip = Some

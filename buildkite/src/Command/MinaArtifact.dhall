@@ -66,12 +66,17 @@ let MinaBuildSpec =
 let labelSuffix
     : MinaBuildSpec.Type -> Text
     =     \(spec : MinaBuildSpec.Type)
-      ->  "${DebianVersions.capitalName spec.debVersion} ${Network.foldNames spec.networks} ${Profiles.toSuffixUppercase spec.profile} ${BuildFlags.toSuffixUppercase spec.buildFlags}"
+      ->  "${DebianVersions.capitalName
+               spec.debVersion} ${Network.foldNames
+                                    spec.networks} ${Profiles.toSuffixUppercase
+                                                       spec.profile} ${BuildFlags.toSuffixUppercase
+                                                                         spec.buildFlags}"
 
 let keySuffix
     : MinaBuildSpec.Type -> Text
     =     \(spec : MinaBuildSpec.Type)
-      ->  "${Profiles.toLabelSegment spec.profile}${BuildFlags.toLabelSegment spec.buildFlags}"
+      ->  "${Profiles.toLabelSegment spec.profile}${BuildFlags.toLabelSegment
+                                                      spec.buildFlags}"
 
 let build_artifacts
     : MinaBuildSpec.Type -> Command.Type

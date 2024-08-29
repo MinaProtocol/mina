@@ -64,8 +64,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run "scripts/merged-to-proof-systems.sh compatible" ]
-            , label =
-                "[proof-systems] Merge: compatible"
+            , label = "[proof-systems] Merge: compatible"
             , key = "merged-to-proof-systems-compatible"
             , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Small
@@ -77,8 +76,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run "scripts/merged-to-proof-systems.sh berkeley" ]
-            , label =
-                "[proof-systems] Merge: berkeley"
+            , label = "[proof-systems] Merge: berkeley"
             , key = "merged-to-proof-systems-berkeley"
             , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Small
@@ -90,8 +88,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run "scripts/merged-to-proof-systems.sh develop" ]
-            , label =
-                "[proof-systems] Merge: develop"
+            , label = "[proof-systems] Merge: develop"
             , key = "merged-to-proof-systems-develop"
             , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Small
@@ -102,8 +99,7 @@ in  Pipeline.build
         , Command.build
             Command.Config::{
             , commands = [ Cmd.run "scripts/merged-to-proof-systems.sh master" ]
-            , label =
-                "[proof-systems] Merge: master"
+            , label = "[proof-systems] Merge: master"
             , key = "merged-to-proof-systems-master"
             , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Small
