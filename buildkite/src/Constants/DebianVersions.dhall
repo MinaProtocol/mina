@@ -44,9 +44,10 @@ let dependsOnStep =
           let prefix = Optional/default Text "MinaArtifact" prefix
 
           let name =
-                "${prefix}${Network.capitalName
-                              network}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                          buildFlag}"
+                "${prefix}${capitalName
+                              debVersion}${Network.capitalName
+                                             network}${profileSuffix}${BuildFlags.toSuffixUppercase
+                                                                         buildFlag}"
 
           in  merge
                 { Bookworm = [ { name = name, key = "${step}-deb-pkg" } ]
