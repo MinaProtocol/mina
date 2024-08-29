@@ -6,6 +6,8 @@ let Size = ./Size.dhall
 
 let RunWithPostgres = ./RunWithPostgres.dhall
 
+let Network = ../Constants/Network.dhall
+
 in  { step =
             \(dependsOn : List Command.TaggedKey.Type)
         ->  Command.build

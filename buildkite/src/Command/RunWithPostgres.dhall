@@ -2,6 +2,10 @@ let Prelude = ../External/Prelude.dhall
 
 let P = Prelude
 
+let Optional/map = Prelude.Optional.map
+
+let Optional/default = Prelude.Optional.default
+
 let Text/concatMap = P.Text.concatMap
 
 let Cmd = ../Lib/Cmds.dhall
@@ -10,11 +14,19 @@ let ContainerImages = ../Constants/ContainerImages.dhall
 
 let Artifacts = ../Constants/Artifacts.dhall
 
+let Network = ../Constants/Network.dhall
+
 let runInDockerWithPostgresConn
-    : List Text -> Text -> Artifacts.Type -> Text -> Cmd.Type
+    :     List Text
+      ->  Text
+      ->  Artifacts.Type
+      ->  Optional Network.Type
+      ->  Text
+      ->  Cmd.Type
     =     \(environment : List Text)
       ->  \(initScript : Text)
       ->  \(docker : Artifacts.Type)
+      ->  \(network : Optional Network.Type)
       ->  \(innerScript : Text)
       ->  let port = "5432"
 
@@ -27,6 +39,15 @@ let runInDockerWithPostgresConn
           let dockerVersion = ContainerImages.postgres
 
           let dbName = "archive"
+
+          let maybeNetwork =
+                Optional/map
+                  Network.Type
+                  Text
+                  (\(network : Network.Type) -> "-${Network.lowerName network}")
+                  network
+
+          let networkOrDefault = Optional/default Text "" maybeNetwork
 
           let pg_conn =
                 "postgres://${user}:${password}@localhost:${port}/${dbName}"
@@ -46,7 +67,7 @@ let runInDockerWithPostgresConn
 
           let outerDir
               : Text
-              = "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
+              = "\\\$BUILDKITE_BUILD_CHECKOUT_PATH${networkOrDefault}"
 
           let minaDockerTag
               : Text
