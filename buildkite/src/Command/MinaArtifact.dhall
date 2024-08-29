@@ -67,17 +67,17 @@ let labelSuffix
     : MinaBuildSpec.Type -> Text
     =     \(spec : MinaBuildSpec.Type)
       ->  "${Network.foldNames
-               spec.networks}-${DebianVersions.lowerName
-                                  spec.debVersion}${Profiles.toLabelSegment
-                                                      spec.profile}${BuildFlags.toLabelSegment
-                                                                       spec.buildFlags}"
+               spec.networks}${DebianVersions.capitalName
+                                 spec.debVersion}${Profiles.toSuffixUppercase
+                                                     spec.profile}${BuildFlags.toSuffixUppercase
+                                                                      spec.buildFlags}"
 
 let keySuffix
     : MinaBuildSpec.Type -> Text
     =     \(spec : MinaBuildSpec.Type)
       ->  "${DebianVersions.lowerName
-               spec.debVersion}${Profiles.toSuffixUppercase
-                                   spec.profile}${BuildFlags.toSuffixUppercase
+               spec.debVersion}${Profiles.toLabelSegment
+                                   spec.profile}${BuildFlags.toLabelSegment
                                                     spec.buildFlags}"
 
 let build_artifacts
