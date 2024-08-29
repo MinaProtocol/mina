@@ -295,7 +295,7 @@ let pipelineBuilder
           , spec = JobSpec::{
             , dirtyWhen = DebianVersions.dirtyWhen spec.debVersion
             , path = "Release"
-            , name = "${spec.prefix}${labelSuffix spec}"
+            , name = "${spec.prefix}--${labelSuffix spec}"
             , tags = spec.tags
             , mode = spec.mode
             }
