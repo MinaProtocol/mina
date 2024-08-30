@@ -542,9 +542,9 @@ func testBitswap(t *testing.T, numNodes, numAttempts, numRequests, maxBlobSize i
 	t.Logf("Seed: %d", seed)
 	r := rand.New(rand.NewSource(seed))
 	conf := initBitswapTestConfig(r, numNodes, numAttempts, numRequests, maxBlobSize)
-	t.Logf("Init the bitswap config %d", seed)
+	t.Logf("Init the bitswap config %v", conf)
 	err := conf.execute(nodes, delayBeforeDownload)
-	t.Logf("Finished executing config %d", seed)
+	t.Logf("Finished executing config %v", conf)
 	if err != nil {
 		printConnectionGraph(buildConnectionGraph(nodes))
 	}
