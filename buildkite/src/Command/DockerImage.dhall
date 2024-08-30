@@ -72,10 +72,10 @@ let stepKey =
 let stepLabel =
           \(spec : ReleaseSpec.Type)
       ->  "Docker: ${Artifacts.capitalName
-                       spec.service} ${DebianVersions.capitalName
-                                         spec.deb_codename} ${Profiles.toSuffixUppercase
-                                                                spec.deb_profile} ${BuildFlags.toSuffixUppercase
-                                                                                      spec.build_flags}"
+                       spec.service} ${spec.network} ${DebianVersions.capitalName
+                                                         spec.deb_codename} ${Profiles.toSuffixUppercase
+                                                                                spec.deb_profile} ${BuildFlags.toSuffixUppercase
+                                                                                                      spec.build_flags}"
 
 let generateStep =
           \(spec : ReleaseSpec.Type)
