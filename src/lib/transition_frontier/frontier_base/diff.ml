@@ -227,53 +227,7 @@ module Lite = struct
   type 'mutant t = (lite, 'mutant) diff
 
   module E = struct
-    module Binable_arg = struct
-      [%%versioned
-      module Stable = struct
-        [@@@no_toplevel_latest_type]
-
-        module V3 = struct
-          type t = Lite_binable.Stable.V3.t
-
-          let to_latest = Fn.id
-        end
-      end]
-    end
-
-    [%%versioned_binable
-    module Stable = struct
-      [@@@no_toplevel_latest_type]
-
-      module V3 = struct
-        type t = E : (lite, 'mutant) diff -> t [@@unboxed]
-
-        module T_nonbinable = struct
-          type nonrec t = t
-
-          let to_binable = function
-            | E (New_node (Lite x)) ->
-                (New_node x : Binable_arg.Stable.V3.t)
-            | E (Root_transitioned x) ->
-                Root_transitioned x
-            | E (Best_tip_changed x) ->
-                Best_tip_changed x
-
-          let of_binable = function
-            | (New_node x : Binable_arg.Stable.V3.t) ->
-                E (New_node (Lite x))
-            | Root_transitioned x ->
-                E (Root_transitioned x)
-            | Best_tip_changed x ->
-                E (Best_tip_changed x)
-        end
-
-        include Binable.Of_binable (Binable_arg.Stable.V3) (T_nonbinable)
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    include (Stable.Latest : module type of Stable.Latest)
+    type t = E : (lite, 'mutant) diff -> t [@@unboxed]
   end
 end
 

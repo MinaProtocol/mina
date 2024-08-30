@@ -132,12 +132,7 @@ module Lite : sig
   type 'mutant t = (lite, 'mutant) diff
 
   module E : sig
-    [%%versioned:
-    module Stable : sig
-      module V3 : sig
-        type t = E : (lite, 'mutant) diff -> t [@@unboxed]
-      end
-    end]
+    type t = E : (lite, 'mutant) diff -> t [@@unboxed]
   end
 end
 
