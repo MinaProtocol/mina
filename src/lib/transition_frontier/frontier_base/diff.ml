@@ -207,22 +207,6 @@ let to_lite (type mutant) (diff : (full, mutant) t) : (lite, mutant) t =
   | Best_tip_changed b ->
       Best_tip_changed b
 
-module Lite_binable = struct
-  [%%versioned
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
-
-    module V3 = struct
-      type t =
-        | New_node of Mina_block.Validated.Stable.V2.t
-        | Root_transitioned of Root_transition.Lite.Stable.V4.t
-        | Best_tip_changed of State_hash.Stable.V1.t
-
-      let to_latest = Fn.id
-    end
-  end]
-end
-
 module Lite = struct
   type 'mutant t = (lite, 'mutant) diff
 
