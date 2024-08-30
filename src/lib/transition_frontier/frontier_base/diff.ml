@@ -5,40 +5,6 @@ type full = Full
 
 type lite = Lite
 
-[@@@alert "-deprecated"]
-
-module Dummy_binable1 (T : sig
-  type 'a t
-end) =
-  Binable.Of_binable1
-    (struct
-      type 'a t = unit [@@deriving bin_io_unversioned]
-    end)
-    (struct
-      type 'a t = 'a T.t
-
-      let to_binable _ = ()
-
-      let of_binable _ = assert false
-    end)
-
-module Dummy_binable2 (T : sig
-  type (_, _) t
-end) =
-  Binable.Of_binable2
-    (struct
-      type (_, _) t = unit [@@deriving bin_io_unversioned]
-    end)
-    (struct
-      type ('a, 'b) t = ('a, 'b) T.t
-
-      let to_binable _ = ()
-
-      let of_binable _ = assert false
-    end)
-
-[@@@alert "+deprecated"]
-
 module Node = struct
   type 'a t =
     | Full : Breadcrumb.t -> full t
