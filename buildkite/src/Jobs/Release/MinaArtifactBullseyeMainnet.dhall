@@ -28,6 +28,5 @@ in  Pipeline.build
             , PipelineTag.Type.Stable
             ]
           , mode = PipelineMode.Type.Stable
-          , prefix = "MinaArtifactMainnet"
           }
       )
