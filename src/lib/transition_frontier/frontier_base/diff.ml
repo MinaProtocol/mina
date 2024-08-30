@@ -40,18 +40,9 @@ end) =
 [@@@alert "+deprecated"]
 
 module Node = struct
-  [%%versioned_binable
-  module Stable = struct
-    module V3 = struct
-      type 'a t =
-        | Full : Breadcrumb.t -> full t
-        | Lite : Mina_block.Validated.Stable.V2.t -> lite t
-
-      include Dummy_binable1 (struct
-        type nonrec 'a t = 'a t
-      end)
-    end
-  end]
+  type 'a t =
+    | Full : Breadcrumb.t -> full t
+    | Lite : Mina_block.Validated.Stable.V2.t -> lite t
 end
 
 module Node_list = struct
@@ -187,28 +178,12 @@ module Root_transition = struct
   end
 end
 
-module T = struct
-  [%%versioned_binable
-  module Stable = struct
-    module V2 = struct
-      type ('repr, 'mutant) t =
-        | New_node : 'repr Node.Stable.V3.t -> ('repr, unit) t
-        | Root_transitioned : 'repr Root_transition.t -> ('repr, State_hash.t) t
-        | Best_tip_changed : State_hash.t -> (_, State_hash.t) t
-
-      include Dummy_binable2 (struct
-        type nonrec ('a, 'b) t = ('a, 'b) t
-      end)
-    end
-  end]
-end
-
-type ('repr, 'mutant) t = ('repr, 'mutant) T.t =
+type ('repr, 'mutant) t =
   | New_node : 'repr Node.t -> ('repr, unit) t
   | Root_transitioned : 'repr Root_transition.t -> ('repr, State_hash.t) t
   | Best_tip_changed : State_hash.t -> (_, State_hash.t) t
 
-type ('repr, 'mutant) diff = ('repr, 'mutant) T.t
+type ('repr, 'mutant) diff = ('repr, 'mutant) t
 
 let name : type repr mutant. (repr, mutant) t -> string = function
   | Root_transitioned _ ->
