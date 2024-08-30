@@ -46,24 +46,32 @@ let dependsOn =
 
           in  merge
                 { Bookworm =
-                  [ { name = "${prefix}${network}${profileSuffix}", key = key }
+                  [ { name =
+                        "${prefix}${capitalName
+                                      docker}${network}${profileSuffix}"
+                    , key = key
+                    }
                   ]
                 , Bullseye =
-                  [ { name = "${prefix}${capitalName docker}${profileSuffix}"
+                  [ { name =
+                        "${prefix}${capitalName
+                                      docker}${network}${profileSuffix}"
                     , key = key
                     }
                   ]
                 , Jammy =
                   [ { name =
-                        "${prefix}${network}${capitalName
-                                                docker}${profileSuffix}"
+                        "${prefix}${capitalName
+                                      docker}${network}${capitalName
+                                                           docker}${profileSuffix}"
                     , key = key
                     }
                   ]
                 , Focal =
                   [ { name =
-                        "${prefix}${network}${capitalName
-                                                docker}${profileSuffix}"
+                        "${prefix}${capitalName
+                                      docker}${network}${capitalName
+                                                           docker}${profileSuffix}"
                     , key = key
                     }
                   ]
