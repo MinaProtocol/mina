@@ -3,6 +3,8 @@ use ark_ff::UniformRand;
 use paste::paste;
 use rand::rngs::StdRng;
 
+use std::time::Instant;
+
 macro_rules! impl_projective {
     ($name: ident, $GroupProjective: ty, $CamlG: ty, $CamlScalarField: ty, $BaseField: ty, $CamlBaseField: ty, $Projective: ty) => {
 
@@ -98,7 +100,7 @@ macro_rules! impl_projective {
             #[ocaml_gen::func]
             #[ocaml::func]
             pub fn [<caml_ $name:snake _of_affine>](x: $CamlG) -> $GroupProjective {
-                Into::<GAffine>::into(x).into_projective().into()
+                Into::<GAffine>::into(x).into_group().into()
             }
 
             #[ocaml_gen::func]
@@ -131,6 +133,19 @@ pub mod pallas {
         CamlFp,
         ProjectivePallas
     );
+
+    #[inline]
+    #[ocaml_gen::func]
+    #[ocaml::func]
+    pub fn caml_regression_foo(
+        x: ocaml::Pointer<CamlGroupProjectivePallas>,
+        y: ocaml::Pointer<CamlGroupProjectivePallas>,
+    ) -> CamlGroupProjectivePallas {
+        let now = Instant::now();
+        let res = x.as_ref() + y.as_ref();
+        println!("Elapsed: {:.2?}", now.elapsed());
+        res
+    }
 }
 
 pub mod vesta {
