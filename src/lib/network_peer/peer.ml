@@ -14,6 +14,8 @@ module Id = struct
     end
   end]
 
+  type t = string
+
   (** Convert to the libp2p-defined base58 string *)
   let to_string (x : t) = x
 

@@ -117,6 +117,8 @@ module Data = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t = { constraints : int } [@@deriving yojson]
 end
 
 module Repr = struct
@@ -134,6 +136,12 @@ module Repr = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { commitments : Backend.Tock.Curve.Affine.t Plonk_verification_key_evals.t
+    ; data : Data.t
+    }
+  [@@deriving to_yojson]
 end
 
 [%%versioned_binable

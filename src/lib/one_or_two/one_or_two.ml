@@ -25,6 +25,9 @@ module Stable = struct
   end
 end]
 
+type 'a t = [ `One of 'a | `Two of 'a * 'a ]
+[@@deriving equal, compare, hash, sexp, yojson]
+
 let length = function `One _ -> 1 | `Two _ -> 2
 
 let to_list = function `One a -> [ a ] | `Two (a, b) -> [ a; b ]

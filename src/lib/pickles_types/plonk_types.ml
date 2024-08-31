@@ -219,6 +219,18 @@ module Features = struct
     end
   end]
 
+  type 'bool t = 'bool Stable.Latest.t =
+    { range_check0 : 'bool
+    ; range_check1 : 'bool
+    ; foreign_field_add : 'bool
+    ; foreign_field_mul : 'bool
+    ; xor : 'bool
+    ; rot : 'bool
+    ; lookup : 'bool
+    ; runtime_tables : 'bool
+    }
+  [@@deriving sexp, compare, yojson, hash, equal, hlist]
+
   let of_full
       ({ range_check0
        ; range_check1
@@ -505,6 +517,35 @@ module Evals = struct
       [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
     end
   end]
+
+  type 'a t = 'a Stable.Latest.t =
+    { w : 'a Columns_vec.t
+    ; coefficients : 'a Columns_vec.t
+    ; z : 'a
+    ; s : 'a Permuts_minus_1_vec.t
+    ; generic_selector : 'a
+    ; poseidon_selector : 'a
+    ; complete_add_selector : 'a
+    ; mul_selector : 'a
+    ; emul_selector : 'a
+    ; endomul_scalar_selector : 'a
+    ; range_check0_selector : 'a option
+    ; range_check1_selector : 'a option
+    ; foreign_field_add_selector : 'a option
+    ; foreign_field_mul_selector : 'a option
+    ; xor_selector : 'a option
+    ; rot_selector : 'a option
+    ; lookup_aggregation : 'a option
+    ; lookup_table : 'a option
+    ; lookup_sorted : 'a option Lookup_sorted_vec.t
+    ; runtime_lookup_table : 'a option
+    ; runtime_lookup_table_selector : 'a option
+    ; xor_lookup_selector : 'a option
+    ; lookup_gate_lookup_selector : 'a option
+    ; range_check_lookup_selector : 'a option
+    ; foreign_field_mul_lookup_selector : 'a option
+    }
+  [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
 
   (* NB: Equivalent checks are run in-circuit below. *)
   let validate_feature_flags ~feature_flags:(f : bool Features.t)
@@ -1236,6 +1277,10 @@ module All_evals = struct
       end
     end]
 
+    type ('f, 'f_multi) t = ('f, 'f_multi) Stable.Latest.t =
+      { public_input : 'f; evals : 'f_multi Evals.t }
+    [@@deriving sexp, compare, yojson, hash, equal, hlist]
+
     module In_circuit = struct
       type ('f, 'f_multi, 'bool) t =
         { public_input : 'f; evals : ('f_multi, 'bool) Evals.In_circuit.t }
@@ -1337,6 +1382,15 @@ module Openings = struct
       end
     end]
 
+    type ('g, 'fq) t = ('g, 'fq) Stable.Latest.t =
+      { lr : ('g * 'g) Bounded_types.ArrayN16.t
+      ; z_1 : 'fq
+      ; z_2 : 'fq
+      ; delta : 'g
+      ; challenge_polynomial_commitment : 'g
+      }
+    [@@deriving sexp, compare, yojson, hash, equal, hlist]
+
     let typ fq g ~length =
       let open Snarky_backendless.Typ in
       of_hlistable
@@ -1356,6 +1410,13 @@ module Openings = struct
       [@@deriving sexp, compare, yojson, hash, equal, hlist]
     end
   end]
+
+  type ('g, 'fq, 'fqv) t = ('g, 'fq, 'fqv) Stable.Latest.t =
+    { proof : ('g, 'fq) Bulletproof.t
+    ; evals : ('fqv * 'fqv) Evals.t
+    ; ft_eval1 : 'fq
+    }
+  [@@deriving sexp, compare, yojson, hash, equal, hlist]
 end
 
 module Poly_comm = struct
@@ -1370,6 +1431,12 @@ module Poly_comm = struct
         [@@deriving sexp, compare, yojson, hlist, hash, equal]
       end
     end]
+
+    type 'g_opt t = 'g_opt Stable.Latest.t =
+      { unshifted : 'g_opt Bounded_types.ArrayN16.Stable.V1.t
+      ; shifted : 'g_opt
+      }
+    [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
     let padded_array_typ0 = padded_array_typ
 
@@ -1401,6 +1468,9 @@ module Poly_comm = struct
         [@@deriving sexp, compare, yojson, hash, equal]
       end
     end]
+
+    type 'g t = 'g Bounded_types.ArrayN16.t
+    [@@deriving sexp, compare, yojson, hash, equal]
   end
 end
 
@@ -1426,6 +1496,10 @@ module Messages = struct
         [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
       end
     end]
+
+    type 'g for_serialization = 'g Stable.Latest.t =
+      { sorted : 'g array; aggreg : 'g; runtime : 'g option }
+    [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
 
     type 'g t =
       { sorted : 'g Lookup_sorted_minus_1_vec.t

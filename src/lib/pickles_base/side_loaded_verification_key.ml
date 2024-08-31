@@ -46,6 +46,8 @@ end = struct
     end
   end]
 
+  type t = char [@@deriving sexp, equal, compare, hash, yojson]
+
   let zero = Char.of_int_exn 0
 
   module Max = Nat.N2
@@ -154,6 +156,15 @@ module Poly = struct
       [@@deriving hash]
     end
   end]
+
+  type ('g, 'proofs_verified, 'vk) t =
+        ('g, 'proofs_verified, 'vk) Stable.Latest.t =
+    { max_proofs_verified : 'proofs_verified
+    ; actual_wrap_domain_size : 'proofs_verified
+    ; wrap_index : 'g Plonk_verification_key_evals.t
+    ; wrap_vk : 'vk option
+    }
+  [@@deriving hash]
 end
 
 let index_to_field_elements (k : 'a Plonk_verification_key_evals.t) ~g =

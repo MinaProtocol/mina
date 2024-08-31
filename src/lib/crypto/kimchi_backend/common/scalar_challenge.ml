@@ -8,6 +8,9 @@ module Stable = struct
   end
 end]
 
+type 'f t = 'f Kimchi_types.scalar_challenge = { inner : 'f }
+[@@deriving sexp, compare, equal, yojson, hash]
+
 let create t = { inner = t }
 
 let typ f =

@@ -100,6 +100,9 @@ module Type1 = struct
     end
   end]
 
+  type 'f t = 'f Stable.Latest.t = Shifted_value of 'f
+  [@@deriving sexp, compare, equal, yojson, hash]
+
   let typ f =
     let there (Shifted_value x) = x in
     let back x = Shifted_value x in
@@ -157,6 +160,9 @@ module Type2 = struct
       [@@deriving sexp, compare, equal, yojson, hash]
     end
   end]
+
+  type 'f t = 'f Stable.Latest.t = Shifted_value of 'f
+  [@@deriving sexp, compare, equal, yojson, hash]
 
   let typ f =
     let there (Shifted_value x) = x in

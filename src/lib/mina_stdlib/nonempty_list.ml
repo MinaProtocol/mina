@@ -8,6 +8,8 @@ module Stable = struct
   end
 end]
 
+type 'a t = 'a * 'a list [@@deriving sexp, compare, equal, hash, to_yojson]
+
 let init x xs = (x, xs)
 
 let singleton x = (x, [])

@@ -23,6 +23,23 @@ module Stable = struct
   end
 end]
 
+type 'a t = 'a Stable.Latest.t =
+  { xt : 'a
+  ; yt : 'a
+  ; xp : 'a
+  ; yp : 'a
+  ; n_acc : 'a
+  ; xr : 'a
+  ; yr : 'a
+  ; s1 : 'a
+  ; s3 : 'a
+  ; b1 : 'a
+  ; b2 : 'a
+  ; b3 : 'a
+  ; b4 : 'a
+  }
+[@@deriving sexp, fields, hlist]
+
 let map { xt; yt; xp; yp; n_acc; xr; yr; s1; s3; b1; b2; b3; b4 } ~f =
   { xt = f xt
   ; yt = f yt

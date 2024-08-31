@@ -12,6 +12,9 @@ module Stable = struct
   end
 end]
 
+type t = Stable.Latest.t = N0 | N1 | N2
+[@@deriving sexp, compare, yojson, hash, equal]
+
 [@@@warning "+4"]
 
 let to_int : t -> int = function N0 -> 0 | N1 -> 1 | N2 -> 2

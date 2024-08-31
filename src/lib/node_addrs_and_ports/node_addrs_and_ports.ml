@@ -29,6 +29,15 @@ module Display = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { external_ip : string
+    ; bind_ip : string
+    ; peer : Peer.Display.t option
+    ; libp2p_port : int
+    ; client_port : int
+    }
+  [@@deriving fields, yojson, sexp]
 end
 
 let to_display (t : t) =

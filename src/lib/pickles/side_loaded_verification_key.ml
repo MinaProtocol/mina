@@ -141,6 +141,9 @@ module R = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Backend.Tock.Curve.Affine.Stable.V1.t Repr.Stable.V2.t
+  [@@deriving sexp, equal, compare, yojson]
 end
 
 [%%versioned_binable
@@ -269,6 +272,13 @@ module Stable = struct
     include Codable.Make_base64 (T)
   end
 end]
+
+type t =
+  ( Backend.Tock.Curve.Affine.t
+  , Pickles_base.Proofs_verified.Stable.V1.t
+  , Vk.t )
+  Poly.Stable.V2.t
+[@@deriving hash]
 
 [%%define_locally
 Stable.Latest.

@@ -9,4 +9,7 @@ module Stable = struct
   end
 end]
 
+type ('a, 'b) t = ('a, 'b) Stable.Latest.t = { data : 'a; proof : 'b }
+[@@deriving sexp, fields]
+
 let map { data; proof } ~f1 ~f2 = { data = f1 data; proof = f2 proof }

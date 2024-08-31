@@ -24,6 +24,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
+    type t = char [@@deriving compare, sexp, yojson, hash, equal]
+
     let of_int_exn : int -> t = Char.of_int_exn
 
     let of_bits_msb (bs : bool list) : t =
@@ -54,6 +56,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { proofs_verified : Proofs_verified.t; domain_log2 : Domain_log2.t }
+  [@@deriving hlist, compare, sexp, yojson, hash, equal]
 
   let length_in_bits = 10
 

@@ -71,6 +71,14 @@ module T = struct
       include Hashable.Make (T)
     end
   end]
+
+  type t =
+    [ `Connecting | `Listening | `Offline | `Bootstrap | `Synced | `Catchup ]
+  [@@deriving sexp, hash, compare, equal, enumerate]
+
+  let to_yojson = to_yojson
+
+  let of_yojson = of_yojson
 end
 
 include T
