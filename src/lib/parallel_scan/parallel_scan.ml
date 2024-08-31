@@ -230,6 +230,7 @@ module Space_partition = struct
   end]
 
   type t = Stable.Latest.t = { first : int * int; second : (int * int) option }
+  [@@deriving sexp]
 end
 
 (**View of a job for json output*)

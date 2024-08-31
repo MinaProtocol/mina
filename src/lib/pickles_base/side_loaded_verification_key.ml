@@ -123,6 +123,9 @@ module Domains = struct
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
+
+  type 'a t = 'a Stable.Latest.t = { h : 'a }
+  [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
 end
 
 module Repr = struct
@@ -137,6 +140,13 @@ module Repr = struct
       [@@deriving sexp, equal, compare, yojson]
     end
   end]
+
+  type 'g t = 'g Stable.Latest.t =
+    { max_proofs_verified : Proofs_verified.t
+    ; actual_wrap_domain_size : Proofs_verified.t
+    ; wrap_index : 'g Plonk_verification_key_evals.t
+    }
+  [@@deriving sexp, equal, compare, yojson]
 end
 
 module Poly = struct

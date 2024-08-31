@@ -9,3 +9,6 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t = Stable.Latest.t = { h : Domain.Stable.V1.t }
+[@@deriving fields, sexp, compare, yojson]

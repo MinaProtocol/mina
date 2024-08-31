@@ -224,6 +224,20 @@ module Stable = struct
   end
 end]
 
+type t = Stable.Latest.t =
+  { commitments : Backend.Tock.Curve.Affine.t Plonk_verification_key_evals.t
+  ; index :
+      (Impls.Wrap.Verification_key.t
+      [@to_yojson
+        Verifier_index_json.to_yojson Backend.Tock.Field.to_yojson
+          Backend.Tick.Field.to_yojson]
+      [@of_yojson
+        Verifier_index_json.of_yojson Backend.Tock.Field.of_yojson
+          Backend.Tick.Field.of_yojson] )
+  ; data : Data.t
+  }
+[@@deriving fields, to_yojson, of_yojson]
+
 let to_yojson = Stable.Latest.to_yojson
 
 let of_yojson = Stable.Latest.of_yojson

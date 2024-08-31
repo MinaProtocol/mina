@@ -1632,4 +1632,6 @@ module Shifts = struct
       [@@deriving sexp, compare, yojson, equal]
     end
   end]
+
+  type 'field t = 'field array [@@deriving sexp, compare, yojson, equal]
 end

@@ -85,6 +85,8 @@ module Make () = struct
     end
   end]
 
+  type t = T1.t [@@deriving hash, sexp, compare, equal]
+
   [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
 
   [%%define_locally
