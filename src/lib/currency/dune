@@ -19,11 +19,9 @@
    ;; local libraries
    bignum_bigint
    bitstring_lib
-   ppx_dhall_type
    codable
    test_util
    unsigned_extended
-   mina_compile_config
    mina_numbers
    snark_bits
    sgn
@@ -32,10 +30,9 @@
    random_oracle_input
    pickles
    snarky.backendless
-   kimchi_backend.common
+   kimchi_backend_common
    ppx_version.runtime
  )
- (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps
    ppx_annot
@@ -47,7 +44,6 @@
    ppx_sexp_conv
    ppx_compare
    ppx_hash
-   ppx_optcomp
    ppx_custom_printf
    ppx_deriving.std
    ppx_deriving_yojson

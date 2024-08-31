@@ -9,6 +9,8 @@ use mina_poseidon::{
 };
 use paste::paste;
 use poly_commitment::commitment::{shift_scalar, PolyComm};
+use poly_commitment::evaluation_proof::OpeningProof;
+use poly_commitment::SRS;
 use wasm_bindgen::prelude::*;
 // use wasm_bindgen::convert::{IntoWasmAbi, FromWasmAbi};
 use crate::wasm_vector::WasmVector;
@@ -178,7 +180,7 @@ macro_rules! impl_oracles {
             ) -> Result<[<Wasm $field_name:camel Oracles>], JsError> {
                 // conversions
                 let result = crate::rayon::run_in_pool(|| {
-                    let index: DlogVerifierIndex<$G> = index.into();
+                    let index: DlogVerifierIndex<$G, OpeningProof<$G>> = index.into();
 
                     let lgr_comm: Vec<PolyComm<$G>> = lgr_comm
                         .into_iter()
@@ -207,10 +209,13 @@ macro_rules! impl_oracles {
                             .commitment
                     };
 
-                    let (proof, public_input): (ProverProof<$G>, Vec<$F>) = proof.into();
+                    let (proof, public_input): (ProverProof<$G, OpeningProof<$G>>, Vec<$F>) = proof.into();
 
                     let oracles_result =
-                        proof.oracles::<DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>, DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>>(&index, &p_comm,&public_input);
+                        proof.oracles::<
+                            DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>,
+                            DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>
+                        >(&index, &p_comm, Some(&public_input));
                     let oracles_result = match oracles_result {
                         Err(e) => {
                             return Err(format!("oracles_create: {}", e));

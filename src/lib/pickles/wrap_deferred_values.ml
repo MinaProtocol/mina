@@ -1,22 +1,18 @@
 module SC = Scalar_challenge
 open Core_kernel
-open Async_kernel
 open Pickles_types
 open Common
 open Import
 open Backend
-open Tuple_lib
 
 (* TODO: Just stick this in plonk_checks.ml *)
 module Plonk_checks = struct
   include Plonk_checks
   module Type1 =
     Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
-  module Type2 =
-    Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
 end
 
-let expand_deferred (type n most_recent_width)
+let expand_deferred (type n most_recent_width) ~zk_rows
     ~(evals :
        ( Backend.Tick.Field.t
        , Backend.Tick.Field.t array )
@@ -39,7 +35,6 @@ let expand_deferred (type n most_recent_width)
        , Branch_data.t )
        Composition_types.Wrap.Proof_state.Minimal.Stable.V1.t ) :
     _ Types.Wrap.Proof_state.Deferred_values.t =
-  let module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk in
   let module Tick_field = Backend.Tick.Field in
   let tick_field : _ Plonk_checks.field = (module Tick_field) in
   Timer.start __LOC__ ;
@@ -47,7 +42,7 @@ let expand_deferred (type n most_recent_width)
   let sc = SC.to_field_constant tick_field ~endo:Endo.Wrap_inner_curve.scalar in
   Timer.clock __LOC__ ;
   let plonk0 = proof_state.deferred_values.plonk in
-  let { Deferred_values.Minimal.branch_data; bulletproof_challenges } =
+  let { Deferred_values.Minimal.branch_data; bulletproof_challenges; _ } =
     Deferred_values.Minimal.map_challenges ~f:Challenge.Constant.to_tick_field
       ~scalar:sc proof_state.deferred_values
   in
@@ -106,7 +101,7 @@ let expand_deferred (type n most_recent_width)
       (module Env_bool)
       (module Env_field)
       ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
-      ~srs_length_log2:Common.Max_degree.step_log2
+      ~srs_length_log2:Common.Max_degree.step_log2 ~zk_rows
       ~field_of_hex:(fun s ->
         Kimchi_pasta.Pasta.Bigint256.of_hex_string s
         |> Kimchi_pasta.Pasta.Fp.of_bigint )
@@ -116,8 +111,6 @@ let expand_deferred (type n most_recent_width)
     let p =
       let module Field = struct
         include Tick.Field
-
-        type nonrec bool = bool
       end in
       Plonk_checks.Type1.derive_plonk
         (module Field)
@@ -128,11 +121,7 @@ let expand_deferred (type n most_recent_width)
     ; alpha = plonk0.alpha
     ; beta = plonk0.beta
     ; gamma = plonk0.gamma
-    ; lookup =
-        Option.map (Plonk_types.Opt.to_option_unsafe p.lookup) ~f:(fun l ->
-            { Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup
-              .joint_combiner = Option.value_exn plonk0.joint_combiner
-            } )
+    ; joint_combiner = plonk0.joint_combiner
     }
   in
   Timer.clock __LOC__ ;
@@ -167,8 +156,8 @@ let expand_deferred (type n most_recent_width)
    absorb evals.ft_eval1 ;
    let xs = Plonk_types.Evals.to_absorption_sequence evals.evals.evals in
    let x1, x2 = evals.evals.public_input in
-   absorb x1 ;
-   absorb x2 ;
+   Array.iter ~f:absorb x1 ;
+   Array.iter ~f:absorb x2 ;
    List.iter xs ~f:(fun (x1, x2) ->
        Array.iter ~f:absorb x1 ; Array.iter ~f:absorb x2 ) ) ;
   let xi_chal = squeeze () in

@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core
 open Async
 open Signature_lib
@@ -37,18 +35,18 @@ let get_keys_with_details t =
   let%map.Participating_state accounts = accounts_pstate in
   List.map accounts ~f:(fun account ->
       ( string_of_public_key account
-      , account.Account.Poly.balance |> Currency.Balance.to_nanomina_int
-      , account.Account.Poly.nonce |> Account.Nonce.to_int ) )
+      , account.Account.balance |> Currency.Balance.to_nanomina_int
+      , account.Account.nonce |> Account.Nonce.to_int ) )
 
 let get_nonce t (addr : Account_id.t) =
   let open Participating_state.Option.Let_syntax in
   let%map account = get_account t addr in
-  account.Account.Poly.nonce
+  account.Account.nonce
 
 let get_balance t (addr : Account_id.t) =
   let open Participating_state.Option.Let_syntax in
   let%map account = get_account t addr in
-  account.Account.Poly.balance
+  account.Account.balance
 
 let get_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let config = Mina_lib.config t in
@@ -231,7 +229,7 @@ let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
   let open Participating_state.Let_syntax in
   let%map account = get_account t addr in
   let account = Option.value_exn account in
-  let resulting_receipt = account.Account.Poly.receipt_chain_hash in
+  let resulting_receipt = account.Account.receipt_chain_hash in
   let open Or_error.Let_syntax in
   let%bind (_ : Receipt.Chain_hash.t Mina_stdlib.Nonempty_list.t) =
     Result.of_option
@@ -259,6 +257,7 @@ let max_block_height = ref 1
 let get_status ~flag t =
   let open Mina_lib.Config in
   let config = Mina_lib.config t in
+  let commit_id = Mina_lib.commit_id t in
   let precomputed_values = config.precomputed_values in
   let protocol_constants = precomputed_values.genesis_constants.protocol in
   let constraint_constants = precomputed_values.constraint_constants in
@@ -267,7 +266,6 @@ let get_status ~flag t =
     Time_ns.diff (Time_ns.now ()) Mina_lib.daemon_start_time
     |> Time_ns.Span.to_sec |> Int.of_float
   in
-  let commit_id = Mina_version.commit_id in
   let conf_dir = config.conf_dir in
   let%map peers =
     let%map undisplay_peers = Mina_lib.peers t in

@@ -127,7 +127,6 @@ let summary exn_json =
     ; ("Sys_name", `String (Core.Unix.Utsname.sysname uname))
     ; ("Exception", exn_json)
     ; ("Command", `String daemon_command)
-    ; ("Coda_branch", `String Mina_version.branch)
     ; ("Coda_commit", `String Mina_version.commit_id)
     ]
 
@@ -325,9 +324,11 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
           Mina_tracing.stop () ; Deferred.unit )
     ; implement Daemon_rpcs.Start_internal_tracing.rpc (fun () () ->
-          Internal_tracing.toggle ~logger `Enabled )
+          Internal_tracing.toggle ~commit_id:Mina_version.commit_id ~logger
+            `Enabled )
     ; implement Daemon_rpcs.Stop_internal_tracing.rpc (fun () () ->
-          Internal_tracing.toggle ~logger `Disabled )
+          Internal_tracing.toggle ~commit_id:Mina_version.commit_id ~logger
+            `Disabled )
     ; implement Daemon_rpcs.Visualization.Frontier.rpc (fun () filename ->
           return (Mina_lib.visualize_frontier ~filename mina) )
     ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
@@ -762,7 +763,8 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
            | _exn ->
                let error = Error.of_exn ~backtrace:`Get exn in
                let%bind () =
-                 Node_error_service.send_report ~logger:top_logger ~error
+                 Node_error_service.send_report
+                   ~commit_id:Mina_version.commit_id ~logger:top_logger ~error
                in
                handle_crash exn ~time_controller ~conf_dir ~child_pids
                  ~top_logger coda_ref

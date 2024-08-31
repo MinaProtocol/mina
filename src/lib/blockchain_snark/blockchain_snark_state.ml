@@ -238,7 +238,7 @@ let%snarkydef_ step ~(logger : Logger.t)
     in
     (t, is_base_case)
   in
-  let%bind txn_snark_should_verify, success =
+  let%bind txn_snark_must_verify, success =
     let%bind new_pending_coinbase_hash, deleted_stack, no_coinbases_popped =
       let coinbase_receiver =
         Consensus.Data.Consensus_state.coinbase_receiver_var consensus_state
@@ -348,14 +348,14 @@ let%snarkydef_ step ~(logger : Logger.t)
     in
     (transaction_snark_should_verifiy, result)
   in
-  let txn_snark_should_verify =
+  let txn_snark_must_verify =
     match proof_level with
     | Check | None ->
         Boolean.false_
     | Full ->
-        txn_snark_should_verify
+        txn_snark_must_verify
   in
-  let prev_should_verify =
+  let prev_must_verify =
     match proof_level with
     | Check | None ->
         Boolean.false_
@@ -374,11 +374,11 @@ let%snarkydef_ step ~(logger : Logger.t)
   ( { Pickles.Inductive_rule.Previous_proof_statement.public_input =
         previous_blockchain_proof_input
     ; proof = previous_blockchain_proof
-    ; proof_must_verify = prev_should_verify
+    ; proof_must_verify = prev_must_verify
     }
   , { Pickles.Inductive_rule.Previous_proof_statement.public_input = txn_snark
     ; proof = txn_snark_proof
-    ; proof_must_verify = txn_snark_should_verify
+    ; proof_must_verify = txn_snark_must_verify
     } )
 
 module Statement = struct

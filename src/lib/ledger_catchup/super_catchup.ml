@@ -646,10 +646,10 @@ let initial_validate ~context:(module Context : CONTEXT) ~trust_system
       ]
     "initial_validate: verification of proofs complete" ;
   let slot_tx_end =
-    Runtime_config.slot_tx_end_or_default precomputed_values.runtime_config
+    Runtime_config.slot_tx_end precomputed_values.runtime_config
   in
   let slot_chain_end =
-    Runtime_config.slot_chain_end_or_default precomputed_values.runtime_config
+    Runtime_config.slot_chain_end precomputed_values.runtime_config
   in
   verify_transition
     ~context:(module Context)
@@ -1430,7 +1430,7 @@ let%test_module "Ledger_catchup tests" =
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            () )
+            ~commit_id:"not specified for unit tests" () )
 
     module Context = struct
       let logger = logger
@@ -1493,6 +1493,7 @@ let%test_module "Ledger_catchup tests" =
       in
       let unprocessed_transition_cache =
         Transition_handler.Unprocessed_transition_cache.create ~logger
+          ~cache_exceptions:true
       in
       run
         ~context:(module Context)

@@ -32,13 +32,12 @@
    exit_handlers
    file_system
    itn_crypto
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    mina_base.util
    mina_ledger
    block_producer
    pickles
-   pickles_unix
    mina_incremental
    coda_genesis_ledger
    work_selector
@@ -49,9 +48,9 @@
    trust_system
    with_hash
    data_hash_lib
-   data_hash_lib_unix
    staged_ledger
    genesis_constants
+   genesis_constants.compiled
    pipe_lib
    sgn
    transaction_snark_work
@@ -88,11 +87,9 @@
    base58_check
    mina_net2
    snark_params
-   snark_params_unix
    rosetta_lib
    random_oracle
    coda_genesis_proof
-   mina_version
    mina_compile_config
    mina_runtime_config
    mina_base.import
@@ -112,5 +109,4 @@
    itn_logger
  )
  (instrumentation (backend bisect_ppx))
- (preprocessor_deps ../../config.mlh)
  (preprocess (pps ppx_mina ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make)))

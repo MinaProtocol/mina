@@ -8,7 +8,7 @@ module Fork_config = struct
     ; blockchain_length : int (* number of blocks produced since genesis *)
     ; global_slot_since_genesis : int (* global slot since genesis *)
     }
-  [@@deriving yojson, dhall_type, bin_io_unversioned]
+  [@@deriving yojson, bin_io_unversioned]
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
@@ -77,7 +77,7 @@ module Json_layout = struct
           ; vesting_period : Mina_numbers.Global_slot_span.t
           ; vesting_increment : Currency.Amount.t
           }
-        [@@deriving yojson, fields, dhall_type, sexp]
+        [@@deriving yojson, fields, sexp]
 
         let fields = Fields.names |> Array.of_list
 
@@ -87,7 +87,7 @@ module Json_layout = struct
       module Permissions = struct
         module Auth_required = struct
           type t = None | Either | Proof | Signature | Impossible
-          [@@deriving dhall_type, sexp, bin_io_unversioned]
+          [@@deriving sexp, bin_io_unversioned]
 
           let to_yojson = function
             | None ->
@@ -156,7 +156,7 @@ module Json_layout = struct
 
         module Verification_key_perm = struct
           type t = { auth : Auth_required.t; txn_version : Txn_version.t }
-          [@@deriving dhall_type, sexp, yojson, bin_io_unversioned]
+          [@@deriving sexp, yojson, bin_io_unversioned]
         end
 
         type t =
@@ -220,7 +220,7 @@ module Json_layout = struct
                   Auth_required.of_account_perm
                     Mina_base.Permissions.user_default.set_timing]
           }
-        [@@deriving yojson, fields, dhall_type, sexp, bin_io_unversioned]
+        [@@deriving yojson, fields, sexp, bin_io_unversioned]
 
         let fields = Fields.names |> Array.of_list
 
@@ -270,9 +270,6 @@ module Json_layout = struct
           type t = Snark_params.Tick.Field.t
           [@@deriving sexp, bin_io_unversioned]
 
-          (* can't be automatically derived *)
-          let dhall_type = Ppx_dhall_type.Dhall_type.Text
-
           let to_yojson t = `String (Snark_params.Tick.Field.to_string t)
 
           let of_yojson = function
@@ -287,9 +284,6 @@ module Json_layout = struct
         module Verification_key = struct
           type t = Pickles.Side_loaded.Verification_key.Stable.Latest.t
           [@@deriving sexp, bin_io_unversioned]
-
-          (* can't be automatically derived *)
-          let dhall_type = Ppx_dhall_type.Dhall_type.Text
 
           let to_yojson t =
             `String (Pickles.Side_loaded.Verification_key.to_base64 t)
@@ -324,7 +318,7 @@ module Json_layout = struct
           ; proved_state : bool
           ; zkapp_uri : string
           }
-        [@@deriving sexp, fields, dhall_type, yojson, bin_io_unversioned]
+        [@@deriving sexp, fields, yojson, bin_io_unversioned]
 
         let fields = Fields.names |> Array.of_list
 
@@ -362,7 +356,7 @@ module Json_layout = struct
         ; permissions : Permissions.t option [@default None]
         ; token_symbol : string option [@default None]
         }
-      [@@deriving sexp, fields, yojson, dhall_type]
+      [@@deriving sexp, fields, yojson]
 
       let fields = Fields.names |> Array.of_list
 
@@ -384,13 +378,13 @@ module Json_layout = struct
         }
     end
 
-    type t = Single.t list [@@deriving yojson, dhall_type]
+    type t = Single.t list [@@deriving yojson]
   end
 
   module Ledger = struct
     module Balance_spec = struct
       type t = { number : int; balance : Currency.Balance.t }
-      [@@deriving yojson, dhall_type]
+      [@@deriving yojson]
     end
 
     type t =
@@ -402,7 +396,7 @@ module Json_layout = struct
       ; name : string option [@default None]
       ; add_genesis_winner : bool option [@default None]
       }
-    [@@deriving yojson, fields, dhall_type]
+    [@@deriving yojson, fields]
 
     let fields = Fields.names |> Array.of_list
 
@@ -412,11 +406,10 @@ module Json_layout = struct
   module Proof_keys = struct
     module Transaction_capacity = struct
       type t =
-        { log_2 : int option
-              [@default None] [@key "2_to_the"] [@dhall_type.key "two_to_the"]
+        { log_2 : int option [@default None] [@key "2_to_the"]
         ; txns_per_second_x10 : int option [@default None]
         }
-      [@@deriving yojson, dhall_type]
+      [@@deriving yojson]
 
       (* we don't deriving the field names here, because the first one differs from the
          field in the record type
@@ -444,7 +437,7 @@ module Json_layout = struct
       ; account_creation_fee : Currency.Fee.t option [@default None]
       ; fork : Fork_config.t option [@default None]
       }
-    [@@deriving yojson, fields, dhall_type]
+    [@@deriving yojson, fields]
 
     let fields = Fields.names |> Array.of_list
 
@@ -460,7 +453,7 @@ module Json_layout = struct
       ; grace_period_slots : int option [@default None]
       ; genesis_state_timestamp : string option [@default None]
       }
-    [@@deriving yojson, fields, dhall_type]
+    [@@deriving yojson, fields]
 
     let fields = Fields.names |> Array.of_list
 
@@ -480,8 +473,10 @@ module Json_layout = struct
       ; zkapp_cmd_limit_hardcap : int option [@default None]
       ; slot_tx_end : int option [@default None]
       ; slot_chain_end : int option [@default None]
+      ; minimum_user_command_fee : Currency.Fee.t option
+      ; network_id : string option [@default None]
       }
-    [@@deriving yojson, fields, dhall_type]
+    [@@deriving yojson, fields]
 
     let fields = Fields.names |> Array.of_list
 
@@ -496,7 +491,7 @@ module Json_layout = struct
         ; s3_data_hash : string option [@default None]
         ; hash : string option [@default None]
         }
-      [@@deriving yojson, fields, dhall_type]
+      [@@deriving yojson, fields]
 
       let fields = Fields.names |> Array.of_list
 
@@ -507,7 +502,7 @@ module Json_layout = struct
       { staking : Data.t
       ; next : (Data.t option[@default None]) (*If None then next = staking*)
       }
-    [@@deriving yojson, fields, dhall_type]
+    [@@deriving yojson, fields]
 
     let fields = Fields.names |> Array.of_list
 
@@ -521,7 +516,7 @@ module Json_layout = struct
     ; ledger : Ledger.t option [@default None]
     ; epoch_data : Epoch_data.t option [@default None]
     }
-  [@@deriving yojson, fields, dhall_type]
+  [@@deriving yojson, fields]
 
   let fields = Fields.names |> Array.of_list
 
@@ -645,7 +640,6 @@ module Accounts = struct
 
     let to_account (a : t) : Mina_base.Account.t =
       let open Signature_lib in
-      let open Mina_base.Account.Poly in
       let timing =
         let open Mina_base.Account_timing.Poly in
         match a.timing with
@@ -1227,6 +1221,9 @@ module Daemon = struct
     ; zkapp_cmd_limit_hardcap : int option [@default None]
     ; slot_tx_end : int option [@default None]
     ; slot_chain_end : int option [@default None]
+    ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t option
+          [@default None]
+    ; network_id : string option [@default None]
     }
   [@@deriving bin_io_unversioned]
 
@@ -1266,6 +1263,10 @@ module Daemon = struct
     ; slot_tx_end = opt_fallthrough ~default:t1.slot_tx_end t2.slot_tx_end
     ; slot_chain_end =
         opt_fallthrough ~default:t1.slot_chain_end t2.slot_chain_end
+    ; minimum_user_command_fee =
+        opt_fallthrough ~default:t1.minimum_user_command_fee
+          t2.minimum_user_command_fee
+    ; network_id = opt_fallthrough ~default:t1.network_id t2.network_id
     }
 
   let gen =
@@ -1277,6 +1278,9 @@ module Daemon = struct
     let%bind zkapp_transaction_cost_limit = Float.gen_incl 0.0 100.0 in
     let%bind max_event_elements = Int.gen_incl 0 100 in
     let%bind zkapp_cmd_limit_hardcap = Int.gen_incl 0 1000 in
+    let%bind minimum_user_command_fee =
+      Currency.Fee.(gen_incl one (of_mina_int_exn 10))
+    in
     let%map max_action_elements = Int.gen_incl 0 1000 in
     { txpool_max_size = Some txpool_max_size
     ; peer_list_url = None
@@ -1289,6 +1293,8 @@ module Daemon = struct
     ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
     ; slot_tx_end = None
     ; slot_chain_end = None
+    ; minimum_user_command_fee = Some minimum_user_command_fee
+    ; network_id = None
     }
 end
 
@@ -1516,11 +1522,12 @@ let ledger_of_accounts accounts =
     ; add_genesis_winner = Some false
     }
 
-let make_fork_config ~staged_ledger ~global_slot ~state_hash ~blockchain_length
-    ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger ~next_epoch_seed =
+let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
+    ~blockchain_length ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
+    ~next_epoch_seed =
   let open Async.Deferred.Result.Let_syntax in
   let global_slot_since_genesis =
-    Mina_numbers.Global_slot_since_hard_fork.to_int global_slot
+    Mina_numbers.Global_slot_since_genesis.to_int global_slot_since_genesis
   in
   let blockchain_length = Unsigned.UInt32.to_int blockchain_length in
   let yield () =
@@ -1585,14 +1592,12 @@ let make_fork_config ~staged_ledger ~global_slot ~state_hash ~blockchain_length
       }
     ~proof:(Proof_keys.make ~fork ()) ()
 
-let slot_tx_end_or_default, slot_chain_end_or_default =
-  let f compile get_runtime t =
-    Option.map ~f:Mina_numbers.Global_slot_since_hard_fork.of_int
-    @@ Option.value_map t.daemon ~default:compile ~f:(fun daemon ->
-           Option.merge compile ~f:(fun _c r -> r) @@ get_runtime daemon )
+let slot_tx_end, slot_chain_end =
+  let f get_runtime t =
+    let open Option.Let_syntax in
+    t.daemon >>= get_runtime >>| Mina_numbers.Global_slot_since_hard_fork.of_int
   in
-  ( f Mina_compile_config.slot_tx_end (fun d -> d.slot_tx_end)
-  , f Mina_compile_config.slot_chain_end (fun d -> d.slot_chain_end) )
+  (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))
 
 module Test_configs = struct
   let bootstrap =

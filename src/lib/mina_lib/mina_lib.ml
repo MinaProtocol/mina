@@ -120,6 +120,7 @@ type t =
   ; in_memory_reverse_structured_log_messages_for_integration_test :
       (int * string list * bool) ref
   ; vrf_evaluation_state : Block_producer.Vrf_evaluation_state.t
+  ; commit_id : string
   }
 [@@deriving fields]
 
@@ -128,6 +129,8 @@ let vrf_evaluation_state t = t.vrf_evaluation_state
 let time_controller t = t.config.time_controller
 
 let subscription t = t.subscriptions
+
+let commit_id t = t.commit_id
 
 let peek_frontier frontier_broadcast_pipe =
   Broadcast_pipe.Reader.peek frontier_broadcast_pipe
@@ -456,19 +459,14 @@ exception Offline_shutdown
 
 exception Bootstrap_stuck_shutdown
 
-let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
-    ~transition_frontier_and_catchup_signal_incr ~online_status_incr
+let create_sync_status_observer ~logger ~genesis_timestamp ~is_seed ~demo_mode
+    ~net ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
   let open Mina_incremental.Status in
   let restart_delay = Time.Span.of_min 5. in
   let offline_shutdown_delay = Time.Span.of_min 25. in
-  let after_genesis =
-    let genesis_timestamp =
-      Genesis_constants.(
-        genesis_timestamp_of_string genesis_state_timestamp_string)
-    in
-    fun () -> Time.(( >= ) (now ())) genesis_timestamp
-  in
+  let genesis_timestamp = Genesis_constants.to_time genesis_timestamp in
+  let after_genesis () = Time.(( >= ) (now ())) genesis_timestamp in
   let incremental_status =
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
       first_connection_incr first_message_incr
@@ -791,7 +789,7 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
   | None ->
       let open Participating_state.Option.Let_syntax in
       let%map account = get_account t account_id in
-      account.Account.Poly.nonce
+      account.Account.nonce
 
 let snark_job_state t = t.snark_job_state
 
@@ -833,84 +831,7 @@ let staged_ledger_ledger_proof t =
 
 let validated_transitions t = t.pipes.validated_transitions_reader
 
-module Root_diff = struct
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t =
-        { commands : User_command.Stable.V2.t With_status.Stable.V2.t list
-        ; root_length : int
-        }
-
-      let to_latest = Fn.id
-    end
-  end]
-end
-
 let initialization_finish_signal t = t.initialization_finish_signal
-
-(* TODO: this is a bad pattern for two reasons:
- *   - uses an abstraction leak to patch new functionality instead of making a new extension
- *   - every call to this function will create a new, unique pipe with it's own thread for transfering
- *     items from the identity extension with no route for termination
- *)
-let root_diff t =
-  let root_diff_reader, root_diff_writer =
-    Strict_pipe.create ~name:"root diff"
-      (Buffered (`Capacity 30, `Overflow Crash))
-  in
-  O1trace.background_thread "read_root_diffs" (fun () ->
-      let open Root_diff.Stable.Latest in
-      let length_of_breadcrumb b =
-        Transition_frontier.Breadcrumb.consensus_state b
-        |> Consensus.Data.Consensus_state.blockchain_length
-        |> Mina_numbers.Length.to_uint32 |> Unsigned.UInt32.to_int
-      in
-      Broadcast_pipe.Reader.iter t.components.transition_frontier ~f:(function
-        | None ->
-            Deferred.unit
-        | Some frontier ->
-            let root = Transition_frontier.root frontier in
-            Strict_pipe.Writer.write root_diff_writer
-              { commands =
-                  List.map
-                    ( Transition_frontier.Breadcrumb.validated_transition root
-                    |> Mina_block.Validated.valid_commands )
-                    ~f:(With_status.map ~f:User_command.forget_check)
-              ; root_length = length_of_breadcrumb root
-              } ;
-            Broadcast_pipe.Reader.iter
-              Transition_frontier.(
-                Extensions.(get_view_pipe (extensions frontier) Identity))
-              ~f:
-                (Deferred.List.iter ~f:(function
-                  | Transition_frontier.Diff.Full.With_mutant.E (New_node _, _)
-                    ->
-                      Deferred.unit
-                  | Transition_frontier.Diff.Full.With_mutant.E
-                      (Best_tip_changed _, _) ->
-                      Deferred.unit
-                  | Transition_frontier.Diff.Full.With_mutant.E
-                      (Root_transitioned { new_root; _ }, _) ->
-                      let root_hash =
-                        (Transition_frontier.Root_data.Limited.hashes new_root)
-                          .state_hash
-                      in
-                      let new_root_breadcrumb =
-                        Transition_frontier.(find_exn frontier root_hash)
-                      in
-                      Strict_pipe.Writer.write root_diff_writer
-                        { commands =
-                            Transition_frontier.Breadcrumb.validated_transition
-                              new_root_breadcrumb
-                            |> Mina_block.Validated.valid_commands
-                            |> List.map
-                                 ~f:
-                                   (With_status.map ~f:User_command.forget_check)
-                        ; root_length = length_of_breadcrumb new_root_breadcrumb
-                        } ;
-                      Deferred.unit ) ) ) ) ;
-  root_diff_reader
 
 let dump_tf t =
   peek_frontier t.components.transition_frontier
@@ -997,7 +918,7 @@ let get_current_nonce t aid =
       let ledger_nonce =
         Participating_state.active (get_account t aid)
         |> Option.join
-        |> Option.map ~f:(fun { Account.Poly.nonce; _ } -> nonce)
+        |> Option.map ~f:(fun { Account.nonce; _ } -> nonce)
         |> Option.value ~default:nonce
       in
       Ok (`Min ledger_nonce, nonce)
@@ -1304,9 +1225,11 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val commit_id : string
 end
 
-let context (config : Config.t) : (module CONTEXT) =
+let context ~commit_id (config : Config.t) : (module CONTEXT) =
   ( module struct
     let logger = config.logger
 
@@ -1315,9 +1238,12 @@ let context (config : Config.t) : (module CONTEXT) =
     let consensus_constants = precomputed_values.consensus_constants
 
     let constraint_constants = precomputed_values.constraint_constants
+
+    let commit_id = commit_id
   end )
 
 let start t =
+  let commit_id_short = String.sub ~pos:0 ~len:8 t.commit_id in
   let set_next_producer_timing timing consensus_state =
     let block_production_status, next_producer_timing =
       let generated_from_consensus_at :
@@ -1380,7 +1306,8 @@ let start t =
     not
       (Keypair.And_compressed_pk.Set.is_empty t.config.block_production_keypairs)
   then
-    Block_producer.run ~context:(context t.config)
+    Block_producer.run
+      ~context:(context ~commit_id:t.commit_id t.config)
       ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
       ~set_next_producer_timing ~prover:t.processes.prover
       ~trust_system:t.config.trust_system
@@ -1411,8 +1338,8 @@ let start t =
             @@ Keypair.And_compressed_pk.Set.choose
                  t.config.block_production_keypairs
           in
-          Node_status_service.start_simplified ~logger:t.config.logger
-            ~node_status_url ~network:t.components.net
+          Node_status_service.start_simplified ~commit_id:t.commit_id
+            ~logger:t.config.logger ~node_status_url ~network:t.components.net
             ~chain_id:t.config.chain_id
             ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
             ~slot_duration:
@@ -1421,8 +1348,8 @@ let start t =
                    .slot_duration_ms )
             ~block_producer_public_key_base58
         else
-          Node_status_service.start ~logger:t.config.logger ~node_status_url
-            ~network:t.components.net
+          Node_status_service.start ~commit_id:t.commit_id
+            ~logger:t.config.logger ~node_status_url ~network:t.components.net
             ~transition_frontier:t.components.transition_frontier
             ~sync_status:t.sync_status ~chain_id:t.config.chain_id
             ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
@@ -1435,12 +1362,13 @@ let start t =
         ()
   in
   let built_with_commit_sha =
-    if t.config.uptime_send_node_commit then Some Mina_version.commit_id_short
-    else None
+    if t.config.uptime_send_node_commit then Some commit_id_short else None
   in
   Uptime_service.start ~logger:t.config.logger ~uptime_url:t.config.uptime_url
     ~snark_worker_opt:t.processes.uptime_snark_worker_opt
     ~transition_frontier:t.components.transition_frontier
+    ~constraint_constants:t.config.precomputed_values.constraint_constants
+    ~protocol_constants:t.config.precomputed_values.genesis_constants.protocol
     ~time_controller:t.config.time_controller
     ~block_produced_bvar:t.components.block_produced_bvar
     ~uptime_submitter_keypair:t.config.uptime_submitter_keypair
@@ -1453,7 +1381,8 @@ let start t =
 
 let start_with_precomputed_blocks t blocks =
   let%bind () =
-    Block_producer.run_precomputed ~context:(context t.config)
+    Block_producer.run_precomputed
+      ~context:(context ~commit_id:t.commit_id t.config)
       ~verifier:t.processes.verifier ~trust_system:t.config.trust_system
       ~time_controller:t.config.time_controller
       ~frontier_reader:t.components.transition_frontier
@@ -1505,8 +1434,36 @@ module type Itn_settable = sig
   val set_itn_logger_data : t -> daemon_port:int -> unit Deferred.Or_error.t
 end
 
-let create ?wallets (config : Config.t) =
-  let module Context = (val context config) in
+let start_filtered_log ~commit_id
+    in_memory_reverse_structured_log_messages_for_integration_test
+    (structured_log_ids : string list) =
+  let handle str =
+    let idx, old_messages, started =
+      !in_memory_reverse_structured_log_messages_for_integration_test
+    in
+    in_memory_reverse_structured_log_messages_for_integration_test :=
+      (idx + 1, str :: old_messages, started)
+  in
+  let _, _, started =
+    !in_memory_reverse_structured_log_messages_for_integration_test
+  in
+  if started then Or_error.error_string "Already initialized"
+  else (
+    in_memory_reverse_structured_log_messages_for_integration_test :=
+      (0, [], true) ;
+    let event_set =
+      Structured_log_events.Set.of_list
+      @@ List.map ~f:Structured_log_events.id_of_string structured_log_ids
+    in
+    Logger.Consumer_registry.register ~id:Logger.Logger_id.mina ~commit_id
+      ~processor:(Logger.Processor.raw_structured_log_events event_set)
+      ~transport:(Logger.Transport.raw handle)
+      () ;
+    Ok () )
+
+let create ~commit_id ?wallets (config : Config.t) =
+  let module Context = (val context ~commit_id config) in
+  let commit_id_short = String.sub ~pos:0 ~len:8 commit_id in
   let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
@@ -1528,6 +1485,15 @@ let create ?wallets (config : Config.t) =
         else Deferred.unit
       in
       O1trace.thread "mina_lib" (fun () ->
+          let in_memory_reverse_structured_log_messages_for_integration_test =
+            ref (0, [], false)
+          in
+          if not (List.is_empty config.start_filtered_logs) then
+            (* Start the filtered logs, if requested. *)
+            Or_error.ok_exn
+            @@ start_filtered_log ~commit_id
+                 in_memory_reverse_structured_log_messages_for_integration_test
+                 config.start_filtered_logs ;
           let%bind prover =
             Monitor.try_with ~here:[%here]
               ~rest:
@@ -1540,7 +1506,7 @@ let create ?wallets (config : Config.t) =
               (fun () ->
                 O1trace.thread "manage_prover_subprocess" (fun () ->
                     let%bind prover =
-                      Prover.create ~logger:config.logger
+                      Prover.create ~commit_id ~logger:config.logger
                         ~enable_internal_tracing:
                           (Internal_tracing.is_enabled ())
                         ~internal_trace_filename:"prover-internal-trace.jsonl"
@@ -1565,7 +1531,7 @@ let create ?wallets (config : Config.t) =
               (fun () ->
                 O1trace.thread "manage_verifier_subprocess" (fun () ->
                     let%bind verifier =
-                      Verifier.create ~logger:config.logger
+                      Verifier.create ~commit_id ~logger:config.logger
                         ~enable_internal_tracing:
                           (Internal_tracing.is_enabled ())
                         ~internal_trace_filename:"verifier-internal-trace.jsonl"
@@ -1606,9 +1572,9 @@ let create ?wallets (config : Config.t) =
                       ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
               (fun () ->
                 O1trace.thread "manage_vrf_evaluator_subprocess" (fun () ->
-                    Vrf_evaluator.create ~constraint_constants ~pids:config.pids
-                      ~logger:config.logger ~conf_dir:config.conf_dir
-                      ~consensus_constants
+                    Vrf_evaluator.create ~commit_id ~constraint_constants
+                      ~pids:config.pids ~logger:config.logger
+                      ~conf_dir:config.conf_dir ~consensus_constants
                       ~keypairs:config.block_production_keypairs ) )
             >>| Result.ok_exn
           in
@@ -1641,6 +1607,8 @@ let create ?wallets (config : Config.t) =
                     O1trace.thread "manage_uptime_snark_worker_subprocess"
                       (fun () ->
                         Uptime_service.Uptime_snark_worker.create
+                          ~constraint_constants:
+                            config.precomputed_values.constraint_constants
                           ~logger:config.logger ~pids:config.pids ) )
                 >>| Result.ok )
           in
@@ -1660,9 +1628,12 @@ let create ?wallets (config : Config.t) =
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
             Broadcast_pipe.create None
           in
+          let get_current_frontier () =
+            Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+          in
           Exit_handlers.register_async_shutdown_handler ~logger:config.logger
             ~description:"Close transition frontier, if exists" (fun () ->
-              match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
+              match get_current_frontier () with
               | None ->
                   Deferred.unit
               | Some frontier ->
@@ -1673,9 +1644,7 @@ let create ?wallets (config : Config.t) =
                 Deferred.return
                 @@
                 let open Option.Let_syntax in
-                let%bind frontier =
-                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                in
+                let%bind frontier = get_current_frontier () in
                 f ~frontier input )
           in
           (* knot-tying hacks so we can pass a get_node_status function before net, Mina_lib.t created *)
@@ -1717,9 +1686,7 @@ let create ?wallets (config : Config.t) =
                       let ( protocol_state_hash
                           , best_tip_opt
                           , k_block_hashes_and_timestamps ) =
-                        match
-                          Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                        with
+                        match get_current_frontier () with
                         | None ->
                             ( config.precomputed_values
                                 .protocol_state_with_hashes
@@ -1770,7 +1737,7 @@ let create ?wallets (config : Config.t) =
                         Trust_system.Peer_trust.peer_statuses
                           config.trust_system
                       in
-                      let git_commit = Mina_version.commit_id_short in
+                      let git_commit = commit_id_short in
                       let uptime_minutes =
                         let now = Time.now () in
                         let minutes_float =
@@ -1824,7 +1791,7 @@ let create ?wallets (config : Config.t) =
                     Mina_networking.peers net )
           in
           let slot_tx_end =
-            Runtime_config.slot_tx_end_or_default
+            Runtime_config.slot_tx_end
               config.Config.precomputed_values.runtime_config
           in
           let txn_pool_config =
@@ -1903,9 +1870,7 @@ let create ?wallets (config : Config.t) =
                         Deferred.return
                         @@
                         let open Option.Let_syntax in
-                        let%bind frontier =
-                          Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                        in
+                        let%bind frontier = get_current_frontier () in
                         let%map ( scan_state
                                 , expected_merkle_root
                                 , pending_coinbases
@@ -1988,10 +1953,7 @@ let create ?wallets (config : Config.t) =
                     O1trace.thread "handle_request_get_transition_knowledge"
                       (fun () ->
                         return
-                          ( match
-                              Broadcast_pipe.Reader.peek
-                                frontier_broadcast_pipe_r
-                            with
+                          ( match get_current_frontier () with
                           | None ->
                               []
                           | Some frontier ->
@@ -2042,11 +2004,14 @@ let create ?wallets (config : Config.t) =
                           User_command.Zkapp_command zkapp_command )
                     , result_cb ) )
           |> Deferred.don't_wait_for ;
-          let ((most_recent_valid_block_reader, _) as most_recent_valid_block) =
+          let most_recent_valid_block_reader, most_recent_valid_block_writer =
             Broadcast_pipe.create
               ( Mina_block.genesis ~precomputed_values:config.precomputed_values
               |> Validation.reset_frontier_dependencies_validation
               |> Validation.reset_staged_ledger_diff_validation )
+          in
+          let get_most_recent_valid_block () =
+            Broadcast_pipe.Reader.peek most_recent_valid_block_reader
           in
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
@@ -2057,10 +2022,11 @@ let create ?wallets (config : Config.t) =
               ~consensus_local_state:config.consensus_local_state
               ~persistent_root_location:config.persistent_root_location
               ~persistent_frontier_location:config.persistent_frontier_location
-              ~frontier_broadcast_pipe:
-                (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
-              ~catchup_mode ~network_transition_reader:block_reader
-              ~producer_transition_reader ~most_recent_valid_block
+              ~get_current_frontier
+              ~frontier_broadcast_writer:frontier_broadcast_pipe_w ~catchup_mode
+              ~network_transition_reader:block_reader
+              ~producer_transition_reader ~get_most_recent_valid_block
+              ~most_recent_valid_block_writer
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
               ~notify_online ()
@@ -2275,8 +2241,11 @@ let create ?wallets (config : Config.t) =
                 return None
           in
           let sync_status =
-            create_sync_status_observer ~logger:config.logger ~net
-              ~is_seed:config.is_seed ~demo_mode:config.demo_mode
+            create_sync_status_observer ~logger:config.logger
+              ~genesis_timestamp:
+                config.precomputed_values.genesis_constants.protocol
+                  .genesis_state_timestamp
+              ~net ~is_seed:config.is_seed ~demo_mode:config.demo_mode
               ~transition_frontier_and_catchup_signal_incr
               ~online_status_incr:(Var.watch @@ of_broadcast_pipe online_status)
               ~first_connection_incr:
@@ -2320,10 +2289,10 @@ let create ?wallets (config : Config.t) =
             ; sync_status
             ; precomputed_block_writer
             ; block_production_status = ref `Free
-            ; in_memory_reverse_structured_log_messages_for_integration_test =
-                ref (0, [], false)
+            ; in_memory_reverse_structured_log_messages_for_integration_test
             ; vrf_evaluation_state =
                 Block_producer.Vrf_evaluation_state.create ()
+            ; commit_id
             } ) )
 
 let net { components = { net; _ }; _ } = net
@@ -2332,30 +2301,14 @@ let runtime_config { config = { precomputed_values; _ }; _ } =
   Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values
 
 let start_filtered_log
-    ({ in_memory_reverse_structured_log_messages_for_integration_test; _ } : t)
-    (structured_log_ids : string list) =
-  let handle str =
-    let idx, old_messages, started =
-      !in_memory_reverse_structured_log_messages_for_integration_test
-    in
-    in_memory_reverse_structured_log_messages_for_integration_test :=
-      (idx + 1, str :: old_messages, started)
-  in
-  let _, _, started =
-    !in_memory_reverse_structured_log_messages_for_integration_test
-  in
-  if started then Or_error.error_string "Already initialized"
-  else (
-    in_memory_reverse_structured_log_messages_for_integration_test :=
-      (0, [], true) ;
-    let event_set =
-      Structured_log_events.Set.of_list
-      @@ List.map ~f:Structured_log_events.id_of_string structured_log_ids
-    in
-    Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
-      ~processor:(Logger.Processor.raw_structured_log_events event_set)
-      ~transport:(Logger.Transport.raw handle) ;
-    Ok () )
+    ({ in_memory_reverse_structured_log_messages_for_integration_test
+     ; commit_id
+     ; _
+     } :
+      t ) (structured_log_ids : string list) =
+  start_filtered_log ~commit_id
+    in_memory_reverse_structured_log_messages_for_integration_test
+    structured_log_ids
 
 let get_filtered_log_entries
     ({ in_memory_reverse_structured_log_messages_for_integration_test; _ } : t)

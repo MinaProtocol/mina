@@ -68,6 +68,7 @@ type t =
   ; snark_worker_fee : string
   ; num_archive_nodes : int
   ; log_precomputed_blocks : bool
+  ; start_filtered_logs : string list
         (* ; num_plain_nodes : int  *)
         (* blockchain constants *)
   ; proof_config : Runtime_config.Proof_keys.t
@@ -79,6 +80,7 @@ type t =
   ; txpool_max_size : int
   ; slot_tx_end : int option
   ; slot_chain_end : int option
+  ; network_id : string option
   }
 
 let proof_config_default : Runtime_config.Proof_keys.t =
@@ -94,6 +96,19 @@ let proof_config_default : Runtime_config.Proof_keys.t =
   ; fork = None
   }
 
+let log_filter_of_event_type ev_existential =
+  let open Event_type in
+  let (Event_type ev_type) = ev_existential in
+  let (module Ty) = event_type_module ev_type in
+  match Ty.parse with
+  | From_error_log _ ->
+      [] (* TODO: Do we need this? *)
+  | From_daemon_log (struct_id, _) ->
+      [ Structured_log_events.string_of_id struct_id ]
+  | From_puppeteer_log _ ->
+      []
+(* TODO: Do we need this? *)
+
 let default =
   { requires_graphql =
       true
@@ -105,6 +120,8 @@ let default =
   ; snark_worker_fee = "0.025"
   ; num_archive_nodes = 0
   ; log_precomputed_blocks = false (* ; num_plain_nodes = 0 *)
+  ; start_filtered_logs =
+      List.bind ~f:log_filter_of_event_type Event_type.all_event_types
   ; proof_config = proof_config_default
   ; k = 20
   ; slots_per_epoch = 3 * 8 * 20
@@ -114,12 +131,14 @@ let default =
   ; txpool_max_size = 3000
   ; slot_tx_end = None
   ; slot_chain_end = None
+  ; network_id = None
   }
 
 let transaction_capacity_log_2 (config : t) =
   match config.proof_config.transaction_capacity with
   | None ->
-      Genesis_constants.Constraint_constants.compiled.transaction_capacity_log_2
+      Genesis_constants_compiled.Constraint_constants.t
+        .transaction_capacity_log_2
   | Some (Log_2 i) ->
       i
   | Some (Txns_per_second_x10 tps_goal_x10) ->
@@ -127,7 +146,7 @@ let transaction_capacity_log_2 (config : t) =
       let block_window_duration_ms =
         Option.value
           ~default:
-            Genesis_constants.Constraint_constants.compiled
+            Genesis_constants_compiled.Constraint_constants.t
               .block_window_duration_ms
           config.proof_config.block_window_duration_ms
       in
@@ -153,7 +172,7 @@ let transaction_capacity config =
 let blocks_for_first_ledger_proof (config : t) =
   let work_delay =
     Option.value
-      ~default:Genesis_constants.Constraint_constants.compiled.work_delay
+      ~default:Genesis_constants_compiled.Constraint_constants.t.work_delay
       config.proof_config.work_delay
   in
   let transaction_capacity_log_2 = transaction_capacity_log_2 config in

@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params.Tick
 module T = Mina_numbers.Length
@@ -104,8 +102,6 @@ let to_input
      ; Block_time.to_input genesis_state_timestamp
     |]
 
-[%%if defined consensus_mechanism]
-
 type var = (T.Checked.t, T.Checked.t, Block_time.Checked.t) Poly.t
 
 let typ =
@@ -147,7 +143,7 @@ let var_to_input
     |]
 
 let%test_unit "value = var" =
-  let compiled = Genesis_constants.for_unit_tests.protocol in
+  let compiled = Genesis_constants.For_unit_tests.t.protocol in
   let test protocol_constants =
     let open Snarky_backendless in
     let p_var =
@@ -162,5 +158,3 @@ let%test_unit "value = var" =
   Quickcheck.test ~trials:100 Value.gen
     ~examples:[ value_of_t compiled ]
     ~f:test
-
-[%%endif]

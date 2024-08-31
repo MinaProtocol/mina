@@ -1,4 +1,4 @@
-(* archive_blocks.ml -- archive precomputed or extensional blocks to Postgresql *)
+(* archive_blocks.ml *)
 
 open Core_kernel
 open Async
@@ -59,9 +59,10 @@ let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
         in
         make_add_block of_yojson
           (Processor.add_block_aux_precomputed
+             ~genesis_constants:Genesis_constants_compiled.t
              ~constraint_constants:
-               Genesis_constants.Constraint_constants.compiled ~pool
-             ~delete_older_than:None ~logger )
+               Genesis_constants_compiled.Constraint_constants.t ~logger ~pool
+             ~delete_older_than:None )
       in
       let add_extensional_block =
         (* allow use of older-versioned blocks *)
@@ -75,7 +76,8 @@ let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
               Error (Error.to_string_hum err)
         in
         make_add_block of_yojson
-          (Processor.add_block_aux_extensional ~logger ~pool
+          (Processor.add_block_aux_extensional
+             ~genesis_constants:Genesis_constants_compiled.t ~logger ~pool
              ~delete_older_than:None )
       in
       Deferred.List.iter files ~f:(fun file ->

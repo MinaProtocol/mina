@@ -591,7 +591,7 @@ let%test_module "random set test" =
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            () )
+            ~commit_id:"not specified for unit tests" () )
 
     module Mock_snark_pool =
       Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
@@ -675,7 +675,7 @@ let%test_module "random set test" =
               , One_or_two.map work ~f:(fun statement ->
                     Ledger_proof.create ~statement
                       ~sok_digest:invalid_sok_digest
-                      ~proof:Proof.transaction_dummy )
+                      ~proof:(Lazy.force Proof.transaction_dummy) )
               , fee
               , some_other_pk )
               :: acc )

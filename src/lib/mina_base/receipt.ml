@@ -1,7 +1,5 @@
 (* receipt.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 module B58_lib = Base58_check
 open Snark_params.Tick
@@ -75,8 +73,6 @@ module Chain_hash = struct
     |> hash ~init:Hash_prefix.receipt_chain_zkapp_command
     |> of_hash
 
-  [%%if defined consensus_mechanism]
-
   module Checked = struct
     module Signed_command_elt = struct
       type t = Signed_command_payload of Transaction_union_payload.var
@@ -127,6 +123,4 @@ module Chain_hash = struct
                  append index_input (append x (field (var_to_hash_packed t)))) )
           |> var_of_hash_packed )
   end
-
-  [%%endif]
 end

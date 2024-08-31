@@ -57,7 +57,8 @@ module Ledger_inner = struct
 
         let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
-        let empty_account = Ledger_hash.of_digest Account.empty_digest
+        let empty_account =
+          Ledger_hash.of_digest (Lazy.force Account.empty_digest)
       end
     end]
   end
@@ -72,11 +73,11 @@ module Ledger_inner = struct
 
         let identifier = Account.identifier
 
-        let balance Account.Poly.{ balance; _ } = balance
+        let balance Account.{ balance; _ } = balance
 
         let empty = Account.empty
 
-        let token = Account.Poly.token_id
+        let token = Account.token_id
       end
     end]
 
@@ -105,7 +106,7 @@ module Ledger_inner = struct
   end
 
   module Db :
-    Merkle_ledger.Database_intf.S
+    Merkle_ledger.Intf.Ledger.DATABASE
       with module Location = Location_at_depth
       with module Addr = Location_at_depth.Addr
       with type root_hash := Ledger_hash.t
@@ -121,7 +122,7 @@ module Ledger_inner = struct
   module Null = Null_ledger.Make (Inputs)
 
   module Any_ledger :
-    Merkle_ledger.Any_ledger.S
+    Merkle_ledger.Intf.Ledger.ANY
       with module Location = Location_at_depth
       with type account := Account.t
        and type key := Public_key.Compressed.t
@@ -458,7 +459,7 @@ let%test_unit "tokens test" =
   let open Mina_transaction_logic.For_tests in
   let open Zkapp_command_builder in
   let constraint_constants =
-    Genesis_constants.Constraint_constants.for_unit_tests
+    Genesis_constants.For_unit_tests.Constraint_constants.t
   in
   let keypair_and_amounts = Quickcheck.random_value (Init_ledger.gen ()) in
   let ledger_get_exn ledger pk token =
@@ -643,7 +644,7 @@ let%test_unit "zkapp_command payment test" =
   let open Mina_transaction_logic.For_tests in
   let module L = Ledger_inner in
   let constraint_constants =
-    { Genesis_constants.Constraint_constants.for_unit_tests with
+    { Genesis_constants.For_unit_tests.Constraint_constants.t with
       account_creation_fee = Currency.Fee.of_nanomina_int_exn 1
     }
   in
@@ -703,7 +704,7 @@ let%test_unit "user_command application on masked ledger" =
   let open Mina_transaction_logic.For_tests in
   let module L = Ledger_inner in
   let constraint_constants =
-    { Genesis_constants.Constraint_constants.for_unit_tests with
+    { Genesis_constants.For_unit_tests.Constraint_constants.t with
       account_creation_fee = Currency.Fee.of_nanomina_int_exn 1
     }
   in
@@ -732,7 +733,7 @@ let%test_unit "zkapp_command application on masked ledger" =
   let open Mina_transaction_logic.For_tests in
   let module L = Ledger_inner in
   let constraint_constants =
-    { Genesis_constants.Constraint_constants.for_unit_tests with
+    { Genesis_constants.For_unit_tests.Constraint_constants.t with
       account_creation_fee = Currency.Fee.of_nanomina_int_exn 1
     }
   in

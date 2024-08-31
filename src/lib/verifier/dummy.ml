@@ -8,7 +8,7 @@ type t =
   ; verify_blockchain_snarks :
          Blockchain_snark.Blockchain.t list
       -> unit Or_error.t Or_error.t Deferred.t
-  ; verification_key : Pickles.Verification_key.t Lazy.t
+  ; verification_key : Pickles.Verification_key.t Deferred.t Lazy.t
   ; verify_transaction_snarks :
          (Ledger_proof.Prod.t * Mina_base.Sok_message.t) list
       -> unit Or_error.t Or_error.t Deferred.t
@@ -21,7 +21,7 @@ let invalid_to_error = Common.invalid_to_error
 type ledger_proof = Ledger_proof.t
 
 let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
-    ~proof_level ~constraint_constants ~pids:_ ~conf_dir:_ () =
+    ~proof_level ~constraint_constants ~pids:_ ~conf_dir:_ ~commit_id:_ () =
   let module T = Transaction_snark.Make (struct
     let constraint_constants = constraint_constants
 
@@ -163,7 +163,7 @@ let verify_transaction_snarks { verify_transaction_snarks; _ } ts =
 
 let get_blockchain_verification_key { verification_key; _ } =
   Deferred.Or_error.try_with ~here:[%here] (fun () ->
-      Deferred.return @@ Lazy.force verification_key )
+      Lazy.force verification_key )
 
 let toggle_internal_tracing _ _ = Deferred.Or_error.ok_unit
 

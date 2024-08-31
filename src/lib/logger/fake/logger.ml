@@ -32,6 +32,8 @@ module Time = struct
 
   let of_yojson _ = not_implemented ()
 
+  let pp _ _ = not_implemented ()
+
   let set_pretty_to_string _ = not_implemented ()
 
   let pretty_to_string _ = not_implemented ()
@@ -125,7 +127,7 @@ end
 module Consumer_registry = struct
   type id = string
 
-  let register ~id:_ ~processor:_ ~transport:_ = not_implemented ()
+  let register ?commit_id:_ ~id:_ ~processor:_ ~transport:_ = not_implemented
 end
 
 [%%versioned

@@ -42,10 +42,10 @@
    mina_ledger
    transaction_snark_work
    error_json
-   mina_compile_config
+   mina_node_config.unconfigurable_constants
    mina_state
    transaction_protocol_state
-   ppx_version_runtime
+   ppx_version.runtime
  )
  (preprocess
   (pps

@@ -31,6 +31,8 @@ module Time : sig
 
   val of_yojson : Yojson.Safe.t -> (t, string) Result.t
 
+  val pp : Format.formatter -> t -> unit
+
   val pretty_to_string : t -> string
 
   val set_pretty_to_string : (t -> string) -> unit
@@ -120,7 +122,13 @@ end
 module Consumer_registry : sig
   type id = string
 
-  val register : id:id -> processor:Processor.t -> transport:Transport.t -> unit
+  val register :
+       ?commit_id:string
+    -> id:id
+    -> processor:Processor.t
+    -> transport:Transport.t
+    -> unit
+    -> unit
 end
 
 type 'a log_function =

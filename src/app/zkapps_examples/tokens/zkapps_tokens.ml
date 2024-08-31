@@ -632,9 +632,6 @@ module Transfer_recursive = struct
          ~branches:(module Nat.N1)
          ~max_proofs_verified:(module Nat.N2)
          ~name:"transfer recurse"
-         ~constraint_constants:
-           Genesis_constants.Constraint_constants.(
-             to_snark_keys_header compiled)
          ~choices:(fun ~self -> [ Rules.Transfer.Recursive.rule self ]) )
 
   let tag = Lazy.map lazy_compiled ~f:(fun (tag, _, _, _) -> tag)
@@ -664,8 +661,6 @@ let lazy_compiled =
        ~branches:(module Nat.N3)
        ~max_proofs_verified:(module Nat.N2)
        ~name:"tokens"
-       ~constraint_constants:
-         Genesis_constants.Constraint_constants.(to_snark_keys_header compiled)
        ~choices:(fun ~self:_ ->
          [ Rules.Initialize_state.rule
          ; Rules.Mint.rule
@@ -691,7 +686,11 @@ module P = struct
   let verification_key =
     Lazy.bind p_module ~f:(fun (module P : Proof_intf) -> P.verification_key)
 
+  let verification_key_promise = lazy (failwith "not implemented")
+
   let id = Lazy.bind p_module ~f:(fun (module P : Proof_intf) -> P.id)
+
+  let id_promise = lazy (failwith "not implemented")
 
   let verify statements =
     let module P : Proof_intf = (val Lazy.force p_module) in

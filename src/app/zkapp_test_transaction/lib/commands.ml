@@ -3,9 +3,9 @@ open Async
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 
-let constraint_constants = Genesis_constants.Constraint_constants.compiled
+let constraint_constants = Genesis_constants_compiled.Constraint_constants.t
 
-let proof_level = Genesis_constants.Proof_level.Full
+let proof_level = Genesis_constants_compiled.Proof_level.Full
 
 let underToCamel s = String.lowercase s |> Mina_graphql.Reflection.underToCamel
 
@@ -59,9 +59,11 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
       (Account.create id Currency.Balance.(of_mina_int_exn 1_000))
     |> Or_error.ok_exn
   in
-  let _v =
-    Option.value_map zkapp_account ~default:() ~f:(fun pk ->
+  let open Async.Deferred.Let_syntax in
+  let%bind () =
+    Option.value_map zkapp_account ~default:(Deferred.return ()) ~f:(fun pk ->
         let `VK vk, `Prover _ = Lazy.force vk_and_prover in
+        let%map vk = vk in
         let id = Account_id.create pk Token_id.default in
         Ledger.get_or_create_account ledger id
           { (Account.create id Currency.Balance.(of_mina_int_exn 1_000)) with
@@ -79,7 +81,7 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
   in
   let consensus_constants =
     Consensus.Constants.create ~constraint_constants
-      ~protocol_constants:Genesis_constants.compiled.protocol
+      ~protocol_constants:Genesis_constants_compiled.t.protocol
   in
   let state_body =
     let compile_time_genesis =
@@ -122,7 +124,6 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
         , zkapp_command )
       ]
   in
-  let open Async.Deferred.Let_syntax in
   let module T = Transaction_snark.Make (struct
     let constraint_constants = constraint_constants
 
@@ -159,7 +160,7 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   in
   let consensus_constants =
     Consensus.Constants.create ~constraint_constants
-      ~protocol_constants:Genesis_constants.compiled.protocol
+      ~protocol_constants:Genesis_constants_compiled.t.protocol
   in
   let open Staged_ledger_diff in
   let compile_time_genesis =
@@ -368,7 +369,7 @@ let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
     ; authorization_kind = Signature
     }
   in
-  let zkapp_command =
+  let%bind zkapp_command =
     Transaction_snark.For_tests.deploy_snapp
       ~permissions:Permissions.user_default ~constraint_constants spec
   in
@@ -452,7 +453,11 @@ let transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer ~fee_payer_nonce
     ; preconditions = None
     }
   in
-  let zkapp_command = Transaction_snark.For_tests.multiple_transfers spec in
+  let zkapp_command =
+    Transaction_snark.For_tests.multiple_transfers
+      ~constraint_constants:
+        Genesis_constants.For_unit_tests.Constraint_constants.t spec
+  in
   let%map () =
     if debug then gen_proof zkapp_command ~zkapp_account:None else return ()
   in
@@ -777,7 +782,10 @@ let%test_module "ZkApps test transaction" =
 
     let%test_unit "zkapps transaction graphql round trip" =
       Quickcheck.test ~trials:20
-        (Mina_generators.User_command_generators.zkapp_command_with_ledger ())
+        (Mina_generators.User_command_generators.zkapp_command_with_ledger
+           ~genesis_constants:Genesis_constants.For_unit_tests.t
+           ~constraint_constants:
+             Genesis_constants.For_unit_tests.Constraint_constants.t () )
         ~f:(fun (user_cmd, _, _, _) ->
           match user_cmd with
           | Zkapp_command p ->

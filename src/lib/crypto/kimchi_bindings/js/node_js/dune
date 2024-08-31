@@ -18,6 +18,8 @@
   plonk_wasm.js
   flags.sexp)
  (deps
+  build.sh
+  ../../dune-build-root
   ../../wasm/Cargo.toml
   ../../wasm/Cargo.lock
   (source_tree ../../wasm/src)
@@ -29,6 +31,6 @@
    (run chmod -R +w ../../wasm .)
    (setenv
     CARGO_TARGET_DIR
-    "%{read:../../../kimchi_bindings/stubs/dune-build-root}/cargo_kimchi_wasm"
-    (run ./build.sh))
+    "%{read:../../dune-build-root}/cargo_kimchi_wasm"
+    (run bash build.sh))
    (write-file flags.sexp "()"))))

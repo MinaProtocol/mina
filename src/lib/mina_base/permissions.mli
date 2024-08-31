@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params.Tick
 
@@ -29,8 +27,6 @@ module Auth_required : sig
 
   val verification_key_perm_fallback_to_signature_with_older_version : t -> t
 
-  [%%ifdef consensus_mechanism]
-
   module Checked : sig
     type t
 
@@ -51,8 +47,6 @@ module Auth_required : sig
   end
 
   val typ : (Checked.t, t) Typ.t
-
-  [%%endif]
 end
 
 module Poly : sig
@@ -100,8 +94,6 @@ val gen : auth_tag:Control.Tag.t -> t Core_kernel.Quickcheck.Generator.t
 
 val to_input : t -> Field.t Random_oracle_input.Chunked.t
 
-[%%ifdef consensus_mechanism]
-
 module Checked : sig
   type t =
     ( Auth_required.Checked.t
@@ -116,8 +108,6 @@ module Checked : sig
 end
 
 val typ : (Checked.t, t) Typ.t
-
-[%%endif]
 
 val user_default : t
 

@@ -142,6 +142,11 @@ impl<'s> ser::Serializer for &'s Serializer {
     type SerializeStruct = ArraySerializer<'s>;
     type SerializeStructVariant = ErrorSerializer;
 
+    #[inline]
+    fn is_human_readable(&self) -> bool {
+        false
+    }
+
     fn serialize_bool(self, v: bool) -> Result {
         if v {
             self.0.serialize_u32(1)

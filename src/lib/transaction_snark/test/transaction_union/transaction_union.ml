@@ -144,7 +144,7 @@ let%test_module "Transaction union tests" =
           in
           let supply_increase =
             Mina_ledger.Ledger.Transaction_applied.supply_increase
-              applied_transaction
+              ~constraint_constants applied_transaction
             |> Or_error.ok_exn
           in
           Transaction_snark.check_transaction txn_in_block
@@ -2041,6 +2041,8 @@ let%test_module "legacy transactions using zkApp accounts" =
     let memo = Signed_command_memo.create_from_string_exn "zkApp-legacy-txns"
 
     let `VK vk, `Prover _zkapp_prover = Lazy.force U.trivial_zkapp
+
+    let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
 
     let account ledger pk =
       let location =

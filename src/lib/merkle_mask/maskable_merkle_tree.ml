@@ -47,7 +47,7 @@ module Make (Inputs : Inputs_intf) = struct
       Visualization.display_prefix_of_string @@ Uuid.to_string
       @@ Mask.Attached.get_uuid mask
 
-    let name mask = sprintf !"\"%s \"" (format_uuid mask)
+    let name mask = sprintf !"%S" (format_uuid mask)
 
     let display_attached_mask mask =
       let root_hash = Mask.Attached.merkle_root mask in
@@ -107,40 +107,6 @@ module Make (Inputs : Inputs_intf) = struct
       Out_channel.with_file filename ~f:(fun output_channel ->
           let graph = to_graph () in
           Graphviz.output_graph output_channel graph )
-  end
-
-  module Visualize = struct
-    module Summary = struct
-      type t = [ `Uuid of Uuid.t ] * [ `Hash of Hash.t ] [@@deriving sexp_of]
-    end
-
-    type t = Leaf of Summary.t | Node of Summary.t * t list
-    [@@deriving sexp_of]
-
-    module type Crawler_intf = sig
-      type t
-
-      val get_uuid : t -> Uuid.t
-
-      val merkle_root : t -> Hash.t
-    end
-
-    let rec _crawl : type a. (module Crawler_intf with type t = a) -> a -> t =
-     fun (module C) c ->
-      let summary =
-        let uuid = C.get_uuid c in
-        ( `Uuid uuid
-        , `Hash
-            ( try C.merkle_root c
-              with _ ->
-                Core.printf !"CAUGHT %{sexp: Uuid.t}\n%!" uuid ;
-                Hash.empty_account ) )
-      in
-      match Uuid.Table.find registered_masks (C.get_uuid c) with
-      | None ->
-          Leaf summary
-      | Some masks ->
-          Node (summary, List.map masks ~f:(_crawl (module Mask.Attached)))
   end
 
   let unsafe_preload_accounts_from_parent =
@@ -278,8 +244,8 @@ module Make (Inputs : Inputs_intf) = struct
               List.iter accounts ~f:(fun account ->
                   Mask.Attached.parent_set_notify mask account ) ) )
 
-  let set_batch t locations_and_accounts =
-    Base.set_batch t locations_and_accounts ;
+  let set_batch ?hash_cache t locations_and_accounts =
+    Base.set_batch ?hash_cache t locations_and_accounts ;
     batch_notify_mask_children t (List.map locations_and_accounts ~f:snd)
 
   let set_batch_accounts t addresses_and_accounts =

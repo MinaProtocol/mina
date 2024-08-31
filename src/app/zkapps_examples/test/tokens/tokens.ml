@@ -14,7 +14,7 @@ let gen_keys () =
   (Public_key.compress kp.public_key, kp.private_key)
 
 let fee_to_create n =
-  Genesis_constants.Constraint_constants.compiled.account_creation_fee
+  Genesis_constants_compiled.Constraint_constants.t.account_creation_fee
   |> Currency.Amount.of_fee
   |> (fun x -> Currency.Amount.scale x n)
   |> Option.value_exn
@@ -42,7 +42,9 @@ let%test_module "Tokens test" =
 
     let owned_token_id = Account_id.derive_token_id ~owner:account_id
 
-    let vk = Lazy.force Zkapps_tokens.vk
+    let vk =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Lazy.force Zkapps_tokens.vk )
 
     let mint_to_keys = gen_keys ()
 

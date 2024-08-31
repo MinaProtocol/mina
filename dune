@@ -1,4 +1,8 @@
 (rule
- (targets graphql_schema.json)
+ (target graphql_schema.json)
  (mode promote)
- (action (with-stdout-to graphql_schema.json (run %{exe:src/app/graphql_schema_dump/graphql_schema_dump.exe}))))
+ (deps
+  (:< src/app/graphql_schema_dump/graphql_schema_dump.exe))
+ (action (with-stdout-to %{target} (run %{<}))))
+
+(dirs :standard \ opam_switches)

@@ -514,7 +514,14 @@ let send_payment_graphql =
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
   let args =
-    Args.zip3 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
+    Args.zip3
+      (Cli_lib.Flag.signed_command_common
+         ~minimum_user_command_fee:
+           Genesis_constants_compiled.t.minimum_user_command_fee
+         ~default_transaction_fee:
+           (Currency.Fee.of_mina_string_exn
+              Mina_compile_config.default_transaction_fee_string ) )
+      receiver_flag amount_flag
   in
   Command.async ~summary:"Send payment to an address"
     (Cli_lib.Background_daemon.graphql_init args
@@ -542,7 +549,16 @@ let delegate_stake_graphql =
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
-  let args = Args.zip2 Cli_lib.Flag.signed_command_common receiver_flag in
+  let args =
+    Args.zip2
+      (Cli_lib.Flag.signed_command_common
+         ~minimum_user_command_fee:
+           Genesis_constants_compiled.t.minimum_user_command_fee
+         ~default_transaction_fee:
+           (Currency.Fee.of_mina_string_exn
+              Mina_compile_config.default_transaction_fee_string ) )
+      receiver_flag
+  in
   Command.async ~summary:"Delegate your stake to another public key"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun
@@ -808,7 +824,7 @@ let hash_ledger =
      fun () ->
        let process_accounts accounts =
          let constraint_constants =
-           Genesis_constants.Constraint_constants.compiled
+           Genesis_constants_compiled.Constraint_constants.t
          in
          let packed_ledger =
            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
@@ -864,7 +880,7 @@ let currency_in_ledger =
            Token_id.Table.create ()
          in
          List.iter accounts ~f:(fun (acct : Account.t) ->
-             let token_id = Account.token acct in
+             let token_id = Account.token_id acct in
              let balance = acct.balance |> Currency.Balance.to_uint64 in
              match Token_id.Table.find currency_tbl token_id with
              | None ->
@@ -911,9 +927,9 @@ let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
     (Command.Param.return (fun () ->
          (* TODO: Allow these to be configurable. *)
-         let proof_level = Genesis_constants.Proof_level.compiled in
+         let proof_level = Genesis_constants_compiled.Proof_level.t in
          let constraint_constants =
-           Genesis_constants.Constraint_constants.compiled
+           Genesis_constants_compiled.Constraint_constants.t
          in
          let all =
            Transaction_snark.constraint_system_digests ~constraint_constants ()
@@ -1034,13 +1050,13 @@ let pending_snark_work =
                  (Array.map
                     ~f:(fun bundle ->
                       Array.map bundle.workBundle ~f:(fun w ->
-                          let f = w.fee_excess in
+                          let fee_excess_left = w.fee_excess.feeExcessLeft in
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id = w.work_id
                           ; fee_excess =
                               Currency.Amount.Signed.of_fee
-                                (to_signed_fee_exn f.sign
-                                   (Currency.Amount.to_fee f.fee_magnitude) )
+                                (to_signed_fee_exn fee_excess_left.sign
+                                   fee_excess_left.feeMagnitude )
                           ; supply_increase = w.supply_increase
                           ; source_first_pass_ledger_hash =
                               w.source_first_pass_ledger_hash
@@ -1512,7 +1528,7 @@ let create_account =
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
-             response.createAccount.public_key
+             response.createAccount.account.public_key
          in
          printf "\n😄 Added new account!\nPublic key: %s\n" pk_string ) )
 
@@ -1529,7 +1545,7 @@ let create_hd_account =
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
-             response.createHDAccount.public_key
+             response.createHDAccount.account.public_key
          in
          printf "\n😄 created HD account with HD-index %s!\nPublic key: %s\n"
            (Mina_numbers.Hd_index.to_string hd_index)
@@ -1563,7 +1579,7 @@ let unlock_account =
              in
              let pk_string =
                Public_key.Compressed.to_base58_check
-                 response.unlockAccount.public_key
+                 response.unlockAccount.account.public_key
              in
              printf "\n🔓 Unlocked account!\nPublic key: %s\n" pk_string
          | Error e ->
@@ -1797,11 +1813,14 @@ let compile_time_constants =
          let open Async in
          let%map ({ consensus_constants; _ } as precomputed_values), _ =
            config_file |> Genesis_ledger_helper.load_config_json >>| Or_error.ok
-           >>| Option.value ~default:(`Assoc [])
+           >>| Option.value
+                 ~default:
+                   (`Assoc [ ("ledger", `Assoc [ ("accounts", `List []) ]) ])
            >>| Runtime_config.of_yojson >>| Result.ok
            >>| Option.value ~default:Runtime_config.default
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_dir
                  ~logger:(Logger.null ()) ~proof_level:None
+                 ~compiled:(module Genesis_constants_compiled)
            >>| Or_error.ok_exn
          in
          let all_constants =
@@ -2249,6 +2268,55 @@ let signature_kind =
        in
        Core.print_endline signature_kind_string )
 
+let test_ledger_application =
+  Command.async ~summary:"Test ledger application"
+    (let%map_open.Command privkey_path = Cli_lib.Flag.privkey_read_path
+     and prev_block_path =
+       flag "--prev-block-path" ~doc:"FILE file with serialized block"
+         (optional string)
+     and ledger_path =
+       flag "--ledger-path" ~doc:"FILE directory with ledger DB"
+         (required string)
+     and num_txs =
+       flag "--num-txs"
+         ~doc:"NN Number of transactions to create after preparatory rounds"
+         (required int)
+     and num_txs_per_round =
+       flag "--num-txs-per-round"
+         ~doc:
+           "NN Number of transactions to create per preparatory round \
+            (default: 3)"
+         (optional int)
+     and rounds =
+       flag "--rounds" ~doc:"NN Number of preparatory rounds (default: 580)"
+         (optional int)
+     and first_partition_slots =
+       flag "--first-partition-slots"
+         ~doc:
+           "NN Number of slots in first partition of scan state (default: 128)"
+         (optional int)
+     and max_depth =
+       flag "--max-depth" ~doc:"NN Maximum depth of masks (default: 290)"
+         (optional int)
+     and no_new_stack =
+       flag "--old-stack" ~doc:"Use is_new_stack: false (scan state)" no_arg
+     and has_second_partition =
+       flag "--has-second-partition"
+         ~doc:"Assume there is a second partition (scan state)" no_arg
+     and tracing = flag "--tracing" ~doc:"Wrap test into tracing" no_arg
+     and no_masks = flag "--no-masks" ~doc:"Do not create masks" no_arg in
+     Cli_lib.Exceptions.handle_nicely
+     @@ fun () ->
+     let first_partition_slots =
+       Option.value ~default:128 first_partition_slots
+     in
+     let num_txs_per_round = Option.value ~default:3 num_txs_per_round in
+     let rounds = Option.value ~default:580 rounds in
+     let max_depth = Option.value ~default:290 max_depth in
+     Test_ledger_application.test ~privkey_path ~ledger_path ?prev_block_path
+       ~first_partition_slots ~no_new_stack ~has_second_partition
+       ~num_txs_per_round ~rounds ~no_masks ~max_depth ~tracing num_txs )
+
 let itn_create_accounts =
   Command.async ~summary:"Fund new accounts for incentivized testnet"
     (let open Command.Param in
@@ -2394,7 +2462,10 @@ let advanced =
     ; ("set-coinbase-receiver", set_coinbase_receiver_graphql)
     ; ("chain-id-inputs", chain_id_inputs)
     ; ("runtime-config", runtime_config)
-    ; ("vrf", Cli_lib.Commands.Vrf.command_group)
+    ; ( "vrf"
+      , Cli_lib.Commands.Vrf.command_group
+          ~constraint_constants:
+            Genesis_constants_compiled.Constraint_constants.t )
     ; ("thread-graph", thread_graph)
     ; ("print-signature-kind", signature_kind)
     ]
@@ -2411,6 +2482,7 @@ let ledger =
     [ ("export", export_ledger)
     ; ("hash", hash_ledger)
     ; ("currency", currency_in_ledger)
+    ; ("test-apply", test_ledger_application)
     ]
 
 let libp2p =

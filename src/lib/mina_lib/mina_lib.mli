@@ -28,6 +28,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val commit_id : string
 end
 
 exception Snark_worker_error of int
@@ -41,6 +43,8 @@ exception Bootstrap_stuck_shutdown
 val time_controller : t -> Block_time.Controller.t
 
 val subscription : t -> Mina_subscriptions.t
+
+val commit_id : t -> string
 
 val daemon_start_time : Time_ns.t
 
@@ -155,20 +159,6 @@ val client_port : t -> int
 
 val validated_transitions : t -> Mina_block.Validated.t Strict_pipe.Reader.t
 
-module Root_diff : sig
-  [%%versioned:
-  module Stable : sig
-    module V2 : sig
-      type t =
-        { commands : User_command.Stable.V2.t With_status.Stable.V2.t list
-        ; root_length : int
-        }
-    end
-  end]
-end
-
-val root_diff : t -> Root_diff.t Strict_pipe.Reader.t
-
 val initialization_finish_signal : t -> unit Ivar.t
 
 val dump_tf : t -> string Or_error.t
@@ -189,7 +179,8 @@ val start_with_precomputed_blocks :
 
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
-val create : ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
+val create :
+  commit_id:string -> ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
 
 val staged_ledger_ledger_proof : t -> Ledger_proof.t option
 

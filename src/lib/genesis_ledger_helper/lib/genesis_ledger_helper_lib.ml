@@ -589,6 +589,9 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
   ; zkapp_cmd_limit_hardcap =
       Option.value ~default:default.zkapp_cmd_limit_hardcap
         (config.daemon >>= fun cfg -> cfg.zkapp_cmd_limit_hardcap)
+  ; minimum_user_command_fee =
+      Option.value ~default:default.minimum_user_command_fee
+        (config.daemon >>= fun cfg -> cfg.minimum_user_command_fee)
   }
 
 let runtime_config_of_genesis_constants (genesis_constants : Genesis_constants.t)
@@ -634,6 +637,9 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
               Some precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap
           ; slot_tx_end = None
           ; slot_chain_end = None
+          ; minimum_user_command_fee =
+              Some precomputed_values.genesis_constants.minimum_user_command_fee
+          ; network_id = None
           }
     ; genesis =
         Some

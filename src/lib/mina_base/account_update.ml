@@ -1,14 +1,6 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base_util
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%endif]
-
 open Signature_lib
 module Impl = Pickles.Impls.Step
 open Mina_numbers
@@ -20,6 +12,10 @@ module type Type = sig
   type t
 end
 
+module Events = Zkapp_account.Events
+module Actions = Zkapp_account.Actions
+module Zkapp_uri = Zkapp_account.Zkapp_uri
+
 module Authorization_kind = struct
   [%%versioned
   module Stable = struct
@@ -28,19 +24,7 @@ module Authorization_kind = struct
       type t =
             Mina_wire_types.Mina_base.Account_update.Authorization_kind.V1.t =
         | Signature
-        | Proof of
-            (Field.t
-            [@version_asserted]
-            [@to_yojson fun t -> `String (Snark_params.Tick.Field.to_string t)]
-            [@of_yojson
-              function
-              | `String s ->
-                  let field = Snark_params.Tick.Field.of_string s in
-                  let s' = Snark_params.Tick.Field.to_string field in
-                  if String.equal s s' then Ok field
-                  else Error "Invalid JSON for field"
-              | _ ->
-                  Error "expected JSON string"] )
+        | Proof of (Field.t[@version_asserted])
         | None_given
       [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -62,8 +46,6 @@ module Authorization_kind = struct
         (Random_oracle_input.Chunked.packeds
            [| (f is_signed, 1); (f is_proved, 1) |] )
         (Random_oracle_input.Chunked.field verification_key_hash)
-
-    [%%ifdef consensus_mechanism]
 
     module Checked = struct
       type t =
@@ -96,8 +78,6 @@ module Authorization_kind = struct
       Fields.make_creator obj ~is_signed:!.bool ~is_proved:!.bool
         ~verification_key_hash:!.verification_key_hash
       |> finish "AuthorizationKindStructured" ~t_toplevel_annots
-
-    [%%endif]
   end
 
   let to_control_tag : t -> Control.Tag.t = function
@@ -143,14 +123,10 @@ module Authorization_kind = struct
 
   let to_input x = Structured.to_input (to_structured x)
 
-  [%%ifdef consensus_mechanism]
-
   module Checked = Structured.Checked
 
   let typ =
     Structured.typ |> Typ.transport ~there:to_structured ~back:of_structured_exn
-
-  [%%endif]
 end
 
 module May_use_token = struct
@@ -491,8 +467,17 @@ module May_use_token = struct
 
   let deriver obj =
     let open Fields_derivers_zkapps in
-    iso_record ~of_record:As_record.to_variant ~to_record:As_record.of_variant
-      As_record.deriver obj
+    let may_use_token =
+      iso_record ~of_record:As_record.to_variant ~to_record:As_record.of_variant
+        As_record.deriver
+    in
+    needs_custom_js
+      ~js_type:
+        (js_record
+           [ ("parentsOwnToken", js_layout bool)
+           ; ("inheritFromParent", js_layout bool)
+           ] )
+      ~name:"MayUseToken" may_use_token obj
 
   module Checked = struct
     type t = Boolean.var As_record.t
@@ -695,7 +680,7 @@ module Update = struct
         ; verification_key :
             Verification_key_wire.Stable.V1.t Set_or_keep.Stable.V1.t
         ; permissions : Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
-        ; zkapp_uri : Bounded_types.String.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; zkapp_uri : Zkapp_uri.Stable.V1.t Set_or_keep.Stable.V1.t
         ; token_symbol :
             Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
         ; timing : Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
@@ -907,8 +892,8 @@ module Update = struct
                    } ) )
       ; Set_or_keep.typ ~dummy:Permissions.empty Permissions.typ
       ; Set_or_keep.optional_typ
-          (Data_as_hash.optional_typ ~hash:Zkapp_account.hash_zkapp_uri
-             ~non_preimage:(Zkapp_account.hash_zkapp_uri_opt None)
+          (Data_as_hash.lazy_optional_typ ~hash:Zkapp_account.hash_zkapp_uri
+             ~non_preimage:(lazy (Zkapp_account.hash_zkapp_uri_opt None))
              ~dummy_value:"" )
           ~to_option:Fn.id ~of_option:Fn.id
       ; Set_or_keep.typ ~dummy:Account.Token_symbol.default
@@ -946,9 +931,6 @@ module Update = struct
          ~voting_for:!.(Set_or_keep.deriver State_hash.deriver)
          obj
 end
-
-module Events = Zkapp_account.Events
-module Actions = Zkapp_account.Actions
 
 module Account_precondition = struct
   [%%versioned
@@ -1629,6 +1611,36 @@ module Body = struct
     ; may_use_token
     ; authorization_kind
     }
+
+  let gen_with_events_and_actions =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map public_key = Public_key.Compressed.gen
+    and token_id = Token_id.gen
+    and update = Update.gen ()
+    and balance_change = Currency.Amount.Signed.gen
+    and increment_nonce = Quickcheck.Generator.bool
+    and events = return [ [| Field.zero |]; [| Field.zero |] ]
+    and actions = return [ [| Field.zero |]; [| Field.zero |] ]
+    and call_data = Field.gen
+    and preconditions = Preconditions.gen
+    and use_full_commitment = Quickcheck.Generator.bool
+    and implicit_account_creation_fee = Quickcheck.Generator.bool
+    and may_use_token = May_use_token.gen
+    and authorization_kind = Authorization_kind.gen in
+    { public_key
+    ; token_id
+    ; update
+    ; balance_change
+    ; increment_nonce
+    ; events
+    ; actions
+    ; call_data
+    ; preconditions
+    ; use_full_commitment
+    ; implicit_account_creation_fee
+    ; may_use_token
+    ; authorization_kind
+    }
 end
 
 module T = struct
@@ -1693,6 +1705,12 @@ module T = struct
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     let%map body = Body.gen and authorization = Control.gen_with_dummies in
+    { body; authorization }
+
+  let gen_with_events_and_actions : t Quickcheck.Generator.t =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map body = Body.gen_with_events_and_actions
+    and authorization = Control.gen_with_dummies in
     { body; authorization }
 
   let quickcheck_generator : t Quickcheck.Generator.t = gen

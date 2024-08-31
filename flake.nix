@@ -12,7 +12,7 @@
   };
 
   inputs.utils.url = "github:gytis-ivaskevicius/flake-utils-plus";
-  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable-small";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-23.11-small";
 
   inputs.mix-to-nix.url = "github:serokell/mix-to-nix";
   inputs.nix-npm-buildPackage.url = "github:serokell/nix-npm-buildpackage";
@@ -57,30 +57,34 @@
         ref = r: "[34;1m${r}[31;1m";
         command = c: "[37;1m${c}[31;1m";
       in lib.warnIf (!builtins.all (x: x)
-        (map (x: builtins.pathExists ./${x} && builtins.readDir ./${x} != { }) submodules)) ''
-          Some submodules are missing, you may get errors. Consider one of the following:
-          - run ${command "nix/pin.sh"} and use "${ref "mina"}" flake ref, e.g. ${command "nix develop mina"} or ${command "nix build mina"};
-          - use "${ref "git+file://$PWD?submodules=1"}";
-          - use "${ref "git+https://github.com/minaprotocol/mina?submodules=1"}";
-          - use non-flake commands like ${command "nix-build"} and ${command "nix-shell"}.
-        '';
+        (map (x: builtins.pathExists ./${x} && builtins.readDir ./${x} != { })
+          submodules)) ''
+            Some submodules are missing, you may get errors. Consider one of the following:
+            - run ${command "nix/pin.sh"} and use "${
+              ref "mina"
+            }" flake ref, e.g. ${command "nix develop mina"} or ${
+              command "nix build mina"
+            };
+            - use "${ref "git+file://$PWD?submodules=1"}";
+            - use "${
+              ref "git+https://github.com/minaprotocol/mina?submodules=1"
+            }";
+            - use non-flake commands like ${command "nix-build"} and ${
+              command "nix-shell"
+            }.
+          '';
       # Only get the ocaml stuff, to reduce the amount of unnecessary rebuilds
-      ocaml-src =
-        with inputs.nix-filter.lib;
-          filter {
-            root = ./.;
-            include =
-              [ (inDirectory "src") "dune" "dune-project"
-                "./graphql_schema.json" "opam.export" ];
-          };
-      ocaml-src-caqti-patched = pkgs:
-        pkgs.stdenv.mkDerivation ({
-          name = "mina-src-caqti-patched";
-          src = ocaml-src;
-          phases = [ "unpackPhase" "patchPhase" "installPhase" ];
-          patches = [ ./buildkite/scripts/caqti-upgrade-plus-archive-init-speedup.patch ];
-          installPhase = "cp -R . $out";
-        });
+      ocaml-src = with inputs.nix-filter.lib;
+        filter {
+          root = ./.;
+          include = [
+            (inDirectory "src")
+            "dune"
+            "dune-project"
+            "./graphql_schema.json"
+            "opam.export"
+          ];
+        };
     in {
       overlays = {
         misc = import ./nix/misc.nix;
@@ -91,10 +95,6 @@
           ocamlPackages_mina = requireSubmodules (import ./nix/ocaml.nix {
             inherit inputs pkgs;
             src = ocaml-src;
-          });
-          ocamlPackages_mina_caqti_patched = requireSubmodules (import ./nix/ocaml.nix {
-            inherit inputs pkgs;
-            src = ocaml-src-caqti-patched prev;
           });
         };
       };
@@ -235,14 +235,13 @@
               label = "Run ${test} integration test";
               depends_on = [ "push_mina-image-full" ]
                 ++ lib.optional with-archive "push_mina-archive-image-full";
-              "if" = ''build.pull_request.labels includes "nix-integration-tests"'';
+              "if" =
+                ''build.pull_request.labels includes "nix-integration-tests"'';
               retry = {
-                automatic = [
-                  {
-                    exit_status = "*";
-                    limit = 3;
-                  }
-                ];
+                automatic = [{
+                  exit_status = "*";
+                  limit = 3;
+                }];
               };
             };
         in {
@@ -273,6 +272,13 @@
         };
     } // utils.lib.eachDefaultSystem (system:
       let
+        rocksdbOverlay = pkgs: prev:
+          if prev.stdenv.isDarwin then {
+            rocksdb-mina = pkgs.rocksdb;
+          } else {
+            rocksdb-mina = pkgs.rocksdb511;
+          };
+
         # nixpkgs with all relevant overlays applied
         pkgs = nixpkgs.legacyPackages.${system}.extend
           (nixpkgs.lib.composeManyExtensions ([
@@ -286,7 +292,7 @@
                   nodejs = pkgs.nodejs-16_x;
                 };
             })
-          ] ++ builtins.attrValues self.overlays));
+          ] ++ builtins.attrValues self.overlays ++ [ rocksdbOverlay ]));
 
         checks = import ./nix/checks.nix inputs pkgs;
 
@@ -309,14 +315,14 @@
         # Main user-facing binaries.
         packages = rec {
           inherit (ocamlPackages)
-            mina devnet mainnet mina_tests mina-ocaml-format test_executive;
-          devnet-caqti-patched = pkgs.ocamlPackages_mina_caqti_patched.devnet;
-          mainnet-caqti-patched = pkgs.ocamlPackages_mina_caqti_patched.mainnet;
+            mina devnet mainnet mina_tests mina-ocaml-format mina_client_sdk
+            test_executive with-instrumentation;
           inherit (pkgs)
-            libp2p_helper kimchi_bindings_stubs snarky_js leaderboard
-            validation trace-tool zkapp-cli;
+            libp2p_helper kimchi_bindings_stubs snarky_js leaderboard validation
+            trace-tool zkapp-cli;
           inherit (dockerImages)
-            mina-image-slim mina-image-full mina-archive-image-full;
+            mina-image-slim mina-image-full mina-archive-image-full
+            mina-image-instr-full;
           mina-deb = debianPackages.mina;
           default = mina;
         };
@@ -396,5 +402,7 @@
         });
 
         inherit checks;
+
+        formatter = pkgs.nixfmt;
       });
 }

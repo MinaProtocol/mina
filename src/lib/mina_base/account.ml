@@ -1,7 +1,5 @@
 (* account.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base_util
 open Snark_params
@@ -63,8 +61,6 @@ module Index = struct
   let fold ~ledger_depth t =
     Fold.group3 ~default:false (fold_bits ~ledger_depth t)
 
-  [%%ifdef consensus_mechanism]
-
   module Unpacked = struct
     type var = Tick.Boolean.var list
 
@@ -79,8 +75,6 @@ module Index = struct
         (Typ.list ~length:ledger_depth Boolean.typ)
         ~there:(to_bits ~ledger_depth) ~back:of_bits
   end
-
-  [%%endif]
 end
 
 module Nonce = Account_nonce
@@ -163,8 +157,6 @@ module Token_symbol = struct
   let to_input (x : t) =
     Random_oracle_input.Chunked.packed (to_field x, num_bits)
 
-  [%%ifdef consensus_mechanism]
-
   type var = Field.Var.t
 
   let range_check (t : var) =
@@ -196,8 +188,6 @@ module Token_symbol = struct
   let var_to_input (x : var) = Random_oracle_input.Chunked.packed (x, num_bits)
 
   let if_ = Tick.Run.Field.if_
-
-  [%%endif]
 end
 
 (* the `token_symbol` describes a token id owned by the account id
@@ -238,8 +228,6 @@ module Poly = struct
   end]
 end
 
-let token = Poly.token_id
-
 module Key = struct
   [%%versioned
   module Stable = struct
@@ -263,19 +251,18 @@ module Binable_arg = struct
   module Stable = struct
     module V2 = struct
       type t =
-        ( Public_key.Compressed.Stable.V1.t
-        , Token_id.Stable.V2.t
-        , Token_symbol.Stable.V1.t
-        , Balance.Stable.V1.t
-        , Nonce.Stable.V1.t
-        , Receipt.Chain_hash.Stable.V1.t
-        , Public_key.Compressed.Stable.V1.t option
-        , State_hash.Stable.V1.t
-        , Timing.Stable.V2.t
-        , Permissions.Stable.V2.t
-        , Zkapp_account.Stable.V2.t option )
-        (* TODO: Cache the digest of this? *)
-        Poly.Stable.V2.t
+        { public_key : Public_key.Compressed.Stable.V1.t
+        ; token_id : Token_id.Stable.V2.t
+        ; token_symbol : Token_symbol.Stable.V1.t
+        ; balance : Balance.Stable.V1.t
+        ; nonce : Nonce.Stable.V1.t
+        ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t
+        ; delegate : Public_key.Compressed.Stable.V1.t option
+        ; voting_for : State_hash.Stable.V1.t
+        ; timing : Timing.Stable.V2.t
+        ; permissions : Permissions.Stable.V2.t
+        ; zkapp : Zkapp_account.Stable.V2.t option
+        }
       [@@deriving sexp, equal, hash, compare, yojson]
 
       let to_latest = Fn.id
@@ -290,8 +277,20 @@ let check = Fn.id
 [%%versioned_binable
 module Stable = struct
   module V2 = struct
-    type t = Binable_arg.Stable.V2.t
-    [@@deriving sexp, equal, hash, compare, yojson]
+    type t = Binable_arg.Stable.V2.t =
+      { public_key : Public_key.Compressed.Stable.V1.t
+      ; token_id : Token_id.Stable.V2.t
+      ; token_symbol : Token_symbol.Stable.V1.t
+      ; balance : Balance.Stable.V1.t
+      ; nonce : Nonce.Stable.V1.t
+      ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t
+      ; delegate : Public_key.Compressed.Stable.V1.t option
+      ; voting_for : State_hash.Stable.V1.t
+      ; timing : Timing.Stable.V2.t
+      ; permissions : Permissions.Stable.V2.t
+      ; zkapp : Zkapp_account.Stable.V2.t option
+      }
+    [@@deriving sexp, equal, hash, compare, yojson, hlist, fields]
 
     include
       Binable.Of_binable_without_uuid
@@ -310,25 +309,67 @@ module Stable = struct
   end
 end]
 
+[%%define_locally
+Stable.Latest.(sexp_of_t, t_of_sexp, equal, to_yojson, of_yojson)]
+
+let to_poly
+    { public_key
+    ; token_id
+    ; token_symbol
+    ; balance
+    ; nonce
+    ; receipt_chain_hash
+    ; delegate
+    ; voting_for
+    ; timing
+    ; permissions
+    ; zkapp
+    } =
+  { Poly.public_key
+  ; token_id
+  ; token_symbol
+  ; balance
+  ; nonce
+  ; receipt_chain_hash
+  ; delegate
+  ; voting_for
+  ; timing
+  ; permissions
+  ; zkapp
+  }
+
+let of_poly
+    { Poly.public_key
+    ; token_id
+    ; token_symbol
+    ; balance
+    ; nonce
+    ; receipt_chain_hash
+    ; delegate
+    ; voting_for
+    ; timing
+    ; permissions
+    ; zkapp
+    } =
+  { public_key
+  ; token_id
+  ; token_symbol
+  ; balance
+  ; nonce
+  ; receipt_chain_hash
+  ; delegate
+  ; voting_for
+  ; timing
+  ; permissions
+  ; zkapp
+  }
+
 [%%define_locally Stable.Latest.(public_key)]
 
 let identifier ({ public_key; token_id; _ } : t) =
   Account_id.create public_key token_id
 
-type value =
-  ( Public_key.Compressed.t
-  , Token_id.t
-  , Token_symbol.t
-  , Balance.t
-  , Nonce.t
-  , Receipt.Chain_hash.t
-  , Public_key.Compressed.t option
-  , State_hash.t
-  , Timing.t
-  , Permissions.t
-  , Zkapp_account.t option )
-  Poly.t
-[@@deriving sexp]
+type value = t [@@deriving sexp]
 
 let key_gen = Public_key.Compressed.gen
 
@@ -363,7 +404,7 @@ let delegate_opt = Option.value ~default:Public_key.Compressed.empty
 let to_input (t : t) =
   let open Random_oracle.Input.Chunked in
   let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
-  Poly.Fields.fold ~init:[]
+  Fields.fold ~init:[]
     ~public_key:(f Public_key.Compressed.to_input)
     ~token_id:(f Token_id.to_input) ~balance:(f Balance.to_input)
     ~token_symbol:(f Token_symbol.to_input) ~nonce:(f Nonce.to_input)
@@ -379,8 +420,6 @@ let crypto_hash_prefix = Hash_prefix.account
 let crypto_hash t =
   Random_oracle.hash ~init:crypto_hash_prefix
     (Random_oracle.pack_input (to_input t))
-
-[%%ifdef consensus_mechanism]
 
 type var =
   ( Public_key.Compressed.var
@@ -418,7 +457,7 @@ let typ' zkapp =
     ; zkapp
     ]
     ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
-    ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
+    ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
 let typ : (var, value) Typ.t =
   let zkapp :
@@ -607,12 +646,10 @@ module Checked = struct
           account.permissions.access ~signature_verifies
 end
 
-[%%endif]
-
 let digest = crypto_hash
 
 let empty =
-  { Poly.public_key = Public_key.Compressed.empty
+  { public_key = Public_key.Compressed.empty
   ; token_id = Token_id.default
   ; token_symbol = Token_symbol.default
   ; balance = Balance.zero
@@ -627,7 +664,7 @@ let empty =
   ; zkapp = None
   }
 
-let empty_digest = digest empty
+let empty_digest = lazy (digest empty)
 
 let create account_id balance =
   let public_key = Account_id.public_key account_id in
@@ -636,7 +673,7 @@ let create account_id balance =
     (* Only allow delegation if this account is for the default token. *)
     if Token_id.(equal default) token_id then Some public_key else None
   in
-  { Poly.public_key
+  { public_key
   ; token_id
   ; token_symbol = Token_symbol.default
   ; balance
@@ -664,7 +701,7 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
       if Token_id.(equal default) token_id then Some public_key else None
     in
     Or_error.return
-      { Poly.public_key
+      { public_key
       ; token_id
       ; token_symbol = Token_symbol.default
       ; balance
@@ -684,23 +721,17 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
             }
       }
 
-(* no vesting after cliff time + 1 slot *)
-let create_time_locked public_key balance ~initial_minimum_balance ~cliff_time =
-  create_timed public_key balance ~initial_minimum_balance ~cliff_time
-    ~vesting_period:Global_slot_span.(succ zero)
-    ~vesting_increment:initial_minimum_balance
-
-let initial_minimum_balance Poly.{ timing; _ } =
+let initial_minimum_balance { timing; _ } =
   match timing with
   | Timing.Untimed ->
       None
   | Timed t ->
       Some t.initial_minimum_balance
 
-let cliff_time Poly.{ timing; _ } =
+let cliff_time { timing; _ } =
   match timing with Timing.Untimed -> None | Timed t -> Some t.cliff_time
 
-let cliff_amount Poly.{ timing; _ } =
+let cliff_amount { timing; _ } =
   match timing with Timing.Untimed -> None | Timed t -> Some t.cliff_amount
 
 let vesting_increment Poly.{ timing; _ } =

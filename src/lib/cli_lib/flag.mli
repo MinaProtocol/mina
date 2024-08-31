@@ -75,8 +75,6 @@ module Log : sig
   val file_log_level : Logger.Level.t Command.Param.t
 
   val file_log_rotations : int Command.Param.t
-
-  val file : string option Command.Param.t
 end
 
 type signed_command_common =
@@ -86,7 +84,15 @@ type signed_command_common =
   ; memo : string option
   }
 
-val signed_command_common : signed_command_common Command.Param.t
+val fee_common :
+     default_transaction_fee:Currency.Fee.t
+  -> minimum_user_command_fee:Currency.Fee.t
+  -> Currency.Fee.t Command.Param.t
+
+val signed_command_common :
+     default_transaction_fee:Currency.Fee.t
+  -> minimum_user_command_fee:Currency.Fee.t
+  -> signed_command_common Command.Param.t
 
 module Signed_command : sig
   val hd_index : Mina_numbers.Hd_index.t Command.Param.t
@@ -95,7 +101,10 @@ module Signed_command : sig
 
   val amount : Currency.Amount.t Command.Param.t
 
-  val fee : Currency.Fee.t option Command.Param.t
+  val fee :
+       default_transaction_fee:Currency.Fee.t
+    -> minimum_user_command_fee:Currency.Fee.t
+    -> Currency.Fee.t option Command.Param.t
 
   val valid_until :
     Mina_numbers.Global_slot_since_genesis.t option Command.Param.t

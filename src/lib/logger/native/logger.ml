@@ -33,7 +33,7 @@ module Time = struct
   let of_yojson json =
     json |> Yojson.Safe.Util.to_string |> fun s -> Ok (Time.of_string s)
 
-  let pretty_to_string timestamp =
+  let pp ppf timestamp =
     (* This used to be
        [Core.Time.format timestamp "%Y-%m-%d %H:%M:%S UTC"
         ~zone:Time.Zone.utc]
@@ -44,14 +44,11 @@ module Time = struct
     let zone = Time.Zone.utc in
     let date, time = Time.to_date_ofday ~zone timestamp in
     let time_parts = Time.Ofday.to_parts time in
-    let fmt_2_chars () i =
-      let s = string_of_int i in
-      if Int.(i < 10) then "0" ^ s else s
-    in
-    Stdlib.Format.sprintf "%i-%a-%a %a:%a:%a UTC" (Date.year date) fmt_2_chars
+    Format.fprintf ppf "%i-%02d-%02d %02d:%02d:%02d UTC" (Date.year date)
       (Date.month date |> Month.to_int)
-      fmt_2_chars (Date.day date) fmt_2_chars time_parts.hr fmt_2_chars
-      time_parts.min fmt_2_chars time_parts.sec
+      (Date.day date) time_parts.hr time_parts.min time_parts.sec
+
+  let pretty_to_string timestamp = Format.asprintf "%a" pp timestamp
 
   let pretty_to_string_ref = ref pretty_to_string
 
@@ -205,14 +202,15 @@ module Processor = struct
                   err ) ;
             None
         | Ok (str, extra) ->
-            let formatted_extra =
-              extra
-              |> List.map ~f:(fun (k, v) -> "\n\t" ^ k ^ ": " ^ v)
-              |> String.concat ~sep:""
+            let msg =
+              (* The previously existing \t has been changed to 2 spaces. *)
+              Format.asprintf "@[<v 2>%a [%a] %s@,%a@]" Time.pp msg.timestamp
+                Level.pp msg.level str
+                (Format.pp_print_list ~pp_sep:Format.pp_print_cut
+                   (fun ppf (k, v) -> Format.fprintf ppf "%s: %s" k v) )
+                extra
             in
-            let time = Time.pretty_to_string msg.timestamp in
-            Some
-              (time ^ " [" ^ Level.show msg.level ^ "] " ^ str ^ formatted_extra)
+            Some msg
   end
 
   let raw ?(log_level = Level.Spam) () = T ((module Raw), Raw.create ~log_level)
@@ -257,10 +255,18 @@ module Transport = struct
 end
 
 module Consumer_registry = struct
-  type consumer = { processor : Processor.t; transport : Transport.t }
+  type consumer =
+    { processor : Processor.t
+    ; transport : Transport.t
+    ; commit_id : string option
+    }
 
   let default_consumer =
-    lazy { processor = Processor.raw (); transport = Transport.stdout () }
+    lazy
+      { processor = Processor.raw ()
+      ; transport = Transport.stdout ()
+      ; commit_id = None
+      }
 
   module Consumer_tbl = Hashtbl.Make (String)
 
@@ -270,8 +276,8 @@ module Consumer_registry = struct
 
   type id = string
 
-  let register ~(id : id) ~processor ~transport =
-    Consumer_tbl.add_multi t ~key:id ~data:{ processor; transport }
+  let register ?commit_id ~(id : id) ~processor ~transport () =
+    Consumer_tbl.add_multi t ~key:id ~data:{ processor; transport; commit_id }
 
   let rec broadcast_log_message ~id msg =
     let consumers =
@@ -284,8 +290,20 @@ module Consumer_registry = struct
     List.iter consumers ~f:(fun consumer ->
         let { processor = Processor.T ((module Processor), processor)
             ; transport = Transport.T ((module Transport), transport)
+            ; commit_id
             } =
           consumer
+        in
+        let commit_id' =
+          if Level.compare msg.Message.level Warn >= 0 then commit_id else None
+        in
+        let msg =
+          Option.value_map ~default:msg commit_id' ~f:(fun cid ->
+              let metadata =
+                String.Map.set ~key:"commit_id" ~data:(`String cid)
+                  msg.Message.metadata
+              in
+              { msg with metadata } )
         in
         match Processor.process processor msg with
         | Some str ->
@@ -444,9 +462,6 @@ module Structured = struct
     -> unit
 
   let log t ~level ~module_ ~location ?(metadata = []) event =
-    let module_ =
-      String.substr_replace_first ~pattern:"Dune__exe__" ~with_:"" module_
-    in
     let message, event_id, str_metadata = Structured_log_events.log event in
     let event_id = Some event_id in
     let metadata = str_metadata @ metadata in

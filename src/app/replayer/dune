@@ -45,13 +45,13 @@
    mina_transaction
    mina_transaction_logic
    mina_caqti
-   genesis_constants
+   genesis_constants.compiled
    mina_runtime_config
    logger
    kimchi_backend
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
-   kimchi_backend.common
+   kimchi_pasta
+   kimchi_pasta.basic
+   kimchi_backend_common
    block_time
    data_hash_lib
    pickles
@@ -61,8 +61,8 @@
    codable
    ppx_version.runtime
    cli_lib
+   mina_version
  )
- (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_let ppx_sexp_conv
                   ppx_hash ppx_compare ppx_deriving_yojson h_list.ppx)))

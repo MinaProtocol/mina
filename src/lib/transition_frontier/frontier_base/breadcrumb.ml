@@ -314,7 +314,7 @@ module For_tests = struct
         in
         let send_amount = Currency.Amount.of_nanomina_int_exn 1_000_000_001 in
         let sender_account_amount =
-          sender_account.Account.Poly.balance |> Currency.Balance.to_amount
+          sender_account.Account.balance |> Currency.Balance.to_amount
         in
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
         let sender_pk = Account.public_key sender_account in
@@ -363,7 +363,7 @@ module For_tests = struct
                 One_or_two.map stmts ~f:(fun statement ->
                     Ledger_proof.create ~statement
                       ~sok_digest:Sok_message.Digest.default
-                      ~proof:Proof.transaction_dummy )
+                      ~proof:(Lazy.force Proof.transaction_dummy) )
             ; prover
             }
       in
@@ -466,7 +466,7 @@ module For_tests = struct
       let next_block =
         let header =
           Mina_block.Header.create ~protocol_state
-            ~protocol_state_proof:Proof.blockchain_dummy
+            ~protocol_state_proof:(Lazy.force Proof.blockchain_dummy)
             ~delta_block_chain_proof:(previous_state_hashes.state_hash, [])
             ()
         in
