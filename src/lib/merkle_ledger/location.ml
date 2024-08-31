@@ -24,6 +24,8 @@ module Bigstring = struct
     end
   end]
 
+  type t = Bigstring.t [@@deriving sexp, compare]
+
   [%%define_locally Bigstring.(get, length, create, to_string, set, blit, sub)]
 
   include Hashable.Make (Stable.Latest)

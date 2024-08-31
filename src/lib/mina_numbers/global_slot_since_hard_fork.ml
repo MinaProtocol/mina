@@ -49,6 +49,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
     end]
 
+    type t = Wire_types.global_slot = Since_hard_fork of T.Stable.V1.t
+    [@@unboxed] [@@deriving hash, compare, equal]
+
     module T = T
 
     let sexp_of_t = Stable.Latest.sexp_of_t

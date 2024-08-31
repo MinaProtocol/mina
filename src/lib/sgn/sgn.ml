@@ -11,6 +11,9 @@ module Stable = struct
   end
 end]
 
+type t = Stable.Latest.t = Pos | Neg
+[@@deriving sexp, hash, compare, equal, yojson]
+
 let gen =
   Quickcheck.Generator.map Bool.quickcheck_generator ~f:(fun b ->
       if b then Pos else Neg )

@@ -68,6 +68,9 @@ module Compressed = struct
     end
   end]
 
+  type t = ((Field.t[@version_asserted]), bool) Poly.Stable.V1.t
+  [@@deriving equal, compare, hash]
+
   module Poly = Poly
   include Comparable.Make_binable (Stable.Latest)
   include Hashable.Make_binable (Stable.Latest)
@@ -213,6 +216,8 @@ module Uncompressed = struct
         Option.value_exn (decompress @@ Compressed.t_of_sexp sexp)
     end
   end]
+
+  type t = Field.t * Field.t [@@deriving compare, equal, hash]
 
   (* so we can make sets of public keys *)
   include Comparable.Make_binable (Stable.Latest)

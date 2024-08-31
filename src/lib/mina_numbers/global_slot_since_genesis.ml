@@ -51,6 +51,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     module T = T
 
+    type t = Wire_types.global_slot = Since_genesis of T.Stable.V1.t
+    [@@unboxed] [@@deriving hash, sexp, compare, equal]
+
     let to_uint32 (Since_genesis u32) : uint32 = u32
 
     let of_uint32 u32 : t = Since_genesis u32

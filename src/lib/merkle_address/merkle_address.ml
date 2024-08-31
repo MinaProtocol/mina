@@ -54,6 +54,8 @@ end
 
 [%%versioned_binable
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type t = Bitstring.t
 
@@ -90,6 +92,8 @@ module Stable = struct
     let equal = equals
   end
 end]
+
+type t = Bitstring.t
 
 let byte_count_of_bits n = (n / 8) + min 1 (n % 8)
 

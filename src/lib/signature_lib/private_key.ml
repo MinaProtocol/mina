@@ -23,6 +23,8 @@ module Stable = struct
   end
 end]
 
+type t = Inner_curve.Scalar.t [@@deriving compare, sexp]
+
 [%%define_locally Stable.Latest.(gen)]
 
 let create () =

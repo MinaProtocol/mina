@@ -1057,6 +1057,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
+    type t = Amount.t [@@deriving sexp, compare, equal, hash, yojson]
+
     include (Amount : Basic with type t := t with type var = Amount.var)
 
     let to_amount = Fn.id

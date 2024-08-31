@@ -2,6 +2,8 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type t = Unbanned | Banned_until of (Time.t[@version_asserted])
 
@@ -25,5 +27,7 @@ module Stable = struct
           Error "Banned_status.of_yojson: unexpected JSON"
   end
 end]
+
+type t = Stable.Latest.t = Unbanned | Banned_until of Time.t
 
 [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
