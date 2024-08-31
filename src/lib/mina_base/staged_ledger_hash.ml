@@ -54,6 +54,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
+    type t = string [@@deriving sexp, equal, compare, hash]
+
     [%%define_locally
     Stable.Latest.
       ( to_yojson
@@ -139,6 +141,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
+    type t = string [@@deriving sexp, equal, compare, hash]
+
     [%%define_locally
     Stable.Latest.(to_yojson, of_yojson, to_base58_check, of_base58_check_exn)]
 
@@ -159,6 +163,13 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t =
+      { ledger_hash : Ledger_hash.t
+      ; aux_hash : Aux_hash.t
+      ; pending_coinbase_aux : Pending_coinbase_aux.t
+      }
+    [@@deriving sexp, equal, compare, hash, yojson, fields]
 
     type value = t [@@deriving sexp, compare, hash, yojson]
 
@@ -233,6 +244,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         [@@deriving sexp, equal, compare, hash, yojson, hlist]
       end
     end]
+
+    type ('non_snark, 'pending_coinbase_hash) t =
+          ('non_snark, 'pending_coinbase_hash) Stable.Latest.t =
+      { non_snark : 'non_snark; pending_coinbase_hash : 'pending_coinbase_hash }
+    [@@deriving sexp, equal, compare, hash, yojson, hlist]
   end
 
   [%%versioned
@@ -252,6 +268,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       let to_latest = Fn.id
     end
   end]
+
+  (** Staged ledger hash has two parts
+      1) merkle root of the pending coinbases
+      2) ledger hash, aux hash, and the FIFO order of the coinbase stacks(Non snark).
+      Only part 1 is required for blockchain snark computation and therefore the remaining fields of the staged ledger are grouped together as "Non_snark"
+      *)
+  type t = (Non_snark.t, Pending_coinbase.Hash_versioned.t) Poly.t
+  [@@deriving sexp, equal, compare, hash, yojson]
 
   type ('a, 'b) t_ = ('a, 'b) Poly.t
 

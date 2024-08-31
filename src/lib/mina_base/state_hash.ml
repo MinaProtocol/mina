@@ -17,6 +17,12 @@ module State_hashes = struct
     end
   end]
 
+  type t = Stable.Latest.t =
+    { mutable state_body_hash : State_body_hash.Stable.V1.t option
+    ; state_hash : T.Stable.V1.t
+    }
+  [@@deriving equal, sexp, to_yojson]
+
   let state_hash { state_hash; _ } = state_hash
 
   let state_body_hash t ~compute_hashes =

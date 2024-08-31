@@ -26,6 +26,17 @@ module Query = struct
       [@@deriving sexp, yojson, hash, compare]
     end
   end]
+
+  type 'addr t = 'addr Stable.Latest.t =
+    | What_child_hashes of 'addr
+        (** What are the hashes of the children of this address? *)
+    | What_contents of 'addr
+        (** What accounts are at this address? addr must have depth
+            tree_depth - account_subtree_height *)
+    | Num_accounts
+        (** How many accounts are there? Used to size data structure and
+            figure out what part of the tree is filled in. *)
+  [@@deriving sexp, yojson, hash, compare]
 end
 
 module Answer = struct
@@ -51,6 +62,16 @@ module Answer = struct
             Num_accounts (i, h)
     end
   end]
+
+  type ('hash, 'account) t = ('hash, 'account) Stable.Latest.t =
+    | Child_hashes_are of 'hash * 'hash
+        (** The requested address's children have these hashes **)
+    | Contents_are of 'account list
+        (** The requested address has these accounts *)
+    | Num_accounts of int * 'hash
+        (** There are this many accounts and the smallest subtree that
+                contains all non-empty nodes has this hash. *)
+  [@@deriving sexp, yojson]
 end
 
 module type Inputs_intf = sig

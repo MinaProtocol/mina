@@ -62,6 +62,16 @@ module Common = struct
         [@@deriving compare, equal, sexp, hash, yojson, hlist]
       end
     end]
+
+    type ('fee, 'public_key, 'nonce, 'global_slot, 'memo) t =
+          ('fee, 'public_key, 'nonce, 'global_slot, 'memo) Stable.Latest.t =
+      { fee : 'fee
+      ; fee_payer_pk : 'public_key
+      ; nonce : 'nonce
+      ; valid_until : 'global_slot
+      ; memo : 'memo
+      }
+    [@@deriving compare, equal, sexp, hash, yojson, hlist]
   end
 
   [%%versioned
@@ -95,6 +105,15 @@ module Common = struct
       let to_latest _ = failwith "Not implemented"
     end
   end]
+
+  type t =
+    ( Currency.Fee.t
+    , Public_key.Compressed.t
+    , Account_nonce.t
+    , Global_slot_since_genesis.t
+    , Memo.t )
+    Poly.t
+  [@@deriving compare, equal, sexp, hash, yojson]
 
   let to_input_legacy ({ fee; fee_payer_pk; nonce; valid_until; memo } : t) =
     let bitstring = Random_oracle.Input.Legacy.bitstring in
@@ -199,6 +218,11 @@ module Body = struct
     end
   end]
 
+  type t = Stable.Latest.t =
+    | Payment of Payment_payload.t
+    | Stake_delegation of Stake_delegation.t
+  [@@deriving sexp, compare, equal, sexp, hash, yojson]
+
   module Tag = Transaction_union_tag
 
   let gen max_amount =
@@ -249,6 +273,10 @@ module Poly = struct
         { common; body }
     end
   end]
+
+  type ('common, 'body) t = ('common, 'body) Stable.Latest.t =
+    { common : 'common; body : 'body }
+  [@@deriving equal, sexp, hash, yojson, compare, hlist]
 end
 
 [%%versioned
@@ -270,6 +298,9 @@ module Stable = struct
     let to_latest _ = failwith "Not implemented"
   end
 end]
+
+type t = (Common.t, Body.t) Poly.t
+[@@deriving compare, equal, sexp, hash, yojson]
 
 let create ~fee ~fee_payer_pk ~nonce ~valid_until ~memo ~body : t =
   { common =

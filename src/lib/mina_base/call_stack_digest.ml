@@ -16,6 +16,9 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
   end]
 
+  type t = Kimchi_backend.Pasta.Basic.Fp.t
+  [@@deriving sexp, compare, equal, hash, yojson]
+
   open Pickles.Impls.Step
 
   let cons (h : Stack_frame.Digest.t) (t : t) : t =

@@ -46,3 +46,6 @@ module Stable = struct
         (M)
   end
 end]
+
+type t = (Side_loaded_verification_key.t, F.t) With_hash.t
+[@@deriving sexp, yojson, equal, compare, hash]

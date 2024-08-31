@@ -16,6 +16,8 @@ module Poly = Genesis_constants.Protocol.Poly
 module Value = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         (T.Stable.V1.t, T.Stable.V1.t, Block_time.Stable.V1.t) Poly.Stable.V1.t
@@ -24,6 +26,9 @@ module Value = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = (T.t, T.t, Block_time.t) Poly.t
+  [@@deriving equal, ord, hash, sexp, yojson]
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in

@@ -27,6 +27,18 @@ module Call_forest = struct
       end
     end]
 
+    type ('account_update, 'account_update_digest, 'digest) t =
+          ('account_update, 'account_update_digest, 'digest) Stable.Latest.t =
+      { account_update : 'account_update
+      ; account_update_digest : 'account_update_digest
+      ; calls :
+          ( ('account_update, 'account_update_digest, 'digest) t
+          , 'digest )
+          With_stack_hash.t
+          list
+      }
+    [@@deriving sexp, compare, equal, hash, yojson]
+
     let rec fold_forest (ts : (_ t, _) With_stack_hash.t list) ~f ~init =
       List.fold ts ~init ~f:(fun acc { elt; stack_hash = _ } ->
           fold elt ~init:acc ~f )
@@ -216,6 +228,9 @@ module Call_forest = struct
           let to_latest = Fn.id
         end
       end]
+
+      type t = Kimchi_backend.Pasta.Basic.Fp.t
+      [@@deriving sexp, compare, equal, hash, yojson]
     end
 
     module Forest = struct
@@ -228,6 +243,9 @@ module Call_forest = struct
           let to_latest = Fn.id
         end
       end]
+
+      type t = Kimchi_backend.Pasta.Basic.Fp.t
+      [@@deriving sexp, compare, equal, hash, yojson]
     end
 
     module Tree = struct
@@ -240,6 +258,9 @@ module Call_forest = struct
           let to_latest = Fn.id
         end
       end]
+
+      type t = Kimchi_backend.Pasta.Basic.Fp.t
+      [@@deriving sexp, compare, equal, hash, yojson]
     end
   end
 
@@ -344,6 +365,16 @@ module Call_forest = struct
       let to_latest = Fn.id
     end
   end]
+
+  type ('account_update, 'account_update_digest, 'digest) t =
+    ( ('account_update, 'account_update_digest, 'digest) Tree.t
+    , 'digest )
+    With_stack_hash.t
+    list
+  [@@deriving sexp, compare, equal, hash, yojson]
+
+  type ('a, 'b, 'c) tt = ('a, 'b, 'c) t
+  [@@deriving sexp, compare, equal, hash, yojson]
 
   module Shape = struct
     module I = struct
@@ -531,6 +562,10 @@ module Call_forest = struct
       end
     end]
 
+    type 'data t =
+      (Account_update.t * 'data, Digest.Account_update.t, Digest.Forest.t) tt
+    [@@deriving sexp, compare, equal, hash, yojson]
+
     let empty = Digest.Forest.empty
 
     let hash_account_update ((p : Account_update.t), _) =
@@ -580,6 +615,9 @@ module Call_forest = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = (Account_update.t, Digest.Account_update.t, Digest.Forest.t) tt
+    [@@deriving sexp, compare, equal, hash, yojson]
 
     let empty = Digest.Forest.empty
 
@@ -639,6 +677,13 @@ module Graphql_repr = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t =
+    { fee_payer : Account_update.Fee_payer.t
+    ; account_updates : Account_update.Graphql_repr.t list
+    ; memo : Signed_command_memo.t
+    }
+  [@@deriving sexp, compare, equal, hash, yojson]
 end
 
 module Simple = struct
@@ -656,6 +701,13 @@ module Simple = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { fee_payer : Account_update.Fee_payer.t
+    ; account_updates : Account_update.Simple.t list
+    ; memo : Signed_command_memo.t
+    }
+  [@@deriving sexp, compare, equal, hash, yojson]
 end
 
 module Digest = Call_forest.Digest
@@ -706,6 +758,13 @@ module T = struct
             let to_latest = Fn.id
           end
         end]
+
+        type t = Stable.Latest.t =
+          { fee_payer : Account_update.Fee_payer.t
+          ; account_updates : (Account_update.t, unit, unit) Call_forest.t
+          ; memo : Signed_command_memo.t
+          }
+        [@@deriving sexp, compare, equal, hash, yojson]
 
         let of_graphql_repr (t : Graphql_repr.t) : t =
           { fee_payer = t.fee_payer
@@ -808,6 +867,17 @@ module T = struct
           end)
     end
   end]
+
+  type t = Stable.Latest.t =
+    { fee_payer : Account_update.Fee_payer.t
+    ; account_updates :
+        ( Account_update.t
+        , Digest.Account_update.t
+        , Digest.Forest.t )
+        Call_forest.t
+    ; memo : Signed_command_memo.t
+    }
+  [@@deriving annot, sexp, compare, equal, hash, yojson, fields]
 end
 
 include T
@@ -1113,6 +1183,15 @@ end = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { fee_payer : Account_update.Fee_payer.t
+    ; account_updates :
+        (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option
+        Call_forest.With_hashes_and_data.t
+    ; memo : Signed_command_memo.t
+    }
+  [@@deriving sexp, compare, equal, hash, yojson]
 
   let ok_if_vk_hash_expected ~got ~expected =
     if not @@ Zkapp_basic.F.equal (With_hash.hash got) expected then
@@ -1486,6 +1565,8 @@ struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Zkapp_basic.F.t [@@deriving sexp, compare, equal, hash, yojson]
   end
 
   [%%versioned
@@ -1498,6 +1579,9 @@ struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t = { zkapp_command : S.Latest.t }
+  [@@deriving sexp, compare, equal, hash, yojson]
 
   let create zkapp_command : t = { zkapp_command }
 

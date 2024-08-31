@@ -24,6 +24,11 @@ module Poly = struct
             failwith "Snapp_command"
     end
   end]
+
+  type ('u, 's) t = ('u, 's) Stable.Latest.t =
+    | Signed_command of 'u
+    | Zkapp_command of 's
+  [@@deriving sexp, compare, equal, hash, yojson]
 end
 
 type ('u, 's) t_ = ('u, 's) Poly.Stable.Latest.t =
@@ -83,6 +88,9 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t = (Signed_command.t, Zkapp_command.t) Poly.t
+[@@deriving sexp, compare, equal, hash, yojson]
 
 let to_base64 : t -> string = function
   | Signed_command sc ->
@@ -150,6 +158,9 @@ module Verifiable = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = (Signed_command.t, Zkapp_command.Verifiable.t) Poly.t
+  [@@deriving sexp, compare, equal, hash, yojson]
 
   let fee_payer (t : t) =
     match t with
@@ -313,6 +324,9 @@ module Valid = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = (Signed_command.With_valid_signature.t, Zkapp_command.Valid.t) Poly.t
+  [@@deriving sexp, compare, equal, hash, yojson]
 
   module Gen = Gen_make (Signed_command.With_valid_signature)
 end

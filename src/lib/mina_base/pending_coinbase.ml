@@ -40,6 +40,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
+    type t = Public_key.Compressed.t * Amount.t [@@deriving sexp, to_yojson]
+
     let of_coinbase (cb : Coinbase.t) : t = (cb.receiver, cb.amount)
 
     type var = Public_key.Compressed.var * Amount.var
@@ -110,6 +112,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = int [@@deriving sexp, yojson, compare, equal]
 
     [%%define_locally Int.(( > ), to_string, zero, to_int, of_int, equal)]
 
@@ -249,6 +253,10 @@ module Make_str (A : Wire_types.Concrete) = struct
           [@@deriving sexp, compare, hash, yojson, equal, hlist]
         end
       end]
+
+      type 'stack_hash t = 'stack_hash Stable.Latest.t =
+        { init : 'stack_hash; curr : 'stack_hash }
+      [@@deriving sexp, compare, hash, yojson, equal, hlist]
     end
 
     [%%versioned
@@ -260,6 +268,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stack_hash.t Poly.t [@@deriving sexp, compare, hash, equal, yojson]
 
     let init (t : t) = t.init
 
@@ -422,6 +432,13 @@ module Make_str (A : Wire_types.Concrete) = struct
         end
       end]
 
+      type t = Stable.Latest.t =
+        | Update_none
+        | Update_one
+        | Update_two_coinbase_in_first
+        | Update_two_coinbase_in_second
+      [@@deriving equal, sexp, to_yojson]
+
       type var = Boolean.var * Boolean.var
 
       let to_bits = function
@@ -472,6 +489,11 @@ module Make_str (A : Wire_types.Concrete) = struct
           [@@deriving sexp, to_yojson, hlist]
         end
       end]
+
+      type ('action, 'coinbase_amount) t =
+            ('action, 'coinbase_amount) Stable.Latest.t =
+        { action : 'action; coinbase_amount : 'coinbase_amount }
+      [@@deriving sexp, to_yojson, hlist]
     end
 
     [%%versioned
@@ -483,6 +505,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = (Action.t, Amount.t) Poly.t [@@deriving sexp, to_yojson]
 
     [%%define_locally Poly.(to_hlist, of_hlist)]
 
@@ -521,6 +545,11 @@ module Make_str (A : Wire_types.Concrete) = struct
           [@@deriving yojson, hash, sexp, equal, compare]
         end
       end]
+
+      type ('data_stack, 'state_stack) t =
+            ('data_stack, 'state_stack) Stable.Latest.t =
+        { data : 'data_stack; state : 'state_stack }
+      [@@deriving yojson, hash, sexp, equal, compare]
     end
 
     [%%versioned
@@ -533,6 +562,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = (Coinbase_stack.t, State_stack.t) Poly.t
+    [@@deriving equal, yojson, hash, sexp, compare]
 
     let data (t : t) = t.data
 
@@ -549,6 +581,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Hash_builder.t [@@deriving equal, compare, sexp, yojson, hash]
   end
 
   module Merkle_tree_versioned = struct
@@ -565,6 +599,13 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t =
+      ( Hash_versioned.t
+      , Stack_id.t
+      , Stack_versioned.t )
+      Sparse_ledger_lib.Sparse_ledger.T.t
+    [@@deriving sexp, to_yojson]
 
     let (_ :
           ( t

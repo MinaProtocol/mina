@@ -2,6 +2,8 @@ open Core
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type t =
       { trust : float
@@ -12,6 +14,12 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t = Stable.Latest.t =
+  { trust : float
+  ; trust_last_updated : Core.Time.t
+  ; banned_until_opt : Core.Time.t option
+  }
 
 module type S = sig
   val init : unit -> t

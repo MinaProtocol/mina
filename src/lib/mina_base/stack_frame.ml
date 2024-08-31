@@ -2,12 +2,18 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type ('caller, 'zkapp_command) t =
       { caller : 'caller; caller_caller : 'caller; calls : 'zkapp_command }
     [@@deriving make, fields, sexp, yojson]
   end
 end]
+
+type ('caller, 'zkapp_command) t = ('caller, 'zkapp_command) Stable.Latest.t =
+  { caller : 'caller; caller_caller : 'caller; calls : 'zkapp_command }
+[@@deriving make, fields, sexp, yojson]
 
 type value =
   ( Token_id.t
@@ -67,6 +73,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Zkapp_basic.F.t [@@deriving sexp, compare, equal, hash, yojson]
 
   open Pickles.Impls.Step
 

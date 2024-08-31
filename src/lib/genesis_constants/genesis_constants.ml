@@ -111,6 +111,8 @@ module Protocol = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type ('length, 'delta, 'genesis_state_timestamp) t =
               ( 'length
@@ -127,10 +129,23 @@ module Protocol = struct
         [@@deriving equal, ord, hash, sexp, yojson, hlist, fields]
       end
     end]
+
+    type ('length, 'delta, 'genesis_state_timestamp) t =
+          ('length, 'delta, 'genesis_state_timestamp) Stable.Latest.t =
+      { k : 'length
+      ; slots_per_epoch : 'length
+      ; slots_per_sub_window : 'length
+      ; grace_period_slots : 'length
+      ; delta : 'delta
+      ; genesis_state_timestamp : 'genesis_state_timestamp
+      }
+    [@@deriving equal, ord, hash, sexp, yojson, hlist, fields]
   end
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = (int, int, (Int64.t[@version_asserted])) Poly.Stable.V1.t
       [@@deriving equal, ord, hash]
@@ -199,6 +214,8 @@ module Protocol = struct
         T.sexp_of_t t'
     end
   end]
+
+  type t = (int, int, Int64.t) Poly.t [@@deriving equal, ord, hash]
 
   [%%define_locally Stable.Latest.(to_yojson)]
 end

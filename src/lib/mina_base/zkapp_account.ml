@@ -169,6 +169,9 @@ module Zkapp_uri = struct
     end
   end]
 
+  type t = Bounded_types.String.Stable.V1.t
+  [@@deriving sexp, equal, compare, hash, yojson]
+
   [%%define_locally
   Stable.Latest.
     (sexp_of_t, t_of_sexp, equal, to_yojson, of_yojson, max_length, check)]
@@ -190,6 +193,25 @@ module Poly = struct
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields, annot]
     end
   end]
+
+  type ('app_state, 'vk, 'zkapp_version, 'field, 'slot, 'bool, 'zkapp_uri) t =
+        ( 'app_state
+        , 'vk
+        , 'zkapp_version
+        , 'field
+        , 'slot
+        , 'bool
+        , 'zkapp_uri )
+        Stable.Latest.t =
+    { app_state : 'app_state
+    ; verification_key : 'vk
+    ; zkapp_version : 'zkapp_version
+    ; action_state : 'field Pickles_types.Vector.Vector_5.t
+    ; last_action_slot : 'slot
+    ; proved_state : 'bool
+    ; zkapp_uri : 'zkapp_uri
+    }
+  [@@deriving sexp, equal, compare, hash, yojson, hlist, fields, annot]
 end
 
 type ('app_state, 'vk, 'zkapp_version, 'field, 'slot, 'bool, 'zkapp_uri) t_ =

@@ -21,6 +21,10 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
   end]
 
+  type t = Stable.Latest.t =
+    { fee : Currency.Fee.t; prover : Public_key.Compressed.t }
+  [@@deriving sexp, yojson, equal, compare]
+
   let create ~fee ~prover = Stable.Latest.{ fee; prover }
 
   module Digest = struct
@@ -61,6 +65,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                ~back:Blake2.bits_to_string
       end
     end]
+
+    type t = string [@@deriving sexp, hash, compare, equal, yojson]
 
     module Checked = struct
       open Snark_params.Tick

@@ -16,6 +16,10 @@ module Stable = struct
   end
 end]
 
+type t =
+  (Ledger_hash.t, Account_id.t, Account.t) Sparse_ledger_lib.Sparse_ledger.T.t
+[@@deriving yojson, sexp]
+
 type sparse_ledger = t [@@deriving sexp, to_yojson]
 
 module Hash = struct

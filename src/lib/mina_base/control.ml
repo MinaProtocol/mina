@@ -14,6 +14,12 @@ module Stable = struct
   end
 end]
 
+type t = Stable.Latest.t =
+  | Proof of Pickles.Side_loaded.Proof.t
+  | Signature of Signature.t
+  | None_given
+[@@deriving sexp, equal, yojson, hash, compare]
+
 (* lazy, to prevent spawning Rust threads at startup, which prevents daemonization *)
 let gen_with_dummies : t Quickcheck.Generator.t =
   let gen =

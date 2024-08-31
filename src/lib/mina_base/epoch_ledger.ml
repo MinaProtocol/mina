@@ -14,6 +14,10 @@ module Poly = struct
       [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
+
+  type ('ledger_hash, 'amount) t = ('ledger_hash, 'amount) Stable.Latest.t =
+    { hash : 'ledger_hash; total_currency : 'amount }
+  [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
 end
 
 module Value = struct
@@ -27,6 +31,9 @@ module Value = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = (Frozen_ledger_hash0.t, Amount.t) Poly.t
+  [@@deriving sexp, equal, compare, hash, yojson]
 end
 
 let to_input ({ hash; total_currency } : Value.t) =

@@ -45,6 +45,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
     end
   end]
 
+  type t = string [@@deriving sexp, equal, compare, hash]
+
   [%%define_locally
   Stable.Latest.
     (to_yojson, of_yojson, to_base58_check, of_base58_check, of_base58_check_exn)]

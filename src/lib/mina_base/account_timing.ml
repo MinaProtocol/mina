@@ -29,6 +29,18 @@ module Poly = struct
       [@@deriving sexp, equal, hash, compare, yojson]
     end
   end]
+
+  type ('slot, 'slot_span, 'balance, 'amount) t =
+        ('slot, 'slot_span, 'balance, 'amount) Stable.Latest.t =
+    | Untimed
+    | Timed of
+        { initial_minimum_balance : 'balance
+        ; cliff_time : 'slot
+        ; cliff_amount : 'amount
+        ; vesting_period : 'slot_span
+        ; vesting_increment : 'amount
+        }
+  [@@deriving sexp, equal, hash, compare, yojson]
 end
 
 [%%versioned
@@ -45,6 +57,10 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t =
+  (Global_slot_since_genesis.t, Global_slot_span.t, Balance.t, Amount.t) Poly.t
+[@@deriving sexp, equal, hash, compare, yojson]
 
 type ('slot, 'slot_span, 'balance, 'amount) tt =
       ('slot, 'slot_span, 'balance, 'amount) Poly.t =

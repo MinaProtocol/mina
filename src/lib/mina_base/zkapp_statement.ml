@@ -10,6 +10,10 @@ module Poly = struct
     end
   end]
 
+  type 'comm t = 'comm Stable.Latest.t =
+    { account_update : 'comm; calls : 'comm }
+  [@@deriving hlist, sexp, yojson]
+
   let to_field_elements (t : 'c t) : 'c array =
     let [ x0; x1 ] = to_hlist t in
     [| x0; x1 |]
@@ -24,6 +28,8 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t = Zkapp_command.Transaction_commitment.t Poly.t [@@deriving sexp]
 
 let to_field_elements : t -> _ = Poly.to_field_elements
 

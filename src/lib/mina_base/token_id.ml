@@ -23,6 +23,8 @@ module Stable = struct
   end
 end]
 
+type t = Account_id.Digest.t [@@deriving sexp, yojson, equal, compare, hash]
+
 [%%define_locally
 Account_id.Digest.
   ( default
