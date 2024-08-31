@@ -1465,11 +1465,7 @@ let of_verifiable (t : Verifiable.t) : t =
 module Transaction_commitment = struct
   module Stable = Kimchi_backend.Pasta.Basic.Fp.Stable
 
-  type t = (Stable.Latest.t[@deriving sexp])
-
-  let sexp_of_t = Stable.Latest.sexp_of_t
-
-  let t_of_sexp = Stable.Latest.t_of_sexp
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash, equal, yojson]
 
   let empty = Outside_hash_image.t
 

@@ -16,6 +16,17 @@ module Poly = struct
       [@@deriving to_yojson, sexp, fields, hlist]
     end
   end]
+
+  type ('blockchain_state, 'consensus_transition, 'pending_coinbase_update) t =
+        ( 'blockchain_state
+        , 'consensus_transition
+        , 'pending_coinbase_update )
+        Stable.Latest.t =
+    { blockchain_state : 'blockchain_state
+    ; consensus_transition : 'consensus_transition
+    ; pending_coinbase_update : 'pending_coinbase_update
+    }
+  [@@deriving to_yojson, sexp, fields, hlist]
 end
 
 module Value = struct
@@ -32,6 +43,13 @@ module Value = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t =
+    ( Blockchain_state.Value.t
+    , Consensus.Data.Consensus_transition.Value.t
+    , Pending_coinbase.Update.t )
+    Poly.t
+  [@@deriving sexp, to_yojson]
 end
 
 [%%define_locally

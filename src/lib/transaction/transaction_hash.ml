@@ -186,6 +186,12 @@ module User_command_with_valid_signature = struct
     end
   end]
 
+  type t =
+    ( (User_command.Valid.t[@hash.ignore])
+    , (T.t[@to_yojson hash_to_yojson]) )
+    With_hash.t
+  [@@deriving sexp, hash, to_yojson]
+
   let create (c : User_command.Valid.t) : t =
     { data = c; hash = hash_command (User_command.forget_check c) }
 
@@ -227,6 +233,12 @@ module User_command = struct
       let compare (x : t) (y : t) = T.compare x.hash y.hash
     end
   end]
+
+  type t =
+    ( (User_command.t[@hash.ignore])
+    , (T.t[@to_yojson hash_to_yojson]) )
+    With_hash.t
+  [@@deriving sexp, hash, to_yojson]
 
   let create (c : User_command.t) : t = { data = c; hash = hash_command c }
 

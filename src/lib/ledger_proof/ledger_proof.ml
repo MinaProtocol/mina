@@ -14,6 +14,8 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
     end
   end]
 
+  type t = Transaction_snark.t [@@deriving compare, equal, sexp, yojson, hash]
+
   let statement (t : t) = Transaction_snark.statement t
 
   let statement_with_sok (t : t) = Transaction_snark.statement_with_sok t

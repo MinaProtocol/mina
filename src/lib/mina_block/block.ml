@@ -69,6 +69,10 @@ module Stable = struct
   end
 end]
 
+type t = Stable.Latest.t =
+  { header : Header.t; body : Staged_ledger_diff.Body.t }
+[@@deriving fields, sexp]
+
 type with_hash = t State_hash.With_state_hashes.t [@@deriving sexp]
 
 [%%define_locally

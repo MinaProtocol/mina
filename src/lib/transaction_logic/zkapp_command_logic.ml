@@ -230,6 +230,58 @@ module Local_state = struct
     end
   end]
 
+  type ( 'stack_frame
+       , 'call_stack
+       , 'signed_amount
+       , 'ledger
+       , 'bool
+       , 'comm
+       , 'length
+       , 'failure_status_tbl )
+       t =
+        ( 'stack_frame
+        , 'call_stack
+        , 'signed_amount
+        , 'ledger
+        , 'bool
+        , 'comm
+        , 'length
+        , 'failure_status_tbl )
+        Stable.Latest.t =
+    { stack_frame : 'stack_frame
+    ; call_stack : 'call_stack
+    ; transaction_commitment : 'comm
+    ; full_transaction_commitment : 'comm
+    ; excess : 'signed_amount
+    ; supply_increase : 'signed_amount
+    ; ledger : 'ledger
+    ; success : 'bool
+    ; account_update_index : 'length
+    ; failure_status_tbl : 'failure_status_tbl
+    ; will_succeed : 'bool
+    }
+  [@@deriving compare, equal, hash, sexp, yojson, fields, hlist]
+
+  type ( 'stack_frame
+       , 'call_stack
+       , 'signed_amount
+       , 'ledger
+       , 'bool
+       , 'comm
+       , 'length
+       , 'failure_status_tbl )
+       tt =
+    ( 'stack_frame
+    , 'call_stack
+    , 'signed_amount
+    , 'ledger
+    , 'bool
+    , 'comm
+    , 'length
+    , 'failure_status_tbl )
+    t
+  [@@deriving compare, equal, hash, sexp, yojson]
+
   let typ stack_frame call_stack excess supply_increase ledger bool comm length
       failure_status_tbl =
     Pickles.Impls.Step.Typ.of_hlistable
@@ -269,6 +321,18 @@ module Local_state = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t =
+      ( Mina_base.Stack_frame.Digest.t
+      , Mina_base.Call_stack_digest.t
+      , (Currency.Amount.t, Sgn.t) Currency.Signed_poly.t
+      , Ledger_hash.t
+      , bool
+      , Zkapp_command.Transaction_commitment.t
+      , Mina_numbers.Index.t
+      , Transaction_status.Failure.Collection.t )
+      tt
+    [@@deriving equal, compare, hash, yojson, sexp]
   end
 
   module Checked = struct
@@ -932,6 +996,14 @@ module Start_data = struct
       [@@deriving sexp, yojson]
     end
   end]
+
+  type ('account_updates, 'field, 'bool) t =
+        ('account_updates, 'field, 'bool) Stable.Latest.t =
+    { account_updates : 'account_updates
+    ; memo_hash : 'field
+    ; will_succeed : 'bool
+    }
+  [@@deriving sexp, yojson]
 end
 
 module Make (Inputs : Inputs_intf) = struct

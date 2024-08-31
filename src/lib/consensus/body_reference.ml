@@ -20,7 +20,7 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t
+type t = Blake2.t [@@deriving sexp, yojson, hash, equal, compare]
 
 [%%define_locally Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, of_yojson)]
 

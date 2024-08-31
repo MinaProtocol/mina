@@ -29,10 +29,36 @@ module Poly = struct
       [@@deriving equal, compare, hash, sexp, to_yojson, hlist]
     end
   end]
+
+  type ('length, 'global_slot_since_hard_fork, 'time, 'timespan) t =
+        ( 'length
+        , 'global_slot_since_hard_fork
+        , 'time
+        , 'timespan )
+        Stable.Latest.t =
+    { k : 'length
+    ; delta : 'length
+    ; slots_per_sub_window : 'length
+    ; slots_per_window : 'length
+    ; sub_windows_per_window : 'length
+    ; slots_per_epoch : 'length (* The first slot after the grace period. *)
+    ; grace_period_slots : 'length
+    ; grace_period_end : 'global_slot_since_hard_fork
+    ; checkpoint_window_slots_per_year : 'length
+    ; checkpoint_window_size_in_slots : 'length
+    ; block_window_duration_ms : 'timespan
+    ; slot_duration_ms : 'timespan
+    ; epoch_duration : 'timespan
+    ; delta_duration : 'timespan
+    ; genesis_state_timestamp : 'time
+    }
+  [@@deriving equal, compare, hash, sexp, to_yojson, hlist]
 end
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       ( Length.Stable.V1.t
@@ -45,6 +71,14 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t =
+  ( Length.t
+  , Global_slot_since_hard_fork.t
+  , Block_time.t
+  , Block_time.Span.t )
+  Poly.t
+[@@deriving equal, ord, sexp, to_yojson]
 
 type var =
   ( Length.Checked.t

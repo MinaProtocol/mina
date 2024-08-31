@@ -22,6 +22,15 @@ module Payload = struct
       end
     end]
 
+    type t =
+      ( Currency.Fee.t
+      , Public_key.Compressed.t
+      , Account_nonce.t option
+      , Global_slot_since_genesis.t
+      , Signed_command_memo.t )
+      Signed_command_payload.Common.Poly.t
+    [@@deriving sexp, to_yojson]
+
     let create ~fee ~fee_payer_pk ?nonce ~valid_until ~memo : t =
       { fee; fee_payer_pk; nonce; valid_until; memo }
 
@@ -74,6 +83,10 @@ module Payload = struct
     end
   end]
 
+  type t =
+    (Common.t, Signed_command_payload.Body.t) Signed_command_payload.Poly.t
+  [@@deriving sexp, to_yojson]
+
   let create ~fee ~fee_payer_pk ?nonce ~valid_until ~memo ~body : t =
     { common = Common.create ~fee ~fee_payer_pk ?nonce ~valid_until ~memo
     ; body
@@ -103,6 +116,12 @@ module Sign_choice = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    | Signature of Signature.t
+    | Hd_index of Unsigned_extended.UInt32.t
+    | Keypair of Keypair.t
+  [@@deriving sexp, to_yojson]
 end
 
 [%%versioned
@@ -118,6 +137,10 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t =
+  (Payload.t, Public_key.Compressed.t, Sign_choice.t) Signed_command.Poly.t
+[@@deriving sexp, to_yojson]
 
 [%%define_locally Stable.Latest.(to_yojson)]
 

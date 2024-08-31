@@ -61,6 +61,8 @@ module Ledger_inner = struct
           Ledger_hash.of_digest (Lazy.force Account.empty_digest)
       end
     end]
+
+    type t = Ledger_hash.t [@@deriving sexp, compare, hash, equal, yojson]
   end
 
   module Account = struct
@@ -80,6 +82,8 @@ module Ledger_inner = struct
         let token = Account.token_id
       end
     end]
+
+    type t = Account.t [@@deriving equal, compare, sexp]
 
     let empty = Stable.Latest.empty
 

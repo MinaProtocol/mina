@@ -26,12 +26,18 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type ('state_hash, 'body) t = ('state_hash, 'body) A.Poly.V1.t =
           { previous_state_hash : 'state_hash; body : 'body }
         [@@deriving equal, ord, hash, sexp, yojson, hlist]
       end
     end]
+
+    type ('state_hash, 'body) t = ('state_hash, 'body) Stable.Latest.t =
+      { previous_state_hash : 'state_hash; body : 'body }
+    [@@deriving equal, ord, hash, sexp, yojson, hlist]
   end
 
   let hashes_abstract ~hash_body
@@ -62,14 +68,29 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; consensus_state : 'consensus_state
             ; constants : 'constants
             }
-          [@@deriving sexp, equal, compare, yojson, hash, version, hlist]
+          [@@deriving sexp, equal, compare, yojson, hash, hlist]
         end
       end]
+
+      type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t =
+            ( 'state_hash
+            , 'blockchain_state
+            , 'consensus_state
+            , 'constants )
+            Stable.Latest.t =
+        { genesis_state_hash : 'state_hash
+        ; blockchain_state : 'blockchain_state
+        ; consensus_state : 'consensus_state
+        ; constants : 'constants
+        }
+      [@@deriving sexp, equal, compare, yojson, hash, hlist]
     end
 
     module Value = struct
       [%%versioned
       module Stable = struct
+        [@@@no_toplevel_latest_type]
+
         module V2 = struct
           type t =
             ( State_hash.Stable.V1.t
@@ -82,6 +103,14 @@ module Make_str (A : Wire_types.Concrete) = struct
           let to_latest = Fn.id
         end
       end]
+
+      type t =
+        ( State_hash.t
+        , Blockchain_state.Value.t
+        , Consensus.Data.Consensus_state.Value.t
+        , Protocol_constants_checked.Value.t )
+        Poly.t
+      [@@deriving equal, ord, hash, sexp, yojson]
     end
 
     type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t =
@@ -195,6 +224,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = (State_hash.t, Body.Value.t) Poly.t
+    [@@deriving sexp, hash, compare, equal, yojson]
 
     include Hashable.Make (Stable.Latest)
   end

@@ -25,6 +25,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         [@@deriving sexp, equal, compare, hash, yojson, hlist]
       end
     end]
+
+    type ('slot_number, 'slots_per_epoch) t =
+          ('slot_number, 'slots_per_epoch) Stable.Latest.t =
+      { slot_number : 'slot_number; slots_per_epoch : 'slots_per_epoch }
+    [@@deriving sexp, equal, compare, hash, yojson, hlist]
   end
 
   [%%versioned
@@ -36,6 +41,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = (T.t, Length.t) Poly.t
+  [@@deriving sexp, equal, compare, hash, yojson]
 
   type value = t [@@deriving sexp, compare, hash, yojson]
 

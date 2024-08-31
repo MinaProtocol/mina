@@ -43,6 +43,41 @@ module Poly = struct
       [@@deriving sexp, fields, equal, compare, hash, yojson, hlist]
     end
   end]
+
+  type ( 'staged_ledger_hash
+       , 'snarked_ledger_hash
+       , 'local_state
+       , 'time
+       , 'body_reference
+       , 'signed_amount
+       , 'pending_coinbase_stack
+       , 'fee_excess
+       , 'sok_digest )
+       t =
+        ( 'staged_ledger_hash
+        , 'snarked_ledger_hash
+        , 'local_state
+        , 'time
+        , 'body_reference
+        , 'signed_amount
+        , 'pending_coinbase_stack
+        , 'fee_excess
+        , 'sok_digest )
+        Stable.Latest.t =
+    { staged_ledger_hash : 'staged_ledger_hash
+    ; genesis_ledger_hash : 'snarked_ledger_hash
+    ; ledger_proof_statement :
+        ( 'snarked_ledger_hash
+        , 'signed_amount
+        , 'pending_coinbase_stack
+        , 'fee_excess
+        , 'sok_digest
+        , 'local_state )
+        Snarked_ledger_state.Poly.t
+    ; timestamp : 'time
+    ; body_reference : 'body_reference
+    }
+  [@@deriving sexp, fields, equal, compare, hash, yojson, hlist]
 end
 
 [%%define_locally
@@ -81,6 +116,19 @@ module Value = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t =
+    ( Staged_ledger_hash.t
+    , Frozen_ledger_hash.t
+    , Local_state.t
+    , Block_time.t
+    , Consensus.Body_reference.t
+    , (Amount.t, Sgn.t) Signed_poly.t
+    , Pending_coinbase.Stack_versioned.t
+    , Fee_excess.t
+    , unit )
+    Poly.t
+  [@@deriving sexp, equal, compare, yojson]
 end
 
 type var =

@@ -9,6 +9,8 @@ module Block_data = struct
     end
   end]
 
+  type t = Mina_state.Protocol_state.Body.Value.t [@@deriving sexp]
+
   type var = Mina_state.Protocol_state.Body.var
 
   let typ = Mina_state.Protocol_state.Body.typ
@@ -26,6 +28,13 @@ module Poly = struct
       [@@deriving sexp]
     end
   end]
+
+  type 'a t = 'a Stable.Latest.t =
+    { transaction : 'a
+    ; block_data : Block_data.Stable.V2.t
+    ; global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+    }
+  [@@deriving sexp]
 end
 
 [%%versioned
@@ -34,6 +43,8 @@ module Stable = struct
     type 'a t = 'a Poly.Stable.V2.t [@@deriving sexp]
   end
 end]
+
+type 'a t = 'a Poly.t [@@deriving sexp]
 
 let transaction t = t.Poly.transaction
 

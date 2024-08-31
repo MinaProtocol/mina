@@ -192,6 +192,8 @@ module Output = struct
       end
     end]
 
+    type t = string [@@deriving sexp, equal, compare, hash, yojson]
+
     include Codable.Make_base58_check (struct
       type t = Stable.Latest.t [@@deriving bin_io_unversioned]
 

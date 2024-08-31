@@ -91,8 +91,17 @@ module Value = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t =
+    ( Epoch_ledger.Value.t
+    , Epoch_seed.t
+    , State_hash.t
+    , State_hash.t
+    , Length.t )
+    Poly.t
+  [@@deriving sexp, compare, equal, hash, yojson]
 end
 
-type t = Value.Stable.V1.t [@@deriving sexp, compare, equal, hash, yojson]
+type t = Value.t [@@deriving sexp, compare, equal, hash, yojson]
 
 include Comparable.Make (Value.Stable.V1)

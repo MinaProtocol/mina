@@ -112,6 +112,17 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
+    type t = Stable.Latest.t =
+      { delta : int
+      ; k : int
+      ; slots_per_epoch : int
+      ; slot_duration : int
+      ; epoch_duration : int
+      ; genesis_state_timestamp : Block_time.t
+      ; acceptable_network_delay : int
+      }
+    [@@deriving yojson, fields]
+
     let t ~constraint_constants ~protocol_constants =
       let constants =
         Constants.create ~constraint_constants ~protocol_constants
@@ -1019,6 +1030,15 @@ module Make_str (A : Wire_types.Concrete) = struct
             end
           end]
 
+          type t =
+            ( Epoch_ledger.Value.t
+            , Epoch_seed.t
+            , Mina_base.State_hash.t
+            , Lock_checkpoint.t
+            , Length.t )
+            Poly.t
+          [@@deriving sexp, compare, equal, hash, yojson]
+
           let (_ : (Stable.Latest.t, Staking.Value.t) Type_equal.t) =
             Type_equal.T
         end
@@ -1043,6 +1063,15 @@ module Make_str (A : Wire_types.Concrete) = struct
               let to_latest = Fn.id
             end
           end]
+
+          type t =
+            ( Epoch_ledger.Value.t
+            , Epoch_seed.t
+            , Mina_base.State_hash.t
+            , Lock_checkpoint.t
+            , Length.t )
+            Poly.t
+          [@@deriving sexp, compare, equal, hash, yojson]
 
           type _unused = unit constraint Stable.Latest.t = Next.Value.t
         end
@@ -1675,6 +1704,44 @@ module Make_str (A : Wire_types.Concrete) = struct
             [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
           end
         end]
+
+        type ( 'length
+             , 'vrf_output
+             , 'amount
+             , 'global_slot
+             , 'global_slot_since_genesis
+             , 'staking_epoch_data
+             , 'next_epoch_data
+             , 'bool
+             , 'pk )
+             t =
+              ( 'length
+              , 'vrf_output
+              , 'amount
+              , 'global_slot
+              , 'global_slot_since_genesis
+              , 'staking_epoch_data
+              , 'next_epoch_data
+              , 'bool
+              , 'pk )
+              Stable.Latest.t =
+          { blockchain_length : 'length
+          ; epoch_count : 'length
+          ; min_window_density : 'length
+          ; sub_window_densities : 'length list
+          ; last_vrf_output : 'vrf_output
+          ; total_currency : 'amount
+          ; curr_global_slot_since_hard_fork : 'global_slot
+          ; global_slot_since_genesis : 'global_slot_since_genesis
+          ; staking_epoch_data : 'staking_epoch_data
+          ; next_epoch_data : 'next_epoch_data
+          ; has_ancestor_in_same_checkpoint_window : 'bool
+          ; block_stake_winner : 'pk
+          ; block_creator : 'pk
+          ; coinbase_receiver : 'pk
+          ; supercharge_coinbase : 'bool
+          }
+        [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
       end
 
       module Value = struct
@@ -1697,6 +1764,19 @@ module Make_str (A : Wire_types.Concrete) = struct
             let to_latest = Fn.id
           end
         end]
+
+        type t =
+          ( Length.t
+          , Vrf.Output.Truncated.t
+          , Amount.t
+          , Global_slot.t
+          , Mina_numbers.Global_slot_since_genesis.t
+          , Epoch_data.Staking_value_versioned.Value.t
+          , Epoch_data.Next_value_versioned.Value.t
+          , bool
+          , Public_key.Compressed.t )
+          Poly.t
+        [@@deriving sexp, equal, compare, hash, yojson]
 
         module For_tests = struct
           let with_global_slot_since_genesis (state : t) slot_number =

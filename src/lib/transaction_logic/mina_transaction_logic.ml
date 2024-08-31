@@ -22,6 +22,10 @@ module Transaction_applied = struct
           let to_latest = Fn.id
         end
       end]
+
+      type t = Stable.Latest.t =
+        { user_command : Signed_command.t With_status.t }
+      [@@deriving sexp, to_yojson]
     end
 
     module Body = struct
@@ -38,6 +42,13 @@ module Transaction_applied = struct
           let to_latest = Fn.id
         end
       end]
+
+      type t = Stable.Latest.t =
+        | Payment of { new_accounts : Account_id.t list }
+        | Stake_delegation of
+            { previous_delegate : Public_key.Compressed.t option }
+        | Failed
+      [@@deriving sexp, to_yojson]
     end
 
     [%%versioned
@@ -49,6 +60,9 @@ module Transaction_applied = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t = { common : Common.t; body : Body.t }
+    [@@deriving sexp, to_yojson]
 
     let new_accounts (t : t) =
       match t.body with
@@ -73,6 +87,13 @@ module Transaction_applied = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t =
+      { accounts : (Account_id.t * Account.t option) list
+      ; command : Zkapp_command.t With_status.t
+      ; new_accounts : Account_id.t list
+      }
+    [@@deriving sexp, to_yojson]
   end
 
   module Command_applied = struct
@@ -87,6 +108,11 @@ module Transaction_applied = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t =
+      | Signed_command of Signed_command_applied.t
+      | Zkapp_command of Zkapp_command_applied.t
+    [@@deriving sexp, to_yojson]
   end
 
   module Fee_transfer_applied = struct
@@ -103,6 +129,13 @@ module Transaction_applied = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t =
+      { fee_transfer : Fee_transfer.t With_status.t
+      ; new_accounts : Account_id.t list
+      ; burned_tokens : Currency.Amount.t
+      }
+    [@@deriving sexp, to_yojson]
   end
 
   module Coinbase_applied = struct
@@ -119,6 +152,13 @@ module Transaction_applied = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t =
+      { coinbase : Coinbase.t With_status.t
+      ; new_accounts : Account_id.t list
+      ; burned_tokens : Currency.Amount.t
+      }
+    [@@deriving sexp, to_yojson]
   end
 
   module Varying = struct
@@ -134,6 +174,12 @@ module Transaction_applied = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t =
+      | Command of Command_applied.t
+      | Fee_transfer of Fee_transfer_applied.t
+      | Coinbase of Coinbase_applied.t
+    [@@deriving sexp, to_yojson]
   end
 
   [%%versioned
@@ -148,6 +194,10 @@ module Transaction_applied = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { previous_hash : Ledger_hash.t; varying : Varying.t }
+  [@@deriving sexp, to_yojson]
 
   let burned_tokens : t -> Currency.Amount.t =
    fun { varying; _ } ->

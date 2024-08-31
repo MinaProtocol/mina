@@ -23,6 +23,12 @@ module Poly = struct
             Coinbase x
     end
   end]
+
+  type 'command t = 'command Stable.Latest.t =
+    | Command of 'command
+    | Fee_transfer of Fee_transfer.t
+    | Coinbase of Coinbase.t
+  [@@deriving sexp, compare, equal, hash, yojson]
 end
 
 module Valid = struct
@@ -35,6 +41,9 @@ module Valid = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = User_command.Valid.t Poly.t
+  [@@deriving sexp, compare, equal, hash, yojson]
 
   include Hashable.Make (Stable.Latest)
   include Comparable.Make (Stable.Latest)
@@ -49,6 +58,8 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t = User_command.t Poly.t [@@deriving sexp, compare, equal, hash, yojson]
 
 include Hashable.Make (Stable.Latest)
 include Comparable.Make (Stable.Latest)
