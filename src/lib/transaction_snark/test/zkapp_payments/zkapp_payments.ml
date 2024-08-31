@@ -86,6 +86,7 @@ let%test_module "Zkapp payments tests" =
                   ; use_full_commitment = false
                   ; may_use_token = No
                   ; authorization_kind = Signature
+                  ; delete_account = false
                   }
               ; authorization = Signature Signature.dummy
               }
@@ -109,6 +110,7 @@ let%test_module "Zkapp payments tests" =
                   ; use_full_commitment = false
                   ; may_use_token = No
                   ; authorization_kind = None_given
+                  ; delete_account = false
                   }
               ; authorization = None_given
               }
