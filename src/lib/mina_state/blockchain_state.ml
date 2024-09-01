@@ -128,7 +128,7 @@ module Value = struct
     , Fee_excess.t
     , unit )
     Poly.t
-  [@@deriving sexp, equal, compare, yojson]
+  [@@deriving sexp, equal, compare, hash, yojson]
 end
 
 type var =

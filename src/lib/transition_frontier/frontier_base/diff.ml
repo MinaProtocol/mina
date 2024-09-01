@@ -42,6 +42,8 @@ end) =
 module Node = struct
   [%%versioned_binable
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V3 = struct
       type 'a t =
         | Full : Breadcrumb.t -> full t
@@ -52,6 +54,10 @@ module Node = struct
       end)
     end
   end]
+
+  type 'a t = 'a Stable.Latest.t =
+    | Full : Breadcrumb.t -> full t
+    | Lite : Mina_block.Validated.Stable.V2.t -> lite t
 end
 
 module Node_list = struct
@@ -88,6 +94,8 @@ module Node_list = struct
 
     [%%versioned_binable
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = lite node_list
 
@@ -104,6 +112,8 @@ module Node_list = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = lite node_list
   end
 end
 
@@ -154,6 +164,8 @@ module Root_transition = struct
 
     [%%versioned_binable
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V4 = struct
         type t = lite root_transition
 
@@ -184,12 +196,16 @@ module Root_transition = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = lite root_transition
   end
 end
 
 module T = struct
   [%%versioned_binable
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type ('repr, 'mutant) t =
         | New_node : 'repr Node.Stable.V3.t -> ('repr, unit) t
@@ -201,6 +217,11 @@ module T = struct
       end)
     end
   end]
+
+  type ('repr, 'mutant) t = ('repr, 'mutant) Stable.Latest.t =
+    | New_node : 'repr Node.t -> ('repr, unit) t
+    | Root_transitioned : 'repr Root_transition.t -> ('repr, State_hash.t) t
+    | Best_tip_changed : State_hash.t -> (_, State_hash.t) t
 end
 
 type ('repr, 'mutant) t = ('repr, 'mutant) T.t =

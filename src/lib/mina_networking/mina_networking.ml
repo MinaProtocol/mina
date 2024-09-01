@@ -744,6 +744,25 @@ module Rpcs = struct
             }
         end
       end]
+
+      type t = Stable.Latest.t =
+        { node_ip_addr : Network_peer.Peer.Inet_addr.t
+        ; node_peer_id : Network_peer.Peer.Id.t
+              [@to_yojson fun peer_id -> `String peer_id]
+              [@of_yojson
+                function `String s -> Ok s | _ -> Error "expected string"]
+        ; sync_status : Sync_status.t
+        ; peers : Network_peer.Peer.t list
+        ; block_producers : Signature_lib.Public_key.Compressed.t list
+        ; protocol_state_hash : State_hash.t
+        ; ban_statuses : (Network_peer.Peer.t * Trust_system.Peer_status.t) list
+        ; k_block_hashes_and_timestamps :
+            (State_hash.t * Bounded_types.String.t) list
+        ; git_commit : string
+        ; uptime_minutes : int
+        ; block_height_opt : int option [@default None]
+        }
+      [@@deriving to_yojson, of_yojson]
     end
 
     module Master = struct

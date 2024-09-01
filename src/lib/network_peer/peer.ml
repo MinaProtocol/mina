@@ -14,7 +14,7 @@ module Id = struct
     end
   end]
 
-  type t = string
+  type t = string [@@deriving compare, hash, equal, sexp]
 
   (** Convert to the libp2p-defined base58 string *)
   let to_string (x : t) = x
@@ -47,7 +47,9 @@ module Inet_addr = struct
     end
   end]
 
-  [%%define_locally Stable.V1.(to_yojson, of_yojson)]
+  type t = Unix.Inet_addr.t [@@deriving compare, hash]
+
+  [%%define_locally Stable.V1.(to_yojson, of_yojson, t_of_sexp, sexp_of_t)]
 end
 
 [%%versioned

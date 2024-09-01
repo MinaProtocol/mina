@@ -15,6 +15,9 @@ module State = struct
     end
   end]
 
+  type t = Stable.Latest.t = Pending | Included | Unknown
+  [@@deriving equal, sexp, compare]
+
   let to_string = function
     | Pending ->
         "PENDING"

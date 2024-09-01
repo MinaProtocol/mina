@@ -98,4 +98,12 @@ module Result = struct
       [@@deriving fields]
     end
   end]
+
+  type ('spec, 'single) t = ('spec, 'single) Stable.Latest.t =
+    { proofs : 'single One_or_two.t
+    ; metrics : (Core.Time.Span.t * [ `Transition | `Merge ]) One_or_two.t
+    ; spec : 'spec
+    ; prover : Signature_lib.Public_key.Compressed.t
+    }
+  [@@deriving fields]
 end

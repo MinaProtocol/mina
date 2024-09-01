@@ -13,11 +13,16 @@ module Fee_transfer_type = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t = Fee_transfer | Fee_transfer_via_coinbase
+  [@@deriving quickcheck, compare, sexp]
 end
 
 module Transactions = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t =
         { commands :
@@ -36,11 +41,21 @@ module Transactions = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { commands :
+        (User_command.t, Transaction_hash.t) With_hash.t With_status.t list
+    ; fee_transfers : (Fee_transfer.Single.t * Fee_transfer_type.t) list
+    ; coinbase : Currency.Amount.t
+    ; coinbase_receiver : Public_key.Compressed.t option
+    }
 end
 
 module Protocol_state = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t =
         { previous_state_hash : State_hash.Stable.V1.t
@@ -51,10 +66,18 @@ module Protocol_state = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { previous_state_hash : State_hash.t
+    ; blockchain_state : Mina_state.Blockchain_state.Value.t
+    ; consensus_state : Consensus.Data.Consensus_state.Value.t
+    }
 end
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       { creator : Public_key.Compressed.Stable.V1.t
@@ -68,6 +91,15 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t = Stable.Latest.t =
+  { creator : Public_key.Compressed.t
+  ; winner : Public_key.Compressed.t
+  ; protocol_state : Protocol_state.t
+  ; transactions : Transactions.t
+  ; snark_jobs : Transaction_snark_work.Info.t list
+  ; proof : Proof.t
+  }
 
 let participants
     { transactions = { commands; fee_transfers; _ }; creator; winner; _ } =

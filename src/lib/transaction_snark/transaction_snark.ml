@@ -55,6 +55,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = [ `Base | `Merge ] [@@deriving compare, equal, hash, sexp, yojson]
   end
 
   module Pending_coinbase_stack_state =
@@ -72,6 +74,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Pickles.Proof.Proofs_verified_2.t
+    [@@deriving yojson, compare, equal, sexp, hash]
   end
 
   [%%versioned
@@ -86,6 +91,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { statement : Mina_state.Snarked_ledger_state.With_sok.t; proof : Proof.t }
+  [@@deriving compare, equal, fields, sexp, yojson, hash]
 
   let proof t = t.proof
 
@@ -128,6 +137,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           let to_latest = Fn.id
         end
       end]
+
+      type t = Stable.Latest.t = Opt_signed_opt_signed | Opt_signed | Proved
+      [@@deriving sexp, yojson]
 
       let of_controls = function
         | [ Control.Proof _ ] ->

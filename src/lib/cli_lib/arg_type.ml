@@ -121,12 +121,16 @@ let user_command =
 module Work_selection_method = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Sequence | Random
 
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t = Sequence | Random
 end
 
 let work_selection_method_val = function

@@ -9,7 +9,7 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, compare, yojson, equal]
+type t = Stable.Latest.t [@@deriving sexp, compare, yojson, hash, equal]
 
 type var
 

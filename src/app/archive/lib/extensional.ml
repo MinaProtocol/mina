@@ -46,6 +46,33 @@ module User_command = struct
     end
   end]
 
+  (* for `command_type` and `status`, a string is enough
+     in any case, there aren't existing string conversions for the
+     original OCaml types
+
+     The versioned modules in Transaction_hash.Stable don't have yojson functions
+     it would be difficult to add them, so we just use the ones for the
+      top-level Transaction.t
+  *)
+  type t = Stable.Latest.t =
+    { sequence_no : int
+    ; command_type : string
+    ; fee_payer : Public_key.Compressed.t
+    ; source : Public_key.Compressed.t
+    ; receiver : Public_key.Compressed.t
+    ; nonce : Account.Nonce.t
+    ; amount : Currency.Amount.t option
+    ; fee : Currency.Fee.t
+    ; valid_until : Mina_numbers.Global_slot_since_genesis.t option
+    ; memo : Signed_command_memo.t
+    ; hash : Transaction_hash.t
+          [@to_yojson Transaction_hash.to_yojson]
+          [@of_yojson Transaction_hash.of_yojson]
+    ; status : string
+    ; failure_reason : Transaction_status.Failure.t option
+    }
+  [@@deriving yojson, equal]
+
   (* fee_payer and source are always the same, so we omit the duplication here *)
   let accounts_referenced { fee_payer; receiver; _ } =
     [ Account_id.create fee_payer Token_id.default
@@ -78,6 +105,23 @@ module Internal_command = struct
     end
   end]
 
+  (* for `command_type`, a string is enough
+     no existing string conversion for the original OCaml type
+  *)
+  type t = Stable.Latest.t =
+    { sequence_no : int
+    ; secondary_sequence_no : int
+    ; command_type : string
+    ; receiver : Public_key.Compressed.t
+    ; fee : Currency.Fee.t
+    ; hash : Transaction_hash.t
+          [@to_yojson Transaction_hash.to_yojson]
+          [@of_yojson Transaction_hash.of_yojson]
+    ; status : string
+    ; failure_reason : Transaction_status.Failure.t option
+    }
+  [@@deriving yojson, equal]
+
   let account_referenced { receiver; _ } =
     Account_id.create receiver Token_id.default
 end
@@ -104,6 +148,19 @@ module Zkapp_command = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { sequence_no : int
+    ; fee_payer : Account_update.Body.Fee_payer.t
+    ; account_updates : Account_update.Body.Simple.t list
+    ; memo : Signed_command_memo.t
+    ; hash : Transaction_hash.t
+          [@to_yojson Transaction_hash.to_yojson]
+          [@of_yojson Transaction_hash.of_yojson]
+    ; status : string
+    ; failure_reasons : Transaction_status.Failure.Collection.Display.t option
+    }
+  [@@deriving yojson, equal]
 
   let accounts_referenced { fee_payer; account_updates; _ } =
     Account_id.create fee_payer.public_key Token_id.default
@@ -156,4 +213,36 @@ module Block = struct
       let to_latest = Fn.id
     end
   end]
+
+  (* in accounts_accessed, the int is the ledger index
+     in tokens_used, the account id is the token owner
+  *)
+  type t = Stable.Latest.t =
+    { state_hash : State_hash.t
+    ; parent_hash : State_hash.t
+    ; creator : Public_key.Compressed.t
+    ; block_winner : Public_key.Compressed.t
+    ; last_vrf_output : Consensus_vrf.Output.Truncated.t
+    ; snarked_ledger_hash : Frozen_ledger_hash.t
+    ; staking_epoch_data : Mina_base.Epoch_data.Value.t
+    ; next_epoch_data : Mina_base.Epoch_data.Value.t
+    ; min_window_density : Mina_numbers.Length.t
+    ; total_currency : Currency.Amount.t
+    ; sub_window_densities : Mina_numbers.Length.t list
+    ; ledger_hash : Ledger_hash.t
+    ; height : Unsigned_extended.UInt32.t
+    ; global_slot_since_hard_fork : Mina_numbers.Global_slot_since_hard_fork.t
+    ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
+    ; timestamp : Block_time.t
+    ; user_cmds : User_command.t list
+    ; internal_cmds : Internal_command.t list
+    ; zkapp_cmds : Zkapp_command.t list
+    ; protocol_version : Protocol_version.t
+    ; proposed_protocol_version : Protocol_version.t option
+    ; chain_status : Chain_status.t
+    ; accounts_accessed : (int * Account.t) list
+    ; accounts_created : (Account_id.t * Currency.Fee.t) list
+    ; tokens_used : (Token_id.t * Account_id.t option) list
+    }
+  [@@deriving yojson, equal]
 end

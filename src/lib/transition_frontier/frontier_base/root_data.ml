@@ -4,6 +4,8 @@ open Mina_base
 module Common = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t =
         { scan_state : Staged_ledger.Scan_state.Stable.V2.t
@@ -21,6 +23,11 @@ module Common = struct
     end
   end]
 
+  type t = Stable.Latest.t =
+    { scan_state : Staged_ledger.Scan_state.t
+    ; pending_coinbase : Pending_coinbase.t
+    }
+
   let create ~scan_state ~pending_coinbase = { scan_state; pending_coinbase }
 
   let scan_state t = t.scan_state
@@ -31,6 +38,8 @@ end
 module Historical = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V3 = struct
       type t =
         { transition : Mina_block.Validated.Stable.V2.t
@@ -41,6 +50,12 @@ module Historical = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { transition : Mina_block.Validated.t
+    ; common : Common.t
+    ; staged_ledger_target_ledger_hash : Ledger_hash.t
+    }
 
   let transition t = t.transition
 
@@ -67,6 +82,8 @@ end
 module Limited = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V3 = struct
       type t =
         { transition : Mina_block.Validated.Stable.V2.t
@@ -87,6 +104,15 @@ module Limited = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { transition : Mina_block.Validated.t
+    ; protocol_states :
+        Mina_state.Protocol_state.Value.t
+        Mina_base.State_hash.With_state_hashes.t
+        list
+    ; common : Common.t
+    }
 
   [%%define_locally Stable.Latest.(to_yojson)]
 

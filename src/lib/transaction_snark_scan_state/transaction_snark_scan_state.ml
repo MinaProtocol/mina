@@ -56,6 +56,18 @@ module Transaction_with_witness = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { transaction_with_info : Mina_transaction_logic.Transaction_applied.t
+    ; state_hash : State_hash.t * State_body_hash.t
+    ; statement : Transaction_snark.Statement.t
+    ; init_stack :
+        Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1.t
+    ; first_pass_ledger_witness : (Mina_ledger.Sparse_ledger.t[@sexp.opaque])
+    ; second_pass_ledger_witness : (Mina_ledger.Sparse_ledger.t[@sexp.opaque])
+    ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
+    }
+  [@@deriving sexp, to_yojson]
 end
 
 module Ledger_proof_with_sok_message = struct
@@ -68,6 +80,8 @@ module Ledger_proof_with_sok_message = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Ledger_proof.t * Sok_message.t [@@deriving sexp]
 end
 
 module Available_job = struct
@@ -196,6 +210,17 @@ module Stable = struct
       |> Digestif.SHA256.get |> Staged_ledger_hash.Aux_hash.of_sha256
   end
 end]
+
+type t = Stable.Latest.t =
+  { scan_state :
+      ( Ledger_proof_with_sok_message.t
+      , Transaction_with_witness.t )
+      Parallel_scan.State.t
+  ; previous_incomplete_zkapp_updates :
+      Transaction_with_witness.t list
+      * [ `Border_block_continued_in_the_next_tree of bool ]
+  }
+[@@deriving sexp]
 
 [%%define_locally Stable.Latest.(hash)]
 
