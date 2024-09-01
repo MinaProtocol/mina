@@ -6,6 +6,8 @@ let Size = ./Size.dhall
 
 let RunWithPostgres = ./RunWithPostgres.dhall
 
+let Network = ../Constants/Network.dhall
+
 in  { step =
             \(dependsOn : List Command.TaggedKey.Type)
         ->  Command.build
@@ -15,6 +17,7 @@ in  { step =
                     ([] : List Text)
                     "./src/test/archive/sample_db/archive_db.sql"
                     Artifacts.Type.Archive
+                    (None Network.Type)
                     "./buildkite/scripts/replayer-test.sh"
                 ]
               , label = "Archive: Replayer test"

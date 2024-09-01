@@ -2,7 +2,7 @@
 set -eox pipefail
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-source "${SCRIPTPATH}/export-git-env-vars.sh"
+source "${SCRIPTPATH}/../export-git-env-vars.sh"
 
 DOWNLOAD_FOLDER=_build
 
@@ -15,7 +15,7 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     exit 0
 fi
 
-source scripts/publish-deb.sh \
+source scripts/debian/publish.sh \
   --names "${DOWNLOAD_FOLDER}/mina-*.deb" \
   --release $MINA_DEB_RELEASE \
   --version $MINA_DEB_VERSION \

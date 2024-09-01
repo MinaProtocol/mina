@@ -29,7 +29,7 @@ in  Pipeline.build
                 DockerImage.ReleaseSpec::{
                 , service = "mina-toolchain"
                 , deb_codename = "bullseye"
-                , extra_args = "--no-cache"
+                , no_cache = True
                 , step_key = "toolchain-bullseye-docker-image"
                 }
 

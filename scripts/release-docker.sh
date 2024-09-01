@@ -23,7 +23,7 @@ function usage() {
   echo "  -n, --network             The network configuration to use (devnet or mainnet). Default=devnet"
   echo "  -b, --branch              The branch of the mina repository to use for staged docker builds. Default=compatible"
   echo "  -r, --repo                The currently used mina repository"
-  echo "      --deb-codename        The debian codename (stretch or buster) to build the docker image from. Default=stretch"
+  echo "      --deb-codename        The debian codename (bullseye or focal) to build the docker image from. Default=stretch"
   echo "      --deb-release         The debian package release channel to pull from (unstable,alpha,beta,stable). Default=unstable"
   echo "      --deb-version         The version string for the debian package to install"
   echo "      --deb-profile         The profile string for the debian package to install"
@@ -57,7 +57,7 @@ case "${DEB_CODENAME##*=}" in
   bionic|focal|impish|jammy)
     IMAGE="ubuntu:${DEB_CODENAME##*=}"
   ;;
-  stretch|buster|bullseye|bookworm|sid)
+  stretch|bullseye|bookworm|sid)
     IMAGE="debian:${DEB_CODENAME##*=}-slim"
   ;;
 esac
@@ -85,9 +85,11 @@ IMAGE="--build-arg image=${IMAGE}"
         *instrumented)
           DOCKER_DEB_SUFFIX="--build-arg deb_suffix=${DEB_PROFILE}-instrumented"
           BUILD_FLAG_SUFFIX="-instrumented"
+          DEB_PROFILE_SUFFIX="-${DEB_PROFILE}"
           ;;
         *)
           DOCKER_DEB_SUFFIX="--build-arg deb_suffix=${DEB_PROFILE}"
+          DEB_PROFILE_SUFFIX="-${DEB_PROFILE}"
           ;;
       esac
       ;;
@@ -129,6 +131,7 @@ mina-batch-txn)
   ;;
 mina-rosetta)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
+  VERSION="${VERSION}-${NETWORK##*=}"
   ;;
 mina-zkapp-test-transaction)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-zkapp-test-transaction"
@@ -154,10 +157,10 @@ if [[ -z "${MINA_REPO}" ]]; then
 fi
 
 DOCKER_REGISTRY="gcr.io/o1labs-192920"
-TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}${BUILD_FLAG_SUFFIX}"
+TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}${DEB_PROFILE_SUFFIX}${BUILD_FLAG_SUFFIX}"
 # friendly, predictable tag
 GITHASH=$(git rev-parse --short=7 HEAD)
-HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}${BUILD_FLAG_SUFFIX}"
+HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}${DEB_PROFILE_SUFFIX}${BUILD_FLAG_SUFFIX}"
 BUILD_NETWORK="--network=host"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
@@ -172,9 +175,9 @@ if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
 
   # push to GCR
   docker push "${TAG}"
-
   # retag and push again to GCR
   docker tag "${TAG}" "${HASHTAG}"
   docker push "${HASHTAG}"
 
 fi
+

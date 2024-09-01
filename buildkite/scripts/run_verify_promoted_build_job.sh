@@ -18,7 +18,7 @@
 #          - "NETWORK=Devnet"
 #          - "FROM_VERSION=3.0.0devnet-tooling-dkijania-hardfork-package-gen-in-nightly-b37f50e"
 #          - "NEW_VERSION=3.0.0fake-ddb6fc4"
-#          - "CODENAMES=Focal,Buster,Bullseye"
+#          - "CODENAMES=Focal,Bullseye"
 #          - "FROM_CHANNEL=Unstable"
 #          - "TO_CHANNEL=Experimental"
 #        image: codaprotocol/ci-toolchain-base:v3
@@ -41,7 +41,7 @@ function usage() {
   fi
   echo "  DEBIANS                     The comma delimitered debian names. For example: 'Daemon,Archive' "
   echo "  DOCKERS                     The comma delimitered docker names. For example: 'Daemon,Archive' "
-  echo "  CODENAMES                   The Debian codenames (Bullseye, Buster etc.)"
+  echo "  CODENAMES                   The Debian codenames (Bullseye, Focal etc.)"
   echo "  NEW_VERSION                 The new Debian version or new Docker tag"
   echo "  REMOVE_PROFILE_FROM_NAME    Should we remove profile suffix from debian name"
   echo "  PROFILE                     The Docker and Debian profile (Standard, Lightnet)"
@@ -59,7 +59,7 @@ DHALL_DEBIANS="([] : List $DEBIAN_DHALL_DEF.Type)"
 if [[ -n "$DEBIANS" ]]; then 
     if [[ -z "$CODENAMES" ]]; then usage "Codenames is not set!"; exit 1; fi;
     if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
-    if [[ -z "$NETWORK" ]]; then NETWORK="Berkeley"; fi;
+    if [[ -z "$NETWORK" ]]; then NETWORK="Devnet"; fi;
     if [[ -z "$REMOVE_PROFILE_FROM_NAME" ]]; then REMOVE_PROFILE_FROM_NAME=0; fi;
     if [[ -z "$PUBLISH" ]]; then PUBLISH=0; fi;
     if [[ -z "$TO_CHANNEL" ]]; then TO_CHANNEL="Unstable"; fi;
