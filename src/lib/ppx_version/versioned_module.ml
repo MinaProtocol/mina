@@ -1067,10 +1067,7 @@ let convert_modbody ~loc ~version_option body =
   let may_convert_latest = ref None in
   let latest_version = ref None in
   let attrs, body_no_attrs = List.partition_tf body ~f:is_attr_stri in
-  let no_toplevel_type =
-    !no_toplevel_latest_type
-    || List.exists attrs ~f:(is_attr_stri_with_name no_toplevel_latest_type_str)
-  in
+  let no_toplevel_type = true in
   let json_version_tag =
     List.exists attrs ~f:(is_attr_stri_with_name with_versioned_json)
   in
