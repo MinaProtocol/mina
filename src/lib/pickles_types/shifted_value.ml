@@ -66,6 +66,8 @@ module type S = sig
     end
   end]
 
+  type 'f t = 'f Stable.Latest.t [@@deriving sexp, compare, equal, yojson, hash]
+
   val typ :
        ('a, 'b, 'f) Snarky_backendless.Typ.t
     -> ('a t, 'b t, 'f) Snarky_backendless.Typ.t

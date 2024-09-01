@@ -1716,6 +1716,7 @@ let convert_module_decls signature =
     !no_toplevel_latest_type
     || List.exists sig_attrs
          ~f:(is_attr_sigitem_with_name no_toplevel_latest_type_str)
+    || true
   in
   let top_version_tagged =
     List.exists sig_attrs ~f:(is_attr_sigitem_with_name with_top_version_tag)

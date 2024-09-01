@@ -932,6 +932,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           end
         end]
 
+        type t = Stable.Latest.t [@@deriving sexp, compare, hash, equal, yojson]
+
         (* Give a definition to var, it will be hidden at the interface level *)
         include
           Basic

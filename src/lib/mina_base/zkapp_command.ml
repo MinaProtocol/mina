@@ -1114,6 +1114,18 @@ module Verifiable : sig
     end
   end]
 
+  type t = Stable.Latest.t = private
+    { fee_payer : Account_update.Fee_payer.Stable.V1.t
+    ; account_updates :
+        ( Side_loaded_verification_key.Stable.V2.t
+        , Zkapp_basic.F.Stable.V1.t )
+        With_hash.Stable.V1.t
+        option
+        Call_forest.With_hashes_and_data.Stable.V1.t
+    ; memo : Signed_command_memo.Stable.V1.t
+    }
+  [@@deriving sexp, compare, equal, hash, yojson]
+
   val load_vk_from_ledger :
        location_of_account:(Account_id.t -> 'loc option)
     -> get:('loc -> Account.t option)
@@ -1527,6 +1539,9 @@ module type Valid_intf = sig
       [@@deriving sexp, compare, equal, hash, yojson]
     end
   end]
+
+  type t = Stable.Latest.t = private { zkapp_command : T.Stable.V1.t }
+  [@@deriving sexp, compare, equal, hash, yojson]
 
   val to_valid_unsafe :
     T.t -> [> `If_this_is_used_it_should_have_a_comment_justifying_it of t ]

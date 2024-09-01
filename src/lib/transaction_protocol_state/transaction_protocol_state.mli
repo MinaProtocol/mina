@@ -9,6 +9,8 @@ module Block_data : sig
     end
   end]
 
+  type t = Mina_state.Protocol_state.Body.Value.t [@@deriving sexp]
+
   type var
 
   val typ :
@@ -28,6 +30,13 @@ module Poly : sig
       [@@deriving sexp]
     end
   end]
+
+  type 'a t = 'a Stable.Latest.t =
+    { transaction : 'a
+    ; block_data : Block_data.t
+    ; global_slot : Mina_numbers.Global_slot_since_genesis.t
+    }
+  [@@deriving sexp]
 end
 
 [%%versioned:
@@ -36,6 +45,8 @@ module Stable : sig
     type 'a t = 'a Poly.Stable.V2.t [@@deriving sexp]
   end
 end]
+
+type 'a t = 'a Poly.t [@@deriving sexp]
 
 val transaction : 'a t -> 'a
 

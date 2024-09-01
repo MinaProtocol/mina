@@ -13,6 +13,12 @@ module type Full = sig
     end
   end]
 
+  type t = Stable.Latest.t = private
+    { receiver_pk : Public_key.Compressed.Stable.V1.t
+    ; fee : Currency.Fee.Stable.V1.t
+    }
+  [@@deriving sexp, compare, equal, yojson, hash]
+
   val create : receiver_pk:Public_key.Compressed.t -> fee:Currency.Fee.t -> t
 
   include Comparable.S with type t := t

@@ -99,6 +99,8 @@ module type Account_id = sig
     end
   end]
 
+  type t = Stable.Latest.t [@@deriving sexp]
+
   val public_key : t -> key
 
   val token_id : t -> token_id

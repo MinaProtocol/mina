@@ -39,6 +39,13 @@ module Value : sig
       [@@deriving sexp, to_yojson]
     end
   end]
+
+  type t =
+    ( Blockchain_state.Value.t
+    , Consensus.Data.Consensus_transition.Value.t
+    , Pending_coinbase.Update.t )
+    Poly.t
+  [@@deriving sexp, to_yojson]
 end
 
 type value = Value.t

@@ -21,6 +21,8 @@ module type Full = sig
     end
   end]
 
+  type t = Stable.Latest.t [@@deriving compare, equal, sexp, yojson, hash]
+
   val create : statement:Statement.With_sok.t -> proof:Mina_base.Proof.t -> t
 
   val proof : t -> Mina_base.Proof.t
@@ -119,6 +121,9 @@ module type Full = sig
           [@@deriving sexp, yojson]
         end
       end]
+
+      type t = Stable.Latest.t = Opt_signed_opt_signed | Opt_signed | Proved
+      [@@deriving sexp, yojson]
 
       val to_single_list : t -> Spec.single list
     end

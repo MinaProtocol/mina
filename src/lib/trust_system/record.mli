@@ -5,6 +5,8 @@ module Stable : sig
   end
 end]
 
+type t = Stable.Latest.t
+
 module type S = sig
   val init : unit -> t
 

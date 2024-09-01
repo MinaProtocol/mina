@@ -91,9 +91,11 @@ module type S = sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type nonrec t = Hash.t [@@deriving sexp, compare, equal, yojson, hash]
+        type t = Hash.t [@@deriving sexp, compare, equal, yojson, hash]
       end
     end]
+
+    type t = Hash.t [@@deriving sexp, compare, equal, yojson, hash]
   end
 
   module Coinbase_stack : sig
@@ -103,6 +105,8 @@ module type S = sig
         type t = Field.t
       end
     end]
+
+    type t = Field.t
   end
 
   module State_stack : sig
@@ -113,6 +117,8 @@ module type S = sig
       end
     end]
 
+    type t = Stable.Latest.t
+
     val init : t -> Field.t
 
     val curr : t -> Field.t
@@ -122,9 +128,11 @@ module type S = sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type nonrec t [@@deriving sexp, compare, equal, yojson, hash]
+        type t [@@deriving sexp, compare, equal, yojson, hash]
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, compare, equal, yojson, hash]
 
     val data : t -> Coinbase_stack.t
 
@@ -208,6 +216,13 @@ module type S = sig
         end
       end]
 
+      type t = Stable.Latest.t =
+        | Update_none
+        | Update_one
+        | Update_two_coinbase_in_first
+        | Update_two_coinbase_in_second
+      [@@deriving sexp, to_yojson]
+
       type var = Boolean.var * Boolean.var
 
       val typ : (var, t) Typ.t
@@ -224,6 +239,11 @@ module type S = sig
           [@@deriving sexp]
         end
       end]
+
+      type ('action, 'coinbase_amount) t =
+            ('action, 'coinbase_amount) Stable.Latest.t =
+        { action : 'action; coinbase_amount : 'coinbase_amount }
+      [@@deriving sexp]
     end
 
     [%%versioned:
@@ -233,6 +253,8 @@ module type S = sig
         [@@deriving sexp, to_yojson]
       end
     end]
+
+    type t = (Action.t, Amount.t) Poly.t [@@deriving sexp, to_yojson]
 
     type var = (Action.var, Amount.var) Poly.t
 

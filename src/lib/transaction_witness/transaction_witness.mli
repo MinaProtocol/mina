@@ -43,6 +43,36 @@ module Zkapp_command_segment_witness : sig
       [@@deriving sexp, to_yojson]
     end
   end]
+
+  type t = Stable.Latest.t =
+    { global_first_pass_ledger : Sparse_ledger.t
+    ; global_second_pass_ledger : Sparse_ledger.t
+    ; local_state_init :
+        ( (Token_id.t, Zkapp_command.Call_forest.With_hashes.t) Stack_frame.t
+        , ( ( (Token_id.t, Zkapp_command.Call_forest.With_hashes.t) Stack_frame.t
+            , Stack_frame.Digest.t )
+            With_hash.t
+          , Call_stack_digest.t )
+          With_stack_hash.t
+          list
+        , (Amount.t, Sgn.t) Signed_poly.t
+        , Sparse_ledger.t
+        , bool
+        , Kimchi_backend.Pasta.Basic.Fp.t
+        , Mina_numbers.Index.t
+        , Transaction_status.Failure.Collection.t )
+        Mina_transaction_logic.Zkapp_command_logic.Local_state.t
+    ; start_zkapp_command :
+        ( Zkapp_command.t
+        , Kimchi_backend.Pasta.Basic.Fp.t
+        , bool )
+        Mina_transaction_logic.Zkapp_command_logic.Start_data.t
+        list
+    ; state_body : Mina_state.Protocol_state.Body.Value.t
+    ; init_stack : Pending_coinbase.Stack_versioned.t
+    ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
+    }
+  [@@deriving sexp, to_yojson]
 end
 
 [%%versioned:
@@ -60,3 +90,14 @@ module Stable : sig
     [@@deriving sexp, yojson]
   end
 end]
+
+type t = Stable.Latest.t =
+  { transaction : Mina_transaction.Transaction.t
+  ; first_pass_ledger : Mina_ledger.Sparse_ledger.t
+  ; second_pass_ledger : Mina_ledger.Sparse_ledger.t
+  ; protocol_state_body : Mina_state.Protocol_state.Body.Value.t
+  ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.t
+  ; status : Mina_base.Transaction_status.t
+  ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
+  }
+[@@deriving sexp, yojson]

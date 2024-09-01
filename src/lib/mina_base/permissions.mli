@@ -15,6 +15,9 @@ module Auth_required : sig
     end
   end]
 
+  type t = Stable.Latest.t = None | Either | Proof | Signature | Impossible
+  [@@deriving sexp, equal, compare, hash, yojson, enum]
+
   val from : auth_tag:Control.Tag.t -> t
 
   val to_input : t -> Field.t Random_oracle_input.Chunked.t
@@ -74,6 +77,24 @@ module Poly : sig
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
+
+  type ('controller, 'txn_version) t =
+        ('controller, 'txn_version) Stable.Latest.t =
+    { edit_state : 'controller
+    ; access : 'controller
+    ; send : 'controller
+    ; receive : 'controller (* TODO: Consider having fee *)
+    ; set_delegate : 'controller
+    ; set_permissions : 'controller
+    ; set_verification_key : 'controller * 'txn_version
+    ; set_zkapp_uri : 'controller
+    ; edit_action_state : 'controller
+    ; set_token_symbol : 'controller
+    ; increment_nonce : 'controller
+    ; set_voting_for : 'controller
+    ; set_timing : 'controller
+    }
+  [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
 end
 
 [%%versioned:
@@ -86,6 +107,9 @@ module Stable : sig
     [@@deriving sexp, equal, compare, hash, yojson]
   end
 end]
+
+type t = (Auth_required.t, Mina_numbers.Txn_version.t) Poly.t
+[@@deriving sexp, equal, compare, hash, yojson]
 
 (** if [auth_tag] is provided, the generated permissions will be compatible with
     the corresponding authorization

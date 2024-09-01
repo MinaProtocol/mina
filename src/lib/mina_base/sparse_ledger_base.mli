@@ -15,6 +15,10 @@ module Stable : sig
   end
 end]
 
+type t =
+  (Ledger_hash.t, Account_id.t, Account.t) Sparse_ledger_lib.Sparse_ledger.T.t
+[@@deriving sexp, yojson]
+
 type sparse_ledger = t
 
 module Global_state : sig

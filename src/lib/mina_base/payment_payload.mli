@@ -54,6 +54,9 @@ module Stable : sig
   end
 end]
 
+type t = (Public_key.Compressed.t, Currency.Amount.t) Poly.t
+[@@deriving compare, equal, sexp, hash, compare, yojson]
+
 val dummy : t
 
 (** [gen ?source_pk max_amount] *)

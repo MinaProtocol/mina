@@ -10,6 +10,8 @@ module Stable : sig
   end
 end]
 
+type t = Stable.Latest.t [@@deriving sexp, yojson]
+
 val create : state:Protocol_state.Value.t -> proof:Proof.t -> t
 
 val state : t -> Protocol_state.Value.t

@@ -12,6 +12,8 @@ module Bigstring : sig
     end
   end]
 
+  type t = Bigstring.t [@@deriving sexp, compare]
+
   include Hashable.S with type t := t
 end
 

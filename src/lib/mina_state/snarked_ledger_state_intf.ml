@@ -15,6 +15,11 @@ module type Full = sig
           [@@deriving sexp, hash, compare, equal, yojson]
         end
       end]
+
+      type t = Stable.Latest.t =
+        | Base of Pending_coinbase.Stack_versioned.t
+        | Merge
+      [@@deriving sexp, hash, compare, equal, yojson]
     end
 
     module Poly : sig
@@ -32,6 +37,10 @@ module type Full = sig
         end
       end]
 
+      type 'pending_coinbase t = 'pending_coinbase Stable.Latest.t =
+        { source : 'pending_coinbase; target : 'pending_coinbase }
+      [@@deriving compare, equal, fields, hash, sexp, yojson]
+
       val typ :
            ('pending_coinbase_var, 'pending_coinbase) Tick.Typ.t
         -> ('pending_coinbase_var t, 'pending_coinbase t) Tick.Typ.t
@@ -48,6 +57,9 @@ module type Full = sig
         [@@deriving compare, equal, hash, sexp, yojson]
       end
     end]
+
+    type t = Pending_coinbase.Stack_versioned.t Poly.t
+    [@@deriving compare, equal, hash, sexp, yojson]
 
     type var = Pending_coinbase.Stack.var Poly.t
 
@@ -90,6 +102,30 @@ module type Full = sig
         [@@deriving compare, equal, hash, sexp, yojson]
       end
     end]
+
+    type ( 'ledger_hash
+         , 'amount
+         , 'pending_coinbase
+         , 'fee_excess
+         , 'sok_digest
+         , 'local_state )
+         t =
+          ( 'ledger_hash
+          , 'amount
+          , 'pending_coinbase
+          , 'fee_excess
+          , 'sok_digest
+          , 'local_state )
+          Stable.Latest.t =
+      { source : ('ledger_hash, 'pending_coinbase, 'local_state) Registers.t
+      ; target : ('ledger_hash, 'pending_coinbase, 'local_state) Registers.t
+      ; connecting_ledger_left : 'ledger_hash
+      ; connecting_ledger_right : 'ledger_hash
+      ; supply_increase : 'amount
+      ; fee_excess : 'fee_excess
+      ; sok_digest : 'sok_digest
+      }
+    [@@deriving compare, equal, hash, sexp, yojson]
 
     val with_empty_local_state :
          supply_increase:'amount
@@ -159,6 +195,16 @@ module type Full = sig
     end
   end]
 
+  type t =
+    ( Frozen_ledger_hash.t
+    , (Amount.t, Sgn.t) Signed_poly.t
+    , Pending_coinbase.Stack_versioned.t
+    , Fee_excess.t
+    , unit
+    , Local_state.t )
+    Poly.t
+  [@@deriving compare, equal, hash, sexp, yojson]
+
   type var =
     ( Frozen_ledger_hash.var
     , Currency.Amount.Signed.var
@@ -206,6 +252,16 @@ module type Full = sig
         [@@deriving compare, equal, hash, sexp, yojson]
       end
     end]
+
+    type t =
+      ( Frozen_ledger_hash.t
+      , (Amount.t, Sgn.t) Signed_poly.t
+      , Pending_coinbase.Stack_versioned.t
+      , Fee_excess.t
+      , Sok_message.Digest.t
+      , Local_state.t )
+      Poly.t
+    [@@deriving compare, equal, hash, sexp, yojson]
 
     type display =
       (string, string, string, string, string, Local_state.display) Poly.t

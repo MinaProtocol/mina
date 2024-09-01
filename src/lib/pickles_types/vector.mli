@@ -71,6 +71,8 @@ module With_version (N : Nat.Intf) : sig
       end
     end]
 
+    type 'a t = ('a, N.n) vec [@@deriving compare, yojson, sexp, hash, equal]
+
     val map : 'a t -> f:('a -> 'b) -> 'b t
 
     val of_list_exn : 'a list -> 'a t

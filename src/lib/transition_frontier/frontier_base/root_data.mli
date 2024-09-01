@@ -12,6 +12,8 @@ module Historical : sig
     end
   end]
 
+  type t = Stable.Latest.t
+
   val transition : t -> Mina_block.Validated.t
 
   val scan_state : t -> Staged_ledger.Scan_state.t
@@ -32,6 +34,8 @@ module Limited : sig
       type t [@@deriving to_yojson]
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving to_yojson]
 
   val transition : t -> Mina_block.Validated.t
 
@@ -65,6 +69,8 @@ module Minimal : sig
       type t
     end
   end]
+
+  type t = Stable.Latest.t
 
   val hash : t -> State_hash.t
 

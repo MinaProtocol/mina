@@ -11,6 +11,8 @@ module Stable : sig
   end
 end]
 
+type t = Field.t * Field.t [@@deriving sexp, hash, compare, yojson]
+
 include Comparable.S_binable with type t := t
 
 type var = Field.Var.t * Field.Var.t
@@ -33,6 +35,9 @@ module Compressed : sig
           { x : 'field; is_odd : 'boolean }
       end
     end]
+
+    type ('field, 'boolean) t = ('field, 'boolean) Stable.Latest.t =
+      { x : 'field; is_odd : 'boolean }
   end
 
   [%%versioned:
@@ -47,6 +52,8 @@ module Compressed : sig
       include Hashable.S_binable with type t := t
     end
   end]
+
+  type t = (Field.t, bool) Poly.t [@@deriving sexp, equal, compare, hash]
 
   include Codable.S with type t := t
 

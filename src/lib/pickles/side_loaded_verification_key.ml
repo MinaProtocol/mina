@@ -45,6 +45,8 @@ module Width : sig
     end
   end]
 
+  type t = V.Width.t [@@deriving sexp, equal, compare, hash, yojson]
+
   open Impls.Step
 
   module Checked : sig

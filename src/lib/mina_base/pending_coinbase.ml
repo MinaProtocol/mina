@@ -90,6 +90,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
+    type t = Stable.Latest.t [@@deriving sexp, to_yojson, compare, equal]
+
     val of_yojson : Yojson.Safe.t -> (t, string) result
 
     val of_int : int -> t

@@ -49,7 +49,7 @@ module type S = sig
     end
   end]
 
-  type 'f t = 'f Stable.V1.t
+  type 'f t = 'f Stable.Latest.t [@@deriving sexp, compare, equal, yojson, hash]
 
   val typ :
        ('a, 'b, 'f) Snarky_backendless.Typ.t
@@ -86,6 +86,9 @@ module Type1 : sig
     end
   end]
 
+  type 'f t = 'f Stable.Latest.t = Shifted_value of 'f
+  [@@deriving sexp, compare, equal, yojson, hash]
+
   (** User beware: [equal] is not your regular equality predicate. *)
   val equal : ('a, 'res) Sigs.rel2 -> ('a t, 'res) Sigs.rel2
 
@@ -118,6 +121,9 @@ module Type2 : sig
       [@@deriving sexp, compare, equal, yojson, hash]
     end
   end]
+
+  type 'f t = 'f Stable.Latest.t = Shifted_value of 'f
+  [@@deriving sexp, compare, equal, yojson, hash]
 
   (** User beware: [equal] is not your regular equality predicate. It's just a
       binary relation.

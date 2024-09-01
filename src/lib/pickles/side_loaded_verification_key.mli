@@ -16,6 +16,8 @@ module Width : sig
     end
   end]
 
+  type t = V.Width.t [@@deriving sexp, equal, compare, hash, yojson]
+
   module Checked : sig
     type t
 

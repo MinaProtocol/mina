@@ -13,6 +13,8 @@ module Width : sig
     end
   end]
 
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
+
   val of_int_exn : int -> t
 
   val to_int : t -> int
@@ -33,6 +35,9 @@ module Width : sig
         [@@deriving compare, sexp, yojson, hash, equal]
       end
     end]
+
+    type 'a t = ('a, Max.n) At_most.t
+    [@@deriving compare, sexp, yojson, hash, equal]
   end
 
   module Length : Nat.Add.Intf_transparent

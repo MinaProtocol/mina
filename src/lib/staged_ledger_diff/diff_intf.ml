@@ -44,6 +44,14 @@ module type Full = sig
       end
     end]
 
+    type ('a, 'b) t = ('a, 'b) Stable.Latest.t =
+      { completed_works : 'a list
+      ; commands : 'b list
+      ; coinbase : Coinbase.Fee_transfer.Stable.V1.t At_most_two.Stable.V1.t
+      ; internal_command_statuses : Transaction_status.Stable.V2.t list
+      }
+    [@@deriving equal, compare, sexp, yojson]
+
     val map : ('a, 'b) t -> f1:('a -> 'c) -> f2:('b -> 'd) -> ('c, 'd) t
   end
 
@@ -60,6 +68,14 @@ module type Full = sig
         [@@deriving equal, compare, sexp, yojson]
       end
     end]
+
+    type ('a, 'b) t = ('a, 'b) Stable.Latest.t =
+      { completed_works : 'a list
+      ; commands : 'b list
+      ; coinbase : Coinbase.Fee_transfer.Stable.V1.t At_most_one.Stable.V1.t
+      ; internal_command_statuses : Transaction_status.Stable.V2.t list
+      }
+    [@@deriving equal, compare, sexp, yojson]
 
     val map : ('a, 'b) t -> f1:('a -> 'c) -> f2:('b -> 'd) -> ('c, 'd) t
   end

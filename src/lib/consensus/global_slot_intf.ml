@@ -9,6 +9,10 @@ module type Full = sig
         [@@deriving sexp, equal, compare, hash, yojson]
       end
     end]
+
+    type ('slot_number, 'slots_per_epoch) t =
+      ('slot_number, 'slots_per_epoch) Stable.Latest.t
+    [@@deriving sexp, equal, compare, hash, yojson]
   end
 
   [%%versioned:
@@ -21,6 +25,10 @@ module type Full = sig
       [@@deriving compare, equal, sexp, hash, yojson]
     end
   end]
+
+  type t =
+    (Mina_numbers.Global_slot_since_hard_fork.t, Mina_numbers.Length.t) Poly.t
+  [@@deriving compare, equal, sexp, hash, yojson]
 
   val to_input : t -> Snark_params.Tick.Field.t Random_oracle.Input.Chunked.t
 

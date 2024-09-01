@@ -29,6 +29,10 @@ module Node : sig
         | Lite : Mina_block.Validated.Stable.V2.t -> lite t
     end
   end]
+
+  type 'a t = 'a Stable.Latest.t =
+    | Full : Breadcrumb.t -> full t
+    | Lite : Mina_block.Validated.t -> lite t
 end
 
 module Node_list : sig
@@ -52,6 +56,8 @@ module Node_list : sig
         type t = lite node_list
       end
     end]
+
+    type t = lite node_list
   end
 end
 
@@ -82,6 +88,8 @@ module Root_transition : sig
         type t = lite root_transition
       end
     end]
+
+    type t = lite root_transition
   end
 end
 
@@ -143,6 +151,8 @@ module Lite : sig
         type t = E : (lite, 'mutant) diff -> t [@@unboxed]
       end
     end]
+
+    type t = Stable.Latest.t = E : (lite, 'mutant) diff -> t [@@unboxed]
   end
 end
 

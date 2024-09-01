@@ -75,6 +75,24 @@ module Wrap : sig
             end
           end]
 
+          (** Challenges from the PLONK IOP. These, plus the evaluations
+                  that are already in the proof, are all that's needed to derive
+                  all the values in the {!module:In_circuit} version below.
+
+                  See src/lib/pickles/plonk_checks/plonk_checks.ml for the
+                  computation of the {!module:In_circuit} value from the
+                  {!module:Minimal} value.  *)
+          type ('challenge, 'scalar_challenge, 'bool) t =
+                ('challenge, 'scalar_challenge, 'bool) Stable.Latest.t =
+            { alpha : 'scalar_challenge
+            ; beta : 'challenge
+            ; gamma : 'challenge
+            ; zeta : 'scalar_challenge
+            ; joint_combiner : 'scalar_challenge option
+            ; feature_flags : 'bool Plonk_types.Features.t
+            }
+          [@@deriving sexp, compare, yojson, hlist, hash, equal]
+
           val map_challenges :
                ('challenge, 'scalar_challenge, 'bool) t
             -> f:('challenge -> 'challenge2)
@@ -292,6 +310,26 @@ module Wrap : sig
             [@@deriving sexp, compare, yojson, hash, equal]
           end
         end]
+
+        type ( 'challenge
+             , 'scalar_challenge
+             , 'fp
+             , 'bool
+             , 'bulletproof_challenges
+             , 'branch_data )
+             t =
+              ( 'challenge
+              , 'scalar_challenge
+              , 'fp
+              , 'bool
+              , 'bulletproof_challenges
+              , 'branch_data )
+              Stable.Latest.t =
+          { plonk : ('challenge, 'scalar_challenge, 'bool) Plonk.Minimal.t
+          ; bulletproof_challenges : 'bulletproof_challenges
+          ; branch_data : 'branch_data
+          }
+        [@@deriving sexp, compare, yojson, hash, equal]
 
         val map_challenges :
              ( 'challenge
@@ -557,6 +595,39 @@ module Wrap : sig
           [@@deriving sexp, compare, yojson, hash, equal]
         end
       end]
+
+      type ( 'challenge
+           , 'scalar_challenge
+           , 'fp
+           , 'bool
+           , 'messages_for_next_wrap_proof
+           , 'digest
+           , 'bp_chals
+           , 'index )
+           t =
+            ( 'challenge
+            , 'scalar_challenge
+            , 'fp
+            , 'bool
+            , 'messages_for_next_wrap_proof
+            , 'digest
+            , 'bp_chals
+            , 'index )
+            Stable.Latest.t =
+        { deferred_values :
+            ( 'challenge
+            , 'scalar_challenge
+            , 'fp
+            , 'bool
+            , 'bp_chals
+            , 'index )
+            Deferred_values.Minimal.t
+        ; sponge_digest_before_evaluations : 'digest
+        ; messages_for_next_wrap_proof : 'messages_for_next_wrap_proof
+              (** Parts of the statement not needed by the other circuit. Represented as a hash inside the
+              circuit which is then "unhashed". *)
+        }
+      [@@deriving sexp, compare, yojson, hash, equal]
     end
 
     module In_circuit : sig

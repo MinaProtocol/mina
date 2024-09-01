@@ -6,6 +6,8 @@ module type S_base = sig
     end
   end]
 
+  type t = Stable.Latest.t [@@deriving hash, sexp, compare, equal, yojson]
+
   val to_uint32 : t -> Unsigned.uint32
 
   val of_uint32 : Unsigned.uint32 -> t

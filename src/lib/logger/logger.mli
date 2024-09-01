@@ -7,6 +7,8 @@ module Stable : sig
   end
 end]
 
+type t = Stable.Latest.t
+
 module Level : sig
   type t =
     | Internal
@@ -52,6 +54,8 @@ module Metadata : sig
       type t = Yojson.Safe.t String.Map.t [@@deriving yojson]
     end
   end]
+
+  type t = Yojson.Safe.t String.Map.t [@@deriving yojson]
 end
 
 (** Used only when dealing with the raw logging function *)

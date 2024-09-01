@@ -225,6 +225,11 @@ module type Full = sig
         [@@deriving sexp, hash, yojson, equal, compare]
       end
     end]
+
+    type ('payload, 'pk, 'signature) t =
+          ('payload, 'pk, 'signature) Stable.Latest.t =
+      { payload : 'payload; signer : 'pk; signature : 'signature }
+    [@@deriving sexp, hash, yojson, equal, compare]
   end
 
   [%%versioned:

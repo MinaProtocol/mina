@@ -147,6 +147,8 @@ module type UInt32_A = sig
     end
   end]
 
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
+
   include S with type t := t
 
   val to_uint32 : t -> uint32
@@ -166,6 +168,8 @@ module type UInt64_A = sig
       type t [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 
   include S with type t := Stable.Latest.t
 

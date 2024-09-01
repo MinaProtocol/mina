@@ -10,6 +10,8 @@ module type S = sig
       end
     end]
 
+    type t = Stable.Latest.t [@@deriving compare, sexp, yojson, hash, equal]
+
     val of_int_exn : int -> t
   end
 
@@ -23,6 +25,10 @@ module type S = sig
       [@@deriving hlist, compare, sexp, yojson, hash, equal]
     end
   end]
+
+  type t = Stable.Latest.t =
+    { proofs_verified : Proofs_verified.t; domain_log2 : Domain_log2.t }
+  [@@deriving hlist, compare, sexp, yojson, hash, equal]
 
   module Checked : sig
     type 'f t =

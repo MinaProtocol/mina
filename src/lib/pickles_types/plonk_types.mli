@@ -55,6 +55,18 @@ module Features : sig
     end
   end]
 
+  type 'bool t = 'bool Stable.Latest.t =
+    { range_check0 : 'bool
+    ; range_check1 : 'bool
+    ; foreign_field_add : 'bool
+    ; foreign_field_mul : 'bool
+    ; xor : 'bool
+    ; rot : 'bool
+    ; lookup : 'bool
+    ; runtime_tables : 'bool
+    }
+  [@@deriving sexp, compare, yojson, hash, equal, hlist]
+
   val to_full :
        or_:('bool -> 'bool -> 'bool)
     -> ?any:('bool list -> 'bool)
@@ -328,6 +340,15 @@ module Openings : sig
         [@@deriving compare, sexp, yojson, hash, equal]
       end
     end]
+
+    type ('g, 'fq) t = ('g, 'fq) Stable.Latest.t =
+      { lr : ('g * 'g) array
+      ; z_1 : 'fq
+      ; z_2 : 'fq
+      ; delta : 'g
+      ; challenge_polynomial_commitment : 'g
+      }
+    [@@deriving compare, sexp, yojson, hash, equal]
 
     val typ :
          ( 'a
