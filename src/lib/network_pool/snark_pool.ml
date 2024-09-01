@@ -536,8 +536,6 @@ include
 module Diff_versioned = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t = Resource_pool.Diff.t =
         | Add_solved_work of

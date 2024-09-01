@@ -29,8 +29,6 @@ module Test_inputs = struct
   module Snark_pool = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
         [@@deriving hash, compare, sexp]

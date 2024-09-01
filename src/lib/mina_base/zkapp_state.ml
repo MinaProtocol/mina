@@ -11,8 +11,6 @@ module V = struct
   *)
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = 'a Vector.Vector_8.Stable.V1.t
       [@@deriving compare, yojson, sexp, hash, equal]
@@ -40,8 +38,6 @@ open Core_kernel
 module Value = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = Zkapp_basic.F.Stable.V1.t V.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]

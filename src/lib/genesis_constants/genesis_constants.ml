@@ -111,8 +111,6 @@ module Protocol = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type ('length, 'delta, 'genesis_state_timestamp) t =
               ( 'length
@@ -144,8 +142,6 @@ module Protocol = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = (int, int, (Int64.t[@version_asserted])) Poly.Stable.V1.t
       [@@deriving equal, ord, hash]

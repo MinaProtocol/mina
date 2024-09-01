@@ -121,8 +121,6 @@ let user_command =
 module Work_selection_method = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = Sequence | Random
 

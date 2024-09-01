@@ -203,8 +203,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Epoch_data_for_vrf = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V2 = struct
           type t =
             { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
@@ -240,8 +238,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Slot_won = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V2 = struct
           type t =
             { delegator :

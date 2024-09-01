@@ -49,8 +49,6 @@ end
 module Metadata = struct
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = Yojson.Safe.t String.Map.t
 
@@ -136,8 +134,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type t =
       { null : bool

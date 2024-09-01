@@ -57,8 +57,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t =
       ( Length.Stable.V1.t

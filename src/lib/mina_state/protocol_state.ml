@@ -26,8 +26,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type ('state_hash, 'body) t = ('state_hash, 'body) A.Poly.V1.t =
           { previous_state_hash : 'state_hash; body : 'body }
@@ -89,8 +87,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Value = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V2 = struct
           type t =
             ( State_hash.Stable.V1.t

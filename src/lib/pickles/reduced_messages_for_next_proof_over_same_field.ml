@@ -58,8 +58,6 @@ module Wrap = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type t =
           Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t

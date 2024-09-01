@@ -303,8 +303,6 @@ end
 module Account_state = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = Empty | Non_empty | Any
       [@@deriving sexp, equal, yojson, hash, compare, enum]

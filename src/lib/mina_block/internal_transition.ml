@@ -31,8 +31,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t =
       { snark_transition : Snark_transition.Value.Stable.V2.t

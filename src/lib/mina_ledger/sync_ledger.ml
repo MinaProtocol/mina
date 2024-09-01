@@ -52,8 +52,6 @@ end)
 module Answer = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         ( Ledger_hash.Stable.V1.t
@@ -77,8 +75,6 @@ end
 module Query = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t =
         Ledger.Location.Addr.Stable.V1.t Syncable_ledger.Query.Stable.V1.t

@@ -22,8 +22,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module At_most_two = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type 'a t = 'a A.At_most_two.V1.t =
           | Zero
@@ -58,8 +56,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module At_most_one = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type 'a t = 'a A.At_most_one.V1.t = Zero | One of 'a option
         [@@deriving equal, compare, sexp, yojson]
@@ -82,8 +78,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Ft = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = Coinbase.Fee_transfer.Stable.V1.t
         [@@deriving equal, compare, sexp, yojson]
@@ -98,8 +92,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Pre_diff_two = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type ('a, 'b) t = ('a, 'b) A.Pre_diff_two.V2.t =
           { completed_works : 'a list
@@ -130,8 +122,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Pre_diff_one = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type ('a, 'b) t = ('a, 'b) A.Pre_diff_one.V2.t =
           { completed_works : 'a list
@@ -162,8 +152,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Pre_diff_with_at_most_two_coinbase = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type t =
           ( Transaction_snark_work.Stable.V2.t
@@ -181,8 +169,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Pre_diff_with_at_most_one_coinbase = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type t =
           ( Transaction_snark_work.Stable.V2.t
@@ -200,8 +186,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Diff = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type t =
           Pre_diff_with_at_most_two_coinbase.Stable.V2.t
@@ -217,8 +201,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t = A.V2.t = { diff : Diff.Stable.V2.t }
       [@@deriving equal, compare, sexp, yojson]

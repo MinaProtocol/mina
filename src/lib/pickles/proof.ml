@@ -31,8 +31,6 @@ module Base = struct
   module Wrap = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
           { statement :
@@ -346,8 +344,6 @@ module Proofs_verified_2 = struct
   module Repr = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type t =
           ( ( Tock.Inner_curve.Affine.Stable.V1.t
@@ -378,8 +374,6 @@ module Proofs_verified_2 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t = T.t
 
@@ -412,8 +406,6 @@ module Proofs_verified_max = struct
   module Repr = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type t =
           ( ( Tock.Inner_curve.Affine.Stable.V1.t
@@ -445,8 +437,6 @@ module Proofs_verified_max = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t = T.t
 

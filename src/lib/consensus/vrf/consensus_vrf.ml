@@ -433,8 +433,6 @@ end
 module Output_hash = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       module T = struct
         type t = (Snark_params.Tick.Field.t[@version_asserted])

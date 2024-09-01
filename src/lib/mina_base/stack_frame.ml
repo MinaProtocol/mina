@@ -2,8 +2,6 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type ('caller, 'zkapp_command) t =
       { caller : 'caller; caller_caller : 'caller; calls : 'zkapp_command }

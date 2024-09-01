@@ -10,8 +10,6 @@ module type S = Intf.S
 module Extend_blockchain_input = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         { chain : Blockchain.Stable.V2.t

@@ -524,8 +524,6 @@ module Vector_2 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = ('a, Nat.N2.n) vec
 
@@ -545,8 +543,6 @@ module Vector_4 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = ('a, Nat.N4.n) vec
 
@@ -566,8 +562,6 @@ module Vector_5 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = ('a, Nat.N5.n) vec
 
@@ -587,8 +581,6 @@ module Vector_6 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = ('a, Nat.N6.n) vec
 
@@ -608,8 +600,6 @@ module Vector_7 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = ('a, Nat.N7.n) vec
 
@@ -629,8 +619,6 @@ module Vector_8 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = ('a, Nat.N8.n) vec
 
@@ -650,8 +638,6 @@ module Vector_15 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = ('a, Nat.N15.n) vec
 
@@ -671,8 +657,6 @@ module Vector_16 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = ('a, Nat.N16.n) vec
 

@@ -42,8 +42,6 @@ let of_tuple (length, string) = slice (bitstring_of_string string) 0 length
 module Binable_arg = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = int * Bounded_types.String.Stable.V1.t
 
@@ -54,8 +52,6 @@ end
 
 [%%versioned_binable
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type t = Bitstring.t
 

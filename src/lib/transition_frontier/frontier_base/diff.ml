@@ -42,8 +42,6 @@ end) =
 module Node = struct
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type 'a t =
         | Full : Breadcrumb.t -> full t
@@ -82,8 +80,6 @@ module Node_list = struct
     module Binable_arg = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V1 = struct
           type t = State_hash.Stable.V1.t list
 
@@ -94,8 +90,6 @@ module Node_list = struct
 
     [%%versioned_binable
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = lite node_list
 
@@ -134,8 +128,6 @@ module Root_transition = struct
   module Lite_binable = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V4 = struct
         type t =
           { new_root : Root_data.Limited.Stable.V3.t
@@ -152,8 +144,6 @@ module Root_transition = struct
     module Binable_arg = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V4 = struct
           type t = Lite_binable.Stable.V4.t
 
@@ -164,8 +154,6 @@ module Root_transition = struct
 
     [%%versioned_binable
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V4 = struct
         type t = lite root_transition
 
@@ -204,8 +192,6 @@ end
 module T = struct
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type ('repr, 'mutant) t =
         | New_node : 'repr Node.Stable.V3.t -> ('repr, unit) t
@@ -290,8 +276,6 @@ let to_lite (type mutant) (diff : (full, mutant) t) : (lite, mutant) t =
 module Lite_binable = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type t =
         | New_node of Mina_block.Validated.Stable.V2.t
@@ -310,8 +294,6 @@ module Lite = struct
     module Binable_arg = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V3 = struct
           type t = Lite_binable.Stable.V3.t
 
@@ -322,8 +304,6 @@ module Lite = struct
 
     [%%versioned_binable
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V3 = struct
         type t = E : (lite, 'mutant) diff -> t [@@unboxed]
 

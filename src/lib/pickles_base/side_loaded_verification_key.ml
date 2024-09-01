@@ -61,8 +61,6 @@ end = struct
   module Max_vector = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type 'a t = 'a Vector.Vector_2.Stable.V1.t
         [@@deriving compare, yojson, sexp, hash, equal]
@@ -82,8 +80,6 @@ end = struct
   module Max_at_most = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type 'a t = 'a At_most.At_most_2.Stable.V1.t
         [@@deriving compare, yojson, sexp, hash, equal]

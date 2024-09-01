@@ -16,8 +16,6 @@ module Poly = Genesis_constants.Protocol.Poly
 module Value = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t =
         (T.Stable.V1.t, T.Stable.V1.t, Block_time.Stable.V1.t) Poly.Stable.V1.t

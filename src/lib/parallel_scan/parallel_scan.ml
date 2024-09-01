@@ -51,8 +51,6 @@ end
 module Weight = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = { base : int; merge : int } [@@deriving sexp]
 
@@ -860,8 +858,6 @@ module T = struct
   module Binable_arg = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type ('merge, 'base) t =
           { trees :

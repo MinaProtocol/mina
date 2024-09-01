@@ -3,8 +3,6 @@ open Core_kernel
 module Tree = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type ('hash, 'account) t =
         | Account of 'account
@@ -32,8 +30,6 @@ end
 module T = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type ('hash, 'key, 'account) t =
         { indexes : ('key * int) list

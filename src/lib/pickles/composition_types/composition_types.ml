@@ -190,8 +190,6 @@ module Wrap = struct
 
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V1 = struct
           (** All the deferred values needed, comprising values from the PLONK IOP verification,
     values from the inner-product argument, and [which_branch] which is needed to know

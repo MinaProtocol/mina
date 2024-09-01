@@ -21,8 +21,6 @@ end
 module Transactions = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         { commands :
@@ -54,8 +52,6 @@ end
 module Protocol_state = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         { previous_state_hash : State_hash.Stable.V1.t
@@ -76,8 +72,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t =
       { creator : Public_key.Compressed.Stable.V1.t

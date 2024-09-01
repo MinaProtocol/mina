@@ -159,8 +159,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         module T = struct
           type t = (Field.t[@version_asserted]) [@@deriving sexp, compare, hash]
@@ -219,8 +217,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         module T = struct
           type t = (Field.t[@version_asserted]) [@@deriving sexp, compare, hash]
@@ -383,8 +379,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         module T = struct
           type t = (Field.t[@version_asserted]) [@@deriving sexp, compare, hash]
@@ -1336,8 +1330,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         ( Merkle_tree_versioned.Stable.V2.t

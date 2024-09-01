@@ -69,8 +69,6 @@ include T
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   [@@@with_versioned_json]
 
   module V3 = struct

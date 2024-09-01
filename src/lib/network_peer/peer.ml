@@ -54,8 +54,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type t =
       { host : Inet_addr.Stable.V1.t (* IPv4 or IPv6 address *)
@@ -144,8 +142,6 @@ end
 module Display = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t =
         { host : Bounded_types.String.Stable.V1.t
