@@ -4,8 +4,6 @@ open Core_kernel
 open Ppxlib
 open Versioned_util
 
-let no_toplevel_latest_type = ref false
-
 let with_all_version_tags = "with_all_version_tags"
 
 let with_all_version_tags_module = String.capitalize with_all_version_tags
@@ -15,8 +13,6 @@ let with_top_version_tag = "with_top_version_tag"
 let with_top_version_tag_module = String.capitalize with_top_version_tag
 
 let with_versioned_json = "with_versioned_json"
-
-let no_toplevel_latest_type_str = "no_toplevel_latest_type"
 
 let ty_decl_to_string =
   let buf = Buffer.create 2048 in
@@ -1549,14 +1545,10 @@ let version_rpc_module ~loc ~path:_ rpc_name (rpc_body : structure_item list loc
 *)
 
 (* parameterless_t means the type t in the module type has no parameters *)
-type sig_accum =
-  { sigitems : signature
-  ; parameterless_t : bool
-  ; type_decl : signature_item option
-  }
+type sig_accum = { sigitems : signature; parameterless_t : bool }
 
-let convert_module_type_signature_item { sigitems; parameterless_t; type_decl }
-    sigitem : sig_accum =
+let convert_module_type_signature_item { sigitems; parameterless_t } sigitem :
+    sig_accum =
   match sigitem.psig_desc with
   | Psig_type
       ( recflag
@@ -1574,24 +1566,17 @@ let convert_module_type_signature_item { sigitems; parameterless_t; type_decl }
           (recflag, [ { type_ with ptype_attributes = ptype_attributes' } ])
       in
       let parameterless_t = List.is_empty ptype_params in
-      let type_decl = Some (erase_stable_versions#signature_item sigitem) in
-      { sigitems = { sigitem with psig_desc } :: sigitems
-      ; parameterless_t
-      ; type_decl
-      }
+      { sigitems = { sigitem with psig_desc } :: sigitems; parameterless_t }
   | _ ->
-      { sigitems = sigitem :: sigitems; parameterless_t; type_decl }
+      { sigitems = sigitem :: sigitems; parameterless_t }
 
 let convert_module_type_signature signature : sig_accum =
   List.fold signature
-    ~init:{ sigitems = []; parameterless_t = false; type_decl = None }
+    ~init:{ sigitems = []; parameterless_t = false }
     ~f:convert_module_type_signature_item
 
 type module_type_with_convertible =
-  { module_type : module_type
-  ; convertible : bool
-  ; extra_items : signature_item list
-  }
+  { module_type : module_type; convertible : bool }
 
 (* add deriving items to type t in module type *)
 let convert_module_type ~loc ~top_version_tagged mod_ty =
@@ -1635,13 +1620,12 @@ let convert_module_type ~loc ~top_version_tagged mod_ty =
       let with_version_tags_decls =
         with_top_version_tag_decl @ with_all_version_tags_decl
       in
-      let { sigitems; parameterless_t; type_decl } =
+      let { sigitems; parameterless_t } =
         convert_module_type_signature signature
       in
       let sigitems' = List.rev sigitems @ with_version_tags_decls in
       { module_type = { mod_ty with pmty_desc = Pmty_signature sigitems' }
       ; convertible = parameterless_t
-      ; extra_items = Option.to_list type_decl
       }
   | _ ->
       Location.raise_errorf ~loc:mod_ty.pmty_loc
@@ -1670,7 +1654,7 @@ let convert_module_decls signature =
     ; extra_sigitems = []
     }
   in
-  let convert ~no_toplevel_latest ~top_version_tagged
+  let convert ~top_version_tagged
       { latest; last; convertible; sigitems; extra_sigitems } sigitem =
     match sigitem.psig_desc with
     | Psig_module ({ pmd_name = { txt = Some name; loc }; pmd_type; _ } as pmd)
@@ -1686,7 +1670,7 @@ let convert_module_decls signature =
                 "Versioned modules must be listed in decreasing order" ) ;
         let in_latest = Option.is_none latest in
         let latest = if in_latest then Some name else latest in
-        let { module_type; convertible = module_convertible; extra_items } =
+        let { module_type; convertible = module_convertible } =
           convert_module_type ~loc ~top_version_tagged pmd_type
         in
         let psig_desc' = Psig_module { pmd with pmd_type = module_type } in
@@ -1694,10 +1678,6 @@ let convert_module_decls signature =
         (* use current convertible if in latest module, else the accumulated convertible *)
         let convertible =
           if in_latest then module_convertible else convertible
-        in
-        let extra_sigitems =
-          if in_latest && not no_toplevel_latest then extra_items
-          else extra_sigitems
         in
         { latest
         ; last = Some version
@@ -1712,18 +1692,11 @@ let convert_module_decls signature =
   let sig_attrs, signature_no_attrs =
     List.partition_tf signature ~f:is_attr_sigitem
   in
-  let no_toplevel_latest =
-    !no_toplevel_latest_type
-    || List.exists sig_attrs
-         ~f:(is_attr_sigitem_with_name no_toplevel_latest_type_str)
-    || true
-  in
   let top_version_tagged =
     List.exists sig_attrs ~f:(is_attr_sigitem_with_name with_top_version_tag)
   in
   ( sig_attrs
-  , List.fold signature_no_attrs ~init
-      ~f:(convert ~no_toplevel_latest ~top_version_tagged) )
+  , List.fold signature_no_attrs ~init ~f:(convert ~top_version_tagged) )
 
 let version_module_decl ~loc ~path:_ modname signature =
   Printexc.record_backtrace true ;
@@ -1869,12 +1842,4 @@ let () =
   let rules =
     [ module_rule; module_rule_binable; module_rule_rpc; module_decl_rule ]
   in
-  Driver.register_transformation "ppx_version/versioned_module" ~rules ;
-  Ppxlib.Driver.add_arg "--no-toplevel-latest-type"
-    (Caml.Arg.Unit (fun () -> no_toplevel_latest_type := true))
-    ~doc:"Disable the toplevel type t declaration for versioned type modules" ;
-  Ppxlib.Driver.add_arg "--toplevel-latest-type"
-    (Caml.Arg.Bool (fun b -> no_toplevel_latest_type := not b))
-    ~doc:
-      "Enable or disable the toplevel type t declaration for versioned type \
-       modules"
+  Driver.register_transformation "ppx_version/versioned_module" ~rules
