@@ -15,6 +15,8 @@ let Filter
       | Release
       | HardforkPackageGeneration
       | Promote
+      | DebianBuild
+      | DockerBuild
       >
 
 let tags
@@ -26,6 +28,8 @@ let tags
             , Long = [ Tag.Type.Long ]
             , TearDownOnly = [ Tag.Type.TearDown ]
             , ToolchainsOnly = [ Tag.Type.Toolchain ]
+            , DebianBuild = [ Tag.Type.Debian ]
+            , DockerBuild = [ Tag.Type.Docker ]
             , AllTests =
               [ Tag.Type.Lint
               , Tag.Type.Release
@@ -50,6 +54,8 @@ let show
             , AllTests = "AllTests"
             , Release = "Release"
             , Promote = "Promote"
+            , DebianBuild = "DebianBuild"
+            , DockerBuild = "DockerBuild"
             , HardforkPackageGeneration = "HardforkPackageGeneration"
             }
             filter
