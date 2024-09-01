@@ -1023,31 +1023,13 @@ let convert_module_stri ~version_option ~top_version_tag ~json_version_tag
   let all_version_tagged =
     List.exists attrs ~f:(is_attr_stri_with_name with_all_version_tags)
   in
-  let stri, type_stri, str_rest =
+  let stri, str_rest =
     match str_no_attrs with
     | [] ->
         Location.raise_errorf ~loc:str.loc
           "Expected a type declaration in this structure."
-    | ( { pstr_desc =
-            Pstr_module
-              { pmb_name = { txt = Some "T"; _ }
-              ; pmb_expr = { pmod_desc = Pmod_structure (type_stri :: _); _ }
-              ; _
-              }
-        ; _
-        } as stri )
-      :: ( { pstr_desc =
-               Pstr_include
-                 { pincl_mod =
-                     { pmod_desc = Pmod_ident { txt = Lident "T"; _ }; _ }
-                 ; _
-                 }
-           ; _
-           }
-           :: _ as str ) ->
-        (stri, type_stri, str)
     | type_stri :: str ->
-        (type_stri, type_stri, str)
+        (type_stri, str)
   in
   let should_convert, type_str, extra_stris =
     version_type ~version_option version ~modl_stri ~all_version_tagged
@@ -1060,32 +1042,24 @@ let convert_module_stri ~version_option ~top_version_tag ~json_version_tag
       (module_binding ~loc ~name:(some_loc name)
          ~expr:(pmod_structure ~loc:str.loc (type_str @ str_rest @ extra_stris)) )
   , should_convert
-  , type_stri
   , all_version_tagged )
 
 let convert_modbody ~loc ~version_option body =
   let may_convert_latest = ref None in
   let latest_version = ref None in
   let attrs, body_no_attrs = List.partition_tf body ~f:is_attr_stri in
-  let no_toplevel_type = true in
   let json_version_tag =
     List.exists attrs ~f:(is_attr_stri_with_name with_versioned_json)
   in
   let top_version_tag =
     List.exists attrs ~f:(is_attr_stri_with_name with_top_version_tag)
   in
-  let _, rev_str, type_stri, top_tag_convs, all_tag_convs, json_tag_convs =
-    List.fold ~init:(None, [], None, [], [], []) body_no_attrs
-      ~f:(fun
-           (version, rev_str, type_stri, top_taggeds, all_taggeds, json_taggeds)
-           stri
-         ->
-        let version, stri, should_convert, current_type_stri, is_all_tagged =
+  let _, rev_str, top_tag_convs, all_tag_convs, json_tag_convs =
+    List.fold ~init:(None, [], [], [], []) body_no_attrs
+      ~f:(fun (version, rev_str, top_taggeds, all_taggeds, json_taggeds) stri ->
+        let version, stri, should_convert, is_all_tagged =
           convert_module_stri ~version_option ~top_version_tag ~json_version_tag
             version stri
-        in
-        let type_stri =
-          Some (Option.value ~default:current_type_stri type_stri)
         in
         ( match !may_convert_latest with
         | None ->
@@ -1107,7 +1081,6 @@ let convert_modbody ~loc ~version_option body =
         in
         ( Some version
         , stri :: rev_str
-        , type_stri
         , top_tag_convs
         , all_tag_convs
         , json_tag_convs ) )
@@ -1381,7 +1354,7 @@ let convert_modbody ~loc ~version_option body =
   let rev_str_with_all =
     alert_epilog @ rev_str_with_converters @ alert_prolog
   in
-  (List.rev rev_str_with_all, if no_toplevel_type then None else type_stri)
+  (List.rev rev_str_with_all, None)
 
 let version_module ~loc ~path:_ ~version_option modname modbody =
   Printexc.record_backtrace true ;
