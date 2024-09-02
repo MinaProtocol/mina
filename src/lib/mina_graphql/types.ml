@@ -779,6 +779,13 @@ module SnarkedLedgerMembership = struct
     ; proof : Ledger.path
     }
 
+  let of_account (proof : Ledger.path) (account : Account.t) : t =
+    { account_balance = account.balance
+    ; timing_info = account.timing
+    ; nonce = account.nonce
+    ; proof
+    }
+
   let obj =
     obj "MembershipInfo" ~fields:(fun _ ->
         [ field "accountBalance"
