@@ -2758,6 +2758,7 @@ module Queries = struct
     ; snark_pool
     ; pending_snark_work
     ; SnarkedLedgerMembership.snarked_ledger_account_membership
+    ; SnarkedLedgerMembership.encoded_snarked_ledger_account_membership
     ; genesis_constants
     ; time_offset
     ; validate_payment
