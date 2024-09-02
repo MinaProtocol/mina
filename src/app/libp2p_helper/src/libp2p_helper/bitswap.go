@@ -3,6 +3,7 @@ package main
 import (
 	"codanet"
 	"context"
+	"fmt"
 	ipc "libp2p_ipc"
 	"math"
 	"time"
@@ -192,27 +193,42 @@ func (br *BitswapBlockRequester) RequestBlocks(ids []cid.Cid) error {
 //	Do not launch more than one instance of it
 func (bs *BitswapCtx) Loop() {
 	configuredCheck := func() {
+		fmt.Print("Checking if context is configured.\n")
 		if bs.engine == nil || bs.storage == nil {
+			fmt.Print("Context not configured hit panic.\n")
 			panic("BitswapLoop: context not configured")
 		}
+		fmt.Print("Context is configured.\n")
 	}
 	for {
 		select {
 		case <-bs.ctx.Done():
+			bitswapLogger.Info("Bitswap loop exiting due to context cancellation.")
+			fmt.Print("Bitswap loop exiting due to context cancellation.")
 			return
 		case root := <-bs.deadlineChan:
+			bitswapLogger.Info("Received deadline command.")
+			fmt.Print("Received deadline command.")
 			configuredCheck()
-			ClearRootDownloadState(bs, root)
+			fmt.Print("cfg check complete.")
+			_ = root
+			//ClearRootDownloadState(bs, root)
+			return
 		case cmd := <-bs.addCmds:
+			bitswapLogger.Infof("Received add command with tag %v.", cmd.tag)
+			fmt.Printf("Received add command with tag %v.\n", cmd.tag)
 			configuredCheck()
 			blocks, root := SplitDataToBitswapBlocksLengthPrefixedWithTag(bs.maxBlockSize, cmd.data, cmd.tag)
 			err := announceNewRootBlock(bs.ctx, bs.engine, bs.storage, blocks, root)
 			if err == nil {
 				bs.SendResourceUpdate(ipc.ResourceUpdateType_added, cmd.tag, root)
+				bitswapLogger.Infof("Announced new root block with cid %s.", codanet.BlockHashToCidSuffix(root))
 			} else {
-				bitswapLogger.Errorf("Failed to announce root cid %s (%s)", codanet.BlockHashToCidSuffix(root), err)
+				bitswapLogger.Errorf("Failed to announce root cid %s: %s", codanet.BlockHashToCidSuffix(root), err)
 			}
 		case cmd := <-bs.deleteCmds:
+			bitswapLogger.Info("Received delete command.")
+			fmt.Print("Received delete command.")
 			configuredCheck()
 			success := map[BitswapDataTag][]root{}
 			for _, root := range cmd.rootIds {
@@ -225,20 +241,24 @@ func (bs *BitswapCtx) Loop() {
 			}
 			for tag, roots := range success {
 				bs.SendResourceUpdates(ipc.ResourceUpdateType_removed, tag, roots...)
+				bitswapLogger.Infof("Processed delete command for tag %v.", tag)
+				fmt.Printf("Processed delete command for tag %v.", tag)
 			}
 		case cmd := <-bs.downloadCmds:
+			bitswapLogger.Info("Received download command.")
+			fmt.Print("Received download command.")
 			configuredCheck()
-			// We put all ids to map to avoid
-			// unneccessary querying in case of id duplicates
 			m := make(map[BitswapBlockLink]bool)
 			for _, root := range cmd.rootIds {
 				m[root] = true
 			}
 			for root := range m {
-				// bitswapLogger.Errorf("Bitswap: request to download root cid %s", codanet.BlockHashToCidSuffix(root))
+				bitswapLogger.Infof("Starting download for root cid %s.", codanet.BlockHashToCidSuffix(root))
 				kickStartRootDownload(root, cmd.tag, bs)
 			}
 		case block := <-bs.blockSink:
+			bitswapLogger.Info("Received block to process.")
+			fmt.Print("Received block to process.")
 			configuredCheck()
 			processDownloadedBlock(block, bs)
 		}

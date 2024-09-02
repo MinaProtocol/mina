@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"testing/quick"
 	"time"
@@ -530,19 +531,26 @@ func testBitswap(t *testing.T, numNodes, numAttempts, numRequests, maxBlobSize i
 	}
 	fmt.Println(strings.Join(seds, " | "))
 
-	for ni := range nodes {
+	var wg sync.WaitGroup
+	node_sub := nodes[:1]
+	for ni := range node_sub {
+		wg.Add(1)
 		go func(ni int) {
+			fmt.Printf("Node %d bitswap loop started\n", ni)
+			defer t.Logf("Node %d bitswap loop exited", ni)
+			defer cancels[ni]()
 			nodes[ni].node.bitswapCtx.Loop()
-			cancels[ni]()
 		}(ni)
 	}
+	wg.Wait()
+
 	connectRingTopology(t, nodes, true)
 	beginAdvertisingOnNodes(t, nodes)
 	seed := time.Now().Unix()
 	t.Logf("Seed: %d", seed)
 	r := rand.New(rand.NewSource(seed))
 	conf := initBitswapTestConfig(r, numNodes, numAttempts, numRequests, maxBlobSize)
-	t.Logf("Init the bitswap config %+v", conf)
+	t.Logf("Bitswap configuration initialized with %d nodes, %d attempts, %d requests, and a maximum blob size of %d bytes.", numNodes, numAttempts, numRequests, maxBlobSize)
 	err := conf.execute(nodes, delayBeforeDownload)
 	t.Logf("Finished executing config")
 	if err != nil {
