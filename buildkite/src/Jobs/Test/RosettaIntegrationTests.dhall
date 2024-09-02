@@ -55,7 +55,7 @@ in  Pipeline.build
                   ([] : List Text)
                   "./src/test/archive/sample_db/archive_db.sql"
                   Artifacts.Type.Rosetta
-                  (Some Network.Type.Berkeley)
+                  (Some Network.Type.Devnet)
                   "./buildkite/scripts/rosetta-indexer-test.sh"
               , Cmd.runInDocker
                   Cmd.Docker::{
@@ -71,7 +71,7 @@ in  Pipeline.build
             , depends_on =
                 Dockers.dependsOn
                   Dockers.Type.Bullseye
-                  (Some Network.Type.Berkeley)
+                  (Some Network.Type.Devnet)
                   Profiles.Type.Standard
                   Artifacts.Type.Rosetta
             }
