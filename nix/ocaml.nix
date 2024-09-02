@@ -114,7 +114,7 @@ let
         for i in $(find -L "${placeholder output}/bin" -type f); do
           wrapProgram "$i" \
             --prefix PATH : ${makeBinPath deps} \
-            --set MINA_LIBP2P_HELPER_PATH ${pkgs.libp2p_helper}/bin/libp2p_helper \
+            --set MINA_LIBP2P_HELPER_PATH ${pkgs.libp2p_helper}/bin/mina-libp2p_helper \
             --set MINA_COMMIT_SHA1 ${escapeShellArg commit_sha1}
         done
       '') package.outputs);

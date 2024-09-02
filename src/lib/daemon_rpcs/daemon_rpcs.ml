@@ -330,9 +330,7 @@ end
 module Get_node_status = struct
   type query = Mina_net2.Multiaddr.t list option [@@deriving bin_io_unversioned]
 
-  type response =
-    Mina_networking.Rpcs.Get_node_status.Node_status.Stable.Latest.t Or_error.t
-    list
+  type response = Mina_networking.Node_status.Stable.Latest.t Or_error.t list
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =

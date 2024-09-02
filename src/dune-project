@@ -127,7 +127,6 @@
 (package (name network_pool))
 (package (name node_addrs_and_ports))
 (package (name node_error_service))
-(package (name node_status))
 (package (name node_status_service))
 (package (name non_zero_curve_point))
 (package (name o1trace))

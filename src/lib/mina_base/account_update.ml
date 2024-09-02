@@ -12,6 +12,10 @@ module type Type = sig
   type t
 end
 
+module Events = Zkapp_account.Events
+module Actions = Zkapp_account.Actions
+module Zkapp_uri = Zkapp_account.Zkapp_uri
+
 module Authorization_kind = struct
   [%%versioned
   module Stable = struct
@@ -676,7 +680,7 @@ module Update = struct
         ; verification_key :
             Verification_key_wire.Stable.V1.t Set_or_keep.Stable.V1.t
         ; permissions : Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
-        ; zkapp_uri : Bounded_types.String.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; zkapp_uri : Zkapp_uri.Stable.V1.t Set_or_keep.Stable.V1.t
         ; token_symbol :
             Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
         ; timing : Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
@@ -927,9 +931,6 @@ module Update = struct
          ~voting_for:!.(Set_or_keep.deriver State_hash.deriver)
          obj
 end
-
-module Events = Zkapp_account.Events
-module Actions = Zkapp_account.Actions
 
 module Account_precondition = struct
   [%%versioned
