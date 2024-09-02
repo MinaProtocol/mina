@@ -10,6 +10,8 @@ let Size = ./Size.dhall
 
 let Profiles = ../Constants/Profiles.dhall
 
+let Artifacts = ../Constants/Artifacts.dhall
+
 let BuildFlags = ../Constants/BuildFlags.dhall
 
 let Cmd = ../Lib/Cmds.dhall
@@ -17,6 +19,8 @@ let Cmd = ../Lib/Cmds.dhall
 let DockerLogin = ../Command/DockerLogin/Type.dhall
 
 let DebianRepo = ../Constants/DebianRepo.dhall
+
+let Network = ../Constants/Network.dhall
 
 let ReleaseSpec =
       { Type =
@@ -38,9 +42,9 @@ let ReleaseSpec =
           }
       , default =
           { deps = [] : List Command.TaggedKey.Type
-          , network = "devnet"
+          , network = "${Network.lowerName Network.Type.Devnet}"
           , version = "\\\${MINA_DOCKER_TAG}"
-          , service = "\\\${MINA_SERVICE}"
+          , service = Artifacts.dockerName Artifacts.Type.Daemon
           , branch = "\\\${BUILDKITE_BRANCH}"
           , repo = "\\\${BUILDKITE_REPO}"
           , deb_codename = "bullseye"
@@ -64,8 +68,8 @@ let generateStep =
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
                 ++  " --service ${spec.service}"
-                ++  " --version ${spec.version}"
                 ++  " --network ${spec.network}"
+                ++  " --version ${spec.version}"
                 ++  " --branch ${spec.branch}"
                 ++  " ${maybeCacheOption} "
                 ++  " --deb-codename ${spec.deb_codename}"
