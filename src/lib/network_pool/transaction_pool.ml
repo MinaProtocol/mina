@@ -44,7 +44,7 @@ module Diff_versioned = struct
     [@@@no_toplevel_latest_type]
 
     module V2 = struct
-      type t = User_command.Stable.V2.t list [@@deriving sexp, yojson, hash]
+      type t = User_command.Stable.V2.t list [@@deriving sexp, yojson]
 
       let to_latest = Fn.id
     end
@@ -334,20 +334,21 @@ struct
       type t =
         { verification_keys :
             (int * Verification_key_wire.t) Zkapp_basic.F_map.Table.t
-        ; account_id_to_vks : int Zkapp_basic.F_map.Map.t Account_id.Table.t
+        ; mutable account_id_to_vks :
+            int Zkapp_basic.F_map.Map.t Account_id.Map.t
         ; vk_to_account_ids : int Account_id.Map.t Zkapp_basic.F_map.Table.t
         }
 
       let create () =
         { verification_keys = Zkapp_basic.F_map.Table.create ()
-        ; account_id_to_vks = Account_id.Table.create ()
+        ; account_id_to_vks = Account_id.Map.empty
         ; vk_to_account_ids = Zkapp_basic.F_map.Table.create ()
         }
 
       let find_vk (t : t) = Hashtbl.find t.verification_keys
 
       let find_vks_by_account_id (t : t) account_id =
-        match Hashtbl.find t.account_id_to_vks account_id with
+        match Map.find t.account_id_to_vks account_id with
         | None ->
             []
         | Some vks ->
@@ -370,8 +371,9 @@ struct
               (1, vk)
           | Some (count, vk) ->
               (count + 1, vk) ) ;
-        Hashtbl.update t.account_id_to_vks account_id
-          ~f:(inc_map ~default_map:Zkapp_basic.F_map.Map.empty vk.hash) ;
+        t.account_id_to_vks <-
+          Map.update t.account_id_to_vks account_id
+            ~f:(inc_map ~default_map:Zkapp_basic.F_map.Map.empty vk.hash) ;
         Hashtbl.update t.vk_to_account_ids vk.hash
           ~f:(inc_map ~default_map:Account_id.Map.empty account_id) ;
         Mina_metrics.(
@@ -390,8 +392,9 @@ struct
             (Option.bind ~f:(fun (count, value) ->
                  let%map count' = dec count in
                  (count', value) ) ) ;
-        Hashtbl.change t.account_id_to_vks account_id
-          ~f:(Option.bind ~f:(dec_map vk_hash)) ;
+        t.account_id_to_vks <-
+          Map.change t.account_id_to_vks account_id
+            ~f:(Option.bind ~f:(dec_map vk_hash)) ;
         Hashtbl.change t.vk_to_account_ids vk_hash
           ~f:(Option.bind ~f:(dec_map account_id)) ;
         Mina_metrics.(
@@ -2093,7 +2096,7 @@ let%test_module _ =
                     Mina_ledger.Ledger.get best_tip_ledger loc )
                in
                (id, (state, `Fee_payer)) )
-        |> Account_id.Table.of_alist_exn
+        |> Account_id.Map.of_alist_exn |> ref
       in
       let rec go n cmds =
         let open Quickcheck.Generator.Let_syntax in

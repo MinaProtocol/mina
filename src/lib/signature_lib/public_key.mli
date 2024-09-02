@@ -45,6 +45,8 @@ module Compressed : sig
       include Codable.S with type t := t
 
       include Hashable.S_binable with type t := t
+
+      include Comparable.S_binable with type t := t
     end
   end]
 
@@ -54,9 +56,9 @@ module Compressed : sig
 
   val empty : t
 
-  include Comparable.S with type t := t
-
   include Hashable.S_binable with type t := t
+
+  include Comparable.S_binable with type t := t
 
   val to_input_legacy : t -> (Field.t, bool) Random_oracle.Input.Legacy.t
 

@@ -21,7 +21,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; fee : Currency.Fee.Stable.V1.t
           ; fee_token : Token_id.Stable.V2.t
           }
-        [@@deriving sexp, compare, equal, yojson, hash]
+        [@@deriving sexp, compare, equal, yojson]
 
         let to_latest = Fn.id
 
@@ -67,7 +67,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Stable = struct
     module V2 = struct
       type t = Single.Stable.V2.t One_or_two.Stable.V1.t
-      [@@deriving sexp, compare, equal, yojson, hash]
+      [@@deriving sexp, compare, equal, yojson]
 
       let to_latest = Fn.id
     end
@@ -78,7 +78,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     ; fee : Currency.Fee.t
     ; fee_token : Token_id.t
     }
-  [@@deriving sexp, compare, yojson, hash]
+  [@@deriving sexp, compare, yojson]
 
   let to_singles = Fn.id
 

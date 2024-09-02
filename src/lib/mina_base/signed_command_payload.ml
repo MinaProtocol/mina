@@ -45,7 +45,7 @@ module Common = struct
           ; valid_until : 'global_slot
           ; memo : 'memo
           }
-        [@@deriving compare, equal, sexp, hash, yojson, hlist]
+        [@@deriving compare, equal, sexp, yojson, hlist]
       end
 
       module V1 = struct
@@ -59,7 +59,7 @@ module Common = struct
           ; valid_until : 'global_slot
           ; memo : 'memo
           }
-        [@@deriving compare, equal, sexp, hash, yojson, hlist]
+        [@@deriving compare, equal, sexp, yojson, hlist]
       end
     end]
   end
@@ -74,7 +74,7 @@ module Common = struct
         , Global_slot_since_genesis.Stable.V1.t
         , Memo.Stable.V1.t )
         Poly.Stable.V2.t
-      [@@deriving compare, equal, sexp, hash, yojson]
+      [@@deriving compare, equal, sexp, yojson]
 
       let to_latest = Fn.id
     end
@@ -90,7 +90,7 @@ module Common = struct
         , Global_slot_legacy.Stable.V1.t
         , Memo.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving compare, equal, sexp, hash, yojson]
+      [@@deriving compare, equal, sexp, yojson]
 
       let to_latest _ = failwith "Not implemented"
     end
@@ -179,7 +179,7 @@ module Body = struct
       type t = Mina_wire_types.Mina_base.Signed_command_payload.Body.V2.t =
         | Payment of Payment_payload.Stable.V2.t
         | Stake_delegation of Stake_delegation.Stable.V2.t
-      [@@deriving sexp, compare, equal, sexp, hash, yojson]
+      [@@deriving sexp, compare, equal, sexp, yojson]
 
       let to_latest = Fn.id
     end
@@ -193,7 +193,7 @@ module Body = struct
       (* omitting token commands, none were ever created
          such omission doesn't affect serialization/Base58Check of payments, delegations
       *)
-      [@@deriving sexp, compare, equal, sexp, hash, yojson]
+      [@@deriving sexp, compare, equal, sexp, yojson]
 
       let to_latest _ = failwith "Not implemented"
     end
@@ -241,7 +241,7 @@ module Poly = struct
             , 'body )
             Mina_wire_types.Mina_base.Signed_command_payload.Poly.V1.t =
         { common : 'common; body : 'body }
-      [@@deriving equal, sexp, hash, yojson, compare, hlist]
+      [@@deriving equal, sexp, yojson, compare, hlist]
 
       let of_latest common_latest body_latest { common; body } =
         let open Result.Let_syntax in
@@ -255,7 +255,7 @@ end
 module Stable = struct
   module V2 = struct
     type t = (Common.Stable.V2.t, Body.Stable.V2.t) Poly.Stable.V1.t
-    [@@deriving compare, equal, sexp, hash, yojson]
+    [@@deriving compare, equal, sexp, yojson]
 
     let to_latest = Fn.id
   end
@@ -264,7 +264,7 @@ module Stable = struct
     [@@@with_all_version_tags]
 
     type t = (Common.Stable.V1.t, Body.Stable.V1.t) Poly.Stable.V1.t
-    [@@deriving compare, equal, sexp, hash, yojson]
+    [@@deriving compare, equal, sexp, yojson]
 
     (* don't need to coerce old transactions to newer version *)
     let to_latest _ = failwith "Not implemented"

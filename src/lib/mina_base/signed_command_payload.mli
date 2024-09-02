@@ -18,21 +18,21 @@ module Body : sig
   type t = Mina_wire_types.Mina_base.Signed_command_payload.Body.V2.t =
     | Payment of Payment_payload.t
     | Stake_delegation of Stake_delegation.t
-  [@@deriving equal, sexp, hash, yojson]
+  [@@deriving equal, sexp, yojson]
 
   [%%versioned:
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
     module V2 : sig
-      type nonrec t = t [@@deriving compare, equal, sexp, hash, yojson]
+      type nonrec t = t [@@deriving compare, equal, sexp, yojson]
     end
 
     module V1 : sig
       type t =
         | Payment of Payment_payload.Stable.V1.t
         | Stake_delegation of Stake_delegation.Stable.V1.t
-      [@@deriving compare, equal, sexp, hash, yojson]
+      [@@deriving compare, equal, sexp, yojson]
     end
   end]
 
@@ -61,7 +61,7 @@ module Common : sig
           ; valid_until : 'global_slot
           ; memo : 'memo
           }
-        [@@deriving equal, sexp, hash, yojson]
+        [@@deriving equal, sexp, yojson]
       end
 
       module V1 : sig
@@ -73,7 +73,7 @@ module Common : sig
           ; valid_until : 'global_slot
           ; memo : 'memo
           }
-        [@@deriving compare, equal, sexp, hash, yojson, hlist]
+        [@@deriving compare, equal, sexp, yojson, hlist]
       end
     end]
   end
@@ -88,7 +88,7 @@ module Common : sig
         , Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         , Signed_command_memo.Stable.V1.t )
         Poly.Stable.V2.t
-      [@@deriving compare, equal, sexp, hash, yojson]
+      [@@deriving compare, equal, sexp, yojson]
     end
 
     module V1 : sig
@@ -100,7 +100,7 @@ module Common : sig
         , Mina_numbers.Global_slot_legacy.Stable.V1.t
         , Signed_command_memo.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving compare, equal, sexp, hash, yojson]
+      [@@deriving compare, equal, sexp, yojson]
     end
   end]
 
@@ -137,7 +137,7 @@ module Poly : sig
             , 'body )
             Mina_wire_types.Mina_base.Signed_command_payload.Poly.V1.t =
         { common : 'common; body : 'body }
-      [@@deriving equal, sexp, hash, yojson, compare, hlist]
+      [@@deriving equal, sexp, yojson, compare, hlist]
 
       val of_latest :
            ('common1 -> ('common2, 'err) Result.t)
@@ -152,14 +152,14 @@ end
 module Stable : sig
   module V2 : sig
     type t = (Common.Stable.V2.t, Body.Stable.V2.t) Poly.Stable.V1.t
-    [@@deriving compare, equal, sexp, hash, yojson]
+    [@@deriving compare, equal, sexp, yojson]
   end
 
   module V1 : sig
     [@@@with_all_version_tags]
 
     type t = (Common.Stable.V1.t, Body.Stable.V1.t) Poly.Stable.V1.t
-    [@@deriving compare, equal, sexp, hash, yojson]
+    [@@deriving compare, equal, sexp, yojson]
 
     val to_latest : t -> Latest.t
   end

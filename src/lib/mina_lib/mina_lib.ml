@@ -1045,22 +1045,22 @@ let current_epoch_delegators t ~pk =
   let%map _transition_frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
-  let current_epoch_delegatee_table =
+  let current_epoch_delegatee_map =
     Consensus.Data.Local_state.current_epoch_delegatee_table
       ~local_state:t.config.consensus_local_state
   in
-  find_delegators current_epoch_delegatee_table pk
+  find_delegators current_epoch_delegatee_map pk
 
 let last_epoch_delegators t ~pk =
   let open Option.Let_syntax in
   let%bind _transition_frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
-  let%map last_epoch_delegatee_table =
+  let%map last_epoch_delegatee_map =
     Consensus.Data.Local_state.last_epoch_delegatee_table
       ~local_state:t.config.consensus_local_state
   in
-  find_delegators last_epoch_delegatee_table pk
+  find_delegators last_epoch_delegatee_map pk
 
 let perform_compaction t =
   match Mina_compile_config.compaction_interval_ms with

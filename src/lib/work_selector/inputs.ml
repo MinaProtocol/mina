@@ -33,26 +33,27 @@ module Test_inputs = struct
 
       module V2 = struct
         type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
-        [@@deriving hash, compare, sexp]
+        [@@deriving compare, sexp]
 
         let to_latest = Fn.id
       end
     end]
 
-    module Work = Hashable.Make_binable (Stable.Latest)
+    module Work = Comparable.Make_binable (Stable.Latest)
 
-    type t = Currency.Fee.t Work.Table.t
+    type t = Currency.Fee.t Work.Map.t ref
 
-    let get_completed_work (t : t) = Work.Table.find t
+    let get_completed_work (t : t) = Work.Map.find !t
 
-    let create () = Work.Table.create ()
+    let create () = ref Work.Map.empty
 
     let add_snark t ~work ~fee =
-      Work.Table.update t work ~f:(function
-        | None ->
-            fee
-        | Some fee' ->
-            Currency.Fee.min fee fee' )
+      t :=
+        Work.Map.update !t work ~f:(function
+          | None ->
+              fee
+          | Some fee' ->
+              Currency.Fee.min fee fee' )
   end
 
   module Staged_ledger = struct

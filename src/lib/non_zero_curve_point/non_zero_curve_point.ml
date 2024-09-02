@@ -60,6 +60,7 @@ module Compressed = struct
 
       include T
       include Hashable.Make_binable (T)
+      include Comparable.Make_binable (T)
 
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -69,8 +70,8 @@ module Compressed = struct
   end]
 
   module Poly = Poly
-  include Comparable.Make_binable (Stable.Latest)
   include Hashable.Make_binable (Stable.Latest)
+  include Comparable.Make_binable (Stable.Latest)
   include Stable.Latest.Base58
 
   let to_string = to_base58_check

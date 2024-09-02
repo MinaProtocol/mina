@@ -8,7 +8,7 @@ module Stable = struct
       { fee : Currency.Fee.Stable.V1.t
       ; prover : Public_key.Compressed.Stable.V1.t
       }
-    [@@deriving sexp, yojson, hash]
+    [@@deriving sexp, yojson]
 
     let to_latest = Fn.id
 

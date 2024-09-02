@@ -15,7 +15,7 @@ module Stable = struct
       ; pending_coinbase_stack : 'pending_coinbase_stack
       ; local_state : 'local_state
       }
-    [@@deriving compare, equal, hash, sexp, yojson, hlist, fields]
+    [@@deriving compare, equal, sexp, yojson, hlist, fields]
   end
 end]
 
@@ -50,12 +50,12 @@ module Value = struct
     , Pending_coinbase.Stack.t
     , Local_state.t )
     Stable.Latest.t
-  [@@deriving compare, equal, sexp, yojson, hash]
+  [@@deriving compare, equal, sexp, yojson]
 
   let connected t t' =
     let module Without_pending_coinbase_stack = struct
       type t = (Frozen_ledger_hash.t, unit, Local_state.t) Stable.Latest.t
-      [@@deriving compare, equal, sexp, yojson, hash]
+      [@@deriving compare, equal, sexp, yojson]
     end in
     Without_pending_coinbase_stack.equal
       { t with pending_coinbase_stack = () }

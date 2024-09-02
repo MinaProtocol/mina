@@ -876,25 +876,28 @@ let currency_in_ledger =
          (* track currency total for each token
             use uint64 to make arithmetic simple
          *)
-         let currency_tbl : Unsigned.UInt64.t Token_id.Table.t =
-           Token_id.Table.create ()
+         let currency_tbl : Unsigned.UInt64.t Token_id.Map.t ref =
+           ref Token_id.Map.empty
          in
          List.iter accounts ~f:(fun (acct : Account.t) ->
              let token_id = Account.token_id acct in
              let balance = acct.balance |> Currency.Balance.to_uint64 in
-             match Token_id.Table.find currency_tbl token_id with
+             match Token_id.Map.find !currency_tbl token_id with
              | None ->
-                 Token_id.Table.add_exn currency_tbl ~key:token_id ~data:balance
+                 currency_tbl :=
+                   Token_id.Map.add_exn !currency_tbl ~key:token_id
+                     ~data:balance
              | Some total ->
                  let new_total = Unsigned.UInt64.add total balance in
-                 Token_id.Table.set currency_tbl ~key:token_id ~data:new_total ) ;
+                 currency_tbl :=
+                   Token_id.Map.set !currency_tbl ~key:token_id ~data:new_total ) ;
          let tokens =
-           Token_id.Table.keys currency_tbl
+           Token_id.Map.keys !currency_tbl
            |> List.dedup_and_sort ~compare:Token_id.compare
          in
          List.iter tokens ~f:(fun token ->
              let total =
-               Token_id.Table.find_exn currency_tbl token
+               Token_id.Map.find_exn !currency_tbl token
                |> Currency.Balance.of_uint64 |> Currency.Balance.to_mina_string
              in
              if Token_id.equal token Token_id.default then

@@ -15,7 +15,7 @@ module Stable = struct
 
   module V1 = struct
     module T = struct
-      type t = (Field.t[@version_asserted]) [@@deriving sexp, compare, hash]
+      type t = (Field.t[@version_asserted]) [@@deriving sexp, compare]
     end
 
     include T
@@ -24,8 +24,7 @@ module Stable = struct
 
     [%%define_from_scope to_yojson, of_yojson]
 
-    include Comparable.Make (T)
-    include Hashable.Make_binable (T)
+    include Comparable.Make_binable (T)
   end
 end]
 
