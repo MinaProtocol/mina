@@ -6,7 +6,7 @@ module Legacy_token = Mina_numbers.Nat.Make64 ()
 module Stable = struct
   module V2 = struct
     type t = Account_id.Digest.Stable.V1.t
-    [@@deriving sexp, yojson, equal, compare, hash]
+    [@@deriving sexp, yojson, equal, compare]
 
     let to_latest = Fn.id
   end

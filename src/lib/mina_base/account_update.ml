@@ -26,7 +26,7 @@ module Authorization_kind = struct
         | Signature
         | Proof of (Field.t[@version_asserted])
         | None_given
-      [@@deriving sexp, equal, yojson, hash, compare]
+      [@@deriving sexp, equal, yojson, compare]
 
       let to_latest = Fn.id
     end
@@ -145,7 +145,7 @@ module May_use_token = struct
             *)
         | Inherit_from_parent
             (** Inherit the token permission available to the parent. *)
-      [@@deriving sexp, equal, yojson, hash, compare]
+      [@@deriving sexp, equal, yojson, compare]
 
       let to_latest = Fn.id
     end
@@ -521,7 +521,7 @@ module Update = struct
           ; vesting_period : Global_slot_span.Stable.V1.t
           ; vesting_increment : Amount.Stable.V1.t
           }
-        [@@deriving annot, compare, equal, sexp, hash, yojson, hlist, fields]
+        [@@deriving annot, compare, equal, sexp, yojson, hlist, fields]
 
         let to_latest = Fn.id
       end
@@ -686,7 +686,7 @@ module Update = struct
         ; timing : Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
         ; voting_for : State_hash.Stable.V1.t Set_or_keep.Stable.V1.t
         }
-      [@@deriving annot, compare, equal, sexp, hash, yojson, fields, hlist]
+      [@@deriving annot, compare, equal, sexp, yojson, fields, hlist]
 
       let to_latest = Fn.id
     end
@@ -936,8 +936,7 @@ module Account_precondition = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Zkapp_precondition.Account.Stable.V2.t
-      [@@deriving sexp, yojson, hash]
+      type t = Zkapp_precondition.Account.Stable.V2.t [@@deriving sexp, yojson]
 
       let (_ :
             ( t
@@ -1013,7 +1012,7 @@ module Preconditions = struct
             Mina_numbers.Global_slot_since_genesis.Stable.V1.t
             Zkapp_precondition.Numeric.Stable.V1.t
         }
-      [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
+      [@@deriving annot, sexp, equal, yojson, hlist, compare, fields]
 
       let to_latest = Fn.id
     end
@@ -1097,7 +1096,7 @@ module Body = struct
           Pickles.Backend.Tick.Field.Stable.V1.t
           Bounded_types.ArrayN16.Stable.V1.t
           list
-        [@@deriving sexp, equal, hash, compare, yojson]
+        [@@deriving sexp, equal, compare, yojson]
 
         let to_latest = Fn.id
       end
@@ -1125,7 +1124,7 @@ module Body = struct
           ; may_use_token : May_use_token.Stable.V1.t
           ; authorization_kind : Authorization_kind.Stable.V1.t
           }
-        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+        [@@deriving annot, sexp, equal, yojson, compare, fields]
 
         let to_latest = Fn.id
       end
@@ -1183,7 +1182,7 @@ module Body = struct
           ; may_use_token : May_use_token.Stable.V1.t
           ; authorization_kind : Authorization_kind.Stable.V1.t
           }
-        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+        [@@deriving annot, sexp, equal, yojson, compare, fields]
 
         let to_latest = Fn.id
       end
@@ -1209,7 +1208,7 @@ module Body = struct
         ; may_use_token : May_use_token.Stable.V1.t
         ; authorization_kind : Authorization_kind.Stable.V1.t
         }
-      [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
+      [@@deriving annot, sexp, equal, yojson, hlist, compare, fields]
 
       let to_latest = Fn.id
     end
@@ -1306,7 +1305,7 @@ module Body = struct
                 [@name "validUntil"]
           ; nonce : Account_nonce.Stable.V1.t
           }
-        [@@deriving annot, sexp, equal, yojson, hash, compare, hlist, fields]
+        [@@deriving annot, sexp, equal, yojson, compare, hlist, fields]
 
         let to_latest = Fn.id
       end
@@ -1653,7 +1652,7 @@ module T = struct
           { body : Body.Graphql_repr.Stable.V1.t
           ; authorization : Control.Stable.V2.t
           }
-        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+        [@@deriving annot, sexp, equal, yojson, compare, fields]
 
         let to_latest = Fn.id
       end
@@ -1676,7 +1675,7 @@ module T = struct
           { body : Body.Simple.Stable.V1.t
           ; authorization : Control.Stable.V2.t
           }
-        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+        [@@deriving annot, sexp, equal, yojson, compare, fields]
 
         let to_latest = Fn.id
       end
@@ -1689,7 +1688,7 @@ module T = struct
       (** A account_update to a zkApp transaction *)
       type t = Mina_wire_types.Mina_base.Account_update.V1.t =
         { body : Body.Stable.V1.t; authorization : Control.Stable.V2.t }
-      [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+      [@@deriving annot, sexp, equal, yojson, compare, fields]
 
       let to_latest = Fn.id
     end
@@ -1715,9 +1714,6 @@ module T = struct
 
   let quickcheck_generator : t Quickcheck.Generator.t = gen
 
-  let quickcheck_observer : t Quickcheck.Observer.t =
-    Quickcheck.Observer.of_hash (module Stable.Latest)
-
   let quickcheck_shrinker : t Quickcheck.Shrinker.t =
     Quickcheck.Shrinker.empty ()
 
@@ -1741,7 +1737,7 @@ module Fee_payer = struct
         { body : Body.Fee_payer.Stable.V1.t
         ; authorization : Signature.Stable.V1.t
         }
-      [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+      [@@deriving annot, sexp, equal, yojson, compare, fields]
 
       let to_latest = Fn.id
     end
@@ -1754,9 +1750,6 @@ module Fee_payer = struct
     { body; authorization }
 
   let quickcheck_generator : t Quickcheck.Generator.t = gen
-
-  let quickcheck_observer : t Quickcheck.Observer.t =
-    Quickcheck.Observer.of_hash (module Stable.Latest)
 
   let quickcheck_shrinker : t Quickcheck.Shrinker.t =
     Quickcheck.Shrinker.empty ()

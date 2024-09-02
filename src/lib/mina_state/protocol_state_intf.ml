@@ -9,7 +9,7 @@ module type Full = sig
       module V1 : sig
         type ('state_hash, 'body) t =
           { previous_state_hash : 'state_hash; body : 'body }
-        [@@deriving equal, ord, hash, sexp, to_yojson]
+        [@@deriving equal, ord, sexp, to_yojson]
       end
     end]
   end
@@ -39,7 +39,7 @@ module type Full = sig
             , Consensus.Data.Consensus_state.Value.Stable.V2.t
             , Protocol_constants_checked.Value.Stable.V1.t )
             Poly.Stable.V1.t
-          [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
+          [@@deriving equal, ord, bin_io, sexp, yojson, version]
         end
       end]
     end
@@ -82,8 +82,6 @@ module type Full = sig
         [@@deriving sexp, compare, equal, yojson]
       end
     end]
-
-    include Hashable.S with type t := t
   end
 
   type value = Value.t [@@deriving sexp, yojson]

@@ -13,7 +13,7 @@ module Ledger_inner = struct
         | Generic of Location.Bigstring.Stable.Latest.t
         | Account of Location_at_depth.Addr.Stable.Latest.t
         | Hash of Location_at_depth.Addr.Stable.Latest.t
-      [@@deriving bin_io_unversioned, hash, sexp, compare]
+      [@@deriving bin_io_unversioned, sexp, compare]
     end
 
     type t = Arg.t =
@@ -22,8 +22,7 @@ module Ledger_inner = struct
       | Hash of Location_at_depth.Addr.t
     [@@deriving hash, sexp, compare]
 
-    include Comparable.Make_binable (Arg)
-    include Hashable.Make_binable (Arg) [@@deriving sexp, compare, hash, yojson]
+    include Comparable.Make_binable (Arg) [@@deriving sexp, compare, yojson]
   end
 
   module Kvdb : Intf.Key_value_database with type config := string =
@@ -36,20 +35,20 @@ module Ledger_inner = struct
   module Hash = struct
     module Arg = struct
       type t = Ledger_hash.Stable.Latest.t
-      [@@deriving sexp, compare, hash, bin_io_unversioned]
+      [@@deriving sexp, compare, bin_io_unversioned]
     end
 
     [%%versioned
     module Stable = struct
       module V1 = struct
         type t = Ledger_hash.Stable.V1.t
-        [@@deriving sexp, compare, hash, equal, yojson]
+        [@@deriving sexp, compare, equal, yojson]
 
         let (_ : (t, Arg.t) Type_equal.t) = Type_equal.T
 
         let to_latest = Fn.id
 
-        include Hashable.Make_binable (Arg)
+        include Comparable.Make_binable (Arg)
 
         let to_base58_check = Ledger_hash.to_base58_check
 

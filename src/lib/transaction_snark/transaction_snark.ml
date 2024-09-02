@@ -49,8 +49,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = [ `Base | `Merge ]
-        [@@deriving compare, equal, hash, sexp, yojson]
+        type t = [ `Base | `Merge ] [@@deriving compare, equal, sexp, yojson]
 
         let to_latest = Fn.id
       end
@@ -67,7 +66,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Stable = struct
       module V2 = struct
         type t = Pickles.Proof.Proofs_verified_2.Stable.V2.t
-        [@@deriving yojson, compare, equal, sexp, hash]
+        [@@deriving yojson, compare, equal, sexp]
 
         let to_latest = Fn.id
       end
@@ -81,7 +80,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         { statement : Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
         ; proof : Proof.Stable.V2.t
         }
-      [@@deriving compare, equal, fields, sexp, version, yojson, hash]
+      [@@deriving compare, equal, fields, sexp, version, yojson]
 
       let to_latest = Fn.id
     end

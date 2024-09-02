@@ -99,7 +99,6 @@ let generate_zkapp_commands_and_apply_them_consecutively_5_times ~successful
   let ledger, fee_payer_keypairs, keymap =
     mk_ledgers_and_fee_payers ~num_of_fee_payers:5 ()
   in
-  let account_state_tbl = Account_id.Table.create () in
   let global_slot = Mina_numbers.Global_slot_since_genesis.one in
   let test i random =
     let zkapp_command_dummy_auths =
@@ -107,7 +106,7 @@ let generate_zkapp_commands_and_apply_them_consecutively_5_times ~successful
         (Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
            ~constraint_constants:U.constraint_constants
            ~genesis_constants:U.genesis_constants ~global_slot
-           ~protocol_state_view:U.genesis_state_view ~account_state_tbl
+           ~protocol_state_view:U.genesis_state_view
            ~fee_payer_keypair:fee_payer_keypairs.(i) ~max_account_updates
            ~keymap ~ledger ~vk () )
     in

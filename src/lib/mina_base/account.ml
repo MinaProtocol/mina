@@ -221,7 +221,7 @@ module Poly = struct
         ; permissions : 'permissions
         ; zkapp : 'zkapp_opt
         }
-      [@@deriving sexp, equal, compare, hash, yojson, fields, hlist, annot]
+      [@@deriving sexp, equal, compare, yojson, fields, hlist, annot]
 
       let to_latest = Fn.id
     end
@@ -263,7 +263,7 @@ module Binable_arg = struct
         ; permissions : Permissions.Stable.V2.t
         ; zkapp : Zkapp_account.Stable.V2.t option
         }
-      [@@deriving sexp, equal, hash, compare, yojson]
+      [@@deriving sexp, equal, compare, yojson]
 
       let to_latest = Fn.id
 
@@ -290,7 +290,7 @@ module Stable = struct
       ; permissions : Permissions.Stable.V2.t
       ; zkapp : Zkapp_account.Stable.V2.t option
       }
-    [@@deriving sexp, equal, hash, compare, yojson, hlist, fields]
+    [@@deriving sexp, equal, compare, yojson, hlist, fields]
 
     include
       Binable.Of_binable_without_uuid

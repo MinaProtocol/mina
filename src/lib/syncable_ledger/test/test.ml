@@ -13,7 +13,7 @@ end
 
 module type Input_intf = sig
   module Root_hash : sig
-    type t [@@deriving bin_io, compare, hash, sexp, compare, yojson]
+    type t [@@deriving bin_io, compare, sexp, compare, yojson]
 
     val equal : t -> t -> bool
   end
@@ -196,7 +196,7 @@ module Db = struct
           | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
           | Account of Location.Addr.Stable.Latest.t
           | Hash of Location.Addr.Stable.Latest.t
-        [@@deriving bin_io_unversioned, hash, sexp, compare]
+        [@@deriving bin_io_unversioned, sexp, compare]
       end
 
       type t = Arg.t =
@@ -205,8 +205,7 @@ module Db = struct
         | Hash of Location.Addr.t
       [@@deriving hash, sexp, compare]
 
-      include Hashable.Make_binable (Arg) [@@deriving
-                                            sexp, compare, hash, yojson]
+      include Comparable.Make_binable (Arg) [@@deriving sexp, compare, yojson]
     end
 
     module Base_ledger_inputs = struct

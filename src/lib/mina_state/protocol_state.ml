@@ -29,7 +29,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       module V1 = struct
         type ('state_hash, 'body) t = ('state_hash, 'body) A.Poly.V1.t =
           { previous_state_hash : 'state_hash; body : 'body }
-        [@@deriving equal, ord, hash, sexp, yojson, hlist]
+        [@@deriving equal, ord, sexp, yojson, hlist]
       end
     end]
   end
@@ -62,7 +62,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; consensus_state : 'consensus_state
             ; constants : 'constants
             }
-          [@@deriving sexp, equal, compare, yojson, hash, version, hlist]
+          [@@deriving sexp, equal, compare, yojson, version, hlist]
         end
       end]
     end
@@ -77,7 +77,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             , Consensus.Data.Consensus_state.Value.Stable.V2.t
             , Protocol_constants_checked.Value.Stable.V1.t )
             Poly.Stable.V1.t
-          [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
+          [@@deriving equal, ord, bin_io, sexp, yojson, version]
 
           let to_latest = Fn.id
         end
@@ -190,13 +190,11 @@ module Make_str (A : Wire_types.Concrete) = struct
       module V2 = struct
         type t =
           (State_hash.Stable.V1.t, Body.Value.Stable.V2.t) Poly.Stable.V1.t
-        [@@deriving sexp, hash, compare, equal, yojson]
+        [@@deriving sexp, compare, equal, yojson]
 
         let to_latest = Fn.id
       end
     end]
-
-    include Hashable.Make (Stable.Latest)
   end
 
   type value = Value.t [@@deriving sexp, yojson]

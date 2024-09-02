@@ -9,13 +9,11 @@ module type S = sig
     [@@@no_toplevel_latest_type]
 
     module V1 : sig
-      type t = Field.t [@@deriving sexp, compare, hash, yojson]
+      type t = Field.t [@@deriving sexp, compare, yojson]
 
       val to_latest : t -> t
 
-      include Comparable.S with type t := t
-
-      include Hashable_binable with type t := t
+      include Comparable.S_binable with type t := t
     end
   end]
 end

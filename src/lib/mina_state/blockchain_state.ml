@@ -40,7 +40,7 @@ module Poly = struct
         ; timestamp : 'time
         ; body_reference : 'body_reference
         }
-      [@@deriving sexp, fields, equal, compare, hash, yojson, hlist]
+      [@@deriving sexp, fields, equal, compare, yojson, hlist]
     end
   end]
 end
@@ -76,7 +76,7 @@ module Value = struct
         , Fee_excess.Stable.V1.t
         , unit )
         Poly.Stable.V2.t
-      [@@deriving sexp, equal, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, yojson]
 
       let to_latest = Fn.id
     end

@@ -6,7 +6,7 @@ module type S = sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type t [@@deriving sexp, equal, compare, hash, yojson]
+        type t [@@deriving sexp, equal, compare, yojson]
       end
     end]
 
@@ -19,8 +19,6 @@ module type S = sig
     (* so we can easily import these into Token_id *)
     module Binables : sig
       include Comparable_binable with type t := t
-
-      include Hashable_binable with type t := t
     end
 
     include module type of Binables
@@ -61,7 +59,7 @@ module type S = sig
   [%%versioned:
   module Stable : sig
     module V2 : sig
-      type t [@@deriving sexp, equal, compare, hash, yojson]
+      type t [@@deriving sexp, equal, compare, yojson]
     end
   end]
 
@@ -83,9 +81,7 @@ module type S = sig
 
   val gen : t Quickcheck.Generator.t
 
-  include Comparable.S with type t := t
-
-  include Hashable.S_binable with type t := t
+  include Comparable.S_binable with type t := t
 
   type var
 

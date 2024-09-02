@@ -2635,7 +2635,7 @@ module For_tests = struct
             } )
 
     let gen () : t Quickcheck.Generator.t =
-      let tbl = Public_key.Compressed.Hash_set.create () in
+      let tbl = ref Public_key.Compressed.Set.empty in
       let open Quickcheck.Generator in
       let open Let_syntax in
       let rec go acc n =
@@ -2643,9 +2643,9 @@ module For_tests = struct
         else
           let%bind kp =
             filter Keypair.gen ~f:(fun kp ->
-                not (Hash_set.mem tbl (Public_key.compress kp.public_key)) )
+                not (Set.mem !tbl (Public_key.compress kp.public_key)) )
           and amount = Int64.gen_incl min_init_balance max_init_balance in
-          Hash_set.add tbl (Public_key.compress kp.public_key) ;
+          tbl := Set.add !tbl (Public_key.compress kp.public_key) ;
           go ((kp, amount) :: acc) (n - 1)
       in
       go [] num_accounts

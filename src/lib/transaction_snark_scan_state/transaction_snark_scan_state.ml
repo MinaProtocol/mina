@@ -95,7 +95,7 @@ module Job_view = struct
     end in
     let statement_to_yojson (s : Transaction_snark.Statement.t) =
       `Assoc
-        [ ("Work_id", `Int (Transaction_snark.Statement.hash s))
+        [ ("Work_id", `Int (Transaction_snark_work.statement_hash s))
         ; ("Source", R.to_yojson s.source)
         ; ("Target", R.to_yojson s.target)
         ; ( "Fee Excess"

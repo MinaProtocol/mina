@@ -25,7 +25,7 @@ module Poly = struct
         ; lock_checkpoint : 'lock_checkpoint
         ; epoch_length : 'length
         }
-      [@@deriving annot, hlist, sexp, equal, compare, hash, yojson, fields]
+      [@@deriving annot, hlist, sexp, equal, compare, yojson, fields]
     end
   end]
 end
@@ -64,13 +64,13 @@ module Value = struct
         , State_hash.Stable.V1.t
         , Length.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving sexp, compare, equal, hash, yojson]
+      [@@deriving sexp, compare, equal, yojson]
 
       let to_latest = Fn.id
     end
   end]
 end
 
-type t = Value.Stable.V1.t [@@deriving sexp, compare, equal, hash, yojson]
+type t = Value.Stable.V1.t [@@deriving sexp, compare, equal, yojson]
 
 include Comparable.Make (Value.Stable.V1)

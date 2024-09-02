@@ -23,7 +23,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Stable = struct
       module V1 = struct
         type t = Bounded_types.String.Stable.V1.t
-        [@@deriving sexp, equal, compare, hash]
+        [@@deriving sexp, equal, compare]
 
         let to_latest = Fn.id
 
@@ -107,7 +107,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Stable = struct
       module V1 = struct
         type t = Bounded_types.String.Stable.V1.t
-        [@@deriving sexp, equal, compare, hash]
+        [@@deriving sexp, equal, compare]
 
         let to_latest = Fn.id
 
@@ -154,13 +154,13 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; aux_hash : Aux_hash.Stable.V1.t
           ; pending_coinbase_aux : Pending_coinbase_aux.Stable.V1.t
           }
-        [@@deriving sexp, equal, compare, hash, yojson, fields]
+        [@@deriving sexp, equal, compare, yojson, fields]
 
         let to_latest = Fn.id
       end
     end]
 
-    type value = t [@@deriving sexp, compare, hash, yojson]
+    type value = t [@@deriving sexp, compare, yojson]
 
     let dummy : t Lazy.t =
       lazy
@@ -230,7 +230,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           { non_snark : 'non_snark
           ; pending_coinbase_hash : 'pending_coinbase_hash
           }
-        [@@deriving sexp, equal, compare, hash, yojson, hlist]
+        [@@deriving sexp, equal, compare, yojson, hlist]
       end
     end]
   end
@@ -247,7 +247,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ( Non_snark.Stable.V1.t
         , Pending_coinbase.Hash_versioned.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving sexp, equal, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, yojson]
 
       let to_latest = Fn.id
     end
@@ -255,11 +255,9 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   type ('a, 'b) t_ = ('a, 'b) Poly.t
 
-  type value = t [@@deriving sexp, equal, compare, hash]
+  type value = t [@@deriving sexp, equal, compare]
 
   type var = (Non_snark.var, Pending_coinbase.Hash.var) t_
-
-  include Hashable.Make (Stable.Latest)
 
   let ledger_hash ({ non_snark; _ } : t) = Non_snark.ledger_hash non_snark
 
