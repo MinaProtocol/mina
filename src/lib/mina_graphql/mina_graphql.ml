@@ -2251,44 +2251,25 @@ module Queries = struct
         ~resolve:
           (resolve_membership ~mapper:Types.SnarkedLedgerMembership.of_account)
 
-    (*
-  let encoded_snarked_ledger_accounts_membership =
-    io_field "encodedSnarkedLedgerAccountsMembership"
-      ~doc:
-        "obtain a membership proof for an account in the snarked ledger along \
-         with the account's balance, timing information, and nonce"
-      ~args:
-        Arg.
-          [ arg "accountInfos" ~doc:"Token id of the account to check"
-              ~typ:(non_null (list (non_null Types.Input.AccountInfo.arg_typ)))
-          ; arg "stateHash" ~doc:"Hash of the snarked ledger to check"
-              ~typ:(non_null string)
-          ]
-      ~typ:(non_null string)
-      ~resolve:(fun resolve_info args account_infos state_hash ->
-        let open Deferred.Let_syntax in
-        let%map memberships =
-          resolve_membership resolve_info () account_infos state_hash
-        in
-        let memberships = 
-          match memberships with
-          | Ok memberships ->
-              memberships
-          | Error err ->
-              raise (Failure err)
-        in
-        (* encode memberships to a base64 encoded string *)
-        let encoded_memberships =
-          let encoded_memberships =
-            List.map memberships ~f:(fun membership ->
-                Types.SnarkedLedgerMembership.to_yojson membership
-                |> Yojson.Safe.to_string )
-          in
-          let encoded_memberships = String.concat ~sep:"\n" encoded_memberships in
-          Base64.encode_exn encoded_memberships
-        in
-        Ok encoded_memberships )
-        *)
+    let encoded_snarked_ledger_account_membership =
+      io_field "encodedSnarkedLedgerAccountMembership"
+        ~doc:
+          "obtain a membership proof for an account in the snarked ledger \
+           along with the accounts full information encoded as base64 binable \
+           type"
+        ~args:
+          Arg.
+            [ arg "accountInfos" ~doc:"Token id of the account to check"
+                ~typ:
+                  (non_null (list (non_null Types.Input.AccountInfo.arg_typ)))
+            ; arg "stateHash" ~doc:"Hash of the snarked ledger to check"
+                ~typ:(non_null string)
+            ]
+        ~typ:
+          (non_null (list (non_null Types.SnarkedLedgerMembership.encoded_obj)))
+        ~resolve:
+          (resolve_membership
+             ~mapper:Types.SnarkedLedgerMembership.of_encoded_account )
   end
 
   let genesis_constants =
