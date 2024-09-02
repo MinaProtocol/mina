@@ -3301,18 +3301,64 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   open Pickles_types
 
+  module Test_number_of_merkle_lookups = struct
+    let rule ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+        : _ Pickles.Inductive_rule.t =
+      { identifier = "merkle_lookups"
+      ; prevs = []
+      ; main =
+          (fun { public_input = _ } ->
+            let open Run in
+            for
+              _i = 0
+              to Option.value_map ~default:45 ~f:Int.of_string
+                   (Core.Sys.getenv "NUM_ITERATIONS")
+            do
+              let initial_root =
+                exists Frozen_ledger_hash.typ ~compute:(fun () ->
+                    failwith "Placeholder" )
+              in
+              let account_id =
+                exists Account_id.typ ~compute:(fun () ->
+                    failwith "Placeholder" )
+              in
+              let balance_change =
+                exists Amount.typ ~compute:(fun () -> failwith "Placeholder")
+              in
+              let _new_root =
+                run_checked
+                @@ Frozen_ledger_hash.modify_account_send
+                     ~depth:constraint_constants.ledger_depth
+                     ~is_writeable:Boolean.true_ initial_root account_id
+                     ~f:(fun ~is_empty_and_writeable:_ account ->
+                       let%map balance =
+                         Balance.Checked.add_amount account.balance
+                           balance_change
+                       in
+                       { account with balance } )
+              in
+              ()
+            done ;
+            { previous_proof_statements = []
+            ; public_output = ()
+            ; auxiliary_output = ()
+            } )
+      ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+      }
+  end
+
   type tag =
     ( Statement.With_sok.Checked.t
     , Statement.With_sok.t
     , Nat.N2.n
-    , Nat.N5.n )
+    , Nat.N6.n )
     Pickles.Tag.t
 
   let system ~proof_level ~constraint_constants =
     Pickles.compile () ~cache:Cache_dir.cache ?proof_cache:!proof_cache
       ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~public_input:(Input Statement.With_sok.typ) ~auxiliary_typ:Typ.unit
-      ~branches:(module Nat.N5)
+      ~branches:(module Nat.N6)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"transaction-snark"
       ~constraint_constants:
@@ -3324,6 +3370,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         [ Base.rule ~constraint_constants
         ; Merge.rule ~proof_level self
+        ; Test_number_of_merkle_lookups.rule ~constraint_constants
         ; zkapp_command Opt_signed_opt_signed
         ; zkapp_command Opt_signed
         ; zkapp_command Proved
@@ -3952,7 +3999,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         , cache_handle
         , p
         , Pickles.Provers.
-            [ base; merge; opt_signed_opt_signed; opt_signed; proved ] ) =
+            [ base; merge; _; opt_signed_opt_signed; opt_signed; proved ] ) =
       system ~proof_level ~constraint_constants
 
     module Proof = (val p)

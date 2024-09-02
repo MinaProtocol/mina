@@ -37,7 +37,7 @@ module type Full = sig
     ( Statement.With_sok.Checked.t
     , Statement.With_sok.t
     , Nat.N2.n
-    , Nat.N5.n )
+    , Nat.N6.n )
     Pickles.Tag.t
 
   val verify :
