@@ -1,41 +1,40 @@
 open Async_kernel
+open Intf
 
 module type S = sig
-  module Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf
+  module Rpc_interface : RPC_INTERFACE
 
-  module type Implementation_intf =
-    Intf.Gossip_net_intf with module Rpc_intf := Rpc_intf
+  module type IMPLEMENTATION =
+    GOSSIP_NET with module Rpc_interface := Rpc_interface
 
-  type 't implementation = (module Implementation_intf with type t = 't)
+  type 't implementation = (module IMPLEMENTATION with type t = 't)
 
   type t = Any : 't implementation * 't -> t
 
-  include Intf.Gossip_net_intf with module Rpc_intf := Rpc_intf and type t := t
+  include IMPLEMENTATION with type t := t
 
-  type 't creator = Rpc_intf.rpc_handler list -> Message.sinks -> 't Deferred.t
+  type 't creator = Rpc_interface.ctx -> Message.sinks -> 't Deferred.t
 
   type creatable = Creatable : 't implementation * 't creator -> creatable
 
   val create : creatable -> t creator
 end
 
-module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
-  S with module Rpc_intf := Rpc_intf = struct
-  open Rpc_intf
+module Make (Rpc_interface : RPC_INTERFACE) :
+  S with module Rpc_interface := Rpc_interface = struct
+  module type IMPLEMENTATION =
+    GOSSIP_NET with module Rpc_interface := Rpc_interface
 
-  module type Implementation_intf =
-    Intf.Gossip_net_intf with module Rpc_intf := Rpc_intf
-
-  type 't implementation = (module Implementation_intf with type t = 't)
+  type 't implementation = (module IMPLEMENTATION with type t = 't)
 
   type t = Any : 't implementation * 't -> t
 
-  type 't creator = rpc_handler list -> Message.sinks -> 't Deferred.t
+  type 't creator = Rpc_interface.ctx -> Message.sinks -> 't Deferred.t
 
   type creatable = Creatable : 't implementation * 't creator -> creatable
 
-  let create (Creatable ((module M), creator)) impls sinks =
-    let%map gossip_net = creator impls sinks in
+  let create (Creatable ((module M), creator)) ctx sinks =
+    let%map gossip_net = creator ctx sinks in
     Any ((module M), gossip_net)
 
   let peers (Any ((module M), t)) = M.peers t
