@@ -42,7 +42,7 @@ type output =
   ; target_genesis_ledger : Runtime_config.Ledger.t
   ; target_epoch_data : Runtime_config.Epoch_data.t
   }
-[@@deriving yojson]
+[@@deriving to_yojson]
 
 module type Get_command_ids = sig
   val run :

@@ -2494,6 +2494,8 @@ module Queries = struct
             ~global_slot_since_genesis ~state_hash ~staking_ledger
             ~staking_epoch_seed ~next_epoch_ledger:(Some next_epoch_ledger)
             ~next_epoch_seed ~blockchain_length
+            ~constraint_constants:runtime_config.constraint_constants
+            ~genesis_constants:runtime_config.genesis_constants
         in
         let%map () =
           let open Async.Deferred.Infix in
