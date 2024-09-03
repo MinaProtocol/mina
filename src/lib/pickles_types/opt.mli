@@ -38,7 +38,7 @@ val to_option_unsafe : ('a, 'bool) t -> 'a option
 
 (** [to_option bool_opt] maps {!const:Just}, resp. {!const:Nothing}, to
     {!const:Option.Some}, resp. {!const:Option.None}.
-    
+
     The difference with {!val:to_option_unsafe} lies in the treatment of
     {!const:Maybe}, where [Maybe(false, x)] maps to {!val:Option.None} and
     [Maybe(true, x)] to [Option.Some x].
@@ -66,7 +66,7 @@ val lift :
 module Flag : sig
   type t = Yes | No | Maybe [@@deriving sexp, compare, yojson, hash, equal]
 
-  (** [( ||| )] is a commutative ternary disjunction on {!type:t} with 
+  (** [( ||| )] is a commutative ternary disjunction on {!type:t} with
       a similar specification to its usual Boolean [||] counterpart:
 
       - [Yes] is absorbing: [Yes ||| x] is [Yes]
