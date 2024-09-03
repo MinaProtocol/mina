@@ -127,7 +127,10 @@ module Lookup_sorted_vec = Vector.Vector_5
 
 (** Messages involved in the polynomial IOP *)
 module Messages : sig
+  (** Different polynomials the prover sends during the protocol *)
   module Poly : sig
+    (** The polynomials are the witnesses (`'w`), the permutation polynomial
+    (`'z`) and the quotient polynomial (`'t`) *)
     type ('w, 'z, 't) t = { w : 'w; z : 'z; t : 't }
   end
 
