@@ -70,7 +70,8 @@ You can build Mina using Docker. Using Docker works in any dev environment. See 
         ```
 
 1. Install [rustup](https://rustup.rs/).
-2. Create your switch with deps `opam switch import --switch mina opam.export`
+2. Add o1-opam-repository with `opam repository add --yes --all --set-default o1-labs https://github.com/o1-labs/opam-repository.git`
+3. Create your switch with deps `opam switch import --switch mina opam.export`
 
     M1- and M2- operating systems experience issues because Homebrew does not link include files automatically.
   
@@ -98,13 +99,13 @@ You can build Mina using Docker. Using Docker works in any dev environment. See 
    - Note:If you get conf-openssl install errors, try running `export PKG_CONFIG_PATH=$(brew --prefix openssl@1.1)/lib/pkgconfig` and try `opam switch import opam.export` again.
    - If prompted, run `opam user-setup install` to enable opam-user-setup support for Merlin.
 
-3. Pin dependencies that override opam versions:
+4. Pin dependencies that override opam versions:
 
     ```sh
     scripts/pin-external-packages.sh
     ```
 
-7. Install the correct version of golang:
+5. Install the correct version of golang:
 
    - `goenv init`
    - To make sure the right `goenv` is used, update your shell env script with:
@@ -118,17 +119,17 @@ You can build Mina using Docker. Using Docker works in any dev environment. See 
    - `goenv global 1.18.10`
    - Check that the `go version` returns the right version, otherwise you see the message `compile:version "go1.18.10" does not match go tool version "go1.20.2"`. If so, run `brew remove go` or get the matching version.
 
-9.  Invoke `make build`.
+6.  Invoke `make build`.
 
     If you get errors about `libp2p` and `capnp`, try with `brew install capnp`.
 
-9.  For better IDE support, install the OCaml-LSP language server for OCaml:
+7.  For better IDE support, install the OCaml-LSP language server for OCaml:
 
     ```sh
     opam install ocaml-lsp-server
     ```
 
-10. Set up your IDE. See [Customizing your dev environment for autocomplete/merlin](https://github.com/MinaProtocol/mina/blob/develop/README-dev.md#customizing-your-dev-environment-for-autocompletemerlin).
+8. Set up your IDE. See [Customizing your dev environment for autocomplete/merlin](https://github.com/MinaProtocol/mina/blob/develop/README-dev.md#customizing-your-dev-environment-for-autocompletemerlin).
 
 ### Developer Setup (Linux)
 
@@ -139,6 +140,7 @@ Mina has a variety of opam and system dependencies.
 To get all of the required opam dependencies, run:
 
 ```sh
+opam repository add --yes --all --set-default o1-labs https://github.com/o1-labs/opam-repository.git
 opam switch import opam.export
 ```
 
@@ -249,6 +251,47 @@ dune exec src/app/cli/src/mina.exe -- -help
 ```
 
 The command line help is the place to learn about other options to the Mina CLI and how to connect to an existing network, such as Mainnet.
+
+## Building debian package locally
+
+Debian package can be build locally by using below commands:
+
+
+1. Build binaries
+```
+make build
+```
+2. Build debian for mina-devet (example for ubuntu 18.04):
+```
+./scripts/debian/build.sh daemon_devnet
+```
+
+## Building docker locally
+
+Prerequisites: 
+
+- debian package previously built
+- aptly app
+
+Steps:
+
+1. Start local debian repository
+```
+./scripts/debian/aptly.sh start -b -c focal -d _build/ -m unstable -l -p 8081
+```
+
+IMPORTANT: debians should be placed in _build folder
+
+2. Build docker:
+```
+./scripts/docker/build.sh --service mina-daemon -v 3.0.0-dkijania-local-debian-build-a099fc7 --network devnet --deb-codename focal --deb-version 3.0.0-dkijania-local-debian-build-a099fc7 
+```
+
+Where:
+
+`-v` - base docker tag
+`--deb-codename` - input debian codename (buster,bullseye etc.)
+`--deb-version` - version of debian which docker will host
 
 ## Using the Makefile
 

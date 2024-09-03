@@ -8,21 +8,19 @@ open Async
 
 let generate_keypair =
   Command.async ~summary:"Generate a new public, private keypair"
-    (let open Command.Let_syntax in
-    let%map_open privkey_path = Flag.privkey_write_path in
-    Exceptions.handle_nicely
-    @@ fun () ->
-    let env = Secrets.Keypair.env in
-    if Option.is_some (Sys.getenv env) then
-      eprintf "Using password from environment variable %s\n" env ;
-    let open Deferred.Let_syntax in
-    let kp = Keypair.create () in
-    let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
-    printf "Keypair generated\nPublic key: %s\nRaw public key: %s\n"
-      ( kp.public_key |> Public_key.compress
-      |> Public_key.Compressed.to_base58_check )
-      (Rosetta_coding.Coding.of_public_key kp.public_key) ;
-    exit 0)
+    (let%map_open.Command privkey_path = Flag.privkey_write_path in
+     Exceptions.handle_nicely
+     @@ fun () ->
+     let env = Secrets.Keypair.env in
+     if Option.is_some (Sys.getenv env) then
+       eprintf "Using password from environment variable %s\n" env ;
+     let kp = Keypair.create () in
+     let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
+     printf "Keypair generated\nPublic key: %s\nRaw public key: %s\n"
+       ( kp.public_key |> Public_key.compress
+       |> Public_key.Compressed.to_base58_check )
+       (Rosetta_coding.Coding.of_public_key kp.public_key) ;
+     exit 0 )
 
 let validate_keypair =
   Command.async ~summary:"Validate a public, private keypair"
@@ -153,7 +151,7 @@ let validate_transaction =
           exit 0 )
 
 module Vrf = struct
-  let generate_witness =
+  let generate_witness ~constraint_constants =
     Command.async
       ~summary:
         "Generate a vrf evaluation witness. This may be used to calculate \
@@ -195,9 +193,6 @@ module Vrf = struct
         eprintf "Using password from environment variable %s\n" env ;
       let open Deferred.Let_syntax in
       (* TODO-someday: constraint constants from config file. *)
-      let constraint_constants =
-        Genesis_constants.Constraint_constants.compiled
-      in
       let%bind () =
         let password =
           lazy
@@ -247,7 +242,7 @@ module Vrf = struct
       in
       exit 0)
 
-  let batch_generate_witness =
+  let batch_generate_witness ~constraint_constants =
     Command.async
       ~summary:
         "Generate a batch of vrf evaluation witnesses from {\"globalSlot\": _, \
@@ -262,9 +257,6 @@ module Vrf = struct
         eprintf "Using password from environment variable %s\n" env ;
       let open Deferred.Let_syntax in
       (* TODO-someday: constraint constants from config file. *)
-      let constraint_constants =
-        Genesis_constants.Constraint_constants.compiled
-      in
       let%bind () =
         let password =
           lazy
@@ -308,7 +300,7 @@ module Vrf = struct
       in
       exit 0)
 
-  let batch_check_witness =
+  let batch_check_witness ~constraint_constants =
     Command.async
       ~summary:
         "Check a batch of vrf evaluation witnesses read on stdin. Outputs the \
@@ -323,9 +315,6 @@ module Vrf = struct
       @@ fun () ->
       let open Deferred.Let_syntax in
       (* TODO-someday: constraint constants from config file. *)
-      let constraint_constants =
-        Genesis_constants.Constraint_constants.compiled
-      in
       let lexbuf = Lexing.from_channel In_channel.stdin in
       let lexer = Yojson.init_lexer () in
       let%bind () =
@@ -358,10 +347,10 @@ module Vrf = struct
       in
       exit 0 )
 
-  let command_group =
+  let command_group ~constraint_constants =
     Command.group ~summary:"Commands for vrf evaluations"
-      [ ("generate-witness", generate_witness)
-      ; ("batch-generate-witness", batch_generate_witness)
-      ; ("batch-check-witness", batch_check_witness)
+      [ ("generate-witness", generate_witness ~constraint_constants)
+      ; ("batch-generate-witness", batch_generate_witness ~constraint_constants)
+      ; ("batch-check-witness", batch_check_witness ~constraint_constants)
       ]
 end

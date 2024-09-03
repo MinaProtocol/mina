@@ -18,10 +18,6 @@ val network_id : string
 
 val zkapp_cmd_limit : int option
 
-val slot_tx_end : int option
-
-val slot_chain_end : int option
-
 val rpc_handshake_timeout_sec : float
 
 val rpc_heartbeat_timeout_sec : float

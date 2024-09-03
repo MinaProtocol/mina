@@ -408,7 +408,7 @@ module Mutations = struct
         in
         let%bind accounts = Ledger.to_list best_tip_ledger in
         let constraint_constants =
-          Genesis_constants.Constraint_constants.compiled
+          Genesis_constants_compiled.Constraint_constants.t
         in
         let depth = constraint_constants.ledger_depth in
         let ledger = Ledger.create_ephemeral ~depth () in
@@ -417,7 +417,7 @@ module Mutations = struct
         *)
         List.iter accounts ~f:(fun account ->
             let pk = Account.public_key account in
-            let token = Account.token account in
+            let token = Account.token_id account in
             let account_id = Account_id.create pk token in
             match Ledger.get_or_create_account ledger account_id account with
             | Ok (`Added, _loc) ->
@@ -515,15 +515,16 @@ module Mutations = struct
         ~error:(sprintf "Invalid `fee` provided.")
     in
     let%bind () =
+      let minimum_fee = Genesis_constants_compiled.t.minimum_user_command_fee in
       Result.ok_if_true
-        Currency.Fee.(fee >= Signed_command.minimum_fee)
+        Currency.Fee.(fee >= minimum_fee)
         ~error:
           (* IMPORTANT! Do not change the content of this error without
            * updating Rosetta's construction API to handle the changes *)
           (sprintf
              !"Invalid user command. Fee %s is less than the minimum fee, %s."
              (Currency.Fee.to_mina_string fee)
-             (Currency.Fee.to_mina_string Signed_command.minimum_fee) )
+             (Currency.Fee.to_mina_string minimum_fee) )
     in
     let%map memo =
       Option.value_map memo ~default:(Ok Signed_command_memo.empty)
@@ -1591,12 +1592,8 @@ module Mutations = struct
   end
 end
 
-module Queries (Context : sig
-  val commit_id : string
-end) =
-struct
+module Queries = struct
   open Schema
-  open Context
 
   (* helper for pooledUserCommands, pooledZkappCommands *)
   let get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt =
@@ -1762,15 +1759,14 @@ struct
              agrees with status; see issue #8251
         *)
         let%map { sync_status; _ } =
-          Mina_commands.get_status ~commit_id ~flag:`Performance mina
+          Mina_commands.get_status ~flag:`Performance mina
         in
         Ok sync_status )
 
   let daemon_status =
     io_field "daemonStatus" ~doc:"Get running daemon status" ~args:[]
       ~typ:(non_null Types.DaemonStatus.t) ~resolve:(fun { ctx = mina; _ } () ->
-        Mina_commands.get_status ~commit_id ~flag:`Performance mina
-        >>| Result.return )
+        Mina_commands.get_status ~flag:`Performance mina >>| Result.return )
 
   let trust_status =
     field "trustStatus"
@@ -1796,7 +1792,7 @@ struct
     field "version" ~typ:string
       ~args:Arg.[]
       ~doc:"The version of the node (git commit hash)"
-      ~resolve:(fun _ _ -> Some commit_id)
+      ~resolve:(fun { ctx; _ } _ -> Some (Mina_lib.commit_id ctx))
 
   let get_filtered_log_entries =
     field "getFilteredLogEntries"
@@ -2196,6 +2192,86 @@ struct
         let (module S) = Mina_lib.work_selection_method mina in
         S.pending_work_statements ~snark_pool ~fee_opt snark_job_state )
 
+  module SnarkedLedgerMembership = struct
+    let resolve_membership :
+           mapper:(Ledger.path -> Account.t -> 'a)
+        -> Mina_lib.t resolve_info
+        -> unit
+        -> (Account.key * Token_id.t option) list
+        -> string
+        -> ('a list, string) result Io.t =
+     fun ~mapper { ctx = mina; _ } () account_infos state_hash ->
+      let open Deferred.Let_syntax in
+      let state_hash = State_hash.of_base58_check_exn state_hash in
+      let%bind ledger =
+        Mina_lib.get_snarked_ledger_full mina (Some state_hash)
+      in
+      let ledger =
+        match ledger with
+        | Ok ledger ->
+            ledger
+        | Error err ->
+            raise
+              (Failure
+                 ("Failed to get snarked ledger: " ^ Error.to_string_hum err) )
+      in
+      let%map memberships =
+        Deferred.List.map account_infos ~f:(fun (pk, token) ->
+            let token = Option.value ~default:Token_id.default token in
+            let account_id = Account_id.create pk token in
+            let location = Ledger.location_of_account ledger account_id in
+            match location with
+            | None ->
+                raise (Failure "Account not found in snarked ledger")
+            | Some location -> (
+                let account = Ledger.get ledger location in
+                match account with
+                | None ->
+                    raise (Failure "Account not found in snarked ledger")
+                | Some account ->
+                    let proof = Ledger.merkle_path ledger location in
+                    mapper proof account |> Deferred.return ) )
+      in
+      Ok memberships
+
+    let snarked_ledger_account_membership =
+      io_field "snarkedLedgerAccountMembership"
+        ~doc:
+          "obtain a membership proof for an account in the snarked ledger \
+           along with the account's balance, timing information, and nonce"
+        ~args:
+          Arg.
+            [ arg "accountInfos" ~doc:"Token id of the account to check"
+                ~typ:
+                  (non_null (list (non_null Types.Input.AccountInfo.arg_typ)))
+            ; arg "stateHash" ~doc:"Hash of the snarked ledger to check"
+                ~typ:(non_null string)
+            ]
+        ~typ:(non_null (list (non_null Types.SnarkedLedgerMembership.obj)))
+        ~resolve:
+          (resolve_membership ~mapper:Types.SnarkedLedgerMembership.of_account)
+
+    let encoded_snarked_ledger_account_membership =
+      io_field "encodedSnarkedLedgerAccountMembership"
+        ~doc:
+          "obtain a membership proof for an account in the snarked ledger \
+           along with the accounts full information encoded as base64 binable \
+           type"
+        ~args:
+          Arg.
+            [ arg "accountInfos" ~doc:"Token id of the account to check"
+                ~typ:
+                  (non_null (list (non_null Types.Input.AccountInfo.arg_typ)))
+            ; arg "stateHash" ~doc:"Hash of the snarked ledger to check"
+                ~typ:(non_null string)
+            ]
+        ~typ:
+          (non_null (list (non_null Types.SnarkedLedgerMembership.encoded_obj)))
+        ~resolve:
+          (resolve_membership
+             ~mapper:Types.SnarkedLedgerMembership.of_encoded_account )
+  end
+
   let genesis_constants =
     field "genesisConstants"
       ~doc:
@@ -2387,7 +2463,7 @@ struct
                   Deferred.Result.fail "Daemon is bootstrapping"
               | `Active breadcrumb -> (
                   let txn_stop_slot_opt =
-                    Runtime_config.slot_tx_end_or_default runtime_config
+                    Runtime_config.slot_tx_end runtime_config
                   in
                   match txn_stop_slot_opt with
                   | None ->
@@ -2681,6 +2757,8 @@ struct
     ; trust_status_all
     ; snark_pool
     ; pending_snark_work
+    ; SnarkedLedgerMembership.snarked_ledger_account_membership
+    ; SnarkedLedgerMembership.encoded_snarked_ledger_account_membership
     ; genesis_constants
     ; time_offset
     ; validate_payment
@@ -2753,29 +2831,21 @@ struct
   end
 end
 
-let schema ~commit_id =
-  let module Q = Queries (struct
-    let commit_id = commit_id
-  end) in
+let schema =
   Graphql_async.Schema.(
-    schema Q.commands ~mutations:Mutations.commands
+    schema Queries.commands ~mutations:Mutations.commands
       ~subscriptions:Subscriptions.commands)
 
-let schema_limited ~commit_id =
-  let module Q = Queries (struct
-    let commit_id = commit_id
-  end) in
+let schema_limited =
   (* including version because that's the default query *)
   Graphql_async.Schema.(
     schema
-      [ Q.daemon_status; Q.block; Q.version ]
+      [ Queries.daemon_status; Queries.block; Queries.version ]
       ~mutations:[] ~subscriptions:[])
 
-let schema_itn ~commit_id : (bool * Mina_lib.t) Schema.schema =
-  let module Q = Queries (struct
-    let commit_id = commit_id
-  end) in
+let schema_itn : (bool * Mina_lib.t) Schema.schema =
   if Mina_compile_config.itn_features then
     Graphql_async.Schema.(
-      schema Q.Itn.commands ~mutations:Mutations.Itn.commands ~subscriptions:[])
+      schema Queries.Itn.commands ~mutations:Mutations.Itn.commands
+        ~subscriptions:[])
   else Graphql_async.Schema.(schema [] ~mutations:[] ~subscriptions:[])
