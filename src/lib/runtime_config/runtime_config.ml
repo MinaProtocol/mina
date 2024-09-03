@@ -1187,6 +1187,62 @@ type t =
   }
 [@@deriving bin_io_unversioned, to_yojson]
 
+(* TODO: This function is only used to print the configuration as part of an error message, is a giant JSON blob really what we want here?*)
+let format_as_json_without_accounts x =
+  let genesis_accounts =
+    let%bind.Option { accounts; _ } =
+      Option.map ~f:Ledger.to_json_layout x.ledger
+    in
+    Option.map ~f:List.length accounts
+  in
+  let staking_accounts =
+    let%bind.Option { staking; _ } = x.epoch_data in
+    Option.map ~f:List.length (Ledger.to_json_layout staking.ledger).accounts
+  in
+  let next_accounts =
+    let%bind.Option { next; _ } = x.epoch_data in
+    let%bind.Option { ledger; _ } = next in
+    Option.map ~f:List.length (Ledger.to_json_layout ledger).accounts
+  in
+  let f ledger =
+    { (Ledger.to_json_layout ledger) with Json_layout.Ledger.accounts = None }
+  in
+  let g ({ staking; next } : Epoch_data.t) =
+    { Json_layout.Epoch_data.staking =
+        (let l = f staking.ledger in
+         { accounts = None
+         ; seed = staking.seed
+         ; hash = l.hash
+         ; s3_data_hash = l.s3_data_hash
+         } )
+    ; next =
+        Option.map next ~f:(fun n ->
+            let l = f n.ledger in
+            { Json_layout.Epoch_data.Data.accounts = None
+            ; seed = n.seed
+            ; hash = l.hash
+            ; s3_data_hash = l.s3_data_hash
+            } )
+    }
+  in
+  let json =
+    `Assoc
+      [ ("daemon", Option.value_map ~default:`Null ~f:Daemon.to_yojson x.daemon)
+      ; ("genesis", Genesis.to_yojson x.genesis_constants)
+      ; ("proof", Proof_keys.to_yojson x.constraint_constants)
+      ; ( "ledger"
+        , Option.value_map ~default:`Null ~f:Json_layout.Ledger.to_yojson
+            (Option.map ~f x.ledger) )
+      ; ( "epoch_data"
+        , Option.value_map ~default:`Null ~f:Json_layout.Epoch_data.to_yojson
+            (Option.map ~f:g x.epoch_data) )
+      ]
+  in
+  ( json
+  , `Accounts_omitted
+      (`Genesis genesis_accounts, `Staking staking_accounts, `Next next_accounts)
+  )
+
 let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
   let open Async.Deferred.Result.Let_syntax in
   let yield = Async_unix.Scheduler.yield_every ~n:100 |> Staged.unstage in

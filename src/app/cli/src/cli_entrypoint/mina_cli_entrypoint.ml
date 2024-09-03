@@ -108,36 +108,34 @@ let load_config_files ~logger ~network_constants ~conf_dir ~genesis_dir
     | Ok (precomputed_values, _) ->
         precomputed_values
     | Error err ->
-        (* TODO: come up with some reasonable alternative here
-           let ( json_config
-               , `Accounts_omitted
-                   ( `Genesis genesis_accounts_omitted
-                   , `Staking staking_accounts_omitted
-                   , `Next next_accounts_omitted ) ) =
-             Runtime_config.to_yojson_without_accounts config
-           in
-           let append_accounts_omitted s =
-             Option.value_map
-               ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
-               ~default:Fn.id
-           in
-           let metadata =
-             append_accounts_omitted "genesis" genesis_accounts_omitted
-             @@ append_accounts_omitted "staking" staking_accounts_omitted
-             @@ append_accounts_omitted "next" next_accounts_omitted []
-             @ [ ("config", json_config)
-               ; ( "name"
-                 , `String
-                     (Option.value ~default:"not provided"
-                        (let%bind.Option ledger = config.ledger in
-                         Option.first_some ledger.name ledger.hash ) ) )
-               ; ("error", Error_json.error_to_yojson err)
-               ]
-           in
-           [%log info]
-             "Initializing with runtime configuration. Ledger source: $name"
-             ~metadata ;
-        *)
+        let ( json_config
+            , `Accounts_omitted
+                ( `Genesis genesis_accounts_omitted
+                , `Staking staking_accounts_omitted
+                , `Next next_accounts_omitted ) ) =
+          Runtime_config.format_as_json_without_accounts config
+        in
+        let append_accounts_omitted s =
+          Option.value_map
+            ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
+            ~default:Fn.id
+        in
+        let metadata =
+          append_accounts_omitted "genesis" genesis_accounts_omitted
+          @@ append_accounts_omitted "staking" staking_accounts_omitted
+          @@ append_accounts_omitted "next" next_accounts_omitted []
+          @ [ ("config", json_config)
+            ; ( "name"
+              , `String
+                  (Option.value ~default:"not provided"
+                     (let%bind.Option ledger = config.ledger in
+                      Option.first_some ledger.name ledger.hash ) ) )
+            ; ("error", Error_json.error_to_yojson err)
+            ]
+        in
+        [%log info]
+          "Initializing with runtime configuration. Ledger source: $name"
+          ~metadata ;
         Error.raise err
   in
   return (precomputed_values, config_jsons, config)

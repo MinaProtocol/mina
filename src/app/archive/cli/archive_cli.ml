@@ -41,10 +41,12 @@ let command_run =
      in
      let runtime_config_opt =
        Option.map runtime_config_file ~f:(fun file ->
-           Yojson.Safe.from_file file |> Runtime_config.Json_layout.of_yojson
-           |> Result.ok_or_failwith
-           |> fun json_config ->
-           Runtime_config.of_json_layout ~network_constants ~json_config
+           Yojson.Safe.from_file file
+           |> fun a ->
+           Result.(
+             Runtime_config.Json_layout.of_yojson a
+             >>= fun json_config ->
+             Runtime_config.of_json_layout ~network_constants ~json_config)
            |> Result.ok_or_failwith )
      in
      fun () ->

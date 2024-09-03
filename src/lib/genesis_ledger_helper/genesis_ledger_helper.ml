@@ -856,7 +856,6 @@ let load_config_file filename
       | Error err ->
           Or_error.error_string err )
 
-(*
 let print_config ~logger config =
   let ledger_name_json =
     Option.value ~default:`Null
@@ -869,7 +868,7 @@ let print_config ~logger config =
           ( `Genesis genesis_accounts_omitted
           , `Staking staking_accounts_omitted
           , `Next next_accounts_omitted ) ) =
-    Runtime_config.to_yojson_without_accounts config
+    Runtime_config.format_as_json_without_accounts config
   in
   let append_accounts_omitted s =
     Option.value_map
@@ -884,10 +883,11 @@ let print_config ~logger config =
   in
   [%log info] "Initializing with runtime configuration. Ledger name: $name"
     ~metadata
-*)
+
 let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ?overwrite_version (config : Runtime_config.t) =
-  (*print_config ~logger config ;*)
+  (*TODO: Do we really want to print a giant json blob here at the INFO level? *)
+  print_config ~logger config ;
   let open Deferred.Or_error.Let_syntax in
   let proof_level = config.constraint_constants.proof_level in
   let constraint_constants = config.constraint_constants in
