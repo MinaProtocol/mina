@@ -2192,61 +2192,85 @@ module Queries = struct
         let (module S) = Mina_lib.work_selection_method mina in
         S.pending_work_statements ~snark_pool ~fee_opt snark_job_state )
 
-  let snarked_ledger_account_membership =
-    io_field "snarkedLedgerAccountMembership"
-      ~doc:
-        "obtain a membership proof for an account in the snarked ledger along \
-         with the account's balance, timing information, and nonce"
-      ~args:
-        Arg.
-          [ arg "accountInfos" ~doc:"Token id of the account to check"
-              ~typ:(non_null (list (non_null Types.Input.AccountInfo.arg_typ)))
-          ; arg "stateHash" ~doc:"Hash of the snarked ledger to check"
-              ~typ:(non_null string)
-          ]
-      ~typ:(non_null (list (non_null Types.SnarkedLedgerMembership.obj)))
-      ~resolve:(fun { ctx = mina; _ } () account_infos state_hash ->
-        let open Deferred.Let_syntax in
-        let state_hash = State_hash.of_base58_check_exn state_hash in
-        let%bind ledger =
-          Mina_lib.get_snarked_ledger_full mina (Some state_hash)
-        in
-        let ledger =
-          match ledger with
-          | Ok ledger ->
-              ledger
-          | Error err ->
-              raise
-                (Failure
-                   ("Failed to get snarked ledger: " ^ Error.to_string_hum err)
-                )
-        in
-        let%map memberships =
-          Deferred.List.map account_infos ~f:(fun (pk, token) ->
-              let token = Option.value ~default:Token_id.default token in
-              let account_id = Account_id.create pk token in
-              let location = Ledger.location_of_account ledger account_id in
-              match location with
-              | None ->
-                  raise (Failure "Account not found in snarked ledger")
-              | Some location -> (
-                  let account = Ledger.get ledger location in
-                  match account with
-                  | None ->
-                      raise (Failure "Account not found in snarked ledger")
-                  | Some account ->
-                      let account_balance = account.balance in
-                      let timing_info = account.timing in
-                      let nonce = account.nonce in
-                      let proof = Ledger.merkle_path ledger location in
-                      { Types.SnarkedLedgerMembership.account_balance
-                      ; timing_info
-                      ; nonce
-                      ; proof
-                      }
-                      |> Deferred.return ) )
-        in
-        Ok memberships )
+  module SnarkedLedgerMembership = struct
+    let resolve_membership :
+           mapper:(Ledger.path -> Account.t -> 'a)
+        -> Mina_lib.t resolve_info
+        -> unit
+        -> (Account.key * Token_id.t option) list
+        -> string
+        -> ('a list, string) result Io.t =
+     fun ~mapper { ctx = mina; _ } () account_infos state_hash ->
+      let open Deferred.Let_syntax in
+      let state_hash = State_hash.of_base58_check_exn state_hash in
+      let%bind ledger =
+        Mina_lib.get_snarked_ledger_full mina (Some state_hash)
+      in
+      let ledger =
+        match ledger with
+        | Ok ledger ->
+            ledger
+        | Error err ->
+            raise
+              (Failure
+                 ("Failed to get snarked ledger: " ^ Error.to_string_hum err) )
+      in
+      let%map memberships =
+        Deferred.List.map account_infos ~f:(fun (pk, token) ->
+            let token = Option.value ~default:Token_id.default token in
+            let account_id = Account_id.create pk token in
+            let location = Ledger.location_of_account ledger account_id in
+            match location with
+            | None ->
+                raise (Failure "Account not found in snarked ledger")
+            | Some location -> (
+                let account = Ledger.get ledger location in
+                match account with
+                | None ->
+                    raise (Failure "Account not found in snarked ledger")
+                | Some account ->
+                    let proof = Ledger.merkle_path ledger location in
+                    mapper proof account |> Deferred.return ) )
+      in
+      Ok memberships
+
+    let snarked_ledger_account_membership =
+      io_field "snarkedLedgerAccountMembership"
+        ~doc:
+          "obtain a membership proof for an account in the snarked ledger \
+           along with the account's balance, timing information, and nonce"
+        ~args:
+          Arg.
+            [ arg "accountInfos" ~doc:"Token id of the account to check"
+                ~typ:
+                  (non_null (list (non_null Types.Input.AccountInfo.arg_typ)))
+            ; arg "stateHash" ~doc:"Hash of the snarked ledger to check"
+                ~typ:(non_null string)
+            ]
+        ~typ:(non_null (list (non_null Types.SnarkedLedgerMembership.obj)))
+        ~resolve:
+          (resolve_membership ~mapper:Types.SnarkedLedgerMembership.of_account)
+
+    let encoded_snarked_ledger_account_membership =
+      io_field "encodedSnarkedLedgerAccountMembership"
+        ~doc:
+          "obtain a membership proof for an account in the snarked ledger \
+           along with the accounts full information encoded as base64 binable \
+           type"
+        ~args:
+          Arg.
+            [ arg "accountInfos" ~doc:"Token id of the account to check"
+                ~typ:
+                  (non_null (list (non_null Types.Input.AccountInfo.arg_typ)))
+            ; arg "stateHash" ~doc:"Hash of the snarked ledger to check"
+                ~typ:(non_null string)
+            ]
+        ~typ:
+          (non_null (list (non_null Types.SnarkedLedgerMembership.encoded_obj)))
+        ~resolve:
+          (resolve_membership
+             ~mapper:Types.SnarkedLedgerMembership.of_encoded_account )
+  end
 
   let genesis_constants =
     field "genesisConstants"
@@ -2733,7 +2757,8 @@ module Queries = struct
     ; trust_status_all
     ; snark_pool
     ; pending_snark_work
-    ; snarked_ledger_account_membership
+    ; SnarkedLedgerMembership.snarked_ledger_account_membership
+    ; SnarkedLedgerMembership.encoded_snarked_ledger_account_membership
     ; genesis_constants
     ; time_offset
     ; validate_payment
