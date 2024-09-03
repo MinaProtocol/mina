@@ -45,22 +45,14 @@ let main ~genesis_constants ~constraint_constants () =
 let () =
   Command.(
     let open Let_syntax in
-    let network_constants =
-         Param.flag "--network"
-           ~doc:
-             "mainnet|testnet|lightnet|dev Set the configuration base according to \
-              the network"
-           (Param.required
-              (Command.Arg_type.of_alist_exn
-                 [ ("mainnet", Runtime_config.Network_constants.mainnet)
-                 ; ("devnet", Runtime_config.Network_constants.devnet)
-                 ; ("lightnet", Runtime_config.Network_constants.lightnet)
-                 ; ("dev", Runtime_config.Network_constants.dev)
-                 ] ) )
-      in
-    let constraint_constants = Genesis_constants.Constraint_constants.make network_constants.constraint_constants in
-    let genesis_constants = Genesis_constants.make network_constants.genesis_constants in
     run
       (async ~summary:"Print heap usage of selected Mina data structures"
-         (let%map.Command () = Let_syntax.return () in
+         (let%map network_constants = Cli_lib.Flag.network_constants in
+          let constraint_constants =
+            Genesis_constants.Constraint_constants.make
+              network_constants.constraint_constants
+          in
+          let genesis_constants =
+            Genesis_constants.make network_constants.genesis_constants
+          in
           main ~genesis_constants ~constraint_constants ) ))

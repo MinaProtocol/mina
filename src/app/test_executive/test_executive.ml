@@ -268,18 +268,20 @@ let main inputs =
    *)
   let logger = Logger.create () in
 
-  let network_constants = 
-    Option.value_map 
-      ~default:Runtime_config.Network_constants.dev
+  let network_constants =
+    Option.value_map ~default:Runtime_config.Network_constants.dev
       (Core_kernel.Sys.getenv_opt "MINA_NETWORK")
       ~f:Runtime_config.Network_constants.of_string
-  in 
-  let genesis_constants = Genesis_constants.make network_constants.genesis_constants in
-  let constraint_constants = Genesis_constants.Constraint_constants.make network_constants.constraint_constants in
+  in
+  let genesis_constants =
+    Genesis_constants.make network_constants.genesis_constants
+  in
+  let constraint_constants =
+    Genesis_constants.Constraint_constants.make
+      network_constants.constraint_constants
+  in
   let constants : Test_config.constants =
-    { genesis_constants
-    ; constraint_constants
-    }
+    { genesis_constants; constraint_constants }
   in
   let images =
     { Test_config.Container_images.mina = inputs.mina_image

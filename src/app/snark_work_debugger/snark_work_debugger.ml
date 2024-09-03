@@ -37,22 +37,12 @@ let cmd =
       let%map path =
         let open Command.Param in
         flag "--spec" ~doc:"PATH Spec path" (required string)
-         and network_constants =
-         Param.flag "--network"
-           ~doc:
-             "mainnet|testnet|lightnet|dev Set the configuration base according to \
-              the network"
-           (Param.required
-              (Command.Arg_type.of_alist_exn
-                 [ ("mainnet", Runtime_config.Network_constants.mainnet)
-                 ; ("devnet", Runtime_config.Network_constants.devnet)
-                 ; ("lightnet", Runtime_config.Network_constants.lightnet)
-                 ; ("dev", Runtime_config.Network_constants.dev)
-                 ] ) )
-      in
+      and network_constants = Cli_lib.Flag.network_constants in
       fun () ->
-
-        let constraint_constants = Genesis_constants.Constraint_constants.make network_constants.constraint_constants in
+        let constraint_constants =
+          Genesis_constants.Constraint_constants.make
+            network_constants.constraint_constants
+        in
         let proof_level = constraint_constants.proof_level in
         Obj.magic (main path ~constraint_constants ~proof_level))
 

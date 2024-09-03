@@ -187,19 +187,7 @@ module Vrf = struct
         flag "--total-stake"
           ~doc:"AMOUNT The total balance of all accounts in the epoch ledger"
           (optional int)
-      and network_constants =
-        flag "--network"
-          ~doc:
-            "mainnet|testnet|lightnet|dev Set the configuration base according \
-             to the network"
-          (required
-             (Command.Arg_type.of_alist_exn
-                [ ("mainnet", Runtime_config.Network_constants.mainnet)
-                ; ("devnet", Runtime_config.Network_constants.devnet)
-                ; ("lightnet", Runtime_config.Network_constants.lightnet)
-                ; ("dev", Runtime_config.Network_constants.dev)
-                ] ) )
-      in
+      and network_constants = Flag.network_constants in
       Exceptions.handle_nicely
       @@ fun () ->
       let env = Secrets.Keypair.env in
@@ -268,19 +256,7 @@ module Vrf = struct
          stdin"
       (let open Command.Let_syntax in
       let%map_open privkey_path = Flag.privkey_read_path
-      and network_constants =
-        flag "--network"
-          ~doc:
-            "mainnet|testnet|lightnet|dev Set the configuration base according \
-             to the network"
-          (required
-             (Command.Arg_type.of_alist_exn
-                [ ("mainnet", Runtime_config.Network_constants.mainnet)
-                ; ("devnet", Runtime_config.Network_constants.devnet)
-                ; ("lightnet", Runtime_config.Network_constants.lightnet)
-                ; ("dev", Runtime_config.Network_constants.dev)
-                ] ) )
-      in
+      and network_constants = Flag.network_constants in
       Exceptions.handle_nicely
       @@ fun () ->
       let constraint_constants =

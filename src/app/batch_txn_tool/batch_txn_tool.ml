@@ -394,14 +394,14 @@ let output_there_and_back_cmds =
            "URL The graphql node to send graphl commands to.  must be in \
             format `<ip>:<port>`.  default is `127.0.0.1:3085`"
          (optional string)
-
      and minimum_user_command_fee =
        let default =
          Currency.Fee.of_mina_string_exn
            Mina_compile_config.default_transaction_fee_string
        in
        Cli_lib.Flag.fee_common
-         ~minimum_user_command_fee:(failwith "TODO: fix circular config") (*genesis_constants.minimum_user_command_fee*)
+         ~minimum_user_command_fee:(failwith "TODO: fix circular config")
+           (*genesis_constants.minimum_user_command_fee*)
          ~default_transaction_fee:default
      in
      there_and_back_again ~num_txn_per_acct ~txns_per_block ~txn_fee_option

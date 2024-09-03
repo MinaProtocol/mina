@@ -44,6 +44,7 @@
    mina_runtime_config
    precomputed_values
    logger
+   cli_lib
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_jane ppx_custom_printf h_list.ppx)))

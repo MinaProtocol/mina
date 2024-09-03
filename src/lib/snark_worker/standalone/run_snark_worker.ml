@@ -8,18 +8,7 @@ let command =
     (let%map_open spec =
        flag "--spec-sexp" ~doc:""
          (required (sexp_conv Prod.single_spec_of_sexp))
-     and network_constants =
-       flag "--network"
-         ~doc:
-           "mainnet|testnet|lightnet|dev Set the configuration base according \
-            to the network"
-         (required
-            (Command.Arg_type.of_alist_exn
-               [ ("mainnet", Runtime_config.Network_constants.mainnet)
-               ; ("devnet", Runtime_config.Network_constants.devnet)
-               ; ("lightnet", Runtime_config.Network_constants.lightnet)
-               ; ("dev", Runtime_config.Network_constants.dev)
-               ] ) )
+     and network_constants = Cli_lib.Flag.network_constants
      and proof_level =
        flag "--proof-level" ~doc:""
          (optional_with_default Genesis_constants.Proof_level.Full

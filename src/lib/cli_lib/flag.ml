@@ -33,6 +33,20 @@ let conf_dir =
   flag "--config-directory" ~aliases:[ "config-directory" ]
     ~doc:"DIR Configuration directory" (optional string)
 
+let network_constants =
+  let open Command.Param in
+  flag "--network"
+    ~doc:
+      "mainnet|testnet|lightnet|dev Set the configuration base according to \
+       the network"
+    (required
+       (Command.Arg_type.of_alist_exn
+          [ ("mainnet", Runtime_config.Network_constants.mainnet)
+          ; ("devnet", Runtime_config.Network_constants.devnet)
+          ; ("lightnet", Runtime_config.Network_constants.lightnet)
+          ; ("dev", Runtime_config.Network_constants.dev)
+          ] ) )
+
 module Doc_builder = struct
   type 'value t =
     { type_name : string

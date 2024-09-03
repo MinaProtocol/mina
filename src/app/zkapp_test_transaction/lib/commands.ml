@@ -324,9 +324,8 @@ module Util = struct
         failwith (sprintf "Invalid authorization: %s" s)
 end
 
-let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile ~network
+let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile ~network_constants
     ~config_file () =
-  let network_constants = Runtime_config.Network_constants.of_string network in
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_kp = Util.snapp_keypair_of_file zkapp_keyfile in
@@ -360,7 +359,8 @@ let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile ~network
     ~genesis_constants:runtime_config.genesis_constants
 
 let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
-    ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ~genesis_constants ~constraint_constants =
+    ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ~genesis_constants
+    ~constraint_constants =
   let open Deferred.Let_syntax in
   let%bind sender_keypair = Util.keypair_of_file sender ~which:"Sender" in
   let%bind fee_payer_keypair = Util.fee_payer_keypair_of_file fee_payer in

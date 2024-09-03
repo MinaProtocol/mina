@@ -31,19 +31,7 @@ let command_run =
      and runtime_config_file =
        flag "--config-file" ~aliases:[ "-config-file" ] (optional string)
          ~doc:"PATH to the configuration file containing the genesis ledger"
-
-         and network_constants =
-         flag "--network"
-           ~doc:
-             "mainnet|testnet|lightnet|dev Set the configuration base according to \
-              the network"
-           (required
-              (Command.Arg_type.of_alist_exn
-                 [ ("mainnet", Runtime_config.Network_constants.mainnet)
-                 ; ("devnet", Runtime_config.Network_constants.devnet)
-                 ; ("lightnet", Runtime_config.Network_constants.lightnet)
-                 ; ("dev", Runtime_config.Network_constants.dev)
-                 ] ) )
+     and network_constants = Cli_lib.Flag.network_constants
      and delete_older_than =
        flag "--delete-older-than" ~aliases:[ "-delete-older-than" ]
          (optional int)

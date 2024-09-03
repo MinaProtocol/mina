@@ -516,7 +516,8 @@ let send_payment_graphql =
   let args =
     Args.zip3
       (Cli_lib.Flag.signed_command_common
-         ~minimum_user_command_fee:(failwith "TODO fix circular config") (*genesis_constants.minimum_user_command_fee*)
+         ~minimum_user_command_fee:(failwith "TODO fix circular config")
+           (*genesis_constants.minimum_user_command_fee*)
          ~default_transaction_fee:
            (Currency.Fee.of_mina_string_exn
               Mina_compile_config.default_transaction_fee_string ) )
@@ -551,7 +552,8 @@ let delegate_stake_graphql =
   let args =
     Args.zip2
       (Cli_lib.Flag.signed_command_common
-         ~minimum_user_command_fee:(failwith "TODO fix circular config") (*genesis_constants.minimum_user_command_fee*)
+         ~minimum_user_command_fee:(failwith "TODO fix circular config")
+           (*genesis_constants.minimum_user_command_fee*)
          ~default_transaction_fee:
            (Currency.Fee.of_mina_string_exn
               Mina_compile_config.default_transaction_fee_string ) )
@@ -818,23 +820,14 @@ let hash_ledger =
          flag "--ledger-file"
            ~doc:"LEDGER-FILE File containing an exported ledger"
            (required string))
-      and network_constants = Command.Param.(
-         flag "--network"
-           ~doc:
-             "mainnet|testnet|lightnet|dev Set the configuration base according to \
-              the network"
-           (required
-              (Command.Arg_type.of_alist_exn
-                 [ ("mainnet", Runtime_config.Network_constants.mainnet)
-                 ; ("devnet", Runtime_config.Network_constants.devnet)
-                 ; ("lightnet", Runtime_config.Network_constants.lightnet)
-                 ; ("dev", Runtime_config.Network_constants.dev)
-                 ] ) ))
+     and network_constants = Cli_lib.Flag.network_constants
      and plaintext = Cli_lib.Flag.plaintext in
      fun () ->
-       let constraint_constants = Genesis_constants.Constraint_constants.make network_constants.constraint_constants
-         
+       let constraint_constants =
+         Genesis_constants.Constraint_constants.make
+           network_constants.constraint_constants
        in
+
        let process_accounts accounts =
          let packed_ledger =
            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
@@ -869,6 +862,19 @@ let hash_ledger =
                err ;
              ignore (exit 1 : 'a Deferred.t) )
 
+(**
+  let open Command.Let_syntax in
+  Command.async
+    ~summary:
+      "Print the Merkle root of the ledger contained in the specified file"
+    (let%map network_constants = Cli_lib.Flag.network_constants in
+     and plaintext = Cli_lib.Flag.plaintext in
+     fun () ->
+       let constraint_constants = Genesis_constants.Constraint_constants.make network_constants.constraint_constants
+         
+       in
+
+  *)
 let currency_in_ledger =
   let open Command.Let_syntax in
   Command.async
@@ -934,23 +940,26 @@ let currency_in_ledger =
              ignore (exit 1 : 'a Deferred.t) )
 
 let constraint_system_digests =
+  let open Command.Let_syntax in
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
-    (Command.Param.return (fun () ->
-         let constraint_constants =
-           Genesis_constants.Compiled.constraint_constants
-         in
-         let proof_level = Genesis_constants.Compiled.proof_level in
-         (* TODO: Allow these to be configurable. *)
-         let all =
-           Transaction_snark.constraint_system_digests ~constraint_constants ()
-           @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
-               ~proof_level ~constraint_constants ()
-         in
-         let all =
-           List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
-         in
-         List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
-         Deferred.unit ) )
+    (let%map network_constants = Cli_lib.Flag.network_constants in
+     fun () ->
+       let constraint_constants =
+         Genesis_constants.Constraint_constants.make
+           network_constants.constraint_constants
+       in
+       let proof_level = constraint_constants.proof_level in
+       (* TODO: Allow these to be configurable. *)
+       let all =
+         Transaction_snark.constraint_system_digests ~constraint_constants ()
+         @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
+             ~proof_level ~constraint_constants ()
+       in
+       let all =
+         List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
+       in
+       List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
+       Deferred.unit )
 
 let snark_job_list =
   let open Deferred.Let_syntax in
@@ -1806,89 +1815,84 @@ let add_peers_graphql =
 let compile_time_constants =
   Command.async
     ~summary:"Print a JSON map of the compile-time consensus parameters"
-    (Command.Param.return (fun () ->
-         let home = Core.Sys.home_directory () in
-         let conf_dir = home ^/ Cli_lib.Default.conf_dir_name in
-         let genesis_dir =
-           let home = Core.Sys.home_directory () in
-           home ^/ Cli_lib.Default.conf_dir_name
-         in
-         let network_constants =
-           match Sys.getenv "MINA_NETWORK" with
-           | Some network ->
-               Runtime_config.Network_constants.of_string network
-           | None ->
-               Runtime_config.Network_constants.dev
-         in
-         let config_file =
-           match Sys.getenv "MINA_CONFIG_FILE" with
-           | Some config_file ->
-               config_file
-           | None ->
-               conf_dir ^/ "daemon.json"
-         in
-         let open Async in
-         let%map ({ consensus_constants; _ } as precomputed_values), _ =
-           config_file |> Genesis_ledger_helper.load_config_json >>| Or_error.ok
-           >>| Option.value
-                 ~default:
-                   (`Assoc [ ("ledger", `Assoc [ ("accounts", `List []) ]) ])
-           >>| Runtime_config.Json_layout.of_yojson >>| Result.ok
-           >>| Option.value_map
-                 ~default:
-                   (Runtime_config.default
-                      ~genesis_constants:
-                        (Genesis_constants.make
-                           network_constants.genesis_constants )
-                      ~constraint_constants:
-                        (Genesis_constants.Constraint_constants.make
-                           network_constants.constraint_constants ) )
-                 ~f:(fun json_config ->
-                   Result.ok_or_failwith
-                   @@ Runtime_config.of_json_layout ~network_constants
-                        ~json_config )
-           >>= Genesis_ledger_helper.init_from_config_file
-                 ~logger:(Logger.null ()) ~genesis_dir
-           >>| Or_error.ok_exn
-         in
-         let all_constants =
-           `Assoc
-             [ ( "genesis_state_timestamp"
-               , `String
-                   ( Block_time.to_time_exn
-                       consensus_constants.genesis_state_timestamp
-                   |> Core.Time.to_string_iso8601_basic ~zone:Core.Time.Zone.utc
-                   ) )
-             ; ("k", `Int (Unsigned.UInt32.to_int consensus_constants.k))
-             ; ( "coinbase"
-               , `String
-                   (Currency.Amount.to_mina_string
-                      precomputed_values.constraint_constants.coinbase_amount )
-               )
-             ; ( "block_window_duration_ms"
-               , `Int
-                   precomputed_values.constraint_constants
-                     .block_window_duration_ms )
-             ; ("delta", `Int (Unsigned.UInt32.to_int consensus_constants.delta))
-             ; ( "sub_windows_per_window"
-               , `Int
-                   (Unsigned.UInt32.to_int
-                      consensus_constants.sub_windows_per_window ) )
-             ; ( "slots_per_sub_window"
-               , `Int
-                   (Unsigned.UInt32.to_int
-                      consensus_constants.slots_per_sub_window ) )
-             ; ( "slots_per_window"
-               , `Int
-                   (Unsigned.UInt32.to_int consensus_constants.slots_per_window)
-               )
-             ; ( "slots_per_epoch"
-               , `Int
-                   (Unsigned.UInt32.to_int consensus_constants.slots_per_epoch)
-               )
-             ]
-         in
-         Core_kernel.printf "%s\n%!" (Yojson.Safe.to_string all_constants) ) )
+    Command.Let_syntax.(
+      let%map network_constants = Cli_lib.Flag.network_constants in
+      fun () ->
+        let home = Core.Sys.home_directory () in
+        let conf_dir = home ^/ Cli_lib.Default.conf_dir_name in
+        let genesis_dir =
+          let home = Core.Sys.home_directory () in
+          home ^/ Cli_lib.Default.conf_dir_name
+        in
+        let config_file =
+          match Sys.getenv "MINA_CONFIG_FILE" with
+          | Some config_file ->
+              config_file
+          | None ->
+              conf_dir ^/ "daemon.json"
+        in
+        let open Async in
+        let%map ({ consensus_constants; _ } as precomputed_values), _ =
+          config_file |> Genesis_ledger_helper.load_config_json >>| Or_error.ok
+          >>| Option.value
+                ~default:
+                  (`Assoc [ ("ledger", `Assoc [ ("accounts", `List []) ]) ])
+          >>| Runtime_config.Json_layout.of_yojson >>| Result.ok
+          >>| Option.value_map
+                ~default:
+                  (Runtime_config.default
+                     ~genesis_constants:
+                       (Genesis_constants.make
+                          network_constants.genesis_constants )
+                     ~constraint_constants:
+                       (Genesis_constants.Constraint_constants.make
+                          network_constants.constraint_constants ) )
+                ~f:(fun json_config ->
+                  Result.ok_or_failwith
+                  @@ Runtime_config.of_json_layout ~network_constants
+                       ~json_config )
+          >>= Genesis_ledger_helper.init_from_config_file
+                ~logger:(Logger.null ()) ~genesis_dir
+          >>| Or_error.ok_exn
+        in
+        let all_constants =
+          `Assoc
+            [ ( "genesis_state_timestamp"
+              , `String
+                  ( Block_time.to_time_exn
+                      consensus_constants.genesis_state_timestamp
+                  |> Core.Time.to_string_iso8601_basic ~zone:Core.Time.Zone.utc
+                  ) )
+            ; ("k", `Int (Unsigned.UInt32.to_int consensus_constants.k))
+            ; ( "coinbase"
+              , `String
+                  (Currency.Amount.to_mina_string
+                     precomputed_values.constraint_constants.coinbase_amount )
+              )
+            ; ( "block_window_duration_ms"
+              , `Int
+                  precomputed_values.constraint_constants
+                    .block_window_duration_ms )
+            ; ("delta", `Int (Unsigned.UInt32.to_int consensus_constants.delta))
+            ; ( "sub_windows_per_window"
+              , `Int
+                  (Unsigned.UInt32.to_int
+                     consensus_constants.sub_windows_per_window ) )
+            ; ( "slots_per_sub_window"
+              , `Int
+                  (Unsigned.UInt32.to_int
+                     consensus_constants.slots_per_sub_window ) )
+            ; ( "slots_per_window"
+              , `Int
+                  (Unsigned.UInt32.to_int consensus_constants.slots_per_window)
+              )
+            ; ( "slots_per_epoch"
+              , `Int
+                  (Unsigned.UInt32.to_int consensus_constants.slots_per_epoch)
+              )
+            ]
+        in
+        Core_kernel.printf "%s\n%!" (Yojson.Safe.to_string all_constants))
 
 let node_status =
   let open Command.Param in
@@ -2318,13 +2322,19 @@ let itn_create_accounts =
         ~doc:"NN Amount in nanomina to be divided among new accounts"
         (required int)
     in
-    let args = Args.zip5 privkey_path key_prefix num_accounts fee amount in
-    let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-    let constraint_constants =
-      Genesis_constants.Compiled.constraint_constants
+    let network_constants = Cli_lib.Flag.network_constants in
+    let constants =
+      map
+        ~f:(fun a ->
+          ( Genesis_constants.make a.genesis_constants
+          , Genesis_constants.Constraint_constants.make a.constraint_constants
+          ) )
+        network_constants
     in
-    Cli_lib.Background_daemon.rpc_init args
-      ~f:(Itn.create_accounts ~genesis_constants ~constraint_constants))
+    let args =
+      Args.zip6 privkey_path key_prefix num_accounts fee amount constants
+    in
+    Cli_lib.Background_daemon.rpc_init args ~f:Itn.create_accounts)
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f

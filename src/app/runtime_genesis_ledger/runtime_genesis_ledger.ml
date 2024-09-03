@@ -131,18 +131,7 @@ let () =
          let%map config_file =
            flag "--config-file" ~doc:"PATH path to the JSON configuration file"
              (required string)
-         and network_constants =
-           flag "--network"
-             ~doc:
-               "mainnet|testnet|lightnet|dev Set the configuration base \
-                according to the network"
-             (required
-                (Command.Arg_type.of_alist_exn
-                   [ ("mainnet", Runtime_config.Network_constants.mainnet)
-                   ; ("devnet", Runtime_config.Network_constants.devnet)
-                   ; ("lightnet", Runtime_config.Network_constants.lightnet)
-                   ; ("dev", Runtime_config.Network_constants.dev)
-                   ] ) )
+         and network_constants = Cli_lib.Flag.network_constants
          and genesis_dir =
            flag "--genesis-dir"
              ~doc:

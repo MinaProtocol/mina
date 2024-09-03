@@ -457,18 +457,7 @@ let setup_daemon logger =
       ~aliases:[ "proposed-protocol-version" ]
       (optional string)
       ~doc:"NN.NN.NN Proposed protocol version to signal other nodes"
-  and network_constants =
-    flag "--network"
-      ~doc:
-        "mainnet|testnet|lightnet|dev Set the configuration base according to \
-         the network"
-      (required
-         (Command.Arg_type.of_alist_exn
-            [ ("mainnet", Runtime_config.Network_constants.mainnet)
-            ; ("devnet", Runtime_config.Network_constants.devnet)
-            ; ("lightnet", Runtime_config.Network_constants.lightnet)
-            ; ("dev", Runtime_config.Network_constants.dev)
-            ] ) )
+  and network_constants = Cli_lib.Flag.network_constants
   and config_files =
     flag "--config-file" ~aliases:[ "config-file" ]
       ~doc:
@@ -1691,32 +1680,32 @@ let snark_hashes =
 
 let internal_commands logger =
   [ ( Snark_worker.Intf.command_name
-    , Snark_worker.command ~proof_level:Genesis_constants.Compiled.proof_level
-        ~constraint_constants:Genesis_constants.Compiled.constraint_constants
-        ~commit_id:Mina_version.commit_id )
+    , Snark_worker.command ~commit_id:Mina_version.commit_id )
   ; ("snark-hashes", snark_hashes)
   ; ( "run-prover"
     , Command.async
         ~summary:"Run prover on a sexp provided on a single line of stdin"
-        (Command.Param.return (fun () ->
-             let logger = Logger.create () in
-             let constraint_constants =
-               Genesis_constants.Compiled.constraint_constants
-             in
-             let proof_level = Genesis_constants.Compiled.proof_level in
-             Parallel.init_master () ;
-             match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
-             | `Ok sexp ->
-                 let%bind conf_dir = Unix.mkdtemp "/tmp/mina-prover" in
-                 [%log info] "Prover state being logged to %s" conf_dir ;
-                 let%bind prover =
-                   Prover.create ~commit_id:Mina_version.commit_id ~logger
-                     ~proof_level ~constraint_constants
-                     ~pids:(Pid.Table.create ()) ~conf_dir ()
-                 in
-                 Prover.prove_from_input_sexp prover sexp >>| ignore
-             | `Eof ->
-                 failwith "early EOF while reading sexp" ) ) )
+        (let%map.Command network_constants = Cli_lib.Flag.network_constants in
+         fun () ->
+           let logger = Logger.create () in
+           let constraint_constants =
+             Genesis_constants.Constraint_constants.make
+               network_constants.constraint_constants
+           in
+           let proof_level = constraint_constants.proof_level in
+           Parallel.init_master () ;
+           match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
+           | `Ok sexp ->
+               let%bind conf_dir = Unix.mkdtemp "/tmp/mina-prover" in
+               [%log info] "Prover state being logged to %s" conf_dir ;
+               let%bind prover =
+                 Prover.create ~commit_id:Mina_version.commit_id ~logger
+                   ~proof_level ~constraint_constants
+                   ~pids:(Pid.Table.create ()) ~conf_dir ()
+               in
+               Prover.prove_from_input_sexp prover sexp >>| ignore
+           | `Eof ->
+               failwith "early EOF while reading sexp" ) )
   ; ( "run-snark-worker-single"
     , Command.async
         ~summary:"Run snark-worker on a sexp provided on a single line of stdin"
@@ -1724,14 +1713,15 @@ let internal_commands logger =
         let%map_open filename =
           flag "--file" (required string)
             ~doc:"File containing the s-expression of the snark work to execute"
-        in
+        and network_constants = Cli_lib.Flag.network_constants in
         fun () ->
           let open Deferred.Let_syntax in
           let logger = Logger.create () in
           let constraint_constants =
-            Genesis_constants.Compiled.constraint_constants
+            Genesis_constants.Constraint_constants.make
+              network_constants.constraint_constants
           in
-          let proof_level = Genesis_constants.Compiled.proof_level in
+          let proof_level = constraint_constants.proof_level in
           Parallel.init_master () ;
           match%bind
             Reader.with_file filename ~f:(fun reader ->
@@ -1775,14 +1765,15 @@ let internal_commands logger =
         and format =
           flag "--format" ~aliases:[ "-format" ] (optional string)
             ~doc:"sexp/json the format to parse input in"
-        in
+        and network_constants = Cli_lib.Flag.network_constants in
         fun () ->
           let open Async in
           let logger = Logger.create () in
           let constraint_constants =
-            Genesis_constants.Compiled.constraint_constants
+            Genesis_constants.Constraint_constants.make
+              network_constants.constraint_constants
           in
-          let proof_level = Genesis_constants.Compiled.proof_level in
+          let proof_level = constraint_constants.proof_level in
           Parallel.init_master () ;
           let%bind conf_dir = Unix.mkdtemp "/tmp/mina-verifier" in
           let mode =
@@ -1928,18 +1919,7 @@ let internal_commands logger =
                override fields from earlier config files"
             (listed string)
         and conf_dir = Cli_lib.Flag.conf_dir
-        and network_constants =
-          flag "--network"
-            ~doc:
-              "mainnet|testnet|lightnet|dev Set the configuration base \
-               according to the network"
-            (required
-               (Command.Arg_type.of_alist_exn
-                  [ ("mainnet", Runtime_config.Network_constants.mainnet)
-                  ; ("devnet", Runtime_config.Network_constants.devnet)
-                  ; ("lightnet", Runtime_config.Network_constants.lightnet)
-                  ; ("dev", Runtime_config.Network_constants.dev)
-                  ] ) )
+        and network_constants = Cli_lib.Flag.network_constants
         and genesis_dir =
           flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
             ~doc:

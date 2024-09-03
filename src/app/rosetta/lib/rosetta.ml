@@ -168,19 +168,7 @@ let command =
   and log_level =
     flag "--log-level" ~aliases:[ "log-level" ]
       ~doc:"Set log level (default: Info)" Cli.log_level
-  and
-        network_constants =
-             flag "--network"
-               ~doc:
-                 "mainnet|testnet|lightnet|dev Set the configuration base according to \
-                  the network"
-               (required
-                  (Command.Arg_type.of_alist_exn
-                     [ ("mainnet", Runtime_config.Network_constants.mainnet)
-                     ; ("devnet", Runtime_config.Network_constants.devnet)
-                     ; ("lightnet", Runtime_config.Network_constants.lightnet)
-                     ; ("dev", Runtime_config.Network_constants.dev)
-                     ] ) )
+  and network_constants = Cli_lib.Flag.network_constants
   and port =
     flag "--port" ~aliases:[ "port" ] ~doc:"Port to expose Rosetta server"
       (required int)
@@ -189,14 +177,18 @@ let command =
   fun () ->
     let logger = Logger.create () in
     Cli.logger_setup log_json log_level ;
-    let minimum_user_command_fee = 
-      let genesis_constants = Genesis_constants.make network_constants.genesis_constants in
-      genesis_constants.minimum_user_command_fee 
+    let minimum_user_command_fee =
+      let genesis_constants =
+        Genesis_constants.make network_constants.genesis_constants
+      in
+      genesis_constants.minimum_user_command_fee
     in
-    let account_creation_fee = 
-
-      let constraint_constants = Genesis_constants.Constraint_constants.make network_constants.constraint_constants in
-      constraint_constants.account_creation_fee 
+    let account_creation_fee =
+      let constraint_constants =
+        Genesis_constants.Constraint_constants.make
+          network_constants.constraint_constants
+      in
+      constraint_constants.account_creation_fee
     in
     let pool =
       lazy

@@ -340,8 +340,7 @@ module Make (Inputs : Intf.Inputs_intf) :
     in
     go ()
 
-  let command_from_rpcs ~commit_id ~proof_level:default_proof_level
-      ~constraint_constants
+  let command_from_rpcs ~commit_id
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
         with type Work.ledger_proof = Inputs.Ledger_proof.t ) =
     Command.async ~summary:"Snark worker"
@@ -354,6 +353,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         flag "--proof-level" ~aliases:[ "proof-level" ]
           (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
           ~doc:"full|check|none"
+      and network_constants = Cli_lib.Flag.network_constants
       and shutdown_on_disconnect =
         flag "--shutdown-on-disconnect"
           ~aliases:[ "shutdown-on-disconnect" ]
@@ -365,9 +365,14 @@ module Make (Inputs : Intf.Inputs_intf) :
         let logger =
           Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
         in
-        let proof_level =
-          Option.value ~default:default_proof_level proof_level
+        let constraint_constants =
+          Genesis_constants.Constraint_constants.make
+            network_constants.constraint_constants
         in
+        let proof_level =
+          Option.value ~default:constraint_constants.proof_level proof_level
+        in
+        let constraint_constants = { constraint_constants with proof_level } in
         Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
             let logrotate_max_size = 1024 * 10 in
             let logrotate_num_rotate = 1 in

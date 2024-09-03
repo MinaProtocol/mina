@@ -1715,22 +1715,13 @@ let () =
            Param.flag "--checkpoint-file-prefix"
              ~doc:"string Checkpoint file prefix (default: 'replayer')"
              Param.(optional_with_default "replayer" string)
-
-         and network_constants =
-         Param.flag "--network"
-           ~doc:
-             "mainnet|testnet|lightnet|dev Set the configuration base according to \
-              the network"
-           (Param.required
-              (Command.Arg_type.of_alist_exn
-                 [ ("mainnet", Runtime_config.Network_constants.mainnet)
-                 ; ("devnet", Runtime_config.Network_constants.devnet)
-                 ; ("lightnet", Runtime_config.Network_constants.lightnet)
-                 ; ("dev", Runtime_config.Network_constants.dev)
-                 ] ) )
+         and network_constants = Cli_lib.Flag.network_constants
          and log_json = Cli_lib.Flag.Log.json
          and log_level = Cli_lib.Flag.Log.level in
-         let constraint_constants = Genesis_constants.Constraint_constants.make network_constants.constraint_constants in
+         let constraint_constants =
+           Genesis_constants.Constraint_constants.make
+             network_constants.constraint_constants
+         in
          let proof_level = constraint_constants.proof_level in
          main ~constraint_constants ~proof_level ~input_file ~output_file_opt
            ~archive_uri ~checkpoint_interval ~continue_on_error

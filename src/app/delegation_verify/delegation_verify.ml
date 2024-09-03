@@ -17,20 +17,6 @@ let config_flag =
   let open Command.Param in
   flag "--config-file" ~doc:"FILE config file" (optional string)
 
-let network_constants =
-  let open Command.Param in
-  flag "--network"
-    ~doc:
-      "mainnet|testnet|lightnet|dev Set the configuration base according to \
-       the network"
-    (required
-       (Command.Arg_type.of_alist_exn
-          [ ("mainnet", Runtime_config.Network_constants.mainnet)
-          ; ("devnet", Runtime_config.Network_constants.devnet)
-          ; ("lightnet", Runtime_config.Network_constants.lightnet)
-          ; ("dev", Runtime_config.Network_constants.dev)
-          ] ) )
-
 let keyspace_flag =
   let open Command.Param in
   flag "--keyspace" ~doc:"Name of the Cassandra keyspace" (required string)
@@ -58,7 +44,8 @@ let timestamp =
   let open Command.Param in
   anon ("timestamp" %: string)
 
-let instantiate_verify_functions ~logger ~(network_constants : Runtime_config.Network_constants.t) ~config_file =
+let instantiate_verify_functions ~logger
+    ~(network_constants : Runtime_config.Network_constants.t) ~config_file =
   match config_file with
   | None ->
       let constraint_constants =
@@ -164,7 +151,7 @@ let filesystem_command =
       let%map_open block_dir = block_dir_flag
       and inputs = anon (sequence ("filename" %: Filename.arg_type))
       and no_checks = no_checks_flag
-      and network_constants = network_constants
+      and network_constants = Cli_lib.Flag.network_constants
       and config_file = config_flag in
       fun () ->
         let logger = Logger.create () in
@@ -197,7 +184,7 @@ let cassandra_command =
       and config_file = config_flag
       and keyspace = keyspace_flag
       and period_start = timestamp
-      and network_constants = network_constants
+      and network_constants = Cli_lib.Flag.network_constants
       and period_end = timestamp in
       fun () ->
         let open Deferred.Let_syntax in
@@ -232,7 +219,7 @@ let stdin_command =
     Command.Let_syntax.(
       let%map_open config_file = config_flag
       and no_checks = no_checks_flag
-      and network_constants = network_constants in
+      and network_constants = Cli_lib.Flag.network_constants in
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in

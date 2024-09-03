@@ -33,6 +33,7 @@
   rosetta_lib
   secrets
   mina_base
+  mina_runtime_config
   work_selector
   rosetta_coding
   logger

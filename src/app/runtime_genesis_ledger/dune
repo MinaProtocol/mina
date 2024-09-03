@@ -13,6 +13,7 @@
    yojson
    async_unix
    ;;local libraries
+   cli_lib
    genesis_constants
    mina_runtime_config
    mina_ledger
