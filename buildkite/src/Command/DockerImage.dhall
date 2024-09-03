@@ -64,7 +64,7 @@ let ReleaseSpec =
 let stepKey =
           \(spec : ReleaseSpec.Type)
       ->  "${Artifacts.lowerName
-               spec.service}-${Profiles.toLabelSegment
+               spec.service}${Profiles.toLabelSegment
                                  spec.deb_profile}${BuildFlags.toLabelSegment
                                                       spec.build_flags}${spec.step_key_suffix}"
 

@@ -42,7 +42,7 @@ let dependsOn =
           let suffix = "docker-image"
 
           let key =
-                "${Artifacts.lowerName binary}-${lowerName docker}-${suffix}"
+                "${Artifacts.lowerName binary}-${suffix}"
 
           in  merge
                 { Bookworm =
