@@ -98,6 +98,7 @@ module Features : sig
   val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
 end
 
+(* FIXME: with degree bound and without degree bound do not exist in the code anymore *)
 module Poly_comm : sig
   module Without_degree_bound : sig
     type 'a t = 'a Bounded_types.ArrayN16.Stable.V1.t
