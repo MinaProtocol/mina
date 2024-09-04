@@ -62,7 +62,7 @@ in  Pipeline.build
           ]
         , mode = PipelineMode.Type.Stable
         }
-        , steps =
+      , steps =
         [ TestExecutive.executeLocal "peers-reliability" dependsOn
         , TestExecutive.executeLocal "chain-reliability" dependsOn
         , TestExecutive.executeLocal "payment" dependsOn
