@@ -1755,21 +1755,21 @@ let%test_module "Ledger_catchup tests" =
                 ~frontier_branch_size:(max_frontier_length / 2)
                 ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
                 ?get_some_initial_peers:None ?answer_sync_ledger_query:None
-                ?get_ancestry:None ?get_best_tip:None ?get_node_status:None
+                ?get_ancestry:None ?get_best_tip:None
                 ?get_transition_knowledge:None ?get_transition_chain_proof:None
                 ?get_transition_chain:(Some impl_rpc)
             ; peer_with_branch_custom_rpc
                 ~frontier_branch_size:(max_frontier_length / 2)
                 ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
                 ?get_some_initial_peers:None ?answer_sync_ledger_query:None
-                ?get_ancestry:None ?get_best_tip:None ?get_node_status:None
+                ?get_ancestry:None ?get_best_tip:None
                 ?get_transition_knowledge:None ?get_transition_chain_proof:None
                 ?get_transition_chain:(Some impl_rpc)
             ; peer_with_branch_custom_rpc
                 ~frontier_branch_size:(max_frontier_length / 2)
                 ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
                 ?get_some_initial_peers:None ?answer_sync_ledger_query:None
-                ?get_ancestry:None ?get_best_tip:None ?get_node_status:None
+                ?get_ancestry:None ?get_best_tip:None
                 ?get_transition_knowledge:None ?get_transition_chain_proof:None
                 ?get_transition_chain:(Some impl_rpc)
             ])

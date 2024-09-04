@@ -20,23 +20,39 @@ let read_privkey privkey_path =
         (Secrets.Privkey_error.to_string err) ;
       exit 1
 
-let mk_tx ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    keypair nonce =
+let generate_event =
+  Snark_params.Tick.Field.gen |> Quickcheck.Generator.map ~f:(fun x -> [| x |])
+
+let mk_tx ~event_elements ~action_elements
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) keypair
+    nonce =
   let num_acc_updates = 8 in
   let multispec : Transaction_snark.For_tests.Multiple_transfers_spec.t =
     let fee_payer = None in
-    let receivers =
+    let generated_values =
+      let open Base_quickcheck.Generator.Let_syntax in
+      let%bind receivers =
+        Base_quickcheck.Generator.list_with_length ~length:num_acc_updates
+        @@ let%map kp = Signature_lib.Keypair.gen in
+           ( Signature_lib.Public_key.compress kp.public_key
+           , Currency.Amount.zero )
+      in
+      let%bind events =
+        Quickcheck.Generator.list_with_length event_elements generate_event
+      in
+      let%map actions =
+        Quickcheck.Generator.list_with_length action_elements generate_event
+      in
+      (receivers, events, actions)
+    in
+    let receivers, events, actions =
       Quickcheck.random_value
         ~seed:(`Deterministic ("test-apply-" ^ Unsigned.UInt32.to_string nonce))
-      @@ Base_quickcheck.Generator.list_with_length ~length:num_acc_updates
-      @@ let%map.Base_quickcheck.Generator kp = Signature_lib.Keypair.gen in
-         (Signature_lib.Public_key.compress kp.public_key, Currency.Amount.zero)
+        generated_values
     in
     let zkapp_account_keypairs = [] in
     let new_zkapp_account = false in
     let snapp_update = Account_update.Update.dummy in
-    let actions = [] in
-    let events = [] in
     let call_data = Snark_params.Tick.Field.zero in
     let preconditions = Some Account_update.Preconditions.accept in
     { fee = Currency.Fee.of_mina_int_exn 1
@@ -69,9 +85,9 @@ let generate_protocol_state_stub ~consensus_constants ~constraint_constants
     ~genesis_epoch_data:None ~constraint_constants ~consensus_constants
     ~genesis_body_reference
 
-let apply_txs ~constraint_constants ~first_partition_slots ~no_new_stack
-    ~has_second_partition ~num_txs ~prev_protocol_state
-    ~(keypair : Signature_lib.Keypair.t) ~i ledger =
+let apply_txs ~action_elements ~event_elements ~constraint_constants
+    ~first_partition_slots ~no_new_stack ~has_second_partition ~num_txs
+    ~prev_protocol_state ~(keypair : Signature_lib.Keypair.t) ~i ledger =
   let init_nonce =
     let account_id = Account_id.of_public_key keypair.public_key in
     let loc =
@@ -84,7 +100,9 @@ let apply_txs ~constraint_constants ~first_partition_slots ~no_new_stack
   let to_nonce =
     Fn.compose (Unsigned.UInt32.add init_nonce) Unsigned.UInt32.of_int
   in
-  let mk_tx' = mk_tx ~constraint_constants keypair in
+  let mk_tx' =
+    mk_tx ~action_elements ~event_elements ~constraint_constants keypair
+  in
   let fork_slot =
     Option.value_map ~default:Mina_numbers.Global_slot_since_genesis.zero
       ~f:(fun f -> f.global_slot_since_genesis)
@@ -172,9 +190,10 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
     in
     Mina_block.header prev_block |> Mina_block.Header.protocol_state
   in
+  let genesis_constants = Genesis_constants_compiled.t in
   let consensus_constants =
     Consensus.Constants.create ~constraint_constants
-      ~protocol_constants:Genesis_constants_compiled.t.protocol
+      ~protocol_constants:genesis_constants.protocol
   in
   let prev_protocol_state =
     match prev_protocol_state with
@@ -211,9 +230,12 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
       in
       List.hd (List.drop ledgers (max_depth - 1))
       |> Option.iter ~f:drop_old_ledger ;
-      apply ~num_txs:num_txs_per_round ~i ledger
+      apply ~action_elements:0 ~event_elements:0 ~num_txs:num_txs_per_round ~i
+        ledger
       >>| mask_handler ledger
       >>| Fn.flip Tuple2.create (ledger :: ledgers) )
   >>| fst
-  >>= apply ~num_txs:num_txs_final ~i:rounds
+  >>= apply ~num_txs:num_txs_final
+        ~action_elements:genesis_constants.max_action_elements
+        ~event_elements:genesis_constants.max_event_elements ~i:rounds
   >>| stop_tracing

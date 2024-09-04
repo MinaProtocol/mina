@@ -63,7 +63,6 @@
    genesis_constants
    bash_colors
    graphql_lib
-   node_status
    o1trace_webkit_event
    generated_graphql_queries
    itn_crypto

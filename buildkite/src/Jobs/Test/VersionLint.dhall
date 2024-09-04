@@ -62,5 +62,5 @@ in  Pipeline.build
                 , PipelineTag.Type.Stable
                 ]
               }
-      , steps = [ buildTestCmd "develop" Size.Small dependsOn ]
+      , steps = [ buildTestCmd "compatible" Size.Small dependsOn ]
       }

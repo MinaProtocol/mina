@@ -1,6 +1,5 @@
 open Async
 open Core
-open Mina_base
 module Sync_ledger = Mina_ledger.Sync_ledger
 open Gadt_lib
 open Signature_lib
@@ -24,47 +23,7 @@ type 'n num_peers = 'n Peano.gt_1
 type peer_state =
   { frontier : Transition_frontier.t
   ; consensus_local_state : Consensus.Data.Local_state.t
-  ; get_staged_ledger_aux_and_pending_coinbases_at_hash :
-         Pasta_bindings.Fp.t Envelope.Incoming.t
-      -> ( Staged_ledger.Scan_state.t
-         * Pasta_bindings.Fp.t
-         * Pending_coinbase.t
-         * Mina_state.Protocol_state.value list )
-         option
-         Deferred.t
-  ; get_some_initial_peers : unit Envelope.Incoming.t -> Peer.t list Deferred.t
-  ; answer_sync_ledger_query :
-         (Pasta_bindings.Fp.t * Sync_ledger.Query.t) Envelope.Incoming.t
-      -> (Sync_ledger.Answer.t, Error.t) result Deferred.t
-  ; get_ancestry :
-         ( Consensus.Data.Consensus_state.Value.t
-         , Pasta_bindings.Fp.t )
-         With_hash.t
-         Envelope.Incoming.t
-      -> ( Mina_block.t
-         , State_body_hash.t list * Mina_block.t )
-         Proof_carrying_data.t
-         option
-         Deferred.t
-  ; get_best_tip :
-         unit Envelope.Incoming.t
-      -> ( Mina_block.t
-         , Pasta_bindings.Fp.t list * Mina_block.t )
-         Proof_carrying_data.t
-         option
-         Deferred.t
-  ; get_node_status :
-         unit Envelope.Incoming.t
-      -> (Mina_networking.Rpcs.Get_node_status.Node_status.t, Error.t) result
-         Deferred.t
-  ; get_transition_knowledge :
-      unit Envelope.Incoming.t -> Pasta_bindings.Fp.t list Deferred.t
-  ; get_transition_chain_proof :
-         Pasta_bindings.Fp.t Envelope.Incoming.t
-      -> (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t list) option Deferred.t
-  ; get_transition_chain :
-         Pasta_bindings.Fp.t list Envelope.Incoming.t
-      -> Mina_block.t list option Deferred.t
+  ; rpc_mocks : Gossip_net.Fake.rpc_mocks
   }
 
 type peer_network =
@@ -107,28 +66,29 @@ let setup (type n) ~context:(module Context : CONTEXT)
   let fake_gossip_network =
     Gossip_net.Fake.create_network (Vect.to_list peers)
   in
-  let config peer consensus_local_state =
-    let trust_system = Trust_system.null () in
+  let context trust_system consensus_local_state :
+      (module Mina_networking.CONTEXT) =
+    ( module struct
+      include Context
+
+      let trust_system = trust_system
+
+      let time_controller = time_controller
+
+      let consensus_local_state = consensus_local_state
+    end )
+  in
+  let config rpc_mocks peer =
     let open Mina_networking.Config in
-    don't_wait_for
-      (Pipe_lib.Strict_pipe.Reader.iter
-         (Trust_system.upcall_pipe trust_system)
-         ~f:(const Deferred.unit) ) ;
-    { logger
-    ; trust_system
-    ; time_controller
-    ; consensus_local_state
-    ; is_seed = Vect.is_empty peers
+    { is_seed = Vect.is_empty peers
     ; genesis_ledger_hash =
         Mina_ledger.Ledger.merkle_root
           (Lazy.force (Precomputed_values.genesis_ledger precomputed_values))
-    ; constraint_constants = precomputed_values.constraint_constants
-    ; consensus_constants = precomputed_values.consensus_constants
-    ; precomputed_values
     ; creatable_gossip_net =
         Gossip_net.Any.Creatable
           ( (module Gossip_net.Fake)
-          , Gossip_net.Fake.create_instance fake_gossip_network peer )
+          , Gossip_net.Fake.create_instance ~network:fake_gossip_network
+              ~rpc_mocks ~local_ip:peer )
     ; log_gossip_heard =
         { snark_pool_diff = true
         ; transaction_pool_diff = true
@@ -136,31 +96,105 @@ let setup (type n) ~context:(module Context : CONTEXT)
         }
     }
   in
+  let get_node_status _ = failwith "unimplemented" in
   let peer_networks =
     Vect.map2 peers states ~f:(fun peer state ->
+        let trust_system = Trust_system.null () in
+        don't_wait_for
+          (Pipe_lib.Strict_pipe.Reader.iter
+             Trust_system.(upcall_pipe trust_system)
+             ~f:(const Deferred.unit) ) ;
         let network =
           Thread_safe.block_on_async_exn (fun () ->
-              (* TODO: merge implementations with mina_lib *)
               Mina_networking.create
-                (config peer state.consensus_local_state)
+                (context trust_system state.consensus_local_state)
+                (config state.rpc_mocks peer)
                 ~sinks:
                   ( Transition_handler.Block_sink.void
                   , Network_pool.Transaction_pool.Remote_sink.void
                   , Network_pool.Snark_pool.Remote_sink.void )
-                ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
-                  state.get_staged_ledger_aux_and_pending_coinbases_at_hash
-                ~get_some_initial_peers:state.get_some_initial_peers
-                ~answer_sync_ledger_query:state.answer_sync_ledger_query
-                ~get_ancestry:state.get_ancestry
-                ~get_best_tip:state.get_best_tip
-                ~get_node_status:state.get_node_status
-                ~get_transition_knowledge:state.get_transition_knowledge
-                ~get_transition_chain_proof:state.get_transition_chain_proof
-                ~get_transition_chain:state.get_transition_chain )
+                ~get_transition_frontier:(Fn.const (Some state.frontier))
+                ~get_node_status )
         in
         { peer; state; network } )
   in
   { fake_gossip_network; peer_networks }
+
+include struct
+  open Mina_networking
+
+  type 'a fn_with_mocks =
+       ?get_some_initial_peers:
+         ( Rpcs.Get_some_initial_peers.query
+         , Rpcs.Get_some_initial_peers.response )
+         Gossip_net.Fake.rpc_mock
+    -> ?get_staged_ledger_aux_and_pending_coinbases_at_hash:
+         ( Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
+         , Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.response )
+         Gossip_net.Fake.rpc_mock
+    -> ?answer_sync_ledger_query:
+         ( Rpcs.Answer_sync_ledger_query.query
+         , Rpcs.Answer_sync_ledger_query.response )
+         Gossip_net.Fake.rpc_mock
+    -> ?get_transition_chain:
+         ( Rpcs.Get_transition_chain.query
+         , Rpcs.Get_transition_chain.response )
+         Gossip_net.Fake.rpc_mock
+    -> ?get_transition_knowledge:
+         ( Rpcs.Get_transition_knowledge.query
+         , Rpcs.Get_transition_knowledge.response )
+         Gossip_net.Fake.rpc_mock
+    -> ?get_transition_chain_proof:
+         ( Rpcs.Get_transition_chain_proof.query
+         , Rpcs.Get_transition_chain_proof.response )
+         Gossip_net.Fake.rpc_mock
+    -> ?get_ancestry:
+         ( Rpcs.Get_ancestry.query
+         , Rpcs.Get_ancestry.response )
+         Gossip_net.Fake.rpc_mock
+    -> ?get_best_tip:
+         ( Rpcs.Get_best_tip.query
+         , Rpcs.Get_best_tip.response )
+         Gossip_net.Fake.rpc_mock
+    -> 'a
+
+  let make_peer_state :
+      (   frontier:Transition_frontier.t
+       -> consensus_local_state:Consensus.Data.Local_state.t
+       -> peer_state )
+      fn_with_mocks =
+   fun ?get_some_initial_peers
+       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
+       ?answer_sync_ledger_query ?get_transition_chain ?get_transition_knowledge
+       ?get_transition_chain_proof ?get_ancestry ?get_best_tip ~frontier
+       ~consensus_local_state ->
+    let rpc_mocks : Gossip_net.Fake.rpc_mocks =
+      let get_mock (type q r) (rpc : (q, r) Rpcs.rpc) :
+          (q, r) Gossip_net.Fake.rpc_mock option =
+        match rpc with
+        | Get_some_initial_peers ->
+            get_some_initial_peers
+        | Get_staged_ledger_aux_and_pending_coinbases_at_hash ->
+            get_staged_ledger_aux_and_pending_coinbases_at_hash
+        | Answer_sync_ledger_query ->
+            answer_sync_ledger_query
+        | Get_transition_chain ->
+            get_transition_chain
+        | Get_transition_knowledge ->
+            get_transition_knowledge
+        | Get_transition_chain_proof ->
+            get_transition_chain_proof
+        | Get_ancestry ->
+            get_ancestry
+        | Ban_notify ->
+            None
+        | Get_best_tip ->
+            get_best_tip
+      in
+      { get_mock }
+    in
+    { frontier; consensus_local_state; rpc_mocks }
+end
 
 module Generator = struct
   open Quickcheck
@@ -173,129 +207,10 @@ module Generator = struct
     -> use_super_catchup:bool
     -> peer_state Generator.t
 
-  let make_peer_state ?get_staged_ledger_aux_and_pending_coinbases_at_hash
-      ?get_some_initial_peers ?answer_sync_ledger_query ?get_ancestry
-      ?get_best_tip ?get_node_status ?get_transition_knowledge
-      ?get_transition_chain_proof ?get_transition_chain ~frontier
-      ~consensus_local_state ~context:(module Context : CONTEXT) =
-    let open Context in
-    { frontier
-    ; consensus_local_state
-    ; get_staged_ledger_aux_and_pending_coinbases_at_hash =
-        ( match get_staged_ledger_aux_and_pending_coinbases_at_hash with
-        | Some f ->
-            f
-        | None ->
-            fun query_env ->
-              let input = Envelope.Incoming.data query_env in
-              Deferred.return
-                (let open Option.Let_syntax in
-                let%map ( scan_state
-                        , expected_merkle_root
-                        , pending_coinbases
-                        , protocol_states ) =
-                  Sync_handler
-                  .get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier
-                    input
-                in
-                let staged_ledger_hash =
-                  Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-                    (Staged_ledger.Scan_state.hash scan_state)
-                    expected_merkle_root pending_coinbases
-                in
-                [%log debug]
-                  ~metadata:
-                    [ ( "staged_ledger_hash"
-                      , Staged_ledger_hash.to_yojson staged_ledger_hash )
-                    ]
-                  "sending scan state and pending coinbase" ;
-                ( scan_state
-                , expected_merkle_root
-                , pending_coinbases
-                , protocol_states )) )
-    ; get_some_initial_peers =
-        ( match get_some_initial_peers with
-        | Some f ->
-            f
-        | None ->
-            fun _ -> Deferred.return [] )
-    ; answer_sync_ledger_query =
-        ( match answer_sync_ledger_query with
-        | Some f ->
-            f
-        | None ->
-            fun query_env ->
-              let ledger_hash, _ = Envelope.Incoming.data query_env in
-              Sync_handler.answer_query ~frontier ledger_hash
-                (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
-                ~logger:(Logger.create ()) ~trust_system:(Trust_system.null ())
-              |> Deferred.map
-                 (* begin error string prefix so we can pattern-match *)
-                   ~f:
-                     (Result.of_option
-                        ~error:
-                          (Error.createf
-                             !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
-                             Mina_networking.refused_answer_query_string
-                             ledger_hash ) ) )
-    ; get_ancestry =
-        ( match get_ancestry with
-        | Some f ->
-            f
-        | None ->
-            fun query_env ->
-              Deferred.return
-                (Sync_handler.Root.prove
-                   ~context:(module Context)
-                   ~frontier
-                   ( Envelope.Incoming.data query_env
-                   |> With_hash.map_hash ~f:(fun state_hash ->
-                          { State_hash.State_hashes.state_hash
-                          ; state_body_hash = None
-                          } ) ) ) )
-    ; get_best_tip =
-        ( match get_best_tip with
-        | Some f ->
-            f
-        | None ->
-            fun _ -> failwith "Get_best_tip unimplemented" )
-    ; get_node_status =
-        ( match get_node_status with
-        | Some f ->
-            f
-        | None ->
-            fun _ -> failwith "Get_node_status unimplemented" )
-    ; get_transition_knowledge =
-        ( match get_transition_knowledge with
-        | Some f ->
-            f
-        | None ->
-            fun _query -> Deferred.return (Sync_handler.best_tip_path ~frontier)
-        )
-    ; get_transition_chain_proof =
-        ( match get_transition_chain_proof with
-        | Some f ->
-            f
-        | None ->
-            fun query_env ->
-              Deferred.return
-                (Transition_chain_prover.prove ~frontier
-                   (Envelope.Incoming.data query_env) ) )
-    ; get_transition_chain =
-        ( match get_transition_chain with
-        | Some f ->
-            f
-        | None ->
-            fun query_env ->
-              Deferred.return
-                (Sync_handler.get_transition_chain ~frontier
-                   (Envelope.Incoming.data query_env) ) )
-    }
-
-  let fresh_peer_custom_rpc ?get_staged_ledger_aux_and_pending_coinbases_at_hash
-      ?get_some_initial_peers ?answer_sync_ledger_query ?get_ancestry
-      ?get_best_tip ?get_node_status ?get_transition_knowledge
-      ?get_transition_chain_proof ?get_transition_chain
+  let fresh_peer_custom_rpc ?get_some_initial_peers
+      ?get_staged_ledger_aux_and_pending_coinbases_at_hash
+      ?answer_sync_ledger_query ?get_transition_chain ?get_transition_knowledge
+      ?get_transition_chain_proof ?get_ancestry ?get_best_tip
       ~context:(module Context : CONTEXT) ~verifier ~max_frontier_length
       ~use_super_catchup =
     let open Context in
@@ -319,28 +234,25 @@ module Generator = struct
         ~use_super_catchup ()
     in
     make_peer_state ~frontier ~consensus_local_state
-      ~context:(module Context)
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
       ?get_some_initial_peers ?answer_sync_ledger_query ?get_ancestry
-      ?get_best_tip ?get_node_status ?get_transition_knowledge
-      ?get_transition_chain_proof ?get_transition_chain
+      ?get_best_tip ?get_transition_knowledge ?get_transition_chain_proof
+      ?get_transition_chain
 
   let fresh_peer ~context:(module Context : CONTEXT) ~verifier
       ~max_frontier_length ~use_super_catchup =
     fresh_peer_custom_rpc
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
       ?get_some_initial_peers:None ?answer_sync_ledger_query:None
-      ?get_ancestry:None ?get_best_tip:None ?get_node_status:None
-      ?get_transition_knowledge:None ?get_transition_chain_proof:None
-      ?get_transition_chain:None
+      ?get_ancestry:None ?get_best_tip:None ?get_transition_knowledge:None
+      ?get_transition_chain_proof:None ?get_transition_chain:None
       ~context:(module Context)
       ~verifier ~max_frontier_length ~use_super_catchup
 
-  let peer_with_branch_custom_rpc ~frontier_branch_size
+  let peer_with_branch_custom_rpc ~frontier_branch_size ?get_some_initial_peers
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
-      ?get_some_initial_peers ?answer_sync_ledger_query ?get_ancestry
-      ?get_best_tip ?get_node_status ?get_transition_knowledge
-      ?get_transition_chain_proof ?get_transition_chain
+      ?answer_sync_ledger_query ?get_transition_chain ?get_transition_knowledge
+      ?get_transition_chain_proof ?get_ancestry ?get_best_tip
       ~context:(module Context : CONTEXT) ~verifier ~max_frontier_length
       ~use_super_catchup =
     let open Context in
@@ -369,20 +281,18 @@ module Generator = struct
           ~f:(Transition_frontier.add_breadcrumb_exn frontier) ) ;
 
     make_peer_state ~frontier ~consensus_local_state
-      ~context:(module Context)
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
       ?get_some_initial_peers ?answer_sync_ledger_query ?get_ancestry
-      ?get_best_tip ?get_node_status ?get_transition_knowledge
-      ?get_transition_chain_proof ?get_transition_chain
+      ?get_best_tip ?get_transition_knowledge ?get_transition_chain_proof
+      ?get_transition_chain
 
   let peer_with_branch ~frontier_branch_size ~context:(module Context : CONTEXT)
       ~verifier ~max_frontier_length ~use_super_catchup =
     peer_with_branch_custom_rpc ~frontier_branch_size
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
       ?get_some_initial_peers:None ?answer_sync_ledger_query:None
-      ?get_ancestry:None ?get_best_tip:None ?get_node_status:None
-      ?get_transition_knowledge:None ?get_transition_chain_proof:None
-      ?get_transition_chain:None
+      ?get_ancestry:None ?get_best_tip:None ?get_transition_knowledge:None
+      ?get_transition_chain_proof:None ?get_transition_chain:None
       ~context:(module Context)
       ~verifier ~max_frontier_length ~use_super_catchup
 

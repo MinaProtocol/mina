@@ -1907,7 +1907,7 @@ let node_status =
              List.iter all_status_data ~f:(fun peer_status_data ->
                  printf "%s\n%!"
                    ( Yojson.Safe.to_string
-                   @@ Mina_networking.Rpcs.Get_node_status.response_to_yojson
+                   @@ Mina_networking.Node_status.response_to_yojson
                         peer_status_data ) )
          | Error err ->
              printf "Failed to get node status: %s\n%!"

@@ -5,3 +5,7 @@
  (mode promote)
  (deps config/config.mlh)
  (action (copy config/config.mlh config.mlh)))
+
+;; to ensure no trouble arises
+;; after switching the branches
+(data_only_dirs external)
