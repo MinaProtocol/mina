@@ -45,7 +45,7 @@ let timestamp =
   anon ("timestamp" %: string)
 
 let instantiate_verify_functions ~logger ~genesis_constants
-    ~constraint_constants ~proof_level = function
+    ~constraint_constants ~proof_level ~cli_proof_level = function
   | None ->
       Deferred.return
         (Verifier.verify_functions ~constraint_constants ~proof_level ())
@@ -60,7 +60,7 @@ let instantiate_verify_functions ~logger ~genesis_constants
           @@ Runtime_config.of_yojson config_json
         in
         Genesis_ledger_helper.init_from_config_file ~logger ~proof_level
-          ~constraint_constants ~genesis_constants config
+          ~constraint_constants ~genesis_constants config ~cli_proof_level
       in
       let%map.Deferred precomputed_values =
         match precomputed_values with
@@ -160,7 +160,7 @@ let filesystem_command =
         let proof_level = Genesis_constants.Compiled.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
-            ~constraint_constants ~proof_level
+            ~constraint_constants ~proof_level ~cli_proof_level:None
         in
         let submission_paths = get_filenames inputs in
         let module V = Make_verifier (struct
@@ -199,7 +199,7 @@ let cassandra_command =
         let proof_level = Genesis_constants.Compiled.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
-            ~constraint_constants ~proof_level
+            ~constraint_constants ~proof_level ~cli_proof_level:None
         in
         let module V = Make_verifier (struct
           include Submission.Cassandra
@@ -237,7 +237,7 @@ let stdin_command =
         let proof_level = Genesis_constants.Compiled.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
-            ~constraint_constants ~proof_level
+            ~constraint_constants ~proof_level ~cli_proof_level:None
         in
         let module V = Make_verifier (struct
           include Submission.Stdin

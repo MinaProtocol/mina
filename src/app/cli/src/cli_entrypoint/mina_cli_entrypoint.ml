@@ -50,7 +50,7 @@ let plugin_flag =
   else Command.Param.return []
 
 let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
-    ~genesis_dir ~proof_level config_files =
+    ~genesis_dir ~cli_proof_level ~proof_level config_files =
   let%bind config_jsons =
     let config_files_paths =
       List.map config_files ~f:(fun (config_file, _) -> `String config_file)
@@ -99,8 +99,8 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
   let genesis_dir = Option.value ~default:(conf_dir ^/ "genesis") genesis_dir in
   let%bind precomputed_values =
     match%map
-      Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
-        ~genesis_constants ~constraint_constants ~proof_level config
+      Genesis_ledger_helper.init_from_config_file ~cli_proof_level ~genesis_dir
+        ~logger ~genesis_constants ~constraint_constants ~proof_level config
     with
     | Ok (precomputed_values, _) ->
         precomputed_values
@@ -467,7 +467,7 @@ let setup_daemon logger =
   and disable_node_status =
     flag "--disable-node-status" ~aliases:[ "disable-node-status" ] no_arg
       ~doc:"Disable reporting node status to other nodes (default: enabled)"
-  and proof_level =
+  and cli_proof_level =
     flag "--proof-level" ~aliases:[ "proof-level" ]
       (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
       ~doc:
@@ -779,13 +779,10 @@ let setup_daemon logger =
           let constraint_constants =
             Genesis_constants.Compiled.constraint_constants
           in
-          let proof_level =
-            Option.value ~default:Genesis_constants.Compiled.proof_level
-              proof_level
-          in
           let%bind precomputed_values, config_jsons, config =
-            load_config_files ~logger ~conf_dir ~genesis_dir ~proof_level
-              config_files ~genesis_constants ~constraint_constants
+            load_config_files ~logger ~conf_dir ~genesis_dir
+              ~proof_level:Genesis_constants.Compiled.proof_level config_files
+              ~genesis_constants ~constraint_constants ~cli_proof_level
           in
           let rev_daemon_configs =
             List.rev_filter_map config_jsons
@@ -1954,6 +1951,7 @@ let internal_commands logger =
           let%bind precomputed_values, _config_jsons, _config =
             load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
               ~constraint_constants ~proof_level config_files
+              ~cli_proof_level:None
           in
           let pids = Child_processes.Termination.create_pid_table () in
           let%bind prover =

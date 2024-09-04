@@ -1266,7 +1266,7 @@ module Mutations = struct
             [%log info] "Starting zkApp scheduler with handle %s"
               (Uuid.to_string uuid) ;
             let { Precomputed_values.constraint_constants
-                ; Precomputed_values.genesis_constants
+                ; genesis_constants
                 ; _
                 } =
               (Mina_lib.config mina).precomputed_values

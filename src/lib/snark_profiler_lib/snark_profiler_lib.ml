@@ -190,7 +190,6 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
     ~max_num_updates () :
     (Mina_ledger.Ledger.t * Zkapp_command.t list) Async.Deferred.t =
   let `VK verification_key, `Prover prover =
-    (*TODO: Why is this For_tests here?*)
     Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
   in
   let zkapp_prover_and_vk = (prover, verification_key) in
@@ -438,69 +437,6 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
       Mina_base.Account.Nonce.zero
   in
   (ledger, zkapp)
-
-let _create_ledger_and_zkapps_from_generator
-    ~(genesis_constants : Genesis_constants.t)
-    (constraint_constants : Genesis_constants.Constraint_constants.t)
-    num_transactions : Mina_ledger.Ledger.t * Zkapp_command.t list =
-  let length =
-    match num_transactions with
-    | `Count length ->
-        length
-    | `Two_from_same ->
-        failwith "Must provide a count when profiling with snapps"
-  in
-  let max_account_updates = 6 in
-  printf
-    !"Generating zkApp transactions with %d updates\n%!"
-    max_account_updates ;
-  let start = Time.now () in
-  let `VK vk, `Prover prover =
-    Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
-  in
-  let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk) in
-  let cmd_infos, ledger =
-    Quickcheck.random_value
-      (Mina_generators.User_command_generators
-       .sequence_zkapp_command_with_ledger ~max_account_updates ~length ~vk
-         ~constraint_constants ~genesis_constants () )
-  in
-  let zkapps =
-    List.map cmd_infos ~f:(fun (user_cmd, _keypair, keymap) ->
-        match user_cmd with
-        | User_command.Zkapp_command parties_valid ->
-            let parties = Zkapp_command.Valid.forget parties_valid in
-            let other_parties = Zkapp_command.account_updates_list parties in
-            let proof_count, signature_count, no_auths =
-              List.fold ~init:(0, 0, 0)
-                (Account_update.of_fee_payer parties.fee_payer :: other_parties)
-                ~f:(fun (pc, sc, na) (p : Account_update.t) ->
-                  match p.authorization with
-                  | Proof _ ->
-                      (pc + 1, sc, na)
-                  | Signature _ ->
-                      (pc, sc + 1, na)
-                  | _ ->
-                      (pc, sc, na + 1) )
-            in
-            printf
-              !"Generated zkapp with %d parties of which %d signatures, %d \
-                proofs and %d none\n\
-                %!"
-              (List.length other_parties + 1)
-              signature_count proof_count no_auths ;
-            Async.Thread_safe.block_on_async_exn (fun () ->
-                Zkapp_command_builder.replace_authorizations
-                  ~prover (*~dummy_proof:proof*)
-                  ~keymap
-                  (Zkapp_command.Valid.forget parties_valid) )
-        | User_command.Signed_command _ ->
-            failwith "Expected Zkapp_command user command" )
-  in
-  printf
-    !"Time to generate zkapps: %f secs\n%!"
-    Time.(Span.to_sec (diff (now ()) start)) ;
-  (ledger, zkapps)
 
 let time thunk =
   let start = Time.now () in

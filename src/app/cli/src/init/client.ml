@@ -1823,7 +1823,7 @@ let compile_time_constants =
            >>| Option.value ~default:Runtime_config.default
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_constants
                  ~constraint_constants ~logger:(Logger.null ()) ~proof_level
-                 ~genesis_dir
+                 ~cli_proof_level:None ~genesis_dir
            >>| Or_error.ok_exn
          in
          let all_constants =
