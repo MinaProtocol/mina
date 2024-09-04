@@ -268,7 +268,20 @@ let main inputs =
    *)
   let logger = Logger.create () in
   let constants : Test_config.constants =
-    { genesis_constants = Genesis_constants.Compiled.genesis_constants
+    let protocol =
+      { Genesis_constants.Compiled.genesis_constants.protocol with
+        k = 20
+      ; delta = 0
+      ; slots_per_epoch = 3 * 8 * 20
+      ; slots_per_sub_window = 2
+      ; grace_period_slots = 140
+      }
+    in
+    { genesis_constants =
+        { Genesis_constants.Compiled.genesis_constants with
+          protocol
+        ; txpool_max_size = 3000
+        }
     ; constraint_constants = Genesis_constants.Compiled.constraint_constants
     }
   in
