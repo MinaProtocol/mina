@@ -3,8 +3,7 @@ open Async_kernel
 open Mina_base
 
 type t =
-  { proof_level : Genesis_constants.Proof_level.t
-  ; constraint_constants : Genesis_constants.Constraint_constants.t
+  { constraint_constants : Genesis_constants.Constraint_constants.t
   ; verify_blockchain_snarks :
          Blockchain_snark.Blockchain.t list
       -> unit Or_error.t Or_error.t Deferred.t
@@ -21,21 +20,17 @@ let invalid_to_error = Common.invalid_to_error
 type ledger_proof = Ledger_proof.t
 
 let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
-    ~proof_level ~constraint_constants ~pids:_ ~conf_dir:_ ~commit_id:_ () =
+    ~constraint_constants ~pids:_ ~conf_dir:_ ~commit_id:_ () =
   let module T = Transaction_snark.Make (struct
     let constraint_constants = constraint_constants
-
-    let proof_level = proof_level
   end) in
   let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
     let tag = T.tag
 
     let constraint_constants = constraint_constants
-
-    let proof_level = proof_level
   end) in
   let verify_blockchain_snarks chains =
-    match proof_level with
+    match constraint_constants.proof_level with
     | Genesis_constants.Proof_level.Full ->
         B.Proof.verify
           (List.map chains ~f:(fun snark ->
@@ -46,7 +41,7 @@ let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
         Deferred.Or_error.return (Ok ())
   in
   let verify_transaction_snarks ts =
-    match proof_level with
+    match constraint_constants.proof_level with
     | Full -> (
         match Or_error.try_with (fun () -> T.verify ts) with
         | Ok result ->
@@ -74,8 +69,7 @@ let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
   in
 
   Deferred.return
-    { proof_level
-    ; constraint_constants
+    { constraint_constants
     ; verify_blockchain_snarks
     ; verification_key = B.Proof.verification_key
     ; verify_transaction_snarks
@@ -87,7 +81,7 @@ let verify_blockchain_snarks { verify_blockchain_snarks; _ } chains =
 (* N.B.: Valid_assuming is never returned, in fact; we assert a return type
    containing Valid_assuming to match the expected type
 *)
-let verify_commands { proof_level; _ }
+let verify_commands { constraint_constants; _ }
     (cs : User_command.Verifiable.t With_status.t list) :
     [ `Valid of Mina_base.User_command.Valid.t
     | `Valid_assuming of
@@ -98,7 +92,7 @@ let verify_commands { proof_level; _ }
     | Common.invalid ]
     list
     Deferred.Or_error.t =
-  match proof_level with
+  match constraint_constants.proof_level with
   | Check | None ->
       List.map cs ~f:(fun c ->
           match Common.check c with

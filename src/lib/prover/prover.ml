@@ -64,7 +64,6 @@ module Worker_state = struct
     ; enable_internal_tracing : bool
     ; internal_trace_filename : string option
     ; logger : Logger.Stable.Latest.t
-    ; proof_level : Genesis_constants.Proof_level.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
     ; commit_id : string
     }
@@ -83,21 +82,16 @@ module Worker_state = struct
           }
         , Lazy.force Proof.transaction_dummy )
 
-  let create { logger; proof_level; constraint_constants; commit_id; _ } :
-      t Deferred.t =
-    match proof_level with
+  let create { logger; constraint_constants; commit_id; _ } : t Deferred.t =
+    match constraint_constants.proof_level with
     | Genesis_constants.Proof_level.Full ->
         let module T = Transaction_snark.Make (struct
           let constraint_constants = constraint_constants
-
-          let proof_level = proof_level
         end) in
         let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
           let tag = T.tag
 
           let constraint_constants = constraint_constants
-
-          let proof_level = proof_level
         end) in
         let%map.Async.Deferred (_ : Pickles.Dirty.t) =
           Pickles.Cache_handle.generate_or_load B.cache_handle
@@ -173,7 +167,7 @@ module Worker_state = struct
                 state_for_handler pending_coinbase =
               let t, _proof = ledger_proof_opt next_state t in
               let res =
-                Blockchain_snark.Blockchain_snark_state.check ~proof_level
+                Blockchain_snark.Blockchain_snark_state.check
                   ~constraint_constants
                   { transition = block
                   ; prev_state = Blockchain_snark.Blockchain.state chain
@@ -324,7 +318,6 @@ module Worker = struct
             ; enable_internal_tracing
             ; internal_trace_filename
             ; logger
-            ; proof_level
             ; constraint_constants
             ; commit_id
             } =
@@ -354,7 +347,6 @@ module Worker = struct
           ; enable_internal_tracing
           ; internal_trace_filename
           ; logger
-          ; proof_level
           ; constraint_constants
           ; commit_id
           }
@@ -370,7 +362,7 @@ type t =
   { connection : Worker.Connection.t; process : Process.t; logger : Logger.t }
 
 let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
-    ~pids ~conf_dir ~proof_level ~constraint_constants ~commit_id () =
+    ~pids ~conf_dir ~constraint_constants ~commit_id () =
   [%log info] "Starting a new prover process" ;
   let on_failure err =
     [%log error] "Prover process failed with error $err"
@@ -385,7 +377,6 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
       ; enable_internal_tracing
       ; internal_trace_filename
       ; logger
-      ; proof_level
       ; constraint_constants
       ; commit_id
       }

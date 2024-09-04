@@ -99,7 +99,7 @@ let%test_module "Epoch ledger sync tests" =
             let%map (module Context) = make_context () in
             Context.precomputed_values
           in
-          Verifier.create ~logger ~proof_level:precomputed_values.proof_level
+          Verifier.create ~logger
             ~constraint_constants:precomputed_values.constraint_constants ~pids
             ~conf_dir:(Some (make_dirname "verifier"))
             ~commit_id:"not specified for unit tests" () )

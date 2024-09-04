@@ -9,10 +9,12 @@ let%test_module "Archive node unit tests" =
   ( module struct
     let logger = Logger.create ()
 
-    let proof_level = Genesis_constants.Proof_level.None
-
     let precomputed_values =
-      { (Lazy.force Precomputed_values.for_unit_tests) with proof_level }
+      let vs = Lazy.force Precomputed_values.for_unit_tests in
+      { vs with
+        constraint_constants =
+          { vs.constraint_constants with proof_level = None }
+      }
 
     let constraint_constants = precomputed_values.constraint_constants
 
@@ -20,8 +22,7 @@ let%test_module "Archive node unit tests" =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
+          Verifier.create ~logger ~constraint_constants ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
             ~commit_id:"not specified for unit tests" () )
 

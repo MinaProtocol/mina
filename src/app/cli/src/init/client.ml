@@ -935,11 +935,10 @@ let constraint_system_digests =
          Genesis_constants.Constraint_constants.make
            network_constants.constraint_constants
        in
-       let proof_level = constraint_constants.proof_level in
        let all =
          Transaction_snark.constraint_system_digests ~constraint_constants ()
          @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
-             ~proof_level ~constraint_constants ()
+             ~constraint_constants ()
        in
        let all =
          List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all

@@ -15,12 +15,10 @@ let rec sexp_to_sexp : Sexp.t -> Sexplib0.Sexp.t = function
 
 let () = ignore sexp_to_sexp
 
-let main (spec_path : string) ~constraint_constants ~proof_level =
+let main (spec_path : string) ~constraint_constants =
   let module Inputs = Snark_worker.Prod.Inputs in
   let%bind spec = Reader.load_sexp_exn spec_path Inputs.single_spec_of_sexp in
-  let%bind worker =
-    Inputs.Worker_state.create ~constraint_constants ~proof_level ()
-  in
+  let%bind worker = Inputs.Worker_state.create ~constraint_constants () in
   let message =
     Mina_base.Sok_message.create ~fee:Currency.Fee.zero
       ~prover:
@@ -43,7 +41,6 @@ let cmd =
           Genesis_constants.Constraint_constants.make
             network_constants.constraint_constants
         in
-        let proof_level = constraint_constants.proof_level in
-        Obj.magic (main path ~constraint_constants ~proof_level))
+        Obj.magic (main path ~constraint_constants))
 
 let () = Command.run cmd

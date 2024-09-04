@@ -28,7 +28,7 @@ let command =
          }
        in
        let%bind worker_state =
-         Prod.Worker_state.create ~constraint_constants ~proof_level ()
+         Prod.Worker_state.create ~constraint_constants ()
        in
        let public_key = fst Key_gen.Sample_keypairs.genesis_winner in
        let fee = Currency.Fee.of_nanomina_int_exn 10 in

@@ -490,16 +490,13 @@ module Snark_pool = struct
 
       let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
-      let proof_level = precomputed_values.proof_level
-
       let constraint_constants = precomputed_values.constraint_constants
 
       let logger = Logger.null ()
 
       let verifier =
         Async.Thread_safe.block_on_async_exn (fun () ->
-            Verifier.create ~logger ~proof_level ~constraint_constants
-              ~conf_dir:None
+            Verifier.create ~logger ~constraint_constants ~conf_dir:None
               ~pids:(Child_processes.Termination.create_pid_table ())
               ~commit_id:"not specified for unit tests" () )
 

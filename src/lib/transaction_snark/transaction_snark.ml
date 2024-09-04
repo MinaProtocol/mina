@@ -2081,7 +2081,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       (* Horrible hack :( *)
       let witness : Witness.t option ref = ref None
 
-      let rule (type a b c d) ~constraint_constants ~proof_level
+      let rule (type a b c d)
+          ~(constraint_constants : Genesis_constants.Constraint_constants.t)
           (t : (a, b, c, d) Basic.t_typed) :
           ( a
           , b
@@ -2099,7 +2100,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let module M = H4.T (Pickles.Tag) in
         let s = Basic.spec t in
         let prev_must_verify =
-          match proof_level with
+          match constraint_constants.proof_level with
           | Genesis_constants.Proof_level.Full ->
               true
           | _ ->
@@ -3308,7 +3309,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     , Nat.N5.n )
     Pickles.Tag.t
 
-  let system ~proof_level ~constraint_constants =
+  let system ~constraint_constants =
     Pickles.compile () ~cache:Cache_dir.cache ?proof_cache:!proof_cache
       ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~public_input:(Input Statement.With_sok.typ) ~auxiliary_typ:Typ.unit
@@ -3320,10 +3321,10 @@ module Make_str (A : Wire_types.Concrete) = struct
            constraint_constants )
       ~choices:(fun ~self ->
         let zkapp_command x =
-          Base.Zkapp_command_snark.rule ~constraint_constants ~proof_level x
+          Base.Zkapp_command_snark.rule ~constraint_constants x
         in
         [ Base.rule ~constraint_constants
-        ; Merge.rule ~proof_level self
+        ; Merge.rule ~proof_level:constraint_constants.proof_level self
         ; zkapp_command Opt_signed_opt_signed
         ; zkapp_command Opt_signed
         ; zkapp_command Proved
@@ -3940,8 +3941,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   module Make (Inputs : sig
     val constraint_constants : Genesis_constants.Constraint_constants.t
-
-    val proof_level : Genesis_constants.Proof_level.t
   end) =
   struct
     open Inputs
@@ -3953,7 +3952,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         , p
         , Pickles.Provers.
             [ base; merge; opt_signed_opt_signed; opt_signed; proved ] ) =
-      system ~proof_level ~constraint_constants
+      system ~constraint_constants
 
     module Proof = (val p)
 

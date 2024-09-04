@@ -264,9 +264,10 @@ module Snark_worker = struct
         log_snark_worker_warning t ;
         let%map snark_worker_process =
           run_process ~logger:t.config.logger
-            ~proof_level:t.config.precomputed_values.proof_level t.config.pids
-            t.config.gossip_net_params.addrs_and_ports.client_port kill_ivar
-            t.config.snark_worker_config.num_threads
+            ~proof_level:
+              t.config.precomputed_values.constraint_constants.proof_level
+            t.config.pids t.config.gossip_net_params.addrs_and_ports.client_port
+            kill_ivar t.config.snark_worker_config.num_threads
         in
         [%log' debug t.config.logger]
           ~metadata:
@@ -1510,7 +1511,6 @@ let create ~commit_id ?wallets (config : Config.t) =
                         ~enable_internal_tracing:
                           (Internal_tracing.is_enabled ())
                         ~internal_trace_filename:"prover-internal-trace.jsonl"
-                        ~proof_level:config.precomputed_values.proof_level
                         ~constraint_constants ~pids:config.pids
                         ~conf_dir:config.conf_dir ()
                     in
@@ -1535,7 +1535,6 @@ let create ~commit_id ?wallets (config : Config.t) =
                         ~enable_internal_tracing:
                           (Internal_tracing.is_enabled ())
                         ~internal_trace_filename:"verifier-internal-trace.jsonl"
-                        ~proof_level:config.precomputed_values.proof_level
                         ~constraint_constants:
                           config.precomputed_values.constraint_constants
                         ~pids:config.pids ~conf_dir:(Some config.conf_dir) ()

@@ -20,11 +20,16 @@ module Worker_state = struct
   type t = (module S)
 
   let create ~constraint_constants () : t Deferred.t =
+    let constraint_constants =
+      { constraint_constants with
+        Genesis_constants.Constraint_constants.proof_level = Full
+      }
+    in
     Deferred.return
       (let module M = struct
          let perform_single (message, single_spec) =
            let%bind (worker_state : Prod.Worker_state.t) =
-             Prod.Worker_state.create ~constraint_constants ~proof_level:Full ()
+             Prod.Worker_state.create ~constraint_constants ()
            in
            Prod.perform_single worker_state ~message single_spec
        end in

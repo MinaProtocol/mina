@@ -6,7 +6,6 @@ module Inputs = struct
   type t =
     { runtime_config : Runtime_config.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
-    ; proof_level : Genesis_constants.Proof_level.t
     ; genesis_constants : Genesis_constants.t
     ; genesis_ledger : Genesis_ledger.Packed.t
     ; genesis_epoch_data : Consensus.Genesis_epoch_data.t
@@ -30,7 +29,7 @@ module Inputs = struct
 
   let genesis_constants { genesis_constants; _ } = genesis_constants
 
-  let proof_level { proof_level; _ } = proof_level
+  let proof_level { constraint_constants; _ } = constraint_constants.proof_level
 
   let protocol_constants t = (genesis_constants t).protocol
 
@@ -84,7 +83,6 @@ module T = struct
     { runtime_config : Runtime_config.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
     ; genesis_constants : Genesis_constants.t
-    ; proof_level : Genesis_constants.Proof_level.t
     ; genesis_ledger : Genesis_ledger.Packed.t
     ; genesis_epoch_data : Consensus.Genesis_epoch_data.t
     ; genesis_body_reference : Consensus.Body_reference.t
@@ -101,7 +99,7 @@ module T = struct
 
   let genesis_constants { genesis_constants; _ } = genesis_constants
 
-  let proof_level { proof_level; _ } = proof_level
+  let proof_level { constraint_constants; _ } = constraint_constants.proof_level
 
   let protocol_constants t = (genesis_constants t).protocol
 
@@ -206,43 +204,17 @@ let blockchain_snark_state (inputs : Inputs.t) :
     * (module Blockchain_snark.Blockchain_snark_state.S) =
   let module T = Transaction_snark.Make (struct
     let constraint_constants = inputs.constraint_constants
-
-    let proof_level = inputs.proof_level
   end) in
   let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
     let tag = T.tag
 
     let constraint_constants = inputs.constraint_constants
-
-    let proof_level = inputs.proof_level
   end) in
   ((module T), (module B))
-
-(*
-let create_values txn b (t : Inputs.t) =
-  let%bind.Async.Deferred (), (), genesis_proof = base_proof b t in
-  let%map.Async.Deferred blockchain_proof_system_id =
-    let (module B) = b in
-    Lazy.force B.Proof.id
-  in
-  { runtime_config = t.runtime_config
-  ; constraint_constants = t.constraint_constants
-  ; proof_level = t.proof_level
-  ; genesis_constants = t.genesis_constants
-  ; genesis_ledger = t.genesis_ledger
-  ; genesis_epoch_data = t.genesis_epoch_data
-  ; genesis_body_reference = t.genesis_body_reference
-  ; consensus_constants = t.consensus_constants
-  ; protocol_state_with_hashes = t.protocol_state_with_hashes
-  ; constraint_system_digests = digests txn b
-  ; proof_data = Some { blockchain_proof_system_id; genesis_proof }
-  }
-*)
 
 let create_values_no_proof (t : Inputs.t) =
   { runtime_config = t.runtime_config
   ; constraint_constants = t.constraint_constants
-  ; proof_level = t.proof_level
   ; genesis_constants = t.genesis_constants
   ; genesis_ledger = t.genesis_ledger
   ; genesis_epoch_data = t.genesis_epoch_data
@@ -259,7 +231,6 @@ let create_values_no_proof (t : Inputs.t) =
 let to_inputs (t : t) : Inputs.t =
   { runtime_config = t.runtime_config
   ; constraint_constants = t.constraint_constants
-  ; proof_level = t.proof_level
   ; genesis_constants = t.genesis_constants
   ; genesis_ledger = t.genesis_ledger
   ; genesis_epoch_data = t.genesis_epoch_data

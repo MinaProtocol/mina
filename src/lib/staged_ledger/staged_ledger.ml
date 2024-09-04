@@ -2364,8 +2364,6 @@ let%test_module "staged ledger tests" =
     let coinbase_receiver =
       Public_key.compress coinbase_receiver_keypair.public_key
 
-    let proof_level = Genesis_constants.For_unit_tests.Proof_level.t
-
     let genesis_constants = Genesis_constants.For_unit_tests.t
 
     let constraint_constants =
@@ -2382,8 +2380,7 @@ let%test_module "staged ledger tests" =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
+          Verifier.create ~logger ~constraint_constants ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
             ~commit_id:"not specified for unit tests" () )
 
@@ -5180,9 +5177,12 @@ let%test_module "staged ledger tests" =
                           (Staged_ledger_diff.With_valid_signatures_and_proofs
                            .commands diff )
                         = 1 ) ;
+                      let constraint_constants =
+                        { constraint_constants with proof_level = Full }
+                      in
                       let%bind verifier_full =
-                        Verifier.create ~logger ~proof_level:Full
-                          ~constraint_constants ~conf_dir:None
+                        Verifier.create ~logger ~constraint_constants
+                          ~conf_dir:None
                           ~pids:
                             (Child_processes.Termination.create_pid_table ())
                           ~commit_id:"not specified for unit tests" ()

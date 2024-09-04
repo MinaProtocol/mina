@@ -31,20 +31,23 @@ module Inputs = struct
       ; proof_level : Genesis_constants.Proof_level.t
       }
 
-    let create ~constraint_constants ~proof_level () =
+    let create
+        ~(constraint_constants : Genesis_constants.Constraint_constants.t) () =
       let m =
-        match proof_level with
+        match constraint_constants.proof_level with
         | Genesis_constants.Proof_level.Full ->
             Some
               ( module Transaction_snark.Make (struct
                 let constraint_constants = constraint_constants
-
-                let proof_level = proof_level
               end) : S )
         | Check | None ->
             None
       in
-      Deferred.return { m; cache = Cache.create (); proof_level }
+      Deferred.return
+        { m
+        ; cache = Cache.create ()
+        ; proof_level = constraint_constants.proof_level
+        }
 
     let worker_wait_time = 5.
   end

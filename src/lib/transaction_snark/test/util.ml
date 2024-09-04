@@ -37,8 +37,6 @@ let snark_module =
   lazy
     ( module Transaction_snark.Make (struct
       let constraint_constants = constraint_constants
-
-      let proof_level = proof_level
     end) : Transaction_snark.S )
 
 let genesis_state_body =

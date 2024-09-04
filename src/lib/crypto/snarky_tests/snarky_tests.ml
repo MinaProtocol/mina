@@ -623,7 +623,7 @@ module Protocol_circuits = struct
     let digest =
       Blockchain_snark.Blockchain_snark_state.constraint_system_digests
     in
-    let digest = digest ~proof_level ~constraint_constants () in
+    let digest = digest ~constraint_constants () in
     assert (List.length digest = 1) ;
     let _, hash = List.hd_exn digest in
     let digest = Md5.to_hex hash in

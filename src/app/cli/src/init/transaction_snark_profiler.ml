@@ -3,9 +3,9 @@ open Snark_profiler_lib
 
 let name = "transaction-snark-profiler"
 
-let run ~genesis_constants ~constraint_constants ~proof_level
-    ~user_command_profiler ~zkapp_profiler num_transactions ~max_num_updates
-    ?min_num_updates repeats preeval use_zkapps : unit =
+let run ~genesis_constants ~constraint_constants ~user_command_profiler
+    ~zkapp_profiler num_transactions ~max_num_updates ?min_num_updates repeats
+    preeval use_zkapps : unit =
   let logger = Logger.null () in
   let print n msg = printf !"[%i] %s\n%!" n msg in
   if use_zkapps then (
@@ -17,7 +17,7 @@ let run ~genesis_constants ~constraint_constants ~proof_level
     Parallel.init_master () ;
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~commit_id:Mina_version.commit_id ~logger ~proof_level
+          Verifier.create ~commit_id:Mina_version.commit_id ~logger
             ~constraint_constants ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
             () )
@@ -57,26 +57,25 @@ let run ~genesis_constants ~constraint_constants ~proof_level
     in
     go repeats
 
-let dry ~genesis_constants ~constraint_constants ~proof_level ~max_num_updates
+let dry ~genesis_constants ~constraint_constants ~max_num_updates
     ?min_num_updates num_transactions repeats preeval use_zkapps () =
   let zkapp_profiler ~verifier:_ _ _ =
     failwith "Can't check base SNARKs on zkApps"
   in
   Test_util.with_randomness 123456789 (fun () ->
-      run ~genesis_constants ~constraint_constants ~proof_level
+      run ~genesis_constants ~constraint_constants
         ~user_command_profiler:
           (check_base_snarks ~genesis_constants ~constraint_constants)
         ~zkapp_profiler num_transactions ~max_num_updates ?min_num_updates
         repeats preeval use_zkapps )
 
-let witness ~genesis_constants ~constraint_constants ~proof_level
-    ~max_num_updates ?min_num_updates num_transactions repeats preeval
-    use_zkapps () =
+let witness ~genesis_constants ~constraint_constants ~max_num_updates
+    ?min_num_updates num_transactions repeats preeval use_zkapps () =
   let zkapp_profiler ~verifier:_ _ _ =
     failwith "Can't generate witnesses for base SNARKs on zkApps"
   in
   Test_util.with_randomness 123456789 (fun () ->
-      run ~genesis_constants ~constraint_constants ~proof_level
+      run ~genesis_constants ~constraint_constants
         ~user_command_profiler:
           (generate_base_snarks_witness ~genesis_constants ~constraint_constants)
         ~zkapp_profiler num_transactions ~max_num_updates ?min_num_updates
@@ -84,15 +83,13 @@ let witness ~genesis_constants ~constraint_constants ~proof_level
 
 let main ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~proof_level ~max_num_updates ?min_num_updates num_transactions repeats
-    preeval use_zkapps () =
+    ~max_num_updates ?min_num_updates num_transactions repeats preeval
+    use_zkapps () =
   Test_util.with_randomness 123456789 (fun () ->
       let module T = Transaction_snark.Make (struct
         let constraint_constants = constraint_constants
-
-        let proof_level = proof_level
       end) in
-      run ~genesis_constants ~constraint_constants ~proof_level
+      run ~genesis_constants ~constraint_constants
         ~user_command_profiler:
           (profile_user_command ~genesis_constants ~constraint_constants
              (module T) )
@@ -184,14 +181,11 @@ let command =
        }
      in
      if witness_only then
-       witness ~genesis_constants ~constraint_constants ~proof_level
-         ~max_num_updates ?min_num_updates num_transactions repeats preeval
-         use_zkapps
+       witness ~genesis_constants ~constraint_constants ~max_num_updates
+         ?min_num_updates num_transactions repeats preeval use_zkapps
      else if check_only then
-       dry ~genesis_constants ~constraint_constants ~proof_level
-         ~max_num_updates ?min_num_updates num_transactions repeats preeval
-         use_zkapps
+       dry ~genesis_constants ~constraint_constants ~max_num_updates
+         ?min_num_updates num_transactions repeats preeval use_zkapps
      else
-       main ~genesis_constants ~constraint_constants ~proof_level
-         ~max_num_updates ?min_num_updates num_transactions repeats preeval
-         use_zkapps )
+       main ~genesis_constants ~constraint_constants ~max_num_updates
+         ?min_num_updates num_transactions repeats preeval use_zkapps )

@@ -628,10 +628,9 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
         [ ("max_canonical_slot", `String (Int64.to_string max_canonical_slot)) ] ;
     Deferred.unit )
 
-let main ~constraint_constants ~proof_level ~input_file ~output_file_opt
-    ~archive_uri ~continue_on_error ~checkpoint_interval
-    ~checkpoint_output_folder_opt ~checkpoint_file_prefix ~genesis_dir_opt
-    ~log_json ~log_level () =
+let main ~constraint_constants ~input_file ~output_file_opt ~archive_uri
+    ~continue_on_error ~checkpoint_interval ~checkpoint_output_folder_opt
+    ~checkpoint_file_prefix ~genesis_dir_opt ~log_json ~log_level () =
   Cli_lib.Stdout_log.setup log_json log_level ;
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
@@ -659,7 +658,7 @@ let main ~constraint_constants ~proof_level ~input_file ~output_file_opt
       let query_db = Mina_caqti.query pool in
       let%bind packed_ledger =
         match%bind
-          Genesis_ledger_helper.Ledger.load ~proof_level
+          Genesis_ledger_helper.Ledger.load
             ~genesis_dir:
               (Option.value ~default:Cache_dir.autogen_path genesis_dir_opt)
             ~logger ~constraint_constants input.genesis_ledger
@@ -1722,8 +1721,6 @@ let () =
            Genesis_constants.Constraint_constants.make
              network_constants.constraint_constants
          in
-         let proof_level = constraint_constants.proof_level in
-         main ~constraint_constants ~proof_level ~input_file ~output_file_opt
-           ~archive_uri ~checkpoint_interval ~continue_on_error
-           ~checkpoint_output_folder_opt ~checkpoint_file_prefix
-           ~genesis_dir_opt ~log_json ~log_level )))
+         main ~constraint_constants ~input_file ~output_file_opt ~archive_uri
+           ~checkpoint_interval ~continue_on_error ~checkpoint_output_folder_opt
+           ~checkpoint_file_prefix ~genesis_dir_opt ~log_json ~log_level )))

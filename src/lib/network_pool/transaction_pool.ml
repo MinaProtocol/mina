@@ -1651,8 +1651,6 @@ let%test_module _ =
 
     let consensus_constants = precomputed_values.consensus_constants
 
-    let proof_level = precomputed_values.proof_level
-
     let genesis_constants = precomputed_values.genesis_constants
 
     let minimum_fee =
@@ -1664,8 +1662,7 @@ let%test_module _ =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
+          Verifier.create ~logger ~constraint_constants ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
             ~commit_id:"not specified for unit tests" () )
 
@@ -3079,10 +3076,12 @@ let%test_module _ =
 
     let%test "account update with a different network id that uses proof \
               authorization would be rejected" =
+      let constraint_constants =
+        { constraint_constants with proof_level = Full }
+      in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind verifier_full =
-            Verifier.create ~logger ~proof_level:Full ~constraint_constants
-              ~conf_dir:None
+            Verifier.create ~logger ~constraint_constants ~conf_dir:None
               ~pids:(Child_processes.Termination.create_pid_table ())
               ~commit_id:"not specified for unit tests" ()
           in

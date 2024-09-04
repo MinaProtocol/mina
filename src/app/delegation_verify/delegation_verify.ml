@@ -52,9 +52,7 @@ let instantiate_verify_functions ~logger
         Genesis_constants.Constraint_constants.make
           network_constants.constraint_constants
       in
-      Deferred.return
-        (Verifier.verify_functions ~constraint_constants
-           ~proof_level:constraint_constants.proof_level () )
+      Deferred.return (Verifier.verify_functions ~constraint_constants ())
   | Some config_file ->
       let%bind.Deferred precomputed_values =
         let%bind.Deferred.Or_error config =
@@ -72,9 +70,11 @@ let instantiate_verify_functions ~logger
             exit 4
       in
       let constraint_constants =
-        Precomputed_values.constraint_constants precomputed_values
+        { (Precomputed_values.constraint_constants precomputed_values) with
+          Genesis_constants.Constraint_constants.proof_level = Full
+        }
       in
-      Verifier.verify_functions ~constraint_constants ~proof_level:Full ()
+      Verifier.verify_functions ~constraint_constants ()
 
 module Make_verifier (Source : Submission.Data_source) = struct
   let verify_transaction_snarks = Source.verify_transaction_snarks

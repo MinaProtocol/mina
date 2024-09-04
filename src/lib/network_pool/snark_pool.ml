@@ -580,16 +580,13 @@ let%test_module "random set test" =
 
     let consensus_constants = precomputed_values.consensus_constants
 
-    let proof_level = precomputed_values.proof_level
-
     let logger = Logger.null ()
 
     let time_controller = Block_time.Controller.basic ~logger
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
+          Verifier.create ~logger ~constraint_constants ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
             ~commit_id:"not specified for unit tests" () )
 

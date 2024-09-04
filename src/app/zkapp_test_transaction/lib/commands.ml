@@ -46,7 +46,6 @@ let get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
 
 let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t)
     ~(genesis_constants : Genesis_constants.t)
-    ~(proof_level : Genesis_constants.Proof_level.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
   let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
   let _v =
@@ -127,8 +126,6 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t)
   in
   let module T = Transaction_snark.Make (struct
     let constraint_constants = constraint_constants
-
-    let proof_level = proof_level
   end) in
   let%map _ =
     Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)
@@ -231,8 +228,6 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   let open Async.Deferred.Let_syntax in
   let module T = Transaction_snark.Make (struct
     let constraint_constants = constraint_constants
-
-    let proof_level = constraint_constants.proof_level
   end) in
   let%map _ =
     Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)
@@ -385,8 +380,10 @@ let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
   in
   let%map () =
     if debug then
-      gen_proof ~genesis_constants ~constraint_constants ~proof_level:Full
-        zkapp_command
+      let constraint_constants =
+        { constraint_constants with proof_level = Full }
+      in
+      gen_proof ~genesis_constants ~constraint_constants zkapp_command
     else return ()
   in
   zkapp_command
@@ -435,8 +432,10 @@ let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
   in
   let%map () =
     if debug then
+      let constraint_constants =
+        { constraint_constants with proof_level = Full }
+      in
       gen_proof zkapp_command ~constraint_constants ~genesis_constants
-        ~proof_level:Full
         ~zkapp_account:
           (Some
              (Signature_lib.Public_key.compress zkapp_account_keypair.public_key)
@@ -479,8 +478,13 @@ let transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer ~fee_payer_nonce
   in
   let%map () =
     if debug then
+      let constraint_constants =
+        { constraint_constants with
+          Genesis_constants.Constraint_constants.proof_level = Full
+        }
+      in
       gen_proof zkapp_command ~zkapp_account:None ~genesis_constants
-        ~constraint_constants ~proof_level:Full
+        ~constraint_constants
     else return ()
   in
   zkapp_command
@@ -517,8 +521,10 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
   in
   let%map () =
     if debug then
+      let constraint_constants =
+        { constraint_constants with proof_level = Full }
+      in
       gen_proof zkapp_command ~genesis_constants ~constraint_constants
-        ~proof_level:Full
         ~zkapp_account:
           (Some (Signature_lib.Public_key.compress zkapp_keypair.public_key))
     else return ()
@@ -557,8 +563,10 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
   in
   let%map () =
     if debug then
+      let constraint_constants =
+        { constraint_constants with proof_level = Full }
+      in
       gen_proof zkapp_command ~genesis_constants ~constraint_constants
-        ~proof_level:Full
         ~zkapp_account:
           (Some
              (Signature_lib.Public_key.compress zkapp_account_keypair.public_key)
@@ -599,8 +607,10 @@ let update_action_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
   in
   let%map () =
     if debug then
+      let constraint_constants =
+        { constraint_constants with proof_level = Full }
+      in
       gen_proof zkapp_command ~genesis_constants ~constraint_constants
-        ~proof_level:Full
         ~zkapp_account:
           (Some (Signature_lib.Public_key.compress zkapp_keypair.public_key))
     else return ()
@@ -639,8 +649,10 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   in
   let%map () =
     if debug then
+      let constraint_constants =
+        { constraint_constants with proof_level = Full }
+      in
       gen_proof zkapp_command ~genesis_constants ~constraint_constants
-        ~proof_level:Full
         ~zkapp_account:
           (Some
              (Signature_lib.Public_key.compress zkapp_account_keypair.public_key)
@@ -681,8 +693,10 @@ let update_snapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~snapp_update
   (*Util.print_snapp_transaction zkapp_command ;*)
   let%map () =
     if debug then
+      let constraint_constants =
+        { constraint_constants with proof_level = Full }
+      in
       gen_proof zkapp_command ~genesis_constants ~constraint_constants
-        ~proof_level:Full
         ~zkapp_account:
           (Some (Signature_lib.Public_key.compress zkapp_keypair.public_key))
     else return ()

@@ -18,16 +18,12 @@ let () =
       in
       let module Transaction_snark_instance = Transaction_snark.Make (struct
         let constraint_constants = constraint_constants
-
-        let proof_level = proof_level
       end) in
       let () = Format.eprintf "Generating blockchain snark circuit..@." in
       let before = Time.now () in
       let module Blockchain_snark_instance =
       Blockchain_snark.Blockchain_snark_state.Make (struct
         let constraint_constants = constraint_constants
-
-        let proof_level = proof_level
 
         let tag = Transaction_snark_instance.tag
       end) in

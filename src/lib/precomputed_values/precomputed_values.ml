@@ -5,15 +5,16 @@ include T
 let hashes =
   lazy
     (let constraint_constants =
-       Genesis_constants.For_unit_tests.Constraint_constants.t
+       { Genesis_constants.For_unit_tests.Constraint_constants.t with
+         proof_level = Full
+       }
      in
-     let proof_level = Genesis_constants.Proof_level.Full in
      let ts =
        Transaction_snark.constraint_system_digests ~constraint_constants ()
      in
      let bs =
        Blockchain_snark.Blockchain_snark_state.constraint_system_digests
-         ~proof_level ~constraint_constants ()
+         ~constraint_constants ()
      in
      ts @ bs )
 
@@ -38,7 +39,6 @@ let for_unit_tests =
           ~genesis_constants:Genesis_constants.For_unit_tests.t
     ; constraint_constants =
         Genesis_constants.For_unit_tests.Constraint_constants.t
-    ; proof_level = Genesis_constants.For_unit_tests.Proof_level.t
     ; genesis_constants = Genesis_constants.For_unit_tests.t
     ; genesis_ledger = Genesis_ledger.for_unit_tests
     ; genesis_epoch_data = Consensus.Genesis_epoch_data.for_unit_tests

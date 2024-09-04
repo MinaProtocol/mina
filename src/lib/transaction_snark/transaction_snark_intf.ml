@@ -204,8 +204,6 @@ module type Full = sig
 
   module Make (Inputs : sig
     val constraint_constants : Genesis_constants.Constraint_constants.t
-
-    val proof_level : Genesis_constants.Proof_level.t
   end) : S
   [@@warning "-67"]
 

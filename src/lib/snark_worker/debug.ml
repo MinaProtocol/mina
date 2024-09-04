@@ -6,8 +6,9 @@ module Inputs = struct
   module Worker_state = struct
     include Unit
 
-    let create ~constraint_constants:_ ~proof_level () =
-      match proof_level with
+    let create
+        ~(constraint_constants : Genesis_constants.Constraint_constants.t) () =
+      match constraint_constants.proof_level with
       | Genesis_constants.Proof_level.Full ->
           failwith "Unable to handle proof-level=Full"
       | Check | None ->

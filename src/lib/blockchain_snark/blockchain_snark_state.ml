@@ -139,7 +139,6 @@ let txn_statement_ledger_hashes_equal
         new consensus state is a function of the old consensus state
 *)
 let%snarkydef_ step ~(logger : Logger.t)
-    ~(proof_level : Genesis_constants.Proof_level.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) new_state
     : _ Tick.Checked.t =
   let new_state_hash =
@@ -349,14 +348,14 @@ let%snarkydef_ step ~(logger : Logger.t)
     (transaction_snark_should_verifiy, result)
   in
   let txn_snark_must_verify =
-    match proof_level with
+    match constraint_constants.proof_level with
     | Check | None ->
         Boolean.false_
     | Full ->
         txn_snark_must_verify
   in
   let prev_must_verify =
-    match proof_level with
+    match constraint_constants.proof_level with
     | Check | None ->
         Boolean.false_
     | Full ->
@@ -396,18 +395,16 @@ type tag = (Statement_var.t, Statement.t, Nat.N2.n, Nat.N1.n) Pickles.Tag.t
 
 let typ = Data_as_hash.typ ~hash:(fun t -> (Protocol_state.hashes t).state_hash)
 
-let check w ?handler ~proof_level ~constraint_constants new_state_hash :
-    unit Or_error.t =
+let check w ?handler ~constraint_constants new_state_hash : unit Or_error.t =
   let open Tick in
   check
     (Fn.flip handle (wrap_handler handler w) (fun () ->
          let%bind curr =
            exists typ ~compute:(As_prover.return new_state_hash)
          in
-         step ~proof_level ~constraint_constants ~logger:(Logger.create ()) curr )
-    )
+         step ~constraint_constants ~logger:(Logger.create ()) curr ) )
 
-let rule ~proof_level ~constraint_constants transaction_snark self :
+let rule ~constraint_constants transaction_snark self :
     _ Pickles.Inductive_rule.t =
   { identifier = "step"
   ; prevs = [ self; transaction_snark ]
@@ -415,8 +412,7 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
       (fun { public_input = x } ->
         let b1, b2 =
           Run.run_checked
-            (step ~proof_level ~constraint_constants ~logger:(Logger.create ())
-               x )
+            (step ~constraint_constants ~logger:(Logger.create ()) x)
         in
         { previous_proof_statements = [ b1; b2 ]
         ; public_output = ()
@@ -451,15 +447,14 @@ end
 
 let verify ts ~key = Pickles.verify (module Nat.N2) (module Statement) key ts
 
-let constraint_system_digests ~proof_level ~constraint_constants () =
+let constraint_system_digests ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
   [ ( "blockchain-step"
     , digest
         (let main x =
            let open Tick in
            let%map _ =
-             step ~proof_level ~constraint_constants ~logger:(Logger.create ())
-               x
+             step ~constraint_constants ~logger:(Logger.create ()) x
            in
            ()
          in
@@ -472,8 +467,6 @@ module Make (T : sig
   val tag : Transaction_snark.tag
 
   val constraint_constants : Genesis_constants.Constraint_constants.t
-
-  val proof_level : Genesis_constants.Proof_level.t
 end) : S = struct
   open T
 
@@ -487,13 +480,12 @@ end) : S = struct
       ~constraint_constants:
         (Genesis_constants.Constraint_constants.to_snark_keys_header
            constraint_constants )
-      ~choices:(fun ~self ->
-        [ rule ~proof_level ~constraint_constants T.tag self ] )
+      ~choices:(fun ~self -> [ rule ~constraint_constants T.tag self ])
 
   let step = with_handler step
 
   let constraint_system_digests =
-    lazy (constraint_system_digests ~proof_level ~constraint_constants ())
+    lazy (constraint_system_digests ~constraint_constants ())
 
   module Proof = (val p)
 end

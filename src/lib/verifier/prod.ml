@@ -67,7 +67,6 @@ module Worker_state = struct
     ; enable_internal_tracing : bool
     ; internal_trace_filename : string option
     ; logger : Logger.Stable.Latest.t
-    ; proof_level : Genesis_constants.Proof_level.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
     ; commit_id : string
     }
@@ -75,25 +74,20 @@ module Worker_state = struct
 
   type t = (module S)
 
-  let create { logger; proof_level; constraint_constants; commit_id; _ } :
-      t Deferred.t =
-    match proof_level with
+  let create { logger; constraint_constants; commit_id; _ } : t Deferred.t =
+    match constraint_constants.proof_level with
     | Full ->
         Pickles.Side_loaded.srs_precomputation () ;
         Deferred.return
           (let module M = struct
              module T = Transaction_snark.Make (struct
                let constraint_constants = constraint_constants
-
-               let proof_level = proof_level
              end)
 
              module B = Blockchain_snark_state.Make (struct
                let tag = T.tag
 
                let constraint_constants = constraint_constants
-
-               let proof_level = proof_level
              end)
 
              let verify_commands
@@ -237,15 +231,11 @@ module Worker_state = struct
                lazy
                  (let module T = Transaction_snark.Make (struct
                     let constraint_constants = constraint_constants
-
-                    let proof_level = proof_level
                   end) in
                  let module B = Blockchain_snark_state.Make (struct
                    let tag = T.tag
 
                    let constraint_constants = constraint_constants
-
-                   let proof_level = proof_level
                  end) in
                  Lazy.force B.Proof.verification_key )
 
@@ -389,7 +379,6 @@ module Worker = struct
             ; enable_internal_tracing
             ; internal_trace_filename
             ; logger
-            ; proof_level
             ; constraint_constants
             ; commit_id
             } =
@@ -423,7 +412,6 @@ module Worker = struct
           ; enable_internal_tracing
           ; internal_trace_filename
           ; logger
-          ; proof_level
           ; constraint_constants
           ; commit_id
           }
@@ -445,8 +433,7 @@ type t = { worker : worker Ivar.t ref; logger : Logger.Stable.Latest.t }
 
 (* TODO: investigate why conf_dir wasn't being used *)
 let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
-    ~proof_level ~constraint_constants ~pids ~conf_dir ~commit_id () :
-    t Deferred.t =
+    ~constraint_constants ~pids ~conf_dir ~commit_id () : t Deferred.t =
   let on_failure err =
     [%log error] "Verifier process failed with error $err"
       ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
@@ -482,7 +469,6 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
             ; enable_internal_tracing
             ; internal_trace_filename
             ; logger
-            ; proof_level
             ; constraint_constants
             ; commit_id
             } )

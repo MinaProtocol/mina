@@ -64,7 +64,6 @@ module type S = sig
        logger:Logger.t
     -> ?enable_internal_tracing:bool
     -> ?internal_trace_filename:string
-    -> proof_level:Genesis_constants.Proof_level.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> pids:Child_processes.Termination.t
     -> conf_dir:string option

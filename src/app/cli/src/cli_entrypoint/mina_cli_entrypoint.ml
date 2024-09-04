@@ -1693,7 +1693,6 @@ let internal_commands logger =
              Genesis_constants.Constraint_constants.make
                network_constants.constraint_constants
            in
-           let proof_level = constraint_constants.proof_level in
            Parallel.init_master () ;
            match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
            | `Ok sexp ->
@@ -1701,8 +1700,8 @@ let internal_commands logger =
                [%log info] "Prover state being logged to %s" conf_dir ;
                let%bind prover =
                  Prover.create ~commit_id:Mina_version.commit_id ~logger
-                   ~proof_level ~constraint_constants
-                   ~pids:(Pid.Table.create ()) ~conf_dir ()
+                   ~constraint_constants ~pids:(Pid.Table.create ()) ~conf_dir
+                   ()
                in
                Prover.prove_from_input_sexp prover sexp >>| ignore
            | `Eof ->
@@ -1722,7 +1721,6 @@ let internal_commands logger =
             Genesis_constants.Constraint_constants.make
               network_constants.constraint_constants
           in
-          let proof_level = constraint_constants.proof_level in
           Parallel.init_master () ;
           match%bind
             Reader.with_file filename ~f:(fun reader ->
@@ -1731,7 +1729,7 @@ let internal_commands logger =
           with
           | `Ok sexp -> (
               let%bind worker_state =
-                Snark_worker.Prod.Inputs.Worker_state.create ~proof_level
+                Snark_worker.Prod.Inputs.Worker_state.create
                   ~constraint_constants ()
               in
               let sok_message =
@@ -1774,7 +1772,6 @@ let internal_commands logger =
             Genesis_constants.Constraint_constants.make
               network_constants.constraint_constants
           in
-          let proof_level = constraint_constants.proof_level in
           Parallel.init_master () ;
           let%bind conf_dir = Unix.mkdtemp "/tmp/mina-verifier" in
           let mode =
@@ -1851,7 +1848,7 @@ let internal_commands logger =
           in
           let%bind verifier =
             Verifier.create ~commit_id:Mina_version.commit_id ~logger
-              ~proof_level ~constraint_constants ~pids:(Pid.Table.create ())
+              ~constraint_constants ~pids:(Pid.Table.create ())
               ~conf_dir:(Some conf_dir) ()
           in
           let%bind result =
@@ -1948,7 +1945,6 @@ let internal_commands logger =
             *)
             Prover.create ~commit_id:Mina_version.commit_id ~logger ~pids
               ~conf_dir
-              ~proof_level:precomputed_values.constraint_constants.proof_level
               ~constraint_constants:precomputed_values.constraint_constants ()
           in
           match%bind
