@@ -151,7 +151,7 @@ let validate_transaction =
           exit 0 )
 
 module Vrf = struct
-  let generate_witness ~constraint_constants =
+  let generate_witness =
     Command.async
       ~summary:
         "Generate a vrf evaluation witness. This may be used to calculate \
@@ -189,6 +189,9 @@ module Vrf = struct
       Exceptions.handle_nicely
       @@ fun () ->
       let env = Secrets.Keypair.env in
+      let constraint_constants =
+        Genesis_constants.Compiled.constraint_constants
+      in
       if Option.is_some (Sys.getenv env) then
         eprintf "Using password from environment variable %s\n" env ;
       let open Deferred.Let_syntax in
@@ -242,7 +245,7 @@ module Vrf = struct
       in
       exit 0)
 
-  let batch_generate_witness ~constraint_constants =
+  let batch_generate_witness =
     Command.async
       ~summary:
         "Generate a batch of vrf evaluation witnesses from {\"globalSlot\": _, \
@@ -252,6 +255,9 @@ module Vrf = struct
       let%map_open privkey_path = Flag.privkey_read_path in
       Exceptions.handle_nicely
       @@ fun () ->
+      let constraint_constants =
+        Genesis_constants.Compiled.constraint_constants
+      in
       let env = Secrets.Keypair.env in
       if Option.is_some (Sys.getenv env) then
         eprintf "Using password from environment variable %s\n" env ;
@@ -300,7 +306,7 @@ module Vrf = struct
       in
       exit 0)
 
-  let batch_check_witness ~constraint_constants =
+  let batch_check_witness =
     Command.async
       ~summary:
         "Check a batch of vrf evaluation witnesses read on stdin. Outputs the \
@@ -314,6 +320,9 @@ module Vrf = struct
       ( Command.Param.return @@ Exceptions.handle_nicely
       @@ fun () ->
       let open Deferred.Let_syntax in
+      let constraint_constants =
+        Genesis_constants.Compiled.constraint_constants
+      in
       (* TODO-someday: constraint constants from config file. *)
       let lexbuf = Lexing.from_channel In_channel.stdin in
       let lexer = Yojson.init_lexer () in
@@ -347,10 +356,10 @@ module Vrf = struct
       in
       exit 0 )
 
-  let command_group ~constraint_constants =
+  let command_group =
     Command.group ~summary:"Commands for vrf evaluations"
-      [ ("generate-witness", generate_witness ~constraint_constants)
-      ; ("batch-generate-witness", batch_generate_witness ~constraint_constants)
-      ; ("batch-check-witness", batch_check_witness ~constraint_constants)
+      [ ("generate-witness", generate_witness)
+      ; ("batch-generate-witness", batch_generate_witness)
+      ; ("batch-check-witness", batch_check_witness)
       ]
 end

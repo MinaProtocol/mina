@@ -267,6 +267,11 @@ let main inputs =
    *   Exec.execute ~logger ~engine_cli_inputs ~images (module Test (Engine))
    *)
   let logger = Logger.create () in
+  let constants : Test_config.constants =
+    { genesis_constants = Genesis_constants.Compiled.genesis_constants
+    ; constraint_constants = Genesis_constants.Compiled.constraint_constants
+    }
+  in
   let images =
     { Test_config.Container_images.mina = inputs.mina_image
     ; archive_node =
@@ -276,11 +281,11 @@ let main inputs =
     ; points = "codaprotocol/coda-points-hack:32b.4"
     }
   in
-  let%bind () = validate_inputs ~logger inputs T.config in
+  let%bind () = validate_inputs ~logger inputs (T.config ~constants) in
   [%log trace] "expanding network config" ;
   let network_config =
     Engine.Network_config.expand ~logger ~test_name ~cli_inputs
-      ~debug:inputs.debug ~test_config:T.config ~images
+      ~debug:inputs.debug ~constants ~images
   in
   (* resources which require additional cleanup at end of test *)
   let net_manager_ref : Engine.Network_manager.t option ref = ref None in

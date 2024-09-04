@@ -50,7 +50,6 @@
    data_hash_lib
    staged_ledger
    genesis_constants
-   genesis_constants.compiled
    pipe_lib
    sgn
    transaction_snark_work

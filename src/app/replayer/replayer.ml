@@ -54,10 +54,6 @@ end
 
 let error_count = ref 0
 
-let constraint_constants = Genesis_constants_compiled.Constraint_constants.t
-
-let proof_level = Genesis_constants.Proof_level.Full
-
 let json_ledger_hash_of_ledger ledger =
   Ledger_hash.to_yojson @@ Ledger.merkle_root ledger
 
@@ -632,9 +628,10 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
         [ ("max_canonical_slot", `String (Int64.to_string max_canonical_slot)) ] ;
     Deferred.unit )
 
-let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
-    ~checkpoint_interval ~checkpoint_output_folder_opt ~checkpoint_file_prefix
-    ~genesis_dir_opt ~log_json ~log_level () =
+let main ~constraint_constants ~proof_level ~input_file ~output_file_opt
+    ~archive_uri ~continue_on_error ~checkpoint_interval
+    ~checkpoint_output_folder_opt ~checkpoint_file_prefix ~genesis_dir_opt
+    ~log_json ~log_level () =
   Cli_lib.Stdout_log.setup log_json log_level ;
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
@@ -1681,6 +1678,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                 exit 1 ) ) )
 
 let () =
+  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let proof_level = Genesis_constants.Proof_level.Full in
   Command.(
     run
       (let open Let_syntax in
@@ -1720,6 +1719,7 @@ let () =
              Param.(optional_with_default "replayer" string)
          and log_json = Cli_lib.Flag.Log.json
          and log_level = Cli_lib.Flag.Log.level in
-         main ~input_file ~output_file_opt ~archive_uri ~checkpoint_interval
-           ~continue_on_error ~checkpoint_output_folder_opt
-           ~checkpoint_file_prefix ~genesis_dir_opt ~log_json ~log_level )))
+         main ~constraint_constants ~proof_level ~input_file ~output_file_opt
+           ~archive_uri ~checkpoint_interval ~continue_on_error
+           ~checkpoint_output_folder_opt ~checkpoint_file_prefix
+           ~genesis_dir_opt ~log_json ~log_level )))
