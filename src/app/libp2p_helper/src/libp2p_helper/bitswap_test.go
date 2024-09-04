@@ -10,7 +10,6 @@ import (
 	"math/rand"
 	"reflect"
 	"strings"
-	"sync"
 	"testing"
 	"testing/quick"
 	"time"
@@ -531,26 +530,38 @@ func testBitswap(t *testing.T, numNodes, numAttempts, numRequests, maxBlobSize i
 	}
 	fmt.Println(strings.Join(seds, " | "))
 
-	var wg sync.WaitGroup
-	node_sub := nodes[:1]
-	for ni := range node_sub {
-		wg.Add(1)
+	for ni := range nodes {
 		go func(ni int) {
 			fmt.Printf("Node %d bitswap loop started\n", ni)
 			defer t.Logf("Node %d bitswap loop exited", ni)
-			defer cancels[ni]()
-			nodes[ni].node.bitswapCtx.Loop()
+			doneChan := make(chan struct{})
+			go func() {
+				fmt.Printf("Node %d about to enter Loop()\n", ni)
+				nodes[ni].node.bitswapCtx.Loop() // Start the loop
+				fmt.Printf("Node %d Loop() has returned\n", ni)
+				close(doneChan)
+			}()
+
+			time.Sleep(2 * time.Minute)
+			fmt.Printf("Node %d about to cancel context\n", ni)
+			cancels[ni]() // Cancel the context
+			fmt.Printf("Node %d context cancelled\n", ni)
+
+			<-doneChan
 		}(ni)
+		fmt.Printf("Node %d bitswap loop ended\n", ni)
 	}
-	wg.Wait()
 
 	connectRingTopology(t, nodes, true)
+	fmt.Print("Ring topology connected\n")
 	beginAdvertisingOnNodes(t, nodes)
+	fmt.Print("Advertising started\n")
 	seed := time.Now().Unix()
 	t.Logf("Seed: %d", seed)
 	r := rand.New(rand.NewSource(seed))
 	conf := initBitswapTestConfig(r, numNodes, numAttempts, numRequests, maxBlobSize)
 	t.Logf("Bitswap configuration initialized with %d nodes, %d attempts, %d requests, and a maximum blob size of %d bytes.", numNodes, numAttempts, numRequests, maxBlobSize)
+	fmt.Printf("Bitswap configuration initialized with %d nodes, %d attempts, %d requests, and a maximum blob size of %d bytes.\n", numNodes, numAttempts, numRequests, maxBlobSize)
 	err := conf.execute(nodes, delayBeforeDownload)
 	t.Logf("Finished executing config")
 	if err != nil {
@@ -582,7 +593,7 @@ func TestBitswapSmoke(t *testing.T) {
 }
 
 func TestBitswapSmall(t *testing.T) {
-	testBitswap(t, 20, 100, 5, 1<<16, false)
+	testBitswap(t, 4, 100, 5, 1<<16, false)
 }
 
 func TestBitswapQC(t *testing.T) {

@@ -223,8 +223,10 @@ func (bs *BitswapCtx) Loop() {
 			if err == nil {
 				bs.SendResourceUpdate(ipc.ResourceUpdateType_added, cmd.tag, root)
 				bitswapLogger.Infof("Announced new root block with cid %s.", codanet.BlockHashToCidSuffix(root))
+				fmt.Printf("Announced new root block with cid %s.", codanet.BlockHashToCidSuffix(root))
 			} else {
 				bitswapLogger.Errorf("Failed to announce root cid %s: %s", codanet.BlockHashToCidSuffix(root), err)
+				fmt.Printf("Failed to announce root cid %s: %s", codanet.BlockHashToCidSuffix(root), err)
 			}
 		case cmd := <-bs.deleteCmds:
 			bitswapLogger.Info("Received delete command.")
@@ -261,6 +263,10 @@ func (bs *BitswapCtx) Loop() {
 			fmt.Print("Received block to process.")
 			configuredCheck()
 			processDownloadedBlock(block, bs)
+		default:
+			bitswapLogger.Info("Waiting for a new event.")
+			fmt.Print("Waiting for a new event.\n")
+			time.Sleep(3 * time.Second) // Sleep briefly to avoid busy-waiting
 		}
 	}
 }
