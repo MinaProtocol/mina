@@ -19,6 +19,7 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 let dependsOn =
       DebianVersions.dependsOn
         DebianVersions.DebVersion.Bullseye
+        Network.Type.Devnet
         Profiles.Type.Standard
 
 in  Pipeline.build
