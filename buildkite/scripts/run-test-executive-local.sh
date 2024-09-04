@@ -26,8 +26,8 @@ cleanup
 
 TEST_NAME="$1"
 
-MINA_IMAGE="gcr.io/o1labs-192920/mina-daemon:3.0.0-develop-541f49f-focal-devnet"
-ARCHIVE_IMAGE="gcr.io/o1labs-192920/mina-archive:3.0.0-develop-541f49f-focal"
+MINA_IMAGE="gcr.io/o1labs-192920/mina-daemon:$MINA_DOCKER_TAG-devnet"
+ARCHIVE_IMAGE="gcr.io/o1labs-192920/mina-archive:$MINA_DOCKER_TAG"
 
 if [[ "${TEST_NAME:0:15}" == "block-prod-prio" ]] && [[ "$RUN_OPT_TESTS" == "" ]]; then
   echo "Skipping $TEST_NAME"
