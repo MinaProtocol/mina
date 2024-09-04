@@ -277,6 +277,22 @@
         "type": "github"
       }
     },
+    "o1-opam-repository": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1715294616,
+        "narHash": "sha256-W2p9Vs8PqpKGvMByxVqpxAljjpEMqNcuNnjMBAAKicI=",
+        "owner": "o1-labs",
+        "repo": "opam-repository",
+        "rev": "38d6995e307c82b3c0b3bc86a867213db724d1c5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "o1-labs",
+        "repo": "opam-repository",
+        "type": "github"
+      }
+    },
     "opam-nix": {
       "inputs": {
         "flake-compat": "flake-compat_2",
@@ -370,6 +386,7 @@
         "nix-utils": "nix-utils",
         "nixpkgs": "nixpkgs_2",
         "nixpkgs-mozilla": "nixpkgs-mozilla",
+        "o1-opam-repository": "o1-opam-repository",
         "opam-nix": "opam-nix",
         "opam-repository": "opam-repository",
         "utils": "utils"

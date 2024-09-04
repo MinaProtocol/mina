@@ -1,7 +1,0 @@
-language: c
-install: wget https://raw.githubusercontent.com/ocaml/ocaml-travisci-skeleton/master/.travis-opam.sh
-script: bash -ex .travis-opam.sh
-env:
-  - PACKAGE="sodium" OCAML_VERSION=latest
-  - PACKAGE="sodium" OCAML_VERSION=4.02
-  - PACKAGE="sodium" OCAML_VERSION=4.01
