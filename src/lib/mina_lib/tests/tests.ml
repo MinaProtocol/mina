@@ -64,7 +64,7 @@ let%test_module "Epoch ledger sync tests" =
           Genesis_ledger_helper.init_from_config_file
             ~genesis_dir:(make_dirname "genesis_dir")
             ~constraint_constants ~genesis_constants ~logger ~proof_level:None
-            runtime_config
+            runtime_config ~cli_proof_level:None
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
