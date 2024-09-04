@@ -862,19 +862,6 @@ let hash_ledger =
                err ;
              ignore (exit 1 : 'a Deferred.t) )
 
-(**
-  let open Command.Let_syntax in
-  Command.async
-    ~summary:
-      "Print the Merkle root of the ledger contained in the specified file"
-    (let%map network_constants = Cli_lib.Flag.network_constants in
-     and plaintext = Cli_lib.Flag.plaintext in
-     fun () ->
-       let constraint_constants = Genesis_constants.Constraint_constants.make network_constants.constraint_constants
-         
-       in
-
-  *)
 let currency_in_ledger =
   let open Command.Let_syntax in
   Command.async
@@ -949,7 +936,6 @@ let constraint_system_digests =
            network_constants.constraint_constants
        in
        let proof_level = constraint_constants.proof_level in
-       (* TODO: Allow these to be configurable. *)
        let all =
          Transaction_snark.constraint_system_digests ~constraint_constants ()
          @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
@@ -1824,6 +1810,7 @@ let compile_time_constants =
           let home = Core.Sys.home_directory () in
           home ^/ Cli_lib.Default.conf_dir_name
         in
+        (*TODO Is this really what we want? This gets hair if you have an installed package but also build from source*)
         let config_file =
           match Sys.getenv "MINA_CONFIG_FILE" with
           | Some config_file ->

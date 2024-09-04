@@ -24,9 +24,8 @@ let convert accounts () =
 let () =
   let runtime_config = Sys.getenv_exn "RUNTIME_CONFIG" in
   let network_constants =
-    Option.value_map ~default:Runtime_config.Network_constants.dev
-      ~f:Runtime_config.Network_constants.of_string
-      (Sys.getenv "MINA_NETWORK")
+    Runtime_config.Network_constants.of_string
+    @@ Sys.getenv_exn "MINA_NETWORK_ID"
   in
   let cfg =
     load_daemon_cfg runtime_config ()

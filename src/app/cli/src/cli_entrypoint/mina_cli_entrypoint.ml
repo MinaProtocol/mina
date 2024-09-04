@@ -81,6 +81,9 @@ let load_config_files ~logger ~network_constants ~conf_dir ~genesis_dir
                 return None ) )
   in
   let config =
+    (*SUGGESTION: This can get pretty confusing when you start pulling in configuration on accident from some "default" sources you don't know about
+      What if instead we allow you to specify at most one file, and complain very loudly if that file doesn't exist.
+    *)
     let json_config : Runtime_config.Json_layout.t =
       List.fold ~init:Runtime_config.Json_layout.default config_jsons
         ~f:(fun config (config_file, config_json) ->

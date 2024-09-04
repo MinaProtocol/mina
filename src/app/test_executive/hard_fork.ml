@@ -89,10 +89,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let older_version = Mina_numbers.Txn_version.of_int 1
 
-  let fork_config : Runtime_config.Fork_config.t =
-    { state_hash = "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
-    ; blockchain_length = 300000
-    ; global_slot_since_genesis = 500000
+  let fork_config : Genesis_constants.Fork_constants.t =
+    { state_hash =
+        Mina_base.State_hash.of_base58_check_exn
+          "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
+    ; blockchain_length = Mina_numbers.Length.of_int 300000
+    ; global_slot_since_genesis =
+        Mina_numbers.Global_slot_since_genesis.of_int 500000
     }
 
   let config ~constants =
@@ -201,7 +204,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           }
     ; snark_worker_fee = "0.0002"
     ; num_archive_nodes = 1
-    ; proof_config = constants.constraint_constants
+    ; proof_config =
+        { constants.constraint_constants with
+          fork = Some fork_config
+        ; work_delay = 1
+        ; transaction_capacity_log_2 = 2
+        }
     }
 
   let run network t =
@@ -547,7 +555,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  (Mina_numbers.Global_slot_since_hard_fork.to_int
                     global_slot_since_hard_fork ) ;
                let bad_height =
-                 Unsigned.UInt32.to_int height <= fork_config.blockchain_length
+                 Unsigned.UInt32.to_int height
+                 <= Mina_numbers.Length.to_int fork_config.blockchain_length
                in
                (* for now, we accept the "link block" with a global slot since genesis equal to the previous global slot
                   see issue #13897
@@ -555,7 +564,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                let bad_slot =
                  Mina_numbers.Global_slot_since_genesis.to_int
                    global_slot_since_genesis
-                 < fork_config.global_slot_since_genesis
+                 < Mina_numbers.Global_slot_since_genesis.to_int
+                     fork_config.global_slot_since_genesis
                in
                if bad_height && bad_slot then
                  Malleable_error.hard_error
@@ -607,7 +617,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "running replayer"
       (let%bind logs =
          Network.Node.run_replayer
-           ~start_slot_since_genesis:fork_config.global_slot_since_genesis
+           ~start_slot_since_genesis:
+             (Mina_numbers.Global_slot_since_genesis.to_int
+                fork_config.global_slot_since_genesis )
            ~logger
            (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in

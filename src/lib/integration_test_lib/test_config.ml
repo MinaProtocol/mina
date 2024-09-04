@@ -100,6 +100,9 @@ let log_filter_of_event_type ev_existential =
 
 let default ~(constants : constants) =
   let { constraint_constants; genesis_constants } = constants in
+  let constraint_constants =
+    { constraint_constants with block_window_duration_ms = 120000 }
+  in
   { requires_graphql =
       true
       (* require_graphql maybe should just be phased out, because it always needs to be enable.  Now with the graphql polling engine, everything will definitely fail if graphql is not enabled.  But even before that, most tests relied on some sort of graphql interaction *)

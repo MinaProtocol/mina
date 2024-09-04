@@ -3,9 +3,7 @@ open Core_kernel
 
 let main () =
   let network_constants =
-    Option.value_map ~default:Runtime_config.Network_constants.dev
-      (Sys.getenv_opt "MINA_NETWORK")
-      ~f:Runtime_config.Network_constants.of_string
+    Runtime_config.Network_constants.of_string @@ Sys.getenv "MINA_NETWORK_ID"
   in
   let genesis_constants =
     Genesis_constants.make network_constants.genesis_constants

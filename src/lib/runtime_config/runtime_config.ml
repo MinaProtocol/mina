@@ -1,16 +1,5 @@
 open Core_kernel
 
-module Fork_config = struct
-  (* Note that length might be smaller than the gernesis_slot
-     or equal if a block was produced in every slot possible. *)
-  type t =
-    { state_hash : string
-    ; blockchain_length : int (* number of blocks produced since genesis *)
-    ; global_slot_since_genesis : int (* global slot since genesis *)
-    }
-  [@@deriving yojson, bin_io_unversioned]
-end
-
 let yojson_strip_fields ~keep_fields = function
   | `Assoc l ->
       `Assoc

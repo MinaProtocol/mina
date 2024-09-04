@@ -605,7 +605,13 @@ module Protocol_circuits = struct
   let proof_level = Genesis_constants.Proof_level.Full
 
   let constraint_constants =
-    Genesis_constants.For_unit_tests.Constraint_constants.t
+    let cs =
+      Genesis_constants.Constraint_constants.make
+      @@ ( Runtime_config.Network_constants.of_string
+         @@ Sys.getenv "MINA_NETWORK_ID" )
+           .constraint_constants
+    in
+    { cs with proof_level }
 
   let print_hash print expected digest : unit =
     if print then (

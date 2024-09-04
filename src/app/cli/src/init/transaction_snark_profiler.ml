@@ -175,11 +175,14 @@ let command =
      let genesis_constants =
        Genesis_constants.make network_constants.genesis_constants
      in
+     let proof_level = Genesis_constants.Proof_level.Full in
      let constraint_constants =
-       Genesis_constants.Constraint_constants.make
-         network_constants.constraint_constants
+       { (Genesis_constants.Constraint_constants.make
+            network_constants.constraint_constants )
+         with
+         proof_level
+       }
      in
-     let proof_level = constraint_constants.proof_level in
      if witness_only then
        witness ~genesis_constants ~constraint_constants ~proof_level
          ~max_num_updates ?min_num_updates num_transactions repeats preeval

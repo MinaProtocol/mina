@@ -52,7 +52,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           }
     ; snark_worker_fee = "0.0002"
     ; num_archive_nodes = 1
-    ; proof_config = constants.constraint_constants
+    ; proof_config =
+        { constants.constraint_constants with
+          work_delay = 1
+        ; transaction_capacity_log_2 = 2
+        }
     }
 
   let run network t =

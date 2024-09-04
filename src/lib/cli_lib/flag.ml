@@ -35,7 +35,7 @@ let conf_dir =
 
 let network_constants =
   let open Command.Param in
-  flag "--network"
+  flag "--network-id"
     ~doc:
       "mainnet|testnet|lightnet|dev Set the configuration base according to \
        the network"

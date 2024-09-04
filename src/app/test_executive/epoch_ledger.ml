@@ -15,10 +15,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let fork_config : Runtime_config.Fork_config.t =
-    { state_hash = "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
-    ; blockchain_length = 300000
-    ; global_slot_since_genesis = 500000
+  let fork_config : Genesis_constants.Fork_constants.t =
+    { state_hash =
+        Mina_base.State_hash.of_base58_check_exn
+          "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
+    ; blockchain_length = Mina_numbers.Length.of_int 300000
+    ; global_slot_since_genesis =
+        Mina_numbers.Global_slot_since_genesis.of_int 500000
     }
 
   let config ~constants =
@@ -57,7 +60,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
         ]
-    ; proof_config = constants.constraint_constants
+    ; proof_config =
+        { constants.constraint_constants with fork = Some fork_config }
     }
 
   let run network t =

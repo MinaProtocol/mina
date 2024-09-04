@@ -40,7 +40,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; worker_nodes = 5
           }
     ; snark_worker_fee = "0.0001"
-    ; proof_config = constants.constraint_constants
+    ; proof_config =
+        { constants.constraint_constants with
+          work_delay = 1
+        ; transaction_capacity_log_2 = 3
+        }
     }
 
   let transactions_sent = ref 0

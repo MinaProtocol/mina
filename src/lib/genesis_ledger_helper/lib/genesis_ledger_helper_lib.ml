@@ -414,11 +414,6 @@ module Accounts = struct
       with Stop -> accounts
 end
 
-let runtime_config_of_constraint_constants
-    (constraint_constants : Genesis_constants.Constraint_constants.t) :
-    Runtime_config.Proof_keys.t =
-  constraint_constants
-
 let%test_module "Runtime config" =
   ( module struct
     [@@@warning "-32"]
