@@ -21,7 +21,6 @@ let Tag
       | Debian
       | Hardfork
       | Promote
-      | IntegrationTest
       >
 
 let toNatural
