@@ -1,6 +1,7 @@
 open Async
 open Core
 open Mina_base
+open Mina_ledger
 open Network_pool
 open Pipe_lib
 open Network_peer
@@ -14,9 +15,34 @@ type Structured_log_events.t +=
   | Gossip_snark_pool_diff of { work : Snark_pool.Resource_pool.Diff.compact }
   [@@deriving register_event]
 
-val refused_answer_query_string : string
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val trust_system : Trust_system.t
+
+  val time_controller : Block_time.Controller.t
+
+  val consensus_local_state : Consensus.Data.Local_state.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
+module Node_status = Node_status
+module Sinks = Sinks
+
+module Gossip_net : Gossip_net.S with module Rpc_interface := Rpcs
 
 module Rpcs : sig
+  module Get_some_initial_peers : sig
+    type query = unit
+
+    type response = Peer.t list
+  end
+
   module Get_staged_ledger_aux_and_pending_coinbases_at_hash : sig
     type query = State_hash.t
 
@@ -29,9 +55,10 @@ module Rpcs : sig
   end
 
   module Answer_sync_ledger_query : sig
-    type query = Ledger_hash.t * Mina_ledger.Sync_ledger.Query.t
+    type query = Ledger_hash.t * Sync_ledger.Query.t
 
-    type response = Mina_ledger.Sync_ledger.Answer.t Core.Or_error.t
+    type response =
+      (Sync_ledger.Answer.t, Bounded_types.Wrapped_error.Stable.V1.t) Result.t
   end
 
   module Get_transition_chain : sig
@@ -40,16 +67,16 @@ module Rpcs : sig
     type response = Mina_block.t list option
   end
 
-  module Get_transition_knowledge : sig
-    type query = unit
-
-    type response = State_hash.t list
-  end
-
   module Get_transition_chain_proof : sig
     type query = State_hash.t
 
     type response = (State_hash.t * State_body_hash.t list) option
+  end
+
+  module Get_transition_knowledge : sig
+    type query = unit
+
+    type response = State_hash.t list
   end
 
   module Get_ancestry : sig
@@ -64,13 +91,14 @@ module Rpcs : sig
   end
 
   module Ban_notify : sig
+    (* banned until this time *)
     type query = Core.Time.t
 
     type response = unit
   end
 
   module Get_best_tip : sig
-    type query = unit [@@deriving sexp, to_yojson]
+    type query = unit
 
     type response =
       ( Mina_block.t
@@ -79,45 +107,7 @@ module Rpcs : sig
       option
   end
 
-  module Get_node_status : sig
-    module Node_status : sig
-      [%%versioned:
-      module Stable : sig
-        module V2 : sig
-          type t =
-            { node_ip_addr : Network_peer.Peer.Inet_addr.Stable.V1.t
-            ; node_peer_id : Peer.Id.Stable.V1.t
-            ; sync_status : Sync_status.Stable.V1.t
-            ; peers : Network_peer.Peer.Stable.V1.t list
-            ; block_producers :
-                Signature_lib.Public_key.Compressed.Stable.V1.t list
-            ; protocol_state_hash : State_hash.Stable.V1.t
-            ; ban_statuses :
-                ( Network_peer.Peer.Stable.V1.t
-                * Trust_system.Peer_status.Stable.V1.t )
-                list
-            ; k_block_hashes_and_timestamps :
-                (State_hash.Stable.V1.t * string) list
-            ; git_commit : string
-            ; uptime_minutes : int
-            ; block_height_opt : int option
-            }
-        end
-      end]
-    end
-
-    type query = unit [@@deriving sexp, to_yojson]
-
-    type response = Node_status.t Or_error.t [@@deriving to_yojson]
-  end
-
-  module Get_some_initial_peers : sig
-    type query = unit [@@deriving sexp, to_yojson]
-
-    type response = Network_peer.Peer.t list [@@deriving to_yojson]
-  end
-
-  type ('query, 'response) rpc =
+  type ('query, 'response) rpc = ('query, 'response) Rpcs.rpc =
     | Get_some_initial_peers
         : (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
     | Get_staged_ledger_aux_and_pending_coinbases_at_hash
@@ -138,17 +128,10 @@ module Rpcs : sig
         : ( Get_transition_chain_proof.query
           , Get_transition_chain_proof.response )
           rpc
-    | Get_node_status : (Get_node_status.query, Get_node_status.response) rpc
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
-
-  include Rpc_intf.Rpc_interface_intf with type ('q, 'r) rpc := ('q, 'r) rpc
 end
-
-module Sinks : module type of Sinks
-
-module Gossip_net : Gossip_net.S with module Rpc_intf := Rpcs
 
 module Config : sig
   type log_gossip_heard =
@@ -156,14 +139,7 @@ module Config : sig
   [@@deriving make]
 
   type t =
-    { logger : Logger.t
-    ; trust_system : Trust_system.t
-    ; time_controller : Block_time.Controller.t
-    ; consensus_constants : Consensus.Constants.t
-    ; consensus_local_state : Consensus.Data.Local_state.t
-    ; genesis_ledger_hash : Ledger_hash.t
-    ; constraint_constants : Genesis_constants.Constraint_constants.t
-    ; precomputed_values : Precomputed_values.t
+    { genesis_ledger_hash : Ledger_hash.t
     ; creatable_gossip_net : Gossip_net.Any.creatable
     ; is_seed : bool
     ; log_gossip_heard : log_gossip_heard
@@ -181,9 +157,12 @@ val bandwidth_info :
      Deferred.Or_error.t
 
 val get_peer_node_status :
+  t -> Network_peer.Peer.t -> Node_status.t Deferred.Or_error.t
+
+val get_node_status_from_peers :
      t
-  -> Network_peer.Peer.t
-  -> Rpcs.Get_node_status.Node_status.t Deferred.Or_error.t
+  -> Mina_net2.Multiaddr.t list option
+  -> Node_status.t Or_error.t list Deferred.t
 
 val add_peer :
   t -> Network_peer.Peer.t -> is_seed:bool -> unit Deferred.Or_error.t
@@ -264,7 +243,7 @@ val query_peer :
   -> Network_peer.Peer.Id.t
   -> ('q, 'r) Rpcs.rpc
   -> 'q
-  -> 'r Network_peer.Rpc_intf.rpc_response Deferred.t
+  -> 'r Gossip_net.rpc_response Deferred.t
 
 val restart_helper : t -> unit
 
@@ -282,35 +261,9 @@ val ban_notification_reader :
   t -> Gossip_net.ban_notification Linear_pipe.Reader.t
 
 val create :
-     Config.t
+     (module CONTEXT)
+  -> Config.t
   -> sinks:Sinks.t
-  -> get_some_initial_peers:
-       (   Rpcs.Get_some_initial_peers.query Envelope.Incoming.t
-        -> Rpcs.Get_some_initial_peers.response Deferred.t )
-  -> get_staged_ledger_aux_and_pending_coinbases_at_hash:
-       (   Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
-           Envelope.Incoming.t
-        -> Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.response
-           Deferred.t )
-  -> answer_sync_ledger_query:
-       (   Rpcs.Answer_sync_ledger_query.query Envelope.Incoming.t
-        -> Rpcs.Answer_sync_ledger_query.response Deferred.t )
-  -> get_ancestry:
-       (   Rpcs.Get_ancestry.query Envelope.Incoming.t
-        -> Rpcs.Get_ancestry.response Deferred.t )
-  -> get_best_tip:
-       (   Rpcs.Get_best_tip.query Envelope.Incoming.t
-        -> Rpcs.Get_best_tip.response Deferred.t )
-  -> get_node_status:
-       (   Rpcs.Get_node_status.query Envelope.Incoming.t
-        -> Rpcs.Get_node_status.response Deferred.t )
-  -> get_transition_chain_proof:
-       (   Rpcs.Get_transition_chain_proof.query Envelope.Incoming.t
-        -> Rpcs.Get_transition_chain_proof.response Deferred.t )
-  -> get_transition_chain:
-       (   Rpcs.Get_transition_chain.query Envelope.Incoming.t
-        -> Rpcs.Get_transition_chain.response Deferred.t )
-  -> get_transition_knowledge:
-       (   Rpcs.Get_transition_knowledge.query Envelope.Incoming.t
-        -> Rpcs.Get_transition_knowledge.response Deferred.t )
+  -> get_transition_frontier:(unit -> Transition_frontier.t option)
+  -> get_node_status:(unit -> Node_status.t Deferred.Or_error.t)
   -> t Deferred.t

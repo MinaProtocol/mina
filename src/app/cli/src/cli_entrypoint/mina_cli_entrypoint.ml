@@ -1290,20 +1290,13 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               }
           in
           let net_config =
-            { Mina_networking.Config.logger
-            ; trust_system
-            ; time_controller
-            ; consensus_constants = precomputed_values.consensus_constants
-            ; consensus_local_state
-            ; genesis_ledger_hash
-            ; constraint_constants = precomputed_values.constraint_constants
+            { Mina_networking.Config.genesis_ledger_hash
             ; log_gossip_heard
             ; is_seed
             ; creatable_gossip_net =
                 Mina_networking.Gossip_net.(
                   Any.Creatable
                     ((module Libp2p), Libp2p.create ~pids gossip_net_params))
-            ; precomputed_values
             }
           in
           let coinbase_receiver : Consensus.Coinbase_receiver.t =

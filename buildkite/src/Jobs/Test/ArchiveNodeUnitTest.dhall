@@ -50,6 +50,7 @@ in  Pipeline.build
                   [ "POSTGRES_PASSWORD=${password}"
                   , "POSTGRES_USER=${user}"
                   , "POSTGRES_DB=${db}"
+                  , "MINA_TEST_POSTGRES=postgres://${user}:${password}@localhost:5434/${db}"
                   , "GO=/usr/lib/go/bin/go"
                   , "DUNE_INSTRUMENT_WITH=bisect_ppx"
                   , "COVERALLS_TOKEN"
@@ -57,7 +58,6 @@ in  Pipeline.build
                   ( Prelude.Text.concatSep
                       " && "
                       [ "bash buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db}"
-                      , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql"
                       , WithCargo.withCargo
                           "eval \\\$(opam config env) && dune runtest src/app/archive && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
                       ]

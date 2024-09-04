@@ -7,7 +7,6 @@ open Mina_block
 open Pipe_lib
 open Strict_pipe
 open Signature_lib
-open Network_peer
 module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
@@ -1220,6 +1219,12 @@ let online_broadcaster ~constraint_constants time_controller =
 module type CONTEXT = sig
   val logger : Logger.t
 
+  val time_controller : Block_time.Controller.t
+
+  val trust_system : Trust_system.t
+
+  val consensus_local_state : Consensus.Data.Local_state.t
+
   val precomputed_values : Precomputed_values.t
 
   val constraint_constants : Genesis_constants.Constraint_constants.t
@@ -1232,6 +1237,12 @@ end
 let context ~commit_id (config : Config.t) : (module CONTEXT) =
   ( module struct
     let logger = config.logger
+
+    let time_controller = config.time_controller
+
+    let trust_system = config.trust_system
+
+    let consensus_local_state = config.consensus_local_state
 
     let precomputed_values = config.precomputed_values
 
@@ -1302,12 +1313,13 @@ let start t =
     t.block_production_status := block_production_status ;
     t.next_producer_timing <- Some next_producer_timing
   in
-  if
+  ( if
     not
       (Keypair.And_compressed_pk.Set.is_empty t.config.block_production_keypairs)
   then
+    let module Context = (val context ~commit_id:t.commit_id t.config) in
     Block_producer.run
-      ~context:(context ~commit_id:t.commit_id t.config)
+      ~context:(module Context)
       ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
       ~set_next_producer_timing ~prover:t.processes.prover
       ~trust_system:t.config.trust_system
@@ -1326,7 +1338,7 @@ let start t =
       ~block_produced_bvar:t.components.block_produced_bvar
       ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net
       ~zkapp_cmd_limit_hardcap:
-        t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap ;
+        t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap ) ;
   perform_compaction t ;
   let () =
     match t.config.node_status_url with
@@ -1380,9 +1392,10 @@ let start t =
   Snark_worker.start t
 
 let start_with_precomputed_blocks t blocks =
+  let module Context = (val context ~commit_id:t.commit_id t.config) in
   let%bind () =
     Block_producer.run_precomputed
-      ~context:(context ~commit_id:t.commit_id t.config)
+      ~context:(module Context)
       ~verifier:t.processes.verifier ~trust_system:t.config.trust_system
       ~time_controller:t.config.time_controller
       ~frontier_reader:t.components.transition_frontier
@@ -1395,8 +1408,8 @@ let send_resource_pool_diff_or_wait ~rl ~diff_score ~max_per_15_seconds diff =
   (* HACK: Pretend we're a remote peer so that we can rate limit
                  ourselves.
   *)
-  let us =
-    { Network_peer.Peer.host = Unix.Inet_addr.of_string "127.0.0.1"
+  let us : Network_peer.Peer.t =
+    { host = Unix.Inet_addr.of_string "127.0.0.1"
     ; libp2p_port = 0
     ; peer_id = ""
     }
@@ -1638,15 +1651,6 @@ let create ~commit_id ?wallets (config : Config.t) =
                   Deferred.unit
               | Some frontier ->
                   Transition_frontier.close ~loc:__LOC__ frontier ) ;
-          let handle_request name ~f query_env =
-            O1trace.thread ("handle_request_" ^ name) (fun () ->
-                let input = Envelope.Incoming.data query_env in
-                Deferred.return
-                @@
-                let open Option.Let_syntax in
-                let%bind frontier = get_current_frontier () in
-                f ~frontier input )
-          in
           (* knot-tying hacks so we can pass a get_node_status function before net, Mina_lib.t created *)
           let net_ref = ref None in
           let sync_status_ref = ref None in
@@ -1765,7 +1769,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                               @@ Consensus.Data.Consensus_state
                                  .blockchain_length consensus_state )
                       in
-                      Mina_networking.Rpcs.Get_node_status.Node_status.
+                      Mina_networking.Node_status.Stable.V2.
                         { node_ip_addr
                         ; node_peer_id
                         ; sync_status
@@ -1778,17 +1782,6 @@ let create ~commit_id ?wallets (config : Config.t) =
                         ; uptime_minutes
                         ; block_height_opt
                         } )
-          in
-          let get_some_initial_peers _ =
-            O1trace.thread "handle_request_get_some_initial_peers" (fun () ->
-                match !net_ref with
-                | None ->
-                    (* should be unreachable; without a network, we wouldn't receive this RPC call *)
-                    [%log' error config.logger]
-                      "Network not instantiated when initial peers requested" ;
-                    Deferred.return []
-                | Some net ->
-                    Mina_networking.peers net )
           in
           let slot_tx_end =
             Runtime_config.slot_tx_end
@@ -1805,7 +1798,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =
             online_broadcaster
-              ~constraint_constants:config.net_config.constraint_constants
+              ~constraint_constants:Context.constraint_constants
               config.time_controller
           in
           let on_first_received_message ~f =
@@ -1850,7 +1843,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                   config.precomputed_values.consensus_constants.slot_duration_ms
               ; on_push = notify_online
               ; log_gossip_heard = config.net_config.log_gossip_heard.new_state
-              ; time_controller = config.net_config.time_controller
+              ; time_controller = Context.time_controller
               ; consensus_constants
               ; genesis_constants = config.precomputed_values.genesis_constants
               ; constraint_constants
@@ -1859,105 +1852,12 @@ let create ~commit_id ?wallets (config : Config.t) =
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
           let%bind net =
             O1trace.thread "mina_networking" (fun () ->
-                Mina_networking.create config.net_config ~get_some_initial_peers
-                  ~sinks
-                  ~get_staged_ledger_aux_and_pending_coinbases_at_hash:(fun query_env
-                                                                            ->
-                    O1trace.thread
-                      "handle_request_get_staged_ledger_aux_and_pending_coinbases_at_hash"
-                      (fun () ->
-                        let input = Envelope.Incoming.data query_env in
-                        Deferred.return
-                        @@
-                        let open Option.Let_syntax in
-                        let%bind frontier = get_current_frontier () in
-                        let%map ( scan_state
-                                , expected_merkle_root
-                                , pending_coinbases
-                                , protocol_states ) =
-                          Sync_handler
-                          .get_staged_ledger_aux_and_pending_coinbases_at_hash
-                            ~frontier input
-                        in
-                        let staged_ledger_hash =
-                          Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-                            (Staged_ledger.Scan_state.hash scan_state)
-                            expected_merkle_root pending_coinbases
-                        in
-                        [%log' debug config.logger]
-                          ~metadata:
-                            [ ( "staged_ledger_hash"
-                              , Staged_ledger_hash.to_yojson staged_ledger_hash
-                              )
-                            ]
-                          "sending scan state and pending coinbase" ;
-                        ( scan_state
-                        , expected_merkle_root
-                        , pending_coinbases
-                        , protocol_states ) ) )
-                  ~answer_sync_ledger_query:(fun query_env ->
-                    let open Deferred.Or_error.Let_syntax in
-                    O1trace.thread "handle_request_answer_sync_ledger_query"
-                      (fun () ->
-                        let ledger_hash, _ = Envelope.Incoming.data query_env in
-                        let%bind frontier =
-                          Deferred.return
-                          @@ peek_frontier frontier_broadcast_pipe_r
-                        in
-                        Sync_handler.answer_query ~frontier ledger_hash
-                          (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
-                          ~logger:config.logger
-                          ~trust_system:config.trust_system
-                        |> Deferred.map
-                           (* begin error string prefix so we can pattern-match *)
-                             ~f:
-                               (Result.of_option
-                                  ~error:
-                                    (Error.createf
-                                       !"%s for ledger_hash: \
-                                         %{sexp:Ledger_hash.t}"
-                                       Mina_networking
-                                       .refused_answer_query_string ledger_hash ) ) )
-                    )
-                  ~get_ancestry:
-                    (handle_request "get_ancestry" ~f:(fun ~frontier s ->
-                         s
-                         |> With_hash.map_hash ~f:(fun state_hash ->
-                                { State_hash.State_hashes.state_hash
-                                ; state_body_hash = None
-                                } )
-                         |> Sync_handler.Root.prove
-                              ~context:(module Context)
-                              ~frontier ) )
-                  ~get_best_tip:
-                    (handle_request "get_best_tip" ~f:(fun ~frontier () ->
-                         let open Option.Let_syntax in
-                         let open Proof_carrying_data in
-                         let%map proof_with_data =
-                           Best_tip_prover.prove
-                             ~context:(module Context)
-                             frontier
-                         in
-                         { proof_with_data with
-                           data = With_hash.data proof_with_data.data
-                         } ) )
-                  ~get_node_status
-                  ~get_transition_chain_proof:
-                    (handle_request "get_transition_chain_proof"
-                       ~f:(fun ~frontier hash ->
-                         Transition_chain_prover.prove ~frontier hash ) )
-                  ~get_transition_chain:
-                    (handle_request "get_transition_chain"
-                       ~f:Sync_handler.get_transition_chain )
-                  ~get_transition_knowledge:(fun _q ->
-                    O1trace.thread "handle_request_get_transition_knowledge"
-                      (fun () ->
-                        return
-                          ( match get_current_frontier () with
-                          | None ->
-                              []
-                          | Some frontier ->
-                              Sync_handler.best_tip_path ~frontier ) ) ) )
+                Mina_networking.create
+                  (module Context)
+                  config.net_config ~sinks
+                  ~get_transition_frontier:(fun () ->
+                    Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r )
+                  ~get_node_status )
           in
           (* tie the first knot *)
           net_ref := Some net ;
