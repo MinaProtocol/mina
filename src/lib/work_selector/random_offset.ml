@@ -25,10 +25,13 @@ struct
         other behavior is observed, the pool is considered updated and a new
         [offset] is generated randomly, uniformly chosen between 0 and
         [new_length]. *)
-    let update ~new_length =
+    let update ~logger ~new_length =
+     Logger.trace logger ~module_:__MODULE__ ~location:__LOC__ ("update : offset is %d, prev_length - new_length is %d") !offset (!prev_length - new_length) ;
       let () =
         if new_length = !prev_length || new_length = !prev_length - 1 then ()
-        else offset := Random.int new_length
+        else let () = offset := Random.int 100
+      in
+      let () = Logger.trace logger ~module_:__MODULE__ ~location:__LOC__ ("update : offset updated to %d, prev_length - new_length is %d") !offset  (!prev_length - new_length) in ()
       in
       prev_length := new_length
 
@@ -53,7 +56,7 @@ struct
     | [] ->
         None
     | expensive_work ->
-        Offset.update ~new_length:(List.length expensive_work) ;
+        Offset.update ~logger ~new_length:(List.length expensive_work) ;
         let x = Offset.get_nth expensive_work in
         Lib.State.set state x ; Some x
 
