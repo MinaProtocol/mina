@@ -1910,7 +1910,7 @@ let node_status =
              List.iter all_status_data ~f:(fun peer_status_data ->
                  printf "%s\n%!"
                    ( Yojson.Safe.to_string
-                   @@ Mina_networking.Rpcs.Get_node_status.response_to_yojson
+                   @@ Mina_networking.Node_status.response_to_yojson
                         peer_status_data ) )
          | Error err ->
              printf "Failed to get node status: %s\n%!"
@@ -2271,6 +2271,60 @@ let signature_kind =
        in
        Core.print_endline signature_kind_string )
 
+let test_ledger_application =
+  Command.async ~summary:"Test ledger application"
+    (let%map_open.Command privkey_path = Cli_lib.Flag.privkey_read_path
+     and prev_block_path =
+       flag "--prev-block-path" ~doc:"FILE file with serialized block"
+         (optional string)
+     and ledger_path =
+       flag "--ledger-path" ~doc:"FILE directory with ledger DB"
+         (required string)
+     and num_txs =
+       flag "--num-txs"
+         ~doc:"NN Number of transactions to create after preparatory rounds"
+         (required int)
+     and num_txs_per_round =
+       flag "--num-txs-per-round"
+         ~doc:
+           "NN Number of transactions to create per preparatory round \
+            (default: 3)"
+         (optional int)
+     and rounds =
+       flag "--rounds" ~doc:"NN Number of preparatory rounds (default: 580)"
+         (optional int)
+     and first_partition_slots =
+       flag "--first-partition-slots"
+         ~doc:
+           "NN Number of slots in first partition of scan state (default: 128)"
+         (optional int)
+     and max_depth =
+       flag "--max-depth" ~doc:"NN Maximum depth of masks (default: 290)"
+         (optional int)
+     and no_new_stack =
+       flag "--old-stack" ~doc:"Use is_new_stack: false (scan state)" no_arg
+     and has_second_partition =
+       flag "--has-second-partition"
+         ~doc:"Assume there is a second partition (scan state)" no_arg
+     and tracing = flag "--tracing" ~doc:"Wrap test into tracing" no_arg
+     and no_masks = flag "--no-masks" ~doc:"Do not create masks" no_arg in
+     Cli_lib.Exceptions.handle_nicely
+     @@ fun () ->
+     let first_partition_slots =
+       Option.value ~default:128 first_partition_slots
+     in
+     let num_txs_per_round = Option.value ~default:3 num_txs_per_round in
+     let rounds = Option.value ~default:580 rounds in
+     let max_depth = Option.value ~default:290 max_depth in
+     let constraint_constants =
+       Genesis_constants.Compiled.constraint_constants
+     in
+     let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+     Test_ledger_application.test ~privkey_path ~ledger_path ?prev_block_path
+       ~first_partition_slots ~no_new_stack ~has_second_partition
+       ~num_txs_per_round ~rounds ~no_masks ~max_depth ~tracing num_txs
+       ~constraint_constants ~genesis_constants )
+
 let itn_create_accounts =
   Command.async ~summary:"Fund new accounts for incentivized testnet"
     (let open Command.Param in
@@ -2438,6 +2492,7 @@ let ledger =
     [ ("export", export_ledger)
     ; ("hash", hash_ledger)
     ; ("currency", currency_in_ledger)
+    ; ("test-apply", test_ledger_application)
     ]
 
 let libp2p =

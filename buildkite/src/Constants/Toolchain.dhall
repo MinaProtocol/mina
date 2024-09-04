@@ -13,7 +13,6 @@ let runner =
       ->  merge
             { Bookworm = RunInToolchain.runInToolchainBookworm
             , Bullseye = RunInToolchain.runInToolchainBullseye
-            , Buster = RunInToolchain.runInToolchainBuster
             , Jammy = RunInToolchain.runInToolchainBookworm
             , Focal = RunInToolchain.runInToolchainBullseye
             }
@@ -34,7 +33,6 @@ let image =
       ->  merge
             { Bookworm = ContainerImages.minaToolchainBookworm
             , Bullseye = ContainerImages.minaToolchainBullseye
-            , Buster = ContainerImages.minaToolchainBuster
             , Jammy = ContainerImages.minaToolchainBookworm
             , Focal = ContainerImages.minaToolchainBullseye
             }
