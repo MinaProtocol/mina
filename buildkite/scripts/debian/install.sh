@@ -49,7 +49,7 @@ fi
 
 debs_with_version=()
 for i in "${debs[@]}"; do
-   debs_with_version+=("${i}=3.0.0-develop-541f49f")
+   debs_with_version+=("${i}=${MINA_DEB_VERSION}")
 done
 
 # Install aptly
