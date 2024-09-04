@@ -36,6 +36,8 @@ let Toolchain = ../Constants/Toolchain.dhall
 
 let Network = ../Constants/Network.dhall
 
+let Artifacts = ../Constants/Artifacts.dhall
+
 let Spec =
       { Type =
           { codename : DebianVersions.DebVersion

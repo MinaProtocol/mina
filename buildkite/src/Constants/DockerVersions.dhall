@@ -1,5 +1,9 @@
 let Profiles = ./Profiles.dhall
 
+let Network = ./Network.dhall
+
+let Artifacts = ./Artifacts.dhall
+
 let Docker
     : Type
     = < Bookworm | Bullseye | Jammy | Focal >
