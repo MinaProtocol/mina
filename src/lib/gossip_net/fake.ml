@@ -2,38 +2,47 @@ open Async_kernel
 open Core
 open Pipe_lib
 open Network_peer
+open Intf
 
 (* TODO: Implement RPC version translations (documented in Async_rpc_kernel).
  * This code currently only supports the latest version of RPCs. *)
 
 module type S = sig
-  include Intf.Gossip_net_intf
+  include GOSSIP_NET
 
   type network
+
+  type ('q, 'r) rpc_mock = 'q Envelope.Incoming.t -> 'r Deferred.t
+
+  type rpc_mocks =
+    { get_mock : 'q 'r. ('q, 'r) Rpc_interface.rpc -> ('q, 'r) rpc_mock option }
 
   val create_network : Peer.t list -> network
 
   val create_instance :
-       network
-    -> Peer.t
-    -> Rpc_intf.rpc_handler list
+       network:network
+    -> rpc_mocks:rpc_mocks
+    -> local_ip:Peer.t
+    -> Rpc_interface.ctx
     -> Message.sinks
     -> t Deferred.t
 end
 
-module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
-  S with module Rpc_intf := Rpc_intf = struct
-  open Intf
-  open Rpc_intf
+module Make (Rpc_interface : RPC_INTERFACE) :
+  S with module Rpc_interface := Rpc_interface = struct
+  type ('q, 'r) rpc_mock = 'q Envelope.Incoming.t -> 'r Deferred.t
+
+  type rpc_mocks =
+    { get_mock : 'q 'r. ('q, 'r) Rpc_interface.rpc -> ('q, 'r) rpc_mock option }
 
   module Network = struct
     type rpc_hook =
       { hook :
           'q 'r.
              Peer.Id.t
-          -> ('q, 'r) rpc
+          -> ('q, 'r) Rpc_interface.rpc
           -> 'q
-          -> 'r Network_peer.Rpc_intf.rpc_response Deferred.t
+          -> 'r rpc_response Deferred.t
       }
 
     type network_interface = { sinks : Message.sinks; rpc_hook : rpc_hook }
@@ -103,9 +112,9 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
         -> _
         -> sender_id:Peer.Id.t
         -> responder_id:Peer.Id.t
-        -> (q, r) rpc
+        -> (q, r) Rpc_interface.rpc
         -> q
-        -> r Network_peer.Rpc_intf.rpc_response Deferred.t =
+        -> r rpc_response Deferred.t =
      fun t peer_table ~sender_id ~responder_id rpc query ->
       let responder =
         Option.value_exn
@@ -117,56 +126,56 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       | Ok intf ->
           intf.rpc_hook.hook sender_id rpc query
       | Error e ->
-          Deferred.return (Network_peer.Rpc_intf.Failed_to_connect e)
+          Deferred.return (Failed_to_connect e)
   end
 
   module Instance = struct
     type t =
-      { network : Network.t
-      ; me : Peer.t
-      ; rpc_handlers : rpc_handler list
+      { time_controller : Block_time.Controller.t
+      ; network : Network.t
+      ; local_ip : Peer.t
       ; peer_table : (Peer.Id.t, Peer.t) Hashtbl.t
       ; initial_peers : Peer.t list
       ; connection_gating : Mina_net2.connection_gating ref
       ; ban_notification_reader : ban_notification Linear_pipe.Reader.t
       ; ban_notification_writer : ban_notification Linear_pipe.Writer.t
-      ; time_controller : Block_time.Controller.t
       }
 
-    let rpc_hook t rpc_handlers =
+    let rpc_hook ~rpc_mocks ctx t =
       let hook :
           type q r.
              Peer.Id.t
-          -> (q, r) rpc
+          -> (q, r) Rpc_interface.rpc
           -> q
-          -> r Network_peer.Rpc_intf.rpc_response Deferred.t =
+          -> r rpc_response Deferred.t =
        fun peer rpc query ->
-        let (module Impl) = implementation_of_rpc rpc in
-        let latest_version =
-          (* this is assumed safe since there should always be at least one version *)
-          Int.Set.max_elt (Impl.versions ())
-          |> Option.value_exn ~error:(Error.of_string "no versions?")
-        in
         let sender =
           Hashtbl.find t.peer_table peer
           |> Option.value_exn ~error:(Error.createf "cannot find peer %s" peer)
         in
-        match
-          List.find_map rpc_handlers ~f:(fun handler ->
-              match_handler handler rpc ~do_:(fun f ->
-                  f sender ~version:latest_version query ) )
-        with
-        | None ->
-            failwith "fake gossip net error: rpc not implemented"
-        | Some deferred ->
-            let%map response = deferred in
-            Network_peer.Rpc_intf.Connected
-              (Envelope.Incoming.wrap_peer ~data:(Ok response) ~sender)
+        let query_env = Envelope.Incoming.wrap_peer ~data:query ~sender in
+        let%map response =
+          match rpc_mocks.get_mock rpc with
+          | Some f ->
+              f query_env
+          | None ->
+              let (module Impl) = Rpc_interface.implementation rpc in
+              let latest_version =
+                (* this is assumed safe since there should always be at least one version *)
+                Int.Set.max_elt (Impl.versions ())
+                |> Option.value_exn ~error:(Error.of_string "no versions?")
+              in
+              Impl.handle_request ctx ~version:latest_version query_env
+        in
+        let response_env =
+          Envelope.Incoming.wrap_peer ~data:(Ok response) ~sender:t.local_ip
+        in
+        Connected response_env
       in
       Network.{ hook }
 
-    let create network me rpc_handlers sinks =
-      let initial_peers = Network.get_initial_peers network me.Peer.host in
+    let create ~network ~rpc_mocks ~(local_ip : Peer.t) ctx sinks =
+      let initial_peers = Network.get_initial_peers network local_ip.host in
       let peer_table = Hashtbl.create (module Peer.Id) in
       List.iter initial_peers ~f:(fun peer ->
           Hashtbl.add_exn peer_table ~key:peer.peer_id ~data:peer ) ;
@@ -179,8 +188,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       in
       let t =
         { network
-        ; me
-        ; rpc_handlers
+        ; local_ip
         ; peer_table
         ; initial_peers
         ; connection_gating =
@@ -193,9 +201,9 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
         }
       in
       Network.(
-        attach_interface network me
-          { sinks; rpc_hook = rpc_hook t rpc_handlers }) ;
-      t
+        attach_interface network local_ip
+          { sinks; rpc_hook = rpc_hook ~rpc_mocks ctx t }) ;
+      return t
 
     let peers { peer_table; _ } = Hashtbl.data peer_table |> Deferred.return
 
@@ -235,7 +243,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       ban_notification_reader
 
     let query_peer ?heartbeat_timeout:_ ?timeout:_ t peer rpc query =
-      Network.call_rpc t.network t.peer_table ~sender_id:t.me.peer_id
+      Network.call_rpc t.network t.peer_table ~sender_id:t.local_ip.peer_id
         ~responder_id:peer rpc query
 
     let query_peer' ?how ?heartbeat_timeout ?timeout t peer rpc qs =
@@ -249,7 +257,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
               | Connected x ->
                   x.data
               | Failed_to_connect e ->
-                  return (Network_peer.Rpc_intf.Failed_to_connect e) )
+                  return (Failed_to_connect e) )
             |> Or_error.all
           in
           let sender =
@@ -263,7 +271,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
     let broadcast_state ?origin_topic t state =
       ignore origin_topic ;
-      Network.broadcast t.network ~sender:t.me state
+      Network.broadcast t.network ~sender:t.local_ip state
         (fun (Any_sinks (sinksM, (sink_block, _, _))) (env, vc) ->
           let time = Block_time.now t.time_controller in
           let module M = (val sinksM) in
@@ -273,7 +281,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
     let broadcast_snark_pool_diff ?origin_topic ?nonce t diff =
       ignore origin_topic ;
       ignore nonce ;
-      Network.broadcast t.network ~sender:t.me diff
+      Network.broadcast t.network ~sender:t.local_ip diff
         (fun (Any_sinks (sinksM, (_, _, sink_snark_work))) ->
           let module M = (val sinksM) in
           M.Snark_sink.push sink_snark_work )
@@ -281,7 +289,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
     let broadcast_transaction_pool_diff ?origin_topic ?nonce t diff =
       ignore origin_topic ;
       ignore nonce ;
-      Network.broadcast t.network ~sender:t.me diff
+      Network.broadcast t.network ~sender:t.local_ip diff
         (fun (Any_sinks (sinksM, (_, sink_tx, _))) ->
           let module M = (val sinksM) in
           M.Tx_sink.push sink_tx )
@@ -301,6 +309,5 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
   let create_network = Network.create
 
-  let create_instance network local_ip impls sinks =
-    Deferred.return (Instance.create network local_ip impls sinks)
+  let create_instance = Instance.create
 end
