@@ -346,14 +346,23 @@ end]
 let metadata t = t.metadata
 
 let create ?(metadata = []) ?(id = "default") ?(itn_features = false) () =
-  { null = false; metadata = Metadata.extend Metadata.empty metadata; id; itn_features }
+  { null = false
+  ; metadata = Metadata.extend Metadata.empty metadata
+  ; id
+  ; itn_features
+  }
 
-let null () = { null = true; metadata = Metadata.empty; id = "default"; itn_features = false }
+let null () =
+  { null = true
+  ; metadata = Metadata.empty
+  ; id = "default"
+  ; itn_features = false
+  }
 
 let extend t metadata =
   { t with metadata = Metadata.extend t.metadata metadata }
 
-let change_id t ~id = {t with id}
+let change_id t ~id = { t with id }
 
 let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
     ~skip_merge_global_metadata =

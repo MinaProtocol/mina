@@ -42,7 +42,6 @@ module type CONTEXT = sig
   val zkapp_cmd_limit : int option ref
 
   val compaction_interval_ms : int option
-
 end
 
 exception Snark_worker_error of int
@@ -243,3 +242,5 @@ val best_chain_block_by_height :
 
 val best_chain_block_by_state_hash :
   t -> State_hash.t -> (Transition_frontier.Breadcrumb.t, string) Result.t
+
+val zkapp_cmd_limit : t -> int option ref

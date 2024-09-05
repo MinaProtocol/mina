@@ -1159,12 +1159,11 @@ let check_and_stop_daemon t ~wait =
             if Time.Span.(wait_for > max_catchup_time) then `Now
             else `Check_in wait_for
         | Evaluating_vrf _last_checked_slot ->
-          let vrf_poll_interval_ms = 
-            (runtime_config t).compile_config.vrf_poll_interval_ms
-          in
+            let vrf_poll_interval_ms =
+              (runtime_config t).compile_config.vrf_poll_interval_ms
+            in
             `Check_in
-              (Core.Time.Span.of_ms
-                 ( vrf_poll_interval_ms * 2 |> Int.to_float) )
+              (Core.Time.Span.of_ms (vrf_poll_interval_ms * 2 |> Int.to_float))
         )
 
 let stop_long_running_daemon t =
@@ -1244,7 +1243,6 @@ module type CONTEXT = sig
   val zkapp_cmd_limit : int option ref
 
   val compaction_interval_ms : int option
-
 end
 
 let context ~commit_id (config : Config.t) : (module CONTEXT) =
@@ -1265,16 +1263,17 @@ let context ~commit_id (config : Config.t) : (module CONTEXT) =
 
     let commit_id = commit_id
 
-    let runtime_config = 
-      Genesis_ledger_helper.runtime_config_of_precomputed_values config.precomputed_values
+    let runtime_config =
+      Genesis_ledger_helper.runtime_config_of_precomputed_values
+        config.precomputed_values
 
-    let vrf_poll_interval_ms = 
-        runtime_config.compile_config.vrf_poll_interval_ms
+    let vrf_poll_interval_ms =
+      runtime_config.compile_config.vrf_poll_interval_ms
 
     let zkapp_cmd_limit = config.zkapp_cmd_limit
 
-    let compaction_interval_ms = 
-        runtime_config.compile_config.compaction_interval_ms
+    let compaction_interval_ms =
+      runtime_config.compile_config.compaction_interval_ms
   end )
 
 let start t =
@@ -1362,9 +1361,10 @@ let start t =
       ~block_produced_bvar:t.components.block_produced_bvar
       ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net
       ~zkapp_cmd_limit_hardcap:
-        t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap 
-        ) ;
-  perform_compaction t.config.precomputed_values.runtime_config.compile_config.compaction_interval_ms t ;
+        t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap ) ;
+  perform_compaction
+    t.config.precomputed_values.runtime_config.compile_config
+      .compaction_interval_ms t ;
   let () =
     match t.config.node_status_url with
     | Some node_status_url ->
@@ -1507,7 +1507,10 @@ let create ~commit_id ?wallets (config : Config.t) =
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
-      let runtime_config = Genesis_ledger_helper.runtime_config_of_precomputed_values config.precomputed_values in
+      let runtime_config =
+        Genesis_ledger_helper.runtime_config_of_precomputed_values
+          config.precomputed_values
+      in
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
           =
         if runtime_config.compile_config.itn_features then
@@ -2287,3 +2290,5 @@ let best_chain_block_by_state_hash (t : t) hash =
        ~error:
          (sprintf "Block with state hash %s not found in transition frontier"
             (State_hash.to_base58_check hash) )
+
+let zkapp_cmd_limit t = t.config.zkapp_cmd_limit

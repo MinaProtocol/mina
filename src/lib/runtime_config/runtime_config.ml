@@ -1401,9 +1401,15 @@ type t =
 [@@deriving bin_io_unversioned]
 
 let make ?daemon ?genesis ?proof ?ledger ?epoch_data () =
-  { daemon; genesis; proof; ledger; epoch_data; compile_config = Mina_compile_config.Compiled.t }
+  { daemon
+  ; genesis
+  ; proof
+  ; ledger
+  ; epoch_data
+  ; compile_config = Mina_compile_config.Compiled.t
+  }
 
-let to_json_layout { daemon; genesis; proof; ledger; epoch_data; _} =
+let to_json_layout { daemon; genesis; proof; ledger; epoch_data; _ } =
   { Json_layout.daemon = Option.map ~f:Daemon.to_json_layout daemon
   ; genesis = Option.map ~f:Genesis.to_json_layout genesis
   ; proof = Option.map ~f:Proof_keys.to_json_layout proof
@@ -1418,7 +1424,13 @@ let of_json_layout { Json_layout.daemon; genesis; proof; ledger; epoch_data } =
   and proof = result_opt ~f:Proof_keys.of_json_layout proof
   and ledger = result_opt ~f:Ledger.of_json_layout ledger
   and epoch_data = result_opt ~f:Epoch_data.of_json_layout epoch_data in
-  { daemon; genesis; proof; ledger; epoch_data; compile_config = Mina_compile_config.Compiled.t }
+  { daemon
+  ; genesis
+  ; proof
+  ; ledger
+  ; epoch_data
+  ; compile_config = Mina_compile_config.Compiled.t
+  }
 
 let to_yojson x = Json_layout.to_yojson (to_json_layout x)
 

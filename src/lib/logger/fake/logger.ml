@@ -147,9 +147,14 @@ end]
 let metadata t = t.metadata
 
 let create ?metadata:_ ?(id = "default") ?(itn_features = false) () =
-  { null = false; metadata = Metadata.empty; id ; itn_features}
+  { null = false; metadata = Metadata.empty; id; itn_features }
 
-let null () = { null = true; metadata = Metadata.empty; id = "default"; itn_features = false }
+let null () =
+  { null = true
+  ; metadata = Metadata.empty
+  ; id = "default"
+  ; itn_features = false
+  }
 
 let extend t _ = t
 

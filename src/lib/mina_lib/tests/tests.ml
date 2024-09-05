@@ -107,9 +107,8 @@ let%test_module "Epoch ledger sync tests" =
 
         let zkapp_cmd_limit = ref Node_config_for_unit_tests.zkapp_cmd_limit
 
-        let compaction_interval_ms = Node_config_for_unit_tests.compaction_interval
-
-
+        let compaction_interval_ms =
+          Node_config_for_unit_tests.compaction_interval
       end in
       let genesis_ledger =
         lazy

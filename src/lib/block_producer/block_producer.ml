@@ -1170,8 +1170,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                    && not (Vrf_evaluation_state.finished vrf_evaluation_state)
                  then
                    Vrf_evaluation_state.poll ~vrf_evaluator ~logger
-                     vrf_evaluation_state
-                     ~vrf_poll_interval_ms
+                     vrf_evaluation_state ~vrf_poll_interval_ms
                  else Deferred.unit
                in
                match Core.Queue.dequeue vrf_evaluation_state.queue with
@@ -1185,8 +1184,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                      in
                      let%map () =
                        Vrf_evaluation_state.poll ~vrf_evaluator ~logger
-                         vrf_evaluation_state
-                         ~vrf_poll_interval_ms:vrf_poll_interval_ms
+                         vrf_evaluation_state ~vrf_poll_interval_ms
                      in
                      Singleton_scheduler.schedule scheduler
                        (Block_time.now time_controller)
