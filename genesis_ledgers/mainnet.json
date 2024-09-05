@@ -25,5 +25,8 @@
       "hash": "jwgzfxD5rEnSP3k4UiZu2569FfhJ1SRUvabfTz21e4btwBHg3jq",
       "s3_data_hash": "61323d7565130cfa4768c0333f32b2a8ea7fdfbf17065adfa48b4e9956619b44"
     }
+  },
+  "daemon": {
+    "network_id": "mainnet"
   }
 }
