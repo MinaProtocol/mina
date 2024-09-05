@@ -311,6 +311,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
 
 let output_there_and_back_cmds =
   let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let compile_config = Mina_compile_config.Compiled.t in
   let open Command.Let_syntax in
   Command.async
     ~summary:
@@ -398,7 +399,7 @@ let output_there_and_back_cmds =
      and minimum_user_command_fee =
        let default =
          Currency.Fee.of_mina_string_exn
-           Mina_compile_config.default_transaction_fee_string
+           compile_config.default_transaction_fee_string
        in
        Cli_lib.Flag.fee_common
          ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee

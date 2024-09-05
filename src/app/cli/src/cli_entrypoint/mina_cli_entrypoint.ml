@@ -137,7 +137,7 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
   in
   return (precomputed_values, config_jsons, config)
 
-let setup_daemon logger =
+let setup_daemon logger ~itn_features ~default_snark_worker_fee_string =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
   let receiver_key_warning = Cli_lib.Default.receiver_key_warning in
@@ -176,7 +176,7 @@ let setup_daemon logger =
          daemon.json config file"
       (optional string)
   and itn_keys =
-    if Mina_compile_config.itn_features then
+    if itn_features then
       flag "--itn-keys" ~aliases:[ "itn-keys" ] (optional string)
         ~doc:
           "PUBLICKEYS A comma-delimited list of Ed25519 public keys that are \
@@ -184,7 +184,7 @@ let setup_daemon logger =
            GraphQL server"
     else Command.Param.return None
   and itn_max_logs =
-    if Mina_compile_config.itn_features then
+    if itn_features then
       flag "--itn-max-logs" ~aliases:[ "itn-max-logs" ] (optional int)
         ~doc:
           "NN Maximum number of logs to store to be made available via GraphQL \
@@ -243,7 +243,7 @@ let setup_daemon logger =
   and rest_server_port = Flag.Port.Daemon.rest_server
   and limited_graphql_port = Flag.Port.Daemon.limited_graphql_server
   and itn_graphql_port =
-    if Mina_compile_config.itn_features then
+    if itn_features then
       flag "--itn-graphql-port" ~aliases:[ "itn-graphql-port" ]
         ~doc:"PORT GraphQL-server for incentivized testnet interaction"
         (optional int)
@@ -308,8 +308,7 @@ let setup_daemon logger =
            "FEE Amount a worker wants to get compensated for generating a \
             snark proof (default: %d)"
            ( Currency.Fee.to_nanomina_int
-           @@ Currency.Fee.of_mina_string_exn
-                Mina_compile_config.default_snark_worker_fee_string ) )
+           @@ Currency.Fee.of_mina_string_exn default_snark_worker_fee_string ) )
       (optional txn_fee)
   and work_reassignment_wait =
     flag "--work-reassignment-wait"
@@ -779,6 +778,7 @@ let setup_daemon logger =
           let constraint_constants =
             Genesis_constants.Compiled.constraint_constants
           in
+          let compile_config = Mina_compile_config.Compiled.t in
           let%bind precomputed_values, config_jsons, config =
             load_config_files ~logger ~conf_dir ~genesis_dir
               ~proof_level:Genesis_constants.Compiled.proof_level config_files
@@ -850,7 +850,7 @@ let setup_daemon logger =
             or_from_config json_to_currency_fee_option "snark-worker-fee"
               ~default:
                 (Currency.Fee.of_mina_string_exn
-                   Mina_compile_config.default_snark_worker_fee_string )
+                   compile_config.default_snark_worker_fee_string )
               snark_work_fee
           in
           let node_status_url =
@@ -1370,7 +1370,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                   "Cannot provide both uptime submitter public key and uptime \
                    submitter keyfile"
           in
-          if Mina_compile_config.itn_features then
+          if compile_config.itn_features then
             (* set queue bound directly in Itn_logger
                adding bound to Mina_lib config introduces cycle
             *)
@@ -1406,6 +1406,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~block_reward_threshold ~uptime_url ~uptime_submitter_keypair
                  ~uptime_send_node_commit ~stop_time ~node_status_url
                  ~graphql_control_port:itn_graphql_port ~simplified_node_stats
+                 ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
                  () )
           in
           { mina
@@ -1466,8 +1467,13 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
         return mina )
 
 let daemon logger =
+  let compile_config = Mina_compile_config.Compiled.t in
   Command.async ~summary:"Mina daemon"
-    (Command.Param.map (setup_daemon logger) ~f:(fun setup_daemon () ->
+    (Command.Param.map
+       (setup_daemon logger ~itn_features:compile_config.itn_features
+          ~default_snark_worker_fee_string:
+            compile_config.default_snark_worker_fee_string )
+       ~f:(fun setup_daemon () ->
          (* Immediately disable updating the time offset. *)
          Block_time.Controller.disable_setting_offset () ;
          let%bind mina = setup_daemon () in
@@ -1486,8 +1492,12 @@ let replay_blocks logger =
     flag "--format" ~aliases:[ "-format" ] (optional string)
       ~doc:"json|sexp The format to read lines of the file in (default: json)"
   in
+  let compile_config = Mina_compile_config.Compiled.t in
   Command.async ~summary:"Start mina daemon with blocks replayed from a file"
-    (Command.Param.map3 replay_flag read_kind (setup_daemon logger)
+    (Command.Param.map3 replay_flag read_kind
+       (setup_daemon logger ~itn_features:compile_config.itn_features
+          ~default_snark_worker_fee_string:
+            compile_config.default_snark_worker_fee_string )
        ~f:(fun blocks_filename read_kind setup_daemon () ->
          (* Enable updating the time offset. *)
          Block_time.Controller.enable_setting_offset () ;
@@ -1970,11 +1980,11 @@ let internal_commands logger =
               exit 1) )
   ]
 
-let mina_commands logger =
+let mina_commands logger ~itn_features =
   [ ("accounts", Client.accounts)
   ; ("daemon", daemon logger)
   ; ("client", Client.client)
-  ; ("advanced", Client.advanced)
+  ; ("advanced", Client.advanced ~itn_features)
   ; ("ledger", Client.ledger)
   ; ("libp2p", Client.libp2p)
   ; ( "internal"
@@ -2016,9 +2026,11 @@ let () =
    | [| _mina_exe; version |] when is_version_cmd version ->
        Mina_version.print_version ()
    | _ ->
+       let compile_config = Mina_compile_config.Compiled.t in
        Command.run
          (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
-            (mina_commands logger) ) ) ;
+            (mina_commands logger ~itn_features:compile_config.itn_features) )
+  ) ;
   Core.exit 0
 
 let linkme = ()

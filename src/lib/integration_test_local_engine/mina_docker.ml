@@ -276,7 +276,7 @@ module Network_config = struct
                     ({ ledger; seed } : Runtime_config.Epoch_data.Data.t) )
               in
               ({ staking; next } : Runtime_config.Epoch_data.t) )
-      ; compile_config = Mina_compile_config.Compiled.t
+      ; compile_config = constants.compile_config
       }
     in
     let genesis_constants =
@@ -285,7 +285,7 @@ module Network_config = struct
            ~default:constants.genesis_constants runtime_config )
     in
     let constants : Test_config.constants =
-      { constraint_constants; genesis_constants }
+      { constants with genesis_constants; constraint_constants }
     in
     let mk_net_keypair keypair_name (pk, sk) =
       let keypair =

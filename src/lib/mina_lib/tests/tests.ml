@@ -63,7 +63,7 @@ let%test_module "Epoch ledger sync tests" =
                 ; add_genesis_winner = None
                 }
           ; epoch_data = None
-          ; compile_config = Mina_compile_config.Compiled.t
+          ; compile_config = Mina_compile_config.For_unit_tests.t
           }
         in
         match%map

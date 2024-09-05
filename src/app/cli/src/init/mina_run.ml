@@ -212,6 +212,7 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
 let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ?limited_graphql_port ?itn_graphql_port ?auth_keys
     ?(open_limited_graphql_port = false) ?(insecure_rest_server = false) mina =
+  let runtime_config = Mina_lib.runtime_config mina in
   let client_trustlist =
     ref
       (Unix.Cidr.Set.of_list
@@ -551,7 +552,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             ~schema:Mina_graphql.schema_limited
             ~server_description:"GraphQL server with limited queries"
             ~require_auth:false rest_server_port ) ) ;
-  if Mina_compile_config.itn_features then
+  if runtime_config.compile_config.itn_features then
     (* Third graphql server with ITN-particular queries exposed *)
     Option.iter itn_graphql_port ~f:(fun rest_server_port ->
         O1trace.background_thread "serve_itn_graphql" (fun () ->
@@ -598,15 +599,17 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                Rpc.Connection.server_with_close
                  ~handshake_timeout:
                    (Time.Span.of_sec
-                      Mina_compile_config.rpc_handshake_timeout_sec )
+                      runtime_config.compile_config.rpc_handshake_timeout_sec )
                  ~heartbeat_config:
                    (Rpc.Connection.Heartbeat_config.create
                       ~timeout:
                         (Time_ns.Span.of_sec
-                           Mina_compile_config.rpc_heartbeat_timeout_sec )
+                           runtime_config.compile_config
+                             .rpc_heartbeat_timeout_sec )
                       ~send_every:
                         (Time_ns.Span.of_sec
-                           Mina_compile_config.rpc_heartbeat_send_every_sec )
+                           runtime_config.compile_config
+                             .rpc_heartbeat_send_every_sec )
                       () )
                  reader writer
                  ~implementations:
