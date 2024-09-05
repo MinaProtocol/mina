@@ -639,8 +639,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
   Option.iter log_filename ~f:(fun log_filename ->
       Logger.Consumer_registry.register ~id:"default"
         ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
-        ~transport:(Logger_file_system.evergrowing ~log_filename)
-        () ) ;
+        ~transport:(Logger_file_system.evergrowing ~log_filename) ) ;
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
