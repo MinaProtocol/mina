@@ -14,8 +14,6 @@ let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
-let Network = ../../Constants/Network.dhall
-
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Network = ../../Constants/Network.dhall

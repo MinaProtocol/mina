@@ -1,7 +1,5 @@
 let Artifacts = ../Constants/Artifacts.dhall
 
-let Network = ../Constants/Network.dhall
-
 let Command = ./Base.dhall
 
 let Size = ./Size.dhall
