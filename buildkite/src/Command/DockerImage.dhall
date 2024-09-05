@@ -89,7 +89,6 @@ let generateStep =
                 ++  " --service ${Artifacts.dockerName spec.service}"
                 ++  " --network ${spec.network}"
                 ++  " --version ${spec.version}"
-                ++  " --network ${spec.network}"
                 ++  " --branch ${spec.branch}"
                 ++  " ${maybeCacheOption} "
                 ++  " --deb-codename ${DebianVersions.lowerName

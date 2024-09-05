@@ -1,8 +1,8 @@
 let Profiles = ./Profiles.dhall
 
-let Network = ./Network.dhall
-
 let Artifacts = ./Artifacts.dhall
+
+let Network = ./Network.dhall
 
 let Docker
     : Type

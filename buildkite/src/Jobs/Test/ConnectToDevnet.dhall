@@ -18,6 +18,8 @@ let Network = ../../Constants/Network.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
+let Network = ../../Constants/Network.dhall
+
 let dependsOn =
       DebianVersions.dependsOn
         DebianVersions.DebVersion.Bullseye
@@ -40,7 +42,7 @@ in  Pipeline.build
       , steps =
         [ ConnectToTestnet.step
             dependsOn
-            "devnet"
+            "${Network.lowerName Network.Type.Devnet}"
             "40s"
             "2m"
             (B/SoftFail.Boolean True)

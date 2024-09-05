@@ -173,7 +173,8 @@ let dockerTag =
                 , LogProc = "${version_and_codename}"
                 , TestExecutive = "${version_and_codename}"
                 , BatchTxn = "${version_and_codename}"
-                , Rosetta = "${version_and_codename}"
+                , Rosetta =
+                    "${version_and_codename}-${Network.lowerName network}"
                 , ZkappTestTransaction = "${version_and_codename}"
                 , FunctionalTestSuite = "${version_and_codename}"
                 , Toolchain = "${version_and_codename}"
