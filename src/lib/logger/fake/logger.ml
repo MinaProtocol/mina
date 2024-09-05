@@ -137,6 +137,7 @@ module Stable = struct
       { null : bool
       ; metadata : Metadata.Stable.V1.t
       ; id : Bounded_types.String.Stable.V1.t
+      ; itn_features : bool
       }
 
     let to_latest = Fn.id
@@ -145,14 +146,14 @@ end]
 
 let metadata t = t.metadata
 
-let create ?metadata:_ ?(id = "default") () =
-  { null = false; metadata = Metadata.empty; id }
+let create ?metadata:_ ?(id = "default") ?(itn_features = false) () =
+  { null = false; metadata = Metadata.empty; id ; itn_features}
 
-let null () = { null = true; metadata = Metadata.empty; id = "default" }
+let null () = { null = true; metadata = Metadata.empty; id = "default"; itn_features = false }
 
 let extend t _ = t
 
-let change_id { null; metadata; id = _ } ~id = { null; metadata; id }
+let change_id t ~id = { t with id }
 
 let raw _ _ = not_implemented ()
 
