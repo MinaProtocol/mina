@@ -373,7 +373,6 @@ module Network_config = struct
                     ({ ledger; seed } : Runtime_config.Epoch_data.Data.t) )
               in
               ({ staking; next } : Runtime_config.Epoch_data.t) )
-      ; compile_config = constants.compile_config
       }
     in
     let genesis_constants =

@@ -2671,7 +2671,7 @@ module Queries = struct
       ~typ:(non_null string)
       ~args:Arg.[]
       ~resolve:(fun { ctx = mina; _ } () ->
-        let cfg = Mina_lib.runtime_config mina in
+        let cfg = Mina_lib.config mina in
         "mina:" ^ cfg.compile_config.network_id )
 
   let signature_kind =
