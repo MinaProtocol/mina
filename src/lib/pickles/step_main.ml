@@ -278,7 +278,7 @@ let step_main :
   in
   let main () : _ Types.Step.Statement.t Promise.t =
     let open Impls.Step in
-    let logger = Internal_tracing_context_logger.get () in
+    let logger = Context_logger.get () in
     let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
                                          with type n = max_proofs_verified )
     in

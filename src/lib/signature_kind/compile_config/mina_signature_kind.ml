@@ -1,4 +1,4 @@
-type t = Testnet | Mainnet | Other_network of string
+include Mina_signature_kind_type
 
 let t =
   match Node_config.network with

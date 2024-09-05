@@ -30,6 +30,8 @@ let DebianVersions = ../Constants/DebianVersions.dhall
 
 let DebianRepo = ../Constants/DebianRepo.dhall
 
+let Artifacts = ../Constants/Artifacts.dhall
+
 let Profiles = ../Constants/Profiles.dhall
 
 let Toolchain = ../Constants/Toolchain.dhall
@@ -125,8 +127,8 @@ let pipeline
                             )
                             "./buildkite/scripts/build-hardfork-package.sh"
                         # [ Cmd.run
-                              "./buildkite/scripts/upload-deb-to-gs.sh ${DebianVersions.lowerName
-                                                                           debVersion}"
+                              "./buildkite/scripts/debian/upload-to-gs.sh ${DebianVersions.lowerName
+                                                                              debVersion}"
                           ]
                     , label =
                         "Build Mina Hardfork Package for ${DebianVersions.capitalName
@@ -144,7 +146,7 @@ let pipeline
                           , "MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                    debVersion}"
                           ]
-                          "./buildkite/scripts/publish-deb.sh"
+                          "./buildkite/scripts/debian/publish.sh"
                     , label =
                         "Publish Mina for ${DebianVersions.capitalName
                                               debVersion} Hardfork"
@@ -157,7 +159,7 @@ let pipeline
                     DockerImage.ReleaseSpec::{
                     , deps =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
-                    , service = "mina-daemon"
+                    , service = Artifacts.dockerName Artifacts.Type.Daemon
                     , network = network_name
                     , deb_codename = "${DebianVersions.lowerName debVersion}"
                     , deb_profile = profile
@@ -212,7 +214,7 @@ let pipeline
                     DockerImage.ReleaseSpec::{
                     , deps =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
-                    , service = "mina-archive"
+                    , service = Artifacts.dockerName Artifacts.Type.Archive
                     , network = network_name
                     , deb_codename = "${DebianVersions.lowerName debVersion}"
                     , deb_profile = profile
@@ -226,7 +228,7 @@ let pipeline
                     DockerImage.ReleaseSpec::{
                     , deps =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
-                    , service = "mina-rosetta"
+                    , service = Artifacts.dockerName Artifacts.Type.Rosetta
                     , network = network_name
                     , deb_repo = DebianRepo.Type.Local
                     , deb_codename = "${DebianVersions.lowerName debVersion}"

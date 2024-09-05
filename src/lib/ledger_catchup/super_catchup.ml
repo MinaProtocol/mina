@@ -646,10 +646,10 @@ let initial_validate ~context:(module Context : CONTEXT) ~trust_system
       ]
     "initial_validate: verification of proofs complete" ;
   let slot_tx_end =
-    Runtime_config.slot_tx_end_or_default precomputed_values.runtime_config
+    Runtime_config.slot_tx_end precomputed_values.runtime_config
   in
   let slot_chain_end =
-    Runtime_config.slot_chain_end_or_default precomputed_values.runtime_config
+    Runtime_config.slot_chain_end precomputed_values.runtime_config
   in
   verify_transition
     ~context:(module Context)
@@ -1493,6 +1493,7 @@ let%test_module "Ledger_catchup tests" =
       in
       let unprocessed_transition_cache =
         Transition_handler.Unprocessed_transition_cache.create ~logger
+          ~cache_exceptions:true
       in
       run
         ~context:(module Context)
@@ -1754,21 +1755,21 @@ let%test_module "Ledger_catchup tests" =
                 ~frontier_branch_size:(max_frontier_length / 2)
                 ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
                 ?get_some_initial_peers:None ?answer_sync_ledger_query:None
-                ?get_ancestry:None ?get_best_tip:None ?get_node_status:None
+                ?get_ancestry:None ?get_best_tip:None
                 ?get_transition_knowledge:None ?get_transition_chain_proof:None
                 ?get_transition_chain:(Some impl_rpc)
             ; peer_with_branch_custom_rpc
                 ~frontier_branch_size:(max_frontier_length / 2)
                 ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
                 ?get_some_initial_peers:None ?answer_sync_ledger_query:None
-                ?get_ancestry:None ?get_best_tip:None ?get_node_status:None
+                ?get_ancestry:None ?get_best_tip:None
                 ?get_transition_knowledge:None ?get_transition_chain_proof:None
                 ?get_transition_chain:(Some impl_rpc)
             ; peer_with_branch_custom_rpc
                 ~frontier_branch_size:(max_frontier_length / 2)
                 ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
                 ?get_some_initial_peers:None ?answer_sync_ledger_query:None
-                ?get_ancestry:None ?get_best_tip:None ?get_node_status:None
+                ?get_ancestry:None ?get_best_tip:None
                 ?get_transition_knowledge:None ?get_transition_chain_proof:None
                 ?get_transition_chain:(Some impl_rpc)
             ])

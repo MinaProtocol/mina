@@ -1,7 +1,5 @@
 val curve_size : int
 
-val genesis_ledger : string
-
 val default_transaction_fee_string : string
 
 val default_snark_worker_fee_string : string
@@ -19,10 +17,6 @@ val vrf_poll_interval_ms : int
 val network_id : string
 
 val zkapp_cmd_limit : int option
-
-val slot_tx_end : int option
-
-val slot_chain_end : int option
 
 val rpc_handshake_timeout_sec : float
 

@@ -6,6 +6,9 @@
     tests and production.
 *)
 
+include Node_config_version
+include Node_config_unconfigurable_constants
+
 [%%inject "ledger_depth", ledger_depth]
 
 [%%inject "curve_size", curve_size]
@@ -42,8 +45,6 @@ let scan_state_transaction_capacity_log_2 =
 
 [%%inject "scan_state_work_delay", scan_state_work_delay]
 
-[%%inject "cache_exceptions", cache_exceptions]
-
 [%%inject "proof_level", proof_level]
 
 [%%inject "pool_max_size", pool_max_size]
@@ -56,17 +57,9 @@ let scan_state_transaction_capacity_log_2 =
 
 [%%inject "minimum_user_command_fee", minimum_user_command_fee]
 
-[%%inject "protocol_version_transaction", protocol_version_transaction]
-
-[%%inject "protocol_version_network", protocol_version_network]
-
-[%%inject "protocol_version_patch", protocol_version_patch]
-
 [%%inject "supercharged_coinbase_factor", supercharged_coinbase_factor]
 
 [%%inject "plugins", plugins]
-
-[%%inject "genesis_ledger", genesis_ledger]
 
 [%%inject "genesis_state_timestamp", genesis_state_timestamp]
 
@@ -99,30 +92,6 @@ let zkapp_cmd_limit = None
 [%%inject "zkapp_cmd_limit", zkapp_cmd_limit]
 
 let zkapp_cmd_limit = Some zkapp_cmd_limit
-
-[%%endif]
-
-[%%ifndef slot_tx_end]
-
-let slot_tx_end : int option = None
-
-[%%else]
-
-[%%inject "slot_tx_end", slot_tx_end]
-
-let slot_tx_end = Some slot_tx_end
-
-[%%endif]
-
-[%%ifndef slot_chain_end]
-
-let slot_chain_end : int option = None
-
-[%%else]
-
-[%%inject "slot_chain_end", slot_chain_end]
-
-let slot_chain_end = Some slot_chain_end
 
 [%%endif]
 
