@@ -62,8 +62,7 @@ type t =
   ; uptime_send_node_commit : bool [@default false]
   ; stop_time : int
   ; graphql_control_port : int option [@default None]
-  ; vrf_poll_interval_ms : int
-  ; zkapp_cmd_limit : int option
-  ; compaction_interval : int option
+  (*added fields*)
+  ; zkapp_cmd_limit : int option ref
   }
 [@@deriving make]

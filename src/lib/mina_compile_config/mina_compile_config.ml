@@ -4,6 +4,8 @@
     tests and production.
 *)
 
+open Core_kernel
+
 type t = {
   curve_size : int
 ; default_transaction_fee_string : string
@@ -26,7 +28,7 @@ type t = {
 ; max_action_elements : int
 ; zkapp_cmd_limit_hardcap : int
 ; zkapps_disabled : bool
-}
+} [@@deriving bin_io_unversioned]
 
 module Compiled = struct
   let t : t = {

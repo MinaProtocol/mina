@@ -63,6 +63,7 @@ let%test_module "Epoch ledger sync tests" =
                 ; add_genesis_winner = None
                 }
           ; epoch_data = None
+          ; compile_config = Mina_compile_config.Compiled.t
           }
         in
         match%map
@@ -101,6 +102,14 @@ let%test_module "Epoch ledger sync tests" =
         let time_controller = time_controller
 
         let commit_id = "not specified for unit test"
+
+        let vrf_poll_interval_ms = Node_config_for_unit_tests.vrf_poll_interval
+
+        let zkapp_cmd_limit = ref Node_config_for_unit_tests.zkapp_cmd_limit
+
+        let compaction_interval_ms = Node_config_for_unit_tests.compaction_interval
+
+
       end in
       let genesis_ledger =
         lazy

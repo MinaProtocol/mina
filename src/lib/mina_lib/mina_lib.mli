@@ -36,6 +36,13 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val commit_id : string
+
+  val vrf_poll_interval_ms : int
+
+  val zkapp_cmd_limit : int option ref
+
+  val compaction_interval_ms : int option
+
 end
 
 exception Snark_worker_error of int

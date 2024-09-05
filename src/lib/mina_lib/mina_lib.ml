@@ -131,6 +131,9 @@ let subscription t = t.subscriptions
 
 let commit_id t = t.commit_id
 
+let runtime_config { config = { precomputed_values; _ }; _ } =
+  Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values
+
 let peek_frontier frontier_broadcast_pipe =
   Broadcast_pipe.Reader.peek frontier_broadcast_pipe
   |> Result.of_option
@@ -1126,7 +1129,7 @@ let perform_compaction compaction_interval_ms t =
       in
       perform interval_configured
 
-let check_and_stop_daemon t ~wait ~vrf_poll_interval_ms =
+let check_and_stop_daemon t ~wait =
   let uptime_mins =
     Time_ns.(diff (now ()) daemon_start_time |> Span.to_min |> Int.of_float)
   in
@@ -1156,12 +1159,15 @@ let check_and_stop_daemon t ~wait ~vrf_poll_interval_ms =
             if Time.Span.(wait_for > max_catchup_time) then `Now
             else `Check_in wait_for
         | Evaluating_vrf _last_checked_slot ->
+          let vrf_poll_interval_ms = 
+            (runtime_config t).compile_config.vrf_poll_interval_ms
+          in
             `Check_in
               (Core.Time.Span.of_ms
-                 (vrf_poll_interval_ms * 2 |> Int.to_float) )
+                 ( vrf_poll_interval_ms * 2 |> Int.to_float) )
         )
 
-let stop_long_running_daemon t ~vrf_poll_interval_ms =
+let stop_long_running_daemon t =
   let wait_mins = (t.config.stop_time * 60) + (Random.int 10 * 60) in
   [%log' info t.config.logger]
     "Stopping daemon after $wait mins and when there are no blocks to be \
@@ -1180,7 +1186,7 @@ let stop_long_running_daemon t ~vrf_poll_interval_ms =
   in
   let rec go interval =
     upon (after interval) (fun () ->
-        match check_and_stop_daemon t ~wait:wait_mins ~vrf_poll_interval_ms with
+        match check_and_stop_daemon t ~wait:wait_mins with
         | `Now ->
             stop_daemon ()
         | `Check_in tm ->
@@ -1235,9 +1241,9 @@ module type CONTEXT = sig
 
   val vrf_poll_interval_ms : int
 
-  val compaction_interval_ms : int option
+  val zkapp_cmd_limit : int option ref
 
-  val zkapp_cmd_limit : int option
+  val compaction_interval_ms : int option
 
 end
 
@@ -1259,11 +1265,16 @@ let context ~commit_id (config : Config.t) : (module CONTEXT) =
 
     let commit_id = commit_id
 
-    let vrf_poll_interval_ms = failwith "TODO: vrf_poll_interval_ms"
+    let runtime_config = 
+      Genesis_ledger_helper.runtime_config_of_precomputed_values config.precomputed_values
 
-    let compaction_interval_ms = failwith "TODO: compaction_interval_ms"
+    let vrf_poll_interval_ms = 
+        runtime_config.compile_config.vrf_poll_interval_ms
 
-    let zkapp_cmd_limit = failwith "TODO: zkapp_cmd_limit"
+    let zkapp_cmd_limit = config.zkapp_cmd_limit
+
+    let compaction_interval_ms = 
+        runtime_config.compile_config.compaction_interval_ms
   end )
 
 let start t =
@@ -1353,7 +1364,7 @@ let start t =
       ~zkapp_cmd_limit_hardcap:
         t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap 
         ) ;
-  perform_compaction compaction_interval_ms t ;
+  perform_compaction t.config.precomputed_values.runtime_config.compile_config.compaction_interval_ms t ;
   let () =
     match t.config.node_status_url with
     | Some node_status_url ->
@@ -1496,9 +1507,10 @@ let create ~commit_id ?wallets (config : Config.t) =
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
+      let runtime_config = Genesis_ledger_helper.runtime_config_of_precomputed_values config.precomputed_values in
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
           =
-        if Mina_compile_config.itn_features then
+        if runtime_config.compile_config.itn_features then
           let ({ client_port; _ } : Node_addrs_and_ports.t) =
             config.gossip_net_params.addrs_and_ports
           in
@@ -2210,9 +2222,6 @@ let create ~commit_id ?wallets (config : Config.t) =
             } ) )
 
 let net { components = { net; _ }; _ } = net
-
-let runtime_config { config = { precomputed_values; _ }; _ } =
-  Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values
 
 let start_filtered_log
     ({ in_memory_reverse_structured_log_messages_for_integration_test
