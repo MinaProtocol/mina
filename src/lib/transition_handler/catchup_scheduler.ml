@@ -226,7 +226,7 @@ let watch t ~timeout_duration ~cached_transition ~valid_cb =
           Gauge.dec_one
             Transition_frontier_controller.transitions_in_catchup_scheduler) ;
         remove_tree t parent_hash ;
-        [%log' info t.logger]
+        [%log' trace t.logger]
           ~metadata:
             [ ("parent_hash", Mina_base.State_hash.to_yojson parent_hash)
             ; ( "duration"

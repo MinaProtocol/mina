@@ -26,12 +26,13 @@ struct
         [offset] is generated randomly, uniformly chosen between 0 and
         [new_length]. *)
     let update ~logger ~new_length =
-     Logger.trace logger ~module_:__MODULE__ ~location:__LOC__ ("update : offset is %d, prev_length - new_length is %d") !offset (!prev_length - new_length) ;
+     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ ("update : new_length is %d") new_length ;
+     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ ("update : offset is %d, prev_length - new_length is %d") !offset (!prev_length - new_length) ;
       let () =
         if new_length = !prev_length || new_length = !prev_length - 1 then ()
         else let () = offset := Random.int 100
       in
-      let () = Logger.trace logger ~module_:__MODULE__ ~location:__LOC__ ("update : offset updated to %d, prev_length - new_length is %d") !offset  (!prev_length - new_length) in ()
+      let () = Logger.info logger ~module_:__MODULE__ ~location:__LOC__ ("update : offset updated to %d, prev_length - new_length is %d") !offset  (!prev_length - new_length) in ()
       in
       prev_length := new_length
 

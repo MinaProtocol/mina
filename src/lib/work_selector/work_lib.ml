@@ -111,15 +111,18 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                   false )
                 else true ) )
 
-    let remove t x =
-      t.jobs_seen <-
-        Map.remove t.jobs_seen (One_or_two.map ~f:Work_spec.statement x)
+
 
     let set t x =
       t.jobs_seen <-
         Map.set t.jobs_seen
           ~key:(One_or_two.map ~f:Work_spec.statement x)
           ~data:(Job_status.Assigned (Time.now ()))
+
+
+    let remove t x =
+      t.jobs_seen <-
+        Map.remove t.jobs_seen (One_or_two.map ~f:Work_spec.statement x)
   end
 
   let does_not_have_better_fee ~snark_pool ~fee
@@ -128,6 +131,10 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       (Inputs.Snark_pool.get_completed_work snark_pool statements)
       ~f:(fun priced_proof ->
         let competing_fee = Inputs.Transaction_snark_work.fee priced_proof in
+        let logger = Logger.create () in
+        let log_msg = Format.asprintf "Fee: %d , competing_fee: %d" (Fee.to_mina_int fee)
+          (Fee.to_mina_int competing_fee) in
+        [%log info] "$log_msg" ~metadata:[("log_msg", `String log_msg)] ;
         Fee.compare fee competing_fee < 0 )
 
   module For_tests = struct
@@ -154,9 +161,22 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     let expensive_work statements ~fee =
       List.filter statements ~f:(does_not_have_better_fee ~snark_pool ~fee)
     in
+    (* log the fee opt and the expensive work size *)
+    let logger = Logger.create () in
+
+    [%log info] "all_todo_statements: $all_todo_statements"
+      ~metadata:
+        [ ( "all_todo_statements"
+          , `Int (List.length all_todo_statements) ) ] ;
     match fee_opt with
     | None ->
+        [%log info] "No fee opt" ;
         all_pending_work ~snark_pool all_todo_statements
     | Some fee ->
-        expensive_work all_todo_statements ~fee
+        let ew = expensive_work all_todo_statements ~fee in 
+        (* log fee amount and expensive work size *)
+        let log_msg = Format.asprintf "Fee: %d , expensive_work: %d" (Fee.to_mina_int fee)
+          (List.length ew) in
+        [%log info] "$log_msg" ~metadata:[("log_msg", `String log_msg)] ;
+        ew
 end

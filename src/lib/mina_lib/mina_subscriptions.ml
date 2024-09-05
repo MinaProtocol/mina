@@ -254,7 +254,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                              [ Yojson.Safe.to_string
                                  (Lazy.force precomputed_block)
                              ] ) ) ;
-                   [%log info] "Saw block with state hash $state_hash"
+                   [%log trace] "Saw block with state hash $state_hash"
                      ~metadata:
                        [ ( "state_hash"
                          , `String (State_hash.to_base58_check hash) )
