@@ -18,11 +18,11 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
-let RunWithPostgres = ../../Command/RunWithPostgres.dhall
+let Artifacts = ../../Constants/Artifacts.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
