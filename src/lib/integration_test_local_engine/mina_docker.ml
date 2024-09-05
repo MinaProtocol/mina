@@ -47,7 +47,8 @@ module Network_config = struct
   [@@deriving to_yojson]
 
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
-      ~(images : Test_config.Container_images.t) ~constants =
+      ~(images : Test_config.Container_images.t) ~(test_config : Test_config.t)
+      ~(constants : Test_config.constants) =
     let _ = cli_inputs in
     let ({ genesis_ledger
          ; epoch_data
@@ -70,7 +71,7 @@ module Network_config = struct
          ; _
          }
           : Test_config.t ) =
-      Test_config.default ~constants
+      test_config
     in
     let git_commit = Mina_version.commit_id_short in
     let stack_name = "it-" ^ git_commit ^ "-" ^ test_name in

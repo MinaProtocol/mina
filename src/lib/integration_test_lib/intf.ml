@@ -38,6 +38,7 @@ module Engine = struct
       -> cli_inputs:Cli_inputs.t
       -> debug:bool
       -> images:Test_config.Container_images.t
+      -> test_config:Test_config.t
       -> constants:Test_config.constants
       -> t
   end

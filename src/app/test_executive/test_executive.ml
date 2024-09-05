@@ -294,11 +294,12 @@ let main inputs =
     ; points = "codaprotocol/coda-points-hack:32b.4"
     }
   in
-  let%bind () = validate_inputs ~logger inputs (T.config ~constants) in
+  let test_config = T.config ~constants in
+  let%bind () = validate_inputs ~logger inputs test_config in
   [%log trace] "expanding network config" ;
   let network_config =
     Engine.Network_config.expand ~logger ~test_name ~cli_inputs
-      ~debug:inputs.debug ~constants ~images
+      ~debug:inputs.debug ~constants ~images ~test_config
   in
   (* resources which require additional cleanup at end of test *)
   let net_manager_ref : Engine.Network_manager.t option ref = ref None in
