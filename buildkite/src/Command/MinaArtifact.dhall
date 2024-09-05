@@ -220,8 +220,8 @@ let docker_step
                         "${DebianVersions.lowerName spec.debVersion}"
                     , step_key =
                         "rosetta-berkeley-${DebianVersions.lowerName
-                                     spec.debVersion}${BuildFlags.toLabelSegment
-                                                         spec.buildFlags}-docker-image"
+                                              spec.debVersion}${BuildFlags.toLabelSegment
+                                                                  spec.buildFlags}-docker-image"
                     }
                   ]
                 , ZkappTestTransaction =
