@@ -66,11 +66,6 @@ let dependsOn =
                     , key = key
                     }
                   ]
-                , Bullseye =
-                  [ { name = "${prefix}${capitalName docker}${profileSuffix}"
-                    , key = "${binary}-${lowerName docker}-${suffix}"
-                    }
-                  ]
                 , Jammy =
                   [ { name = "${prefix}${capitalName docker}${profileSuffix}"
                     , key = key

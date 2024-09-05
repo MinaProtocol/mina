@@ -2,10 +2,6 @@ let Prelude = ../External/Prelude.dhall
 
 let P = Prelude
 
-let Optional/map = Prelude.Optional.map
-
-let Optional/default = Prelude.Optional.default
-
 let Text/concatMap = P.Text.concatMap
 
 let Cmd = ../Lib/Cmds.dhall
@@ -39,15 +35,6 @@ let runInDockerWithPostgresConn
           let dockerVersion = ContainerImages.postgres
 
           let dbName = "archive"
-
-          let maybeNetwork =
-                Optional/map
-                  Network.Type
-                  Text
-                  (\(network : Network.Type) -> "-${Network.lowerName network}")
-                  network
-
-          let networkOrDefault = Optional/default Text "" maybeNetwork
 
           let pg_conn =
                 "postgres://${user}:${password}@localhost:${port}/${dbName}"

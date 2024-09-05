@@ -16,6 +16,14 @@ let Command = ../../Command/Base.dhall
 
 let Size = ../../Command/Size.dhall
 
+let Network = ../../Constants/Network.dhall
+
+let Profiles = ../../Constants/Profiles.dhall
+
+let Artifacts = ../../Constants/Artifacts.dhall
+
+let Dockers = ../../Constants/DockerVersions.dhall
+
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let dirtyWhen =
