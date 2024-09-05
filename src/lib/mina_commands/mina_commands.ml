@@ -441,7 +441,7 @@ let get_status ~commit_id ~flag t =
     let%bind frontier =
       Mina_lib.transition_frontier t |> Pipe_lib.Broadcast_pipe.Reader.peek
     in
-    match Transition_frontier.catchup_tree frontier with
+    match Transition_frontier.catchup_state frontier with
     | Full full ->
         Some
           (List.map (Hashtbl.to_alist full.states) ~f:(fun (state, hashes) ->
