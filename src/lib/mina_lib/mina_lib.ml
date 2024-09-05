@@ -1062,8 +1062,8 @@ let last_epoch_delegators t ~pk =
   in
   find_delegators last_epoch_delegatee_table pk
 
-let perform_compaction t =
-  match Mina_compile_config.compaction_interval_ms with
+let perform_compaction compaction_interval_ms t =
+  match compaction_interval_ms with
   | None ->
       ()
   | Some compaction_interval_compiled ->
@@ -1126,7 +1126,7 @@ let perform_compaction t =
       in
       perform interval_configured
 
-let check_and_stop_daemon t ~wait =
+let check_and_stop_daemon t ~wait ~vrf_poll_interval_ms =
   let uptime_mins =
     Time_ns.(diff (now ()) daemon_start_time |> Span.to_min |> Int.of_float)
   in
@@ -1158,10 +1158,10 @@ let check_and_stop_daemon t ~wait =
         | Evaluating_vrf _last_checked_slot ->
             `Check_in
               (Core.Time.Span.of_ms
-                 (Mina_compile_config.vrf_poll_interval_ms * 2 |> Int.to_float) )
+                 (vrf_poll_interval_ms * 2 |> Int.to_float) )
         )
 
-let stop_long_running_daemon t =
+let stop_long_running_daemon t ~vrf_poll_interval_ms =
   let wait_mins = (t.config.stop_time * 60) + (Random.int 10 * 60) in
   [%log' info t.config.logger]
     "Stopping daemon after $wait mins and when there are no blocks to be \
@@ -1180,7 +1180,7 @@ let stop_long_running_daemon t =
   in
   let rec go interval =
     upon (after interval) (fun () ->
-        match check_and_stop_daemon t ~wait:wait_mins with
+        match check_and_stop_daemon t ~wait:wait_mins ~vrf_poll_interval_ms with
         | `Now ->
             stop_daemon ()
         | `Check_in tm ->
@@ -1232,6 +1232,13 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val commit_id : string
+
+  val vrf_poll_interval_ms : int
+
+  val compaction_interval_ms : int option
+
+  val zkapp_cmd_limit : int option
+
 end
 
 let context ~commit_id (config : Config.t) : (module CONTEXT) =
@@ -1251,6 +1258,12 @@ let context ~commit_id (config : Config.t) : (module CONTEXT) =
     let constraint_constants = precomputed_values.constraint_constants
 
     let commit_id = commit_id
+
+    let vrf_poll_interval_ms = failwith "TODO: vrf_poll_interval_ms"
+
+    let compaction_interval_ms = failwith "TODO: compaction_interval_ms"
+
+    let zkapp_cmd_limit = failwith "TODO: zkapp_cmd_limit"
   end )
 
 let start t =
@@ -1338,8 +1351,9 @@ let start t =
       ~block_produced_bvar:t.components.block_produced_bvar
       ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net
       ~zkapp_cmd_limit_hardcap:
-        t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap ) ;
-  perform_compaction t ;
+        t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap 
+        ) ;
+  perform_compaction compaction_interval_ms t ;
   let () =
     match t.config.node_status_url with
     | Some node_status_url ->
