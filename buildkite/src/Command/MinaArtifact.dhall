@@ -219,7 +219,7 @@ let docker_step
                     , deb_codename =
                         "${DebianVersions.lowerName spec.debVersion}"
                     , step_key =
-                        "rosetta-${DebianVersions.lowerName
+                        "rosetta-${spec.network}-${DebianVersions.lowerName
                                      spec.debVersion}${BuildFlags.toLabelSegment
                                                          spec.buildFlags}-docker-image"
                     }
