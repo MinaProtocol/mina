@@ -772,11 +772,42 @@ let snarked_ledger_state :
       ] )
 
 module SnarkedLedgerMembership = struct
+  type encoded_account = { account : string; proof : Ledger.path }
+
+  let encoded_obj =
+    obj "EncodedAccount" ~fields:(fun _ ->
+        [ field "account"
+            ~args:Arg.[]
+            ~doc:"Base64 encoded account as binable wire type"
+            ~typ:(non_null string)
+            ~resolve:(fun _ { account; _ } -> account)
+        ; field "merklePath"
+            ~args:Arg.[]
+            ~doc:"Membership proof in the snarked ledger"
+            ~typ:(non_null (list (non_null merkle_path_element)))
+            ~resolve:(fun _ { proof; _ } -> proof)
+        ] )
+
+  let of_encoded_account (proof : Ledger.path) (account : Account.t) :
+      encoded_account =
+    let account =
+      Binable.to_string (module Account.Binable_arg.Stable.Latest) account
+      |> Base64.encode_exn
+    in
+    { account; proof }
+
   type t =
     { account_balance : Currency.Balance.t
     ; timing_info : Account_timing.t
     ; nonce : Account.Nonce.t
     ; proof : Ledger.path
+    }
+
+  let of_account (proof : Ledger.path) (account : Account.t) : t =
+    { account_balance = account.balance
+    ; timing_info = account.timing
+    ; nonce = account.nonce
+    ; proof
     }
 
   let obj =

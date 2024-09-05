@@ -14,13 +14,18 @@ let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
+let Artifacts = ../../Constants/Artifacts.dhall
+
+let Network = ../../Constants/Network.dhall
+
 let Dockers = ../../Constants/DockerVersions.dhall
 
 let dependsOn =
       Dockers.dependsOn
         Dockers.Type.Bullseye
+        (Some Network.Type.Berkeley)
         Profiles.Type.Standard
-        "daemon-berkeley"
+        Artifacts.Type.Daemon
 
 in  Pipeline.build
       Pipeline.Config::{
