@@ -212,14 +212,14 @@ let docker_step
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = "mina-rosetta"
-                    , network = "berkeley"
+                    , network = Network.lowerName n
                     , build_flags = spec.buildFlags
                     , deb_repo = DebianRepo.Type.Local
                     , deb_profile = spec.profile
                     , deb_codename =
                         "${DebianVersions.lowerName spec.debVersion}"
                     , step_key =
-                        "rosetta-${spec.network}-${DebianVersions.lowerName
+                        "rosetta-${Network.lowername n}-${DebianVersions.lowerName
                                      spec.debVersion}${BuildFlags.toLabelSegment
                                                          spec.buildFlags}-docker-image"
                     }
