@@ -212,7 +212,7 @@ let docker_step
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = "mina-rosetta"
-                    , network = Network.lowerName n
+                    , network = Network.lowerName Network.Type.Berkeley
                     , build_flags = spec.buildFlags
                     , deb_repo = DebianRepo.Type.Local
                     , deb_profile = spec.profile
