@@ -14,12 +14,21 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
+let Network = ../../Constants/Network.dhall
+
+let Artifacts = ../../Constants/Artifacts.dhall
+
 let dependsOn =
         Dockers.dependsOn
           Dockers.Type.Bullseye
+          (Some Network.Type.Berkeley)
           Profiles.Type.Standard
-          "daemon-berkeley"
-      # Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "archive"
+          Artifacts.Type.Rosetta
+      # Dockers.dependsOn
+          Dockers.Type.Bullseye
+          (None Network.Type)
+          Profiles.Type.Standard
+          Artifacts.Type.Archive
 
 in  Pipeline.build
       Pipeline.Config::{

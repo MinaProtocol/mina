@@ -16,6 +16,14 @@ let Command = ../../Command/Base.dhall
 
 let Size = ../../Command/Size.dhall
 
+let Network = ../../Constants/Network.dhall
+
+let Profiles = ../../Constants/Profiles.dhall
+
+let Artifacts = ../../Constants/Artifacts.dhall
+
+let Dockers = ../../Constants/DockerVersions.dhall
+
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let dirtyWhen =
@@ -47,7 +55,7 @@ in  Pipeline.build
               , Cmd.runInDocker
                   Cmd.Docker::{
                   , image =
-                      "gcr.io/o1labs-192920/mina-rosetta:\\\${MINA_DOCKER_TAG}"
+                      "gcr.io/o1labs-192920/mina-rosetta:\\\${MINA_DOCKER_TAG}-berkeley"
                   }
                   "buildkite/scripts/rosetta-integration-tests-full.sh"
               ]
@@ -56,10 +64,11 @@ in  Pipeline.build
             , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Small
             , depends_on =
-              [ { name = "MinaArtifactBullseye"
-                , key = "rosetta-bullseye-docker-image"
-                }
-              ]
+                Dockers.dependsOn
+                  Dockers.Type.Bullseye
+                  (Some Network.Type.Berkeley)
+                  Profiles.Type.Standard
+                  Artifacts.Type.Rosetta
             }
         ]
       }

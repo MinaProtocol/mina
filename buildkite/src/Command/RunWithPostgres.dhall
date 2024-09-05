@@ -10,11 +10,19 @@ let ContainerImages = ../Constants/ContainerImages.dhall
 
 let Artifacts = ../Constants/Artifacts.dhall
 
+let Network = ../Constants/Network.dhall
+
 let runInDockerWithPostgresConn
-    : List Text -> Text -> Artifacts.Type -> Text -> Cmd.Type
+    :     List Text
+      ->  Text
+      ->  Artifacts.Type
+      ->  Optional Network.Type
+      ->  Text
+      ->  Cmd.Type
     =     \(environment : List Text)
       ->  \(initScript : Text)
       ->  \(docker : Artifacts.Type)
+      ->  \(network : Optional Network.Type)
       ->  \(innerScript : Text)
       ->  let port = "5432"
 
