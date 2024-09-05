@@ -157,7 +157,8 @@ let docker_step
                       (     \(n : Network.Type)
                         ->  DockerImage.ReleaseSpec::{
                             , deps = deps
-                            , service = "mina-daemon"
+                            , service =
+                                Artifacts.dockerName Artifacts.Type.Daemon
                             , network = Network.lowerName n
                             , deb_codename =
                                 "${DebianVersions.lowerName spec.debVersion}"
