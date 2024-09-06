@@ -124,7 +124,8 @@ module Base_node_config = struct
 
   let default ?(runtime_config_path = None) ?(peer = None)
       ?(start_filtered_logs = []) =
-    { runtime_config_path
+      let runtime_config_path = Option.value ~default:("/var/lib/coda/berkeley.json") runtime_config_path in
+    { runtime_config_path = Some runtime_config_path
     ; peer
     ; log_snark_work_gossip = true
     ; log_txn_pool_gossip = true
@@ -188,7 +189,7 @@ module Base_node_config = struct
       | Some path ->
           [ "-config-file"; path ]
       | None ->
-          []
+          [ "-config-file"; "/var/lib/coda/berkeley.json" ]
     in
     List.concat
       [ base_args; runtime_config_path; peer_args; start_filtered_logs_args ]
@@ -276,9 +277,15 @@ module Seed_config = struct
     let seed_args =
       match config.archive_address with
       | Some archive_address ->
-          [ "daemon"; "-seed"; "-archive-address"; archive_address ]
+          [ "daemon"
+          ; "-seed"
+          ; "-archive-address"
+          ; archive_address
+          ; "-config-file"
+          ; "/var/lib/coda/berkeley.json"
+          ]
       | None ->
-          [ "daemon"; "-seed" ]
+          [ "daemon"; "-seed"; "-config-file"; "/var/lib/coda/berkeley.json" ]
     in
     List.concat [ seed_args; base_args ]
 
