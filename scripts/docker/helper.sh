@@ -18,7 +18,7 @@ function export_base_image () {
 
 function export_version () {
     case "${SERVICE}" in
-        mina-daemon|mina-batch-txn) export VERSION="${VERSION}-${NETWORK##*=}" ;;
+        mina-daemon|mina-batch-txn|mina-rosetta) export VERSION="${VERSION}-${NETWORK##*=}" ;;
         *)  ;;
 esac
 }
