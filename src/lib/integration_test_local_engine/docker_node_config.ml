@@ -124,7 +124,9 @@ module Base_node_config = struct
 
   let default ?(runtime_config_path = None) ?(peer = None)
       ?(start_filtered_logs = []) =
-      let runtime_config_path = Option.value ~default:("/var/lib/coda/berkeley.json") runtime_config_path in
+    let runtime_config_path =
+      Option.value ~default:"/var/lib/coda/berkeley.json" runtime_config_path
+    in
     { runtime_config_path = Some runtime_config_path
     ; peer
     ; log_snark_work_gossip = true
