@@ -1,4 +1,3 @@
-
 open Core_kernel
 
 let min_capacity = 64
