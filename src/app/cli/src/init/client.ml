@@ -519,9 +519,7 @@ let send_payment_graphql =
     Args.zip3
       (Cli_lib.Flag.signed_command_common
          ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
-         ~default_transaction_fee:
-           (Currency.Fee.of_mina_string_exn
-              compile_config.default_transaction_fee_string ) )
+         ~default_transaction_fee:compile_config.default_transaction_fee )
       receiver_flag amount_flag
   in
   Command.async ~summary:"Send payment to an address"
@@ -556,9 +554,7 @@ let delegate_stake_graphql =
     Args.zip2
       (Cli_lib.Flag.signed_command_common
          ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
-         ~default_transaction_fee:
-           (Currency.Fee.of_mina_string_exn
-              compile_config.default_transaction_fee_string ) )
+         ~default_transaction_fee:compile_config.default_transaction_fee )
       receiver_flag
   in
   Command.async ~summary:"Delegate your stake to another public key"
@@ -2342,7 +2338,7 @@ let itn_create_accounts =
       flag "--fee"
         ~doc:
           (sprintf "NN Fee in nanomina paid to create an account (minimum: %s)"
-             compile_config.minimum_user_command_fee_string )
+             (Currency.Fee.to_string compile_config.minimum_user_command_fee) )
         (required int)
     in
     let amount =

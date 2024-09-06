@@ -397,10 +397,7 @@ let output_there_and_back_cmds =
             format `<ip>:<port>`.  default is `127.0.0.1:3085`"
          (optional string)
      and minimum_user_command_fee =
-       let default =
-         Currency.Fee.of_mina_string_exn
-           compile_config.default_transaction_fee_string
-       in
+       let default = compile_config.default_transaction_fee in
        Cli_lib.Flag.fee_common
          ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
          ~default_transaction_fee:default

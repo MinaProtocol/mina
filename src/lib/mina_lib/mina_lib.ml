@@ -1064,8 +1064,8 @@ let last_epoch_delegators t ~pk =
   in
   find_delegators last_epoch_delegatee_table pk
 
-let perform_compaction compaction_interval_ms t =
-  match compaction_interval_ms with
+let perform_compaction compaction_interval t =
+  match compaction_interval with
   | None ->
       ()
   | Some compaction_interval_compiled ->
@@ -1087,7 +1087,7 @@ let perform_compaction compaction_interval_ms t =
         | Some ms ->
             Time.Span.of_ms (Float.of_string ms)
         | None ->
-            span compaction_interval_compiled
+            compaction_interval_compiled
       in
       if Time.Span.(interval_configured <= of_ms expected_time_for_compaction)
       then (
@@ -1158,12 +1158,10 @@ let check_and_stop_daemon t ~wait =
             if Time.Span.(wait_for > max_catchup_time) then `Now
             else `Check_in wait_for
         | Evaluating_vrf _last_checked_slot ->
-            let vrf_poll_interval_ms =
-              (config t).compile_config.vrf_poll_interval_ms
+            let vrf_poll_interval =
+              (config t).compile_config.vrf_poll_interval
             in
-            `Check_in
-              (Core.Time.Span.of_ms (vrf_poll_interval_ms * 2 |> Int.to_float))
-        )
+            `Check_in (Core.Time.Span.scale vrf_poll_interval 2.0) )
 
 let stop_long_running_daemon t =
   let wait_mins = (t.config.stop_time * 60) + (Random.int 10 * 60) in
@@ -1237,11 +1235,11 @@ module type CONTEXT = sig
 
   val commit_id : string
 
-  val vrf_poll_interval_ms : int
+  val vrf_poll_interval : Time.Span.t
 
   val zkapp_cmd_limit : int option ref
 
-  val compaction_interval_ms : int option
+  val compaction_interval : Time.Span.t option
 end
 
 let context ~commit_id (config : Config.t) : (module CONTEXT) =
@@ -1262,11 +1260,11 @@ let context ~commit_id (config : Config.t) : (module CONTEXT) =
 
     let commit_id = commit_id
 
-    let vrf_poll_interval_ms = config.compile_config.vrf_poll_interval_ms
+    let vrf_poll_interval = config.compile_config.vrf_poll_interval
 
     let zkapp_cmd_limit = config.zkapp_cmd_limit
 
-    let compaction_interval_ms = config.compile_config.compaction_interval_ms
+    let compaction_interval = config.compile_config.compaction_interval
   end )
 
 let start t =
@@ -1355,7 +1353,7 @@ let start t =
       ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net
       ~zkapp_cmd_limit_hardcap:
         t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap ) ;
-  perform_compaction t.config.compile_config.compaction_interval_ms t ;
+  perform_compaction t.config.compile_config.compaction_interval t ;
   let () =
     match t.config.node_status_url with
     | Some node_status_url ->

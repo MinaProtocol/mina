@@ -37,11 +37,11 @@ module type CONTEXT = sig
 
   val commit_id : string
 
-  val vrf_poll_interval_ms : int
+  val vrf_poll_interval : Time.Span.t
 
   val zkapp_cmd_limit : int option ref
 
-  val compaction_interval_ms : int option
+  val compaction_interval : Time.Span.t option
 end
 
 exception Snark_worker_error of int

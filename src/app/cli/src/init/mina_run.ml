@@ -597,16 +597,17 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                Deferred.unit )
              else
                Rpc.Connection.server_with_close
-                 ~handshake_timeout:
-                   (Time.Span.of_sec compile_config.rpc_handshake_timeout_sec)
+                 ~handshake_timeout:compile_config.rpc_handshake_timeout
                  ~heartbeat_config:
                    (Rpc.Connection.Heartbeat_config.create
                       ~timeout:
                         (Time_ns.Span.of_sec
-                           compile_config.rpc_heartbeat_timeout_sec )
+                           (Time.Span.to_sec
+                              compile_config.rpc_heartbeat_timeout ) )
                       ~send_every:
                         (Time_ns.Span.of_sec
-                           compile_config.rpc_heartbeat_send_every_sec )
+                           (Time.Span.to_sec
+                              compile_config.rpc_heartbeat_send_every ) )
                       () )
                  reader writer
                  ~implementations:

@@ -146,8 +146,8 @@ end]
 
 let metadata t = t.metadata
 
-let create ?metadata:_ ?(id = "default") ?(itn_features = false) () =
-  { null = false; metadata = Metadata.empty; id; itn_features }
+let create ?metadata:_ ?(id = "default") ?itn_features:_ () =
+  { null = false; metadata = Metadata.empty; id; itn_features = false }
 
 let null () =
   { null = true
