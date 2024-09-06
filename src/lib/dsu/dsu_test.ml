@@ -9,13 +9,20 @@ module MockData : Data with type t = int = struct
 end
 
 (* Instantiate the DSU with int keys and mock data *)
-module IntKey = Dsu (Int) (MockData)
+module IntKeyDsu = Dsu (Int) (MockData)
 
-(*
 (* Test creating a new DSU *)
 let test_create () =
   let dsu = IntKeyDsu.create () in
-  (* Initially, the DSU should be empty, trying to get any element should return None *)
   Alcotest.(check (option int)) "empty DSU" (IntKeyDsu.get ~key:1 dsu) None
 
-*)
+
+(* alcotest harness *)
+let tests = [
+  "test_create", `Quick, test_create;
+]
+
+let () =
+  run "dsu" [
+    "dsu", tests;
+  ]
