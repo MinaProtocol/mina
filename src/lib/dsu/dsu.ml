@@ -33,7 +33,10 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
 
   let init_array =
     Array.init ~f:(fun i ->
-        { value = None; parent = i; rank = (if i = 0 then infinity_rank else 0) } )
+        { value = None
+        ; parent = i
+        ; rank = (if i = 0 then infinity_rank else 0)
+        } )
 
   let create () =
     { arr = init_array min_capacity
@@ -122,9 +125,10 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
       if rank ~id:a t < rank ~id:b t then update b a else update a b
 
   let add_exn ~key ~value t =
-    print_endline @@ sprintf "Adding key to array of size %d" (Array.length t.arr) ;
+    print_endline
+    @@ sprintf "Adding key to array of size %d" (Array.length t.arr) ;
     let id = allocate_id t in
-    print_endline @@ sprintf "finished allocation with occupqncy %d" t.occupancy ; 
+    print_endline @@ sprintf "finished allocation with occupqncy %d" t.occupancy ;
     Hashtbl.add_exn ~key ~data:id t.key_to_id ;
     Array.set t.arr id { value = Some value; parent = id; rank = 0 } ;
     t.occupancy <- t.occupancy + 1
@@ -139,9 +143,9 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
           && t.occupancy lsl 2 < Array.length t.arr
         then resize ~inc:0 t )
   *)
-  
-  let remove ~key t = 
-    let _ = key in  
+
+  let remove ~key t =
+    let _ = key in
     let _ = t in
     failwith "Not implemented"
 
