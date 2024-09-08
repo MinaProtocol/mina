@@ -20,7 +20,7 @@ let test_create () =
 (* Test adding a single element to the dsu *)
 let test_add () =
   let dsu = IntKeyDsu.create () in
-  IntKeyDsu.add_exn ~key:1 ~data:1 dsu ;
+  IntKeyDsu.add_exn ~key:1 ~value:1 dsu ;
   Alcotest.(check (option int))
     "added element" (IntKeyDsu.get ~key:1 dsu) (Some 1)
 
@@ -33,7 +33,7 @@ let test_add_array () =
   Printf.printf "Array size: %d\n" (Array.length arr) ;
 
   (* add each element to the dsu *)
-  Array.iter arr ~f:(fun x -> IntKeyDsu.add_exn ~key:x ~data:x dsu) ;
+  Array.iter arr ~f:(fun x -> IntKeyDsu.add_exn ~key:x ~value:x dsu) ;
   Array.iter arr ~f:(fun x ->
       Alcotest.(check (option int))
         "added element" (IntKeyDsu.get ~key:x dsu) (Some x) )

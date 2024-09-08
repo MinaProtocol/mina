@@ -14,13 +14,13 @@ end
     Also read: https://cp-algorithms.com/data_structures/disjoint_set_union.html
 *)
 module Dsu : functor (Key : Hashtbl.Key) (D : Data) -> sig
-  type element_t = { data : D.t option; parent : int; rank : int }
+  type element = { value : D.t option; parent : int; rank : int }
 
   type t
 
   val create : unit -> t
 
-  val add_exn : key:Key.t -> data:D.t -> t -> unit
+  val add_exn : key:Key.t -> value:D.t -> t -> unit
 
   val remove : key:Key.t -> t -> unit
 
