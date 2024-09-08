@@ -1,9 +1,9 @@
 open Core_kernel
 
 let min_capacity = 64
+let infinity_rank = Int.max_value lsr 1
 
 type resizing_opt = Double | Half
-
 module type Data = sig
   type t
 
@@ -30,7 +30,8 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
     }
 
   let init_array =
-    Array.init ~f:(fun i -> { value = None; parent = i; rank = 0 })
+    Array.init ~f:(fun i -> { value = None; parent = i; rank = 
+    if i = 0 then infinity_rank else 0 })
 
   let create () =
     { arr = init_array min_capacity
@@ -92,7 +93,6 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
     Array.set t.arr id { value = Some value; parent = id; rank = 0 } ;
     t.occupancy <- t.occupancy + 1
 
-  (*
   let remove ~key t =
     Option.iter (Hashtbl.find_and_remove t.key_to_id key) ~f:(fun id ->
         union_sets t id 0 ;
@@ -100,13 +100,7 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
         if
           Array.length t.arr > min_capacity
           && t.occupancy lsl 2 < Array.length t.arr
-        then resize ~inc:0 t )
-  *)
-
-  let remove ~key t =
-    let _ = key in
-    let _ = t in
-    failwith "Not implemented"
+        then resize t Half )
 
   let get ~key t =
     let%bind.Option id = Hashtbl.find t.key_to_id key in
