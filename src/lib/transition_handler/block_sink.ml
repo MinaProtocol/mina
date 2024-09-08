@@ -19,6 +19,7 @@ type block_sink_config =
   ; consensus_constants : Consensus.Constants.t
   ; genesis_constants : Genesis_constants.t
   ; constraint_constants : Genesis_constants.Constraint_constants.t
+  ; block_window_duration : Time.Span.t
   }
 
 type t =
@@ -32,6 +33,7 @@ type t =
       ; consensus_constants : Consensus.Constants.t
       ; genesis_constants : Genesis_constants.t
       ; constraint_constants : Genesis_constants.Constraint_constants.t
+      ; block_window_duration : Time.Span.t
       }
   | Void
 
@@ -53,10 +55,14 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       ; consensus_constants
       ; genesis_constants
       ; constraint_constants
+      ; block_window_duration
       } ->
       O1trace.sync_thread "handle_block_gossip"
       @@ fun () ->
       let%bind () = on_push () in
+      let module Metrics_Context = struct
+        let block_window_duration = block_window_duration
+      end in
       Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
       let state = Envelope.Incoming.data e in
       let state_hash =
@@ -85,15 +91,19 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
         Block_time.(now time_controller |> to_time_exn)
       in
       don't_wait_for
-        ( match%map Mina_net2.Validation_callback.await cb with
+        ( match%map
+            Mina_net2.Validation_callback.await ~block_window_duration cb
+          with
         | Some `Accept ->
             let processing_time_span =
               Time.diff
                 Block_time.(now time_controller |> to_time_exn)
                 processing_start_time
             in
-            Mina_metrics.Block_latency.(
-              Validation_acceptance_time.update processing_time_span)
+            let module Validation_acceptance_time =
+              Mina_metrics.Block_latency.Validation_acceptance_time
+                (Metrics_Context) in
+            Validation_acceptance_time.update processing_time_span
         | Some _ ->
             ()
         | None ->
@@ -182,9 +192,12 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
           (Consensus.Data.Consensus_time.of_time_exn
              ~constants:consensus_constants tm )
       in
-      Mina_metrics.Block_latency.Gossip_slots.update
-        (Float.of_int (tm_slot - tn_production_slot)) ;
-      Mina_metrics.Block_latency.Gossip_time.update
+      let module Gossip_slots =
+        Mina_metrics.Block_latency.Gossip_slots (Metrics_Context) in
+      Gossip_slots.update (Float.of_int (tm_slot - tn_production_slot)) ;
+      let module Gossip_time =
+        Mina_metrics.Block_latency.Gossip_time (Metrics_Context) in
+      Gossip_time.update
         Block_time.(Span.to_time_span @@ diff tm tn_production_time) ;
       Deferred.unit
 
@@ -204,6 +217,7 @@ let create
     ; consensus_constants
     ; genesis_constants
     ; constraint_constants
+    ; block_window_duration
     } =
   let rate_limiter =
     Network_pool.Rate_limiter.create
@@ -225,6 +239,7 @@ let create
       ; consensus_constants
       ; genesis_constants
       ; constraint_constants
+      ; block_window_duration
       } )
 
 let void = Void

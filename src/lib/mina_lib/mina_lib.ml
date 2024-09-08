@@ -1240,6 +1240,8 @@ module type CONTEXT = sig
   val zkapp_cmd_limit : int option ref
 
   val compaction_interval : Time.Span.t option
+
+  val compile_config : Mina_compile_config.t
 end
 
 let context ~commit_id (config : Config.t) : (module CONTEXT) =
@@ -1265,6 +1267,8 @@ let context ~commit_id (config : Config.t) : (module CONTEXT) =
     let zkapp_cmd_limit = config.zkapp_cmd_limit
 
     let compaction_interval = config.compile_config.compaction_interval
+
+    let compile_config = config.compile_config
   end )
 
 let start t =
@@ -1494,6 +1498,7 @@ let create ~commit_id ?wallets (config : Config.t) =
   let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
+  let block_window_duration = config.compile_config.block_window_duration in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
@@ -1834,6 +1839,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~on_remote_push:notify_online
               ~log_gossip_heard:
                 config.net_config.log_gossip_heard.transaction_pool_diff
+              ~block_window_duration
           in
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
@@ -1848,6 +1854,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~on_remote_push:notify_online
               ~log_gossip_heard:
                 config.net_config.log_gossip_heard.snark_pool_diff
+              ~block_window_duration
           in
           let block_reader, block_sink =
             Transition_handler.Block_sink.create
@@ -1860,6 +1867,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ; consensus_constants
               ; genesis_constants = config.precomputed_values.genesis_constants
               ; constraint_constants
+              ; block_window_duration
               }
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in

@@ -42,6 +42,8 @@ module type CONTEXT = sig
   val zkapp_cmd_limit : int option ref
 
   val compaction_interval : Time.Span.t option
+
+  val compile_config : Mina_compile_config.t
 end
 
 exception Snark_worker_error of int

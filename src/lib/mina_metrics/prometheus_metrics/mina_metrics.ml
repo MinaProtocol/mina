@@ -11,7 +11,9 @@ open Async_kernel
 
 let time_offset_sec = 1609459200.
 
-let block_window_duration = Node_config.block_window_duration
+module type CONTEXT = sig
+  val block_window_duration : Time.Span.t
+end
 
 (* textformat serialization and runtime metrics taken from github.com/mirage/prometheus:/app/prometheus_app.ml *)
 module TextFormat_0_0_4 = struct
@@ -432,12 +434,10 @@ module Network = struct
     let help = "# of messages received" in
     Counter.v "messages_received" ~help ~namespace ~subsystem
 
-  module Delay_time_spec = struct
-    let tick_interval =
-      Core.Time.Span.of_ms (Int.to_float block_window_duration)
+  module Delay_time_spec (Context : CONTEXT) = struct
+    let tick_interval = Context.block_window_duration
 
-    let rolling_interval =
-      Core.Time.Span.of_ms (Int.to_float (block_window_duration * 20))
+    let rolling_interval = Time.Span.scale Context.block_window_duration 20.0
   end
 
   module Block = struct
@@ -459,10 +459,10 @@ module Network = struct
       let help = "# of blocks received" in
       Counter.v "received" ~help ~namespace ~subsystem
 
-    module Validation_time =
+    module Validation_time (Context : CONTEXT) =
       Moving_time_average
         (struct
-          include Delay_time_spec
+          include Delay_time_spec (Context)
 
           let subsystem = subsystem
 
@@ -473,10 +473,10 @@ module Network = struct
         end)
         ()
 
-    module Processing_time =
+    module Processing_time (Context : CONTEXT) =
       Moving_time_average
         (struct
-          include Delay_time_spec
+          include Delay_time_spec (Context)
 
           let subsystem = subsystem
 
@@ -488,10 +488,10 @@ module Network = struct
         end)
         ()
 
-    module Rejection_time =
+    module Rejection_time (Context : CONTEXT) =
       Moving_time_average
         (struct
-          include Delay_time_spec
+          include Delay_time_spec (Context)
 
           let subsystem = subsystem
 
@@ -523,10 +523,10 @@ module Network = struct
       let help = "# of snark work received" in
       Counter.v "received" ~help ~namespace ~subsystem
 
-    module Validation_time =
+    module Validation_time (Context : CONTEXT) =
       Moving_time_average
         (struct
-          include Delay_time_spec
+          include Delay_time_spec (Context)
 
           let subsystem = subsystem
 
@@ -538,10 +538,10 @@ module Network = struct
         end)
         ()
 
-    module Processing_time =
+    module Processing_time (Context : CONTEXT) =
       Moving_time_average
         (struct
-          include Delay_time_spec
+          include Delay_time_spec (Context)
 
           let subsystem = subsystem
 
@@ -553,10 +553,10 @@ module Network = struct
         end)
         ()
 
-    module Rejection_time =
+    module Rejection_time (Context : CONTEXT) =
       Moving_time_average
         (struct
-          include Delay_time_spec
+          include Delay_time_spec (Context)
 
           let subsystem = subsystem
 
@@ -588,10 +588,10 @@ module Network = struct
       let help = "# of transactions received" in
       Counter.v "received" ~help ~namespace ~subsystem
 
-    module Validation_time =
+    module Validation_time (Context : CONTEXT) =
       Moving_time_average
         (struct
-          include Delay_time_spec
+          include Delay_time_spec (Context)
 
           let subsystem = subsystem
 
@@ -603,10 +603,10 @@ module Network = struct
         end)
         ()
 
-    module Processing_time =
+    module Processing_time (Context : CONTEXT) =
       Moving_time_average
         (struct
-          include Delay_time_spec
+          include Delay_time_spec (Context)
 
           let subsystem = subsystem
 
@@ -618,10 +618,10 @@ module Network = struct
         end)
         ()
 
-    module Rejection_time =
+    module Rejection_time (Context : CONTEXT) =
       Moving_time_average
         (struct
-          include Delay_time_spec
+          include Delay_time_spec (Context)
 
           let subsystem = subsystem
 
@@ -1442,19 +1442,16 @@ module Block_latency = struct
       Gauge.v "upload_to_gcloud_blocks" ~help ~namespace ~subsystem
   end
 
-  module Latency_time_spec = struct
-    let tick_interval =
-      Core.Time.Span.of_ms (Int.to_float (block_window_duration / 2))
+  module Latency_time_spec (Context : CONTEXT) = struct
+    let tick_interval = Time.Span.scale Context.block_window_duration 0.5
 
-    let rolling_interval =
-      Core.Time.Span.of_ms (Int.to_float (block_window_duration * 20))
+    let rolling_interval = Time.Span.scale Context.block_window_duration 20.0
   end
 
-  module Gossip_slots =
+  module Gossip_slots (Context : CONTEXT) =
     Moving_bucketed_average
       (struct
-        let bucket_interval =
-          Core.Time.Span.of_ms (Int.to_float (block_window_duration / 2))
+        let bucket_interval = Time.Span.scale Context.block_window_duration 0.5
 
         let num_buckets = 40
 
@@ -1475,10 +1472,10 @@ module Block_latency = struct
       end)
       ()
 
-  module Gossip_time =
+  module Gossip_time (Context : CONTEXT) =
     Moving_time_average
       (struct
-        include Latency_time_spec
+        include Latency_time_spec (Context)
 
         let subsystem = subsystem
 
@@ -1489,10 +1486,10 @@ module Block_latency = struct
       end)
       ()
 
-  module Inclusion_time =
+  module Inclusion_time (Context : CONTEXT) =
     Moving_time_average
       (struct
-        include Latency_time_spec
+        include Latency_time_spec (Context)
 
         let subsystem = subsystem
 
@@ -1504,10 +1501,10 @@ module Block_latency = struct
       end)
       ()
 
-  module Validation_acceptance_time =
+  module Validation_acceptance_time (Context : CONTEXT) =
     Moving_time_average
       (struct
-        include Latency_time_spec
+        include Latency_time_spec (Context)
 
         let subsystem = subsystem
 

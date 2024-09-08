@@ -3,6 +3,10 @@ open Async_kernel
 
 val time_offset_sec : float
 
+module type CONTEXT = sig
+  val block_window_duration : Time.Span.t
+end
+
 module Counter : sig
   type t
 
@@ -121,15 +125,15 @@ module Network : sig
 
     val received : Counter.t
 
-    module Validation_time : sig
+    module Validation_time (Context : CONTEXT) : sig
       val update : Time.Span.t -> unit
     end
 
-    module Processing_time : sig
+    module Processing_time (Context : CONTEXT) : sig
       val update : Time.Span.t -> unit
     end
 
-    module Rejection_time : sig
+    module Rejection_time (Context : CONTEXT) : sig
       val update : Time.Span.t -> unit
     end
   end
@@ -143,15 +147,15 @@ module Network : sig
 
     val received : Counter.t
 
-    module Validation_time : sig
+    module Validation_time (Context : CONTEXT) : sig
       val update : Time.Span.t -> unit
     end
 
-    module Processing_time : sig
+    module Processing_time (Context : CONTEXT) : sig
       val update : Time.Span.t -> unit
     end
 
-    module Rejection_time : sig
+    module Rejection_time (Context : CONTEXT) : sig
       val update : Time.Span.t -> unit
     end
   end
@@ -165,15 +169,15 @@ module Network : sig
 
     val received : Counter.t
 
-    module Validation_time : sig
+    module Validation_time (Context : CONTEXT) : sig
       val update : Time.Span.t -> unit
     end
 
-    module Processing_time : sig
+    module Processing_time (Context : CONTEXT) : sig
       val update : Time.Span.t -> unit
     end
 
-    module Rejection_time : sig
+    module Rejection_time (Context : CONTEXT) : sig
       val update : Time.Span.t -> unit
     end
   end
@@ -480,7 +484,7 @@ module Block_latency : sig
     val upload_to_gcloud_blocks : Gauge.t
   end
 
-  module Gossip_slots : sig
+  module Gossip_slots (Context : CONTEXT) : sig
     val v : Gauge.t
 
     val update : float -> unit
@@ -488,7 +492,7 @@ module Block_latency : sig
     val clear : unit -> unit
   end
 
-  module Gossip_time : sig
+  module Gossip_time (Context : CONTEXT) : sig
     val v : Gauge.t
 
     val update : Time.Span.t -> unit
@@ -496,7 +500,7 @@ module Block_latency : sig
     val clear : unit -> unit
   end
 
-  module Inclusion_time : sig
+  module Inclusion_time (Context : CONTEXT) : sig
     val v : Gauge.t
 
     val update : Time.Span.t -> unit
@@ -504,7 +508,7 @@ module Block_latency : sig
     val clear : unit -> unit
   end
 
-  module Validation_acceptance_time : sig
+  module Validation_acceptance_time (Context : CONTEXT) : sig
     val v : Gauge.t
 
     val update : Time.Span.t -> unit
