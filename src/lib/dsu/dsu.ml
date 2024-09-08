@@ -2,15 +2,13 @@ open Core_kernel
 
 let min_capacity = 64
 
+type resizing_opt = Double | Half
+
 module type Data = sig
   type t
 
   val merge : t -> t -> t
 end
-
-(* Id 0 set is configured with unreachably large rank to be always
-     chosen when ranks are compared *)
-let infinity_rank = Int.max_value lsr 1
 
 (** DSU data structure with ability to remove sets fromt he structure.contents
     
@@ -35,7 +33,7 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
     Array.init ~f:(fun i ->
         { value = None
         ; parent = i
-        ; rank = (if i = 0 then infinity_rank else 0)
+        ; rank = 0
         } )
 
   let create () =
@@ -53,53 +51,21 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
       Array.set arr id { el with parent } ;
       parent
 
-  (** Rebuild array in-place: all remaining elements
-      will point to itself, map will be updated.
-      Returns count of roots in the new structure (excluding id 0)
-  *)
-  let rebuild ~key_to_id arr =
-    (* 1. Map entries to the root set *)
-    Hashtbl.map_inplace key_to_id ~f:(fun id -> find_set ~id arr) ;
-    let roots = ref 0 in
-
-    (* 2. Remove entries pointing to set 0 *)
-    Hashtbl.filter_inplace key_to_id ~f:(fun id -> id <> 0) ;
-
-    (* 3. Copy [data], [rank] to new locations use [parent] field to store new ids *)
-    Array.iteri arr ~f:(fun i { value; rank; parent = old_parent } ->
-        if old_parent = i then (
-          roots := !roots + 1 ;
-          Array.set arr i { value; rank; parent = !roots } ;
-          let dst_el = Array.get arr !roots in
-          Array.set arr !roots { dst_el with value; rank } ) ) ;
-
-    (* 4. Replace old ids with new ids in mapping *)
-    Hashtbl.map_inplace key_to_id ~f:(fun id -> (Array.get arr id).parent) ;
-
-    (* 5. Set parent values for new sets *)
-    for i = 1 to !roots do
-      let dst_el = Array.get arr i in
-      Array.set arr !roots { dst_el with parent = i }
-    done ;
-
-    !roots
-
-  let resize ~inc ({ key_to_id; _ } as t) =
-    let roots = rebuild ~key_to_id t.arr in
-    let c' = Int.max min_capacity (Int.ceil_pow2 (roots + 1 + inc) lsl 1) in
-    t.next_id <- roots + 1 ;
-    t.occupancy <- t.next_id ;
-    if c' <> Array.length t.arr then (
-      let arr' = init_array c' in
-      for i = 1 to roots do
-        Array.set arr' i (Array.get t.arr i)
+  let resize t = function
+    | Double -> 
+      let dsu_size = Array.length t.arr in
+      let reallocation_size = dsu_size * 2 in 
+      let new_arr = init_array reallocation_size in
+      (* ocaml for loops are inclusive of the upper bound *)
+      for i = 1 to dsu_size - 1 do
+        Array.set new_arr i (Array.get t.arr i)
       done ;
-      t.arr <- arr' )
+      t.arr <- new_arr
+    | Half ->
+      failwith "Not implemented"
 
   let allocate_id t =
-    (* the maximum index is Array.length - 2 because the range is from 1 to n- 1 as the 0 index is used for deletions*)
-    let maximum_index = Array.length t.arr - 1 in
-    if t.occupancy = maximum_index then resize ~inc:1 t ;
+    if t.next_id = Array.length t.arr then  resize t Double;
     let id = t.next_id in
     t.next_id <- id + 1 ;
     id
@@ -125,10 +91,7 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
       if rank ~id:a t < rank ~id:b t then update b a else update a b
 
   let add_exn ~key ~value t =
-    print_endline
-    @@ sprintf "Adding key to array of size %d" (Array.length t.arr) ;
     let id = allocate_id t in
-    print_endline @@ sprintf "finished allocation with occupqncy %d" t.occupancy ;
     Hashtbl.add_exn ~key ~data:id t.key_to_id ;
     Array.set t.arr id { value = Some value; parent = id; rank = 0 } ;
     t.occupancy <- t.occupancy + 1
