@@ -1290,6 +1290,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ; time_controller
               ; pubsub_v1
               ; pubsub_v0
+              ; block_window_duration = compile_config.block_window_duration
               }
           in
           let net_config =
