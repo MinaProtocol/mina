@@ -30,11 +30,7 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
     }
 
   let init_array =
-    Array.init ~f:(fun i ->
-        { value = None
-        ; parent = i
-        ; rank = 0
-        } )
+    Array.init ~f:(fun i -> { value = None; parent = i; rank = 0 })
 
   let create () =
     { arr = init_array min_capacity
@@ -52,20 +48,20 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
       parent
 
   let resize t = function
-    | Double -> 
-      let dsu_size = Array.length t.arr in
-      let reallocation_size = dsu_size * 2 in 
-      let new_arr = init_array reallocation_size in
-      (* ocaml for loops are inclusive of the upper bound *)
-      for i = 1 to dsu_size - 1 do
-        Array.set new_arr i (Array.get t.arr i)
-      done ;
-      t.arr <- new_arr
+    | Double ->
+        let dsu_size = Array.length t.arr in
+        let reallocation_size = dsu_size * 2 in
+        let new_arr = init_array reallocation_size in
+        (* ocaml for loops are inclusive of the upper bound *)
+        for i = 1 to dsu_size - 1 do
+          Array.set new_arr i (Array.get t.arr i)
+        done ;
+        t.arr <- new_arr
     | Half ->
-      failwith "Not implemented"
+        failwith "Not implemented"
 
   let allocate_id t =
-    if t.next_id = Array.length t.arr then  resize t Double;
+    if t.next_id = Array.length t.arr then resize t Double ;
     let id = t.next_id in
     t.next_id <- id + 1 ;
     id
