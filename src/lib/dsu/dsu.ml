@@ -132,4 +132,8 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
   let capacity t = Array.length t.arr
 
   let occupancy t = t.occupancy
+
+  let get_rank ~key t =
+    let%bind.Option id = Hashtbl.find t.key_to_id key in
+    Some (rank ~id t)
 end

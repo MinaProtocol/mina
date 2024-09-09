@@ -31,4 +31,6 @@ module Dsu : functor (Key : Hashtbl.Key) (D : Data) -> sig
   val capacity : t -> int
 
   val occupancy : t -> int
+
+  val get_rank : key:Key.t -> t -> int option
 end
