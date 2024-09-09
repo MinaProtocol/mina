@@ -35,7 +35,7 @@ let buildTestCmd
                     ([] : List Text)
                     "buildkite/scripts/dump-mina-type-shapes.sh"
                 # [ Cmd.run
-                      "gsutil cp \$(git log -n 1 --format=%h --abbrev=7 --no-merges)-type_shape.txt \$MINA_TYPE_SHAPE gs://mina-type-shapes"
+                      "gsutil cp \$(git log -n 1 --format=%h --abbrev=7)-type_shape.txt \$MINA_TYPE_SHAPE gs://mina-type-shapes"
                   ]
                 # RunInToolchain.runInToolchain
                     ([] : List Text)
