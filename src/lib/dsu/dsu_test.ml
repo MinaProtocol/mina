@@ -99,6 +99,8 @@ let test_union_existing_elements () =
   IntKeyDsu.add_exn ~key:2 ~value:2 dsu ;
   IntKeyDsu.add_exn ~key:3 ~value:3 dsu ;
   IntKeyDsu.union ~a:1 ~b:2 dsu ;
+  Alcotest.(check (option int))
+    "existent element" (IntKeyDsu.get ~key:2 dsu) (Some 1) ;
   IntKeyDsu.union ~a:2 ~b:3 dsu ;
   Alcotest.(check (option int))
     "existent element" (IntKeyDsu.get ~key:1 dsu) (Some 3) ;
@@ -111,12 +113,10 @@ let test_union_existing_elements () =
   let element_rank = IntKeyDsu.get_rank ~key:1 dsu in
   Alcotest.(check (option int)) "rank" (element_rank) (Some 0);
   let element_rank = IntKeyDsu.get_rank ~key:2 dsu in
+  (*since 2 has a higher rank than 3 we should merge 2 into 3 increasing the rank to of 2 to 2 *)
   Alcotest.(check (option int)) "rank" (element_rank) (Some 2);
   let element_rank = IntKeyDsu.get_rank ~key:3 dsu in
-  Alcotest.(check (option int)) "rank" (element_rank) (Some 1)
-
-
-
+  Alcotest.(check (option int)) "rank" (element_rank) (Some 0)
 
 
 (* Test suite *)
@@ -125,6 +125,12 @@ let tests =
   ; ("test_add", `Quick, test_add)
   ; ("test_add_array", `Quick, test_add_array)
   ; ("test_reallocation", `Quick, test_reallocation)
+  ; ("test_get_non_existent_element", `Quick, test_get_non_existent_element)
+  ; ( "test_union_existing_with_non_existent_element"
+    , `Quick
+    , test_union_existing_with_non_existent_element )
+  ; ("test_union_non_existent_elements", `Quick, test_union_non_existent_elements)
+  ; ("test_union_existing_elements", `Quick, test_union_existing_elements)
   ]
 
 let () = run "dsu" [ ("dsu", tests) ]
