@@ -2,6 +2,10 @@ let Cmd = ../../Lib/Cmds.dhall
 
 let S = ../../Lib/SelectFiles.dhall
 
+let B = ../../External/Buildkite.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
@@ -29,10 +33,11 @@ let dependsOn =
         Profiles.Type.Standard
 
 let buildTestCmd
-    : Text -> Size -> List Command.TaggedKey.Type -> Command.Type
+    : Text -> Size -> List Command.TaggedKey.Type -> B/SoftFail -> Command.Type
     =     \(release_branch : Text)
       ->  \(cmd_target : Size)
       ->  \(dependsOn : List Command.TaggedKey.Type)
+      ->  \(soft_fail : B/SoftFail)
       ->  Command.build
             Command.Config::{
             , commands =
@@ -47,8 +52,7 @@ let buildTestCmd
                     "buildkite/scripts/version-linter.sh ${release_branch}"
             , label = "Versioned type linter for ${release_branch}"
             , key = "version-linter-${release_branch}"
-            , if = Some
-                " build.pull_request.base_branch == '${release_branch}' "
+            , soft_fail = Some soft_fail
             , target = cmd_target
             , docker = None Docker.Type
             , depends_on = dependsOn
@@ -75,8 +79,12 @@ in  Pipeline.build
                 ]
               }
       , steps =
-        [ buildTestCmd "compatible" Size.Small dependsOn
-        , buildTestCmd "develop" Size.Small dependsOn
-        , buildTestCmd "master" Size.Small dependsOn
+        [ buildTestCmd
+            "compatible"
+            Size.Small
+            dependsOn
+            (B/SoftFail.Boolean True)
+        , buildTestCmd "develop" Size.Small dependsOn (B/SoftFail.Boolean True)
+        , buildTestCmd "master" Size.Small dependsOn (B/SoftFail.Boolean True)
         ]
       }
