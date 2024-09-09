@@ -94,12 +94,24 @@ let keyIdEnv =
 
           in  Optional/default Text "" maybeKey
 
+let bucketEnv =
+          \(repo : DebianRepo)
+      ->  let maybeKey =
+                Optional/map
+                  Text
+                  Text
+                  (\(repo : Text) -> "BUCKET=" ++ repo)
+                  (bucket repo)
+
+          in  Optional/default Text "" maybeKey
+
 in  { Type = DebianRepo
     , keyIdEnv = keyIdEnv
     , keyAddressArg = keyAddressArg
     , address = address
     , bucket = bucket
     , bucketArg = bucketArg
+    , bucketEnv = bucketEnv
     , keyId = keyId
     , keyArg = keyArg
     }

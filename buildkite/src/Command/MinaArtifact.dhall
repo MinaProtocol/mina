@@ -120,8 +120,8 @@ let publish_to_debian_repo =
                   , "MINA_DEB_CODENAME=${DebianVersions.lowerName
                                            spec.debVersion}"
                   , "MINA_DEB_RELEASE=${DebianChannel.lowerName spec.channel}"
-                  , "SIGN=${DebianRepo.keyIdEnv spec.debianRepo}"
-                  , "BUCKET=${DebianRepo.address spec.debianRepo}"
+                  , "${DebianRepo.keyIdEnv spec.debianRepo}"
+                  , "${DebianRepo.bucketEnv spec.debianRepo}"
                   ]
                   "./buildkite/scripts/debian/publish.sh"
             , label =
