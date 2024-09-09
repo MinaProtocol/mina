@@ -81,8 +81,8 @@ let test_get_non_existent_element () =
   (* also test the occupancy, we have 2 to account for the 0 case *)
   Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 2;
   (* verify the rank of the existing element *)
-  let element = IntKeyDsu.get_rank ~key:1 dsu in
- Alcotest.(check (option int)) "rank" (element) (Some 0)
+  let element_rank = IntKeyDsu.get_rank ~key:1 dsu in
+ Alcotest.(check (option int)) "rank" (element_rank) (Some 0)
 
 let test_union_non_existent_elements () =
   let dsu = IntKeyDsu.create () in
@@ -101,10 +101,22 @@ let test_union_existing_elements () =
   IntKeyDsu.union ~a:1 ~b:2 dsu ;
   IntKeyDsu.union ~a:2 ~b:3 dsu ;
   Alcotest.(check (option int))
-    "non-existent element" (IntKeyDsu.get ~key:1 dsu) (Some 3) ;
+    "existent element" (IntKeyDsu.get ~key:1 dsu) (Some 3) ;
   Alcotest.(check (option int))
-    "non-existent element" (IntKeyDsu.get ~key:2 dsu) None ;
-  Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 2
+    "existent element" (IntKeyDsu.get ~key:2 dsu) None ;
+  Alcotest.(check (option int))
+    "existent element" (IntKeyDsu.get ~key:3 dsu) None ;
+  Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 4;
+  (* verify the rank of the existing elements *)
+  let element_rank = IntKeyDsu.get_rank ~key:1 dsu in
+  Alcotest.(check (option int)) "rank" (element_rank) (Some 0);
+  let element_rank = IntKeyDsu.get_rank ~key:2 dsu in
+  Alcotest.(check (option int)) "rank" (element_rank) (Some 2);
+  let element_rank = IntKeyDsu.get_rank ~key:3 dsu in
+  Alcotest.(check (option int)) "rank" (element_rank) (Some 1)
+
+
+
 
 
 (* Test suite *)
