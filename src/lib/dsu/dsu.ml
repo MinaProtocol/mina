@@ -59,7 +59,22 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
         done ;
         t.arr <- new_arr
     | Half ->
-        failwith "Not implemented"
+      (* remove all the 0 parents *)
+      KeyMap.filter_inplace t.key_to_id ~f:(fun id -> 
+        let {parent; _} = t.arr.(id) in 
+        parent = 0 );
+      let dsu_size = Array.length t.arr in
+      let reallocation_size = dsu_size / 2 in
+      let new_arr = init_array reallocation_size in
+      (* ocaml for loops are inclusive of the upper bound *)
+      t.occupancy <- 1;
+      KeyMap.iteri t.key_to_id ~f:(fun ~key ~data -> 
+        let element = Array.get t.arr data in
+        Array.set new_arr t.occupancy element;
+        Hashtbl.set t.key_to_id ~key ~data:t.occupancy;
+        t.occupancy <- t.occupancy + 1
+        );
+      t.arr <- new_arr
 
   let allocate_id t =
     if t.next_id = Array.length t.arr then resize t Double ;
