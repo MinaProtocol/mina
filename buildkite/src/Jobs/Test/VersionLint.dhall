@@ -45,8 +45,10 @@ let buildTestCmd
                 # RunInToolchain.runInToolchain
                     ([] : List Text)
                     "buildkite/scripts/version-linter.sh ${release_branch}"
-            , label = "Versioned type linter"
-            , key = "version-linter"
+            , label = "Versioned type linter for ${release_branch}"
+            , key = "version-linter-${release_branch}"
+            , if = Some
+                " build.pull_request.base_branch == '${release_branch}' "
             , target = cmd_target
             , docker = None Docker.Type
             , depends_on = dependsOn
@@ -72,5 +74,9 @@ in  Pipeline.build
                 , PipelineTag.Type.Stable
                 ]
               }
-      , steps = [ buildTestCmd "compatible" Size.Small dependsOn ]
+      , steps =
+        [ buildTestCmd "compatible" Size.Small dependsOn
+        , buildTestCmd "develop" Size.Small dependsOn
+        , buildTestCmd "master" Size.Small dependsOn
+        ]
       }
