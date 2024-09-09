@@ -60,7 +60,10 @@ let dependsOn =
 
           in  merge
                 { Bookworm =
-                  [ { name = "${prefix}${profileSuffix}", key = key } ]
+                  [ { name = "${prefix}${capitalName docker}${profileSuffix}"
+                    , key = key
+                    }
+                  ]
                 , Bullseye =
                   [ { name = "${prefix}${capitalName docker}${profileSuffix}"
                     , key = key
