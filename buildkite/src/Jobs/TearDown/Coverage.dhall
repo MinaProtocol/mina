@@ -29,7 +29,7 @@ in  Pipeline.build
                   "buildkite/scripts/finish-coverage-data-upload.sh"
             , label = "Finish coverage data gathering"
             , key = "finish-coverage-data"
-            , target = Size.Small
+            , target = Size.Multi
             }
         ]
       }

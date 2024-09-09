@@ -39,7 +39,7 @@ in  Pipeline.build
             , commands = [] : List Cmd.Type
             , label = "Verifies references in markdown"
             , key = "xrefcheck"
-            , target = Size.Small
+            , target = Size.Multi
             , soft_fail = Some (B/SoftFail.Boolean True)
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).xrefcheck

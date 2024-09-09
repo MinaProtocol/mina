@@ -40,7 +40,7 @@ in  Pipeline.build
               ]
             , label = "Helm chart release"
             , key = "release-helm-chart"
-            , target = Size.Medium
+            , target = Size.Multi
             , docker = None Docker.Type
             , artifact_paths = [ S.contains "updates/*" ]
             , depends_on = [ { name = "HelmChart", key = "lint-helm-chart" } ]

@@ -14,7 +14,7 @@ in  { step =
                     "./buildkite/scripts/check-graphql-schema.sh"
               , label = "Check GraphQL Schema"
               , key = "check-graphql-schema"
-              , target = Size.Large
+              , target = Size.Multi
               , depends_on = dependsOn
               }
     }

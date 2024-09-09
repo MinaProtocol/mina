@@ -38,7 +38,7 @@ in  Pipeline.build
                   "cd src/app/trace-tool && PATH=/home/opam/.cargo/bin:\$PATH cargo build --release"
             , label = "Build trace-tool"
             , key = "build-trace-tool"
-            , target = Size.Small
+            , target = Size.Multi
             , docker = None Docker.Type
             , artifact_paths =
               [ S.contains "src/app/trace-tool/target/release/trace-tool" ]

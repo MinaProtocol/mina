@@ -49,7 +49,7 @@ in  { step =
                 ]
               , label = "Deploy ${spec.testnetLabel}"
               , key = "deploy-${spec.testnetLabel}"
-              , target = Size.Large
+              , target = Size.Multi
               , depends_on = spec.deps
               }
     , DeploySpec = DeploySpec

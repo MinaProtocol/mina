@@ -47,7 +47,7 @@ in  Pipeline.build
                   )
             , label = "OCaml Lints; Check-format, Require-ppx-version"
             , key = "check"
-            , target = Size.Large
+            , target = Size.Multi
             , docker = None Docker.Type
             }
         ]
