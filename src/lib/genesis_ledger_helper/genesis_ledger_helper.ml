@@ -777,7 +777,8 @@ let print_config ~logger config =
 let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~proof_level ?overwrite_version (config : Runtime_config.t) =
+    ~proof_level:compiled_proof_level ?overwrite_version
+    (config : Runtime_config.t) =
   print_config ~logger config ;
   let open Deferred.Or_error.Let_syntax in
   let proof_level =
@@ -792,7 +793,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
               Check
           | None ->
               None)
-      ; Some proof_level
+      ; Some compiled_proof_level
       ]
   in
   let constraint_constants, blockchain_proof_system_id =
@@ -814,6 +815,23 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
         in
         ( make_constraint_constants ~default:constraint_constants config
         , blockchain_proof_system_id )
+  in
+  let%bind () =
+    match (proof_level, compiled_proof_level) with
+    | _, Full | (Check | None), _ ->
+        return ()
+    | Full, ((Check | None) as compiled) ->
+        let str = Genesis_constants.Proof_level.to_string in
+        [%log fatal]
+          "Proof level $proof_level is not compatible with compile-time proof \
+           level $compiled_proof_level"
+          ~metadata:
+            [ ("proof_level", `String (str proof_level))
+            ; ("compiled_proof_level", `String (str compiled))
+            ] ;
+        Deferred.Or_error.errorf
+          "Proof level %s is not compatible with compile-time proof level %s"
+          (str proof_level) (str compiled)
   in
   let%bind genesis_ledger, ledger_config, ledger_file =
     match config.ledger with
