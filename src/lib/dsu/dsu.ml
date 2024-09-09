@@ -71,7 +71,6 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
         let dsu_size = Array.length t.arr in
         let reallocation_size = dsu_size / 2 in
         let new_arr = init_array reallocation_size in
-        (* ocaml for loops are inclusive of the upper bound *)
         t.occupancy <- 1 ;
         KeyMap.iteri t.key_to_id ~f:(fun ~key ~data ->
             let element = Array.get t.arr data in
