@@ -100,23 +100,23 @@ let test_union_existing_elements () =
   IntKeyDsu.add_exn ~key:3 ~value:3 dsu ;
   IntKeyDsu.union ~a:1 ~b:2 dsu ;
   Alcotest.(check (option int))
-    "existent element" (IntKeyDsu.get ~key:2 dsu) (Some 1) ;
+    "existent element fst" (IntKeyDsu.get ~key:2 dsu) (Some 1) ;
   IntKeyDsu.union ~a:2 ~b:3 dsu ;
   Alcotest.(check (option int))
-    "existent element" (IntKeyDsu.get ~key:1 dsu) (Some 3) ;
+    "existent element snd" (IntKeyDsu.get ~key:1 dsu) (Some 3) ;
   Alcotest.(check (option int))
-    "existent element" (IntKeyDsu.get ~key:2 dsu) None ;
+    "existent element third" (IntKeyDsu.get ~key:2 dsu) None ;
   Alcotest.(check (option int))
-    "existent element" (IntKeyDsu.get ~key:3 dsu) None ;
+    "existent element fourth" (IntKeyDsu.get ~key:3 dsu) None ;
   Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 4;
   (* verify the rank of the existing elements *)
   let element_rank = IntKeyDsu.get_rank ~key:1 dsu in
-  Alcotest.(check (option int)) "rank" (element_rank) (Some 0);
+  Alcotest.(check (option int)) "rank 1" (element_rank) (Some 0);
   let element_rank = IntKeyDsu.get_rank ~key:2 dsu in
   (*since 2 has a higher rank than 3 we should merge 2 into 3 increasing the rank to of 2 to 2 *)
-  Alcotest.(check (option int)) "rank" (element_rank) (Some 2);
+  Alcotest.(check (option int)) "rank 2" (element_rank) (Some 2);
   let element_rank = IntKeyDsu.get_rank ~key:3 dsu in
-  Alcotest.(check (option int)) "rank" (element_rank) (Some 0)
+  Alcotest.(check (option int)) "rank 3" (element_rank) (Some 0)
 
 
 (* Test suite *)
