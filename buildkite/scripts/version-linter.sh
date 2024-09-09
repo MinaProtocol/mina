@@ -26,12 +26,12 @@ pip3 install sexpdata==1.0.0
 echo "--- Fetch the latest ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
 git fetch -- origin ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
 
-echo "--- Fetch the latest ${REMOTE}/$1"
-git fetch -- ${REMOTE} $1
+echo "--- Fetch the latest $1"
+git fetch -- origin $1
 
 base_branch=${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-compatible}
 pr_branch=origin/${BUILDKITE_BRANCH}
-release_branch=${REMOTE}/$1
+release_branch=origin/$1
 
 echo "--- Run Python version linter with branches: ${pr_branch} ${base_branch} ${release_branch}"
 ./scripts/version-linter.py ${pr_branch} ${base_branch} ${release_branch}
