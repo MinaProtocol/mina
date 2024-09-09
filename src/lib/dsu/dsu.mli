@@ -27,4 +27,8 @@ module Dsu : functor (Key : Hashtbl.Key) (D : Data) -> sig
   val get : key:Key.t -> t -> D.t option
 
   val union : a:Key.t -> b:Key.t -> t -> unit
+
+  val capacity : t -> int
+
+  val occupancy : t -> int
 end

@@ -129,4 +129,8 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
     let a_set = Option.value ~default:0 (Hashtbl.find t.key_to_id a) in
     let b_set = Option.value ~default:0 (Hashtbl.find t.key_to_id b) in
     union_sets t a_set b_set
+
+  let capacity t = Array.length t.arr
+
+  let occupancy t = t.occupancy
 end
