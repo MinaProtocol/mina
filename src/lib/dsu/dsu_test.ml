@@ -38,20 +38,16 @@ let test_add_array () =
       Alcotest.(check (option int))
         "added element" (IntKeyDsu.get ~key:x dsu) (Some x) )
 
-let test_reallocation () = 
+let test_reallocation () =
   let dsu = IntKeyDsu.create () in
   let arr_size = QCheck.Gen.(int_range 10 15) in
   let arr = QCheck.Gen.(generate1 (array_size arr_size int)) in
   Array.iter arr ~f:(fun x -> IntKeyDsu.add_exn ~key:x ~value:x dsu) ;
   let arr_size = Array.length arr in
-    Alcotest.(check (int))
-        "verifying length is above min capacity" 
-        (IntKeyDsu.capacity dsu) (64);
-    Alcotest.(check (int))
-        "verifying length is above min capacity" 
-        (IntKeyDsu.capacity dsu) arr_size
-
-
+  Alcotest.(check int)
+    "verifying length is above min capacity" (IntKeyDsu.capacity dsu) 64 ;
+  Alcotest.(check int)
+    "verifying length is above min capacity" (IntKeyDsu.capacity dsu) arr_size
 
 (* alcotest harness *)
 let tests =
