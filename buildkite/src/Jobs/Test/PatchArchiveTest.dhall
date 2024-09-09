@@ -10,13 +10,18 @@ let PatchArchiveTest = ../../Command/PatchArchiveTest.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
+let Network = ../../Constants/Network.dhall
+
+let Artifacts = ../../Constants/Artifacts.dhall
+
 let Dockers = ../../Constants/DockerVersions.dhall
 
 let dependsOn =
       Dockers.dependsOn
         Dockers.Type.Bullseye
+        (None Network.Type)
         Profiles.Type.Standard
-        "test-suite"
+        Artifacts.Type.FunctionalTestSuite
 
 in  Pipeline.build
       Pipeline.Config::{
