@@ -58,5 +58,5 @@ in  Pipeline.build
               , name = "VersionLint"
               , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
               }
-      , steps = [ buildTestCmd "compatible" Size.Small dependsOn ]
+      , steps = [ buildTestCmd "master" Size.Small dependsOn ]
       }
