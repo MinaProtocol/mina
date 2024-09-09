@@ -32,7 +32,6 @@ let is_expired cb =
   | Some expires_at ->
       Time_ns.(now () >= expires_at)
 
-(*
 module type Metric_intf = sig
   val validations_timed_out : Mina_metrics.Counter.t
 
@@ -40,94 +39,58 @@ module type Metric_intf = sig
 
   val ignored : Mina_metrics.Counter.t
 
-  module Validation_time(Context : Mina_metrics.CONTEXT) : sig
+  module Validation_time (Context : Mina_metrics.CONTEXT) : sig
     val update : Time.Span.t -> unit
   end
 
-  module Processing_time(Context : Mina_metrics.CONTEXT) : sig
+  module Processing_time (Context : Mina_metrics.CONTEXT) : sig
     val update : Time.Span.t -> unit
   end
 
-  module Rejection_time(Context : Mina_metrics.CONTEXT) : sig
+  module Rejection_time (Context : Mina_metrics.CONTEXT) : sig
     val update : Time.Span.t -> unit
   end
 end
 
-let metrics_of_message_type m  =
+let metrics_of_message_type m : (module Metric_intf) option =
   match m with
   | `Unknown ->
       None
   | `Block ->
-      Some (Mina_metrics.Network.Block.validations_timed_out)
+      Some (module Mina_metrics.Network.Block)
   | `Snark_work ->
-      Some (Mina_metrics.Network.Snark_work.validations_timed_out)
+      Some (module Mina_metrics.Network.Snark_work)
   | `Transaction ->
-      Some (Mina_metrics.Network.Transaction.validations_timed_out)
-
-*)
+      Some (module Mina_metrics.Network.Transaction)
 
 let record_timeout_metrics cb =
   Mina_metrics.(Counter.inc_one Network.validations_timed_out) ;
-  let counter =
-    match cb.message_type with
-    | `Unknown ->
-        None
-    | `Block ->
-        Some Mina_metrics.Network.Block.validations_timed_out
-    | `Snark_work ->
-        Some Mina_metrics.Network.Snark_work.validations_timed_out
-    | `Transaction ->
-        Some Mina_metrics.Network.Transaction.validations_timed_out
-  in
-  Option.iter ~f:Mina_metrics.Counter.inc_one counter
+  match metrics_of_message_type cb.message_type with
+  | None ->
+      ()
+  | Some (module M) ->
+      Mina_metrics.Counter.inc_one M.validations_timed_out
 
-let record_validation_metrics ~block_window_duration message_type
-    (result : validation_result) validation_time processing_time =
-  let open Mina_metrics.Network in
+let record_validation_metrics message_type (result : validation_result)
+    validation_time processing_time ~block_window_duration =
   let module Context = struct
     let block_window_duration = block_window_duration
   end in
-  match message_type with
-  | `Unknown ->
+  match metrics_of_message_type message_type with
+  | None ->
       ()
-  | `Block -> (
-      let module Validation_time = Block.Validation_time (Context) in
-      let module Processing_time = Block.Processing_time (Context) in
-      let module Rejection_time = Block.Rejection_time (Context) in
+  | Some (module M) -> (
       match result with
       | `Ignore ->
-          Mina_metrics.Counter.inc_one Block.ignored
+          Mina_metrics.Counter.inc_one M.ignored
       | `Accept ->
+          let module Validation_time = M.Validation_time (Context) in
           Validation_time.update validation_time ;
+          let module Processing_time = M.Processing_time (Context) in
           Processing_time.update processing_time
       | `Reject ->
-          Mina_metrics.Counter.inc_one Block.rejected ;
-          Rejection_time.update processing_time )
-  | `Snark_work -> (
-      let module Validation_time = Snark_work.Validation_time (Context) in
-      let module Processing_time = Snark_work.Processing_time (Context) in
-      let module Rejection_time = Snark_work.Rejection_time (Context) in
-      match result with
-      | `Ignore ->
-          Mina_metrics.Counter.inc_one Block.ignored
-      | `Accept ->
-          Validation_time.update validation_time ;
-          Processing_time.update processing_time
-      | `Reject ->
-          Mina_metrics.Counter.inc_one Block.rejected ;
-          Rejection_time.update processing_time )
-  | `Transaction -> (
-      let module Validation_time = Transaction.Validation_time (Context) in
-      let module Processing_time = Transaction.Processing_time (Context) in
-      let module Rejection_time = Transaction.Rejection_time (Context) in
-      match result with
-      | `Ignore ->
-          Mina_metrics.Counter.inc_one Block.ignored
-      | `Accept ->
-          Validation_time.update validation_time ;
-          Processing_time.update processing_time
-      | `Reject ->
-          Mina_metrics.Counter.inc_one Block.rejected ;
+          Mina_metrics.Counter.inc_one M.rejected ;
+          let module Rejection_time = M.Rejection_time (Context) in
           Rejection_time.update processing_time )
 
 let await_timeout cb =

@@ -435,9 +435,9 @@ module Network = struct
     Counter.v "messages_received" ~help ~namespace ~subsystem
 
   module Delay_time_spec (Context : CONTEXT) = struct
-    let tick_interval = Context.block_window_duration
-
-    let rolling_interval = Time.Span.scale Context.block_window_duration 20.0
+    let intervals =
+      Intervals.make ~rolling_interval:Context.block_window_duration
+        ~tick_interval:Context.block_window_duration
   end
 
   module Block = struct
@@ -459,49 +459,52 @@ module Network = struct
       let help = "# of blocks received" in
       Counter.v "received" ~help ~namespace ~subsystem
 
-    module Validation_time (Context : CONTEXT) =
-      Moving_time_average
-        (struct
-          include Delay_time_spec (Context)
+    let validation_time_is_initialized = ref false
 
-          let subsystem = subsystem
+    let processing_time_is_initialized = ref false
 
-          let name = "validation_time"
+    let rejection_time_is_initialized = ref false
 
-          let help =
-            "average time, in ms, for blocks to be validated and rebroadcasted"
-        end)
-        ()
+    module Validation_time (Context : CONTEXT) = Moving_time_average (struct
+      include Delay_time_spec (Context)
 
-    module Processing_time (Context : CONTEXT) =
-      Moving_time_average
-        (struct
-          include Delay_time_spec (Context)
+      let subsystem = subsystem
 
-          let subsystem = subsystem
+      let name = "validation_time"
 
-          let name = "processing_time"
+      let help =
+        "average time, in ms, for blocks to be validated and rebroadcasted"
 
-          let help =
-            "average time, in ms, for blocks to be accepted after the OCaml \
-             process receives it"
-        end)
-        ()
+      let is_initialized = validation_time_is_initialized
+    end)
 
-    module Rejection_time (Context : CONTEXT) =
-      Moving_time_average
-        (struct
-          include Delay_time_spec (Context)
+    module Processing_time (Context : CONTEXT) = Moving_time_average (struct
+      include Delay_time_spec (Context)
 
-          let subsystem = subsystem
+      let subsystem = subsystem
 
-          let name = "rejection_time"
+      let name = "processing_time"
 
-          let help =
-            "average time, in ms, for blocks to be rejected after the OCaml \
-             process receives it"
-        end)
-        ()
+      let help =
+        "average time, in ms, for blocks to be accepted after the OCaml \
+         process receives it"
+
+      let is_initialized = processing_time_is_initialized
+    end)
+
+    module Rejection_time (Context : CONTEXT) = Moving_time_average (struct
+      include Delay_time_spec (Context)
+
+      let subsystem = subsystem
+
+      let name = "rejection_time"
+
+      let help =
+        "average time, in ms, for blocks to be rejected after the OCaml \
+         process receives it"
+
+      let is_initialized = rejection_time_is_initialized
+    end)
   end
 
   module Snark_work = struct
@@ -523,50 +526,52 @@ module Network = struct
       let help = "# of snark work received" in
       Counter.v "received" ~help ~namespace ~subsystem
 
-    module Validation_time (Context : CONTEXT) =
-      Moving_time_average
-        (struct
-          include Delay_time_spec (Context)
+    let validation_time_is_initialized = ref false
 
-          let subsystem = subsystem
+    let processing_time_is_initialized = ref false
 
-          let name = "validation_time"
+    let rejection_time_is_initialized = ref false
 
-          let help =
-            "average delay, in ms, for snark work to be validated and \
-             rebroadcasted"
-        end)
-        ()
+    module Validation_time (Context : CONTEXT) = Moving_time_average (struct
+      include Delay_time_spec (Context)
 
-    module Processing_time (Context : CONTEXT) =
-      Moving_time_average
-        (struct
-          include Delay_time_spec (Context)
+      let subsystem = subsystem
 
-          let subsystem = subsystem
+      let name = "validation_time"
 
-          let name = "processing_time"
+      let help =
+        "average delay, in ms, for snark work to be validated and rebroadcasted"
 
-          let help =
-            "average delay, in ms, for snark work to be accepted after the \
-             OCaml process receives it"
-        end)
-        ()
+      let is_initialized = validation_time_is_initialized
+    end)
 
-    module Rejection_time (Context : CONTEXT) =
-      Moving_time_average
-        (struct
-          include Delay_time_spec (Context)
+    module Processing_time (Context : CONTEXT) = Moving_time_average (struct
+      include Delay_time_spec (Context)
 
-          let subsystem = subsystem
+      let subsystem = subsystem
 
-          let name = "rejection_time"
+      let name = "processing_time"
 
-          let help =
-            "average time, in ms, for snark work to be rejected after the \
-             OCaml process receives it"
-        end)
-        ()
+      let help =
+        "average delay, in ms, for snark work to be accepted after the OCaml \
+         process receives it"
+
+      let is_initialized = processing_time_is_initialized
+    end)
+
+    module Rejection_time (Context : CONTEXT) = Moving_time_average (struct
+      include Delay_time_spec (Context)
+
+      let subsystem = subsystem
+
+      let name = "rejection_time"
+
+      let help =
+        "average time, in ms, for snark work to be rejected after the OCaml \
+         process receives it"
+
+      let is_initialized = rejection_time_is_initialized
+    end)
   end
 
   module Transaction = struct
@@ -588,50 +593,53 @@ module Network = struct
       let help = "# of transactions received" in
       Counter.v "received" ~help ~namespace ~subsystem
 
-    module Validation_time (Context : CONTEXT) =
-      Moving_time_average
-        (struct
-          include Delay_time_spec (Context)
+    let validation_time_is_initialized = ref false
 
-          let subsystem = subsystem
+    let processing_time_is_initialized = ref false
 
-          let name = "validation_time"
+    let rejection_time_is_initialized = ref false
 
-          let help =
-            "average delay, in ms, for transactions to be validated and \
-             rebroadcasted"
-        end)
-        ()
+    module Validation_time (Context : CONTEXT) = Moving_time_average (struct
+      include Delay_time_spec (Context)
 
-    module Processing_time (Context : CONTEXT) =
-      Moving_time_average
-        (struct
-          include Delay_time_spec (Context)
+      let subsystem = subsystem
 
-          let subsystem = subsystem
+      let name = "validation_time"
 
-          let name = "processing_time"
+      let help =
+        "average delay, in ms, for transactions to be validated and \
+         rebroadcasted"
 
-          let help =
-            "average delay, in ms, for transactions to be accepted after the \
-             OCaml process receives it"
-        end)
-        ()
+      let is_initialized = validation_time_is_initialized
+    end)
 
-    module Rejection_time (Context : CONTEXT) =
-      Moving_time_average
-        (struct
-          include Delay_time_spec (Context)
+    module Processing_time (Context : CONTEXT) = Moving_time_average (struct
+      include Delay_time_spec (Context)
 
-          let subsystem = subsystem
+      let subsystem = subsystem
 
-          let name = "rejection_time"
+      let name = "processing_time"
 
-          let help =
-            "average time, in ms, for transactions to be rejected after the \
-             OCaml process receives it"
-        end)
-        ()
+      let help =
+        "average delay, in ms, for transactions to be accepted after the OCaml \
+         process receives it"
+
+      let is_initialized = processing_time_is_initialized
+    end)
+
+    module Rejection_time (Context : CONTEXT) = Moving_time_average (struct
+      include Delay_time_spec (Context)
+
+      let subsystem = subsystem
+
+      let name = "rejection_time"
+
+      let help =
+        "average time, in ms, for transactions to be rejected after the OCaml \
+         process receives it"
+
+      let is_initialized = rejection_time_is_initialized
+    end)
   end
 
   let rpc_requests_received : Counter.t =
@@ -1275,28 +1283,27 @@ module Transition_frontier = struct
     let help = "total # of staged txns that have been finalized" in
     Counter.v "finalized_staged_txns" ~help ~namespace ~subsystem
 
-  module TPS_30min =
-    Moving_bucketed_average
-      (struct
-        let bucket_interval = Core.Time.Span.of_min 3.0
+  let tps_30min_is_initialized = ref false
 
-        let num_buckets = 10
+  module TPS_30min = Moving_bucketed_average (struct
+    let bucket_interval = Core.Time.Span.of_min 3.0
 
-        let render_average buckets =
-          let total =
-            List.fold buckets ~init:0.0 ~f:(fun acc (n, _) -> acc +. n)
-          in
-          total /. Core.Time.Span.(of_min 30.0 |> to_sec)
+    let num_buckets = 10
 
-        let subsystem = subsystem
+    let render_average buckets =
+      let total = List.fold buckets ~init:0.0 ~f:(fun acc (n, _) -> acc +. n) in
+      total /. Core.Time.Span.(of_min 30.0 |> to_sec)
 
-        let name = "tps_30min"
+    let subsystem = subsystem
 
-        let help =
-          "moving average for transaction per second, the rolling interval is \
-           set to 30 min"
-      end)
-      ()
+    let name = "tps_30min"
+
+    let help =
+      "moving average for transaction per second, the rolling interval is set \
+       to 30 min"
+
+    let is_initialized = tps_30min_is_initialized
+  end)
 
   let recently_finalized_staged_txns : Gauge.t =
     let help =
@@ -1443,79 +1450,84 @@ module Block_latency = struct
   end
 
   module Latency_time_spec (Context : CONTEXT) = struct
-    let tick_interval = Time.Span.scale Context.block_window_duration 0.5
-
-    let rolling_interval = Time.Span.scale Context.block_window_duration 20.0
+    let intervals =
+      Intervals.make
+        ~tick_interval:(Time.Span.scale Context.block_window_duration 0.5)
+        ~rolling_interval:(Time.Span.scale Context.block_window_duration 20.0)
   end
 
-  module Gossip_slots (Context : CONTEXT) =
-    Moving_bucketed_average
-      (struct
-        let bucket_interval = Time.Span.scale Context.block_window_duration 0.5
+  let gossip_slots_is_initialized = ref false
 
-        let num_buckets = 40
+  module Gossip_slots (Context : CONTEXT) = Moving_bucketed_average (struct
+    let bucket_interval = Time.Span.scale Context.block_window_duration 0.5
 
-        let subsystem = subsystem
+    let num_buckets = 40
 
-        let name = "gossip_slots"
+    let subsystem = subsystem
 
-        let help =
-          "average delay, in slots, after which produced blocks are received"
+    let name = "gossip_slots"
 
-        let render_average buckets =
-          let total_sum, count_sum =
-            List.fold buckets ~init:(0.0, 0)
-              ~f:(fun (total_sum, count_sum) (total, count) ->
-                (total_sum +. total, count_sum + count) )
-          in
-          total_sum /. Float.of_int count_sum
-      end)
-      ()
+    let help =
+      "average delay, in slots, after which produced blocks are received"
 
-  module Gossip_time (Context : CONTEXT) =
-    Moving_time_average
-      (struct
-        include Latency_time_spec (Context)
+    let render_average buckets =
+      let total_sum, count_sum =
+        List.fold buckets ~init:(0.0, 0)
+          ~f:(fun (total_sum, count_sum) (total, count) ->
+            (total_sum +. total, count_sum + count) )
+      in
+      total_sum /. Float.of_int count_sum
 
-        let subsystem = subsystem
+    let is_initialized = gossip_slots_is_initialized
+  end)
 
-        let name = "gossip_time"
+  let gossip_time_is_initialized = ref false
 
-        let help =
-          "average delay, in seconds, after which produced blocks are received"
-      end)
-      ()
+  module Gossip_time (Context : CONTEXT) = Moving_time_average (struct
+    include Latency_time_spec (Context)
 
-  module Inclusion_time (Context : CONTEXT) =
-    Moving_time_average
-      (struct
-        include Latency_time_spec (Context)
+    let subsystem = subsystem
 
-        let subsystem = subsystem
+    let name = "gossip_time"
 
-        let name = "inclusion_time"
+    let help =
+      "average delay, in seconds, after which produced blocks are received"
 
-        let help =
-          "average delay, in seconds, after which produced blocks are included \
-           into our frontier"
-      end)
-      ()
+    let is_initialized = gossip_time_is_initialized
+  end)
+
+  let inclusion_time_is_initialized = ref false
+
+  module Inclusion_time (Context : CONTEXT) = Moving_time_average (struct
+    include Latency_time_spec (Context)
+
+    let subsystem = subsystem
+
+    let name = "inclusion_time"
+
+    let help =
+      "average delay, in seconds, after which produced blocks are included \
+       into our frontier"
+
+    let is_initialized = inclusion_time_is_initialized
+  end)
+
+  let validation_acceptance_time_is_initialized = ref false
 
   module Validation_acceptance_time (Context : CONTEXT) =
-    Moving_time_average
-      (struct
-        include Latency_time_spec (Context)
+  Moving_time_average (struct
+    include Latency_time_spec (Context)
 
-        let subsystem = subsystem
+    let subsystem = subsystem
 
-        let name = "validation_acceptance_time"
+    let name = "validation_acceptance_time"
 
-        let help =
-          "average delay, in seconds, between the time blocks are initially \
-           received from the libp2p_helper, and when they are accepted as \
-           valid"
-      end)
-      ()
+    let help =
+      "average delay, in seconds, between the time blocks are initially \
+       received from the libp2p_helper, and when they are accepted as valid"
+
+    let is_initialized = validation_acceptance_time_is_initialized
+  end)
 end
 
 module Rejected_blocks = struct
