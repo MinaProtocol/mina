@@ -465,6 +465,16 @@ module Network = struct
 
     let rejection_time_is_initialized = ref false
 
+    module Gauge_map = Metric_map (struct
+      type t = Gauge.t
+
+      let subsystem = subsystem
+
+      let v = Gauge.v
+    end)
+
+    let block_table = Gauge_map.of_alist_exn []
+
     module Validation_time (Context : CONTEXT) = Moving_time_average (struct
       include Delay_time_spec (Context)
 
@@ -474,6 +484,8 @@ module Network = struct
 
       let help =
         "average time, in ms, for blocks to be validated and rebroadcasted"
+
+      let v = Gauge_map.add block_table ~name ~help
 
       let is_initialized = validation_time_is_initialized
     end)
@@ -489,6 +501,8 @@ module Network = struct
         "average time, in ms, for blocks to be accepted after the OCaml \
          process receives it"
 
+      let v = Gauge_map.add block_table ~name ~help
+
       let is_initialized = processing_time_is_initialized
     end)
 
@@ -502,6 +516,8 @@ module Network = struct
       let help =
         "average time, in ms, for blocks to be rejected after the OCaml \
          process receives it"
+
+      let v = Gauge_map.add block_table ~name ~help
 
       let is_initialized = rejection_time_is_initialized
     end)
@@ -532,6 +548,16 @@ module Network = struct
 
     let rejection_time_is_initialized = ref false
 
+    module Gauge_map = Metric_map (struct
+      type t = Gauge.t
+
+      let subsystem = subsystem
+
+      let v = Gauge.v
+    end)
+
+    let snark_work_table = Gauge_map.of_alist_exn []
+
     module Validation_time (Context : CONTEXT) = Moving_time_average (struct
       include Delay_time_spec (Context)
 
@@ -541,6 +567,8 @@ module Network = struct
 
       let help =
         "average delay, in ms, for snark work to be validated and rebroadcasted"
+
+      let v = Gauge_map.add snark_work_table ~name ~help
 
       let is_initialized = validation_time_is_initialized
     end)
@@ -556,6 +584,8 @@ module Network = struct
         "average delay, in ms, for snark work to be accepted after the OCaml \
          process receives it"
 
+      let v = Gauge_map.add snark_work_table ~name ~help
+
       let is_initialized = processing_time_is_initialized
     end)
 
@@ -569,6 +599,8 @@ module Network = struct
       let help =
         "average time, in ms, for snark work to be rejected after the OCaml \
          process receives it"
+
+      let v = Gauge_map.add snark_work_table ~name ~help
 
       let is_initialized = rejection_time_is_initialized
     end)
@@ -599,6 +631,16 @@ module Network = struct
 
     let rejection_time_is_initialized = ref false
 
+    module Gauge_map = Metric_map (struct
+      type t = Gauge.t
+
+      let subsystem = subsystem
+
+      let v = Gauge.v
+    end)
+
+    let transaction_table = Gauge_map.of_alist_exn []
+
     module Validation_time (Context : CONTEXT) = Moving_time_average (struct
       include Delay_time_spec (Context)
 
@@ -609,6 +651,8 @@ module Network = struct
       let help =
         "average delay, in ms, for transactions to be validated and \
          rebroadcasted"
+
+      let v = Gauge_map.add transaction_table ~name ~help
 
       let is_initialized = validation_time_is_initialized
     end)
@@ -624,6 +668,8 @@ module Network = struct
         "average delay, in ms, for transactions to be accepted after the OCaml \
          process receives it"
 
+      let v = Gauge_map.add transaction_table ~name ~help
+
       let is_initialized = processing_time_is_initialized
     end)
 
@@ -637,6 +683,8 @@ module Network = struct
       let help =
         "average time, in ms, for transactions to be rejected after the OCaml \
          process receives it"
+
+      let v = Gauge_map.add transaction_table ~name ~help
 
       let is_initialized = rejection_time_is_initialized
     end)
@@ -1285,6 +1333,16 @@ module Transition_frontier = struct
 
   let tps_30min_is_initialized = ref false
 
+  module Gauge_map = Metric_map (struct
+    type t = Gauge.t
+
+    let subsystem = subsystem
+
+    let v = Gauge.v
+  end)
+
+  let transaction_frontier_table = Gauge_map.of_alist_exn []
+
   module TPS_30min = Moving_bucketed_average (struct
     let bucket_interval = Core.Time.Span.of_min 3.0
 
@@ -1301,6 +1359,8 @@ module Transition_frontier = struct
     let help =
       "moving average for transaction per second, the rolling interval is set \
        to 30 min"
+
+    let v = Gauge_map.add transaction_frontier_table ~name ~help
 
     let is_initialized = tps_30min_is_initialized
   end)
@@ -1458,6 +1518,16 @@ module Block_latency = struct
 
   let gossip_slots_is_initialized = ref false
 
+  module Gauge_map = Metric_map (struct
+    type t = Gauge.t
+
+    let subsystem = subsystem
+
+    let v = Gauge.v
+  end)
+
+  let block_latency_table = Gauge_map.of_alist_exn []
+
   module Gossip_slots (Context : CONTEXT) = Moving_bucketed_average (struct
     let bucket_interval = Time.Span.scale Context.block_window_duration 0.5
 
@@ -1478,6 +1548,8 @@ module Block_latency = struct
       in
       total_sum /. Float.of_int count_sum
 
+    let v = Gauge_map.add block_latency_table ~name ~help
+
     let is_initialized = gossip_slots_is_initialized
   end)
 
@@ -1492,6 +1564,8 @@ module Block_latency = struct
 
     let help =
       "average delay, in seconds, after which produced blocks are received"
+
+    let v = Gauge_map.add block_latency_table ~name ~help
 
     let is_initialized = gossip_time_is_initialized
   end)
@@ -1509,6 +1583,8 @@ module Block_latency = struct
       "average delay, in seconds, after which produced blocks are included \
        into our frontier"
 
+    let v = Gauge_map.add block_latency_table ~name ~help
+
     let is_initialized = inclusion_time_is_initialized
   end)
 
@@ -1525,6 +1601,8 @@ module Block_latency = struct
     let help =
       "average delay, in seconds, between the time blocks are initially \
        received from the libp2p_helper, and when they are accepted as valid"
+
+    let v = Gauge_map.add block_latency_table ~name ~help
 
     let is_initialized = validation_acceptance_time_is_initialized
   end)

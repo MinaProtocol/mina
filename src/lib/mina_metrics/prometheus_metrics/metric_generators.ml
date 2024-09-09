@@ -1,7 +1,6 @@
 open Core_kernel
 open Async_kernel
 open Prometheus
-open Namespace
 
 module type Metric_spec_intf = sig
   val subsystem : string
@@ -19,6 +18,8 @@ module type Bucketed_average_spec_intf = sig
   val num_buckets : int
 
   val render_average : (float * int) list -> float
+
+  val v : Gauge.t
 
   val is_initialized : bool ref
 end
@@ -42,17 +43,19 @@ module type Time_average_spec_intf = sig
 
   val intervals : Intervals.t
 
+  val v : Gauge.t
+
   val is_initialized : bool ref
 end
 
 module type Moving_average_metric_intf = sig
   type datum
 
-  val v : Gauge.t
-
   val update : datum -> unit
 
   val clear : unit -> unit
+
+  val v : Gauge.t
 
   val initialize : unit -> unit
 end
@@ -60,8 +63,6 @@ end
 module Moving_bucketed_average (Spec : Bucketed_average_spec_intf) :
   Moving_average_metric_intf with type datum := float = struct
   open Spec
-
-  let v = Gauge.v name ~subsystem ~namespace ~help
 
   let empty_bucket_entry = (0.0, 0)
 
@@ -78,6 +79,8 @@ module Moving_bucketed_average (Spec : Bucketed_average_spec_intf) :
         failwith "Moving_bucketed_average buckets are malformed"
     | (value, num_entries) :: t ->
         buckets := Some ((value +. datum, num_entries + 1) :: t)
+
+  let v = Spec.v
 
   let initialize () =
     let rec tick () =
