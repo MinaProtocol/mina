@@ -65,7 +65,49 @@ let test_reallocation () =
     "verifying capacity is 512 meaning there have been 4 re-allocations"
     (IntKeyDsu.capacity dsu) 512
 
-(* alcotest harness *)
+let test_get_non_existent_element () =
+  let dsu = IntKeyDsu.create () in
+  Alcotest.(check (option int))
+    "non-existent element" (IntKeyDsu.get ~key:1 dsu) None
+  (* also verify the occupancy *)
+  ; Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 1
+
+  let test_union_existing_with_non_existent_element () =
+  let dsu = IntKeyDsu.create () in
+  IntKeyDsu.add_exn ~key:1 ~value:1 dsu ;
+  IntKeyDsu.union ~a:1 ~b:2 dsu ;
+  Alcotest.(check (option int))
+    "non-existent element" (IntKeyDsu.get ~key:2 dsu) None;
+  (* also test the occupancy, we have 2 to account for the 0 case *)
+  Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 2;
+  (* verify the rank of the existing element *)
+  let element = IntKeyDsu.get_rank ~key:1 dsu in
+ Alcotest.(check (option int)) "rank" (element) (Some 0)
+
+let test_union_non_existent_elements () =
+  let dsu = IntKeyDsu.create () in
+  IntKeyDsu.union ~a:1 ~b:2 dsu ;
+  Alcotest.(check (option int))
+    "non-existent element" (IntKeyDsu.get ~key:1 dsu) None ;
+  Alcotest.(check (option int))
+    "non-existent element" (IntKeyDsu.get ~key:2 dsu) None ;
+  Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 1
+
+let test_union_existing_elements () =
+  let dsu = IntKeyDsu.create () in
+  IntKeyDsu.add_exn ~key:1 ~value:1 dsu ;
+  IntKeyDsu.add_exn ~key:2 ~value:2 dsu ;
+  IntKeyDsu.add_exn ~key:3 ~value:3 dsu ;
+  IntKeyDsu.union ~a:1 ~b:2 dsu ;
+  IntKeyDsu.union ~a:2 ~b:3 dsu ;
+  Alcotest.(check (option int))
+    "non-existent element" (IntKeyDsu.get ~key:1 dsu) (Some 3) ;
+  Alcotest.(check (option int))
+    "non-existent element" (IntKeyDsu.get ~key:2 dsu) None ;
+  Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 2
+
+
+(* Test suite *)
 let tests =
   [ ("test_create", `Quick, test_create)
   ; ("test_add", `Quick, test_add)
