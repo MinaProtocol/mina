@@ -1,8 +1,6 @@
 let Prelude = ../External/Prelude.dhall
 
-let P = Prelude
-
-let Text/concatMap = P.Text.concatMap
+let Text/concatMap = Prelude.Text.concatMap
 
 let Optional/map = Prelude.Optional.map
 
