@@ -16,7 +16,17 @@ let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
 
-let dependsOn = [ { name = "MinaArtifactBullseye", key = "build-deb-pkg" } ]
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
+let Network = ../../Constants/Network.dhall
+
+let Profiles = ../../Constants/Profiles.dhall
+
+let dependsOn =
+      DebianVersions.dependsOn
+        DebianVersions.DebVersion.Bullseye
+        Network.Type.Devnet
+        Profiles.Type.Standard
 
 let buildTestCmd
     : Text -> Size -> List Command.TaggedKey.Type -> Command.Type
@@ -62,5 +72,5 @@ in  Pipeline.build
                 , PipelineTag.Type.Stable
                 ]
               }
-      , steps = [ buildTestCmd "develop" Size.Small dependsOn ]
+      , steps = [ buildTestCmd "compatible" Size.Small dependsOn ]
       }

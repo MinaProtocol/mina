@@ -104,3 +104,7 @@ Pipfile.lock
 # coverage report files
 *.coverage
 _coverage/
+
+# directory removed in this branch, but still existing in berkeley,
+# may appear as an untracked file occasionally
+/src/external

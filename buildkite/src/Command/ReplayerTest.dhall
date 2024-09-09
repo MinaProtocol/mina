@@ -18,7 +18,7 @@ in  { step =
                     "./src/test/archive/sample_db/archive_db.sql"
                     Artifacts.Type.Archive
                     (Some Network.Type.Devnet)
-                    "./scripts/replayer-test.sh -i src/test/archive/sample_db/replayer_input_file.json -a mina-replayer"
+                    "./buildkite/scripts/replayer-test.sh"
                 ]
               , label = "Archive: Replayer test"
               , key = "replayer-test"
