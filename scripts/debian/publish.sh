@@ -40,6 +40,8 @@ if [[ -z "$DEB_RELEASE" ]]; then usage "Release is not set!"; fi;
 
 if [[ -z "$SIGN" ]]; then 
   SIGN_ARG="--sign=$SIGN"
+else
+  SIGN_ARG=""
 fi
 
 BUCKET_ARG="--bucket $BUCKET"
