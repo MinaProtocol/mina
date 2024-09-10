@@ -101,7 +101,7 @@ macro_rules! impl_projective {
 
             #[wasm_bindgen]
             pub fn [<caml_ $name:snake _of_affine_coordinates>](x: $CamlBaseField, y: $CamlBaseField) -> $GroupProjective {
-                let res = $Projective::new(x.into(), y.into(), <$BaseField as ark_ff::One>::one());
+                let res = $Projective::new_unchecked(x.into(), y.into(), <$BaseField as ark_ff::One>::one());
                 res.into()
             }
 
