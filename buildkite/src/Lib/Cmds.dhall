@@ -71,11 +71,11 @@ let module =
                         = if docker.useBash then "/bin/bash" else "/bin/sh"
 
                     in  { line =
-                            "docker run -it --rm --entrypoint ${entrypoint} --init --volume /var/secrets/debian:/var/secrets/debian --volume /var/secrets/google:/var/secrets/google --volume ${sharedDir}:/shared --volume ${outerDir}:/workdir --workdir /workdir${envVars}${      if docker.privileged
+                            "cp /var/secrets/debian/key.gpg ${outerDir} && docker run -it --rm --entrypoint ${entrypoint} --init --volume \\\$BUILDKITE_BUILD_CHECKOUT_PATH/key.gpg:/var/secrets/debian/key.gpg --volume /var/secrets/google:/var/secrets/google --volume ${sharedDir}:/shared --volume ${outerDir}:/workdir --workdir /workdir${envVars}${      if docker.privileged
 
-                                                                                                                                                                                                                                                                               then  " --privileged"
+                                                                                                                                                                                                                                                                                                                                                           then  " --privileged"
 
-                                                                                                                                                                                                                                                                               else  ""} ${docker.image} -c '${inner.line}'"
+                                                                                                                                                                                                                                                                                                                                                           else  ""} ${docker.image} -c '${inner.line}'"
                         , readable =
                             Optional/map
                               Text
@@ -142,7 +142,7 @@ let tests =
       let dockerExample =
               assert
             :     { line =
-                      "docker run -it --rm --entrypoint /bin/bash --init --volume /var/secrets/debian:/var/secrets/debian --volume /var/secrets/google:/var/secrets/google --volume /var/buildkite/shared:/shared --volume \\\$BUILDKITE_BUILD_CHECKOUT_PATH:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag -c 'echo hello'"
+                      "cp /var/secrets/debian/key.gpg \\\$BUILDKITE_BUILD_CHECKOUT_PATH && docker run -it --rm --entrypoint /bin/bash --init --volume \\\$BUILDKITE_BUILD_CHECKOUT_PATH/key.gpg:/var/secrets/debian/key.gpg --volume /var/secrets/google:/var/secrets/google --volume /var/buildkite/shared:/shared --volume \\\$BUILDKITE_BUILD_CHECKOUT_PATH:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag -c 'echo hello'"
                   , readable = Some "Docker@foo/bar:tag ( echo hello )"
                   }
               ===  M.inDocker
@@ -154,7 +154,7 @@ let tests =
 
       let cacheExample =
               assert
-            :     "./buildkite/scripts/cache-through.sh data.tar \"docker run -it --rm --entrypoint /bin/bash --init --volume /var/secrets/debian:/var/secrets/debian --volume /var/secrets/google:/var/secrets/google --volume /var/buildkite/shared:/shared --volume \\\$BUILDKITE_BUILD_CHECKOUT_PATH:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag -c 'echo hello > /tmp/data/foo.txt && tar cvf data.tar /tmp/data'\""
+            :     "./buildkite/scripts/cache-through.sh data.tar \"cp /var/secrets/debian/key.gpg \\\$BUILDKITE_BUILD_CHECKOUT_PATH && docker run -it --rm --entrypoint /bin/bash --init --volume \\\$BUILDKITE_BUILD_CHECKOUT_PATH/key.gpg:/var/secrets/debian/key.gpg --volume /var/secrets/google:/var/secrets/google --volume /var/buildkite/shared:/shared --volume \\\$BUILDKITE_BUILD_CHECKOUT_PATH:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag -c 'echo hello > /tmp/data/foo.txt && tar cvf data.tar /tmp/data'\""
               ===  M.format
                      ( M.cacheThrough
                          M.Docker::{
