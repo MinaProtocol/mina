@@ -71,7 +71,7 @@ let module =
                         = if docker.useBash then "/bin/bash" else "/bin/sh"
 
                     in  { line =
-                            "docker run -it --rm --entrypoint ${entrypoint} --init --volume ${sharedDir}:/shared --volume ${outerDir}:/workdir --workdir /workdir${envVars}${      if docker.privileged
+                            "docker run -it --rm --entrypoint ${entrypoint} --init --volume /var/secret/debian:/var/secret/debian --volume /var/secrets/google:/var/secrets/google --volume ${sharedDir}:/shared --volume ${outerDir}:/workdir --workdir /workdir${envVars}${      if docker.privileged
 
                                                                                                                                                                              then  " --privileged"
 

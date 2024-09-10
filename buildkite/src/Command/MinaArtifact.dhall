@@ -117,6 +117,7 @@ let publish_to_debian_repo =
                   spec.debVersion
                   [ "AWS_ACCESS_KEY_ID"
                   , "AWS_SECRET_ACCESS_KEY"
+                  , "GPG_PASSPHRASE"
                   , "MINA_DEB_CODENAME=${DebianVersions.lowerName
                                            spec.debVersion}"
                   , "MINA_DEB_RELEASE=${DebianChannel.lowerName spec.channel}"
