@@ -22,7 +22,7 @@ source buildkite/scripts/export-git-env-vars.sh
 pip3 install sexpdata==1.0.0
 
 pr_branch=origin/${BUILDKITE_BRANCH}
-release_branch=${REMOTE}/$1
+release_branch=origin/$1
 
 if [[ -n "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" ]]; then
     base_branch=${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}

@@ -2,6 +2,10 @@ let Cmd = ../../Lib/Cmds.dhall
 
 let S = ../../Lib/SelectFiles.dhall
 
+let B = ../../External/Buildkite.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
@@ -32,10 +36,11 @@ let dependsOn =
         Artifacts.Type.Daemon
 
 let buildTestCmd
-    : Text -> Size -> List Command.TaggedKey.Type -> Command.Type
+    : Text -> Size -> List Command.TaggedKey.Type -> B/SoftFail -> Command.Type
     =     \(release_branch : Text)
       ->  \(cmd_target : Size)
       ->  \(dependsOn : List Command.TaggedKey.Type)
+      ->  \(soft_fail : B/SoftFail)
       ->  Command.build
             Command.Config::{
             , commands =
@@ -83,5 +88,13 @@ in  Pipeline.build
               , name = "VersionLint"
               , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
               }
-      , steps = [ buildTestCmd "develop" Size.Small dependsOn ]
+      , steps =
+        [ buildTestCmd
+            "compatible"
+            Size.Small
+            dependsOn
+            (B/SoftFail.Boolean True)
+        , buildTestCmd "develop" Size.Small dependsOn (B/SoftFail.Boolean True)
+        , buildTestCmd "master" Size.Small dependsOn (B/SoftFail.Boolean True)
+        ]
       }

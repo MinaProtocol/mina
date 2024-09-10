@@ -34,7 +34,7 @@ def set_error():
 
 def branch_commits(branch,n):
   print ('Retrieving', branch, 'head commit...')
-  result=subprocess.run(['git','log','-n',str(n),'--format="%h"','--abbrev=7','--no-merges',f'{branch}'],
+  result=subprocess.run(['git','log','-n','1','--format="%h"','--abbrev=7',f'{branch}'],
                         capture_output=True)
   output=result.stdout.decode('ascii')
   print ('command stdout:', output)
@@ -255,7 +255,7 @@ def check_type_shapes(pr_branch_dict,base_branch,base_type_dict,release_branch,r
     # not an error if the type was introduced in the base branch, and the type changed in PR branch
 
 def assert_commit(commit, desc):
-  if not commit: 
+  if not commit:
     f"Empty commit detected when evaluating commit of {desc}"
 
 if __name__ == "__main__":

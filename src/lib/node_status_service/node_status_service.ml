@@ -195,11 +195,11 @@ let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
       Deferred.unit
   | Some tf -> (
       let catchup_job_states =
-        match Transition_frontier.catchup_tree tf with
-        | Full catchup_tree ->
+        match Transition_frontier.catchup_state tf with
+        | Full catchup_state ->
             Some
               (Transition_frontier.Full_catchup_tree.to_node_status_report
-                 catchup_tree )
+                 catchup_state )
         | _ ->
             None
       in
