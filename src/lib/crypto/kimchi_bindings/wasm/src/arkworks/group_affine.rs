@@ -205,7 +205,7 @@ pub fn caml_pasta_pallas_of_affine(x: &WasmPallasGAffine) -> WasmPallasGProjecti
 
 #[wasm_bindgen]
 pub fn caml_pasta_pallas_of_affine_coordinates(x: WasmPastaFp, y: WasmPastaFp) -> WasmPallasGProjective {
-    GProjective::new(x.0, y.0, Fp::one()).into()
+    GProjective::new_unchecked(x.0, y.0, Fp::one()).into()
 }
 
 #[wasm_bindgen]
