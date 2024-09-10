@@ -141,6 +141,13 @@ module type Lib_intf = sig
     -> State.t
     -> Transaction_snark.Statement.t One_or_two.t list
 
+  (** transfer jobs that are not in the snark pool yet *)
+  val pending_user_work_statements :
+       snark_pool:Snark_pool.t
+    -> fee_opt:Fee.t option
+    -> State.t
+    -> Transaction_snark.Statement.t One_or_two.t list
+
   module For_tests : sig
     val does_not_have_better_fee :
          snark_pool:Snark_pool.t
@@ -171,6 +178,13 @@ module type Selection_method_intf = sig
     -> work One_or_two.t option
 
   val pending_work_statements :
+       snark_pool:snark_pool
+    -> fee_opt:Currency.Fee.t option
+    -> State.t
+    -> Transaction_snark.Statement.t One_or_two.t list
+
+  (** This returns the pending work for transfers *)
+  val pending_user_work_statements :
        snark_pool:snark_pool
     -> fee_opt:Currency.Fee.t option
     -> State.t

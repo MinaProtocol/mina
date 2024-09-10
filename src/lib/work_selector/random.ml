@@ -18,6 +18,8 @@ struct
   let remove = Lib.State.remove
 
   let pending_work_statements = Lib.pending_work_statements
+
+  let pending_user_work_statements = Lib.pending_user_work_statements
 end
 
 let%test_module "test" =

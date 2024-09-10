@@ -159,4 +159,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         all_pending_work ~snark_pool all_todo_statements
     | Some fee ->
         expensive_work all_todo_statements ~fee
+
+  let pending_user_work_statements ~snark_pool:_ ~fee_opt:_ _ =
+    failwith "pending_user_work_statement"
 end
