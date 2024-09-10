@@ -59,8 +59,6 @@ let scan_state_transaction_capacity_log_2 =
 
 [%%inject "supercharged_coinbase_factor", supercharged_coinbase_factor]
 
-[%%inject "plugins", plugins]
-
 [%%inject "genesis_state_timestamp", genesis_state_timestamp]
 
 [%%inject "block_window_duration", block_window_duration]

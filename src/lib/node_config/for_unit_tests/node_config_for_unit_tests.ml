@@ -47,8 +47,6 @@ let (minimum_user_command_fee : string) = ("2" : string)
 
 let (supercharged_coinbase_factor : int) = (1 : int)
 
-let (plugins : bool) = (true : bool)
-
 let (genesis_state_timestamp : string) = ("2019-01-30 12:00:00-08:00" : string)
 
 let (block_window_duration : int) = (2000 : int)
