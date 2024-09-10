@@ -928,7 +928,6 @@ let constraint_system_digests =
            Genesis_constants.Compiled.constraint_constants
          in
          let proof_level = Genesis_constants.Compiled.proof_level in
-         (* TODO: Allow these to be configurable. *)
          let all =
            Transaction_snark.constraint_system_digests ~constraint_constants ()
            @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
