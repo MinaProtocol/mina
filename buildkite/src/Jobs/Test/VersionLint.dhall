@@ -2,6 +2,10 @@ let Cmd = ../../Lib/Cmds.dhall
 
 let S = ../../Lib/SelectFiles.dhall
 
+let B = ../../External/Buildkite.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
@@ -19,10 +23,11 @@ let Size = ../../Command/Size.dhall
 let dependsOn = [ { name = "MinaArtifactBullseye", key = "build-deb-pkg" } ]
 
 let buildTestCmd
-    : Text -> Size -> List Command.TaggedKey.Type -> Command.Type
+    : Text -> Size -> List Command.TaggedKey.Type -> B/SoftFail -> Command.Type
     =     \(release_branch : Text)
       ->  \(cmd_target : Size)
       ->  \(dependsOn : List Command.TaggedKey.Type)
+      ->  \(soft_fail : B/SoftFail)
       ->  Command.build
             Command.Config::{
             , commands =
@@ -30,13 +35,14 @@ let buildTestCmd
                     ([] : List Text)
                     "buildkite/scripts/dump-mina-type-shapes.sh"
                 # [ Cmd.run
-                      "gsutil cp \$(git log -n 1 --format=%h --abbrev=7 --no-merges)-type_shape.txt \$MINA_TYPE_SHAPE gs://mina-type-shapes"
+                      "gsutil cp \$(git log -n 1 --format=%h --abbrev=7)-type_shape.txt \$MINA_TYPE_SHAPE gs://mina-type-shapes"
                   ]
                 # RunInToolchain.runInToolchain
                     ([] : List Text)
                     "buildkite/scripts/version-linter.sh ${release_branch}"
-            , label = "Versioned type linter"
-            , key = "version-linter"
+            , label = "Versioned type linter for ${release_branch}"
+            , key = "version-linter-${release_branch}"
+            , soft_fail = Some soft_fail
             , target = cmd_target
             , docker = None Docker.Type
             , depends_on = dependsOn
@@ -62,5 +68,13 @@ in  Pipeline.build
                 , PipelineTag.Type.Stable
                 ]
               }
-      , steps = [ buildTestCmd "compatible" Size.Small dependsOn ]
+      , steps =
+        [ buildTestCmd
+            "compatible"
+            Size.Small
+            dependsOn
+            (B/SoftFail.Boolean True)
+        , buildTestCmd "develop" Size.Small dependsOn (B/SoftFail.Boolean True)
+        , buildTestCmd "master" Size.Small dependsOn (B/SoftFail.Boolean True)
+        ]
       }

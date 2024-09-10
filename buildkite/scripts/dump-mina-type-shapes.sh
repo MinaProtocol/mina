@@ -15,7 +15,7 @@ source buildkite/scripts/export-git-env-vars.sh
 
 source buildkite/scripts/debian/install.sh "mina-${TESTNET_NAME}" 1
 
-MINA_COMMIT_SHA1=$(git log -n 1 --format=%h --abbrev=7 --no-merges)
+MINA_COMMIT_SHA1=$(git log -n 1 --format=%h --abbrev=7)
 export TYPE_SHAPE_FILE=${MINA_COMMIT_SHA1}-type_shape.txt
 
 echo "--- Create type shapes git note for commit: ${MINA_COMMIT_SHA1}"
