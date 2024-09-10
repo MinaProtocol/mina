@@ -23,7 +23,7 @@
    transaction_snark
    blockchain_snark
    mina_base
-   genesis_constants.compiled  
+   genesis_constants
    uptime_service
    currency
    ledger_proof
