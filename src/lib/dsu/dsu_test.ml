@@ -62,7 +62,7 @@ let test_reallocation () =
   let arr = QCheck.Gen.(generate1 (array_size (int_range 400 401) int)) in
   Array.iter arr ~f:(fun x -> IntKeyDsu.add_exn ~key:x ~value:x dsu) ;
   Alcotest.(check int)
-    "verifying capacity is 512 meaning there have been 4 re-allocations"
+    "verifying capacity is 512 meaning there have been 3 re-allocations"
     (IntKeyDsu.capacity dsu) 512
 
 let test_get_non_existent_element () =
@@ -80,9 +80,9 @@ let test_get_non_existent_element () =
     "non-existent element" (IntKeyDsu.get ~key:2 dsu) None;
   (* also test the occupancy, we have 2 to account for the 0 case *)
   Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 2;
-  (* verify the rank of the existing element *)
-  let element_rank = IntKeyDsu.get_rank ~key:1 dsu in
- Alcotest.(check (option int)) "rank" (element_rank) (Some 0)
+  (* verify the size of the existing element *)
+  let element_size = IntKeyDsu.get_size ~key:1 dsu in
+ Alcotest.(check (option int)) "size" (element_size) (Some 0)
 
 let test_union_non_existent_elements () =
   let dsu = IntKeyDsu.create () in
@@ -100,23 +100,24 @@ let test_union_existing_elements () =
   IntKeyDsu.add_exn ~key:3 ~value:3 dsu ;
   IntKeyDsu.union ~a:1 ~b:2 dsu ;
   Alcotest.(check (option int))
-    "existent element fst" (IntKeyDsu.get ~key:2 dsu) (Some 1) ;
+    "checking size of 1" (IntKeyDsu.get_size ~key:2 dsu) (Some 1) ;
   IntKeyDsu.union ~a:2 ~b:3 dsu ;
   Alcotest.(check (option int))
-    "existent element snd" (IntKeyDsu.get ~key:1 dsu) (Some 3) ;
+    "existent element 1" (IntKeyDsu.get ~key:1 dsu) (Some 1) ;
   Alcotest.(check (option int))
-    "existent element third" (IntKeyDsu.get ~key:2 dsu) None ;
+    "existent element 2" (IntKeyDsu.get ~key:2 dsu) (Some 2) ;
   Alcotest.(check (option int))
-    "existent element fourth" (IntKeyDsu.get ~key:3 dsu) None ;
+    "existent element 3" (IntKeyDsu.get ~key:3 dsu) (Some 3) ;
+
   Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 4;
-  (* verify the rank of the existing elements *)
-  let element_rank = IntKeyDsu.get_rank ~key:1 dsu in
-  Alcotest.(check (option int)) "rank 1" (element_rank) (Some 0);
-  let element_rank = IntKeyDsu.get_rank ~key:2 dsu in
-  (*since 2 has a higher rank than 3 we should merge 2 into 3 increasing the rank to of 2 to 2 *)
-  Alcotest.(check (option int)) "rank 2" (element_rank) (Some 2);
-  let element_rank = IntKeyDsu.get_rank ~key:3 dsu in
-  Alcotest.(check (option int)) "rank 3" (element_rank) (Some 0)
+  (* verify the size of the existing elements *)
+  let element_size = IntKeyDsu.get_size ~key:1 dsu in
+  Alcotest.(check (option int)) "size 1" (element_size) (Some 1);
+  let element_size = IntKeyDsu.get_size ~key:2 dsu in
+  (* since 2 has a higher size than 3 we should merge 2 into 3 increasing the size to of 2 to 2 *)
+  Alcotest.(check (option int)) "size 2" (element_size) (Some 1);
+  let element_size = IntKeyDsu.get_size ~key:3 dsu in
+  Alcotest.(check (option int)) "size 3" (element_size) (Some 1)
 
 
 (* Test suite *)

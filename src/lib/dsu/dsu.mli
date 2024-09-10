@@ -14,7 +14,7 @@ end
     Also read: https://cp-algorithms.com/data_structures/disjoint_set_union.html
 *)
 module Dsu : functor (Key : Hashtbl.Key) (D : Data) -> sig
-  type element = { value : D.t option; parent : int; rank : int }
+  type element = { value : D.t option; parent : int; size : int }
 
   type t
 
@@ -32,5 +32,5 @@ module Dsu : functor (Key : Hashtbl.Key) (D : Data) -> sig
 
   val occupancy : t -> int
 
-  val get_rank : key:Key.t -> t -> int option
+  val get_size : key:Key.t -> t -> int option
 end
