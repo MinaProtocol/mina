@@ -13,7 +13,7 @@
    yojson
    async_unix
    ;;local libraries
-   genesis_constants
+   genesis_constants.compiled
    mina_runtime_config
    mina_ledger
    genesis_ledger_helper
@@ -25,6 +25,5 @@
    consensus
    mina_base
  )
- (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_mina ppx_version ppx_let ppx_optcomp ppx_deriving_yojson)))
+ (preprocess (pps ppx_mina ppx_version ppx_let ppx_deriving_yojson)))

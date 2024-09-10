@@ -20,7 +20,7 @@
    snark_work_lib
    transaction_witness
    transaction_snark
-   genesis_constants
+   genesis_constants.compiled
    logger
    error_json
    transaction_protocol_state
@@ -31,6 +31,6 @@
    mina_base.import
    )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_here ppx_custom_printf ppx_version ppx_mina ppx_let ppx_deriving_yojson ppx_sexp_conv ppx_optcomp))
+ (preprocess (pps ppx_here ppx_custom_printf ppx_version ppx_mina ppx_let ppx_deriving_yojson ppx_sexp_conv))
  (flags -short-paths -w @a-4-29-40-41-42-44-45-48-58-59-60))
 

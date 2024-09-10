@@ -14,6 +14,8 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
+let Network = ../../Constants/Network.dhall
+
 let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
@@ -21,9 +23,11 @@ let Size = ../../Command/Size.dhall
 let dependsOn =
         DebianVersions.dependsOn
           DebianVersions.DebVersion.Bullseye
+          Network.Type.Devnet
           Profiles.Type.Lightnet
       # DebianVersions.dependsOn
           DebianVersions.DebVersion.Bullseye
+          Network.Type.Devnet
           Profiles.Type.Standard
 
 let buildTestCmd
@@ -58,7 +62,11 @@ in  Pipeline.build
               , dirtyWhen = unitDirtyWhen
               , path = "Test"
               , name = "SingleNodeTest"
-              , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
+              , tags =
+                [ PipelineTag.Type.Long
+                , PipelineTag.Type.Test
+                , PipelineTag.Type.Stable
+                ]
               }
       , steps = [ buildTestCmd Size.XLarge ]
       }

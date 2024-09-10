@@ -10,11 +10,14 @@ let ContainerImages = ../Constants/ContainerImages.dhall
 
 let Artifacts = ../Constants/Artifacts.dhall
 
+let Network = ../Constants/Network.dhall
+
 let runInDockerWithPostgresConn
-    : List Text -> Text -> Artifacts.Type -> Text -> Cmd.Type
+    : List Text -> Text -> Artifacts.Type -> Network.Type -> Text -> Cmd.Type
     =     \(environment : List Text)
       ->  \(initScript : Text)
       ->  \(docker : Artifacts.Type)
+      ->  \(network : Network.Type)
       ->  \(innerScript : Text)
       ->  let port = "5432"
 
@@ -48,14 +51,18 @@ let runInDockerWithPostgresConn
               : Text
               = "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
 
+          let minaDockerTag
+              : Text
+              = "\\\$MINA_DOCKER_TAG"
+
           in  Cmd.chain
                 [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
                 , "source buildkite/scripts/export-git-env-vars.sh"
                 , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
                 , "sleep 5"
                 , "docker exec ${postgresDockerName} psql ${pg_conn} -f /workdir/${initScript}"
-                , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir  ${envVars} gcr.io/o1labs-192920/${Artifacts.dockerName
-                                                                                                                                   docker}:\\\$MINA_DOCKER_TAG ${innerScript}"
+                , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --entrypoint bash ${envVars} gcr.io/o1labs-192920/${Artifacts.dockerName
+                                                                                                                                                    docker}:${minaDockerTag} ${innerScript}"
                 ]
 
 in  { runInDockerWithPostgresConn = runInDockerWithPostgresConn }

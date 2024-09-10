@@ -14,9 +14,13 @@ let Tag
       | TearDown
       | Lint
       | Release
-      | Hardfork
       | Test
+      | Stable
       | Toolchain
+      | Docker
+      | Debian
+      | Hardfork
+      | Promote
       >
 
 let toNatural
@@ -32,6 +36,10 @@ let toNatural
             , Test = 7
             , Toolchain = 8
             , Hardfork = 9
+            , Stable = 10
+            , Promote = 11
+            , Debian = 12
+            , Docker = 13
             }
             tag
 
@@ -65,6 +73,10 @@ let capitalName =
             , Test = "Test"
             , Toolchain = "Toolchain"
             , Hardfork = "Hardfork"
+            , Stable = "Stable"
+            , Promote = "Promote"
+            , Docker = "Docker"
+            , Debian = "Debian"
             }
             tag
 
@@ -80,6 +92,10 @@ let lowerName =
             , Test = "test"
             , Toolchain = "toolchain"
             , Hardfork = "hardfork"
+            , Stable = "stable"
+            , Promote = "promote"
+            , Docker = "docker"
+            , Debian = "debian"
             }
             tag
 

@@ -14,12 +14,21 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
+let Network = ../../Constants/Network.dhall
+
+let Artifacts = ../../Constants/Artifacts.dhall
+
 let dependsOn =
         Dockers.dependsOn
           Dockers.Type.Bullseye
+          Network.Type.Devnet
           Profiles.Type.Standard
-          "daemon-berkeley"
-      # Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "archive"
+          Artifacts.Type.Daemon
+      # Dockers.dependsOn
+          Dockers.Type.Bullseye
+          Network.Type.Devnet
+          Profiles.Type.Standard
+          Artifacts.Type.Archive
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -39,7 +48,11 @@ in  Pipeline.build
         , path = "Test"
         , name = "TestnetIntegrationTestsLong"
         , mode = PipelineMode.Type.Stable
-        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
         }
-      , steps = [ TestExecutive.executeCloud "hard-fork" dependsOn ]
+      , steps = [ TestExecutive.executeLocal "hard-fork" dependsOn ]
       }

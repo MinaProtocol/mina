@@ -23,11 +23,19 @@ type Structured_log_events.t +=
 module type CONTEXT = sig
   val logger : Logger.t
 
+  val time_controller : Block_time.Controller.t
+
+  val trust_system : Trust_system.t
+
+  val consensus_local_state : Consensus.Data.Local_state.t
+
   val precomputed_values : Precomputed_values.t
 
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val commit_id : string
 end
 
 exception Snark_worker_error of int
@@ -41,6 +49,8 @@ exception Bootstrap_stuck_shutdown
 val time_controller : t -> Block_time.Controller.t
 
 val subscription : t -> Mina_subscriptions.t
+
+val commit_id : t -> string
 
 val daemon_start_time : Time_ns.t
 
@@ -175,7 +185,8 @@ val start_with_precomputed_blocks :
 
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
-val create : ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
+val create :
+  commit_id:string -> ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
 
 val staged_ledger_ledger_proof : t -> Ledger_proof.t option
 

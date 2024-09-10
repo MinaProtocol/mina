@@ -144,7 +144,7 @@ module Network_config = struct
     let genesis_ledger_accounts = add_accounts genesis_accounts_and_keys in
     let constraint_constants =
       Genesis_ledger_helper.make_constraint_constants
-        ~default:Genesis_constants.Constraint_constants.compiled proof_config
+        ~default:Genesis_constants_compiled.Constraint_constants.t proof_config
     in
     let ledger_is_prefix ledger1 ledger2 =
       List.is_prefix ledger2 ~prefix:ledger1
@@ -167,6 +167,7 @@ module Network_config = struct
             ; zkapp_cmd_limit_hardcap = None
             ; slot_tx_end
             ; slot_chain_end
+            ; minimum_user_command_fee = None
             ; network_id
             }
       ; genesis =
@@ -280,7 +281,7 @@ module Network_config = struct
     let genesis_constants =
       Or_error.ok_exn
         (Genesis_ledger_helper.make_genesis_constants ~logger
-           ~default:Genesis_constants.compiled runtime_config )
+           ~default:Genesis_constants_compiled.t runtime_config )
     in
     let constants : Test_config.constants =
       { constraints = constraint_constants; genesis = genesis_constants }
@@ -302,9 +303,7 @@ module Network_config = struct
       ^ "/src/app/archive/"
     in
     let mina_archive_schema_aux_files =
-      [ sprintf "%screate_schema.sql" mina_archive_base_url
-      ; sprintf "%szkapp_tables.sql" mina_archive_base_url
-      ]
+      [ sprintf "%screate_schema.sql" mina_archive_base_url ]
     in
     let genesis_keypairs =
       List.fold genesis_accounts_and_keys ~init:String.Map.empty
@@ -371,7 +370,6 @@ module Network_config = struct
               ~image:Postgres_config.postgres_image ~ports:[ postgres_port ]
               ~volumes:
                 [ Postgres_config.postgres_create_schema_volume
-                ; Postgres_config.postgres_zkapp_schema_volume
                 ; Postgres_config.postgres_entrypoint_volume
                 ]
               ~config

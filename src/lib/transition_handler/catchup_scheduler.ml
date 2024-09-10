@@ -333,7 +333,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None ~pids () )
+            ~conf_dir:None ~pids ~commit_id:"not specified for unit tests" () )
 
     (* cast a breadcrumb into a cached, enveloped, partially validated transition *)
     let downcast_breadcrumb breadcrumb =
@@ -402,7 +402,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
         (Transition_frontier.For_tests.gen_with_branch ~precomputed_values
            ~verifier ~max_length ~frontier_size:1 ~branch_size:2 () )
         ~f:(fun (frontier, branch) ->
-          let cache = Unprocessed_transition_cache.create ~logger in
+          let cache =
+            Unprocessed_transition_cache.create ~logger ~cache_exceptions:true
+          in
           let register_breadcrumb breadcrumb =
             Unprocessed_transition_cache.register_exn cache
               (downcast_breadcrumb breadcrumb)

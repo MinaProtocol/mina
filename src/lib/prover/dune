@@ -52,6 +52,5 @@
    mina_wire_types
    promise
  )
- (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_jane ppx_bin_prot)))

@@ -13,10 +13,12 @@
    async.async_command
    ;;local libraries
    genesis_constants
+   genesis_constants.compiled
    mina_runtime_config
    cli_lib
    logger
    block_time
+   mina_version
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_mina)))

@@ -12,9 +12,12 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
+let Network = ../../Constants/Network.dhall
+
 let dependsOn =
       DebianVersions.dependsOn
         DebianVersions.DebVersion.Bullseye
+        Network.Type.Devnet
         Profiles.Type.Standard
 
 in  Pipeline.build
@@ -27,7 +30,11 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "CheckGraphQLSchema"
-        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
         }
       , steps = [ CheckGraphQLSchema.step dependsOn ]
       }

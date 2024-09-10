@@ -30,6 +30,8 @@ let DebianVersions = ../Constants/DebianVersions.dhall
 
 let DebianRepo = ../Constants/DebianRepo.dhall
 
+let Artifacts = ../Constants/Artifacts.dhall
+
 let Profiles = ../Constants/Profiles.dhall
 
 let Toolchain = ../Constants/Toolchain.dhall
@@ -96,6 +98,17 @@ let pipeline
                 "gcr.io/o1labs-192920/mina-daemon:\${BUILDKITE_COMMIT:0:7}-${DebianVersions.lowerName
                                                                                debVersion}-${network_name}"
 
+          let dockerSpec =
+                DockerImage.ReleaseSpec::{
+                , deps =
+                  [ { name = pipelineName, key = generateLedgersJobKey } ]
+                , service = Artifacts.Type.Daemon
+                , network = network_name
+                , deb_codename = debVersion
+                , deb_profile = profile
+                , deb_repo = DebianRepo.Type.Local
+                }
+
           in  Pipeline.Config::{
               , spec = JobSpec::{
                 , dirtyWhen = [ S.everything ]
@@ -125,8 +138,8 @@ let pipeline
                             )
                             "./buildkite/scripts/build-hardfork-package.sh"
                         # [ Cmd.run
-                              "./buildkite/scripts/upload-deb-to-gs.sh ${DebianVersions.lowerName
-                                                                           debVersion}"
+                              "./buildkite/scripts/debian/upload-to-gs.sh ${DebianVersions.lowerName
+                                                                              debVersion}"
                           ]
                     , label =
                         "Build Mina Hardfork Package for ${DebianVersions.capitalName
@@ -144,7 +157,7 @@ let pipeline
                           , "MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                    debVersion}"
                           ]
-                          "./buildkite/scripts/publish-deb.sh"
+                          "./buildkite/scripts/debian/publish.sh"
                     , label =
                         "Publish Mina for ${DebianVersions.capitalName
                                               debVersion} Hardfork"
@@ -153,20 +166,7 @@ let pipeline
                     , key = "publish-hardfork-deb-pkg"
                     , target = Size.Small
                     }
-                , DockerImage.generateStep
-                    DockerImage.ReleaseSpec::{
-                    , deps =
-                      [ { name = pipelineName, key = generateLedgersJobKey } ]
-                    , service = "mina-daemon"
-                    , network = network_name
-                    , deb_codename = "${DebianVersions.lowerName debVersion}"
-                    , deb_profile = profile
-                    , deb_repo = DebianRepo.Type.Local
-                    , step_key =
-                        "daemon-berkeley-${DebianVersions.lowerName
-                                             debVersion}${Profiles.toLabelSegment
-                                                            profile}-docker-image"
-                    }
+                , DockerImage.generateStep dockerSpec
                 , Command.build
                     Command.Config::{
                     , commands =
@@ -180,10 +180,7 @@ let pipeline
                     , target = Size.XLarge
                     , depends_on =
                       [ { name = pipelineName
-                        , key =
-                            "daemon-berkeley-${DebianVersions.lowerName
-                                                 debVersion}${Profiles.toLabelSegment
-                                                                profile}-docker-image"
+                        , key = DockerImage.stepKey dockerSpec
                         }
                       ]
                     , if = None B/If
@@ -200,10 +197,7 @@ let pipeline
                     , target = Size.XLarge
                     , depends_on =
                       [ { name = pipelineName
-                        , key =
-                            "daemon-berkeley-${DebianVersions.lowerName
-                                                 debVersion}${Profiles.toLabelSegment
-                                                                profile}-docker-image"
+                        , key = DockerImage.stepKey dockerSpec
                         }
                       ]
                     , if = None B/If
@@ -212,28 +206,20 @@ let pipeline
                     DockerImage.ReleaseSpec::{
                     , deps =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
-                    , service = "mina-archive"
+                    , service = Artifacts.Type.Archive
                     , network = network_name
-                    , deb_codename = "${DebianVersions.lowerName debVersion}"
+                    , deb_codename = debVersion
                     , deb_profile = profile
                     , deb_repo = DebianRepo.Type.Local
-                    , step_key =
-                        "archive-${DebianVersions.lowerName
-                                     debVersion}${Profiles.toLabelSegment
-                                                    profile}-docker-image"
                     }
                 , DockerImage.generateStep
                     DockerImage.ReleaseSpec::{
                     , deps =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
-                    , service = "mina-rosetta"
+                    , service = Artifacts.Type.Rosetta
                     , network = network_name
                     , deb_repo = DebianRepo.Type.Local
-                    , deb_codename = "${DebianVersions.lowerName debVersion}"
-                    , step_key =
-                        "rosetta-${DebianVersions.lowerName
-                                     debVersion}${Profiles.toLabelSegment
-                                                    profile}-docker-image"
+                    , deb_codename = debVersion
                     }
                 ]
               }

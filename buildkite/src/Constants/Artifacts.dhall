@@ -11,40 +11,53 @@ let Network = ./Network.dhall
 let Artifact
     : Type
     = < Daemon
+      | LogProc
       | Archive
-      | ArchiveMigration
       | TestExecutive
       | BatchTxn
       | Rosetta
       | ZkappTestTransaction
       | FunctionalTestSuite
+      | Toolchain
+      | ItnOrchestrator
+      | Leaderboard
       >
 
 let AllButTests =
       [ Artifact.Daemon
+      , Artifact.LogProc
       , Artifact.Archive
-      , Artifact.ArchiveMigration
       , Artifact.BatchTxn
       , Artifact.TestExecutive
       , Artifact.Rosetta
       , Artifact.ZkappTestTransaction
       ]
 
-let Main = [ Artifact.Daemon, Artifact.Archive, Artifact.Rosetta ]
+let Main =
+      [ Artifact.Daemon, Artifact.LogProc, Artifact.Archive, Artifact.Rosetta ]
 
-let All = AllButTests # [ Artifact.FunctionalTestSuite ]
+let All =
+        AllButTests
+      # [ Artifact.FunctionalTestSuite
+        , Artifact.Toolchain
+        , Artifact.ItnOrchestrator
+        , Artifact.Leaderboard
+        ]
 
 let capitalName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "Daemon"
+            , LogProc = "LogProc"
             , Archive = "Archive"
-            , ArchiveMigration = "ArchiveMigration"
             , TestExecutive = "TestExecutive"
             , BatchTxn = "BatchTxn"
             , Rosetta = "Rosetta"
             , ZkappTestTransaction = "ZkappTestTransaction"
             , FunctionalTestSuite = "FunctionalTestSuite"
+            , Toolchain = "Toolchain"
+            , ItnOrchestrator = "ItnOrchestrator"
+            , Leaderboard = "Leaderboard"
             }
             artifact
 
@@ -52,13 +65,16 @@ let lowerName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "daemon"
+            , LogProc = "logproc"
             , Archive = "archive"
-            , ArchiveMigration = "archive_migration"
             , TestExecutive = "test_executive"
             , BatchTxn = "batch_txn"
             , Rosetta = "rosetta"
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
+            , Toolchain = "toolchain"
+            , ItnOrchestrator = "itnOrchestrator"
+            , Leaderboard = "leaderboard"
             }
             artifact
 
@@ -68,38 +84,69 @@ let dockerName =
             { Daemon = "mina-daemon"
             , Archive = "mina-archive"
             , TestExecutive = "mina-test-executive"
-            , ArchiveMigration = "mina-archive-migration"
+            , LogProc = "mina-logproc"
             , BatchTxn = "mina-batch-txn"
             , Rosetta = "mina-rosetta"
             , ZkappTestTransaction = "mina-zkapp-test-transaction"
             , FunctionalTestSuite = "mina-test-suite"
+            , Toolchain = "mina-toolchain"
+            , ItnOrchestrator = "itn-orchestrator"
+            , Leaderboard = "leaderboard"
             }
             artifact
 
 let toDebianName =
           \(artifact : Artifact)
+      ->  \(network : Network.Type)
       ->  merge
-            { Daemon = "daemon"
+            { Daemon = "daemon_${Network.lowerName network}"
+            , LogProc = "logproc"
             , Archive = "archive"
-            , ArchiveMigration = "archive_migration"
             , TestExecutive = "test_executive"
             , BatchTxn = "batch_txn"
-            , Rosetta = ""
+            , Rosetta = "rosetta_${Network.lowerName network}"
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
+            , Toolchain = ""
+            , ItnOrchestrator = ""
+            , Leaderboard = ""
             }
             artifact
 
 let toDebianNames =
           \(artifacts : List Artifact)
-      ->  let text =
+      ->  \(network : Network.Type)
+      ->  let list_of_list_of_debians =
                 Prelude.List.map
                   Artifact
-                  Text
-                  (\(a : Artifact) -> toDebianName a)
+                  (List Text)
+                  (     \(a : Artifact)
+                    ->  merge
+                          { Daemon = [ toDebianName a network ]
+                          , Archive = [ "archive" ]
+                          , LogProc = [ "logproc" ]
+                          , TestExecutive = [ "test_executive" ]
+                          , BatchTxn = [ "batch_txn" ]
+                          , Rosetta = [ toDebianName a network ]
+                          , ZkappTestTransaction = [ "zkapp_test_transaction" ]
+                          , FunctionalTestSuite = [ "functional_test_suite" ]
+                          , Toolchain = [] : List Text
+                          , ItnOrchestrator = [] : List Text
+                          , Leaderboard = [] : List Text
+                          }
+                          a
+                  )
                   artifacts
 
-          in  Text/concatSep " " text
+          let items =
+                Prelude.List.fold
+                  (List Text)
+                  list_of_list_of_debians
+                  (List Text)
+                  (\(x : List Text) -> \(y : List Text) -> x # y)
+                  ([] : List Text)
+
+          in  Text/concatSep " " items
 
 let dockerTag =
           \(artifact : Artifact)
@@ -123,12 +170,16 @@ let dockerTag =
                     "${version_and_codename}-${Network.lowerName
                                                  network}${profile_part}"
                 , Archive = "${version_and_codename}"
-                , ArchiveMigration = "${version_and_codename}"
+                , LogProc = "${version_and_codename}"
                 , TestExecutive = "${version_and_codename}"
                 , BatchTxn = "${version_and_codename}"
-                , Rosetta = "${version_and_codename}"
+                , Rosetta =
+                    "${version_and_codename}-${Network.lowerName network}"
                 , ZkappTestTransaction = "${version_and_codename}"
                 , FunctionalTestSuite = "${version_and_codename}"
+                , Toolchain = "${version_and_codename}"
+                , ItnOrchestrator = "${version_and_codename}"
+                , Leaderboard = "${version_and_codename}"
                 }
                 artifact
 

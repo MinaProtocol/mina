@@ -1,15 +1,18 @@
 let Profiles = ./Profiles.dhall
 
+let Artifacts = ./Artifacts.dhall
+
+let Network = ./Network.dhall
+
 let Docker
     : Type
-    = < Bookworm | Bullseye | Buster | Jammy | Focal >
+    = < Bookworm | Bullseye | Jammy | Focal >
 
 let capitalName =
           \(docker : Docker)
       ->  merge
             { Bookworm = "Bookworm"
             , Bullseye = "Bullseye"
-            , Buster = "Buster"
             , Jammy = "Jammy"
             , Focal = "Focal"
             }
@@ -20,7 +23,6 @@ let lowerName =
       ->  merge
             { Bookworm = "bookworm"
             , Bullseye = "bullseye"
-            , Buster = "buster"
             , Jammy = "jammy"
             , Focal = "focal"
             }
@@ -28,38 +30,48 @@ let lowerName =
 
 let dependsOn =
           \(docker : Docker)
+      ->  \(network : Network.Type)
       ->  \(profile : Profiles.Type)
-      ->  \(binary : Text)
-      ->  let profileSuffix = Profiles.toSuffixUppercase profile
+      ->  \(binary : Artifacts.Type)
+      ->  let network = "${Network.capitalName network}"
+
+          let profileSuffix = "${Profiles.toSuffixUppercase profile}"
 
           let prefix = "MinaArtifact"
 
           let suffix = "docker-image"
 
+          let key = "${Artifacts.lowerName binary}-${suffix}"
+
           in  merge
                 { Bookworm =
-                  [ { name = "${prefix}${profileSuffix}"
-                    , key = "${binary}-${lowerName docker}-${suffix}"
+                  [ { name =
+                        "${prefix}${capitalName
+                                      docker}${network}${profileSuffix}"
+                    , key = key
                     }
                   ]
                 , Bullseye =
-                  [ { name = "${prefix}${capitalName docker}${profileSuffix}"
-                    , key = "${binary}-${lowerName docker}-${suffix}"
-                    }
-                  ]
-                , Buster =
-                  [ { name = "${prefix}${capitalName docker}${profileSuffix}"
-                    , key = "${binary}-${lowerName docker}-${suffix}"
+                  [ { name =
+                        "${prefix}${capitalName
+                                      docker}${network}${profileSuffix}"
+                    , key = key
                     }
                   ]
                 , Jammy =
-                  [ { name = "${prefix}${capitalName docker}${profileSuffix}"
-                    , key = "${binary}-${lowerName docker}-${suffix}"
+                  [ { name =
+                        "${prefix}${capitalName
+                                      docker}${network}${capitalName
+                                                           docker}${profileSuffix}"
+                    , key = key
                     }
                   ]
                 , Focal =
-                  [ { name = "${prefix}${capitalName docker}${profileSuffix}"
-                    , key = "${binary}-${lowerName docker}-${suffix}"
+                  [ { name =
+                        "${prefix}${capitalName
+                                      docker}${network}${capitalName
+                                                           docker}${profileSuffix}"
+                    , key = key
                     }
                   ]
                 }

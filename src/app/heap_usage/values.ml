@@ -67,7 +67,7 @@ let verification_key =
   lazy
     (let `VK vk, `Prover _ =
        Transaction_snark.For_tests.create_trivial_snapp
-         ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+         ~constraint_constants:Genesis_constants_compiled.Constraint_constants.t
          ()
      in
      let%map.Async.Deferred vk = vk in
@@ -92,7 +92,7 @@ let mk_scan_state_base_node
     in
     let ledger_witness =
       let depth =
-        Genesis_constants.Constraint_constants.compiled.ledger_depth
+        Genesis_constants_compiled.Constraint_constants.t.ledger_depth
       in
       let account_access_statuses =
         match varying with
@@ -470,7 +470,7 @@ let protocol_state =
 let pending_coinbase =
   (* size is fixed, given a particular depth *)
   let depth =
-    Genesis_constants.Constraint_constants.compiled.pending_coinbase_depth
+    Genesis_constants_compiled.Constraint_constants.t.pending_coinbase_depth
   in
   Mina_base.Pending_coinbase.create ~depth () |> Or_error.ok_exn
 
@@ -701,7 +701,7 @@ let staged_ledger_diff =
 let merkle_path =
   (* size is constant for a given length, assuming each hash is distinct *)
   let ledger_depth =
-    Genesis_constants.Constraint_constants.compiled.ledger_depth
+    Genesis_constants_compiled.Constraint_constants.t.ledger_depth
   in
   let hashes =
     Quickcheck.random_value

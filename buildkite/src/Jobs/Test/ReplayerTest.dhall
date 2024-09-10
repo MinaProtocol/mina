@@ -12,8 +12,16 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
+let Network = ../../Constants/Network.dhall
+
+let Artifacts = ../../Constants/Artifacts.dhall
+
 let dependsOn =
-      Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "archive"
+      Dockers.dependsOn
+        Dockers.Type.Bullseye
+        Network.Type.Devnet
+        Profiles.Type.Standard
+        Artifacts.Type.Archive
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -26,7 +34,11 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "ReplayerTest"
-        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
         }
       , steps = [ ReplayerTest.step dependsOn ]
       }

@@ -15,8 +15,8 @@ let run ~user_command_profiler ~zkapp_profiler num_transactions ~max_num_updates
     Parallel.init_master () ;
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
+          Verifier.create ~commit_id:Mina_version.commit_id ~logger ~proof_level
+            ~constraint_constants ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
             () )
     in
@@ -80,7 +80,7 @@ let main ~max_num_updates ?min_num_updates num_transactions repeats preeval
   Test_util.with_randomness 123456789 (fun () ->
       let module T = Transaction_snark.Make (struct
         let constraint_constants =
-          Genesis_constants.Constraint_constants.compiled
+          Genesis_constants_compiled.Constraint_constants.t
 
         let proof_level = Genesis_constants.Proof_level.Full
       end) in

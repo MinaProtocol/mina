@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 module Intf = Intf
 
 module Make : Intf.F

@@ -69,12 +69,14 @@ module Worker_state = struct
     ; logger : Logger.Stable.Latest.t
     ; proof_level : Genesis_constants.Proof_level.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
+    ; commit_id : string
     }
   [@@deriving bin_io_unversioned]
 
   type t = (module S)
 
-  let create { logger; proof_level; constraint_constants; _ } : t Deferred.t =
+  let create { logger; proof_level; constraint_constants; commit_id; _ } :
+      t Deferred.t =
     match proof_level with
     | Full ->
         Pickles.Side_loaded.srs_precomputation () ;
@@ -146,7 +148,7 @@ module Worker_state = struct
                    (id, result) )
 
              let verify_commands cs =
-               Internal_tracing.Context_logger.with_logger (Some logger)
+               Context_logger.with_logger (Some logger)
                @@ fun () ->
                Internal_tracing.Context_call.with_call_id
                @@ fun () ->
@@ -158,7 +160,7 @@ module Worker_state = struct
              let verify_blockchain_snarks = B.Proof.verify
 
              let verify_blockchain_snarks bs =
-               Internal_tracing.Context_logger.with_logger (Some logger)
+               Context_logger.with_logger (Some logger)
                @@ fun () ->
                Internal_tracing.Context_call.with_call_id
                @@ fun () ->
@@ -179,7 +181,7 @@ module Worker_state = struct
                    failwith "Verifier crashed"
 
              let verify_transaction_snarks ts =
-               Internal_tracing.Context_logger.with_logger (Some logger)
+               Context_logger.with_logger (Some logger)
                @@ fun () ->
                Internal_tracing.Context_call.with_call_id
                @@ fun () ->
@@ -193,7 +195,7 @@ module Worker_state = struct
 
              let toggle_internal_tracing enabled =
                don't_wait_for
-               @@ Internal_tracing.toggle ~logger
+               @@ Internal_tracing.toggle ~commit_id ~logger
                     (if enabled then `Enabled else `Disabled)
 
              let set_itn_logger_data ~daemon_port =
@@ -389,29 +391,32 @@ module Worker = struct
             ; logger
             ; proof_level
             ; constraint_constants
+            ; commit_id
             } =
         if Option.is_some conf_dir then (
           let max_size = 256 * 1024 * 512 in
           let num_rotate = 1 in
-          Logger.Consumer_registry.register ~id:"default"
+          Logger.Consumer_registry.register ~id:"default" ~commit_id
             ~processor:(Logger.Processor.raw ())
             ~transport:
               (Logger_file_system.dumb_logrotate
                  ~directory:(Option.value_exn conf_dir)
-                 ~log_filename:"mina-verifier.log" ~max_size ~num_rotate ) ;
+                 ~log_filename:"mina-verifier.log" ~max_size ~num_rotate )
+            () ;
           Option.iter internal_trace_filename ~f:(fun log_filename ->
               Itn_logger.set_message_postprocessor
                 Internal_tracing.For_itn_logger.post_process_message ;
               Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
-                ~processor:Internal_tracing.For_logger.processor
+                ~commit_id ~processor:Internal_tracing.For_logger.processor
                 ~transport:
                   (Logger_file_system.dumb_logrotate
                      ~directory:(Option.value_exn conf_dir ^ "/internal-tracing")
                      ~log_filename
                      ~max_size:(1024 * 1024 * 10)
-                     ~num_rotate:50 ) ) ) ;
+                     ~num_rotate:50 )
+                () ) ) ;
         if enable_internal_tracing then
-          don't_wait_for @@ Internal_tracing.toggle ~logger `Enabled ;
+          don't_wait_for @@ Internal_tracing.toggle ~commit_id ~logger `Enabled ;
         [%log info] "Verifier started" ;
         Worker_state.create
           { conf_dir
@@ -420,6 +425,7 @@ module Worker = struct
           ; logger
           ; proof_level
           ; constraint_constants
+          ; commit_id
           }
 
       let init_connection_state ~connection:_ ~worker_state:_ () = Deferred.unit
@@ -439,7 +445,8 @@ type t = { worker : worker Ivar.t ref; logger : Logger.Stable.Latest.t }
 
 (* TODO: investigate why conf_dir wasn't being used *)
 let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
-    ~proof_level ~constraint_constants ~pids ~conf_dir () : t Deferred.t =
+    ~proof_level ~constraint_constants ~pids ~conf_dir ~commit_id () :
+    t Deferred.t =
   let on_failure err =
     [%log error] "Verifier process failed with error $err"
       ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
@@ -477,6 +484,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
             ; logger
             ; proof_level
             ; constraint_constants
+            ; commit_id
             } )
       |> Deferred.Result.map_error ~f:Error.of_exn
     in

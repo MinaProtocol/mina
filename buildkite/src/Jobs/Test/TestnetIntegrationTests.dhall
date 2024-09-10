@@ -14,12 +14,21 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
+let Network = ../../Constants/Network.dhall
+
+let Artifacts = ../../Constants/Artifacts.dhall
+
 let dependsOn =
         Dockers.dependsOn
           Dockers.Type.Bullseye
+          Network.Type.Devnet
           Profiles.Type.Standard
-          "daemon-berkeley"
-      # Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "archive"
+          Artifacts.Type.Daemon
+      # Dockers.dependsOn
+          Dockers.Type.Bullseye
+          Network.Type.Devnet
+          Profiles.Type.Standard
+          Artifacts.Type.Archive
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -46,22 +55,26 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "TestnetIntegrationTests"
-        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
         , mode = PipelineMode.Type.Stable
         }
       , steps =
-        [ TestExecutive.executeCloud "peers-reliability" dependsOn
-        , TestExecutive.executeCloud "chain-reliability" dependsOn
+        [ TestExecutive.executeLocal "peers-reliability" dependsOn
+        , TestExecutive.executeLocal "chain-reliability" dependsOn
         , TestExecutive.executeLocal "payment" dependsOn
-        , TestExecutive.executeCloud "gossip-consis" dependsOn
-        , TestExecutive.executeCloud "block-prod-prio" dependsOn
-        , TestExecutive.executeCloud "medium-bootstrap" dependsOn
-        , TestExecutive.executeCloud "block-reward" dependsOn
-        , TestExecutive.executeCloud "zkapps" dependsOn
-        , TestExecutive.executeCloud "zkapps-timing" dependsOn
-        , TestExecutive.executeCloud "zkapps-nonce" dependsOn
-        , TestExecutive.executeCloud "verification-key" dependsOn
-        , TestExecutive.executeCloud "slot-end" dependsOn
-        , TestExecutive.executeCloud "epoch-ledger" dependsOn
+        , TestExecutive.executeLocal "gossip-consis" dependsOn
+        , TestExecutive.executeLocal "block-prod-prio" dependsOn
+        , TestExecutive.executeLocal "medium-bootstrap" dependsOn
+        , TestExecutive.executeLocal "block-reward" dependsOn
+        , TestExecutive.executeLocal "zkapps" dependsOn
+        , TestExecutive.executeLocal "zkapps-timing" dependsOn
+        , TestExecutive.executeLocal "zkapps-nonce" dependsOn
+        , TestExecutive.executeLocal "verification-key" dependsOn
+        , TestExecutive.executeLocal "slot-end" dependsOn
+        , TestExecutive.executeLocal "epoch-ledger" dependsOn
         ]
       }

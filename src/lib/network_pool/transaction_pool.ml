@@ -1271,61 +1271,76 @@ struct
             Transaction_hash.User_command_with_valid_signature.command
         in
         let check_command pool cmd =
-          if
+          let already_in_pool =
             Indexed_pool.member pool
               (Transaction_hash.User_command.of_checked cmd)
-          then Error Diff_error.Duplicate
-          else
-            match Map.find fee_payer_accounts (fee_payer cmd) with
-            | None ->
-                Error Diff_error.Fee_payer_account_not_found
-            | Some account ->
-                Result.ok_if_true
-                  ( Account.has_permission_to_send account
-                  && Account.has_permission_to_increment_nonce account )
-                  ~error:Diff_error.Fee_payer_not_permitted_to_send
+          in
+          let%map.Result () =
+            if already_in_pool then
+              if is_sender_local then Ok () else Error Diff_error.Duplicate
+            else
+              match Map.find fee_payer_accounts (fee_payer cmd) with
+              | None ->
+                  Error Diff_error.Fee_payer_account_not_found
+              | Some account ->
+                  Result.ok_if_true
+                    ( Account.has_permission_to_send account
+                    && Account.has_permission_to_increment_nonce account )
+                    ~error:Diff_error.Fee_payer_not_permitted_to_send
+          in
+          already_in_pool
         in
+        (* Dedicated variant to track whether the transaction was already in
+           the pool. We use this to signal that the user wants to re-broadcast
+           a txn that already exists in their local pool.
+        *)
+        let module Command_state = struct
+          type t = New_command | Rebroadcast
+        end in
         let pool, add_results =
           List.fold_map (Envelope.Incoming.data diff) ~init:t.pool
             ~f:(fun pool cmd ->
               let result =
-                let%bind.Result () = check_command pool cmd in
+                let%bind.Result already_in_pool = check_command pool cmd in
                 let global_slot =
                   Indexed_pool.global_slot_since_genesis t.pool
                 in
                 let account = Map.find_exn fee_payer_accounts (fee_payer cmd) in
-                match
-                  Indexed_pool.add_from_gossip_exn pool cmd account.nonce
-                    ( Account.liquid_balance_at_slot ~global_slot account
-                    |> Currency.Balance.to_amount )
-                with
-                | Ok x ->
-                    Ok x
-                | Error err ->
-                    report_command_error ~logger:t.logger ~is_sender_local
-                      (Transaction_hash.User_command_with_valid_signature
-                       .command cmd )
-                      err ;
-                    Error (diff_error_of_indexed_pool_error err)
+                if already_in_pool then
+                  Ok ((cmd, pool, Sequence.empty), Command_state.Rebroadcast)
+                else
+                  match
+                    Indexed_pool.add_from_gossip_exn pool cmd account.nonce
+                      ( Account.liquid_balance_at_slot ~global_slot account
+                      |> Currency.Balance.to_amount )
+                  with
+                  | Ok x ->
+                      Ok (x, Command_state.New_command)
+                  | Error err ->
+                      report_command_error ~logger:t.logger ~is_sender_local
+                        (Transaction_hash.User_command_with_valid_signature
+                         .command cmd )
+                        err ;
+                      Error (diff_error_of_indexed_pool_error err)
               in
               match result with
-              | Ok (cmd', pool', dropped) ->
-                  (pool', Ok (cmd', dropped))
+              | Ok ((cmd', pool', dropped), cmd_state) ->
+                  (pool', Ok (cmd', dropped, cmd_state))
               | Error err ->
                   (pool, Error (cmd, err)) )
         in
         let added_cmds =
           List.filter_map add_results ~f:(function
-            | Ok (cmd, _) ->
+            | Ok (cmd, _, Command_state.New_command) ->
                 Some cmd
-            | Error _ ->
+            | Ok (_, _, Command_state.Rebroadcast) | Error _ ->
                 None )
         in
         let dropped_for_add =
           List.filter_map add_results ~f:(function
-            | Ok (_, dropped) ->
+            | Ok (_, dropped, Command_state.New_command) ->
                 Some (Sequence.to_list dropped)
-            | Error _ ->
+            | Ok (_, _, Command_state.Rebroadcast) | Error _ ->
                 None )
           |> List.concat
         in
@@ -1389,7 +1404,7 @@ struct
         (* register locally generated commands *)
         if is_sender_local then
           List.iter add_results ~f:(function
-            | Ok (cmd, _dropped) ->
+            | Ok (cmd, _dropped, _command_type) ->
                 if
                   not
                     (Set.mem all_dropped_cmd_hashes
@@ -1410,7 +1425,11 @@ struct
         (* partition the results *)
         let accepted, rejected, _dropped =
           List.partition3_map add_results ~f:(function
-            | Ok (cmd, _dropped) ->
+            | Ok (cmd, _dropped, _cmd_state) ->
+                (* NB: We ignore the command state here, so that commands only
+                   for rebroadcast are still included in the bundle that we
+                   rebroadcast.
+                *)
                 if
                   Set.mem all_dropped_cmd_hashes
                     (Transaction_hash.User_command_with_valid_signature.hash cmd)
@@ -1634,8 +1653,10 @@ let%test_module _ =
 
     let proof_level = precomputed_values.proof_level
 
+    let genesis_constants = precomputed_values.genesis_constants
+
     let minimum_fee =
-      Currency.Fee.to_nanomina_int Currency.Fee.minimum_user_command_fee
+      Currency.Fee.to_nanomina_int genesis_constants.minimum_user_command_fee
 
     let logger = Logger.create ()
 
@@ -1646,7 +1667,7 @@ let%test_module _ =
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            () )
+            ~commit_id:"not specified for unit tests" () )
 
     let `VK vk, `Prover prover =
       Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
@@ -1656,7 +1677,6 @@ let%test_module _ =
     let dummy_state_view =
       let state_body =
         let consensus_constants =
-          let genesis_constants = Genesis_constants.for_unit_tests in
           Consensus.Constants.create ~constraint_constants
             ~protocol_constants:genesis_constants.protocol
         in
@@ -1896,7 +1916,7 @@ let%test_module _ =
       let trust_system = Trust_system.null () in
       let config =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
-          ~genesis_constants:Genesis_constants.compiled ~slot_tx_end
+          ~genesis_constants ~slot_tx_end
       in
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
@@ -2025,7 +2045,8 @@ let%test_module _ =
         }
       in
       let zkapp_command =
-        Transaction_snark.For_tests.multiple_transfers test_spec
+        Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+          test_spec
       in
       let zkapp_command =
         Or_error.ok_exn
@@ -2083,7 +2104,8 @@ let%test_module _ =
             let%map (zkapp_command : Zkapp_command.t) =
               Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
                 ~max_token_updates:1 ~keymap ~account_state_tbl
-                ~fee_payer_keypair ~ledger:best_tip_ledger ()
+                ~fee_payer_keypair ~ledger:best_tip_ledger ~constraint_constants
+                ~genesis_constants ()
             in
             let zkapp_command =
               { zkapp_command with
@@ -3062,7 +3084,7 @@ let%test_module _ =
             Verifier.create ~logger ~proof_level:Full ~constraint_constants
               ~conf_dir:None
               ~pids:(Child_processes.Termination.create_pid_table ())
-              ()
+              ~commit_id:"not specified for unit tests" ()
           in
           let%bind test =
             setup_test ~verifier:verifier_full

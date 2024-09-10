@@ -254,6 +254,10 @@ def check_type_shapes(pr_branch_dict,base_branch,base_type_dict,release_branch,r
         set_error()
     # not an error if the type was introduced in the base branch, and the type changed in PR branch
 
+def assert_commit(commit, desc):
+  if not commit: 
+    f"Empty commit detected when evaluating commit of {desc}"
+
 if __name__ == "__main__":
   if len(sys.argv) != 4 :
         print("Usage: %s pr-branch base-branch release-branch" % sys.argv[0], file=sys.stderr)
