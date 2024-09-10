@@ -69,20 +69,20 @@ let test_get_non_existent_element () =
   let dsu = IntKeyDsu.create () in
   Alcotest.(check (option int))
     "non-existent element" (IntKeyDsu.get ~key:1 dsu) None
-  (* also verify the occupancy *)
-  ; Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 1
+  (* also verify the occupancy *) ;
+  Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 1
 
-  let test_union_existing_with_non_existent_element () =
+let test_union_existing_with_non_existent_element () =
   let dsu = IntKeyDsu.create () in
   IntKeyDsu.add_exn ~key:1 ~value:1 dsu ;
   IntKeyDsu.union ~a:1 ~b:2 dsu ;
   Alcotest.(check (option int))
-    "non-existent element" (IntKeyDsu.get ~key:2 dsu) None;
+    "non-existent element" (IntKeyDsu.get ~key:2 dsu) None ;
   (* also test the occupancy, we have 2 to account for the 0 case *)
-  Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 2;
+  Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 2 ;
   (* verify the size of the existing element *)
   let element_size = IntKeyDsu.get_size ~key:1 dsu in
- Alcotest.(check (option int)) "size" (element_size) (Some 0)
+  Alcotest.(check (option int)) "size" element_size (Some 0)
 
 let test_union_non_existent_elements () =
   let dsu = IntKeyDsu.create () in
@@ -100,7 +100,9 @@ let test_union_existing_elements () =
   IntKeyDsu.add_exn ~key:3 ~value:3 dsu ;
   IntKeyDsu.union ~a:1 ~b:2 dsu ;
   Alcotest.(check (option int))
-    "checking size of 1" (IntKeyDsu.get_size ~key:2 dsu) (Some 1) ;
+    "checking size of 1"
+    (IntKeyDsu.get_size ~key:2 dsu)
+    (Some 1) ;
   IntKeyDsu.union ~a:2 ~b:3 dsu ;
   Alcotest.(check (option int))
     "existent element 1" (IntKeyDsu.get ~key:1 dsu) (Some 1) ;
@@ -109,16 +111,15 @@ let test_union_existing_elements () =
   Alcotest.(check (option int))
     "existent element 3" (IntKeyDsu.get ~key:3 dsu) (Some 3) ;
 
-  Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 4;
+  Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 4 ;
   (* verify the size of the existing elements *)
   let element_size = IntKeyDsu.get_size ~key:1 dsu in
-  Alcotest.(check (option int)) "size 1" (element_size) (Some 1);
+  Alcotest.(check (option int)) "size 1" element_size (Some 1) ;
   let element_size = IntKeyDsu.get_size ~key:2 dsu in
   (* since 2 has a higher size than 3 we should merge 2 into 3 increasing the size to of 2 to 2 *)
-  Alcotest.(check (option int)) "size 2" (element_size) (Some 1);
+  Alcotest.(check (option int)) "size 2" element_size (Some 1) ;
   let element_size = IntKeyDsu.get_size ~key:3 dsu in
-  Alcotest.(check (option int)) "size 3" (element_size) (Some 1)
-
+  Alcotest.(check (option int)) "size 3" element_size (Some 1)
 
 (* Test suite *)
 let tests =
@@ -130,7 +131,9 @@ let tests =
   ; ( "test_union_existing_with_non_existent_element"
     , `Quick
     , test_union_existing_with_non_existent_element )
-  ; ("test_union_non_existent_elements", `Quick, test_union_non_existent_elements)
+  ; ( "test_union_non_existent_elements"
+    , `Quick
+    , test_union_non_existent_elements )
   ; ("test_union_existing_elements", `Quick, test_union_existing_elements)
   ]
 

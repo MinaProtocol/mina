@@ -85,24 +85,22 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
     t.next_id <- id + 1 ;
     id
 
-  let size ~id t = 
-    (Array.get t.arr id).size
+  let size ~id t = (Array.get t.arr id).size
 
   let union_sets t a b =
     let a = find_set t.arr ~id:a in
     let b = find_set t.arr ~id:b in
     let adopt_parent ~parent ~child =
       let child_el = Array.get t.arr child in
-      Array.set t.arr child { child_el with parent };
+      Array.set t.arr child { child_el with parent } ;
       Array.set t.arr parent
-        { (Array.get t.arr parent)
-        with size = (Array.get t.arr parent).size + child_el.size }
+        { (Array.get t.arr parent) with
+          size = (Array.get t.arr parent).size + child_el.size
+        }
     in
     if a <> b then
-      if size ~id:a t < size ~id:b t then 
-        adopt_parent ~parent:a ~child:b
-      else
-        adopt_parent ~parent:b ~child:a
+      if size ~id:a t < size ~id:b t then adopt_parent ~parent:a ~child:b
+      else adopt_parent ~parent:b ~child:a
 
   let add_exn ~key ~value t =
     let id = allocate_id t in
@@ -127,11 +125,10 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
     let a_set = Hashtbl.find t.key_to_id a in
     let b_set = Hashtbl.find t.key_to_id b in
     match (a_set, b_set) with
-    | None, None 
-    | Some _, None 
-    | None, Some _ -> ()
+    | None, None | Some _, None | None, Some _ ->
+        ()
     | Some a_set, Some b_set ->
-      union_sets t a_set b_set
+        union_sets t a_set b_set
 
   let capacity t = Array.length t.arr
 
