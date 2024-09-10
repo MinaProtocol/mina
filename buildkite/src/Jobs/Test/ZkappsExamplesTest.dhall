@@ -53,5 +53,5 @@ in  Pipeline.build
                 , PipelineTag.Type.Stable
                 ]
               }
-      , steps = [ buildTestCmd "dev" Size.XLarge ]
+      , steps = [ buildTestCmd "dev" Size.Multi ]
       }

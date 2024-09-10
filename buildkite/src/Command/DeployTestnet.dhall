@@ -1,7 +1,5 @@
 let Command = ./Base.dhall
 
-let Size = ./Size.dhall
-
 let Cmd = ../Lib/Cmds.dhall
 
 let DeploySpec =
@@ -49,7 +47,6 @@ in  { step =
                 ]
               , label = "Deploy ${spec.testnetLabel}"
               , key = "deploy-${spec.testnetLabel}"
-              , target = Size.Multi
               , depends_on = spec.deps
               }
     , DeploySpec = DeploySpec

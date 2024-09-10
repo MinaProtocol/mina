@@ -6,8 +6,6 @@ let List/map = Prelude.List.map
 
 let Command = ../Base.dhall
 
-let Size = ../Size.dhall
-
 let Cmd = ../../Lib/Cmds.dhall
 
 let PromoteDocker = ./PromoteDocker.dhall
@@ -46,7 +44,6 @@ let promoteDockerVerificationStep =
                 , commands = commands
                 , label = "Docker: ${spec.step_key}"
                 , key = spec.step_key
-                , target = Size.Small
                 , depends_on = spec.deps
                 , if = spec.if
                 }

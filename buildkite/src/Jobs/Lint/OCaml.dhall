@@ -12,8 +12,6 @@ let Command = ../../Command/Base.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
 
-let Size = ../../Command/Size.dhall
-
 in  Pipeline.build
       Pipeline.Config::{
       , spec =
@@ -47,7 +45,6 @@ in  Pipeline.build
                   )
             , label = "OCaml Lints; Check-format, Require-ppx-version"
             , key = "check"
-            , target = Size.Multi
             , docker = None Docker.Type
             }
         ]

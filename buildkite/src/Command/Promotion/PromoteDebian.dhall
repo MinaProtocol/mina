@@ -16,8 +16,6 @@ let Toolchain = ../../Constants/Toolchain.dhall
 
 let Command = ../Base.dhall
 
-let Size = ../Size.dhall
-
 let PromoteDebianSpec =
       { Type =
           { deps : List Command.TaggedKey.Type
@@ -82,7 +80,6 @@ let promoteDebianStep =
                                                                                                                                                                                                                                                                                                                                   spec.to_channel} ${new_name}"
                 , label = "Debian: ${spec.step_key}"
                 , key = spec.step_key
-                , target = Size.Small
                 , depends_on = spec.deps
                 , if = spec.if
                 }

@@ -13,8 +13,6 @@ let JobSpec = ./Pipeline/JobSpec.dhall
 
 let Pipeline = ./Pipeline/Dsl.dhall
 
-let Size = ./Command/Size.dhall
-
 let mode = env:BUILDKITE_PIPELINE_MODE as Text ? "PullRequest"
 
 let filter = env:BUILDKITE_PIPELINE_FILTER as Text ? "FastOnly"
@@ -39,7 +37,6 @@ let config
               ]
             , label = "Prepare monorepo triage"
             , key = "monorepo-${mode}-${filter}"
-            , target = Size.Small
             , docker = Some Docker::{
               , image = (./Constants/ContainerImages.dhall).toolchainBase
               , environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ]

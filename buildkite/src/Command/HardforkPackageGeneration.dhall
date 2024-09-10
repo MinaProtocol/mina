@@ -22,8 +22,6 @@ let PipelineMode = ../Pipeline/Mode.dhall
 
 let JobSpec = ../Pipeline/JobSpec.dhall
 
-let Size = ./Size.dhall
-
 let DockerImage = ./DockerImage.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
@@ -134,7 +132,6 @@ let pipeline
                         "Build Mina Hardfork Package for ${DebianVersions.capitalName
                                                              debVersion}"
                     , key = generateLedgersJobKey
-                    , target = Size.XLarge
                     }
                 , Command.build
                     Command.Config::{
@@ -153,7 +150,6 @@ let pipeline
                     , depends_on =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
                     , key = "publish-hardfork-deb-pkg"
-                    , target = Size.Small
                     }
                 , DockerImage.generateStep
                     DockerImage.ReleaseSpec::{
@@ -179,7 +175,6 @@ let pipeline
                     , label =
                         "Assert corrupted packaged artifacts are unverifiable"
                     , key = "assert-unverify-corrupted-packaged-artifacts"
-                    , target = Size.XLarge
                     , depends_on =
                       [ { name = pipelineName
                         , key =
@@ -199,7 +194,6 @@ let pipeline
                       ]
                     , label = "Verify packaged artifacts"
                     , key = "verify-packaged-artifacts"
-                    , target = Size.XLarge
                     , depends_on =
                       [ { name = pipelineName
                         , key =

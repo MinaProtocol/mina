@@ -10,8 +10,6 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
 
-let Size = ../../Command/Size.dhall
-
 let DockerImage = ../../Command/DockerImage.dhall
 
 let spec =
@@ -45,7 +43,6 @@ in  Pipeline.build
               ]
             , label = "Setup Leaderboard docker image deploy environment"
             , key = "setup-deploy-env"
-            , target = Size.Small
             , artifact_paths =
               [ S.contains "frontend/leaderboard/package.json" ]
             }

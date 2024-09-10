@@ -14,8 +14,6 @@ let Command = ../../Command/Base.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
 
-let Size = ../../Command/Size.dhall
-
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -50,7 +48,6 @@ in  Pipeline.build
               ]
             , label = "nix build tests"
             , key = "nix-build-tests"
-            , target = Size.Small
             , docker = None Docker.Type
             }
         ]

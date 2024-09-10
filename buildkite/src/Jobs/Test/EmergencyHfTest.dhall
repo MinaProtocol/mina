@@ -8,8 +8,6 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
 
-let Size = ../../Command/Size.dhall
-
 let Cmd = ../../Lib/Cmds.dhall
 
 in  Pipeline.build
@@ -36,7 +34,6 @@ in  Pipeline.build
               ]
             , label = "Emergency HF test"
             , key = "emergency-hf-test"
-            , target = Size.Large
             }
         ]
       }

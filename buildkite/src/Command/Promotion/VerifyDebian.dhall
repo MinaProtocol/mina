@@ -8,8 +8,6 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Command = ../Base.dhall
 
-let Size = ../Size.dhall
-
 let Cmd = ../../Lib/Cmds.dhall
 
 let PromoteDebian = ./PromoteDebian.dhall
@@ -36,7 +34,6 @@ let promoteDebianVerificationStep =
                   ]
                 , label = "Debian: ${spec.step_key}"
                 , key = spec.step_key
-                , target = Size.Small
                 , depends_on = spec.deps
                 , if = spec.if
                 }

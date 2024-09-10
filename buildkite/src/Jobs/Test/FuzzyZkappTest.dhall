@@ -71,6 +71,6 @@ in  Pipeline.build
             "src/lib/transaction_snark/test/zkapp_fuzzy/zkapp_fuzzy.exe"
             4200
             150
-            Size.Small
+            Size.Multi
         ]
       }

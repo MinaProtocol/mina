@@ -14,8 +14,6 @@ let Command = ../../Command/Base.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
 
-let Size = ../../Command/Size.dhall
-
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 in  Pipeline.build
@@ -39,7 +37,6 @@ in  Pipeline.build
             , commands = [] : List Cmd.Type
             , label = "Verifies references in markdown"
             , key = "xrefcheck"
-            , target = Size.Multi
             , soft_fail = Some (B/SoftFail.Boolean True)
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).xrefcheck

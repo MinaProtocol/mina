@@ -14,8 +14,6 @@ let PipelineMode = ../Pipeline/Mode.dhall
 
 let JobSpec = ../Pipeline/JobSpec.dhall
 
-let Size = ./Size.dhall
-
 let Libp2p = ./Libp2pHelperBuild.dhall
 
 let DockerImage = ./DockerImage.dhall
@@ -96,7 +94,6 @@ let build_artifacts
                                                          spec.profile} ${BuildFlags.toSuffixUppercase
                                                                            spec.buildFlags}"
             , key = "build-deb-pkg"
-            , target = Size.XLarge
             , retries =
               [ Command.Retry::{
                 , exit_status = Command.ExitStatus.Code +2
@@ -132,7 +129,6 @@ let publish_to_debian_repo =
                   spec.profile
                   spec.buildFlags
                   "build"
-            , target = Size.Small
             }
 
 let docker_step

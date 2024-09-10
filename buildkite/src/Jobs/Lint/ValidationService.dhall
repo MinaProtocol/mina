@@ -16,8 +16,6 @@ let Command = ../../Command/Base.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
-let Size = ../../Command/Size.dhall
-
 let Docker = ../../Command/Docker/Type.dhall
 
 let ValidationService = ../../Projects/ValidationService.dhall
@@ -94,7 +92,6 @@ in  Pipeline.build
             , label =
                 "Validation service lint steps; employs various forms static analysis on the elixir codebase"
             , key = "lint"
-            , target = Size.Multi
             , skip = Some
                 ( B/Skip.String
                     "https://github.com/MinaProtocol/mina/issues/6285"

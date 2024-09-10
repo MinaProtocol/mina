@@ -12,8 +12,6 @@ let Command = ../../Command/Base.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
 
-let Size = ../../Command/Size.dhall
-
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -40,7 +38,6 @@ in  Pipeline.build
               ]
             , label = "Helm chart release"
             , key = "release-helm-chart"
-            , target = Size.Multi
             , docker = None Docker.Type
             , artifact_paths = [ S.contains "updates/*" ]
             , depends_on = [ { name = "HelmChart", key = "lint-helm-chart" } ]

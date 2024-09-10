@@ -118,6 +118,7 @@ let Config =
           , skip = None B/Skip
           , if = None B/If
           , timeout_in_minutes = None Integer
+          , target = Size.Multi
           }
       }
 
