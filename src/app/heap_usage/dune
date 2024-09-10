@@ -31,7 +31,7 @@
    mina_ledger
    mina_state
    mina_transaction_logic
-   genesis_constants.compiled
+   genesis_constants
    staged_ledger_diff
    parallel_scan
    pickles

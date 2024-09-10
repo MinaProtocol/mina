@@ -7,11 +7,10 @@ module Impl = Pickles.Impls.Step
 module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 module Statement = Transaction_snark.Statement
 
-(* TODO: Should be For_unit_tests *)
-let constraint_constants = Genesis_constants_compiled.Constraint_constants.t
+let constraint_constants =
+  Genesis_constants.For_unit_tests.Constraint_constants.t
 
-(* TODO: Should be For_unit_tests *)
-let genesis_constants = Genesis_constants_compiled.t
+let genesis_constants = Genesis_constants.For_unit_tests.t
 
 (* Always run tests with proof-level Full *)
 let proof_level = Genesis_constants.Proof_level.Full
@@ -573,7 +572,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
               ~consensus_state:consensus_state_at_slot
               ~constants:
                 (Protocol_constants_checked.value_of_t
-                   Genesis_constants_compiled.t.protocol ))
+                   genesis_constants.protocol ))
             .body
         in
         let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in

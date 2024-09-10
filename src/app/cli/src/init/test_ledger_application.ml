@@ -171,13 +171,11 @@ let apply_txs ~action_elements ~event_elements ~constraint_constants
 
 let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
     ~no_new_stack ~has_second_partition ~num_txs_per_round ~rounds ~no_masks
-    ~max_depth ~tracing num_txs_final =
+    ~max_depth ~tracing num_txs_final ~(genesis_constants : Genesis_constants.t)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
   O1trace.thread "mina"
   @@ fun () ->
   let%bind keypair = read_privkey privkey_path in
-  let constraint_constants =
-    Genesis_constants_compiled.Constraint_constants.t
-  in
   let init_ledger =
     Ledger.create ~directory_name:ledger_path
       ~depth:constraint_constants.ledger_depth ()
@@ -190,7 +188,6 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
     in
     Mina_block.header prev_block |> Mina_block.Header.protocol_state
   in
-  let genesis_constants = Genesis_constants_compiled.t in
   let consensus_constants =
     Consensus.Constants.create ~constraint_constants
       ~protocol_constants:genesis_constants.protocol

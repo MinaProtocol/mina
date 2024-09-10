@@ -52,8 +52,8 @@ module Snark_coordinator_node = struct
 end
 
 type constants =
-  { constraints : Genesis_constants.Constraint_constants.t
-  ; genesis : Genesis_constants.t
+  { constraint_constants : Genesis_constants.Constraint_constants.t
+  ; genesis_constants : Genesis_constants.t
   }
 [@@deriving to_yojson]
 
@@ -81,6 +81,8 @@ type t =
   ; slot_tx_end : int option
   ; slot_chain_end : int option
   ; network_id : string option
+  ; block_window_duration_ms : int
+  ; transaction_capacity_log_2 : int
   }
 
 let proof_config_default : Runtime_config.Proof_keys.t =
@@ -109,7 +111,8 @@ let log_filter_of_event_type ev_existential =
       []
 (* TODO: Do we need this? *)
 
-let default =
+let default ~(constants : constants) =
+  let { constraint_constants; genesis_constants } = constants in
   { requires_graphql =
       true
       (* require_graphql maybe should just be phased out, because it always needs to be enable.  Now with the graphql polling engine, everything will definitely fail if graphql is not enabled.  But even before that, most tests relied on some sort of graphql interaction *)
@@ -123,31 +126,29 @@ let default =
   ; start_filtered_logs =
       List.bind ~f:log_filter_of_event_type Event_type.all_event_types
   ; proof_config = proof_config_default
-  ; k = 20
-  ; slots_per_epoch = 3 * 8 * 20
-  ; slots_per_sub_window = 2
-  ; grace_period_slots = 140
-  ; delta = 0
-  ; txpool_max_size = 3000
+  ; k = genesis_constants.protocol.k
+  ; slots_per_epoch = genesis_constants.protocol.slots_per_epoch
+  ; slots_per_sub_window = genesis_constants.protocol.slots_per_sub_window
+  ; grace_period_slots = genesis_constants.protocol.grace_period_slots
+  ; delta = genesis_constants.protocol.delta
+  ; txpool_max_size = genesis_constants.txpool_max_size
   ; slot_tx_end = None
   ; slot_chain_end = None
   ; network_id = None
+  ; block_window_duration_ms = constraint_constants.block_window_duration_ms
+  ; transaction_capacity_log_2 = constraint_constants.transaction_capacity_log_2
   }
 
 let transaction_capacity_log_2 (config : t) =
   match config.proof_config.transaction_capacity with
   | None ->
-      Genesis_constants_compiled.Constraint_constants.t
-        .transaction_capacity_log_2
+      config.transaction_capacity_log_2
   | Some (Log_2 i) ->
       i
   | Some (Txns_per_second_x10 tps_goal_x10) ->
       let max_coinbases = 2 in
       let block_window_duration_ms =
-        Option.value
-          ~default:
-            Genesis_constants_compiled.Constraint_constants.t
-              .block_window_duration_ms
+        Option.value ~default:config.block_window_duration_ms
           config.proof_config.block_window_duration_ms
       in
       let max_user_commands_per_block =
@@ -171,8 +172,7 @@ let transaction_capacity config =
 
 let blocks_for_first_ledger_proof (config : t) =
   let work_delay =
-    Option.value
-      ~default:Genesis_constants_compiled.Constraint_constants.t.work_delay
+    Option.value ~default:config.block_window_duration_ms
       config.proof_config.work_delay
   in
   let transaction_capacity_log_2 = transaction_capacity_log_2 config in

@@ -1,9 +1,11 @@
 open Core_kernel
 open Mina_base
 
+let constraint_constants =
+  Genesis_constants.For_unit_tests.Constraint_constants.t
+
 let `VK vk, `Prover p =
-  Transaction_snark.For_tests.create_trivial_snapp
-    ~constraint_constants:Genesis_constants_compiled.Constraint_constants.t ()
+  Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
 
 let { With_hash.data = vk; hash = _ } =
   Async.Thread_safe.block_on_async_exn (fun () -> vk)

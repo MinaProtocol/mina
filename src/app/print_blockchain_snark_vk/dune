@@ -1,7 +1,7 @@
 (executable
  (name print_blockchain_snark_vk)
  (libraries
-   blockchain_snark genesis_constants.compiled)
+   blockchain_snark genesis_constants)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version)))
 

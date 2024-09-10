@@ -1,8 +1,0 @@
-(library
- (name genesis_constants_compiled)
- (public_name genesis_constants.compiled)
- (libraries
-   genesis_constants
-   mina_node_config)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version)))

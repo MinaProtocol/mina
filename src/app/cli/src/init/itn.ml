@@ -6,17 +6,15 @@ open Signature_lib
 open Mina_base
 open Mina_transaction
 
-let create_accounts port (privkey_path, key_prefix, num_accounts, fee, amount) =
+let create_accounts ~(genesis_constants : Genesis_constants.t)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) port
+    (privkey_path, key_prefix, num_accounts, fee, amount) =
   let keys_per_zkapp = 8 in
   let zkapps_per_block = 10 in
   let pk_check_wait = Time.Span.of_sec 10. in
   let pk_check_timeout = Time.Span.of_min 30. in
   let min_fee =
-    Currency.Fee.to_nanomina_int
-      Genesis_constants_compiled.t.minimum_user_command_fee
-  in
-  let constraint_constants =
-    Genesis_constants_compiled.Constraint_constants.t
+    Currency.Fee.to_nanomina_int genesis_constants.minimum_user_command_fee
   in
   let account_creation_fee_int =
     Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee

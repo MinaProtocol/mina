@@ -15,14 +15,16 @@ end
 
 let logger = Logger.create ()
 
-let load_ledger (accounts : Runtime_config.Accounts.t) =
+let load_ledger
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    (accounts : Runtime_config.Accounts.t) =
   let accounts =
     List.map accounts ~f:(fun account ->
         (None, Runtime_config.Accounts.Single.to_account account) )
   in
   let packed =
     Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-      ~depth:Genesis_constants_compiled.Constraint_constants.t.ledger_depth
+      ~depth:constraint_constants.ledger_depth
       (lazy accounts)
   in
   Lazy.force (Genesis_ledger.Packed.t packed)
@@ -116,16 +118,21 @@ let load_config_exn config_file =
   , Option.map ~f:extract_accounts_exn staking_ledger
   , Option.map ~f:extract_accounts_exn next_ledger )
 
-let main ~config_file ~genesis_dir ~hash_output_file () =
+let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~config_file ~genesis_dir ~hash_output_file () =
   let%bind accounts, staking_accounts_opt, next_accounts_opt =
     load_config_exn config_file
   in
-  let ledger = load_ledger accounts in
-  let staking_ledger =
-    Option.value_map ~default:ledger ~f:load_ledger staking_accounts_opt
+  let ledger = load_ledger ~constraint_constants accounts in
+  let staking_ledger : Ledger.t =
+    Option.value_map ~default:ledger
+      ~f:(load_ledger ~constraint_constants)
+      staking_accounts_opt
   in
   let next_ledger =
-    Option.value_map ~default:staking_ledger ~f:load_ledger next_accounts_opt
+    Option.value_map ~default:staking_ledger
+      ~f:(load_ledger ~constraint_constants)
+      next_accounts_opt
   in
   let%bind hash_json =
     generate_hash_json ~genesis_dir ledger staking_ledger next_ledger
@@ -134,6 +141,7 @@ let main ~config_file ~genesis_dir ~hash_output_file () =
     ~contents:(Yojson.Safe.to_string (Hash_json.to_yojson hash_json))
 
 let () =
+  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
   Command.run
     (Command.async
        ~summary:
@@ -160,4 +168,4 @@ let () =
                "PATH path to the file where the hashes of the ledgers are to \
                 be saved"
          in
-         main ~config_file ~genesis_dir ~hash_output_file) )
+         main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file) )

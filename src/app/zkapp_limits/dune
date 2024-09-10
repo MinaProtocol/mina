@@ -9,7 +9,7 @@
    core_kernel
    ;; local libraries
    mina_base
-   genesis_constants.compiled
+   genesis_constants
    bounded_types
  )
  (instrumentation (backend bisect_ppx))

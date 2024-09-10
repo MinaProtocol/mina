@@ -728,112 +728,6 @@ module Genesis_proof = struct
   let id_to_json x =
     `String (Sexp.to_string (Pickles.Verification_key.Id.sexp_of_t x))
 
-  let load_or_generate ~genesis_dir ~logger (inputs : Genesis_proof.Inputs.t) =
-    let b, id =
-      match (inputs.blockchain_proof_system_id, inputs.proof_level) with
-      | Some id, _ ->
-          (None, Deferred.return id)
-      | None, Full ->
-          let ((_, (module B)) as b) =
-            Genesis_proof.blockchain_snark_state inputs
-          in
-          (Some b, Lazy.force B.Proof.id)
-      | _ ->
-          (None, Deferred.return @@ Pickles.Verification_key.Id.dummy ())
-    in
-    let%bind id = id in
-    let base_hash =
-      Base_hash.create ~id
-        ~state_hash:
-          (State_hash.With_state_hashes.state_hash
-             inputs.protocol_state_with_hashes )
-    in
-    let%bind found_proof =
-      match%bind find_file ~logger ~base_hash ~genesis_dir with
-      | Some file -> (
-          match%bind load file with
-          | Ok genesis_proof ->
-              let b =
-                lazy
-                  ( match b with
-                  | Some b ->
-                      b
-                  | None ->
-                      Genesis_proof.blockchain_snark_state inputs )
-              in
-              let constraint_system_digests =
-                match inputs.constraint_system_digests with
-                | Some digests ->
-                    lazy digests
-                | None ->
-                    lazy
-                      (let (module T), (module B) = Lazy.force b in
-                       Lazy.force @@ Genesis_proof.digests (module T) (module B)
-                      )
-              in
-              let%map blockchain_proof_system_id =
-                match inputs.blockchain_proof_system_id with
-                | Some id ->
-                    Deferred.return id
-                | None ->
-                    let _, (module B) = Lazy.force b in
-                    Lazy.force B.Proof.id
-              in
-              Some
-                ( { Genesis_proof.runtime_config = inputs.runtime_config
-                  ; constraint_constants = inputs.constraint_constants
-                  ; proof_level = inputs.proof_level
-                  ; genesis_constants = inputs.genesis_constants
-                  ; genesis_ledger = inputs.genesis_ledger
-                  ; genesis_epoch_data = inputs.genesis_epoch_data
-                  ; consensus_constants = inputs.consensus_constants
-                  ; protocol_state_with_hashes =
-                      inputs.protocol_state_with_hashes
-                  ; constraint_system_digests
-                  ; proof_data =
-                      Some { blockchain_proof_system_id; genesis_proof }
-                  ; genesis_body_reference = inputs.genesis_body_reference
-                  }
-                , file )
-          | Error err ->
-              [%log error] "Could not load genesis proof from $path: $error"
-                ~metadata:
-                  [ ("path", `String file)
-                  ; ("error", Error_json.error_to_yojson err)
-                  ] ;
-              return None )
-      | None ->
-          return None
-    in
-    match found_proof with
-    | Some found_proof ->
-        return (Ok found_proof)
-    | None ->
-        [%log info]
-          "No genesis proof file was found for $base_hash, generating a new \
-           genesis proof"
-          ~metadata:[ ("base_hash", Base_hash.to_yojson base_hash) ] ;
-        let%bind values = generate inputs in
-        let filename = genesis_dir ^/ filename ~base_hash in
-        let%map () =
-          match values.proof_data with
-          | None ->
-              return ()
-          | Some proof_data -> (
-              match%map store ~filename proof_data.genesis_proof with
-              | Ok () ->
-                  [%log info] "New genesis proof written to $path"
-                    ~metadata:[ ("path", `String filename) ]
-              | Error err ->
-                  [%log warn]
-                    "Genesis proof could not be written to $path: $error"
-                    ~metadata:
-                      [ ("path", `String filename)
-                      ; ("error", Error_json.error_to_yojson err)
-                      ] )
-        in
-        Ok (values, filename)
-
   let create_values_no_proof = Genesis_proof.create_values_no_proof
 end
 
@@ -881,14 +775,15 @@ let print_config ~logger config =
     ~metadata
 
 let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~compiled:(module Genesis_constants_compiled : Genesis_constants.S)
-    ~proof_level ?overwrite_version (config : Runtime_config.t) =
+    ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~proof_level:compiled_proof_level ?overwrite_version
+    (config : Runtime_config.t) =
   print_config ~logger config ;
   let open Deferred.Or_error.Let_syntax in
-  let genesis_constants = Genesis_constants_compiled.t in
   let proof_level =
     List.find_map_exn ~f:Fn.id
-      [ proof_level
+      [ cli_proof_level
       ; Option.Let_syntax.(
           let%bind proof = config.proof in
           match%map proof.level with
@@ -898,15 +793,14 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
               Check
           | None ->
               None)
-      ; Some Genesis_constants_compiled.Proof_level.t
+      ; Some compiled_proof_level
       ]
   in
   let constraint_constants, blockchain_proof_system_id =
     match config.proof with
     | None ->
         [%log info] "Using the compiled constraint constants" ;
-        ( Genesis_constants_compiled.Constraint_constants.t
-        , Some (Pickles.Verification_key.Id.dummy ()) )
+        (constraint_constants, Some (Pickles.Verification_key.Id.dummy ()))
     | Some config ->
         [%log info] "Using the constraint constants from the configuration file" ;
         let blockchain_proof_system_id =
@@ -919,12 +813,11 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
           *)
           None
         in
-        ( make_constraint_constants
-            ~default:Genesis_constants_compiled.Constraint_constants.t config
+        ( make_constraint_constants ~default:constraint_constants config
         , blockchain_proof_system_id )
   in
   let%bind () =
-    match (proof_level, Genesis_constants_compiled.Proof_level.t) with
+    match (proof_level, compiled_proof_level) with
     | _, Full | (Check | None), _ ->
         return ()
     | Full, ((Check | None) as compiled) ->
@@ -973,13 +866,14 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   (proof_inputs, config)
 
-let init_from_config_file ?genesis_dir ~logger ~proof_level ?overwrite_version
-    ~compiled (config : Runtime_config.t) :
+let init_from_config_file ?genesis_dir ~cli_proof_level ~genesis_constants
+    ~constraint_constants ~logger ~proof_level ?overwrite_version
+    (config : Runtime_config.t) :
     (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
   let open Deferred.Or_error.Let_syntax in
   let%map inputs, config =
-    inputs_from_config_file ?genesis_dir ~logger ~proof_level ?overwrite_version
-      ~compiled config
+    inputs_from_config_file ?genesis_dir ~cli_proof_level ~genesis_constants
+      ~constraint_constants ~logger ~proof_level ?overwrite_version config
   in
   let values = Genesis_proof.create_values_no_proof inputs in
   (values, config)

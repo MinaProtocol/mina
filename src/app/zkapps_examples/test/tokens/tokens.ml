@@ -14,7 +14,7 @@ let gen_keys () =
   (Public_key.compress kp.public_key, kp.private_key)
 
 let fee_to_create n =
-  Genesis_constants_compiled.Constraint_constants.t.account_creation_fee
+  Genesis_constants.For_unit_tests.Constraint_constants.t.account_creation_fee
   |> Currency.Amount.of_fee
   |> (fun x -> Currency.Amount.scale x n)
   |> Option.value_exn

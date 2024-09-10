@@ -36,7 +36,7 @@
    currency
    mina_ledger
    mina_graphql
-   genesis_constants.compiled
+   genesis_constants
    secrets
    transaction_snark
    signature_lib
