@@ -19,10 +19,11 @@ let command =
      in
      fun () ->
        let open Async in
+       let constraint_constants =
+         Genesis_constants.Compiled.constraint_constants
+       in
        let%bind worker_state =
-         Prod.Worker_state.create
-           ~constraint_constants:
-             Genesis_constants_compiled.Constraint_constants.t ~proof_level ()
+         Prod.Worker_state.create ~constraint_constants ~proof_level ()
        in
        let public_key = fst Key_gen.Sample_keypairs.genesis_winner in
        let fee = Currency.Fee.of_nanomina_int_exn 10 in
