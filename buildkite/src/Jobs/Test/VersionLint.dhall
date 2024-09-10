@@ -22,6 +22,8 @@ let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
 
+let RunInToolchain = ../../Command/RunInToolchain.dhall
+
 let dependsOn =
       Dockers.dependsOn
         Dockers.Type.Bullseye
@@ -37,30 +39,27 @@ let buildTestCmd
       ->  Command.build
             Command.Config::{
             , commands =
-              [ Cmd.runInDocker
-                  Cmd.Docker::{
-                  , image =
-                      ( ../../Constants/ContainerImages.dhall
-                      ).minaToolchainBullseye
-                  }
-                  "buildkite/scripts/dump-mina-type-shapes.sh"
-              , Cmd.runInDocker
-                  Cmd.Docker::{
-                  , image =
-                      ( ../../Constants/ContainerImages.dhall
-                      ).minaToolchainBullseye
-                  }
-                  "buildkite/scripts/version-linter-patch-missing-type-shapes.sh ${release_branch}"
-              , Cmd.run
-                  "gsutil cp *-type_shape.txt \$MINA_TYPE_SHAPE gs://mina-type-shapes"
-              , Cmd.runInDocker
-                  Cmd.Docker::{
-                  , image =
-                      ( ../../Constants/ContainerImages.dhall
-                      ).minaToolchainBullseye
-                  }
-                  "buildkite/scripts/version-linter.sh ${release_branch}"
-              ]
+                  [ Cmd.runInDocker
+                      Cmd.Docker::{
+                      , image =
+                          ( ../../Constants/ContainerImages.dhall
+                          ).minaToolchainBullseye
+                      }
+                      "buildkite/scripts/dump-mina-type-shapes.sh"
+                  ]
+                # RunInToolchain.runInToolchain
+                    ([] : List Text)
+                    "buildkite/scripts/version-linter-patch-missing-type-shapes.sh ${release_branch}"
+                # [ Cmd.run
+                      "gsutil cp *-type_shape.txt \$MINA_TYPE_SHAPE gs://mina-type-shapes"
+                  , Cmd.runInDocker
+                      Cmd.Docker::{
+                      , image =
+                          ( ../../Constants/ContainerImages.dhall
+                          ).minaToolchainBullseye
+                      }
+                      "buildkite/scripts/version-linter.sh ${release_branch}"
+                  ]
             , label = "Versioned type linter"
             , key = "version-linter"
             , target = cmd_target
