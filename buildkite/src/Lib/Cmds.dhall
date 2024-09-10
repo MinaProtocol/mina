@@ -142,7 +142,7 @@ let tests =
       let dockerExample =
               assert
             :     { line =
-                      "docker run -it --rm --entrypoint /bin/bash --init --volume /var/secret/debian:/var/secrets/debian --volume /var/secrets/google:/var/secrets/google --volume /var/buildkite/shared:/shared --volume \\\$BUILDKITE_BUILD_CHECKOUT_PATH:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag -c 'echo hello'"
+                      "docker run -it --rm --entrypoint /bin/bash --init --volume /var/secrets/debian:/var/secrets/debian --volume /var/secrets/google:/var/secrets/google --volume /var/buildkite/shared:/shared --volume \\\$BUILDKITE_BUILD_CHECKOUT_PATH:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag -c 'echo hello'"
                   , readable = Some "Docker@foo/bar:tag ( echo hello )"
                   }
               ===  M.inDocker
