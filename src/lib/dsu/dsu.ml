@@ -66,11 +66,7 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
         let dsu_size = Array.length t.arr in
         let new_key_to_id = KeyMap.create () in
         let reallocation_size = dsu_size / 2 in
-        print_endline @@ Printf.sprintf "Resizing DSU to %d" reallocation_size ;
         let new_arr = init_array reallocation_size in
-        (* print size of keymap *)
-        print_endline
-        @@ Printf.sprintf "KeyMap size is %d" (KeyMap.length t.key_to_id) ;
         let parent_tbl = Hashtbl.create (module Int) in
         KeyMap.iteri t.key_to_id ~f:(fun ~key ~data ->
             let idx = KeyMap.length new_key_to_id + 1 in
