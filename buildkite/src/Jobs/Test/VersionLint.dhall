@@ -14,11 +14,11 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
 
-let RunInToolchain = ../../Command/RunInToolchain.dhall
-
 let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
+
+let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let dependsOn = [ { name = "MinaArtifactBullseye", key = "build-deb-pkg" } ]
 
@@ -34,15 +34,17 @@ let buildTestCmd
                   RunInToolchain.runInToolchain
                     ([] : List Text)
                     "buildkite/scripts/dump-mina-type-shapes.sh"
-                # [ Cmd.run
-                      "gsutil cp \$(git log -n 1 --format=%h --abbrev=7 --no-merges)-type_shape.txt \$MINA_TYPE_SHAPE gs://mina-type-shapes"
-                  ]
+                # RunInToolchain.runInToolchain
+                    ([] : List Text)
+                    "buildkite/scripts/version-linter-patch-missing-type-shapes.sh ${release_branch}"
+                # RunInToolchain.runInToolchain
+                    ([] : List Text)
+                    "gsutil cp *-type_shape.txt \$MINA_TYPE_SHAPE gs://mina-type-shapes"
                 # RunInToolchain.runInToolchain
                     ([] : List Text)
                     "buildkite/scripts/version-linter.sh ${release_branch}"
             , label = "Versioned type linter for ${release_branch}"
             , key = "version-linter-${release_branch}"
-            , soft_fail = Some soft_fail
             , target = cmd_target
             , docker = None Docker.Type
             , depends_on = dependsOn
