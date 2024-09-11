@@ -134,17 +134,17 @@ module type Digest_intf = sig
     module Checked : sig
       include Digest_intf.S_checked
 
-      val create : ?chain:Mina_signature_kind.t -> Account_update.Checked.t -> t
+      val create : chain:Mina_signature_kind.t -> Account_update.Checked.t -> t
 
       val create_body :
-        ?chain:Mina_signature_kind.t -> Account_update.Body.Checked.t -> t
+        chain:Mina_signature_kind.t -> Account_update.Body.Checked.t -> t
     end
 
     include Digest_intf.S_aux with type t := t and type checked := Checked.t
 
-    val create : ?chain:Mina_signature_kind.t -> Account_update.t -> t
+    val create : chain:Mina_signature_kind.t -> Account_update.t -> t
 
-    val create_body : ?chain:Mina_signature_kind.t -> Account_update.Body.t -> t
+    val create_body : chain:Mina_signature_kind.t -> Account_update.Body.t -> t
   end
 
   module rec Forest : sig
@@ -254,10 +254,10 @@ module Make_digest_str
       let create_body = Account_update.Body.Checked.digest
     end
 
-    let create : ?chain:Mina_signature_kind.t -> Account_update.t -> t =
+    let create : chain:Mina_signature_kind.t -> Account_update.t -> t =
       Account_update.digest
 
-    let create_body : ?chain:Mina_signature_kind.t -> Account_update.Body.t -> t
+    let create_body : chain:Mina_signature_kind.t -> Account_update.Body.t -> t
         =
       Account_update.Body.digest
   end
