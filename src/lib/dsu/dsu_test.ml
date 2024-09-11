@@ -148,7 +148,7 @@ let test_remove () =
 
 let test_deallocation () =
   let dsu = IntKeyDsu.create () in
-  let arr_size = QCheck.Gen.(int_range 65 65) in
+  let arr_size = QCheck.Gen.(int_range 600 800) in
   let arr = QCheck.Gen.(generate1 (array_size arr_size int)) in
   (* a ref to an array size int*)
   let arr_size = ref (Array.length arr) in
@@ -158,11 +158,11 @@ let test_deallocation () =
   Alcotest.(check int)
     (* we add 1 to account for the default 0 element used for dynamic deletions in the dsu *)
     "verifying occupancy is the size of the array additions" (!arr_size + 1)
-    (IntKeyDsu.occupancy dsu) ;
+    (IntKeyDsu.occupancy dsu);
 
   Alcotest.(check int)
     "verifying capacity is 1024 meaning there have been 4 re-allocations"
-    (IntKeyDsu.capacity dsu) 128 ;
+    (IntKeyDsu.capacity dsu) 1024;
 
   Array.iter arr ~f:(fun x -> IntKeyDsu.remove ~key:x dsu) ;
   Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 1 ;
