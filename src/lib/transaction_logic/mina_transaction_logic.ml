@@ -386,9 +386,17 @@ module type S = sig
     val command : t -> Transaction.t
   end
 
+  (** Type holding transaction-related data that is dependent only on a transaction
+      (and not ledger)
+  *)
+  type precomputed_t
+
+  val precompute_transaction_hashes : User_command.t -> precomputed_t
+
   val apply_user_command :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> txn_global_slot:Global_slot_since_genesis.t
+    -> ?precomputed:precomputed_t
     -> ledger
     -> Signed_command.With_valid_signature.t
     -> Transaction_applied.Signed_command_applied.t Or_error.t
@@ -396,6 +404,7 @@ module type S = sig
   val apply_user_command_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> txn_global_slot:Global_slot_since_genesis.t
+    -> ?precomputed:precomputed_t
     -> ledger
     -> Signed_command.t
     -> Transaction_applied.Signed_command_applied.t Or_error.t
@@ -412,6 +421,7 @@ module type S = sig
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
+    -> ?precomputed:precomputed_t
     -> ledger
     -> Zkapp_command.t
     -> ( Transaction_applied.Zkapp_command_applied.t
@@ -461,6 +471,7 @@ module type S = sig
           -> 'acc )
     -> ?fee_excess:Amount.Signed.t
     -> ?supply_increase:Amount.Signed.t
+    -> ?precomputed:precomputed_t
     -> ledger
     -> Zkapp_command.t
     -> (Transaction_applied.Zkapp_command_applied.t * 'acc) Or_error.t
@@ -485,6 +496,7 @@ module type S = sig
           -> 'acc )
     -> ?fee_excess:Amount.Signed.t
     -> ?supply_increase:Amount.Signed.t
+    -> ?precomputed:precomputed_t
     -> ledger
     -> Zkapp_command.t
     -> (Transaction_partially_applied.Zkapp_command_partially_applied.t * 'acc)
@@ -505,6 +517,7 @@ module type S = sig
                , Transaction_status.Failure.Collection.t )
                Zkapp_command_logic.Local_state.t
           -> 'acc )
+    -> ?precomputed:precomputed_t
     -> ledger
     -> Transaction_partially_applied.Zkapp_command_partially_applied.t
     -> (Transaction_applied.Zkapp_command_applied.t * 'acc) Or_error.t
@@ -527,12 +540,14 @@ module type S = sig
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> global_slot:Global_slot_since_genesis.t
     -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
+    -> ?precomputed:precomputed_t
     -> ledger
     -> Transaction.t
     -> Transaction_partially_applied.t Or_error.t
 
   val apply_transaction_second_pass :
-       ledger
+       ?precomputed:precomputed_t
+    -> ledger
     -> Transaction_partially_applied.t
     -> Transaction_applied.t Or_error.t
 
@@ -718,7 +733,9 @@ module Make (L : Ledger_intf.S) :
     | None ->
         Ok (`New, Account.create account_id Balance.zero)
 
-  let set_with_location ledger location account =
+  let set_with_location ?precomputed ledger location account =
+    ignore precomputed ;
+    (* TODO pass account hash further down the call stack *)
     match location with
     | `Existing location ->
         Ok (set ledger location account)
@@ -884,7 +901,7 @@ module Make (L : Ledger_intf.S) :
      we don't for now. *)
   let apply_user_command_unchecked
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~txn_global_slot ledger
+      ~txn_global_slot ?precomputed ledger
       ({ payload; signer; signature = _ } as user_command : Signed_command.t) =
     let open Or_error.Let_syntax in
     let signer_pk = Public_key.compress signer in
@@ -916,7 +933,7 @@ module Make (L : Ledger_intf.S) :
        command.
     *)
     let%bind () =
-      set_with_location ledger fee_payer_location fee_payer_account
+      set_with_location ?precomputed ledger fee_payer_location fee_payer_account
     in
     let receiver = Signed_command.receiver user_command in
     let exception Reject of Error.t in
@@ -1047,7 +1064,7 @@ module Make (L : Ledger_intf.S) :
           List.fold located_accounts ~init:(Ok ())
             ~f:(fun acc (location, account) ->
               let%bind () = acc in
-              set_with_location ledger location account )
+              set_with_location ?precomputed ledger location account )
         in
         let applied_common : Transaction_applied.Signed_command_applied.Common.t
             =
@@ -1078,9 +1095,10 @@ module Make (L : Ledger_intf.S) :
         *)
         Error err
 
-  let apply_user_command ~constraint_constants ~txn_global_slot ledger
-      (user_command : Signed_command.With_valid_signature.t) =
-    apply_user_command_unchecked ~constraint_constants ~txn_global_slot ledger
+  let apply_user_command ~constraint_constants ~txn_global_slot ?precomputed
+      ledger (user_command : Signed_command.With_valid_signature.t) =
+    apply_user_command_unchecked ~constraint_constants ~txn_global_slot
+      ?precomputed ledger
       (Signed_command.forget_check user_command)
 
   module Global_state = struct
@@ -1922,6 +1940,79 @@ module Make (L : Ledger_intf.S) :
 
   module M = Zkapp_command_logic.Make (Inputs)
 
+  (** Type holding transaction-related data that is dependent only on a transaction
+      (and not ledger)
+  *)
+  type precomputed_t =
+    { memo_hash : Random_oracle.Digest.t
+    ; token_ids : Token_id.t Account_id.Map.t
+    ; zkapp_precomputed : M.zkapp_precomputed_t option
+    }
+
+  let get_init_account_update account_updates =
+    let default_caller = M.default_caller in
+    M.get_next_account_update
+      (Stack_frame.make ~calls:account_updates ~caller:default_caller
+         ~caller_caller:default_caller )
+      (Inputs.Call_stack.empty ())
+
+  let commitments_on_start ~memo_hash
+      { M.account_update; new_frame = remaining; _ } =
+    let tx_commitment_on_start =
+      Inputs.Transaction_commitment.commitment
+        ~account_updates:(Stack_frame.calls remaining)
+    in
+    ( tx_commitment_on_start
+    , Inputs.Transaction_commitment.full_commitment ~account_update ~memo_hash
+        ~commitment:tx_commitment_on_start )
+
+  let precompute_transaction_hashes : User_command.t -> precomputed_t =
+    let mk_token_ids ids =
+      Account_id.Map.of_key_set
+        ~f:(fun owner -> Account_id.derive_token_id ~owner)
+        (Account_id.Set.of_list ids)
+    in
+    function
+    | Signed_command tx ->
+        let memo_hash = Signed_command_memo.hash (Signed_command.memo tx) in
+        let token_ids =
+          mk_token_ids
+            [ Signed_command.receiver tx; Signed_command.fee_payer tx ]
+        in
+        { memo_hash; token_ids; zkapp_precomputed = None }
+    | Zkapp_command tx ->
+        let token_ids = mk_token_ids (Zkapp_command.accounts_referenced tx) in
+        let memo_hash = Signed_command_memo.hash tx.memo in
+        let all_account_updates = Zkapp_command.all_account_updates tx in
+        let init_account_update_result =
+          get_init_account_update
+            ~lookup_precomputed_token_id:(Map.find token_ids)
+            all_account_updates
+        in
+        let tx_commitment_on_start, full_commitment_on_start =
+          commitments_on_start ~memo_hash init_account_update_result
+        in
+        { memo_hash
+        ; token_ids
+        ; zkapp_precomputed =
+            Some
+              { all_account_updates
+              ; init_account_update_result
+              ; tx_commitment_on_start
+              ; full_commitment_on_start
+              }
+        }
+
+  let m_precomputed_of_precomputed_option precomputed =
+    match
+      Option.(precomputed >>= fun p -> p.zkapp_precomputed >>| fun z -> (p, z))
+    with
+    | None ->
+        None
+    | Some ({ token_ids; _ }, zkapp_precomputed) ->
+        Some
+          { M.lookup_derived_token_id = Map.find token_ids; zkapp_precomputed }
+
   let update_action_state action_state actions ~txn_global_slot
       ~last_action_slot =
     let action_state', last_action_slot' =
@@ -1939,7 +2030,7 @@ module Make (L : Ledger_intf.S) :
       ?((* TODO: can this be ripped out from here? *)
         fee_excess = Amount.Signed.zero)
       ?((* TODO: is the right? is it never used for zkapps? *)
-        supply_increase = Amount.Signed.zero) (ledger : L.t)
+        supply_increase = Amount.Signed.zero) ?precomputed (ledger : L.t)
       (command : Zkapp_command.t) :
       ( Transaction_partially_applied.Zkapp_command_partially_applied.t
       * user_acc )
@@ -1987,12 +2078,26 @@ module Make (L : Ledger_intf.S) :
         } )
     in
     let user_acc = f init initial_state in
-    let account_updates = Zkapp_command.all_account_updates command in
+    let memo_hash =
+      match precomputed with
+      | Some p ->
+          p.memo_hash
+      | _ ->
+          Signed_command_memo.hash command.memo
+    in
+    let account_updates =
+      match Option.(precomputed >>= fun p -> p.zkapp_precomputed) with
+      | Some p ->
+          p.all_account_updates
+      | _ ->
+          Zkapp_command.all_account_updates command
+    in
     let%map global_state, local_state =
       Or_error.try_with (fun () ->
           M.start ~constraint_constants
+            ?precomputed:(m_precomputed_of_precomputed_option precomputed)
             { account_updates
-            ; memo_hash = Signed_command_memo.hash command.memo
+            ; memo_hash
             ; will_succeed =
                 (* It's always valid to set this value to true, and it will
                    have no effect outside of the snark.
@@ -2016,20 +2121,20 @@ module Make (L : Ledger_intf.S) :
       ?((* TODO: can this be ripped out from here? *)
         fee_excess = Amount.Signed.zero)
       ?((* TODO: is the right? is it never used for zkapps? *)
-        supply_increase = Amount.Signed.zero) (ledger : L.t)
+        supply_increase = Amount.Signed.zero) ?precomputed (ledger : L.t)
       (command : Zkapp_command.t) :
       Transaction_partially_applied.Zkapp_command_partially_applied.t Or_error.t
       =
     let open Or_error.Let_syntax in
     let%map partial_stmt, _user_acc =
       apply_zkapp_command_first_pass_aux ~constraint_constants ~global_slot
-        ~state_view ~fee_excess ~supply_increase ledger command ~init:None
-        ~f:(fun _acc state -> Some state)
+        ~state_view ~fee_excess ~supply_increase ?precomputed ledger command
+        ~init:None ~f:(fun _acc state -> Some state)
     in
     partial_stmt
 
   let apply_zkapp_command_second_pass_aux (type user_acc) ~(init : user_acc) ~f
-      ledger
+      ?precomputed ledger
       (c : Transaction_partially_applied.Zkapp_command_partially_applied.t) :
       (Transaction_applied.Zkapp_command_applied.t * user_acc) Or_error.t =
     let open Or_error.Let_syntax in
@@ -2066,8 +2171,9 @@ module Make (L : Ledger_intf.S) :
       else
         let%bind states =
           Or_error.try_with (fun () ->
-              M.step ~constraint_constants:c.constraint_constants { perform }
-                (g_state, l_state) )
+              M.step ~constraint_constants:c.constraint_constants
+                ?precomputed:(m_precomputed_of_precomputed_option precomputed)
+                { perform } (g_state, l_state) )
         in
         step_all (f user_acc states) states
     in
@@ -2179,28 +2285,32 @@ module Make (L : Ledger_intf.S) :
               "Zkapp_command application failed but new accounts created or \
                some of the other account_update updates applied"
 
-  let apply_zkapp_command_second_pass ledger c :
+  let apply_zkapp_command_second_pass ?precomputed ledger c :
       Transaction_applied.Zkapp_command_applied.t Or_error.t =
     let open Or_error.Let_syntax in
     let%map x, () =
-      apply_zkapp_command_second_pass_aux ~init:() ~f:Fn.const ledger c
+      apply_zkapp_command_second_pass_aux ~init:() ~f:Fn.const ?precomputed
+        ledger c
     in
     x
 
   let apply_zkapp_command_unchecked_aux ~constraint_constants ~global_slot
-      ~state_view ~init ~f ?fee_excess ?supply_increase ledger command =
+      ~state_view ~init ~f ?fee_excess ?supply_increase ?precomputed ledger
+      command =
     let open Or_error.Let_syntax in
     apply_zkapp_command_first_pass_aux ~constraint_constants ~global_slot
-      ~state_view ?fee_excess ?supply_increase ledger command ~init ~f
+      ~state_view ?fee_excess ?supply_increase ?precomputed ledger command ~init
+      ~f
     >>= fun (partial_stmt, user_acc) ->
-    apply_zkapp_command_second_pass_aux ~init:user_acc ~f ledger partial_stmt
+    apply_zkapp_command_second_pass_aux ~init:user_acc ~f ?precomputed ledger
+      partial_stmt
 
   let apply_zkapp_command_unchecked ~constraint_constants ~global_slot
-      ~state_view ledger command =
+      ~state_view ?precomputed ledger command =
     let open Or_error.Let_syntax in
     apply_zkapp_command_first_pass ~constraint_constants ~global_slot
-      ~state_view ledger command
-    >>= apply_zkapp_command_second_pass_aux ledger ~init:None
+      ~state_view ?precomputed ledger command
+    >>= apply_zkapp_command_second_pass_aux ?precomputed ledger ~init:None
           ~f:(fun _acc (global_state, local_state) ->
             Some (local_state, global_state.fee_excess) )
     |> Result.map ~f:(fun (account_update_applied, state_res) ->
@@ -2486,8 +2596,8 @@ module Make (L : Ledger_intf.S) :
       }
 
   let apply_transaction_first_pass ~constraint_constants ~global_slot
-      ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t) ledger
-      (t : Transaction.t) : Transaction_partially_applied.t Or_error.t =
+      ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t) ?precomputed
+      ledger (t : Transaction.t) : Transaction_partially_applied.t Or_error.t =
     let open Or_error.Let_syntax in
     let previous_hash = merkle_root ledger in
     let txn_global_slot = global_slot in
@@ -2495,13 +2605,13 @@ module Make (L : Ledger_intf.S) :
     | Command (Signed_command txn) ->
         let%map applied =
           apply_user_command_unchecked ~constraint_constants ~txn_global_slot
-            ledger txn
+            ?precomputed ledger txn
         in
         Transaction_partially_applied.Signed_command { previous_hash; applied }
     | Command (Zkapp_command txn) ->
         let%map partially_applied =
           apply_zkapp_command_first_pass ~global_slot ~state_view:txn_state_view
-            ~constraint_constants ledger txn
+            ~constraint_constants ?precomputed ledger txn
         in
         Transaction_partially_applied.Zkapp_command partially_applied
     | Fee_transfer t ->
@@ -2515,8 +2625,8 @@ module Make (L : Ledger_intf.S) :
         in
         Transaction_partially_applied.Coinbase { previous_hash; applied }
 
-  let apply_transaction_second_pass ledger (t : Transaction_partially_applied.t)
-      : Transaction_applied.t Or_error.t =
+  let apply_transaction_second_pass ?precomputed ledger
+      (t : Transaction_partially_applied.t) : Transaction_applied.t Or_error.t =
     let open Or_error.Let_syntax in
     let open Transaction_applied in
     match t with
@@ -2526,7 +2636,7 @@ module Make (L : Ledger_intf.S) :
     | Zkapp_command partially_applied ->
         (* TODO: either here or in second phase of apply, need to update the prior global state statement for the fee payer segment to add the second phase ledger at the end *)
         let%map applied =
-          apply_zkapp_command_second_pass ledger partially_applied
+          apply_zkapp_command_second_pass ?precomputed ledger partially_applied
         in
         { previous_hash = partially_applied.previous_hash
         ; varying = Varying.Command (Zkapp_command applied)

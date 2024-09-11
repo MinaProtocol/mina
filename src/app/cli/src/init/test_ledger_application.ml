@@ -136,10 +136,14 @@ let apply_txs ~action_elements ~event_elements ~constraint_constants
   in
   let zkapps' =
     List.map zkapps ~f:(fun tx ->
-        { With_status.data =
-            Mina_transaction.Transaction.Command (User_command.Zkapp_command tx)
-        ; status = Applied
-        } )
+        ( { With_status.data =
+              Mina_transaction.Transaction.Command
+                (User_command.Zkapp_command tx)
+          ; status = Applied
+          }
+        , Option.some
+          @@ Ledger.precompute_transaction_hashes (User_command.Zkapp_command tx)
+        ) )
   in
   let accounts_accessed =
     List.fold_left ~init:Account_id.Set.empty zkapps ~f:(fun set txn ->
