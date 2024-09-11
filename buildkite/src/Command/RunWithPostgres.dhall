@@ -60,6 +60,7 @@ let runInDockerWithPostgresConn
               = "\\\$MINA_DOCKER_TAG"
 
           let maybeNetwork =
+                Some (network) ?
                 Optional/map
                   Network.Type
                   Text
