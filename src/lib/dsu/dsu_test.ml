@@ -158,11 +158,11 @@ let test_deallocation () =
   Alcotest.(check int)
     (* we add 1 to account for the default 0 element used for dynamic deletions in the dsu *)
     "verifying occupancy is the size of the array additions" (!arr_size + 1)
-    (IntKeyDsu.occupancy dsu);
+    (IntKeyDsu.occupancy dsu) ;
 
   Alcotest.(check int)
     "verifying capacity is 1024 meaning there have been 4 re-allocations"
-    (IntKeyDsu.capacity dsu) 1024;
+    (IntKeyDsu.capacity dsu) 1024 ;
 
   Array.iter arr ~f:(fun x -> IntKeyDsu.remove ~key:x dsu) ;
   Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 1 ;

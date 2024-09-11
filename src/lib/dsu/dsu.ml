@@ -10,7 +10,6 @@ module type Data = sig
   type t
 
   val merge : t -> t -> t
-
 end
 
 (** DSU data structure with ability to remove sets fromt he structure.contents
@@ -39,10 +38,7 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
         } )
 
   let create () =
-    { arr = init_array min_capacity
-    ; next_id = 1
-    ; key_to_id = KeyMap.create ()
-    }
+    { arr = init_array min_capacity; next_id = 1; key_to_id = KeyMap.create () }
 
   let rec find_set ~id arr =
     let el = Array.get arr id in
@@ -69,11 +65,12 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
             parent <> 0 ) ;
         let dsu_size = Array.length t.arr in
         let new_key_to_id = KeyMap.create () in
-        let reallocation_size = (dsu_size / 2) in
-        print_endline @@ Printf.sprintf "Resizing DSU to %d" (reallocation_size);
+        let reallocation_size = dsu_size / 2 in
+        print_endline @@ Printf.sprintf "Resizing DSU to %d" reallocation_size ;
         let new_arr = init_array reallocation_size in
         (* print size of keymap *)
-        print_endline @@ Printf.sprintf "KeyMap size is %d" (KeyMap.length t.key_to_id);
+        print_endline
+        @@ Printf.sprintf "KeyMap size is %d" (KeyMap.length t.key_to_id) ;
         let parent_tbl = Hashtbl.create (module Int) in
         KeyMap.iteri t.key_to_id ~f:(fun ~key ~data ->
             let idx = KeyMap.length new_key_to_id + 1 in
@@ -81,15 +78,14 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
             Array.set new_arr idx element ;
             Hashtbl.set new_key_to_id ~key ~data:idx ;
             if element.size <> 0 then
-              Hashtbl.set parent_tbl ~key:element.parent ~data:idx
-            );
+              Hashtbl.set parent_tbl ~key:element.parent ~data:idx ) ;
         (* loop through all the new keys in the hash tbl and replace the old parents with the new parent indexes*)
         Hashtbl.iteri parent_tbl ~f:(fun ~key ~data ->
             let element = Array.get new_arr data in
-            Array.set new_arr data { element with parent = Hashtbl.find_exn parent_tbl key }
-            );
+            Array.set new_arr data
+              { element with parent = Hashtbl.find_exn parent_tbl key } ) ;
 
-        t.arr <- new_arr;
+        t.arr <- new_arr ;
         t.key_to_id <- new_key_to_id
 
   let allocate_id t =
@@ -98,7 +94,7 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
     t.next_id <- id + 1 ;
     id
 
-  let size ~id t =  (Array.get t.arr id).size 
+  let size ~id t = (Array.get t.arr id).size
 
   let union_sets t a b =
     let a = find_set t.arr ~id:a in
@@ -109,9 +105,7 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
       let child_set_size = child_el.size in
       Array.set t.arr child { child_el with parent; size = 0 } ;
       Array.set t.arr parent
-        { parent_el with
-          size = parent_el.size + child_set_size
-        }
+        { parent_el with size = parent_el.size + child_set_size }
     in
     if a <> b then
       if size ~id:a t < size ~id:b t then adopt_parent ~parent:b ~child:a
@@ -120,18 +114,16 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
   let add_exn ~key ~value t =
     let id = allocate_id t in
     Hashtbl.add_exn ~key ~data:id t.key_to_id ;
-    Array.set t.arr id { value = Some value; parent = id; size = 1 } 
+    Array.set t.arr id { value = Some value; parent = id; size = 1 }
 
   let remove ~key t =
     Option.iter (Hashtbl.find_and_remove t.key_to_id key) ~f:(fun id ->
-          union_sets t id 0 ;
-          (* the rest of the items will be updated when we lazily resize *)
-          let num_keys = KeyMap.length t.key_to_id in
-          if
-            Array.length t.arr > min_capacity
-            && ((num_keys) * 4) < Array.length t.arr
-        then resize t Half 
-        )
+        union_sets t id 0 ;
+        (* the rest of the items will be updated when we lazily resize *)
+        let num_keys = KeyMap.length t.key_to_id in
+        if
+          Array.length t.arr > min_capacity && num_keys * 4 < Array.length t.arr
+        then resize t Half )
 
   let get ~key t =
     let%bind.Option id = Hashtbl.find t.key_to_id key in
