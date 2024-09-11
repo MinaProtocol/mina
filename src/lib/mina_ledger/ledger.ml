@@ -371,7 +371,7 @@ module Ledger_inner = struct
 end
 
 include Ledger_inner
-include Mina_transaction_logic.Make (Ledger_inner)
+module Transaction_logic = Mina_transaction_logic.Make (Ledger_inner)
 
 (* use mask to restore ledger after application *)
 let merkle_root_after_zkapp_command_exn ~constraint_constants ~global_slot
@@ -380,8 +380,8 @@ let merkle_root_after_zkapp_command_exn ~constraint_constants ~global_slot
   let masked_ledger = register_mask ledger mask in
   let _applied =
     Or_error.ok_exn
-      (apply_zkapp_command_unchecked ~constraint_constants ~global_slot
-         ~state_view:txn_state_view masked_ledger
+      (Transaction_logic.apply_zkapp_command_unchecked ~constraint_constants
+         ~global_slot ~state_view:txn_state_view masked_ledger
          (Zkapp_command.Valid.forget zkapp_command) )
   in
   let root = merkle_root masked_ledger in
@@ -395,8 +395,8 @@ let merkle_root_after_user_command_exn ~constraint_constants ~txn_global_slot
   let masked_ledger = register_mask ledger mask in
   let _applied =
     Or_error.ok_exn
-      (apply_user_command ~constraint_constants ~txn_global_slot masked_ledger
-         cmd )
+      (Transaction_logic.apply_user_command ~constraint_constants
+         ~txn_global_slot masked_ledger cmd )
   in
   let root = merkle_root masked_ledger in
   ignore (unregister_mask_exn ~loc:__LOC__ masked_ledger : unattached_mask) ;
@@ -491,7 +491,7 @@ let%test_unit "tokens test" =
           account_updates
       in
       match
-        apply_zkapp_command_unchecked ~constraint_constants
+        Transaction_logic.apply_zkapp_command_unchecked ~constraint_constants
           ~global_slot:
             (Mina_numbers.Global_slot_since_genesis.succ
                view.global_slot_since_genesis )
@@ -664,14 +664,15 @@ let%test_unit "zkapp_command payment test" =
               let open Result.Let_syntax in
               let%bind () =
                 iter_err ts1 ~f:(fun t ->
-                    apply_user_command_unchecked l1 t ~constraint_constants
-                      ~txn_global_slot )
+                    Transaction_logic.apply_user_command_unchecked l1 t
+                      ~constraint_constants ~txn_global_slot )
               in
               let%bind () =
                 iter_err ts2 ~f:(fun t ->
                     let%bind res, _ =
-                      apply_zkapp_command_unchecked l2 t ~constraint_constants
-                        ~global_slot:txn_global_slot ~state_view:view
+                      Transaction_logic.apply_zkapp_command_unchecked l2 t
+                        ~constraint_constants ~global_slot:txn_global_slot
+                        ~state_view:view
                     in
                     match res.command.status with
                     | Transaction_status.Applied ->
@@ -721,8 +722,8 @@ let%test_unit "user_command application on masked ledger" =
           let () =
             iter_err cmds
               ~f:
-                (apply_user_command_unchecked ~constraint_constants
-                   ~txn_global_slot l )
+                (Transaction_logic.apply_user_command_unchecked
+                   ~constraint_constants ~txn_global_slot l )
             |> Or_error.ok_exn
           in
           assert (not (Ledger_hash.equal init_merkle_root (L.merkle_root l))) ;
@@ -757,10 +758,13 @@ let%test_unit "zkapp_command application on masked ledger" =
           let () =
             iter_err cmds
               ~f:
-                (apply_zkapp_command_unchecked ~constraint_constants
-                   ~global_slot:txn_global_slot ~state_view:view l )
+                (Transaction_logic.apply_zkapp_command_unchecked
+                   ~constraint_constants ~global_slot:txn_global_slot
+                   ~state_view:view l )
             |> Or_error.ok_exn
           in
           assert (not (Ledger_hash.equal init_merkle_root (L.merkle_root l))) ;
           (*Parent updates reflected in child masks*)
           assert (Ledger_hash.equal (L.merkle_root l) (L.merkle_root m)) ) )
+
+include Transaction_logic
