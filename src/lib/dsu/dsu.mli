@@ -2,7 +2,6 @@ open Core_kernel
 
 module type Data = sig
   type t
-
 end
 
 (** DSU data structure with ability to remove sets from the structure.contents

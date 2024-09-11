@@ -5,7 +5,6 @@ open Dsu
 (* Mock data module for testing *)
 module MockData : Data with type t = int = struct
   type t = int
-
 end
 
 (* Instantiate the DSU with int keys and mock data *)
@@ -145,7 +144,7 @@ let test_remove () =
   (* no dynamic resizing so we do not remove the remaining element just yet *)
   Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 3
 
-let test_deallocation () = 
+let test_deallocation () =
   let dsu = IntKeyDsu.create () in
   let arr_size = QCheck.Gen.(int_range 130 140) in
   let arr = QCheck.Gen.(generate1 (array_size arr_size int)) in
@@ -167,76 +166,152 @@ let test_deallocation () =
   Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 1 ;
   Alcotest.(check int) "capacity" (IntKeyDsu.capacity dsu) 64
 
-
-let test_complicated_merge () = 
-  let keys = [
-    1; 2; 3; 4; 5; 6; 7; 8; 9; 10;
-    11; 12; 13; 14; 15; 16; 17; 18; 19; 20;
-    21; 22; 23; 24; 25; 26; 27; 28; 29; 30;
-    31; 32; 33; 34; 35; 36; 37; 38; 39; 40;
-    41; 42; 43; 44; 45; 46; 47; 48; 49; 50;
-    51; 52; 53; 54; 55; 56; 57; 58; 59; 60;
-    61; 62; 63; 64; 65; 66; 67; 68; 69; 70;
-    71; 72; 73; 74; 75; 76; 77; 78; 79; 80;
-    81; 82; 83; 84; 85; 86; 87; 88; 89; 90;
-    91; 92; 93; 94; 95; 96; 97; 98; 99; 100;
-  ] in
+let test_complicated_merge () =
+  let keys =
+    [ 1
+    ; 2
+    ; 3
+    ; 4
+    ; 5
+    ; 6
+    ; 7
+    ; 8
+    ; 9
+    ; 10
+    ; 11
+    ; 12
+    ; 13
+    ; 14
+    ; 15
+    ; 16
+    ; 17
+    ; 18
+    ; 19
+    ; 20
+    ; 21
+    ; 22
+    ; 23
+    ; 24
+    ; 25
+    ; 26
+    ; 27
+    ; 28
+    ; 29
+    ; 30
+    ; 31
+    ; 32
+    ; 33
+    ; 34
+    ; 35
+    ; 36
+    ; 37
+    ; 38
+    ; 39
+    ; 40
+    ; 41
+    ; 42
+    ; 43
+    ; 44
+    ; 45
+    ; 46
+    ; 47
+    ; 48
+    ; 49
+    ; 50
+    ; 51
+    ; 52
+    ; 53
+    ; 54
+    ; 55
+    ; 56
+    ; 57
+    ; 58
+    ; 59
+    ; 60
+    ; 61
+    ; 62
+    ; 63
+    ; 64
+    ; 65
+    ; 66
+    ; 67
+    ; 68
+    ; 69
+    ; 70
+    ; 71
+    ; 72
+    ; 73
+    ; 74
+    ; 75
+    ; 76
+    ; 77
+    ; 78
+    ; 79
+    ; 80
+    ; 81
+    ; 82
+    ; 83
+    ; 84
+    ; 85
+    ; 86
+    ; 87
+    ; 88
+    ; 89
+    ; 90
+    ; 91
+    ; 92
+    ; 93
+    ; 94
+    ; 95
+    ; 96
+    ; 97
+    ; 98
+    ; 99
+    ; 100
+    ]
+  in
   let dsu = IntKeyDsu.create () in
   List.iter keys ~f:(fun x -> IntKeyDsu.add_exn ~key:x ~value:x dsu) ;
   List.iter (List.take keys 75) ~f:(fun x -> IntKeyDsu.union ~a:1 ~b:x dsu) ;
   (* checking capacity *)
-  Alcotest.(check (int))
-    "checking the capacity"
-    (IntKeyDsu.capacity dsu)
-    (128) ;
+  Alcotest.(check int) "checking the capacity" (IntKeyDsu.capacity dsu) 128 ;
   (* checking occupancy *)
   Alcotest.(check (option int))
     "checking size of 1"
     (IntKeyDsu.get_size ~key:1 dsu)
     (Some 75) ;
-  Alcotest.(check (int))
-    "checking the occupancy"
-    (IntKeyDsu.occupancy dsu)
-    (101);
+  Alcotest.(check int) "checking the occupancy" (IntKeyDsu.occupancy dsu) 101 ;
   IntKeyDsu.remove ~key:44 dsu ;
   Alcotest.(check (option int))
-    "checking size of 1"
-    (IntKeyDsu.get ~key:1 dsu)
-    None ;
-  Alcotest.(check (int))
-    "checking the occupancy"
-    (IntKeyDsu.occupancy dsu)
-    (26); 
-  Alcotest.(check (int))
-    "checking the capacity"
-    (IntKeyDsu.capacity dsu)
-    (64) ;
+    "checking size of 1" (IntKeyDsu.get ~key:1 dsu) None ;
+  Alcotest.(check int) "checking the occupancy" (IntKeyDsu.occupancy dsu) 26 ;
+  Alcotest.(check int) "checking the capacity" (IntKeyDsu.capacity dsu) 64 ;
   List.iter (List.drop keys 75) ~f:(fun x ->
-    Alcotest.(check (option int))
-      "checking size of 1"
-      (IntKeyDsu.get ~key:x dsu)
-      (Some x) );
+      Alcotest.(check (option int))
+        "checking size of 1" (IntKeyDsu.get ~key:x dsu) (Some x) ) ;
   IntKeyDsu.union ~a:80 ~b:90 dsu ;
   IntKeyDsu.union ~a:90 ~b:100 dsu ;
   IntKeyDsu.union ~a:99 ~b:100 dsu ;
   Alcotest.(check (option int))
     "checking size of 99"
-    (IntKeyDsu.get_size ~key:99 dsu) (Some 0) ;
+    (IntKeyDsu.get_size ~key:99 dsu)
+    (Some 0) ;
   Alcotest.(check (option int))
     "checking size of 100"
-    (IntKeyDsu.get_size ~key:100 dsu) (Some 0) ;
+    (IntKeyDsu.get_size ~key:100 dsu)
+    (Some 0) ;
   Alcotest.(check (option int))
     "checking size of 80"
-    (IntKeyDsu.get_size ~key:80 dsu) (Some 4) ;
+    (IntKeyDsu.get_size ~key:80 dsu)
+    (Some 4) ;
   Alcotest.(check (option int))
-  "checking the size of 90"
-  (IntKeyDsu.get_size ~key:90 dsu)
-  (Some 0) ;
+    "checking the size of 90"
+    (IntKeyDsu.get_size ~key:90 dsu)
+    (Some 0) ;
   Alcotest.(check (option int))
     "finding the root of 99"
     (IntKeyDsu.get ~key:99 dsu)
-    (Some 80) 
-
+    (Some 80)
 
 (* Test suite *)
 let tests =
