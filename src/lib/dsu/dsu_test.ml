@@ -129,7 +129,50 @@ let test_union_existing_elements () =
   let element_size = IntKeyDsu.get_size ~key:3 dsu in
   Alcotest.(check (option int)) "size 3" element_size (Some 0)
 
-(* Test suite *)
+let test_remove () = ()
+  (*
+  let dsu = IntKeyDsu.create () in
+  IntKeyDsu.add_exn ~key:1 ~value:1 dsu ;
+  IntKeyDsu.add_exn ~key:2 ~value:2 dsu ;
+  IntKeyDsu.add_exn ~key:3 ~value:3 dsu ;
+  IntKeyDsu.union ~a:1 ~b:2 dsu ;
+  IntKeyDsu.union ~a:2 ~b:3 dsu ;
+  IntKeyDsu.remove ~key:2 dsu ;
+  Alcotest.(check (option int))
+    "removed element" (IntKeyDsu.get ~key:2 dsu) None ;
+  Alcotest.(check (option int))
+    "existent element 1" (IntKeyDsu.get ~key:1 dsu) None ;
+  Alcotest.(check (option int))
+    "existent element 3" (IntKeyDsu.get ~key:3 dsu) None ;
+  (* no dynamic resizing so we do not remove the remaining element just yet *)
+  Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 3
+  *)
+
+let test_deallocation () =
+  let dsu = IntKeyDsu.create () in
+  let arr_size = QCheck.Gen.(int_range 65 65) in
+  let arr = QCheck.Gen.(generate1 (array_size arr_size int)) in
+  (* a ref to an array size int*)
+  let arr_size = ref (Array.length arr) in
+  Alcotest.(check int)
+    "verifying capacity is 64 i.e min capacity" (IntKeyDsu.capacity dsu) 64 ;
+  Array.iter arr ~f:(fun x ->
+          IntKeyDsu.add_exn ~key:x ~value:x dsu ) ;
+  Alcotest.(check int)
+    (* we add 1 to account for the default 0 element used for dynamic deletions in the dsu *)
+    "verifying occupancy is the size of the array additions" (!arr_size + 1)
+    (IntKeyDsu.occupancy dsu) ;
+
+  Alcotest.(check int)
+    "verifying capacity is 1024 meaning there have been 4 re-allocations"
+    (IntKeyDsu.capacity dsu) 128;
+
+  Array.iter arr ~f:(fun x -> IntKeyDsu.remove ~key:x dsu) ;
+  Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 1 ;
+  Alcotest.(check int) "capacity" (IntKeyDsu.capacity dsu) 64
+
+
+  (* Test suite *)
 let tests =
   [ ("test_create", `Quick, test_create)
   ; ("test_add", `Quick, test_add)
@@ -143,6 +186,8 @@ let tests =
     , `Quick
     , test_union_non_existent_elements )
   ; ("test_union_existing_elements", `Quick, test_union_existing_elements)
+  ; ("test_remove", `Quick, test_remove)
+  ; ("test_deallocation", `Quick, test_deallocation)
   ]
 
 let () = run "dsu" [ ("dsu", tests) ]
