@@ -176,7 +176,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          , bool
          , 'max_proofs_verified
            Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
-         , (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.vec
+         , Import.Types.Digest.Constant.t
          , ( 'b
            , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
              , 'actual_proofs_verified )
@@ -205,9 +205,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          , bool
          , 'max_proofs_verified
            Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
-         , ( Limb_vector.Constant.Hex64.t
-           , Composition_types.Digest.Limbs.n )
-           Pickles_types.Vector.vec
+         , Import.Types.Digest.Constant.t
          , ( 'b
            , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
              , 'actual_proofs_verified )
@@ -1265,7 +1263,7 @@ module Make_adversarial_test (M : sig
        , bool
        , 'max_proofs_verified
          Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
-       , (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.vec
+       , Import.Types.Digest.Constant.t
        , ( 'b
          , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
            , 'actual_proofs_verified )
@@ -1294,9 +1292,7 @@ module Make_adversarial_test (M : sig
        , bool
        , 'max_proofs_verified
          Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
-       , ( Limb_vector.Constant.Hex64.t
-         , Composition_types.Digest.Limbs.n )
-         Pickles_types.Vector.vec
+       , Import.Types.Digest.Constant.t
        , ( 'b
          , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
            , 'actual_proofs_verified )

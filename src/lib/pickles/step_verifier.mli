@@ -122,9 +122,8 @@ val verify :
   -> lookup_parameters:
        ( Limb_vector.Challenge.Constant.t
        , Step_main_inputs.Impl.field Limb_vector.Challenge.t
-       , 'b Pickles_types.Hlist0.Id.t
-       , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-         Pickles_types.Hlist0.Id.t )
+       , 'b
+       , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t )
        Composition_types.Wrap.Lookup_parameters.t
        (* lookup arguments parameters *)
   -> feature_flags:Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.t
@@ -159,7 +158,6 @@ val verify :
          Composition_types.Bulletproof_challenge.t
        , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
        Pickles_types.Vector.t
-       Pickles_types.Hlist0.Id.t
      , Step_main_inputs.Impl.field Composition_types.Branch_data.Checked.t )
      Import.Types.Wrap.Statement.In_circuit.t
      (* statement *)
