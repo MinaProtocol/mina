@@ -27,6 +27,7 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
     { mutable arr : element array
     ; mutable next_id : int
     ; mutable key_to_id : int KeyMap.t
+    ; mutable deletion_height : int
     }
 
   let init_array =
@@ -37,14 +38,14 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
         } )
 
   let create () =
-    { arr = init_array min_capacity; next_id = 1; key_to_id = KeyMap.create () }
+    { arr = init_array min_capacity; next_id = 1; key_to_id = KeyMap.create (); deletion_height = 0 }
 
-  let rec find_set ~id arr =
-    let el = Array.get arr id in
+  let rec find_set ~id t =
+    let el = Array.get t.arr id in
     if id = el.parent then id
     else
-      let parent = find_set ~id:el.parent arr in
-      Array.set arr id { el with parent } ;
+      let parent = find_set ~id:el.parent t in
+      Array.set t.arr id { el with parent } ;
       parent
 
   let resize t = function
@@ -58,30 +59,46 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
         done ;
         t.arr <- new_arr
     | Half ->
-        (* remove all the 0 parents *)
+        printf "Filt: Key Map Size: %d\n" (KeyMap.length t.key_to_id);
         KeyMap.filter_inplace t.key_to_id ~f:(fun id ->
-            let { parent; _ } = t.arr.(id) in
+            let parent = find_set ~id t in
             parent <> 0 ) ;
+        (* print the size of key map now *)
+        printf "Key Map Size: %d\n, deletion height is %d, occupancy is %d\n" (KeyMap.length t.key_to_id)
+          t.deletion_height
+          (KeyMap.length t.key_to_id + 1);
+        print_endline "Deletion Height Reset";
         let dsu_size = Array.length t.arr in
+        t.deletion_height <- 0;
         let new_key_to_id = KeyMap.create () in
         let reallocation_size = dsu_size / 2 in
         let new_arr = init_array reallocation_size in
         let parent_tbl = Hashtbl.create (module Int) in
+        print_endline "creating new dsu";
         KeyMap.iteri t.key_to_id ~f:(fun ~key ~data ->
             let idx = KeyMap.length new_key_to_id + 1 in
+            print_endline "adding key";
             let element = Array.get t.arr data in
+            print_endline "adding element";
+            (* print the index and the reallocation_size*)
+            printf "Index: %d\n" idx;
+            printf "Reallocation Size: %d\n" reallocation_size;
             Array.set new_arr idx element ;
+            print_endline "setting new key to id";
             Hashtbl.set new_key_to_id ~key ~data:idx ;
             if element.size <> 0 then
               Hashtbl.set parent_tbl ~key:element.parent ~data:idx ) ;
+        print_endline "updating parents";
         (* loop through all the new keys in the hash tbl and replace the old parents with the new parent indexes*)
         Hashtbl.iteri parent_tbl ~f:(fun ~key ~data ->
             let element = Array.get new_arr data in
             Array.set new_arr data
               { element with parent = Hashtbl.find_exn parent_tbl key } ) ;
+        print_endline "updating parents done";
 
         t.arr <- new_arr ;
-        t.key_to_id <- new_key_to_id
+        t.key_to_id <- new_key_to_id;
+        printf "New Capacity: %d\n" (Array.length t.arr)
 
   let allocate_id t =
     if t.next_id = Array.length t.arr then resize t Double ;
@@ -92,8 +109,8 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
   let size ~id t = (Array.get t.arr id).size
 
   let union_sets t a b =
-    let a = find_set t.arr ~id:a in
-    let b = find_set t.arr ~id:b in
+    let a = find_set t ~id:a in
+    let b = find_set t ~id:b in
     let adopt_parent ~parent ~child =
       let child_el = Array.get t.arr child in
       let parent_el = Array.get t.arr parent in
@@ -113,16 +130,22 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
 
   let remove ~key t =
     Option.iter (Hashtbl.find_and_remove t.key_to_id key) ~f:(fun id ->
+        let parent = find_set ~id t in
+        let parent_el = Array.get t.arr parent in
         union_sets t id 0 ;
         (* the rest of the items will be updated when we lazily resize *)
-        let num_keys = KeyMap.length t.key_to_id in
+        t.deletion_height <- t.deletion_height + parent_el.size;
+        (* print deletion height *)
+        printf "Deletion Height: %d\n" t.deletion_height;
+        let num_keys = KeyMap.length t.key_to_id + 1 - t.deletion_height  in
+        printf "Num Keys: %d\n" num_keys;
         if
           Array.length t.arr > min_capacity && num_keys * 4 < Array.length t.arr
         then resize t Half )
 
   let get ~key t =
     let%bind.Option id = Hashtbl.find t.key_to_id key in
-    (Array.get t.arr @@ find_set ~id t.arr).value
+    (Array.get t.arr @@ find_set ~id t).value
 
   let union ~a ~b t =
     let a_set = Hashtbl.find t.key_to_id a in

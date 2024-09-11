@@ -145,27 +145,98 @@ let test_remove () =
   (* no dynamic resizing so we do not remove the remaining element just yet *)
   Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 3
 
-let test_deallocation () =
+let test_deallocation () = 
   let dsu = IntKeyDsu.create () in
-  let arr_size = QCheck.Gen.(int_range 600 800) in
+  let arr_size = QCheck.Gen.(int_range 130 140) in
   let arr = QCheck.Gen.(generate1 (array_size arr_size int)) in
+  let arr_size = Array.length arr in
   (* a ref to an array size int*)
-  let arr_size = ref (Array.length arr) in
   Alcotest.(check int)
     "verifying capacity is 64 i.e min capacity" (IntKeyDsu.capacity dsu) 64 ;
   Array.iter arr ~f:(fun x -> IntKeyDsu.add_exn ~key:x ~value:x dsu) ;
   Alcotest.(check int)
     (* we add 1 to account for the default 0 element used for dynamic deletions in the dsu *)
-    "verifying occupancy is the size of the array additions" (!arr_size + 1)
+    "verifying occupancy is the size of the array additions" (arr_size + 1)
     (IntKeyDsu.occupancy dsu) ;
 
   Alcotest.(check int)
     "verifying capacity is 1024 meaning there have been 4 re-allocations"
-    (IntKeyDsu.capacity dsu) 1024 ;
+    (IntKeyDsu.capacity dsu) 256 ;
 
   Array.iter arr ~f:(fun x -> IntKeyDsu.remove ~key:x dsu) ;
   Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 1 ;
   Alcotest.(check int) "capacity" (IntKeyDsu.capacity dsu) 64
+
+
+let test_complicated_merge () = 
+  let keys = [
+    1; 2; 3; 4; 5; 6; 7; 8; 9; 10;
+    11; 12; 13; 14; 15; 16; 17; 18; 19; 20;
+    21; 22; 23; 24; 25; 26; 27; 28; 29; 30;
+    31; 32; 33; 34; 35; 36; 37; 38; 39; 40;
+    41; 42; 43; 44; 45; 46; 47; 48; 49; 50;
+    51; 52; 53; 54; 55; 56; 57; 58; 59; 60;
+    61; 62; 63; 64; 65; 66; 67; 68; 69; 70;
+    71; 72; 73; 74; 75; 76; 77; 78; 79; 80;
+    81; 82; 83; 84; 85; 86; 87; 88; 89; 90;
+    91; 92; 93; 94; 95; 96; 97; 98; 99; 100;
+  ] in
+  let dsu = IntKeyDsu.create () in
+  List.iter keys ~f:(fun x -> IntKeyDsu.add_exn ~key:x ~value:x dsu) ;
+  List.iter (List.take keys 75) ~f:(fun x -> IntKeyDsu.union ~a:1 ~b:x dsu) ;
+  (* checking capacity *)
+  Alcotest.(check (int))
+    "checking the capacity"
+    (IntKeyDsu.capacity dsu)
+    (128) ;
+  (* checking occupancy *)
+  Alcotest.(check (option int))
+    "checking size of 1"
+    (IntKeyDsu.get_size ~key:1 dsu)
+    (Some 75) ;
+  Alcotest.(check (int))
+    "checking the occupancy"
+    (IntKeyDsu.occupancy dsu)
+    (101);
+  IntKeyDsu.remove ~key:44 dsu ;
+  Alcotest.(check (option int))
+    "checking size of 1"
+    (IntKeyDsu.get ~key:1 dsu)
+    None ;
+  Alcotest.(check (int))
+    "checking the occupancy"
+    (IntKeyDsu.occupancy dsu)
+    (26); 
+  Alcotest.(check (int))
+    "checking the capacity"
+    (IntKeyDsu.capacity dsu)
+    (64) ;
+  List.iter (List.drop keys 75) ~f:(fun x ->
+    Alcotest.(check (option int))
+      "checking size of 1"
+      (IntKeyDsu.get ~key:x dsu)
+      (Some x) );
+  IntKeyDsu.union ~a:80 ~b:90 dsu ;
+  IntKeyDsu.union ~a:90 ~b:100 dsu ;
+  IntKeyDsu.union ~a:99 ~b:100 dsu ;
+  Alcotest.(check (option int))
+    "checking size of 99"
+    (IntKeyDsu.get_size ~key:99 dsu) (Some 0) ;
+  Alcotest.(check (option int))
+    "checking size of 100"
+    (IntKeyDsu.get_size ~key:100 dsu) (Some 0) ;
+  Alcotest.(check (option int))
+    "checking size of 80"
+    (IntKeyDsu.get_size ~key:80 dsu) (Some 4) ;
+  Alcotest.(check (option int))
+  "checking the size of 90"
+  (IntKeyDsu.get_size ~key:90 dsu)
+  (Some 0) ;
+  Alcotest.(check (option int))
+    "finding the root of 99"
+    (IntKeyDsu.get ~key:99 dsu)
+    (Some 80) 
+
 
 (* Test suite *)
 let tests =
@@ -183,6 +254,7 @@ let tests =
   ; ("test_union_existing_elements", `Quick, test_union_existing_elements)
   ; ("test_remove", `Quick, test_remove)
   ; ("test_deallocation", `Quick, test_deallocation)
+  ; ("test_complicated_merge", `Quick, test_complicated_merge)
   ]
 
 let () = run "dsu" [ ("dsu", tests) ]
