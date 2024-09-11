@@ -15,7 +15,7 @@ let Pipeline = ./Pipeline/Dsl.dhall
 
 let Size = ./Command/Size.dhall
 
-let mode = env:BUILDKITE_PIPELINE_MODE as Text ? "PullRequest"
+let mode = env:BUILDKITE_PIPELINE_MODE as Text ? "Stable"
 
 let filter = env:BUILDKITE_PIPELINE_FILTER as Text ? "FastOnly"
 
