@@ -6,7 +6,6 @@ open Dsu
 module MockData : Data with type t = int = struct
   type t = int
 
-  let merge a b = a + b
 end
 
 (* Instantiate the DSU with int keys and mock data *)

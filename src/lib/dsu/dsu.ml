@@ -9,7 +9,6 @@ type resizing_opt = Double | Half
 module type Data = sig
   type t
 
-  val merge : t -> t -> t
 end
 
 (** DSU data structure with ability to remove sets fromt he structure.contents

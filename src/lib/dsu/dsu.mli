@@ -3,7 +3,6 @@ open Core_kernel
 module type Data = sig
   type t
 
-  val merge : t -> t -> t
 end
 
 (** DSU data structure with ability to remove sets from the structure.contents
