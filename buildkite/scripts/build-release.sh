@@ -4,7 +4,7 @@ set -eo pipefail
 
 ([ -z ${DUNE_PROFILE+x} ] || [ -z ${MINA_DEB_CODENAME+x} ]) && echo "required env vars were not provided" && exit 1
 
-source ~/.profile
+eval $(opam config env)
 
 ./buildkite/scripts/build-artifact.sh
 

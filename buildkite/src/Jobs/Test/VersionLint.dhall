@@ -44,29 +44,20 @@ let buildTestCmd
       ->  Command.build
             Command.Config::{
             , commands =
-                  [ Cmd.runInDocker
-                      Cmd.Docker::{
-                      , image =
-                          ( ../../Constants/ContainerImages.dhall
-                          ).minaToolchainBullseye
-                      }
-                      "buildkite/scripts/dump-mina-type-shapes.sh"
-                  ]
+                  RunInToolchain.runInToolchain
+                    ([] : List Text)
+                    "buildkite/scripts/dump-mina-type-shapes.sh"
                 # RunInToolchain.runInToolchain
                     ([] : List Text)
                     "buildkite/scripts/version-linter-patch-missing-type-shapes.sh ${release_branch}"
                 # [ Cmd.run
                       "gsutil cp *-type_shape.txt \$MINA_TYPE_SHAPE gs://mina-type-shapes"
-                  , Cmd.runInDocker
-                      Cmd.Docker::{
-                      , image =
-                          ( ../../Constants/ContainerImages.dhall
-                          ).minaToolchainBullseye
-                      }
-                      "buildkite/scripts/version-linter.sh ${release_branch}"
                   ]
-            , label = "Versioned type linter"
-            , key = "version-linter"
+                # RunInToolchain.runInToolchain
+                    ([] : List Text)
+                    "buildkite/scripts/version-linter.sh ${release_branch}"
+            , label = "Versioned type linter for ${release_branch}"
+            , key = "version-linter-${release_branch}"
             , target = cmd_target
             , docker = None Docker.Type
             , depends_on = dependsOn
