@@ -82,7 +82,11 @@ let test_union_existing_with_non_existent_element () =
   Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 2 ;
   (* verify the size of the existing element *)
   let element_size = IntKeyDsu.get_size ~key:1 dsu in
-  Alcotest.(check (option int)) "size" element_size (Some 0)
+  Alcotest.(check (option int)) "size" element_size (Some 1);
+  Alcotest.(check (option int))
+    "checking size of 2"
+    (IntKeyDsu.get_size ~key:2 dsu)
+    (None)
 
 let test_union_non_existent_elements () =
   let dsu = IntKeyDsu.create () in
@@ -101,25 +105,29 @@ let test_union_existing_elements () =
   IntKeyDsu.union ~a:1 ~b:2 dsu ;
   Alcotest.(check (option int))
     "checking size of 1"
+    (IntKeyDsu.get_size ~key:1 dsu)
+    (Some 2) ;
+  Alcotest.(check (option int))
+    "checking size of 2"
     (IntKeyDsu.get_size ~key:2 dsu)
-    (Some 1) ;
+    (Some 0) ;
   IntKeyDsu.union ~a:2 ~b:3 dsu ;
   Alcotest.(check (option int))
     "existent element 1" (IntKeyDsu.get ~key:1 dsu) (Some 1) ;
   Alcotest.(check (option int))
-    "existent element 2" (IntKeyDsu.get ~key:2 dsu) (Some 2) ;
+    "existent element 2" (IntKeyDsu.get ~key:2 dsu) (Some 1) ;
   Alcotest.(check (option int))
-    "existent element 3" (IntKeyDsu.get ~key:3 dsu) (Some 3) ;
+    "existent element 3" (IntKeyDsu.get ~key:3 dsu) (Some 1) ;
 
   Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 4 ;
   (* verify the size of the existing elements *)
   let element_size = IntKeyDsu.get_size ~key:1 dsu in
-  Alcotest.(check (option int)) "size 1" element_size (Some 1) ;
+  Alcotest.(check (option int)) "size 1" element_size (Some 3) ;
   let element_size = IntKeyDsu.get_size ~key:2 dsu in
   (* since 2 has a higher size than 3 we should merge 2 into 3 increasing the size to of 2 to 2 *)
-  Alcotest.(check (option int)) "size 2" element_size (Some 1) ;
+  Alcotest.(check (option int)) "size 2" element_size (Some 0) ;
   let element_size = IntKeyDsu.get_size ~key:3 dsu in
-  Alcotest.(check (option int)) "size 3" element_size (Some 1)
+  Alcotest.(check (option int)) "size 3" element_size (Some 0)
 
 (* Test suite *)
 let tests =

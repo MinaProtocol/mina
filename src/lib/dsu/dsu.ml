@@ -10,6 +10,7 @@ module type Data = sig
   type t
 
   val merge : t -> t -> t
+
 end
 
 (** DSU data structure with ability to remove sets fromt he structure.contents
@@ -92,20 +93,22 @@ module Dsu (Key : Hashtbl.Key) (D : Data) = struct
     let b = find_set t.arr ~id:b in
     let adopt_parent ~parent ~child =
       let child_el = Array.get t.arr child in
-      Array.set t.arr child { child_el with parent } ;
+      let parent_el = Array.get t.arr parent in
+      let child_set_size = child_el.size in
+      Array.set t.arr child { child_el with parent; size = 0 } ;
       Array.set t.arr parent
-        { (Array.get t.arr parent) with
-          size = (Array.get t.arr parent).size + child_el.size
+        { parent_el with
+          size = parent_el.size + child_set_size
         }
     in
     if a <> b then
-      if size ~id:a t < size ~id:b t then adopt_parent ~parent:a ~child:b
-      else adopt_parent ~parent:b ~child:a
+      if size ~id:a t < size ~id:b t then adopt_parent ~parent:b ~child:a
+      else adopt_parent ~parent:a ~child:b
 
   let add_exn ~key ~value t =
     let id = allocate_id t in
     Hashtbl.add_exn ~key ~data:id t.key_to_id ;
-    Array.set t.arr id { value = Some value; parent = id; size = 0 } ;
+    Array.set t.arr id { value = Some value; parent = id; size = 1 } ;
     t.occupancy <- t.occupancy + 1
 
   let remove ~key t =
