@@ -33,9 +33,10 @@ if [ -z "$DEBS" ]; then
 else
   debs=(${DEBS//,/ })
   for i in "${debs[@]}"; do
+    echo $i
     case $i in
       mina-devnet|mina-mainnet|mina-devnet-lightnet)
-        # Downaload mina-logproc too
+        # Download mina-logproc too
         source ./buildkite/scripts/download-artifact-from-cache.sh "mina-logproc*" $MINA_DEB_CODENAME/_build "" $LOCAL_DEB_FOLDER
       ;;
       mina-create-legacy-genesis)

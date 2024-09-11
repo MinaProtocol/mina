@@ -25,10 +25,18 @@ function checkout_and_dump() {
     dune exec src/app/cli/src/mina.exe internal dump-type-shapes > ${__commit:0:7}-type-shapes.txt
 }
 
+function revert_checkout() {
+    git checkout $BUILDKITE_COMMIT
+    git submodule sync
+    git submodule update --init --recursive
+}
+
 if ! $(gsutil ls gs://mina-type-shapes/$BUILDKITE_COMMIT 2>/dev/null); then
     checkout_and_dump $BUILDKITE_COMMIT
+    revert_checkout
 fi
 
 if ! $(gsutil ls gs://mina-type-shapes/$RELEASE_BRANCH_COMMIT 2>/dev/null); then
     checkout_and_dump $RELEASE_BRANCH_COMMIT
+    revert_checkout
 fi
