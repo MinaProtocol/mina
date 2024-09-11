@@ -1,3 +1,6 @@
+open Core_kernel
+include List
+
 module Length = struct
   type 'a t = ('a list, int) Sigs.predicate2
 

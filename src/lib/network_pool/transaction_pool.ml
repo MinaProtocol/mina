@@ -1653,8 +1653,10 @@ let%test_module _ =
 
     let proof_level = precomputed_values.proof_level
 
+    let genesis_constants = precomputed_values.genesis_constants
+
     let minimum_fee =
-      Currency.Fee.to_nanomina_int Currency.Fee.minimum_user_command_fee
+      Currency.Fee.to_nanomina_int genesis_constants.minimum_user_command_fee
 
     let logger = Logger.create ()
 
@@ -1675,7 +1677,6 @@ let%test_module _ =
     let dummy_state_view =
       let state_body =
         let consensus_constants =
-          let genesis_constants = Genesis_constants.for_unit_tests in
           Consensus.Constants.create ~constraint_constants
             ~protocol_constants:genesis_constants.protocol
         in
@@ -1915,7 +1916,7 @@ let%test_module _ =
       let trust_system = Trust_system.null () in
       let config =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
-          ~genesis_constants:Genesis_constants.compiled ~slot_tx_end
+          ~genesis_constants ~slot_tx_end
       in
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
@@ -2044,7 +2045,8 @@ let%test_module _ =
         }
       in
       let zkapp_command =
-        Transaction_snark.For_tests.multiple_transfers test_spec
+        Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+          test_spec
       in
       let zkapp_command =
         Or_error.ok_exn
@@ -2102,7 +2104,8 @@ let%test_module _ =
             let%map (zkapp_command : Zkapp_command.t) =
               Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
                 ~max_token_updates:1 ~keymap ~account_state_tbl
-                ~fee_payer_keypair ~ledger:best_tip_ledger ()
+                ~fee_payer_keypair ~ledger:best_tip_ledger ~constraint_constants
+                ~genesis_constants ()
             in
             let zkapp_command =
               { zkapp_command with

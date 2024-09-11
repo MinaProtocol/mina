@@ -192,6 +192,7 @@ TL;DR:
 ```
 nix develop mina#impure
 opam init --bare
+opam repository add --yes --all --set-default o1-labs https://github.com/o1-labs/opam-repository.git
 opam update
 opam switch import src/opam.export --strict
 eval $(opam env)

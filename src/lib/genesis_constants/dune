@@ -13,6 +13,8 @@
    sexplib0
    integers
    ;; local libraries
+   mina_node_config.intf
+   mina_node_config.for_unit_tests
    mina_node_config
    mina_wire_types
    unsigned_extended
@@ -21,7 +23,6 @@
    currency
    blake2
    data_hash_lib
-   mina_compile_config
    pickles.backend
    snark_keys_header
    kimchi_pasta
