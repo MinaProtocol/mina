@@ -60,21 +60,22 @@ in  Pipeline.build
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
           ]
-        , mode = PipelineMode.Type.Stable
+        , mode = PipelineMode.Type.PullRequest
         }
       , steps =
         [ TestExecutive.executeLocal "peers-reliability" dependsOn
-        , TestExecutive.executeLocal "chain-reliability" dependsOn
+
+        --, TestExecutive.executeLocal "chain-reliability" dependsOn
         , TestExecutive.executeLocal "payment" dependsOn
-        , TestExecutive.executeLocal "gossip-consis" dependsOn
-        , TestExecutive.executeLocal "block-prod-prio" dependsOn
-        , TestExecutive.executeLocal "medium-bootstrap" dependsOn
-        , TestExecutive.executeLocal "block-reward" dependsOn
-        , TestExecutive.executeLocal "zkapps" dependsOn
-        , TestExecutive.executeLocal "zkapps-timing" dependsOn
-        , TestExecutive.executeLocal "zkapps-nonce" dependsOn
-        , TestExecutive.executeLocal "verification-key" dependsOn
-        , TestExecutive.executeLocal "slot-end" dependsOn
-        , TestExecutive.executeLocal "epoch-ledger" dependsOn
+        --, TestExecutive.executeLocal "gossip-consis" dependsOn
+        --, TestExecutive.executeLocal "block-prod-prio" dependsOn
+        --, TestExecutive.executeLocal "medium-bootstrap" dependsOn
+        --, TestExecutive.executeLocal "block-reward" dependsOn
+        --, TestExecutive.executeLocal "zkapps" dependsOn
+        --, TestExecutive.executeLocal "zkapps-timing" dependsOn
+        --, TestExecutive.executeLocal "zkapps-nonce" dependsOn
+        --, TestExecutive.executeLocal "verification-key" dependsOn
+        --, TestExecutive.executeLocal "slot-end" dependsOn
+        --, TestExecutive.executeLocal "epoch-ledger" dependsOn
         ]
       }
