@@ -23,7 +23,7 @@ let dependsOn =
           Dockers.Type.Bullseye
           Network.Type.Devnet
           Profiles.Type.Standard
-          Artifacts.Type.Rosetta
+          Artifacts.Type.Daemon
       # Dockers.dependsOn
           Dockers.Type.Bullseye
           Network.Type.Devnet

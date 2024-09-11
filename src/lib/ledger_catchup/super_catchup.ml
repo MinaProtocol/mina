@@ -1081,13 +1081,13 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
        Strict_pipe.Writer.t ) =
   let open Context in
   let t =
-    match Transition_frontier.catchup_tree frontier with
+    match Transition_frontier.catchup_state frontier with
     | Full t ->
         t
     | Hash _ ->
         failwith
           "If super catchup is running, the frontier should have a full \
-           catchup tree"
+           catchup state"
   in
   let stop = Transition_frontier.closed frontier in
   upon stop (fun () -> tear_down t) ;
@@ -1816,26 +1816,27 @@ let%test_module "Ledger_catchup tests" =
                   | `Success _ ->
                       failwith "final state should be at `Failed"
                   | `Failed ->
-                      let catchup_tree =
+                      let catchup_state =
                         match
-                          Transition_frontier.catchup_tree my_net.state.frontier
+                          Transition_frontier.catchup_state
+                            my_net.state.frontier
                         with
                         | Full tr ->
                             tr
                         | Hash _ ->
                             failwith
-                              "in super catchup unit tests, the catchup tree \
+                              "in super catchup unit tests, the catchup state \
                                should always be Full_catchup_tree, but it is \
                                Catchup_hash_tree for some reason"
                       in
-                      let catchup_tree_node_list =
-                        State_hash.Table.data catchup_tree.nodes
+                      let catchup_state_node_list =
+                        State_hash.Table.data catchup_state.nodes
                       in
-                      let catchup_tree_node =
-                        List.hd_exn catchup_tree_node_list
+                      let catchup_state_node =
+                        List.hd_exn catchup_state_node_list
                       in
                       let num_attempts =
-                        Peer.Map.length catchup_tree_node.attempts
+                        Peer.Map.length catchup_state_node.attempts
                       in
                       if num_attempts < 2 then
                         let failstring =
@@ -1845,317 +1846,8 @@ let%test_module "Ledger_catchup tests" =
                              attempts= %d.  length of catchup_tree_node_list= \
                              %d"
                             num_attempts
-                            (List.length catchup_tree_node_list)
+                            (List.length catchup_state_node_list)
                         in
                         failwith failstring
                       else () ) ) )
-
-    (* let%test_unit "when initial validation of a blocks fails (except for the \
-                    verifier_unreachable case), then catchup will cancel the \
-                    block's children's catchup job" =
-       Quickcheck.test ~trials:1
-         Fake_network.Generator.(
-           gen ~precomputed_values ~verifier ~max_frontier_length
-             ~use_super_catchup
-             [ fresh_peer
-             ; broken_rpc_peer_branch
-                 ~frontier_branch_size:(max_frontier_length / 2)
-                 ~get_transition_chain_impl_option:None
-               (* TODO: write some kind of mock that makes validation fail, and thus make the test pass *)
-             ])
-         ~f:(fun network ->
-           let open Fake_network in
-           let [ my_net; peer_net ] = network.peer_networks in
-           let target_best_tip_path =
-             Transition_frontier.best_tip_path peer_net.state.frontier
-           in
-           let open Fake_network in
-           let target_breadcrumb_child = List.last_exn target_best_tip_path in
-           let target_breadcrumb_child_hash =
-             Transition_frontier.Breadcrumb.state_hash target_breadcrumb_child
-           in
-           let target_breadcrumb_parent =
-             List.nth_exn target_best_tip_path
-               (List.length target_best_tip_path - 2)
-           in
-           let test =
-             setup_catchup_pipes ~network:my_net.network
-               ~frontier:my_net.state.frontier
-           in
-           let parent_hash =
-             Transition_frontier.Breadcrumb.parent_hash target_breadcrumb_parent
-           in
-           let target_transition_parent =
-             Transition_handler.Unprocessed_transition_cache.register_exn
-               test.cache
-               (downcast_breadcrumb target_breadcrumb_parent)
-           in
-           let target_transition_child =
-             Transition_handler.Unprocessed_transition_cache.register_exn
-               test.cache
-               (downcast_breadcrumb target_breadcrumb_child)
-           in
-           [%log info] "validation fails unit test" ;
-           Strict_pipe.Writer.write test.job_writer
-             ( parent_hash
-             , [ Rose_tree.T
-                   ( target_transition_parent
-                   , [ Rose_tree.T (target_transition_child, []) ] )
-               ] ) ;
-           Thread_safe.block_on_async_exn (fun () ->
-               let final =
-                 Cache_lib.Cached.final_state target_transition_parent
-               in
-               match%map
-                 Deferred.any
-                   [ (Ivar.read final >>| fun x -> `Catchup_failed x)
-                   ; Strict_pipe.Reader.read test.breadcrumbs_reader
-                     >>| const `Catchup_success
-                   ]
-               with
-               | `Catchup_success ->
-                   [%log info]
-                     "validation fails unit test: somehow incorrectly succeeded" ;
-
-                   failwith
-                     "target transition should've been invalidated with a \
-                      failure"
-               | `Catchup_failed fnl -> (
-                   match fnl with
-                   | `Success _ ->
-                       [%log info]
-                         "validation fails unit test: somehow incorrectly \
-                          succeeded" ;
-                       failwith "final state should be at `Failed"
-                   | `Failed ->
-                       [%log info]
-                         "validation fails unit test: correctly failed, running \
-                          checks" ;
-
-                       let catchup_tree =
-                         match
-                           Transition_frontier.catchup_tree my_net.state.frontier
-                         with
-                         | Full tr ->
-                             tr
-                         | Hash _ ->
-                             failwith
-                               "in super catchup unit tests, the catchup tree \
-                                should always be Full_catchup_tree, but it is \
-                                Catchup_hash_tree for some reason"
-                       in
-                       let catchup_tree_node_list =
-                         State_hash.Table.data catchup_tree.nodes
-                       in
-                       List.iter catchup_tree_node_list ~f:(fun catchup_node ->
-                           let hash = catchup_node.state_hash in
-                           if
-                             Marlin_plonk_bindings_pasta_fp.equal hash
-                               target_breadcrumb_child_hash
-                           then
-                             failwith
-                               "the catchup job associated with \
-                                target_breadcrumb_child_hash should have been \
-                                cancelled and thus removed from the catchup \
-                                tree, but it is still here"
-                           else ()) ))) *)
-
-    (* let%test_unit "when verification of a blocks fails, catchup will cancel \
-                    its children's catchup job and remove the failed-to-verify \
-                    block from the cache" =
-       Quickcheck.test ~trials:1
-         Fake_network.Generator.(
-           gen ~precomputed_values ~verifier ~max_frontier_length
-             ~use_super_catchup
-             [ fresh_peer
-             ; broken_rpc_peer_branch
-                 ~frontier_branch_size:(max_frontier_length / 2)
-                 ~get_transition_chain_impl_option:None
-               (* TODO: write some kind of mock that makes verification fail, and thus make the test pass *)
-             ])
-         ~f:(fun network ->
-           let open Fake_network in
-           let [ my_net; peer_net ] = network.peer_networks in
-           let target_best_tip_path =
-             Transition_frontier.best_tip_path peer_net.state.frontier
-           in
-           let open Fake_network in
-           let target_breadcrumb_child = List.last_exn target_best_tip_path in
-           let target_breadcrumb_child_hash =
-             Transition_frontier.Breadcrumb.state_hash target_breadcrumb_child
-           in
-           let target_breadcrumb_parent =
-             List.nth_exn target_best_tip_path
-               (List.length target_best_tip_path - 2)
-           in
-           let test =
-             setup_catchup_pipes ~network:my_net.network
-               ~frontier:my_net.state.frontier
-           in
-           let parent_hash =
-             Transition_frontier.Breadcrumb.parent_hash target_breadcrumb_parent
-           in
-           let target_transition_parent =
-             Transition_handler.Unprocessed_transition_cache.register_exn
-               test.cache
-               (downcast_breadcrumb target_breadcrumb_parent)
-           in
-           let target_transition_child =
-             Transition_handler.Unprocessed_transition_cache.register_exn
-               test.cache
-               (downcast_breadcrumb target_breadcrumb_child)
-           in
-           Strict_pipe.Writer.write test.job_writer
-             ( parent_hash
-             , [ Rose_tree.T
-                   ( target_transition_parent
-                   , [ Rose_tree.T (target_transition_child, []) ] )
-               ] ) ;
-           Thread_safe.block_on_async_exn (fun () ->
-               let final =
-                 Cache_lib.Cached.final_state target_transition_parent
-               in
-               match%map
-                 Deferred.any
-                   [ (Ivar.read final >>| fun x -> `Catchup_failed x)
-                   ; Strict_pipe.Reader.read test.breadcrumbs_reader
-                     >>| const `Catchup_success
-                   ]
-               with
-               | `Catchup_success ->
-                   failwith
-                     "target transition should've been invalidated with a \
-                      failure"
-               | `Catchup_failed fnl -> (
-                   match fnl with
-                   | `Success _ ->
-                       failwith "final state should be at `Failed"
-                   | `Failed ->
-                       let catchup_tree =
-                         match
-                           Transition_frontier.catchup_tree my_net.state.frontier
-                         with
-                         | Full tr ->
-                             tr
-                         | Hash _ ->
-                             failwith
-                               "in super catchup unit tests, the catchup tree \
-                                should always be Full_catchup_tree, but it is \
-                                Catchup_hash_tree for some reason"
-                       in
-                       let catchup_tree_node_list =
-                         State_hash.Table.data catchup_tree.nodes
-                       in
-                       List.iter catchup_tree_node_list ~f:(fun catchup_node ->
-                           let hash = catchup_node.state_hash in
-                           if
-                             Marlin_plonk_bindings_pasta_fp.equal hash
-                               target_breadcrumb_child_hash
-                           then
-                             failwith
-                               "the catchup job associated with \
-                                target_breadcrumb_child_hash should have been \
-                                cancelled and thus removed from the catchup \
-                                tree, but it is still here"
-                           else ()) ))) *)
-
-    (* let%test_unit "when building a breadcrumb fails, catchup will cancel its \
-                    children's catchup job and remove the failed-to-build block \
-                    from the cache" =
-       Quickcheck.test ~trials:1
-         Fake_network.Generator.(
-           gen ~precomputed_values ~verifier ~max_frontier_length
-             ~use_super_catchup
-             [ fresh_peer
-             ; broken_rpc_peer_branch
-                 ~frontier_branch_size:(max_frontier_length / 2)
-                 ~get_transition_chain_impl_option:None
-             ])
-         ~f:(fun network ->
-           let open Fake_network in
-           let [ my_net; peer_net ] = network.peer_networks in
-           let target_best_tip_path =
-             Transition_frontier.best_tip_path peer_net.state.frontier
-           in
-           let open Fake_network in
-           let target_breadcrumb_child = List.last_exn target_best_tip_path in
-           let target_breadcrumb_child_hash =
-             Transition_frontier.Breadcrumb.state_hash target_breadcrumb_child
-           in
-           let target_breadcrumb_parent =
-             List.nth_exn target_best_tip_path
-               (List.length target_best_tip_path - 2)
-           in
-           let test =
-             setup_catchup_pipes ~network:my_net.network
-               ~frontier:my_net.state.frontier
-             (* setup_catchup_pipes_fail_build_breadcrumb ~network:my_net.network
-               ~frontier:my_net.state.frontier *)
-           in
-           let parent_hash =
-             Transition_frontier.Breadcrumb.parent_hash target_breadcrumb_parent
-           in
-           let target_transition_parent =
-             Transition_handler.Unprocessed_transition_cache.register_exn
-               test.cache
-               (downcast_breadcrumb target_breadcrumb_parent)
-           in
-           let target_transition_child =
-             Transition_handler.Unprocessed_transition_cache.register_exn
-               test.cache
-               (downcast_breadcrumb target_breadcrumb_child)
-           in
-           Strict_pipe.Writer.write test.job_writer
-             ( parent_hash
-             , [ Rose_tree.T
-                   ( target_transition_parent
-                   , [ Rose_tree.T (target_transition_child, []) ] )
-               ] ) ;
-           Thread_safe.block_on_async_exn (fun () ->
-               let final =
-                 Cache_lib.Cached.final_state target_transition_parent
-               in
-               match%map
-                 Deferred.any
-                   [ (Ivar.read final >>| fun x -> `Catchup_failed x)
-                   ; Strict_pipe.Reader.read test.breadcrumbs_reader
-                     >>| const `Catchup_success
-                   ]
-               with
-               | `Catchup_success ->
-                   failwith
-                     "target transition should've been invalidated with a \
-                      failure"
-               | `Catchup_failed fnl -> (
-                   match fnl with
-                   | `Success _ ->
-                       failwith "final state should be at `Failed"
-                   | `Failed ->
-                       let catchup_tree =
-                         match
-                           Transition_frontier.catchup_tree my_net.state.frontier
-                         with
-                         | Full tr ->
-                             tr
-                         | Hash _ ->
-                             failwith
-                               "in super catchup unit tests, the catchup tree \
-                                should always be Full_catchup_tree, but it is \
-                                Catchup_hash_tree for some reason"
-                       in
-                       let catchup_tree_node_list =
-                         State_hash.Table.data catchup_tree.nodes
-                       in
-                       List.iter catchup_tree_node_list ~f:(fun catchup_node ->
-                           let hash = catchup_node.state_hash in
-                           if
-                             Marlin_plonk_bindings_pasta_fp.equal hash
-                               target_breadcrumb_child_hash
-                           then
-                             failwith
-                               "the catchup job associated with \
-                                target_breadcrumb_child_hash should have been \
-                                cancelled and thus removed from the catchup \
-                                tree, but it is still here"
-                           else ()) ))) *)
   end )

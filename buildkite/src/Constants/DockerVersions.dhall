@@ -45,9 +45,7 @@ let dependsOn =
 
           in  merge
                 { Bookworm =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      docker}${network}${profileSuffix}"
+                  [ { name = "${prefix}${capitalName docker}${profileSuffix}"
                     , key = key
                     }
                   ]
