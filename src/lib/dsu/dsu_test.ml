@@ -129,8 +129,7 @@ let test_union_existing_elements () =
   let element_size = IntKeyDsu.get_size ~key:3 dsu in
   Alcotest.(check (option int)) "size 3" element_size (Some 0)
 
-let test_remove () = ()
-  (*
+let test_remove () = 
   let dsu = IntKeyDsu.create () in
   IntKeyDsu.add_exn ~key:1 ~value:1 dsu ;
   IntKeyDsu.add_exn ~key:2 ~value:2 dsu ;
@@ -146,7 +145,6 @@ let test_remove () = ()
     "existent element 3" (IntKeyDsu.get ~key:3 dsu) None ;
   (* no dynamic resizing so we do not remove the remaining element just yet *)
   Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 3
-  *)
 
 let test_deallocation () =
   let dsu = IntKeyDsu.create () in
