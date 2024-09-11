@@ -9,6 +9,7 @@ fi
 
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
+TESTNET_NAME=devnet
 
 sudo apt-get update
 sudo apt-get install -y git apt-transport-https ca-certificates tzdata curl python3 python3-pip wget
