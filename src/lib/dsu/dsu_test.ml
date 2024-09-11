@@ -82,11 +82,11 @@ let test_union_existing_with_non_existent_element () =
   Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 2 ;
   (* verify the size of the existing element *)
   let element_size = IntKeyDsu.get_size ~key:1 dsu in
-  Alcotest.(check (option int)) "size" element_size (Some 1);
+  Alcotest.(check (option int)) "size" element_size (Some 1) ;
   Alcotest.(check (option int))
     "checking size of 2"
     (IntKeyDsu.get_size ~key:2 dsu)
-    (None)
+    None
 
 let test_union_non_existent_elements () =
   let dsu = IntKeyDsu.create () in
@@ -129,7 +129,7 @@ let test_union_existing_elements () =
   let element_size = IntKeyDsu.get_size ~key:3 dsu in
   Alcotest.(check (option int)) "size 3" element_size (Some 0)
 
-let test_remove () = 
+let test_remove () =
   let dsu = IntKeyDsu.create () in
   IntKeyDsu.add_exn ~key:1 ~value:1 dsu ;
   IntKeyDsu.add_exn ~key:2 ~value:2 dsu ;
@@ -154,8 +154,7 @@ let test_deallocation () =
   let arr_size = ref (Array.length arr) in
   Alcotest.(check int)
     "verifying capacity is 64 i.e min capacity" (IntKeyDsu.capacity dsu) 64 ;
-  Array.iter arr ~f:(fun x ->
-          IntKeyDsu.add_exn ~key:x ~value:x dsu ) ;
+  Array.iter arr ~f:(fun x -> IntKeyDsu.add_exn ~key:x ~value:x dsu) ;
   Alcotest.(check int)
     (* we add 1 to account for the default 0 element used for dynamic deletions in the dsu *)
     "verifying occupancy is the size of the array additions" (!arr_size + 1)
@@ -163,14 +162,13 @@ let test_deallocation () =
 
   Alcotest.(check int)
     "verifying capacity is 1024 meaning there have been 4 re-allocations"
-    (IntKeyDsu.capacity dsu) 128;
+    (IntKeyDsu.capacity dsu) 128 ;
 
   Array.iter arr ~f:(fun x -> IntKeyDsu.remove ~key:x dsu) ;
   Alcotest.(check int) "occupancy" (IntKeyDsu.occupancy dsu) 1 ;
   Alcotest.(check int) "capacity" (IntKeyDsu.capacity dsu) 64
 
-
-  (* Test suite *)
+(* Test suite *)
 let tests =
   [ ("test_create", `Quick, test_create)
   ; ("test_add", `Quick, test_add)
