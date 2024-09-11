@@ -154,7 +154,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     ~origin_sender_secret_key_path
     ~(origin_sender_secret_key_pw_option : string option)
     ~returner_secret_key_path ~(returner_secret_key_pw_option : string option)
-    ~graphql_target_node_option () =
+    ~graphql_target_node_option ~minimum_user_command_fee () =
   let open Deferred.Let_syntax in
   (* define the rate limiting function *)
   let open Logger in
@@ -201,7 +201,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
         Currency.Amount.to_fee
           (Option.value_exn
              (Currency.Amount.scale
-                (Currency.Amount.of_fee Mina_base.Signed_command.minimum_fee)
+                (Currency.Amount.of_fee minimum_user_command_fee)
                 10 ) )
     | Some f ->
         Currency.Amount.to_fee (Currency.Amount.of_mina_string_exn f)
@@ -310,6 +310,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   return ()
 
 let output_there_and_back_cmds =
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
   let open Command.Let_syntax in
   Command.async
     ~summary:
@@ -394,12 +395,20 @@ let output_there_and_back_cmds =
            "URL The graphql node to send graphl commands to.  must be in \
             format `<ip>:<port>`.  default is `127.0.0.1:3085`"
          (optional string)
+     and minimum_user_command_fee =
+       let default =
+         Currency.Fee.of_mina_string_exn
+           Mina_compile_config.default_transaction_fee_string
+       in
+       Cli_lib.Flag.fee_common
+         ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
+         ~default_transaction_fee:default
      in
      there_and_back_again ~num_txn_per_acct ~txns_per_block ~txn_fee_option
        ~slot_time ~fill_rate ~rate_limit ~rate_limit_level ~rate_limit_interval
        ~origin_sender_secret_key_path ~origin_sender_secret_key_pw_option
        ~returner_secret_key_path ~returner_secret_key_pw_option
-       ~graphql_target_node_option )
+       ~graphql_target_node_option ~minimum_user_command_fee )
 
 let () =
   Command.run

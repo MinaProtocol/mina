@@ -286,12 +286,6 @@ module type Full = sig
 
     include Codable.S with type t := t
 
-    val minimum_user_command_fee : t
-
-    val default_transaction_fee : t
-
-    val default_snark_worker_fee : t
-
     (* TODO: Get rid of signed fee, use signed amount *)
     module Signed :
       Signed_intf

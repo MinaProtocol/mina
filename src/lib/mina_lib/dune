@@ -25,7 +25,6 @@
    transition_chain_prover
    best_tip_prover
    proof_carrying_data
-   mina_compile_config
    mina_runtime_config
    ledger_proof
    mina_net2

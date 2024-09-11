@@ -34,6 +34,7 @@ let logger_setup log_json log_level =
           ; pretty_print = true
           }
   in
-  Logger.Consumer_registry.register ~id:"default"
-    ~processor:stdout_log_processor
+  Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+    ~id:"default" ~processor:stdout_log_processor
     ~transport:(Logger.Transport.stdout ())
+    ()

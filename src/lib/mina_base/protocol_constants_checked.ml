@@ -143,7 +143,7 @@ let var_to_input
     |]
 
 let%test_unit "value = var" =
-  let compiled = Genesis_constants.for_unit_tests.protocol in
+  let compiled = Genesis_constants.For_unit_tests.t.protocol in
   let test protocol_constants =
     let open Snarky_backendless in
     let p_var =
