@@ -9,7 +9,6 @@ fi
 
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
-TESTNET_NAME=devnet
 
 sudo apt-get update
 sudo apt-get install -y git apt-transport-https ca-certificates tzdata curl python3 python3-pip wget
@@ -36,7 +35,7 @@ fi
 echo "--- Run Python version linter with branches: ${pr_branch} ${base_branch} ${release_branch}"
 ./scripts/version-linter.py ${pr_branch} ${base_branch} ${release_branch}
 
-source buildkite/scripts/debian/install.sh "mina-${TESTNET_NAME}" 1
+source buildkite/scripts/debian/install.sh "mina-devnet" 1
 
 echo "--- Audit type shapes"
 mina internal audit-type-shapes
