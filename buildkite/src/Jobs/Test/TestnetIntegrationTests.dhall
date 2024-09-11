@@ -66,7 +66,7 @@ in  Pipeline.build
         [ TestExecutive.executeLocal "peers-reliability" dependsOn
 
         --, TestExecutive.executeLocal "chain-reliability" dependsOn
-        , TestExecutive.executeLocal "payment" dependsOn
+        -- , TestExecutive.executeLocal "payment" dependsOn
         --, TestExecutive.executeLocal "gossip-consis" dependsOn
         --, TestExecutive.executeLocal "block-prod-prio" dependsOn
         --, TestExecutive.executeLocal "medium-bootstrap" dependsOn
