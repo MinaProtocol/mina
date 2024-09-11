@@ -2,10 +2,23 @@ open Core_kernel
 open Currency
 
 module Test_inputs = struct
-  module Transaction_witness = Int
   module Ledger_hash = Int
   module Sparse_ledger = Int
-  module Transaction = Int
+
+  module Transaction = struct
+    include Int
+
+    (* TODO write test & adapt this function accordingly *)
+    let is_user_transaction (_ : t) = false
+  end
+
+  module Transaction_witness = struct
+    include Int
+
+    (* TODO write test & adapt this function accordingly *)
+    let transaction : t -> Transaction.t = Fun.id
+  end
+
   module Ledger_proof_statement = Fee
 
   module Transaction_protocol_state = struct
@@ -90,7 +103,13 @@ module Implementation_inputs = struct
   module Ledger_hash = Ledger_hash
   module Sparse_ledger = Mina_ledger.Sparse_ledger
   module Transaction = Transaction
-  module Transaction_witness = Transaction_witness
+
+  module Transaction_witness = struct
+    include Transaction_witness
+
+    let transaction t = t.transaction
+  end
+
   module Ledger_proof = Ledger_proof
   module Transaction_snark_work = Transaction_snark_work
   module Snark_pool = Network_pool.Snark_pool

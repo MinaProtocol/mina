@@ -192,3 +192,9 @@ let yojson_summary_with_status cmd_with_status =
   match yojson_summary (With_status.data cmd_with_status) with
   | `List lst ->
       `List (lst @ [ status ])
+
+let is_user_transaction : t -> bool = function
+  | Command (Signed_command _) ->
+      true
+  | Command (Zkapp_command _) | Fee_transfer _ | Coinbase _ ->
+      false

@@ -12,10 +12,14 @@ module type Inputs_intf = sig
 
   module Transaction : sig
     type t
+
+    val is_user_transaction : t -> bool
   end
 
   module Transaction_witness : sig
     type t
+
+    val transaction : t -> Transaction.t
   end
 
   module Ledger_proof : sig

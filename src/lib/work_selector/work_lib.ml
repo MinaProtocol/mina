@@ -160,6 +160,39 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     | Some fee ->
         expensive_work all_todo_statements ~fee
 
-  let pending_user_work_statements ~snark_pool:_ ~fee_opt:_ _ =
-    failwith "pending_user_work_statement"
+  (* Seen/Unseen transfer jobs that are not in the snark pool yet *)
+  let pending_user_work_statements ~snark_pool ~fee_opt (state : State.t) =
+    let work_filter (witness : Inputs.Transaction_witness.t option) =
+      match witness with
+      | None ->
+          false
+      | Some witness ->
+          Inputs.Transaction.is_user_transaction
+            (Inputs.Transaction_witness.transaction witness)
+    in
+    (* statement is for filtering the fees, witness is for filtering job type *)
+    let all_todo_statements_and_witnesses =
+      List.map state.available_jobs
+        ~f:(One_or_two.map ~f:(fun w -> Work_spec.(statement w, witness w)))
+    in
+    let expensive_work statements_and_witnesses ~fee =
+      List.filter_map statements_and_witnesses ~f:(function
+        | `One (statement, witness) ->
+            if
+              work_filter witness
+              && does_not_have_better_fee ~snark_pool ~fee (`One statement)
+            then Some (`One statement)
+            else None
+        (* This is a merge proof so not a transfer: we filter out *)
+        | `Two _ ->
+            None )
+    in
+    (* Return only the statements for jobs with correct fees that are a
+       transfer *)
+    match fee_opt with
+    | None ->
+        all_pending_work ~snark_pool
+          (List.map ~f:(One_or_two.map ~f:fst) all_todo_statements_and_witnesses)
+    | Some fee ->
+        expensive_work all_todo_statements_and_witnesses ~fee
 end
