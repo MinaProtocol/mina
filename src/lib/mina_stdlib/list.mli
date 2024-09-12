@@ -7,6 +7,10 @@ module Length : sig
    *)
   val equal : 'a t
 
+  (** [unequal l len] returns [true] if [List.length l <> len], [false] otherwise.
+   *)
+  val unequal : 'a t
+
   (** [gte l len] returns [true] if [List.length l >= len], [false]
     otherwise.
    *)
@@ -29,24 +33,24 @@ module Length : sig
 
   (** {2 Infix comparison operators} *)
 
-  (** [Compare] contains infix aliases for functions of {!module:Length} *)
+  (** [Compare] contains infix aliases for functions of {!module:Length}. *)
   module Compare : sig
-    (** [( = )] is [equal] *)
+    (** [( = )] is {!val:equal}. *)
     val ( = ) : 'a t
 
-    (** [( <> )] is [unequal] *)
+    (** [( <> )] is {!val:unequal}. *)
     val ( <> ) : 'a t
 
-    (** [( >= )] is [gte] *)
+    (** [( >= )] is {!val:gte}. *)
     val ( >= ) : 'a t
 
-    (** [l > len] is [gt] *)
+    (** [l > len] is {!val:gt}. *)
     val ( > ) : 'a t
 
-    (** [( <= )] is [lte] *)
+    (** [( <= )] is {!val:lte}. *)
     val ( <= ) : 'a t
 
-    (** [l < len] is [lt] *)
+    (** [l < len] is {!val:lt}. *)
     val ( < ) : 'a t
   end
 end

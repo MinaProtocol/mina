@@ -1,5 +1,4 @@
 open Core
-open Frontier_base
 open Full_frontier.For_tests
 
 (* NOTE: This type is initially instantiated as Encoding.t io, where
@@ -74,7 +73,7 @@ let output_block : type a. a -> a codec io -> unit
   fprintf channel "%s" (Enc.to_string content);
   match filename with
     | "-" -> ()
-    | s -> Out_channel.close channel
+    | _ -> Out_channel.close channel
 
 (* This executable outputs random block to stderr in sexp and json
    The output is useful for src/lib/mina_block tests when the sexp/json representation changes. *)

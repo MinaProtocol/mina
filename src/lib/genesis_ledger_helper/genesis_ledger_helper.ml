@@ -112,7 +112,8 @@ module Ledger = struct
         ; List.to_string balances ~f:(fun (i, balance) ->
               sprintf "%i %s" i (Currency.Balance.to_string balance) )
         ; (* Distinguish ledgers when the hash function is different. *)
-          Snark_params.Tick.Field.to_string Mina_base.Account.empty_digest
+          Snark_params.Tick.Field.to_string
+            (Lazy.force Mina_base.Account.empty_digest)
         ; (* Distinguish ledgers when the account record layout has changed. *)
           Bin_prot.Writer.to_string Mina_base.Account.Stable.Latest.bin_writer_t
             Mina_base.Account.empty
@@ -234,32 +235,10 @@ module Ledger = struct
       Tar.filename_without_extension @@ Filename.basename filename
     in
     let dirname = genesis_dir ^/ dirname in
-    (* remove dir if it exists *)
-    let%bind () =
-      if%bind file_exists ~follow_symlinks:true dirname then (
-        [%log trace] "Genesis ledger dir $path already exists, removing"
-          ~metadata:[ ("path", `String dirname) ] ;
-        let rec remove_dir dir =
-          let%bind files = Sys.ls_dir dir in
-          let%bind () =
-            Deferred.List.iter files ~f:(fun file ->
-                let file = dir ^/ file in
-                remove file )
-          in
-          Unix.rmdir dir
-        and remove file =
-          match%bind Sys.is_directory file with
-          | `Yes ->
-              remove_dir file
-          | _ ->
-              Unix.unlink file
-        in
-        remove dirname )
-      else Deferred.unit
+    let%bind () = File_system.create_dir ~clear_if_exists:true dirname in
+    let%map.Deferred.Or_error () =
+      Tar.extract ~root:dirname ~file:filename ()
     in
-    let%bind () = Unix.mkdir ~p:() dirname in
-    let open Deferred.Or_error.Let_syntax in
-    let%map () = Tar.extract ~root:dirname ~file:filename () in
     let (packed : Genesis_ledger.Packed.t) =
       match accounts with
       | Some accounts ->
@@ -328,8 +307,9 @@ module Ledger = struct
     (* This sleep for 5s is a hack for rocksdb. It seems like rocksdb would need some
        time to stablize *)
     let%bind () = after (Time.Span.of_int_sec 5) in
-    let open Deferred.Or_error.Let_syntax in
-    let%map () = Tar.create ~root:dirname ~file:tar_path ~directory:"." () in
+    let%map.Deferred.Or_error () =
+      Tar.create ~root:dirname ~file:tar_path ~directory:"." ()
+    in
     tar_path
 
   let padded_accounts_from_runtime_config_opt ~logger ~proof_level
@@ -755,15 +735,16 @@ module Genesis_proof = struct
     let b, id =
       match (inputs.blockchain_proof_system_id, inputs.proof_level) with
       | Some id, _ ->
-          (None, id)
+          (None, Deferred.return id)
       | None, Full ->
           let ((_, (module B)) as b) =
             Genesis_proof.blockchain_snark_state inputs
           in
           (Some b, Lazy.force B.Proof.id)
       | _ ->
-          (None, Pickles.Verification_key.Id.dummy ())
+          (None, Deferred.return @@ Pickles.Verification_key.Id.dummy ())
     in
+    let%bind id = id in
     let base_hash =
       Base_hash.create ~id
         ~state_hash:
@@ -793,7 +774,7 @@ module Genesis_proof = struct
     let%bind found_proof =
       match%bind find_file ~logger ~base_hash ~genesis_dir with
       | Some file -> (
-          match%map load file with
+          match%bind load file with
           | Ok genesis_proof ->
               let b =
                 lazy
@@ -813,10 +794,10 @@ module Genesis_proof = struct
                        Lazy.force @@ Genesis_proof.digests (module T) (module B)
                       )
               in
-              let blockchain_proof_system_id =
+              let%map blockchain_proof_system_id =
                 match inputs.blockchain_proof_system_id with
                 | Some id ->
-                    id
+                    Deferred.return id
                 | None ->
                     let _, (module B) = Lazy.force b in
                     Lazy.force B.Proof.id
@@ -843,7 +824,7 @@ module Genesis_proof = struct
                   [ ("path", `String file)
                   ; ("error", Error_json.error_to_yojson err)
                   ] ;
-              None )
+              return None )
       | None ->
           return None
     in

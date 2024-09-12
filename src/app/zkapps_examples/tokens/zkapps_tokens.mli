@@ -12,7 +12,7 @@ val tag :
   Pickles.Tag.t
   Lazy.t
 
-val vk : Pickles.Side_loaded.Verification_key.t Lazy.t
+val vk : Pickles.Side_loaded.Verification_key.t Async.Deferred.t Lazy.t
 
 module P :
   Pickles.Proof_intf

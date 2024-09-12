@@ -1,14 +1,27 @@
 let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+
 let PipelineTag = ../../Pipeline/Tag.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let ReplayerTest = ../../Command/ReplayerTest.dhall
+
 let Profiles = ../../Constants/Profiles.dhall
+
 let Dockers = ../../Constants/DockerVersions.dhall
 
-let dependsOn = Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "archive"
+let Network = ../../Constants/Network.dhall
+
+let Artifacts = ../../Constants/Artifacts.dhall
+
+let dependsOn =
+      Dockers.dependsOn
+        Dockers.Type.Bullseye
+        (None Network.Type)
+        Profiles.Type.Standard
+        Artifacts.Type.Archive
 
 in  Pipeline.build
       Pipeline.Config::{

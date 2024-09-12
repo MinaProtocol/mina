@@ -1,43 +1,93 @@
 let Prelude = ../External/Prelude.dhall
+
+let Optional/map = Prelude.Optional.map
+
+let Optional/default = Prelude.Optional.default
+
 let Profiles = ./Profiles.dhall
 
-let Docker: Type  = < Bookworm | Bullseye | Buster | Jammy | Focal >
+let Artifacts = ./Artifacts.dhall
 
-let capitalName = \(docker : Docker) ->
-  merge {
-    Bookworm = "Bookworm"
-    , Bullseye = "Bullseye"
-    , Buster = "Buster"
-    , Jammy = "Jammy"
-    , Focal = "Focal"
-  } docker
+let Network = ./Network.dhall
 
-let lowerName = \(docker : Docker) ->
-  merge {
-    Bookworm = "bookworm"
-    , Bullseye = "bullseye"
-    , Buster = "buster"
-    , Jammy = "jammy"
-    , Focal = "focal"
-  } docker
+let Docker
+    : Type
+    = < Bookworm | Bullseye | Buster | Jammy | Focal >
 
-let dependsOn = \(docker : Docker) -> \(profile : Profiles.Type) -> \(binary: Text) -> 
-  let profileSuffix = Profiles.toSuffixUppercase profile in
-  let prefix = "MinaArtifact" in 
-  let suffix = "docker-image" in
-  merge {
-    Bookworm = [{ name = "${prefix}${profileSuffix}", key = "${binary}-${lowerName docker}-${suffix}" }]
-    , Bullseye = [{ name = "${prefix}${capitalName docker}${profileSuffix}", key = "${binary}-${lowerName docker}-${suffix}" }]
-    , Buster = [{ name = "${prefix}${capitalName docker}${profileSuffix}", key = "${binary}-${lowerName docker}-${suffix}" }]
-    , Jammy = [{ name = "${prefix}${capitalName docker}${profileSuffix}", key = "${binary}-${lowerName docker}-${suffix}" }]
-    , Focal = [{ name = "${prefix}${capitalName docker}${profileSuffix}", key = "${binary}-${lowerName docker}-${suffix}" }]
-  } docker
+let capitalName =
+          \(docker : Docker)
+      ->  merge
+            { Bookworm = "Bookworm"
+            , Bullseye = "Bullseye"
+            , Buster = "Buster"
+            , Jammy = "Jammy"
+            , Focal = "Focal"
+            }
+            docker
 
-in
+let lowerName =
+          \(docker : Docker)
+      ->  merge
+            { Bookworm = "bookworm"
+            , Bullseye = "bullseye"
+            , Buster = "buster"
+            , Jammy = "jammy"
+            , Focal = "focal"
+            }
+            docker
 
-{
-  Type = Docker
-  , capitalName = capitalName
-  , lowerName = lowerName
-  , dependsOn = dependsOn
-}
+let dependsOn =
+          \(docker : Docker)
+      ->  \(network : Optional Network.Type)
+      ->  \(profile : Profiles.Type)
+      ->  \(binary : Artifacts.Type)
+      ->  let profileSuffix = Profiles.toSuffixUppercase profile
+
+          let prefix = "MinaArtifact"
+
+          let suffix = "docker-image"
+
+          let maybeNetwork =
+                Optional/map
+                  Network.Type
+                  Text
+                  (\(network : Network.Type) -> "-${Network.lowerName network}")
+                  network
+
+          let networkOrDefault = Optional/default Text "" maybeNetwork
+
+          let key =
+                "${Artifacts.lowerName
+                     binary}${networkOrDefault}-${lowerName docker}-${suffix}"
+
+          in  merge
+                { Bookworm =
+                  [ { name = "${prefix}${profileSuffix}", key = key } ]
+                , Bullseye =
+                  [ { name = "${prefix}${capitalName docker}${profileSuffix}"
+                    , key = key
+                    }
+                  ]
+                , Buster =
+                  [ { name = "${prefix}${capitalName docker}${profileSuffix}"
+                    , key = key
+                    }
+                  ]
+                , Jammy =
+                  [ { name = "${prefix}${capitalName docker}${profileSuffix}"
+                    , key = key
+                    }
+                  ]
+                , Focal =
+                  [ { name = "${prefix}${capitalName docker}${profileSuffix}"
+                    , key = key
+                    }
+                  ]
+                }
+                docker
+
+in  { Type = Docker
+    , capitalName = capitalName
+    , lowerName = lowerName
+    , dependsOn = dependsOn
+    }

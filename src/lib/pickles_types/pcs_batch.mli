@@ -1,3 +1,5 @@
+(** Batch of Polynomial Commitment Scheme *)
+
 type ('a, 'n, 'm) t
 
 val map : ('a, 'n, 'm) t -> f:('a -> 'b) -> ('b, 'n, 'm) t
@@ -44,15 +46,15 @@ val combine_evaluations' :
   -> ('f, 'm) Vector.t
   -> 'f
 
-open Plonk_types.Poly_comm
-
 val combine_split_commitments :
      (_, 'n, 'm) t
   -> scale_and_add:(acc:'g_acc -> xi:'f -> 'g -> 'g_acc)
-  -> init:('g -> 'g_acc)
+  -> init:('g -> 'g_acc option)
   -> xi:'f
-  -> ('g Without_degree_bound.t, 'n) Vector.t
-  -> ('g With_degree_bound.t, 'm) Vector.t
+  -> reduce_without_degree_bound:('without_degree_bound -> 'g list)
+  -> reduce_with_degree_bound:('with_degree_bound -> 'g list)
+  -> ('without_degree_bound, 'n) Vector.t
+  -> ('with_degree_bound, 'm) Vector.t
   -> 'g_acc
 
 val combine_split_evaluations :

@@ -1,16 +1,21 @@
 let ContainerImages = ../../Constants/ContainerImages.dhall
 
 let Cmd = ../../Lib/Cmds.dhall
+
 let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+
 let PipelineTag = ../../Pipeline/Tag.dhall
+
 let PipelineMode = ../../Pipeline/Mode.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
+
 let Docker = ../../Command/Docker/Type.dhall
+
 let Size = ../../Command/Size.dhall
 
 let B = ../../External/Buildkite.dhall
@@ -50,7 +55,7 @@ in  Pipeline.build
             , target = Size.Small
             , soft_fail = Some (B/SoftFail.Boolean True)
             , docker = None Docker.Type
-            , timeout_in_minutes = Some 420
+            , timeout_in_minutes = Some +420
             }
         ]
       }

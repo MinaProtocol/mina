@@ -21,8 +21,6 @@ module type S = sig
     module Latest = V1
   end
 
-  [%%ifdef consensus_mechanism]
-
   module Checked : sig
     type unchecked = t
 
@@ -33,8 +31,6 @@ module type S = sig
 
   (** typ representation *)
   val typ : (Checked.t, t) Typ.t
-
-  [%%endif]
 
   val dummy : t
 

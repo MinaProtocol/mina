@@ -2,13 +2,7 @@
 
 open Core_kernel
 open Mina_base_util
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%endif]
-
 module Frozen_ledger_hash = Frozen_ledger_hash0
 module Ledger_hash = Ledger_hash0
 
@@ -175,8 +169,6 @@ module Auth_required = struct
 
     let _ = map
 
-    [%%ifdef consensus_mechanism]
-
     let if_ b ~then_:t ~else_:e =
       let open Pickles.Impls.Step in
       { constant = Boolean.if_ b ~then_:t.constant ~else_:e.constant
@@ -187,8 +179,6 @@ module Auth_required = struct
           Boolean.if_ b ~then_:t.signature_sufficient
             ~else_:e.signature_sufficient
       }
-
-    [%%endif]
   end
 
   let encode : t -> bool Encoding.t = function
@@ -251,8 +241,6 @@ module Auth_required = struct
   let%test_unit "decode encode" =
     List.iter [ Impossible; Proof; Signature; Either ] ~f:(fun t ->
         [%test_eq: t] t (decode (encode t)) )
-
-  [%%ifdef consensus_mechanism]
 
   module Checked = struct
     type t = Boolean.var Encoding.t
@@ -324,8 +312,6 @@ module Auth_required = struct
         ~value_of_hlist:of_hlist
     in
     Typ.transport t ~there:encode ~back:decode
-
-  [%%endif]
 
   let to_input x = Encoding.to_input (encode x) ~field_of_bool
 
@@ -455,8 +441,6 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
     ; access
     }
 
-[%%ifdef consensus_mechanism]
-
 module Checked = struct
   type t =
     ( Auth_required.Checked.t
@@ -571,8 +555,6 @@ let typ =
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
-
-[%%endif]
 
 let to_input (x : t) =
   Poly.to_input Auth_required.to_input Mina_numbers.Txn_version.to_input x
