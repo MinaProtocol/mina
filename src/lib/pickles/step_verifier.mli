@@ -161,17 +161,7 @@ val verify :
      , Step_main_inputs.Impl.field Composition_types.Branch_data.Checked.t )
      Import.Types.Wrap.Statement.In_circuit.t
      (* statement *)
-  -> ( Step_main_inputs.Impl.Field.t
-     , Step_main_inputs.Impl.Field.t Import.Scalar_challenge.t
-     , Other_field.t Pickles_types.Shifted_value.Type2.t
-     , ( Step_main_inputs.Impl.Field.t Import.Scalar_challenge.t
-         Import.Bulletproof_challenge.t
-       , 'd )
-       Pickles_types.Vector.t
-     , Step_main_inputs.Impl.Field.t
-     , Step_main_inputs.Impl.Boolean.var )
-     Import.Types.Step.Proof_state.Per_proof.In_circuit.t
-     (* unfinalized *)
+  -> Impls.Step.unfinalized_proof_var (* unfinalized *)
   -> Step_main_inputs.Impl.Boolean.var
 
 module For_tests_only : sig

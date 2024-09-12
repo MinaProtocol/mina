@@ -100,16 +100,7 @@ val wrap :
            Import.Types.Wrap.Statement.In_circuit.t )
   -> Kimchi_pasta.Pallas_based_plonk.Keypair.t
   -> ( 'b
-     , ( ( Impls.Wrap.Challenge.Constant.t
-         , Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
-         , Impls.Wrap.Field.Constant.t Pickles_types.Shifted_value.Type2.t
-         , ( Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
-             Import.Types.Bulletproof_challenge.t
-           , Backend.Tock.Rounds.n )
-           Pickles_types.Vector.t
-         , Impls.Wrap.Digest.Constant.t
-         , bool )
-         Import.Types.Step.Proof_state.Per_proof.In_circuit.t
+     , ( Impls.Step.unfinalized_proof
        , 'max_proofs_verified )
        Pickles_types.Vector.t
      , ( Kimchi_pasta.Basic.Fp.Stable.Latest.t
