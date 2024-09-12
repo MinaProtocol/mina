@@ -75,29 +75,121 @@ let jane_street_library_modules = [ "Uuid" ]
 let jane_street_modules =
   [ "Core"; "Core_kernel" ] @ jane_street_library_modules
 
-let rec type_appears_in_lident (needle : string) (haystack : Longident.t) : bool =
-  match haystack with
-  | Lident s -> String.equal s needle
-  | Ldot (l, s2) -> type_appears_in_lident needle l || String.equal s2 needle
-  | Lapply (l1, l2) ->
-      type_appears_in_lident needle l1 || type_appears_in_lident needle l2
+let types_in_declaration_fold : string list Ast_traverse.fold =
+  let rec structure s acc =
+    List.fold_right ~f:(fun i acc' -> structure_item_desc i.pstr_desc acc') ~init:acc s
+  and structure_item item acc = structure_item_desc item.pstr_desc acc
+  and structure_item_desc desc acc =
+    match desc with
+    | Pstr_type (_, decls) ->
+        List.fold_right
+          ~f:type_declaration
+          ~init:acc decls
+    | Pstr_module binding ->
+        module_expr_desc binding.pmb_expr.pmod_desc acc
+    | Pstr_open open_description ->
+        module_expr_desc open_description.popen_expr.pmod_desc acc
+    | Pstr_include include_description ->
+        module_expr_desc include_description.pincl_mod.pmod_desc acc
+    | _ ->
+        acc
+  and type_declaration decl acc =
+    match decl.ptype_kind with
+    | Ptype_abstract ->
+        Option.value_map
+          ~f:(fun t -> core_type t acc)
+          ~default:acc decl.ptype_manifest
+    | Ptype_variant variants ->
+        List.fold_right
+          ~f:constructor_declaration
+          ~init:acc variants
+    | Ptype_record labels ->
+        List.fold_right
+          ~f:label_declaration
+          ~init:acc labels
+    | Ptype_open ->
+        acc
+  and constructor_declaration decl acc =
+    match decl.pcd_args with
+    | Pcstr_tuple types ->
+        List.fold_right ~f:core_type ~init:acc types
+    | Pcstr_record labels ->
+        List.fold_right
+          ~f:label_declaration
+          ~init:acc labels
+  and label_declaration decl acc = core_type decl.pld_type acc
+  and lident l acc =
+    match l with
+    | Lident s ->
+        s :: acc
+    | Ldot (m, s) ->
+        lident m (s :: acc)
+    | _ ->
+        failwith "failed to match Lident"
+  and core_type (ct : core_type) acc =
+    core_type_desc ct.ptyp_desc acc
+  and core_type_desc ct acc =
+    match ct with
+    | Ptyp_var _ ->
+        acc
+    | Ptyp_arrow (_, source, target) ->
+        core_type source (core_type target acc)
+    | Ptyp_tuple types ->
+        List.fold_right ~f:core_type ~init:acc types
+    | Ptyp_constr (l, types) ->
+        let acc' = lident l.txt acc in
+        List.fold_right ~f:core_type ~init:acc' types
+    | Ptyp_alias (t, _) ->
+        core_type t acc
+    | Ptyp_object (fields, _) ->
+        List.fold_right ~f:object_field ~init:acc fields
+    | Ptyp_class (_, core_types) ->
+        List.fold_right ~f:core_type ~init:acc core_types
+    | _ ->
+        failwith "unhandled core_type_desc"
+  and object_field field acc = object_field_desc field.pof_desc acc
+  and object_field_desc desc acc =
+    match desc with
+    | Otag (_, t) ->
+        core_type t acc
+    | Oinherit t ->
+        core_type t acc
+  and module_expr_desc desc acc =
+    match desc with
+    | Pmod_ident l ->
+        lident l.txt acc
+    | Pmod_structure s ->
+        structure s acc
+    | Pmod_apply (e1, e2) ->
+        module_expr_desc e1.pmod_desc (module_expr_desc e2.pmod_desc acc)
+    | _ ->
+        acc
+  in
 
-let rec type_appears_in_ptyp (needle : string) (haystack : core_type_desc) : bool = 
-  match haystack with
-    | Ptyp_arrow 
-        ( _
-        , {ptyp_desc = source; _}
-        , {ptyp_desc = target; _}
-        ) -> type_appears_in_ptyp needle source || type_appears_in_ptyp needle target
-    | Ptyp_tuple types -> 
-        List.exists types 
-          ~f:(fun {ptyp_desc = haystacks;_} -> type_appears_in_ptyp needle haystacks)
-    | Ptyp_constr ({txt = c; _}, haystacks) ->
-        type_appears_in_lident needle c || List.exists ~f:(fun {ptyp_desc = h; _} -> type_appears_in_ptyp needle h) haystacks
-    | Ptyp_alias _ -> failwith "Ptyp_alias not supported"
-    | Ptyp_any | Ptyp_var _ | Ptyp_variant _ | Ptyp_poly _ | Ptyp_package _ | Ptyp_extension _ -> false 
-    | Ptyp_object _ | Ptyp_class _ -> failwith "Ptyp_object and Ptyp_class not supported"
+  object
+    inherit [string list] Ast_traverse.fold
 
-let type_appears_in_core_type (needle : string) ({ptyp_desc = haystack;_} : core_type) : bool =
-  type_appears_in_ptyp needle haystack
-  
+    method! structure = structure
+
+    method! structure_item = structure_item
+
+    method! structure_item_desc = structure_item_desc
+
+    method! type_declaration = type_declaration
+
+    method! constructor_declaration = constructor_declaration
+
+    method! label_declaration = label_declaration
+
+    method! core_type = core_type
+
+    method! core_type_desc = core_type_desc
+
+    method! object_field = object_field
+
+    method! object_field_desc = object_field_desc
+
+    method! module_expr_desc = module_expr_desc
+  end
+
+let collect_type_names = types_in_declaration_fold#type_declaration
