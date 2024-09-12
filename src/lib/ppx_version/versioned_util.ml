@@ -74,3 +74,30 @@ let jane_street_library_modules = [ "Uuid" ]
 
 let jane_street_modules =
   [ "Core"; "Core_kernel" ] @ jane_street_library_modules
+
+let rec type_appears_in_lident (needle : string) (haystack : Longident.t) : bool =
+  match haystack with
+  | Lident s -> String.equal s needle
+  | Ldot (l, s2) -> type_appears_in_lident needle l || String.equal s2 needle
+  | Lapply (l1, l2) ->
+      type_appears_in_lident needle l1 || type_appears_in_lident needle l2
+
+let rec type_appears_in_ptyp (needle : string) (haystack : core_type_desc) : bool = 
+  match haystack with
+    | Ptyp_arrow 
+        ( _
+        , {ptyp_desc = source; _}
+        , {ptyp_desc = target; _}
+        ) -> type_appears_in_ptyp needle source || type_appears_in_ptyp needle target
+    | Ptyp_tuple types -> 
+        List.exists types 
+          ~f:(fun {ptyp_desc = haystacks;_} -> type_appears_in_ptyp needle haystacks)
+    | Ptyp_constr ({txt = c; _}, haystacks) ->
+        type_appears_in_lident needle c || List.exists ~f:(fun {ptyp_desc = h; _} -> type_appears_in_ptyp needle h) haystacks
+    | Ptyp_alias _ -> failwith "Ptyp_alias not supported"
+    | Ptyp_any | Ptyp_var _ | Ptyp_variant _ | Ptyp_poly _ | Ptyp_package _ | Ptyp_extension _ -> false 
+    | Ptyp_object _ | Ptyp_class _ -> failwith "Ptyp_object and Ptyp_class not supported"
+
+let type_appears_in_core_type (needle : string) ({ptyp_desc = haystack;_} : core_type) : bool =
+  type_appears_in_ptyp needle haystack
+  

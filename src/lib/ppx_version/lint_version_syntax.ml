@@ -84,6 +84,7 @@ type accumulator =
   ; in_include : bool
   ; in_versioned_ext : bool
   ; module_path : string list
+  ; functor_args : string list
   ; errors : (Location.t * string) list
   }
 
@@ -237,14 +238,14 @@ let lint_ast =
       let acc' =
         match expr.pmod_desc with
         (* don't match special case of functor with () argument *)
-        | Pmod_functor (Named _, body) ->
+        | Pmod_functor (Named ({txt = Some(name); _},_), body) ->
             (* Don't match special case of functor called [Make_str].
                This convention is used when using the [mina_wire_types] library framework.
             *)
             let in_functor =
               match acc.module_path with "Make_str" :: _ -> false | _ -> true
             in
-            self#module_expr body { acc with in_functor }
+            self#module_expr body { acc with in_functor; functor_args = name :: acc.functor_args }
         | Pmod_apply
             ( { pmod_desc =
                   Pmod_apply
@@ -454,6 +455,7 @@ let lint_impl str =
       ; in_include = false
       ; in_versioned_ext = false
       ; module_path = []
+      ; functor_args = []
       ; errors = []
       }
   in
