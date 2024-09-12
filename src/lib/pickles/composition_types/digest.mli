@@ -7,8 +7,6 @@ type nat4 := Limbs.n
 (** Alias for fixed typed-size vector of size 4 *)
 type 'a v := ('a, nat4) Pickles_types.Vector.vec
 
-type vector := int64 v
-
 module Constant : sig
   module A : sig
     type 'a t = 'a v [@@deriving compare, sexp, yojson, hash, equal]
@@ -39,24 +37,23 @@ module Constant : sig
 
   val length : int
 
-  type t = Limb_vector.Constant.Hex64.t A.t
-  [@@deriving compare, sexp, yojson, hash, equal]
+  type t = Stable.Latest.t [@@deriving compare, sexp, yojson, hash, equal]
 
-  val to_bits : vector -> bool list
+  val to_bits : t -> bool list
 
-  val of_bits : bool list -> vector
+  val of_bits : bool list -> t
 
-  val of_tock_field : Backend.Tock.Field.t -> vector
+  val of_tock_field : Backend.Tock.Field.t -> t
 
   val dummy : t
 
   val zero : t
 
-  val to_tick_field : vector -> Backend.Tick.Field.t
+  val to_tick_field : t -> Backend.Tick.Field.t
 
-  val to_tock_field : vector -> Backend.Tock.Field.t
+  val to_tock_field : t -> Backend.Tock.Field.t
 
-  val of_tick_field : Backend.Tick.Field.t -> vector
+  val of_tick_field : Backend.Tick.Field.t -> t
 end
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) : sig
@@ -69,8 +66,8 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) : sig
   end
 
   module Constant : sig
-    include module type of Constant
+    include module type of Constant with type Stable.V1.t = Constant.Stable.V1.t
   end
 
-  val typ : (t, vector) Impl.Typ.t
+  val typ : (t, Constant.t) Impl.Typ.t
 end
