@@ -18,17 +18,20 @@ let Network = ../../Constants/Network.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
 
-let dependsOn =
-        Dockers.dependsOn
-          Dockers.Type.Bullseye
-          Network.Type.Devnet
-          Profiles.Type.Standard
-          Artifacts.Type.Daemon
-      # Dockers.dependsOn
-          Dockers.Type.Bullseye
-          Network.Type.Devnet
-          Profiles.Type.Standard
-          Artifacts.Type.Archive
+
+--let dependsOn =
+--        Dockers.dependsOn
+--          Dockers.Type.Bullseye
+--          Network.Type.Devnet
+--          Profiles.Type.Standard
+--          Artifacts.Type.Daemon
+--      # Dockers.dependsOn
+--          Dockers.Type.Bullseye
+ --         Network.Type.Devnet
+ --         Profiles.Type.Standard
+ --         Artifacts.Type.Archive
+let dependsOn : List Dockers.Type = [] : List Dockers.Type
+
 
 in  Pipeline.build
       Pipeline.Config::{
