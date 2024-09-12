@@ -63,7 +63,7 @@ module Worker_state = struct
     { conf_dir : string
     ; enable_internal_tracing : bool
     ; internal_trace_filename : string option
-    ; logger : Logger.Stable.Latest.t
+    ; logger : Logger.t
     ; proof_level : Genesis_constants.Proof_level.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
     ; commit_id : string

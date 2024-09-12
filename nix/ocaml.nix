@@ -1,19 +1,16 @@
 # A set defining OCaml parts&dependencies of Minaocamlnix
-{ inputs, src, ... }@args:
+{ inputs, ... }@args:
 let
   opam-nix = inputs.opam-nix.lib.${pkgs.system};
 
   inherit (args) pkgs;
-
-  inherit (builtins) filterSource path;
-
   inherit (pkgs.lib)
     hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath optionalString
     escapeShellArg;
 
   repos = with inputs; [ o1-opam-repository opam-repository ];
 
-  export = opam-nix.importOpam "${src}/opam.export";
+  export = opam-nix.importOpam ../opam.export;
 
   # Dependencies required by every Mina package:
   # Packages which are `installed` in the export.
@@ -68,6 +65,15 @@ let
         rocksdb_stubs = super.rocksdb_stubs.overrideAttrs {
           MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
         };
+
+        # This is needed because
+        # - lld package is not wrapped to pick up the correct linker flags
+        # - bintools package also includes as which is incompatible with gcc
+        lld_wrapped = pkgs.writeShellScriptBin "ld.lld"
+          ''${pkgs.llvmPackages.bintools}/bin/ld.lld "$@"'';
+
+        core =
+          super.core.overrideAttrs { propagatedBuildInputs = [ pkgs.tzdata ]; };
       };
 
   scope =
@@ -85,15 +91,149 @@ let
     [ zlib bzip2 gmp openssl libffi ]
     ++ lib.optional (!(stdenv.isDarwin && stdenv.isAarch64)) jemalloc;
 
+  dune-nix = inputs.dune-nix.lib.${pkgs.system};
+
+  base-libs = dune-nix.squashOpamNixDeps scope.ocaml.version
+    (pkgs.lib.attrVals (builtins.attrNames implicit-deps) scope);
+
+  dune-description = pkgs.stdenv.mkDerivation {
+    pname = "dune-description";
+    version = "dev";
+    src = pkgs.lib.sources.sourceFilesBySuffices ../src [
+      "dune"
+      "dune-project"
+      ".inc"
+      ".opam"
+    ];
+    phases = [ "unpackPhase" "buildPhase" ];
+    buildPhase = ''
+      files=$(ls)
+      mkdir src
+      mv $files src
+      cp ${../dune} dune
+      cp ${../dune-project} dune-project
+      ${
+        inputs.describe-dune.defaultPackage.${pkgs.system}
+      }/bin/describe-dune > $out
+    '';
+  };
+
+  duneDescLoaded = builtins.fromJSON (builtins.readFile dune-description);
+  info = dune-nix.info duneDescLoaded;
+  allDeps = dune-nix.allDeps info;
+  commonOverrides = {
+    DUNE_PROFILE = "dev";
+    buildInputs = [ base-libs ] ++ external-libs;
+    nativeBuildInputs = [ ];
+  };
+  packageHasSrcApp =
+    dune-nix.packageHasUnit ({ src, ... }: pkgs.lib.hasPrefix "src/app/" src);
+  sqlSchemaFiles = with inputs.nix-filter.lib;
+    filter {
+      root = ../src/app/archive;
+      include = [ (matchExt "sql") ];
+    };
+
+  granularBase =
+    dune-nix.outputs' commonOverrides ./.. allDeps info packageHasSrcApp;
+  vmOverlays = let
+    commit = inputs.self.sourceInfo.rev or "<dirty>";
+    commitShort = builtins.substring 0 8 commit;
+    cmdLineTest = ''
+      mina --version
+      mv _build/default/src/test/command_line_tests/command_line_tests.exe tests.exe
+      chmod +x tests.exe
+      export TMPDIR=tmp # to align with janestreet core library
+      mkdir -p $TMPDIR
+      export MINA_LIBP2P_PASS="naughty blue worm"
+      export MINA_PRIVKEY_PASS="naughty blue worm"
+      export MINA_KEYS_PATH=genesis_ledgers
+      mkdir -p $MINA_KEYS_PATH
+      echo '{"ledger":{"accounts":[]}}' > $MINA_KEYS_PATH/config_${commitShort}.json
+      ./tests.exe --mina-path mina
+    '';
+  in [
+    (dune-nix.testWithVm { } "mina_net2" [ pkgs.libp2p_helper ])
+    (dune-nix.testWithVm { } "__src-lib-mina_net2-tests__"
+      [ pkgs.libp2p_helper ])
+    (self:
+      dune-nix.testWithVm' cmdLineTest { } "__src-test-command_line_tests__" [
+        self.pkgs.cli
+        pkgs.libp2p_helper
+      ] self)
+    (dune-nix.testWithVm { } "__src-lib-staged_ledger-test__" [ ])
+  ];
+  granularCustom = _: super:
+    let
+      makefileTest = pkg:
+        let src = info.pseudoPackages."${pkg}";
+        in dune-nix.makefileTest ./.. pkg src;
+      marlinPlonkStubs = {
+        MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
+      };
+      childProcessesTester = pkgs.writeShellScriptBin "mina-tester.sh"
+        (builtins.readFile ../src/lib/child_processes/tester.sh);
+      withLibp2pHelper = (s: {
+        nativeBuildInputs = s.nativeBuildInputs ++ [ pkgs.libp2p_helper ];
+      });
+    in {
+      pkgs.mina_version = super.pkgs.mina_version.overrideAttrs {
+        MINA_COMMIT_SHA1 = inputs.self.sourceInfo.rev or "<dirty>";
+      };
+      pkgs.kimchi_bindings =
+        super.pkgs.kimchi_bindings.overrideAttrs marlinPlonkStubs;
+      pkgs.kimchi_types =
+        super.pkgs.kimchi_types.overrideAttrs marlinPlonkStubs;
+      pkgs.pasta_bindings =
+        super.pkgs.pasta_bindings.overrideAttrs marlinPlonkStubs;
+      pkgs.libp2p_ipc = super.pkgs.libp2p_ipc.overrideAttrs (s: {
+        GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
+        nativeBuildInputs = s.nativeBuildInputs ++ [ pkgs.capnproto ];
+      });
+      pkgs.bindings_js = super.pkgs.bindings_js.overrideAttrs {
+        PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
+        PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
+      };
+      files.src-lib-crypto-kimchi_bindings-js-node_js =
+        super.files.src-lib-crypto-kimchi_bindings-js-node_js.overrideAttrs {
+          PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
+        };
+      files.src-lib-crypto-kimchi_bindings-js-web =
+        super.files.src-lib-crypto-kimchi_bindings-js-web.overrideAttrs {
+          PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
+        };
+      pkgs.__src-lib-ppx_mina-tests__ =
+        makefileTest "__src-lib-ppx_mina-tests__" super;
+      pkgs.__src-lib-ppx_version-test__ =
+        makefileTest "__src-lib-ppx_version-test__" super;
+      tested.child_processes = super.tested.child_processes.overrideAttrs
+        (s: { buildInputs = s.buildInputs ++ [ childProcessesTester ]; });
+      tested.block_storage =
+        super.tested.block_storage.overrideAttrs withLibp2pHelper;
+      tested.mina_lib = super.tested.mina_lib.overrideAttrs withLibp2pHelper;
+      tested.mina_lib_tests =
+        super.tested.mina_lib_tests.overrideAttrs withLibp2pHelper;
+      tested.archive_lib = super.tested.archive_lib.overrideAttrs (s: {
+        buildInputs = s.buildInputs ++ [ pkgs.ephemeralpg ];
+        preBuild = ''
+          export MINA_TEST_POSTGRES="$(pg_tmp -w 1200)"
+          ( cd ${sqlSchemaFiles} && psql "$MINA_TEST_POSTGRES" < create_schema.sql >/dev/null )
+        '';
+      });
+    };
+
+  # We merge overlays in a cutsom way because pkgs.lib.composeManyExtensions
+  # uses `//` for update instead of recursiveUpdate
+  granularOverlay = self: _:
+    let
+      base = granularBase self;
+      overlays = [ granularCustom ] ++ vmOverlays;
+    in builtins.foldl' (super: f: pkgs.lib.recursiveUpdate super (f self super))
+    base overlays;
+
   overlay = self: super:
     let
       ocaml-libs = builtins.attrValues (getAttrs installedPackageNames self);
-
-      # This is needed because
-      # - lld package is not wrapped to pick up the correct linker flags
-      # - bintools package also includes as which is incompatible with gcc
-      lld_wrapped = pkgs.writeShellScriptBin "ld.lld"
-        ''${pkgs.llvmPackages.bintools}/bin/ld.lld "$@"'';
 
       # Make a script wrapper around a binary, setting all the necessary environment variables and adding necessary tools to PATH.
       # Also passes the version information to the executable.
@@ -131,8 +271,18 @@ let
       mina-dev = pkgs.stdenv.mkDerivation ({
         pname = "mina";
         version = "dev";
-        # Prevent unnecessary rebuilds on non-source changes
-        inherit src;
+        # Only get the ocaml stuff, to reduce the amount of unnecessary rebuilds
+        src = with inputs.nix-filter.lib;
+          filter {
+            root = ./..;
+            include = [
+              (inDirectory "src")
+              "dune"
+              "dune-project"
+              "./graphql_schema.json"
+              "opam.export"
+            ];
+          };
 
         withFakeOpam = false;
 
@@ -154,7 +304,7 @@ let
           self.dune
           self.ocamlfind
           self.odoc
-          lld_wrapped
+          self.lld_wrapped
           pkgs.capnproto
           pkgs.removeReferencesTo
           pkgs.fd
@@ -311,5 +461,8 @@ let
       mina-ocaml-format = runMinaCheck { name = "ocaml-format"; } ''
         dune exec --profile=dev src/app/reformat/reformat.exe -- -path . -check
       '';
+
+      inherit dune-description base-libs external-libs;
     };
-in scope.overrideScope' overlay
+in scope.overrideScope'
+(pkgs.lib.composeManyExtensions ([ overlay granularOverlay ]))
