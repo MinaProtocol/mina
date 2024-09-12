@@ -26,8 +26,8 @@ cleanup
 
 TEST_NAME="$1"
 
-MINA_IMAGE=gcr.io/o1labs-192920/mina-daemon:3.0.1-beta1-develop-4d7d7d2-bullseye-devnet
-ARCHIVE_IMAGE=gcr.io/o1labs-192920/mina-archive:3.0.1-beta1-develop-4d7d7d2-bullseye
+MINA_IMAGE="gcr.io/o1labs-192920/mina-daemon:$MINA_DOCKER_TAG-devnet"
+ARCHIVE_IMAGE="gcr.io/o1labs-192920/mina-archive:$MINA_DOCKER_TAG"
 
 if [[ "${TEST_NAME:0:15}" == "block-prod-prio" ]] && [[ "$RUN_OPT_TESTS" == "" ]]; then
   echo "Skipping $TEST_NAME"
@@ -51,7 +51,6 @@ apt-get install -y "terraform" "docker" "docker-compose-plugin" "docker-ce"
 source buildkite/scripts/debian/install.sh "mina-test-executive"
 
 mina-test-executive local "$TEST_NAME" \
-  --debug \
   --mina-image "$MINA_IMAGE" \
   --archive-image "$ARCHIVE_IMAGE" \
   | tee "$TEST_NAME.local.test.log" \
