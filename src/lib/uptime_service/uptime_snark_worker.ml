@@ -13,8 +13,7 @@ module Worker_state = struct
   end
 
   (* bin_io required by rpc_parallel *)
-  type init_arg =
-    Logger.Stable.Latest.t * Genesis_constants.Constraint_constants.t
+  type init_arg = Logger.t * Genesis_constants.Constraint_constants.t
   [@@deriving bin_io_unversioned]
 
   type t = (module S)
@@ -89,10 +88,7 @@ module Worker = struct
 end
 
 type t =
-  { connection : Worker.Connection.t
-  ; process : Process.t
-  ; logger : Logger.Stable.Latest.t
-  }
+  { connection : Worker.Connection.t; process : Process.t; logger : Logger.t }
 
 let create ~logger ~constraint_constants ~pids : t Deferred.t =
   let on_failure err =
