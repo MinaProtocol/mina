@@ -602,8 +602,9 @@ end
 (* Tests that check that the hashes of the protocol circuits remain the same *)
 module Protocol_circuits = struct
   (* Full because we want to be sure nothing changes *)
-  let proof_level, constraint_constants =
-    Genesis_constants_compiled.(Proof_level.Full, Constraint_constants.t)
+  let proof_level = Genesis_constants.Proof_level.Full
+
+  let constraint_constants = Genesis_constants.Compiled.constraint_constants
 
   let print_hash print expected digest : unit =
     if print then (

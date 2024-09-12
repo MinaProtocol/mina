@@ -68,5 +68,4 @@
   blockchain_snark
   transaction_snark
   genesis_constants
-  genesis_constants.compiled
   core))
