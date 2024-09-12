@@ -30,8 +30,8 @@ let Artifacts = ../../Constants/Artifacts.dhall
  --         Network.Type.Devnet
  --         Profiles.Type.Standard
  --         Artifacts.Type.Archive
-let dependsOn : List Dockers.Type = [] : List Dockers.Type
 
+ let dependsOn : List Command.TaggedKey.Type = []
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -68,7 +68,7 @@ in  Pipeline.build
       , steps =
         [ TestExecutive.executeLocal "peers-reliability" dependsOn
 
-        --, TestExecutive.executeLocal "chain-reliability" dependsOn
+        , TestExecutive.executeLocal "chain-reliability" dependsOn
         -- , TestExecutive.executeLocal "payment" dependsOn
         --, TestExecutive.executeLocal "gossip-consis" dependsOn
         --, TestExecutive.executeLocal "block-prod-prio" dependsOn
