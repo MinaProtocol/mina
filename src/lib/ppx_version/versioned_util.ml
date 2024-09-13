@@ -84,7 +84,7 @@ let collect_types : StringSet.t Ast_traverse.fold =
         StringSet.add acc s
     | Ldot (m, s) ->
         lident m (StringSet.add acc s)
-    | Lapply (l1,l2) ->
+    | Lapply (l1, l2) ->
         lident l1 (lident l2 acc)
   in
 
