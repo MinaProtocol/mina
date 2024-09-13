@@ -92,7 +92,7 @@ let proof_config_default : Runtime_config.Proof_keys.t =
   ; transaction_capacity = None
   ; coinbase_amount = None
   ; supercharged_coinbase_factor = None
-  ; account_creation_fee = None
+  ; account_creation_fee = Some Currency.Fee.one
   ; fork = None
   }
 
