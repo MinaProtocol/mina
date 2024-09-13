@@ -38,7 +38,6 @@
    signature_lib
    snarky.backendless
    genesis_constants
-   genesis_constants.compiled
    transaction_protocol_state
    coda_genesis_ledger
    pickles_types

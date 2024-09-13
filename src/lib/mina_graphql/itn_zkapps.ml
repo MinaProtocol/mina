@@ -153,9 +153,11 @@ let insert_account_queue ~account_queue ~account_queue_size ~account_state_tbl
       ~data:(a, role)
   else ()
 
-let send_zkapps ~fee_payer_array ~constraint_constants ~tm_end ~scheduler_tbl
-    ~uuid ~keymap ~unused_pks ~stop_signal ~mina ~zkapp_command_details
-    ~wait_span ~logger ~account_state_tbl init_tm_next init_counter =
+let send_zkapps ~(genesis_constants : Genesis_constants.t)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~fee_payer_array ~tm_end ~scheduler_tbl ~uuid ~keymap ~unused_pks
+    ~stop_signal ~mina ~zkapp_command_details ~wait_span ~logger
+    ~account_state_tbl init_tm_next init_counter =
   let wait_span_ms = Time.Span.to_ms wait_span |> int_of_float in
   let repeat tm_next counter =
     let%map () = Async_unix.at tm_next in
@@ -251,10 +253,8 @@ let send_zkapps ~fee_payer_array ~constraint_constants ~tm_end ~scheduler_tbl
                    ~ignore_sequence_events_precond:true ~no_token_accounts:true
                    ~limited:true ~fee_payer_keypair:fee_payer ~keymap
                    ~account_state_tbl ~generate_new_accounts ~ledger ~vk
-                   ~available_public_keys:unused_pks
-                   ~genesis_constants:Genesis_constants_compiled.t
-                   ~constraint_constants:
-                     Genesis_constants_compiled.Constraint_constants.t () )
+                   ~available_public_keys:unused_pks ~genesis_constants
+                   ~constraint_constants () )
                ~size:1
                ~random:(Splittable_random.State.create Random.State.default)
     in

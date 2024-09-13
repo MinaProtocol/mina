@@ -346,9 +346,9 @@ type t =
 
 let constants { constants; _ } = constants
 
-let constraint_constants { constants; _ } = constants.constraints
+let constraint_constants { constants; _ } = constants.constraint_constants
 
-let genesis_constants { constants; _ } = constants.genesis
+let genesis_constants { constants; _ } = constants.genesis_constants
 
 let seeds { seeds; _ } = seeds
 

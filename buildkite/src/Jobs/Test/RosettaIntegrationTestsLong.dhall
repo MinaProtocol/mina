@@ -66,7 +66,7 @@ in  Pipeline.build
             , depends_on =
                 Dockers.dependsOn
                   Dockers.Type.Bullseye
-                  (Some Network.Type.Berkeley)
+                  (None Network.Type)
                   Profiles.Type.Standard
                   Artifacts.Type.Rosetta
             }
