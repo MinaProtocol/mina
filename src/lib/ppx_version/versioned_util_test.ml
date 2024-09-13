@@ -15,17 +15,21 @@ module M = struct
 end
 
 module O = struct
-  type t = int
+  type o = int
 
-  let foo : t -> t = fun x -> x
+  let foo : o -> o = fun x -> x
 end
+
+module P = struct end
 
 let str ~loc =
   [%str
     open M
     include O
 
-    type t = { a : int * string * M.N.t list; b : char }]
+    let a = const (module P)
+
+    type t = { a : int * string * N.t list; b : o }]
 
 let () =
   let _ = M.foo 1 in
