@@ -86,12 +86,12 @@ type t =
 let proof_config_default : Runtime_config.Proof_keys.t =
   { level = Some Full
   ; sub_windows_per_window = None
-  ; ledger_depth = None
+  ; ledger_depth = Some 10
   ; work_delay = None
   ; block_window_duration_ms = Some 120000
   ; transaction_capacity = Some (Log_2 3)
-  ; coinbase_amount = None
-  ; supercharged_coinbase_factor = None
+  ; coinbase_amount = Some (Currency.Amount.of_mina_int_exn 20)
+  ; supercharged_coinbase_factor = Some 1
   ; account_creation_fee = Some Currency.Fee.one
   ; fork = None
   }
