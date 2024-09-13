@@ -64,7 +64,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                             , timing_update
                             , timed_account_keypair ) =
       let open Mina_base in
-      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let fee = Currency.Fee.one in
       let amount = Currency.Amount.of_mina_int_exn 10 in
       let nonce = Account.Nonce.of_int 0 in
       let memo =
