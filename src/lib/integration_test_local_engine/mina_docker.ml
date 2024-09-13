@@ -164,7 +164,7 @@ module Network_config = struct
             ; zkapp_transaction_cost_limit = Some 1000.
             ; max_event_elements = None
             ; max_action_elements = None
-            ; zkapp_cmd_limit_hardcap = None
+            ; zkapp_cmd_limit_hardcap = Some 0
             ; slot_tx_end
             ; slot_chain_end
             ; minimum_user_command_fee = Some (Currency.Fee.of_string "2")

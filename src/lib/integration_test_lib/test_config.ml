@@ -92,7 +92,7 @@ let proof_config_default : Runtime_config.Proof_keys.t =
   ; transaction_capacity = Some (Log_2 3)
   ; coinbase_amount = Some (Currency.Amount.of_mina_int_exn 20)
   ; supercharged_coinbase_factor = Some 1
-  ; account_creation_fee = Some Currency.Fee.one
+  ; account_creation_fee = (Some (Currency.Fee.of_mina_string_exn ".001"))
   ; fork = None
   }
 
@@ -126,7 +126,7 @@ let default =
   ; k = 20
   ; slots_per_epoch = 3 * 8 * 20
   ; slots_per_sub_window = 2
-  ; grace_period_slots = 140
+  ; grace_period_slots = 180
   ; delta = 0
   ; txpool_max_size = 3000
   ; slot_tx_end = None
