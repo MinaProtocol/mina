@@ -105,7 +105,7 @@ module Base_node_config = struct
       mina accounts import -config-directory /root/.mina-config -privkey-path "$key_file"
     fi
   done
-  env
+  rm /var/lib/coda/config*
   # Execute the puppeteer script
   exec /mina_daemon_puppeteer.py "$@"
   |}
@@ -177,7 +177,7 @@ module Base_node_config = struct
       ]
     in
     let peer_args =
-      match t.peer with Some peer -> [ "-peer"; peer ] | None -> []
+      match t.peer with Some peer -> [ "--peer"; peer ] | None -> []
     in
     let start_filtered_logs_args =
       List.concat
@@ -216,11 +216,11 @@ module Block_producer_config = struct
     let base_args = Base_node_config.to_list config.base_config in
     let block_producer_args =
       [ "daemon"
-      ; "-block-producer-key"
+      ; "--block-producer-key"
       ; config.priv_key_path
-      ; "-enable-flooding"
+      ; "--enable-flooding"
       ; config.enable_flooding |> Bool.to_string
-      ; "-enable-peer-exchange"
+      ; "--enable-peer-exchange"
       ; config.enable_peer_exchange |> Bool.to_string
       ]
     in
