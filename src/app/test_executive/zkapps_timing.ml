@@ -115,7 +115,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind zkapp_command_create_second_account_with_timing =
       let open Mina_base in
-      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let fee = Currency.Fee.one in
       let amount = Currency.Amount.of_mina_int_exn 10 in
       let nonce = Account.Nonce.of_int 1 in
       let memo =
@@ -162,7 +162,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                             , third_timed_account_id
                             , third_timed_account_keypair ) =
       let open Mina_base in
-      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let fee = Currency.Fee.one in
       let amount = Currency.Amount.of_mina_int_exn 100 in
       let nonce = Account.Nonce.of_int 2 in
       let memo =
@@ -210,7 +210,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind.Async.Deferred zkapp_command_with_zero_vesting_period =
       let open Mina_base in
-      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let fee = Currency.Fee.one in
       let amount = Currency.Amount.of_mina_int_exn 10 in
       let nonce = Account.Nonce.of_int 3 in
       let memo =
@@ -250,7 +250,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind zkapp_command_transfer_from_timed_account =
       let open Mina_base in
-      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let fee = Currency.Fee.one in
       let amount = Currency.Amount.of_nanomina_int_exn 1_500_000 in
       let nonce = Account.Nonce.zero in
       let memo =
@@ -282,7 +282,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind zkapp_command_invalid_transfer_from_timed_account =
       let open Mina_base in
-      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let fee = Currency.Fee.one in
       let amount = Currency.Amount.of_mina_int_exn 7 in
       let nonce = Account.Nonce.of_int 1 in
       let memo =
@@ -314,7 +314,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind.Deferred zkapp_command_update_timing =
       let open Mina_base in
-      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let fee = Currency.Fee.one in
       let amount = Currency.Amount.zero in
       let nonce = Account.Nonce.of_int 3 in
       let memo =
