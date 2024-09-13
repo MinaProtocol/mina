@@ -83,6 +83,12 @@ type t =
   ; network_id : string option
   }
 
+let default_fork_config = Runtime_config.Fork_config.{
+  blockchain_length = 0;
+  state_hash = "";
+  global_slot_since_genesis = 0;
+}
+
 let proof_config_default : Runtime_config.Proof_keys.t =
   { level = Some Full
   ; sub_windows_per_window = None
@@ -93,7 +99,7 @@ let proof_config_default : Runtime_config.Proof_keys.t =
   ; coinbase_amount = None
   ; supercharged_coinbase_factor = None
   ; account_creation_fee = None
-  ; fork = None
+  ; fork = Some default_fork_config
   }
 
 let log_filter_of_event_type ev_existential =
