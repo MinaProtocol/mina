@@ -4,28 +4,9 @@
 (library
  (name ppx_version)
  (public_name ppx_version)
- (modules versioned_module versioned_type versioned_util)
  (kind ppx_deriver)
  (libraries
    ;; opam libs
-   compiler-libs.common
-   ppxlib
-   ppxlib.astlib
-   ppx_derivers
-   ppx_bin_prot
-   base base.caml
-   core_kernel
-   ppx_version.runtime
-   bin_prot)
- (preprocess (pps ppx_compare ppxlib.metaquot)))
-
-(executable
- (name versioned_util_test)
- (modules versioned_util_test)
- (modes native)
- (libraries
-   ;; opam libs
-   ppx_version
    compiler-libs.common
    ppxlib
    ppxlib.astlib

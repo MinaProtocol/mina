@@ -3,6 +3,7 @@
 open Core_kernel
 open Ppxlib
 open Versioned_util
+module StringSet = Set.Make (String)
 
 let name = "enforce_version_syntax"
 
@@ -74,8 +75,10 @@ let is_versioned_module_inc_decl inc_decl =
   | _ ->
       false
 
-let versioned_in_functor_error loc =
-  (loc, "Cannot use versioned extension within a functor body")
+let versioned_in_functor_error loc bad_modules =
+  ( loc
+  , "Cannot use types from functor arguments in versioned module: "
+    ^ String.concat ~sep:", " (StringSet.to_list bad_modules) )
 
 let include_stable_latest_error loc = (loc, "Cannot include Stable.Latest")
 
@@ -84,7 +87,7 @@ type accumulator =
   ; in_include : bool
   ; in_versioned_ext : bool
   ; module_path : string list
-  ; functor_args : string list
+  ; functor_args : StringSet.t
   ; errors : (Location.t * string) list
   }
 
@@ -246,7 +249,10 @@ let lint_ast =
               match acc.module_path with "Make_str" :: _ -> false | _ -> true
             in
             self#module_expr body
-              { acc with in_functor; functor_args = name :: acc.functor_args }
+              { acc with
+                in_functor
+              ; functor_args = StringSet.add acc.functor_args name
+              }
         | Pmod_apply
             ( { pmod_desc =
                   Pmod_apply
@@ -419,7 +425,15 @@ let lint_ast =
         when acc.in_functor
              && String.length name.txt >= 9
              && String.equal (String.sub name.txt ~pos:0 ~len:9) "versioned" ->
-          acc_with_accum_errors acc [ versioned_in_functor_error name.loc ]
+          let used_modules =
+            Versioned_util.types_in_declaration_fold#payload _payload
+              StringSet.empty
+          in
+          let bad_modules = Set.inter used_modules acc.functor_args in
+          if Set.is_empty bad_modules then acc
+          else
+            acc_with_accum_errors acc
+              [ versioned_in_functor_error name.loc bad_modules ]
       | Pstr_extension ((name, PStr [ stri ]), _attrs)
         when String.length name.txt >= 9
              && String.equal (String.sub name.txt ~pos:0 ~len:9) "versioned" ->
@@ -456,7 +470,7 @@ let lint_impl str =
       ; in_include = false
       ; in_versioned_ext = false
       ; module_path = []
-      ; functor_args = []
+      ; functor_args = StringSet.empty
       ; errors = []
       }
   in

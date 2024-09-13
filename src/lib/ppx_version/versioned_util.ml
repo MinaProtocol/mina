@@ -75,57 +75,57 @@ let jane_street_library_modules = [ "Uuid" ]
 let jane_street_modules =
   [ "Core"; "Core_kernel" ] @ jane_street_library_modules
 
-let types_in_declaration_fold : string list Ast_traverse.fold =
+module StringSet = Set.Make (String)
+
+let types_in_declaration_fold : StringSet.t Ast_traverse.fold =
   let rec lident l acc =
     match l with
     | Lident s ->
-        s :: acc
+        StringSet.add acc s
     | Ldot (m, s) ->
-        lident m (s :: acc)
+        lident m (StringSet.add acc s)
     | _ ->
         failwith "failed to match Lident"
   in
-  let rec core_type (ct : core_type) acc = core_type_desc ct.ptyp_desc acc
-  and core_type_desc ct acc =
-    match ct with
-    | Ptyp_var _ ->
-        acc
-    | Ptyp_arrow (_, source, target) ->
-        core_type source (core_type target acc)
-    | Ptyp_tuple types ->
-        List.fold_right ~f:core_type ~init:acc types
-    | Ptyp_constr (l, types) ->
-        let acc' = lident l.txt acc in
-        List.fold_right ~f:core_type ~init:acc' types
-    | Ptyp_alias (t, _) ->
-        core_type t acc
-    | Ptyp_class (_, core_types) ->
-        List.fold_right ~f:core_type ~init:acc core_types
-    | _ ->
-        failwith "unhandled core_type_desc"
-  in
-  let rec module_expr_desc desc acc =
-    match desc with
-    | Pmod_ident l ->
-        lident l.txt acc
-    | Pmod_apply (e1, e2) ->
-        module_expr_desc e1.pmod_desc (module_expr_desc e2.pmod_desc acc)
-    | _ ->
-        acc
-  and module_substitution ms acc = lident ms.pms_manifest.txt acc in
 
-  let expression _ acc = acc in
+  object (self)
+    inherit [StringSet.t] Ast_traverse.fold
 
-  object
-    inherit [string list] Ast_traverse.fold
+    method! core_type (ct : core_type) acc =
+      self#core_type_desc ct.ptyp_desc acc
 
-    method! core_type_desc = core_type_desc
+    method! core_type_desc ct acc =
+      match ct with
+      | Ptyp_var _ ->
+          acc
+      | Ptyp_arrow (_, source, target) ->
+          self#core_type source (self#core_type target acc)
+      | Ptyp_tuple types ->
+          List.fold_right ~f:self#core_type ~init:acc types
+      | Ptyp_constr (l, types) ->
+          let acc' = lident l.txt acc in
+          List.fold_right ~f:self#core_type ~init:acc' types
+      | Ptyp_alias (t, _) ->
+          self#core_type t acc
+      | Ptyp_class (_, core_types) ->
+          List.fold_right ~f:self#core_type ~init:acc core_types
+      | _ ->
+          failwith "unhandled core_type_desc"
 
-    method! core_type = core_type
+    method! module_expr_desc desc acc =
+      match desc with
+      | Pmod_ident l ->
+          lident l.txt acc
+      | Pmod_apply (e1, e2) ->
+          self#module_expr_desc e1.pmod_desc
+            (self#module_expr_desc e2.pmod_desc acc)
+      | Pmod_structure s ->
+          List.fold_right ~f:self#structure_item ~init:acc s
+      | _ ->
+          acc
 
-    method! module_expr_desc = module_expr_desc
-
-    method! module_substitution = module_substitution
-
-    method! expression = expression
+    method! module_substitution ms acc = lident ms.pms_manifest.txt acc
   end
+
+let modules_used_in_type_defs (module_ : module_expr) : StringSet.t =
+  types_in_declaration_fold#module_expr module_ StringSet.empty
