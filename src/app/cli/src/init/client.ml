@@ -2461,7 +2461,6 @@ let advanced =
     ; ("visualization", Visualization.command_group)
     ; ("verify-receipt", verify_receipt)
     ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
-    ; ("generate-ledger-accounts", Cli_lib.Commands.generate_ledger_accounts)
     ; ("validate-keypair", Cli_lib.Commands.validate_keypair)
     ; ("validate-transaction", Cli_lib.Commands.validate_transaction)
     ; ("send-rosetta-transactions", send_rosetta_transactions_graphql)
@@ -2493,6 +2492,7 @@ let ledger =
     ; ("hash", hash_ledger)
     ; ("currency", currency_in_ledger)
     ; ("test-apply", test_ledger_application)
+    ; ("test-generate-accounts", Cli_lib.Commands.generate_test_ledger)
     ]
 
 let libp2p =

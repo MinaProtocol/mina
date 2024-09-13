@@ -26,7 +26,7 @@ let balance =
   Command.Arg_type.map Command.Param.string
     ~f:Currency.Balance.of_mina_string_exn
 
-let generate_ledger_accounts =
+let generate_test_ledger =
   Command.async ~summary:"Generate a ledger for testing"
     (let open Command.Let_syntax in
     let%map_open n =
