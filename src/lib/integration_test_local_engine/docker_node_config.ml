@@ -152,25 +152,25 @@ module Base_node_config = struct
 
   let to_list t =
     let base_args =
-      [ "-log-level"
+      [ "--log-level"
       ; t.log_level
-      ; "-log-snark-work-gossip"
+      ; "--log-snark-work-gossip"
       ; Bool.to_string t.log_snark_work_gossip
-      ; "-log-txn-pool-gossip"
+      ; "--log-txn-pool-gossip"
       ; Bool.to_string t.log_txn_pool_gossip
       ; "-generate-genesis-proof"
       ; Bool.to_string t.generate_genesis_proof
-      ; "-client-port"
+      ; "--client-port"
       ; t.client_port
-      ; "-rest-port"
+      ; "--rest-port"
       ; t.rest_port
-      ; "-external-port"
+      ; "--external-port"
       ; t.external_port
-      ; "-metrics-port"
+      ; "--metrics-port"
       ; t.metrics_port
       ; "--libp2p-keypair"
       ; t.libp2p_key_path
-      ; "-log-json"
+      ; "--log-json"
       ; "--insecure-rest-server"
       ; "-external-ip"
       ; "0.0.0.0"
@@ -187,7 +187,7 @@ module Base_node_config = struct
     let runtime_config_path =
       match t.runtime_config_path with
       | Some path ->
-          [ "-config-file"; path ]
+          [ "--config-file"; path ]
       | None ->
           []
     in
@@ -542,7 +542,7 @@ module Archive_node_config = struct
     let runtime_config_path =
       match config.base_config.runtime_config_path with
       | Some path ->
-          [ "-config-file"; path ]
+          [ "--config-file"; path ]
       | None ->
           []
     in
