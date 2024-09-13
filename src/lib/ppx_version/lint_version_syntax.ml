@@ -413,7 +413,18 @@ let lint_ast =
             | Nonrecursive ->
                 no_errors_fun
             | Recursive ->
-                if acc.in_functor then validate_neither_bin_io_nor_version
+                if acc.in_functor 
+                  then 
+                    let used_modules =
+                      Versioned_util.collect_types#payload _payload StringSet.empty
+                    in
+                    print_endline ("used: " ^ String.concat ~sep:", " (StringSet.to_list used_modules));
+                    let bad_modules = Set.inter used_modules acc.functor_args 
+                    in
+                    print_endline ("bad: " ^ String.concat ~sep:", " (StringSet.to_list bad_modules));
+                    if Set.is_empty bad_modules 
+                      then validate_version_if_bin_io
+                      else validate_neither_bin_io_nor_version
                 else validate_version_if_bin_io
           in
           let deriving_errors =
@@ -426,13 +437,12 @@ let lint_ast =
              && String.length name.txt >= 9
              && String.equal (String.sub name.txt ~pos:0 ~len:9) "versioned" ->
           let used_modules =
-            Versioned_util.types_in_declaration_fold#payload _payload
-              StringSet.empty
+            Versioned_util.collect_types#payload _payload StringSet.empty
           in
+          print_endline ("used: " ^ String.concat ~sep:", " (StringSet.to_list used_modules));
           let bad_modules = Set.inter used_modules acc.functor_args in
-          if Set.is_empty bad_modules then acc
-          else
-            acc_with_accum_errors acc
+          print_endline ("bad: " ^ String.concat ~sep:", " (StringSet.to_list bad_modules));
+          acc_with_accum_errors acc
               [ versioned_in_functor_error name.loc bad_modules ]
       | Pstr_extension ((name, PStr [ stri ]), _attrs)
         when String.length name.txt >= 9

@@ -11,6 +11,8 @@ struct
     module V1 = struct
       type t = string [@@deriving bin_io]
 
+      open X
+
       let to_latest = Fn.id
     end
   end]

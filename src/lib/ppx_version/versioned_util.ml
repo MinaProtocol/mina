@@ -77,7 +77,7 @@ let jane_street_modules =
 
 module StringSet = Set.Make (String)
 
-let types_in_declaration_fold : StringSet.t Ast_traverse.fold =
+let collect_types : StringSet.t Ast_traverse.fold =
   let rec lident l acc =
     match l with
     | Lident s ->
@@ -87,45 +87,27 @@ let types_in_declaration_fold : StringSet.t Ast_traverse.fold =
     | _ ->
         failwith "failed to match Lident"
   in
+         
+  object(self)
+    inherit [StringSet.t] Ast_traverse.fold as super
 
-  object (self)
-    inherit [StringSet.t] Ast_traverse.fold
-
-    method! core_type (ct : core_type) acc =
-      self#core_type_desc ct.ptyp_desc acc
-
-    method! core_type_desc ct acc =
+    method! core_type_desc ct acc = 
       match ct with
-      | Ptyp_var _ ->
-          acc
-      | Ptyp_arrow (_, source, target) ->
-          self#core_type source (self#core_type target acc)
-      | Ptyp_tuple types ->
-          List.fold_right ~f:self#core_type ~init:acc types
       | Ptyp_constr (l, types) ->
           let acc' = lident l.txt acc in
           List.fold_right ~f:self#core_type ~init:acc' types
-      | Ptyp_alias (t, _) ->
-          self#core_type t acc
-      | Ptyp_class (_, core_types) ->
-          List.fold_right ~f:self#core_type ~init:acc core_types
-      | _ ->
-          failwith "unhandled core_type_desc"
+      | _ -> super#core_type_desc ct acc
 
-    method! module_expr_desc desc acc =
+
+    method! module_expr_desc desc acc = 
       match desc with
       | Pmod_ident l ->
           lident l.txt acc
-      | Pmod_apply (e1, e2) ->
-          self#module_expr_desc e1.pmod_desc
-            (self#module_expr_desc e2.pmod_desc acc)
-      | Pmod_structure s ->
-          List.fold_right ~f:self#structure_item ~init:acc s
-      | _ ->
-          acc
+      | _ -> super#module_expr_desc desc acc
+      
 
-    method! module_substitution ms acc = lident ms.pms_manifest.txt acc
+    method! module_substitution ms acc = 
+      lident ms.pms_manifest.txt acc
+
+
   end
-
-let modules_used_in_type_defs (module_ : module_expr) : StringSet.t =
-  types_in_declaration_fold#module_expr module_ StringSet.empty
