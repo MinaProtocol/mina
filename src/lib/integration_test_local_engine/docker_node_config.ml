@@ -172,7 +172,7 @@ module Base_node_config = struct
       ; t.libp2p_key_path
       ; "--log-json"
       ; "--insecure-rest-server"
-      ; "-external-ip"
+      ; "--external-ip"
       ; "0.0.0.0"
       ]
     in
