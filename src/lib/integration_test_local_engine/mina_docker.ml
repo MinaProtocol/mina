@@ -167,7 +167,7 @@ module Network_config = struct
             ; zkapp_cmd_limit_hardcap = Some 128
             ; slot_tx_end
             ; slot_chain_end
-            ; minimum_user_command_fee = Some (Currency.Fee.of_string ".001")
+            ; minimum_user_command_fee = Some (Currency.Fee.of_string "1000000")
             ; network_id
             }
       ; genesis =
