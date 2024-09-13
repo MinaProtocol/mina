@@ -416,12 +416,10 @@ let lint_ast =
                 if acc.in_functor 
                   then 
                     let used_modules =
-                      Versioned_util.collect_types#payload _payload StringSet.empty
+                      List.fold_right  ~init:StringSet.empty ~f:Versioned_util.collect_types#type_declaration type_decls
                     in
-                    print_endline ("used: " ^ String.concat ~sep:", " (StringSet.to_list used_modules));
                     let bad_modules = Set.inter used_modules acc.functor_args 
                     in
-                    print_endline ("bad: " ^ String.concat ~sep:", " (StringSet.to_list bad_modules));
                     if Set.is_empty bad_modules 
                       then validate_version_if_bin_io
                       else validate_neither_bin_io_nor_version
@@ -439,9 +437,9 @@ let lint_ast =
           let used_modules =
             Versioned_util.collect_types#payload _payload StringSet.empty
           in
-          print_endline ("used: " ^ String.concat ~sep:", " (StringSet.to_list used_modules));
           let bad_modules = Set.inter used_modules acc.functor_args in
-          print_endline ("bad: " ^ String.concat ~sep:", " (StringSet.to_list bad_modules));
+          if Set.is_empty bad_modules then acc
+          else
           acc_with_accum_errors acc
               [ versioned_in_functor_error name.loc bad_modules ]
       | Pstr_extension ((name, PStr [ stri ]), _attrs)
