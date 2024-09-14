@@ -97,6 +97,14 @@ module Base_node_config = struct
       ^ container_keys_path ^ {|/
   # Import any compatible keys in |}
       ^ container_keys_path ^ {|/*, excluding certain keys
+  for key_file in |}
+      ^ container_keys_path
+      ^ {|/*; do
+    # Exclude specific keys (e.g., libp2p keys)
+    if [[ $(basename "$key_file") != "libp2p_key" ]]; then
+      mina accounts import -config-directory /root/.mina-config -privkey-path "$key_file"
+    fi
+  done
   rm /var/lib/coda/config*
   # Execute the puppeteer script
   exec /mina_daemon_puppeteer.py "$@"
