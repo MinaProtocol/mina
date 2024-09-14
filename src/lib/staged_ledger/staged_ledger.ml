@@ -1041,7 +1041,19 @@ module T = struct
               (of_list (Transaction.accounts_referenced txn.With_status.data))) )
       |> Set.to_list
     in
-    Ledger.unsafe_preload_accounts_from_parent new_ledger accounts_accessed ;
+    let derived_token_ids =
+      List.fold transactions ~init:Account_id.Map.empty
+        ~f:(fun acc (_, cache_opt) ->
+          let combine ~key:_ _ v = v in
+          Option.value_map ~default:acc
+            ~f:
+              (Fn.compose
+                 (Map.merge_skewed ~combine acc)
+                 Ledger.precomputed_token_ids )
+            cache_opt )
+    in
+    Ledger.unsafe_preload_accounts_from_parent new_ledger ~derived_token_ids
+      accounts_accessed ;
     let%bind () =
       (* Check number of zkApps in a block does not exceed hardcap *)
       O1trace.thread "zkapp_hardcap_check" (fun () ->

@@ -151,7 +151,18 @@ let apply_txs ~action_elements ~event_elements ~constraint_constants
           union set (of_list (Zkapp_command.accounts_referenced txn))) )
     |> Set.to_list
   in
-  Ledger.unsafe_preload_accounts_from_parent ledger accounts_accessed ;
+  let derived_token_ids =
+    List.fold zkapps' ~init:Account_id.Map.empty ~f:(fun acc (_, cache_opt) ->
+        let combine ~key:_ _ v = v in
+        Option.value_map ~default:acc
+          ~f:
+            (Fn.compose
+               (Map.merge_skewed ~combine acc)
+               Ledger.precomputed_token_ids )
+          cache_opt )
+  in
+  Ledger.unsafe_preload_accounts_from_parent ledger ~derived_token_ids
+    accounts_accessed ;
   let start = Time.now () in
   match%map
     Staged_ledger.Test_helpers.update_coinbase_stack_and_get_data_impl

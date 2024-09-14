@@ -10,6 +10,8 @@ module type S = sig
 
   type accumulated_t
 
+  type derived_token_ids_t
+
   (* registering a mask makes it an active child of the parent Merkle tree
      - reads to the mask that fail are delegated to the parent
      - writes to the parent notify the child mask
@@ -19,7 +21,10 @@ module type S = sig
     ?accumulated:accumulated_t -> t -> unattached_mask -> attached_mask
 
   val unsafe_preload_accounts_from_parent :
-    attached_mask -> account_id list -> unit
+       attached_mask
+    -> derived_token_ids:derived_token_ids_t
+    -> account_id list
+    -> unit
 
   (** raises an exception if mask is not registered *)
   val unregister_mask_exn :
