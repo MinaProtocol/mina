@@ -43,6 +43,18 @@ function export_suffixes () {
             ;;
         esac
         ;;
+        lightnet)
+        case "${DEB_BUILD_FLAGS}" in
+            *instrumented)
+            export DOCKER_DEB_SUFFIX="--build-arg deb_suffix=lightnet-instrumented"
+            export BUILD_FLAG_SUFFIX="lightnet-instrumented"
+            ;;
+            *)
+            export DOCKER_DEB_SUFFIX="--build-arg deb_suffix=lightnet"
+            export BUILD_FLAG_SUFFIX="-lightnet"
+            ;;
+        esac
+        ;;
         *)
         case "${DEB_BUILD_FLAGS}" in 
             *instrumented)
