@@ -101,7 +101,7 @@ module Base_node_config = struct
       ^ container_keys_path
       ^ {|/*; do
     # Exclude specific keys (e.g., libp2p keys)
-    if [[ "$base_name" != "libp2p_key" && "$base_name" != *.peerid ]]; then
+    if [[ "$base_name" != *key && "$base_name" != *.peerid ]]; then
       mina accounts import -config-directory /root/.mina-config -privkey-path "$key_file"
     fi
   done
