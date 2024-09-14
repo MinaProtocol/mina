@@ -594,7 +594,7 @@ struct
       ()
     in
     match%map
-      O1trace.sync_thread "validate_transaction_snark_scan_state" (fun () ->
+      O1trace.thread "validate_transaction_snark_scan_state" (fun () ->
           scan_statement t ~constraint_constants ~statement_check ~verifier )
     with
     | Error (`Error e) ->

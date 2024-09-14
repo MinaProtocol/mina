@@ -381,5 +381,5 @@ module Test_helpers : sig
              * Pending_coinbase.Stack_versioned.t ]
          * [> `First_pass_ledger_end of Frozen_ledger_hash.t ]
        , Staged_ledger_error.t )
-       Deferred.Result.t
+       Result.t
 end
