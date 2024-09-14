@@ -10,3 +10,4 @@ module Make (I : Inputs_intf.S) :
      and type account_id := I.Account_id.t
      and type account_id_set := I.Account_id.Set.t
      and type location := I.Location.t
+     and type derived_token_ids_t := I.Token_id.t I.Account_id.Map.t

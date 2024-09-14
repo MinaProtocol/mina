@@ -391,6 +391,8 @@ module type S = sig
   *)
   type precomputed_t
 
+  val precomputed_token_ids : precomputed_t -> Token_id.t Account_id.Map.t
+
   val precompute_transaction_hashes : User_command.t -> precomputed_t
 
   val apply_user_command :
@@ -1945,9 +1947,11 @@ module Make (L : Ledger_intf.S) :
   *)
   type precomputed_t =
     { memo_hash : Random_oracle.Digest.t
-    ; token_ids : Token_id.t Account_id.Map.t
+    ; derived_token_ids : Token_id.t Account_id.Map.t
     ; zkapp_precomputed : M.zkapp_precomputed_t option
     }
+
+  let precomputed_token_ids { derived_token_ids; _ } = derived_token_ids
 
   let get_init_account_update account_updates =
     let default_caller = M.default_caller in
@@ -1975,25 +1979,27 @@ module Make (L : Ledger_intf.S) :
     function
     | Signed_command tx ->
         let memo_hash = Signed_command_memo.hash (Signed_command.memo tx) in
-        let token_ids =
+        let derived_token_ids =
           mk_token_ids
             [ Signed_command.receiver tx; Signed_command.fee_payer tx ]
         in
-        { memo_hash; token_ids; zkapp_precomputed = None }
+        { memo_hash; derived_token_ids; zkapp_precomputed = None }
     | Zkapp_command tx ->
-        let token_ids = mk_token_ids (Zkapp_command.accounts_referenced tx) in
+        let derived_token_ids =
+          mk_token_ids (Zkapp_command.accounts_referenced tx)
+        in
         let memo_hash = Signed_command_memo.hash tx.memo in
         let all_account_updates = Zkapp_command.all_account_updates tx in
         let init_account_update_result =
           get_init_account_update
-            ~lookup_precomputed_token_id:(Map.find token_ids)
+            ~lookup_precomputed_token_id:(Map.find derived_token_ids)
             all_account_updates
         in
         let tx_commitment_on_start, full_commitment_on_start =
           commitments_on_start ~memo_hash init_account_update_result
         in
         { memo_hash
-        ; token_ids
+        ; derived_token_ids
         ; zkapp_precomputed =
             Some
               { all_account_updates
@@ -2009,9 +2015,11 @@ module Make (L : Ledger_intf.S) :
     with
     | None ->
         None
-    | Some ({ token_ids; _ }, zkapp_precomputed) ->
+    | Some ({ derived_token_ids; _ }, zkapp_precomputed) ->
         Some
-          { M.lookup_derived_token_id = Map.find token_ids; zkapp_precomputed }
+          { M.lookup_derived_token_id = Map.find derived_token_ids
+          ; zkapp_precomputed
+          }
 
   let update_action_state action_state actions ~txn_global_slot
       ~last_action_slot =

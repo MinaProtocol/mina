@@ -144,7 +144,8 @@ module Ledger_inner = struct
        and type account_id_set := Account_id.Set.t
        and type hash := Hash.t
        and type location := Location_at_depth.t
-       and type parent := Any_ledger.M.t =
+       and type parent := Any_ledger.M.t
+       and type derived_token_ids_t := Token_id.t Account_id.Map.t =
   Merkle_mask.Masking_merkle_tree.Make (struct
     include Inputs
     module Base = Any_ledger.M
@@ -165,6 +166,7 @@ module Ledger_inner = struct
        and type unattached_mask := Mask.t
        and type attached_mask := Mask.Attached.t
        and type accumulated_t := Mask.accumulated_t
+       and type derived_token_ids_t := Token_id.t Account_id.Map.t
        and type t := Any_ledger.M.t =
   Merkle_mask.Maskable_merkle_tree.Make (struct
     include Inputs
@@ -227,7 +229,8 @@ module Ledger_inner = struct
       This should *NOT* be used to create a ledger for other purposes.
   *)
   let create_masked (t : t) : t =
-    let mask = Mask.create ~depth:(depth t) () in
+    let derived_token_ids = Mask.Attached.derived_token_ids t in
+    let mask = Mask.create ~derived_token_ids ~depth:(depth t) () in
     (* We don't register the mask here. This is only used in transaction logic,
        where we don't want to unregister. Transaction logic is also
        synchronous, so we don't need to worry that our mask will be reparented.

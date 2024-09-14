@@ -27,6 +27,8 @@ module Make (Inputs : Inputs_intf.S) = struct
     let t_of_sexp (_ : Sexp.t) : t = Async.Ivar.create ()
   end
 
+  type derived_token_ids_t = Token_id.t Account_id.Map.t [@@deriving sexp]
+
   type maps_t =
     { accounts : Account.t Location_binable.Map.t
     ; token_owners : Account_id.t Token_id.Map.t
@@ -106,6 +108,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; mutable accumulated : (accumulated_t[@sexp.opaque]) option
     ; mutable is_committing : bool
     ; mutable unhashed_accounts : unhashed_account_t list
+    ; mutable derived_token_ids : derived_token_ids_t
     }
   [@@deriving sexp]
 
@@ -119,7 +122,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; non_existent_accounts = Account_id.Set.empty
     }
 
-  let create ~depth () =
+  let create ?(derived_token_ids = Account_id.Map.empty) ~depth () =
     { uuid = Uuid_unix.create ()
     ; parent = Error __LOC__
     ; detached_parent_signal = Async.Ivar.create ()
@@ -129,6 +132,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; maps = empty_maps
     ; is_committing = false
     ; unhashed_accounts = []
+    ; derived_token_ids
     }
 
   let get_uuid { uuid; _ } = uuid
@@ -137,6 +141,8 @@ module Make (Inputs : Inputs_intf.S) = struct
     type parent = Base.t [@@deriving sexp]
 
     type t = unattached [@@deriving sexp]
+
+    let derived_token_ids t = t.derived_token_ids
 
     module Path = Base.Path
     module Addr = Location.Addr
@@ -597,6 +603,13 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           Base.merkle_root ancestor
 
+    let derive_token_id cache owner =
+      match Map.find cache owner with
+      | Some tid ->
+          tid
+      | None ->
+          Account_id.derive_token_id ~owner
+
     let remove_account_and_update_hashes t location =
       (* remove account and key from tables *)
       let account = Option.value_exn (Map.find t.maps.accounts location) in
@@ -608,7 +621,7 @@ module Make (Inputs : Inputs_intf.S) = struct
             Map.remove t.maps.accounts location (* update token info. *)
         ; token_owners =
             Token_id.Map.remove t.maps.token_owners
-              (Account_id.derive_token_id ~owner:account_id)
+              (derive_token_id t.derived_token_ids account_id)
             (* TODO : use stack database to save unused location, which can be used
                when allocating a location *)
         ; locations = Map.remove t.maps.locations account_id
@@ -629,7 +642,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       (* Update token info. *)
       let account_id = Account.identifier account in
       self_set_token_owner t
-        (Account_id.derive_token_id ~owner:account_id)
+        (derive_token_id t.derived_token_ids account_id)
         account_id
 
     (* a write writes only to the mask, parent is not involved
@@ -739,6 +752,7 @@ module Make (Inputs : Inputs_intf.S) = struct
               } )
       ; is_committing = false
       ; unhashed_accounts = t.unhashed_accounts
+      ; derived_token_ids = t.derived_token_ids
       }
 
     let last_filled t =
@@ -810,7 +824,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         List.iter locations_and_accounts ~f:(fun (location, account) ->
             let account_id = Account.identifier account in
             self_set_token_owner t
-              (Account_id.derive_token_id ~owner:account_id)
+              (derive_token_id t.derived_token_ids account_id)
               account_id ;
             self_set_account t location account )
     end)
@@ -893,8 +907,9 @@ module Make (Inputs : Inputs_intf.S) = struct
        from parent on each lookup. I.e. these accounts will be cached in mask and accessing
        them during processing of a transaction won't use disk I/O.
     *)
-    let unsafe_preload_accounts_from_parent t account_ids =
+    let unsafe_preload_accounts_from_parent t ~derived_token_ids account_ids =
       assert_is_attached t ;
+      t.derived_token_ids <- derived_token_ids ;
       let locations = location_of_account_batch t account_ids in
       let non_empty_locations, empty_keys =
         List.partition_map locations ~f:(function
