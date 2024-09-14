@@ -93,18 +93,7 @@ module Base_node_config = struct
   if [ ! -f "$LIBP2P_KEY_PATH" ]; then
     mina libp2p generate-keypair --privkey-path $LIBP2P_KEY_PATH
   fi
-  /bin/chmod -R 700 |}
-      ^ container_keys_path ^ {|/
-  # Import any compatible keys in |}
-      ^ container_keys_path ^ {|/*, excluding certain keys
-  for key_file in |}
-      ^ container_keys_path
-      ^ {|/*; do
-    # Exclude specific keys (e.g., libp2p keys)
-    if [[ "$base_name" != *key && "$base_name" != *.peerid ]]; then
-      mina accounts import -config-directory /root/.mina-config -privkey-path "$key_file"
-    fi
-  done
+  /bin/chmod -R 700 |} ^ {|/
   rm /var/lib/coda/config*
   # Execute the puppeteer script
   exec /mina_daemon_puppeteer.py "$@"
