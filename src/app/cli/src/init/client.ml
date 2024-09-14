@@ -2492,6 +2492,7 @@ let ledger =
     ; ("hash", hash_ledger)
     ; ("currency", currency_in_ledger)
     ; ("test-apply", test_ledger_application)
+    ; ("test-generate-accounts", Cli_lib.Commands.generate_test_ledger)
     ]
 
 let libp2p =
