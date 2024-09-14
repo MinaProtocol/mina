@@ -15,13 +15,11 @@ let rec sexp_to_sexp : Sexp.t -> Sexplib0.Sexp.t = function
 
 let () = ignore sexp_to_sexp
 
-let main (spec_path : string) =
+let main (spec_path : string) ~constraint_constants ~proof_level =
   let module Inputs = Snark_worker.Prod.Inputs in
   let%bind spec = Reader.load_sexp_exn spec_path Inputs.single_spec_of_sexp in
   let%bind worker =
-    Inputs.Worker_state.create
-      ~constraint_constants:Genesis_constants_compiled.Constraint_constants.t
-      ~proof_level:Full ()
+    Inputs.Worker_state.create ~constraint_constants ~proof_level ()
   in
   let message =
     Mina_base.Sok_message.create ~fee:Currency.Fee.zero
@@ -40,6 +38,11 @@ let cmd =
         let open Command.Param in
         flag "--spec" ~doc:"PATH Spec path" (required string)
       in
-      fun () -> Obj.magic (main path))
+      fun () ->
+        let constraint_constants =
+          Genesis_constants.Compiled.constraint_constants
+        in
+        let proof_level = Genesis_constants.Compiled.proof_level in
+        Obj.magic (main path ~constraint_constants ~proof_level))
 
 let () = Command.run cmd

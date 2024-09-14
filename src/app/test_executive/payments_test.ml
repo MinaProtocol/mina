@@ -19,9 +19,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   (* TODO: refactor all currency values to decimal represenation *)
   (* TODO: test account creation fee *)
-  let config =
+  let config ~constants =
     let open Test_config in
-    { default with
+    { (default ~constants) with
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
@@ -378,6 +378,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                Malleable_error.soft_error_format ~value:()
                  "Payment failed for unexpected reason: %s" err_str ) )
     in
+    let constants : Test_config.constants =
+      { genesis_constants = Network.genesis_constants network
+      ; constraint_constants = Network.constraint_constants network
+      }
+    in
+    let config = config ~constants in
     let%bind () =
       section_hard
         "send out a bunch more txns to fill up the snark ledger, then wait for \
