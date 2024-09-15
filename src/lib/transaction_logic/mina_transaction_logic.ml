@@ -1434,7 +1434,9 @@ module Make (L : Ledger_intf.S) :
 
       let is_empty = List.is_empty
 
-      let push_events = Account_update.Actions.push_events
+      let push_events_hash = Account_update.Actions.push_events_hash
+
+      let hash = Account_update.Actions.hash
     end
 
     module Zkapp_uri = struct
@@ -1998,6 +2000,15 @@ module Make (L : Ledger_intf.S) :
         let tx_commitment_on_start, full_commitment_on_start =
           commitments_on_start ~memo_hash init_account_update_result
         in
+        let actions_hash_map =
+          Zkapp_command.Call_forest.fold all_account_updates
+            ~init:Account_update.Actions.Map.empty ~f:(fun acc el ->
+              let actions = el.body.actions in
+              if not @@ Map.mem acc actions then
+                Map.add_exn acc ~key:actions
+                  ~data:(Account_update.Actions.hash actions)
+              else acc )
+        in
         { memo_hash
         ; derived_token_ids
         ; zkapp_precomputed =
@@ -2006,6 +2017,7 @@ module Make (L : Ledger_intf.S) :
               ; init_account_update_result
               ; tx_commitment_on_start
               ; full_commitment_on_start
+              ; lookup_actions_hash = Map.find actions_hash_map
               }
         }
 

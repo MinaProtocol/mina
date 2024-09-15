@@ -176,7 +176,9 @@ module type Actions_intf = sig
 
   val is_empty : t -> bool
 
-  val push_events : field -> t -> field
+  val push_events_hash : acc:field -> field -> field
+
+  val hash : t -> field
 end
 
 module type Protocol_state_precondition_intf = sig
@@ -1066,12 +1068,15 @@ module Make (Inputs : Inputs_intf) = struct
     ; new_call_stack
     }
 
-  let update_action_state (action_state : _ Pickles_types.Vector.t) actions
-      ~txn_global_slot ~last_action_slot =
+  let update_action_state (action_state : _ Pickles_types.Vector.t)
+      ?actions_hash actions ~txn_global_slot ~last_action_slot =
     (* Push events to s1. *)
     let [ s1'; s2'; s3'; s4'; s5' ] = action_state in
     let is_empty = Actions.is_empty actions in
-    let s1_updated = Actions.push_events s1' actions in
+    let actions_hash =
+      match actions_hash with None -> Actions.hash actions | Some h -> h
+    in
+    let s1_updated = Actions.push_events_hash ~acc:s1' actions_hash in
     let s1 = Field.if_ is_empty ~then_:s1' ~else_:s1_updated in
     (* Shift along if not empty and last update wasn't this slot *)
     let is_this_slot =
@@ -1100,6 +1105,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; init_account_update_result : get_next_account_update_result
     ; tx_commitment_on_start : Inputs.Transaction_commitment.t
     ; full_commitment_on_start : Inputs.Transaction_commitment.t
+    ; lookup_actions_hash : Actions.t -> Field.t option
     }
 
   (** Type holding transaction-related data that is dependent only on a transaction
@@ -1642,9 +1648,14 @@ module Make (Inputs : Inputs_intf) = struct
     let a, local_state =
       let actions = Account_update.Update.actions account_update in
       let last_action_slot = Account.last_action_slot a in
+      let actions_hash =
+        Option.bind precomputed
+          ~f:(fun { zkapp_precomputed = { lookup_actions_hash; _ }; _ } ->
+            lookup_actions_hash actions )
+      in
       let action_state, last_action_slot =
-        update_action_state (Account.action_state a) actions ~txn_global_slot
-          ~last_action_slot
+        update_action_state (Account.action_state a) ?actions_hash actions
+          ~txn_global_slot ~last_action_slot
       in
       let is_empty =
         (* also computed in update_action_state, but messy to return it *)
