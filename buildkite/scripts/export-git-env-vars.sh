@@ -15,7 +15,7 @@ function find_most_recent_numeric_tag() {
 }
 
 export GITHASH=$(git rev-parse --short=7 HEAD)
-export GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!g; s!_!-!g; s!#!-!g' )
+export GITBRANCH=$(git rev-parse --abbrev-ref HEAD |  sed 's!/!-!g; s!_!-!g; s!#!-!g' )
 
 export THIS_COMMIT_TAG=$(git tag --points-at HEAD)
 export PROJECT="mina"
