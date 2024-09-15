@@ -26,7 +26,12 @@ module Make_events (Inputs : sig
   val deriver_name : string
 end) =
 struct
-  type t = Event.t list [@@deriving compare, sexp]
+  module T = struct
+    type t = Event.t list [@@deriving compare, sexp]
+  end
+
+  include T
+  include Comparable.Make (T)
 
   let empty_hash =
     Hash_prefix_create.salt Inputs.salt_phrase |> Random_oracle.digest
@@ -119,12 +124,13 @@ module Actions = struct
     let salt_phrase = "MinaZkappActionStateEmptyElt" in
     Hash_prefix_create.salt salt_phrase |> Random_oracle.digest
 
-  let push_events (acc : Field.t) (events : t) : Field.t =
-    push_hash acc (hash events)
+  let push_events_hash ~(acc : Field.t) (events_hash : Field.t) : Field.t =
+    push_hash acc events_hash
 
-  let push_events_checked (x : Field.Var.t) (e : var) : Field.Var.t =
+  let push_events_hash_checked ~(acc : Field.Var.t) (e : Field.Var.t) :
+      Field.Var.t =
     Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_actions
-      [| x; Data_as_hash.hash e |]
+      [| acc; e |]
 end
 
 module Zkapp_uri = struct
