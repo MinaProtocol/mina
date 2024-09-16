@@ -73,7 +73,7 @@ module type S = sig
   val digest :
        field Sponge.Params.t
     -> Inputs.Field.t Core_kernel.Array.t
-    -> (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.t
+    -> Import.Types.Digest.Constant.t
 end
 
 module Make (Field : Kimchi_backend.Field.S) :
