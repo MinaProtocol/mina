@@ -137,9 +137,9 @@ copy_common_daemon_configs() {
 
   echo "------------------------------------------------------------"
   echo "copy_common_daemon_configs inputs:"
-  echo "Network Name: ${1} (like mainnet, devnet, berkeley)"
+  echo "Network Name: ${1} (like mainnet, devnet)"
   echo "Signature Type: ${2} (mainnet or testnet)"
-  echo "Seed List URL path: ${3} (like seed-lists/berkeley_seeds.txt)"
+  echo "Seed List URL path: ${3} (like seed-lists/devnet_seeds.txt)"
 
   # Copy shared binaries
   cp ../src/app/libp2p_helper/result/bin/libp2p_helper "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
@@ -161,7 +161,6 @@ copy_common_daemon_configs() {
   # Include all useful genesis ledgers
   cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/mainnet.json"
   cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
-  cp ../genesis_ledgers/berkeley.json "${BUILDDIR}/var/lib/coda/berkeley.json"
   # Set the default configuration based on Network name ($1)
   cp ../genesis_ledgers/${1}.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
   cp ../scripts/hardfork/create_runtime_config.sh "${BUILDDIR}/usr/local/bin/mina-hf-create-runtime-config"
@@ -290,20 +289,6 @@ build_rosetta_devnet_deb() {
   
   build_deb mina-rosetta-devnet
 }
-
-##################################### ROSETTA BERKELEY PACKAGE #######################################
-build_rosetta_berkeley_deb() {
- 
-  echo "------------------------------------------------------------"
-  echo "--- Building rosetta berkeley deb"
-
-  create_control_file mina-rosetta-berkeley "${SHARED_DEPS}" 'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
-
-  copy_common_rosetta_configs "testnet"
-  
-  build_deb mina-rosetta-berkeley
-}
-
 
 ##################################### MAINNET PACKAGE #######################################
 build_daemon_mainnet_deb() {
