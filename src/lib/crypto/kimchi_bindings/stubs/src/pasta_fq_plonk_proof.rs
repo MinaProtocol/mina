@@ -5,7 +5,7 @@ use crate::{
     pasta_fq_plonk_verifier_index::CamlPastaFqPlonkVerifierIndex,
     WithLagrangeBasis,
 };
-use ark_ec::AffineCurve;
+use ark_ec::AffineRepr;
 use ark_ff::One;
 use array_init::array_init;
 use groupmap::GroupMap;
@@ -157,7 +157,7 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProofWithPublic<CamlGPallas, CamlFq> {
     fn comm() -> PolyComm<Pallas> {
-        let g = Pallas::prime_subgroup_generator();
+        let g = Pallas::generator();
         PolyComm {
             elems: vec![g, g, g],
         }
@@ -169,7 +169,7 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProofWithPublic<CamlGPallas, Cam
     };
     let prev_challenges = vec![prev.clone(), prev.clone(), prev];
 
-    let g = Pallas::prime_subgroup_generator();
+    let g = Pallas::generator();
     let proof = OpeningProof {
         lr: vec![(g, g), (g, g), (g, g)],
         z1: Fq::one(),
