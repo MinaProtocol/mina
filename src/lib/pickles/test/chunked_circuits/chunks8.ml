@@ -29,7 +29,7 @@ let test () =
       ~num_chunks:8 ~override_wrap_domain:N2 ~name:"chunked_circuits"
       ~constraint_constants (* TODO(mrmr1993): This was misguided.. Delete. *)
       ~choices:(fun ~self:_ ->
-        [ { identifier = "2^19"
+        [ { identifier = "2^18"
           ; prevs = []
           ; main =
               (fun _ ->
@@ -37,7 +37,7 @@ let test () =
                   exists Field.typ ~compute:(fun _ -> Field.Constant.zero)
                 in
                 (* Remember that each of these counts for *half* a row, so we
-                   need 2^17 of them to fill 2^16 columns.
+                   need 2^19 of them to fill 2^18 rows.
                 *)
                 for _ = 0 to 1 lsl 19 do
                   ignore (Field.mul (fresh_zero ()) (fresh_zero ()) : Field.t)
