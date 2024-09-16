@@ -130,35 +130,17 @@ module Consumer_registry = struct
   let register ?commit_id:_ ~id:_ ~processor:_ ~transport:_ = not_implemented
 end
 
-[%%versioned
-module Stable = struct
-  module V1 = struct
-    type t =
-      { null : bool
-      ; metadata : Metadata.Stable.V1.t
-      ; id : Bounded_types.String.Stable.V1.t
-      ; itn_features : bool
-      }
+type t = Metadata.Stable.Latest.t [@@deriving bin_io_unversioned]
 
-    let to_latest = Fn.id
-  end
-end]
+let metadata = Fn.id
 
-let metadata t = t.metadata
+let create ?metadata:_ ?id:_ ?itn_features:_ () = Metadata.empty
 
-let create ?metadata:_ ?(id = "default") ?itn_features:_ () =
-  { null = false; metadata = Metadata.empty; id; itn_features = false }
-
-let null () =
-  { null = true
-  ; metadata = Metadata.empty
-  ; id = "default"
-  ; itn_features = false
-  }
+let null () = Metadata.empty
 
 let extend t _ = t
 
-let change_id t ~id = { t with id }
+let change_id t ~id:_ = t
 
 let raw _ _ = not_implemented ()
 

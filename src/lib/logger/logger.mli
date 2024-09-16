@@ -1,11 +1,6 @@
 open Core_kernel
 
-[%%versioned:
-module Stable : sig
-  module V1 : sig
-    type t
-  end
-end]
+type t [@@deriving bin_io]
 
 module Level : sig
   type t =

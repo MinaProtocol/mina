@@ -44,7 +44,8 @@
   kimchi_pasta
   kimchi_pasta.basic
   ppx_version.runtime
-  gossip_net)
+  gossip_net
+  runtime_config)
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make))
  (instrumentation (backend bisect_ppx))
