@@ -1596,8 +1596,8 @@ module Mutations = struct
           Arg.[ arg "limit" ~doc:"ZkApp commands per block limit." ~typ:int ]
         ~typ:int
         ~doc:"Set zkApp commands per block limit for the block producer."
-        ~resolve:(fun { ctx = _; _ } () limit ->
-          Block_producer.zkapp_cmd_limit := limit ;
+        ~resolve:(fun { ctx = _, mina; _ } () limit ->
+          Mina_lib.zkapp_cmd_limit mina := limit ;
           limit )
 
     let commands =
@@ -2671,15 +2671,8 @@ module Queries = struct
       ~typ:(non_null string)
       ~args:Arg.[]
       ~resolve:(fun { ctx = mina; _ } () ->
-        let configured_name =
-          let open Option.Let_syntax in
-          let cfg = Mina_lib.runtime_config mina in
-          let%bind daemon = cfg.daemon in
-          daemon.network_id
-        in
-        "mina:"
-        ^ Option.value ~default:Mina_compile_config.network_id configured_name
-        )
+        let cfg = Mina_lib.config mina in
+        "mina:" ^ cfg.compile_config.network_id )
 
   let signature_kind =
     field "signatureKind"
@@ -2868,8 +2861,6 @@ let schema_limited =
       ~mutations:[] ~subscriptions:[])
 
 let schema_itn : (bool * Mina_lib.t) Schema.schema =
-  if Mina_compile_config.itn_features then
-    Graphql_async.Schema.(
-      schema Queries.Itn.commands ~mutations:Mutations.Itn.commands
-        ~subscriptions:[])
-  else Graphql_async.Schema.(schema [] ~mutations:[] ~subscriptions:[])
+  Graphql_async.Schema.(
+    schema Queries.Itn.commands ~mutations:Mutations.Itn.commands
+      ~subscriptions:[])
