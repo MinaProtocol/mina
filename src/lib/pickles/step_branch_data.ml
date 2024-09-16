@@ -197,7 +197,7 @@ let create
                 3
             | num_chunks ->
                 let permuts = 7 in
-                ((2 * (permuts + 1) * num_chunks) - 1 + permuts) / permuts )
+                ((2 * (permuts + 1) * num_chunks) - 2 + permuts) / permuts )
         }
       ~public_input ~auxiliary_typ ~self_branches:branches ~proofs_verified
       ~local_signature:widths ~local_signature_length ~local_branches:heights

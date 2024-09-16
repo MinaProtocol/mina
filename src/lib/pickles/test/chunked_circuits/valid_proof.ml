@@ -29,7 +29,7 @@ let test () =
       ~num_chunks:8 ~override_wrap_domain:N2 ~name:"chunked_circuits"
       ~constraint_constants (* TODO(mrmr1993): This was misguided.. Delete. *)
       ~choices:(fun ~self:_ ->
-        [ { identifier = "2^16"
+        [ { identifier = "2^19"
           ; prevs = []
           ; main =
               (fun _ ->

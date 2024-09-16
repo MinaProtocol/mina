@@ -881,7 +881,7 @@ struct
               3
           | num_chunks ->
               let permuts = 7 in
-              ((2 * (permuts + 1) * num_chunks) - 1 + permuts) / permuts )
+              ((2 * (permuts + 1) * num_chunks) - 2 + permuts) / permuts )
       }
     in
     Timer.clock __LOC__ ;

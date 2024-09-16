@@ -19,6 +19,12 @@ let constraint_constants =
   ; fork = None
   }
 
+(*
+Used to fail with
+`(Pickles.verify dlog_check)`
+before the zkrows were fixed in step_branch_data.ml and compile.ml
+*)
+
 let test () =
   let t11 = Sys.time () in
   let _tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
@@ -29,7 +35,7 @@ let test () =
       ~num_chunks:4 ~override_wrap_domain:N1 ~name:"chunked_circuits"
       ~constraint_constants (* TODO(mrmr1993): This was misguided.. Delete. *)
       ~choices:(fun ~self:_ ->
-        [ { identifier = "2^16"
+        [ { identifier = "2^17"
           ; prevs = []
           ; main =
               (fun _ ->
@@ -37,7 +43,7 @@ let test () =
                   exists Field.typ ~compute:(fun _ -> Field.Constant.zero)
                 in
                 (* Remember that each of these counts for *half* a row, so we
-                   need 2^17 of them to fill 2^16 columns.
+                   need 2^18 of them to fill 2^17 rows.
                 *)
                 for _ = 0 to 1 lsl 18 do
                   ignore (Field.mul (fresh_zero ()) (fresh_zero ()) : Field.t)
