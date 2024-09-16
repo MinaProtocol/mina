@@ -1,11 +1,7 @@
 open Core_kernel
 open Signature_lib
 
-module type CONTEXT = sig
-  val signature_kind : Mina_signature_kind.t
-end
-
-module Call_forest(Context :CONTEXT) = struct
+module Call_forest = struct
   let empty = Outside_hash_image.t
 
   module Tree = struct
@@ -150,18 +146,18 @@ module Call_forest(Context :CONTEXT) = struct
         include Digest_intf.S_checked
 
         val create :
-          Account_update.Checked.t -> t
+          chain:Mina_signature_kind.t -> Account_update.Checked.t -> t
 
         val create_body :
-          Account_update.Body.Checked.t -> t
+          chain:Mina_signature_kind.t -> Account_update.Body.Checked.t -> t
       end
 
       include Digest_intf.S_aux with type t := t and type checked := Checked.t
 
-      val create : Account_update.t -> t
+      val create : chain:Mina_signature_kind.t -> Account_update.t -> t
 
       val create_body :
-        Account_update.Body.t -> t
+        chain:Mina_signature_kind.t -> Account_update.Body.t -> t
     end
 
     module rec Forest : sig
@@ -248,7 +244,6 @@ module Call_forest(Context :CONTEXT) = struct
   end
 
   module Make_digest_str
-      (Context : CONTEXT)
       (T : Mina_wire_types.Mina_base.Zkapp_command.Digest_concrete) :
     Make_digest_sig(T).S = struct
     module M = struct
@@ -267,17 +262,17 @@ module Call_forest(Context :CONTEXT) = struct
       module Checked = struct
         include Checked
 
-        let create = Account_update.Checked.digest ~chain:Context.signature_kind
+        let create = Account_update.Checked.digest
 
-        let create_body = Account_update.Body.Checked.digest ~chain:Context.signature_kind
+        let create_body = Account_update.Body.Checked.digest
       end
 
-      let create : Account_update.t -> t =
-        Account_update.digest ~chain:Context.signature_kind
+      let create : chain:Mina_signature_kind.t -> Account_update.t -> t =
+        Account_update.digest
 
       let create_body :
-          Account_update.Body.t -> t =
-        Account_update.Body.digest ~chain:Context.signature_kind
+          chain:Mina_signature_kind.t -> Account_update.Body.t -> t =
+        Account_update.Body.digest
     end
 
     module Forest = struct
@@ -325,10 +320,10 @@ module Call_forest(Context :CONTEXT) = struct
     end
   end
 
-  module Digest(Context : CONTEXT) =
+  module Digest =
     Mina_wire_types.Mina_base.Zkapp_command.Digest_make
       (Make_digest_sig)
-      (Make_digest_str(Context))
+      (Make_digest_str)
 
   let fold = Tree.fold_forest
 

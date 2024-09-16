@@ -208,14 +208,3 @@ module M13 = struct
     end
   end]
 end
-
-module Functor (X : sig type t end) = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = string
-
-      let to_latest = Fn.id
-    end
-  end]
-end

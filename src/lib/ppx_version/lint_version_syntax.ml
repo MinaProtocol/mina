@@ -3,7 +3,6 @@
 open Core_kernel
 open Ppxlib
 open Versioned_util
-module StringSet = Set.Make (String)
 
 let name = "enforce_version_syntax"
 
@@ -75,10 +74,8 @@ let is_versioned_module_inc_decl inc_decl =
   | _ ->
       false
 
-let versioned_in_functor_error loc bad_modules =
-  ( loc
-  , "Cannot use types from functor arguments in versioned module: "
-    ^ String.concat ~sep:", " (StringSet.to_list bad_modules) )
+let versioned_in_functor_error loc =
+  (loc, "Cannot use versioned extension within a functor body")
 
 let include_stable_latest_error loc = (loc, "Cannot include Stable.Latest")
 
@@ -87,7 +84,6 @@ type accumulator =
   ; in_include : bool
   ; in_versioned_ext : bool
   ; module_path : string list
-  ; functor_args : StringSet.t
   ; errors : (Location.t * string) list
   }
 
@@ -241,18 +237,14 @@ let lint_ast =
       let acc' =
         match expr.pmod_desc with
         (* don't match special case of functor with () argument *)
-        | Pmod_functor (Named ({ txt = Some name; _ }, _), body) ->
+        | Pmod_functor (Named _, body) ->
             (* Don't match special case of functor called [Make_str].
                This convention is used when using the [mina_wire_types] library framework.
             *)
             let in_functor =
               match acc.module_path with "Make_str" :: _ -> false | _ -> true
             in
-            self#module_expr body
-              { acc with
-                in_functor
-              ; functor_args = StringSet.add acc.functor_args name
-              }
+            self#module_expr body { acc with in_functor }
         | Pmod_apply
             ( { pmod_desc =
                   Pmod_apply
@@ -413,16 +405,7 @@ let lint_ast =
             | Nonrecursive ->
                 no_errors_fun
             | Recursive ->
-                if acc.in_functor 
-                  then 
-                    let used_modules =
-                      List.fold_right  ~init:StringSet.empty ~f:Versioned_util.collect_types#type_declaration type_decls
-                    in
-                    let bad_modules = Set.inter used_modules acc.functor_args 
-                    in
-                    if Set.is_empty bad_modules 
-                      then validate_version_if_bin_io
-                      else validate_neither_bin_io_nor_version
+                if acc.in_functor then validate_neither_bin_io_nor_version
                 else validate_version_if_bin_io
           in
           let deriving_errors =
@@ -434,14 +417,7 @@ let lint_ast =
         when acc.in_functor
              && String.length name.txt >= 9
              && String.equal (String.sub name.txt ~pos:0 ~len:9) "versioned" ->
-          let used_modules =
-            Versioned_util.collect_types#payload _payload StringSet.empty
-          in
-          let bad_modules = Set.inter used_modules acc.functor_args in
-          if Set.is_empty bad_modules then acc
-          else
-          acc_with_accum_errors acc
-              [ versioned_in_functor_error name.loc bad_modules ]
+          acc_with_accum_errors acc [ versioned_in_functor_error name.loc ]
       | Pstr_extension ((name, PStr [ stri ]), _attrs)
         when String.length name.txt >= 9
              && String.equal (String.sub name.txt ~pos:0 ~len:9) "versioned" ->
@@ -478,7 +454,6 @@ let lint_impl str =
       ; in_include = false
       ; in_versioned_ext = false
       ; module_path = []
-      ; functor_args = StringSet.empty
       ; errors = []
       }
   in
