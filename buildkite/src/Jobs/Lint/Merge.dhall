@@ -73,7 +73,7 @@ in  Pipeline.build
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
             }
-        Command.build
+        , Command.build
             Command.Config::{
             , commands =
               [ Cmd.run "scripts/merged-to-proof-systems.sh develop" ]
