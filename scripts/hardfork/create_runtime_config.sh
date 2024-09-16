@@ -11,11 +11,18 @@ GENESIS_TIMESTAMP=${GENESIS_TIMESTAMP:=$(date -u +"%Y-%m-%dT%H:%M:%SZ" -d "10 mi
 
 # Pull the original genesis timestamp from the pre-fork config file
 ORIGINAL_GENESIS_TIMESTAMP=$(jq -r '.genesis.genesis_state_timestamp' "$FORKING_FROM_CONFIG_JSON")
+OFFSET=$(jq -r '.proof.fork.global_slot_since_genesis' "$FORKING_FROM_CONFIG_JSON")
+
+if [[ "$OFFSET" == null ]]; then
+  OFFSET=0
+fi
 
 DIFFERENCE_IN_SECONDS=$(($(date -d "$GENESIS_TIMESTAMP" "+%s") - $(date -d "$ORIGINAL_GENESIS_TIMESTAMP" "+%s")))
 # Default: mainnet currently uses 180s per slot
 SECONDS_PER_SLOT=${SECONDS_PER_SLOT:=180}
 DIFFERENCE_IN_SLOTS=$(($DIFFERENCE_IN_SECONDS / $SECONDS_PER_SLOT))
+
+SLOT=$((DIFFERENCE_IN_SLOTS+OFFSET))
 
 # jq expression below could be written with less code,
 # but we aimed for maximum verbosity
@@ -28,7 +35,7 @@ jq "{\
         fork: {\
             state_hash: .proof.fork.state_hash,\
             blockchain_length: .proof.fork.blockchain_length,\
-            global_slot_since_genesis: $DIFFERENCE_IN_SLOTS,\
+            global_slot_since_genesis: $SLOT,\
         },\
     },\
     ledger: {\
