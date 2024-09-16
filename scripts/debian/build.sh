@@ -6,11 +6,7 @@ set -eox pipefail
 
 # In case of running this script on detached head, script has difficulties in finding out
 # what is the current 
-while [[ "$#" -gt 0 ]]; do case $1 in
-  -b|--branch-name) BRANCH_NAME_OPT="-b $2"; shift;;
-  *) echo "Unknown parameter passed: $1"; exit 1;;
-esac; shift; done
-
+[[ -n "$BRANCH_NAME" ]] && export BRANCH_NAME_OPT="-b $BRANCH_NAME"
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 source ${SCRIPTPATH}/../export-git-env-vars.sh "$BRANCH_NAME_OPT"
