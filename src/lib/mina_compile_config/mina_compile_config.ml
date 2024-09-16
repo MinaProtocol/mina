@@ -29,6 +29,8 @@ module Inputs = struct
     ; max_action_elements : int
     ; zkapp_cmd_limit_hardcap : int
     ; zkapps_disabled : bool
+    ; slot_chain_end : int option
+    ; slot_tx_end : int option
     }
   [@@deriving yojson]
 end
@@ -55,6 +57,8 @@ type t =
   ; max_action_elements : int
   ; zkapp_cmd_limit_hardcap : int
   ; zkapps_disabled : bool
+  ; slot_chain_end : Mina_numbers.Global_slot_since_hard_fork.t option
+  ; slot_tx_end : Mina_numbers.Global_slot_since_hard_fork.t option
   }
 
 let make (inputs : Inputs.t) =
@@ -88,6 +92,8 @@ let make (inputs : Inputs.t) =
   ; zkapp_cmd_limit = inputs.zkapp_cmd_limit
   ; zkapp_cmd_limit_hardcap = inputs.zkapp_cmd_limit_hardcap
   ; zkapps_disabled = inputs.zkapps_disabled
+  ; slot_chain_end = Option.map ~f:Mina_numbers.Global_slot_since_hard_fork.of_int inputs.slot_chain_end
+  ; slot_tx_end = Option.map ~f:Mina_numbers.Global_slot_since_hard_fork.of_int inputs.slot_tx_end
   }
 
 let to_yojson t =
@@ -162,6 +168,8 @@ module For_unit_tests = struct
       ; zkapp_cmd_limit_hardcap =
           Node_config_for_unit_tests.zkapp_cmd_limit_hardcap
       ; zkapps_disabled = Node_config_for_unit_tests.zkapps_disabled
+      ; slot_chain_end = None
+      ; slot_tx_end = None
       }
     in
     make inputs

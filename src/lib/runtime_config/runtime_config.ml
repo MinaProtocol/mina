@@ -1,24 +1,5 @@
 open Core_kernel
 
-module Fork_config = struct
-  (* Note that length might be smaller than the gernesis_slot
-     or equal if a block was produced in every slot possible. *)
-  type t =
-    { state_hash : string
-    ; blockchain_length : int (* number of blocks produced since genesis *)
-    ; global_slot_since_genesis : int (* global slot since genesis *)
-    }
-  [@@deriving yojson, bin_io_unversioned]
-
-  let gen =
-    let open Quickcheck.Generator.Let_syntax in
-    let%bind global_slot_since_genesis = Int.gen_incl 0 1_000_000 in
-    let%bind blockchain_length = Int.gen_incl 0 global_slot_since_genesis in
-    let%map state_hash = Mina_base.State_hash.gen in
-    let state_hash = Mina_base.State_hash.to_base58_check state_hash in
-    { state_hash; blockchain_length; global_slot_since_genesis }
-end
-
 let yojson_strip_fields ~keep_fields = function
   | `Assoc l ->
       `Assoc
@@ -403,86 +384,6 @@ module Json_layout = struct
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
 
-  module Proof_keys = struct
-    module Transaction_capacity = struct
-      type t =
-        { log_2 : int option [@default None] [@key "2_to_the"]
-        ; txns_per_second_x10 : int option [@default None]
-        }
-      [@@deriving yojson]
-
-      (* we don't deriving the field names here, because the first one differs from the
-         field in the record type
-      *)
-      let fields = [| "2_to_the"; "txns_per_second_x10" |]
-
-      let alternates = [| ("two_to_the", "2_to_the"); ("log_2", "2_to_the") |]
-
-      let of_yojson json =
-        json
-        |> yojson_rename_fields ~alternates
-        |> yojson_strip_fields ~keep_fields:fields
-        |> of_yojson |> dump_on_error json
-    end
-
-    type t =
-      { level : string option [@default None]
-      ; sub_windows_per_window : int option [@default None]
-      ; ledger_depth : int option [@default None]
-      ; work_delay : int option [@default None]
-      ; block_window_duration_ms : int option [@default None]
-      ; transaction_capacity : Transaction_capacity.t option [@default None]
-      ; coinbase_amount : Currency.Amount.t option [@default None]
-      ; supercharged_coinbase_factor : int option [@default None]
-      ; account_creation_fee : Currency.Fee.t option [@default None]
-      ; fork : Fork_config.t option [@default None]
-      }
-    [@@deriving yojson, fields]
-
-    let fields = Fields.names |> Array.of_list
-
-    let of_yojson json = of_yojson_generic ~fields of_yojson json
-  end
-
-  module Genesis = struct
-    type t =
-      { k : int option [@default None]
-      ; delta : int option [@default None]
-      ; slots_per_epoch : int option [@default None]
-      ; slots_per_sub_window : int option [@default None]
-      ; grace_period_slots : int option [@default None]
-      ; genesis_state_timestamp : string option [@default None]
-      }
-    [@@deriving yojson, fields]
-
-    let fields = Fields.names |> Array.of_list
-
-    let of_yojson json = of_yojson_generic ~fields of_yojson json
-  end
-
-  module Daemon = struct
-    type t =
-      { txpool_max_size : int option [@default None]
-      ; peer_list_url : string option [@default None]
-      ; zkapp_proof_update_cost : float option [@default None]
-      ; zkapp_signed_single_update_cost : float option [@default None]
-      ; zkapp_signed_pair_update_cost : float option [@default None]
-      ; zkapp_transaction_cost_limit : float option [@default None]
-      ; max_event_elements : int option [@default None]
-      ; max_action_elements : int option [@default None]
-      ; zkapp_cmd_limit_hardcap : int option [@default None]
-      ; slot_tx_end : int option [@default None]
-      ; slot_chain_end : int option [@default None]
-      ; minimum_user_command_fee : Currency.Fee.t option
-      ; network_id : string option [@default None]
-      }
-    [@@deriving yojson, fields]
-
-    let fields = Fields.names |> Array.of_list
-
-    let of_yojson json = of_yojson_generic ~fields of_yojson json
-  end
-
   module Epoch_data = struct
     module Data = struct
       type t =
@@ -510,17 +411,14 @@ module Json_layout = struct
   end
 
   type t =
-    { daemon : Daemon.t option [@default None]
-    ; genesis : Genesis.t option [@default None]
-    ; proof : Proof_keys.t option [@default None]
+    { daemon : Mina_compile_config.Inputs.t
+    ; genesis : Genesis_constants.Inputs.t
+    ; proof : Genesis_constants.Constraint_constants.Inputs.t
     ; ledger : Ledger.t option [@default None]
     ; epoch_data : Epoch_data.t option [@default None]
     }
-  [@@deriving yojson, fields]
+  [@@deriving yojson]
 
-  let fields = Fields.names |> Array.of_list
-
-  let of_yojson json = of_yojson_generic ~fields of_yojson json
 end
 
 (** JSON representation:
@@ -592,16 +490,10 @@ module Accounts = struct
       }
     [@@deriving bin_io_unversioned, sexp]
 
-    let to_json_layout : t -> Json_layout.Accounts.Single.t = Fn.id
-
     let of_json_layout : Json_layout.Accounts.Single.t -> (t, string) Result.t =
       Result.return
 
-    let to_yojson x = Json_layout.Accounts.Single.to_yojson (to_json_layout x)
-
-    let of_yojson json =
-      Result.bind ~f:of_json_layout (Json_layout.Accounts.Single.of_yojson json)
-
+    let to_yojson = Json_layout.Accounts.Single.to_yojson
     let default = Json_layout.Accounts.Single.default
 
     let of_account (a : Mina_base.Account.t) : (t, string) Result.t =
@@ -748,10 +640,6 @@ module Accounts = struct
       ; zkapp = Option.map ~f:mk_zkapp a.zkapp
       }
 
-    let gen =
-      Quickcheck.Generator.map Mina_base.Account.gen ~f:(fun a ->
-          (* This will never fail with a proper account generator. *)
-          of_account a |> Result.ok_or_failwith )
   end
 
   type single = Single.t =
@@ -771,9 +659,6 @@ module Accounts = struct
 
   type t = Single.t list [@@deriving bin_io_unversioned]
 
-  let to_json_layout : t -> Json_layout.Accounts.t =
-    List.map ~f:Single.to_json_layout
-
   let of_json_layout (t : Json_layout.Accounts.t) : (t, string) Result.t =
     let exception Stop of string in
     try
@@ -786,10 +671,7 @@ module Accounts = struct
                  raise (Stop err) )
     with Stop err -> Error err
 
-  let to_yojson x = Json_layout.Accounts.to_yojson (to_json_layout x)
-
-  let of_yojson json =
-    Result.bind ~f:of_json_layout (Json_layout.Accounts.of_yojson json)
+  let to_yojson x = Json_layout.Accounts.to_yojson (Fn.id x)
 end
 
 module Ledger = struct
@@ -838,9 +720,12 @@ module Ledger = struct
     | Named name ->
         { without_base with name = Some name }
     | Accounts accounts ->
-        { without_base with accounts = Some (Accounts.to_json_layout accounts) }
+        { without_base with accounts = Some accounts }
     | Hash ->
-        without_base
+        without_base  
+
+    let to_yojson x = Json_layout.Ledger.to_yojson (to_json_layout x)
+
 
   let of_json_layout
       ({ accounts
@@ -885,434 +770,18 @@ module Ledger = struct
     ; add_genesis_winner
     }
 
-  let to_yojson x = Json_layout.Ledger.to_yojson (to_json_layout x)
-
-  let of_yojson json =
-    Result.bind ~f:of_json_layout (Json_layout.Ledger.of_yojson json)
-
-  let gen =
-    let open Quickcheck in
-    let open Generator.Let_syntax in
-    let%bind accounts = Generator.list Accounts.Single.gen in
-    let num_accounts = List.length accounts in
-    let balances =
-      List.mapi accounts ~f:(fun number a -> (number, a.balance))
-    in
-    let%bind hash =
-      Mina_base.Ledger_hash.(Generator.map ~f:to_base58_check gen)
-      |> Option.quickcheck_generator
-    in
-    let%bind name = String.gen_nonempty in
-    let%map add_genesis_winner = Bool.quickcheck_generator in
-    { base = Accounts accounts
-    ; num_accounts = Some num_accounts
-    ; balances
-    ; hash
-    ; s3_data_hash = None
-    ; name = Some name
-    ; add_genesis_winner = Some add_genesis_winner
-    }
 end
 
-module Proof_keys = struct
-  module Level = struct
-    type t = Full | Check | None [@@deriving bin_io_unversioned, equal]
-
-    let to_string = function
-      | Full ->
-          "full"
-      | Check ->
-          "check"
-      | None ->
-          "none"
-
-    let of_string str =
-      match String.lowercase str with
-      | "full" ->
-          Ok Full
-      | "check" ->
-          Ok Check
-      | "none" ->
-          Ok None
-      | _ ->
-          Error "Expected one of 'full', 'check', or 'none'"
-
-    let to_json_layout = to_string
-
-    let of_json_layout str =
-      Result.map_error (of_string str) ~f:(fun err ->
-          "Runtime_config.Proof_keys.Level.of_json_layout: Could not decode \
-           field 'level'. " ^ err )
-
-    let to_yojson x = `String (to_json_layout x)
-
-    let of_yojson = function
-      | `String str ->
-          of_json_layout str
-      | _ ->
-          Error
-            "Runtime_config.Proof_keys.Level.of_json_layout: Expected the \
-             field 'level' to contain a string"
-
-    let gen = Quickcheck.Generator.of_list [ Full; Check; None ]
-  end
-
-  module Transaction_capacity = struct
-    type t = Log_2 of int | Txns_per_second_x10 of int
-    [@@deriving bin_io_unversioned]
-
-    let to_json_layout : t -> Json_layout.Proof_keys.Transaction_capacity.t =
-      function
-      | Log_2 i ->
-          { log_2 = Some i; txns_per_second_x10 = None }
-      | Txns_per_second_x10 i ->
-          { log_2 = None; txns_per_second_x10 = Some i }
-
-    let of_json_layout :
-        Json_layout.Proof_keys.Transaction_capacity.t -> (t, string) Result.t =
-      function
-      | { log_2 = Some i; txns_per_second_x10 = None } ->
-          Ok (Log_2 i)
-      | { txns_per_second_x10 = Some i; log_2 = None } ->
-          Ok (Txns_per_second_x10 i)
-      | _ ->
-          Error
-            "Runtime_config.Proof_keys.Transaction_capacity.of_json_layout: \
-             Expected exactly one of the fields '2_to_the' or \
-             'txns_per_second_x10'"
-
-    let to_yojson x =
-      Json_layout.Proof_keys.Transaction_capacity.to_yojson (to_json_layout x)
-
-    let of_yojson json =
-      Result.bind ~f:of_json_layout
-        (Json_layout.Proof_keys.Transaction_capacity.of_yojson json)
-
-    let gen =
-      let open Quickcheck in
-      let log_2_gen =
-        Generator.map ~f:(fun i -> Log_2 i) @@ Int.gen_incl 0 10
-      in
-      let txns_per_second_x10_gen =
-        Generator.map ~f:(fun i -> Txns_per_second_x10 i) @@ Int.gen_incl 0 1000
-      in
-      Generator.union [ log_2_gen; txns_per_second_x10_gen ]
-
-    let small : t = Log_2 2
-
-    let medium : t = Log_2 3
-  end
-
-  type t =
-    { level : Level.t option
-    ; sub_windows_per_window : int option
-    ; ledger_depth : int option
-    ; work_delay : int option
-    ; block_window_duration_ms : int option
-    ; transaction_capacity : Transaction_capacity.t option
-    ; coinbase_amount : Currency.Amount.Stable.Latest.t option
-    ; supercharged_coinbase_factor : int option
-    ; account_creation_fee : Currency.Fee.Stable.Latest.t option
-    ; fork : Fork_config.t option
-    }
-  [@@deriving bin_io_unversioned]
-
-  let make ?level ?sub_windows_per_window ?ledger_depth ?work_delay
-      ?block_window_duration_ms ?transaction_capacity ?coinbase_amount
-      ?supercharged_coinbase_factor ?account_creation_fee ?fork () =
-    { level
-    ; sub_windows_per_window
-    ; ledger_depth
-    ; work_delay
-    ; block_window_duration_ms
-    ; transaction_capacity
-    ; coinbase_amount
-    ; supercharged_coinbase_factor
-    ; account_creation_fee
-    ; fork
-    }
-
-  let to_json_layout
-      { level
-      ; sub_windows_per_window
-      ; ledger_depth
-      ; work_delay
-      ; block_window_duration_ms
-      ; transaction_capacity
-      ; coinbase_amount
-      ; supercharged_coinbase_factor
-      ; account_creation_fee
-      ; fork
-      } =
-    { Json_layout.Proof_keys.level = Option.map ~f:Level.to_json_layout level
-    ; sub_windows_per_window
-    ; ledger_depth
-    ; work_delay
-    ; block_window_duration_ms
-    ; transaction_capacity =
-        Option.map ~f:Transaction_capacity.to_json_layout transaction_capacity
-    ; coinbase_amount
-    ; supercharged_coinbase_factor
-    ; account_creation_fee
-    ; fork
-    }
-
-  let of_json_layout
-      { Json_layout.Proof_keys.level
-      ; sub_windows_per_window
-      ; ledger_depth
-      ; work_delay
-      ; block_window_duration_ms
-      ; transaction_capacity
-      ; coinbase_amount
-      ; supercharged_coinbase_factor
-      ; account_creation_fee
-      ; fork
-      } =
-    let open Result.Let_syntax in
-    let%map level = result_opt ~f:Level.of_json_layout level
-    and transaction_capacity =
-      result_opt ~f:Transaction_capacity.of_json_layout transaction_capacity
-    in
-    { level
-    ; sub_windows_per_window
-    ; ledger_depth
-    ; work_delay
-    ; block_window_duration_ms
-    ; transaction_capacity
-    ; coinbase_amount
-    ; supercharged_coinbase_factor
-    ; account_creation_fee
-    ; fork
-    }
-
-  let to_yojson x = Json_layout.Proof_keys.to_yojson (to_json_layout x)
-
-  let of_yojson json =
-    Result.bind ~f:of_json_layout (Json_layout.Proof_keys.of_yojson json)
-
-  let combine t1 t2 =
-    { level = opt_fallthrough ~default:t1.level t2.level
-    ; sub_windows_per_window =
-        opt_fallthrough ~default:t1.sub_windows_per_window
-          t2.sub_windows_per_window
-    ; ledger_depth = opt_fallthrough ~default:t1.ledger_depth t2.ledger_depth
-    ; work_delay = opt_fallthrough ~default:t1.work_delay t2.work_delay
-    ; block_window_duration_ms =
-        opt_fallthrough ~default:t1.block_window_duration_ms
-          t2.block_window_duration_ms
-    ; transaction_capacity =
-        opt_fallthrough ~default:t1.transaction_capacity t2.transaction_capacity
-    ; coinbase_amount =
-        opt_fallthrough ~default:t1.coinbase_amount t2.coinbase_amount
-    ; supercharged_coinbase_factor =
-        opt_fallthrough ~default:t1.supercharged_coinbase_factor
-          t2.supercharged_coinbase_factor
-    ; account_creation_fee =
-        opt_fallthrough ~default:t1.account_creation_fee t2.account_creation_fee
-    ; fork = opt_fallthrough ~default:t1.fork t2.fork
-    }
-
-  let gen =
-    let open Quickcheck.Generator.Let_syntax in
-    let%bind level = Level.gen in
-    let%bind sub_windows_per_window = Int.gen_incl 0 1000 in
-    let%bind ledger_depth = Int.gen_incl 0 64 in
-    let%bind work_delay = Int.gen_incl 0 1000 in
-    let%bind block_window_duration_ms = Int.gen_incl 1_000 360_000 in
-    let%bind transaction_capacity = Transaction_capacity.gen in
-    let%bind coinbase_amount =
-      Currency.Amount.(gen_incl zero (of_mina_int_exn 1))
-    in
-    let%bind supercharged_coinbase_factor = Int.gen_incl 0 100 in
-    let%bind account_creation_fee =
-      Currency.Fee.(gen_incl one (of_mina_int_exn 10))
-    in
-    let%map fork =
-      let open Quickcheck.Generator in
-      union [ map ~f:Option.some Fork_config.gen; return None ]
-    in
-    { level = Some level
-    ; sub_windows_per_window = Some sub_windows_per_window
-    ; ledger_depth = Some ledger_depth
-    ; work_delay = Some work_delay
-    ; block_window_duration_ms = Some block_window_duration_ms
-    ; transaction_capacity = Some transaction_capacity
-    ; coinbase_amount = Some coinbase_amount
-    ; supercharged_coinbase_factor = Some supercharged_coinbase_factor
-    ; account_creation_fee = Some account_creation_fee
-    ; fork
-    }
-end
-
-module Genesis = struct
-  type t = Json_layout.Genesis.t =
-    { k : int option (* the depth of finality constant (in slots) *)
-    ; delta : int option (* max permissible delay of packets (in slots) *)
-    ; slots_per_epoch : int option
-    ; slots_per_sub_window : int option
-    ; grace_period_slots : int option
-    ; genesis_state_timestamp : string option
-    }
-  [@@deriving bin_io_unversioned]
-
-  let to_json_layout : t -> Json_layout.Genesis.t = Fn.id
-
-  let of_json_layout : Json_layout.Genesis.t -> (t, string) Result.t =
-    Result.return
-
-  let to_yojson x = Json_layout.Genesis.to_yojson (to_json_layout x)
-
-  let of_yojson json =
-    Result.bind ~f:of_json_layout (Json_layout.Genesis.of_yojson json)
-
-  let combine t1 t2 =
-    { k = opt_fallthrough ~default:t1.k t2.k
-    ; delta = opt_fallthrough ~default:t1.delta t2.delta
-    ; slots_per_epoch =
-        opt_fallthrough ~default:t1.slots_per_epoch t2.slots_per_epoch
-    ; slots_per_sub_window =
-        opt_fallthrough ~default:t1.slots_per_sub_window t2.slots_per_sub_window
-    ; grace_period_slots =
-        opt_fallthrough ~default:t1.grace_period_slots t2.grace_period_slots
-    ; genesis_state_timestamp =
-        opt_fallthrough ~default:t1.genesis_state_timestamp
-          t2.genesis_state_timestamp
-    }
-
-  let gen =
-    let open Quickcheck.Generator.Let_syntax in
-    let%bind k = Int.gen_incl 0 1000 in
-    let%bind delta = Int.gen_incl 0 1000 in
-    let%bind slots_per_epoch = Int.gen_incl 1 1_000_000 in
-    let%bind slots_per_sub_window = Int.gen_incl 1 1_000 in
-    let%bind grace_period_slots =
-      Quickcheck.Generator.union
-        [ return None
-        ; Quickcheck.Generator.map ~f:Option.some @@ Int.gen_incl 0 1000
-        ]
-    in
-    let%map genesis_state_timestamp =
-      Time.(gen_incl epoch (of_string "2050-01-01 00:00:00Z"))
-      |> Quickcheck.Generator.map ~f:Time.to_string
-    in
-    { k = Some k
-    ; delta = Some delta
-    ; slots_per_epoch = Some slots_per_epoch
-    ; slots_per_sub_window = Some slots_per_sub_window
-    ; grace_period_slots
-    ; genesis_state_timestamp = Some genesis_state_timestamp
-    }
-end
-
-module Daemon = struct
-  (* Peer list URL should usually be None. This option is better provided with
-     a command line argument. Putting it in the config makes the network explicitly
-     rely on a certain number of nodes, reducing decentralisation. See #14766 *)
-  type t = Json_layout.Daemon.t =
-    { txpool_max_size : int option
-    ; peer_list_url : string option
-    ; zkapp_proof_update_cost : float option [@default None]
-    ; zkapp_signed_single_update_cost : float option [@default None]
-    ; zkapp_signed_pair_update_cost : float option [@default None]
-    ; zkapp_transaction_cost_limit : float option [@default None]
-    ; max_event_elements : int option [@default None]
-    ; max_action_elements : int option [@default None]
-    ; zkapp_cmd_limit_hardcap : int option [@default None]
-    ; slot_tx_end : int option [@default None]
-    ; slot_chain_end : int option [@default None]
-    ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t option
-          [@default None]
-    ; network_id : string option [@default None]
-    }
-  [@@deriving bin_io_unversioned]
-
-  let to_json_layout : t -> Json_layout.Daemon.t = Fn.id
-
-  let of_json_layout : Json_layout.Daemon.t -> (t, string) Result.t =
-    Result.return
-
-  let to_yojson x = Json_layout.Daemon.to_yojson (to_json_layout x)
-
-  let of_yojson json =
-    Result.bind ~f:of_json_layout (Json_layout.Daemon.of_yojson json)
-
-  let combine t1 t2 =
-    { txpool_max_size =
-        opt_fallthrough ~default:t1.txpool_max_size t2.txpool_max_size
-    ; peer_list_url = opt_fallthrough ~default:t1.peer_list_url t2.peer_list_url
-    ; zkapp_proof_update_cost =
-        opt_fallthrough ~default:t1.zkapp_proof_update_cost
-          t2.zkapp_proof_update_cost
-    ; zkapp_signed_single_update_cost =
-        opt_fallthrough ~default:t1.zkapp_signed_single_update_cost
-          t2.zkapp_signed_single_update_cost
-    ; zkapp_signed_pair_update_cost =
-        opt_fallthrough ~default:t1.zkapp_signed_pair_update_cost
-          t2.zkapp_signed_pair_update_cost
-    ; zkapp_transaction_cost_limit =
-        opt_fallthrough ~default:t1.zkapp_transaction_cost_limit
-          t2.zkapp_transaction_cost_limit
-    ; max_event_elements =
-        opt_fallthrough ~default:t1.max_event_elements t2.max_event_elements
-    ; max_action_elements =
-        opt_fallthrough ~default:t1.max_action_elements t2.max_action_elements
-    ; zkapp_cmd_limit_hardcap =
-        opt_fallthrough ~default:t1.zkapp_cmd_limit_hardcap
-          t2.zkapp_cmd_limit_hardcap
-    ; slot_tx_end = opt_fallthrough ~default:t1.slot_tx_end t2.slot_tx_end
-    ; slot_chain_end =
-        opt_fallthrough ~default:t1.slot_chain_end t2.slot_chain_end
-    ; minimum_user_command_fee =
-        opt_fallthrough ~default:t1.minimum_user_command_fee
-          t2.minimum_user_command_fee
-    ; network_id = opt_fallthrough ~default:t1.network_id t2.network_id
-    }
-
-  let gen =
-    let open Quickcheck.Generator.Let_syntax in
-    let%bind txpool_max_size = Int.gen_incl 0 1000 in
-    let%bind zkapp_proof_update_cost = Float.gen_incl 0.0 100.0 in
-    let%bind zkapp_signed_single_update_cost = Float.gen_incl 0.0 100.0 in
-    let%bind zkapp_signed_pair_update_cost = Float.gen_incl 0.0 100.0 in
-    let%bind zkapp_transaction_cost_limit = Float.gen_incl 0.0 100.0 in
-    let%bind max_event_elements = Int.gen_incl 0 100 in
-    let%bind zkapp_cmd_limit_hardcap = Int.gen_incl 0 1000 in
-    let%bind minimum_user_command_fee =
-      Currency.Fee.(gen_incl one (of_mina_int_exn 10))
-    in
-    let%map max_action_elements = Int.gen_incl 0 1000 in
-    { txpool_max_size = Some txpool_max_size
-    ; peer_list_url = None
-    ; zkapp_proof_update_cost = Some zkapp_proof_update_cost
-    ; zkapp_signed_single_update_cost = Some zkapp_signed_single_update_cost
-    ; zkapp_signed_pair_update_cost = Some zkapp_signed_pair_update_cost
-    ; zkapp_transaction_cost_limit = Some zkapp_transaction_cost_limit
-    ; max_event_elements = Some max_event_elements
-    ; max_action_elements = Some max_action_elements
-    ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
-    ; slot_tx_end = None
-    ; slot_chain_end = None
-    ; minimum_user_command_fee = Some minimum_user_command_fee
-    ; network_id = None
-    }
-end
 
 module Epoch_data = struct
   module Data = struct
     type t = { ledger : Ledger.t; seed : string }
-    [@@deriving bin_io_unversioned, yojson]
-
-    let gen =
-      let open Quickcheck.Generator.Let_syntax in
-      let%bind ledger = Ledger.gen in
-      let%map seed = String.gen_nonempty in
-      { ledger; seed }
+    [@@deriving bin_io_unversioned, to_yojson]
   end
 
   type t =
     { staking : Data.t; next : Data.t option (*If None, then next = staking*) }
-  [@@deriving bin_io_unversioned, yojson]
+  [@@deriving bin_io_unversioned, to_yojson]
 
   let to_json_layout : t -> Json_layout.Epoch_data.t =
    fun { staking; next } ->
@@ -1380,117 +849,89 @@ module Epoch_data = struct
 
   let to_yojson x = Json_layout.Epoch_data.to_yojson (to_json_layout x)
 
-  let of_yojson json =
-    Result.bind ~f:of_json_layout (Json_layout.Epoch_data.of_yojson json)
-
-  let gen =
-    let open Quickcheck.Generator.Let_syntax in
-    let%bind staking = Data.gen in
-    let%map next = Option.quickcheck_generator Data.gen in
-    { staking; next }
 end
 
 type t =
-  { daemon : Daemon.t option
-  ; genesis : Genesis.t option
-  ; proof : Proof_keys.t option
+  { compile_config : Mina_compile_config.t
+  ; genesis_constants : Genesis_constants.t
+  ; constraint_constants : Genesis_constants.Constraint_constants.t
   ; ledger : Ledger.t option
   ; epoch_data : Epoch_data.t option
-  }
-[@@deriving bin_io_unversioned]
-
-let make ?daemon ?genesis ?proof ?ledger ?epoch_data () =
-  { daemon; genesis; proof; ledger; epoch_data }
-
-let to_json_layout { daemon; genesis; proof; ledger; epoch_data } =
-  { Json_layout.daemon = Option.map ~f:Daemon.to_json_layout daemon
-  ; genesis = Option.map ~f:Genesis.to_json_layout genesis
-  ; proof = Option.map ~f:Proof_keys.to_json_layout proof
-  ; ledger = Option.map ~f:Ledger.to_json_layout ledger
-  ; epoch_data = Option.map ~f:Epoch_data.to_json_layout epoch_data
-  }
+  } [@@deriving to_yojson]
 
 let of_json_layout { Json_layout.daemon; genesis; proof; ledger; epoch_data } =
   let open Result.Let_syntax in
-  let%map daemon = result_opt ~f:Daemon.of_json_layout daemon
-  and genesis = result_opt ~f:Genesis.of_json_layout genesis
-  and proof = result_opt ~f:Proof_keys.of_json_layout proof
-  and ledger = result_opt ~f:Ledger.of_json_layout ledger
+  let compile_config = Mina_compile_config.make daemon in
+  let genesis_constants = Genesis_constants.make genesis in
+  let constraint_constants = Genesis_constants.Constraint_constants.make proof in
+  let%map ledger = result_opt ~f:Ledger.of_json_layout ledger
   and epoch_data = result_opt ~f:Epoch_data.of_json_layout epoch_data in
-  { daemon; genesis; proof; ledger; epoch_data }
+  { compile_config; genesis_constants; constraint_constants; ledger; epoch_data }
 
-let to_yojson x = Json_layout.to_yojson (to_json_layout x)
 
-let to_yojson_without_accounts x =
-  let layout = to_json_layout x in
+let format_as_json_without_accounts (x : t) =
   let genesis_accounts =
-    let%bind.Option { accounts; _ } = layout.ledger in
+    let%bind.Option { accounts; _ } =
+      Option.map ~f:Ledger.to_json_layout x.ledger
+    in
     Option.map ~f:List.length accounts
   in
   let staking_accounts =
-    let%bind.Option { staking; _ } = layout.epoch_data in
-    Option.map ~f:List.length staking.accounts
+    let%bind.Option { staking; _ } = x.epoch_data in
+    Option.map ~f:List.length (Ledger.to_json_layout staking.ledger).accounts
   in
   let next_accounts =
-    let%bind.Option { next; _ } = layout.epoch_data in
-    let%bind.Option { accounts; _ } = next in
-    Option.map ~f:List.length accounts
+    let%bind.Option { next; _ } = x.epoch_data in
+    let%bind.Option { ledger; _ } = next in
+    Option.map ~f:List.length (Ledger.to_json_layout ledger).accounts
   in
-  let layout =
-    let f ledger = { ledger with Json_layout.Ledger.accounts = None } in
-    { layout with
-      ledger = Option.map ~f layout.ledger
-    ; epoch_data =
-        Option.map layout.epoch_data ~f:(fun { staking; next } ->
-            { Json_layout.Epoch_data.staking = { staking with accounts = None }
-            ; next = Option.map next ~f:(fun n -> { n with accounts = None })
+  let f ledger =
+    { (Ledger.to_json_layout ledger) with Json_layout.Ledger.accounts = None }
+  in
+  let g ({ staking; next } : Epoch_data.t) =
+    { Json_layout.Epoch_data.staking =
+        (let l = f staking.ledger in
+         { accounts = None
+         ; seed = staking.seed
+         ; hash = l.hash
+         ; s3_data_hash = l.s3_data_hash
+         } )
+    ; next =
+        Option.map next ~f:(fun n ->
+            let l = f n.ledger in
+            { Json_layout.Epoch_data.Data.accounts = None
+            ; seed = n.seed
+            ; hash = l.hash
+            ; s3_data_hash = l.s3_data_hash
             } )
     }
   in
-  ( Json_layout.to_yojson layout
+  let json =
+    `Assoc
+      [ ("daemon", Mina_compile_config.to_yojson x.compile_config)
+      ; ("genesis", Genesis_constants.to_yojson x.genesis_constants)
+      ; ("proof", Genesis_constants.Constraint_constants.to_yojson x.constraint_constants)
+      ; ( "ledger"
+        , Option.value_map ~default:`Null ~f:Json_layout.Ledger.to_yojson
+            (Option.map ~f x.ledger) )
+      ; ( "epoch_data"
+        , Option.value_map ~default:`Null ~f:Json_layout.Epoch_data.to_yojson
+            (Option.map ~f:g x.epoch_data) )
+      ]
+  in
+  ( json
   , `Accounts_omitted
       (`Genesis genesis_accounts, `Staking staking_accounts, `Next next_accounts)
   )
 
 let of_yojson json = Result.bind ~f:of_json_layout (Json_layout.of_yojson json)
 
-let default =
-  { daemon = None
-  ; genesis = None
-  ; proof = None
+let default ~compile_config ~genesis_constants ~constraint_constants =
+  { compile_config
+  ; genesis_constants
+  ; constraint_constants
   ; ledger = None
   ; epoch_data = None
-  }
-
-let combine t1 t2 =
-  let merge ~combine t1 t2 =
-    match (t1, t2) with
-    | Some t1, Some t2 ->
-        Some (combine t1 t2)
-    | Some t, None | None, Some t ->
-        Some t
-    | None, None ->
-        None
-  in
-  { daemon = merge ~combine:Daemon.combine t1.daemon t2.daemon
-  ; genesis = merge ~combine:Genesis.combine t1.genesis t2.genesis
-  ; proof = merge ~combine:Proof_keys.combine t1.proof t2.proof
-  ; ledger = opt_fallthrough ~default:t1.ledger t2.ledger
-  ; epoch_data = opt_fallthrough ~default:t1.epoch_data t2.epoch_data
-  }
-
-let gen =
-  let open Quickcheck.Generator.Let_syntax in
-  let%map daemon = Daemon.gen
-  and genesis = Genesis.gen
-  and proof = Proof_keys.gen
-  and ledger = Ledger.gen
-  and epoch_data = Epoch_data.gen in
-  { daemon = Some daemon
-  ; genesis = Some genesis
-  ; proof = Some proof
-  ; ledger = Some ledger
-  ; epoch_data = Some epoch_data
   }
 
 let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
@@ -1524,7 +965,7 @@ let ledger_of_accounts accounts =
 
 let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
     ~blockchain_length ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
-    ~next_epoch_seed =
+    ~next_epoch_seed ~genesis_constants ~constraint_constants ~compile_config =
   let open Async.Deferred.Result.Let_syntax in
   let global_slot_since_genesis =
     Mina_numbers.Global_slot_since_genesis.to_int global_slot_since_genesis
@@ -1544,10 +985,12 @@ let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
     @@ Mina_ledger.Ledger.merkle_root staged_ledger
   in
   let fork =
-    Fork_config.
-      { state_hash = Mina_base.State_hash.to_base58_check state_hash
-      ; blockchain_length
-      ; global_slot_since_genesis
+    Genesis_constants.Fork_constants.
+      { state_hash
+      ; blockchain_length = Mina_numbers.Length.of_int blockchain_length
+      ; global_slot_since_genesis =
+          Mina_numbers.Global_slot_since_genesis.of_int
+            global_slot_since_genesis
       }
   in
   let%bind () = yield () in
@@ -1572,29 +1015,29 @@ let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
             { ledger = ledger_of_accounts accounts; seed = next_epoch_seed } )
     }
   in
-  make
-  (* add_genesis_winner must be set to false, because this
-     config effectively creates a continuation of the current
-     blockchain state and therefore the genesis ledger already
-     contains the winner of the previous block. No need to
-     artificially add it. In fact, it wouldn't work at all,
-     because the new node would try to create this account at
-     startup, even though it already exists, leading to an error.*)
-    ~epoch_data
-    ~ledger:
-      { base = Accounts accounts
-      ; num_accounts = None
-      ; balances = []
-      ; hash
-      ; s3_data_hash = None
-      ; name = None
-      ; add_genesis_winner = Some false
-      }
-    ~proof:(Proof_keys.make ~fork ()) ()
+  { (* add_genesis_winner must be set to false, because this
+       config effectively creates a continuation of the current
+       blockchain state and therefore the genesis ledger already
+       contains the winner of the previous block. No need to
+       artificially add it. In fact, it wouldn't work at all,
+       because the new node would try to create this account at
+       startup, even though it already exists, leading to an error.*)
+    epoch_data = Some epoch_data
+  ; ledger =
+      Some
+        { Ledger.base = Accounts accounts
+        ; num_accounts = None
+        ; balances = []
+        ; hash
+        ; s3_data_hash = None
+        ; name = None
+        ; add_genesis_winner = Some false
+        }
+  ; constraint_constants = { constraint_constants with fork = Some fork }
+  ; genesis_constants
+  ; compile_config 
+  }
 
-let slot_tx_end, slot_chain_end =
-  let f get_runtime t =
-    let open Option.Let_syntax in
-    t.daemon >>= get_runtime >>| Mina_numbers.Global_slot_since_hard_fork.of_int
-  in
-  (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))
+let slot_chain_end (config : t) = config.compile_config.slot_chain_end
+
+let slot_tx_end config = config.compile_config.slot_tx_end
