@@ -149,7 +149,7 @@ let apply_txs ~action_elements ~event_elements ~constraint_constants
   in
   Ledger.unsafe_preload_accounts_from_parent ledger accounts_accessed ;
   let start = Time.now () in
-  match%map
+  match
     Staged_ledger.Test_helpers.update_coinbase_stack_and_get_data_impl
       ~first_partition_slots ~is_new_stack:(not no_new_stack)
       ~no_second_partition:(not has_second_partition) ~constraint_constants
@@ -222,17 +222,17 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
   printf !"Init root %s\n%!" (Ledger_hash.to_base58_check init_root) ;
   Deferred.List.fold (List.init rounds ~f:ident) ~init:(init_ledger, [])
     ~f:(fun (ledger, ledgers) i ->
-      let%bind () =
+      let%map () =
         if tracing && i = 1 then Mina_tracing.start "." else Deferred.unit
       in
       List.hd (List.drop ledgers (max_depth - 1))
       |> Option.iter ~f:drop_old_ledger ;
       apply ~action_elements:0 ~event_elements:0 ~num_txs:num_txs_per_round ~i
         ledger
-      >>| mask_handler ledger
-      >>| Fn.flip Tuple2.create (ledger :: ledgers) )
+      |> mask_handler ledger
+      |> Fn.flip Tuple2.create (ledger :: ledgers) )
   >>| fst
-  >>= apply ~num_txs:num_txs_final
+  >>| apply ~num_txs:num_txs_final
         ~action_elements:genesis_constants.max_action_elements
         ~event_elements:genesis_constants.max_event_elements ~i:rounds
   >>| stop_tracing
