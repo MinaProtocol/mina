@@ -14,7 +14,7 @@ echo " Includes mina daemon, archive-node, rosetta, generate keypair for devnet"
 
 
 echo "--- Prepare debian packages"
-./scripts/debian/build.sh $@
+./scripts/debian/build.sh -b "$BUILDKIE_BRANCH" $@
 
 echo "--- Git diff after build is complete:"
 git diff --exit-code -- .
