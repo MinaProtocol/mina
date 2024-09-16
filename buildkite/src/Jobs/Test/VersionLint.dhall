@@ -48,6 +48,7 @@ let buildTestCmd
             , target = cmd_target
             , docker = None Docker.Type
             , depends_on = dependsOn
+            , soft_fail = Some soft_fail
             , artifact_paths = [ S.contains "core_dumps/*" ]
             }
 
