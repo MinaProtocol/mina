@@ -101,6 +101,15 @@ let%test_module "Epoch ledger sync tests" =
         let time_controller = time_controller
 
         let commit_id = "not specified for unit test"
+
+        let vrf_poll_interval =
+          Mina_compile_config.For_unit_tests.t.vrf_poll_interval
+
+        let zkapp_cmd_limit =
+          ref Mina_compile_config.For_unit_tests.t.zkapp_cmd_limit
+
+        let compaction_interval =
+          Mina_compile_config.For_unit_tests.t.compaction_interval
       end in
       let genesis_ledger =
         lazy
