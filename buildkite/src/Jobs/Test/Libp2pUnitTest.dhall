@@ -14,8 +14,6 @@ let Command = ../../Command/Base.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
 
-let Size = ../../Command/Size.dhall
-
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -47,7 +45,6 @@ in  Pipeline.build
               ]
             , label = "libp2p unit-tests"
             , key = "libp2p-unit-tests"
-            , target = Size.Large
             , docker = None Docker.Type
             }
         , Command.build
@@ -63,7 +60,6 @@ in  Pipeline.build
               ]
             , label = "libp2p bitswap QuickCheck"
             , key = "libp2p-bs-qc"
-            , target = Size.Large
             , docker = None Docker.Type
             , timeout_in_minutes = Some +45
             }

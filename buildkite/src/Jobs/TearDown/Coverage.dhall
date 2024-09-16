@@ -4,8 +4,6 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let Command = ../../Command/Base.dhall
 
-let Size = ../../Command/Size.dhall
-
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -29,7 +27,6 @@ in  Pipeline.build
                   "buildkite/scripts/finish-coverage-data-upload.sh"
             , label = "Finish coverage data gathering"
             , key = "finish-coverage-data"
-            , target = Size.Small
             }
         ]
       }

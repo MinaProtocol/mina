@@ -20,8 +20,6 @@ let PipelineFilter = ./Pipeline/Filter.dhall
 
 let PipelineTag = ./Pipeline/Tag.dhall
 
-let Size = ./Command/Size.dhall
-
 let triggerCommand = ./Pipeline/TriggerCommand.dhall
 
 let jobs
@@ -121,7 +119,6 @@ in      \(args : { filter : PipelineFilter.Type, mode : PipelineMode.Type })
                       , label =
                           "Monorepo triage ${PipelineFilter.show args.filter}"
                       , key = "cmds-${PipelineFilter.show args.filter}"
-                      , target = Size.Small
                       , docker = Some Docker::{
                         , image =
                             (./Constants/ContainerImages.dhall).toolchainBase

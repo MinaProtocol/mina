@@ -14,8 +14,6 @@ let Command = ../../Command/Base.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
 
-let Size = ../../Command/Size.dhall
-
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 in  Pipeline.build
@@ -33,7 +31,6 @@ in  Pipeline.build
               [ Cmd.run "buildkite/scripts/merges-cleanly.sh compatible" ]
             , label = "Check merges cleanly into compatible"
             , key = "clean-merge-compatible"
-            , target = Size.Small
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
@@ -44,7 +41,6 @@ in  Pipeline.build
               [ Cmd.run "buildkite/scripts/merges-cleanly.sh develop" ]
             , label = "Check merges cleanly into develop"
             , key = "clean-merge-develop"
-            , target = Size.Small
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
@@ -55,7 +51,6 @@ in  Pipeline.build
               [ Cmd.run "buildkite/scripts/merges-cleanly.sh master" ]
             , label = "Check merges cleanly into master"
             , key = "clean-merge-master"
-            , target = Size.Small
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
@@ -68,7 +63,6 @@ in  Pipeline.build
                 "[proof-systems] Check merges cleanly into proof-systems compatible branch"
             , key = "merged-to-proof-systems-compatible"
             , soft_fail = Some (B/SoftFail.Boolean True)
-            , target = Size.Small
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
@@ -81,7 +75,6 @@ in  Pipeline.build
                 "[proof-systems] Check merges cleanly into proof-systems berkeley branch"
             , key = "merged-to-proof-systems-berkeley"
             , soft_fail = Some (B/SoftFail.Boolean True)
-            , target = Size.Small
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
@@ -94,7 +87,6 @@ in  Pipeline.build
                 "[proof-systems] Check merges cleanly into proof-systems develop branch"
             , key = "merged-to-proof-systems-develop"
             , soft_fail = Some (B/SoftFail.Boolean True)
-            , target = Size.Small
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
@@ -106,7 +98,6 @@ in  Pipeline.build
                 "[proof-systems] Check merges cleanly into proof-systems master branch"
             , key = "merged-to-proof-systems-master"
             , soft_fail = Some (B/SoftFail.Boolean True)
-            , target = Size.Small
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
@@ -116,7 +107,6 @@ in  Pipeline.build
             , commands = [ Cmd.run "true" ] : List Cmd.Type
             , label = "pr"
             , key = "pr"
-            , target = Size.Small
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }

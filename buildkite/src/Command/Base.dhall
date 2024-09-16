@@ -118,6 +118,7 @@ let Config =
           , skip = None B/Skip
           , if = None B/If
           , timeout_in_minutes = None Integer
+          , target = Size.Multi
           }
       }
 
@@ -131,6 +132,7 @@ let targetToAgent =
             , Integration = toMap { size = "integration" }
             , QA = toMap { size = "qa" }
             , Hardfork = toMap { size = "hardfork" }
+            , Multi = toMap { size = "generic-multi" }
             }
             target
 

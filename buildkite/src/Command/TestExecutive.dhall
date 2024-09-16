@@ -1,8 +1,8 @@
 let Command = ./Base.dhall
 
-let Size = ./Size.dhall
-
 let Cmd = ../Lib/Cmds.dhall
+
+let Size = ../Command/Size.dhall
 
 let SelectFiles = ../Lib/SelectFiles.dhall
 
@@ -18,8 +18,8 @@ in  { executeCloud =
               , artifact_paths =
                 [ SelectFiles.exactly "." "${testName}.cloud.test.log" ]
               , label = "${testName} integration test"
+              , target = Size.XLarge
               , key = "integration-test-${testName}"
-              , target = Size.Integration
               , depends_on = dependsOn
               }
     , executeLocal =

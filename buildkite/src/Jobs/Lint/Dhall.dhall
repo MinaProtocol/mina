@@ -12,8 +12,6 @@ let Command = ../../Command/Base.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
 
-let Size = ../../Command/Size.dhall
-
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -33,7 +31,6 @@ in  Pipeline.build
             , commands = [ Cmd.run "cd buildkite && make check_syntax" ]
             , label = "Dhall: syntax"
             , key = "check-dhall-syntax"
-            , target = Size.Small
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
@@ -43,7 +40,6 @@ in  Pipeline.build
             , commands = [ Cmd.run "cd buildkite && make check_lint" ]
             , label = "Dhall: lint"
             , key = "check-dhall-lint"
-            , target = Size.Small
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
@@ -53,7 +49,6 @@ in  Pipeline.build
             , commands = [ Cmd.run "cd buildkite && make check_format" ]
             , label = "Dhall: format"
             , key = "check-dhall-format"
-            , target = Size.Small
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }

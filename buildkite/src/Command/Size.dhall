@@ -1,1 +1,1 @@
-< XLarge | Large | Medium | Small | Integration | QA | Hardfork >
+< XLarge | Large | Medium | Small | Multi | Integration | QA | Hardfork >
