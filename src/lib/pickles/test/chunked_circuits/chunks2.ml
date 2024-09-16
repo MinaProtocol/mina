@@ -28,7 +28,7 @@ let test () =
       ~num_chunks:2 ~override_wrap_domain:N1 ~name:"chunked_circuits"
       ~constraint_constants (* TODO(mrmr1993): This was misguided.. Delete. *)
       ~choices:(fun ~self:_ ->
-        [ { identifier = "2^17"
+        [ { identifier = "2^16"
           ; prevs = []
           ; main =
               (fun _ ->
@@ -153,4 +153,3 @@ let () =
   test () ;
   Alcotest.run "Chunked circuit"
     [ ("2^16", [ ("prove and verify", `Quick, test) ]) ]
-

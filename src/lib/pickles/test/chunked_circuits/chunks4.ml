@@ -19,12 +19,6 @@ let constraint_constants =
   ; fork = None
   }
 
-(*
-Used to fail with
-`(Pickles.verify dlog_check)`
-before the zkrows were fixed in step_branch_data.ml and compile.ml
-*)
-
 let test () =
   let t11 = Sys.time () in
   let _tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
