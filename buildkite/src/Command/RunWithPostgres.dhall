@@ -64,6 +64,15 @@ let runInDockerWithPostgresConn
               : Text
               = "\\\$MINA_DOCKER_TAG"
 
+          let maybeNetwork =
+                Optional/map
+                  Network.Type
+                  Text
+                  (\(network : Network.Type) -> "-${Network.lowerName network}")
+                  network
+
+          let networkOrDefault = Optional/default Text "" maybeNetwork
+
           in  Cmd.chain
                 [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
                 , "source buildkite/scripts/export-git-env-vars.sh"
