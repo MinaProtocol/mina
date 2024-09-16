@@ -2,6 +2,8 @@ let B = ../External/Buildkite.dhall
 
 let Command = ./Base.dhall
 
+let RunInToolchain = ./RunInToolchain.dhall
+
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 in  { step =
