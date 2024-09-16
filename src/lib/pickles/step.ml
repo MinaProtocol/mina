@@ -307,7 +307,9 @@ struct
                  statement.messages_for_next_step_proof
                    .challenge_polynomial_commitments Local_max_proofs_verified.n
                  (Lazy.force Dummy.Ipa.Wrap.sg) )
-              (* This should indeed have length Max_proofs_verified... No! It should have type Max_proofs_verified_a. That is, the max_proofs_verified specific to a proof of this type...*)
+              (* This should indeed have length Max_proofs_verified... No! It
+                 should have type Max_proofs_verified_a. That is, the
+                 max_proofs_verified specific to a proof of this type...*)
               prev_challenges
               ~f:(fun commitment chals ->
                 { Tock.Proof.Challenge_polynomial.commitment
