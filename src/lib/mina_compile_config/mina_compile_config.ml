@@ -126,39 +126,6 @@ let to_yojson t =
     ; ("zkapp_cmd_limit_hardcap", `Int t.zkapp_cmd_limit_hardcap)
     ; ("zkapps_disabled", `Bool t.zkapps_disabled)
     ]
-
-(*TODO: Delete this module and read in a value from the environment*)
-module Compiled = struct
-  let t : t =
-    let (inputs : Inputs.t) =
-      { curve_size = Node_config.curve_size
-      ; default_transaction_fee_string = Node_config.default_transaction_fee
-      ; default_snark_worker_fee_string = Node_config.default_snark_worker_fee
-      ; minimum_user_command_fee_string = Node_config.minimum_user_command_fee
-      ; itn_features = Node_config.itn_features
-      ; compaction_interval_ms = Node_config.compaction_interval
-      ; block_window_duration_ms = Node_config.block_window_duration
-      ; vrf_poll_interval_ms = Node_config.vrf_poll_interval
-      ; rpc_handshake_timeout_sec = Node_config.rpc_handshake_timeout_sec
-      ; rpc_heartbeat_timeout_sec = Node_config.rpc_heartbeat_timeout_sec
-      ; rpc_heartbeat_send_every_sec = Node_config.rpc_heartbeat_send_every_sec
-      ; zkapp_proof_update_cost = Node_config.zkapp_proof_update_cost
-      ; zkapp_signed_pair_update_cost =
-          Node_config.zkapp_signed_pair_update_cost
-      ; zkapp_signed_single_update_cost =
-          Node_config.zkapp_signed_single_update_cost
-      ; zkapp_transaction_cost_limit = Node_config.zkapp_transaction_cost_limit
-      ; max_event_elements = Node_config.max_event_elements
-      ; max_action_elements = Node_config.max_action_elements
-      ; network_id = Node_config.network
-      ; zkapp_cmd_limit = Node_config.zkapp_cmd_limit
-      ; zkapp_cmd_limit_hardcap = Node_config.zkapp_cmd_limit_hardcap
-      ; zkapps_disabled = Node_config.zkapps_disabled
-      }
-    in
-    make inputs
-end
-
 module For_unit_tests = struct
   let t : t =
     let inputs : Inputs.t =
