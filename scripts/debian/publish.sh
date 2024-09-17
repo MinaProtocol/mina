@@ -14,6 +14,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -c|--codename) DEB_CODENAME="$2"; shift;;
   -b|--bucket) BUCKET="$2"; shift;;
   -s|--sign) SIGN="$2"; shift;;
+  -p|--passphrase) GPG_PASSPHRASE="$2"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
@@ -28,6 +29,7 @@ function usage() {
   echo "  -v, --version       The Debian version"
   echo "  -c, --codename      The Debian codename"
   echo "  -s, --sign          The Debian key id used for sign"
+  echo "  -p, --passphrase    The Debian key passphrase (optional)"
   echo ""
   echo "Example: $0 --name mina-archive --release unstable --version 2.0.0berkeley-rc1-berkeley-48efea4 --codename bullseye "
   exit 1
@@ -45,6 +47,12 @@ else
   SIGN_ARG="--sign=$SIGN"
 fi
 
+if [[ -z "$PASSPHRASE" ]]; then
+  GPG_OPTIONS=""
+else
+  GPG_OPTIONS="--gpg-options \"--batch --homedir .gpg --pinentry-mode=loopback --yes --passphrase ${PASSPHRASE}\""
+fi
+
 BUCKET_ARG="--bucket $BUCKET"
 S3_REGION_ARG='--s3-region=us-west-2'
 # utility for publishing deb repo with commons options
@@ -58,7 +66,7 @@ DEBS3_UPLOAD="deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
   --lock \
   --preserve-versions \
   --cache-control=max-age=120 \
-  $SIGN_ARG "
+  $SIGN_ARG $GPG_OPTIONS"
 
 echo "Publishing debs: ${DEB_NAMES} to Release: ${DEB_RELEASE} and Codename: ${DEB_CODENAME}"
 # Upload the deb files to s3.
