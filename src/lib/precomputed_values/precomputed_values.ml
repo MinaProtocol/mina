@@ -17,7 +17,7 @@ let hashes =
      in
      ts @ bs )
 
-let for_unit_tests =
+let for_unit_tests : T.t Lazy.t =
   let constraint_constants =
     Genesis_constants.For_unit_tests.Constraint_constants.t
   in
@@ -36,9 +36,9 @@ let for_unit_tests =
         ~consensus_constants:(Lazy.force Consensus.Constants.for_unit_tests)
         ~genesis_body_reference
     in
-    { runtime_config = Runtime_config.default ~constraint_constants ~genesis_constants ~compile_config
-    ; constraint_constants
-    ; proof_level = constraint_constants.proof_level
+    { constraint_constants
+    ; compile_config
+    ; proof_level = Genesis_constants.For_unit_tests.Proof_level.t
     ; genesis_constants
     ; genesis_ledger = Genesis_ledger.for_unit_tests
     ; genesis_epoch_data = Consensus.Genesis_epoch_data.for_unit_tests

@@ -36,11 +36,6 @@ let%test_module "Epoch ledger sync tests" =
 
     let dir_prefix = "sync_test_data"
 
-    let genesis_constants = Genesis_constants.For_unit_tests.t
-
-    let constraint_constants =
-      Genesis_constants.For_unit_tests.Constraint_constants.t
-
     let make_dirname s =
       let open Core in
       let uuid = Uuid_unix.create () |> Uuid.to_string in
@@ -48,28 +43,31 @@ let%test_module "Epoch ledger sync tests" =
 
     let make_context () : (module CONTEXT) Deferred.t =
       let%bind precomputed_values =
-        let runtime_config : Runtime_config.t =
-          { daemon = None
-          ; genesis = None
-          ; proof = None
+        let runtime_config : Runtime_config.Json_layout.t =
+          { daemon = Mina_compile_config.For_unit_tests.inputs
+          ; genesis = Genesis_constants.For_unit_tests.inputs
+          ; proof =
+              { constraint_constants =
+                  Genesis_constants.For_unit_tests.Constraint_constants.inputs
+              ; proof_level =
+                  Genesis_constants.For_unit_tests.Proof_level.inputs
+              }
           ; ledger =
-              Some
-                { base = Named "test"
-                ; num_accounts = None
-                ; balances = []
-                ; hash = None
-                ; s3_data_hash = None
-                ; name = None
-                ; add_genesis_winner = None
-                }
+              { accounts = None
+              ; num_accounts = None
+              ; balances = []
+              ; hash = None
+              ; s3_data_hash = None
+              ; name = Some "test"
+              ; add_genesis_winner = None
+              }
           ; epoch_data = None
           }
         in
         match%map
-          Genesis_ledger_helper.init_from_config_file
+          Genesis_ledger_helper.Config_loader.init_from_config_file
             ~genesis_dir:(make_dirname "genesis_dir")
-            ~constraint_constants ~genesis_constants ~logger ~proof_level:None
-            runtime_config ~cli_proof_level:None
+            ~logger runtime_config
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
@@ -79,9 +77,9 @@ let%test_module "Epoch ledger sync tests" =
       in
       let constraint_constants = precomputed_values.constraint_constants in
       let consensus_constants =
-        let genesis_constants = Genesis_constants.For_unit_tests.t in
-        Consensus.Constants.create ~constraint_constants
-          ~protocol_constants:genesis_constants.protocol
+        Consensus.Constants.create
+          ~constraint_constants:precomputed_values.constraint_constants
+          ~protocol_constants:precomputed_values.genesis_constants.protocol
       in
       let%bind trust_system =
         Trust_system.create (make_dirname "trust_system")

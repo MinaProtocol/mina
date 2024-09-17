@@ -645,12 +645,8 @@ let initial_validate ~context:(module Context : CONTEXT) ~trust_system
       ; ("state_hash", state_hash)
       ]
     "initial_validate: verification of proofs complete" ;
-  let slot_tx_end =
-    Runtime_config.slot_tx_end precomputed_values.runtime_config
-  in
-  let slot_chain_end =
-    Runtime_config.slot_chain_end precomputed_values.runtime_config
-  in
+  let slot_tx_end = precomputed_values.compile_config.slot_tx_end in
+  let slot_chain_end = precomputed_values.compile_config.slot_chain_end in
   verify_transition
     ~context:(module Context)
     ~trust_system ~frontier ~unprocessed_transition_cache ~slot_tx_end

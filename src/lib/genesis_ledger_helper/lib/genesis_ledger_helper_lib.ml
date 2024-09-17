@@ -414,7 +414,6 @@ module Accounts = struct
       with Stop -> accounts
 end
 
-
 let%test_module "Runtime config" =
   ( module struct
     [@@@warning "-32"]
@@ -436,9 +435,10 @@ let%test_module "Runtime config" =
           pk
       in
       let json = Yojson.Safe.from_string s in
-      Result.(Runtime_config.Json_layout.Ledger.of_yojson json >>=
-       Runtime_config.Ledger.of_json_layout
-      ) |> Result.ok_or_failwith
+      Result.(
+        Runtime_config.Json_layout.Ledger.of_yojson json
+        >>= Runtime_config.Ledger.of_json_layout)
+      |> Result.ok_or_failwith
 
     let nondefault_token =
       let owner =
@@ -463,8 +463,10 @@ let%test_module "Runtime config" =
           pk token_id
       in
       let json = Yojson.Safe.from_string s in
-      Result.(Runtime_config.Json_layout.Ledger.of_yojson json >>= Runtime_config.Ledger.of_json_layout) 
-        |> Result.ok_or_failwith 
+      Result.(
+        Runtime_config.Json_layout.Ledger.of_yojson json
+        >>= Runtime_config.Ledger.of_json_layout)
+      |> Result.ok_or_failwith
 
     let zkapp_ledger =
       (* in zkApp account, all fields are required *)
@@ -487,7 +489,10 @@ let%test_module "Runtime config" =
           pk
       in
       let json = Yojson.Safe.from_string s in
-      Result.(Runtime_config.Json_layout.Ledger.of_yojson json >>= Runtime_config.Ledger.of_json_layout) |> Result.ok_or_failwith
+      Result.(
+        Runtime_config.Json_layout.Ledger.of_yojson json
+        >>= Runtime_config.Ledger.of_json_layout)
+      |> Result.ok_or_failwith
 
     (* omitted account fields in runtime config same as those given by `Account.create` on same public key *)
     let%test_unit "non-zkApp ledger" =

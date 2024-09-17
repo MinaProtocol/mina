@@ -41,7 +41,6 @@ module Constraint_constants = struct
       ; ledger_depth : int
       ; sub_windows_per_window : int
       ; fork : Fork_constants.t option
-      ; proof_level : string
       }
     [@@deriving yojson]
   end
@@ -57,7 +56,6 @@ module Constraint_constants = struct
     ; supercharged_coinbase_factor : int
     ; account_creation_fee : Currency.Fee.Stable.Latest.t
     ; fork : Fork_constants.t option
-    ; proof_level : Proof_level.t
     }
   [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
 
@@ -124,7 +122,6 @@ module Constraint_constants = struct
     ; account_creation_fee =
         Currency.Fee.of_mina_string_exn inputs.account_creation_fee_int
     ; fork = inputs.fork
-    ; proof_level = Proof_level.of_string inputs.proof_level
     }
 
   let to_snark_keys_header (t : t) : Snark_keys_header.Constraint_constants.t =
@@ -374,66 +371,62 @@ end
 include T
 
 module For_unit_tests = struct
-  let t =
-    let inputs =
-      { T.Inputs.genesis_state_timestamp =
-          Node_config_for_unit_tests.genesis_state_timestamp
-      ; k = Node_config_for_unit_tests.k
-      ; slots_per_epoch = Node_config_for_unit_tests.slots_per_epoch
-      ; slots_per_sub_window = Node_config_for_unit_tests.slots_per_sub_window
-      ; grace_period_slots = Node_config_for_unit_tests.grace_period_slots
-      ; delta = Node_config_for_unit_tests.delta
-      ; pool_max_size = Node_config_for_unit_tests.pool_max_size
-      ; num_accounts = None
-      ; zkapp_proof_update_cost =
-          Node_config_for_unit_tests.zkapp_proof_update_cost
-      ; zkapp_signed_single_update_cost =
-          Node_config_for_unit_tests.zkapp_signed_single_update_cost
-      ; zkapp_signed_pair_update_cost =
-          Node_config_for_unit_tests.zkapp_signed_pair_update_cost
-      ; zkapp_transaction_cost_limit =
-          Node_config_for_unit_tests.zkapp_transaction_cost_limit
-      ; max_event_elements = Node_config_for_unit_tests.max_event_elements
-      ; max_action_elements = Node_config_for_unit_tests.max_action_elements
-      ; zkapp_cmd_limit_hardcap =
-          Node_config_for_unit_tests.zkapp_cmd_limit_hardcap
-      ; minimum_user_command_fee =
-          Node_config_for_unit_tests.minimum_user_command_fee
-      }
-    in
-    T.make inputs
+  let inputs =
+    { T.Inputs.genesis_state_timestamp =
+        Node_config_for_unit_tests.genesis_state_timestamp
+    ; k = Node_config_for_unit_tests.k
+    ; slots_per_epoch = Node_config_for_unit_tests.slots_per_epoch
+    ; slots_per_sub_window = Node_config_for_unit_tests.slots_per_sub_window
+    ; grace_period_slots = Node_config_for_unit_tests.grace_period_slots
+    ; delta = Node_config_for_unit_tests.delta
+    ; pool_max_size = Node_config_for_unit_tests.pool_max_size
+    ; num_accounts = None
+    ; zkapp_proof_update_cost =
+        Node_config_for_unit_tests.zkapp_proof_update_cost
+    ; zkapp_signed_single_update_cost =
+        Node_config_for_unit_tests.zkapp_signed_single_update_cost
+    ; zkapp_signed_pair_update_cost =
+        Node_config_for_unit_tests.zkapp_signed_pair_update_cost
+    ; zkapp_transaction_cost_limit =
+        Node_config_for_unit_tests.zkapp_transaction_cost_limit
+    ; max_event_elements = Node_config_for_unit_tests.max_event_elements
+    ; max_action_elements = Node_config_for_unit_tests.max_action_elements
+    ; zkapp_cmd_limit_hardcap =
+        Node_config_for_unit_tests.zkapp_cmd_limit_hardcap
+    ; minimum_user_command_fee =
+        Node_config_for_unit_tests.minimum_user_command_fee
+    }
+
+  let t = T.make inputs
 
   module Constraint_constants = struct
-    let t =
-      let inputs =
-        { Constraint_constants.Inputs.scan_state_with_tps_goal =
-            Node_config_for_unit_tests.scan_state_with_tps_goal
-        ; scan_state_tps_goal_x10 =
-            Node_config_for_unit_tests.scan_state_tps_goal_x10
-        ; block_window_duration =
-            Node_config_for_unit_tests.block_window_duration
-        ; scan_state_transaction_capacity_log_2 =
-            Node_config_for_unit_tests.scan_state_transaction_capacity_log_2
-        ; supercharged_coinbase_factor =
-            Node_config_for_unit_tests.supercharged_coinbase_factor
-        ; scan_state_work_delay =
-            Node_config_for_unit_tests.scan_state_work_delay
-        ; coinbase = Node_config_for_unit_tests.coinbase
-        ; account_creation_fee_int =
-            Node_config_for_unit_tests.account_creation_fee_int
-        ; ledger_depth = Node_config_for_unit_tests.ledger_depth
-        ; sub_windows_per_window =
-            Node_config_for_unit_tests.sub_windows_per_window
-        ; fork = None
-        ; proof_level = Node_config_for_unit_tests.proof_level
-        }
-      in
+    let inputs =
+      { Constraint_constants.Inputs.scan_state_with_tps_goal =
+          Node_config_for_unit_tests.scan_state_with_tps_goal
+      ; scan_state_tps_goal_x10 =
+          Node_config_for_unit_tests.scan_state_tps_goal_x10
+      ; block_window_duration = Node_config_for_unit_tests.block_window_duration
+      ; scan_state_transaction_capacity_log_2 =
+          Node_config_for_unit_tests.scan_state_transaction_capacity_log_2
+      ; supercharged_coinbase_factor =
+          Node_config_for_unit_tests.supercharged_coinbase_factor
+      ; scan_state_work_delay = Node_config_for_unit_tests.scan_state_work_delay
+      ; coinbase = Node_config_for_unit_tests.coinbase
+      ; account_creation_fee_int =
+          Node_config_for_unit_tests.account_creation_fee_int
+      ; ledger_depth = Node_config_for_unit_tests.ledger_depth
+      ; sub_windows_per_window =
+          Node_config_for_unit_tests.sub_windows_per_window
+      ; fork = None
+      }
 
-      Constraint_constants.make inputs
+    let t = Constraint_constants.make inputs
   end
 
   module Proof_level = struct
-    let t = Proof_level.of_string Node_config_for_unit_tests.proof_level
+    let inputs = Node_config_for_unit_tests.proof_level
+
+    let t = Proof_level.of_string inputs
   end
 
   let genesis_state_timestamp_string =

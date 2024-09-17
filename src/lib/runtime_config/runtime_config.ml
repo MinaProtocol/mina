@@ -410,53 +410,27 @@ module Json_layout = struct
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
 
+  module Constraint_config = struct
+    type t =
+      { constraint_constants : Genesis_constants.Constraint_constants.Inputs.t
+      ; proof_level : string
+      }
+    [@@deriving yojson, fields]
+
+    let fields = Fields.names |> Array.of_list
+
+    let of_yojson json = of_yojson_generic ~fields of_yojson json
+  end
+
   type t =
     { daemon : Mina_compile_config.Inputs.t
     ; genesis : Genesis_constants.Inputs.t
-    ; proof : Genesis_constants.Constraint_constants.Inputs.t
-    ; ledger : Ledger.t option [@default None]
+    ; proof : Constraint_config.t
+    ; ledger : Ledger.t
     ; epoch_data : Epoch_data.t option [@default None]
     }
   [@@deriving yojson]
-
 end
-
-(** JSON representation:
-
-  { "daemon":
-      { "txpool_max_size": 1
-      , "peer_list_url": "https://www.example.com/peer-list.txt" }
-  , "genesis": { "k": 1, "delta": 1 }
-  , "proof":
-      { "level": "check"
-      , "sub_windows_per_window": 8
-      , "ledger_depth": 14
-      , "work_delay": 2
-      , "block_window_duration_ms": 120000
-      , "transaction_capacity": {"txns_per_second_x10": 2}
-      , "coinbase_amount": "200"
-      , "supercharged_coinbase_factor": 2
-      , "account_creation_fee": "0.001" }
-  , "ledger":
-      { "name": "release"
-      , "accounts":
-          [ { "pk": "public_key"
-            , "sk": "secret_key"
-            , "balance": "0.000600000"
-            , "delegate": "public_key" }
-          , { "pk": "public_key"
-            , "sk": "secret_key"
-            , "balance": "0.000000000"
-            , "delegate": "public_key" } ]
-      , "hash": "root_hash"
-      , "num_accounts": 10
-      , "genesis_state_timestamp": "2000-00-00 12:00:00+0100" } }
-
-  All fields are optional *except*:
-  * each account in [ledger.accounts] must have a [balance] field
-  * if [ledger] is present, it must feature one of [name], [accounts] or [hash].
-
-*)
 
 module Accounts = struct
   module Single = struct
@@ -494,6 +468,7 @@ module Accounts = struct
       Result.return
 
     let to_yojson = Json_layout.Accounts.Single.to_yojson
+
     let default = Json_layout.Accounts.Single.default
 
     let of_account (a : Mina_base.Account.t) : (t, string) Result.t =
@@ -639,7 +614,6 @@ module Accounts = struct
       ; permissions
       ; zkapp = Option.map ~f:mk_zkapp a.zkapp
       }
-
   end
 
   type single = Single.t =
@@ -722,10 +696,9 @@ module Ledger = struct
     | Accounts accounts ->
         { without_base with accounts = Some accounts }
     | Hash ->
-        without_base  
+        without_base
 
-    let to_yojson x = Json_layout.Ledger.to_yojson (to_json_layout x)
-
+  let to_yojson x = Json_layout.Ledger.to_yojson (to_json_layout x)
 
   let of_json_layout
       ({ accounts
@@ -769,9 +742,7 @@ module Ledger = struct
     ; name
     ; add_genesis_winner
     }
-
 end
-
 
 module Epoch_data = struct
   module Data = struct
@@ -848,28 +819,34 @@ module Epoch_data = struct
     { staking; next }
 
   let to_yojson x = Json_layout.Epoch_data.to_yojson (to_json_layout x)
+end
 
+module Constraint_config = struct
+  type t =
+    { constraint_constants : Genesis_constants.Constraint_constants.t
+    ; proof_level : Genesis_constants.Proof_level.t
+    }
+  [@@deriving to_yojson]
+
+  let of_json_layout : Json_layout.Constraint_config.t -> t =
+   fun { constraint_constants; proof_level } ->
+    { constraint_constants =
+        Genesis_constants.Constraint_constants.make constraint_constants
+    ; proof_level = Genesis_constants.Proof_level.of_string proof_level
+    }
 end
 
 type t =
   { compile_config : Mina_compile_config.t
   ; genesis_constants : Genesis_constants.t
-  ; constraint_constants : Genesis_constants.Constraint_constants.t
-  ; ledger : Ledger.t option
+  ; constraint_config : Constraint_config.t
+  ; ledger : Ledger.t
   ; epoch_data : Epoch_data.t option
-  } [@@deriving to_yojson]
+  }
+[@@deriving to_yojson]
 
-let of_json_layout { Json_layout.daemon; genesis; proof; ledger; epoch_data } =
-  let open Result.Let_syntax in
-  let compile_config = Mina_compile_config.make daemon in
-  let genesis_constants = Genesis_constants.make genesis in
-  let constraint_constants = Genesis_constants.Constraint_constants.make proof in
-  let%map ledger = result_opt ~f:Ledger.of_json_layout ledger
-  and epoch_data = result_opt ~f:Epoch_data.of_json_layout epoch_data in
-  { compile_config; genesis_constants; constraint_constants; ledger; epoch_data }
-
-
-let format_as_json_without_accounts (x : t) =
+let format_as_json_without_accounts (_ : t) : Yojson.Safe.t = failwith "TODO"
+(*
   let genesis_accounts =
     let%bind.Option { accounts; _ } =
       Option.map ~f:Ledger.to_json_layout x.ledger
@@ -924,15 +901,7 @@ let format_as_json_without_accounts (x : t) =
       (`Genesis genesis_accounts, `Staking staking_accounts, `Next next_accounts)
   )
 
-let of_yojson json = Result.bind ~f:of_json_layout (Json_layout.of_yojson json)
-
-let default ~compile_config ~genesis_constants ~constraint_constants =
-  { compile_config
-  ; genesis_constants
-  ; constraint_constants
-  ; ledger = None
-  ; epoch_data = None
-  }
+*)
 
 let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
   let open Async.Deferred.Result.Let_syntax in
@@ -965,7 +934,8 @@ let ledger_of_accounts accounts =
 
 let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
     ~blockchain_length ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
-    ~next_epoch_seed ~genesis_constants ~constraint_constants ~compile_config =
+    ~next_epoch_seed ~genesis_constants
+    ~(constraint_config : Constraint_config.t) ~compile_config =
   let open Async.Deferred.Result.Let_syntax in
   let global_slot_since_genesis =
     Mina_numbers.Global_slot_since_genesis.to_int global_slot_since_genesis
@@ -1024,20 +994,19 @@ let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
        startup, even though it already exists, leading to an error.*)
     epoch_data = Some epoch_data
   ; ledger =
-      Some
-        { Ledger.base = Accounts accounts
-        ; num_accounts = None
-        ; balances = []
-        ; hash
-        ; s3_data_hash = None
-        ; name = None
-        ; add_genesis_winner = Some false
-        }
-  ; constraint_constants = { constraint_constants with fork = Some fork }
+      { Ledger.base = Accounts accounts
+      ; num_accounts = None
+      ; balances = []
+      ; hash
+      ; s3_data_hash = None
+      ; name = None
+      ; add_genesis_winner = Some false
+      }
+  ; constraint_config =
+      { constraint_config with
+        constraint_constants =
+          { constraint_config.constraint_constants with fork = Some fork }
+      }
   ; genesis_constants
-  ; compile_config 
+  ; compile_config
   }
-
-let slot_chain_end (config : t) = config.compile_config.slot_chain_end
-
-let slot_tx_end config = config.compile_config.slot_tx_end
