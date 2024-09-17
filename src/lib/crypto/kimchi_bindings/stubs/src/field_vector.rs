@@ -126,6 +126,24 @@ pub mod fp {
     use mina_curves::pasta::Fp;
 
     impl_vector_old!(CamlFpVector, CamlFp, Fp);
+
+    impl From<CamlFpVector> for Vec<Fp> {
+        fn from(caml_vector: CamlFpVector) -> Vec<Fp> {
+            caml_vector.to_vec()
+        }
+    }
+    impl From<&Vec<Fp>> for CamlFpVector {
+        fn from(vector: &Vec<Fp>) -> CamlFpVector {
+            CamlFpVector(vector.clone().into())
+        }
+    }
+}
+
+pub mod fp_batch {
+    use super::*;
+    use mina_curves::pasta::Fp;
+
+    impl_vector_old!(CamlFpBatchVector, fp::CamlFpVector, Vec<Fp>);
 }
 
 pub mod fq {

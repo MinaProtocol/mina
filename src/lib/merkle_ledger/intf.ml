@@ -143,7 +143,11 @@ module type Hash = sig
 
   val merge : height:int -> t -> t -> t
 
+  val merge_batch : height:int -> (t * t) list -> t list
+
   val hash_account : account -> t
+
+  val hash_account_batch : account list -> t list
 
   val empty_account : t
 end

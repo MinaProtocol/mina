@@ -45,6 +45,8 @@ let update ~state = update ~state params
 
 let hash ?init = hash ?init params
 
+let hash_batch ?init = hash_batch ?init params
+
 let pow2 =
   let rec pow2 acc n = if n = 0 then acc else pow2 Field.(acc + acc) (n - 1) in
   Memo.general ~hashable:Int.hashable (fun n -> pow2 Field.one n)
@@ -71,6 +73,9 @@ module Checked = struct
 
   let hash ?init xs =
     hash ?init:(Option.map init ~f:(State.map ~f:constant)) params xs
+
+  let hash_batch ?init xss =
+    hash_batch ?init:(Option.map init ~f:(State.map ~f:constant)) params xss
 
   let pack_input =
     Input.Chunked.pack_to_fields
@@ -160,6 +165,8 @@ module Legacy = struct
 
   let hash ?init = hash ?init params
 
+  let hash_batch ?init = hash_batch ?init params
+
   let update ~state = update ~state params
 
   let salt (s : string) = update ~state:initial_state [| prefix_to_field s |]
@@ -221,5 +228,8 @@ module Legacy = struct
 
     let hash ?init xs =
       hash ?init:(Option.map init ~f:(State.map ~f:constant)) params xs
+
+    let hash_batch ?init xss =
+      hash_batch ?init:(Option.map init ~f:(State.map ~f:constant)) params xss
   end
 end

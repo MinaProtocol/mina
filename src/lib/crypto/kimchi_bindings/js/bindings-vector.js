@@ -22,6 +22,20 @@ var caml_fp_vector_get = tsBindings.caml_fp_vector_get;
 // Requires: tsBindings
 var caml_fp_vector_set = tsBindings.caml_fp_vector_set;
 
+// fp_batch
+
+// Provides: caml_fp_batch_vector_create
+// Requires: tsBindings
+var caml_fp_batch_vector_create = tsBindings.caml_fp_vector_create;
+
+// Provides: caml_fp_batch_vector_emplace_back
+// Requires: tsBindings
+var caml_fp_batch_vector_emplace_back = tsBindings.caml_fp_vector_emplace_back;
+
+// Provides: caml_fp_batch_vector_get
+// Requires: tsBindings
+var caml_fp_batch_vector_get = tsBindings.caml_fp_vector_get;
+
 // fq
 
 // Provides: caml_fq_vector_create

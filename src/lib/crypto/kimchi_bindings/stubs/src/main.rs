@@ -13,7 +13,7 @@ use std::io::Write;
 use wires_15_stubs::{
     // we must import all here, to have access to the derived functions
     arkworks::{bigint_256::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*},
-    field_vector::{fp::*, fq::*},
+    field_vector::{fp::*, fp_batch::*, fq::*},
     gate_vector::{fp::*, fq::*},
     oracles::{fp::*, fq::*, CamlOracles},
     pasta_fp_plonk_index::*,
@@ -307,6 +307,15 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, caml_fp_vector_emplace_back => "emplace_back");
             decl_func!(w, env, caml_fp_vector_get => "get");
             decl_func!(w, env, caml_fp_vector_set => "set");
+        });
+
+        decl_module!(w, env, "Fp_batch", {
+            decl_type!(w, env, CamlFpBatchVector => "t");
+            decl_type_alias!(w, env, "elt" => CamlFpVector);
+
+            decl_func!(w, env, caml_fp_batch_vector_create => "create");
+            decl_func!(w, env, caml_fp_batch_vector_emplace_back => "emplace_back");
+            decl_func!(w, env, caml_fp_batch_vector_get => "get");
         });
 
         decl_module!(w, env, "Fq", {

@@ -33,7 +33,7 @@ struct
 
   module Field = Impl.Field
 
-  let block_cipher (_params : _ Sponge.Params.t) init =
+  let block_cipher (_params : Field.t Sponge.Params.t) init =
     let open Impl in
     Impl.with_label __LOC__ (fun () ->
         let t =
@@ -56,5 +56,14 @@ struct
   let add_assign ~state i x =
     state.(i) <- Util.seal (module Impl) Field.(state.(i) + x)
 
+  let update =
+    let open Sponge.Default.F (Field) in
+    Fn.compose (sponge ~add_assign) block_cipher
+
   let copy = Array.copy
+
+  let update_batch params ~rate ~state =
+    List.map ~f:(fun input ->
+        let state = copy state in
+        update params ~rate ~state input )
 end

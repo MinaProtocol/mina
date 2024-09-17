@@ -307,28 +307,25 @@ module Make (Inputs : Inputs_intf.S) = struct
            * [ `Left of Hash.t | `Right of Hash.t ] list )
            list
         -> (Addr.t * Hash.t) list =
-      let process_pair height = function
+      let process_pair = function
         | (lh, laddr, `Left _ :: lpath), (rh, _, `Right _ :: _rpath) ->
             (* Assertion: lpath == _rpath *)
             let parent = Addr.parent_exn laddr in
-            let h = Hash.merge ~height lh rh in
-            (h, parent, lpath)
+            (lh, rh, parent, lpath)
         | _ ->
             failwith "compute_merge_hashes: unexpected match of nodes"
       in
-      let process_single height (self_hash, addr, path) =
+      let process_single (self_hash, addr, path) =
         let parent = Addr.parent_exn addr in
         match path with
         | `Left sibling_hash :: rest ->
-            let new_hash = Hash.merge ~height self_hash sibling_hash in
-            (new_hash, parent, rest)
+            (self_hash, sibling_hash, parent, rest)
         | `Right sibling_hash :: rest ->
-            let new_hash = Hash.merge ~height sibling_hash self_hash in
-            (new_hash, parent, rest)
+            (sibling_hash, self_hash, parent, rest)
         | _ ->
             failwith "compute_merge_hashes: path is empty"
       in
-      let converge height task =
+      let converge task =
         let reversed, mlast =
           List.fold task ~init:([], None)
             ~f:(fun (processed, mprev) ((_, addr, _) as el) ->
@@ -337,12 +334,18 @@ module Make (Inputs : Inputs_intf.S) = struct
                   (processed, Some el)
               | Some ((_, prev_addr, _) as prev)
                 when Addr.(equal @@ sibling prev_addr) addr ->
-                  (process_pair height (prev, el) :: processed, None)
+                  (process_pair (prev, el) :: processed, None)
               | Some prev ->
-                  (process_single height prev :: processed, Some el) )
+                  (process_single prev :: processed, Some el) )
         in
         List.rev_append reversed
-        @@ Option.(map ~f:(process_single height) mlast |> to_list)
+        @@ Option.(map ~f:process_single mlast |> to_list)
+      in
+      let converge' ~height task =
+        let res = converge task in
+        let pairs = List.map ~f:(fun (l, r, _, _) -> (l, r)) res in
+        let hashes = Hash.merge_batch ~height pairs in
+        List.map2_exn res hashes ~f:(fun (_, _, a, b) h -> (h, a, b))
       in
       let rec impl acc height task =
         let acc' =
@@ -352,12 +355,24 @@ module Make (Inputs : Inputs_intf.S) = struct
         | [] | [ (_, _, []) ] ->
             acc'
         | _ ->
-            impl acc' (height + 1) (converge height task)
+            impl acc' (height + 1) (converge' ~height task)
       in
-      let hash_account =
-        Option.value_map ~default:Hash.empty_account ~f:Hash.hash_account
-      in
-      Fn.compose (impl [] 0) (List.map ~f:(Tuple3.map_fst ~f:hash_account))
+      fun leafs ->
+        let accounts = List.filter_map leafs ~f:Tuple3.get1 in
+        let account_hashes = Hash.hash_account_batch accounts in
+        let init_tasks =
+          List.fold ~init:(account_hashes, [])
+            ~f:
+              (fun (rem_hashes, acc) -> function
+                | None, addr, path ->
+                    (rem_hashes, (Hash.empty_account, addr, path) :: acc)
+                | _, addr, path ->
+                    ( List.tl_exn rem_hashes
+                    , (List.hd_exn rem_hashes, addr, path) :: acc ) )
+            leafs
+          |> snd |> List.rev
+        in
+        impl [] 0 init_tasks
 
     let finalize_hashes_do t unhashed_accounts =
       let with_merkle_path_batch accs =

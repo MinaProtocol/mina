@@ -8,7 +8,12 @@ module Hash = struct
 
   let merge = Ledger_hash.merge
 
+  let merge_batch = Ledger_hash.merge_batch
+
   let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
+
+  let hash_account_batch =
+    Fn.compose (List.map ~f:Ledger_hash.of_digest) Account.digest_batch
 
   let empty_account = Ledger_hash.of_digest (Lazy.force Account.empty_digest)
 end

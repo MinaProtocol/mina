@@ -648,6 +648,10 @@ end
 
 let digest = crypto_hash
 
+let digest_batch ts =
+  Random_oracle.hash_batch ~init:crypto_hash_prefix
+  @@ List.map ~f:(Fn.compose Random_oracle.pack_input to_input) ts
+
 let empty =
   { public_key = Public_key.Compressed.empty
   ; token_id = Token_id.default

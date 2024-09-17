@@ -18,6 +18,8 @@ module type S = sig
 
   val merge : height:int -> t -> t -> t
 
+  val merge_batch : height:int -> (t * t) list -> t list
+
   (** string representation of hash is Base58Check of bin_io representation *)
   val to_base58_check : t -> string
 

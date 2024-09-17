@@ -61,12 +61,16 @@ module Hash = struct
   let hash_account account =
     Md5.digest_string (Format.sprintf !"0%{sexp: Account.t}" account)
 
+  let hash_account_batch = List.map ~f:hash_account
+
   let merge ~height a b =
     let res =
       Md5.digest_string
         (sprintf "test_ledger_%d:%s%s" height (Md5.to_hex a) (Md5.to_hex b))
     in
     res
+
+  let merge_batch ~height = List.map ~f:(fun (a, b) -> merge ~height a b)
 
   let empty_account = hash_account Account.empty
 end

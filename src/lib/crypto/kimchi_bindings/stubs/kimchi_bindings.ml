@@ -17,6 +17,19 @@ module FieldVectors = struct
     external set : t -> int -> elt -> unit = "caml_fp_vector_set"
   end
 
+  module Fp_batch = struct
+    type nonrec t
+
+    type nonrec elt = Fp.t
+
+    external create : unit -> t = "caml_fp_batch_vector_create"
+
+    external emplace_back : t -> elt -> unit
+      = "caml_fp_batch_vector_emplace_back"
+
+    external get : t -> int -> elt = "caml_fp_batch_vector_get"
+  end
+
   module Fq = struct
     type nonrec t
 

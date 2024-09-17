@@ -31,5 +31,8 @@ module type S = sig
 
   val hash : ?init:field_constant State.t -> field array -> Digest.t
 
+  val hash_batch :
+    ?init:field_constant State.t -> field array list -> Digest.t list
+
   val pack_input : input -> field array
 end
