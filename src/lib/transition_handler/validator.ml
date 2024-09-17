@@ -136,12 +136,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
           @@ fun () ->
           let transition = With_hash.data transition_with_hash in
           let sender = Envelope.Incoming.sender transition_env in
-          let slot_tx_end =
-            Runtime_config.slot_tx_end
-              precomputed_values.Precomputed_values.runtime_config
-          in
+          let slot_tx_end = precomputed_values.compile_config.slot_tx_end in
           let slot_chain_end =
-            Runtime_config.slot_chain_end precomputed_values.runtime_config
+            precomputed_values.compile_config.slot_chain_end
           in
           match
             validate_transition_is_relevant
