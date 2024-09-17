@@ -731,11 +731,33 @@ module Genesis_proof = struct
   let create_values_no_proof = Genesis_proof.create_values_no_proof
 end
 
+
+module type Config_loader = sig
+  val load_config : 
+    ?genesis_dir:string ->
+    ?overwrite_version: Unsigned.UInt32.t ->
+    config_file:string -> 
+    cli_proof_level: Genesis_constants.Proof_level.t option ->
+    logger:Logger.t  ->
+    (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t
+
+  val load_config_exn :
+    ?genesis_dir:string ->
+    ?overwrite_version: Unsigned.UInt32.t ->
+    config_file:string -> 
+    cli_proof_level: Genesis_constants.Proof_level.t option ->
+    logger:Logger.t  ->
+    (Precomputed_values.t * Runtime_config.t) Deferred.t
+end
+
+module Config_loader : Config_loader = struct
+
 let load_config_json filename =
   Monitor.try_with_or_error ~here:[%here] (fun () ->
       let%map json = Reader.file_contents filename in
       Yojson.Safe.from_string json )
 
+(*
 let load_config_file filename =
   let open Deferred.Or_error.Let_syntax in
   Monitor.try_with_join_or_error ~here:[%here] (fun () ->
@@ -745,7 +767,7 @@ let load_config_file filename =
           Ok config
       | Error err ->
           Or_error.error_string err )
-
+*)
 let print_config ~logger config =
   let ledger_name_json =
     Option.value ~default:`Null
@@ -814,18 +836,34 @@ let inputs_from_config_file
   in
   (proof_inputs, config)
 
-let init_from_config_file ?genesis_dir ~cli_proof_level ~genesis_constants
-    ~constraint_constants ~logger ~proof_level ?overwrite_version
+let init_from_config_file ?genesis_dir ~cli_proof_level 
+     ~logger ?overwrite_version
     (config : Runtime_config.t) :
     (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
   let open Deferred.Or_error.Let_syntax in
   let%map inputs, config =
-    inputs_from_config_file ?genesis_dir ~cli_proof_level ~genesis_constants
-      ~constraint_constants ~logger ~proof_level ?overwrite_version config
+    inputs_from_config_file ?genesis_dir ~cli_proof_level
+      ~logger ?overwrite_version config
   in
   let values = Genesis_proof.create_values_no_proof inputs in
   (values, config)
 
+let load_config ?genesis_dir ?overwrite_version ~config_file ~cli_proof_level  ~logger  =
+  let open Deferred.Or_error.Let_syntax in
+  let%bind config_json = load_config_json config_file in
+  let e_config = Result.map_error ~f:Error.(fun e -> of_string e |> to_exn) 
+      Result.(Runtime_config.Json_layout.of_yojson config_json >>= Runtime_config.of_json_layout) in
+  let%bind config = Deferred.Or_error.of_exn_result (Deferred.return e_config) in
+  init_from_config_file ?genesis_dir ~cli_proof_level ~logger ?overwrite_version config
+
+let load_config_exn ?genesis_dir  ?overwrite_version ~config_file ~cli_proof_level  ~logger =
+  let open Deferred.Let_syntax in
+  let%bind config = load_config ?genesis_dir  ~config_file ~cli_proof_level  ~logger ?overwrite_version in
+  Deferred.return (Or_error.ok_exn config)
+end
+
+
+(*
 let upgrade_old_config ~logger filename json =
   match json with
   | `Assoc fields ->
@@ -891,6 +929,7 @@ let upgrade_old_config ~logger filename json =
       (* This error will get handled properly elsewhere, do nothing here. *)
       return json
 
+*)
 let%test_module "Account config test" =
   ( module struct
     let%test_unit "Runtime config <=> Account" =

@@ -4728,21 +4728,11 @@ let run pool reader ~genesis_constants ~constraint_constants ~logger
         Deferred.unit )
 
 (* [add_genesis_accounts] is called when starting the archive process *)
-let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
-    ~(genesis_constants : Genesis_constants.t)
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t) pool =
-  match runtime_config_opt with
-  | None ->
-      Deferred.unit
-  | Some runtime_config -> (
-      let%bind precomputed_values =
+let add_genesis_accounts ~logger ~(config_file : string) pool =
+      let%bind (precomputed_values, config) =
         match%map
-          Genesis_ledger_helper.init_from_config_file ~logger ~proof_level:None
-            ~genesis_constants ~constraint_constants runtime_config
-            ~cli_proof_level:None
-        with
-        | Ok (precomputed_values, _) ->
-            precomputed_values
+          Genesis_ledger_helper.Config_loader.load_config ~logger ~config_file ~cli_proof_level:None ?genesis_dir:None ?overwrite_version:None with
+        | Ok a -> a
         | Error err ->
             failwithf "Could not get precomputed values, error: %s"
               (Error.to_string_hum err) ()
@@ -4766,7 +4756,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
             let%bind.Deferred.Result genesis_block_id =
               Block.add_if_doesn't_exist
                 (module Conn)
-                ~constraint_constants genesis_block
+                ~constraint_constants:config.constraint_constants genesis_block
             in
             let%bind.Deferred.Result { ledger_hash; _ } =
               Block.load (module Conn) ~id:genesis_block_id
@@ -4844,7 +4834,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
             ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
           failwith "Failed to add genesis accounts"
       | Ok () ->
-          () )
+          ()
 
 let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
     ~block_window_duration_ms pool =
@@ -4873,7 +4863,7 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
 let setup_server ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~metrics_server_port ~logger ~postgres_address ~server_port
-    ~delete_older_than ~runtime_config_opt ~missing_blocks_width =
+    ~delete_older_than ~config_file_opt ~missing_blocks_width =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -4902,9 +4892,12 @@ let setup_server ~(genesis_constants : Genesis_constants.t)
         ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
       Deferred.unit
   | Ok pool ->
-      let%bind () =
+      let%bind () = match config_file_opt with
+        | None ->
+            Deferred.unit
+        | Some config_file ->
         add_genesis_accounts pool ~logger ~genesis_constants
-          ~constraint_constants ~runtime_config_opt
+          ~constraint_constants ~config_file
       in
       run ~constraint_constants ~genesis_constants pool reader ~logger
         ~delete_older_than
