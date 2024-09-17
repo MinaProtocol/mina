@@ -24,6 +24,7 @@ export BUILD_NUM=${BUILDKITE_BUILD_NUM}
 export BUILD_URL=${BUILDKITE_BUILD_URL}
 set -u
 
+export MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=bullseye}
 if [[ -n "$BUILDKITE_BRANCH" ]]; then
    export GITBRANCH=$(echo "$BUILDKITE_BRANCH" | sed 's!/!-!g; s!_!-!g; s!#!-!g')
 else
