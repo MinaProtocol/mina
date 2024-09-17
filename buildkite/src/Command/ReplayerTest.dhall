@@ -17,7 +17,7 @@ in  { step =
                     ([] : List Text)
                     "./src/test/archive/sample_db/archive_db.sql"
                     Artifacts.Type.Archive
-                    (None Network.Type.Devnet)
+                    (None Network.Type)
                     "./buildkite/scripts/replayer-test.sh"
                 ]
               , label = "Archive: Replayer test"
