@@ -594,66 +594,6 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
         (config.daemon >>= fun cfg -> cfg.minimum_user_command_fee)
   }
 
-let runtime_config_of_genesis_constants (genesis_constants : Genesis_constants.t)
-    : Runtime_config.Genesis.t =
-  { k = Some genesis_constants.protocol.k
-  ; delta = Some genesis_constants.protocol.delta
-  ; slots_per_epoch = Some genesis_constants.protocol.slots_per_epoch
-  ; slots_per_sub_window = Some genesis_constants.protocol.slots_per_sub_window
-  ; grace_period_slots = Some genesis_constants.protocol.grace_period_slots
-  ; genesis_state_timestamp =
-      Some
-        (Genesis_constants.genesis_timestamp_to_string
-           genesis_constants.protocol.genesis_state_timestamp )
-  }
-
-let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
-    : Runtime_config.t =
-  Runtime_config.combine precomputed_values.runtime_config
-    { daemon =
-        Some
-          { txpool_max_size =
-              Some precomputed_values.genesis_constants.txpool_max_size
-          ; peer_list_url = None
-          ; zkapp_proof_update_cost =
-              Some precomputed_values.genesis_constants.zkapp_proof_update_cost
-          ; zkapp_signed_single_update_cost =
-              Some
-                precomputed_values.genesis_constants
-                  .zkapp_signed_single_update_cost
-          ; zkapp_signed_pair_update_cost =
-              Some
-                precomputed_values.genesis_constants
-                  .zkapp_signed_pair_update_cost
-          ; zkapp_transaction_cost_limit =
-              Some
-                precomputed_values.genesis_constants
-                  .zkapp_transaction_cost_limit
-          ; max_event_elements =
-              Some precomputed_values.genesis_constants.max_event_elements
-          ; max_action_elements =
-              Some precomputed_values.genesis_constants.max_action_elements
-          ; zkapp_cmd_limit_hardcap =
-              Some precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap
-          ; slot_tx_end = None
-          ; slot_chain_end = None
-          ; minimum_user_command_fee =
-              Some precomputed_values.genesis_constants.minimum_user_command_fee
-          ; network_id = None
-          }
-    ; genesis =
-        Some
-          (runtime_config_of_genesis_constants
-             precomputed_values.genesis_constants )
-    ; proof =
-        Some
-          (runtime_config_of_constraint_constants
-             ~proof_level:precomputed_values.proof_level
-             precomputed_values.constraint_constants )
-    ; ledger = None
-    ; epoch_data = None
-    }
-
 let%test_module "Runtime config" =
   ( module struct
     [@@@warning "-32"]

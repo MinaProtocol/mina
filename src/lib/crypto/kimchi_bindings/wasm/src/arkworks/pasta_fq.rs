@@ -1,10 +1,11 @@
 use crate::arkworks::bigint_256::{self, WasmBigInteger256};
 use ark_ff::{
-    fields::{Field, FpParameters, PrimeField, SquareRootField},
+    fields::{Field, PrimeField},
     FftField, One, UniformRand, Zero,
 };
-use ark_ff::{FromBytes, ToBytes};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use mina_curves::pasta::fields::fft::FpParameters;
 use mina_curves::pasta::{fields::fq::FqParameters as Fq_params, Fq};
 use num_bigint::BigUint;
 use rand::rngs::StdRng;
@@ -20,11 +21,11 @@ impl crate::wasm_flat_vector::FlatVectorElem for WasmPastaFq {
     const FLATTENED_SIZE: usize = std::mem::size_of::<Fq>();
     fn flatten(self) -> Vec<u8> {
         let mut bytes: Vec<u8> = Vec::with_capacity(Self::FLATTENED_SIZE);
-        self.0.write(&mut bytes).unwrap();
+        self.0.serialize_compressed(&mut bytes).unwrap();
         bytes
     }
     fn unflatten(flat: Vec<u8>) -> Self {
-        WasmPastaFq(FromBytes::read(flat.as_slice()).unwrap())
+        WasmPastaFq(Fq::deserialize_compressed(flat.as_slice()).unwrap())
     }
 }
 
@@ -56,7 +57,7 @@ impl FromWasmAbi for WasmPastaFq {
     type Abi = <Vec<u8> as FromWasmAbi>::Abi;
     unsafe fn from_abi(js: Self::Abi) -> Self {
         let bytes: Vec<u8> = FromWasmAbi::from_abi(js);
-        WasmPastaFq(FromBytes::read(bytes.as_slice()).unwrap())
+        WasmPastaFq(Fq::deserialize_compressed(bytes.as_slice()).unwrap())
     }
 }
 
@@ -64,7 +65,7 @@ impl IntoWasmAbi for WasmPastaFq {
     type Abi = <Vec<u8> as FromWasmAbi>::Abi;
     fn into_abi(self) -> Self::Abi {
         let mut bytes: Vec<u8> = vec![];
-        self.0.write(&mut bytes).unwrap();
+        self.0.serialize_compressed(&mut bytes).unwrap();
         bytes.into_abi()
     }
 }
@@ -144,7 +145,7 @@ pub fn caml_pasta_fq_of_int(i: i32) -> WasmPastaFq {
 
 #[wasm_bindgen]
 pub fn caml_pasta_fq_to_string(x: WasmPastaFq) -> String {
-    bigint_256::to_biguint(&x.0.into_repr()).to_string()
+    bigint_256::to_biguint(&x.0.into_bigint()).to_string()
 }
 
 #[wasm_bindgen]
@@ -152,7 +153,7 @@ pub fn caml_pasta_fq_of_string(s: String) -> Result<WasmPastaFq, JsValue> {
     let biguint = BigUint::parse_bytes(s.as_bytes(), 10)
         .ok_or(JsValue::from_str("caml_pasta_fq_of_string"))?;
 
-    match Fq::from_repr(bigint_256::of_biguint(&biguint)) {
+    match Fq::from_bigint(bigint_256::of_biguint(&biguint)) {
         Some(x) => Ok(x.into()),
         None => Err(JsValue::from_str("caml_pasta_fq_of_string")),
     }
@@ -160,7 +161,7 @@ pub fn caml_pasta_fq_of_string(s: String) -> Result<WasmPastaFq, JsValue> {
 
 #[wasm_bindgen]
 pub fn caml_pasta_fq_print(x: WasmPastaFq) {
-    println!("{}", bigint_256::to_biguint(&(x.0.into_repr())));
+    println!("{}", bigint_256::to_biguint(&(x.0.into_bigint())));
 }
 
 #[wasm_bindgen]
@@ -192,12 +193,12 @@ pub fn caml_pasta_fq_rng(i: i32) -> WasmPastaFq {
 
 #[wasm_bindgen]
 pub fn caml_pasta_fq_to_bigint(x: WasmPastaFq) -> WasmBigInteger256 {
-    WasmBigInteger256(x.0.into_repr())
+    WasmBigInteger256(x.0.into_bigint())
 }
 
 #[wasm_bindgen]
 pub fn caml_pasta_fq_of_bigint(x: WasmBigInteger256) -> Result<WasmPastaFq, JsValue> {
-    match Fq::from_repr(x.0) {
+    match Fq::from_bigint(x.0) {
         Some(x) => Ok(x.into()),
         None => Err(JsValue::from_str("caml_pasta_fq_of_bigint")),
     }
@@ -205,7 +206,7 @@ pub fn caml_pasta_fq_of_bigint(x: WasmBigInteger256) -> Result<WasmPastaFq, JsVa
 
 #[wasm_bindgen]
 pub fn caml_pasta_fq_two_adic_root_of_unity() -> WasmPastaFq {
-    WasmPastaFq(FftField::two_adic_root_of_unity())
+    WasmPastaFq(<Fq as FftField>::TWO_ADIC_ROOT_OF_UNITY)
 }
 
 #[wasm_bindgen]
