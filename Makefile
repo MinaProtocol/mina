@@ -132,11 +132,6 @@ replayer: ocaml_checks
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/replayer/replayer.exe --profile=devnet
 	$(info Build complete)
 
-replayer: ocaml_checks
-	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/replayer/replayer.exe --profile=devnet
-	$(info Build complete)
-
 missing_blocks_auditor: ocaml_checks
 	$(info Starting Build)
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/missing_blocks_auditor/missing_blocks_auditor.exe --profile=testnet_postake_medium_curves

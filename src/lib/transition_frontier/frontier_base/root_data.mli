@@ -5,12 +5,7 @@ open Mina_base
  * were available on a breadcrumb in the transition frontier when this was
  * created. *)
 module Historical : sig
-  [%%versioned:
-  module Stable : sig
-    module V3 : sig
-      type t
-    end
-  end]
+  type t
 
   val transition : t -> Mina_block.Validated.t
 

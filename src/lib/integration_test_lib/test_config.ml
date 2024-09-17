@@ -54,6 +54,7 @@ end
 type constants =
   { constraint_constants : Genesis_constants.Constraint_constants.t
   ; genesis_constants : Genesis_constants.t
+  ; compile_config : Mina_compile_config.t
   }
 [@@deriving to_yojson]
 
@@ -112,7 +113,7 @@ let log_filter_of_event_type ev_existential =
 (* TODO: Do we need this? *)
 
 let default ~(constants : constants) =
-  let { constraint_constants; genesis_constants } = constants in
+  let { constraint_constants; genesis_constants; _ } = constants in
   { requires_graphql =
       true
       (* require_graphql maybe should just be phased out, because it always needs to be enable.  Now with the graphql polling engine, everything will definitely fail if graphql is not enabled.  But even before that, most tests relied on some sort of graphql interaction *)

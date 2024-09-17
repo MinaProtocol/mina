@@ -13,9 +13,7 @@ open Pickles_types
 let input_size w =
   (* This should be an affine function in [a]. *)
   let size proofs_verified =
-    let (T (Typ typ, _conv, _conv_inv)) =
-      Impls.Step.input ~proofs_verified ~wrap_rounds:Backend.Tock.Rounds.n
-    in
+    let (T (Typ typ, _conv, _conv_inv)) = Impls.Step.input ~proofs_verified in
     typ.size_in_field_elements
   in
   let f0 = size Nat.N0.n in
@@ -33,7 +31,6 @@ let test_input_size () =
         (let (T a) = Pickles_types.Nat.of_int n in
          let (T (Typ typ, _conv, _conv_inv)) =
            Impls.Step.input ~proofs_verified:a
-             ~wrap_rounds:Backend.Tock.Rounds.n
          in
          typ.size_in_field_elements ) )
 

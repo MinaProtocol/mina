@@ -62,4 +62,5 @@
    snark_worker
    one_or_two
    error_json
+   mina_compile_config
 ))

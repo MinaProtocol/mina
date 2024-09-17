@@ -131,6 +131,8 @@ let subscription t = t.subscriptions
 
 let commit_id t = t.commit_id
 
+let compile_config t = t.config.compile_config
+
 let peek_frontier frontier_broadcast_pipe =
   Broadcast_pipe.Reader.peek frontier_broadcast_pipe
   |> Result.of_option
@@ -1062,8 +1064,8 @@ let last_epoch_delegators t ~pk =
   in
   find_delegators last_epoch_delegatee_table pk
 
-let perform_compaction t =
-  match Mina_compile_config.compaction_interval_ms with
+let perform_compaction compaction_interval t =
+  match compaction_interval with
   | None ->
       ()
   | Some compaction_interval_compiled ->
@@ -1085,7 +1087,7 @@ let perform_compaction t =
         | Some ms ->
             Time.Span.of_ms (Float.of_string ms)
         | None ->
-            span compaction_interval_compiled
+            compaction_interval_compiled
       in
       if Time.Span.(interval_configured <= of_ms expected_time_for_compaction)
       then (
@@ -1156,10 +1158,10 @@ let check_and_stop_daemon t ~wait =
             if Time.Span.(wait_for > max_catchup_time) then `Now
             else `Check_in wait_for
         | Evaluating_vrf _last_checked_slot ->
-            `Check_in
-              (Core.Time.Span.of_ms
-                 (Mina_compile_config.vrf_poll_interval_ms * 2 |> Int.to_float) )
-        )
+            let vrf_poll_interval =
+              (config t).compile_config.vrf_poll_interval
+            in
+            `Check_in (Core.Time.Span.scale vrf_poll_interval 2.0) )
 
 let stop_long_running_daemon t =
   let wait_mins = (t.config.stop_time * 60) + (Random.int 10 * 60) in
@@ -1232,6 +1234,12 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val commit_id : string
+
+  val vrf_poll_interval : Time.Span.t
+
+  val zkapp_cmd_limit : int option ref
+
+  val compaction_interval : Time.Span.t option
 end
 
 let context ~commit_id (config : Config.t) : (module CONTEXT) =
@@ -1251,6 +1259,12 @@ let context ~commit_id (config : Config.t) : (module CONTEXT) =
     let constraint_constants = precomputed_values.constraint_constants
 
     let commit_id = commit_id
+
+    let vrf_poll_interval = config.compile_config.vrf_poll_interval
+
+    let zkapp_cmd_limit = config.zkapp_cmd_limit
+
+    let compaction_interval = config.compile_config.compaction_interval
   end )
 
 let start t =
@@ -1339,7 +1353,7 @@ let start t =
       ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net
       ~zkapp_cmd_limit_hardcap:
         t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap ) ;
-  perform_compaction t ;
+  perform_compaction t.config.compile_config.compaction_interval t ;
   let () =
     match t.config.node_status_url with
     | Some node_status_url ->
@@ -1484,7 +1498,7 @@ let create ~commit_id ?wallets (config : Config.t) =
   Async.Scheduler.within' ~monitor (fun () ->
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
           =
-        if Mina_compile_config.itn_features then
+        if config.compile_config.itn_features then
           let ({ client_port; _ } : Node_addrs_and_ports.t) =
             config.gossip_net_params.addrs_and_ports
           in
@@ -1784,8 +1798,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                         } )
           in
           let slot_tx_end =
-            Runtime_config.slot_tx_end
-              config.Config.precomputed_values.runtime_config
+            Runtime_config.slot_tx_end config.precomputed_values.runtime_config
           in
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
@@ -2197,8 +2210,7 @@ let create ~commit_id ?wallets (config : Config.t) =
 
 let net { components = { net; _ }; _ } = net
 
-let runtime_config { config = { precomputed_values; _ }; _ } =
-  Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values
+let runtime_config t = t.config.precomputed_values.runtime_config
 
 let start_filtered_log
     ({ in_memory_reverse_structured_log_messages_for_integration_test
@@ -2264,3 +2276,5 @@ let best_chain_block_by_state_hash (t : t) hash =
        ~error:
          (sprintf "Block with state hash %s not found in transition frontier"
             (State_hash.to_base58_check hash) )
+
+let zkapp_cmd_limit t = t.config.zkapp_cmd_limit

@@ -76,7 +76,7 @@ module Worker_state = struct
     { constraint_constants : Genesis_constants.Constraint_constants.t
     ; consensus_constants : Consensus.Constants.Stable.Latest.t
     ; conf_dir : string
-    ; logger : Logger.Stable.Latest.t
+    ; logger : Logger.t
     ; commit_id : string
     }
   [@@deriving bin_io_unversioned]

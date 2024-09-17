@@ -283,6 +283,7 @@ let main inputs =
         ; txpool_max_size = 3000
         }
     ; constraint_constants = Genesis_constants.Compiled.constraint_constants
+    ; compile_config = Mina_compile_config.Compiled.t
     }
   in
   let images =

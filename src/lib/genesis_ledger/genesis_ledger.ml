@@ -252,8 +252,6 @@ module Testnet_postake_many_producers = Register (Balances (struct
 end))
 
 module Test = Register (Balances (Test_ledger))
-module Fuzz = Register (Balances (Fuzz_ledger))
-module Release = Register (Balances (Release_ledger))
 
 module Unit_test_ledger = Make (struct
   include Test
@@ -265,35 +263,3 @@ module Unit_test_ledger = Make (struct
 end)
 
 let for_unit_tests : Packed.t = (module Unit_test_ledger)
-
-module Integration_tests = struct
-  module Delegation = Register (Balances (struct
-    let name = "test_delegation"
-
-    let balances =
-      lazy [ 0 (* delegatee *); 0 (* placeholder *); 5_000_000 (* delegator *) ]
-  end))
-
-  module Five_even_stakes = Register (Balances (struct
-    let name = "test_five_even_stakes"
-
-    let balances =
-      lazy [ 1_000_000; 1_000_000; 1_000_000; 1_000_000; 1_000_000; 1_000 ]
-  end))
-
-  module Split_two_stakes = Register (Balances (struct
-    let name = "test_split_two_stakers"
-
-    let balances =
-      lazy
-        (let high_balances = List.init 2 ~f:(Fn.const 5_000_000) in
-         let low_balances = List.init 16 ~f:(Fn.const 1_000) in
-         high_balances @ low_balances )
-  end))
-
-  module Three_even_stakes = Register (Balances (struct
-    let name = "test_three_even_stakes"
-
-    let balances = lazy [ 1_000_000; 1_000_000; 1_000_000; 1000; 1000; 1000 ]
-  end))
-end

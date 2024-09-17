@@ -92,6 +92,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let constants : Test_config.constants =
       { genesis_constants = Network.genesis_constants network
       ; constraint_constants = Network.constraint_constants network
+      ; compile_config = Network.compile_config network
       }
     in
     let logger = Logger.create () in

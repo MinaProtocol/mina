@@ -1,5 +1,5 @@
 use crate::WithLagrangeBasis;
-use ark_poly::UVPolynomial;
+use ark_poly::DenseUVPolynomial;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
 use paste::paste;
 use poly_commitment::SRS as _;

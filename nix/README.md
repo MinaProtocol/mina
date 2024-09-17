@@ -617,3 +617,156 @@ Before running any `dune` commands.
 Alternatively, you can just run your commands inside `nix develop
 --ignore-environment mina`, which unsets all the outside environment variables,
 resulting in a more reproducible but less convenient environment.
+
+# Granular nix
+
+A new way to build Mina with nix goes by the catchname "granular nix". It's granular because it relies on splitting the task of building the Mina project to building each opam package defined by Mina in isolation (instead of invoking `dune build` for the whole filetree).
+
+This has a benefit of allowing caching of artifacts and test results.
+
+## Build methodology
+
+Dune files are analyzed by the [o1-labs/describe-dune](https://github.com/o1-labs/describe-dune) tool. Libraries, executables, tests and generated files, along with their mutual dependencies (as present by dune files) are extracted.
+
+After that, dependencies between all of the units (libraries, executables, tests) and files are determined. Then a greedy algorithm attempts to "upgrade" each library/executable dependency to a package dependency. It ends with an error if it fails. But if it succeeds, it comes up with a dependency tree (that can be plotted with `nix build mina#info.deps-graph`) that allows compilation of project's Ocaml code to be executed package-by-package.
+
+Then packages are compiled one by one using `dune`, with dependencies of a package built before it and then provided to the package via `OCAMLPATH` environment variable. Code of each package is isolated from its dependencies and packages that depend on it.
+
+## New nix derivations
+
+There is a bunch of new derivations available using nix flake for Mina repository.
+In subsections there are some examples and the full list of new derivations.
+
+A note on building process and treatment of packages. All of the code is build on a package level. That is, for compilation units (executables, libraries, tests) that are assigned to a package, they are compiled with `dune build --only-packages <package>`. Any of dependencies are pre-built the same way and are provided to `dune` via `OCAMLPATH`.
+
+For compilation units that have no package defined, a synthetic package name is generated. Path to dune directory with these units is quoted by replacing `.` with `__` and `/` with `-` in the package path, and also prepending and appending the resulting string with `__`. E.g. for path `src/test/command_line_tests` a synthetic package `__src-test-command_line_tests__` is generated. Such synthetic packages are built with `dune build <path-to-dune-directory>` (isolation is ensured by filtering out all of irrelevant Ocaml sources).
+
+## Examples
+
+CLI commands below assume to be executed from a directory with Mina repository checked out and `./nix/pin.sh` executed.
+
+| Description | Command |
+|--------------|-------------|
+| Build all Ocaml code, run same tests as in `unit-test.sh` | `nix build mina#granular` |
+| Build all Ocaml code and run all unit tests | `nix build mina#all-tested` |
+| Build all Ocaml code without running tests | `nix build mina#all` |
+| Build `mina_lib` package | `nix build mina#pkgs.mina_lib` |
+| Build `mina_net2` package and run its tests | `nix build mina#tested.mina_net2` |
+| Build `validate_keypair` executable | `nix build mina#exes.validate_keypair` |
+| Run tests from `src/lib/staged_ledger/test` | `nix build mina#tested.__src-lib-staged_ledger-test__` |
+| Plot dependencies of package `mina_lib` | `nix build mina#info.deps-graphs.mina_lib` |
+| Plot dependency graph of Mina repository | `nix build mina#info.deps-graph` |
+| Extract json description of dependencies | `nix build mina#info.deps` |
+
+Dependency description generated via `nix build mina#info.deps --out-link deps.json` is useful for investigation of depencies in a semi-automated way. E.g. to check which executables implicitly depend on `mina_lib`, just run the following `jq` command:
+
+```bash
+$ jq '[.units | to_entries | .[] | { key: .key, value: [ .value.exe? | to_entries? | .[]? | select(.value.pkgs? | contains(["mina_lib"])?) | .key ] } | select (.value != []) | .key ]' <deps.json
+[
+  "__src-app-batch_txn_tool__",
+  "__src-app-graphql_schema_dump__",
+  "__src-app-test_executive__",
+  "cli",
+  "zkapp_test_transaction"
+]
+```
+
+## Combined derivations
+
+Derivations that combine all packages: all of the Ocaml code is built, three options vary in which unit tests are executed.
+
+- `#all`
+  - builds all the Ocaml code discovered in the dune root (libraries, executables, tests)
+  - tests aren't executed
+- `#granular`
+  - `#all` + running all of tests except for tests in `src/app` (behavior similar to `buildkite/scripts/unit-test.sh`)
+- `#all-tested`
+  - `#all` + running all discovered tests
+  - discovery of tests is done by finding `test` stanzas and libraries with `inline_tests` stanza
+
+## Individual compilation units
+
+These allow every package to be compiled/tested in isolation, without requiring all of the other packages to be built (except for dependencies, of course).
+
+- `#pkgs.<package>`
+  - takes sources of the package and builds it with `dune build <package>`
+  - all library dependencies are provided via `OCAMLPATH`
+  - derivation contains everything from the `_build` directory
+- `#src.pkgs.<package>`
+  - show sources of a package (and some relevant files, like `dune` from the parent directory), as filtered for building the `#pkgs.<package>`
+- `#files.<path>`
+  - build all file rules in the `<path>` used by stanzas in other directories
+  - defined only for generated files that are used outside `<path>/dune` scope
+- `#src.files.<path>`
+  - source director used for building `#files.<path>`
+- `#tested.<package>`
+  - same as `#pkgs.<package>`, but also runs tests for the package
+  - note that tests for package's dependencies aren't executed
+
+There are also a few derivations that help build a particular executable. These are merely shortcuts for building a package with an executable and then copying the executable to another directory.
+
+- `#all-exes.<package>.<exe>`
+  - builds a derivation with a single file `bin/<exe>` that is executable with name `<exe>` from package `<package>`
+  - when a public name is available, `<exe>` stands for executable's public name (and private name otherwise)
+- `#exes.<exe>`
+  - shortcut for `#all-exes.<package>.<exe>`
+  - if `<exe>` is defined for multiple packages, error is printed
+  - if `<exe>` is defined in a single package `<pkg>`, it's same as `#all-exes.<pkg>.<exe>`
+
+## Metadata/debug information
+
+- `#info.src`
+  - mapping from dune directory path `dir` to metadata related to files outside of dune directory that is needed for compilation
+  - in particular the following fields:
+     - `subdirs`, containing list of file paths (relative to the `dir`) that contain dune files with compilation units
+     - `file_deps`, containing list of file paths from other dirs which should be included into source when compiling units from `dir` (e.g. some top-level `dune` files which use `env` stanza)
+     - `file_outs`, containing a mapping from absolute path of a file generated by some `rule` stanza of the dune file to type of this file output (for type being one of `promote`, `standard` and `fallback`)
+- `#info.exe`
+  - mapping from executable path (in format like `src/app/archive/archive.exe`) to an object with fields `name` and `package`
+  - `package` field contains name of the package that declares the executable
+  - `name` is either `public_name` of executable (if defined) or simply `name`
+- `#info.package`
+  - mapping from package name to an object containing information about all of the units defined by the package
+  - object schema is the following:
+     ```
+     { exe | lib | test : { name:  { public_name: string (optional), name: string, src: string, type: exe | lib | test, deps: [string] } }
+     ```
+  - this object contains raw data extracted from dune files
+  - `deps` contains opam library names exactly as defined by dune (ppx-related libraries are concatenated to `libraries`)
+- `#info.separated-libs`
+  - when there is a package-to-package circular dependency, this would be a non-empty object in the format similar to `#info.deps` containing information about edges in dependency graph that form a cycle
+  - useful for debugging when an error `Package ${pkg} has separated lib dependency to packages` which may occur after future edits to dune files
+- `#info.deps`
+  - mapping from files and units to their dependencies
+  - external dependencies (defined outside of repository) are ignored
+  - schema:
+     ```
+     { files: { <path> : { exes: { <package> : [<exe>] } } },
+       units: { <package> : { exe | lib | test : { <name> : { 
+          exes: { <package> : <exe> },
+          files: [<dune dir path>],
+          libs: { <package> : [<lib name>] },
+          pkgs: [ <package> ]
+       } } 
+     }
+     ```
+- `#dune-description`
+  - raw description of dune files as parsed by  [o1-labs/describe-dune](https://github.com/o1-labs/describe-dune) tool
+- `#base-libs`
+  - a derivation that builds an opam repo-like file structure with all of the dependencies from `opam.export` (plus some extra opam packages for building)
+
+## Dependency graphs
+
+- `#info.deps-graph`
+  - generates a dot graph of all of Mina packages (a huge one)
+  - see [example ](https://drive.google.com/file/d/1G_8REbd4-rKJpWBkNOFI4P6_3sWAp2io/view?usp=sharing)(after generating an svg with `nix build mina#info.deps-graph --out-link all.dot && dot -Tsvg -o all.svg all.dot`)
+- `#info.deps-graphs.<package>`
+  - plots package dependencies for the `<package>`
+
+Here's example of graph for `mina_wire_types` package:
+
+![Dependencies of mina_wire_types](https://storage.googleapis.com/o1labs-doc-images/mina_wire_types_dep_diagram.png)
+
+Note that there are a few details of this graph. Graph generated for a package `p` displays may omit some of transitive dependencies of a dependency package if they're formed by units on which `p` has no dependency itself. And dependencies `A -> B` and `B -> C` do not always imply `A -> C`: package `B` may have a test dependent on package `C`, but `A` doesn't depend on that tests, only libraries it uses.
+
+True meaning of this graph is that one can build package by package following edges backwards, building all of the units of a package all at once on each step. Interpretation of a graph for dependency analysis is handy, just it's useful to keep in mind certain details.

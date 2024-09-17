@@ -62,5 +62,7 @@ type t =
   ; uptime_send_node_commit : bool [@default false]
   ; stop_time : int
   ; graphql_control_port : int option [@default None]
+  ; zkapp_cmd_limit : int option ref
+  ; compile_config : Mina_compile_config.t
   }
 [@@deriving make]
