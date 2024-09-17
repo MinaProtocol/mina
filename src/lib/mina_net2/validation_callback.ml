@@ -39,15 +39,15 @@ module type Metric_intf = sig
 
   val ignored : Mina_metrics.Counter.t
 
-  module Validation_time (Context : Mina_metrics.CONTEXT) : sig
+  module Validation_time : sig
     val update : Time.Span.t -> unit
   end
 
-  module Processing_time (Context : Mina_metrics.CONTEXT) : sig
+  module Processing_time : sig
     val update : Time.Span.t -> unit
   end
 
-  module Rejection_time (Context : Mina_metrics.CONTEXT) : sig
+  module Rejection_time : sig
     val update : Time.Span.t -> unit
   end
 end
@@ -72,10 +72,7 @@ let record_timeout_metrics cb =
       Mina_metrics.Counter.inc_one M.validations_timed_out
 
 let record_validation_metrics message_type (result : validation_result)
-    validation_time processing_time ~block_window_duration =
-  let module Context = struct
-    let block_window_duration = block_window_duration
-  end in
+    validation_time processing_time ~block_window_duration:_ (*TODO remove*) =
   match metrics_of_message_type message_type with
   | None ->
       ()
@@ -84,13 +81,13 @@ let record_validation_metrics message_type (result : validation_result)
       | `Ignore ->
           Mina_metrics.Counter.inc_one M.ignored
       | `Accept ->
-          let module Validation_time = M.Validation_time (Context) in
+          let module Validation_time = M.Validation_time in
           Validation_time.update validation_time ;
-          let module Processing_time = M.Processing_time (Context) in
+          let module Processing_time = M.Processing_time in
           Processing_time.update processing_time
       | `Reject ->
           Mina_metrics.Counter.inc_one M.rejected ;
-          let module Rejection_time = M.Rejection_time (Context) in
+          let module Rejection_time = M.Rejection_time in
           Rejection_time.update processing_time )
 
 let await_timeout cb =

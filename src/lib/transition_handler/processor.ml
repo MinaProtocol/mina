@@ -47,12 +47,8 @@ let cached_transform_deferred_result ~transform_cached ~transform_result cached
 let add_and_finalize ~logger ~frontier ~catchup_scheduler
     ~processed_transition_writer ~only_if_present ~time_controller ~source
     ~valid_cb cached_breadcrumb ~(precomputed_values : Precomputed_values.t)
-    ~block_window_duration =
-  let module Metrics_context = struct
-    let block_window_duration = block_window_duration
-  end in
-  let module Inclusion_time =
-    Mina_metrics.Block_latency.Inclusion_time (Metrics_context) in
+    ~block_window_duration:_ (*TODO remove unused var*) =
+  let module Inclusion_time = Mina_metrics.Block_latency.Inclusion_time in
   let breadcrumb =
     if Cached.is_pure cached_breadcrumb then Cached.peek cached_breadcrumb
     else Cached.invalidate_with_success cached_breadcrumb

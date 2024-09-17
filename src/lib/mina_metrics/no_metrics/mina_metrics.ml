@@ -3,10 +3,6 @@ open Async_kernel
 
 let time_offset_sec = 1609459200.
 
-module type CONTEXT = sig
-  val block_window_duration : Time.Span.t
-end
-
 module Counter = struct
   type t = unit
 
@@ -135,15 +131,15 @@ module Network = struct
 
     let received : Counter.t = ()
 
-    module Validation_time (Context : CONTEXT) = struct
+    module Validation_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
 
-    module Processing_time (Context : CONTEXT) = struct
+    module Processing_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
 
-    module Rejection_time (Context : CONTEXT) = struct
+    module Rejection_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
   end
@@ -157,15 +153,15 @@ module Network = struct
 
     let received : Counter.t = ()
 
-    module Validation_time (Context : CONTEXT) = struct
+    module Validation_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
 
-    module Processing_time (Context : CONTEXT) = struct
+    module Processing_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
 
-    module Rejection_time (Context : CONTEXT) = struct
+    module Rejection_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
   end
@@ -179,15 +175,15 @@ module Network = struct
 
     let received : Counter.t = ()
 
-    module Validation_time (Context : CONTEXT) = struct
+    module Validation_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
 
-    module Processing_time (Context : CONTEXT) = struct
+    module Processing_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
 
-    module Rejection_time (Context : CONTEXT) = struct
+    module Rejection_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
   end
@@ -440,6 +436,8 @@ module Transition_frontier = struct
     let update : float -> unit = fun _ -> ()
 
     let clear : unit -> unit = fun _ -> ()
+
+    let initialize = Fn.ignore
   end
 
   let recently_finalized_staged_txns : Gauge.t = ()
@@ -496,36 +494,44 @@ module Block_latency = struct
     let upload_to_gcloud_blocks : Gauge.t = ()
   end
 
-  module Gossip_slots (Context : CONTEXT) = struct
+  module Gossip_slots = struct
     let v : Gauge.t = ()
 
     let update : float -> unit = fun _ -> ()
 
     let clear : unit -> unit = fun _ -> ()
+
+    let initialize = Fn.ignore
   end
 
-  module Gossip_time (Context : CONTEXT) = struct
+  module Gossip_time = struct
     let v : Gauge.t = ()
 
     let update : Time.Span.t -> unit = fun _ -> ()
 
     let clear : unit -> unit = fun _ -> ()
+
+    let initialize = Fn.ignore
   end
 
-  module Inclusion_time (Context : CONTEXT) = struct
+  module Inclusion_time = struct
     let v : Gauge.t = ()
 
     let update : Time.Span.t -> unit = fun _ -> ()
 
     let clear : unit -> unit = fun _ -> ()
+
+    let initialize = Fn.ignore
   end
 
-  module Validation_acceptance_time (Context : CONTEXT) = struct
+  module Validation_acceptance_time = struct
     let v : Gauge.t = ()
 
     let update : Time.Span.t -> unit = fun _ -> ()
 
     let clear : unit -> unit = fun _ -> ()
+
+    let initialize = Fn.ignore
   end
 end
 

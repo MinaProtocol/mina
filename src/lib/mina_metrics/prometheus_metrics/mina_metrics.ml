@@ -11,10 +11,6 @@ open Async_kernel
 
 let time_offset_sec = 1609459200.
 
-module type CONTEXT = sig
-  val block_window_duration : Time.Span.t
-end
-
 (* textformat serialization and runtime metrics taken from github.com/mirage/prometheus:/app/prometheus_app.ml *)
 module TextFormat_0_0_4 = struct
   let re_unquoted_escapes = Re.compile @@ Re.set "\\\n"
@@ -225,8 +221,7 @@ module Runtime = struct
 
   let process_uptime_ms_total =
     simple_metric ~metric_type:Counter "process_uptime_ms_total"
-      (fun () ->
-        Core.Time.Span.to_ms (Core.Time.diff (Core.Time.now ()) start_time) )
+      (fun () -> Time.Span.to_ms (Core.Time.diff (Core.Time.now ()) start_time))
       ~help:"Total time the process has been running for in milliseconds."
 
   let metrics =
@@ -434,10 +429,10 @@ module Network = struct
     let help = "# of messages received" in
     Counter.v "messages_received" ~help ~namespace ~subsystem
 
-  module Delay_time_spec (Context : CONTEXT) = struct
-    let intervals =
-      Intervals.make ~rolling_interval:Context.block_window_duration
-        ~tick_interval:Context.block_window_duration
+  module Delay_time_spec = struct
+    let intervals block_window_duration =
+      Intervals.make ~rolling_interval:block_window_duration
+        ~tick_interval:block_window_duration
   end
 
   module Block = struct
@@ -459,12 +454,6 @@ module Network = struct
       let help = "# of blocks received" in
       Counter.v "received" ~help ~namespace ~subsystem
 
-    let validation_time_is_initialized = ref false
-
-    let processing_time_is_initialized = ref false
-
-    let rejection_time_is_initialized = ref false
-
     module Gauge_map = Metric_map (struct
       type t = Gauge.t
 
@@ -473,10 +462,8 @@ module Network = struct
       let v = Gauge.v
     end)
 
-    let block_table = Gauge_map.of_alist_exn []
-
-    module Validation_time (Context : CONTEXT) = Moving_time_average (struct
-      include Delay_time_spec (Context)
+    module Validation_time = Moving_time_average (struct
+      include Delay_time_spec
 
       let subsystem = subsystem
 
@@ -484,14 +471,10 @@ module Network = struct
 
       let help =
         "average time, in ms, for blocks to be validated and rebroadcasted"
-
-      let v = Gauge_map.add block_table ~name ~help
-
-      let is_initialized = validation_time_is_initialized
     end)
 
-    module Processing_time (Context : CONTEXT) = Moving_time_average (struct
-      include Delay_time_spec (Context)
+    module Processing_time = Moving_time_average (struct
+      include Delay_time_spec
 
       let subsystem = subsystem
 
@@ -500,14 +483,10 @@ module Network = struct
       let help =
         "average time, in ms, for blocks to be accepted after the OCaml \
          process receives it"
-
-      let v = Gauge_map.add block_table ~name ~help
-
-      let is_initialized = processing_time_is_initialized
     end)
 
-    module Rejection_time (Context : CONTEXT) = Moving_time_average (struct
-      include Delay_time_spec (Context)
+    module Rejection_time = Moving_time_average (struct
+      include Delay_time_spec
 
       let subsystem = subsystem
 
@@ -516,10 +495,6 @@ module Network = struct
       let help =
         "average time, in ms, for blocks to be rejected after the OCaml \
          process receives it"
-
-      let v = Gauge_map.add block_table ~name ~help
-
-      let is_initialized = rejection_time_is_initialized
     end)
   end
 
@@ -542,12 +517,6 @@ module Network = struct
       let help = "# of snark work received" in
       Counter.v "received" ~help ~namespace ~subsystem
 
-    let validation_time_is_initialized = ref false
-
-    let processing_time_is_initialized = ref false
-
-    let rejection_time_is_initialized = ref false
-
     module Gauge_map = Metric_map (struct
       type t = Gauge.t
 
@@ -556,10 +525,8 @@ module Network = struct
       let v = Gauge.v
     end)
 
-    let snark_work_table = Gauge_map.of_alist_exn []
-
-    module Validation_time (Context : CONTEXT) = Moving_time_average (struct
-      include Delay_time_spec (Context)
+    module Validation_time = Moving_time_average (struct
+      include Delay_time_spec
 
       let subsystem = subsystem
 
@@ -567,14 +534,10 @@ module Network = struct
 
       let help =
         "average delay, in ms, for snark work to be validated and rebroadcasted"
-
-      let v = Gauge_map.add snark_work_table ~name ~help
-
-      let is_initialized = validation_time_is_initialized
     end)
 
-    module Processing_time (Context : CONTEXT) = Moving_time_average (struct
-      include Delay_time_spec (Context)
+    module Processing_time = Moving_time_average (struct
+      include Delay_time_spec
 
       let subsystem = subsystem
 
@@ -583,14 +546,10 @@ module Network = struct
       let help =
         "average delay, in ms, for snark work to be accepted after the OCaml \
          process receives it"
-
-      let v = Gauge_map.add snark_work_table ~name ~help
-
-      let is_initialized = processing_time_is_initialized
     end)
 
-    module Rejection_time (Context : CONTEXT) = Moving_time_average (struct
-      include Delay_time_spec (Context)
+    module Rejection_time = Moving_time_average (struct
+      include Delay_time_spec
 
       let subsystem = subsystem
 
@@ -599,10 +558,6 @@ module Network = struct
       let help =
         "average time, in ms, for snark work to be rejected after the OCaml \
          process receives it"
-
-      let v = Gauge_map.add snark_work_table ~name ~help
-
-      let is_initialized = rejection_time_is_initialized
     end)
   end
 
@@ -625,12 +580,6 @@ module Network = struct
       let help = "# of transactions received" in
       Counter.v "received" ~help ~namespace ~subsystem
 
-    let validation_time_is_initialized = ref false
-
-    let processing_time_is_initialized = ref false
-
-    let rejection_time_is_initialized = ref false
-
     module Gauge_map = Metric_map (struct
       type t = Gauge.t
 
@@ -639,10 +588,8 @@ module Network = struct
       let v = Gauge.v
     end)
 
-    let transaction_table = Gauge_map.of_alist_exn []
-
-    module Validation_time (Context : CONTEXT) = Moving_time_average (struct
-      include Delay_time_spec (Context)
+    module Validation_time = Moving_time_average (struct
+      include Delay_time_spec
 
       let subsystem = subsystem
 
@@ -651,14 +598,10 @@ module Network = struct
       let help =
         "average delay, in ms, for transactions to be validated and \
          rebroadcasted"
-
-      let v = Gauge_map.add transaction_table ~name ~help
-
-      let is_initialized = validation_time_is_initialized
     end)
 
-    module Processing_time (Context : CONTEXT) = Moving_time_average (struct
-      include Delay_time_spec (Context)
+    module Processing_time = Moving_time_average (struct
+      include Delay_time_spec
 
       let subsystem = subsystem
 
@@ -667,14 +610,10 @@ module Network = struct
       let help =
         "average delay, in ms, for transactions to be accepted after the OCaml \
          process receives it"
-
-      let v = Gauge_map.add transaction_table ~name ~help
-
-      let is_initialized = processing_time_is_initialized
     end)
 
-    module Rejection_time (Context : CONTEXT) = Moving_time_average (struct
-      include Delay_time_spec (Context)
+    module Rejection_time = Moving_time_average (struct
+      include Delay_time_spec
 
       let subsystem = subsystem
 
@@ -683,10 +622,6 @@ module Network = struct
       let help =
         "average time, in ms, for transactions to be rejected after the OCaml \
          process receives it"
-
-      let v = Gauge_map.add transaction_table ~name ~help
-
-      let is_initialized = rejection_time_is_initialized
     end)
   end
 
@@ -1331,8 +1266,6 @@ module Transition_frontier = struct
     let help = "total # of staged txns that have been finalized" in
     Counter.v "finalized_staged_txns" ~help ~namespace ~subsystem
 
-  let tps_30min_is_initialized = ref false
-
   module Gauge_map = Metric_map (struct
     type t = Gauge.t
 
@@ -1341,16 +1274,14 @@ module Transition_frontier = struct
     let v = Gauge.v
   end)
 
-  let transaction_frontier_table = Gauge_map.of_alist_exn []
-
   module TPS_30min = Moving_bucketed_average (struct
-    let bucket_interval = Core.Time.Span.of_min 3.0
+    let bucket_interval _ = Time.Span.of_min 3.0
 
-    let num_buckets = 10
+    let num_buckets _ = 10
 
     let render_average buckets =
       let total = List.fold buckets ~init:0.0 ~f:(fun acc (n, _) -> acc +. n) in
-      total /. Core.Time.Span.(of_min 30.0 |> to_sec)
+      total /. Time.Span.(of_min 30.0 |> to_sec)
 
     let subsystem = subsystem
 
@@ -1359,10 +1290,6 @@ module Transition_frontier = struct
     let help =
       "moving average for transaction per second, the rolling interval is set \
        to 30 min"
-
-    let v = Gauge_map.add transaction_frontier_table ~name ~help
-
-    let is_initialized = tps_30min_is_initialized
   end)
 
   let recently_finalized_staged_txns : Gauge.t =
@@ -1509,14 +1436,12 @@ module Block_latency = struct
       Gauge.v "upload_to_gcloud_blocks" ~help ~namespace ~subsystem
   end
 
-  module Latency_time_spec (Context : CONTEXT) = struct
-    let intervals =
+  module Latency_time_spec = struct
+    let intervals block_window_duration =
       Intervals.make
-        ~tick_interval:(Time.Span.scale Context.block_window_duration 0.5)
-        ~rolling_interval:(Time.Span.scale Context.block_window_duration 20.0)
+        ~tick_interval:(Time.Span.scale block_window_duration 0.5)
+        ~rolling_interval:(Time.Span.scale block_window_duration 20.0)
   end
-
-  let gossip_slots_is_initialized = ref false
 
   module Gauge_map = Metric_map (struct
     type t = Gauge.t
@@ -1526,12 +1451,11 @@ module Block_latency = struct
     let v = Gauge.v
   end)
 
-  let block_latency_table = Gauge_map.of_alist_exn []
+  module Gossip_slots = Moving_bucketed_average (struct
+    let bucket_interval block_window_duration =
+      Time.Span.scale block_window_duration 0.5
 
-  module Gossip_slots (Context : CONTEXT) = Moving_bucketed_average (struct
-    let bucket_interval = Time.Span.scale Context.block_window_duration 0.5
-
-    let num_buckets = 40
+    let num_buckets _ = 40
 
     let subsystem = subsystem
 
@@ -1547,16 +1471,10 @@ module Block_latency = struct
             (total_sum +. total, count_sum + count) )
       in
       total_sum /. Float.of_int count_sum
-
-    let v = Gauge_map.add block_latency_table ~name ~help
-
-    let is_initialized = gossip_slots_is_initialized
   end)
 
-  let gossip_time_is_initialized = ref false
-
-  module Gossip_time (Context : CONTEXT) = Moving_time_average (struct
-    include Latency_time_spec (Context)
+  module Gossip_time = Moving_time_average (struct
+    include Latency_time_spec
 
     let subsystem = subsystem
 
@@ -1564,16 +1482,10 @@ module Block_latency = struct
 
     let help =
       "average delay, in seconds, after which produced blocks are received"
-
-    let v = Gauge_map.add block_latency_table ~name ~help
-
-    let is_initialized = gossip_time_is_initialized
   end)
 
-  let inclusion_time_is_initialized = ref false
-
-  module Inclusion_time (Context : CONTEXT) = Moving_time_average (struct
-    include Latency_time_spec (Context)
+  module Inclusion_time = Moving_time_average (struct
+    include Latency_time_spec
 
     let subsystem = subsystem
 
@@ -1582,17 +1494,10 @@ module Block_latency = struct
     let help =
       "average delay, in seconds, after which produced blocks are included \
        into our frontier"
-
-    let v = Gauge_map.add block_latency_table ~name ~help
-
-    let is_initialized = inclusion_time_is_initialized
   end)
 
-  let validation_acceptance_time_is_initialized = ref false
-
-  module Validation_acceptance_time (Context : CONTEXT) =
-  Moving_time_average (struct
-    include Latency_time_spec (Context)
+  module Validation_acceptance_time = Moving_time_average (struct
+    include Latency_time_spec
 
     let subsystem = subsystem
 
@@ -1601,10 +1506,6 @@ module Block_latency = struct
     let help =
       "average delay, in seconds, between the time blocks are initially \
        received from the libp2p_helper, and when they are accepted as valid"
-
-    let v = Gauge_map.add block_latency_table ~name ~help
-
-    let is_initialized = validation_acceptance_time_is_initialized
   end)
 end
 

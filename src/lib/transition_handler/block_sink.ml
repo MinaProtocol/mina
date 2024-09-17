@@ -60,9 +60,6 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       O1trace.sync_thread "handle_block_gossip"
       @@ fun () ->
       let%bind () = on_push () in
-      let module Metrics_Context = struct
-        let block_window_duration = block_window_duration
-      end in
       Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
       let state = Envelope.Incoming.data e in
       let state_hash =
@@ -102,7 +99,7 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
             in
             let module Validation_acceptance_time =
               Mina_metrics.Block_latency.Validation_acceptance_time
-                (Metrics_Context) in
+            in
             Validation_acceptance_time.update processing_time_span
         | Some _ ->
             ()
@@ -192,11 +189,9 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
           (Consensus.Data.Consensus_time.of_time_exn
              ~constants:consensus_constants tm )
       in
-      let module Gossip_slots =
-        Mina_metrics.Block_latency.Gossip_slots (Metrics_Context) in
+      let module Gossip_slots = Mina_metrics.Block_latency.Gossip_slots in
       Gossip_slots.update (Float.of_int (tm_slot - tn_production_slot)) ;
-      let module Gossip_time =
-        Mina_metrics.Block_latency.Gossip_time (Metrics_Context) in
+      let module Gossip_time = Mina_metrics.Block_latency.Gossip_time in
       Gossip_time.update
         Block_time.(Span.to_time_span @@ diff tm tn_production_time) ;
       Deferred.unit
