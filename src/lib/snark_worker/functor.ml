@@ -365,6 +365,9 @@ module Make (Inputs : Intf.Inputs_intf) :
         let logger =
           Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
         in
+        let proof_level =
+          Option.value ~default:default_proof_level proof_level
+        in
         Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
             let logrotate_max_size = 1024 * 10 in
             let logrotate_num_rotate = 1 in
@@ -380,9 +383,6 @@ module Make (Inputs : Intf.Inputs_intf) :
             [%log info]
               !"Received signal to terminate. Aborting snark worker process" ;
             Core.exit 0 ) ;
-        let proof_level =
-          Option.value ~default:default_proof_level proof_level
-        in
         main
           (module Rpcs_versioned)
           ~logger ~proof_level ~constraint_constants daemon_port

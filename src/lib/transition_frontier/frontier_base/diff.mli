@@ -21,14 +21,9 @@ type lite = Lite
  *  transition frontier and the persistent transition frontier.
  *)
 module Node : sig
-  [%%versioned:
-  module Stable : sig
-    module V3 : sig
-      type 'a t =
-        | Full : Breadcrumb.t -> full t
-        | Lite : Mina_block.Validated.Stable.V2.t -> lite t
-    end
-  end]
+  type 'a t =
+    | Full : Breadcrumb.t -> full t
+    | Lite : Mina_block.Validated.t -> lite t
 end
 
 module Node_list : sig
@@ -137,12 +132,7 @@ module Lite : sig
   type 'mutant t = (lite, 'mutant) diff
 
   module E : sig
-    [%%versioned:
-    module Stable : sig
-      module V3 : sig
-        type t = E : (lite, 'mutant) diff -> t [@@unboxed]
-      end
-    end]
+    type t = E : (lite, 'mutant) diff -> t [@@unboxed]
   end
 end
 

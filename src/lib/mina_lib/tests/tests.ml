@@ -36,6 +36,11 @@ let%test_module "Epoch ledger sync tests" =
 
     let dir_prefix = "sync_test_data"
 
+    let genesis_constants = Genesis_constants.For_unit_tests.t
+
+    let constraint_constants =
+      Genesis_constants.For_unit_tests.Constraint_constants.t
+
     let make_dirname s =
       let open Core in
       let uuid = Uuid_unix.create () |> Uuid.to_string in
@@ -63,8 +68,8 @@ let%test_module "Epoch ledger sync tests" =
         match%map
           Genesis_ledger_helper.init_from_config_file
             ~genesis_dir:(make_dirname "genesis_dir")
-            ~compiled:(module Genesis_constants.For_unit_tests)
-            ~logger ~proof_level:None runtime_config
+            ~constraint_constants ~genesis_constants ~logger ~proof_level:None
+            runtime_config ~cli_proof_level:None
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
@@ -96,6 +101,15 @@ let%test_module "Epoch ledger sync tests" =
         let time_controller = time_controller
 
         let commit_id = "not specified for unit test"
+
+        let vrf_poll_interval =
+          Mina_compile_config.For_unit_tests.t.vrf_poll_interval
+
+        let zkapp_cmd_limit =
+          ref Mina_compile_config.For_unit_tests.t.zkapp_cmd_limit
+
+        let compaction_interval =
+          Mina_compile_config.For_unit_tests.t.compaction_interval
       end in
       let genesis_ledger =
         lazy
