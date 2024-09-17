@@ -134,7 +134,7 @@ type t = Metadata.Stable.Latest.t [@@deriving bin_io_unversioned]
 
 let metadata = Fn.id
 
-let create ?metadata:_ ?id:_ () = Metadata.empty
+let create ?metadata:_ ?id:_ ?itn_features:_ () = Metadata.empty
 
 let null () = Metadata.empty
 
