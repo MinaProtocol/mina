@@ -333,20 +333,30 @@ type t =
   { null : bool
   ; metadata : Metadata.Stable.Latest.t
   ; id : Bounded_types.String.Stable.V1.t
+  ; itn_features : bool
   }
 [@@deriving bin_io_unversioned]
 
 let metadata t = t.metadata
 
-let create ?(metadata = []) ?(id = "default") () =
-  { null = false; metadata = Metadata.extend Metadata.empty metadata; id }
+let create ?(metadata = []) ?(id = "default") ?(itn_features = false) () =
+  { null = false
+  ; metadata = Metadata.extend Metadata.empty metadata
+  ; id
+  ; itn_features
+  }
 
-let null () = { null = true; metadata = Metadata.empty; id = "default" }
+let null () =
+  { null = true
+  ; metadata = Metadata.empty
+  ; id = "default"
+  ; itn_features = false
+  }
 
 let extend t metadata =
   { t with metadata = Metadata.extend t.metadata metadata }
 
-let change_id { null; metadata; id = _ } ~id = { null; metadata; id }
+let change_id t ~id = { t with id }
 
 let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
     ~skip_merge_global_metadata =
@@ -404,7 +414,7 @@ let log t ~level ~module_ ~location ?(metadata = []) ?event_id fmt =
     raw t message' ;
     match level with
     | Internal ->
-        if Mina_compile_config.itn_features then
+        if t.itn_features then
           let timestamp = message'.timestamp in
           let entries =
             Itn_logger.postprocess_message ~timestamp ~message ~metadata
