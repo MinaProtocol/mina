@@ -22,6 +22,51 @@ let generate_keypair =
        (Rosetta_coding.Coding.of_public_key kp.public_key) ;
      exit 0 )
 
+let balance =
+  Command.Arg_type.map Command.Param.string
+    ~f:Currency.Balance.of_mina_string_exn
+
+let generate_test_ledger =
+  Command.async ~summary:"Generate a ledger for testing"
+    (let open Command.Let_syntax in
+    let%map_open n =
+      Command.Param.flag "-n"
+        ~doc:(Printf.sprintf "NN number of accounts to generate")
+        (required int)
+    and min_balance =
+      flag "--min-balance" ~doc:"MINA Minimum balance of a key"
+        (optional balance)
+    and max_balance =
+      flag "--max-balance" ~doc:"MINA Maximum balance of a key"
+        (optional balance)
+    in
+    Exceptions.handle_nicely
+    @@ fun () ->
+    let min_balance = Option.value ~default:Currency.Balance.zero min_balance in
+    let max_balance =
+      Option.value ~default:(Currency.Balance.of_mina_int_exn 100) max_balance
+    in
+    let balance_seq =
+      Quickcheck.random_sequence ~seed:`Nondeterministic
+      @@ Currency.Balance.gen_incl min_balance max_balance
+    in
+    let ledger =
+      Sequence.take balance_seq n
+      |> Sequence.map ~f:(fun balance ->
+             let kp = Keypair.create () in
+             { Runtime_config.Json_layout.Accounts.Single.default with
+               pk =
+                 Public_key.compress kp.public_key
+                 |> Public_key.Compressed.to_base58_check
+             ; sk = Some (Private_key.to_base58_check kp.private_key)
+             ; balance
+             } )
+      |> Sequence.to_list
+    in
+    Yojson.Safe.pretty_print Format.std_formatter
+    @@ Runtime_config.Json_layout.Accounts.to_yojson ledger ;
+    exit 0)
+
 let validate_keypair =
   Command.async ~summary:"Validate a public, private keypair"
     (let open Command.Let_syntax in
@@ -151,7 +196,7 @@ let validate_transaction =
           exit 0 )
 
 module Vrf = struct
-  let generate_witness ~constraint_constants =
+  let generate_witness =
     Command.async
       ~summary:
         "Generate a vrf evaluation witness. This may be used to calculate \
@@ -189,6 +234,9 @@ module Vrf = struct
       Exceptions.handle_nicely
       @@ fun () ->
       let env = Secrets.Keypair.env in
+      let constraint_constants =
+        Genesis_constants.Compiled.constraint_constants
+      in
       if Option.is_some (Sys.getenv env) then
         eprintf "Using password from environment variable %s\n" env ;
       let open Deferred.Let_syntax in
@@ -242,7 +290,7 @@ module Vrf = struct
       in
       exit 0)
 
-  let batch_generate_witness ~constraint_constants =
+  let batch_generate_witness =
     Command.async
       ~summary:
         "Generate a batch of vrf evaluation witnesses from {\"globalSlot\": _, \
@@ -252,6 +300,9 @@ module Vrf = struct
       let%map_open privkey_path = Flag.privkey_read_path in
       Exceptions.handle_nicely
       @@ fun () ->
+      let constraint_constants =
+        Genesis_constants.Compiled.constraint_constants
+      in
       let env = Secrets.Keypair.env in
       if Option.is_some (Sys.getenv env) then
         eprintf "Using password from environment variable %s\n" env ;
@@ -300,7 +351,7 @@ module Vrf = struct
       in
       exit 0)
 
-  let batch_check_witness ~constraint_constants =
+  let batch_check_witness =
     Command.async
       ~summary:
         "Check a batch of vrf evaluation witnesses read on stdin. Outputs the \
@@ -314,6 +365,9 @@ module Vrf = struct
       ( Command.Param.return @@ Exceptions.handle_nicely
       @@ fun () ->
       let open Deferred.Let_syntax in
+      let constraint_constants =
+        Genesis_constants.Compiled.constraint_constants
+      in
       (* TODO-someday: constraint constants from config file. *)
       let lexbuf = Lexing.from_channel In_channel.stdin in
       let lexer = Yojson.init_lexer () in
@@ -347,10 +401,10 @@ module Vrf = struct
       in
       exit 0 )
 
-  let command_group ~constraint_constants =
+  let command_group =
     Command.group ~summary:"Commands for vrf evaluations"
-      [ ("generate-witness", generate_witness ~constraint_constants)
-      ; ("batch-generate-witness", batch_generate_witness ~constraint_constants)
-      ; ("batch-check-witness", batch_check_witness ~constraint_constants)
+      [ ("generate-witness", generate_witness)
+      ; ("batch-generate-witness", batch_generate_witness)
+      ; ("batch-check-witness", batch_check_witness)
       ]
 end

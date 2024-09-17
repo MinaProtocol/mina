@@ -66,7 +66,7 @@ module Worker_state = struct
     { conf_dir : string option
     ; enable_internal_tracing : bool
     ; internal_trace_filename : string option
-    ; logger : Logger.Stable.Latest.t
+    ; logger : Logger.t
     ; proof_level : Genesis_constants.Proof_level.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
     ; commit_id : string
@@ -441,7 +441,7 @@ type worker =
   ; exit_or_signal : Unix.Exit_or_signal.t Deferred.Or_error.t
   }
 
-type t = { worker : worker Ivar.t ref; logger : Logger.Stable.Latest.t }
+type t = { worker : worker Ivar.t ref; logger : Logger.t }
 
 (* TODO: investigate why conf_dir wasn't being used *)
 let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename

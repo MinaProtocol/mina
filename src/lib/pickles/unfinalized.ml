@@ -10,16 +10,7 @@ module Shifted_value = Shifted_value.Type2
    is expected to verify. This allows for situations like the blockchain
    SNARK where we let the previous proof fail in the base case.
 *)
-type t =
-  ( Field.t
-  , Field.t Scalar_challenge.t
-  , Other_field.t Shifted_value.t
-  , ( Field.t Scalar_challenge.t Bulletproof_challenge.t
-    , Tock.Rounds.n )
-    Pickles_types.Vector.t
-  , Field.t
-  , Boolean.var )
-  Types.Step.Proof_state.Per_proof.In_circuit.t
+type t = Impls.Step.unfinalized_proof_var
 
 module Plonk_checks = struct
   include Plonk_checks
@@ -27,16 +18,7 @@ module Plonk_checks = struct
 end
 
 module Constant = struct
-  type t =
-    ( Challenge.Constant.t
-    , Challenge.Constant.t Scalar_challenge.t
-    , Tock.Field.t Shifted_value.t
-    , ( Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
-      , Tock.Rounds.n )
-      Vector.t
-    , Digest.Constant.t
-    , bool )
-    Types.Step.Proof_state.Per_proof.In_circuit.t
+  type t = Impls.Step.unfinalized_proof
 
   let shift = Shifted_value.Shift.create (module Tock.Field)
 
