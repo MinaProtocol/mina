@@ -845,13 +845,10 @@ type t =
   }
 [@@deriving to_yojson]
 
-let format_as_json_without_accounts (_ : t) : Yojson.Safe.t = failwith "TODO"
-(*
+let format_as_json_without_accounts (x: t) =
   let genesis_accounts =
-    let%bind.Option { accounts; _ } =
-      Option.map ~f:Ledger.to_json_layout x.ledger
-    in
-    Option.map ~f:List.length accounts
+    let { accounts; _ } : Json_layout.Ledger.t = Ledger.to_json_layout x.ledger
+    in Option.map ~f:List.length accounts
   in
   let staking_accounts =
     let%bind.Option { staking; _ } = x.epoch_data in
@@ -883,14 +880,12 @@ let format_as_json_without_accounts (_ : t) : Yojson.Safe.t = failwith "TODO"
             } )
     }
   in
-  let json =
+  let json : Yojson.Safe.t =
     `Assoc
       [ ("daemon", Mina_compile_config.to_yojson x.compile_config)
       ; ("genesis", Genesis_constants.to_yojson x.genesis_constants)
-      ; ("proof", Genesis_constants.Constraint_constants.to_yojson x.constraint_constants)
-      ; ( "ledger"
-        , Option.value_map ~default:`Null ~f:Json_layout.Ledger.to_yojson
-            (Option.map ~f x.ledger) )
+      ; ("proof", Genesis_constants.Constraint_constants.to_yojson x.constraint_config.constraint_constants)
+      ; ( "ledger", Json_layout.Ledger.to_yojson @@ f x.ledger)
       ; ( "epoch_data"
         , Option.value_map ~default:`Null ~f:Json_layout.Epoch_data.to_yojson
             (Option.map ~f:g x.epoch_data) )
@@ -900,8 +895,6 @@ let format_as_json_without_accounts (_ : t) : Yojson.Safe.t = failwith "TODO"
   , `Accounts_omitted
       (`Genesis genesis_accounts, `Staking staking_accounts, `Next next_accounts)
   )
-
-*)
 
 let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
   let open Async.Deferred.Result.Let_syntax in
