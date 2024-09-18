@@ -4,8 +4,14 @@ open Core_kernel
 open Async
 open Archive_lib
 
-let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
-    ~extensional ~success_file ~failure_file ~log_successes ~files () =
+let main ~config_file ~archive_uri ~precomputed ~extensional ~success_file
+    ~failure_file ~log_successes ~files () =
+  let logger = Logger.create () in
+  let%bind _, config =
+    Genesis_ledger_helper.Config_loader.load_config_exn ~config_file ~logger ()
+  in
+  let genesis_constants = config.genesis_constants in
+  let constraint_constants = config.constraint_config.constraint_constants in
   let output_file_line path =
     match path with
     | Some path ->
@@ -99,10 +105,6 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
 
 let () =
   Command.(
-    let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-    let constraint_constants =
-      Genesis_constants.Compiled.constraint_constants
-    in
     run
       (let open Let_syntax in
       async ~summary:"Write blocks to an archive database"
@@ -133,6 +135,7 @@ let () =
                "true/false Whether to log messages for files that were \
                 processed successfully"
              (Flag.optional_with_default true Param.bool)
+         and config_file = Cli_lib.Flag.conf_file
          and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
-         main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
-           ~extensional ~success_file ~failure_file ~log_successes ~files )))
+         main ~config_file ~archive_uri ~precomputed ~extensional ~success_file
+           ~failure_file ~log_successes ~files )))

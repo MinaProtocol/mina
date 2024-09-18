@@ -19,6 +19,7 @@
    base.caml
    async.async_command
    ;; local libraries
+   cli_lib
    logger
    mina_block
    bounded_types
