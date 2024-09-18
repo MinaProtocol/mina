@@ -58,23 +58,6 @@ let generate_hash_json ~genesis_dir ledger staking_ledger next_ledger =
   in
   { Hash_json.ledger = ledger_hashes; epoch_data = { staking; next } }
 
-let is_dirty_proof = function
-  | Runtime_config.Proof_keys.
-      { level = None
-      ; sub_windows_per_window = None
-      ; ledger_depth = None
-      ; work_delay = None
-      ; block_window_duration_ms = None
-      ; transaction_capacity = None
-      ; coinbase_amount = None
-      ; supercharged_coinbase_factor = None
-      ; account_creation_fee = None
-      ; fork = _
-      } ->
-      false
-  | _ ->
-      true
-
 let extract_accounts_exn = function
   | { Runtime_config.Ledger.base = Accounts accounts
     ; num_accounts = None
@@ -88,41 +71,26 @@ let extract_accounts_exn = function
   | _ ->
       failwith "Wrong ledger supplied"
 
-let load_config_exn config_file =
-  let%map config_json =
-    Deferred.Or_error.ok_exn
-    @@ Genesis_ledger_helper.load_config_json config_file
+let main ~config_file ~genesis_dir ~hash_output_file () =
+  let%bind _, config =
+    Genesis_ledger_helper.Config_loader.load_config_exn ~config_file ~logger ()
   in
-  let config =
-    Runtime_config.of_yojson config_json
-    |> Result.map_error ~f:(fun err ->
-           Failure ("Could not parse configuration: " ^ err) )
-    |> Result.ok_exn
+  let accounts, staking_accounts_opt, next_accounts_opt =
+    let ledger = config.ledger in
+    let staking_ledger =
+      let%map.Option { staking; _ } = config.epoch_data in
+      staking.ledger
+    in
+    let next_ledger =
+      let%bind.Option { next; _ } = config.epoch_data in
+      let%map.Option { ledger; _ } = next in
+      ledger
+    in
+    ( extract_accounts_exn ledger
+    , Option.map ~f:extract_accounts_exn staking_ledger
+    , Option.map ~f:extract_accounts_exn next_ledger )
   in
-  if
-    Option.(
-      is_some config.daemon || is_some config.genesis
-      || Option.value_map ~default:false ~f:is_dirty_proof config.proof)
-  then failwith "Runtime config has unexpected fields" ;
-  let ledger = Option.value_exn ~message:"No ledger provided" config.ledger in
-  let staking_ledger =
-    let%map.Option { staking; _ } = config.epoch_data in
-    staking.ledger
-  in
-  let next_ledger =
-    let%bind.Option { next; _ } = config.epoch_data in
-    let%map.Option { ledger; _ } = next in
-    ledger
-  in
-  ( extract_accounts_exn ledger
-  , Option.map ~f:extract_accounts_exn staking_ledger
-  , Option.map ~f:extract_accounts_exn next_ledger )
-
-let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~config_file ~genesis_dir ~hash_output_file () =
-  let%bind accounts, staking_accounts_opt, next_accounts_opt =
-    load_config_exn config_file
-  in
+  let constraint_constants = config.constraint_config.constraint_constants in
   let ledger = load_ledger ~constraint_constants accounts in
   let staking_ledger : Ledger.t =
     Option.value_map ~default:ledger
@@ -141,7 +109,6 @@ let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~contents:(Yojson.Safe.to_string (Hash_json.to_yojson hash_json))
 
 let () =
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
   Command.run
     (Command.async
        ~summary:
@@ -151,9 +118,7 @@ let () =
        Command.(
          let open Let_syntax in
          let open Command.Param in
-         let%map config_file =
-           flag "--config-file" ~doc:"PATH path to the JSON configuration file"
-             (required string)
+         let%map config_file = Cli_lib.Flag.conf_file
          and genesis_dir =
            flag "--genesis-dir"
              ~doc:
@@ -168,4 +133,4 @@ let () =
                "PATH path to the file where the hashes of the ledgers are to \
                 be saved"
          in
-         main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file) )
+         main ~config_file ~genesis_dir ~hash_output_file) )
