@@ -39,9 +39,6 @@ let buildTestCmd
                     "buildkite/scripts/version-linter-patch-missing-type-shapes.sh ${release_branch}"
                 # RunInToolchain.runInToolchain
                     ([] : List Text)
-                    "gsutil cp *-type_shape.txt \$MINA_TYPE_SHAPE gs://mina-type-shapes"
-                # RunInToolchain.runInToolchain
-                    ([] : List Text)
                     "buildkite/scripts/version-linter.sh ${release_branch}"
             , label = "Versioned type linter for ${release_branch}"
             , key = "version-linter-${release_branch}"
