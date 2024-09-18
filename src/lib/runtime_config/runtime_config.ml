@@ -742,6 +742,8 @@ module Ledger = struct
     ; name
     ; add_genesis_winner
     }
+
+  let of_yojson x = Result.(Json_layout.Ledger.of_yojson x >>= of_json_layout)
 end
 
 module Epoch_data = struct
@@ -819,6 +821,8 @@ module Epoch_data = struct
     { staking; next }
 
   let to_yojson x = Json_layout.Epoch_data.to_yojson (to_json_layout x)
+
+  let of_yojson x = Result.(Json_layout.Epoch_data.of_yojson x >>= of_json_layout)
 end
 
 module Constraint = struct
