@@ -22,7 +22,11 @@ function find_most_recent_numeric_tag() {
 export GITHASH=$(git rev-parse --short=7 HEAD)
 export THIS_COMMIT_TAG=$(git tag --points-at HEAD)
 
-[[ -n "$BRANCH_NAME" ]] && export GITBRANCH=$(echo "$BRANCH_NAME" | sed 's!/!-!g; s!_!-!g; s!#!-!g') || export GITBRANCH=$(git name-rev --name-only $GITHASH | sed "s/remotes\/origin\///g" | sed 's!/!-!g; s!_!-!g; s!#!-!g' )
+if [[ -n "$BRANCH_NAME" ]]; then
+   export GITBRANCH=$(echo "$BRANCH_NAME" | sed 's!/!-!g; s!_!-!g; s!#!-!g')
+else
+   export GITBRANCH=$(git name-rev --name-only $GITHASH | sed "s/remotes\/origin\///g" | sed 's!/!-!g; s!_!-!g; s!#!-!g' )
+fi
 
 export GITTAG=$(find_most_recent_numeric_tag HEAD)
 
