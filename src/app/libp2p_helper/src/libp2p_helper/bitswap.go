@@ -223,7 +223,9 @@ func (bs *BitswapCtx) Loop() {
 					bitswapLogger.Errorf("Error processing delete request for %s: %s", codanet.BlockHashToCidSuffix(root), err)
 				}
 			}
-			bs.SendResourceUpdates(ipc.ResourceUpdateType_removed, success...)
+			for tag, roots := range success {
+				bs.SendResourceUpdates(ipc.ResourceUpdateType_removed, tag, roots...)
+			}
 		case cmd := <-bs.downloadCmds:
 			configuredCheck()
 			// We put all ids to map to avoid

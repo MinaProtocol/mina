@@ -76,7 +76,11 @@ type BitswapState interface {
 	GetStatus(key [32]byte) (codanet.RootBlockStatus, error)
 	SetStatus(key [32]byte, value codanet.RootBlockStatus) error
 	DeleteStatus(key [32]byte) error
+	// Delete blocks for which no reference exist
 	DeleteBlocks(keys [][32]byte) error
+	// Reference or dereference blocks related to the root.
+	// Blocks with references are protected from deletion.
+	UpdateReferences(root [32]byte, exists bool, keys ...[32]byte) error
 	ViewBlock(key [32]byte, callback func([]byte) error) error
 	StoreDownloadedBlock(block blocks.Block) error
 	NodeDownloadParams() map[cid.Cid]map[root][]NodeIndex
@@ -86,7 +90,7 @@ type BitswapState interface {
 	DepthIndices() DepthIndices
 	NewSession(downloadTimeout time.Duration) (BlockRequester, context.CancelFunc)
 	RegisterDeadlineTracker(root, time.Duration)
-	SendResourceUpdate(type_ ipc.ResourceUpdateType, root root)
+	SendResourceUpdate(type_ ipc.ResourceUpdateType, tag BitswapDataTag, root root)
 	CheckInvariants()
 }
 
@@ -109,7 +113,7 @@ func kickStartRootDownload(root_ BitswapBlockLink, tag BitswapDataTag, bs Bitswa
 		bitswapLogger.Debugf("Skipping download request for %s due to status: %s", codanet.BlockHashToCidSuffix(root_), err)
 		status, err := bs.GetStatus(root_)
 		if err == nil && status == codanet.Full {
-			bs.SendResourceUpdate(ipc.ResourceUpdateType_added, root_)
+			bs.SendResourceUpdate(ipc.ResourceUpdateType_added, tag, root_)
 		}
 		return
 	}
@@ -251,10 +255,6 @@ func processDownloadedBlockStep(params map[root][]NodeIndex, block blocks.Block,
 func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 	bs.CheckInvariants()
 	id := block.Cid()
-	err := bs.StoreDownloadedBlock(block)
-	if err != nil {
-		bitswapLogger.Errorf("Failed to store block %s", id)
-	}
 	nodeDownloadParams := bs.NodeDownloadParams()
 	rootDownloadStates := bs.RootDownloadStates()
 	depthIndices := bs.DepthIndices()
@@ -276,12 +276,24 @@ func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 		}
 		rootState.remainingNodeCounter = rootState.remainingNodeCounter - len(ixs)
 		rps[root] = rootState
+		blockHash, err := codanet.CidToBlockHash(id)
+		if err == nil {
+			err = bs.UpdateReferences(root, true, blockHash)
+		}
+		if err != nil {
+			bitswapLogger.Errorf("Failed to strore reference for block %s (to root %s)",
+				id, codanet.BlockHashToCidSuffix(root))
+		}
+	}
+	err := bs.StoreDownloadedBlock(block)
+	if err != nil {
+		bitswapLogger.Errorf("Failed to store block %s", id)
 	}
 	newParams, malformed := processDownloadedBlockStep(oldPs, block, rps, bs.MaxBlockSize(), depthIndices, bs.DataConfig())
 	for root, err := range malformed {
 		bitswapLogger.Warnf("Block %s of root %s is malformed: %s", id, codanet.BlockHashToCidSuffix(root), err)
-		ClearRootDownloadState(bs, root)
-		bs.SendResourceUpdate(ipc.ResourceUpdateType_broken, root)
+		DeleteRoot(bs, root)
+		bs.SendResourceUpdate(ipc.ResourceUpdateType_broken, rps[root].getTag(), root)
 	}
 
 	blocksToProcess := make([]blocks.Block, 0)
@@ -338,7 +350,7 @@ func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 				bitswapLogger.Warnf("Failed to update status of fully downloaded root %s: %s", root, err)
 			}
 			ClearRootDownloadState(bs, root)
-			bs.SendResourceUpdate(ipc.ResourceUpdateType_added, root)
+			bs.SendResourceUpdate(ipc.ResourceUpdateType_added, rootState.tag, root)
 		}
 	}
 	for _, b := range blocksToProcess {
