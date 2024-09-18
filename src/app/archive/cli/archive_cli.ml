@@ -28,36 +28,33 @@ let command_run =
               Archive_lib.Metrics.default_missing_blocks_width )
          (optional int)
      and postgres = Flag.Uri.Archive.postgres
-     and runtime_config_file =
-       flag "--config-file" ~aliases:[ "-config-file" ] (optional string)
-         ~doc:"PATH to the configuration file containing the genesis ledger"
      and delete_older_than =
        flag "--delete-older-than" ~aliases:[ "-delete-older-than" ]
          (optional int)
          ~doc:
            "int Delete blocks that are more than n blocks lower than the \
             maximum seen block."
-     in
-     let runtime_config_opt =
-       Option.map runtime_config_file ~f:(fun file ->
-           Yojson.Safe.from_file file |> Runtime_config.of_yojson
-           |> Result.ok_or_failwith )
+     and config_file = Cli_lib.Flag.conf_file
+     and add_genesis_accounts_opt =
+       Command.Param.flag "--add-genesis-accounts"
+         ~doc:"add genesis accounts to the db" Command.Param.no_arg
      in
      fun () ->
        let logger = Logger.create () in
-       let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
+       let open Deferred.Let_syntax in
+       let%bind precomputed_values, _ =
+         Genesis_ledger_helper.Config_loader.load_config_exn ~logger
+           ~config_file ()
        in
        Stdout_log.setup log_json log_level ;
        [%log info] "Starting archive process; built with commit $commit"
          ~metadata:[ ("commit", `String Mina_version.commit_id) ] ;
        Archive_lib.Processor.setup_server ~metrics_server_port ~logger
-         ~genesis_constants ~constraint_constants
          ~postgres_address:postgres.value
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)
-         ~delete_older_than ~runtime_config_opt ~missing_blocks_width )
+         ~delete_older_than ~missing_blocks_width ~precomputed_values
+         ~add_genesis_accounts_opt )
 
 let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)

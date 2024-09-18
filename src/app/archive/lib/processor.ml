@@ -4728,17 +4728,7 @@ let run pool reader ~genesis_constants ~constraint_constants ~logger
         Deferred.unit )
 
 (* [add_genesis_accounts] is called when starting the archive process *)
-let add_genesis_accounts ~logger ~(config_file : string) pool =
-  let%bind precomputed_values, (config : Runtime_config.t) =
-    match%map
-      Genesis_ledger_helper.Config_loader.load_config ~config_file ~logger ()
-    with
-    | Ok a ->
-        a
-    | Error err ->
-        failwithf "Could not get precomputed values, error: %s"
-          (Error.to_string_hum err) ()
-  in
+let add_genesis_accounts ~logger ~(precomputed_values : Genesis_proof.t) pool =
   let ledger =
     Precomputed_values.genesis_ledger precomputed_values |> Lazy.force
   in
@@ -4758,7 +4748,7 @@ let add_genesis_accounts ~logger ~(config_file : string) pool =
         let%bind.Deferred.Result genesis_block_id =
           Block.add_if_doesn't_exist
             (module Conn)
-            ~constraint_constants:config.constraint_config.constraint_constants
+            ~constraint_constants:precomputed_values.constraint_constants
             genesis_block
         in
         let%bind.Deferred.Result { ledger_hash; _ } =
@@ -4857,10 +4847,11 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
       go ()
 
 (* for running the archive process *)
-let setup_server ~(genesis_constants : Genesis_constants.t)
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~metrics_server_port ~logger ~postgres_address ~server_port
-    ~delete_older_than ~config_file_opt ~missing_blocks_width =
+let setup_server ~metrics_server_port ~logger ~postgres_address ~server_port
+    ~delete_older_than ~(precomputed_values : Genesis_proof.t)
+    ~missing_blocks_width ~add_genesis_accounts_opt =
+  let genesis_constants = precomputed_values.genesis_constants in
+  let constraint_constants = precomputed_values.constraint_constants in
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -4890,11 +4881,9 @@ let setup_server ~(genesis_constants : Genesis_constants.t)
       Deferred.unit
   | Ok pool ->
       let%bind () =
-        match config_file_opt with
-        | None ->
-            Deferred.unit
-        | Some config_file ->
-            add_genesis_accounts pool ~logger ~config_file
+        if add_genesis_accounts_opt then
+          add_genesis_accounts pool ~logger ~precomputed_values
+        else Deferred.unit
       in
       run ~constraint_constants ~genesis_constants pool reader ~logger
         ~delete_older_than
