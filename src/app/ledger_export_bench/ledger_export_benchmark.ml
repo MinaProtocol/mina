@@ -3,13 +3,14 @@ open Core_bench
 
 let load_daemon_cfg filename () =
   let json = Yojson.Safe.from_file filename in
-  match Runtime_config.of_yojson json with
+  match Runtime_config.Json_layout.of_yojson json with
   | Ok cfg ->
       cfg
   | Error err ->
       raise (Failure err)
 
-let serialize cfg () = Runtime_config.to_yojson cfg |> Yojson.Safe.to_string
+let serialize cfg () =
+  Runtime_config.Json_layout.to_yojson cfg |> Yojson.Safe.to_string
 
 let map_results ~f =
   List.fold ~init:(Ok []) ~f:(fun acc x ->
@@ -25,10 +26,12 @@ let () =
   let runtime_config = Sys.getenv_exn "RUNTIME_CONFIG" in
   let cfg = load_daemon_cfg runtime_config () in
   let accounts =
-    match cfg.ledger with
-    | None | Some { base = Named _; _ } | Some { base = Hash; _ } ->
+    match
+      Runtime_config.Ledger.of_json_layout cfg.ledger |> Result.ok_or_failwith
+    with
+    | { base = Named _; _ } | { base = Hash; _ } ->
         []
-    | Some { base = Accounts accs; _ } ->
+    | { base = Accounts accs; _ } ->
         List.map ~f:Runtime_config.Accounts.Single.to_account accs
   in
   Command.run
