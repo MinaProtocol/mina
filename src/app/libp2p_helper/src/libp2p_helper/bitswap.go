@@ -12,7 +12,6 @@ import (
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	exchange "github.com/ipfs/go-ipfs-exchange-interface"
-	ipld "github.com/ipfs/go-ipld-format"
 )
 
 type bitswapDeleteCmd struct {
@@ -48,6 +47,10 @@ type BitswapCtx struct {
 
 func NewBitswapCtx(ctx context.Context, outMsgChan chan<- *capnp.Message) *BitswapCtx {
 	maxBlockSize := 1 << 18 // 256 KiB
+	return NewBitswapCtxWithMaxBlockSize(maxBlockSize, ctx, outMsgChan)
+}
+
+func NewBitswapCtxWithMaxBlockSize(maxBlockSize int, ctx context.Context, outMsgChan chan<- *capnp.Message) *BitswapCtx {
 	return &BitswapCtx{
 		downloadCmds:       make(chan bitswapDownloadCmd, 100),
 		addCmds:            make(chan bitswapAddCmd, 100),
