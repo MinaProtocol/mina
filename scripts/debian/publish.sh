@@ -50,7 +50,8 @@ fi
 if [[ -z "${PASSPHRASE:-}" ]]; then
   GPG_OPTIONS=""
 else
-  GPG_OPTIONS="--gpg-options \"--batch --pinentry-mode=loopback --yes --passphrase ${PASSPHRASE}\""
+  INNER_OPTIONS="--batch --pinentry-mode=loopback --yes --passphrase ${PASSPHRASE}"
+  GPG_OPTIONS="--gpg-options \"${INNER_OPTIONS}\" "
 fi
 
 BUCKET_ARG="--bucket $BUCKET"
