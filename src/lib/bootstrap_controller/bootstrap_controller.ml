@@ -17,6 +17,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val compile_config : Mina_compile_config.t
 end
 
 type Structured_log_events.t += Bootstrap_complete
@@ -712,6 +714,8 @@ let%test_module "Bootstrap_controller tests" =
 
     let constraint_constants = precomputed_values.constraint_constants
 
+    let compile_config = Mina_compile_config.For_unit_tests.t
+
     module Context = struct
       let logger = Logger.create ()
 
@@ -721,6 +725,8 @@ let%test_module "Bootstrap_controller tests" =
         Genesis_constants.For_unit_tests.Constraint_constants.t
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let compile_config = compile_config
     end
 
     let verifier =
@@ -769,7 +775,8 @@ let%test_module "Bootstrap_controller tests" =
         let%bind fake_network =
           Fake_network.Generator.(
             gen ~precomputed_values ~verifier ~max_frontier_length
-              [ fresh_peer; fresh_peer ] ~use_super_catchup:false)
+              ~compile_config [ fresh_peer; fresh_peer ]
+              ~use_super_catchup:false)
         in
         let%map make_branch =
           Transition_frontier.Breadcrumb.For_tests.gen_seq ~precomputed_values
@@ -899,7 +906,7 @@ let%test_module "Bootstrap_controller tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup:false
+            ~use_super_catchup:false ~compile_config
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 2) + 2)

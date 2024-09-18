@@ -25,6 +25,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val compile_config : Mina_compile_config.t
 end
 
 (* TODO: calculate a sensible value from postake consensus arguments *)
@@ -44,7 +46,9 @@ let cached_transform_deferred_result ~transform_cached ~transform_result cached
 (* add a breadcrumb and perform post processing *)
 let add_and_finalize ~logger ~frontier ~catchup_scheduler
     ~processed_transition_writer ~only_if_present ~time_controller ~source
-    ~valid_cb cached_breadcrumb ~(precomputed_values : Precomputed_values.t) =
+    ~valid_cb cached_breadcrumb ~(precomputed_values : Precomputed_values.t)
+    ~block_window_duration:_ (*TODO remove unused var*) =
+  let module Inclusion_time = Mina_metrics.Block_latency.Inclusion_time in
   let breadcrumb =
     if Cached.is_pure cached_breadcrumb then Cached.peek cached_breadcrumb
     else Cached.invalidate_with_success cached_breadcrumb
@@ -94,8 +98,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
           (Consensus.Data.Consensus_time.to_time ~constants:consensus_constants
              transition_time )
       in
-      Mina_metrics.Block_latency.Inclusion_time.update
-        (Block_time.Span.to_time_span time_elapsed) ) ;
+      Inclusion_time.update (Block_time.Span.to_time_span time_elapsed) ) ;
   [%log internal] "Add_and_finalize_done" ;
   if Writer.is_closed processed_transition_writer then
     Or_error.error_string "processed transitions closed"
@@ -204,7 +207,8 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
               in
               Catchup_scheduler.watch catchup_scheduler ~timeout_duration
                 ~cached_transition:cached_initially_validated_transition
-                ~valid_cb ;
+                ~valid_cb
+                ~block_window_duration:compile_config.block_window_duration ;
               return (Error ()) )
     in
     (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
@@ -251,6 +255,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       add_and_finalize ~logger ~frontier ~catchup_scheduler
         ~processed_transition_writer ~only_if_present:false ~time_controller
         ~source:`Gossip breadcrumb ~precomputed_values ~valid_cb
+        ~block_window_duration:compile_config.block_window_duration
     in
     ( match result with
     | Ok () ->
@@ -343,6 +348,8 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                               let%map result =
                                 add_and_finalize ~logger ~only_if_present:true
                                   ~source:`Catchup ~valid_cb b
+                                  ~block_window_duration:
+                                    compile_config.block_window_duration
                               in
                               Internal_tracing.with_state_hash state_hash
                               @@ fun () ->
@@ -406,6 +413,8 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                     match%map
                       add_and_finalize ~logger ~only_if_present:false
                         ~source:`Internal breadcrumb ~valid_cb:None
+                        ~block_window_duration:
+                          compile_config.block_window_duration
                     with
                     | Ok () ->
                         [%log internal] "Breadcrumb_integrated" ;
@@ -453,6 +462,8 @@ let%test_module "Transition_handler.Processor tests" =
 
     let trust_system = Trust_system.null ()
 
+    let compile_config = Mina_compile_config.For_unit_tests.t
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
@@ -468,6 +479,8 @@ let%test_module "Transition_handler.Processor tests" =
       let constraint_constants = constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let compile_config = compile_config
     end
 
     let downcast_breadcrumb breadcrumb =
