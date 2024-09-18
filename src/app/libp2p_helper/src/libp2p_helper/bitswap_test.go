@@ -71,12 +71,12 @@ func getRootIds(ids ipc.RootBlockId_List) ([]BitswapBlockLink, error) {
 	return links, nil
 }
 
-func deleteResource(n testNode, root root) error {
+func removeResource(n testNode, root root) error {
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 	if err != nil {
 		return err
 	}
-	m, err := ipc.NewRootLibp2pHelperInterface_DeleteResource(seg)
+	m, err := ipc.NewRootLibp2pHelperInterface_RemoveResource(seg)
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func deleteResource(n testNode, root root) error {
 	if err != nil {
 		return err
 	}
-	DeleteResourcePush(m).handle(n.node)
+	RemoveResourcePush(m).handle(n.node)
 	return nil
 }
 
@@ -393,7 +393,7 @@ func (conf bitswapTestConfig) execute(nodes []testNode, delayBeforeDownload bool
 			if !resourceReplicated[ni] {
 				continue
 			}
-			err = deleteResource(nodes[ni], roots[ni])
+			err = removeResource(nodes[ni], roots[ni])
 			if err != nil {
 				return fmt.Errorf("Error removing own resources: %v", err)
 			}
