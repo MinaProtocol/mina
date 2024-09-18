@@ -16,6 +16,12 @@ release_branch=${REMOTE}/$1
 
 RELEASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 --no-merges $release_branch)
 
+function revert_checkout() {
+    git checkout $BUILDKITE_COMMIT
+    git submodule sync
+    git submodule update --init --recursive
+}
+
 function checkout_and_dump() {
     local __commit=$1
     git checkout $__commit
@@ -23,22 +29,15 @@ function checkout_and_dump() {
     git submodule update --init --recursive
     eval $(opam config env)
     TYPE_SHAPE_FILE=${__commit:0:7}-type_shape.txt
-    dune exec src/app/cli/src/mina.exe internal dump-type-shapes > ${TYPE_SHAPE_FILE}
-    source buildkite/scripts/gsutil-upload.sh ${TYPE_SHAPE_FILE} gs://mina-type-shapes
-}
-
-function revert_checkout() {
-    git checkout $BUILDKITE_COMMIT
-    git submodule sync
-    git submodule update --init --recursive
+    dune exec src/app/cli/src/mina.exe internal dump-type-shapes > /tmp/${TYPE_SHAPE_FILE}
+    revert_checkout
+    source buildkite/scripts/gsutil-upload.sh /tmp/${TYPE_SHAPE_FILE} gs://mina-type-shapes
 }
 
 if ! $(gsutil ls gs://mina-type-shapes/$BUILDKITE_COMMIT 2>/dev/null); then
     checkout_and_dump $BUILDKITE_COMMIT
-    revert_checkout
 fi
 
 if ! $(gsutil ls gs://mina-type-shapes/$RELEASE_BRANCH_COMMIT 2>/dev/null); then
     checkout_and_dump $RELEASE_BRANCH_COMMIT
-    revert_checkout
 fi
