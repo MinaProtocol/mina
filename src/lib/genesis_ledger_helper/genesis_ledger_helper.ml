@@ -415,9 +415,8 @@ module Ledger = struct
       let depth = depth
     end) )
 
-  let load ~genesis_dir ~logger
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~proof_level ?(ledger_name_prefix = "genesis_ledger") ?overwrite_version
+  let load ~proof_level ~genesis_dir ~logger ~constraint_constants
+      ?(ledger_name_prefix = "genesis_ledger") ?overwrite_version
       (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error ~here:[%here] (fun () ->
         let padded_accounts_opt =
@@ -557,7 +556,7 @@ module Ledger = struct
 end
 
 module Epoch_data = struct
-  let load ~genesis_dir ~logger ~constraint_constants ~proof_level
+  let load ~proof_level ~genesis_dir ~logger ~constraint_constants
       (config : Runtime_config.Epoch_data.t option) =
     let open Deferred.Or_error.Let_syntax in
     match config with
@@ -566,8 +565,8 @@ module Epoch_data = struct
     | Some config ->
         let ledger_name_prefix = "epoch_ledger" in
         let load_ledger ledger =
-          Ledger.load ~genesis_dir ~logger ~constraint_constants
-            ~ledger_name_prefix ~proof_level ledger
+          Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
+            ~ledger_name_prefix ledger
         in
         let%bind staking, staking_config =
           let%map staking_ledger, config', ledger_file =
@@ -666,8 +665,8 @@ module Genesis_proof = struct
           ~metadata:[ ("base_hash", Base_hash.to_yojson base_hash) ] ;
         return None
 
-  let generate_inputs ~ledger ~genesis_epoch_data ~blockchain_proof_system_id
-      ~(config : Runtime_config.t) : Genesis_proof.Inputs.t =
+  let generate_inputs ~(config : Runtime_config.t) ~ledger ~genesis_epoch_data
+      ~blockchain_proof_system_id =
     let consensus_constants =
       Consensus.Constants.create
         ~constraint_constants:config.constraint_config.constraint_constants
@@ -681,7 +680,8 @@ module Genesis_proof = struct
         ~constraint_constants:config.constraint_config.constraint_constants
         ~consensus_constants ~genesis_body_reference
     in
-    { constraint_constants = config.constraint_config.constraint_constants
+    { Genesis_proof.Inputs.constraint_constants =
+        config.constraint_config.constraint_constants
     ; proof_level = config.constraint_config.proof_level
     ; compile_config = config.compile_config
     ; blockchain_proof_system_id
@@ -767,30 +767,32 @@ module Config_loader : Config_loader = struct
         let%map json = Reader.file_contents filename in
         Yojson.Safe.from_string json )
 
-let print_config ~logger config =
-  let ledger_name_json = Option.value_map ~default:`Null ~f:(fun a -> `String a) 
-        config.Runtime_config.ledger.name in
-  let ( json_config
-      , `Accounts_omitted
-          ( `Genesis genesis_accounts_omitted
-          , `Staking staking_accounts_omitted
-          , `Next next_accounts_omitted ) ) =
-     Runtime_config.format_as_json_without_accounts config
-  in
-  let append_accounts_omitted s =
-    Option.value_map
-      ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
-      ~default:Fn.id
-  in
-  let metadata =
-    append_accounts_omitted "genesis" genesis_accounts_omitted
-    @@ append_accounts_omitted "staking" staking_accounts_omitted
-    @@ append_accounts_omitted "next" next_accounts_omitted
-         [ ("name", ledger_name_json); ("config", json_config) ]
-  in
-  [%log info] "Initializing with runtime configuration. Ledger name: $name"
-    ~metadata
-
+  let print_config ~logger config =
+    let ledger_name_json =
+      Option.value_map ~default:`Null
+        ~f:(fun a -> `String a)
+        config.Runtime_config.ledger.name
+    in
+    let ( json_config
+        , `Accounts_omitted
+            ( `Genesis genesis_accounts_omitted
+            , `Staking staking_accounts_omitted
+            , `Next next_accounts_omitted ) ) =
+      Runtime_config.format_as_json_without_accounts config
+    in
+    let append_accounts_omitted s =
+      Option.value_map
+        ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
+        ~default:Fn.id
+    in
+    let metadata =
+      append_accounts_omitted "genesis" genesis_accounts_omitted
+      @@ append_accounts_omitted "staking" staking_accounts_omitted
+      @@ append_accounts_omitted "next" next_accounts_omitted
+           [ ("name", ledger_name_json); ("config", json_config) ]
+    in
+    [%log info] "Initializing with runtime configuration. Ledger name: $name"
+      ~metadata
 
   let init_from_config_file ?overwrite_version ?cli_proof_level ~genesis_dir
       ~logger (config : Runtime_config.Json_layout.t) :
@@ -869,73 +871,6 @@ let print_config ~logger config =
     Deferred.return (Or_error.ok_exn config)
 end
 
-(*
-let upgrade_old_config ~logger filename json =
-  match json with
-  | `Assoc fields ->
-      (* Fields previously part of daemon.json *)
-      let old_fields =
-        [ "client_port"
-        ; "libp2p-port"
-        ; "rest-port"
-        ; "block-producer-key"
-        ; "block-producer-pubkey"
-        ; "block-producer-password"
-        ; "coinbase-receiver"
-        ; "run-snark-worker"
-        ; "snark-worker-fee"
-        ; "peers"
-        ; "work-selection"
-        ; "work-reassignment-wait"
-        ; "log-received-blocks"
-        ; "log-txn-pool-gossip"
-        ; "log-snark-work-gossip"
-        ; "log-block-creation"
-        ]
-      in
-      let found_daemon = ref false in
-      let old_fields, remaining_fields =
-        List.partition_tf fields ~f:(fun (key, _) ->
-            if String.equal key "daemon" then (
-              found_daemon := true ;
-              false )
-            else List.mem ~equal:String.equal old_fields key )
-      in
-      if List.is_empty old_fields then return json
-      else if !found_daemon then (
-        (* This file has already been upgraded, or was written for the new
-           format. Do not accept old-style fields.
-        *)
-        [%log warn]
-          "Ignoring old-format values $values from the config file $filename. \
-           These flags are now fields in the 'daemon' object of the config \
-           file."
-          ~metadata:
-            [ ("values", `Assoc old_fields); ("filename", `String filename) ] ;
-        return (`Assoc remaining_fields) )
-      else (
-        (* This file was written for the old format. Upgrade it. *)
-        [%log warn]
-          "Automatically upgrading the config file $filename. The values \
-           $values have been moved to the 'daemon' object."
-          ~metadata:
-            [ ("filename", `String filename); ("values", `Assoc old_fields) ] ;
-        let upgraded_json =
-          `Assoc (("daemon", `Assoc old_fields) :: remaining_fields)
-        in
-        let%map () =
-          Deferred.Or_error.try_with ~here:[%here] (fun () ->
-              Writer.with_file filename ~f:(fun w ->
-                  Deferred.return
-                  @@ Writer.write w (Yojson.Safe.pretty_to_string upgraded_json) ) )
-          |> Deferred.ignore_m
-        in
-        upgraded_json )
-  | _ ->
-      (* This error will get handled properly elsewhere, do nothing here. *)
-      return json
-
-*)
 let%test_module "Account config test" =
   ( module struct
     let%test_unit "Runtime config <=> Account" =

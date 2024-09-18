@@ -845,10 +845,12 @@ type t =
   }
 [@@deriving to_yojson]
 
-let format_as_json_without_accounts (x: t) =
+let format_as_json_without_accounts (x : t) =
   let genesis_accounts =
-    let { accounts; _ } : Json_layout.Ledger.t = Ledger.to_json_layout x.ledger
-    in Option.map ~f:List.length accounts
+    let ({ accounts; _ } : Json_layout.Ledger.t) =
+      Ledger.to_json_layout x.ledger
+    in
+    Option.map ~f:List.length accounts
   in
   let staking_accounts =
     let%bind.Option { staking; _ } = x.epoch_data in
@@ -884,8 +886,10 @@ let format_as_json_without_accounts (x: t) =
     `Assoc
       [ ("daemon", Mina_compile_config.to_yojson x.compile_config)
       ; ("genesis", Genesis_constants.to_yojson x.genesis_constants)
-      ; ("proof", Genesis_constants.Constraint_constants.to_yojson x.constraint_config.constraint_constants)
-      ; ( "ledger", Json_layout.Ledger.to_yojson @@ f x.ledger)
+      ; ( "proof"
+        , Genesis_constants.Constraint_constants.to_yojson
+            x.constraint_config.constraint_constants )
+      ; ("ledger", Json_layout.Ledger.to_yojson @@ f x.ledger)
       ; ( "epoch_data"
         , Option.value_map ~default:`Null ~f:Json_layout.Epoch_data.to_yojson
             (Option.map ~f:g x.epoch_data) )
@@ -927,8 +931,8 @@ let ledger_of_accounts accounts =
 
 let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
     ~blockchain_length ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
-    ~next_epoch_seed ~genesis_constants
-    ~(constraint_config : Constraint.t) ~compile_config =
+    ~next_epoch_seed ~genesis_constants ~(constraint_config : Constraint.t)
+    ~compile_config =
   let open Async.Deferred.Result.Let_syntax in
   let global_slot_since_genesis =
     Mina_numbers.Global_slot_since_genesis.to_int global_slot_since_genesis
