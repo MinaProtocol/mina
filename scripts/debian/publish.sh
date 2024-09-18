@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eo pipefail
+set -eox pipefail
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
@@ -47,13 +47,6 @@ else
   SIGN_ARG="--sign=$SIGN"
 fi
 
-if [[ -z "${PASSPHRASE:-}" ]]; then
-  GPG_OPTIONS=""
-else
-  INNER_OPTIONS="--batch --pinentry-mode=loopback --yes --passphrase ${PASSPHRASE}"
-  GPG_OPTIONS="--gpg-options \"${INNER_OPTIONS}\" "
-fi
-
 BUCKET_ARG="--bucket $BUCKET"
 S3_REGION_ARG='--s3-region=us-west-2'
 # utility for publishing deb repo with commons options
@@ -63,26 +56,32 @@ S3_REGION_ARG='--s3-region=us-west-2'
 #>> Repository is locked by another user:  at host dc7eaad3c537
 #>> Attempting to obtain a lock
 #/var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
+
 DEBS3_UPLOAD="deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
-  --lock \
-  --preserve-versions \
-  --cache-control=max-age=120 \
-  $SIGN_ARG $GPG_OPTIONS"
+    --lock \
+    --preserve-versions \
+    --cache-control=max-age=120 \
+    $SIGN_ARG "
+
+if [[ -z "${PASSPHRASE:-}" ]]; then
+  GPG_OPTS=""
+else
+  GPG_OPTS="--gpg-options=\"--batch --pinentry-mode=loopback --yes --passphrase ${PASSPHRASE}\""
+fi
+
+
 
 echo "Publishing debs: ${DEB_NAMES} to Release: ${DEB_RELEASE} and Codename: ${DEB_CODENAME}"
 # Upload the deb files to s3.
 # If this fails, attempt to remove the lockfile and retry.
 for i in {1..10}; do (
-  ${DEBS3_UPLOAD} \
-    --component "${DEB_RELEASE}" \
-    --codename "${DEB_CODENAME}" \
-    "${DEB_NAMES}"
+  eval "${DEBS3_UPLOAD} --component ${DEB_RELEASE} --codename ${DEB_CODENAME} ${GPG_OPTS} ${DEB_NAMES}"
 ) && break || scripts/debian/clear-s3-lockfile.sh; done
 
 # Verify integrity of debs on remote repo
 function verify_o1test_repo_has_package {
   sudo apt-get update
-  ${DEBS3_SHOW} ${1} ${DEB_VERSION} $ARCH -c $DEB_CODENAME -m $DEB_RELEASE
+  ${DEBS3_SHOW} ${1} ${DEB_VERSION} $ARCH -c $DEB_CODENAME -m $DEB_RELEASE 
   return $?
 }
 
