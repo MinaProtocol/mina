@@ -204,14 +204,7 @@ val apply :
   -> supercharge_coinbase:bool
   -> zkapp_cmd_limit_hardcap:int
   -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
-       * [ `Ledger_proof of
-           ( Ledger_proof.t
-           * ( Transaction.t With_status.t
-             * State_hash.t
-             * Mina_numbers.Global_slot_since_genesis.t )
-             Scan_state.Transactions_ordered.Poly.t
-             list )
-           option ]
+       * [ `Ledger_proof of Ledger_proof.t option ]
        * [ `Staged_ledger of t ]
        * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]
      , Staged_ledger_error.t )

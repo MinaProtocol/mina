@@ -945,7 +945,7 @@ module T = struct
     (*Deleting oldest stack if proof emitted*)
     let%bind pending_coinbase_collection_updated1 =
       match ledger_proof with
-      | Some (proof, _) ->
+      | Some proof ->
           let%bind oldest_stack, pending_coinbase_collection_updated1 =
             Pending_coinbase.remove_coinbase_stack ~depth
               pending_coinbase_collection
@@ -1174,9 +1174,9 @@ module T = struct
     , new_staged_ledger
     , debug_log_metadata )
 
-  let apply_diff ?(skip_verification = false) ~logger ~constraint_constants
-      ~global_slot t pre_diff_info ~current_state_view ~state_and_body_hash
-      ~log_prefix ~zkapp_cmd_limit_hardcap =
+  let apply_diff ~light_application:_ ~skip_verification ~logger
+      ~constraint_constants ~global_slot t pre_diff_info ~current_state_view
+      ~state_and_body_hash ~log_prefix ~zkapp_cmd_limit_hardcap =
     let%bind.Deferred.Result ( is_new_stack
                              , data
                              , stack_update_in_snark
@@ -1322,7 +1322,7 @@ module T = struct
     let apply_diff_start_time = Core.Time.now () in
     [%log internal] "Apply_diff" ;
     let%map ((_, _, `Staged_ledger new_staged_ledger, _) as res) =
-      apply_diff
+      apply_diff ~light_application:false
         ~skip_verification:
           ([%equal: [ `All | `Proofs ] option] skip_verification (Some `All))
         ~constraint_constants ~global_slot t
@@ -1362,7 +1362,7 @@ module T = struct
             , `Ledger_proof ledger_proof
             , `Staged_ledger new_staged_ledger
             , `Pending_coinbase_update pending_coinbase_update ) =
-      apply_diff t
+      apply_diff t ~light_application:true ~skip_verification:false
         (transform_prediff_info ?precomputed prediff)
         ~constraint_constants ~global_slot ~logger ~current_state_view
         ~state_and_body_hash ~log_prefix:"apply_diff_unchecked"
@@ -1373,7 +1373,7 @@ module T = struct
     @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
          (ledger new_staged_ledger) ;
     ( `Hash_after_applying staged_ledger_hash
-    , `Ledger_proof (Option.map ~f:fst ledger_proof)
+    , `Ledger_proof ledger_proof
     , `Pending_coinbase_update pending_coinbase_update )
 
   module Resources = struct
@@ -2733,17 +2733,11 @@ let%test_module "staged ledger tests" =
       |> Sequence.to_list
 
     (* Fee excess at top level ledger proofs should always be zero *)
-    let assert_fee_excess :
-           ( Ledger_proof.t
-           * (Transaction.t With_status.t * _ * _)
-             Sl.Scan_state.Transactions_ordered.Poly.t
-             list )
-           option
-        -> unit =
+    let assert_fee_excess : Ledger_proof.t option -> unit =
      fun proof_opt ->
       let fee_excess =
-        Option.value_map ~default:Fee_excess.zero proof_opt
-          ~f:(fun (proof, _txns) -> (Ledger_proof.statement proof).fee_excess)
+        Option.value_map ~default:Fee_excess.zero proof_opt ~f:(fun proof ->
+            (Ledger_proof.statement proof).fee_excess )
       in
       assert (Fee_excess.is_zero fee_excess)
 
@@ -2869,7 +2863,7 @@ let%test_module "staged ledger tests" =
               in
               let%bind () =
                 match proof_opt with
-                | Some (proof, _transactions) ->
+                | Some proof ->
                     (*update snarked ledger with the transactions in the most recently emitted proof*)
                     let%map res =
                       Sl.Scan_state.get_snarked_ledger_async
