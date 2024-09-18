@@ -63,6 +63,6 @@ type t =
   ; stop_time : int
   ; graphql_control_port : int option [@default None]
   ; zkapp_cmd_limit : int option ref
-  ; compile_config : Mina_compile_config.t
+  ; runtime_config : Runtime_config.t
   }
 [@@deriving make]

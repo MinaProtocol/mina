@@ -4,10 +4,10 @@ open Mina_state
 
 module Inputs = struct
   type t =
-    { runtime_config : Runtime_config.t
-    ; constraint_constants : Genesis_constants.Constraint_constants.t
+    { constraint_constants : Genesis_constants.Constraint_constants.t
     ; proof_level : Genesis_constants.Proof_level.t
     ; genesis_constants : Genesis_constants.t
+    ; compile_config : Mina_compile_config.t
     ; genesis_ledger : Genesis_ledger.Packed.t
     ; genesis_epoch_data : Consensus.Genesis_epoch_data.t
     ; genesis_body_reference : Consensus.Body_reference.t
@@ -24,11 +24,11 @@ module Inputs = struct
         Pickles.Verification_key.Id.t option
     }
 
-  let runtime_config { runtime_config; _ } = runtime_config
-
   let constraint_constants { constraint_constants; _ } = constraint_constants
 
   let genesis_constants { genesis_constants; _ } = genesis_constants
+
+  let compile_config { compile_config; _ } = compile_config
 
   let proof_level { proof_level; _ } = proof_level
 
@@ -81,9 +81,9 @@ end
 
 module T = struct
   type t =
-    { runtime_config : Runtime_config.t
-    ; constraint_constants : Genesis_constants.Constraint_constants.t
+    { constraint_constants : Genesis_constants.Constraint_constants.t
     ; genesis_constants : Genesis_constants.t
+    ; compile_config : Mina_compile_config.t
     ; proof_level : Genesis_constants.Proof_level.t
     ; genesis_ledger : Genesis_ledger.Packed.t
     ; genesis_epoch_data : Consensus.Genesis_epoch_data.t
@@ -95,11 +95,11 @@ module T = struct
     ; proof_data : Proof_data.t option
     }
 
-  let runtime_config { runtime_config; _ } = runtime_config
-
   let constraint_constants { constraint_constants; _ } = constraint_constants
 
   let genesis_constants { genesis_constants; _ } = genesis_constants
+
+  let compile_config { compile_config; _ } = compile_config
 
   let proof_level { proof_level; _ } = proof_level
 
@@ -219,10 +219,10 @@ let blockchain_snark_state (inputs : Inputs.t) :
   ((module T), (module B))
 
 let create_values_no_proof (t : Inputs.t) =
-  { runtime_config = t.runtime_config
-  ; constraint_constants = t.constraint_constants
+  { constraint_constants = t.constraint_constants
   ; proof_level = t.proof_level
   ; genesis_constants = t.genesis_constants
+  ; compile_config = t.compile_config
   ; genesis_ledger = t.genesis_ledger
   ; genesis_epoch_data = t.genesis_epoch_data
   ; genesis_body_reference = t.genesis_body_reference
@@ -236,10 +236,10 @@ let create_values_no_proof (t : Inputs.t) =
   }
 
 let to_inputs (t : t) : Inputs.t =
-  { runtime_config = t.runtime_config
-  ; constraint_constants = t.constraint_constants
+  { constraint_constants = t.constraint_constants
   ; proof_level = t.proof_level
   ; genesis_constants = t.genesis_constants
+  ; compile_config = t.compile_config
   ; genesis_ledger = t.genesis_ledger
   ; genesis_epoch_data = t.genesis_epoch_data
   ; genesis_body_reference = t.genesis_body_reference
