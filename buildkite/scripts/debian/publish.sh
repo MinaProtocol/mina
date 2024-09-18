@@ -15,11 +15,12 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     exit 0
 fi
 
-set +x
-echo ${GPG_PASSPHRASE} | sudo gpg --batch --yes --passphrase-fd 0 --import /var/secrets/debian/key.gpg
-set -x
 
 sudo chown -R opam ~/.gnupg/
+
+set +x
+echo ${GPG_PASSPHRASE} | gpg --batch --yes --passphrase-fd 0 --import /var/secrets/debian/key.gpg
+set -x
 
 source scripts/debian/publish.sh \
   --names "${DOWNLOAD_FOLDER}/mina-*.deb" \
