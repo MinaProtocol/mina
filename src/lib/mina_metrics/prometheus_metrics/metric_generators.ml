@@ -13,9 +13,9 @@ end
 module type Bucketed_average_spec_intf = sig
   include Metric_spec_intf
 
-  val bucket_interval : Core.Time.Span.t -> Core.Time.Span.t
+  val bucket_interval : Time.Span.t -> Time.Span.t
 
-  val num_buckets : Core.Time.Span.t -> int
+  val num_buckets : Time.Span.t -> int
 
   val render_average : (float * int) list -> float
 end
@@ -49,7 +49,7 @@ module type Moving_average_metric_intf = sig
 
   val v : Gauge.t
 
-  val initialize : Core.Time.Span.t -> unit
+  val initialize : Time.Span.t -> unit
 end
 
 module Moving_bucketed_average (Spec : Bucketed_average_spec_intf) :
@@ -96,7 +96,7 @@ module Moving_bucketed_average (Spec : Bucketed_average_spec_intf) :
 end
 
 module Moving_time_average (Spec : Time_average_spec_intf) :
-  Moving_average_metric_intf with type datum := Core.Time.Span.t = struct
+  Moving_average_metric_intf with type datum := Time.Span.t = struct
   include Moving_bucketed_average (struct
     include Spec
 
@@ -117,5 +117,5 @@ module Moving_time_average (Spec : Time_average_spec_intf) :
       total_sum /. Float.of_int count_sum
   end)
 
-  let update span = update (Core.Time.Span.to_sec span)
+  let update span = update (Time.Span.to_sec span)
 end

@@ -581,3 +581,5 @@ module Archive = struct
    fun ?forward_uri:_ ~port:_ ~logger:_ _ ->
     failwith "No metrics server available"
 end
+
+let initialize_all = Fn.ignore

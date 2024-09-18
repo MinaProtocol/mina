@@ -563,3 +563,5 @@ module Archive : sig
   val create_archive_server :
     ?forward_uri:Uri.t -> port:int -> logger:Logger.t -> unit -> t Deferred.t
 end
+
+val initialize_all : Time.Span.t -> unit

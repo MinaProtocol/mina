@@ -1755,3 +1755,10 @@ module Archive = struct
     ; gauge_metrics = Hashtbl.create (module String)
     }
 end
+
+let initialize_all block_window_duration =
+  Transition_frontier.TPS_30min.initialize block_window_duration ;
+  Block_latency.Gossip_slots.initialize block_window_duration ;
+  Block_latency.Gossip_time.initialize block_window_duration ;
+  Block_latency.Inclusion_time.initialize block_window_duration ;
+  Block_latency.Validation_acceptance_time.initialize block_window_duration
