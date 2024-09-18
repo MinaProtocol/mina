@@ -136,7 +136,11 @@ type 'a log_function =
   -> 'a
 
 val create :
-  ?metadata:(string, Yojson.Safe.t) List.Assoc.t -> ?id:string -> unit -> t
+     ?metadata:(string, Yojson.Safe.t) List.Assoc.t
+  -> ?id:string
+  -> ?itn_features:bool
+  -> unit
+  -> t
 
 val null : unit -> t
 
