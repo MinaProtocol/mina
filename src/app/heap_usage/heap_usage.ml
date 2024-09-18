@@ -43,10 +43,20 @@ let main ~genesis_constants ~constraint_constants () =
   Async.return ()
 
 let () =
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
-  Command.(
-    run
-      (async ~summary:"Print heap usage of selected Mina data structures"
-         (let%map.Command () = Let_syntax.return () in
-          main ~genesis_constants ~constraint_constants ) ))
+  Command.run
+  @@
+  let open Command.Let_syntax in
+  Command.async ~summary:"Print heap usage of selected Mina data structures"
+    (let%map_open config_file = Cli_lib.Flag.conf_file in
+     fun () ->
+       let open Deferred.Let_syntax in
+       let logger = Logger.create () in
+       let%bind _, config =
+         Genesis_ledger_helper.Config_loader.load_config_exn ~config_file
+           ~logger ()
+       in
+       let genesis_constants = config.genesis_constants in
+       let constraint_constants =
+         config.constraint_config.constraint_constants
+       in
+       main ~genesis_constants ~constraint_constants () )
