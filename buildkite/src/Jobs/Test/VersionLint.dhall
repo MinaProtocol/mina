@@ -1,5 +1,3 @@
-let Cmd = ../../Lib/Cmds.dhall
-
 let S = ../../Lib/SelectFiles.dhall
 
 let B = ../../External/Buildkite.dhall
