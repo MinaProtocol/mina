@@ -513,21 +513,30 @@ let send_payment_graphql =
     flag "--amount" ~aliases:[ "amount" ]
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let compile_config = Mina_compile_config.Compiled.t in
+  let config_file = Cli_lib.Flag.conf_file in
   let args =
-    Args.zip3
-      (Cli_lib.Flag.signed_command_common
-         ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
-         ~default_transaction_fee:compile_config.default_transaction_fee )
-      receiver_flag amount_flag
+    Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
+      config_file
   in
   Command.async ~summary:"Send payment to an address"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun
             graphql_endpoint
-            ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver, amount)
+            ( { Cli_lib.Flag.sender; fee; nonce; memo }
+            , receiver
+            , amount
+            , config_file )
           ->
+         let open Deferred.Let_syntax in
+         let%bind _, config =
+           let logger = Logger.create () in
+           Genesis_ledger_helper.Config_loader.load_config_exn ~config_file
+             ~logger ()
+         in
+         let fee =
+           Option.value ~default:config.compile_config.default_transaction_fee
+             fee
+         in
          let%map response =
            let input =
              Mina_graphql.Types.Input.SendPaymentInput.make_input ~to_:receiver
@@ -548,21 +557,27 @@ let delegate_stake_graphql =
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let compile_config = Mina_compile_config.Compiled.t in
+  let config_file = Cli_lib.Flag.conf_file in
   let args =
-    Args.zip2
-      (Cli_lib.Flag.signed_command_common
-         ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
-         ~default_transaction_fee:compile_config.default_transaction_fee )
-      receiver_flag
+    Args.zip3 Cli_lib.Flag.signed_command_common receiver_flag config_file
   in
+
   Command.async ~summary:"Delegate your stake to another public key"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun
             graphql_endpoint
-            ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver)
+            ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver, config_file)
           ->
+         let open Deferred.Let_syntax in
+         let%bind _, config =
+           let logger = Logger.create () in
+           Genesis_ledger_helper.Config_loader.load_config_exn ~config_file
+             ~logger ()
+         in
+         let fee =
+           Option.value ~default:config.compile_config.default_transaction_fee
+             fee
+         in
          let%map response =
            Graphql_client.query_exn
              Graphql_queries.Send_delegation.(
@@ -818,15 +833,20 @@ let hash_ledger =
          flag "--ledger-file"
            ~doc:"LEDGER-FILE File containing an exported ledger"
            (required string))
+     and config_file = Cli_lib.Flag.conf_file
      and plaintext = Cli_lib.Flag.plaintext in
      fun () ->
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
+       let open Deferred.Let_syntax in
+       let%bind _, config =
+         let logger = Logger.create () in
+         Genesis_ledger_helper.Config_loader.load_config_exn ~config_file
+           ~logger ()
        in
        let process_accounts accounts =
          let packed_ledger =
            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-             ~depth:constraint_constants.ledger_depth accounts
+             ~depth:config.constraint_config.constraint_constants.ledger_depth
+             accounts
          in
          let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
          Format.printf "%s@."
@@ -846,7 +866,11 @@ let hash_ledger =
              process_accounts accounts )
        else
          let json = Yojson.Safe.from_file ledger_file in
-         match Runtime_config.Accounts.of_yojson json with
+         match
+           Result.(
+             Runtime_config.Json_layout.Accounts.of_yojson json
+             >>= Runtime_config.Accounts.of_json_layout)
+         with
          | Ok runtime_accounts ->
              let accounts =
                lazy (Genesis_ledger_helper.Accounts.to_full runtime_accounts)
@@ -909,7 +933,11 @@ let currency_in_ledger =
              process_accounts accounts )
        else
          let json = Yojson.Safe.from_file ledger_file in
-         match Runtime_config.Accounts.of_yojson json with
+         match
+           Result.(
+             Runtime_config.Json_layout.Accounts.of_yojson json
+             >>= Runtime_config.Accounts.of_json_layout)
+         with
          | Ok runtime_accounts ->
              let accounts =
                Genesis_ledger_helper.Accounts.to_full runtime_accounts
@@ -922,22 +950,29 @@ let currency_in_ledger =
              ignore (exit 1 : 'a Deferred.t) )
 
 let constraint_system_digests =
+  let open Command.Let_syntax in
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
-    (Command.Param.return (fun () ->
-         let constraint_constants =
-           Genesis_constants.Compiled.constraint_constants
-         in
-         let proof_level = Genesis_constants.Compiled.proof_level in
-         let all =
-           Transaction_snark.constraint_system_digests ~constraint_constants ()
-           @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
-               ~proof_level ~constraint_constants ()
-         in
-         let all =
-           List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
-         in
-         List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
-         Deferred.unit ) )
+    (let%map_open config_file = Cli_lib.Flag.conf_file in
+     fun () ->
+       let open Deferred.Let_syntax in
+       let%bind _, config =
+         let logger = Logger.create () in
+         Genesis_ledger_helper.Config_loader.load_config_exn ~config_file
+           ~logger ()
+       in
+       let { Runtime_config.Constraint.constraint_constants; proof_level } =
+         config.constraint_config
+       in
+       let all =
+         Transaction_snark.constraint_system_digests ~constraint_constants ()
+         @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
+             ~proof_level ~constraint_constants ()
+       in
+       let all =
+         List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
+       in
+       List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
+       Deferred.unit )
 
 let snark_job_list =
   let open Deferred.Let_syntax in
@@ -1791,76 +1826,53 @@ let add_peers_graphql =
                   } ) ) ) )
 
 let compile_time_constants =
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
-  let proof_level = Genesis_constants.Compiled.proof_level in
+  let open Command.Let_syntax in
   Command.async
     ~summary:"Print a JSON map of the compile-time consensus parameters"
-    (Command.Param.return (fun () ->
-         let home = Core.Sys.home_directory () in
-         let conf_dir = home ^/ Cli_lib.Default.conf_dir_name in
-         let genesis_dir =
-           let home = Core.Sys.home_directory () in
-           home ^/ Cli_lib.Default.conf_dir_name
-         in
-         let config_file =
-           match Sys.getenv "MINA_CONFIG_FILE" with
-           | Some config_file ->
-               config_file
-           | None ->
-               conf_dir ^/ "daemon.json"
-         in
-         let open Async in
-         let%map ({ consensus_constants; _ } as precomputed_values), _ =
-           config_file |> Genesis_ledger_helper.load_config_json >>| Or_error.ok
-           >>| Option.value
-                 ~default:
-                   (`Assoc [ ("ledger", `Assoc [ ("accounts", `List []) ]) ])
-           >>| Runtime_config.of_yojson >>| Result.ok
-           >>| Option.value ~default:Runtime_config.default
-           >>= Genesis_ledger_helper.init_from_config_file ~genesis_constants
-                 ~constraint_constants ~logger:(Logger.null ()) ~proof_level
-                 ~cli_proof_level:None ~genesis_dir
-           >>| Or_error.ok_exn
-         in
-         let all_constants =
-           `Assoc
-             [ ( "genesis_state_timestamp"
-               , `String
-                   ( Block_time.to_time_exn
-                       consensus_constants.genesis_state_timestamp
-                   |> Core.Time.to_string_iso8601_basic ~zone:Core.Time.Zone.utc
-                   ) )
-             ; ("k", `Int (Unsigned.UInt32.to_int consensus_constants.k))
-             ; ( "coinbase"
-               , `String
-                   (Currency.Amount.to_mina_string
-                      precomputed_values.constraint_constants.coinbase_amount )
-               )
-             ; ( "block_window_duration_ms"
-               , `Int
-                   precomputed_values.constraint_constants
-                     .block_window_duration_ms )
-             ; ("delta", `Int (Unsigned.UInt32.to_int consensus_constants.delta))
-             ; ( "sub_windows_per_window"
-               , `Int
-                   (Unsigned.UInt32.to_int
-                      consensus_constants.sub_windows_per_window ) )
-             ; ( "slots_per_sub_window"
-               , `Int
-                   (Unsigned.UInt32.to_int
-                      consensus_constants.slots_per_sub_window ) )
-             ; ( "slots_per_window"
-               , `Int
-                   (Unsigned.UInt32.to_int consensus_constants.slots_per_window)
-               )
-             ; ( "slots_per_epoch"
-               , `Int
-                   (Unsigned.UInt32.to_int consensus_constants.slots_per_epoch)
-               )
-             ]
-         in
-         Core_kernel.printf "%s\n%!" (Yojson.Safe.to_string all_constants) ) )
+    (let%map_open config_file = Cli_lib.Flag.conf_file in
+     fun () ->
+       let open Deferred.Let_syntax in
+       let%map ({ consensus_constants; _ } as precomputed_values), _ =
+         let logger = Logger.create () in
+         Genesis_ledger_helper.Config_loader.load_config_exn ~config_file
+           ~logger ()
+       in
+       let all_constants =
+         `Assoc
+           [ ( "genesis_state_timestamp"
+             , `String
+                 ( Block_time.to_time_exn
+                     consensus_constants.genesis_state_timestamp
+                 |> Core.Time.to_string_iso8601_basic ~zone:Core.Time.Zone.utc
+                 ) )
+           ; ("k", `Int (Unsigned.UInt32.to_int consensus_constants.k))
+           ; ( "coinbase"
+             , `String
+                 (Currency.Amount.to_mina_string
+                    precomputed_values.constraint_constants.coinbase_amount ) )
+           ; ( "block_window_duration_ms"
+             , `Int
+                 precomputed_values.constraint_constants
+                   .block_window_duration_ms )
+           ; ("delta", `Int (Unsigned.UInt32.to_int consensus_constants.delta))
+           ; ( "sub_windows_per_window"
+             , `Int
+                 (Unsigned.UInt32.to_int
+                    consensus_constants.sub_windows_per_window ) )
+           ; ( "slots_per_sub_window"
+             , `Int
+                 (Unsigned.UInt32.to_int
+                    consensus_constants.slots_per_sub_window ) )
+           ; ( "slots_per_window"
+             , `Int
+                 (Unsigned.UInt32.to_int consensus_constants.slots_per_window)
+             )
+           ; ( "slots_per_epoch"
+             , `Int (Unsigned.UInt32.to_int consensus_constants.slots_per_epoch)
+             )
+           ]
+       in
+       Core_kernel.printf "%s\n%!" (Yojson.Safe.to_string all_constants) )
 
 let node_status =
   let open Command.Param in
@@ -2304,26 +2316,30 @@ let test_ledger_application =
        flag "--has-second-partition"
          ~doc:"Assume there is a second partition (scan state)" no_arg
      and tracing = flag "--tracing" ~doc:"Wrap test into tracing" no_arg
+     and config_file = Cli_lib.Flag.conf_file
      and no_masks = flag "--no-masks" ~doc:"Do not create masks" no_arg in
      Cli_lib.Exceptions.handle_nicely
      @@ fun () ->
+     let open Deferred.Let_syntax in
+     let%bind _, config =
+       let logger = Logger.create () in
+       Genesis_ledger_helper.Config_loader.load_config_exn ~config_file ~logger
+         ()
+     in
      let first_partition_slots =
        Option.value ~default:128 first_partition_slots
      in
      let num_txs_per_round = Option.value ~default:3 num_txs_per_round in
      let rounds = Option.value ~default:580 rounds in
      let max_depth = Option.value ~default:290 max_depth in
-     let constraint_constants =
-       Genesis_constants.Compiled.constraint_constants
-     in
-     let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+     let constraint_constants = config.constraint_config.constraint_constants in
+     let genesis_constants = config.genesis_constants in
      Test_ledger_application.test ~privkey_path ~ledger_path ?prev_block_path
        ~first_partition_slots ~no_new_stack ~has_second_partition
        ~num_txs_per_round ~rounds ~no_masks ~max_depth ~tracing num_txs
        ~constraint_constants ~genesis_constants )
 
 let itn_create_accounts =
-  let compile_config = Mina_compile_config.Compiled.t in
   Command.async ~summary:"Fund new accounts for incentivized testnet"
     (let open Command.Param in
     let privkey_path = Cli_lib.Flag.privkey_read_path in
@@ -2334,10 +2350,7 @@ let itn_create_accounts =
       flag "--num-accounts" ~doc:"NN Number of new accounts" (required int)
     in
     let fee =
-      flag "--fee"
-        ~doc:
-          (sprintf "NN Fee in nanomina paid to create an account (minimum: %s)"
-             (Currency.Fee.to_string compile_config.minimum_user_command_fee) )
+      flag "--fee" ~doc:"NN Fee in nanomina paid to create an account"
         (required int)
     in
     let amount =
@@ -2345,13 +2358,27 @@ let itn_create_accounts =
         ~doc:"NN Amount in nanomina to be divided among new accounts"
         (required int)
     in
-    let args = Args.zip5 privkey_path key_prefix num_accounts fee amount in
-    let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-    let constraint_constants =
-      Genesis_constants.Compiled.constraint_constants
+    let config_file = Cli_lib.Flag.conf_file in
+    let args =
+      Args.zip6 privkey_path key_prefix num_accounts fee amount config_file
     in
     Cli_lib.Background_daemon.rpc_init args
-      ~f:(Itn.create_accounts ~genesis_constants ~constraint_constants))
+      ~f:(fun
+           port
+           (privkey_path, key_prefix, num_accounts, fee, amount, config_file)
+         ->
+        let open Deferred.Let_syntax in
+        let%bind _, config =
+          let logger = Logger.create () in
+          Genesis_ledger_helper.Config_loader.load_config_exn ~config_file
+            ~logger ()
+        in
+        let args' = (privkey_path, key_prefix, num_accounts, fee, amount) in
+        let genesis_constants = config.genesis_constants in
+        let constraint_constants =
+          config.constraint_config.constraint_constants
+        in
+        Itn.create_accounts ~genesis_constants ~constraint_constants ~port args' ))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
