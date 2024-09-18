@@ -64,3 +64,7 @@ The [Node Developers](https://docs.minaprotocol.com/node-developers) docs contai
 [Apache 2.0](LICENSE)
 
 Commits older than 2018-10-03 do not have a [LICENSE](LICENSE) file or this notice, but are distributed under the same terms.
+
+[^1]: Develop is a mainline branch containig code that may be not compatible with current mainnet and may require major upgrade (hardfork).
+[^2]: Compatible is a mainline branch containig code which does not need hardfork in order to apply it to mainnet.
+[^3]: Branch which contains current mainnet code.
