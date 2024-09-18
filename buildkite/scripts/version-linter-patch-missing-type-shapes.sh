@@ -14,7 +14,7 @@ source buildkite/scripts/export-git-env-vars.sh
 
 release_branch=${REMOTE}/$1
 
-RELEASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 --no-merges $release_branch)
+RELEASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 $release_branch)
 
 function checkout_and_dump() {
     local __commit=$1
@@ -39,4 +39,12 @@ fi
 if ! $(gsutil ls gs://mina-type-shapes/$RELEASE_BRANCH_COMMIT 2>/dev/null); then
     checkout_and_dump $RELEASE_BRANCH_COMMIT
     revert_checkout
+fi
+
+if [[ -n "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" ]]; then 
+    BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 $BUILDKITE_PULL_REQUEST_BASE_BRANCH)
+    if ! $(gsutil ls gs://mina-type-shapes/$BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT 2>/dev/null); then
+        checkout_and_dump $BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT
+        revert_checkout
+    fi
 fi
