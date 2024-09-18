@@ -108,7 +108,7 @@ module Network_config = struct
     in
     assoc
 
-  let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
+  let expand ~logger:_ ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ~(images : Test_config.Container_images.t) ~test_config
       ~(constants : Test_config.constants) =
     let ({ requires_graphql
@@ -219,10 +219,6 @@ module Network_config = struct
     let genesis_accounts_and_keys = List.zip_exn genesis_ledger keypairs in
     let genesis_ledger_accounts = add_accounts genesis_accounts_and_keys in
     (* DAEMON CONFIG *)
-    let constraint_constants =
-      Genesis_ledger_helper.make_constraint_constants
-        ~default:constants.constraint_constants proof_config
-    in
     let ledger_is_prefix ledger1 ledger2 =
       List.is_prefix ledger2 ~prefix:ledger1
         ~equal:(fun
@@ -231,8 +227,19 @@ module Network_config = struct
                -> String.equal name1 name2 )
     in
     let runtime_config =
-      { Runtime_config.daemon =
-          Some
+      { Runtime_config.compile_config =
+          { constants.compile_config with
+            network_id =
+              Option.value ~default:constants.compile_config.network_id
+                network_id
+          ; slot_tx_end =
+              Option.map ~f:Mina_numbers.Global_slot_since_hard_fork.of_int
+                slot_tx_end
+          ; slot_chain_end =
+              Option.map ~f:Mina_numbers.Global_slot_since_hard_fork.of_int
+                slot_chain_end
+          }
+          (*
             { txpool_max_size = Some txpool_max_size
             ; peer_list_url = None
             ; zkapp_proof_update_cost = None
@@ -247,30 +254,38 @@ module Network_config = struct
             ; minimum_user_command_fee = None
             ; network_id
             }
-      ; genesis =
-          Some
-            { k = Some k
-            ; delta = Some delta
-            ; slots_per_epoch = Some slots_per_epoch
-            ; slots_per_sub_window = Some slots_per_sub_window
-            ; grace_period_slots = Some grace_period_slots
-            ; genesis_state_timestamp =
-                Some Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
-            }
-      ; proof = Some proof_config (* TODO: prebake ledger and only set hash *)
+*)
+      ; genesis_constants =
+          { constants.genesis_constants with
+            protocol =
+              { k
+              ; delta
+              ; slots_per_epoch
+              ; slots_per_sub_window
+              ; grace_period_slots
+              ; genesis_state_timestamp =
+                  (let t = Core.Time.(to_string_abs ~zone:Zone.utc (now ())) in
+                   Genesis_constants.genesis_timestamp_of_string t
+                   |> Genesis_constants.of_time )
+              }
+          ; txpool_max_size
+          }
+      ; constraint_config =
+          { proof_level = constants.proof_level
+          ; constraint_constants = proof_config
+          }
       ; ledger =
-          Some
-            { base =
-                Accounts
-                  (List.map genesis_ledger_accounts ~f:(fun (_name, acct) ->
-                       acct ) )
-            ; add_genesis_winner = None
-            ; num_accounts = None
-            ; balances = []
-            ; hash = None
-            ; s3_data_hash = None
-            ; name = None
-            }
+          { base =
+              Accounts
+                (List.map genesis_ledger_accounts ~f:(fun (_name, acct) ->
+                     acct ) )
+          ; add_genesis_winner = None
+          ; num_accounts = None
+          ; balances = []
+          ; hash = None
+          ; s3_data_hash = None
+          ; name = None
+          }
       ; epoch_data =
           (* each staking epoch ledger account must also be a genesis ledger account, though
              the balance may be different; the converse is not necessarily true, since
@@ -375,13 +390,12 @@ module Network_config = struct
               ({ staking; next } : Runtime_config.Epoch_data.t) )
       }
     in
-    let genesis_constants =
-      Or_error.ok_exn
-        (Genesis_ledger_helper.make_genesis_constants ~logger
-           ~default:constants.genesis_constants runtime_config )
-    in
     let constants : Test_config.constants =
-      { constants with genesis_constants; constraint_constants }
+      { constants with
+        genesis_constants = runtime_config.genesis_constants
+      ; constraint_constants =
+          runtime_config.constraint_config.constraint_constants
+      }
     in
     (* BLOCK PRODUCER CONFIG *)
     let mk_net_keypair keypair_name (pk, sk) =
@@ -679,33 +693,6 @@ module Network_manager = struct
       | None ->
           (Core.String.Map.of_alist_exn [], Core.String.Map.of_alist_exn [])
     in
-    (*
-         let snark_coordinator_id =
-           String.lowercase
-             (String.sub network_config.terraform.snark_worker_public_key
-                ~pos:
-                  (String.length network_config.terraform.snark_worker_public_key - 6)
-                ~len:6 )
-         in
-         let snark_coordinator_workloads =
-           if network_config.terraform.snark_worker_replicas > 0 then
-             [ Kubernetes_network.Workload_to_deploy.construct_workload
-                 ("snark-coordinator-" ^ snark_coordinator_id)
-                 [ Kubernetes_network.Workload_to_deploy.cons_pod_info "mina" ]
-             ]
-           else []
-         in
-         let snark_worker_workloads =
-           if network_config.terraform.snark_worker_replicas > 0 then
-             [ Kubernetes_network.Workload_to_deploy.construct_workload
-                 ("snark-worker-" ^ snark_coordinator_id)
-                 (List.init network_config.terraform.snark_worker_replicas
-                    ~f:(fun _i ->
-                      Kubernetes_network.Workload_to_deploy.cons_pod_info "worker" )
-                 )
-             ]
-           else []
-         in *)
     let block_producer_workloads =
       List.map network_config.terraform.block_producer_configs
         ~f:(fun bp_config ->
