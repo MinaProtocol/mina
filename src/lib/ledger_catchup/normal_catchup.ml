@@ -528,12 +528,8 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
                 @@ diff verification_end_time verification_start_time) )
         ]
       "verification of proofs complete" ;
-    let slot_tx_end =
-      Runtime_config.slot_tx_end precomputed_values.runtime_config
-    in
-    let slot_chain_end =
-      Runtime_config.slot_chain_end precomputed_values.runtime_config
-    in
+    let slot_tx_end = precomputed_values.compile_config.slot_tx_end in
+    let slot_chain_end = precomputed_values.compile_config.slot_chain_end in
     fold_until (List.rev tvs) ~init:[]
       ~f:(fun acc transition ->
         let open Deferred.Let_syntax in

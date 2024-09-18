@@ -698,12 +698,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
       let log_bootstrap_mode () =
         [%log info] "Pausing block production while bootstrapping"
       in
-      let slot_tx_end =
-        Runtime_config.slot_tx_end precomputed_values.runtime_config
-      in
-      let slot_chain_end =
-        Runtime_config.slot_chain_end precomputed_values.runtime_config
-      in
+      let slot_tx_end = precomputed_values.compile_config.slot_tx_end in
+      let slot_chain_end = precomputed_values.compile_config.slot_chain_end in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
       let produce ivar (scheduled_time, block_data, winner_pubkey) =
         let open Interruptible.Let_syntax in
