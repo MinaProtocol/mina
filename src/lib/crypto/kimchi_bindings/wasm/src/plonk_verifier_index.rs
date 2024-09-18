@@ -780,7 +780,7 @@ macro_rules! impl_verification_key {
                 let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
 
                 let index = {
-                let zk_rows = index.zk_rows as u64;
+                    let zk_rows = index.zk_rows as u64;
 
                     DlogVerifierIndex {
                         domain,
@@ -835,7 +835,8 @@ macro_rules! impl_verification_key {
                         linearization,
                         powers_of_alpha,
                         lookup_index: index.lookup_index.map(Into::into),
-                }};
+                    }
+                };
                 (index, srs.0.clone())
             }
 

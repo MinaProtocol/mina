@@ -98,5 +98,4 @@ let () =
   test () ;
   Alcotest.run "Chunked circuit"
     [ ("2^19", [ ("prove and verify", `Quick, test) ]) ]
-
 *)
