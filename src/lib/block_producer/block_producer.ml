@@ -16,6 +16,10 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val commit_id : string
+
+  val zkapp_cmd_limit : int option ref
+
+  val vrf_poll_interval : Time.Span.t
 end
 
 type Structured_log_events.t += Block_produced
@@ -72,8 +76,6 @@ let lift_sync f =
          if Ivar.is_full ivar then
            [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
          Ivar.fill ivar (f ()) ) )
-
-let zkapp_cmd_limit = ref Mina_compile_config.zkapp_cmd_limit
 
 module Singleton_scheduler : sig
   type t
@@ -606,18 +608,14 @@ module Vrf_evaluation_state = struct
     | Completed ->
         t.vrf_evaluator_status <- Completed
 
-  let poll ~vrf_evaluator ~logger t =
+  let poll ~vrf_evaluator ~logger ~vrf_poll_interval t =
     [%log info] "Polling VRF evaluator process" ;
     let%bind vrf_result = poll_vrf_evaluator vrf_evaluator ~logger in
     let%map vrf_result =
       match (vrf_result.evaluator_status, vrf_result.slots_won) with
       | At _, [] ->
           (*try again*)
-          let%bind () =
-            Async.after
-              (Time.Span.of_ms
-                 (Mina_compile_config.vrf_poll_interval_ms |> Int.to_float) )
-          in
+          let%bind () = Async.after vrf_poll_interval in
           poll_vrf_evaluator vrf_evaluator ~logger
       | _ ->
           return vrf_result
@@ -634,7 +632,8 @@ module Vrf_evaluation_state = struct
                      s.global_slot ) ) )
         ]
 
-  let update_epoch_data ~vrf_evaluator ~logger ~epoch_data_for_vrf t =
+  let update_epoch_data ~vrf_evaluator ~logger ~epoch_data_for_vrf
+      ~vrf_poll_interval t =
     let set_epoch_data () =
       let f () =
         O1trace.thread "set_vrf_evaluator_epoch_state" (fun () ->
@@ -648,7 +647,7 @@ module Vrf_evaluation_state = struct
         [ ("epoch", Mina_numbers.Length.to_yojson epoch_data_for_vrf.epoch) ] ;
     t.vrf_evaluator_status <- Start ;
     let%bind () = set_epoch_data () in
-    poll ~logger ~vrf_evaluator t
+    poll ~logger ~vrf_evaluator ~vrf_poll_interval t
 end
 
 let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
@@ -1158,6 +1157,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                  if Mina_numbers.Length.(i' > i) then
                    Vrf_evaluation_state.update_epoch_data ~vrf_evaluator
                      ~epoch_data_for_vrf ~logger vrf_evaluation_state
+                     ~vrf_poll_interval
                  else Deferred.unit
                in
                let%bind () =
@@ -1168,22 +1168,17 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                    && not (Vrf_evaluation_state.finished vrf_evaluation_state)
                  then
                    Vrf_evaluation_state.poll ~vrf_evaluator ~logger
-                     vrf_evaluation_state
+                     vrf_evaluation_state ~vrf_poll_interval
                  else Deferred.unit
                in
                match Core.Queue.dequeue vrf_evaluation_state.queue with
                | None -> (
                    (*Keep trying until we get some slots*)
                    let poll () =
-                     let%bind () =
-                       Async.after
-                         (Time.Span.of_ms
-                            ( Mina_compile_config.vrf_poll_interval_ms
-                            |> Int.to_float ) )
-                     in
+                     let%bind () = Async.after vrf_poll_interval in
                      let%map () =
                        Vrf_evaluation_state.poll ~vrf_evaluator ~logger
-                         vrf_evaluation_state
+                         vrf_evaluation_state ~vrf_poll_interval
                      in
                      Singleton_scheduler.schedule scheduler
                        (Block_time.now time_controller)

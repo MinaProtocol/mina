@@ -17,6 +17,8 @@ let Tag
       | Test
       | Stable
       | Toolchain
+      | Docker
+      | Debian
       | Hardfork
       | Promote
       >
@@ -36,6 +38,8 @@ let toNatural
             , Hardfork = 9
             , Stable = 10
             , Promote = 11
+            , Debian = 12
+            , Docker = 13
             }
             tag
 
@@ -71,6 +75,8 @@ let capitalName =
             , Hardfork = "Hardfork"
             , Stable = "Stable"
             , Promote = "Promote"
+            , Docker = "Docker"
+            , Debian = "Debian"
             }
             tag
 
@@ -88,6 +94,8 @@ let lowerName =
             , Hardfork = "hardfork"
             , Stable = "stable"
             , Promote = "promote"
+            , Docker = "docker"
+            , Debian = "debian"
             }
             tag
 

@@ -86,7 +86,9 @@ impl TryFrom<BigUint> for CamlBigInteger256 {
     type Error = String;
 
     fn try_from(x: BigUint) -> Result<Self, Self::Error> {
-        Ok(Self(BigInteger256::try_from(x)?))
+        Ok(Self(
+            BigInteger256::try_from(x).map_err(|()| "Biginteger was too big")?,
+        ))
     }
 }
 
@@ -94,7 +96,9 @@ impl TryFrom<&BigUint> for CamlBigInteger256 {
     type Error = String;
 
     fn try_from(x: &BigUint) -> Result<Self, Self::Error> {
-        Ok(Self(BigInteger256::try_from(x.clone())?))
+        Ok(Self(
+            BigInteger256::try_from(x.clone()).map_err(|()| "Biginteger was too big")?,
+        ))
     }
 }
 
@@ -205,7 +209,7 @@ pub fn caml_bigint_256_to_bytes(
     x: ocaml::Pointer<CamlBigInteger256>,
 ) -> [u8; std::mem::size_of::<BigInteger256>()] {
     let mut res = [0u8; std::mem::size_of::<BigInteger256>()];
-    x.as_ref().0.serialize(&mut res[..]).unwrap();
+    x.as_ref().0.serialize_compressed(&mut res[..]).unwrap();
     res
 }
 
@@ -216,7 +220,7 @@ pub fn caml_bigint_256_of_bytes(x: &[u8]) -> Result<CamlBigInteger256, ocaml::Er
     if x.len() != len {
         ocaml::Error::failwith("caml_bigint_256_of_bytes")?;
     };
-    let result = BigInteger256::deserialize(&mut &*x)
+    let result = BigInteger256::deserialize_compressed(&mut &*x)
         .map_err(|_| ocaml::Error::Message("deserialization error"))?;
     Ok(CamlBigInteger256(result))
 }

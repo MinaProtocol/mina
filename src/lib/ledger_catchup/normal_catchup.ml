@@ -77,7 +77,7 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
       Envelope.Incoming.map enveloped_transition
         ~f:(Fn.const initially_validated_transition)
     in
-    Transition_handler.Validator.validate_transition
+    Transition_handler.Validator.validate_transition_is_relevant
       ~context:(module Context)
       ~frontier ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
       enveloped_initially_validated_transition
@@ -647,7 +647,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~unprocessed_transition_cache : unit =
   let open Context in
   let hash_tree =
-    match Transition_frontier.catchup_tree frontier with
+    match Transition_frontier.catchup_state frontier with
     | Hash t ->
         t
     | Full _ ->
