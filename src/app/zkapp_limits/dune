@@ -4,13 +4,17 @@
  (public_name zkapp_limits)
  (libraries
    ;; opam libraries
+   async
+   async.async_command
    base
    base.caml
    core_kernel
    ;; local libraries
-   mina_base
-   genesis_constants
    bounded_types
+   cli_lib
+   genesis_ledger_helper
+   mina_base
+   runtime_config
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_mina ppx_custom_printf ppx_let ppx_hash ppx_compare ppx_sexp_conv)))

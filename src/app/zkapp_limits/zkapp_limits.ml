@@ -1,8 +1,8 @@
 (*All the limits set for zkApp transactions*)
 open Core_kernel
+open Async
 
-let main () =
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+let main ({ genesis_constants; _ } : Runtime_config.t) =
   let cost_limit = genesis_constants.zkapp_transaction_cost_limit in
   let max_event_elements = genesis_constants.max_event_elements in
   let max_action_elements = genesis_constants.max_action_elements in
@@ -29,4 +29,17 @@ let main () =
                   (proofs + signed_single_segments + (signed_pair_segments * 2))
                   cost ) ) )
 
-let () = main ()
+let () =
+  Command.run
+  @@
+  let open Command.Let_syntax in
+  Command.async ~summary:"All the limits set for zkApp transactions"
+    (let%map_open config_file = Cli_lib.Flag.conf_file in
+     fun () ->
+       let open Deferred.Let_syntax in
+       let logger = Logger.create () in
+       let%map _, config =
+         Genesis_ledger_helper.Config_loader.load_config_exn ~config_file
+           ~logger ()
+       in
+       main config )
