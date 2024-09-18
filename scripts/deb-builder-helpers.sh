@@ -51,6 +51,7 @@ case "${MINA_DEB_CODENAME}" in
     ;;
 esac
 
+# Add suffix to debian to distinguish different profiles (mainnet/devnet/lightnet)
 case "${DUNE_PROFILE}" in
   devnet|mainnet)
     MINA_DEB_NAME="mina-berkeley"
@@ -64,17 +65,24 @@ case "${DUNE_PROFILE}" in
     ;;
 esac
 
+
+#ADd suffix to debian to distinguish instrumented packages
+if [[ -v DUNE_INSTRUMENT_WITH ]]; then
+    INSTRUMENTED_SUFFIX=instrumented
+    MINA_DEB_NAME="${MINA_DEB_NAME}-${INSTRUMENTED_SUFFIX}"
+    DEB_SUFFIX="${DEB_SUFFIX}-${INSTRUMENTED_SUFFIX}"
+fi 
+
 BUILDDIR="deb_build"
 
 # Function to ease creation of Debian package control files
 create_control_file() {
 
   echo "------------------------------------------------------------"
-  echo "create_control_file inputs:" 
+  echo "create_control_file inputs:"
   echo "Package Name: ${1}"
   echo "Dependencies: ${2}"
   echo "Description: ${3}"
-  echo "Suggests: ${4}"
 
   # Make sure the directory exists
   mkdir -p "${BUILDDIR}/DEBIAN"
@@ -95,7 +103,6 @@ Architecture: amd64
 Maintainer: O(1)Labs <build@o1labs.org>
 Installed-Size:
 Depends: ${2}
-Suggests: ${4}
 Section: base
 Priority: optional
 Homepage: https://minaprotocol.com/
@@ -168,6 +175,7 @@ copy_common_daemon_configs() {
 
   cp ../src/app/rosetta/rosetta-cli-config/*.json "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
   cp ../src/app/rosetta/rosetta-cli-config/*.ros "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  cp ./default/src/app/rosetta/indexer_test/indexer_test.exe "${BUILDDIR}/usr/local/bin/mina-rosetta-indexer-test"
   cp ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/rosetta/archive"
   cp -r ../genesis_ledgers/* ${BUILDDIR}/etc/mina/rosetta/genesis_ledgers/
 
@@ -224,7 +232,7 @@ build_keypair_deb() {
 
 ##################################### LOGPROC PACKAGE #######################################
 build_logproc_deb() {
-  create_control_file mina-logproc "${SHARED_DEPS}" 'Utility for processing mina-daemon log output' "${SUGGESTED_DEPS}"
+  create_control_file mina-logproc "${SHARED_DEPS}" 'Utility for processing mina-daemon log output'
 
   # Binaries
   cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
@@ -235,7 +243,7 @@ build_logproc_deb() {
 
 ##################################### GENERATE TEST_EXECUTIVE PACKAGE #######################################
 build_test_executive_deb () {
-  create_control_file mina-test-executive "${SHARED_DEPS}${TEST_EXECUTIVE_DEPS}" 'Tool to run automated tests against a full mina testnet with multiple nodes.' "${SUGGESTED_DEPS}"
+  create_control_file mina-test-executive "${SHARED_DEPS}${TEST_EXECUTIVE_DEPS}" 'Tool to run automated tests against a full mina testnet with multiple nodes.'
 
   # Binaries
   cp ./default/src/app/test_executive/test_executive.exe "${BUILDDIR}/usr/local/bin/mina-test-executive"
@@ -247,7 +255,7 @@ build_test_executive_deb () {
 ##################################### GENERATE BATCH TXN TOOL PACKAGE #######################################
 build_batch_txn_deb() {
 
-  create_control_file mina-batch-txn "${SHARED_DEPS}" 'Load transaction tool against a mina node.' "${SUGGESTED_DEPS}"
+  create_control_file mina-batch-txn "${SHARED_DEPS}" 'Load transaction tool against a mina node.'
 
   # Binaries
   cp ./default/src/app/batch_txn_tool/batch_txn_tool.exe "${BUILDDIR}/usr/local/bin/mina-batch-txn"
@@ -258,11 +266,11 @@ build_batch_txn_deb() {
 
 ##################################### GENERATE TEST SUITE PACKAGE #######################################
 build_functional_test_suite_deb() {
-  create_control_file mina-test-suite "${SHARED_DEPS}" 'Test suite apps for mina.' "${SUGGESTED_DEPS}"
+  create_control_file mina-test-suite "${SHARED_DEPS}" 'Test suite apps for mina.'
 
   # Binaries
   cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
-
+  
   build_deb mina-test-suite
 
 }
@@ -302,7 +310,7 @@ build_daemon_berkeley_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building Mina Berkeley testnet signatures deb without keys:"
 
-  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
+  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
 
   copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
 
@@ -319,7 +327,8 @@ build_archive_deb () {
   echo "--- Building archive deb"
 
 
-  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process Compatible with Mina Daemon' "${SUGGESTED_DEPS}"
+  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
+ Compatible with Mina Daemon'
 
   cp ./default/src/app/archive/archive.exe "${BUILDDIR}/usr/local/bin/mina-archive"
   cp ./default/src/app/archive_blocks/archive_blocks.exe "${BUILDDIR}/usr/local/bin/mina-archive-blocks"
@@ -332,7 +341,8 @@ build_archive_deb () {
   cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-replayer"
   cp ./default/src/app/swap_bad_balances/swap_bad_balances.exe "${BUILDDIR}/usr/local/bin/mina-swap-bad-balances"
 
-
+  cp ../src/app/archive/create_schema.sql "${BUILDDIR}/etc/mina/archive"
+  
   build_deb "$ARCHIVE_DEB"
 
 }
@@ -342,7 +352,7 @@ build_zkapp_test_transaction_deb () {
   echo "------------------------------------------------------------"
   echo "--- Building Mina Berkeley ZkApp test transaction tool:"
 
-  create_control_file mina-zkapp-test-transaction "${SHARED_DEPS}${DAEMON_DEPS}" 'Utility to generate ZkApp transactions in Mina GraphQL format' "${SUGGESTED_DEPS}"
+  create_control_file mina-zkapp-test-transaction "${SHARED_DEPS}${DAEMON_DEPS}" 'Utility to generate ZkApp transactions in Mina GraphQL format'
 
   # Binaries
   cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe "${BUILDDIR}/usr/local/bin/mina-zkapp-test-transaction"

@@ -6,9 +6,7 @@
 
 <br />
 
-<a href="https://minaprotocol.com">
-  <img src="https://minaprotocol.com/wp-content/themes/minaprotocol/img/footerLogo.svg" width="350" alt="Mina logo" />
-</a>
+# Mina
 
 <br />
 

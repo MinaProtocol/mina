@@ -15,7 +15,7 @@ pub fn caml_pasta_fp_poseidon_block_cipher(
 ) -> WasmFlatVector<WasmPastaFp> {
     let mut state_vec: Vec<Fp> = state.into_iter().map(Into::into).collect();
     poseidon_block_cipher::<Fp, PlonkSpongeConstantsKimchi>(
-        &mina_poseidon::pasta::fp_kimchi::params(),
+        &mina_poseidon::pasta::fp_kimchi::static_params(),
         &mut state_vec,
     );
     state_vec
@@ -33,7 +33,7 @@ pub fn caml_pasta_fq_poseidon_block_cipher(
 ) -> WasmFlatVector<WasmPastaFq> {
     let mut state_vec: Vec<Fq> = state.into_iter().map(Into::into).collect();
     poseidon_block_cipher::<Fq, PlonkSpongeConstantsKimchi>(
-        &mina_poseidon::pasta::fq_kimchi::params(),
+        &mina_poseidon::pasta::fq_kimchi::static_params(),
         &mut state_vec,
     );
     state_vec

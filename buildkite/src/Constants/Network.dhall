@@ -18,21 +18,21 @@ let lowerName =
             { Devnet = "devnet", Mainnet = "mainnet", Berkeley = "berkeley" }
             network
 
-let requiresMainnetBuild = 
+let requiresMainnetBuild =
           \(network : Network)
-      ->  merge
-            { Devnet = True
-             , Mainnet = True
-             , Berkeley = False
-            }
-            network
+      ->  merge { Devnet = True, Mainnet = True, Berkeley = False } network
 
-let foldMinaBuildMainnetEnv = 
+let foldMinaBuildMainnetEnv =
           \(networks : List Network)
-      ->  
-        if List/any Network requiresMainnetBuild networks then
-            "MINA_BUILD_MAINNET=true"
-        else 
-            "MINA_BUILD_MAINNET=false"
+      ->        if List/any Network requiresMainnetBuild networks
 
-in  { Type = Network, capitalName = capitalName, lowerName = lowerName, requiresMainnetBuild = requiresMainnetBuild, foldMinaBuildMainnetEnv = foldMinaBuildMainnetEnv}
+          then  "MINA_BUILD_MAINNET=true"
+
+          else  "MINA_BUILD_MAINNET=false"
+
+in  { Type = Network
+    , capitalName = capitalName
+    , lowerName = lowerName
+    , requiresMainnetBuild = requiresMainnetBuild
+    , foldMinaBuildMainnetEnv = foldMinaBuildMainnetEnv
+    }

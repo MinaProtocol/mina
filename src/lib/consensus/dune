@@ -10,8 +10,6 @@
    async_unix
    core.uuid
    async_kernel
-   graphql-async
-   graphql
    sexplib0
    base.caml
    integers
@@ -30,8 +28,8 @@
    mina_base.util
    bounded_types
    unsigned_extended
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    fold_lib
    random_oracle_input
    outside_hash_image
@@ -53,7 +51,6 @@
    mina_base
    mina_transaction_logic
    key_gen
-   mina_base_unix
    block_time
    perf_histograms
    test_util
@@ -61,7 +58,6 @@
    non_zero_curve_point
    mina_metrics
    mina_numbers
-   mina_numbers_unix
    mina_stdlib
    signature_lib
    snarky.backendless
@@ -69,7 +65,6 @@
    crypto_params
    data_hash_lib
    currency
-   currency_unix
    file_system
    coda_genesis_ledger
    interruptible
@@ -81,8 +76,6 @@
    trust_system
    mina_base.import
    ppx_version.runtime
-   graphql_basic_scalars
-   signature_lib_unix
    internal_tracing
    o1trace
  )

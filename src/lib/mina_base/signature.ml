@@ -67,11 +67,7 @@ module Raw = struct
     try Some (to_field field_enc, to_scalar scalar_enc) with _ -> None
 end
 
-[%%ifdef consensus_mechanism]
-
 type var = Field.Var.t * Inner_curve.Scalar.var
-
-[%%endif]
 
 [%%define_locally
 Stable.Latest.

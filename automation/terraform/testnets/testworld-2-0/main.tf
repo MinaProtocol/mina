@@ -86,7 +86,7 @@ module "testworld-2-0" {
 
   archive_node_count            = 2
   mina_archive_schema           = "create_schema.sql"
-  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/20a2b3ab80546d06a69996e6ad76e112b727b79b/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/20a2b3ab80546d06a69996e6ad76e112b727b79b/src/app/archive/zkapp_tables.sql"]
+  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/20a2b3ab80546d06a69996e6ad76e112b727b79b/src/app/archive/create_schema.sql"]
 
   archive_configs = [
     {
