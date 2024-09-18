@@ -513,14 +513,13 @@ let send_payment_graphql =
     flag "--amount" ~aliases:[ "amount" ]
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let compile_config = Mina_compile_config.Compiled.t in
   let args =
     Args.zip3
       (Cli_lib.Flag.signed_command_common
-         ~minimum_user_command_fee:
-           Genesis_constants_compiled.t.minimum_user_command_fee
-         ~default_transaction_fee:
-           (Currency.Fee.of_mina_string_exn
-              Mina_compile_config.default_transaction_fee_string ) )
+         ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
+         ~default_transaction_fee:compile_config.default_transaction_fee )
       receiver_flag amount_flag
   in
   Command.async ~summary:"Send payment to an address"
@@ -549,14 +548,13 @@ let delegate_stake_graphql =
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let compile_config = Mina_compile_config.Compiled.t in
   let args =
     Args.zip2
       (Cli_lib.Flag.signed_command_common
-         ~minimum_user_command_fee:
-           Genesis_constants_compiled.t.minimum_user_command_fee
-         ~default_transaction_fee:
-           (Currency.Fee.of_mina_string_exn
-              Mina_compile_config.default_transaction_fee_string ) )
+         ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
+         ~default_transaction_fee:compile_config.default_transaction_fee )
       receiver_flag
   in
   Command.async ~summary:"Delegate your stake to another public key"
@@ -822,10 +820,10 @@ let hash_ledger =
            (required string))
      and plaintext = Cli_lib.Flag.plaintext in
      fun () ->
+       let constraint_constants =
+         Genesis_constants.Compiled.constraint_constants
+       in
        let process_accounts accounts =
-         let constraint_constants =
-           Genesis_constants_compiled.Constraint_constants.t
-         in
          let packed_ledger =
            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
              ~depth:constraint_constants.ledger_depth accounts
@@ -926,11 +924,10 @@ let currency_in_ledger =
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
     (Command.Param.return (fun () ->
-         (* TODO: Allow these to be configurable. *)
-         let proof_level = Genesis_constants_compiled.Proof_level.t in
          let constraint_constants =
-           Genesis_constants_compiled.Constraint_constants.t
+           Genesis_constants.Compiled.constraint_constants
          in
+         let proof_level = Genesis_constants.Compiled.proof_level in
          let all =
            Transaction_snark.constraint_system_digests ~constraint_constants ()
            @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
@@ -1794,6 +1791,9 @@ let add_peers_graphql =
                   } ) ) ) )
 
 let compile_time_constants =
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let proof_level = Genesis_constants.Compiled.proof_level in
   Command.async
     ~summary:"Print a JSON map of the compile-time consensus parameters"
     (Command.Param.return (fun () ->
@@ -1818,9 +1818,9 @@ let compile_time_constants =
                    (`Assoc [ ("ledger", `Assoc [ ("accounts", `List []) ]) ])
            >>| Runtime_config.of_yojson >>| Result.ok
            >>| Option.value ~default:Runtime_config.default
-           >>= Genesis_ledger_helper.init_from_config_file ~genesis_dir
-                 ~logger:(Logger.null ()) ~proof_level:None
-                 ~compiled:(module Genesis_constants_compiled)
+           >>= Genesis_ledger_helper.init_from_config_file ~genesis_constants
+                 ~constraint_constants ~logger:(Logger.null ()) ~proof_level
+                 ~cli_proof_level:None ~genesis_dir
            >>| Or_error.ok_exn
          in
          let all_constants =
@@ -2313,11 +2313,17 @@ let test_ledger_application =
      let num_txs_per_round = Option.value ~default:3 num_txs_per_round in
      let rounds = Option.value ~default:580 rounds in
      let max_depth = Option.value ~default:290 max_depth in
+     let constraint_constants =
+       Genesis_constants.Compiled.constraint_constants
+     in
+     let genesis_constants = Genesis_constants.Compiled.genesis_constants in
      Test_ledger_application.test ~privkey_path ~ledger_path ?prev_block_path
        ~first_partition_slots ~no_new_stack ~has_second_partition
-       ~num_txs_per_round ~rounds ~no_masks ~max_depth ~tracing num_txs )
+       ~num_txs_per_round ~rounds ~no_masks ~max_depth ~tracing num_txs
+       ~constraint_constants ~genesis_constants )
 
 let itn_create_accounts =
+  let compile_config = Mina_compile_config.Compiled.t in
   Command.async ~summary:"Fund new accounts for incentivized testnet"
     (let open Command.Param in
     let privkey_path = Cli_lib.Flag.privkey_read_path in
@@ -2331,7 +2337,7 @@ let itn_create_accounts =
       flag "--fee"
         ~doc:
           (sprintf "NN Fee in nanomina paid to create an account (minimum: %s)"
-             Mina_compile_config.minimum_user_command_fee_string )
+             (Currency.Fee.to_string compile_config.minimum_user_command_fee) )
         (required int)
     in
     let amount =
@@ -2340,7 +2346,12 @@ let itn_create_accounts =
         (required int)
     in
     let args = Args.zip5 privkey_path key_prefix num_accounts fee amount in
-    Cli_lib.Background_daemon.rpc_init args ~f:Itn.create_accounts)
+    let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+    let constraint_constants =
+      Genesis_constants.Compiled.constraint_constants
+    in
+    Cli_lib.Background_daemon.rpc_init args
+      ~f:(Itn.create_accounts ~genesis_constants ~constraint_constants))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
@@ -2422,7 +2433,7 @@ let client_trustlist_group =
     ; ("remove", trustlist_remove)
     ]
 
-let advanced =
+let advanced ~itn_features =
   let cmds0 =
     [ ("get-nonce", get_nonce_cmd)
     ; ("client-trustlist", client_trustlist_group)
@@ -2462,17 +2473,13 @@ let advanced =
     ; ("set-coinbase-receiver", set_coinbase_receiver_graphql)
     ; ("chain-id-inputs", chain_id_inputs)
     ; ("runtime-config", runtime_config)
-    ; ( "vrf"
-      , Cli_lib.Commands.Vrf.command_group
-          ~constraint_constants:
-            Genesis_constants_compiled.Constraint_constants.t )
+    ; ("vrf", Cli_lib.Commands.Vrf.command_group)
     ; ("thread-graph", thread_graph)
     ; ("print-signature-kind", signature_kind)
     ]
   in
   let cmds =
-    if Mina_compile_config.itn_features then
-      ("itn-create-accounts", itn_create_accounts) :: cmds0
+    if itn_features then ("itn-create-accounts", itn_create_accounts) :: cmds0
     else cmds0
   in
   Command.group ~summary:"Advanced client commands" cmds
@@ -2482,7 +2489,11 @@ let ledger =
     [ ("export", export_ledger)
     ; ("hash", hash_ledger)
     ; ("currency", currency_in_ledger)
-    ; ("test-apply", test_ledger_application)
+    ; ( "test"
+      , Command.group ~summary:"Testing-only commands"
+          [ ("apply", test_ledger_application)
+          ; ("generate-accounts", Cli_lib.Commands.generate_test_ledger)
+          ] )
     ]
 
 let libp2p =
