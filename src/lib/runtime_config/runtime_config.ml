@@ -410,7 +410,7 @@ module Json_layout = struct
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
 
-  module Constraint_config = struct
+  module Constraint = struct
     type t =
       { constraint_constants : Genesis_constants.Constraint_constants.Inputs.t
       ; proof_level : string
@@ -425,7 +425,7 @@ module Json_layout = struct
   type t =
     { daemon : Mina_compile_config.Inputs.t
     ; genesis : Genesis_constants.Inputs.t
-    ; proof : Constraint_config.t
+    ; proof : Constraint.t
     ; ledger : Ledger.t
     ; epoch_data : Epoch_data.t option [@default None]
     }
@@ -828,7 +828,7 @@ module Constraint = struct
     }
   [@@deriving to_yojson]
 
-  let of_json_layout : Json_layout.Constraint_config.t -> t =
+  let of_json_layout : Json_layout.Constraint.t -> t =
    fun { constraint_constants; proof_level } ->
     { constraint_constants =
         Genesis_constants.Constraint_constants.make constraint_constants

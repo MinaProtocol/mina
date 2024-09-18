@@ -797,12 +797,12 @@ let print_config ~logger config =
       (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
     let open Deferred.Or_error.Let_syntax in
     let constraint_config =
-      let c = Runtime_config.Constraint_config.of_json_layout config.proof in
+      let c = Runtime_config.Constraint.of_json_layout config.proof in
       { c with
         proof_level = Option.value ~default:c.proof_level cli_proof_level
       }
     in
-    let { Runtime_config.Constraint_config.constraint_constants; proof_level } =
+    let { Runtime_config.Constraint.constraint_constants; proof_level } =
       constraint_config
     in
     let genesis_constants = Genesis_constants.make config.genesis in
@@ -840,6 +840,7 @@ let print_config ~logger config =
       ; epoch_data = genesis_epoch_data_config
       }
     in
+    print_config ~logger config ;
     let inputs =
       Genesis_proof.generate_inputs ~config ~ledger:genesis_ledger
         ~blockchain_proof_system_id:None ~genesis_epoch_data
