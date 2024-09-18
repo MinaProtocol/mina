@@ -216,7 +216,7 @@ func (bs *BitswapCtx) Loop() {
 			configuredCheck()
 			success := map[BitswapDataTag][]root{}
 			for _, root := range cmd.rootIds {
-				tag, err := DeleteRoot(root)
+				tag, err := DeleteRoot(bs, root)
 				if err == nil {
 					success[tag] = append(success[tag], root)
 				} else {
