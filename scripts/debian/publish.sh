@@ -14,7 +14,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -c|--codename) DEB_CODENAME="$2"; shift;;
   -b|--bucket) BUCKET="$2"; shift;;
   -s|--sign) SIGN="$2"; shift;;
-  -p|--passphrase) GPG_PASSPHRASE="$2"; shift;;
+  -p|--passphrase) PASSPHRASE="$2"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
@@ -47,7 +47,7 @@ else
   SIGN_ARG="--sign=$SIGN"
 fi
 
-if [[ -z "$PASSPHRASE" ]]; then
+if [[ -z "${PASSPHRASE:-}" ]]; then
   GPG_OPTIONS=""
 else
   GPG_OPTIONS="--gpg-options \"--batch --homedir .gpg --pinentry-mode=loopback --yes --passphrase ${PASSPHRASE}\""
