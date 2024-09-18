@@ -33,6 +33,11 @@ let conf_dir =
   flag "--config-directory" ~aliases:[ "config-directory" ]
     ~doc:"DIR Configuration directory" (optional string)
 
+let conf_file =
+  let open Command.Param in
+  flag "--config-file" ~aliases:[ "config-file" ] ~doc:"FILE Configuration file"
+    (required string)
+
 module Doc_builder = struct
   type 'value t =
     { type_name : string
