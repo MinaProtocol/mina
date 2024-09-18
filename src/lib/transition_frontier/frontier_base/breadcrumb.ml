@@ -400,7 +400,6 @@ module For_tests = struct
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
-               , `Staged_ledger _
                , `Pending_coinbase_update _ ) =
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
@@ -425,8 +424,7 @@ module For_tests = struct
         |> Blockchain_state.ledger_proof_statement
       in
       let ledger_proof_statement =
-        Option.value_map ledger_proof_opt
-          ~f:(fun (proof, _) -> Ledger_proof.statement proof)
+        Option.value_map ledger_proof_opt ~f:Ledger_proof.statement
           ~default:previous_ledger_proof_stmt
       in
       let genesis_ledger_hash =

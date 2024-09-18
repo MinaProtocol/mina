@@ -273,39 +273,35 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                     | _ ->
                         diff_result )
           in
-          [%log internal] "Apply_staged_ledger_diff" ;
-          match%map
-            let%bind.Deferred.Result diff = return diff in
-            Staged_ledger.apply_diff_unchecked staged_ledger
-              ~constraint_constants ~global_slot diff ~logger
-              ~current_state_view:previous_state_view
-              ~state_and_body_hash:
-                (previous_protocol_state_hash, previous_protocol_state_body_hash)
-              ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap
-          with
-          | Ok
-              ( `Hash_after_applying next_staged_ledger_hash
-              , `Ledger_proof ledger_proof_opt
-              , `Staged_ledger transitioned_staged_ledger
-              , `Pending_coinbase_update (is_new_stack, pending_coinbase_update)
-              ) ->
-              (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
-              ignore
-              @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
-                   (Staged_ledger.ledger transitioned_staged_ledger) ;
-              Some
-                ( (match diff with Ok diff -> diff | Error _ -> assert false)
-                , next_staged_ledger_hash
-                , ledger_proof_opt
-                , is_new_stack
-                , pending_coinbase_update )
-          | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
-              [%log error] "Failed to apply the diff: $error"
-                ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-              None
+          match diff with
           | Error e ->
-              ( match diff with
-              | Ok diff ->
+              [%log error] "Error building the diff: $error"
+                ~metadata:
+                  [ ( "error"
+                    , `String (Staged_ledger.Staged_ledger_error.to_string e) )
+                  ] ;
+              Deferred.return None
+          | Ok diff -> (
+              [%log internal] "Apply_staged_ledger_diff" ;
+              let%map res =
+                Staged_ledger.apply_diff_unchecked staged_ledger
+                  ~constraint_constants ~global_slot diff ~logger
+                  ~current_state_view:previous_state_view
+                  ~state_and_body_hash:
+                    ( previous_protocol_state_hash
+                    , previous_protocol_state_body_hash )
+                  ~coinbase_receiver ~supercharge_coinbase
+                  ~zkapp_cmd_limit_hardcap
+              in
+              [%log internal] "Apply_staged_ledger_diff_done" ;
+              match res with
+              | Ok res ->
+                  Some (diff, res)
+              | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
+                  [%log error] "Failed to apply the diff: $error"
+                    ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+                  None
+              | Error e ->
                   [%log error]
                     ~metadata:
                       [ ( "error"
@@ -315,26 +311,18 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                         , Staged_ledger_diff.With_valid_signatures_and_proofs
                           .to_yojson diff )
                       ]
-                    "Error applying the diff $diff: $error"
-              | Error e ->
-                  [%log error] "Error building the diff: $error"
-                    ~metadata:
-                      [ ( "error"
-                        , `String
-                            (Staged_ledger.Staged_ledger_error.to_string e) )
-                      ] ) ;
-              None)
+                    "Error applying the diff $diff: $error" ;
+                  None ))
       in
-      [%log internal] "Apply_staged_ledger_diff_done" ;
       match res with
       | None ->
           Interruptible.return None
       | Some
           ( diff
-          , next_staged_ledger_hash
-          , ledger_proof_opt
-          , is_new_stack
-          , pending_coinbase_update ) ->
+          , ( `Hash_after_applying next_staged_ledger_hash
+            , `Ledger_proof ledger_proof_opt
+            , `Pending_coinbase_update (is_new_stack, pending_coinbase_update)
+            ) ) ->
           let%bind protocol_state, consensus_transition_data =
             lift_sync (fun () ->
                 let previous_ledger_hash =
@@ -343,7 +331,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 in
                 let ledger_proof_statement =
                   match ledger_proof_opt with
-                  | Some (proof, _) ->
+                  | Some proof ->
                       Ledger_proof.statement proof
                   | None ->
                       let state =
@@ -358,7 +346,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 in
                 let supply_increase =
                   Option.value_map ledger_proof_opt
-                    ~f:(fun (proof, _) ->
+                    ~f:(fun proof ->
                       (Ledger_proof.statement proof).supply_increase )
                     ~default:Currency.Amount.Signed.zero
                 in
@@ -407,9 +395,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                       ~prover_state:
                         (Consensus.Data.Block_data.prover_state block_data)
                       ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
-                      ~ledger_proof:
-                        (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
-                             proof ) ) )
+                      ~ledger_proof:ledger_proof_opt )
               in
               let witness =
                 { Pending_coinbase_witness.pending_coinbases =

@@ -1358,11 +1358,23 @@ module T = struct
            ~supercharge_coinbase sl_diff
       |> Deferred.return
     in
-    apply_diff t
-      (transform_prediff_info ?precomputed prediff)
-      ~constraint_constants ~global_slot ~logger ~current_state_view
-      ~state_and_body_hash ~log_prefix:"apply_diff_unchecked"
-      ~zkapp_cmd_limit_hardcap
+    let%map ( `Hash_after_applying staged_ledger_hash
+            , `Ledger_proof ledger_proof
+            , `Staged_ledger new_staged_ledger
+            , `Pending_coinbase_update pending_coinbase_update ) =
+      apply_diff t
+        (transform_prediff_info ?precomputed prediff)
+        ~constraint_constants ~global_slot ~logger ~current_state_view
+        ~state_and_body_hash ~log_prefix:"apply_diff_unchecked"
+        ~zkapp_cmd_limit_hardcap
+    in
+    (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
+    ignore
+    @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
+         (ledger new_staged_ledger) ;
+    ( `Hash_after_applying staged_ledger_hash
+    , `Ledger_proof (Option.map ~f:fst ledger_proof)
+    , `Pending_coinbase_update pending_coinbase_update )
 
   module Resources = struct
     module Discarded = struct
