@@ -783,6 +783,10 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               ~proof_level:Genesis_constants.Compiled.proof_level config_files
               ~genesis_constants ~constraint_constants ~cli_proof_level
           in
+
+          constraint_constants.block_window_duration_ms |> Float.of_int
+          |> Time.Span.of_ms |> Mina_metrics.initialize_all ;
+
           let rev_daemon_configs =
             List.rev_filter_map config_jsons
               ~f:(fun (config_file, config_json) ->
@@ -1290,6 +1294,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ; time_controller
               ; pubsub_v1
               ; pubsub_v0
+              ; block_window_duration = compile_config.block_window_duration
               }
           in
           let net_config =
