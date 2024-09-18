@@ -44,8 +44,8 @@ let keyId =
       ->  merge
             { Local = None Text
             , PackagesO1Test = None Text
-            , Unstable = Some "102473394ACD294847ADCB01A322CBF05E3997CD"
-            , Nightly = Some "102473394ACD294847ADCB01A322CBF05E3997CD"
+            , Unstable = Some "B40D16B1A4773DE415DAF9DBFE236881C07523DC"
+            , Nightly = Some "B40D16B1A4773DE415DAF9DBFE236881C07523DC"
             }
             repo
 
