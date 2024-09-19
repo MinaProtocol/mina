@@ -87,6 +87,9 @@ let%test_module "transaction_status" =
 
     let pool_max_size = precomputed_values.genesis_constants.txpool_max_size
 
+    let block_window_duration =
+      Mina_compile_config.For_unit_tests.t.block_window_duration
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
@@ -124,6 +127,7 @@ let%test_module "transaction_status" =
           ~consensus_constants:precomputed_values.consensus_constants
           ~time_controller ~logger ~frontier_broadcast_pipe
           ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
+          ~block_window_duration
       in
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
