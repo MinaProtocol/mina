@@ -58,57 +58,57 @@ module Transaction_with_witness = struct
     end
   end]
 
-  let statement_of_optional :
-      Transaction_with_optional_witness.Full.t -> Transaction_snark.Statement.t
-      =
-   fun { statement =
-           { connecting_ledger_left
-           ; connecting_ledger_right
-           ; supply_increase
-           ; fee_excess
-           }
-       ; first_pass
-       ; second_pass
-       ; pending_coinbase_stack_source
-       ; pending_coinbase_stack_target
-       ; _
-       } ->
+  let statement_of_optional ~connecting_ledger
+      { Transaction_with_optional_witness.statement =
+          { supply_increase; fee_excess }
+      ; first_pass
+      ; second_pass
+      ; pending_coinbase_stack_source
+      ; pending_coinbase_stack_target
+      ; _
+      } =
     let empty_local_state = Mina_state.Local_state.empty () in
-    { connecting_ledger_left
-    ; connecting_ledger_right
-    ; supply_increase
-    ; sok_digest = ()
-    ; fee_excess
-    ; source =
-        { first_pass_ledger = first_pass.source_hash
-        ; second_pass_ledger = second_pass.source_hash
-        ; pending_coinbase_stack = pending_coinbase_stack_source
-        ; local_state = empty_local_state
-        }
-    ; target =
-        { first_pass_ledger = first_pass.target_hash
-        ; second_pass_ledger = second_pass.target_hash
-        ; pending_coinbase_stack = pending_coinbase_stack_target
-        ; local_state = empty_local_state
-        }
-    }
+    ( { connecting_ledger_left = connecting_ledger
+      ; connecting_ledger_right = connecting_ledger
+      ; supply_increase
+      ; sok_digest = ()
+      ; fee_excess
+      ; source =
+          { first_pass_ledger =
+              first_pass.Transaction_with_optional_witness.source_hash
+          ; second_pass_ledger = second_pass.source_hash
+          ; pending_coinbase_stack = pending_coinbase_stack_source
+          ; local_state = empty_local_state
+          }
+      ; target =
+          { first_pass_ledger = first_pass.target_hash
+          ; second_pass_ledger = second_pass.target_hash
+          ; pending_coinbase_stack = pending_coinbase_stack_target
+          ; local_state = empty_local_state
+          }
+      }
+      : Transaction_snark.Statement.t )
 
-  let of_optional : Transaction_with_optional_witness.Full.t -> t =
-   fun ( { transaction_with_info
-         ; state_hash
-         ; init_stack
-         ; first_pass
-         ; second_pass
-         ; block_global_slot
-         ; _
-         } as tx ) ->
-    { transaction_with_info
+  let of_optional ~connecting_ledger
+      ( { Transaction_with_optional_witness.transaction_with_info = varying
+        ; state_hash
+        ; init_stack
+        ; first_pass
+        ; second_pass
+        ; block_global_slot
+        ; _
+        } as tx ) =
+    { transaction_with_info =
+        { Ledger.Transaction_applied.varying
+        ; previous_hash =
+            first_pass.Transaction_with_optional_witness.source_hash
+        }
     ; state_hash
     ; init_stack
     ; block_global_slot
     ; first_pass_ledger_witness = first_pass.witness
     ; second_pass_ledger_witness = second_pass.witness
-    ; statement = statement_of_optional tx
+    ; statement = statement_of_optional ~connecting_ledger tx
     }
 end
 
@@ -276,7 +276,7 @@ let create_expected_statement ~constraint_constants
     @@ Sparse_ledger.merkle_root second_pass_ledger_witness
   in
   let { With_status.data = transaction; status = _ } =
-    Ledger.Transaction_applied.transaction transaction_with_info
+    Ledger.Transaction_applied.transaction transaction_with_info.varying
   in
   let%bind protocol_state = get_state (fst state_hash) in
   let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
@@ -756,7 +756,7 @@ module Transactions_ordered = struct
                    ->
                   let txn =
                     Ledger.Transaction_applied.transaction
-                      txn_with_witness.transaction_with_info
+                      txn_with_witness.transaction_with_info.varying
                   in
                   let target_first_pass_ledger =
                     txn_with_witness.statement.target.first_pass_ledger
@@ -825,7 +825,7 @@ let extract_txn_and_global_slot (txn_with_witness : Transaction_with_witness.t)
     =
   let txn =
     Ledger.Transaction_applied.transaction
-      txn_with_witness.transaction_with_info
+      txn_with_witness.transaction_with_info.varying
   in
   let state_hash = fst txn_with_witness.state_hash in
   let global_slot = txn_with_witness.block_global_slot in
@@ -1034,7 +1034,6 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
           in
           Ledger.Transaction_partially_applied.Zkapp_command
             { command = t.command
-            ; previous_hash = t.previous_hash
             ; original_first_pass_account_states
             ; constraint_constants = t.constraint_constants
             ; state_view = t.state_view
@@ -1042,17 +1041,11 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
             ; local_state
             }
       | Signed_command c ->
-          return
-            (Ledger.Transaction_partially_applied.Signed_command
-               { previous_hash = c.previous_hash; applied = c.applied } )
+          return (Ledger.Transaction_partially_applied.Signed_command c)
       | Fee_transfer f ->
-          return
-            (Ledger.Transaction_partially_applied.Fee_transfer
-               { previous_hash = f.previous_hash; applied = f.applied } )
+          return (Ledger.Transaction_partially_applied.Fee_transfer f)
       | Coinbase c ->
-          return
-            (Ledger.Transaction_partially_applied.Coinbase
-               { previous_hash = c.previous_hash; applied = c.applied } )
+          return (Ledger.Transaction_partially_applied.Coinbase c)
     in
     let rec apply_txns_to_witnesses_first_pass ?(acc = []) ~k txns =
       match txns with
@@ -1096,7 +1089,7 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
             (List.filter txns ~f:(fun txn ->
                  match
                    (Ledger.Transaction_applied.transaction
-                      txn.transaction_with_info )
+                      txn.transaction_with_info.varying )
                      .data
                  with
                  | Command (Zkapp_command _) ->

@@ -87,8 +87,8 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
 
     let get_at_index_exn (T ((module Base), t)) = Base.get_at_index_exn t
 
-    let set_batch ?hash_cache (T ((module Base), t)) =
-      Base.set_batch ?hash_cache t
+    let set_batch ?compute_hash_cache (T ((module Base), t)) =
+      Base.set_batch ?compute_hash_cache t
 
     let set (T ((module Base), t)) = Base.set t
 

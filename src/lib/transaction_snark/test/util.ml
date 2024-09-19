@@ -220,7 +220,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                     ; sok_digest = ()
                     }
                   in
-                  (applied_txn.varying, Some stmt)
+                  (applied_txn, Some stmt)
               in
               match applied with
               | Command (Zkapp_command { command; _ }) -> (

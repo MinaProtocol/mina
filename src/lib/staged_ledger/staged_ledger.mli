@@ -93,7 +93,7 @@ module Scan_state : sig
     -> apply_second_pass:
          (   Ledger.t
           -> Ledger.Transaction_partially_applied.t
-          -> Ledger.Transaction_applied.t Or_error.t )
+          -> Ledger.Transaction_applied.Varying.t Or_error.t )
     -> apply_first_pass_sparse_ledger:
          (   global_slot:Mina_numbers.Global_slot_since_genesis.t
           -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
@@ -121,7 +121,7 @@ module Scan_state : sig
     -> apply_second_pass:
          (   Ledger.t
           -> Ledger.Transaction_partially_applied.t
-          -> Ledger.Transaction_applied.t Or_error.t )
+          -> Ledger.Transaction_applied.Varying.t Or_error.t )
     -> apply_first_pass_sparse_ledger:
          (   global_slot:Mina_numbers.Global_slot_since_genesis.t
           -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
@@ -363,7 +363,6 @@ module Test_helpers : sig
            | `Update_two of
              Pending_coinbase.Stack_versioned.t
              * Pending_coinbase.Stack_versioned.t ]
-         * [> `First_pass_ledger_end of Frozen_ledger_hash.t ]
        , Staged_ledger_error.t )
        Result.t
 end

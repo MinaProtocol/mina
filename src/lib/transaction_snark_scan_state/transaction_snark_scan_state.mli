@@ -27,7 +27,10 @@ module Transaction_with_witness : sig
     }
   [@@deriving sexp]
 
-  val of_optional : Transaction_with_optional_witness.Full.t -> t
+  val of_optional :
+       connecting_ledger:Ledger_hash.t
+    -> Transaction_with_optional_witness.Full.t
+    -> t
 end
 
 module Ledger_proof_with_sok_message : sig
@@ -138,7 +141,7 @@ val get_snarked_ledger_sync :
   -> apply_second_pass:
        (   Ledger.t
         -> Ledger.Transaction_partially_applied.t
-        -> Ledger.Transaction_applied.t Or_error.t )
+        -> Ledger.Transaction_applied.Varying.t Or_error.t )
   -> apply_first_pass_sparse_ledger:
        (   global_slot:Mina_numbers.Global_slot_since_genesis.t
         -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
@@ -163,7 +166,7 @@ val get_snarked_ledger_async :
   -> apply_second_pass:
        (   Ledger.t
         -> Ledger.Transaction_partially_applied.t
-        -> Ledger.Transaction_applied.t Or_error.t )
+        -> Ledger.Transaction_applied.Varying.t Or_error.t )
   -> apply_first_pass_sparse_ledger:
        (   global_slot:Mina_numbers.Global_slot_since_genesis.t
         -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
@@ -195,7 +198,7 @@ val get_staged_ledger_async :
   -> apply_second_pass:
        (   Ledger.t
         -> Ledger.Transaction_partially_applied.t
-        -> Ledger.Transaction_applied.t Or_error.t )
+        -> Ledger.Transaction_applied.Varying.t Or_error.t )
   -> apply_first_pass_sparse_ledger:
        (   global_slot:Mina_numbers.Global_slot_since_genesis.t
         -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t

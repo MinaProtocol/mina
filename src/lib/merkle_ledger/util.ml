@@ -45,6 +45,14 @@ module type Inputs_intf = sig
     -> Base.t
     -> (Account_id.t * Location.t) Mina_stdlib.Nonempty_list.t
     -> unit
+
+  val compute_hash_cache :
+       Base.t
+    -> (unit -> Hash.t Location.Addr.Map.t)
+       * (   unit
+          -> (Account.t option * Location.t) list * Hash.t Location.Addr.Map.t
+         )
+    -> (Account.t -> bool) * Hash.t Location.Addr.Map.t option
 end
 
 module Make (Inputs : Inputs_intf) : sig
@@ -57,7 +65,11 @@ module Make (Inputs : Inputs_intf) : sig
     Inputs.Base.t -> (Inputs.Location.t * Inputs.Hash.t) list -> unit
 
   val set_batch :
-       ?hash_cache:Inputs.Hash.t Inputs.Location.Addr.Map.t
+       ?compute_hash_cache:
+         (unit -> Inputs.Hash.t Inputs.Location.Addr.Map.t)
+         * (   unit
+            -> (Inputs.Account.t option * Inputs.Location.t) list
+               * Inputs.Hash.t Inputs.Location.Addr.Map.t )
     -> Inputs.Base.t
     -> (Inputs.Location.t * Inputs.Account.t) list
     -> unit
@@ -207,17 +219,27 @@ end = struct
 
   (* TODO: When we do batch on a database, we should add accounts, locations and hashes
      simulatenously for full atomicity. *)
-  let set_batch ?hash_cache t locations_and_accounts =
+  let set_batch ?compute_hash_cache t locations_and_accounts =
+    let predicate, hash_cache =
+      Option.value_map compute_hash_cache
+        ~f:(Inputs.compute_hash_cache t)
+        ~default:(Fn.const true, None)
+    in
     set_raw_addresses t locations_and_accounts ;
     Inputs.set_raw_account_batch t locations_and_accounts ;
-    set_hash_batch ?hash_cache t
-    @@ List.map locations_and_accounts ~f:(fun (location, account) ->
-           let addr = Inputs.Location.to_path_exn location in
-           let account_hash =
-             lookup_hash ?hash_cache location ~compute:(fun () ->
-                 Inputs.Hash.hash_account account )
-           in
-           (Inputs.location_of_hash_addr addr, account_hash) )
+    let locations_and_account_hashes =
+      List.filter_map
+        ~f:(fun (location, account) ->
+          let%map.Option () = Option.some_if (predicate account) () in
+          let addr = Inputs.Location.to_path_exn location in
+          let account_hash =
+            lookup_hash ?hash_cache location ~compute:(fun () ->
+                Inputs.Hash.hash_account account )
+          in
+          (Inputs.location_of_hash_addr addr, account_hash) )
+        locations_and_accounts
+    in
+    set_hash_batch ?hash_cache t locations_and_account_hashes
 
   let set_batch_accounts t addresses_and_accounts =
     set_batch t

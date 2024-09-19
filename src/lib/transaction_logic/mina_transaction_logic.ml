@@ -149,9 +149,7 @@ module Transaction_applied = struct
     end
   end]
 
-  let burned_tokens : t -> Currency.Amount.t =
-   fun { varying; _ } ->
-    match varying with
+  let burned_tokens : Varying.t -> Currency.Amount.t = function
     | Command _ ->
         Currency.Amount.zero
     | Fee_transfer f ->
@@ -159,9 +157,7 @@ module Transaction_applied = struct
     | Coinbase c ->
         c.burned_tokens
 
-  let new_accounts : t -> Account_id.t list =
-   fun { varying; _ } ->
-    match varying with
+  let new_accounts : Varying.t -> Account_id.t list = function
     | Command c -> (
         match c with
         | Signed_command sc ->
@@ -175,7 +171,7 @@ module Transaction_applied = struct
 
   let supply_increase :
          constraint_constants:Genesis_constants.Constraint_constants.t
-      -> t
+      -> Varying.t
       -> Currency.Amount.Signed.t Or_error.t =
    fun ~constraint_constants t ->
     let open Or_error.Let_syntax in
@@ -192,7 +188,7 @@ module Transaction_applied = struct
         @@ of_nanomina_int_exn (account_creation_fee_int * num_accounts_created))
     in
     let txn : Transaction.t =
-      match t.varying with
+      match t with
       | Command
           (Signed_command { common = { user_command = { data; _ }; _ }; _ }) ->
           Command (Signed_command data)
@@ -324,18 +320,18 @@ module type S = sig
       { previous_hash : Ledger_hash.t; varying : Varying.t }
     [@@deriving sexp]
 
-    val burned_tokens : t -> Currency.Amount.t
+    val burned_tokens : Varying.t -> Currency.Amount.t
 
     val supply_increase :
          constraint_constants:Genesis_constants.Constraint_constants.t
-      -> t
+      -> Varying.t
       -> Currency.Amount.Signed.t Or_error.t
 
-    val transaction : t -> Transaction.t With_status.t
+    val transaction : Varying.t -> Transaction.t With_status.t
 
-    val transaction_status : t -> Transaction_status.t
+    val transaction_status : Varying.t -> Transaction_status.t
 
-    val new_accounts : t -> Account_id.t list
+    val new_accounts : Varying.t -> Account_id.t list
   end
 
   module Global_state : sig
@@ -354,7 +350,6 @@ module type S = sig
     module Zkapp_command_partially_applied : sig
       type t =
         { command : Zkapp_command.t
-        ; previous_hash : Ledger_hash.t
         ; original_first_pass_account_states :
             (Account_id.t * (location * Account.t) option) list
         ; constraint_constants : Genesis_constants.Constraint_constants.t
@@ -373,15 +368,11 @@ module type S = sig
         }
     end
 
-    type 'applied fully_applied =
-      { previous_hash : Ledger_hash.t; applied : 'applied }
-
     type t =
-      | Signed_command of
-          Transaction_applied.Signed_command_applied.t fully_applied
+      | Signed_command of Transaction_applied.Signed_command_applied.t
       | Zkapp_command of Zkapp_command_partially_applied.t
-      | Fee_transfer of Transaction_applied.Fee_transfer_applied.t fully_applied
-      | Coinbase of Transaction_applied.Coinbase_applied.t fully_applied
+      | Fee_transfer of Transaction_applied.Fee_transfer_applied.t
+      | Coinbase of Transaction_applied.Coinbase_applied.t
 
     val command : t -> Transaction.t
   end
@@ -551,7 +542,7 @@ module type S = sig
        ?precomputed:precomputed_t
     -> ledger
     -> Transaction_partially_applied.t
-    -> Transaction_applied.t Or_error.t
+    -> Transaction_applied.Varying.t Or_error.t
 
   val apply_transactions :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -560,6 +551,14 @@ module type S = sig
     -> ledger
     -> Transaction.t list
     -> Transaction_applied.t list Or_error.t
+
+  val apply_transactions_light :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
+    -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
+    -> ledger
+    -> Transaction.t list
+    -> Transaction_applied.Varying.t list Or_error.t
 
   val has_locked_tokens :
        global_slot:Global_slot_since_genesis.t
@@ -782,9 +781,7 @@ module Make (L : Ledger_intf.S) :
   module Transaction_applied = struct
     include Transaction_applied
 
-    let transaction : t -> Transaction.t With_status.t =
-     fun { varying; _ } ->
-      match varying with
+    let transaction : Varying.t -> Transaction.t With_status.t = function
       | Command (Signed_command uc) ->
           With_status.map uc.common.user_command ~f:(fun cmd ->
               Transaction.Command (User_command.Signed_command cmd) )
@@ -797,9 +794,7 @@ module Make (L : Ledger_intf.S) :
       | Coinbase c ->
           With_status.map c.coinbase ~f:(fun c -> Transaction.Coinbase c)
 
-    let transaction_status : t -> Transaction_status.t =
-     fun { varying; _ } ->
-      match varying with
+    let transaction_status : Varying.t -> Transaction_status.t = function
       | Command
           (Signed_command { common = { user_command = { status; _ }; _ }; _ })
         ->
@@ -1142,7 +1137,6 @@ module Make (L : Ledger_intf.S) :
     module Zkapp_command_partially_applied = struct
       type t =
         { command : Zkapp_command.t
-        ; previous_hash : Ledger_hash.t
         ; original_first_pass_account_states :
             (Account_id.t * (location * Account.t) option) list
         ; constraint_constants : Genesis_constants.Constraint_constants.t
@@ -1161,28 +1155,24 @@ module Make (L : Ledger_intf.S) :
         }
     end
 
-    type 'applied fully_applied =
-      { previous_hash : Ledger_hash.t; applied : 'applied }
-
     (* TODO: lift previous_hash up in the types *)
     type t =
-      | Signed_command of
-          Transaction_applied.Signed_command_applied.t fully_applied
+      | Signed_command of Transaction_applied.Signed_command_applied.t
       | Zkapp_command of Zkapp_command_partially_applied.t
-      | Fee_transfer of Transaction_applied.Fee_transfer_applied.t fully_applied
-      | Coinbase of Transaction_applied.Coinbase_applied.t fully_applied
+      | Fee_transfer of Transaction_applied.Fee_transfer_applied.t
+      | Coinbase of Transaction_applied.Coinbase_applied.t
 
     let command (t : t) : Transaction.t =
       match t with
       | Signed_command s ->
           Transaction.Command
-            (User_command.Signed_command s.applied.common.user_command.data)
+            (User_command.Signed_command s.common.user_command.data)
       | Zkapp_command z ->
           Command (User_command.Zkapp_command z.command)
       | Fee_transfer f ->
-          Fee_transfer f.applied.fee_transfer.data
+          Fee_transfer f.fee_transfer.data
       | Coinbase c ->
-          Coinbase c.applied.coinbase.data
+          Coinbase c.coinbase.data
   end
 
   module Inputs = struct
@@ -2056,7 +2046,6 @@ module Make (L : Ledger_intf.S) :
       * user_acc )
       Or_error.t =
     let open Or_error.Let_syntax in
-    let previous_hash = merkle_root ledger in
     let original_first_pass_account_states =
       let id = Zkapp_command.fee_payer command in
       [ ( id
@@ -2127,7 +2116,6 @@ module Make (L : Ledger_intf.S) :
             { perform } initial_state )
     in
     ( { Transaction_partially_applied.Zkapp_command_partially_applied.command
-      ; previous_hash
       ; original_first_pass_account_states
       ; constraint_constants
       ; state_view
@@ -2619,7 +2607,6 @@ module Make (L : Ledger_intf.S) :
       ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t) ?precomputed
       ledger (t : Transaction.t) : Transaction_partially_applied.t Or_error.t =
     let open Or_error.Let_syntax in
-    let previous_hash = merkle_root ledger in
     let txn_global_slot = global_slot in
     match t with
     | Command (Signed_command txn) ->
@@ -2627,7 +2614,7 @@ module Make (L : Ledger_intf.S) :
           apply_user_command_unchecked ~constraint_constants ~txn_global_slot
             ?precomputed ledger txn
         in
-        Transaction_partially_applied.Signed_command { previous_hash; applied }
+        Transaction_partially_applied.Signed_command applied
     | Command (Zkapp_command txn) ->
         let%map partially_applied =
           apply_zkapp_command_first_pass ~global_slot ~state_view:txn_state_view
@@ -2638,42 +2625,60 @@ module Make (L : Ledger_intf.S) :
         let%map applied =
           apply_fee_transfer ~constraint_constants ~txn_global_slot ledger t
         in
-        Transaction_partially_applied.Fee_transfer { previous_hash; applied }
+        Transaction_partially_applied.Fee_transfer applied
     | Coinbase t ->
         let%map applied =
           apply_coinbase ~constraint_constants ~txn_global_slot ledger t
         in
-        Transaction_partially_applied.Coinbase { previous_hash; applied }
+        Transaction_partially_applied.Coinbase applied
 
   let apply_transaction_second_pass ?precomputed ledger
-      (t : Transaction_partially_applied.t) : Transaction_applied.t Or_error.t =
+      (t : Transaction_partially_applied.t) :
+      Transaction_applied.Varying.t Or_error.t =
     let open Or_error.Let_syntax in
     let open Transaction_applied in
     match t with
-    | Signed_command { previous_hash; applied } ->
-        return
-          { previous_hash; varying = Varying.Command (Signed_command applied) }
+    | Signed_command applied ->
+        return @@ Varying.Command (Signed_command applied)
     | Zkapp_command partially_applied ->
         (* TODO: either here or in second phase of apply, need to update the prior global state statement for the fee payer segment to add the second phase ledger at the end *)
         let%map applied =
           apply_zkapp_command_second_pass ?precomputed ledger partially_applied
         in
-        { previous_hash = partially_applied.previous_hash
-        ; varying = Varying.Command (Zkapp_command applied)
-        }
-    | Fee_transfer { previous_hash; applied } ->
-        return { previous_hash; varying = Varying.Fee_transfer applied }
-    | Coinbase { previous_hash; applied } ->
-        return { previous_hash; varying = Varying.Coinbase applied }
+        Varying.Command (Zkapp_command applied)
+    | Fee_transfer applied ->
+        return @@ Varying.Fee_transfer applied
+    | Coinbase applied ->
+        return @@ Varying.Coinbase applied
+
+  let apply_transactions_light ~constraint_constants ~global_slot
+      ~txn_state_view ledger txns =
+    let open Or_error.Let_syntax in
+    let first_pass =
+      apply_transaction_first_pass ~constraint_constants ~global_slot
+        ~txn_state_view ledger
+    in
+    let second_pass = apply_transaction_second_pass ledger in
+    Mina_stdlib.Result.List.map txns ~f:first_pass
+    >>= Mina_stdlib.Result.List.map ~f:second_pass
 
   let apply_transactions ~constraint_constants ~global_slot ~txn_state_view
       ledger txns =
-    let open Or_error in
-    Mina_stdlib.Result.List.map txns
-      ~f:
-        (apply_transaction_first_pass ~constraint_constants ~global_slot
-           ~txn_state_view ledger )
-    >>= Mina_stdlib.Result.List.map ~f:(apply_transaction_second_pass ledger)
+    let open Or_error.Let_syntax in
+    let first_pass txn =
+      let previous_hash = merkle_root ledger in
+      let%map preapplied =
+        apply_transaction_first_pass ~constraint_constants ~global_slot
+          ~txn_state_view ledger txn
+      in
+      (previous_hash, preapplied)
+    in
+    let second_pass (previous_hash, txn) =
+      let%map varying = apply_transaction_second_pass ledger txn in
+      { Transaction_applied.previous_hash; varying }
+    in
+    Mina_stdlib.Result.List.map txns ~f:first_pass
+    >>= Mina_stdlib.Result.List.map ~f:second_pass
 
   module For_tests = struct
     module Stack = Inputs.Stack

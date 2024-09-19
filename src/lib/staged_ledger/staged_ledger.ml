@@ -544,8 +544,8 @@ module T = struct
         ; init_stack = new_init_stack
         } )
 
-    let single_transaction_second_pass ~constraint_constants ~connecting_ledger
-        ?precomputed ledger state_and_body_hash ~global_slot pre_stmt =
+    let single_transaction_second_pass ~constraint_constants ?precomputed ledger
+        state_and_body_hash ~global_slot pre_stmt =
       let open Result.Let_syntax in
       let source_witness =
         W.compute_source
@@ -586,12 +586,7 @@ module T = struct
         ; first_pass = pre_stmt.witness
         ; second_pass = witness
         ; init_stack = pre_stmt.init_stack
-        ; statement =
-            { connecting_ledger_left = connecting_ledger
-            ; connecting_ledger_right = connecting_ledger
-            ; fee_excess = pre_stmt.fee_excess
-            ; supply_increase
-            }
+        ; statement = { fee_excess = pre_stmt.fee_excess; supply_increase }
         ; block_global_slot = global_slot
         ; pending_coinbase_stack_source = pre_stmt.pending_coinbase_stack_source
         ; pending_coinbase_stack_target = pre_stmt.pending_coinbase_stack_target
@@ -626,14 +621,12 @@ module T = struct
 
     let transactions_second_pass ~constraint_constants ~global_slot ledger
         state_and_body_hash pre_stmts =
-      let connecting_ledger = Ledger.merkle_root ledger in
       List.fold_left pre_stmts ~init:(Result.Ok [])
         ~f:(fun res (pre_stmt, precomputed) ->
           let%bind.Result acc = res in
           let%map.Result el =
-            single_transaction_second_pass ~constraint_constants
-              ~connecting_ledger ~global_slot ?precomputed ledger
-              state_and_body_hash pre_stmt
+            single_transaction_second_pass ~constraint_constants ~global_slot
+              ?precomputed ledger state_and_body_hash pre_stmt
           in
           el :: acc )
       |> Result.map ~f:List.rev
@@ -673,15 +666,11 @@ module T = struct
       let pre_stmts_with_precomputed =
         List.zip_exn (pre_stmts1 @ pre_stmts2) all_precomputed
       in
-      let first_pass_ledger_end = Ledger.merkle_root ledger in
       let%map txns_with_witnesses =
         transactions_second_pass ~constraint_constants ~global_slot ledger
           state_and_body_hash pre_stmts_with_precomputed
       in
-      ( txns_with_witnesses
-      , updated_stack1
-      , updated_stack2
-      , first_pass_ledger_end )
+      (txns_with_witnesses, updated_stack1, updated_stack2)
 
     let update_coinbase_stack_and_get_data_impl ~logger ~constraint_constants
         ~global_slot ~first_partition_slots:slots ~no_second_partition
@@ -707,7 +696,7 @@ module T = struct
         in
         [%log internal] "Update_ledger_and_get_statements"
           ~metadata:[ ("partition", `String "single") ] ;
-        let%map data, updated_stack, _, first_pass_ledger_end =
+        let%map data, updated_stack, _ =
           update_ledger_and_get_statements ~constraint_constants ~global_slot
             ledger working_stack (transactions, None) current_state_view
             state_and_body_hash
@@ -722,8 +711,7 @@ module T = struct
         ( is_new_stack
         , data
         , Pending_coinbase.Update.Action.Update_one
-        , `Update_one updated_stack
-        , `First_pass_ledger_end first_pass_ledger_end ) )
+        , `Update_one updated_stack ) )
       else
         (*Two partition:
           Assumption: Only one of the partition will have coinbase transaction(s)in it.
@@ -740,7 +728,7 @@ module T = struct
         let txns_for_partition2 = List.drop transactions slots in
         [%log internal] "Update_ledger_and_get_statements"
           ~metadata:[ ("partition", `String "both") ] ;
-        let%map data, updated_stack1, updated_stack2, first_pass_ledger_end =
+        let%map data, updated_stack1, updated_stack2 =
           update_ledger_and_get_statements ~constraint_constants ~global_slot
             ledger working_stack1
             (txns_for_partition1, Some txns_for_partition2)
@@ -775,11 +763,7 @@ module T = struct
             ; ("txns_for_partition1_len", `Int (List.length txns_for_partition1))
             ; ("txns_for_partition2_len", `Int (List.length txns_for_partition2))
             ] ;
-        ( false
-        , data
-        , pending_coinbase_action
-        , stack_update
-        , `First_pass_ledger_end first_pass_ledger_end )
+        (false, data, pending_coinbase_action, stack_update)
 
     let update_coinbase_stack_and_get_data ~logger ~constraint_constants
         ~global_slot scan_state ledger pending_coinbase_collection transactions
@@ -796,12 +780,8 @@ module T = struct
           state_and_body_hash
       else (
         [%log internal] "Update_coinbase_stack_done" ;
-        Ok
-          ( false
-          , []
-          , Pending_coinbase.Update.Action.Update_none
-          , `Update_none
-          , `First_pass_ledger_end (Ledger.merkle_root ledger) ) )
+        Ok (false, [], Pending_coinbase.Update.Action.Update_none, `Update_none)
+        )
   end
 
   (** Checks if the work has already been verified before by the snark pool logic *)
@@ -1020,11 +1000,7 @@ module T = struct
         ; ("proofs_waiting", `Int proofs_waiting)
         ; ("max_throughput", `Int max_throughput)
         ] ;
-    let%bind ( is_new_stack
-             , _
-             , stack_update_in_snark
-             , stack_update
-             , `First_pass_ledger_end first_pass_ledger_end ) =
+    let%bind is_new_stack, _, stack_update_in_snark, stack_update =
       O1trace.sync_thread "update_coinbase_stack_start_time" (fun () ->
           Apply_light.update_coinbase_stack_and_get_data ~logger
             ~constraint_constants ~global_slot scan_state new_ledger
@@ -1052,7 +1028,7 @@ module T = struct
     ( is_new_stack
     , stack_update_in_snark
     , stack_update
-    , `First_pass_ledger_end first_pass_ledger_end
+    , `First_pass_ledger_end ()
     , ledger_proof )
 
   let update_ledger_and_scan_state_full ~constraint_constants ~global_slot
@@ -1071,19 +1047,27 @@ module T = struct
         ; ("proofs_waiting", `Int proofs_waiting)
         ; ("max_throughput", `Int max_throughput)
         ] ;
-    let%bind ( is_new_stack
-             , data
-             , stack_update_in_snark
-             , stack_update
-             , `First_pass_ledger_end first_pass_ledger_end ) =
+    let%bind is_new_stack, data, stack_update_in_snark, stack_update =
       O1trace.sync_thread "update_coinbase_stack_start_time" (fun () ->
           Apply_full.update_coinbase_stack_and_get_data ~logger
             ~constraint_constants ~global_slot scan_state new_ledger
             pending_coinbase_collection transactions current_state_view
             state_and_body_hash )
     in
+    let first_pass_ledger_end =
+      match List.last data with
+      | None ->
+          Ledger.merkle_root new_ledger
+      | Some { first_pass = { target_hash; _ }; _ } ->
+          target_hash
+    in
     let data =
-      List.map ~f:Scan_state.Transaction_with_witness.of_optional data
+      (* Connecting ledger is a ledger hash at the start of second pass (before the first transaction is applied in second pass) *)
+      let f =
+        Scan_state.Transaction_with_witness.of_optional
+          ~connecting_ledger:first_pass_ledger_end
+      in
+      List.map ~f data
     in
     [%log internal] "Fill_work_and_enqueue_transactions" ;
     let%map ledger_proof, scan_state' =
@@ -1421,7 +1405,8 @@ module T = struct
     in
     let%map ( is_new_stack
             , stack_update_in_snark
-            , _
+            , _first_pass_ledger_end
+              (* TODO after replacing update_ledger_and_scan_state_full with update_ledger_and_scan_state_light, replace placeholder with () *)
             , ledger_proof
             , scan_state'
             , coinbase_amount

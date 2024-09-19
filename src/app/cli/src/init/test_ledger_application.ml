@@ -171,7 +171,7 @@ let apply_txs ~action_elements ~event_elements ~constraint_constants
       ~logger ~global_slot ledger pending_coinbase zkapps' prev_state_view
       (prev_protocol_state_hash, prev_protocol_state_body_hash)
   with
-  | Ok (b, _, _, _, _) ->
+  | Ok (b, _, _, _) ->
       let root = Ledger.merkle_root ledger in
       printf
         !"Result of application %d: %B (took %s): new root %s\n%!"

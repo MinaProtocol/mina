@@ -502,6 +502,9 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       in
       Kvdb.set_batch mdb.kvdb ~remove_keys:[]
         ~key_data_pairs:token_owner_changes
+
+    let compute_hash_cache _ (finalize_and_pass, _pass_unhashed) =
+      (Fn.const true, Some (finalize_and_pass ()))
   end)
 
   let set_hash mdb location new_hash =

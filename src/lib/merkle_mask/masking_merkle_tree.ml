@@ -374,6 +374,12 @@ module Make (Inputs : Inputs_intf.S) = struct
         in
         impl [] 0 init_tasks
 
+    let remove_unhashed_account_duplicates unhashed_accounts =
+      let on_snd f (_, a) (_, b) = f a b in
+      List.stable_sort ~compare:(on_snd Location.compare) unhashed_accounts
+      |> List.remove_consecutive_duplicates ~which_to_keep:`First
+           ~equal:(on_snd Location.equal)
+
     let finalize_hashes_do t unhashed_accounts =
       eprintf "finalizing hashes for %d accounts: %s\n"
         (List.length unhashed_accounts)
@@ -390,10 +396,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         |> List.map2_exn accs ~f:(fun (a, loc) p ->
                (a, Location.to_path_exn loc, p) )
       in
-      let on_snd f (_, a) (_, b) = f a b in
-      List.stable_sort ~compare:(on_snd Location.compare) unhashed_accounts
-      |> List.remove_consecutive_duplicates ~which_to_keep:`First
-           ~equal:(on_snd Location.equal)
+      remove_unhashed_account_duplicates unhashed_accounts
       |> with_merkle_path_batch |> compute_merge_hashes
       |> List.iter ~f:(Tuple2.uncurry @@ self_set_hash_impl t)
 
@@ -736,21 +739,20 @@ module Make (Inputs : Inputs_intf.S) = struct
       t.is_committing <- true ;
       assert_is_attached t ;
       let parent = get_parent t in
-      let old_root_hash = merkle_root t in
       let account_data = Map.to_alist t.maps.accounts in
-      finalize_hashes t ;
-      let hash_cache = t.maps.hashes in
+      let hashes = t.maps.hashes in
+      let finalize_and_pass () = finalize_hashes t ; hashes in
+      let pass_unhashed () =
+        let unhashed_accounts =
+          remove_unhashed_account_duplicates t.unhashed_accounts
+        in
+        t.unhashed_accounts <- [] ;
+        (unhashed_accounts, hashes)
+      in
       t.maps <- empty_maps ;
-      Base.set_batch ~hash_cache parent account_data ;
-      Debug_assert.debug_assert (fun () ->
-          [%test_result: Hash.t]
-            ~message:
-              "Parent merkle root after committing should be the same as the \
-               old one in the mask"
-            ~expect:old_root_hash (Base.merkle_root parent) ;
-          [%test_result: Hash.t]
-            ~message:"Merkle root of the mask should delegate to the parent now"
-            ~expect:(merkle_root t) (Base.merkle_root parent) ) ;
+      Base.set_batch
+        ~compute_hash_cache:(finalize_and_pass, pass_unhashed)
+        parent account_data ;
       t.is_committing <- false
 
     (* copy tables in t; use same parent *)
@@ -845,6 +847,21 @@ module Make (Inputs : Inputs_intf.S) = struct
               (derive_token_id t.derived_token_ids account_id)
               account_id ;
             self_set_account t location account )
+
+      let compute_hash_cache t (_finalize_and_pass, pass_unhashed) =
+        let unhashed_accounts, hashes = pass_unhashed () in
+        let unhashed_accounts_set =
+          List.filter_map
+            ~f:(Fn.compose (Option.map ~f:Inputs.Account.identifier) fst)
+            unhashed_accounts
+          |> Inputs.Account_id.Set.of_list
+        in
+        t.unhashed_accounts <- unhashed_accounts @ t.unhashed_accounts ;
+        ( (fun account ->
+            Inputs.Account.identifier account
+            |> Set.mem unhashed_accounts_set
+            |> not )
+        , Some hashes )
     end)
 
     let set_batch_accounts t addresses_and_accounts =

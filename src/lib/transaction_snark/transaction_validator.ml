@@ -21,6 +21,18 @@ let apply_user_command ~constraint_constants ~txn_global_slot l uc =
             .status )
         (Ledger.apply_user_command l' ~constraint_constants ~txn_global_slot uc) )
 
+let apply_transactions_light' ~constraint_constants ~global_slot ~txn_state_view
+    l t =
+  O1trace.sync_thread "apply_transaction" (fun () ->
+      within_mask l ~f:(fun l' ->
+          Ledger.apply_transactions_light ~constraint_constants ~global_slot
+            ~txn_state_view l' t ) )
+
+let apply_transactions_light ~constraint_constants ~global_slot ~txn_state_view
+    l txn =
+  apply_transactions_light' l ~constraint_constants ~global_slot ~txn_state_view
+    txn
+
 let apply_transactions' ~constraint_constants ~global_slot ~txn_state_view l t =
   O1trace.sync_thread "apply_transaction" (fun () ->
       within_mask l ~f:(fun l' ->

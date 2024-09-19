@@ -93,7 +93,7 @@ end = struct
 
   let get_at_index_exn _t = failwith "get_at_index_exn: null ledgers are empty"
 
-  let set_batch ?hash_cache:_ _t =
+  let set_batch ?compute_hash_cache:_ _t =
     failwith "set_batch: null ledgers cannot be mutated"
 
   let set _t = failwith "set: null ledgers cannot be mutated"

@@ -391,7 +391,12 @@ module Ledger = struct
     val set : t -> Location.t -> account -> unit
 
     val set_batch :
-      ?hash_cache:hash Addr.Map.t -> t -> (Location.t * account) list -> unit
+         ?compute_hash_cache:
+           (unit -> hash Addr.Map.t)
+           * (unit -> (account option * Location.t) list * hash Addr.Map.t)
+      -> t
+      -> (Location.t * account) list
+      -> unit
 
     val get_at_index_exn : t -> int -> account
 

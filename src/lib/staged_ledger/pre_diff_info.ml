@@ -382,7 +382,7 @@ let compute_statuses
     (List.length p1_txns, p1_txns @ p2_txns)
   in
   let%map txns_with_statuses =
-    Transaction_snark.Transaction_validator.apply_transactions
+    Transaction_snark.Transaction_validator.apply_transactions_light
       ~constraint_constants ~global_slot ~txn_state_view ledger txns
     |> Result.map_error ~f:(fun err -> Error.Unexpected err)
   in

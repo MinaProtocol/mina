@@ -45,6 +45,14 @@ module type Inputs_intf = sig
     -> Base.t
     -> (Account_id.t * Location.t) Mina_stdlib.Nonempty_list.t
     -> unit
+
+  val compute_hash_cache :
+       Base.t
+    -> (unit -> Hash.t Location.Addr.Map.t)
+       * (   unit
+          -> (Account.t option * Location.t) list * Hash.t Location.Addr.Map.t
+         )
+    -> (Account.t -> bool) * Hash.t Location.Addr.Map.t option
 end
 
 module Make (Inputs : Inputs_intf) : sig
@@ -57,7 +65,11 @@ module Make (Inputs : Inputs_intf) : sig
     Inputs.Base.t -> (Inputs.Location.t * Inputs.Hash.t) list -> unit
 
   val set_batch :
-       ?hash_cache:Inputs.Hash.t Inputs.Location.Addr.Map.t
+       ?compute_hash_cache:
+         (unit -> Inputs.Hash.t Inputs.Location.Addr.Map.t)
+         * (   unit
+            -> (Inputs.Account.t option * Inputs.Location.t) list
+               * Inputs.Hash.t Inputs.Location.Addr.Map.t )
     -> Inputs.Base.t
     -> (Inputs.Location.t * Inputs.Account.t) list
     -> unit
