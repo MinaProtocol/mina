@@ -967,7 +967,7 @@ func TestBitswapDownload(t *testing.T) {
 	}
 }
 
-func TestBitswapDownloadPrepoluated(t *testing.T) {
+func TestBitswapDownloadPrepopulated(t *testing.T) {
 	seed := time.Now().Unix()
 	t.Logf("Seed: %d", seed)
 	r := rand.New(rand.NewSource(seed))
