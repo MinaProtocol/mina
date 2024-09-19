@@ -253,7 +253,7 @@ func TestGetListeningAddrs(t *testing.T) {
 }
 
 func TestListen(t *testing.T) {
-	addrStr := "/ip4/127.0.0.2/tcp/8000"
+	addrStr := "/ip4/127.0.0.1/tcp/8000"
 
 	testApp, _ := newTestApp(t, nil, true)
 
