@@ -232,6 +232,27 @@ end = struct
 
   type query = Addr.t Query.t
 
+  (* TODO: parameterize *)
+  let subtree_depth : index = 4
+
+  (* Provides addresses at an specific depth from this address *)
+  let rec intermediate_range : index -> Addr.t -> index -> Addr.t list =
+   fun ledger_depth addr i ->
+    match i with
+    | 0 ->
+        [ addr ]
+    | i ->
+        let left, right =
+          Option.value_exn
+            ( Or_error.ok
+            @@ Or_error.both
+                 (Addr.child ~ledger_depth addr Direction.Left)
+                 (Addr.child ~ledger_depth addr Direction.Right) )
+        in
+        let left = intermediate_range ledger_depth left (i - 1) in
+        let right = intermediate_range ledger_depth right (i - 1) in
+        left @ right
+
   module Responder = struct
     type t =
       { mt : MT.t
@@ -352,10 +373,11 @@ end = struct
               (Num_accounts
                  (len, MT.get_inner_hash_at_addr_exn mt content_root_addr) )
         | Subtree a ->
-            (* TODO:giving error for now *)
-            Either.Second
-              ( Actions.Violated_protocol
-              , Some ("Error: $addr", [ ("addr", Addr.to_yojson a) ]) )
+            let ledger_depth = MT.depth mt in
+            let addresses = intermediate_range ledger_depth a subtree_depth in
+            let get_hash a = MT.get_inner_hash_at_addr_exn mt a in
+            let hashes = List.map addresses ~f:get_hash in
+            Either.First (Subtree hashes)
       in
 
       match response_or_punish with
@@ -454,27 +476,6 @@ end = struct
     let actual = MT.get_inner_hash_at_addr_exn t.tree addr in
     if Hash.equal actual expected then `Success
     else `Hash_mismatch (expected, actual)
-
-  (* TODO: parameterize *)
-  let subtree_depth : index = 4
-
-  (* Provides addresses at an specific depth from this address *)
-  let rec intermediate_range : index -> Addr.t -> index -> Addr.t list =
-   fun ledger_depth addr i ->
-    match i with
-    | 0 ->
-        [ addr ]
-    | i ->
-        let left, right =
-          Option.value_exn
-            ( Or_error.ok
-            @@ Or_error.both
-                 (Addr.child ~ledger_depth addr Direction.Left)
-                 (Addr.child ~ledger_depth addr Direction.Right) )
-        in
-        let left = intermediate_range ledger_depth left (i - 1) in
-        let right = intermediate_range ledger_depth right (i - 1) in
-        left @ right
 
   (* Merges each 2 contigous nodes, halving the size of the list *)
   let rec merge_siblings : Hash.t list -> index -> Hash.t list =
