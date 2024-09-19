@@ -27,6 +27,8 @@ module Query = struct
             (** What are the 2^k nodes at depth k from the given prefix 
             address **)
       (* TODO: Properly handle versioning *)
+      (* TODO: Consider additional query to verify subtree suport, for
+         softfork compatibility *)
       [@@deriving sexp, yojson, hash, compare]
     end
   end]
@@ -418,7 +420,7 @@ end = struct
       "Expecting content addr $address, expected: $hash" ;
     Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
 
-  (* Expects for a subtree with root at the given address *)
+  (* Waits for a subtree with root at the given address *)
   let expect_subtree : 'a t -> Addr.t -> Hash.t -> unit =
    fun t parent_addr expected ->
     [%log' trace t.logger]
@@ -505,7 +507,7 @@ end = struct
       -> [ `Good of (Addr.t * Hash.t) list | `Hash_mismatch of Hash.t * Hash.t ]
       =
    fun t addr nodes ->
-    let prefix_depth = Addr.depth addr in
+    (* let prefix_depth = Addr.depth addr in *)
     let expected =
       Option.value_exn ~message:"Forgot to wait for a node"
         (Addr.Table.find t.waiting_parents addr)
