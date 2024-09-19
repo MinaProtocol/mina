@@ -49,7 +49,7 @@ let buildTestCmd
                     "buildkite/scripts/dump-mina-type-shapes.sh"
                 # RunInToolchain.runInToolchain
                     ([] : List Text)
-                    "buildkite/scripts/version-linter-patch-missing-type-shapes.sh origin/${release_branch}"
+                    "buildkite/scripts/version-linter-patch-missing-type-shapes.sh ${release_branch}"
                 # [ Cmd.run
                       "gsutil cp *-type_shape.txt \$MINA_TYPE_SHAPE gs://mina-type-shapes"
                   ]
