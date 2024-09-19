@@ -5,9 +5,9 @@ module Scalars = Scalars
 module Domain = Domain
 module Opt = Opt
 
-let zk_rows_by_default = 3
-
 let num_chunks_by_default = 1
+
+let zk_rows_by_default = 3
 
 type 'field plonk_domain =
   < vanishing_polynomial : 'field -> 'field

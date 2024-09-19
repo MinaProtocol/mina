@@ -118,7 +118,7 @@ let verify_one ~srs
           let must_verify = read Boolean.typ must_verify in
           printf "finalized: %b\n%!" finalized ;
           printf "verified: %b\n%!" verified ;
-          printf "must_verify: %b\n\n%!" must_verify) ;
+          printf "must_verify: %b\n\n%!" must_verify ) ;
   (chals, Boolean.(verified &&& finalized ||| not must_verify))
 
 (* The SNARK function corresponding to the input inductive rule. *)
@@ -266,8 +266,8 @@ let step_main :
         let f = Fn.id
       end)
   in
-  let (input_typ, output_typ)
-        : (a_var, a_value) Typ.t * (ret_var, ret_value) Typ.t =
+  let (input_typ, output_typ) :
+      (a_var, a_value) Typ.t * (ret_var, ret_value) Typ.t =
     match public_input with
     | Input typ ->
         (typ, Typ.unit)
@@ -279,8 +279,8 @@ let step_main :
   let main () : _ Types.Step.Statement.t Promise.t =
     let open Impls.Step in
     let logger = Context_logger.get () in
-    let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
-                                         with type n = max_proofs_verified )
+    let module Max_proofs_verified =
+      (val max_proofs_verified : Nat.Add.Intf with type n = max_proofs_verified)
     in
     let T = Max_proofs_verified.eq in
     let app_state = exists input_typ ~request:(fun () -> Req.App_state) in
@@ -351,7 +351,7 @@ let step_main :
               Req.Compute_prev_proof_parts previous_proof_statements )
         in
         let dlog_plonk_index =
-          let num_chunks = (* TODO *) 1 in
+          let num_chunks = (* TODO *) Plonk_checks.num_chunks_by_default in
           exists
             ~request:(fun () -> Req.Wrap_index)
             (Plonk_verification_key_evals.typ
@@ -369,7 +369,7 @@ let step_main :
             ~request:(fun () -> Req.Unfinalized_proofs)
         and messages_for_next_wrap_proof =
           exists (Vector.typ Digest.typ Max_proofs_verified.n)
-            ~request:(fun () -> Req.Messages_for_next_wrap_proof)
+            ~request:(fun () -> Req.Messages_for_next_wrap_proof )
         and actual_wrap_domains =
           exists
             (Vector.typ (Typ.Internal.ref ()) (Length.to_nat proofs_verified))

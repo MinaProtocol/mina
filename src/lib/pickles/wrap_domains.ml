@@ -29,7 +29,9 @@ struct
       lazy
         (Promise.return
            (Vector.init num_choices ~f:(fun _ ->
-                let num_chunks = (* TODO *) 1 in
+                let num_chunks =
+                  (* TODO *) Plonk_checks.num_chunks_by_default
+                in
                 let g =
                   Array.init num_chunks ~f:(fun _ ->
                       Backend.Tock.Inner_curve.(to_affine_exn one) )

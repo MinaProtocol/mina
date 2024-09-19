@@ -254,7 +254,9 @@ struct
                      Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t)) )
                in
                let none_sum =
-                 let num_chunks = (* TODO *) 1 in
+                 let num_chunks =
+                   (* TODO *) Plonk_checks.num_chunks_by_default
+                 in
                  Option.map is_none ~f:(fun (b : Boolean.var) ->
                      Array.init num_chunks ~f:(fun _ ->
                          Double.map Inner_curve.one ~f:(( * ) (b :> t)) ) )
