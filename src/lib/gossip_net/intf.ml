@@ -146,14 +146,14 @@ module type GOSSIP_NET = sig
   -> unit Deferred.t
 
   val broadcast_transaction_pool_diff :
-       ?origin_topic:string list
+       ?origin_topics:string list
     -> ?nonce:int
     -> t
     -> Message.transaction_pool_diff_msg
     -> unit Deferred.t
 
   val broadcast_snark_pool_diff :
-       ?origin_topic:string list
+       ?origin_topics:string list
     -> ?nonce:int
     -> t
     -> Message.snark_pool_diff_msg

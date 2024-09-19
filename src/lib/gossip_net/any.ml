@@ -74,12 +74,12 @@ let broadcast_transaction_pool_diff ?origin_topics ?nonce (Any ((module M), t))
   let broadcast_snark_pool_diff ?origin_topics ?nonce (Any ((module M), t)) =
     M.broadcast_snark_pool_diff ?origin_topics ?nonce t
 
-  let broadcast_transaction_pool_diff ?origin_topic ?nonce (Any ((module M), t))
+  let broadcast_transaction_pool_diff ?origin_topics ?nonce (Any ((module M), t))
       =
-    M.broadcast_transaction_pool_diff ?origin_topic ?nonce t
+    M.broadcast_transaction_pool_diff ?origin_topics ?nonce t
 
-  let broadcast_snark_pool_diff ?origin_topic ?nonce (Any ((module M), t)) =
-    M.broadcast_snark_pool_diff ?origin_topic ?nonce t
+  let broadcast_snark_pool_diff ?origin_topics ?nonce (Any ((module M), t)) =
+    M.broadcast_snark_pool_diff ?origin_topics ?nonce t
 
   let on_first_connect (Any ((module M), t)) = M.on_first_connect t
 
