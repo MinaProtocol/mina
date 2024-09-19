@@ -60,8 +60,8 @@ let verify_heterogenous (ts : Instance.t list) =
         Timer.start __LOC__ ;
         let non_chunking, expected_num_chunks =
           let expected_num_chunks =
-            Option.value_map ~default:1 chunking_data ~f:(fun x ->
-                x.Instance.num_chunks )
+            Option.value_map ~default:Plonk_checks.num_chunks_by_default
+              chunking_data ~f:(fun x -> x.Instance.num_chunks )
           in
           let exception Is_chunked in
           match

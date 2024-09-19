@@ -380,7 +380,8 @@ struct
        ~storables:
          { step_storable; step_vk_storable; wrap_storable; wrap_vk_storable }
        ~proof_cache ?disk_keys ?override_wrap_domain ?override_wrap_main
-       ?(num_chunks = 1) ~branches:(module Branches) ~max_proofs_verified ~name
+       ?(num_chunks = Plonk_checks.num_chunks_by_default)
+       ~branches:(module Branches) ~max_proofs_verified ~name
        ?constraint_constants ~public_input ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       let constraint_constants : Snark_keys_header.Constraint_constants.t =
@@ -411,8 +412,8 @@ struct
       }
     in
     Timer.start __LOC__ ;
-    let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
-                                         with type n = max_proofs_verified )
+    let module Max_proofs_verified =
+      (val max_proofs_verified : Nat.Add.Intf with type n = max_proofs_verified)
     in
     let T = Max_proofs_verified.eq in
     let choices = choices ~self in
@@ -869,7 +870,8 @@ struct
             ~f:
               (Promise.map ~f:(fun x ->
                    Plonk_verification_key_evals.map
-                     (Verification_key.commitments x) ~f:(fun x -> [| x |]) ) )
+                     (Verification_key.commitments x) ~f:(fun x -> [| x |] ) )
+              )
       ; wrap_vk = Lazy.map wrap_vk ~f:(Promise.map ~f:Verification_key.index)
       ; wrap_domains
       ; step_domains
@@ -877,8 +879,8 @@ struct
       ; num_chunks
       ; zk_rows =
           ( match num_chunks with
-          | 1 ->
-              3
+          | 1 (* cannot match with Plonk_checks.num_chunks_by_default *) ->
+              Plonk_checks.zk_rows_by_default
           | num_chunks ->
               let permuts = 7 in
               ((2 * (permuts + 1) * num_chunks) - 2 + permuts) / permuts )
@@ -932,8 +934,8 @@ module Side_loaded = struct
       ; branches = Verification_key.Max_branches.n
       ; feature_flags =
           Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
-      ; num_chunks = 1
-      ; zk_rows = 3
+      ; num_chunks = Plonk_checks.num_chunks_by_default
+      ; zk_rows = Plonk_checks.zk_rows_by_default
       }
 
   module Proof = struct
@@ -956,7 +958,7 @@ module Side_loaded = struct
     in
     (* TODO: This should be the actual max width on a per proof basis *)
     let max_proofs_verified =
-      (module Verification_key.Max_width : Nat.Intf
+      ( module Verification_key.Max_width : Nat.Intf
         with type n = Verification_key.Max_width.n )
     in
     with_return (fun { return } ->
@@ -1151,9 +1153,9 @@ let compile_with_wrap_main_override_promise :
           domains
           |> Vector.reduce_exn
                ~f:(fun
-                    { h = Pow_2_roots_of_unity d1 }
-                    { h = Pow_2_roots_of_unity d2 }
-                  -> { h = Pow_2_roots_of_unity (Int.max d1 d2) } )
+                   { h = Pow_2_roots_of_unity d1 }
+                   { h = Pow_2_roots_of_unity d2 }
+                 -> { h = Pow_2_roots_of_unity (Int.max d1 d2) } )
         in
         Some
           { Verify.Instance.num_chunks
