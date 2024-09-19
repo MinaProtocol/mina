@@ -24,6 +24,7 @@ module type S = sig
     -> rpc_mocks:rpc_mocks
     -> local_ip:Peer.t
     -> Rpc_interface.ctx
+    -> on_bitswap_update:Mina_net2.on_bitswap_update_t
     -> Message.sinks
     -> t Deferred.t
 end
@@ -174,7 +175,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       in
       Network.{ hook }
 
-    let create ~network ~rpc_mocks ~(local_ip : Peer.t) ctx sinks =
+    let create ~network ~rpc_mocks ~(local_ip : Peer.t) ctx ~on_bitswap_update:_ sinks =
       let initial_peers = Network.get_initial_peers network local_ip.host in
       let peer_table = Hashtbl.create (module Peer.Id) in
       List.iter initial_peers ~f:(fun peer ->
@@ -269,25 +270,31 @@ module Make (Rpc_interface : RPC_INTERFACE) :
 
     let query_random_peers _ = failwith "TODO stub"
 
-    let broadcast_state ?origin_topic t state =
-      ignore origin_topic ;
-      Network.broadcast t.network ~sender:t.local_ip state
+    let broadcast_transition ?origin_topics:_ t b_or_h =
+      Network.broadcast t.network ~sender:t.local_ip b_or_h
         (fun (Any_sinks (sinksM, (sink_block, _, _))) (env, vc) ->
+          let { Envelope.Incoming.sender; received_at; _ } = env in
+          let env' =
+            match Envelope.Incoming.data env with
+            | `Block data ->
+                `Block { Envelope.Incoming.data; sender; received_at }
+            | `Header data ->
+                `Header { Envelope.Incoming.data; sender; received_at }
+          in
           let time = Block_time.now t.time_controller in
           let module M = (val sinksM) in
           M.Block_sink.push sink_block
-            (`Transition env, `Time_received time, `Valid_cb vc) )
+            (env', `Time_received time, `Topic_and_vc ("some_topic", vc)) )
 
-    let broadcast_snark_pool_diff ?origin_topic ?nonce t diff =
-      ignore origin_topic ;
+
+    let broadcast_snark_pool_diff ?origin_topics:_ ?nonce t diff =
       ignore nonce ;
       Network.broadcast t.network ~sender:t.local_ip diff
         (fun (Any_sinks (sinksM, (_, _, sink_snark_work))) ->
           let module M = (val sinksM) in
           M.Snark_sink.push sink_snark_work )
 
-    let broadcast_transaction_pool_diff ?origin_topic ?nonce t diff =
-      ignore origin_topic ;
+    let broadcast_transaction_pool_diff ?origin_topics:_ ?nonce t diff =
       ignore nonce ;
       Network.broadcast t.network ~sender:t.local_ip diff
         (fun (Any_sinks (sinksM, (_, sink_tx, _))) ->
@@ -299,6 +306,18 @@ module Make (Rpc_interface : RPC_INTERFACE) :
     let set_connection_gating ?clean_added_peers:_ t config =
       t.connection_gating := config ;
       Deferred.return config
+    
+      let add_bitswap_resource _ ~id:_ ~tag:_ ~data:_ =
+        (* TODO is this implementation what it should be? *)
+        Deferred.unit
+  
+      let remove_bitswap_resource _ ~ids:_ =
+        (* TODO is this implementation what it should be? *)
+        Deferred.unit
+  
+      let download_bitswap_resource _ ~tag:_ ~ids:_ =
+        (* TODO is this implementation what it should be? *)
+        Deferred.unit
   end
 
   type network = Network.t
@@ -309,5 +328,5 @@ module Make (Rpc_interface : RPC_INTERFACE) :
 
   let create_network = Network.create
 
-  let create_instance = Instance.create
+  let create_instance = Instance.create 
 end
