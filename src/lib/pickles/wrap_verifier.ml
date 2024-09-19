@@ -94,7 +94,7 @@ struct
             printf
               !"%s: %{sexp:Backend.Tock.Field.t}, %{sexp:Backend.Tock.Field.t}\n\
                 %!"
-              lab (read_var x) (read_var y))
+              lab (read_var x) (read_var y) )
 
   let _print_w lab gs =
     if Import.debug then
@@ -111,7 +111,7 @@ struct
             printf "in-snark %s:%!" lab ;
             Field.Constant.print
               (Field.Constant.project (List.map ~f:(read Boolean.typ) x)) ;
-            printf "\n%!")
+            printf "\n%!" )
 
   let print_bool lab x =
     if debug then
@@ -264,8 +264,8 @@ struct
                  |> List.map ~f:(fun ((b : Boolean.var), g) ->
                         (b, Array.map g ~f:(Double.map ~f:(( * ) (b :> t)))) )
                  |> List.reduce
-                      ~f:(fun ((b1 : Boolean.var), g1) ((b2 : Boolean.var), g2)
-                         ->
+                      ~f:(fun
+                          ((b1 : Boolean.var), g1) ((b2 : Boolean.var), g2) ->
                         ( Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t))
                         , Array.map2_exn ~f:(Double.map2 ~f:( + )) g1 g2 ) )
                  |> fun x -> (Option.map ~f:fst x, Option.map ~f:snd x)
@@ -277,8 +277,8 @@ struct
                         ( Boolean.Unsafe.of_cvar Field.(mul (b :> t) (b_g :> t))
                         , Array.map g ~f:(Double.map ~f:(( * ) (b :> t))) ) )
                  |> List.reduce
-                      ~f:(fun ((b1 : Boolean.var), g1) ((b2 : Boolean.var), g2)
-                         ->
+                      ~f:(fun
+                          ((b1 : Boolean.var), g1) ((b2 : Boolean.var), g2) ->
                         ( Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t))
                         , Array.map2_exn ~f:(Double.map2 ~f:( + )) g1 g2 ) )
                  |> fun x -> (Option.map ~f:fst x, Option.map ~f:snd x)
@@ -331,8 +331,7 @@ struct
     |> Vector.map2
          (which_branch :> (Boolean.var, n) Vector.t)
          ~f:(fun b pts ->
-           Array.map pts ~f:(fun (x, y) -> Field.((b :> t) * x, (b :> t) * y))
-           )
+           Array.map pts ~f:(fun (x, y) -> Field.((b :> t) * x, (b :> t) * y)) )
     |> Vector.reduce_exn ~f:(Array.map2_exn ~f:(Double.map2 ~f:Field.( + )))
 
   let scaled_lagrange (type n) c
@@ -355,8 +354,7 @@ struct
     |> Vector.map2
          (which_branch :> (Boolean.var, n) Vector.t)
          ~f:(fun b pts ->
-           Array.map pts ~f:(fun (x, y) -> Field.((b :> t) * x, (b :> t) * y))
-           )
+           Array.map pts ~f:(fun (x, y) -> Field.((b :> t) * x, (b :> t) * y)) )
     |> Vector.reduce_exn ~f:(Array.map2_exn ~f:(Double.map2 ~f:Field.( + )))
 
   let lagrange_with_correction (type n) ~input_length
@@ -446,7 +444,7 @@ struct
             Field.(
               (x * x * x)
               + (constant Inner_curve.Params.a * x)
-              + constant Inner_curve.Params.b) )
+              + constant Inner_curve.Params.b ) )
         |> unstage )
     in
     fun x -> Lazy.force f x
@@ -495,8 +493,11 @@ struct
         Pcs_batch.combine_split_commitments batch
           ~reduce_with_degree_bound:(fun _ -> assert false)
           ~reduce_without_degree_bound:(fun x -> [ x ])
-          ~scale_and_add:(fun ~(acc : Curve_opt.t) ~xi
-                              (p : (Point.t array, Boolean.var) Opt.t) ->
+          ~scale_and_add:(fun
+              ~(acc : Curve_opt.t)
+              ~xi
+              (p : (Point.t array, Boolean.var) Opt.t)
+            ->
             (* match acc.non_zero, keep with
                | false, false -> acc
                | true, false -> acc
@@ -512,7 +513,7 @@ struct
                     ~else_:
                       ((* In this branch, the accumulator was zero, so there is no harm in
                           putting the potentially junk underlying point here. *)
-                       Point.underlying p ))
+                       Point.underlying p ) )
               in
               let point = ref base_point in
               for i = Array.length p - 2 downto 0 do
@@ -700,9 +701,10 @@ struct
       (m2 : (_, Scalar_challenge.t, _) Plonk.Minimal.In_circuit.t) =
     iter2 m1 m2
       ~chal:(fun c1 c2 -> Field.Assert.equal c1 c2)
-      ~scalar_chal:(fun ({ inner = t1 } : _ Import.Scalar_challenge.t)
-                        ({ inner = t2 } : Scalar_challenge.t) ->
-        Field.Assert.equal t1 t2 )
+      ~scalar_chal:(fun
+          ({ inner = t1 } : _ Import.Scalar_challenge.t)
+          ({ inner = t2 } : Scalar_challenge.t)
+        -> Field.Assert.equal t1 t2 )
 
   let index_to_field_elements ~g (m : _ Plonk_verification_key_evals.Step.t) =
     let { Plonk_verification_key_evals.Step.sigma_comm
@@ -857,14 +859,14 @@ struct
                 | `Field (Constant c, _) ->
                     First
                       ( if Field.Constant.(equal zero) c then None
-                      else if Field.Constant.(equal one) c then
-                        Some (lagrange ~domain srs i)
-                      else
-                        Some
-                          (scaled_lagrange ~domain
-                             (Inner_curve.Constant.Scalar.project
-                                (Field.Constant.unpack c) )
-                             srs i ) )
+                        else if Field.Constant.(equal one) c then
+                          Some (lagrange ~domain srs i)
+                        else
+                          Some
+                            (scaled_lagrange ~domain
+                               (Inner_curve.Constant.Scalar.project
+                                  (Field.Constant.unpack c) )
+                               srs i ) )
                 | `Field x ->
                     Second (i, x) )
           in
@@ -1426,11 +1428,11 @@ struct
 
   let _shift1 =
     Pickles_types.Shifted_value.Type1.Shift.(
-      map ~f:Field.constant (create (module Field.Constant)))
+      map ~f:Field.constant (create (module Field.Constant)) )
 
   let shift2 =
     Shifted_value.Type2.Shift.(
-      map ~f:Field.constant (create (module Field.Constant)))
+      map ~f:Field.constant (create (module Field.Constant)) )
 
   let map_plonk_to_field plonk =
     Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
@@ -1576,7 +1578,8 @@ struct
       Plonk_checks.scalars_env
         (module Env_bool)
         (module Env_field)
-        ~srs_length_log2:Common.Max_degree.wrap_log2 ~zk_rows:3
+        ~srs_length_log2:Common.Max_degree.wrap_log2
+        ~zk_rows:Plonk_checks.zk_rows_by_default
         ~endo:(Impl.Field.constant Endo.Wrap_inner_curve.base)
         ~mds:sponge_params.mds
         ~field_of_hex:(fun s ->

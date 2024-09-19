@@ -41,22 +41,22 @@ let verify_heterogenous (ts : Instance.t list) =
   let _computed_bp_chals, deferred_values =
     List.map ts
       ~f:(fun
-           (T
-             ( _max_proofs_verified
-             , _statement
-             , chunking_data
-             , key
-             , _app_state
-             , T
-                 { statement =
-                     { proof_state
-                     ; messages_for_next_step_proof =
-                         { old_bulletproof_challenges; _ }
-                     }
-                 ; prev_evals = evals
-                 ; proof = _
-                 } ) )
-         ->
+          (T
+            ( _max_proofs_verified
+            , _statement
+            , chunking_data
+            , key
+            , _app_state
+            , T
+                { statement =
+                    { proof_state
+                    ; messages_for_next_step_proof =
+                        { old_bulletproof_challenges; _ }
+                    }
+                ; prev_evals = evals
+                ; proof = _
+                } ) )
+        ->
         Timer.start __LOC__ ;
         let non_chunking, expected_num_chunks =
           let expected_num_chunks =
@@ -117,8 +117,8 @@ let verify_heterogenous (ts : Instance.t list) =
         Timer.clock __LOC__ ;
         let deferred_values =
           let zk_rows =
-            Option.value_map ~default:3 chunking_data ~f:(fun x ->
-                x.Instance.zk_rows )
+            Option.value_map ~default:Plonk_checks.zk_rows_by_default
+              chunking_data ~f:(fun x -> x.Instance.zk_rows )
           in
           Wrap_deferred_values.expand_deferred ~evals ~zk_rows
             ~old_bulletproof_challenges ~proof_state
@@ -167,15 +167,15 @@ let verify_heterogenous (ts : Instance.t list) =
   let batch_verify_inputs =
     List.map2_exn ts deferred_values
       ~f:(fun
-           (T
-             ( (module Max_proofs_verified)
-             , (module A_value)
-             , _chunking_data
-             , key
-             , app_state
-             , T t ) )
-           deferred_values
-         ->
+          (T
+            ( (module Max_proofs_verified)
+            , (module A_value)
+            , _chunking_data
+            , key
+            , app_state
+            , T t ) )
+          deferred_values
+        ->
         let prepared_statement : _ Types.Wrap.Statement.In_circuit.t =
           { messages_for_next_step_proof =
               Common.hash_messages_for_next_step_proof

@@ -254,8 +254,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ; branches = Verification_key.Max_branches.n
         ; feature_flags =
             Plonk_types.(Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags)
-        ; num_chunks = 1
-        ; zk_rows = 3
+        ; num_chunks = Plonk_checks.num_chunks_by_default
+        ; zk_rows = Plonk_checks.zk_rows_by_default
         }
 
     module Proof = struct
@@ -278,7 +278,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       in
       (* TODO: This should be the actual max width on a per proof basis *)
       let max_proofs_verified =
-        (module Verification_key.Max_width : Nat.Intf
+        ( module Verification_key.Max_width : Nat.Intf
           with type n = Verification_key.Max_width.n )
       in
       with_return (fun { return } ->
@@ -446,7 +446,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           ignore
             ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
                 (Kimchi_backend_common.Scalar_challenge.create x)
-              : Field.t * Field.t ))
+              : Field.t * Field.t ) )
 
       module No_recursion = struct
         let[@warning "-45"] tag, _, p, Provers.[ step ] =
@@ -794,7 +794,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           let proof_must_verify = Boolean.not is_base_case in
                           let self =
                             Field.(
-                              if_ is_base_case ~then_:zero ~else_:(one + prev))
+                              if_ is_base_case ~then_:zero ~else_:(one + prev) )
                           in
                           Promise.return
                             { Inductive_rule.previous_proof_statements =
@@ -1459,7 +1459,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               { Tick.Proof.Challenge_polynomial.commitment
                               ; challenges = Vector.to_array cs
                               } )
-                          |> to_list)
+                          |> to_list )
                         public_input proof
                     in
                     let x_hat = O.(p_eval_1 o, p_eval_2 o) in
@@ -1725,9 +1725,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       in
                       Common.time "wrap proof" (fun () ->
                           Impls.Wrap.generate_witness_conv
-                            ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs
-                                    ; public_inputs
-                                    } () ->
+                            ~f:(fun
+                                { Impls.Wrap.Proof_inputs.auxiliary_inputs
+                                ; public_inputs
+                                }
+                                ()
+                              ->
                               Backend.Tock.Proof.create_async
                                 ~primary:public_inputs
                                 ~auxiliary:auxiliary_inputs pk
@@ -2014,7 +2017,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           ignore
             ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
                 (Kimchi_backend_common.Scalar_challenge.create x)
-              : Field.t * Field.t ))
+              : Field.t * Field.t ) )
 
       module No_recursion = struct
         let[@warning "-45"] tag, _, p, Provers.[ step ] =
@@ -2190,7 +2193,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               Side_loaded.in_prover side_loaded_tag vk ) ;
                           let vk =
                             exists Side_loaded_verification_key.typ
-                              ~compute:(fun () -> As_prover.Ref.get vk)
+                              ~compute:(fun () -> As_prover.Ref.get vk )
                           in
                           Side_loaded.in_circuit side_loaded_tag vk ;
                           let is_base_case = Field.equal Field.zero self in
@@ -2323,7 +2326,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           ignore
             ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
                 (Kimchi_backend_common.Scalar_challenge.create x)
-              : Field.t * Field.t ))
+              : Field.t * Field.t ) )
 
       module No_recursion = struct
         let[@warning "-45"] tag, _, p, Provers.[ step ] =
@@ -2502,7 +2505,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               Side_loaded.in_prover side_loaded_tag vk ) ;
                           let vk =
                             exists Side_loaded_verification_key.typ
-                              ~compute:(fun () -> As_prover.Ref.get vk)
+                              ~compute:(fun () -> As_prover.Ref.get vk )
                           in
                           Side_loaded.in_circuit side_loaded_tag vk ;
                           let is_base_case = Field.equal Field.zero self in

@@ -229,7 +229,7 @@ module Stable = struct
                    } )
               ; shifts = Common.tock_shifts ~log2_size
               ; lookup_index = None
-              ; zk_rows = 3
+              ; zk_rows = Plonk_checks.zk_rows_by_default
               } )
         in
         { Poly.max_proofs_verified
@@ -354,9 +354,6 @@ let typ : (Checked.t, t) Impls.Step.Typ.t =
     ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
     ~value_of_hlist:(fun _ ->
       failwith "Side_loaded_verification_key: value_of_hlist" )
-    ~value_to_hlist:(fun { Poly.wrap_index
-                         ; actual_wrap_domain_size
-                         ; max_proofs_verified
-                         ; _
-                         } ->
+    ~value_to_hlist:(fun
+        { Poly.wrap_index; actual_wrap_domain_size; max_proofs_verified; _ } ->
       [ max_proofs_verified; actual_wrap_domain_size; wrap_index ] )
