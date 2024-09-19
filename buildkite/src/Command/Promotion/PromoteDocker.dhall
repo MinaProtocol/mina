@@ -77,7 +77,7 @@ let promoteDockerStep =
                                 spec.remove_profile_from_name
 
                         in  Cmd.run
-                              ". ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/promote-docker.sh --name ${Artifact.dockerName
+                              ". ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/docker/promote.sh --name ${Artifact.dockerName
                                                                                                                                 spec.name} --version ${old_tag} --tag ${new_tag} ${publish}"
                   )
                   spec.new_tags
