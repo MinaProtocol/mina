@@ -456,8 +456,8 @@ end = struct
     else `Hash_mismatch (expected, actual)
 
   (* Provides addresses at an specific depth from this address *)
-  let rec intermediate_range : Addr.t -> index -> Addr.t list =
-   fun addr i ->
+  let rec intermediate_range : index -> Addr.t -> index -> Addr.t list =
+   fun ledger_depth addr i ->
     match i with
     | 0 ->
         [ addr ]
@@ -466,12 +466,11 @@ end = struct
           Option.value_exn
             ( Or_error.ok
             @@ Or_error.both
-                 (* TODO:use proper depth *)
-                 (Addr.child ~ledger_depth:5 addr Direction.Left)
-                 (Addr.child ~ledger_depth:5 addr Direction.Right) )
+                 (Addr.child ~ledger_depth addr Direction.Left)
+                 (Addr.child ~ledger_depth addr Direction.Right) )
         in
-        let left = intermediate_range left (i - 1) in
-        let right = intermediate_range right (i - 1) in
+        let left = intermediate_range ledger_depth left (i - 1) in
+        let right = intermediate_range ledger_depth right (i - 1) in
         left @ right
 
   (* Merges each 2 contigous nodes, halving the size of the list *)
@@ -515,8 +514,9 @@ end = struct
     let merged = merge_many nodes in
     if Hash.equal expected merged then (
       Addr.Table.remove t.waiting_parents addr ;
+      let ledger_depth = MT.depth t.tree in
       (* TODO: parameterize *)
-      let addresses = intermediate_range addr 5 in
+      let addresses = intermediate_range ledger_depth addr 5 in
       let addresses_and_hashes = List.(zip_exn addresses nodes) in
 
       (* Filter to fetch only those that differ *)
