@@ -5,7 +5,8 @@ use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi, constants::SpongeConstants,
     permutation::poseidon_block_cipher, poseidon::ArithmeticSpongeParams,
 };
-use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
+use rayon::iter::ParallelIterator;
+use rayon::prelude::ParallelSliceMut;
 
 pub struct CamlPastaFpPoseidonParams(ArithmeticSpongeParams<Fp>);
 pub type CamlPastaFpPoseidonParamsPtr<'a> = ocaml::Pointer<'a, CamlPastaFpPoseidonParams>;
@@ -74,9 +75,13 @@ pub fn caml_pasta_fp_poseidon_update_batch(
 ) {
     let state_ = state.to_vec();
     let params2 = &params.as_ref().0;
-    inputs.par_iter_mut().for_each(|input| {
-        let input_ = (&(*input)).to_vec();
+    let n = 128;
+    let f = |input: &mut Vec<Fp>| {
+        let input_ = input.clone();
         *input = state_.clone();
-        caml_pasta_fp_poseidon_update_impl(params2, input.as_mut(), input_);
-    })
+        caml_pasta_fp_poseidon_update_impl(params2, input, input_);
+    };
+    inputs
+        .par_chunks_mut(n)
+        .for_each(|chunk| chunk.iter_mut().for_each(f));
 }
