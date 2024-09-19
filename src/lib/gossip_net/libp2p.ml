@@ -64,6 +64,7 @@ module type S = sig
     -> Config.t
     -> pids:Child_processes.Termination.t
     -> Rpc_interface.ctx
+    -> on_bitswap_update:Mina_net2.on_bitswap_update_t
     -> Message.sinks
     -> t Deferred.t
 end
@@ -77,7 +78,7 @@ let download_seed_peer_list uri =
 
 type publish_functions =
   { publish_v0 : Message.msg -> unit Deferred.t
-  ; publish_v1_block : Message.state_msg -> unit Deferred.t
+  ; publish_v1_block : Mina_block.Header.t -> unit Deferred.t
   ; publish_v1_tx : Message.transaction_pool_diff_msg -> unit Deferred.t
   ; publish_v1_snark_work : Message.snark_pool_diff_msg -> unit Deferred.t
   }
@@ -219,7 +220,8 @@ module Make (Rpc_interface : RPC_INTERFACE) :
         ctx first_peer_ivar high_connectivity_ivar ~added_seeds ~pids
         ~on_unexpected_termination
         ~sinks:
-          (Message.Any_sinks (sinksM, (sink_block, sink_tx, sink_snark_work))) =
+          (Message.Any_sinks (sinksM, (sink_block, sink_tx, sink_snark_work))) 
+        ~on_bitswap_update =
       let module Sinks = (val sinksM) in
       let ctr = ref 0 in
       let record_peer_connection () =
@@ -256,7 +258,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                   ~all_peers_seen_metric:config.all_peers_seen_metric
                   ~on_peer_connected:(fun _ -> record_peer_connection ())
                   ~on_peer_disconnected:ignore ~logger:config.logger ~conf_dir
-                  ~pids () ) )
+                  ~on_bitswap_update ~pids ?outstanding_resource_requests () ) )
       with
       | Ok (Ok net2) -> (
           let open Mina_net2 in
@@ -441,7 +443,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
             let snark_bin_prot =
               Network_pool.Snark_pool.Diff_versioned.Stable.Latest.bin_t
             in
-            let block_bin_prot = Mina_block.Stable.Latest.bin_t in
+            let header_bin_prot = Mina_block.Header.Stable.Latest.bin_t in
             let unit_f _ = Deferred.unit in
             let publish_v1_impl push_impl bin_prot topic =
               match config.pubsub_v1 with
