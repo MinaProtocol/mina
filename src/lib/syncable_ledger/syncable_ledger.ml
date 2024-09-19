@@ -23,6 +23,10 @@ module Query = struct
         | Num_accounts
             (** How many accounts are there? Used to size data structure and
             figure out what part of the tree is filled in. *)
+        | Subtree of 'addr
+            (** What are the 2^k nodes at depth k from the given prefix 
+            address **)
+      (* TODO: Properly handle versioning *)
       [@@deriving sexp, yojson, hash, compare]
     end
   end]
@@ -40,6 +44,8 @@ module Answer = struct
         | Num_accounts of int * 'hash
             (** There are this many accounts and the smallest subtree that
                 contains all non-empty nodes has this hash. *)
+        | Subtree of 'hash list
+      (* TODO: Properly handle versioning *)
       [@@deriving sexp, yojson]
 
       let to_latest acct_to_latest = function
@@ -49,6 +55,9 @@ module Answer = struct
             Contents_are (List.map ~f:acct_to_latest accts)
         | Num_accounts (i, h) ->
             Num_accounts (i, h)
+        | Subtree nodes ->
+            Subtree (List.map ~f:acct_to_latest nodes)
+      (* TODO: Properly handle versioning *)
     end
   end]
 end
@@ -340,7 +349,13 @@ end = struct
             Either.First
               (Num_accounts
                  (len, MT.get_inner_hash_at_addr_exn mt content_root_addr) )
+        | Subtree a ->
+            (* TODO:giving error for now *)
+            Either.Second
+              ( Actions.Violated_protocol
+              , Some ("Error: $addr", [ ("addr", Addr.to_yojson a) ]) )
       in
+
       match response_or_punish with
       | Either.First answer ->
           Deferred.return @@ Some answer
@@ -403,6 +418,17 @@ end = struct
       "Expecting content addr $address, expected: $hash" ;
     Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
 
+  (* Expects for a subtree with root at the given address *)
+  let expect_subtree : 'a t -> Addr.t -> Hash.t -> unit =
+   fun t parent_addr expected ->
+    [%log' trace t.logger]
+      ~metadata:
+        [ ("subtree prefix address", Addr.to_yojson parent_addr)
+        ; ("hash", Hash.to_yojson expected)
+        ]
+      "Expecting subtree at address $parent_address, expected: $hash" ;
+    Addr.Table.add_exn t.waiting_parents ~key:parent_addr ~data:expected
+
   (** Given an address and the accounts below that address, fill in the tree
       with them. *)
   let add_content :
@@ -426,6 +452,81 @@ end = struct
     let actual = MT.get_inner_hash_at_addr_exn t.tree addr in
     if Hash.equal actual expected then `Success
     else `Hash_mismatch (expected, actual)
+
+  (* Provides addresses at an specific depth from this address *)
+  let rec intermediate_range : Addr.t -> index -> Addr.t list =
+   fun addr i ->
+    match i with
+    | 0 ->
+        [ addr ]
+    | i ->
+        let left, right =
+          Option.value_exn
+            ( Or_error.ok
+            @@ Or_error.both
+                 (* TODO:use proper depth *)
+                 (Addr.child ~ledger_depth:5 addr Direction.Left)
+                 (Addr.child ~ledger_depth:5 addr Direction.Right) )
+        in
+        let left = intermediate_range left (i - 1) in
+        let right = intermediate_range right (i - 1) in
+        left @ right
+
+  (* Merges each 2 contigous nodes, halving the size of the list *)
+  let rec merge_siblings : Hash.t list -> Hash.t list =
+   (* TODO: domain separation *)
+   fun nodes ->
+    match nodes with
+    | [ l; r ] ->
+        [ Hash.merge ~height:5 l r ]
+    | l :: r :: rest ->
+        Hash.merge ~height:5 l r :: merge_siblings rest
+    | _ ->
+        (* TODO: give some error as this shouldn't really happen *)
+        []
+
+  (* Assumes nodes to be a power of 2 and merges them into their common root *)
+  (* TODO:domain separation *)
+  let rec merge_many : Hash.t list -> Hash.t =
+   fun nodes ->
+    match nodes with
+    | [ single ] ->
+        single
+    | many ->
+        let half = merge_siblings many in
+        merge_many half
+
+  (* Adds the subtree given as the 2^k subtree leaves with the given prefix address *)
+  (* Returns next nodes to be checked *)
+  let add_subtree :
+         'a t
+      -> Addr.t
+      -> Hash.t list
+      -> [ `Good of (Addr.t * Hash.t) list | `Hash_mismatch of Hash.t * Hash.t ]
+      =
+   fun t addr nodes ->
+    let prefix_depth = Addr.depth addr in
+    let expected =
+      Option.value_exn ~message:"Forgot to wait for a node"
+        (Addr.Table.find t.waiting_parents addr)
+    in
+    let merged = merge_many nodes in
+    if Hash.equal expected merged then (
+      Addr.Table.remove t.waiting_parents addr ;
+      (* TODO: parameterize *)
+      let addresses = intermediate_range addr 5 in
+      let addresses_and_hashes = List.(zip_exn addresses nodes) in
+
+      (* Filter to fetch only those that differ *)
+      let should_fetch_children addr hash =
+        not @@ Hash.equal (MT.get_inner_hash_at_addr_exn t.tree addr) hash
+      in
+      let subtrees_to_fetch =
+        addresses_and_hashes
+        |> List.filter ~f:(Tuple2.uncurry should_fetch_children)
+      in
+      `Good subtrees_to_fetch )
+    else `Hash_mismatch (expected, merged)
 
   (** Given an address and the hashes of the children of the corresponding node,
       check the children hash to the expected value. If they do, queue the
@@ -509,10 +610,22 @@ end = struct
       expect_content t addr exp_hash ;
       Linear_pipe.write_without_pushback_if_open t.queries
         (desired_root_exn t, What_contents addr) )
-    else (
-      expect_children t addr exp_hash ;
-      Linear_pipe.write_without_pushback_if_open t.queries
-        (desired_root_exn t, What_child_hashes addr) )
+    else
+      let account_subtree_depth = MT.depth t.tree - account_subtree_height in
+      let depth_to_account_subtree = account_subtree_depth - Addr.depth addr in
+
+      (* If distance to the account subtree is big enough, use wide queries,
+         if not just request the next 2 children *)
+      (* TODO: parameterize depth *)
+      if depth_to_account_subtree >= 5 then (
+        expect_subtree t addr exp_hash ;
+        Linear_pipe.write_without_pushback_if_open t.queries
+          (* TODO: verify purpose of sending the root *)
+          (desired_root_exn t, Subtree addr) )
+      else (
+        expect_children t addr exp_hash ;
+        Linear_pipe.write_without_pushback_if_open t.queries
+          (desired_root_exn t, What_child_hashes addr) )
 
   (** Handle the initial Num_accounts message, starting the main syncing
       process. *)
@@ -644,6 +757,24 @@ end = struct
                             ] ) )
                   in
                   requeue_query () )
+          | Query.Subtree address, Answer.Subtree hashes -> (
+              match add_subtree t address hashes with
+              | `Hash_mismatch (expected, actual) ->
+                  let%map () =
+                    record_envelope_sender t.trust_system t.logger sender
+                      ( Actions.Sent_bad_hash
+                      , Some
+                          ( "hashes sent for subtree on address $address merge \
+                             to $actualmerge but we expected $expectedmerge"
+                          , [ ("actualmerge", Hash.to_yojson actual)
+                            ; ("expectedmerge", Hash.to_yojson expected)
+                            ] ) )
+                  in
+                  requeue_query ()
+              | `Good children_to_verify ->
+                  List.iter children_to_verify ~f:(fun (addr, hash) ->
+                      handle_node t addr hash ) ;
+                  credit_fulfilled_request () )
           | query, answer ->
               let%map () =
                 record_envelope_sender t.trust_system t.logger sender
