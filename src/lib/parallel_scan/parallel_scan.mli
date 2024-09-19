@@ -208,7 +208,7 @@ module State : sig
     end
   end]
 
-  val map : ('a1, 'a2) t -> f1:('a1 -> 'b1) -> f2:('a2 -> 'b2) -> ('b1, 'b2) t
+  (* val map : ('a1, 'a2) t -> f1:('a1 -> 'b1) -> f2:('a2 -> 'b2) -> ('b1, 'b2) t *)
 
   module Hash : sig
     type t = Digestif.SHA256.t
@@ -267,6 +267,14 @@ val update :
   -> completed_jobs:'merge list
   -> ('merge, 'base) State.t
   -> (('merge * 'base list) option * ('merge, 'base) State.t) Or_error.t
+
+(** Complete jobs needed at this state -- optionally emits the ['a] at the top
+ * of the tree along with the ['d list] responsible for emitting the ['a]. *)
+val update_light :
+     data_count:int
+  -> completed_jobs:'merge list
+  -> ('merge, 'base) State.t
+  -> 'merge option Or_error.t
 
 (** The last ['a] we emitted from the top of the tree and the ['d list]
  * responsible for that ['a]. *)

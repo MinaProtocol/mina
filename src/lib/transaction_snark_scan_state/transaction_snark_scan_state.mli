@@ -92,6 +92,12 @@ end
 val empty :
   constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
 
+val fill_work :
+     t
+  -> int
+  -> Transaction_snark_work.unchecked list
+  -> Ledger_proof.t option Or_error.t
+
 val fill_work_and_enqueue_transactions :
      t
   -> logger:Logger.t

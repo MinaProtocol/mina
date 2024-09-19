@@ -1335,23 +1335,33 @@ let all_work_pairs t
 
 let update_metrics t = Parallel_scan.update_metrics t.scan_state
 
+let fill_in_transaction_snark_work tree (works : Transaction_snark_work.t list)
+    : (Ledger_proof.t * Sok_message.t) list Or_error.t =
+  let next_jobs =
+    List.(
+      take
+        (concat @@ Parallel_scan.jobs_for_next_update tree)
+        (total_proofs works))
+  in
+  map2_or_error next_jobs
+    (List.concat_map works
+       ~f:(fun { Transaction_snark_work.fee; proofs; prover } ->
+         One_or_two.map proofs ~f:(fun proof -> (fee, proof, prover))
+         |> One_or_two.to_list ) )
+    ~f:completed_work_to_scanable_work
+
+let fill_work t transaction_count work =
+  let%bind.Or_error work_list =
+    fill_in_transaction_snark_work t.scan_state work
+  in
+  let%map.Or_error res_opt =
+    Parallel_scan.update_light t.scan_state ~completed_jobs:work_list
+      ~data_count:transaction_count
+  in
+  Option.map ~f:fst res_opt
+
 let fill_work_and_enqueue_transactions t ~logger transactions work =
   let open Or_error.Let_syntax in
-  let fill_in_transaction_snark_work tree (works : Transaction_snark_work.t list)
-      : (Ledger_proof.t * Sok_message.t) list Or_error.t =
-    let next_jobs =
-      List.(
-        take
-          (concat @@ Parallel_scan.jobs_for_next_update tree)
-          (total_proofs works))
-    in
-    map2_or_error next_jobs
-      (List.concat_map works
-         ~f:(fun { Transaction_snark_work.fee; proofs; prover } ->
-           One_or_two.map proofs ~f:(fun proof -> (fee, proof, prover))
-           |> One_or_two.to_list ) )
-      ~f:completed_work_to_scanable_work
-  in
   (*get incomplete transactions from previous proof which will be completed in
      the new proof, if there's one*)
   let old_proof_and_incomplete_zkapp_updates =

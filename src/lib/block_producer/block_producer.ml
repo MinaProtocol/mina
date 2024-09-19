@@ -70,13 +70,6 @@ let time_to_ms = Fn.compose Block_time.Span.to_ms Block_time.to_span_since_epoch
 
 let time_of_ms = Fn.compose Block_time.of_span_since_epoch Block_time.Span.of_ms
 
-let lift_sync f =
-  Interruptible.uninterruptible
-    (Deferred.create (fun ivar ->
-         if Ivar.is_full ivar then
-           [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-         Ivar.fill ivar (f ()) ) )
-
 module Singleton_scheduler : sig
   type t
 
@@ -166,12 +159,181 @@ let report_transaction_inclusion_failures ~commit_id ~logger failed_txns =
       let leftover_bytes = available_bytes - base_error_size - 2 in
       wrap_error (`List (generate_errors failed_txns leftover_bytes)) )
 
+let apply_diff_unchecked ~logger ~constraint_constants ~global_slot
+    ~current_state_view ~state_and_body_hash ~coinbase_receiver
+    ~supercharge_coinbase ~zkapp_cmd_limit_hardcap staged_ledger diff =
+  [%log internal] "Apply_staged_ledger_diff" ;
+  let res =
+    Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
+      ~global_slot diff ~logger ~current_state_view ~state_and_body_hash
+      ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap
+  in
+  [%log internal] "Apply_staged_ledger_diff_done" ;
+  match res with
+  | Ok res ->
+      Some (diff, res)
+  | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
+      [%log error] "Failed to apply the diff: $error"
+        ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+      None
+  | Error e ->
+      [%log error]
+        ~metadata:
+          [ ("error", `String (Staged_ledger.Staged_ledger_error.to_string e))
+          ; ( "diff"
+            , Staged_ledger_diff.With_valid_signatures_and_proofs.to_yojson diff
+            )
+          ]
+        "Error applying the diff $diff: $error" ;
+      None
+
+let wrap_create_diff ~logger ~slot_tx_end ~global_slot_since_hard_fork f =
+  match slot_tx_end with
+  | Some slot_tx_end
+    when Mina_numbers.Global_slot_since_hard_fork.(
+           global_slot_since_hard_fork >= slot_tx_end) ->
+      [%log info] "Reached slot_tx_end $slot_tx_end, producing empty block"
+        ~metadata:
+          [ ( "slot_tx_end"
+            , Mina_numbers.Global_slot_since_hard_fork.to_yojson slot_tx_end )
+          ] ;
+      Result.return
+        Staged_ledger_diff.With_valid_signatures_and_proofs.empty_diff
+  | Some _ | None ->
+      O1trace.sync_thread "create_staged_ledger_diff" f
+
+let create_diff ~block_reward_threshold ~commit_id ~constraint_constants
+    ~global_slot staged_ledger ~coinbase_receiver ~logger ~current_state_view
+    ~transactions_by_fee ~get_completed_work ~log_block_creation
+    ~supercharge_coinbase ~zkapp_cmd_limit () =
+  [%log internal] "Create_staged_ledger_diff" ;
+  (* TODO: handle transaction inclusion failures here *)
+  let diff_result =
+    Staged_ledger.create_diff ~constraint_constants ~global_slot staged_ledger
+      ~coinbase_receiver ~logger ~current_state_view ~transactions_by_fee
+      ~get_completed_work ~log_block_creation ~supercharge_coinbase
+      ~zkapp_cmd_limit
+    |> Result.map ~f:(fun (diff, failed_txns) ->
+           if not (List.is_empty failed_txns) then
+             don't_wait_for
+               (report_transaction_inclusion_failures ~logger ~commit_id
+                  failed_txns ) ;
+           diff )
+    |> Result.map_error ~f:(fun err ->
+           Staged_ledger.Staged_ledger_error.Pre_diff err )
+  in
+  [%log internal] "Create_staged_ledger_diff_done" ;
+  match (diff_result, block_reward_threshold) with
+  | Ok diff, Some threshold ->
+      let net_return =
+        Option.value ~default:Currency.Amount.zero
+          (Staged_ledger_diff.net_return ~constraint_constants
+             ~supercharge_coinbase
+             (Staged_ledger_diff.forget diff) )
+      in
+      if Currency.Amount.(net_return >= threshold) then diff_result
+      else (
+        [%log info]
+          "Block reward $reward is less than the min-block-reward $threshold, \
+           creating empty block"
+          ~metadata:
+            [ ("threshold", Currency.Amount.to_yojson threshold)
+            ; ("reward", Currency.Amount.to_yojson net_return)
+            ] ;
+        Ok Staged_ledger_diff.With_valid_signatures_and_proofs.empty_diff )
+  | _ ->
+      diff_result
+
+let create_internal_transition ~previous_pending_coinbases ~logger
+    ~constraint_constants ~previous_protocol_state ~time_controller
+    ~scheduled_time ~block_data ~supercharge_coinbase
+    ( diff
+    , ( `Hash_after_applying next_staged_ledger_hash
+      , `Ledger_proof ledger_proof_opt
+      , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) ) ) =
+  let protocol_state, consensus_transition_data =
+    let previous_ledger_hash =
+      previous_protocol_state |> Protocol_state.blockchain_state
+      |> Blockchain_state.snarked_ledger_hash
+    in
+    let ledger_proof_statement =
+      match ledger_proof_opt with
+      | Some proof ->
+          Ledger_proof.statement proof
+      | None ->
+          let state =
+            previous_protocol_state |> Protocol_state.blockchain_state
+          in
+          Blockchain_state.ledger_proof_statement state
+    in
+    let genesis_ledger_hash =
+      previous_protocol_state |> Protocol_state.blockchain_state
+      |> Blockchain_state.genesis_ledger_hash
+    in
+    let supply_increase =
+      Option.value_map ledger_proof_opt
+        ~f:(fun proof -> (Ledger_proof.statement proof).supply_increase)
+        ~default:Currency.Amount.Signed.zero
+    in
+    let body_reference =
+      Staged_ledger_diff.Body.compute_reference
+        (Body.create @@ Staged_ledger_diff.forget diff)
+    in
+    let blockchain_state =
+      (* We use the time of the beginning of the slot because if things
+         are slower than expected, we may have entered the next slot and
+         putting the **current** timestamp rather than the expected one
+         will screw things up.
+
+         [generate_transition] will log an error if the [current_time]
+         has a different slot from the [scheduled_time]
+      *)
+      Blockchain_state.create_value ~timestamp:scheduled_time
+        ~genesis_ledger_hash ~staged_ledger_hash:next_staged_ledger_hash
+        ~body_reference ~ledger_proof_statement
+    in
+    let current_time =
+      Block_time.now time_controller
+      |> Block_time.to_span_since_epoch |> Block_time.Span.to_ms
+    in
+    O1trace.sync_thread "generate_consensus_transition" (fun () ->
+        Consensus_state_hooks.generate_transition ~previous_protocol_state
+          ~blockchain_state ~current_time ~block_data ~supercharge_coinbase
+          ~snarked_ledger_hash:previous_ledger_hash ~genesis_ledger_hash
+          ~supply_increase ~logger ~constraint_constants )
+  in
+  let snark_transition =
+    O1trace.sync_thread "generate_snark_transition" (fun () ->
+        Snark_transition.create_value
+          ~blockchain_state:(Protocol_state.blockchain_state protocol_state)
+          ~consensus_transition:consensus_transition_data
+          ~pending_coinbase_update () )
+  in
+  let internal_transition =
+    O1trace.sync_thread "generate_internal_transition" (fun () ->
+        Internal_transition.create ~snark_transition
+          ~prover_state:(Consensus.Data.Block_data.prover_state block_data)
+          ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
+          ~ledger_proof:ledger_proof_opt )
+  in
+  let witness =
+    { Pending_coinbase_witness.pending_coinbases = previous_pending_coinbases
+    ; is_new_stack
+    }
+  in
+  Some (protocol_state, internal_transition, witness)
+
+let handle_diff_build_error ~logger e =
+  [%log error] "Error building the diff: $error"
+    ~metadata:
+      [ ("error", `String (Staged_ledger.Staged_ledger_error.to_string e)) ] ;
+  None
+
 let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
     ~previous_protocol_state ~time_controller ~staged_ledger ~transactions
     ~get_completed_work ~logger ~(block_data : Consensus.Data.Block_data.t)
     ~winner_pk ~scheduled_time ~log_block_creation ~block_reward_threshold
     ~zkapp_cmd_limit_hardcap ~slot_tx_end ~slot_chain_end =
-  let open Interruptible.Let_syntax in
   let global_slot_since_hard_fork =
     Consensus.Data.Block_data.global_slot block_data
   in
@@ -185,8 +347,8 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
             , Mina_numbers.Global_slot_since_hard_fork.to_yojson slot_chain_end
             )
           ] ;
-      Interruptible.return None
-  | None | Some _ -> (
+      None
+  | None | Some _ ->
       let previous_protocol_state_body_hash =
         Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
       in
@@ -207,203 +369,40 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
         Staged_ledger.can_apply_supercharged_coinbase_exn ~winner:winner_pk
           ~epoch_ledger ~global_slot
       in
-      let%bind res =
-        Interruptible.uninterruptible
-          (let open Deferred.Let_syntax in
-          let coinbase_receiver =
-            Consensus.Data.Block_data.coinbase_receiver block_data
-          in
-          let diff =
-            match slot_tx_end with
-            | Some slot_tx_end
-              when Mina_numbers.Global_slot_since_hard_fork.(
-                     global_slot_since_hard_fork >= slot_tx_end) ->
-                [%log info]
-                  "Reached slot_tx_end $slot_tx_end, producing empty block"
-                  ~metadata:
-                    [ ( "slot_tx_end"
-                      , Mina_numbers.Global_slot_since_hard_fork.to_yojson
-                          slot_tx_end )
-                    ] ;
-                Result.return
-                  Staged_ledger_diff.With_valid_signatures_and_proofs.empty_diff
-            | Some _ | None ->
-                O1trace.sync_thread "create_staged_ledger_diff" (fun () ->
-                    [%log internal] "Create_staged_ledger_diff" ;
-                    (* TODO: handle transaction inclusion failures here *)
-                    let diff_result =
-                      Staged_ledger.create_diff ~constraint_constants
-                        ~global_slot staged_ledger ~coinbase_receiver ~logger
-                        ~current_state_view:previous_state_view
-                        ~transactions_by_fee:transactions ~get_completed_work
-                        ~log_block_creation ~supercharge_coinbase
-                        ~zkapp_cmd_limit
-                      |> Result.map ~f:(fun (diff, failed_txns) ->
-                             if not (List.is_empty failed_txns) then
-                               don't_wait_for
-                                 (report_transaction_inclusion_failures ~logger
-                                    ~commit_id failed_txns ) ;
-                             diff )
-                      |> Result.map_error ~f:(fun err ->
-                             Staged_ledger.Staged_ledger_error.Pre_diff err )
-                    in
-                    [%log internal] "Create_staged_ledger_diff_done" ;
-                    match (diff_result, block_reward_threshold) with
-                    | Ok diff, Some threshold ->
-                        let net_return =
-                          Option.value ~default:Currency.Amount.zero
-                            (Staged_ledger_diff.net_return ~constraint_constants
-                               ~supercharge_coinbase
-                               (Staged_ledger_diff.forget diff) )
-                        in
-                        if Currency.Amount.(net_return >= threshold) then
-                          diff_result
-                        else (
-                          [%log info]
-                            "Block reward $reward is less than the \
-                             min-block-reward $threshold, creating empty block"
-                            ~metadata:
-                              [ ( "threshold"
-                                , Currency.Amount.to_yojson threshold )
-                              ; ("reward", Currency.Amount.to_yojson net_return)
-                              ] ;
-                          Ok
-                            Staged_ledger_diff.With_valid_signatures_and_proofs
-                            .empty_diff )
-                    | _ ->
-                        diff_result )
-          in
-          match diff with
-          | Error e ->
-              [%log error] "Error building the diff: $error"
-                ~metadata:
-                  [ ( "error"
-                    , `String (Staged_ledger.Staged_ledger_error.to_string e) )
-                  ] ;
-              Deferred.return None
-          | Ok diff -> (
-              [%log internal] "Apply_staged_ledger_diff" ;
-              let%map res =
-                Staged_ledger.apply_diff_unchecked staged_ledger
-                  ~constraint_constants ~global_slot diff ~logger
-                  ~current_state_view:previous_state_view
-                  ~state_and_body_hash:
-                    ( previous_protocol_state_hash
-                    , previous_protocol_state_body_hash )
-                  ~coinbase_receiver ~supercharge_coinbase
-                  ~zkapp_cmd_limit_hardcap
-              in
-              [%log internal] "Apply_staged_ledger_diff_done" ;
-              match res with
-              | Ok res ->
-                  Some (diff, res)
-              | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
-                  [%log error] "Failed to apply the diff: $error"
-                    ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-                  None
-              | Error e ->
-                  [%log error]
-                    ~metadata:
-                      [ ( "error"
-                        , `String
-                            (Staged_ledger.Staged_ledger_error.to_string e) )
-                      ; ( "diff"
-                        , Staged_ledger_diff.With_valid_signatures_and_proofs
-                          .to_yojson diff )
-                      ]
-                    "Error applying the diff $diff: $error" ;
-                  None ))
+      let coinbase_receiver =
+        Consensus.Data.Block_data.coinbase_receiver block_data
       in
-      match res with
-      | None ->
-          Interruptible.return None
-      | Some
-          ( diff
-          , ( `Hash_after_applying next_staged_ledger_hash
-            , `Ledger_proof ledger_proof_opt
-            , `Pending_coinbase_update (is_new_stack, pending_coinbase_update)
-            ) ) ->
-          let%bind protocol_state, consensus_transition_data =
-            lift_sync (fun () ->
-                let previous_ledger_hash =
-                  previous_protocol_state |> Protocol_state.blockchain_state
-                  |> Blockchain_state.snarked_ledger_hash
-                in
-                let ledger_proof_statement =
-                  match ledger_proof_opt with
-                  | Some proof ->
-                      Ledger_proof.statement proof
-                  | None ->
-                      let state =
-                        previous_protocol_state
-                        |> Protocol_state.blockchain_state
-                      in
-                      Blockchain_state.ledger_proof_statement state
-                in
-                let genesis_ledger_hash =
-                  previous_protocol_state |> Protocol_state.blockchain_state
-                  |> Blockchain_state.genesis_ledger_hash
-                in
-                let supply_increase =
-                  Option.value_map ledger_proof_opt
-                    ~f:(fun proof ->
-                      (Ledger_proof.statement proof).supply_increase )
-                    ~default:Currency.Amount.Signed.zero
-                in
-                let body_reference =
-                  Staged_ledger_diff.Body.compute_reference
-                    (Body.create @@ Staged_ledger_diff.forget diff)
-                in
-                let blockchain_state =
-                  (* We use the time of the beginning of the slot because if things
-                     are slower than expected, we may have entered the next slot and
-                     putting the **current** timestamp rather than the expected one
-                     will screw things up.
-
-                     [generate_transition] will log an error if the [current_time]
-                     has a different slot from the [scheduled_time]
-                  *)
-                  Blockchain_state.create_value ~timestamp:scheduled_time
-                    ~genesis_ledger_hash
-                    ~staged_ledger_hash:next_staged_ledger_hash ~body_reference
-                    ~ledger_proof_statement
-                in
-                let current_time =
-                  Block_time.now time_controller
-                  |> Block_time.to_span_since_epoch |> Block_time.Span.to_ms
-                in
-                O1trace.sync_thread "generate_consensus_transition" (fun () ->
-                    Consensus_state_hooks.generate_transition
-                      ~previous_protocol_state ~blockchain_state ~current_time
-                      ~block_data ~supercharge_coinbase
-                      ~snarked_ledger_hash:previous_ledger_hash
-                      ~genesis_ledger_hash ~supply_increase ~logger
-                      ~constraint_constants ) )
-          in
-          lift_sync (fun () ->
-              let snark_transition =
-                O1trace.sync_thread "generate_snark_transition" (fun () ->
-                    Snark_transition.create_value
-                      ~blockchain_state:
-                        (Protocol_state.blockchain_state protocol_state)
-                      ~consensus_transition:consensus_transition_data
-                      ~pending_coinbase_update () )
-              in
-              let internal_transition =
-                O1trace.sync_thread "generate_internal_transition" (fun () ->
-                    Internal_transition.create ~snark_transition
-                      ~prover_state:
-                        (Consensus.Data.Block_data.prover_state block_data)
-                      ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
-                      ~ledger_proof:ledger_proof_opt )
-              in
-              let witness =
-                { Pending_coinbase_witness.pending_coinbases =
-                    Staged_ledger.pending_coinbase_collection staged_ledger
-                ; is_new_stack
-                }
-              in
-              Some (protocol_state, internal_transition, witness) ) )
+      let previous_pending_coinbases =
+        Staged_ledger.pending_coinbase_collection staged_ledger
+      in
+      let create_diff =
+        (* Function to create diff if slot_tx_end condition isn't triggered *)
+        create_diff ~block_reward_threshold ~commit_id ~constraint_constants
+          ~global_slot staged_ledger ~coinbase_receiver ~logger
+          ~current_state_view:previous_state_view
+          ~transactions_by_fee:transactions ~get_completed_work
+          ~log_block_creation ~supercharge_coinbase ~zkapp_cmd_limit
+      in
+      let apply_diff =
+        apply_diff_unchecked staged_ledger ~constraint_constants ~global_slot
+          ~logger ~current_state_view:previous_state_view
+          ~state_and_body_hash:
+            (previous_protocol_state_hash, previous_protocol_state_body_hash)
+          ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap
+      in
+      let create_internal_transition =
+        create_internal_transition ~previous_pending_coinbases ~logger
+          ~constraint_constants ~previous_protocol_state ~time_controller
+          ~scheduled_time ~block_data ~supercharge_coinbase
+      in
+      let diff_opt =
+        (* Check if the slot_tx_end condition and create diff *)
+        wrap_create_diff ~logger ~slot_tx_end ~global_slot_since_hard_fork
+          create_diff
+        |> Result.map_error ~f:(handle_diff_build_error ~logger)
+        |> Result.map ~f:apply_diff |> Result.to_either |> Either.value
+      in
+      Option.bind ~f:create_internal_transition diff_opt
 
 module Precomputed = struct
   type t = Precomputed.t =
@@ -784,7 +783,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
               Interruptible.lift (Deferred.return ()) (Ivar.read ivar)
             in
             [%log internal] "Generate_next_state" ;
-            let%bind next_state_opt =
+            let next_state_opt =
               generate_next_state ~commit_id ~constraint_constants
                 ~scheduled_time ~block_data ~previous_protocol_state
                 ~time_controller

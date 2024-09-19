@@ -26,6 +26,8 @@ module Make3 (State : State_or_error_intf.State_intf2) :
 
   let run_state t ~state = t state
 
+  let eval_state t ~state = t state |> Or_error.map ~f:fst
+
   let error_if b ~message ~value =
     if b then fun _ -> Or_error.error_string message else return value
 end

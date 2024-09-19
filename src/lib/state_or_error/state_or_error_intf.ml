@@ -20,6 +20,8 @@ module type S = sig
 
   val run_state : 'a t -> state:state -> ('a * state) Or_error.t
 
+  val eval_state : 'a t -> state:state -> 'a Or_error.t
+
   val get : state t
 
   val put : state -> unit t
@@ -33,6 +35,8 @@ module type S2 = sig
   type 'a state
 
   val run_state : ('b, 'a) t -> state:'a state -> ('b * 'a state) Or_error.t
+
+  val eval_state : ('b, 'a) t -> state:'a state -> 'b Or_error.t
 
   val get : ('a state, 'a) t
 
@@ -48,6 +52,8 @@ module type S3 = sig
 
   val run_state :
     ('c, 'a, 'b) t -> state:('a, 'b) state -> ('c * ('a, 'b) state) Or_error.t
+
+  val eval_state : ('c, 'a, 'b) t -> state:('a, 'b) state -> 'c Or_error.t
 
   val get : (('a, 'b) state, 'a, 'b) t
 

@@ -825,11 +825,6 @@ let most_recent_valid_transition t = t.components.most_recent_valid_block
 
 let block_produced_bvar t = t.components.block_produced_bvar
 
-let staged_ledger_ledger_proof t =
-  let open Option.Let_syntax in
-  let%bind sl = best_staged_ledger_opt t in
-  Staged_ledger.current_ledger_proof sl
-
 let validated_transitions t = t.pipes.validated_transitions_reader
 
 let initialization_finish_signal t = t.initialization_finish_signal

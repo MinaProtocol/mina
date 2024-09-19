@@ -226,10 +226,7 @@ val apply_diff_unchecked :
        * [ `Ledger_proof of Ledger_proof.t option ]
        * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]
      , Staged_ledger_error.t )
-     Deferred.Result.t
-
-(** Most recent ledger proof in t *)
-val current_ledger_proof : t -> Ledger_proof.t option
+     result
 
 (* Internals of the txn application. This is only exposed to facilitate
    writing unit tests. *)

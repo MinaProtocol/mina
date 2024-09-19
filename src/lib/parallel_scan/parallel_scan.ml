@@ -73,8 +73,6 @@ module Base = struct
         [@@deriving sexp]
       end
     end]
-
-    let map (t : 'a t) ~(f : 'a -> 'b) : 'b t = { t with job = f t.job }
   end
 
   module Job = struct
@@ -86,9 +84,6 @@ module Base = struct
       end
     end]
 
-    let map (t : 'a t) ~(f : 'a -> 'b) : 'b t =
-      match t with Empty -> Empty | Full r -> Full (Record.map r ~f)
-
     let job_str = function Empty -> "Base.Empty" | Full _ -> "Base.Full"
   end
 
@@ -99,8 +94,6 @@ module Base = struct
       [@@deriving sexp]
     end
   end]
-
-  let map ((x, j) : 'a t) ~(f : 'a -> 'b) : 'b t = (x, Job.map j ~f)
 end
 
 (** For merge proofs: Merging two base proofs or two merge proofs*)
@@ -118,9 +111,6 @@ module Merge = struct
         [@@deriving sexp]
       end
     end]
-
-    let map (t : 'a t) ~(f : 'a -> 'b) : 'b t =
-      { t with left = f t.left; right = f t.right }
   end
 
   module Job = struct
@@ -134,15 +124,6 @@ module Merge = struct
         [@@deriving sexp]
       end
     end]
-
-    let map (t : 'a t) ~(f : 'a -> 'b) : 'b t =
-      match t with
-      | Empty ->
-          Empty
-      | Part x ->
-          Part (f x)
-      | Full r ->
-          Full (Record.map r ~f)
 
     let job_str = function
       | Empty ->
@@ -161,8 +142,6 @@ module Merge = struct
       [@@deriving sexp]
     end
   end]
-
-  let map ((x, j) : 'a t) ~(f : 'a -> 'b) : 'b t = (x, Job.map j ~f)
 end
 
 (**All the jobs on a tree that can be done. Base.Full and Merge.Full*)
@@ -917,18 +896,6 @@ module State = struct
   include T
   module Hash = Hash
 
-  let map (type a1 a2 b1 b2) (t : (a1, a2) t) ~(f1 : a1 -> b1) ~(f2 : a2 -> b2)
-      : (b1, b2) t =
-    { t with
-      trees =
-        Mina_stdlib.Nonempty_list.map t.trees
-          ~f:
-            (Tree.map_depth
-               ~f_merge:(fun _ -> Merge.map ~f:f1)
-               ~f_base:(Base.map ~f:f2) )
-    ; acc = Option.map t.acc ~f:(fun (m, bs) -> (f1 m, List.map bs ~f:f2))
-    }
-
   let hash t f_merge f_base =
     let { trees; acc; max_base_jobs; curr_job_seq_no; delay; _ } =
       with_leaner_trees t
@@ -1218,7 +1185,7 @@ let add_merge_jobs :
       in
       if
         Option.is_some result_opt
-        || List.length (curr_tree :: updated_trees) < max_trees state
+        || List.length updated_trees + 1 < max_trees state
            && List.length completed_jobs = List.length jobs_required
         (*exact number of jobs*)
       then (List.map updated_trees ~f:(Tree.reset_weights `Merge), result_opt)
@@ -1342,15 +1309,14 @@ let update_metrics t =
                Gauge.set (Scan_state_metrics.scan_state_merge_snarks ~name))
                (Int.to_float @@ merge_job_count) ) )
 
-let update_helper :
-       data:'base list
+let update_complete_jobs_helper :
+       data_count:int
     -> completed_jobs:'merge list
     -> ('a, 'merge, 'base) State_or_error.t =
- fun ~data ~completed_jobs ->
+ fun ~data_count ~completed_jobs ->
   let open State_or_error in
-  let open State_or_error.Let_syntax in
+  let open Let_syntax in
   let%bind t = get in
-  let data_count = List.length data in
   let%bind () =
     check
       (data_count > t.max_base_jobs)
@@ -1364,7 +1330,7 @@ let update_helper :
     let required = (List.length required_jobs + 1) / 2 in
     let got = (List.length completed_jobs + 1) / 2 in
     check
-      (got < required && List.length data > t.max_base_jobs - required + got)
+      (got < required && data_count > t.max_base_jobs - required + got)
       ~message:
         (sprintf
            !"Insufficient jobs (Data count %d): Required- %d got- %d"
@@ -1376,7 +1342,6 @@ let update_helper :
   let latest_tree = Mina_stdlib.Nonempty_list.head t.trees in
   let available_space = Tree.available_space latest_tree in
   (*Possible that new base jobs is added to a new tree within an update i.e., part of it is added to the first tree and the rest of it to a new tree. This happens when the throughput is not max. This also requires merge jobs to be done on two different set of trees*)
-  let data1, data2 = List.split_n data available_space in
   let required_jobs_for_current_tree =
     work
       (Mina_stdlib.Nonempty_list.tail t.trees)
@@ -1387,7 +1352,37 @@ let update_helper :
     List.split_n completed_jobs required_jobs_for_current_tree
   in
   (*update first set of jobs and data*)
-  let%bind result_opt = add_merge_jobs ~completed_jobs:jobs1 in
+  let%map result_opt = add_merge_jobs ~completed_jobs:jobs1 in
+  (result_opt, jobs2, available_space)
+
+let update_complete_jobs_helper' :
+       data_count:int
+    -> completed_jobs:'merge list
+    -> ('a, 'merge, 'base) State_or_error.t =
+ fun ~data_count ~completed_jobs ->
+  let open State_or_error in
+  let open Let_syntax in
+  let%bind result_opt, _, _ =
+    update_complete_jobs_helper ~data_count ~completed_jobs
+  in
+  let%map state = State_or_error.get in
+  (*update the latest emitted value *)
+  Option.merge result_opt state.acc ~f:Fn.const |> Option.map ~f:fst
+
+(* TODO: taking ledger proof from above might not be a corect strategy as add_merge_jobs called later may have replaced that proof already *)
+
+let update_helper :
+       data:'base list
+    -> completed_jobs:'merge list
+    -> ('a, 'merge, 'base) State_or_error.t =
+ fun ~data ~completed_jobs ->
+  let open State_or_error in
+  let open Let_syntax in
+  let data_count = List.length data in
+  let%bind result_opt, jobs2, available_space =
+    update_complete_jobs_helper ~data_count ~completed_jobs
+  in
+  let data1, data2 = List.split_n data available_space in
   let%bind () = add_data ~data:data1 in
   (*update second set of jobs and data. This will be empty if all the data fit in the current tree*)
   let%bind _ = add_merge_jobs ~completed_jobs:jobs2 in
@@ -1409,6 +1404,15 @@ let update_helper :
            (max_trees state) )
   in
   result_opt
+
+let update_light :
+       data_count:int
+    -> completed_jobs:'merge list
+    -> ('merge, 'base) t
+    -> 'merge option Or_error.t =
+ fun ~data_count ~completed_jobs state ->
+  State_or_error.eval_state ~state
+  @@ update_complete_jobs_helper' ~data_count ~completed_jobs
 
 let update :
        data:'base list

@@ -398,22 +398,18 @@ module For_tests = struct
       let body =
         Mina_block.Body.create @@ Staged_ledger_diff.forget staged_ledger_diff
       in
-      let%bind ( `Hash_after_applying next_staged_ledger_hash
-               , `Ledger_proof ledger_proof_opt
-               , `Pending_coinbase_update _ ) =
-        match%bind
-          Staged_ledger.apply_diff_unchecked parent_staged_ledger
-            ~global_slot:current_global_slot ~coinbase_receiver ~logger
-            staged_ledger_diff
-            ~constraint_constants:precomputed_values.constraint_constants
-            ~current_state_view ~state_and_body_hash ~supercharge_coinbase
-            ~zkapp_cmd_limit_hardcap:
-              precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap
-        with
-        | Ok r ->
-            return r
-        | Error e ->
-            failwith (Staged_ledger.Staged_ledger_error.to_string e)
+      let ( `Hash_after_applying next_staged_ledger_hash
+          , `Ledger_proof ledger_proof_opt
+          , `Pending_coinbase_update _ ) =
+        Staged_ledger.apply_diff_unchecked parent_staged_ledger
+          ~global_slot:current_global_slot ~coinbase_receiver ~logger
+          staged_ledger_diff
+          ~constraint_constants:precomputed_values.constraint_constants
+          ~current_state_view ~state_and_body_hash ~supercharge_coinbase
+          ~zkapp_cmd_limit_hardcap:
+            precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap
+        |> Result.map_error ~f:Staged_ledger.Staged_ledger_error.to_string
+        |> Result.ok_or_failwith
       in
       let previous_protocol_state =
         parent_breadcrumb |> block |> Mina_block.header
