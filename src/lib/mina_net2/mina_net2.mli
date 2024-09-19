@@ -138,7 +138,7 @@ end
 *)
 val create :
      ?allow_multiple_instances:bool
-     -> ?outstanding_resource_requests:outstanding_request_t Blake2.Table.t
+  -> ?outstanding_resource_requests:outstanding_request_t Blake2.Table.t
   -> all_peers_seen_metric:bool
   -> logger:Logger.t
   -> pids:Child_processes.Termination.t
