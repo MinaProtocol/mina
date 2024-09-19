@@ -5,7 +5,14 @@
 set -eox pipefail
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-source ${SCRIPTPATH}/../export-git-env-vars.sh
+
+# In case of running this script on detached head, script has difficulties in finding out
+# what is the current branch.
+if [[ -n "$BRANCH_NAME" ]]; then 
+  BRANCH_NAME="$BRANCH_NAME" source ${SCRIPTPATH}/../export-git-env-vars.sh
+else
+  source ${SCRIPTPATH}/../export-git-env-vars.sh
+fi 
 
 echo "after export"
 
