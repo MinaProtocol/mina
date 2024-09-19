@@ -945,13 +945,15 @@ let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
 
 module type Config_loader = sig
   val load_config :
-       ?cli_proof_level:Genesis_constants.Proof_level.t
+       ?itn_features:bool
+    -> ?cli_proof_level:Genesis_constants.Proof_level.t
     -> config_file:string
     -> unit
     -> t Deferred.Or_error.t
 
   val load_config_exn :
-       ?cli_proof_level:Genesis_constants.Proof_level.t
+       ?itn_features:bool
+    -> ?cli_proof_level:Genesis_constants.Proof_level.t
     -> config_file:string
     -> unit
     -> t Deferred.t
@@ -988,7 +990,7 @@ module Config_loader : Config_loader = struct
     in
     { constraint_config; genesis_constants; compile_config; ledger; epoch_data }
 
-  let load_config ?cli_proof_level ~config_file () =
+  let load_config ?(itn_features = false) ?cli_proof_level ~config_file () =
     let open Deferred.Or_error.Let_syntax in
     let%bind config = load_config_json config_file in
     let e_config = of_json_layout config in
@@ -1001,10 +1003,12 @@ module Config_loader : Config_loader = struct
               { config.constraint_config with
                 proof_level = Option.value ~default:proof_level cli_proof_level
               }
+          ; compile_config = { config.compile_config with itn_features }
           }
     | Error e ->
         Deferred.Or_error.error_string e
 
-  let load_config_exn ?cli_proof_level ~config_file () =
-    Deferred.Or_error.ok_exn @@ load_config ?cli_proof_level ~config_file ()
+  let load_config_exn ?itn_features ?cli_proof_level ~config_file () =
+    Deferred.Or_error.ok_exn
+    @@ load_config ?itn_features ?cli_proof_level ~config_file ()
 end
