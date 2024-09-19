@@ -11,8 +11,6 @@ open Async_kernel
 
 let time_offset_sec = 1609459200.
 
-let block_window_duration = Node_config.block_window_duration
-
 (* textformat serialization and runtime metrics taken from github.com/mirage/prometheus:/app/prometheus_app.ml *)
 module TextFormat_0_0_4 = struct
   let re_unquoted_escapes = Re.compile @@ Re.set "\\\n"
@@ -223,8 +221,7 @@ module Runtime = struct
 
   let process_uptime_ms_total =
     simple_metric ~metric_type:Counter "process_uptime_ms_total"
-      (fun () ->
-        Core.Time.Span.to_ms (Core.Time.diff (Core.Time.now ()) start_time) )
+      (fun () -> Time.Span.to_ms (Core.Time.diff (Core.Time.now ()) start_time))
       ~help:"Total time the process has been running for in milliseconds."
 
   let metrics =
@@ -433,11 +430,9 @@ module Network = struct
     Counter.v "messages_received" ~help ~namespace ~subsystem
 
   module Delay_time_spec = struct
-    let tick_interval =
-      Core.Time.Span.of_ms (Int.to_float block_window_duration)
-
-    let rolling_interval =
-      Core.Time.Span.of_ms (Int.to_float (block_window_duration * 20))
+    let intervals block_window_duration =
+      Intervals.make ~rolling_interval:block_window_duration
+        ~tick_interval:block_window_duration
   end
 
   module Block = struct
@@ -459,49 +454,48 @@ module Network = struct
       let help = "# of blocks received" in
       Counter.v "received" ~help ~namespace ~subsystem
 
-    module Validation_time =
-      Moving_time_average
-        (struct
-          include Delay_time_spec
+    module Gauge_map = Metric_map (struct
+      type t = Gauge.t
 
-          let subsystem = subsystem
+      let subsystem = subsystem
 
-          let name = "validation_time"
+      let v = Gauge.v
+    end)
 
-          let help =
-            "average time, in ms, for blocks to be validated and rebroadcasted"
-        end)
-        ()
+    module Validation_time = Moving_time_average (struct
+      include Delay_time_spec
 
-    module Processing_time =
-      Moving_time_average
-        (struct
-          include Delay_time_spec
+      let subsystem = subsystem
 
-          let subsystem = subsystem
+      let name = "validation_time"
 
-          let name = "processing_time"
+      let help =
+        "average time, in ms, for blocks to be validated and rebroadcasted"
+    end)
 
-          let help =
-            "average time, in ms, for blocks to be accepted after the OCaml \
-             process receives it"
-        end)
-        ()
+    module Processing_time = Moving_time_average (struct
+      include Delay_time_spec
 
-    module Rejection_time =
-      Moving_time_average
-        (struct
-          include Delay_time_spec
+      let subsystem = subsystem
 
-          let subsystem = subsystem
+      let name = "processing_time"
 
-          let name = "rejection_time"
+      let help =
+        "average time, in ms, for blocks to be accepted after the OCaml \
+         process receives it"
+    end)
 
-          let help =
-            "average time, in ms, for blocks to be rejected after the OCaml \
-             process receives it"
-        end)
-        ()
+    module Rejection_time = Moving_time_average (struct
+      include Delay_time_spec
+
+      let subsystem = subsystem
+
+      let name = "rejection_time"
+
+      let help =
+        "average time, in ms, for blocks to be rejected after the OCaml \
+         process receives it"
+    end)
   end
 
   module Snark_work = struct
@@ -523,50 +517,48 @@ module Network = struct
       let help = "# of snark work received" in
       Counter.v "received" ~help ~namespace ~subsystem
 
-    module Validation_time =
-      Moving_time_average
-        (struct
-          include Delay_time_spec
+    module Gauge_map = Metric_map (struct
+      type t = Gauge.t
 
-          let subsystem = subsystem
+      let subsystem = subsystem
 
-          let name = "validation_time"
+      let v = Gauge.v
+    end)
 
-          let help =
-            "average delay, in ms, for snark work to be validated and \
-             rebroadcasted"
-        end)
-        ()
+    module Validation_time = Moving_time_average (struct
+      include Delay_time_spec
 
-    module Processing_time =
-      Moving_time_average
-        (struct
-          include Delay_time_spec
+      let subsystem = subsystem
 
-          let subsystem = subsystem
+      let name = "validation_time"
 
-          let name = "processing_time"
+      let help =
+        "average delay, in ms, for snark work to be validated and rebroadcasted"
+    end)
 
-          let help =
-            "average delay, in ms, for snark work to be accepted after the \
-             OCaml process receives it"
-        end)
-        ()
+    module Processing_time = Moving_time_average (struct
+      include Delay_time_spec
 
-    module Rejection_time =
-      Moving_time_average
-        (struct
-          include Delay_time_spec
+      let subsystem = subsystem
 
-          let subsystem = subsystem
+      let name = "processing_time"
 
-          let name = "rejection_time"
+      let help =
+        "average delay, in ms, for snark work to be accepted after the OCaml \
+         process receives it"
+    end)
 
-          let help =
-            "average time, in ms, for snark work to be rejected after the \
-             OCaml process receives it"
-        end)
-        ()
+    module Rejection_time = Moving_time_average (struct
+      include Delay_time_spec
+
+      let subsystem = subsystem
+
+      let name = "rejection_time"
+
+      let help =
+        "average time, in ms, for snark work to be rejected after the OCaml \
+         process receives it"
+    end)
   end
 
   module Transaction = struct
@@ -588,50 +580,49 @@ module Network = struct
       let help = "# of transactions received" in
       Counter.v "received" ~help ~namespace ~subsystem
 
-    module Validation_time =
-      Moving_time_average
-        (struct
-          include Delay_time_spec
+    module Gauge_map = Metric_map (struct
+      type t = Gauge.t
 
-          let subsystem = subsystem
+      let subsystem = subsystem
 
-          let name = "validation_time"
+      let v = Gauge.v
+    end)
 
-          let help =
-            "average delay, in ms, for transactions to be validated and \
-             rebroadcasted"
-        end)
-        ()
+    module Validation_time = Moving_time_average (struct
+      include Delay_time_spec
 
-    module Processing_time =
-      Moving_time_average
-        (struct
-          include Delay_time_spec
+      let subsystem = subsystem
 
-          let subsystem = subsystem
+      let name = "validation_time"
 
-          let name = "processing_time"
+      let help =
+        "average delay, in ms, for transactions to be validated and \
+         rebroadcasted"
+    end)
 
-          let help =
-            "average delay, in ms, for transactions to be accepted after the \
-             OCaml process receives it"
-        end)
-        ()
+    module Processing_time = Moving_time_average (struct
+      include Delay_time_spec
 
-    module Rejection_time =
-      Moving_time_average
-        (struct
-          include Delay_time_spec
+      let subsystem = subsystem
 
-          let subsystem = subsystem
+      let name = "processing_time"
 
-          let name = "rejection_time"
+      let help =
+        "average delay, in ms, for transactions to be accepted after the OCaml \
+         process receives it"
+    end)
 
-          let help =
-            "average time, in ms, for transactions to be rejected after the \
-             OCaml process receives it"
-        end)
-        ()
+    module Rejection_time = Moving_time_average (struct
+      include Delay_time_spec
+
+      let subsystem = subsystem
+
+      let name = "rejection_time"
+
+      let help =
+        "average time, in ms, for transactions to be rejected after the OCaml \
+         process receives it"
+    end)
   end
 
   let rpc_requests_received : Counter.t =
@@ -1275,28 +1266,31 @@ module Transition_frontier = struct
     let help = "total # of staged txns that have been finalized" in
     Counter.v "finalized_staged_txns" ~help ~namespace ~subsystem
 
-  module TPS_30min =
-    Moving_bucketed_average
-      (struct
-        let bucket_interval = Core.Time.Span.of_min 3.0
+  module Gauge_map = Metric_map (struct
+    type t = Gauge.t
 
-        let num_buckets = 10
+    let subsystem = subsystem
 
-        let render_average buckets =
-          let total =
-            List.fold buckets ~init:0.0 ~f:(fun acc (n, _) -> acc +. n)
-          in
-          total /. Core.Time.Span.(of_min 30.0 |> to_sec)
+    let v = Gauge.v
+  end)
 
-        let subsystem = subsystem
+  module TPS_30min = Moving_bucketed_average (struct
+    let bucket_interval _ = Time.Span.of_min 3.0
 
-        let name = "tps_30min"
+    let num_buckets _ = 10
 
-        let help =
-          "moving average for transaction per second, the rolling interval is \
-           set to 30 min"
-      end)
-      ()
+    let render_average buckets =
+      let total = List.fold buckets ~init:0.0 ~f:(fun acc (n, _) -> acc +. n) in
+      total /. Time.Span.(of_min 30.0 |> to_sec)
+
+    let subsystem = subsystem
+
+    let name = "tps_30min"
+
+    let help =
+      "moving average for transaction per second, the rolling interval is set \
+       to 30 min"
+  end)
 
   let recently_finalized_staged_txns : Gauge.t =
     let help =
@@ -1443,82 +1437,76 @@ module Block_latency = struct
   end
 
   module Latency_time_spec = struct
-    let tick_interval =
-      Core.Time.Span.of_ms (Int.to_float (block_window_duration / 2))
-
-    let rolling_interval =
-      Core.Time.Span.of_ms (Int.to_float (block_window_duration * 20))
+    let intervals block_window_duration =
+      Intervals.make
+        ~tick_interval:(Time.Span.scale block_window_duration 0.5)
+        ~rolling_interval:(Time.Span.scale block_window_duration 20.0)
   end
 
-  module Gossip_slots =
-    Moving_bucketed_average
-      (struct
-        let bucket_interval =
-          Core.Time.Span.of_ms (Int.to_float (block_window_duration / 2))
+  module Gauge_map = Metric_map (struct
+    type t = Gauge.t
 
-        let num_buckets = 40
+    let subsystem = subsystem
 
-        let subsystem = subsystem
+    let v = Gauge.v
+  end)
 
-        let name = "gossip_slots"
+  module Gossip_slots = Moving_bucketed_average (struct
+    let bucket_interval block_window_duration =
+      Time.Span.scale block_window_duration 0.5
 
-        let help =
-          "average delay, in slots, after which produced blocks are received"
+    let num_buckets _ = 40
 
-        let render_average buckets =
-          let total_sum, count_sum =
-            List.fold buckets ~init:(0.0, 0)
-              ~f:(fun (total_sum, count_sum) (total, count) ->
-                (total_sum +. total, count_sum + count) )
-          in
-          total_sum /. Float.of_int count_sum
-      end)
-      ()
+    let subsystem = subsystem
 
-  module Gossip_time =
-    Moving_time_average
-      (struct
-        include Latency_time_spec
+    let name = "gossip_slots"
 
-        let subsystem = subsystem
+    let help =
+      "average delay, in slots, after which produced blocks are received"
 
-        let name = "gossip_time"
+    let render_average buckets =
+      let total_sum, count_sum =
+        List.fold buckets ~init:(0.0, 0)
+          ~f:(fun (total_sum, count_sum) (total, count) ->
+            (total_sum +. total, count_sum + count) )
+      in
+      total_sum /. Float.of_int count_sum
+  end)
 
-        let help =
-          "average delay, in seconds, after which produced blocks are received"
-      end)
-      ()
+  module Gossip_time = Moving_time_average (struct
+    include Latency_time_spec
 
-  module Inclusion_time =
-    Moving_time_average
-      (struct
-        include Latency_time_spec
+    let subsystem = subsystem
 
-        let subsystem = subsystem
+    let name = "gossip_time"
 
-        let name = "inclusion_time"
+    let help =
+      "average delay, in seconds, after which produced blocks are received"
+  end)
 
-        let help =
-          "average delay, in seconds, after which produced blocks are included \
-           into our frontier"
-      end)
-      ()
+  module Inclusion_time = Moving_time_average (struct
+    include Latency_time_spec
 
-  module Validation_acceptance_time =
-    Moving_time_average
-      (struct
-        include Latency_time_spec
+    let subsystem = subsystem
 
-        let subsystem = subsystem
+    let name = "inclusion_time"
 
-        let name = "validation_acceptance_time"
+    let help =
+      "average delay, in seconds, after which produced blocks are included \
+       into our frontier"
+  end)
 
-        let help =
-          "average delay, in seconds, between the time blocks are initially \
-           received from the libp2p_helper, and when they are accepted as \
-           valid"
-      end)
-      ()
+  module Validation_acceptance_time = Moving_time_average (struct
+    include Latency_time_spec
+
+    let subsystem = subsystem
+
+    let name = "validation_acceptance_time"
+
+    let help =
+      "average delay, in seconds, between the time blocks are initially \
+       received from the libp2p_helper, and when they are accepted as valid"
+  end)
 end
 
 module Rejected_blocks = struct
@@ -1767,3 +1755,10 @@ module Archive = struct
     ; gauge_metrics = Hashtbl.create (module String)
     }
 end
+
+let initialize_all block_window_duration =
+  Transition_frontier.TPS_30min.initialize block_window_duration ;
+  Block_latency.Gossip_slots.initialize block_window_duration ;
+  Block_latency.Gossip_time.initialize block_window_duration ;
+  Block_latency.Inclusion_time.initialize block_window_duration ;
+  Block_latency.Validation_acceptance_time.initialize block_window_duration
