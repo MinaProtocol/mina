@@ -375,6 +375,9 @@ module Make (Inputs : Inputs_intf.S) = struct
         impl [] 0 init_tasks
 
     let finalize_hashes_do t unhashed_accounts =
+      eprintf "finalizing hashes for %d accounts: %s\n"
+        (List.length unhashed_accounts)
+        Caml.(Printexc.get_callstack 40 |> Printexc.raw_backtrace_to_string) ;
       let with_merkle_path_batch accs =
         let { hashes; _ }, ancestor = maps_and_ancestor t in
         path_batch_impl
