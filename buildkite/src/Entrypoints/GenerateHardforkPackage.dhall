@@ -35,7 +35,7 @@ let generate_hardfork_package =
                         , Cmd.quietly
                             "dhall-to-yaml --quoted <<< '(Pipeline.build (HardforkPackageGeneration.pipeline HardforkPackageGeneration.Spec::{=}).pipeline' | buildkite-agent pipeline upload"
                         , Cmd.quietly
-                            "dhall-to-yaml --quoted <<< '(Pipeline.build (HardforkPackageGeneration.pipeline HardforkPackageGeneration.Spec::{codename = DebianVersions.DebVersion.Buster}).pipeline' | buildkite-agent pipeline upload"
+                            "dhall-to-yaml --quoted <<< '(Pipeline.build (HardforkPackageGeneration.pipeline HardforkPackageGeneration.Spec::{codename = DebianVersions.DebVersion.Bullseye}).pipeline' | buildkite-agent pipeline upload"
                         ]
                       , label = "Generate hardfork package"
                       , key = "generate-hardfork-package"

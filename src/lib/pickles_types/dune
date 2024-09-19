@@ -37,4 +37,5 @@
   tuple_lib
   ppx_version.runtime
   bounded_types
+  mina_wire_types
   ))

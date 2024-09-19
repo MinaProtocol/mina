@@ -10,7 +10,8 @@ set -x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator')
+
+VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard'  'itn-orchestrator')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -22,7 +23,7 @@ function usage() {
   echo "  -n, --network             The network configuration to use (devnet or mainnet). Default=devnet"
   echo "  -b, --branch              The branch of the mina repository to use for staged docker builds. Default=compatible"
   echo "  -r, --repo                The currently used mina repository"
-  echo "      --deb-codename        The debian codename (stretch or buster) to build the docker image from. Default=stretch"
+  echo "      --deb-codename        The debian codename (bullseye or focal) to build the docker image from. Default=stretch"
   echo "      --deb-release         The debian package release channel to pull from (unstable,alpha,beta,stable). Default=unstable"
   echo "      --deb-version         The version string for the debian package to install"
   echo "      --deb-profile         The profile string for the debian package to install"
@@ -56,7 +57,7 @@ case "${DEB_CODENAME##*=}" in
   bionic|focal|impish|jammy)
     IMAGE="ubuntu:${DEB_CODENAME##*=}"
   ;;
-  stretch|buster|bullseye|bookworm|sid)
+  stretch|bullseye|bookworm|sid)
     IMAGE="debian:${DEB_CODENAME##*=}-slim"
   ;;
 esac
@@ -138,14 +139,6 @@ mina-zkapp-test-transaction)
 leaderboard)
   DOCKERFILE_PATH="frontend/leaderboard/Dockerfile"
   DOCKER_CONTEXT="frontend/leaderboard"
-  ;;
-delegation-backend)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend"
-  DOCKER_CONTEXT="src/app/delegation_backend"
-  ;;
-delegation-backend-toolchain)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend-toolchain"
-  DOCKER_CONTEXT="src/app/delegation_backend"
   ;;
 itn-orchestrator)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-itn-orchestrator"

@@ -131,7 +131,7 @@ module M4 = struct
     module V2 = struct
       [@@@with_all_version_tags]
 
-      type t = { a : int; b : string } [@@deriving equal]
+      type t = { a : int; b : Bounded_types.String.Tagged.Stable.V1.t } [@@deriving equal]
 
       let to_latest = Fn.id
     end
@@ -139,7 +139,7 @@ module M4 = struct
     module V1 = struct
       [@@@with_all_version_tags]
 
-      type t = { a : string; b : int }
+      type t = { a : Bounded_types.String.Tagged.Stable.V1.t; b : int }
 
       let to_latest ({ a; b } : t) : Latest.t = { a = b; b = a }
     end

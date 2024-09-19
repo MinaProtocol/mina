@@ -3,8 +3,9 @@ use crate::{
     pasta_fq_plonk_index::CamlPastaFqPlonkIndexPtr,
     plonk_verifier_index::{CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex},
     srs::fq::CamlFqSrs,
+    WithLagrangeBasis,
 };
-use ark_ec::AffineCurve;
+use ark_ec::AffineRepr;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use kimchi::circuits::constraints::FeatureFlags;
@@ -222,7 +223,7 @@ pub fn caml_pasta_fq_plonk_verifier_index_create(
     {
         let ptr: &mut poly_commitment::srs::SRS<Pallas> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
-        ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
+        ptr.with_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
     let verifier_index = index.as_ref().0.verifier_index();
     verifier_index.into()
@@ -240,7 +241,7 @@ pub fn caml_pasta_fq_plonk_verifier_index_shifts(log2_size: ocaml::Int) -> Vec<C
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierIndex {
     fn comm() -> CamlPolyComm<CamlGPallas> {
-        let g: CamlGPallas = Pallas::prime_subgroup_generator().into();
+        let g: CamlGPallas = Pallas::generator().into();
         CamlPolyComm {
             shifted: None,
             unshifted: vec![g, g, g],
