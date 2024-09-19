@@ -455,6 +455,9 @@ end = struct
     if Hash.equal actual expected then `Success
     else `Hash_mismatch (expected, actual)
 
+  (* TODO: parameterize *)
+  let subtree_depth : index = 4
+
   (* Provides addresses at an specific depth from this address *)
   let rec intermediate_range : index -> Addr.t -> index -> Addr.t list =
    fun ledger_depth addr i ->
@@ -474,28 +477,31 @@ end = struct
         left @ right
 
   (* Merges each 2 contigous nodes, halving the size of the list *)
-  let rec merge_siblings : Hash.t list -> Hash.t list =
-   (* TODO: domain separation *)
-   fun nodes ->
+  let rec merge_siblings : Hash.t list -> index -> Hash.t list =
+   fun nodes height ->
     match nodes with
     | [ l; r ] ->
-        [ Hash.merge ~height:5 l r ]
+        [ Hash.merge ~height l r ]
     | l :: r :: rest ->
-        Hash.merge ~height:5 l r :: merge_siblings rest
+        Hash.merge ~height l r :: merge_siblings rest height
     | _ ->
         (* TODO: give some error as this shouldn't really happen *)
         []
 
   (* Assumes nodes to be a power of 2 and merges them into their common root *)
-  (* TODO:domain separation *)
-  let rec merge_many : Hash.t list -> Hash.t =
-   fun nodes ->
+  let rec merge_many : Hash.t list -> index -> Hash.t =
+   fun nodes depth ->
     match nodes with
     | [ single ] ->
         single
     | many ->
-        let half = merge_siblings many in
-        merge_many half
+        let half = merge_siblings many depth in
+        merge_many half (depth - 1)
+
+  let merge_many : Hash.t list -> index -> Hash.t =
+   fun nodes depth ->
+    let final_depth = depth + subtree_depth in
+    merge_many nodes final_depth
 
   (* Adds the subtree given as the 2^k subtree leaves with the given prefix address *)
   (* Returns next nodes to be checked *)
@@ -507,16 +513,15 @@ end = struct
       =
    fun t addr nodes ->
     (* let prefix_depth = Addr.depth addr in *)
+    let ledger_depth = MT.depth t.tree in
     let expected =
       Option.value_exn ~message:"Forgot to wait for a node"
         (Addr.Table.find t.waiting_parents addr)
     in
-    let merged = merge_many nodes in
+    let merged = merge_many nodes (ledger_depth - Addr.depth addr) in
     if Hash.equal expected merged then (
       Addr.Table.remove t.waiting_parents addr ;
-      let ledger_depth = MT.depth t.tree in
-      (* TODO: parameterize *)
-      let addresses = intermediate_range ledger_depth addr 5 in
+      let addresses = intermediate_range ledger_depth addr subtree_depth in
       let addresses_and_hashes = List.(zip_exn addresses nodes) in
 
       (* Filter to fetch only those that differ *)
@@ -618,8 +623,7 @@ end = struct
 
       (* If distance to the account subtree is big enough, use wide queries,
          if not just request the next 2 children *)
-      (* TODO: parameterize depth *)
-      if depth_to_account_subtree >= 5 then (
+      if depth_to_account_subtree >= subtree_depth then (
         expect_subtree t addr exp_hash ;
         Linear_pipe.write_without_pushback_if_open t.queries
           (* TODO: verify purpose of sending the root *)
