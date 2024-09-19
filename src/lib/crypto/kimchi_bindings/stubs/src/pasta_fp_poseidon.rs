@@ -70,18 +70,18 @@ pub fn caml_pasta_fp_poseidon_update(
 #[ocaml::func]
 pub fn caml_pasta_fp_poseidon_update_batch(
     params: CamlPastaFpPoseidonParamsPtr,
+    chunk_size: usize,
     state: CamlFpVector,
     mut inputs: CamlFpBatchVector,
 ) {
     let state_ = state.to_vec();
     let params2 = &params.as_ref().0;
-    let n = 128;
     let f = |input: &mut Vec<Fp>| {
         let input_ = input.clone();
         *input = state_.clone();
         caml_pasta_fp_poseidon_update_impl(params2, input, input_);
     };
     inputs
-        .par_chunks_mut(n)
+        .par_chunks_mut(chunk_size)
         .for_each(|chunk| chunk.iter_mut().for_each(f));
 }

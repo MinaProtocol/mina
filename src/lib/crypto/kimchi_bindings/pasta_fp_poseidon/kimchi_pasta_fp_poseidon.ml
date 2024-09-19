@@ -13,6 +13,7 @@ external update :
 
 external update_batch :
      t
+  -> int
   -> Kimchi_bindings.FieldVectors.Fp.t
   -> Kimchi_bindings.FieldVectors.Fp_batch.t
   -> unit = "caml_pasta_fp_poseidon_update_batch"
