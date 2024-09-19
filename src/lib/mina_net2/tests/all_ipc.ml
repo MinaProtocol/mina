@@ -537,10 +537,11 @@ let%test_module "all-ipc test" =
       let%bind conf_dir =
         Unix.mkdtemp (String.concat [ "p2p_helper_test_"; local_name ])
       in
+      let on_bitswap_update ~tag:_ _ _ = failwith "no bitswap update handler" in
       let%bind node =
         create ~all_peers_seen_metric:false
           ~logger:(Logger.extend logger [ ("name", `String local_name) ])
-          ~conf_dir ~pids ~on_peer_connected ~on_peer_disconnected ()
+          ~conf_dir ~pids ~on_peer_connected ~on_peer_disconnected ~on_bitswap_update ()
         >>| Or_error.ok_exn
       in
       let%bind kp_a =
@@ -577,7 +578,7 @@ let%test_module "all-ipc test" =
       let shutdown () =
         [%log info] "Shutting down $name"
           ~metadata:[ ("name", `String local_name) ] ;
-        let%bind () = shutdown node in
+        let%bind _ = shutdown node in
         File_system.remove_dir conf_dir
       in
       return (node, peerid, addr, shutdown)
