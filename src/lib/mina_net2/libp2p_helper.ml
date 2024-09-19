@@ -369,12 +369,12 @@ let send_add_resource ~tag ~data =
 let send_download_resource ~tag ~ids =
   let tag = Bitswap_tag.to_enum tag in
   let ids = List.map ids ~f:Consensus.Body_reference.to_raw_string in
-  send_push ~name:"DownloadResourse"
+  send_push ~name:"DownloadResource"
     ~msg:(Libp2p_ipc.create_download_resource_push_message ~tag ~ids)
 
 let send_remove_resource ~ids =
   let ids = List.map ids ~f:Consensus.Body_reference.to_raw_string in
-  send_push ~name:"RemoveResourse"
+  send_push ~name:"RemoveResource"
     ~msg:(Libp2p_ipc.create_remove_resource_push_message ~ids)
 
 let send_heartbeat ~peer_id =
