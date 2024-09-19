@@ -1,5 +1,9 @@
 open Pickles_types
 
+val zk_rows_by_default : int
+
+val num_chunks_by_default : int
+
 type 'field plonk_domain =
   < vanishing_polynomial : 'field -> 'field
   ; shifts : 'field Pickles_types.Plonk_types.Shifts.t
@@ -93,7 +97,9 @@ val scalars_env :
   -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
   -> 't Scalars.Env.t
 
-module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : sig
+module Make
+    (Shifted_value : Pickles_types.Shifted_value.S)
+    (_ : Scalars.S) : sig
   val ft_eval0 :
        't field
     -> domain:< shifts : 't array ; .. >
