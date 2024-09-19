@@ -139,18 +139,21 @@ module type GOSSIP_NET = sig
     -> 'q
     -> 'r rpc_response Deferred.t List.t Deferred.t
 
-  val broadcast_state :
-    ?origin_topic:string -> t -> Message.state_msg -> unit Deferred.t
+  val broadcast_transition :
+  ?origin_topics:string list
+  -> t
+  -> [ `Block of Mina_block.t | `Header of Mina_block.Header.t ]
+  -> unit Deferred.t
 
   val broadcast_transaction_pool_diff :
-       ?origin_topic:string
+       ?origin_topic:string list
     -> ?nonce:int
     -> t
     -> Message.transaction_pool_diff_msg
     -> unit Deferred.t
 
   val broadcast_snark_pool_diff :
-       ?origin_topic:string
+       ?origin_topic:string list
     -> ?nonce:int
     -> t
     -> Message.snark_pool_diff_msg
@@ -161,4 +164,16 @@ module type GOSSIP_NET = sig
   val on_first_high_connectivity : t -> f:(unit -> 'a) -> 'a Deferred.t
 
   val ban_notification_reader : t -> ban_notification Linear_pipe.Reader.t
+
+  val add_bitswap_resource :
+  t
+-> id:Blake2.t
+-> tag:Mina_net2.Bitswap_tag.t
+-> data:string
+-> unit Deferred.t
+
+val download_bitswap_resource :
+t -> tag:Mina_net2.Bitswap_tag.t -> ids:Blake2.t list -> unit Deferred.t
+
+val remove_bitswap_resource : t -> ids:Blake2.t list -> unit Deferred.t
 end
