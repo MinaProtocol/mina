@@ -36,3 +36,7 @@ export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 
 [[ -n ${THIS_COMMIT_TAG} ]] && export MINA_COMMIT_TAG="${THIS_COMMIT_TAG}"
 
 echo "after commit tag"
+
+if [[ $GITBRANCH = "HEAD" ]]; then
+  exit -1
+fi
