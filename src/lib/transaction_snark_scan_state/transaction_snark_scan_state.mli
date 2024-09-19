@@ -3,6 +3,7 @@ open Async_kernel
 open Mina_base
 open Mina_transaction
 module Ledger = Mina_ledger.Ledger
+module Transaction_with_optional_witness = Transaction_with_optional_witness
 
 [%%versioned:
 module Stable : sig
@@ -25,6 +26,8 @@ module Transaction_with_witness : sig
     ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
     }
   [@@deriving sexp]
+
+  val of_optional : Transaction_with_optional_witness.Full.t -> t
 end
 
 module Ledger_proof_with_sok_message : sig

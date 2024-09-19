@@ -330,6 +330,8 @@ val latest_block_accounts_created :
   t -> previous_block_state_hash:State_hash.t -> Account_id.t list
 
 module Test_helpers : sig
+  open Transaction_snark_scan_state
+
   val dummy_state_and_view :
        ?global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> unit
@@ -354,7 +356,7 @@ module Test_helpers : sig
     -> Zkapp_precondition.Protocol_state.View.t
     -> Frozen_ledger_hash.t * Frozen_ledger_hash.t
     -> ( bool
-         * Transaction_snark_scan_state.Transaction_with_witness.t list
+         * Transaction_with_optional_witness.Light.t list
          * Pending_coinbase.Update.Action.t
          * [> `Update_none
            | `Update_one of Pending_coinbase.Stack_versioned.t

@@ -5,6 +5,7 @@ open Mina_transaction
 open Currency
 module Ledger = Mina_ledger.Ledger
 module Sparse_ledger = Mina_ledger.Sparse_ledger
+module Transaction_with_optional_witness = Transaction_with_optional_witness
 
 let map2_or_error xs ys ~f =
   let rec go xs ys acc =
@@ -56,6 +57,59 @@ module Transaction_with_witness = struct
       let to_latest = Fn.id
     end
   end]
+
+  let statement_of_optional :
+      Transaction_with_optional_witness.Full.t -> Transaction_snark.Statement.t
+      =
+   fun { statement =
+           { connecting_ledger_left
+           ; connecting_ledger_right
+           ; supply_increase
+           ; fee_excess
+           }
+       ; first_pass
+       ; second_pass
+       ; pending_coinbase_stack_source
+       ; pending_coinbase_stack_target
+       ; _
+       } ->
+    let empty_local_state = Mina_state.Local_state.empty () in
+    { connecting_ledger_left
+    ; connecting_ledger_right
+    ; supply_increase
+    ; sok_digest = ()
+    ; fee_excess
+    ; source =
+        { first_pass_ledger = first_pass.source_hash
+        ; second_pass_ledger = second_pass.source_hash
+        ; pending_coinbase_stack = pending_coinbase_stack_source
+        ; local_state = empty_local_state
+        }
+    ; target =
+        { first_pass_ledger = first_pass.target_hash
+        ; second_pass_ledger = second_pass.target_hash
+        ; pending_coinbase_stack = pending_coinbase_stack_target
+        ; local_state = empty_local_state
+        }
+    }
+
+  let of_optional : Transaction_with_optional_witness.Full.t -> t =
+   fun ( { transaction_with_info
+         ; state_hash
+         ; init_stack
+         ; first_pass
+         ; second_pass
+         ; block_global_slot
+         ; _
+         } as tx ) ->
+    { transaction_with_info
+    ; state_hash
+    ; init_stack
+    ; block_global_slot
+    ; first_pass_ledger_witness = first_pass.witness
+    ; second_pass_ledger_witness = second_pass.witness
+    ; statement = statement_of_optional tx
+    }
 end
 
 module Ledger_proof_with_sok_message = struct
