@@ -3,8 +3,9 @@ use crate::field_vector::fp_batch::CamlFpBatchVector;
 use mina_curves::pasta::Fp;
 use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi, constants::SpongeConstants,
-    permutation::poseidon_block_cipher, poseidon::sbox, poseidon::ArithmeticSpongeParams,
+    permutation::poseidon_block_cipher, poseidon::ArithmeticSpongeParams,
 };
+use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 pub struct CamlPastaFpPoseidonParams(ArithmeticSpongeParams<Fp>);
 pub type CamlPastaFpPoseidonParamsPtr<'a> = ocaml::Pointer<'a, CamlPastaFpPoseidonParams>;
@@ -33,7 +34,6 @@ pub fn caml_pasta_fp_poseidon_block_cipher(
     poseidon_block_cipher::<Fp, PlonkSpongeConstantsKimchi>(&params.as_ref().0, state.as_mut())
 }
 
-#[inline]
 pub fn caml_pasta_fp_poseidon_update_impl(
     params: &ArithmeticSpongeParams<Fp>,
     state: &mut Vec<Fp>,
@@ -53,27 +53,7 @@ pub fn caml_pasta_fp_poseidon_update_impl(
                 state[j] += input[ix]
             }
         }
-        for r in 0..PlonkSpongeConstantsKimchi::PERM_ROUNDS_FULL {
-            let mut el0 = state[0];
-            let mut el1 = state[1];
-            let mut el2 = state[2];
-            el0 = sbox::<Fp, PlonkSpongeConstantsKimchi>(el0);
-            el1 = sbox::<Fp, PlonkSpongeConstantsKimchi>(el1);
-            el2 = sbox::<Fp, PlonkSpongeConstantsKimchi>(el2);
-            // Manually unrolled loops for multiplying each row by the vector
-            state[0] = params.mds[0][0] * el0
-                + params.mds[0][1] * el1
-                + params.mds[0][2] * el2
-                + params.round_constants[r][0];
-            state[1] = params.mds[1][0] * el0
-                + params.mds[1][1] * el1
-                + params.mds[1][2] * el2
-                + params.round_constants[r][1];
-            state[2] = params.mds[2][0] * el0
-                + params.mds[2][1] * el1
-                + params.mds[2][2] * el2
-                + params.round_constants[r][2];
-        }
+        poseidon_block_cipher::<Fp, PlonkSpongeConstantsKimchi>(params, state)
     }
 }
 
@@ -94,7 +74,7 @@ pub fn caml_pasta_fp_poseidon_update_batch(
 ) {
     let state_ = state.to_vec();
     let params2 = &params.as_ref().0;
-    inputs.iter_mut().for_each(|input| {
+    inputs.par_iter_mut().for_each(|input| {
         let input_ = (&(*input)).to_vec();
         *input = state_.clone();
         caml_pasta_fp_poseidon_update_impl(params2, input.as_mut(), input_);
