@@ -27,6 +27,7 @@
    integration_test_lib
    logger
    bounded_types
+   runtime_config
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../graphql_schema.json)

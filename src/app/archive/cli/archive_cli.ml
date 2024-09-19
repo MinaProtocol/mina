@@ -43,8 +43,11 @@ let command_run =
        let logger = Logger.create () in
        let open Deferred.Let_syntax in
        let%bind precomputed_values, _ =
-         Genesis_ledger_helper.Config_loader.load_config_exn ~logger
-           ~config_file ()
+         let%bind config =
+           Runtime_config.Config_loader.load_config_exn ~config_file ()
+         in
+         Deferred.Or_error.ok_exn
+         @@ Genesis_ledger_helper.Config_initializer.initialize ~logger config
        in
        Stdout_log.setup log_json log_level ;
        [%log info] "Starting archive process; built with commit $commit"

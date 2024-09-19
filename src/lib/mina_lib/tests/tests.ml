@@ -64,10 +64,14 @@ let%test_module "Epoch ledger sync tests" =
           ; epoch_data = None
           }
         in
+        let config =
+          Runtime_config.Config_loader.of_json_layout runtime_config
+          |> Result.ok_or_failwith
+        in
         match%map
-          Genesis_ledger_helper.Config_loader.init_from_config_file
+          Genesis_ledger_helper.Config_initializer.initialize
             ~genesis_dir:(make_dirname "genesis_dir")
-            ~logger runtime_config
+            ~logger config
         with
         | Ok (precomputed_values, _) ->
             precomputed_values

@@ -72,8 +72,8 @@ let extract_accounts_exn = function
       failwith "Wrong ledger supplied"
 
 let main ~config_file ~genesis_dir ~hash_output_file () =
-  let%bind _, config =
-    Genesis_ledger_helper.Config_loader.load_config_exn ~config_file ~logger ()
+  let%bind config =
+    Runtime_config.Config_loader.load_config_exn ~config_file ()
   in
   let accounts, staking_accounts_opt, next_accounts_opt =
     let ledger = config.ledger in

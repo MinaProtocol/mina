@@ -334,9 +334,8 @@ let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_kp = Util.snapp_keypair_of_file zkapp_keyfile in
-  let%bind _, config =
-    let logger = Logger.create () in
-    Genesis_ledger_helper.Config_loader.load_config_exn ~config_file ~logger ()
+  let%bind config =
+    Runtime_config.Config_loader.load_config_exn ~config_file ()
   in
   let ledger =
     let accounts =
@@ -375,9 +374,8 @@ let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
     ; authorization_kind = Signature
     }
   in
-  let%bind _, config =
-    let logger = Logger.create () in
-    Genesis_ledger_helper.Config_loader.load_config_exn ~config_file ~logger
+  let%bind config =
+    Runtime_config.Config_loader.load_config_exn ~config_file
       ~cli_proof_level:Full ()
   in
   let constraint_constants = config.constraint_config.constraint_constants in
@@ -422,9 +420,8 @@ let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~config_file
     ; preconditions = None
     }
   in
-  let%bind _, config =
-    let logger = Logger.create () in
-    Genesis_ledger_helper.Config_loader.load_config_exn ~config_file ~logger
+  let%bind config =
+    Runtime_config.Config_loader.load_config_exn ~config_file
       ~cli_proof_level:Full ()
   in
   let constraint_constants = config.constraint_config.constraint_constants in
@@ -473,9 +470,8 @@ let transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer ~fee_payer_nonce
     ; preconditions = None
     }
   in
-  let%bind _, config =
-    let logger = Logger.create () in
-    Genesis_ledger_helper.Config_loader.load_config_exn ~config_file ~logger
+  let%bind config =
+    Runtime_config.Config_loader.load_config_exn ~config_file
       ~cli_proof_level:Full ()
   in
   let zkapp_command =
@@ -512,9 +508,8 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
     ; preconditions = None
     }
   in
-  let%bind _, config =
-    let logger = Logger.create () in
-    Genesis_ledger_helper.Config_loader.load_config_exn ~config_file ~logger
+  let%bind config =
+    Runtime_config.Config_loader.load_config_exn ~config_file
       ~cli_proof_level:Full ()
   in
   let constraint_constants = config.constraint_config.constraint_constants in
@@ -557,9 +552,8 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
     ; preconditions = None
     }
   in
-  let%bind _, config =
-    let logger = Logger.create () in
-    Genesis_ledger_helper.Config_loader.load_config_exn ~config_file ~logger
+  let%bind config =
+    Runtime_config.Config_loader.load_config_exn ~config_file
       ~cli_proof_level:Full ()
   in
   let constraint_constants = config.constraint_config.constraint_constants in
@@ -604,9 +598,8 @@ let update_action_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ; preconditions = None
     }
   in
-  let%bind _, config =
-    let logger = Logger.create () in
-    Genesis_ledger_helper.Config_loader.load_config_exn ~config_file ~logger
+  let%bind config =
+    Runtime_config.Config_loader.load_config_exn ~config_file
       ~cli_proof_level:Full ()
   in
   let constraint_constants = config.constraint_config.constraint_constants in
@@ -649,9 +642,8 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; preconditions = None
     }
   in
-  let%bind _, config =
-    let logger = Logger.create () in
-    Genesis_ledger_helper.Config_loader.load_config_exn ~config_file ~logger
+  let%bind config =
+    Runtime_config.Config_loader.load_config_exn ~config_file
       ~cli_proof_level:Full ()
   in
   let constraint_constants = config.constraint_config.constraint_constants in
@@ -695,9 +687,8 @@ let update_snapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~snapp_update
     ; preconditions = None
     }
   in
-  let%bind _, config =
-    let logger = Logger.create () in
-    Genesis_ledger_helper.Config_loader.load_config_exn ~config_file ~logger
+  let%bind config =
+    Runtime_config.Config_loader.load_config_exn ~config_file
       ~cli_proof_level:Full ()
   in
   let constraint_constants = config.constraint_config.constraint_constants in

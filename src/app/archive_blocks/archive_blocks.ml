@@ -6,9 +6,8 @@ open Archive_lib
 
 let main ~config_file ~archive_uri ~precomputed ~extensional ~success_file
     ~failure_file ~log_successes ~files () =
-  let logger = Logger.create () in
-  let%bind _, config =
-    Genesis_ledger_helper.Config_loader.load_config_exn ~config_file ~logger ()
+  let%bind config =
+    Runtime_config.Config_loader.load_config_exn ~config_file ()
   in
   let genesis_constants = config.genesis_constants in
   let constraint_constants = config.constraint_config.constraint_constants in

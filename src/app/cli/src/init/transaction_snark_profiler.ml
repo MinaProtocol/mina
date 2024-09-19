@@ -149,10 +149,9 @@ let command =
      and config_file = Cli_lib.Flag.conf_file in
      fun () ->
        let open Deferred.Let_syntax in
-       let logger = Logger.create () in
-       let%map _, config =
-         Genesis_ledger_helper.Config_loader.load_config_exn ~config_file
-           ~logger ~cli_proof_level:Full ()
+       let%map config =
+         Runtime_config.Config_loader.load_config_exn ~config_file
+           ~cli_proof_level:Full ()
        in
        let num_transactions =
          Option.map n ~f:(fun n -> `Count (Int.pow 2 n))

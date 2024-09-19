@@ -43,15 +43,16 @@ let timestamp =
   anon ("timestamp" %: string)
 
 (*We use the cli_proof_level arg to overide the config settings *)
-let instantiate_verify_functions ~logger ~config_file =
-  let%map.Deferred precomputed_values, _ =
-    Genesis_ledger_helper.Config_loader.load_config_exn ~config_file ~logger
-      ~cli_proof_level:Full ()
+let instantiate_verify_functions ~config_file =
+  let open Deferred.Let_syntax in
+  let%map config =
+    Runtime_config.Config_loader.load_config_exn ~cli_proof_level:Full
+      ~config_file ()
   in
-  let constraint_constants =
-    Precomputed_values.constraint_constants precomputed_values
+  let { Runtime_config.Constraint.constraint_constants; proof_level } =
+    config.constraint_config
   in
-  Verifier.verify_functions ~constraint_constants ~proof_level:Full ()
+  Verifier.verify_functions ~constraint_constants ~proof_level ()
 
 module Make_verifier (Source : Submission.Data_source) = struct
   let verify_transaction_snarks = Source.verify_transaction_snarks
@@ -130,9 +131,8 @@ let filesystem_command =
       and no_checks = no_checks_flag
       and config_file = config_flag in
       fun () ->
-        let logger = Logger.create () in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger ~config_file
+          instantiate_verify_functions ~config_file
         in
 
         let submission_paths = get_filenames inputs in
@@ -164,9 +164,8 @@ let cassandra_command =
       and period_end = timestamp in
       fun () ->
         let open Deferred.Let_syntax in
-        let logger = Logger.create () in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger ~config_file
+          instantiate_verify_functions ~config_file
         in
         let module V = Make_verifier (struct
           include Submission.Cassandra
@@ -196,9 +195,8 @@ let stdin_command =
       let%map_open config_file = config_flag and no_checks = no_checks_flag in
       fun () ->
         let open Deferred.Let_syntax in
-        let logger = Logger.create () in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger ~config_file
+          instantiate_verify_functions ~config_file
         in
         let module V = Make_verifier (struct
           include Submission.Stdin

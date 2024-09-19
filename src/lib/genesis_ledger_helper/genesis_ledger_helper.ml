@@ -733,40 +733,16 @@ module Genesis_proof = struct
   let create_values_no_proof = Genesis_proof.create_values_no_proof
 end
 
-module type Config_loader = sig
-  val load_config :
+module type Config_initializer_intf = sig
+  val initialize :
        ?genesis_dir:string
     -> ?overwrite_version:Unsigned.UInt32.t
-    -> ?cli_proof_level:Genesis_constants.Proof_level.t
-    -> config_file:string
     -> logger:Logger.t
-    -> unit
-    -> (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t
-
-  val load_config_exn :
-       ?genesis_dir:string
-    -> ?overwrite_version:Unsigned.UInt32.t
-    -> ?cli_proof_level:Genesis_constants.Proof_level.t
-    -> config_file:string
-    -> logger:Logger.t
-    -> unit
-    -> (Precomputed_values.t * Runtime_config.t) Deferred.t
-
-  val init_from_config_file :
-       ?overwrite_version:Unsigned.UInt32.t
-    -> ?cli_proof_level:Genesis_constants.Proof_level.t
-    -> genesis_dir:string
-    -> logger:Logger.t
-    -> Runtime_config.Json_layout.t
+    -> Runtime_config.t
     -> (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t
 end
 
-module Config_loader : Config_loader = struct
-  let load_config_json filename =
-    Monitor.try_with_or_error ~here:[%here] (fun () ->
-        let%map json = Reader.file_contents filename in
-        Yojson.Safe.from_string json )
-
+module Config_initializer : Config_initializer_intf = struct
   let print_config ~logger config =
     let ledger_name_json =
       Option.value_map ~default:`Null
@@ -794,51 +770,33 @@ module Config_loader : Config_loader = struct
     [%log info] "Initializing with runtime configuration. Ledger name: $name"
       ~metadata
 
-  let init_from_config_file ?overwrite_version ?cli_proof_level ~genesis_dir
-      ~logger (config : Runtime_config.Json_layout.t) :
+  let initialize ?(genesis_dir = Cache_dir.autogen_path) ?overwrite_version
+      ~logger (config : Runtime_config.t) :
       (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
     let open Deferred.Or_error.Let_syntax in
-    let constraint_config =
-      let c = Runtime_config.Constraint.of_json_layout config.proof in
-      { c with
-        proof_level = Option.value ~default:c.proof_level cli_proof_level
-      }
-    in
     let { Runtime_config.Constraint.constraint_constants; proof_level } =
-      constraint_config
+      config.constraint_config
     in
-    let genesis_constants = Genesis_constants.make config.genesis in
-    let compile_config = Mina_compile_config.make config.daemon in
     let%bind genesis_ledger, runtime_ledger =
-      match Runtime_config.Ledger.of_json_layout config.ledger with
-      | Error e ->
-          Deferred.Or_error.error_string e
-      | Ok c ->
-          let%bind genesis_ledger, runtime_ledger, ledger_file =
-            Ledger.load ~genesis_dir ~logger ~constraint_constants ~proof_level
-              ?overwrite_version c
-          in
-          [%log info] "Loaded genesis ledger from $ledger_file"
-            ~metadata:[ ("ledger_file", `String ledger_file) ] ;
-          Deferred.Or_error.return (genesis_ledger, runtime_ledger)
+      let%bind genesis_ledger, runtime_ledger, ledger_file =
+        Ledger.load ~genesis_dir ~logger ~constraint_constants ~proof_level
+          ?overwrite_version config.ledger
+      in
+      [%log info] "Loaded genesis ledger from $ledger_file"
+        ~metadata:[ ("ledger_file", `String ledger_file) ] ;
+      Deferred.Or_error.return (genesis_ledger, runtime_ledger)
     in
     let%map genesis_epoch_data, genesis_epoch_data_config =
       match config.epoch_data with
       | None ->
           Deferred.Or_error.return (None, None)
-      | Some conf -> (
-          match Runtime_config.Epoch_data.of_json_layout conf with
-          | Error e ->
-              Deferred.Or_error.error_string e
-          | Ok c ->
-              Epoch_data.load ~genesis_dir ~logger ~constraint_constants
-                ~proof_level (Some c) )
+      | Some conf ->
+          Epoch_data.load ~genesis_dir ~logger ~constraint_constants
+            ~proof_level (Some conf)
     in
     let config : Runtime_config.t =
-      { constraint_config = { constraint_constants; proof_level }
-      ; genesis_constants
-      ; compile_config
-      ; ledger = runtime_ledger
+      { config with
+        ledger = runtime_ledger
       ; epoch_data = genesis_epoch_data_config
       }
     in
@@ -849,26 +807,6 @@ module Config_loader : Config_loader = struct
     in
     let values = Genesis_proof.create_values_no_proof inputs in
     (values, config)
-
-  let load_config ?(genesis_dir = Cache_dir.autogen_path) ?overwrite_version
-      ?cli_proof_level ~config_file ~logger () =
-    let open Deferred.Or_error.Let_syntax in
-    let%bind config_json = load_config_json config_file in
-    match Runtime_config.Json_layout.of_yojson config_json with
-    | Error e ->
-        Deferred.Or_error.error_string e
-    | Ok c ->
-        init_from_config_file ?overwrite_version ?cli_proof_level ~genesis_dir
-          ~logger c
-
-  let load_config_exn ?genesis_dir ?overwrite_version ?cli_proof_level
-      ~config_file ~logger () =
-    let open Deferred.Let_syntax in
-    let%bind config =
-      load_config ?genesis_dir ?overwrite_version ?cli_proof_level ~config_file
-        ~logger ()
-    in
-    Deferred.return (Or_error.ok_exn config)
 end
 
 let%test_module "Account config test" =

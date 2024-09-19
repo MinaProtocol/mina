@@ -154,11 +154,18 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     ~origin_sender_secret_key_path
     ~(origin_sender_secret_key_pw_option : string option)
     ~returner_secret_key_path ~(returner_secret_key_pw_option : string option)
-    ~graphql_target_node_option ~minimum_user_command_fee () =
+    ~graphql_target_node_option ~minimum_user_command_fee_opt ~config_file () =
   let open Deferred.Let_syntax in
   (* define the rate limiting function *)
   let open Logger in
   let logger = Logger.create () in
+  let%bind minimum_user_command_fee =
+    let%map config =
+      Runtime_config.Config_loader.load_config_exn ~config_file ()
+    in
+    Option.value ~default:config.genesis_constants.minimum_user_command_fee
+      minimum_user_command_fee_opt
+  in
   let limit_level =
     let slot_limit =
       Float.(
@@ -310,8 +317,6 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   return ()
 
 let output_there_and_back_cmds =
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let compile_config = Mina_compile_config.Compiled.t in
   let open Command.Let_syntax in
   Command.async
     ~summary:
@@ -390,23 +395,19 @@ let output_there_and_back_cmds =
             transactions, if this is not present then we use the env var \
             MINA_PRIVKEY_PASS"
          (optional string)
+     and config_file = Cli_lib.Flag.conf_file
      and graphql_target_node_option =
        flag "--graphql-target-node" ~aliases:[ "graphql-target-node" ]
          ~doc:
            "URL The graphql node to send graphl commands to.  must be in \
             format `<ip>:<port>`.  default is `127.0.0.1:3085`"
          (optional string)
-     and minimum_user_command_fee =
-       let default = compile_config.default_transaction_fee in
-       Cli_lib.Flag.fee_common
-         ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
-         ~default_transaction_fee:default
-     in
+     and minimum_user_command_fee_opt = Cli_lib.Flag.fee_common in
      there_and_back_again ~num_txn_per_acct ~txns_per_block ~txn_fee_option
        ~slot_time ~fill_rate ~rate_limit ~rate_limit_level ~rate_limit_interval
        ~origin_sender_secret_key_path ~origin_sender_secret_key_pw_option
        ~returner_secret_key_path ~returner_secret_key_pw_option
-       ~graphql_target_node_option ~minimum_user_command_fee )
+       ~graphql_target_node_option ~minimum_user_command_fee_opt ~config_file )
 
 let () =
   Command.run

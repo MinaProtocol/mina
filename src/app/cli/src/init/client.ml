@@ -528,10 +528,8 @@ let send_payment_graphql =
             , config_file )
           ->
          let open Deferred.Let_syntax in
-         let%bind _, config =
-           let logger = Logger.create () in
-           Genesis_ledger_helper.Config_loader.load_config_exn ~config_file
-             ~logger ()
+         let%bind config =
+           Runtime_config.Config_loader.load_config_exn ~config_file ()
          in
          let fee =
            Option.value ~default:config.compile_config.default_transaction_fee
@@ -569,10 +567,8 @@ let delegate_stake_graphql =
             ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver, config_file)
           ->
          let open Deferred.Let_syntax in
-         let%bind _, config =
-           let logger = Logger.create () in
-           Genesis_ledger_helper.Config_loader.load_config_exn ~config_file
-             ~logger ()
+         let%bind config =
+           Runtime_config.Config_loader.load_config_exn ~config_file ()
          in
          let fee =
            Option.value ~default:config.compile_config.default_transaction_fee
@@ -837,10 +833,8 @@ let hash_ledger =
      and plaintext = Cli_lib.Flag.plaintext in
      fun () ->
        let open Deferred.Let_syntax in
-       let%bind _, config =
-         let logger = Logger.create () in
-         Genesis_ledger_helper.Config_loader.load_config_exn ~config_file
-           ~logger ()
+       let%bind config =
+         Runtime_config.Config_loader.load_config_exn ~config_file ()
        in
        let process_accounts accounts =
          let packed_ledger =
@@ -955,10 +949,8 @@ let constraint_system_digests =
     (let%map_open config_file = Cli_lib.Flag.conf_file in
      fun () ->
        let open Deferred.Let_syntax in
-       let%bind _, config =
-         let logger = Logger.create () in
-         Genesis_ledger_helper.Config_loader.load_config_exn ~config_file
-           ~logger ()
+       let%bind config =
+         Runtime_config.Config_loader.load_config_exn ~config_file ()
        in
        let { Runtime_config.Constraint.constraint_constants; proof_level } =
          config.constraint_config
@@ -1834,8 +1826,11 @@ let compile_time_constants =
        let open Deferred.Let_syntax in
        let%map ({ consensus_constants; _ } as precomputed_values), _ =
          let logger = Logger.create () in
-         Genesis_ledger_helper.Config_loader.load_config_exn ~config_file
-           ~logger ()
+         let%bind config =
+           Runtime_config.Config_loader.load_config_exn ~config_file ()
+         in
+         Deferred.Or_error.ok_exn
+         @@ Genesis_ledger_helper.Config_initializer.initialize ~logger config
        in
        let all_constants =
          `Assoc
@@ -2321,10 +2316,8 @@ let test_ledger_application =
      Cli_lib.Exceptions.handle_nicely
      @@ fun () ->
      let open Deferred.Let_syntax in
-     let%bind _, config =
-       let logger = Logger.create () in
-       Genesis_ledger_helper.Config_loader.load_config_exn ~config_file ~logger
-         ()
+     let%bind config =
+       Runtime_config.Config_loader.load_config_exn ~config_file ()
      in
      let first_partition_slots =
        Option.value ~default:128 first_partition_slots
@@ -2368,10 +2361,8 @@ let itn_create_accounts =
            (privkey_path, key_prefix, num_accounts, fee, amount, config_file)
          ->
         let open Deferred.Let_syntax in
-        let%bind _, config =
-          let logger = Logger.create () in
-          Genesis_ledger_helper.Config_loader.load_config_exn ~config_file
-            ~logger ()
+        let%bind config =
+          Runtime_config.Config_loader.load_config_exn ~config_file ()
         in
         let args' = (privkey_path, key_prefix, num_accounts, fee, amount) in
         let genesis_constants = config.genesis_constants in

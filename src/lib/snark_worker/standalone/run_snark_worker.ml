@@ -21,13 +21,10 @@ let command =
      fun () ->
        let open Async in
        let open Deferred.Let_syntax in
-       let logger = Logger.create () in
-       let%bind ( _
-                , { constraint_config = { constraint_constants; proof_level }
-                  ; _
-                  } ) =
-         Genesis_ledger_helper.Config_loader.load_config_exn ~cli_proof_level
-           ~config_file ~logger ()
+       let%bind { constraint_config = { constraint_constants; proof_level }; _ }
+           =
+         Runtime_config.Config_loader.load_config_exn ~cli_proof_level
+           ~config_file ()
        in
        let%bind worker_state =
          Prod.Worker_state.create ~constraint_constants ~proof_level ()

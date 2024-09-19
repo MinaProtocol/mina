@@ -639,8 +639,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         ~transport:(Logger_file_system.evergrowing ~log_filename)
         () ) ;
   let logger = Logger.create () in
-  let%bind _, config =
-    Genesis_ledger_helper.Config_loader.load_config_exn ~config_file ~logger ()
+  let%bind config =
+    Runtime_config.Config_loader.load_config_exn ~config_file ()
   in
   let { Runtime_config.Constraint.constraint_constants; proof_level } =
     config.constraint_config

@@ -1,43 +1,5 @@
 open Core_kernel
-
-let yojson_strip_fields ~keep_fields = function
-  | `Assoc l ->
-      `Assoc
-        (List.filter l ~f:(fun (fld, _) ->
-             Array.mem ~equal:String.equal keep_fields fld ) )
-  | json ->
-      json
-
-let yojson_rename_fields ~alternates = function
-  | `Assoc l ->
-      `Assoc
-        (List.map l ~f:(fun (fld, json) ->
-             let fld =
-               Option.value ~default:fld
-                 (Array.find_map alternates ~f:(fun (alt, orig) ->
-                      if String.equal fld alt then Some orig else None ) )
-             in
-             (fld, json) ) )
-  | json ->
-      json
-
-let opt_fallthrough ~default x2 =
-  Option.value_map ~default x2 ~f:(fun x -> Some x)
-
-let result_opt ~f x =
-  match x with
-  | Some x ->
-      Result.map ~f:Option.some (f x)
-  | None ->
-      Result.return None
-
-let dump_on_error yojson x =
-  Result.map_error x ~f:(fun str ->
-      str ^ "\n\nCould not parse JSON:\n" ^ Yojson.Safe.pretty_to_string yojson )
-
-let of_yojson_generic ~fields of_yojson json =
-  dump_on_error json @@ of_yojson
-  @@ yojson_strip_fields ~keep_fields:fields json
+open Async
 
 let rec deferred_list_fold ~init ~f = function
   | [] ->
@@ -58,11 +20,7 @@ module Json_layout = struct
           ; vesting_period : Mina_numbers.Global_slot_span.t
           ; vesting_increment : Currency.Amount.t
           }
-        [@@deriving yojson, fields, sexp]
-
-        let fields = Fields.names |> Array.of_list
-
-        let of_yojson json = of_yojson_generic ~fields of_yojson json
+        [@@deriving yojson, sexp]
       end
 
       module Permissions = struct
@@ -201,11 +159,7 @@ module Json_layout = struct
                   Auth_required.of_account_perm
                     Mina_base.Permissions.user_default.set_timing]
           }
-        [@@deriving yojson, fields, sexp, bin_io_unversioned]
-
-        let fields = Fields.names |> Array.of_list
-
-        let of_yojson json = of_yojson_generic ~fields of_yojson json
+        [@@deriving yojson, sexp, bin_io_unversioned]
 
         let to_yojson t =
           `Assoc
@@ -299,11 +253,7 @@ module Json_layout = struct
           ; proved_state : bool
           ; zkapp_uri : string
           }
-        [@@deriving sexp, fields, yojson, bin_io_unversioned]
-
-        let fields = Fields.names |> Array.of_list
-
-        let of_yojson json = of_yojson_generic ~fields of_yojson json
+        [@@deriving sexp, yojson, bin_io_unversioned]
 
         let of_zkapp (zkapp : Mina_base.Zkapp_account.t) : t =
           let open Mina_base.Zkapp_account in
@@ -337,11 +287,7 @@ module Json_layout = struct
         ; permissions : Permissions.t option [@default None]
         ; token_symbol : string option [@default None]
         }
-      [@@deriving sexp, fields, yojson]
-
-      let fields = Fields.names |> Array.of_list
-
-      let of_yojson json = of_yojson_generic ~fields of_yojson json
+      [@@deriving sexp, yojson]
 
       let default : t =
         { pk = Signature_lib.Public_key.Compressed.(to_base58_check empty)
@@ -377,11 +323,7 @@ module Json_layout = struct
       ; name : string option [@default None]
       ; add_genesis_winner : bool option [@default None]
       }
-    [@@deriving yojson, fields]
-
-    let fields = Fields.names |> Array.of_list
-
-    let of_yojson json = of_yojson_generic ~fields of_yojson json
+    [@@deriving yojson]
   end
 
   module Epoch_data = struct
@@ -392,22 +334,14 @@ module Json_layout = struct
         ; s3_data_hash : string option [@default None]
         ; hash : string option [@default None]
         }
-      [@@deriving yojson, fields]
-
-      let fields = Fields.names |> Array.of_list
-
-      let of_yojson json = of_yojson_generic ~fields of_yojson json
+      [@@deriving yojson]
     end
 
     type t =
       { staking : Data.t
       ; next : (Data.t option[@default None]) (*If None then next = staking*)
       }
-    [@@deriving yojson, fields]
-
-    let fields = Fields.names |> Array.of_list
-
-    let of_yojson json = of_yojson_generic ~fields of_yojson json
+    [@@deriving yojson]
   end
 
   module Constraint = struct
@@ -415,11 +349,7 @@ module Json_layout = struct
       { constraint_constants : Genesis_constants.Constraint_constants.Inputs.t
       ; proof_level : string
       }
-    [@@deriving yojson, fields]
-
-    let fields = Fields.names |> Array.of_list
-
-    let of_yojson json = of_yojson_generic ~fields of_yojson json
+    [@@deriving yojson]
   end
 
   type t =
@@ -822,7 +752,8 @@ module Epoch_data = struct
 
   let to_yojson x = Json_layout.Epoch_data.to_yojson (to_json_layout x)
 
-  let of_yojson x = Result.(Json_layout.Epoch_data.of_yojson x >>= of_json_layout)
+  let of_yojson x =
+    Result.(Json_layout.Epoch_data.of_yojson x >>= of_json_layout)
 end
 
 module Constraint = struct
@@ -1011,3 +942,69 @@ let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
   ; genesis_constants
   ; compile_config
   }
+
+module type Config_loader = sig
+  val load_config :
+       ?cli_proof_level:Genesis_constants.Proof_level.t
+    -> config_file:string
+    -> unit
+    -> t Deferred.Or_error.t
+
+  val load_config_exn :
+       ?cli_proof_level:Genesis_constants.Proof_level.t
+    -> config_file:string
+    -> unit
+    -> t Deferred.t
+
+  val of_json_layout : Json_layout.t -> (t, string) Result.t
+end
+
+module Config_loader : Config_loader = struct
+  let load_config_json filename : Json_layout.t Deferred.Or_error.t =
+    let open Deferred.Or_error.Let_syntax in
+    let%bind json =
+      Monitor.try_with_or_error (fun () ->
+          Deferred.map ~f:Yojson.Safe.from_string
+          @@ Reader.file_contents filename )
+    in
+    match Json_layout.of_yojson json with
+    | Ok config ->
+        Deferred.Or_error.return config
+    | Error e ->
+        Deferred.Or_error.error_string e
+
+  let of_json_layout (config : Json_layout.t) : (t, string) result =
+    let open Result.Let_syntax in
+    let constraint_config = Constraint.of_json_layout config.proof in
+    let genesis_constants = Genesis_constants.make config.genesis in
+    let compile_config = Mina_compile_config.make config.daemon in
+    let%bind ledger = Ledger.of_json_layout config.ledger in
+    let%map epoch_data =
+      match config.epoch_data with
+      | None ->
+          Ok None
+      | Some conf ->
+          Epoch_data.of_json_layout conf |> Result.map ~f:Option.some
+    in
+    { constraint_config; genesis_constants; compile_config; ledger; epoch_data }
+
+  let load_config ?cli_proof_level ~config_file () =
+    let open Deferred.Or_error.Let_syntax in
+    let%bind config = load_config_json config_file in
+    let e_config = of_json_layout config in
+    match e_config with
+    | Ok config ->
+        let { Constraint.proof_level; _ } = config.constraint_config in
+        Deferred.Or_error.return
+          { config with
+            constraint_config =
+              { config.constraint_config with
+                proof_level = Option.value ~default:proof_level cli_proof_level
+              }
+          }
+    | Error e ->
+        Deferred.Or_error.error_string e
+
+  let load_config_exn ?cli_proof_level ~config_file () =
+    Deferred.Or_error.ok_exn @@ load_config ?cli_proof_level ~config_file ()
+end

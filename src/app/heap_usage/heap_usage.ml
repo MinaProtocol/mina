@@ -50,10 +50,8 @@ let () =
     (let%map_open config_file = Cli_lib.Flag.conf_file in
      fun () ->
        let open Deferred.Let_syntax in
-       let logger = Logger.create () in
-       let%bind _, config =
-         Genesis_ledger_helper.Config_loader.load_config_exn ~config_file
-           ~logger ()
+       let%bind config =
+         Runtime_config.Config_loader.load_config_exn ~config_file ()
        in
        let genesis_constants = config.genesis_constants in
        let constraint_constants =

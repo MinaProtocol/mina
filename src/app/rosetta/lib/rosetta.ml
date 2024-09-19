@@ -176,9 +176,8 @@ let command =
   fun () ->
     let logger = Logger.create () in
     Cli.logger_setup log_json log_level ;
-    let%bind _, config =
-      Genesis_ledger_helper.Config_loader.load_config_exn ~config_file ~logger
-        ()
+    let%bind config =
+      Runtime_config.Config_loader.load_config_exn ~config_file ()
     in
     let account_creation_fee =
       config.constraint_config.constraint_constants.account_creation_fee

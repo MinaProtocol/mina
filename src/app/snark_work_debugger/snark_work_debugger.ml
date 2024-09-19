@@ -39,11 +39,9 @@ let cmd =
         flag "--spec" ~doc:"PATH Spec path" (required string)
       and config_file = Cli_lib.Flag.conf_file in
       fun () ->
-        let logger = Logger.create () in
         let open Deferred.Let_syntax in
-        let%bind _, config =
-          Genesis_ledger_helper.Config_loader.load_config_exn ~config_file
-            ~logger ()
+        let%bind config =
+          Runtime_config.Config_loader.load_config_exn ~config_file ()
         in
         let { Runtime_config.Constraint.constraint_constants; proof_level } =
           config.constraint_config
