@@ -48,26 +48,19 @@ module Network_config = struct
 
   let expand ~logger:_ ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ~(images : Test_config.Container_images.t) ~(test_config : Test_config.t)
-      ~(constants : Test_config.constants) =
+      =
     let _ = cli_inputs in
     let ({ genesis_ledger
          ; epoch_data
          ; block_producers
          ; snark_coordinator
-         ; snark_worker_fee
          ; num_archive_nodes
          ; log_precomputed_blocks (* ; num_plain_nodes *)
          ; start_filtered_logs
-         ; proof_config
-         ; k
-         ; delta
-         ; slots_per_epoch
-         ; slots_per_sub_window
-         ; grace_period_slots
-         ; txpool_max_size
-         ; slot_tx_end
-         ; slot_chain_end
-         ; network_id
+         ; genesis_constants
+         ; constraint_constants
+         ; compile_config
+         ; proof_level
          ; _
          }
           : Test_config.t ) =
@@ -150,37 +143,20 @@ module Network_config = struct
                -> String.equal name1 name2 )
     in
     let runtime_config =
-      { Runtime_config.compile_config =
-          { constants.compile_config with
-            network_id =
-              Option.value ~default:constants.compile_config.network_id
-                network_id
-          ; slot_tx_end =
-              Option.map ~f:Mina_numbers.Global_slot_since_hard_fork.of_int
-                slot_tx_end
-          ; slot_chain_end =
-              Option.map ~f:Mina_numbers.Global_slot_since_hard_fork.of_int
-                slot_chain_end
-          }
+      { Runtime_config.compile_config
       ; genesis_constants =
-          { constants.genesis_constants with
+          { genesis_constants with
             protocol =
-              { k
-              ; delta
-              ; slots_per_epoch
-              ; slots_per_sub_window
-              ; grace_period_slots
-              ; genesis_state_timestamp =
-                  (let t = Core.Time.(to_string_abs ~zone:Zone.utc (now ())) in
-                   Genesis_constants.genesis_timestamp_of_string t
-                   |> Genesis_constants.of_time )
+              { genesis_constants.protocol with
+                genesis_state_timestamp =
+                  Genesis_constants.(
+                    genesis_timestamp_of_string
+                      Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
+                    |> of_time)
               }
-          ; txpool_max_size
           }
       ; constraint_config =
-          { proof_level = constants.proof_level
-          ; constraint_constants = proof_config
-          }
+          { Runtime_config.Constraint.constraint_constants; proof_level }
       ; ledger =
           { base =
               Accounts
@@ -278,11 +254,7 @@ module Network_config = struct
       }
     in
     let constants : Test_config.constants =
-      { constants with
-        genesis_constants = runtime_config.genesis_constants
-      ; constraint_constants =
-          runtime_config.constraint_config.constraint_constants
-      }
+      { genesis_constants; constraint_constants; compile_config; proof_level }
     in
     let mk_net_keypair keypair_name (pk, sk) =
       let keypair =
@@ -531,7 +503,9 @@ module Network_config = struct
           in
           let snark_coordinator_config : Snark_coordinator_config.config =
             { worker_nodes
-            ; snark_worker_fee
+            ; snark_worker_fee =
+                Currency.Fee.to_mina_string
+                  compile_config.default_snark_worker_fee
             ; snark_coordinator_key = public_key
             ; work_selection = "seq"
             ; base_config =

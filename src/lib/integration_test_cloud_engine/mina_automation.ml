@@ -109,28 +109,19 @@ module Network_config = struct
     assoc
 
   let expand ~logger:_ ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
-      ~(images : Test_config.Container_images.t) ~test_config
-      ~(constants : Test_config.constants) =
+      ~(images : Test_config.Container_images.t) ~test_config =
     let ({ requires_graphql
          ; genesis_ledger
          ; epoch_data
          ; block_producers
          ; snark_coordinator
-         ; snark_worker_fee
          ; num_archive_nodes
          ; log_precomputed_blocks (* ; num_plain_nodes *)
          ; start_filtered_logs
-         ; proof_config
-         ; k
-         ; delta
-         ; slots_per_epoch
-         ; slots_per_sub_window
-         ; grace_period_slots
-         ; txpool_max_size
-         ; slot_tx_end
-         ; slot_chain_end
-         ; network_id
-         ; _
+         ; genesis_constants
+         ; constraint_constants
+         ; compile_config
+         ; proof_level
          }
           : Test_config.t ) =
       test_config
@@ -227,53 +218,20 @@ module Network_config = struct
                -> String.equal name1 name2 )
     in
     let runtime_config =
-      { Runtime_config.compile_config =
-          { constants.compile_config with
-            network_id =
-              Option.value ~default:constants.compile_config.network_id
-                network_id
-          ; slot_tx_end =
-              Option.map ~f:Mina_numbers.Global_slot_since_hard_fork.of_int
-                slot_tx_end
-          ; slot_chain_end =
-              Option.map ~f:Mina_numbers.Global_slot_since_hard_fork.of_int
-                slot_chain_end
-          }
-          (*
-            { txpool_max_size = Some txpool_max_size
-            ; peer_list_url = None
-            ; zkapp_proof_update_cost = None
-            ; zkapp_signed_single_update_cost = None
-            ; zkapp_signed_pair_update_cost = None
-            ; zkapp_transaction_cost_limit = None
-            ; max_event_elements = None
-            ; max_action_elements = None
-            ; zkapp_cmd_limit_hardcap = None
-            ; slot_tx_end
-            ; slot_chain_end
-            ; minimum_user_command_fee = None
-            ; network_id
-            }
-*)
+      { Runtime_config.compile_config
       ; genesis_constants =
-          { constants.genesis_constants with
+          { genesis_constants with
             protocol =
-              { k
-              ; delta
-              ; slots_per_epoch
-              ; slots_per_sub_window
-              ; grace_period_slots
-              ; genesis_state_timestamp =
-                  (let t = Core.Time.(to_string_abs ~zone:Zone.utc (now ())) in
-                   Genesis_constants.genesis_timestamp_of_string t
-                   |> Genesis_constants.of_time )
+              { genesis_constants.protocol with
+                genesis_state_timestamp =
+                  Genesis_constants.(
+                    genesis_timestamp_of_string
+                      Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
+                    |> of_time)
               }
-          ; txpool_max_size
           }
       ; constraint_config =
-          { proof_level = constants.proof_level
-          ; constraint_constants = proof_config
-          }
+          { Runtime_config.Constraint.constraint_constants; proof_level }
       ; ledger =
           { base =
               Accounts
@@ -390,13 +348,6 @@ module Network_config = struct
               ({ staking; next } : Runtime_config.Epoch_data.t) )
       }
     in
-    let constants : Test_config.constants =
-      { constants with
-        genesis_constants = runtime_config.genesis_constants
-      ; constraint_constants =
-          runtime_config.constraint_config.constraint_constants
-      }
-    in
     (* BLOCK PRODUCER CONFIG *)
     let mk_net_keypair keypair_name (pk, sk) =
       let keypair =
@@ -482,7 +433,8 @@ module Network_config = struct
     { mina_automation_location = cli_inputs.mina_automation_location
     ; debug_arg = debug
     ; genesis_keypairs
-    ; constants
+    ; constants =
+        { genesis_constants; constraint_constants; compile_config; proof_level }
     ; terraform =
         { cluster_name
         ; cluster_region
@@ -502,7 +454,8 @@ module Network_config = struct
         ; mina_archive_schema
         ; mina_archive_schema_aux_files
         ; snark_coordinator_config
-        ; snark_worker_fee
+        ; snark_worker_fee =
+            Currency.Fee.to_mina_string compile_config.default_snark_worker_fee
         ; aws_route53_zone_id
         ; cpu_request = 6
         ; mem_request = "12Gi"
@@ -693,6 +646,33 @@ module Network_manager = struct
       | None ->
           (Core.String.Map.of_alist_exn [], Core.String.Map.of_alist_exn [])
     in
+    (*
+         let snark_coordinator_id =
+           String.lowercase
+             (String.sub network_config.terraform.snark_worker_public_key
+                ~pos:
+                  (String.length network_config.terraform.snark_worker_public_key - 6)
+                ~len:6 )
+         in
+         let snark_coordinator_workloads =
+           if network_config.terraform.snark_worker_replicas > 0 then
+             [ Kubernetes_network.Workload_to_deploy.construct_workload
+                 ("snark-coordinator-" ^ snark_coordinator_id)
+                 [ Kubernetes_network.Workload_to_deploy.cons_pod_info "mina" ]
+             ]
+           else []
+         in
+         let snark_worker_workloads =
+           if network_config.terraform.snark_worker_replicas > 0 then
+             [ Kubernetes_network.Workload_to_deploy.construct_workload
+                 ("snark-worker-" ^ snark_coordinator_id)
+                 (List.init network_config.terraform.snark_worker_replicas
+                    ~f:(fun _i ->
+                      Kubernetes_network.Workload_to_deploy.cons_pod_info "worker" )
+                 )
+             ]
+           else []
+         in *)
     let block_producer_workloads =
       List.map network_config.terraform.block_producer_configs
         ~f:(fun bp_config ->
