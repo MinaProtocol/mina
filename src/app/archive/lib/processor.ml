@@ -76,14 +76,16 @@ end
 (* Unlike other modules here, `Token_owners` does not correspond with a database table *)
 module Token_owners = struct
   (* hash table of token owners, updated for each block *)
-  let owner_tbl : Account_id.t Token_id.Table.t = Token_id.Table.create ()
+  let owner_tbl : Account_id.t Token_id.Map.t ref = ref Token_id.Map.empty
 
   let add_if_doesn't_exist token_id owner =
-    match Token_id.Table.add owner_tbl ~key:token_id ~data:owner with
-    | `Ok | `Duplicate ->
+    match Token_id.Map.add !owner_tbl ~key:token_id ~data:owner with
+    | `Ok tbl' ->
+        owner_tbl := tbl'
+    | `Duplicate ->
         ()
 
-  let find_owner token_id = Token_id.Table.find owner_tbl token_id
+  let find_owner token_id = Token_id.Map.find !owner_tbl token_id
 end
 
 module Token = struct

@@ -547,16 +547,16 @@ Make (struct
         | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
         | Account of Location.Addr.Stable.Latest.t
         | Hash of Location.Addr.Stable.Latest.t
-      [@@deriving bin_io_unversioned, hash, sexp, compare]
+      [@@deriving bin_io_unversioned, sexp, compare]
     end
 
     type t = Arg.t =
       | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
       | Account of Location.Addr.Stable.Latest.t
       | Hash of Location.Addr.Stable.Latest.t
-    [@@deriving hash, sexp, compare]
+    [@@deriving sexp, compare]
 
-    include Hashable.Make_binable (Arg) [@@deriving sexp, compare, hash, yojson]
+    include Comparable.Make_binable (Arg) [@@deriving sexp, compare, yojson]
   end
 
   module Inputs = struct

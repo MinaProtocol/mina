@@ -12,7 +12,7 @@ module type Full = sig
           type t =
             | Base of Pending_coinbase.Stack_versioned.Stable.V1.t
             | Merge
-          [@@deriving sexp, hash, compare, equal, yojson]
+          [@@deriving sexp, compare, equal, yojson]
         end
       end]
     end
@@ -23,7 +23,7 @@ module type Full = sig
         module V1 : sig
           type 'pending_coinbase t =
             { source : 'pending_coinbase; target : 'pending_coinbase }
-          [@@deriving compare, equal, fields, hash, sexp, yojson]
+          [@@deriving compare, equal, fields, sexp, yojson]
 
           val to_latest :
                ('pending_coinbase -> 'pending_coinbase')
@@ -39,13 +39,13 @@ module type Full = sig
 
     type 'pending_coinbase poly = 'pending_coinbase Poly.t =
       { source : 'pending_coinbase; target : 'pending_coinbase }
-    [@@deriving sexp, hash, compare, equal, fields, yojson]
+    [@@deriving sexp, compare, equal, fields, yojson]
 
     [%%versioned:
     module Stable : sig
       module V1 : sig
         type t = Pending_coinbase.Stack_versioned.Stable.V1.t Poly.Stable.V1.t
-        [@@deriving compare, equal, hash, sexp, yojson]
+        [@@deriving compare, equal, sexp, yojson]
       end
     end]
 
@@ -87,7 +87,7 @@ module type Full = sig
           ; fee_excess : 'fee_excess
           ; sok_digest : 'sok_digest
           }
-        [@@deriving compare, equal, hash, sexp, yojson]
+        [@@deriving compare, equal, sexp, yojson]
       end
     end]
 
@@ -123,7 +123,7 @@ module type Full = sig
       ; local_state_ledger_source : 'a
       ; local_state_ledger_target : 'a
       }
-    [@@deriving compare, equal, hash, sexp, yojson]
+    [@@deriving compare, equal, sexp, yojson]
 
     val of_statement :
          ( 'a
@@ -155,7 +155,7 @@ module type Full = sig
         , unit
         , Local_state.Stable.V1.t )
         Poly.Stable.V2.t
-      [@@deriving compare, equal, hash, sexp, yojson]
+      [@@deriving compare, equal, sexp, yojson]
     end
   end]
 
@@ -203,7 +203,7 @@ module type Full = sig
           , Sok_message.Digest.Stable.V1.t
           , Local_state.Stable.V1.t )
           Poly.Stable.V2.t
-        [@@deriving compare, equal, hash, sexp, yojson]
+        [@@deriving compare, equal, sexp, yojson]
       end
     end]
 
@@ -252,7 +252,5 @@ module type Full = sig
 
   val snarked_ledger_hash : ('ledger_hash, _, _, _, _, _) Poly.t -> 'ledger_hash
 
-  include Hashable.S_binable with type t := t
-
-  include Comparable.S with type t := t
+  include Comparable.S_binable with type t := t
 end

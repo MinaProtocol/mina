@@ -77,9 +77,8 @@ module Make (Inputs : Intf.Graphviz.I) :
             let target : target =
               if
                 not
-                @@ Hash_set.mem
-                     ( List.init ~f:empty_hash ledger_depth
-                     |> Hash.Hash_set.of_list )
+                @@ Set.mem
+                     (List.init ~f:empty_hash ledger_depth |> Hash.Set.of_list)
                      current_hash
               then (
                 Queue.enqueue jobs

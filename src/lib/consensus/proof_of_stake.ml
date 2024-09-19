@@ -905,7 +905,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       module Stable = struct
         module V1 = struct
           type t = Mina_base.State_hash.Stable.V1.t option
-          [@@deriving sexp, compare, hash, to_yojson]
+          [@@deriving sexp, compare, to_yojson]
 
           let to_latest = Fn.id
         end
@@ -916,7 +916,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       include Mina_base.Epoch_data
 
       module Make (Lock_checkpoint : sig
-        type t [@@deriving sexp, compare, hash, to_yojson]
+        type t [@@deriving sexp, compare, to_yojson]
 
         val typ : (Mina_base.State_hash.var, t) Typ.t
 
@@ -936,7 +936,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             , Lock_checkpoint.t
             , Length.t )
             Poly.t
-          [@@deriving sexp, compare, hash, to_yojson]
+          [@@deriving sexp, compare, to_yojson]
         end
 
         let typ : (var, Value.t) Typ.t =
@@ -1013,7 +1013,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 , Lock_checkpoint.Stable.V1.t
                 , Length.Stable.V1.t )
                 Poly.Stable.V1.t
-              [@@deriving sexp, compare, equal, hash, yojson]
+              [@@deriving sexp, compare, equal, yojson]
 
               let to_latest = Fn.id
             end
@@ -1038,7 +1038,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 , Lock_checkpoint.Stable.V1.t
                 , Length.Stable.V1.t )
                 Poly.Stable.V1.t
-              [@@deriving sexp, compare, equal, hash, yojson]
+              [@@deriving sexp, compare, equal, yojson]
 
               let to_latest = Fn.id
             end
@@ -1672,7 +1672,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               ; coinbase_receiver : 'pk
               ; supercharge_coinbase : 'bool
               }
-            [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
+            [@@deriving sexp, equal, compare, yojson, fields, hlist]
           end
         end]
       end
@@ -1692,7 +1692,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               , bool
               , Public_key.Compressed.Stable.V1.t )
               Poly.Stable.V1.t
-            [@@deriving sexp, equal, compare, hash, yojson]
+            [@@deriving sexp, equal, compare, yojson]
 
             let to_latest = Fn.id
           end

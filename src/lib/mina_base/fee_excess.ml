@@ -44,7 +44,7 @@ module Poly = struct
         ; fee_token_r : 'token
         ; fee_excess_r : 'fee
         }
-      [@@deriving compare, equal, hash, sexp, hlist]
+      [@@deriving compare, equal, sexp, hlist]
 
       let to_yojson token_to_yojson fee_to_yojson
           { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
@@ -107,7 +107,7 @@ module Stable = struct
       ( Token_id.Stable.V2.t
       , (Fee.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t )
       Poly.Stable.V1.t
-    [@@deriving compare, equal, hash, sexp, yojson]
+    [@@deriving compare, equal, sexp, yojson]
 
     let to_latest = Fn.id
   end
@@ -119,7 +119,7 @@ type ('token, 'fee) poly = ('token, 'fee) Poly.t =
   ; fee_token_r : 'token
   ; fee_excess_r : 'fee
   }
-[@@deriving compare, equal, hash, sexp]
+[@@deriving compare, equal, sexp]
 
 let poly_to_yojson = Poly.to_yojson
 

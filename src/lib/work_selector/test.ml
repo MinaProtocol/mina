@@ -114,13 +114,14 @@ struct
           |> Or_error.ok_exn )
           (Currency.Fee.of_nanomina_int_exn 2)
       in
-      (sl, pool)
+      (sl, !pool)
     in
     Quickcheck.test g
       ~sexp_of:
         [%sexp_of:
-          (int, Fee.t) Lib.Work_spec.t list * Fee.t T.Snark_pool.Work.Table.t]
-      ~trials:100 ~f:(fun (sl, snark_pool) ->
+          (int, Fee.t) Lib.Work_spec.t list * Fee.t T.Snark_pool.Work.Map.t]
+      ~trials:100 ~f:(fun (sl, init_snark_pool) ->
+        let snark_pool = ref init_snark_pool in
         Async.Thread_safe.block_on_async_exn (fun () ->
             let open Deferred.Let_syntax in
             let%bind work_state = init_state sl reassignment_wait logger in

@@ -34,11 +34,6 @@ module type S = sig
       val compare : t -> t -> int
 
       val equal : t -> t -> bool
-
-      val hash_fold_t :
-        Base_internalhash_types.state -> t -> Base_internalhash_types.state
-
-      val hash : t -> int
     end
 
     module Latest = V1
@@ -57,11 +52,6 @@ module type S = sig
   val compare : t -> t -> int
 
   val equal : t -> t -> bool
-
-  val hash_fold_t :
-    Base_internalhash_types.state -> t -> Base_internalhash_types.state
-
-  val hash : t -> int
 end
 
 module type S_checked = sig

@@ -85,7 +85,7 @@ module T = struct
               %s"
             (List.map ts ~f:(fun (_p, s, m) ->
                  ( s
-                 , Transaction_snark.Statement.hash s
+                 , Transaction_snark_work.statement_hash s
                  , Yojson.Safe.to_string
                    @@ Public_key.Compressed.to_yojson m.prover ) ) )
             (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err))
@@ -168,7 +168,7 @@ module T = struct
               [ ( "work_id"
                 , `List
                     (List.map proofs ~f:(fun (_, s, _) ->
-                         `Int (Transaction_snark.Statement.hash s) ) ) )
+                         `Int (Transaction_snark_work.statement_hash s) ) ) )
               ; ("time", `Float time_ms)
               ]
             "Verification in apply_diff for work $work_id took $time ms" ;

@@ -608,7 +608,7 @@ let work_statement =
       ; field "workId" ~doc:"Unique identifier for a snark work"
           ~typ:(non_null int)
           ~args:Arg.[]
-          ~resolve:(fun _ w -> Transaction_snark.Statement.hash w)
+          ~resolve:(fun _ -> Transaction_snark_work.statement_hash)
       ] )
 
 let pending_work =

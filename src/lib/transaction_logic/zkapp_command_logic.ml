@@ -264,7 +264,7 @@ module Local_state = struct
           , Mina_numbers.Index.Stable.V1.t
           , Transaction_status.Failure.Collection.Stable.V1.t )
           Stable.V1.t
-        [@@deriving equal, compare, hash, yojson, sexp]
+        [@@deriving equal, compare, yojson, sexp]
 
         let to_latest = Fn.id
       end

@@ -38,7 +38,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           type t =
             | Base of Pending_coinbase.Stack_versioned.Stable.V1.t
             | Merge
-          [@@deriving sexp, hash, compare, equal, yojson]
+          [@@deriving sexp, compare, equal, yojson]
 
           let to_latest = Fn.id
         end
@@ -51,7 +51,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         module V1 = struct
           type 'pending_coinbase t =
             { source : 'pending_coinbase; target : 'pending_coinbase }
-          [@@deriving sexp, hash, compare, equal, fields, yojson, hlist]
+          [@@deriving sexp, compare, equal, fields, yojson, hlist]
 
           let to_latest pending_coinbase { source; target } =
             { source = pending_coinbase source
@@ -69,14 +69,14 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     type 'pending_coinbase poly = 'pending_coinbase Poly.t =
       { source : 'pending_coinbase; target : 'pending_coinbase }
-    [@@deriving sexp, hash, compare, equal, fields, yojson]
+    [@@deriving sexp, compare, equal, fields, yojson]
 
     (* State of the coinbase stack for the current transaction snark *)
     [%%versioned
     module Stable = struct
       module V1 = struct
         type t = Pending_coinbase.Stack_versioned.Stable.V1.t Poly.Stable.V1.t
-        [@@deriving sexp, hash, compare, equal, yojson]
+        [@@deriving sexp, compare, equal, yojson]
 
         let to_latest = Fn.id
       end
@@ -96,8 +96,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         (Pending_coinbase.Stack.var_to_input source)
         (Pending_coinbase.Stack.var_to_input target)
 
-    include Hashable.Make_binable (Stable.Latest)
-    include Comparable.Make (Stable.Latest)
+    include Comparable.Make_binable (Stable.Latest)
   end
 
   module Poly = struct
@@ -134,7 +133,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; fee_excess : 'fee_excess
           ; sok_digest : 'sok_digest
           }
-        [@@deriving compare, equal, hash, sexp, yojson, hlist]
+        [@@deriving compare, equal, sexp, yojson, hlist]
       end
     end]
 
@@ -196,7 +195,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         , unit
         , Local_state.Stable.V1.t )
         Poly.Stable.V2.t
-      [@@deriving compare, equal, hash, sexp, yojson]
+      [@@deriving compare, equal, sexp, yojson]
 
       let to_latest = Fn.id
     end
@@ -350,7 +349,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           , Sok_message.Digest.Stable.V1.t
           , Local_state.Stable.V1.t )
           Poly.Stable.V2.t
-        [@@deriving compare, equal, hash, sexp, yojson]
+        [@@deriving compare, equal, sexp, yojson]
 
         let to_latest = Fn.id
       end
@@ -531,7 +530,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       ; local_state_ledger_source : 'a
       ; local_state_ledger_target : 'a
       }
-    [@@deriving compare, equal, hash, sexp, yojson, hlist]
+    [@@deriving compare, equal, sexp, yojson, hlist]
 
     let of_statement (s : _ Poly.t) : _ t =
       let local_state_ledger
@@ -683,8 +682,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       }
       : t )
 
-  include Hashable.Make_binable (Stable.Latest)
-  include Comparable.Make (Stable.Latest)
+  include Comparable.Make_binable (Stable.Latest)
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in

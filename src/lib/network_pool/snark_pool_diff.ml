@@ -28,7 +28,7 @@ module Make
   type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
     | Add_solved_work of Work.t * Ledger_proof.t One_or_two.t Priced_proof.t
     | Empty
-  [@@deriving compare, sexp, to_yojson, hash]
+  [@@deriving compare, sexp, to_yojson]
 
   type verified = t [@@deriving compare, sexp, to_yojson]
 

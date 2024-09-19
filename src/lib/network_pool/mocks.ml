@@ -14,7 +14,7 @@ module Staged_ledger = struct
 end
 
 module Transition_frontier = struct
-  type table = int Transaction_snark_work.Statement.Table.t [@@deriving sexp]
+  type table = int Transaction_snark_work.Statement.Map.t ref [@@deriving sexp]
 
   type diff = Extensions.Snark_pool_refcount.view [@@deriving sexp]
 
@@ -37,15 +37,16 @@ module Transition_frontier = struct
 
   let add_statements table stmts =
     List.iter stmts ~f:(fun s ->
-        Transaction_snark_work.Statement.Table.change table s ~f:(function
-          | None ->
-              Some 1
-          | Some count ->
-              Some (count + 1) ) )
+        table :=
+          Transaction_snark_work.Statement.Map.change !table s ~f:(function
+            | None ->
+                Some 1
+            | Some count ->
+                Some (count + 1) ) )
 
   (*Create tf with some statements referenced to be able to add snark work for those statements to the pool*)
   let create _stmts : t =
-    let refcount_table = Transaction_snark_work.Statement.Table.create () in
+    let refcount_table = ref Transaction_snark_work.Statement.Map.empty in
     (*add_statements table stmts ;*)
     let diff_reader, diff_writer =
       Broadcast_pipe.create { Extensions.Snark_pool_refcount.removed_work = [] }
@@ -70,7 +71,7 @@ module Transition_frontier = struct
     let r, _ = Broadcast_pipe.create () in
     r
 
-  let work_is_referenced t = Hashtbl.mem t.refcount_table
+  let work_is_referenced t = Map.mem !(t.refcount_table)
 
   let best_tip_table t = t.best_tip_table
 

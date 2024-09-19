@@ -99,7 +99,7 @@ module type Protocol_state = sig
   type consensus_state_var
 
   module Poly : sig
-    type ('state_hash, 'body) t [@@deriving equal, hash, sexp, to_yojson]
+    type ('state_hash, 'body) t [@@deriving equal, sexp, to_yojson]
   end
 
   module Body : sig
@@ -480,7 +480,7 @@ module type S = sig
         [%%versioned:
         module Stable : sig
           module V2 : sig
-            type t [@@deriving hash, equal, compare, sexp, yojson]
+            type t [@@deriving equal, compare, sexp, yojson]
           end
         end]
 

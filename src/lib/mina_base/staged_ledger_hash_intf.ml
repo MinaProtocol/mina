@@ -2,11 +2,9 @@ module type Full = sig
   open Core_kernel
   open Snark_params.Tick
 
-  type t [@@deriving sexp, equal, compare, hash, yojson]
+  type t [@@deriving sexp, equal, compare, yojson]
 
-  include Hashable with type t := t
-
-  type value [@@deriving sexp, equal, compare, hash]
+  type value [@@deriving sexp, equal, compare]
 
   type var
 
@@ -26,7 +24,7 @@ module type Full = sig
   module Stable : sig
     module V1 : sig
       type nonrec t = t
-      [@@deriving bin_io, sexp, equal, compare, hash, yojson, version]
+      [@@deriving bin_io, sexp, equal, compare, yojson, version]
     end
 
     module Latest : module type of V1
@@ -38,7 +36,7 @@ module type Full = sig
     module Stable : sig
       module V1 : sig
         type nonrec t = t
-        [@@deriving bin_io, sexp, equal, compare, hash, yojson, version]
+        [@@deriving bin_io, sexp, equal, compare, yojson, version]
       end
 
       module Latest : module type of V1
@@ -69,7 +67,7 @@ module type Full = sig
     module Stable : sig
       module V1 : sig
         type nonrec t = t
-        [@@deriving bin_io, sexp, equal, compare, hash, yojson, version]
+        [@@deriving bin_io, sexp, equal, compare, yojson, version]
       end
 
       module Latest : module type of V1

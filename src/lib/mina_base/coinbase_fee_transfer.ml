@@ -16,7 +16,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         { receiver_pk : Public_key.Compressed.Stable.V1.t
         ; fee : Currency.Fee.Stable.V1.t
         }
-      [@@deriving sexp, compare, equal, yojson, hash]
+      [@@deriving sexp, compare, equal, yojson]
 
       let to_latest = Fn.id
 

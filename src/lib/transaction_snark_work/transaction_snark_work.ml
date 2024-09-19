@@ -2,13 +2,19 @@ open Core_kernel
 open Currency
 open Signature_lib
 
+let statement_hash t =
+  let open Transaction_snark.Statement.Stable.Latest in
+  let bs = Bigstring.create (bin_size_t t) in
+  ignore (Bigstring.write_bin_prot bs bin_writer_t t : int) ;
+  Bigstring.hash_t_frozen bs
+
 module Statement = struct
   module Arg = struct
     [%%versioned
     module Stable = struct
       module V2 = struct
         type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
-        [@@deriving hash, sexp, compare]
+        [@@deriving sexp, compare]
 
         let to_latest = Fn.id
       end
@@ -21,30 +27,27 @@ module Statement = struct
 
     module V2 = struct
       type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
-      [@@deriving equal, compare, hash, sexp, yojson]
+      [@@deriving equal, compare, sexp, yojson]
 
       let to_latest = Fn.id
 
       let (_ : (t, Arg.Stable.V2.t) Type_equal.t) = Type_equal.T
 
       include Comparable.Make_binable (Arg.Stable.V2)
-      include Hashable.Make_binable (Arg.Stable.V2)
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson, equal]
+  type t = Stable.Latest.t [@@deriving sexp, compare, yojson, equal]
 
   include Comparable.Make_binable (Stable.Latest)
-  include Hashable.Make (Stable.Latest)
 
   let gen = One_or_two.gen Transaction_snark.Statement.gen
 
   let compact_json t =
-    let f s = `Int (Transaction_snark.Statement.hash s) in
+    let f s = `Int (statement_hash s) in
     `List (One_or_two.map ~f t |> One_or_two.to_list)
 
-  let work_ids t : int One_or_two.t =
-    One_or_two.map t ~f:Transaction_snark.Statement.hash
+  let work_ids t : int One_or_two.t = One_or_two.map t ~f:statement_hash
 end
 
 module Info = struct
@@ -103,7 +106,7 @@ module T = struct
   let info t =
     let statements = One_or_two.map t.proofs ~f:Ledger_proof.statement in
     { Info.statements
-    ; work_ids = One_or_two.map statements ~f:Transaction_snark.Statement.hash
+    ; work_ids = One_or_two.map statements ~f:statement_hash
     ; fee = t.fee
     ; prover = t.prover
     }

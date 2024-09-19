@@ -332,7 +332,7 @@ struct
         let log_and_punish ?(punish = true) statement e =
           let metadata =
             [ ("error", Error_json.error_to_yojson e)
-            ; ("work_id", `Int (Transaction_snark.Statement.hash statement))
+            ; ("work_id", `Int (Transaction_snark_work.statement_hash statement))
             ]
             @ metadata
           in
@@ -545,7 +545,7 @@ module Diff_versioned = struct
             * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
-      [@@deriving compare, sexp, to_yojson, hash]
+      [@@deriving compare, sexp, to_yojson]
 
       let to_latest = Fn.id
     end
@@ -556,7 +556,7 @@ module Diff_versioned = struct
         Transaction_snark_work.Statement.t
         * Ledger_proof.t One_or_two.t Priced_proof.t
     | Empty
-  [@@deriving compare, sexp, to_yojson, hash]
+  [@@deriving compare, sexp, to_yojson]
 end
 
 (* Only show stdout for failed inline tests. *)

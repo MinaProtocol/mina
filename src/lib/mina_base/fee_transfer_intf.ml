@@ -10,7 +10,7 @@ module type Full = sig
           ; fee : Currency.Fee.Stable.V1.t
           ; fee_token : Token_id.Stable.V2.t
           }
-        [@@deriving bin_io, sexp, compare, equal, yojson, version, hash]
+        [@@deriving bin_io, sexp, compare, equal, yojson, version]
       end
 
       module Latest = V2
@@ -21,7 +21,7 @@ module type Full = sig
       ; fee : Currency.Fee.t
       ; fee_token : Token_id.t
       }
-    [@@deriving sexp, compare, yojson, hash]
+    [@@deriving sexp, compare, yojson]
 
     include Comparable.S with type t := t
 
@@ -54,20 +54,20 @@ module type Full = sig
   module Stable : sig
     module V2 : sig
       type t = private Single.Stable.V2.t One_or_two.Stable.V1.t
-      [@@deriving bin_io, sexp, compare, equal, yojson, version, hash]
+      [@@deriving bin_io, sexp, compare, equal, yojson, version]
     end
 
     module Latest = V2
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, yojson, hash]
+  type t = Stable.Latest.t [@@deriving sexp, compare, yojson]
 
   type single = Single.t = private
     { receiver_pk : Public_key.Compressed.t
     ; fee : Currency.Fee.t
     ; fee_token : Token_id.t
     }
-  [@@deriving sexp, compare, yojson, hash]
+  [@@deriving sexp, compare, yojson]
 
   include Comparable.S with type t := t
 

@@ -10,7 +10,7 @@ module type LOCATION = sig
   end
 
   type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
-  [@@deriving sexp, hash, compare]
+  [@@deriving sexp, compare]
 
   val is_generic : t -> bool
 
@@ -65,9 +65,7 @@ module type Key = sig
 
   val to_string : t -> string
 
-  include Hashable.S_binable with type t := t
-
-  include Comparable.S with type t := t
+  include Comparable.S_binable with type t := t
 end
 
 module type Token_id = sig
@@ -81,8 +79,6 @@ module type Token_id = sig
   with type Latest.t = t
 
   val default : t
-
-  include Hashable.S_binable with type t := t
 
   include Comparable.S_binable with type t := t
 end
@@ -107,9 +103,7 @@ module type Account_id = sig
 
   val derive_token_id : owner:t -> token_id
 
-  include Hashable.S_binable with type t := t
-
-  include Comparable.S with type t := t
+  include Comparable.S_binable with type t := t
 end
 
 module type Balance = sig
@@ -139,11 +133,11 @@ module type Account = sig
 end
 
 module type Hash = sig
-  type t [@@deriving bin_io, compare, equal, sexp, yojson]
+  type t [@@deriving bin_io, equal, sexp, yojson]
 
   val to_base58_check : t -> string
 
-  include Hashable.S_binable with type t := t
+  include Comparable.S_binable with type t := t
 
   type account
 
@@ -266,7 +260,7 @@ module Inputs = struct
   module type DATABASE = sig
     include Intf
 
-    module Location_binable : Hashable.S_binable with type t := Location.t
+    module Location_binable : Comparable.S_binable with type t := Location.t
 
     module Kvdb : Key_value_database with type config := string
 
@@ -304,7 +298,7 @@ module Ledger = struct
     module Path : Merkle_path.S with type hash := hash
 
     module Location : sig
-      type t [@@deriving sexp, compare, hash]
+      type t [@@deriving sexp, compare]
 
       include Comparable.S with type t := t
     end

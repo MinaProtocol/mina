@@ -19,7 +19,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; amount : Currency.Amount.Stable.V1.t
         ; fee_transfer : Fee_transfer.Stable.V1.t option
         }
-      [@@deriving sexp, compare, equal, hash, yojson]
+      [@@deriving sexp, compare, equal, yojson]
 
       let to_latest = Fn.id
 

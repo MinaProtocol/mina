@@ -28,7 +28,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               , 'signature )
               Mina_wire_types.Mina_base.Signed_command.Poly.V1.t =
           { payload : 'payload; signer : 'pk; signature : 'signature }
-        [@@deriving compare, sexp, hash, yojson, equal]
+        [@@deriving compare, sexp, yojson, equal]
       end
     end]
   end
@@ -52,19 +52,18 @@ module Make_str (_ : Wire_types.Concrete) = struct
         , Public_key.Stable.V1.t
         , Signature.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving compare, sexp, hash, yojson]
+      [@@deriving compare, sexp, yojson]
 
       let to_latest = Fn.id
 
       module T = struct
         (* can't use nonrec + deriving *)
-        type typ = t [@@deriving compare, sexp, hash]
+        type typ = t [@@deriving compare, sexp]
 
-        type t = typ [@@deriving compare, sexp, hash]
+        type t = typ [@@deriving compare, sexp]
       end
 
       include Comparable.Make (T)
-      include Hashable.Make (T)
 
       let account_access_statuses ({ payload; _ } : t) status =
         Payload.account_access_statuses payload status
@@ -82,7 +81,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         , Public_key.Stable.V1.t
         , Signature.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving compare, sexp, hash, yojson]
+      [@@deriving compare, sexp, yojson]
 
       let to_latest ({ payload; signer; signature } : t) : Latest.t =
         let payload : Signed_command_payload.t =
@@ -375,7 +374,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     [%%versioned
     module Stable = struct
       module V2 = struct
-        type t = Stable.V2.t [@@deriving sexp, equal, yojson, hash]
+        type t = Stable.V2.t [@@deriving sexp, equal, yojson]
 
         let to_latest = Stable.V2.to_latest
 

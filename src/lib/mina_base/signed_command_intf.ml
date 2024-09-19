@@ -77,14 +77,12 @@ module type Gen_intf = sig
 end
 
 module type S = sig
-  type t [@@deriving sexp, yojson, hash]
+  type t [@@deriving sexp, yojson]
 
   (* type of signed commands, pre-Berkeley hard fork *)
   type t_v1
 
   include Comparable.S with type t := t
-
-  include Hashable.S with type t := t
 
   val signature : t -> Signature.t
 
@@ -130,8 +128,7 @@ module type S = sig
   module With_valid_signature : sig
     module Stable : sig
       module Latest : sig
-        type nonrec t
-        [@@deriving sexp, equal, bin_io, yojson, version, compare, hash]
+        type nonrec t [@@deriving sexp, equal, bin_io, yojson, version, compare]
 
         include Gen_intf with type t := t
       end
@@ -139,7 +136,7 @@ module type S = sig
       module V2 = Latest
     end
 
-    type t = Stable.Latest.t [@@deriving sexp, yojson, compare, hash]
+    type t = Stable.Latest.t [@@deriving sexp, yojson, compare]
 
     include Gen_intf with type t := t
 
@@ -222,7 +219,7 @@ module type Full = sig
               , 'signature )
               Mina_wire_types.Mina_base.Signed_command.Poly.V1.t =
           { payload : 'payload; signer : 'pk; signature : 'signature }
-        [@@deriving sexp, hash, yojson, equal, compare]
+        [@@deriving sexp, yojson, equal, compare]
       end
     end]
   end
@@ -237,15 +234,13 @@ module type Full = sig
         , Public_key.Stable.Latest.t
         , Signature.Stable.Latest.t )
         Poly.Stable.V1.t
-      [@@deriving sexp, hash, version]
+      [@@deriving sexp, version]
 
       val to_yojson : t -> Yojson.Safe.t
 
       val of_yojson : Yojson.Safe.t -> (t, string) result
 
       include Comparable.S with type t := t
-
-      include Hashable.S with type t := t
 
       val account_access_statuses :
            t
@@ -261,7 +256,7 @@ module type Full = sig
         , Public_key.Stable.V1.t
         , Signature.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving compare, sexp, hash, yojson]
+      [@@deriving compare, sexp, yojson]
 
       val to_latest : t -> Latest.t
     end

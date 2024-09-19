@@ -2,21 +2,20 @@ open Core_kernel
 open Currency
 open Signature_lib
 
+(* Hash derived from binio serialization, to be used only for information printouts *)
+val statement_hash : Transaction_snark.Statement.t -> int
+
 module Statement : sig
   type t = Transaction_snark.Statement.t One_or_two.t
   [@@deriving compare, sexp, yojson, equal]
 
   include Comparable.S with type t := t
 
-  include Hashable.S with type t := t
-
   module Stable : sig
     module V2 : sig
       type t [@@deriving bin_io, compare, sexp, version, yojson, equal]
 
-      include Comparable.S with type t := t
-
-      include Hashable.S_binable with type t := t
+      include Comparable.S_binable with type t := t
     end
   end
   with type V2.t = t

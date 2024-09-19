@@ -15,7 +15,7 @@ module Closed_interval = struct
       type 'a t =
             'a Mina_wire_types.Mina_base.Zkapp_precondition.Closed_interval.V1.t =
         { lower : 'a; upper : 'a }
-      [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
+      [@@deriving annot, sexp, equal, compare, yojson, hlist, fields]
     end
   end]
 
@@ -155,7 +155,7 @@ module Numeric = struct
   module Stable = struct
     module V1 = struct
       type 'a t = 'a Closed_interval.Stable.V1.t Or_ignore.Stable.V1.t
-      [@@deriving sexp, equal, yojson, hash, compare]
+      [@@deriving sexp, equal, yojson, compare]
     end
   end]
 
@@ -464,7 +464,7 @@ module Account = struct
         ; proved_state : bool Eq_data.Stable.V1.t
         ; is_new : bool Eq_data.Stable.V1.t
         }
-      [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
+      [@@deriving annot, hlist, sexp, equal, yojson, compare, fields]
 
       let to_latest = Fn.id
     end
@@ -790,7 +790,7 @@ module Protocol_state = struct
           , State_hash.Stable.V1.t Hash.Stable.V1.t
           , Length.Stable.V1.t Numeric.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving sexp, equal, yojson, hash, compare]
+        [@@deriving sexp, equal, yojson, compare]
 
         let to_latest = Fn.id
       end
@@ -948,7 +948,7 @@ module Protocol_state = struct
           ; staking_epoch_data : 'epoch_data
           ; next_epoch_data : 'epoch_data
           }
-        [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
+        [@@deriving annot, hlist, sexp, equal, yojson, compare, fields]
       end
     end]
   end
@@ -963,7 +963,7 @@ module Protocol_state = struct
         , Currency.Amount.Stable.V1.t Numeric.Stable.V1.t
         , Epoch_data.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving sexp, equal, yojson, hash, compare]
+      [@@deriving sexp, equal, yojson, compare]
 
       let to_latest = Fn.id
     end
@@ -1064,7 +1064,7 @@ module Protocol_state = struct
             , Length.Stable.V1.t )
             Epoch_data.Poly.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving sexp, equal, yojson, hash, compare]
+        [@@deriving sexp, equal, yojson, compare]
 
         let to_latest = Fn.id
       end
@@ -1343,7 +1343,7 @@ module Valid_while = struct
   module Stable = struct
     module V1 = struct
       type t = Global_slot_since_genesis.Stable.V1.t Numeric.Stable.V1.t
-      [@@deriving sexp, equal, yojson, hash, compare]
+      [@@deriving sexp, equal, yojson, compare]
 
       let to_latest = Fn.id
     end
@@ -1378,7 +1378,7 @@ module Account_type = struct
   module Stable = struct
     module V1 = struct
       type t = User | Zkapp | None | Any
-      [@@deriving sexp, equal, yojson, hash, compare]
+      [@@deriving sexp, equal, yojson, compare]
 
       let to_latest = Fn.id
     end
@@ -1491,7 +1491,7 @@ module Other = struct
           ; account_transition : 'account_transition
           ; account_vk : 'vk
           }
-        [@@deriving hlist, sexp, equal, yojson, hash, compare]
+        [@@deriving hlist, sexp, equal, yojson, compare]
       end
     end]
   end
@@ -1504,7 +1504,7 @@ module Other = struct
         , Account_state.Stable.V1.t Transition.Stable.V1.t
         , F.Stable.V1.t Hash.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving sexp, equal, yojson, hash, compare]
+      [@@deriving sexp, equal, yojson, compare]
 
       let to_latest = Fn.id
     end
@@ -1559,7 +1559,7 @@ module Poly = struct
         ; fee_payer : 'pk
         ; protocol_state_predicate : 'protocol_state
         }
-      [@@deriving hlist, sexp, equal, yojson, hash, compare]
+      [@@deriving hlist, sexp, equal, yojson, compare]
 
       let to_latest = Fn.id
     end
@@ -1580,7 +1580,7 @@ module Stable = struct
       , Other.Stable.V2.t
       , Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t )
       Poly.Stable.V1.t
-    [@@deriving sexp, equal, yojson, hash, compare]
+    [@@deriving sexp, equal, yojson, compare]
 
     let to_latest = Fn.id
   end
