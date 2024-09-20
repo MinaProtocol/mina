@@ -49,17 +49,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; worker_nodes = 4
           }
     ; genesis_constants =
-        { default_config.genesis_constants with
-          txpool_max_size = 10_000_000
-        } 
-    ; compile_config = {default_config.compile_config with 
-        default_snark_worker_fee = Currency.Fee.of_mina_string_exn "0.0001"
+        { default_config.genesis_constants with txpool_max_size = 10_000_000 }
+    ; compile_config =
+        { default_config.compile_config with
+          default_snark_worker_fee = Currency.Fee.of_mina_string_exn "0.0001"
+        }
+    ; constraint_constants =
+        { default_config.constraint_constants with
+          work_delay = 1
+        ; transaction_capacity_log_2 = 2
+        }
     }
-    ; constraint_constants = { default_config.constraint_constants with
-        work_delay = 1;
-        transaction_capacity_log_2 = 2;
-    }
-  }
 
   let fee = Currency.Fee.of_nanomina_int_exn 10_000_000
 
@@ -111,7 +111,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           return ([%log info] "sender: %s" (pk_to_string pk)) )
     in
     let window_ms =
-      (Network.network_config network).constraint_config.constraint_constants.block_window_duration_ms
+      (Network.network_config network).constraint_config.constraint_constants
+        .block_window_duration_ms
     in
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =

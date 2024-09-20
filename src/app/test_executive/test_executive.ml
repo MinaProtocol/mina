@@ -30,6 +30,7 @@ type inputs =
   ; mina_image : string
   ; archive_image : string option
   ; debug : bool
+  ; config_file : string
   }
 
 let validate_inputs ~logger inputs (test_config : Test_config.t) :
@@ -251,9 +252,7 @@ type constants =
   }
 [@@deriving to_yojson]
 
-
-let make_default_config ~(constants : Test_config.constants) =
-
+let make_default_config ~(constants : constants) =
   let log_filter_of_event_type ev_existential =
     let open Event_type in
     let (Event_type ev_type) = ev_existential in
@@ -277,15 +276,16 @@ let make_default_config ~(constants : Test_config.constants) =
   ; log_precomputed_blocks = false
   ; start_filtered_logs =
       List.bind ~f:log_filter_of_event_type Event_type.all_event_types
-  ; genesis_constants = 
-      { constants.genesis_constants with 
-          txpool_max_size = 3000;
-          protocol = { constants.genesis_constants.protocol with 
-          k = 20;
-          delta = 0;
-          slots_per_epoch = 3 * 8 * 20;
-          slots_per_sub_window = 2;
-          grace_period_slots = 140;
+  ; genesis_constants =
+      { constants.genesis_constants with
+        txpool_max_size = 3000
+      ; protocol =
+          { constants.genesis_constants.protocol with
+            k = 20
+          ; delta = 0
+          ; slots_per_epoch = 3 * 8 * 20
+          ; slots_per_sub_window = 2
+          ; grace_period_slots = 140
           }
       }
   ; constraint_constants =
@@ -297,7 +297,7 @@ let make_default_config ~(constants : Test_config.constants) =
       }
   }
 
-let main ~constants inputs =
+let main inputs =
   (* TODO: abstract over which engine is in use, allow engine to be set form CLI *)
   let (Test_inputs_with_cli_inputs ((module Test_inputs), cli_inputs)) =
     inputs.test_inputs
@@ -330,13 +330,24 @@ let main ~constants inputs =
     ; points = "codaprotocol/coda-points-hack:32b.4"
     }
   in
+  let%bind config =
+    Runtime_config.Config_loader.load_config_exn ~config_file:inputs.config_file
+      ()
+  in
+  let constants =
+    { genesis_constants = config.genesis_constants
+    ; constraint_constants = config.constraint_config.constraint_constants
+    ; compile_config = config.compile_config
+    ; proof_level = config.constraint_config.proof_level
+    }
+  in
   let default_config = make_default_config ~constants in
   let test_config = T.config ~default_config in
   let%bind () = validate_inputs ~logger inputs test_config in
   [%log trace] "expanding network config" ;
   let network_config =
     Engine.Network_config.expand ~logger ~test_name ~cli_inputs
-      ~debug:inputs.debug  ~images ~test_config
+      ~debug:inputs.debug ~images ~test_config
   in
   (* resources which require additional cleanup at end of test *)
   let net_manager_ref : Engine.Network_manager.t option ref = ref None in
@@ -486,6 +497,14 @@ let test_arg =
   let doc = "The name of the test to execute." in
   Arg.(required & pos 0 (some (enum indexed_tests)) None & info [] ~doc)
 
+let config_file_arg =
+  let doc = "The path to the node configuration file." in
+  let env = Arg.env_var "MINA_CONFIG_FILE" ~doc in
+  Arg.(
+    required
+    & pos 1 (some string) None
+    & info [ "config-file" ] ~env ~docv:"MINA_CONFIG_FILE" ~doc)
+
 let mina_image_arg =
   let doc = "Identifier of the Mina docker image to test." in
   let env = Arg.env_var "MINA_IMAGE" ~doc in
@@ -524,12 +543,13 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
     Term.(const wrap_cli_inputs $ Engine.Network_config.Cli_inputs.term)
   in
   let inputs_term =
-    let cons_inputs test_inputs test mina_image archive_image debug =
-      { test_inputs; test; mina_image; archive_image; debug }
+    let cons_inputs test_inputs test mina_image archive_image debug config_file
+        =
+      { test_inputs; test; mina_image; archive_image; debug; config_file }
     in
     Term.(
       const cons_inputs $ test_inputs_with_cli_inputs_arg $ test_arg
-      $ mina_image_arg $ archive_image_arg $ debug_arg)
+      $ mina_image_arg $ archive_image_arg $ debug_arg $ config_file_arg)
   in
   let term = Term.(const start $ inputs_term) in
   (term, info)

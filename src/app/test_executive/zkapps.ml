@@ -39,12 +39,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; account_name = "snark-node-key"
           ; worker_nodes = 2
           }
-    ; compile_config = { default_config.compile_config with default_snark_worker_fee = Currency.Fee.of_mina_string_exn "0.0001" }
-    ; constraint_constants = { default_config.constraint_constants with
-        work_delay = 1;
-        transaction_capacity_log_2 = 2
+    ; compile_config =
+        { default_config.compile_config with
+          default_snark_worker_fee = Currency.Fee.of_mina_string_exn "0.0001"
+        }
+    ; constraint_constants =
+        { default_config.constraint_constants with
+          work_delay = 1
+        ; transaction_capacity_log_2 = 2
+        }
     }
-  }
 
   let transactions_sent = ref 0
 
@@ -134,7 +138,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let node =
       Core.String.Map.find_exn (Network.block_producers network) "node-a"
     in
-    let constraint_constants = (Network.network_config network).constraint_config.constraint_constants in
+    let constraint_constants =
+      (Network.network_config network).constraint_config.constraint_constants
+    in
     let fish1_kp =
       (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1")
         .keypair
@@ -893,8 +899,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "Wait for proof to be emitted"
         (wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis
-              network ~num_proofs:1 ) )
+           (Wait_condition.ledger_proofs_emitted_since_genesis network
+              ~num_proofs:1 ) )
     in
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;

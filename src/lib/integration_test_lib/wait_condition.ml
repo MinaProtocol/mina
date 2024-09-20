@@ -257,7 +257,9 @@ struct
 
   let ledger_proofs_emitted_since_genesis t ~num_proofs =
     let open Network_state in
-    let constraint_constants = (Engine.Network.network_config t).constraint_config.constraint_constants in
+    let constraint_constants =
+      (Engine.Network.network_config t).constraint_config.constraint_constants
+    in
     let check () (state : Network_state.t) =
       if state.snarked_ledgers_generated >= num_proofs then Predicate_passed
       else Predicate_continuation ()

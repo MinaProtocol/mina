@@ -52,9 +52,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; worker_nodes = 4
           }
     ; genesis_constants =
-        { default_config.genesis_constants with
-          txpool_max_size = 10_000_000
-        }
+        { default_config.genesis_constants with txpool_max_size = 10_000_000 }
     ; compile_config =
         { default_config.compile_config with
           default_snark_worker_fee = Currency.Fee.of_mina_string_exn "0.0002"
@@ -78,7 +76,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let num_slots = Mina_numbers.Global_slot_since_hard_fork.to_int slot_chain_end + 2 in
+    let num_slots =
+      Mina_numbers.Global_slot_since_hard_fork.to_int slot_chain_end + 2
+    in
     let receiver =
       String.Map.find_exn (Network.block_producers network) "receiver"
     in
@@ -104,7 +104,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           return ([%log info] "sender: %s" (pk_to_string pk)) )
     in
     let window_ms =
-      (Network.network_config network).constraint_config.constraint_constants.block_window_duration_ms
+      (Network.network_config network).constraint_config.constraint_constants
+        .block_window_duration_ms
     in
     let all_nodes = Network.all_mina_nodes network in
     let%bind () =
@@ -114,7 +115,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let genesis_timestamp =
       Block_time.to_time_exn
       @@ Block_time.of_int64
-           (Network.network_config network).genesis_constants.protocol.genesis_state_timestamp
+           (Network.network_config network).genesis_constants.protocol
+             .genesis_state_timestamp
     in
     let end_t =
       Time.add genesis_timestamp

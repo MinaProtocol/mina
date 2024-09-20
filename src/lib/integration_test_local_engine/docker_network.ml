@@ -279,7 +279,7 @@ type t =
   ; genesis_keypairs : Network_keypair.t Core.String.Map.t
   }
 
-let network_config {config;_} = config
+let network_config { config; _ } = config
 
 let seeds { seeds; _ } = seeds
 

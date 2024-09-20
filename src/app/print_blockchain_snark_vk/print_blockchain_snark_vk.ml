@@ -2,10 +2,24 @@ open Core_kernel
 
 let () =
   Async.Thread_safe.block_on_async_exn (fun () ->
+      let config_file = Sys.getenv_opt "MINA_CONFIG_FILE" in
+      let config_file =
+        match config_file with
+        | Some config_file ->
+            config_file
+        | None ->
+            failwith "MINA_CONFIG_FILE environment variable not set"
+      in
+      let open Async.Deferred.Let_syntax in
+      let%bind config =
+        Runtime_config.Config_loader.load_config_exn ~config_file ()
+      in
+      let { Runtime_config.Constraint.constraint_constants; _ } =
+        config.constraint_config
+      in
       let () = Format.eprintf "Generating transaction snark circuit..@." in
       let module Transaction_snark_instance = Transaction_snark.Make (struct
-        let constraint_constants =
-          Genesis_constants.Compiled.constraint_constants
+        let constraint_constants = constraint_constants
 
         let proof_level = Genesis_constants.Proof_level.Full
       end) in
@@ -13,8 +27,7 @@ let () =
       let before = Time.now () in
       let module Blockchain_snark_instance =
       Blockchain_snark.Blockchain_snark_state.Make (struct
-        let constraint_constants =
-          Genesis_constants.Compiled.constraint_constants
+        let constraint_constants = constraint_constants
 
         let proof_level = Genesis_constants.Proof_level.Full
 

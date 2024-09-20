@@ -39,8 +39,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; account_name = "snark-node-key"
           ; worker_nodes = 5
           }
-    ; compile_config = { default_config.compile_config with default_snark_worker_fee = Currency.Fee.of_mina_string_exn "0.0001" }
-    ; constraint_constants = { default_config.constraint_constants with work_delay = 1; transaction_capacity_log_2 = 3 }
+    ; compile_config =
+        { default_config.compile_config with
+          default_snark_worker_fee = Currency.Fee.of_mina_string_exn "0.0001"
+        }
+    ; constraint_constants =
+        { default_config.constraint_constants with
+          work_delay = 1
+        ; transaction_capacity_log_2 = 3
+        }
     }
 
   let transactions_sent = ref 0
@@ -115,10 +122,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (*Wait for first BP to start sending payments and avoid partially filling blocks*)
     let first_bp = List.hd_exn block_producer_nodes in
     let%bind () =
-      wait_for t (Wait_condition.nodes_to_initialize [ first_bp ]) 
+      wait_for t (Wait_condition.nodes_to_initialize [ first_bp ])
     in
     (*Start sending padding transactions to get snarked ledger sooner*)
-    let constraint_constants = (Network.network_config network).constraint_config.constraint_constants in
+    let constraint_constants =
+      (Network.network_config network).constraint_config.constraint_constants
+    in
     let%bind () =
       let fee = Currency.Fee.of_nanomina_int_exn 3_000_000 in
       send_padding_transactions block_producer_nodes ~fee ~logger
@@ -366,8 +375,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       (*wait for blocks required to produce 2 proofs given 0.75 slot fill rate + some buffer*)
       section_hard "Wait for proof to be emitted"
         ( wait_for t
-        @@ Wait_condition.ledger_proofs_emitted_since_genesis
-             network ~num_proofs )
+        @@ Wait_condition.ledger_proofs_emitted_since_genesis network
+             ~num_proofs )
     in
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;

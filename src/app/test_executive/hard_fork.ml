@@ -91,10 +91,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let fork_config : Genesis_constants.Fork_constants.t =
     Genesis_constants.Fork_constants.make
-    { state_hash = "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
-    ; blockchain_length = 300000
-    ; global_slot_since_genesis = 500000
-    }
+      { state_hash = "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
+      ; blockchain_length = 300000
+      ; global_slot_since_genesis = 500000
+      }
 
   let config ~default_config =
     let open Test_config in
@@ -200,16 +200,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; account_name = "snark-node-key1"
           ; worker_nodes = 4
           }
-    ; compile_config = { default_config.compile_config with default_snark_worker_fee = Currency.Fee.of_mina_string_exn "0.0002" }
+    ; compile_config =
+        { default_config.compile_config with
+          default_snark_worker_fee = Currency.Fee.of_mina_string_exn "0.0002"
+        }
     ; num_archive_nodes = 1
-    ; constraint_constants = { default_config.constraint_constants with work_delay = 1; transaction_capacity_log_2 = 2; fork = Some fork_config }
+    ; constraint_constants =
+        { default_config.constraint_constants with
+          work_delay = 1
+        ; transaction_capacity_log_2 = 2
+        ; fork = Some fork_config
+        }
     }
 
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let fork_constants : Genesis_constants.Fork_constants.t =
-      Option.value_exn (Engine.Network.network_config network).constraint_config.constraint_constants.fork
+      Option.value_exn
+        (Engine.Network.network_config network).constraint_config
+          .constraint_constants
+          .fork
     in
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
@@ -299,7 +310,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let zkapp_keypairs =
         List.init 3 ~f:(fun _ -> Signature_lib.Keypair.create ())
       in
-      let constraint_constants = (Network.network_config network).constraint_config.constraint_constants in
+      let constraint_constants =
+        (Network.network_config network).constraint_config.constraint_constants
+      in
       let amount = Currency.Amount.of_mina_int_exn 10 in
       let nonce = Account.Nonce.zero in
       let memo =
@@ -360,7 +373,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; sender = (fish1.keypair, Account.Nonce.(succ one))
         }
       in
-      let constraint_constants = (Network.network_config network).constraint_config.constraint_constants in
+      let constraint_constants =
+        (Network.network_config network).constraint_config.constraint_constants
+      in
       let%bind vk_proof =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
@@ -479,8 +494,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~amount:Currency.Amount.one ~fee ~node:sender 10
          in
          wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis
-              network ~num_proofs:1 ) )
+           (Wait_condition.ledger_proofs_emitted_since_genesis network
+              ~num_proofs:1 ) )
     in
     let%bind () =
       section_hard "Check vesting of timed3/timed4 account"
@@ -547,7 +562,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     global_slot_since_hard_fork ) ;
 
                let bad_height =
-                 Unsigned.UInt32.to_int height <= (Mina_numbers.Length.to_int fork_constants.blockchain_length)
+                 Unsigned.UInt32.to_int height
+                 <= Mina_numbers.Length.to_int fork_constants.blockchain_length
                in
                (* for now, we accept the "link block" with a global slot since genesis equal to the previous global slot
                   see issue #13897
@@ -555,7 +571,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                let bad_slot =
                  Mina_numbers.Global_slot_since_genesis.(
                    global_slot_since_genesis
-                 < fork_config.global_slot_since_genesis)
+                   < fork_config.global_slot_since_genesis)
                in
                if bad_height && bad_slot then
                  Malleable_error.hard_error
@@ -607,7 +623,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "running replayer"
       (let%bind logs =
          Network.Node.run_replayer
-           ~start_slot_since_genesis:(Global_slot_since_genesis.to_int fork_constants.global_slot_since_genesis)
+           ~start_slot_since_genesis:
+             (Global_slot_since_genesis.to_int
+                fork_constants.global_slot_since_genesis )
            ~logger
            (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in

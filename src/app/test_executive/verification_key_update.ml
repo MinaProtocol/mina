@@ -92,7 +92,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; account_name = "snark-node-key"
           ; worker_nodes = 2
           }
-    ; compile_config = { default_config.compile_config with default_snark_worker_fee = Currency.Fee.of_mina_string_exn "0.0001" }
+    ; compile_config =
+        { default_config.compile_config with
+          default_snark_worker_fee = Currency.Fee.of_mina_string_exn "0.0001"
+        }
     }
 
   let logger = Logger.create ()
@@ -110,7 +113,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind whale1_pk = pub_key_of_node whale1 in
     let%bind whale1_sk = priv_key_of_node whale1 in
-    let constraint_constants = (Network.network_config network).constraint_config.constraint_constants in
+    let constraint_constants =
+      (Network.network_config network).constraint_config.constraint_constants
+    in
     let (whale1_kp : Keypair.t) =
       { public_key = whale1_pk |> Public_key.decompress_exn
       ; private_key = whale1_sk

@@ -215,13 +215,13 @@ module Network_config = struct
                -> String.equal name1 name2 )
     in
     let runtime_config =
-       let {
-           Test_config.genesis_constants
-         ; constraint_constants
-         ; compile_config
-         ; proof_level
-         ; _
-       } = test_config
+      let { Test_config.genesis_constants
+          ; constraint_constants
+          ; compile_config
+          ; proof_level
+          ; _
+          } =
+        test_config
       in
       { Runtime_config.compile_config
       ; genesis_constants =
@@ -459,7 +459,8 @@ module Network_config = struct
         ; mina_archive_schema_aux_files
         ; snark_coordinator_config
         ; snark_worker_fee =
-            Currency.Fee.to_mina_string runtime_config.compile_config.default_snark_worker_fee
+            Currency.Fee.to_mina_string
+              runtime_config.compile_config.default_snark_worker_fee
         ; aws_route53_zone_id
         ; cpu_request = 6
         ; mem_request = "12Gi"

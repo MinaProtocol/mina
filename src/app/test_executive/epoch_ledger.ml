@@ -58,7 +58,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
         ]
-    ; constraint_constants = { default_config.constraint_constants with fork = Some fork_config }
+    ; constraint_constants =
+        { default_config.constraint_constants with fork = Some fork_config }
     }
 
   let run network t =

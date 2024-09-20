@@ -18,7 +18,6 @@ module Proof_level = struct
 end
 
 module Fork_constants = struct
-
   module Inputs = struct
     type t =
       { state_hash : string
