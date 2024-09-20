@@ -1,9 +1,11 @@
 package main
 
 import (
+	"codanet"
 	"context"
 	"net/http"
 	"os"
+	"path"
 	"runtime/debug"
 	"strconv"
 	"sync"
@@ -15,7 +17,10 @@ import (
 	ipc "libp2p_ipc"
 
 	capnp "capnproto.org/go/capnp/v3"
+	"github.com/ipfs/boxo/bitswap"
+	"github.com/ipfs/boxo/bitswap/network"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/libp2p/go-libp2p"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -141,6 +146,23 @@ func main() {
 	decoder := capnp.NewDecoder(os.Stdin)
 
 	app := newApp()
+	host, err := libp2p.New()
+	if err != nil {
+		helperLog.Fatalf("failed to create libp2p host: %v", err)
+	}
+	defer host.Close()
+
+	bstore, err := codanet.OpenBitswapStorageLmdb(path.Join("/tmp/", "block-db"))
+	if err != nil {
+		helperLog.Fatalf("failed to open block store: %v", err)
+	}
+	app.bitswapCtx.storage = bstore
+	bsNetwork := network.NewFromIpfsHost(host, nil)
+	app.bitswapCtx.engine = bitswap.New(
+		app.Ctx,
+		bsNetwork,
+		bstore.Blockstore(),
+	)
 
 	go func() {
 		for {
