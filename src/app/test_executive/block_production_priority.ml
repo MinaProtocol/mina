@@ -19,9 +19,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   (* let num_sender_nodes = 4 *)
 
-  let config ~(constants : Test_config.constants) =
+  let config ~default_config =
     let open Test_config in
-    let default_config = default ~constants in
     { default_config with
       requires_graphql = true
     ; genesis_ledger =
@@ -112,7 +111,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           return ([%log info] "sender: %s" (pk_to_string pk)) )
     in
     let window_ms =
-      (Network.constraint_constants network).block_window_duration_ms
+      (Network.network_config network).constraint_config.constraint_constants.block_window_duration_ms
     in
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =

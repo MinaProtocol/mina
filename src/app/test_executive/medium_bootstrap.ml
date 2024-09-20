@@ -16,9 +16,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let config ~constants =
+  let config ~default_config =
     let open Test_config in
-    let default_config = default ~constants in
     { default_config with
       genesis_constants = {default_config.genesis_constants with protocol = {default_config.genesis_constants.protocol with k = 2}}
     ; requires_graphql = true

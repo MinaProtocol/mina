@@ -41,7 +41,7 @@ module Network_config = struct
                  ~f:(fun ~key:k ~data:v accum ->
                    (k, Network_keypair.to_yojson v) :: accum )
                  map )] )
-    ; constants : Test_config.constants
+    ; config : Runtime_config.t
     ; docker : docker_config
     }
   [@@deriving to_yojson]
@@ -252,9 +252,6 @@ module Network_config = struct
               in
               ({ staking; next } : Runtime_config.Epoch_data.t) )
       }
-    in
-    let constants : Test_config.constants =
-      { genesis_constants; constraint_constants; compile_config; proof_level }
     in
     let mk_net_keypair keypair_name (pk, sk) =
       let keypair =
@@ -523,7 +520,7 @@ module Network_config = struct
     in
     { debug_arg = debug
     ; genesis_keypairs
-    ; constants
+    ; config = runtime_config
     ; docker =
         { docker_swarm_version
         ; stack_name
@@ -606,7 +603,7 @@ module Network_manager = struct
     ; graphql_enabled : bool
     ; docker_dir : string
     ; docker_compose_file_path : string
-    ; constants : Test_config.constants
+    ; config : Runtime_config.t
     ; seed_workloads : Docker_network.Service_to_deploy.t Core.String.Map.t
     ; block_producer_workloads :
         Docker_network.Service_to_deploy.t Core.String.Map.t
@@ -968,7 +965,7 @@ module Network_manager = struct
       ; logger
       ; docker_dir
       ; docker_compose_file_path
-      ; constants = network_config.constants
+      ; config = network_config.config
       ; graphql_enabled = true
       ; seed_workloads
       ; block_producer_workloads
@@ -1025,7 +1022,7 @@ module Network_manager = struct
     in
     let network =
       { Docker_network.namespace = t.stack_name
-      ; constants = t.constants
+      ; config = t.config
       ; seeds
       ; block_producers
       ; snark_coordinators

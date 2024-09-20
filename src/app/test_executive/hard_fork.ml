@@ -96,7 +96,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; global_slot_since_genesis = 500000
     }
 
-  let config ~constants =
+  let config ~default_config =
     let open Test_config in
     let staking_accounts : Test_account.t list =
       let open Test_account in
@@ -130,7 +130,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let epoch_ledger = next_accounts in
       { epoch_ledger; epoch_seed }
     in
-    let default_config = default ~constants in
     { default_config with
       requires_graphql = true
     ; epoch_data = Some { staking; next = Some next }
@@ -209,18 +208,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let config =
-
-         let constants : Test_config.constants =
-           { genesis_constants = Network.genesis_constants network
-           ; constraint_constants = Network.constraint_constants network
-           ; compile_config = Network.compile_config network
-           ; proof_level = Genesis_constants.Proof_level.Full
-           }
-         in config ~constants
-    in
     let fork_constants : Genesis_constants.Fork_constants.t =
-      Option.value_exn config.constraint_constants.fork
+      Option.value_exn (Engine.Network.network_config network).constraint_config.constraint_constants.fork
     in
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
@@ -310,7 +299,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let zkapp_keypairs =
         List.init 3 ~f:(fun _ -> Signature_lib.Keypair.create ())
       in
-      let constraint_constants = Network.constraint_constants network in
+      let constraint_constants = (Network.network_config network).constraint_config.constraint_constants in
       let amount = Currency.Amount.of_mina_int_exn 10 in
       let nonce = Account.Nonce.zero in
       let memo =
@@ -371,7 +360,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; sender = (fish1.keypair, Account.Nonce.(succ one))
         }
       in
-      let constraint_constants = Network.constraint_constants network in
+      let constraint_constants = (Network.network_config network).constraint_config.constraint_constants in
       let%bind vk_proof =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
@@ -491,7 +480,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          in
          wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis
-              ~test_config:config ~num_proofs:1 ) )
+              network ~num_proofs:1 ) )
     in
     let%bind () =
       section_hard "Check vesting of timed3/timed4 account"

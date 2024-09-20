@@ -333,7 +333,7 @@ end
 
 type t =
   { namespace : string
-  ; constants : Test_config.constants
+  ; config : Runtime_config.t
   ; seeds : Node.t Core.String.Map.t
   ; block_producers : Node.t Core.String.Map.t
   ; snark_coordinators : Node.t Core.String.Map.t
@@ -344,15 +344,7 @@ type t =
   ; genesis_keypairs : Network_keypair.t Core.String.Map.t
   }
 
-let constants { constants; _ } = constants
-
-let constraint_constants { constants; _ } = constants.constraint_constants
-
-let genesis_constants { constants; _ } = constants.genesis_constants
-
-let compile_config { constants; _ } = constants.compile_config
-
-let proof_level { constants; _ } = constants.proof_level
+let network_config { config; _ } = config
 
 let seeds { seeds; _ } = seeds
 

@@ -81,15 +81,7 @@ module Engine = struct
 
     type t
 
-    val constants : t -> Test_config.constants
-
-    val constraint_constants : t -> Genesis_constants.Constraint_constants.t
-
-    val genesis_constants : t -> Genesis_constants.t
-
-    val compile_config : t -> Mina_compile_config.t
-
-    val proof_level : t -> Genesis_constants.Proof_level.t
+    val network_config : t -> Runtime_config.t
 
     val seeds : t -> Node.t Core.String.Map.t
 
@@ -268,7 +260,7 @@ module Dsl = struct
       -> t
 
     val ledger_proofs_emitted_since_genesis :
-      test_config:Test_config.t -> num_proofs:int -> t
+      Engine.Network.t -> num_proofs:int -> t
 
     val zkapp_to_be_included_in_frontier :
       has_failures:bool -> zkapp_command:Mina_base.Zkapp_command.t -> t
@@ -344,7 +336,7 @@ module Test = struct
 
     type dsl
 
-    val config : constants:Test_config.constants -> Test_config.t
+    val config : default_config:Test_config.t -> Test_config.t
 
     val run : network -> dsl -> unit Malleable_error.t
   end

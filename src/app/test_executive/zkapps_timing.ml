@@ -15,9 +15,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let config ~constants =
+  let config ~default_config =
     let open Test_config in
-    { (default ~constants) with
+    { default_config with
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
@@ -46,7 +46,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Network.block_producers network |> Core.String.Map.data
     in
     let node = List.hd_exn block_producer_nodes in
-    let constraint_constants = Network.constraint_constants network in
+    let constraint_constants = (Network.network_config network).constraint_config.constraint_constants in
     let block_window_duration_ms =
       constraint_constants.block_window_duration_ms
     in

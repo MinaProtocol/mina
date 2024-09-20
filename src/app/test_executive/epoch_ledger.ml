@@ -22,7 +22,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ; global_slot_since_genesis = 500000
       }
 
-  let config ~constants =
+  let config ~default_config =
     let open Test_config in
     let staking_accounts : Test_account.t list =
       let open Test_account in
@@ -50,7 +50,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let epoch_ledger = next_accounts in
       { epoch_ledger; epoch_seed }
     in
-    let default_config = default ~constants in
     { default_config with
       requires_graphql = true
     ; epoch_data = Some { staking; next = Some next }

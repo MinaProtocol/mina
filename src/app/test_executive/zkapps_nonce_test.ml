@@ -16,9 +16,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let config ~constants =
+  let config ~default_config =
     let open Test_config in
-    let default_config = default ~constants in
     { default_config with
       requires_graphql = true
     ; genesis_ledger =
@@ -48,9 +47,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let num_proofs = 2
 
-  let padding_payments ~config () =
+  let padding_payments constraint_constants () =
     let needed_for_padding =
-      Test_config.transactions_needed_for_ledger_proofs config
+      Test_config.transactions_needed_for_ledger_proofs constraint_constants
         ~num_proofs
     in
     if !transactions_sent >= needed_for_padding then 0
@@ -86,15 +85,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let config = 
-      let constants : Test_config.constants =
-        { genesis_constants = Network.genesis_constants network
-        ; constraint_constants = Network.constraint_constants network
-        ; compile_config = Network.compile_config network
-        ; proof_level = Network.proof_level network
-        }
-      in config ~constants
-    in
     let block_producer_nodes =
       Network.block_producers network |> Core.String.Map.data
     in
@@ -125,13 +115,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (*Wait for first BP to start sending payments and avoid partially filling blocks*)
     let first_bp = List.hd_exn block_producer_nodes in
     let%bind () =
-      wait_for t (Wait_condition.nodes_to_initialize [ first_bp ])
+      wait_for t (Wait_condition.nodes_to_initialize [ first_bp ]) 
     in
     (*Start sending padding transactions to get snarked ledger sooner*)
+    let constraint_constants = (Network.network_config network).constraint_config.constraint_constants in
     let%bind () =
       let fee = Currency.Fee.of_nanomina_int_exn 3_000_000 in
       send_padding_transactions block_producer_nodes ~fee ~logger
-        ~n:(padding_payments ~config ())
+        ~n:(padding_payments constraint_constants ())
     in
     (*wait for the rest*)
     let%bind () =
@@ -376,7 +367,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Wait for proof to be emitted"
         ( wait_for t
         @@ Wait_condition.ledger_proofs_emitted_since_genesis
-             ~test_config:config ~num_proofs )
+             network ~num_proofs )
     in
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;

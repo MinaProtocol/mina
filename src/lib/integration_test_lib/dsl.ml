@@ -107,12 +107,13 @@ module Make (Engine : Intf.Engine.S) () :
 
   let wait_for t condition =
     let open Wait_condition in
-    let constants = Engine.Network.constants t.network in
+    let genesis_constants = (Engine.Network.network_config t.network).genesis_constants in
+    let constraint_constants = (Engine.Network.network_config t.network).constraint_config.constraint_constants in
     let soft_timeout =
-      Network_time_span.to_span condition.soft_timeout ~constants
+      Network_time_span.to_span ~genesis_constants ~constraint_constants condition.soft_timeout 
     in
     let hard_timeout =
-      Network_time_span.to_span condition.hard_timeout ~constants
+      Network_time_span.to_span ~genesis_constants ~constraint_constants condition.hard_timeout
     in
     let start_time = Time.now () in
     [%log' info t.logger]
@@ -122,10 +123,10 @@ module Make (Engine : Intf.Engine.S) () :
       ~metadata:
         [ ( "soft_timeout"
           , `String
-              (Network_time_span.to_string ~constants condition.soft_timeout) )
+              (Network_time_span.to_string ~genesis_constants ~constraint_constants condition.soft_timeout) )
         ; ( "hard_timeout"
           , `String
-              (Network_time_span.to_string ~constants condition.hard_timeout) )
+              (Network_time_span.to_string ~genesis_constants ~constraint_constants condition.hard_timeout) )
         ] ;
     let%bind result =
       match condition.predicate with

@@ -17,7 +17,7 @@ module Test_account = struct
     ; timing : Mina_base.Account_timing.t
     ; permissions : Mina_base.Permissions.t option
     ; zkapp : Mina_base.Zkapp_account.t option
-    }
+    } [@@deriving to_yojson]
 
   let create ~account_name ~balance ?timing ?permissions ?zkapp () =
     { account_name
@@ -36,19 +36,18 @@ end
 module Epoch_data = struct
   module Data = struct
     (* the seed is a field value in Base58Check format *)
-    type t = { epoch_ledger : Test_account.t list; epoch_seed : string }
+    type t = { epoch_ledger : Test_account.t list; epoch_seed : string } [@@deriving to_yojson]
   end
 
-  type t = { staking : Data.t; next : Data.t option }
+  type t = { staking : Data.t; next : Data.t option } [@@deriving to_yojson]
 end
 
 module Block_producer_node = struct
-  type t = { node_name : string; account_name : string }
+  type t = { node_name : string; account_name : string } [@@deriving to_yojson]
 end
 
 module Snark_coordinator_node = struct
-  type t = { node_name : string; account_name : string; worker_nodes : int }
-  [@@deriving to_yojson]
+  type t = { node_name : string; account_name : string; worker_nodes : int } [@@deriving to_yojson]
 end
 
 type constants =
@@ -86,7 +85,7 @@ type t =
   ; constraint_constants : Genesis_constants.Constraint_constants.t
   ; proof_level : Genesis_constants.Proof_level.t
   ; compile_config : Mina_compile_config.t
-  }
+  } [@@deriving to_yojson]
 
 (* TODO: Do we need this? *)
 
@@ -112,14 +111,14 @@ let default ~(constants : constants) =
       }
   }
 
-let transaction_capacity config =
-  let i = config.constraint_constants.transaction_capacity_log_2 in
+let transaction_capacity ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
+  let i = constraint_constants.transaction_capacity_log_2 in
   Int.pow 2 i
 
-let blocks_for_first_ledger_proof (config : t) =
-  let work_delay = config.constraint_constants.work_delay in
+let blocks_for_first_ledger_proof ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
+  let work_delay = constraint_constants.work_delay in
   let transaction_capacity_log_2 =
-    config.constraint_constants.transaction_capacity_log_2
+    constraint_constants.transaction_capacity_log_2
   in
   ((work_delay + 1) * (transaction_capacity_log_2 + 1)) + 1
 
@@ -127,7 +126,7 @@ let slots_for_blocks blocks =
   (*Given 0.75 slots are filled*)
   Float.round_up (Float.of_int blocks *. 4.0 /. 3.0) |> Float.to_int
 
-let transactions_needed_for_ledger_proofs ?(num_proofs = 1) config =
-  let transactions_per_block = transaction_capacity config in
-  (blocks_for_first_ledger_proof config * transactions_per_block)
+let transactions_needed_for_ledger_proofs ?(num_proofs = 1) constraint_constants =
+  let transactions_per_block = transaction_capacity ~constraint_constants in
+  (blocks_for_first_ledger_proof ~constraint_constants * transactions_per_block)
   + (transactions_per_block * (num_proofs - 1))

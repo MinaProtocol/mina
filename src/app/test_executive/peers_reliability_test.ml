@@ -16,9 +16,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let config ~constants =
+  let config ~default_config =
     let open Test_config in
-    { (default ~constants) with
+    { default_config with
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
@@ -140,7 +140,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            in
            Malleable_error.lift
            @@ Transaction_snark.For_tests.deploy_snapp
-                ~constraint_constants:(Network.constraint_constants network)
+                ~constraint_constants:(Network.network_config network).constraint_config.constraint_constants
                 parties_spec
          in
          let%bind () =

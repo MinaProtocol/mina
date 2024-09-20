@@ -243,7 +243,61 @@ let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
       cleanup_deferred_ref := Some deferred ;
       deferred
 
-let main inputs =
+type constants =
+  { constraint_constants : Genesis_constants.Constraint_constants.t
+  ; genesis_constants : Genesis_constants.t
+  ; compile_config : Mina_compile_config.t
+  ; proof_level : Genesis_constants.Proof_level.t
+  }
+[@@deriving to_yojson]
+
+
+let make_default_config ~(constants : Test_config.constants) =
+
+  let log_filter_of_event_type ev_existential =
+    let open Event_type in
+    let (Event_type ev_type) = ev_existential in
+    let (module Ty) = event_type_module ev_type in
+    match Ty.parse with
+    | From_error_log _ ->
+        [] (* TODO: Do we need this? *)
+    | From_daemon_log (struct_id, _) ->
+        [ Structured_log_events.string_of_id struct_id ]
+    | From_puppeteer_log _ ->
+        []
+  in
+  { Test_config.requires_graphql =
+      true
+      (* require_graphql maybe should just be phased out, because it always needs to be enable.  Now with the graphql polling engine, everything will definitely fail if graphql is not enabled.  But even before that, most tests relied on some sort of graphql interaction *)
+  ; genesis_ledger = []
+  ; epoch_data = None
+  ; block_producers = []
+  ; snark_coordinator = None
+  ; num_archive_nodes = 0
+  ; log_precomputed_blocks = false
+  ; start_filtered_logs =
+      List.bind ~f:log_filter_of_event_type Event_type.all_event_types
+  ; genesis_constants = 
+      { constants.genesis_constants with 
+          txpool_max_size = 3000;
+          protocol = { constants.genesis_constants.protocol with 
+          k = 20;
+          delta = 0;
+          slots_per_epoch = 3 * 8 * 20;
+          slots_per_sub_window = 2;
+          grace_period_slots = 140;
+          }
+      }
+  ; constraint_constants =
+      { constants.constraint_constants with block_window_duration_ms = 120000 }
+  ; proof_level = constants.proof_level
+  ; compile_config =
+      { constants.compile_config with
+        default_snark_worker_fee = Currency.Fee.of_mina_string_exn "0.025"
+      }
+  }
+
+let main ~constants inputs =
   (* TODO: abstract over which engine is in use, allow engine to be set form CLI *)
   let (Test_inputs_with_cli_inputs ((module Test_inputs), cli_inputs)) =
     inputs.test_inputs
@@ -267,25 +321,6 @@ let main inputs =
    *   Exec.execute ~logger ~engine_cli_inputs ~images (module Test (Engine))
    *)
   let logger = Logger.create () in
-  let constants : Test_config.constants =
-    let protocol =
-      { Genesis_constants.Compiled.genesis_constants.protocol with
-        k = 20
-      ; delta = 0
-      ; slots_per_epoch = 3 * 8 * 20
-      ; slots_per_sub_window = 2
-      ; grace_period_slots = 140
-      }
-    in
-    { genesis_constants =
-        { Genesis_constants.Compiled.genesis_constants with
-          protocol
-        ; txpool_max_size = 3000
-        }
-    ; constraint_constants = Genesis_constants.Compiled.constraint_constants
-    ; compile_config = Mina_compile_config.Compiled.t
-    }
-  in
   let images =
     { Test_config.Container_images.mina = inputs.mina_image
     ; archive_node =
@@ -295,12 +330,13 @@ let main inputs =
     ; points = "codaprotocol/coda-points-hack:32b.4"
     }
   in
-  let test_config = T.config ~constants in
+  let default_config = make_default_config ~constants in
+  let test_config = T.config ~default_config in
   let%bind () = validate_inputs ~logger inputs test_config in
   [%log trace] "expanding network config" ;
   let network_config =
     Engine.Network_config.expand ~logger ~test_name ~cli_inputs
-      ~debug:inputs.debug ~constants ~images ~test_config
+      ~debug:inputs.debug  ~images ~test_config
   in
   (* resources which require additional cleanup at end of test *)
   let net_manager_ref : Engine.Network_manager.t option ref = ref None in

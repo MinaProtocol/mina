@@ -97,7 +97,7 @@ module Network_config = struct
                  ~f:(fun ~key:k ~data:v accum ->
                    (k, Network_keypair.to_yojson v) :: accum )
                  map )] )
-    ; constants : Test_config.constants
+    ; config : Runtime_config.t
     ; terraform : terraform_config
     }
   [@@deriving to_yojson]
@@ -433,20 +433,12 @@ module Network_config = struct
             ; worker_nodes = node.worker_nodes
             }
     in
-    let constants : Test_config.constants =
-      { genesis_constants = runtime_config.genesis_constants
-      ; constraint_constants = runtime_config.constraint_config.constraint_constants
-      ; proof_level = runtime_config.constraint_config.proof_level
-      ; compile_config = runtime_config.compile_config
-      }
-    in
-
 
     (* NETWORK CONFIG *)
     { mina_automation_location = cli_inputs.mina_automation_location
     ; debug_arg = debug
     ; genesis_keypairs
-    ; constants
+    ; config = runtime_config
     ; terraform =
         { cluster_name
         ; cluster_region
@@ -524,7 +516,7 @@ module Network_manager = struct
     ; graphql_enabled : bool
     ; testnet_dir : string
     ; testnet_log_filter : string
-    ; constants : Test_config.constants
+    ; config : Runtime_config.t
     ; seed_workloads : Kubernetes_network.Workload_to_deploy.t Core.String.Map.t
     ; block_producer_workloads :
         Kubernetes_network.Workload_to_deploy.t Core.String.Map.t
@@ -701,7 +693,7 @@ module Network_manager = struct
       ; graphql_enabled = network_config.terraform.deploy_graphql_ingress
       ; testnet_dir
       ; testnet_log_filter
-      ; constants = network_config.constants
+      ; config = network_config.config
       ; seed_workloads
       ; block_producer_workloads
       ; snark_coordinator_workloads
@@ -794,7 +786,7 @@ module Network_manager = struct
     in
     let network =
       { Kubernetes_network.namespace = t.namespace
-      ; constants = t.constants
+      ; config = t.config
       ; seeds
       ; block_producers
       ; snark_coordinators
