@@ -13,24 +13,6 @@ let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
 module Query = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type 'addr t =
-        | What_child_hashes of 'addr
-            (** What are the hashes of the children of this address? *)
-        | What_contents of 'addr
-            (** What accounts are at this address? addr must have depth
-            tree_depth - account_subtree_height *)
-        | Num_accounts
-            (** How many accounts are there? Used to size data structure and
-            figure out what part of the tree is filled in. *)
-        | Subtree of 'addr
-            (** What are the 2^k nodes at depth k from the given prefix 
-            address **)
-        | Subtree_supported
-      (* TODO: only use subtree after berifying its supported *)
-      [@@deriving sexp, yojson, hash, compare]
-    end
-
     module V1 = struct
       type 'addr t =
         | What_child_hashes of 'addr
@@ -45,11 +27,11 @@ module Query = struct
 
       let to_latest = function
         | What_child_hashes addr ->
-            V2.What_child_hashes addr
+            What_child_hashes addr
         | What_contents addr ->
-            V2.What_contents addr
+            What_contents addr
         | Num_accounts ->
-            V2.Num_accounts
+            Num_accounts
     end
   end]
 end
@@ -67,7 +49,7 @@ module Answer = struct
             (** There are this many accounts and the smallest subtree that
                 contains all non-empty nodes has this hash. *)
         | Subtree of 'hash list
-        | Subtree_supported
+            (** The subtree rooted on the requested address has these leaves *)
       [@@deriving sexp, yojson]
     end
 
@@ -78,6 +60,8 @@ module Answer = struct
         | Contents_are of 'account list
             (** The requested address has these accounts *)
         | Num_accounts of int * 'hash
+            (** There are this many accounts and the smallest subtree that
+                contains all non-empty nodes has this hash. *)
       [@@deriving sexp, yojson]
 
       let to_latest acct_to_latest = function
@@ -270,6 +254,7 @@ end = struct
         [ addr ]
     | i ->
         let left, right =
+          (* TODO: may be better to propagate the error *)
           Option.value_exn
             ( Or_error.ok
             @@ Or_error.both
@@ -306,29 +291,6 @@ end = struct
       f query ;
       let response_or_punish =
         match query with
-        | What_child_hashes a -> (
-            match
-              let open Or_error.Let_syntax in
-              let%bind lchild = Addr.child ~ledger_depth a Direction.Left in
-              let%bind rchild = Addr.child ~ledger_depth a Direction.Right in
-              Or_error.try_with (fun () ->
-                  Answer.Child_hashes_are
-                    ( MT.get_inner_hash_at_addr_exn mt lchild
-                    , MT.get_inner_hash_at_addr_exn mt rchild ) )
-            with
-            | Ok answer ->
-                Either.First answer
-            | Error e ->
-                let logger = Logger.create () in
-                [%log error]
-                  ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-                  "When handling What_child_hashes request, the following \
-                   error happended: $error" ;
-                Either.Second
-                  ( Actions.Violated_protocol
-                  , Some
-                      ( "invalid address $addr in What_child_hashes request"
-                      , [ ("addr", Addr.to_yojson a) ] ) ) )
         | What_contents a ->
             if Addr.height ~ledger_depth a > account_subtree_height then
               Either.Second
@@ -399,14 +361,12 @@ end = struct
             Either.First
               (Num_accounts
                  (len, MT.get_inner_hash_at_addr_exn mt content_root_addr) )
-        | Subtree a ->
+        | What_child_hashes a ->
             let ledger_depth = MT.depth mt in
             let addresses = intermediate_range ledger_depth a subtree_depth in
             let get_hash a = MT.get_inner_hash_at_addr_exn mt a in
             let hashes = List.map addresses ~f:get_hash in
             Either.First (Subtree hashes)
-        | Subtree_supported ->
-            Either.First Subtree_supported
       in
 
       match response_or_punish with
@@ -647,21 +607,9 @@ end = struct
       expect_content t addr exp_hash ;
       Linear_pipe.write_without_pushback_if_open t.queries
         (desired_root_exn t, What_contents addr) )
-    else
-      let account_subtree_depth = MT.depth t.tree - account_subtree_height in
-      let depth_to_account_subtree = account_subtree_depth - Addr.depth addr in
-
-      (* If distance to the account subtree is big enough, use wide queries,
-         if not just request the next 2 children *)
-      if depth_to_account_subtree >= subtree_depth then (
-        expect_subtree t addr exp_hash ;
-        Linear_pipe.write_without_pushback_if_open t.queries
-          (* TODO: verify purpose of sending the root *)
-          (desired_root_exn t, Subtree addr) )
-      else (
-        expect_children t addr exp_hash ;
-        Linear_pipe.write_without_pushback_if_open t.queries
-          (desired_root_exn t, What_child_hashes addr) )
+    else expect_children t addr exp_hash ;
+    Linear_pipe.write_without_pushback_if_open t.queries
+      (desired_root_exn t, What_child_hashes addr)
 
   (** Handle the initial Num_accounts message, starting the main syncing
       process. *)
@@ -793,7 +741,7 @@ end = struct
                             ] ) )
                   in
                   requeue_query () )
-          | Query.Subtree address, Answer.Subtree hashes -> (
+          | Query.What_child_hashes address, Answer.Subtree hashes -> (
               match add_subtree t address hashes with
               | `Hash_mismatch (expected, actual) ->
                   let%map () =
