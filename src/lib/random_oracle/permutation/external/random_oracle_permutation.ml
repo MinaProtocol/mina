@@ -15,7 +15,16 @@ let block_cipher _params (s : Field.t array) =
   Kimchi_pasta_fp_poseidon.block_cipher params v ;
   Array.init (Array.length s) ~f:(Kimchi_bindings.FieldVectors.Fp.get v)
 
-let update _params input ~rate:_ ~state =
+let update =
+  let open Sponge.Default.F (Field) in
+  Fn.compose (sponge ~add_assign) block_cipher
+
+let update_batch_ocaml_sponge params ~rate ~state =
+  List.map ~f:(fun input ->
+      let state = copy state in
+      update params ~rate ~state input )
+
+let update_rust_sponge _params input ~rate:_ ~state =
   let input_v = Kimchi_bindings.FieldVectors.Fp.create () in
   Array.iter input ~f:(Kimchi_bindings.FieldVectors.Fp.emplace_back input_v) ;
   let state_v = Kimchi_bindings.FieldVectors.Fp.create () in
@@ -24,22 +33,34 @@ let update _params input ~rate:_ ~state =
   Array.init (Array.length state)
     ~f:(Kimchi_bindings.FieldVectors.Fp.get state_v)
 
-let update_batch _params ~rate:_ ~state inputs =
-  let input_vs = Kimchi_bindings.FieldVectors.Fp_batch.create () in
-  List.iter inputs ~f:(fun input ->
-      let input_v = Kimchi_bindings.FieldVectors.Fp.create () in
-      Array.iter input ~f:(Kimchi_bindings.FieldVectors.Fp.emplace_back input_v) ;
-      Kimchi_bindings.FieldVectors.Fp_batch.emplace_back input_vs input_v ) ;
-  let state_v = Kimchi_bindings.FieldVectors.Fp.create () in
-  Array.iter state ~f:(Kimchi_bindings.FieldVectors.Fp.emplace_back state_v) ;
-  Kimchi_pasta_fp_poseidon.update_batch params 16 state_v input_vs ;
-  let state_length = Array.length state in
-  let res =
-    List.mapi inputs ~f:(fun i _ ->
-        let v = Kimchi_bindings.FieldVectors.Fp_batch.get input_vs i in
-        Array.init state_length ~f:(Kimchi_bindings.FieldVectors.Fp.get v) )
-  in
-  res
+let chunks_pow =
+  Sys.getenv_opt "CHUNKS_POW" |> Option.value_map ~default:4 ~f:Int.of_string
+
+let chunks_thr =
+  Sys.getenv_opt "CHUNKS_THR"
+  |> Option.value_map ~default:(1 lsl (chunks_pow + 1)) ~f:Int.of_string
+
+let update_batch params' ~rate ~state inputs =
+  let len = List.length inputs in
+  if len < chunks_thr then update_batch_ocaml_sponge params' ~rate ~state inputs
+  else
+    let input_vs = Kimchi_bindings.FieldVectors.Fp_batch.create () in
+    List.iter inputs ~f:(fun input ->
+        let input_v = Kimchi_bindings.FieldVectors.Fp.create () in
+        Array.iter input
+          ~f:(Kimchi_bindings.FieldVectors.Fp.emplace_back input_v) ;
+        Kimchi_bindings.FieldVectors.Fp_batch.emplace_back input_vs input_v ) ;
+    let chunk_size = len lsr chunks_pow in
+    let state_v = Kimchi_bindings.FieldVectors.Fp.create () in
+    Array.iter state ~f:(Kimchi_bindings.FieldVectors.Fp.emplace_back state_v) ;
+    Kimchi_pasta_fp_poseidon.update_batch params chunk_size state_v input_vs ;
+    let state_length = Array.length state in
+    let res =
+      List.mapi inputs ~f:(fun i _ ->
+          let v = Kimchi_bindings.FieldVectors.Fp_batch.get input_vs i in
+          Array.init state_length ~f:(Kimchi_bindings.FieldVectors.Fp.get v) )
+    in
+    res
 
 let%test_unit "check rust implementation of block-cipher" =
   let params' : Field.t Sponge.Params.t =
@@ -72,7 +93,7 @@ let%test_unit "check rust implementation of update" =
       let value () = Array.of_list value in
       [%test_eq: T.Field.t array]
         (Ocaml_permutation.update ~rate:2 params' ~state:(s ()) @@ value ())
-        (update ~rate:2 params' ~state:(s ()) @@ value ()) )
+        (update_rust_sponge ~rate:2 params' ~state:(s ()) @@ value ()) )
 
 let%test_unit "check rust implementation of update_batch" =
   let params' : Field.t Sponge.Params.t =
@@ -96,34 +117,6 @@ let%test_unit "check rust implementation of update_batch" =
         @@ value () )
         (update_batch ~rate:2 params' ~state:(s ()) @@ value ()) )
 
-let%test_unit "check update_batch on a large number of small vectors" =
-  let params' : Field.t Sponge.Params.t =
-    Kimchi_pasta_basic.poseidon_params_fp
-  in
-  let update =
-    let open Sponge.Default.F (Field) in
-    Fn.compose (sponge ~add_assign) block_cipher
-  in
-  let update_batch params ~rate ~state =
-    List.map ~f:(fun input ->
-        let state = copy state in
-        update params ~rate ~state input )
-  in
-  let open Pickles.Impls.Step in
-  let module T = Internal_Basic in
-  let gen =
-    let open Quickcheck.Generator in
-    let open Let_syntax in
-    let%bind init_state = list_with_length 3 T.Field.gen in
-    let%map values = list_with_length 1280 @@ list_with_length 2 T.Field.gen in
-    (init_state, values)
-  in
-  Quickcheck.test ~trials:10 gen ~f:(fun (s, value) ->
-      let s () = Array.of_list s in
-      let value () = List.map ~f:Array.of_list value in
-      let _ = update_batch ~rate:2 params' ~state:(s ()) @@ value () in
-      () )
-
 (* Parametrize chunk size via an argument and experiment more
    we need to determine minimum effective chunk, maybe *)
 let%test_unit "check update_batch on a large number of small vectors (parallel)"
@@ -140,7 +133,7 @@ let%test_unit "check update_batch on a large number of small vectors (parallel)"
     let%map values = list_with_length 1280 @@ list_with_length 2 T.Field.gen in
     (init_state, values)
   in
-  Quickcheck.test ~trials:10 gen ~f:(fun (s, value) ->
+  Quickcheck.test ~trials:100 gen ~f:(fun (s, value) ->
       let s () = Array.of_list s in
       let value () = List.map ~f:Array.of_list value in
       let _ = update_batch ~rate:2 params' ~state:(s ()) @@ value () in
