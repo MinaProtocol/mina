@@ -33,6 +33,8 @@ module type CONTEXT = sig
   val list_peers : unit -> Peer.t list Deferred.t
 
   val get_transition_frontier : unit -> Transition_frontier.t option
+
+  val compile_config : Mina_compile_config.t
 end
 
 type ctx = (module CONTEXT)

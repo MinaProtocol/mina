@@ -206,6 +206,7 @@ module Features = struct
   module Stable = struct
     module V1 = struct
       type 'bool t =
+            'bool Mina_wire_types.Pickles_types.Plonk_types.Features.V1.t =
         { range_check0 : 'bool
         ; range_check1 : 'bool
         ; foreign_field_add : 'bool
@@ -475,7 +476,7 @@ module Evals = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type 'a t =
+      type 'a t = 'a Mina_wire_types.Pickles_types.Plonk_types.Evals.V2.t =
         { w : 'a Columns_vec.Stable.V1.t
         ; coefficients : 'a Columns_vec.Stable.V1.t
         ; z : 'a
@@ -1231,6 +1232,12 @@ module All_evals = struct
     module Stable = struct
       module V1 = struct
         type ('f, 'f_multi) t =
+              ( 'f
+              , 'f_multi )
+              Mina_wire_types.Pickles_types.Plonk_types.All_evals
+              .With_public_input
+              .V1
+              .t =
           { public_input : 'f; evals : 'f_multi Evals.Stable.V2.t }
         [@@deriving sexp, compare, yojson, hash, equal, hlist]
       end
@@ -1276,6 +1283,7 @@ module All_evals = struct
   end]
 
   type ('f, 'f_multi) t =
+        ('f, 'f_multi) Mina_wire_types.Pickles_types.Plonk_types.All_evals.V1.t =
     { evals : ('f_multi * 'f_multi, 'f_multi * 'f_multi) With_public_input.t
     ; ft_eval1 : 'f
     }
@@ -1327,6 +1335,10 @@ module Openings = struct
     module Stable = struct
       module V1 = struct
         type ('g, 'fq) t =
+              ( 'g
+              , 'fq )
+              Mina_wire_types.Pickles_types.Plonk_types.Openings.Bulletproof.V1
+              .t =
           { lr : ('g * 'g) Bounded_types.ArrayN16.Stable.V1.t
           ; z_1 : 'fq
           ; z_2 : 'fq

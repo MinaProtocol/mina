@@ -72,7 +72,7 @@ let record_timeout_metrics cb =
       Mina_metrics.Counter.inc_one M.validations_timed_out
 
 let record_validation_metrics message_type (result : validation_result)
-    validation_time processing_time =
+    validation_time processing_time ~block_window_duration:_ (*TODO remove*) =
   match metrics_of_message_type message_type with
   | None ->
       ()
@@ -81,11 +81,14 @@ let record_validation_metrics message_type (result : validation_result)
       | `Ignore ->
           Mina_metrics.Counter.inc_one M.ignored
       | `Accept ->
-          M.Validation_time.update validation_time ;
-          M.Processing_time.update processing_time
+          let module Validation_time = M.Validation_time in
+          Validation_time.update validation_time ;
+          let module Processing_time = M.Processing_time in
+          Processing_time.update processing_time
       | `Reject ->
           Mina_metrics.Counter.inc_one M.rejected ;
-          M.Rejection_time.update processing_time )
+          let module Rejection_time = M.Rejection_time in
+          Rejection_time.update processing_time )
 
 let await_timeout cb =
   if is_expired cb then Deferred.return ()
@@ -98,7 +101,7 @@ let await_timeout cb =
           ( Time_ns.Span.to_span_float_round_nearest
           @@ Time_ns.diff expires_at (Time_ns.now ()) )
 
-let await cb =
+let await ~block_window_duration cb =
   if is_expired cb then (record_timeout_metrics cb ; Deferred.return None)
   else
     match cb.expiration with
@@ -119,14 +122,18 @@ let await cb =
               Time_ns.abs_diff (Time_ns.now ()) cb.created_at
               |> Time_ns.Span.to_ms |> Time.Span.of_ms
             in
-            record_validation_metrics cb.message_type result validation_time
-              processing_time ;
+            record_validation_metrics ~block_window_duration cb.message_type
+              result validation_time processing_time ;
             Some result
         | `Timeout ->
             record_timeout_metrics cb ; None )
 
-let await_exn cb =
-  match%map await cb with None -> failwith "timeout" | Some result -> result
+let await_exn ~block_window_duration cb =
+  match%map await ~block_window_duration cb with
+  | None ->
+      failwith "timeout"
+  | Some result ->
+      result
 
 let fire_if_not_already_fired cb result =
   if not (is_expired cb) then (
