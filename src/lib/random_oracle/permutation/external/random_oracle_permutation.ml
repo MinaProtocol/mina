@@ -25,13 +25,14 @@ let update_batch_ocaml_sponge params ~rate ~state =
       update params ~rate ~state input )
 
 let update_rust_sponge _params input ~rate:_ ~state =
-  let input_v = Kimchi_bindings.FieldVectors.Fp.create () in
-  Array.iter input ~f:(Kimchi_bindings.FieldVectors.Fp.emplace_back input_v) ;
-  let state_v = Kimchi_bindings.FieldVectors.Fp.create () in
-  Array.iter state ~f:(Kimchi_bindings.FieldVectors.Fp.emplace_back state_v) ;
-  Kimchi_pasta_fp_poseidon.update params state_v input_v ;
+  let state_and_input_v = Kimchi_bindings.FieldVectors.Fp.create () in
+  Array.iter state
+    ~f:(Kimchi_bindings.FieldVectors.Fp.emplace_back state_and_input_v) ;
+  Array.iter input
+    ~f:(Kimchi_bindings.FieldVectors.Fp.emplace_back state_and_input_v) ;
+  Kimchi_pasta_fp_poseidon.update params state_and_input_v ;
   Array.init (Array.length state)
-    ~f:(Kimchi_bindings.FieldVectors.Fp.get state_v)
+    ~f:(Kimchi_bindings.FieldVectors.Fp.get state_and_input_v)
 
 let chunks_pow =
   Sys.getenv_opt "CHUNKS_POW" |> Option.value_map ~default:4 ~f:Int.of_string
@@ -44,20 +45,23 @@ let update_batch params' ~rate ~state inputs =
   let len = List.length inputs in
   if len < chunks_thr then update_batch_ocaml_sponge params' ~rate ~state inputs
   else
-    let input_vs = Kimchi_bindings.FieldVectors.Fp_batch.create () in
+    let state_and_input_vs = Kimchi_bindings.FieldVectors.Fp_batch.create () in
     List.iter inputs ~f:(fun input ->
-        let input_v = Kimchi_bindings.FieldVectors.Fp.create () in
+        let state_and_input_v = Kimchi_bindings.FieldVectors.Fp.create () in
+        Array.iter state
+          ~f:(Kimchi_bindings.FieldVectors.Fp.emplace_back state_and_input_v) ;
         Array.iter input
-          ~f:(Kimchi_bindings.FieldVectors.Fp.emplace_back input_v) ;
-        Kimchi_bindings.FieldVectors.Fp_batch.emplace_back input_vs input_v ) ;
+          ~f:(Kimchi_bindings.FieldVectors.Fp.emplace_back state_and_input_v) ;
+        Kimchi_bindings.FieldVectors.Fp_batch.emplace_back state_and_input_vs
+          state_and_input_v ) ;
     let chunk_size = len lsr chunks_pow in
-    let state_v = Kimchi_bindings.FieldVectors.Fp.create () in
-    Array.iter state ~f:(Kimchi_bindings.FieldVectors.Fp.emplace_back state_v) ;
-    Kimchi_pasta_fp_poseidon.update_batch params chunk_size state_v input_vs ;
+    Kimchi_pasta_fp_poseidon.update_batch params chunk_size state_and_input_vs ;
     let state_length = Array.length state in
     let res =
       List.mapi inputs ~f:(fun i _ ->
-          let v = Kimchi_bindings.FieldVectors.Fp_batch.get input_vs i in
+          let v =
+            Kimchi_bindings.FieldVectors.Fp_batch.get state_and_input_vs i
+          in
           Array.init state_length ~f:(Kimchi_bindings.FieldVectors.Fp.get v) )
     in
     res
