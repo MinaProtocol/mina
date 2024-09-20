@@ -22,6 +22,8 @@ module type Full = sig
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> genesis_ledger_hash:Ledger_hash.t
     -> t
+  
+include Comparable with type t := t
 
   module Stable : sig
     module V1 : sig
