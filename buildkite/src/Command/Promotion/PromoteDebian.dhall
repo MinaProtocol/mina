@@ -76,10 +76,10 @@ let promoteDebianStep =
                       , "AWS_SECRET_ACCESS_KEY"
                       , "FROM_VERSION_MANUAL"
                       ]
-                      ". ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/promote-deb.sh --package ${package_name} --version ${spec.version}  --new-version ${spec.new_version}  --architecture ${spec.architecture}  --codename ${DebianVersions.lowerName
-                                                                                                                                                                                                                                                      spec.codename}  --from-component ${DebianChannel.lowerName
-                                                                                                                                                                                                                                                                                           spec.from_channel}  --to-component ${DebianChannel.lowerName
-                                                                                                                                                                                                                                                                                                                                  spec.to_channel} ${new_name}"
+                      ". ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/debian/promote.sh --package ${package_name} --version ${spec.version}  --new-version ${spec.new_version}  --architecture ${spec.architecture}  --codename ${DebianVersions.lowerName
+                                                                                                                                                                                                                                                         spec.codename}  --from-component ${DebianChannel.lowerName
+                                                                                                                                                                                                                                                                                              spec.from_channel}  --to-component ${DebianChannel.lowerName
+                                                                                                                                                                                                                                                                                                                                     spec.to_channel} ${new_name}"
                 , label = "Debian: ${spec.step_key}"
                 , key = spec.step_key
                 , target = Size.Small
