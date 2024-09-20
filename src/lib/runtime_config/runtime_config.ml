@@ -473,7 +473,7 @@ module Json_layout = struct
       ; zkapp_cmd_limit_hardcap : int option [@default None]
       ; slot_tx_end : int option [@default None]
       ; slot_chain_end : int option [@default None]
-      ; minimum_user_command_fee : Currency.Fee.t option
+      ; minimum_user_command_fee : Currency.Fee.t option [@default None]
       ; network_id : string option [@default None]
       }
     [@@deriving yojson, fields]
