@@ -70,7 +70,7 @@ type t =
   }
 [@@deriving fields]
 
-let create (module Context : CONTEXT) (config : Config.t) ~sinks
+let create (module Context : CONTEXT) (config : Config.t) ~on_bitswap_update ~sinks
     ~(get_transition_frontier : unit -> Transition_frontier.t option)
     ~(get_node_status : unit -> Node_status.t Deferred.Or_error.t) =
   let open Context in
@@ -93,6 +93,7 @@ let create (module Context : CONTEXT) (config : Config.t) ~sinks
     O1trace.thread "gossip_net" (fun () ->
         Gossip_net.Any.create config.creatable_gossip_net
           (module Rpc_context)
+          ~on_bitswap_update
           (Gossip_net.Message.Any_sinks ((module Sinks), sinks)) )
   in
   gossip_net_ref := Some gossip_net ;

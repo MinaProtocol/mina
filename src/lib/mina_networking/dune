@@ -45,9 +45,9 @@
    mina_metrics
    syncable_ledger
    mina_ledger
-   transition_handler
    o1trace
    ppx_version.runtime
+   blake2
    bounded_types
    sync_handler
    transition_chain_prover
