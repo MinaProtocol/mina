@@ -128,7 +128,7 @@ val validate_genesis_protocol_state :
      , 'd
      , 'e
      , 'f )
-     with_block
+     with_header
   -> ( ( 'a
        , [ `Genesis_state ] * unit Truth.true_t
        , 'b
@@ -136,7 +136,7 @@ val validate_genesis_protocol_state :
        , 'd
        , 'e
        , 'f )
-       with_block
+       with_header
      , [> `Invalid_genesis_protocol_state ] )
      Result.t
 

@@ -556,7 +556,6 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
   let incorrect_staged =
     not
     @@
-    let open Staged_ledger_hash in
     Staged_ledger_hash.equal staged_ledger_hash
       (Blockchain_state.staged_ledger_hash blockchain_state)
   in
