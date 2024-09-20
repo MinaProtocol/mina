@@ -15,7 +15,9 @@ let%test_module "Mina network tests" =
       let%bind a_tmp = Unix.mkdtemp "p2p_helper_test_a" in
       let%bind b_tmp = Unix.mkdtemp "p2p_helper_test_b" in
       let%bind c_tmp = Unix.mkdtemp "p2p_helper_test_c" in
-      let on_bitswap_update ~tag:_ _ _   = failwith "no bitswap update handler in tests" in
+      let on_bitswap_update ~tag:_ _ _ =
+        failwith "no bitswap update handler in tests"
+      in
       let%bind a =
         create ~all_peers_seen_metric:false
           ~logger:(Logger.extend logger [ ("name", `String "a") ])

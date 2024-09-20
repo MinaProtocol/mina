@@ -217,11 +217,10 @@ module Make (Rpc_interface : RPC_INTERFACE) :
     (* Creates just the helper, making sure to register everything
        BEFORE we start listening/advertise ourselves for discovery. *)
     let create_libp2p ?(allow_multiple_instances = false) (config : Config.t)
-        ?outstanding_resource_requests
-        ctx first_peer_ivar high_connectivity_ivar ~added_seeds ~pids
-        ~on_unexpected_termination
+        ?outstanding_resource_requests ctx first_peer_ivar
+        high_connectivity_ivar ~added_seeds ~pids ~on_unexpected_termination
         ~sinks:
-          (Message.Any_sinks (sinksM, (sink_block, sink_tx, sink_snark_work))) 
+          (Message.Any_sinks (sinksM, (sink_block, sink_tx, sink_snark_work)))
         ~on_bitswap_update =
       let module Sinks = (val sinksM) in
       let ctr = ref 0 in
@@ -471,7 +470,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                   Sinks.Block_sink.push sink_block
                     ( `Header env
                     , `Time_received (Block_time.now config.time_controller)
-                    , `Topic_and_vc  (v1_topic_block, vc) ) )
+                    , `Topic_and_vc (v1_topic_block, vc) ) )
                 header_bin_prot v1_topic_block
             in
             let map_v0_msg msg =
@@ -489,8 +488,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                   match Envelope.Incoming.data env with
                   | Message.Latest.T.New_state state ->
                       Sinks.Block_sink.push sink_block
-                        ( `Block 
-                            (Envelope.Incoming.map ~f:(const state) env)
+                        ( `Block (Envelope.Incoming.map ~f:(const state) env)
                         , `Time_received (Block_time.now config.time_controller)
                         , `Topic_and_vc (v0_topic, vc) )
                   | Message.Latest.T.Transaction_pool_diff
@@ -608,8 +606,10 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                     in
                     don't_wait_for
                       ( after restart_after
-                      >>= fun () -> Mina_net2.shutdown n 
-                      >>| fun reqs -> restart_libp2p ~outstanding_resource_requests:reqs () )
+                      >>= fun () ->
+                      Mina_net2.shutdown n
+                      >>| fun reqs ->
+                      restart_libp2p ~outstanding_resource_requests:reqs () )
                 | None ->
                     () ) ;
                 n ) ;
@@ -629,18 +629,22 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                 "Successfully restarted libp2p" )
         and start_libp2p ?outstanding_resource_requests () =
           let libp2p =
-            create_libp2p ~allow_multiple_instances ?outstanding_resource_requests config rpc_handlers
-              first_peer_ivar high_connectivity_ivar ~added_seeds ~pids
+            create_libp2p ~allow_multiple_instances
+              ?outstanding_resource_requests config rpc_handlers first_peer_ivar
+              high_connectivity_ivar ~added_seeds ~pids
               ~on_unexpected_termination:restart_libp2p ~sinks
               ~on_bitswap_update
           in
           on_libp2p_create libp2p ; Deferred.ignore_m libp2p
-        and restart_libp2p ?outstanding_resource_requests () = don't_wait_for (start_libp2p ?outstanding_resource_requests ()) in
+        and restart_libp2p ?outstanding_resource_requests () =
+          don't_wait_for (start_libp2p ?outstanding_resource_requests ())
+        in
         don't_wait_for
           (Strict_pipe.Reader.iter restarts_r ~f:(fun () ->
                let%bind n = !net2_ref in
                let%bind outstanding_resource_requests = Mina_net2.shutdown n in
-               restart_libp2p ~outstanding_resource_requests () ; !net2_ref >>| ignore ) ) ;
+               restart_libp2p ~outstanding_resource_requests () ;
+               !net2_ref >>| ignore ) ) ;
         start_libp2p ()
       in
       let ban_configuration =
@@ -967,7 +971,8 @@ module Make (Rpc_interface : RPC_INTERFACE) :
           guard_topic ~origin_topics v0_topic pfs.publish_v0
             (Message.New_state block) )
 
-    let broadcast_transaction_pool_diff ?(origin_topics = []) ?(nonce = 0) t diff =
+    let broadcast_transaction_pool_diff ?(origin_topics = []) ?(nonce = 0) t
+        diff =
       let pfs = !(t.publish_functions) in
       let%bind () =
         guard_topic ~origin_topics v1_topic_tx pfs.publish_v1_tx diff
@@ -1002,6 +1007,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       Mina_net2.set_connection_gating_config ?clean_added_peers net2 config
 
     let restart_helper t = t.restart_helper ()
+
     let add_bitswap_resource t ~id ~tag ~data =
       let%map net2 = !(t.net2) in
       Mina_net2.add_bitswap_resource net2 ~id ~tag ~data

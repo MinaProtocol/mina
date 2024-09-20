@@ -52,13 +52,13 @@ let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
   (block_with_hash, validation)
 
 let genesis_header ~precomputed_values =
-    let b, v = genesis ~precomputed_values in
-    (With_hash.map ~f:Block.header b, v)
-    
-  let handle_dropped_transition ?pipe_name ~valid_cbs ~logger state_hash =
+  let b, v = genesis ~precomputed_values in
+  (With_hash.map ~f:Block.header b, v)
+
+let handle_dropped_transition ?pipe_name ~valid_cbs ~logger state_hash =
   [%log warn] "Dropping state_hash $state_hash from $pipe transition pipe"
     ~metadata:
-    [ ("state_hash", State_hash.to_yojson state_hash)
+      [ ("state_hash", State_hash.to_yojson state_hash)
       ; ("pipe", `String (Option.value pipe_name ~default:"an unknown"))
       ] ;
   List.iter
@@ -74,14 +74,14 @@ let consensus_state =
   Fn.compose Protocol_state.consensus_state
     (Fn.compose Header.protocol_state Block.header)
 
-  let strip_headers_from_chain_proof (init_st, body_hashes, headers) =
-    let compute_hashes =
-      Fn.compose Mina_state.Protocol_state.hashes Header.protocol_state
-    in
-    let body_hashes' =
-      List.map headers
-        ~f:(State_hash.With_state_hashes.state_body_hash ~compute_hashes)
-    in
-    (init_st, body_hashes @ body_hashes')
+let strip_headers_from_chain_proof (init_st, body_hashes, headers) =
+  let compute_hashes =
+    Fn.compose Mina_state.Protocol_state.hashes Header.protocol_state
+  in
+  let body_hashes' =
+    List.map headers
+      ~f:(State_hash.With_state_hashes.state_body_hash ~compute_hashes)
+  in
+  (init_st, body_hashes @ body_hashes')
 
 include Block

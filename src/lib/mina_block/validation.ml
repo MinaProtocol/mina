@@ -283,8 +283,8 @@ let validate_time_received ~(precomputed_values : Precomputed_values.t)
       Error (`Invalid_time_received err)
 
 let skip_time_received_validation_header `This_block_was_not_received_via_gossip
-      (t, validation) =
-    (t, Unsafe.set_valid_time_received validation)
+    (t, validation) =
+  (t, Unsafe.set_valid_time_received validation)
 
 let skip_time_received_validation `This_block_was_not_received_via_gossip
     (t, validation) =
@@ -300,8 +300,8 @@ let validate_genesis_protocol_state ~genesis_state_hash (t, validation) =
   else Error `Invalid_genesis_protocol_state
 
 let skip_genesis_protocol_state_validation_header
-  `This_header_was_loaded_from_persistence (t, validation) =
-(t, Unsafe.set_valid_genesis_state validation)
+    `This_header_was_loaded_from_persistence (t, validation) =
+  (t, Unsafe.set_valid_genesis_state validation)
 
 let skip_genesis_protocol_state_validation `This_block_was_generated_internally
     (t, validation) =
@@ -340,7 +340,7 @@ let validate_proofs ~verifier ~genesis_state_hash tvs =
           *)
           None
         else
-          let header =  With_hash.data t in
+          let header = With_hash.data t in
           Some
             (Blockchain_snark.Blockchain.create
                ~state:(Header.protocol_state header)
@@ -379,7 +379,7 @@ let extract_delta_block_chain_witness = function
       failwith "why can't this be refuted?"
 
 let validate_delta_block_chain (t, validation) =
-  let header = t |> With_hash.data  in
+  let header = t |> With_hash.data in
   match
     Transition_chain_verifier.verify
       ~target_hash:
@@ -391,15 +391,15 @@ let validate_delta_block_chain (t, validation) =
   | None ->
       Error `Invalid_delta_block_chain_proof
 
-  let skip_delta_block_chain_validation_header
-      `This_header_was_loaded_from_persistence (t, validation) =
-    let previous_protocol_state_hash =
-      t |> With_hash.data |> Header.protocol_state
-      |> Protocol_state.previous_state_hash
-    in
-    ( t
-    , Unsafe.set_valid_delta_block_chain validation
-        (Mina_stdlib.Nonempty_list.singleton previous_protocol_state_hash) )
+let skip_delta_block_chain_validation_header
+    `This_header_was_loaded_from_persistence (t, validation) =
+  let previous_protocol_state_hash =
+    t |> With_hash.data |> Header.protocol_state
+    |> Protocol_state.previous_state_hash
+  in
+  ( t
+  , Unsafe.set_valid_delta_block_chain validation
+      (Mina_stdlib.Nonempty_list.singleton previous_protocol_state_hash) )
 
 let skip_delta_block_chain_validation `This_block_was_not_received_via_gossip
     (t, validation) =
@@ -410,9 +410,10 @@ let skip_delta_block_chain_validation `This_block_was_not_received_via_gossip
   ( t
   , Unsafe.set_valid_delta_block_chain validation
       (Mina_stdlib.Nonempty_list.singleton previous_protocol_state_hash) )
-  let validate_frontier_dependencies ~to_header
-      ~context:(module Context : CONTEXT) ~root_block ~is_block_in_frontier
-      (t, validation) =
+
+let validate_frontier_dependencies ~to_header
+    ~context:(module Context : CONTEXT) ~root_block ~is_block_in_frontier
+    (t, validation) =
   let module Context = struct
     include Context
 
@@ -440,7 +441,7 @@ let skip_delta_block_chain_validation `This_block_was_not_received_via_gossip
   in
   let%bind () =
     Result.ok_if_true
-    (not @@ is_block_in_frontier hash)
+      (not @@ is_block_in_frontier hash)
       ~error:`Already_in_frontier
   in
   let%bind () =
@@ -456,7 +457,7 @@ let skip_delta_block_chain_validation `This_block_was_not_received_via_gossip
   in
   let%map () =
     Result.ok_if_true
-    (is_block_in_frontier parent_hash)
+      (is_block_in_frontier parent_hash)
       ~error:`Parent_missing_from_frontier
   in
   (t, Unsafe.set_valid_frontier_dependencies validation)
@@ -552,9 +553,12 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
     | Some (proof, _) ->
         Ledger_proof.snarked_ledger_hash proof
   in
-  let incorrect_staged = not @@
+  let incorrect_staged =
+    not
+    @@
     let open Staged_ledger_hash in
-    Staged_ledger_hash.equal staged_ledger_hash  (Blockchain_state.staged_ledger_hash blockchain_state)
+    Staged_ledger_hash.equal staged_ledger_hash
+      (Blockchain_state.staged_ledger_hash blockchain_state)
   in
   let incorrect_snarked =
     let open Frozen_ledger_hash in
@@ -620,34 +624,34 @@ let skip_protocol_versions_validation `This_block_has_valid_protocol_versions
     (t, validation) =
   (t, Unsafe.set_valid_protocol_versions validation)
 
-  let skip_protocol_versions_validation_header
-  `This_header_was_loaded_from_persistence (t, validation) =
-(t, Unsafe.set_valid_protocol_versions validation)
+let skip_protocol_versions_validation_header
+    `This_header_was_loaded_from_persistence (t, validation) =
+  (t, Unsafe.set_valid_protocol_versions validation)
 
 let with_body (header_with_hash, validation) body =
-( With_hash.map ~f:(fun header -> Block.create ~header ~body) header_with_hash
-, validation )
+  ( With_hash.map ~f:(fun header -> Block.create ~header ~body) header_with_hash
+  , validation )
 
 let wrap_header t : fully_invalid_with_header = (t, fully_invalid)
 
 let to_header (b, v) = (With_hash.map ~f:Block.header b, v)
 
 let reset_proof_validation_header (h, validation) =
-match validation with
-| ( time_received
-  , genesis_state
-  , (`Proof, Truth.True ())
-  , delta_block_chain
-  , frontier_dependencies
-  , staged_ledger_diff
-  , protocol_versions ) ->
-    ( h
-    , ( time_received
-      , genesis_state
-      , (`Proof, Truth.False)
-      , delta_block_chain
-      , frontier_dependencies
-      , staged_ledger_diff
-      , protocol_versions ) )
-| _ ->
-    failwith "why can't this be refuted?"
+  match validation with
+  | ( time_received
+    , genesis_state
+    , (`Proof, Truth.True ())
+    , delta_block_chain
+    , frontier_dependencies
+    , staged_ledger_diff
+    , protocol_versions ) ->
+      ( h
+      , ( time_received
+        , genesis_state
+        , (`Proof, Truth.False)
+        , delta_block_chain
+        , frontier_dependencies
+        , staged_ledger_diff
+        , protocol_versions ) )
+  | _ ->
+      failwith "why can't this be refuted?"

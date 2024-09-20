@@ -42,7 +42,8 @@ type t =
 type Structured_log_events.t +=
   | Block_received of { state_hash : State_hash.t; sender : Envelope.Sender.t }
   [@@deriving register_event { msg = "Received a block from $sender" }]
-let push  sink (b_or_h, `Time_received tm, `Topic_and_vc (topic, cb)) =
+
+let push sink (b_or_h, `Time_received tm, `Topic_and_vc (topic, cb)) =
   match sink with
   | Void ->
       Deferred.unit
@@ -96,10 +97,10 @@ let push  sink (b_or_h, `Time_received tm, `Topic_and_vc (topic, cb)) =
 
       [%log internal] "@block_metadata"
         ~metadata:
-        ( ( "blockchain_length"
-        , Mina_numbers.Length.to_yojson
-            (Mina_block.Header.blockchain_length header) )
-      :: txs_meta ) ;
+          ( ( "blockchain_length"
+            , Mina_numbers.Length.to_yojson
+                (Mina_block.Header.blockchain_length header) )
+          :: txs_meta ) ;
       [%log internal] "External_block_received" ;
       don't_wait_for
         ( match%map Mina_net2.Validation_callback.await cb with
@@ -139,8 +140,7 @@ let push  sink (b_or_h, `Time_received tm, `Topic_and_vc (topic, cb)) =
       Mina_metrics.(Counter.inc_one Network.Block.received) ;
       let%bind () =
         match
-          Rate_limiter.add rate_limiter sender ~now:(Time.now ())
-            ~score:1
+          Rate_limiter.add rate_limiter sender ~now:(Time.now ()) ~score:1
         with
         | `Capacity_exceeded ->
             Internal_tracing.with_state_hash state_hash
@@ -152,8 +152,8 @@ let push  sink (b_or_h, `Time_received tm, `Topic_and_vc (topic, cb)) =
             Mina_net2.Validation_callback.fire_if_not_already_fired cb `Reject ;
             Deferred.unit
         | `Within_capacity ->
-          Writer.write writer
-          (b_or_h, `Time_received tm, `Topic_and_vc (topic, cb))
+            Writer.write writer
+              (b_or_h, `Time_received tm, `Topic_and_vc (topic, cb))
       in
       let exists_well_formedness_errors =
         match b_or_h with
@@ -194,7 +194,7 @@ let push  sink (b_or_h, `Time_received tm, `Topic_and_vc (topic, cb)) =
       in
       let tn_production_consensus_time =
         Consensus.Data.Consensus_state.consensus_time
-        @@ Protocol_state.consensus_state 
+        @@ Protocol_state.consensus_state
         @@ Mina_block.Header.protocol_state header
       in
       let tn_production_slot =
@@ -219,7 +219,7 @@ let log_rate_limiter_occasionally rl ~logger ~label =
   let t = Time_ns.Span.of_min 1. in
   every t (fun () ->
       [%log debug]
-      ~metadata:[ ("rate_limiter", Rate_limiter.summary rl) ]
+        ~metadata:[ ("rate_limiter", Rate_limiter.summary rl) ]
         !"%s $rate_limiter" label )
 
 let create

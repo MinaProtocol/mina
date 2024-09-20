@@ -12,7 +12,7 @@ type block_or_header =
 include
   Mina_net2.Sink.S_with_void
     with type msg :=
-    block_or_header
+      block_or_header
       * [ `Time_received of Block_time.t ]
       * [ `Topic_and_vc of string * Mina_net2.Validation_callback.t ]
 
@@ -31,6 +31,6 @@ val create :
      block_sink_config
   -> ( block_or_header
      * [ `Time_received of Block_time.t ]
-      * [ `Topic_and_vc of string * Mina_net2.Validation_callback.t ] )
+     * [ `Topic_and_vc of string * Mina_net2.Validation_callback.t ] )
      Pipe_lib.Strict_pipe.Reader.t
      * t

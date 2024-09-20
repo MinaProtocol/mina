@@ -175,7 +175,8 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       in
       Network.{ hook }
 
-    let create ~network ~rpc_mocks ~(local_ip : Peer.t) ctx ~on_bitswap_update:_ sinks =
+    let create ~network ~rpc_mocks ~(local_ip : Peer.t) ctx ~on_bitswap_update:_
+        sinks =
       let initial_peers = Network.get_initial_peers network local_ip.host in
       let peer_table = Hashtbl.create (module Peer.Id) in
       List.iter initial_peers ~f:(fun peer ->
@@ -286,7 +287,6 @@ module Make (Rpc_interface : RPC_INTERFACE) :
           M.Block_sink.push sink_block
             (env', `Time_received time, `Topic_and_vc ("some_topic", vc)) )
 
-
     let broadcast_snark_pool_diff ?origin_topics:_ ?nonce t diff =
       ignore nonce ;
       Network.broadcast t.network ~sender:t.local_ip diff
@@ -306,18 +306,18 @@ module Make (Rpc_interface : RPC_INTERFACE) :
     let set_connection_gating ?clean_added_peers:_ t config =
       t.connection_gating := config ;
       Deferred.return config
-    
-      let add_bitswap_resource _ ~id:_ ~tag:_ ~data:_ =
-        (* TODO is this implementation what it should be? *)
-        Deferred.unit
-  
-      let remove_bitswap_resource _ ~ids:_ =
-        (* TODO is this implementation what it should be? *)
-        Deferred.unit
-  
-      let download_bitswap_resource _ ~tag:_ ~ids:_ =
-        (* TODO is this implementation what it should be? *)
-        Deferred.unit
+
+    let add_bitswap_resource _ ~id:_ ~tag:_ ~data:_ =
+      (* TODO is this implementation what it should be? *)
+      Deferred.unit
+
+    let remove_bitswap_resource _ ~ids:_ =
+      (* TODO is this implementation what it should be? *)
+      Deferred.unit
+
+    let download_bitswap_resource _ ~tag:_ ~ids:_ =
+      (* TODO is this implementation what it should be? *)
+      Deferred.unit
   end
 
   type network = Network.t
@@ -328,5 +328,5 @@ module Make (Rpc_interface : RPC_INTERFACE) :
 
   let create_network = Network.create
 
-  let create_instance = Instance.create 
+  let create_instance = Instance.create
 end

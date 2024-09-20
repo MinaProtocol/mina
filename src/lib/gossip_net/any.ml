@@ -13,7 +13,11 @@ module type S = sig
 
   include IMPLEMENTATION with type t := t
 
-  type 't creator = Rpc_interface.ctx ->  on_bitswap_update:Mina_net2.on_bitswap_update_t -> Message.sinks -> 't Deferred.t
+  type 't creator =
+       Rpc_interface.ctx
+    -> on_bitswap_update:Mina_net2.on_bitswap_update_t
+    -> Message.sinks
+    -> 't Deferred.t
 
   type creatable = Creatable : 't implementation * 't creator -> creatable
 
@@ -29,10 +33,11 @@ module Make (Rpc_interface : RPC_INTERFACE) :
 
   type t = Any : 't implementation * 't -> t
 
-  type 't creator = 
-    Rpc_interface.ctx 
+  type 't creator =
+       Rpc_interface.ctx
     -> on_bitswap_update:Mina_net2.on_bitswap_update_t
-    -> Message.sinks -> 't Deferred.t
+    -> Message.sinks
+    -> 't Deferred.t
 
   type creatable = Creatable : 't implementation * 't creator -> creatable
 
@@ -67,7 +72,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
   let broadcast_transition ?origin_topics (Any ((module M), t)) =
     M.broadcast_transition ?origin_topics t
 
-let broadcast_transaction_pool_diff ?origin_topics ?nonce (Any ((module M), t))
+  let broadcast_transaction_pool_diff ?origin_topics ?nonce (Any ((module M), t))
       =
     M.broadcast_transaction_pool_diff ?origin_topics ?nonce t
 

@@ -70,8 +70,8 @@ type t =
   }
 [@@deriving fields]
 
-let create (module Context : CONTEXT) (config : Config.t) ~on_bitswap_update ~sinks
-    ~(get_transition_frontier : unit -> Transition_frontier.t option)
+let create (module Context : CONTEXT) (config : Config.t) ~on_bitswap_update
+    ~sinks ~(get_transition_frontier : unit -> Transition_frontier.t option)
     ~(get_node_status : unit -> Node_status.t Deferred.Or_error.t) =
   let open Context in
   let gossip_net_ref = ref None in
