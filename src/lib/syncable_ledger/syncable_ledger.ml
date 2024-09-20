@@ -13,7 +13,7 @@ let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
 module Query = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type 'addr t =
         | What_child_hashes of 'addr
             (** What are the hashes of the children of this address? *)
@@ -26,10 +26,30 @@ module Query = struct
         | Subtree of 'addr
             (** What are the 2^k nodes at depth k from the given prefix 
             address **)
-      (* TODO: Properly handle versioning *)
-      (* TODO: Consider additional query to verify subtree suport, for
-         softfork compatibility *)
+        | Subtree_supported
+      (* TODO: only use subtree after berifying its supported *)
       [@@deriving sexp, yojson, hash, compare]
+    end
+
+    module V1 = struct
+      type 'addr t =
+        | What_child_hashes of 'addr
+            (** What are the hashes of the children of this address? *)
+        | What_contents of 'addr
+            (** What accounts are at this address? addr must have depth
+            tree_depth - account_subtree_height *)
+        | Num_accounts
+            (** How many accounts are there? Used to size data structure and
+            figure out what part of the tree is filled in. *)
+      [@@deriving sexp, yojson, hash, compare]
+
+      let to_latest = function
+        | What_child_hashes addr ->
+            V2.What_child_hashes addr
+        | What_contents addr ->
+            V2.What_contents addr
+        | Num_accounts ->
+            V2.Num_accounts
     end
   end]
 end
@@ -37,7 +57,7 @@ end
 module Answer = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type ('hash, 'account) t =
         | Child_hashes_are of 'hash * 'hash
             (** The requested address's children have these hashes **)
@@ -47,19 +67,26 @@ module Answer = struct
             (** There are this many accounts and the smallest subtree that
                 contains all non-empty nodes has this hash. *)
         | Subtree of 'hash list
-      (* TODO: Properly handle versioning *)
+        | Subtree_supported
+      [@@deriving sexp, yojson]
+    end
+
+    module V1 = struct
+      type ('hash, 'account) t =
+        | Child_hashes_are of 'hash * 'hash
+            (** The requested address's children have these hashes **)
+        | Contents_are of 'account list
+            (** The requested address has these accounts *)
+        | Num_accounts of int * 'hash
       [@@deriving sexp, yojson]
 
       let to_latest acct_to_latest = function
         | Child_hashes_are (h1, h2) ->
-            Child_hashes_are (h1, h2)
+            V2.Child_hashes_are (h1, h2)
         | Contents_are accts ->
-            Contents_are (List.map ~f:acct_to_latest accts)
+            V2.Contents_are (List.map ~f:acct_to_latest accts)
         | Num_accounts (i, h) ->
-            Num_accounts (i, h)
-        | Subtree nodes ->
-            Subtree (List.map ~f:acct_to_latest nodes)
-      (* TODO: Properly handle versioning *)
+            V2.Num_accounts (i, h)
     end
   end]
 end
@@ -378,6 +405,8 @@ end = struct
             let get_hash a = MT.get_inner_hash_at_addr_exn mt a in
             let hashes = List.map addresses ~f:get_hash in
             Either.First (Subtree hashes)
+        | Subtree_supported ->
+            Either.First Subtree_supported
       in
 
       match response_or_punish with
