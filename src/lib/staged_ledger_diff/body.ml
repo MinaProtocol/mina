@@ -6,7 +6,6 @@ module Make_sig (A : Wire_types.Types.S) = struct
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
-
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -74,7 +73,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     @@ Fn.compose
          (Bitswap_block.blocks_of_data ~max_block_size:262144)
          (serialize_with_len_and_tag ~tag)
-    
+
   let to_raw_string = Fn.compose Bigstring.to_string to_binio_bigstring
 end
 

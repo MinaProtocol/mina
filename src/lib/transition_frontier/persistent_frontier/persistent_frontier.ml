@@ -208,17 +208,17 @@ module Instance = struct
       |> Validation.reset_staged_ledger_diff_validation
       |> Validation.reset_genesis_protocol_state_validation
       |> validate genesis_state_hash
-  in
-  let%bind.Deferred.Result () = Deferred.return (assert_no_sync t) in
-  let not_found_failure err =
-    `Failure (Database.Error.not_found_message err)
-  in
+    in
+    let%bind.Deferred.Result () = Deferred.return (assert_no_sync t) in
+    let not_found_failure err =
+      `Failure (Database.Error.not_found_message err)
+    in
     (* read basic information from the database *)
     let%bind.Deferred.Result ( root
-    , root_transition
-    , best_tip
-    , protocol_states
-    , root_hash ) =
+                             , root_transition
+                             , best_tip
+                             , protocol_states
+                             , root_hash ) =
       (let open Result.Let_syntax in
       let%bind root = Database.get_root t.db in
       let root_hash = Root_data.Minimal.hash root in

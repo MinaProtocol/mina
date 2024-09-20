@@ -1,5 +1,4 @@
 module type Full = sig
-
   [%%versioned:
   module Stable : sig
     [@@@no_toplevel_latest_type]
@@ -20,5 +19,4 @@ module type Full = sig
   val to_raw_string : t -> string
 
   val compute_reference : tag:int -> t -> Consensus.Body_reference.t
-
 end

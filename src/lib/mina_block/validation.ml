@@ -555,9 +555,8 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
   in
   let incorrect_staged =
     not
-    @@
-    Staged_ledger_hash.equal staged_ledger_hash
-      (Blockchain_state.staged_ledger_hash blockchain_state)
+    @@ Staged_ledger_hash.equal staged_ledger_hash
+         (Blockchain_state.staged_ledger_hash blockchain_state)
   in
   let incorrect_snarked =
     let open Frozen_ledger_hash in

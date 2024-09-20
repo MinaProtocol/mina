@@ -90,15 +90,8 @@ val skip_time_received_validation :
      , 'd
      , 'e
      , 'f )
-     with_header
-  -> ( [ `Time_received ] * unit Truth.true_t
-     , 'a
-     , 'b
-     , 'c
-     , 'd
-     , 'e
-     , 'f )
-     with_header
+     with_block
+  -> ([ `Time_received ] * unit Truth.true_t, 'a, 'b, 'c, 'd, 'e, 'f) with_block
 
 val skip_genesis_protocol_state_validation_header :
      [ `This_header_was_loaded_from_persistence ]
