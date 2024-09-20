@@ -651,9 +651,14 @@ module Get_transition_chain_proof = struct
     let name = "get_transition_chain_proof"
 
     module T = struct
-      type query = State_hash.t [@@deriving sexp, to_yojson]
+      type query = State_hash.t * State_hash.t list [@@deriving sexp, to_yojson]
 
-      type response = (State_hash.t * State_body_hash.t list) option
+      type response =
+      ( State_hash.t
+      * State_body_hash.t list
+      * Mina_block.Header.with_hash list )
+      option
+
     end
 
     module Caller = T

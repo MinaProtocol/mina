@@ -28,6 +28,11 @@ type Structured_log_events.t +=
   [@@deriving
     register_event { msg = "Broadcasting snark pool diff over gossip net" }]
 
+    type Structured_log_events.t +=
+    | Rebroadcast_transition of { state_hash : State_hash.t }
+    [@@deriving register_event { msg = "Rebroadcasting $state_hash" }]
+
+
 module type CONTEXT = sig
   val logger : Logger.t
 
