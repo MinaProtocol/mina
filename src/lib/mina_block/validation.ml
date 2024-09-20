@@ -24,6 +24,8 @@ let validation (_, v) = v
 
 let header_with_hash (b, _) = b
 
+let header (b, _) = With_hash.data b
+
 let block_with_hash (b, _) = b
 
 let block (b, _) = With_hash.data b
@@ -594,3 +596,11 @@ let validate_protocol_versions (t, validation) =
 let skip_protocol_versions_validation `This_block_has_valid_protocol_versions
     (t, validation) =
   (t, Unsafe.set_valid_protocol_versions validation)
+
+let with_body (header_with_hash, validation) body =
+  ( With_hash.map ~f:(fun header -> Block.create ~header ~body) header_with_hash
+  , validation )
+
+let wrap_header t : fully_invalid_with_header = (t, fully_invalid)
+
+let to_header (b, v) = (With_hash.map ~f:Block.header b, v)
