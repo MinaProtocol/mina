@@ -30,7 +30,15 @@ val block_with_hash : _ with_block -> Block.with_hash
 
 val block : _ with_block -> Block.t
 
+val header : _ with_header -> Header.t
+
+val to_header :
+     ('a, 'b, 'c, 'd, 'e, 'f, 'g) with_block
+  -> ('a, 'b, 'c, 'd, 'e, 'f, 'g) with_header
+
 val wrap : Block.with_hash -> fully_invalid_with_block
+
+val wrap_header : Header.with_hash -> fully_invalid_with_header
 
 val validate_time_received :
      precomputed_values:Precomputed_values.t
@@ -382,4 +390,23 @@ val skip_protocol_versions_validation :
      , 'e
      , 'f
      , [ `Protocol_versions ] * unit Truth.true_t )
+     with_block
+
+val with_body :
+     ( 'a
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , [ `Staged_ledger_diff ] * unit Truth.false_t
+     , 'f )
+     with_header
+  -> Staged_ledger_diff.Body.t
+  -> ( 'a
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , [ `Staged_ledger_diff ] * unit Truth.false_t
+     , 'f )
      with_block
