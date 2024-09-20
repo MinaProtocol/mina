@@ -192,6 +192,12 @@ module Instance = struct
       ~consensus_local_state ~max_length ~ignore_consensus_local_state
       ~persistent_root_instance =
     let open Context in
+    let validate genesis_state_hash (b, v) =
+      let f h = Validation.with_body h (Mina_block.body @@ With_hash.data b) in
+      Validation.validate_genesis_protocol_state ~genesis_state_hash
+        (With_hash.map ~f:Mina_block.header b, v)
+      |> Result.map ~f
+    in
     let open Deferred.Result.Let_syntax in
     let downgrade_transition transition genesis_state_hash :
         ( Mina_block.almost_valid_block
@@ -201,11 +207,18 @@ module Instance = struct
       transition |> Mina_block.Validated.remember
       |> Validation.reset_staged_ledger_diff_validation
       |> Validation.reset_genesis_protocol_state_validation
-      |> Validation.validate_genesis_protocol_state ~genesis_state_hash
-    in
-    let%bind () = Deferred.return (assert_no_sync t) in
+      |> validate genesis_state_hash
+  in
+  let%bind.Deferred.Result () = Deferred.return (assert_no_sync t) in
+  let not_found_failure err =
+    `Failure (Database.Error.not_found_message err)
+  in
     (* read basic information from the database *)
-    let%bind root, root_transition, best_tip, protocol_states, root_hash =
+    let%bind.Deferred.Result ( root
+    , root_transition
+    , best_tip
+    , protocol_states
+    , root_hash ) =
       (let open Result.Let_syntax in
       let%bind root = Database.get_root t.db in
       let root_hash = Root_data.Minimal.hash root in
@@ -215,8 +228,7 @@ module Instance = struct
         Database.get_protocol_states_for_root_scan_state t.db
       in
       (root, root_transition, best_tip, protocol_states, root_hash))
-      |> Result.map_error ~f:(fun err ->
-             `Failure (Database.Error.not_found_message err) )
+      |> Result.map_error ~f:not_found_failure
       |> Deferred.return
     in
     let root_genesis_state_hash =
