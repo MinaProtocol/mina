@@ -89,6 +89,8 @@ module Engine = struct
 
     val compile_config : t -> Mina_compile_config.t
 
+    val proof_level : t -> Genesis_constants.Proof_level.t
+
     val seeds : t -> Node.t Core.String.Map.t
 
     val all_non_seed_nodes : t -> Node.t Core.String.Map.t

@@ -73,7 +73,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config ~constants =
     let open Test_config in
-    { (default ~constants) with
+    let default_config = default ~constants in
+    { default_config with
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
@@ -92,7 +93,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; account_name = "snark-node-key"
           ; worker_nodes = 2
           }
-    ; snark_worker_fee = "0.0001"
+    ; compile_config = { default_config.compile_config with default_snark_worker_fee = Currency.Fee.of_mina_string_exn "0.0001" }
     }
 
   let logger = Logger.create ()
@@ -110,7 +111,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind whale1_pk = pub_key_of_node whale1 in
     let%bind whale1_sk = priv_key_of_node whale1 in
-    let constraint_constants = Network.constraint_constants network in
+    let config = 
+      let constants : Test_config.constants =
+        { genesis_constants = Network.genesis_constants network
+        ; constraint_constants = Network.constraint_constants network
+        ; compile_config = Network.compile_config network
+        ; proof_level = Network.proof_level network
+        }
+      in config ~constants
+    in
+    let constraint_constants = config.constraint_constants in
     let (whale1_kp : Keypair.t) =
       { public_key = whale1_pk |> Public_key.decompress_exn
       ; private_key = whale1_sk

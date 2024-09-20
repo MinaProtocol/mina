@@ -21,7 +21,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   (* TODO: test account creation fee *)
   let config ~constants =
     let open Test_config in
-    { (default ~constants) with
+    let default_config = default ~constants in
+    { default_config with
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
@@ -50,14 +51,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; account_name = "snark-node-key1"
           ; worker_nodes = 4
           }
-    ; snark_worker_fee = "0.0002"
+    ; compile_config = { default_config.compile_config with default_snark_worker_fee = Currency.Fee.of_mina_string_exn "0.0002" }
     ; num_archive_nodes = 1
-    ; proof_config =
-        { proof_config_default with
-          work_delay = Some 1
-        ; transaction_capacity =
-            Some Runtime_config.Proof_keys.Transaction_capacity.small
-        }
+    ; constraint_constants = {default_config.constraint_constants with work_delay = 1; transaction_capacity_log_2 = 2}
     }
 
   let run network t =
@@ -378,13 +374,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                Malleable_error.soft_error_format ~value:()
                  "Payment failed for unexpected reason: %s" err_str ) )
     in
-    let constants : Test_config.constants =
-      { genesis_constants = Network.genesis_constants network
-      ; constraint_constants = Network.constraint_constants network
-      ; compile_config = Network.compile_config network
-      }
-    in
-    let config = config ~constants in
+    let config = 
+      let constants : Test_config.constants =
+        { genesis_constants = Network.genesis_constants network
+        ; constraint_constants = Network.constraint_constants network
+        ; compile_config = Network.compile_config network
+        ; proof_level  = Network.proof_level network
+        }
+      in
+      config ~constants in
     let%bind () =
       section_hard
         "send out a bunch more txns to fill up the snark ledger, then wait for \
@@ -433,8 +431,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Network.Node.get_ingress_uri untimed_node_a)
              ~account_id:(get_account_id snark_node_key2.keypair.public_key)
          in
-         let key_1_balance_expected =
-           Currency.Amount.of_mina_string_exn config.snark_worker_fee
+         let key_1_balance_expected = 
+          Currency.Fee.to_mina_string config.compile_config.default_snark_worker_fee |>
+          Currency.Amount.of_mina_string_exn
          in
          if
            Currency.Amount.( >= )
@@ -448,7 +447,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               snark-worker-fee: %s"
              (Currency.Balance.to_mina_string key_1_balance_actual)
              (Currency.Balance.to_mina_string key_2_balance_actual)
-             config.snark_worker_fee ;
+             (Currency.Fee.to_mina_string config.compile_config.default_snark_worker_fee) ;
 
            Malleable_error.return () )
          else
@@ -459,7 +458,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               snark-worker-fee: %s"
              (Currency.Balance.to_mina_string key_1_balance_actual)
              (Currency.Balance.to_mina_string key_2_balance_actual)
-             config.snark_worker_fee )
+             (Currency.Fee.to_mina_string config.compile_config.default_snark_worker_fee))
     in
     let%bind () =
       section_hard

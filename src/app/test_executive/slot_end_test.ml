@@ -17,15 +17,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let num_extra_keys = 100
 
-  let slot_tx_end = 5
+  let slot_tx_end = Mina_numbers.Global_slot_since_hard_fork.of_int 5
 
-  let slot_chain_end = 8
+  let slot_chain_end = Mina_numbers.Global_slot_since_hard_fork.of_int 8
 
   let sender_account_prefix = "sender-account-"
 
   let config ~constants =
     let open Test_config in
-    { (default ~constants) with
+    let default_config = default ~constants in
+    { default_config with
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
@@ -51,17 +52,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; account_name = "snark-node-key"
           ; worker_nodes = 4
           }
-    ; txpool_max_size = 10_000_000
-    ; snark_worker_fee = "0.0002"
-    ; num_archive_nodes = 0
-    ; proof_config =
-        { proof_config_default with
-          work_delay = Some 1
-        ; transaction_capacity =
-            Some Runtime_config.Proof_keys.Transaction_capacity.small
+    ; genesis_constants =
+        { default_config.genesis_constants with
+          txpool_max_size = 10_000_000
         }
-    ; slot_tx_end = Some slot_tx_end
-    ; slot_chain_end = Some slot_chain_end
+    ; compile_config =
+        { default_config.compile_config with
+          default_snark_worker_fee = Currency.Fee.of_mina_string_exn "0.0002"
+        ; slot_tx_end = Some slot_tx_end
+        ; slot_chain_end = Some slot_chain_end
+        }
+    ; num_archive_nodes = 0
+    ; constraint_constants =
+        { default_config.constraint_constants with
+          work_delay = 1
+        ; transaction_capacity_log_2 = 2
+        }
     }
 
   let fee = Currency.Fee.of_nanomina_int_exn 10_000_000
@@ -73,7 +79,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let num_slots = slot_chain_end + 2 in
+    let num_slots = Mina_numbers.Global_slot_since_hard_fork.to_int slot_chain_end + 2 in
     let receiver =
       String.Map.find_exn (Network.block_producers network) "receiver"
     in
@@ -114,12 +120,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let end_t =
       Time.add genesis_timestamp
         (Time.Span.of_ms @@ float_of_int (num_slots * window_ms))
-    in
-    let slot_tx_end =
-      Mina_numbers.Global_slot_since_hard_fork.of_int slot_tx_end
-    in
-    let slot_chain_end =
-      Mina_numbers.Global_slot_since_hard_fork.of_int slot_chain_end
     in
     let%bind () =
       section_hard "spawn transaction sending"

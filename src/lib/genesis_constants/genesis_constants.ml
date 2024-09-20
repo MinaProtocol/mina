@@ -18,6 +18,16 @@ module Proof_level = struct
 end
 
 module Fork_constants = struct
+
+  module Inputs = struct
+    type t =
+      { state_hash : string
+      ; blockchain_length : int
+      ; global_slot_since_genesis : int
+      }
+    [@@deriving yojson]
+  end
+
   type t =
     { state_hash : Pickles.Backend.Tick.Field.Stable.Latest.t
     ; blockchain_length : Mina_numbers.Length.Stable.Latest.t
@@ -25,6 +35,14 @@ module Fork_constants = struct
         Mina_numbers.Global_slot_since_genesis.Stable.Latest.t
     }
   [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
+
+  let make (inputs : Inputs.t) : t =
+    { state_hash = Pickles.Backend.Tick.Field.of_string inputs.state_hash
+    ; blockchain_length = Mina_numbers.Length.of_int inputs.blockchain_length
+    ; global_slot_since_genesis =
+        Mina_numbers.Global_slot_since_genesis.of_int
+          inputs.global_slot_since_genesis
+    }
 end
 
 module Constraint_constants = struct

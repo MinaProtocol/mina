@@ -15,11 +15,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let fork_config : Runtime_config.Fork_config.t =
-    { state_hash = "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
-    ; blockchain_length = 300000
-    ; global_slot_since_genesis = 500000
-    }
+  let fork_config : Genesis_constants.Fork_constants.t =
+    Genesis_constants.Fork_constants.make
+      { state_hash = "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
+      ; blockchain_length = 300000
+      ; global_slot_since_genesis = 500000
+      }
 
   let config ~constants =
     let open Test_config in
@@ -49,7 +50,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let epoch_ledger = next_accounts in
       { epoch_ledger; epoch_seed }
     in
-    { (default ~constants) with
+    let default_config = default ~constants in
+    { default_config with
       requires_graphql = true
     ; epoch_data = Some { staking; next = Some next }
     ; genesis_ledger = next_accounts
@@ -57,7 +59,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
         ]
-    ; proof_config = { proof_config_default with fork = Some fork_config }
+    ; constraint_constants = { default_config.constraint_constants with fork = Some fork_config }
     }
 
   let run network t =

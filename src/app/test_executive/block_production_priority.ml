@@ -21,7 +21,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config ~(constants : Test_config.constants) =
     let open Test_config in
-    { (default ~constants) with
+    let default_config = default ~constants in
+    { default_config with
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
@@ -48,15 +49,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; account_name = "snark-node-key"
           ; worker_nodes = 4
           }
-    ; txpool_max_size = 10_000_000
-    ; snark_worker_fee = "0.0001"
-    ; proof_config =
-        { proof_config_default with
-          work_delay = Some 1
-        ; transaction_capacity =
-            Some Runtime_config.Proof_keys.Transaction_capacity.small
-        }
+    ; genesis_constants =
+        { default_config.genesis_constants with
+          txpool_max_size = 10_000_000
+        } 
+    ; compile_config = {default_config.compile_config with 
+        default_snark_worker_fee = Currency.Fee.of_mina_string_exn "0.0001"
     }
+    ; constraint_constants = { default_config.constraint_constants with
+        work_delay = 1;
+        transaction_capacity_log_2 = 2;
+    }
+  }
 
   let fee = Currency.Fee.of_nanomina_int_exn 10_000_000
 

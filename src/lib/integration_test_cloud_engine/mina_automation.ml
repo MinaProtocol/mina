@@ -118,10 +118,7 @@ module Network_config = struct
          ; num_archive_nodes
          ; log_precomputed_blocks (* ; num_plain_nodes *)
          ; start_filtered_logs
-         ; genesis_constants
-         ; constraint_constants
-         ; compile_config
-         ; proof_level
+         ; _
          }
           : Test_config.t ) =
       test_config
@@ -218,6 +215,14 @@ module Network_config = struct
                -> String.equal name1 name2 )
     in
     let runtime_config =
+       let {
+           Test_config.genesis_constants
+         ; constraint_constants
+         ; compile_config
+         ; proof_level
+         ; _
+       } = test_config
+      in
       { Runtime_config.compile_config
       ; genesis_constants =
           { genesis_constants with
@@ -428,13 +433,20 @@ module Network_config = struct
             ; worker_nodes = node.worker_nodes
             }
     in
+    let constants : Test_config.constants =
+      { genesis_constants = runtime_config.genesis_constants
+      ; constraint_constants = runtime_config.constraint_config.constraint_constants
+      ; proof_level = runtime_config.constraint_config.proof_level
+      ; compile_config = runtime_config.compile_config
+      }
+    in
+
 
     (* NETWORK CONFIG *)
     { mina_automation_location = cli_inputs.mina_automation_location
     ; debug_arg = debug
     ; genesis_keypairs
-    ; constants =
-        { genesis_constants; constraint_constants; compile_config; proof_level }
+    ; constants
     ; terraform =
         { cluster_name
         ; cluster_region
@@ -455,7 +467,7 @@ module Network_config = struct
         ; mina_archive_schema_aux_files
         ; snark_coordinator_config
         ; snark_worker_fee =
-            Currency.Fee.to_mina_string compile_config.default_snark_worker_fee
+            Currency.Fee.to_mina_string runtime_config.compile_config.default_snark_worker_fee
         ; aws_route53_zone_id
         ; cpu_request = 6
         ; mem_request = "12Gi"
@@ -646,33 +658,6 @@ module Network_manager = struct
       | None ->
           (Core.String.Map.of_alist_exn [], Core.String.Map.of_alist_exn [])
     in
-    (*
-         let snark_coordinator_id =
-           String.lowercase
-             (String.sub network_config.terraform.snark_worker_public_key
-                ~pos:
-                  (String.length network_config.terraform.snark_worker_public_key - 6)
-                ~len:6 )
-         in
-         let snark_coordinator_workloads =
-           if network_config.terraform.snark_worker_replicas > 0 then
-             [ Kubernetes_network.Workload_to_deploy.construct_workload
-                 ("snark-coordinator-" ^ snark_coordinator_id)
-                 [ Kubernetes_network.Workload_to_deploy.cons_pod_info "mina" ]
-             ]
-           else []
-         in
-         let snark_worker_workloads =
-           if network_config.terraform.snark_worker_replicas > 0 then
-             [ Kubernetes_network.Workload_to_deploy.construct_workload
-                 ("snark-worker-" ^ snark_coordinator_id)
-                 (List.init network_config.terraform.snark_worker_replicas
-                    ~f:(fun _i ->
-                      Kubernetes_network.Workload_to_deploy.cons_pod_info "worker" )
-                 )
-             ]
-           else []
-         in *)
     let block_producer_workloads =
       List.map network_config.terraform.block_producer_configs
         ~f:(fun bp_config ->
