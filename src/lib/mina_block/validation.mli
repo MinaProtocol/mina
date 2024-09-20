@@ -91,26 +91,33 @@ val skip_time_received_validation :
      , 'e
      , 'f )
      with_header
-  -> ([ `Time_received ] * unit Truth.true_t, 'a, 'b, 'c, 'd, 'e, 'f) with_header
+  -> ( [ `Time_received ] * unit Truth.true_t
+     , 'a
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_header
 
-  val skip_genesis_protocol_state_validation_header :
-  [ `This_header_was_loaded_from_persistence ]
--> ( 'a
-  , [ `Genesis_state ] * unit Truth.false_t
-  , 'b
-  , 'c
-  , 'd
-  , 'e
-  , 'f )
-  with_header
--> ( 'a
-  , [ `Genesis_state ] * unit Truth.true_t
-  , 'b
-  , 'c
-  , 'd
-  , 'e
-  , 'f )
-  with_header
+val skip_genesis_protocol_state_validation_header :
+     [ `This_header_was_loaded_from_persistence ]
+  -> ( 'a
+     , [ `Genesis_state ] * unit Truth.false_t
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_header
+  -> ( 'a
+     , [ `Genesis_state ] * unit Truth.true_t
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_header
 
 val validate_genesis_protocol_state :
      genesis_state_hash:State_hash.t
@@ -156,7 +163,7 @@ val reset_genesis_protocol_state_validation :
      , 'f )
      with_block
 
-   val reset_proof_validation_header :
+val reset_proof_validation_header :
      ('a, 'b, [ `Proof ] * unit Truth.true_t, 'c, 'd, 'e, 'f) with_header
   -> ('a, 'b, [ `Proof ] * unit Truth.false_t, 'c, 'd, 'e, 'f) with_header
 
@@ -236,7 +243,7 @@ val skip_delta_block_chain_validation_header :
      , 'f )
      with_header
 
-     val skip_delta_block_chain_validation :
+val skip_delta_block_chain_validation :
      [ `This_block_was_not_received_via_gossip ]
   -> ( 'a
      , 'b
@@ -257,7 +264,7 @@ val skip_delta_block_chain_validation_header :
      , 'f )
      with_block
 
-     val validate_frontier_dependencies :
+val validate_frontier_dependencies :
      to_header:('a -> Header.t)
   -> context:(module CONTEXT)
   -> root_block:Block.with_hash
@@ -279,11 +286,11 @@ val skip_delta_block_chain_validation_header :
          , [ `Frontier_dependencies ] * unit Truth.true_t
          , 'f
          , 'g )
-         t     
-         , [> `Already_in_frontier
-         | `Not_selected_over_frontier_root
-         | `Parent_missing_from_frontier ] )
-       Result.t
+         t
+     , [> `Already_in_frontier
+       | `Not_selected_over_frontier_root
+       | `Parent_missing_from_frontier ] )
+     Result.t
 
 val skip_frontier_dependencies_validation :
      [ `This_block_belongs_to_a_detached_subtree
@@ -305,7 +312,7 @@ val skip_frontier_dependencies_validation :
      , 'f )
      with_block
 
-     val reset_frontier_dependencies_validation :
+val reset_frontier_dependencies_validation :
      'g
      * ( 'a
        , 'b
@@ -358,9 +365,9 @@ val validate_staged_ledger_diff :
           Staged_ledger.Staged_ledger_error.t
        | `Invalid_body_reference
        | `Invalid_staged_ledger_diff of
-       [ `Incorrect_target_snarked_ledger_hash
-       | `Incorrect_target_staged_and_snarked_ledger_hashes
-       | `Incorrect_target_staged_ledger_hash ] ] )
+         [ `Incorrect_target_snarked_ledger_hash
+         | `Incorrect_target_staged_and_snarked_ledger_hashes
+         | `Incorrect_target_staged_ledger_hash ] ] )
      Deferred.Result.t
 
 val validate_staged_ledger_hash :
@@ -446,7 +453,8 @@ val skip_protocol_versions_validation :
      , 'f
      , [ `Protocol_versions ] * unit Truth.true_t )
      with_block
-     val skip_protocol_versions_validation_header :
+
+val skip_protocol_versions_validation_header :
      [ `This_header_was_loaded_from_persistence ]
   -> ( 'a
      , 'b
