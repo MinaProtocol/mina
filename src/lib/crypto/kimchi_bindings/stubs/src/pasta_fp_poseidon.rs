@@ -28,7 +28,7 @@ pub fn caml_pasta_fp_poseidon_params_create() -> CamlPastaFpPoseidonParams {
     CamlPastaFpPoseidonParams(mina_poseidon::pasta::fp_kimchi::params())
 }
 
-pub fn full_round(params: &ArithmeticSpongeParams<Fp>, state: &mut Vec<Fp>, r: usize) {
+pub fn full_round(params: &ArithmeticSpongeParams<Fp>, state: &mut [Fp; 3], r: usize) {
     let mut el0 = state[0];
     let mut el1 = state[1];
     let mut el2 = state[2];
@@ -55,37 +55,44 @@ pub fn caml_pasta_fp_poseidon_block_cipher(
     params: CamlPastaFpPoseidonParamsPtr,
     mut state: CamlFpVector,
 ) {
+    let mut state_: [Fp; 3] = [state[0], state[1], state[2]];
     let params = &params.as_ref().0;
     for r in 0..PlonkSpongeConstantsKimchi::PERM_ROUNDS_FULL {
-        full_round(params, state.as_mut(), r);
+        full_round(params, &mut state_, r);
     }
+    state[0] = state_[0];
+    state[1] = state_[1];
+    state[2] = state_[2];
 }
 
 pub fn caml_pasta_fp_poseidon_update_impl(
     params: &ArithmeticSpongeParams<Fp>,
     state_and_input: &mut Vec<Fp>,
 ) {
+    let mut state: [Fp; 3] = [state_and_input[0], state_and_input[1], state_and_input[2]];
     // Implemented for rate=2, width=3
     let len = state_and_input.len() - 3;
     if len == 0 {
         for r in 0..PlonkSpongeConstantsKimchi::PERM_ROUNDS_FULL {
-            full_round(params, state_and_input.as_mut(), r);
+            full_round(params, &mut state, r);
         }
     } else {
         let num = (len >> 1) + (len & 1);
         for i in 0..num {
             let i_ = i << 1;
-            let v0 = state_and_input[3 + i_];
-            state_and_input[0] += v0;
+            // let v0 = ;
+            state[0] += state_and_input[3 + i_];
             if i_ + 1 < len {
-                let v1 = state_and_input[4 + i_];
-                state_and_input[1] += v1;
+                state[1] += state_and_input[4 + i_];
             }
             for r in 0..PlonkSpongeConstantsKimchi::PERM_ROUNDS_FULL {
-                full_round(params, state_and_input.as_mut(), r);
+                full_round(params, &mut state, r);
             }
         }
     }
+    state_and_input[0] = state[0];
+    state_and_input[1] = state[1];
+    state_and_input[2] = state[2];
 }
 
 #[ocaml::func]
