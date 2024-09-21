@@ -134,6 +134,7 @@ let apply_txs ~action_elements ~event_elements ~constraint_constants
       ()
     |> Or_error.ok_exn
   in
+  let start_precompute = Time.now () in
   let zkapps' =
     List.map zkapps ~f:(fun tx ->
         ( { With_status.data =
@@ -145,6 +146,9 @@ let apply_txs ~action_elements ~event_elements ~constraint_constants
           @@ Ledger.precompute_transaction_hashes (User_command.Zkapp_command tx)
         ) )
   in
+  printf
+    !"Precomputation (took %s)\n%!"
+    Time.(Span.to_string @@ diff (now ()) start_precompute) ;
   let accounts_accessed =
     List.fold_left ~init:Account_id.Set.empty zkapps ~f:(fun set txn ->
         Account_id.Set.(
