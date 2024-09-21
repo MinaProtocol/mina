@@ -119,13 +119,18 @@ pub fn caml_pasta_fp_poseidon_update_batch(
     chunk_size: usize,
     mut state_and_inputs: CamlFpBatchVector,
 ) {
-    let params2 = &params.as_ref().0;
-    let f =
-        |state_and_input: &Vec<Fp>| caml_pasta_fp_poseidon_update_impl(params2, state_and_input);
+    let params_ = &params.as_ref().0;
     state_and_inputs
         .par_chunks_mut(chunk_size)
         .for_each(|chunk| {
-            let states: Vec<[Fp; 3]> = (*chunk).to_vec().iter().map(f).collect();
+            let params2 = params_.clone();
+            let states: Vec<[Fp; 3]> = (*chunk)
+                .to_vec()
+                .iter()
+                .map(|state_and_input: &Vec<Fp>| {
+                    caml_pasta_fp_poseidon_update_impl(&params2, state_and_input)
+                })
+                .collect();
             chunk.iter_mut().enumerate().for_each(|(ix, chunk)| {
                 chunk[0] = states[ix][0];
                 chunk[1] = states[ix][1];
