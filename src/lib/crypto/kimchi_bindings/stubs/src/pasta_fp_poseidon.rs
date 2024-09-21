@@ -75,8 +75,8 @@ pub fn caml_pasta_fp_poseidon_block_cipher(
 
 pub fn caml_pasta_fp_poseidon_update_impl(
     params: &ArithmeticSpongeParams<Fp>,
-    state_and_input: &Vec<Fp>,
-) -> [Fp; 3] {
+    state_and_input: &mut Vec<Fp>,
+) {
     let mut state0 = state_and_input[0];
     let mut state1 = state_and_input[1];
     let mut state2 = state_and_input[2];
@@ -99,7 +99,9 @@ pub fn caml_pasta_fp_poseidon_update_impl(
             }
         }
     }
-    [state0, state1, state2]
+    state_and_input[0] = state0;
+    state_and_input[1] = state1;
+    state_and_input[2] = state2;
 }
 
 #[ocaml::func]
@@ -107,10 +109,7 @@ pub fn caml_pasta_fp_poseidon_update(
     params: CamlPastaFpPoseidonParamsPtr,
     mut state_and_input: CamlFpVector,
 ) {
-    let state = caml_pasta_fp_poseidon_update_impl(&params.as_ref().0, &state_and_input);
-    state_and_input[0] = state[0];
-    state_and_input[1] = state[1];
-    state_and_input[2] = state[2];
+    caml_pasta_fp_poseidon_update_impl(&params.as_ref().0, &mut state_and_input);
 }
 
 #[ocaml::func]
@@ -123,18 +122,8 @@ pub fn caml_pasta_fp_poseidon_update_batch(
     state_and_inputs
         .par_chunks_mut(chunk_size)
         .for_each(|chunk| {
-            let params2 = params_.clone();
-            let states: Vec<[Fp; 3]> = (*chunk)
-                .to_vec()
-                .iter()
-                .map(|state_and_input: &Vec<Fp>| {
-                    caml_pasta_fp_poseidon_update_impl(&params2, state_and_input)
-                })
-                .collect();
-            chunk.iter_mut().enumerate().for_each(|(ix, chunk)| {
-                chunk[0] = states[ix][0];
-                chunk[1] = states[ix][1];
-                chunk[2] = states[ix][2];
+            chunk.iter_mut().for_each(|state_and_input| {
+                caml_pasta_fp_poseidon_update_impl(params_, state_and_input);
             })
         });
 }
