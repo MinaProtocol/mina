@@ -399,21 +399,43 @@ let hash_zkapp_account_opt = function
   | Some (a : Zkapp_account.t) ->
       Zkapp_account.digest a
 
+let hash_zkapp_account_opt_m = function
+  | None ->
+      Random_oracle.Monad.return @@ Lazy.force Zkapp_account.default_digest
+  | Some (a : Zkapp_account.t) ->
+      Zkapp_account.digest_m a
+
 let delegate_opt = Option.value ~default:Public_key.Compressed.empty
 
-let to_input (t : t) =
-  let open Random_oracle.Input.Chunked in
-  let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
-  Fields.fold ~init:[]
+let to_input_do ~cons (t : t) =
+  let f mk acc field = cons (mk (Core_kernel.Field.get field t)) acc in
+  Fields.fold
     ~public_key:(f Public_key.Compressed.to_input)
     ~token_id:(f Token_id.to_input) ~balance:(f Balance.to_input)
     ~token_symbol:(f Token_symbol.to_input) ~nonce:(f Nonce.to_input)
     ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
     ~delegate:(f (Fn.compose Public_key.Compressed.to_input delegate_opt))
     ~voting_for:(f State_hash.to_input) ~timing:(f Timing.to_input)
-    ~zkapp:(f (Fn.compose field hash_zkapp_account_opt))
     ~permissions:(f Permissions.to_input)
-  |> List.reduce_exn ~f:append
+
+let to_input_m (t : t) =
+  let open Random_oracle.Input.Chunked in
+  let open Random_oracle.Monad in
+  let zkapp acc field_ =
+    lift2 List.cons
+      ( map ~f:field @@ hash_zkapp_account_opt_m
+      @@ Core_kernel.Field.get field_ t )
+      acc
+  in
+  to_input_do t ~init:(return []) ~cons:(fun x -> map ~f:(List.cons x)) ~zkapp
+  >>| List.reduce_exn ~f:append
+
+let to_input (t : t) =
+  let open Random_oracle.Input.Chunked in
+  let zkapp acc field_ =
+    (field @@ hash_zkapp_account_opt @@ Core_kernel.Field.get field_ t) :: acc
+  in
+  to_input_do t ~cons:List.cons ~init:[] ~zkapp |> List.reduce_exn ~f:append
 
 let crypto_hash_prefix = Hash_prefix.account
 
@@ -648,9 +670,13 @@ end
 
 let digest = crypto_hash
 
-let digest_batch ts =
-  Random_oracle.hash_batch ~init:crypto_hash_prefix
-  @@ List.map ~f:(Fn.compose Random_oracle.pack_input to_input) ts
+let digest_m acc =
+  let open Random_oracle.Monad in
+  to_input_m acc
+  >>= Fn.compose (hash ~init:crypto_hash_prefix) Random_oracle.pack_input
+
+let digest_batch =
+  Random_oracle.Monad.(Fn.compose evaluate @@ map_list ~f:digest_m)
 
 let empty =
   { public_key = Public_key.Compressed.empty

@@ -43,10 +43,9 @@ let merge ~height h1 h2 =
   |> of_hash
 
 let merge_batch ~height pairs =
-  let f (h1, h2) = pair_to_input h1 h2 in
-  Random_oracle.hash_batch
-    ~init:(Hash_prefix.merkle_tree height)
-    (Core_kernel.List.map ~f pairs)
+  let init = Hash_prefix.merkle_tree height in
+  let f (h1, h2) = (`State init, pair_to_input h1 h2) in
+  Random_oracle.hash_batch (Core_kernel.List.map ~f pairs)
   |> Core_kernel.List.map ~f:of_hash
 
 let empty_hash = of_hash Outside_hash_image.t

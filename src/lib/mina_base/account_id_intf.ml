@@ -65,6 +65,10 @@ module type S = sig
 
   val create : Public_key.Compressed.t -> Digest.t -> t
 
+  val derive_token_ids_m : t list -> Digest.t list Random_oracle.Monad.t
+
+  val derive_token_id_m : owner:t -> Digest.t Random_oracle.Monad.t
+
   val derive_token_id : owner:t -> Digest.t
 
   val empty : t

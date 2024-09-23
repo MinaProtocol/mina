@@ -158,6 +158,8 @@ module Call_forest = struct
 
       val create_body :
         ?chain:Mina_signature_kind.t -> Account_update.Body.t -> t
+
+      val of_field : Snark_params.Tick.Field.t -> t
     end
 
     module rec Forest : sig
@@ -175,7 +177,15 @@ module Call_forest = struct
 
       val empty : t
 
+      val cons_input :
+           Tree.t
+        -> Forest.t
+        -> [ `State of Pasta_bindings.Fp.t Random_oracle.State.t ]
+           * Pasta_bindings.Fp.t array
+
       val cons : Tree.t -> Forest.t -> Forest.t
+
+      val of_field : Snark_params.Tick.Field.t -> Forest.t
     end
 
     and Tree : sig
@@ -192,7 +202,14 @@ module Call_forest = struct
 
       include Digest_intf.S_aux with type t := t and type checked := Checked.t
 
+      val create_input :
+           (_, Account_update.t, Forest.t) tree
+        -> [ `State of Pasta_bindings.Fp.t Random_oracle.State.t ]
+           * Pasta_bindings.Fp.t array
+
       val create : (_, Account_update.t, Forest.t) tree -> Tree.t
+
+      val of_field : Snark_params.Tick.Field.t -> Tree.t
     end
   end
 
@@ -267,6 +284,8 @@ module Call_forest = struct
         let create_body = Account_update.Body.Checked.digest
       end
 
+      let of_field : Snark_params.Tick.Field.t -> t = fun x -> x
+
       let create : ?chain:Mina_signature_kind.t -> Account_update.t -> t =
         Account_update.digest
 
@@ -291,9 +310,14 @@ module Call_forest = struct
 
       let empty = empty
 
+      let cons_input hash h_tl =
+        (`State Hash_prefix_states.account_update_cons, [| hash; h_tl |])
+
       let cons hash h_tl =
-        Random_oracle.hash ~init:Hash_prefix_states.account_update_cons
-          [| hash; h_tl |]
+        let `State init, data = cons_input hash h_tl in
+        Random_oracle.hash ~init data
+
+      let of_field : Snark_params.Tick.Field.t -> t = fun x -> x
     end
 
     module Tree = struct
@@ -310,13 +334,19 @@ module Call_forest = struct
             [| (account_update :> t); (calls :> t) |]
       end
 
-      let create ({ account_update = _; calls; account_update_digest } : _ tree)
-          =
+      let create_input
+          ({ account_update = _; calls; account_update_digest } : _ tree) =
         let stack_hash =
           match calls with [] -> empty | e :: _ -> e.stack_hash
         in
-        Random_oracle.hash ~init:Hash_prefix_states.account_update_node
-          [| account_update_digest; stack_hash |]
+        ( `State Hash_prefix_states.account_update_node
+        , [| account_update_digest; stack_hash |] )
+
+      let create tree =
+        let `State init, data = create_input tree in
+        Random_oracle.hash ~init data
+
+      let of_field : Snark_params.Tick.Field.t -> t = fun x -> x
     end
   end
 
@@ -459,15 +489,28 @@ module Call_forest = struct
     in
     List.rev (collect xs [])
 
-  let hash_cons hash h_tl =
-    Random_oracle.hash ~init:Hash_prefix_states.account_update_cons
-      [| hash; h_tl |]
+  let hash_cons = Digest.Forest.cons
 
   let hash = function
     | [] ->
         Digest.Forest.empty
     | x :: _ ->
         With_stack_hash.stack_hash x
+
+  let cons_tree_input ~(tree_hash : Snark_params.Tick.Field.t) (forest : _ t) =
+    Digest.Forest.cons_input (Digest.Tree.of_field tree_hash) (hash forest)
+
+  let tree_hash_input ?(calls = [])
+      ~(account_update_digest : Digest.Account_update.t) account_update =
+    let tree : _ Tree.t = { account_update; account_update_digest; calls } in
+    Digest.Tree.create_input tree
+
+  let cons_tree_construct ?(calls = [])
+      ~(account_update_digest : Digest.Account_update.t) ~account_update ~forest
+      cons_tree_hash : _ t =
+    let stack_hash = Digest.Forest.of_field cons_tree_hash in
+    let tree : _ Tree.t = { account_update; account_update_digest; calls } in
+    { elt = tree; stack_hash } :: forest
 
   let cons_tree tree (forest : _ t) : _ t =
     { elt = tree
@@ -857,13 +900,35 @@ let to_simple (t : t) : Simple.t =
              } )
   }
 
-let all_account_updates (t : t) : _ Call_forest.t =
+let fee_payer_account_as_regular_update (t : t) : Account_update.t =
   let p = t.fee_payer in
   let body = Account_update.Body.of_fee_payer p.body in
-  let fee_payer : Account_update.t =
-    let p = t.fee_payer in
-    { authorization = Control.Signature p.authorization; body }
+  { authorization = Control.Signature t.fee_payer.authorization; body }
+
+let fee_payer_with_hash_m (tx : t) =
+  let fee_payer = fee_payer_account_as_regular_update tx in
+  let hash (`State init, data) = Random_oracle.Monad.hash ~init data in
+  let%map.Random_oracle.Monad h =
+    (* Call stack has calls to hashing, but they're not called for the fee_payer account update *)
+    Account_update.Body.digest_input fee_payer.body |> hash
   in
+  (fee_payer, Digest.Account_update.of_field h)
+
+let all_account_updates_m ~fee_payer ~fee_payer_hash account_updates :
+    _ Call_forest.t Random_oracle.Monad.t =
+  let hash (`State init, data) = Random_oracle.Monad.hash ~init data in
+  let%bind.Random_oracle.Monad tree_hash =
+    Call_forest.tree_hash_input ~account_update_digest:fee_payer_hash fee_payer
+    |> hash
+  in
+  let%map.Random_oracle.Monad cons_hash =
+    Call_forest.cons_tree_input ~tree_hash account_updates |> hash
+  in
+  Call_forest.cons_tree_construct ~account_update_digest:fee_payer_hash
+    ~account_update:fee_payer ~forest:account_updates cons_hash
+
+let all_account_updates (t : t) : _ Call_forest.t =
+  let fee_payer = fee_payer_account_as_regular_update t in
   Call_forest.cons fee_payer t.account_updates
 
 let fee (t : t) : Currency.Fee.t = t.fee_payer.body.fee
@@ -1400,10 +1465,22 @@ module Transaction_commitment = struct
   let create ~(account_updates_hash : Digest.Forest.t) : t =
     (account_updates_hash :> t)
 
+  let create_complete_input (t : t) ~memo_hash ~fee_payer_hash =
+    (`State Hash_prefix.account_update_cons, [| memo_hash; fee_payer_hash; t |])
+
+  let create_complete_m (t : t) ~memo_hash
+      ~(fee_payer_hash : Digest.Account_update.t) =
+    let `State init, data =
+      create_complete_input t ~memo_hash ~fee_payer_hash:(fee_payer_hash :> t)
+    in
+    Random_oracle.Monad.hash ~init data
+
   let create_complete (t : t) ~memo_hash
       ~(fee_payer_hash : Digest.Account_update.t) =
-    Random_oracle.hash ~init:Hash_prefix.account_update_cons
-      [| memo_hash; (fee_payer_hash :> t); t |]
+    let `State init, data =
+      create_complete_input t ~memo_hash ~fee_payer_hash:(fee_payer_hash :> t)
+    in
+    Random_oracle.hash ~init data
 
   module Checked = struct
     type t = Pickles.Impls.Step.Field.t

@@ -1097,11 +1097,7 @@ module Make (Inputs : Inputs_intf) = struct
       (and not ledger)
   *)
   type zkapp_precomputed_t =
-    { all_account_updates :
-        ( Account_update.t
-        , Zkapp_command.Digest.Account_update.t
-        , Zkapp_command.Digest.Forest.t )
-        Zkapp_command.Call_forest.t
+    { all_account_updates : Call_forest.t
     ; init_account_update_result : get_next_account_update_result
     ; tx_commitment_on_start : Inputs.Transaction_commitment.t
     ; full_commitment_on_start : Inputs.Transaction_commitment.t

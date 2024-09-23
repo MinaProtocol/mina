@@ -129,9 +129,20 @@ module Make_str (_ : Wire_types.Concrete) = struct
     Random_oracle_input.Chunked.(
       append (Public_key.Compressed.to_input key) (field tid))
 
+  let derive_token_id_input (owner : t) =
+    ( `State Hash_prefix.derive_token_id
+    , Random_oracle.pack_input (to_input owner) )
+
+  let derive_token_ids_m owners =
+    Random_oracle.Monad.hash_batch (List.map ~f:derive_token_id_input owners)
+
+  let derive_token_id_m ~owner =
+    let `State init, data = derive_token_id_input owner in
+    Random_oracle.Monad.hash ~init data
+
   let derive_token_id ~(owner : t) : Digest.t =
-    Random_oracle.hash ~init:Hash_prefix.derive_token_id
-      (Random_oracle.pack_input (to_input owner))
+    let `State init, data = derive_token_id_input owner in
+    Random_oracle.hash ~init data
 
   let gen =
     let open Quickcheck.Let_syntax in

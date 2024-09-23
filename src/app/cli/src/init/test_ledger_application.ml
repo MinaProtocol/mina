@@ -135,16 +135,20 @@ let apply_txs ~action_elements ~event_elements ~constraint_constants
     |> Or_error.ok_exn
   in
   let start_precompute = Time.now () in
+  let precomputed_batch =
+    let open Random_oracle.Monad in
+    evaluate
+    @@ map_list ~f:Ledger.precompute_transaction_hashes
+    @@ List.map ~f:(fun tx -> User_command.Zkapp_command tx) zkapps
+  in
   let zkapps' =
-    List.map zkapps ~f:(fun tx ->
+    List.map2_exn zkapps precomputed_batch ~f:(fun tx precomputed ->
         ( { With_status.data =
               Mina_transaction.Transaction.Command
                 (User_command.Zkapp_command tx)
           ; status = Applied
           }
-        , Option.some
-          @@ Ledger.precompute_transaction_hashes (User_command.Zkapp_command tx)
-        ) )
+        , Option.some precomputed ) )
   in
   printf
     !"Precomputation (took %s)\n%!"

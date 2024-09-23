@@ -184,7 +184,7 @@ let%test_module "Add events test" =
 
       let hash (parent_hash : hash) (proof_elem : proof_elem) =
         let elem_hash = Mina_base.Zkapp_account.Event.hash proof_elem in
-        Mina_base.Zkapp_account.Events.push_hash parent_hash elem_hash
+        Mina_base.Zkapp_account.Events.push_hash elem_hash parent_hash
     end)
 
     let%test_unit "Initialize" =

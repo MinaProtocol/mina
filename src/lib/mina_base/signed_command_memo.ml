@@ -193,10 +193,18 @@ module Make_str (_ : Wire_types.Concrete) = struct
     Quickcheck.Generator.map String.quickcheck_generator
       ~f:create_by_digesting_string_exn
 
+  let hash_input memo =
+    ( Hash_prefix.zkapp_memo
+    , Random_oracle.Legacy.pack_input
+        (Random_oracle_input.Legacy.bitstring (to_bits memo)) )
+
+  let hash_m memo =
+    let init, data = hash_input memo in
+    Random_oracle.Monad.hash ~init data
+
   let hash memo =
-    Random_oracle.hash ~init:Hash_prefix.zkapp_memo
-      (Random_oracle.Legacy.pack_input
-         (Random_oracle_input.Legacy.bitstring (to_bits memo)) )
+    let init, data = hash_input memo in
+    Random_oracle.hash ~init data
 
   let to_plaintext (memo : t) : string Or_error.t =
     if is_bytes memo then Ok (String.sub memo ~pos:2 ~len:(length memo))

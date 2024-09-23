@@ -19,8 +19,8 @@ let update =
   let open Sponge.Default.F (Field) in
   Fn.compose (sponge ~add_assign) block_cipher
 
-let update_batch_ocaml_sponge params ~rate ~state =
-  List.map ~f:(fun input ->
+let update_batch_ocaml_sponge params ~rate =
+  List.map ~f:(fun (`State state, input) ->
       let state = copy state in
       update params ~rate ~state input )
 
@@ -41,12 +41,12 @@ let chunks_thr =
   Sys.getenv_opt "CHUNKS_THR"
   |> Option.value_map ~default:(1 lsl (chunks_pow + 1)) ~f:Int.of_string
 
-let update_batch params' ~rate ~state inputs =
+let update_batch params' ~rate inputs =
   let len = List.length inputs in
-  if len < chunks_thr then update_batch_ocaml_sponge params' ~rate ~state inputs
+  if len < chunks_thr then update_batch_ocaml_sponge params' ~rate inputs
   else
     let state_and_input_vs = Kimchi_bindings.FieldVectors.Fp_batch.create () in
-    List.iter inputs ~f:(fun input ->
+    List.iter inputs ~f:(fun (`State state, input) ->
         let state_and_input_v = Kimchi_bindings.FieldVectors.Fp.create () in
         Array.iter state
           ~f:(Kimchi_bindings.FieldVectors.Fp.emplace_back state_and_input_v) ;
@@ -56,13 +56,13 @@ let update_batch params' ~rate ~state inputs =
           state_and_input_v ) ;
     let chunk_size = len lsr chunks_pow in
     Kimchi_pasta_fp_poseidon.update_batch params chunk_size state_and_input_vs ;
-    let state_length = Array.length state in
     let res =
-      List.mapi inputs ~f:(fun i _ ->
+      List.init len ~f:(fun i ->
           let v =
             Kimchi_bindings.FieldVectors.Fp_batch.get state_and_input_vs i
           in
-          Array.init state_length ~f:(Kimchi_bindings.FieldVectors.Fp.get v) )
+          Array.init 3 (*state length*)
+            ~f:(Kimchi_bindings.FieldVectors.Fp.get v) )
     in
     res
 
@@ -114,12 +114,11 @@ let%test_unit "check rust implementation of update_batch" =
     (init_state, values_large @ values)
   in
   Quickcheck.test gen ~f:(fun (s, value) ->
-      let s () = Array.of_list s in
-      let value () = List.map ~f:Array.of_list value in
+      let s = Array.of_list s in
+      let value () = List.map ~f:(fun l -> (`State s, Array.of_list l)) value in
       [%test_eq: T.Field.t array list]
-        ( Ocaml_permutation.update_batch ~rate:2 params' ~state:(s ())
-        @@ value () )
-        (update_batch ~rate:2 params' ~state:(s ()) @@ value ()) )
+        (Ocaml_permutation.update_batch ~rate:2 params' @@ value ())
+        (update_batch ~rate:2 params' @@ value ()) )
 
 (* Parametrize chunk size via an argument and experiment more
    we need to determine minimum effective chunk, maybe *)
@@ -138,7 +137,7 @@ let%test_unit "check update_batch on a large number of small vectors (parallel)"
     (init_state, values)
   in
   Quickcheck.test ~trials:100 gen ~f:(fun (s, value) ->
-      let s () = Array.of_list s in
-      let value () = List.map ~f:Array.of_list value in
-      let _ = update_batch ~rate:2 params' ~state:(s ()) @@ value () in
+      let s = Array.of_list s in
+      let value () = List.map ~f:(fun l -> (`State s, Array.of_list l)) value in
+      let _ = update_batch ~rate:2 params' @@ value () in
       () )

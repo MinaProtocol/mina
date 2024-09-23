@@ -94,6 +94,8 @@ module type S = sig
   (** Quickcheck generator for memos. *)
   val gen : t Quickcheck.Generator.t
 
+  val hash_m : t -> Field.t Random_oracle.Monad.t
+
   (** Compute a standalone hash of the current memo. *)
   val hash : t -> Field.t
 

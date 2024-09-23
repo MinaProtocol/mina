@@ -62,8 +62,8 @@ struct
 
   let copy = Array.copy
 
-  let update_batch params ~rate ~state =
-    List.map ~f:(fun input ->
+  let update_batch params ~rate =
+    List.map ~f:(fun (`State state, input) ->
         let state = copy state in
         update params ~rate ~state input )
 end

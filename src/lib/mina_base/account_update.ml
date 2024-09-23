@@ -1569,9 +1569,13 @@ module Body = struct
       ; Authorization_kind.to_input authorization_kind
       ]
 
+  let digest_input ?chain (t : t) =
+    ( `State (Hash_prefix.zkapp_body ?chain)
+    , Random_oracle.pack_input (to_input t) )
+
   let digest ?chain (t : t) =
-    Random_oracle.(
-      hash ~init:(Hash_prefix.zkapp_body ?chain) (pack_input (to_input t)))
+    let `State init, data = digest_input ?chain t in
+    Random_oracle.hash ~init data
 
   module Digested = struct
     type t = Random_oracle.Digest.t

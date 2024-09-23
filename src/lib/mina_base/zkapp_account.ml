@@ -36,14 +36,25 @@ struct
   let empty_hash =
     Hash_prefix_create.salt Inputs.salt_phrase |> Random_oracle.digest
 
-  let push_hash acc hash =
+  let push_hash hash acc =
     Random_oracle.hash ~init:Inputs.hash_prefix [| acc; hash |]
 
-  let push_event acc event = push_hash acc (Event.hash event)
+  let push_hash_m hash acc =
+    Random_oracle.Monad.hash ~init:Inputs.hash_prefix [| acc; hash |]
+
+  let push_event event acc = push_hash (Event.hash event) acc
 
   let hash (x : t) =
     (* fold_right so the empty hash is used at the end of the events *)
-    List.fold_right ~init:empty_hash ~f:(Fn.flip push_event) x
+    List.fold_right ~init:empty_hash ~f:push_event x
+
+  let hash_m (events : t) =
+    let%bind.Random_oracle.Monad event_hashes =
+      Random_oracle.Monad.hash_batch
+      @@ List.map events
+           ~f:(Tuple2.create (`State Hash_prefix_states.zkapp_event))
+    in
+    Random_oracle.Monad.fold_right ~init:empty_hash ~f:push_hash_m event_hashes
 
   type var = t Data_as_hash.t
 
@@ -310,30 +321,38 @@ let zkapp_uri_non_preimage_hash =
            [| Field.zero; Field.zero |] )
     |> Random_oracle.hash ~init:Hash_prefix_states.zkapp_uri )
 
+let hash_zkapp_uri_input (zkapp_uri : string) =
+  (* We use [length*8 + 1] to pass a final [true] after the end of the
+     string, to ensure that trailing null bytes don't alias in the hash
+     preimage.
+  *)
+  let bits = Array.create ~len:((String.length zkapp_uri * 8) + 1) true in
+  String.foldi zkapp_uri ~init:() ~f:(fun i () c ->
+      let c = Char.to_int c in
+      (* Insert the bits into [bits], LSB order. *)
+      for j = 0 to 7 do
+        (* [Int.test_bit c j] *)
+        bits.((i * 8) + j) <- Int.bit_and c (1 lsl j) <> 0
+      done ) ;
+  let input =
+    Random_oracle_input.Chunked.packeds
+      (Array.map ~f:(fun b -> (field_of_bool b, 1)) bits)
+  in
+  Random_oracle.pack_input input
+
+let hash_zkapp_uri_m zkapp_uri =
+  Random_oracle.Monad.hash ~init:Hash_prefix_states.zkapp_uri
+    (hash_zkapp_uri_input zkapp_uri)
+
+let hash_zkapp_uri zkapp_uri =
+  hash_zkapp_uri_input zkapp_uri
+  |> Random_oracle.hash ~init:Hash_prefix_states.zkapp_uri
+
 let hash_zkapp_uri_opt = function
   | None ->
       Lazy.force zkapp_uri_non_preimage_hash
   | Some zkapp_uri ->
-      (* We use [length*8 + 1] to pass a final [true] after the end of the
-         string, to ensure that trailing null bytes don't alias in the hash
-         preimage.
-      *)
-      let bits = Array.create ~len:((String.length zkapp_uri * 8) + 1) true in
-      String.foldi zkapp_uri ~init:() ~f:(fun i () c ->
-          let c = Char.to_int c in
-          (* Insert the bits into [bits], LSB order. *)
-          for j = 0 to 7 do
-            (* [Int.test_bit c j] *)
-            bits.((i * 8) + j) <- Int.bit_and c (1 lsl j) <> 0
-          done ) ;
-      let input =
-        Random_oracle_input.Chunked.packeds
-          (Array.map ~f:(fun b -> (field_of_bool b, 1)) bits)
-      in
-      Random_oracle.pack_input input
-      |> Random_oracle.hash ~init:Hash_prefix_states.zkapp_uri
-
-let hash_zkapp_uri (zkapp_uri : string) = hash_zkapp_uri_opt (Some zkapp_uri)
+      hash_zkapp_uri zkapp_uri
 
 let typ : (Checked.t, t) Typ.t =
   let open Poly in
@@ -355,16 +374,20 @@ let typ : (Checked.t, t) Typ.t =
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
 
+let zkapp_uri_to_input_m zkapp_uri =
+  Random_oracle.Monad.map ~f:Random_oracle.Input.Chunked.field
+  @@ hash_zkapp_uri_m zkapp_uri
+
 let zkapp_uri_to_input zkapp_uri =
   Random_oracle.Input.Chunked.field @@ hash_zkapp_uri zkapp_uri
 
-let to_input (t : t) : _ Random_oracle.Input.Chunked.t =
+let to_input_do (t : t) ~cons ~zkapp_uri =
   let open Random_oracle.Input.Chunked in
-  let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
   let app_state v =
     Random_oracle.Input.Chunked.field_elements (Pickles_types.Vector.to_array v)
   in
-  Poly.Fields.fold ~init:[] ~app_state:(f app_state)
+  let f mk acc field = cons (mk (Core_kernel.Field.get field t)) acc in
+  Poly.Fields.fold ~app_state:(f app_state)
     ~verification_key:
       (f
          (Fn.compose field
@@ -374,8 +397,24 @@ let to_input (t : t) : _ Random_oracle.Input.Chunked.t =
     ~last_action_slot:(f Mina_numbers.Global_slot_since_genesis.to_input)
     ~proved_state:
       (f (fun b -> Random_oracle.Input.Chunked.packed (field_of_bool b, 1)))
-    ~zkapp_uri:(f zkapp_uri_to_input)
-  |> List.reduce_exn ~f:append
+    ~zkapp_uri
+
+let to_input t : _ Random_oracle.Input.Chunked.t =
+  let zkapp_uri acc field =
+    zkapp_uri_to_input (Core_kernel.Field.get field t) :: acc
+  in
+  to_input_do t ~init:[] ~cons:List.cons ~zkapp_uri
+  |> List.reduce_exn ~f:Random_oracle.Input.Chunked.append
+
+let to_input_m (t : t) : _ Random_oracle.Input.Chunked.t Random_oracle.Monad.t =
+  let open Random_oracle.Monad in
+  let zkapp_uri acc field =
+    lift2 List.cons (zkapp_uri_to_input_m @@ Core_kernel.Field.get field t) acc
+  in
+  to_input_do t ~init:(return [])
+    ~cons:(fun x -> map ~f:(List.cons x))
+    ~zkapp_uri
+  >>| List.reduce_exn ~f:Random_oracle.Input.Chunked.append
 
 let default : _ Poly.t =
   (* These are the permissions of a "user"/"non zkapp" account. *)
@@ -395,6 +434,11 @@ let default : _ Poly.t =
 let digest (t : t) =
   Random_oracle.(
     hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)))
+
+let digest_m t =
+  let%bind.Random_oracle.Monad input = to_input_m t in
+  Random_oracle.Monad.hash ~init:Hash_prefix_states.zkapp_account
+    (Random_oracle.pack_input input)
 
 let default_digest = lazy (digest default)
 
