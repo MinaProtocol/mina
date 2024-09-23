@@ -11,8 +11,7 @@ open Common
 (* This contains the "step" prover *)
 
 module Make
-    (A : T0)
-    (A_value : sig
+    (A : T0) (A_value : sig
       type t
     end)
     (Max_proofs_verified : Nat.Add.Intf_transparent) =
@@ -161,7 +160,7 @@ struct
         let zeta = to_field plonk0.zeta in
         let zetaw =
           Tick.Field.(
-            zeta * domain_generator ~log2_size:(Domain.log2_size domain) )
+            zeta * domain_generator ~log2_size:(Domain.log2_size domain))
         in
         let combined_evals =
           Plonk_checks.evals_of_split_evals
@@ -798,7 +797,7 @@ struct
                { Tick.Proof.Challenge_polynomial.commitment
                ; challenges = Vector.to_array chals
                } )
-           |> to_list ) )
+           |> to_list) )
     in
     let%map.Promise ( (next_proof : Tick.Proof.with_public_evals)
                     , _next_statement_hashed ) =
