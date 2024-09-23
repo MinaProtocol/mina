@@ -13,6 +13,21 @@ use std::{
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
 };
 
+//impl<T> ocaml_gen::OCamlDesc for ocaml::Array<T>
+//where
+//    T: ocaml_gen::OCamlDesc,
+//{
+//    fn ocaml_desc(env: &ocaml_gen::Env, generics: &[&str]) -> String {
+//        unimplemented!()
+//        //format!("({}) option", T::ocaml_desc(env, generics))
+//    }
+//
+//    fn unique_id() -> u128 {
+//        unimplemented!()
+//        //const_random!(u128)
+//    }
+//}
+
 macro_rules! impl_srs {
     ($name: ident, $CamlF: ty, $CamlG: ty, $F: ty, $G: ty) => {
 
@@ -71,6 +86,47 @@ macro_rules! impl_srs {
 
                 Ok(Some($name::new(srs)))
             }
+
+            #[ocaml_gen::func]
+            #[ocaml::func]
+            /// This is same as _lagrange_commitments, but returns the result for every
+            /// i <= domain_size.
+            pub fn [<$name:snake _lagrange_commitments_whole_domain>](
+                srs: $name,
+                domain_size: ocaml::Int,
+            ) -> Result<Vec<CamlPolyComm<$CamlG>>, ocaml::Error> {
+                use std::time::{Duration, Instant};
+                let time_0 = Instant::now();
+                println!("entering _lagrange_commitment_whole_domain");
+                let x_domain = EvaluationDomain::<$F>::new(domain_size as usize).ok_or_else(|| {
+                    ocaml::Error::invalid_argument("CamlSRS::lagrange_commitment")
+                        .err()
+                        .unwrap()
+                })?;
+                println!("rust ..._lagrange_commitment_whole_domain 1 {:.2?}", time_0.elapsed());
+
+                {
+                    // We're single-threaded, so it's safe to grab this pointer as mutable.
+                    // Do not try this at home.
+                    let srs = unsafe { &mut *((&**srs as *const SRS<$G>) as *mut SRS<$G>) as &mut SRS<$G> };
+                    srs.with_lagrange_basis(x_domain);
+                }
+                println!("rust ..._lagrange_commitment_whole_domain 2 {:.2?}", time_0.elapsed());
+
+
+                //let mut res = unsafe { ocaml::Array::alloc(domain_size as usize) };
+                //for i in 0..domain_size {
+                //    let value: CamlPolyComm<$CamlG> = srs.lagrange_bases[&x_domain.size()][i as usize].clone().into();
+                //    unsafe {
+                //        res.set_unchecked(gc, i as usize, value);
+                //    };
+                //}
+
+                let res = Ok(srs.lagrange_bases[&x_domain.size()].clone().into_iter().map(|x| x.into()).collect());
+                println!("rust ..._lagrange_commitment_whole_domain total {:.2?}", time_0.elapsed());
+                res
+            }
+
 
             #[ocaml_gen::func]
             #[ocaml::func]
