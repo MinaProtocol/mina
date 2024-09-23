@@ -45,6 +45,8 @@ pub fn caml_pasta_fp_plonk_proof_create(
     prev_challenges: Vec<CamlFp>,
     prev_sgs: Vec<CamlGVesta>,
 ) -> Result<CamlProofWithPublic<CamlGVesta, CamlFp>, ocaml::Error> {
+    use std::time::{Duration, Instant};
+    let time_0 = Instant::now();
     {
         let ptr: &mut poly_commitment::srs::SRS<Vesta> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
@@ -97,6 +99,9 @@ pub fn caml_pasta_fp_plonk_proof_create(
             None,
         )
         .map_err(|e| ocaml::Error::Error(e.into()))?;
+
+        //println!("pasta_fp_plonk_proof total {:.2?}", time_0.elapsed());
+
         Ok((proof, public_input).into())
     })
 }

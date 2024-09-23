@@ -810,6 +810,7 @@ struct
               (keep, sg) ) )
     in
     with_label __LOC__ (fun () ->
+        let time_0 = Time.now () in
         let sample () = Opt.challenge sponge in
         let sample_scalar () : Scalar_challenge.t =
           Opt.scalar_challenge sponge
@@ -832,13 +833,16 @@ struct
                   () ) ;
               Sponge.squeeze_field index_sponge )
         in
+        let time_1 = Time.now () in
         let without = Type.Without_degree_bound in
         let absorb_g gs =
           absorb sponge without (Array.map gs ~f:(fun g -> (Boolean.true_, g)))
         in
         absorb sponge Field (Boolean.true_, index_digest) ;
         Vector.iter ~f:(absorb sponge PC) sg_old ;
+        let time_2 = Time.now () in
         let x_hat =
+          let time_0_0 = Time.now () in
           let domain = (which_branch, step_domains) in
           let public_input =
             Array.concat_map public_input ~f:(function
@@ -849,6 +853,7 @@ struct
               | `Packed_bits (x, n) ->
                   [| `Field (x, n) |] )
           in
+          let time_0_1 = Time.now () in
           let constant_part, non_constant_part =
             List.partition_map
               Array.(to_list (mapi public_input ~f:(fun i t -> (i, t))))
@@ -868,52 +873,72 @@ struct
                 | `Field x ->
                     Second (i, x) )
           in
-          with_label __LOC__ (fun () ->
-              let terms =
-                List.map non_constant_part ~f:(fun (i, x) ->
-                    match x with
-                    | b, 1 ->
-                        assert_ (Constraint.boolean (b :> Field.t)) ;
-                        `Cond_add
-                          (Boolean.Unsafe.of_cvar b, lagrange ~domain srs i)
-                    | x, n ->
-                        `Add_with_correction
-                          ( (x, n)
-                          , lagrange_with_correction ~input_length:n ~domain srs
-                              i ) )
-              in
-              let correction =
+          let time_0_2 = Time.now () in
+          (* the creation of the following code seems to be slow *)
+          let to_map =
+            with_label __LOC__ (fun () ->
+                let terms =
+                  List.map non_constant_part ~f:(fun (i, x) ->
+                      match x with
+                      | b, 1 ->
+                          assert_ (Constraint.boolean (b :> Field.t)) ;
+                          `Cond_add
+                            (Boolean.Unsafe.of_cvar b, lagrange ~domain srs i)
+                      | x, n ->
+                          `Add_with_correction
+                            ( (x, n)
+                            , lagrange_with_correction ~input_length:n ~domain
+                                srs i ) )
+                in
+                let correction =
+                  with_label __LOC__ (fun () ->
+                      List.reduce_exn
+                        (List.filter_map terms ~f:(function
+                          | `Cond_add _ ->
+                              None
+                          | `Add_with_correction (_, chunks) ->
+                              Some (Array.map ~f:snd chunks) ) )
+                        ~f:(Array.map2_exn ~f:(Ops.add_fast ?check_finite:None)) )
+                in
                 with_label __LOC__ (fun () ->
-                    List.reduce_exn
-                      (List.filter_map terms ~f:(function
-                        | `Cond_add _ ->
-                            None
-                        | `Add_with_correction (_, chunks) ->
-                            Some (Array.map ~f:snd chunks) ) )
-                      ~f:(Array.map2_exn ~f:(Ops.add_fast ?check_finite:None)) )
-              in
-              with_label __LOC__ (fun () ->
-                  let init =
-                    List.fold
-                      (List.filter_map ~f:Fn.id constant_part)
-                      ~init:correction
-                      ~f:(Array.map2_exn ~f:(Ops.add_fast ?check_finite:None))
-                  in
-                  List.fold terms ~init ~f:(fun acc term ->
-                      match term with
-                      | `Cond_add (b, g) ->
-                          with_label __LOC__ (fun () ->
-                              Array.map2_exn acc g ~f:(fun acc g ->
-                                  Inner_curve.if_ b ~then_:(Ops.add_fast g acc)
-                                    ~else_:acc ) )
-                      | `Add_with_correction ((x, num_bits), chunks) ->
-                          Array.map2_exn acc chunks ~f:(fun acc (g, _) ->
-                              Ops.add_fast acc
-                                (Ops.scale_fast2'
-                                   (module Other_field.With_top_bit0)
-                                   g x ~num_bits ) ) ) ) )
-          |> Array.map ~f:Inner_curve.negate
+                    let init =
+                      List.fold
+                        (List.filter_map ~f:Fn.id constant_part)
+                        ~init:correction
+                        ~f:(Array.map2_exn ~f:(Ops.add_fast ?check_finite:None))
+                    in
+                    List.fold terms ~init ~f:(fun acc term ->
+                        match term with
+                        | `Cond_add (b, g) ->
+                            with_label __LOC__ (fun () ->
+                                Array.map2_exn acc g ~f:(fun acc g ->
+                                    Inner_curve.if_ b
+                                      ~then_:(Ops.add_fast g acc) ~else_:acc ) )
+                        | `Add_with_correction ((x, num_bits), chunks) ->
+                            Array.map2_exn acc chunks ~f:(fun acc (g, _) ->
+                                Ops.add_fast acc
+                                  (Ops.scale_fast2'
+                                     (module Other_field.With_top_bit0)
+                                     g x ~num_bits ) ) ) ) )
+          in
+          let time_0_3 = Time.now () in
+          let res = Array.map ~f:Inner_curve.negate to_map in
+          let time_0_4 = Time.now () in
+          printf
+            !"wrap_verifier x_hat took %f ms:\n\
+             \           1   %f\n\
+             \           2   %f\n\
+             \           3   %f\n\
+             \           4   %f\n\n\
+              %!"
+            (Time.Span.to_ms (Time.diff time_0_4 time_0_0))
+            (Time.Span.to_ms (Time.diff time_0_1 time_0_0))
+            (Time.Span.to_ms (Time.diff time_0_2 time_0_1))
+            (Time.Span.to_ms (Time.diff time_0_3 time_0_2))
+            (Time.Span.to_ms (Time.diff time_0_4 time_0_3)) ;
+          res
         in
+        let time_3 = Time.now () in
         let x_hat =
           with_label "x_hat blinding" (fun () ->
               Array.map x_hat ~f:(fun x_hat ->
@@ -924,6 +949,7 @@ struct
             absorb sponge PC (Boolean.true_, x_hat) ) ;
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
+        let time_4 = Time.now () in
         let runtime_comm =
           match messages.lookup with
           | Nothing
@@ -939,6 +965,7 @@ struct
           | Just { runtime = Just runtime; _ } ->
               Pickles_types.Opt.Just runtime
         in
+        let time_5 = Time.now () in
         let absorb_runtime_tables () =
           match runtime_comm with
           | Nothing ->
@@ -951,6 +978,7 @@ struct
               absorb sponge Without_degree_bound z
         in
         absorb_runtime_tables () ;
+        let time_6 = Time.now () in
         let joint_combiner =
           let compute_joint_combiner (l : _ Messages.Lookup.In_circuit.t) =
             let absorb_sorted_1 sponge =
@@ -1042,6 +1070,7 @@ struct
               Opt.consume_all_pending sponge ;
               Types.Opt.just (compute_joint_combiner l)
         in
+        let time_7 = Time.now () in
         let lookup_table_comm =
           let compute_lookup_table_comm (l : _ Messages.Lookup.In_circuit.t)
               joint_combiner =
@@ -1186,6 +1215,7 @@ struct
             , (Types.Opt.Nothing | Maybe _ | Just _) ) ->
               assert false
         in
+        let time_8 = Time.now () in
         let lookup_sorted =
           let lookup_sorted_minus_1 =
             Nat.to_int Plonk_types.Lookup_sorted_minus_1.n
@@ -1202,6 +1232,7 @@ struct
                   if i = lookup_sorted_minus_1 then l.sorted_5th_column
                   else Types.Opt.Just (Option.value_exn (Vector.nth l.sorted i)) )
         in
+        let time_9 = Time.now () in
         let beta = sample () in
         let gamma = sample () in
         let () =
@@ -1244,6 +1275,7 @@ struct
         in
         let sponge_before_evaluations = Sponge.copy sponge in
         let sponge_digest_before_evaluations = Sponge.squeeze_field sponge in
+        let time_10 = Time.now () in
 
         (* xi, r are sampled here using the other sponge. *)
         (* No need to expose the polynomial evaluations as deferred values as they're
@@ -1268,6 +1300,7 @@ struct
                      m )
                 ~plonk ~t_comm )
         in
+        let time_11 = Time.now () in
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)
              1. The polynomial commitments
@@ -1353,6 +1386,36 @@ struct
                        ~f:(Array.map ~f:(fun x -> `Finite x)) )
               , [] )
         in
+        let time_12 = Time.now () in
+        printf
+          !"wrap_verifier incrementally_verify_proof took %f ms:\n\
+           \           1   %f\n\
+           \           2   %f\n\
+           \           3   %f\n\
+           \           4   %f\n\
+           \           5   %f\n\
+           \           6   %f\n\
+           \           7   %f\n\
+           \           8   %f\n\
+           \           9   %f\n\
+           \           10  %f\n\
+           \           11  %f\n\
+           \           12  %f\n\n\
+            %!"
+          (Time.Span.to_ms (Time.diff time_12 time_0))
+          (Time.Span.to_ms (Time.diff time_1 time_0))
+          (Time.Span.to_ms (Time.diff time_2 time_1))
+          (Time.Span.to_ms (Time.diff time_3 time_2))
+          (Time.Span.to_ms (Time.diff time_4 time_3))
+          (Time.Span.to_ms (Time.diff time_5 time_4))
+          (Time.Span.to_ms (Time.diff time_6 time_5))
+          (Time.Span.to_ms (Time.diff time_7 time_6))
+          (Time.Span.to_ms (Time.diff time_8 time_7))
+          (Time.Span.to_ms (Time.diff time_9 time_8))
+          (Time.Span.to_ms (Time.diff time_10 time_9))
+          (Time.Span.to_ms (Time.diff time_11 time_10))
+          (Time.Span.to_ms (Time.diff time_12 time_11)) ;
+
         assert_eq_plonk
           { alpha = plonk.alpha
           ; beta = plonk.beta

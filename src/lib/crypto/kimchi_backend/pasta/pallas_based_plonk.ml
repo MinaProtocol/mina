@@ -89,6 +89,7 @@ module Proof = Plonk_dlog_proof.Make (struct
 
     let create_aux ~f:backend_create (pk : Keypair.t) ~primary ~auxiliary
         ~prev_chals ~prev_comms =
+      let time_0 = Time.now () in
       (* external values contains [1, primary..., auxiliary ] *)
       let external_values i =
         let open Field.Vector in
@@ -96,11 +97,14 @@ module Proof = Plonk_dlog_proof.Make (struct
         else get auxiliary (i - length primary)
       in
 
+      let time_1 = Time.now () in
       (* compute witness *)
       let computed_witness, runtime_tables =
         R1CS_constraint_system.compute_witness pk.cs external_values
       in
+      let time_2 = Time.now () in
       let num_rows = Array.length computed_witness.(0) in
+      let time_3 = Time.now () in
 
       (* convert to Rust vector *)
       let witness_cols =
@@ -111,15 +115,44 @@ module Proof = Plonk_dlog_proof.Make (struct
             done ;
             witness )
       in
-      backend_create pk.index witness_cols runtime_tables prev_chals prev_comms
+      let time_4 = Time.now () in
+      let res =
+        backend_create pk.index witness_cols runtime_tables prev_chals
+          prev_comms
+      in
+      let time_5 = Time.now () in
+
+      (* printf
+         !"pallas_based_plonk took %f ms:\n\n\
+          \           1   %f\n\
+          \           2   %f\n\
+          \           3   %f\n\
+          \           4   %f\n\
+          \           5   %f\n\
+           %!"
+         (Time.Span.to_ms (Time.diff time_5 time_0))
+         (Time.Span.to_ms (Time.diff time_1 time_0))
+         (Time.Span.to_ms (Time.diff time_2 time_1))
+         (Time.Span.to_ms (Time.diff time_3 time_2))
+         (Time.Span.to_ms (Time.diff time_4 time_3))
+         (Time.Span.to_ms (Time.diff time_5 time_4)) ; *)
+      res
 
     let create_async (pk : Keypair.t) ~primary ~auxiliary ~prev_chals
         ~prev_comms =
       create_aux pk ~primary ~auxiliary ~prev_chals ~prev_comms
         ~f:(fun index witness runtime_tables prev_chals prev_sgs ->
           Promise.run_in_thread (fun () ->
-              Kimchi_bindings.Protocol.Proof.Fq.create index witness
-                runtime_tables prev_chals prev_sgs ) )
+              let time_0 = Time.now () in
+              let res =
+                Kimchi_bindings.Protocol.Proof.Fq.create index witness
+                  runtime_tables prev_chals prev_sgs
+              in
+              let time_1 = Time.now () in
+              printf
+                !"pallas_based_plonk background_create took %f ms:\n%!"
+                (Time.Span.to_ms (Time.diff time_1 time_0)) ;
+              res ) )
 
     let create (pk : Keypair.t) ~primary ~auxiliary ~prev_chals ~prev_comms =
       create_aux pk ~primary ~auxiliary ~prev_chals ~prev_comms

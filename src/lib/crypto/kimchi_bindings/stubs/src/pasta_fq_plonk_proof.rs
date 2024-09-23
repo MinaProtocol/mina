@@ -40,6 +40,8 @@ pub fn caml_pasta_fq_plonk_proof_create(
     prev_challenges: Vec<CamlFq>,
     prev_sgs: Vec<CamlGPallas>,
 ) -> Result<CamlProofWithPublic<CamlGPallas, CamlFq>, ocaml::Error> {
+    use std::time::{Duration, Instant};
+    let time_0 = Instant::now();
     {
         let ptr: &mut poly_commitment::srs::SRS<Pallas> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
@@ -89,6 +91,9 @@ pub fn caml_pasta_fq_plonk_proof_create(
             DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
         >(&group_map, witness, &runtime_tables, index, prev, None)
         .map_err(|e| ocaml::Error::Error(e.into()))?;
+
+        println!("pasta_fq_plonk_proof total {:.2?}", time_0.elapsed());
+
         Ok((proof, public_input).into())
     })
 }

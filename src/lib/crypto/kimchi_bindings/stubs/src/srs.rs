@@ -79,11 +79,14 @@ macro_rules! impl_srs {
                 domain_size: ocaml::Int,
                 i: ocaml::Int,
             ) -> Result<CamlPolyComm<$CamlG>, ocaml::Error> {
+                use std::time::{Duration, Instant};
+                let time_0 = Instant::now();
                 let x_domain = EvaluationDomain::<$F>::new(domain_size as usize).ok_or_else(|| {
                     ocaml::Error::invalid_argument("CamlSRS::lagrange_commitment")
                         .err()
                         .unwrap()
                 })?;
+                println!("rust ..._lagrange_commitment 1 {:.2?}", time_0.elapsed());
 
                 {
                     // We're single-threaded, so it's safe to grab this pointer as mutable.
@@ -91,8 +94,11 @@ macro_rules! impl_srs {
                     let srs = unsafe { &mut *((&**srs as *const SRS<$G>) as *mut SRS<$G>) as &mut SRS<$G> };
                     srs.with_lagrange_basis(x_domain);
                 }
+                println!("rust ..._lagrange_commitment 2 {:.2?}", time_0.elapsed());
 
-                Ok(srs.lagrange_bases[&x_domain.size()][i as usize].clone().into())
+                let res = Ok(srs.lagrange_bases[&x_domain.size()][i as usize].clone().into());
+                println!("rust ..._lagrange_commitment total {:.2?}", time_0.elapsed());
+                res
             }
 
             #[ocaml_gen::func]

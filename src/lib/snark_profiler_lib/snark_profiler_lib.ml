@@ -661,8 +661,8 @@ let profile_zkapps
         let account_updates =
           Zkapp_command.account_updates_list zkapp_command
         in
-        printf "Processing zkApp %d of %d, other_parties length: %d\n" (ndx + 1)
-          num_zkapp_commands
+        printf "========= Processing zkApp %d of %d, other_parties length: %d\n"
+          (ndx + 1) num_zkapp_commands
           (List.length account_updates) ;
         let v_start_time = Time.now () in
         let%bind res =

@@ -106,6 +106,7 @@ module For_tests_only = struct
       ~(proof : Backend.Tick.Proof.with_public_evals)
       ~(actual_proofs_verified : n Nat.t) : deferred_values_and_hints =
     let module O = Tick.Oracles in
+    let time_0 = Time.now () in
     let o =
       O.create_with_public_evals step_vk
         Vector.(
@@ -123,6 +124,7 @@ module For_tests_only = struct
       | None ->
           O.([| p_eval_1 o |], [| p_eval_2 o |])
     in
+    let time_1 = Time.now () in
     let scalar_chal f =
       Scalar_challenge.map ~f:Challenge.Constant.of_tick_field (f o)
     in
@@ -139,6 +141,7 @@ module For_tests_only = struct
       ; feature_flags = actual_feature_flags
       }
     in
+    let time_2 = Time.now () in
     let r = scalar_chal O.u in
     let xi = scalar_chal O.v in
     let module As_field = struct
@@ -157,6 +160,7 @@ module For_tests_only = struct
 
       let joint_combiner = Option.map ~f:to_field plonk0.joint_combiner
     end in
+    let time_3 = Time.now () in
     let domain = Domain.Pow_2_roots_of_unity step_vk.domain.log_size_of_group in
     let zetaw = Tick.Field.mul As_field.zeta step_vk.domain.group_gen in
     let tick_plonk_minimal =
@@ -179,6 +183,7 @@ module For_tests_only = struct
         domain ~shifts:Common.tick_shifts
         ~domain_generator:Backend.Tick.Field.domain_generator
     in
+    let time_4 = Time.now () in
     let tick_env =
       let module Env_bool = struct
         type t = bool
@@ -210,6 +215,7 @@ module For_tests_only = struct
           |> Kimchi_pasta.Pasta.Fp.of_bigint )
         ~domain:tick_domain tick_plonk_minimal tick_combined_evals
     in
+    let time_5 = Time.now () in
     let plonk =
       let module Field = struct
         include Tick.Field
@@ -217,7 +223,9 @@ module For_tests_only = struct
       Type1.derive_plonk
         (module Field)
         ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal tick_combined_evals
-    and new_bulletproof_challenges, b =
+    in
+    let time_6 = Time.now () in
+    let new_bulletproof_challenges, b =
       let prechals =
         Array.map (O.opening_prechallenges o) ~f:(fun x ->
             Scalar_challenge.map ~f:Challenge.Constant.of_tick_field x )
@@ -234,53 +242,78 @@ module For_tests_only = struct
       let prechals = Array.map prechals ~f:Bulletproof_challenge.unpack in
       (prechals, b)
     in
+    let time_7 = Time.now () in
     let shift_value =
       Shifted_value.Type1.of_field (module Tick.Field) ~shift:Shifts.tick1
     and chal = Challenge.Constant.of_tick_field in
-    { deferred_values =
-        { Types.Wrap.Proof_state.Deferred_values.xi
-        ; b = shift_value b
-        ; bulletproof_challenges =
-            Vector.of_array_and_length_exn new_bulletproof_challenges
-              Tick.Rounds.n
-        ; combined_inner_product =
-            shift_value
-              As_field.(
-                combined_inner_product (* Note: We do not pad here. *)
-                  ~actual_proofs_verified:
-                    (Nat.Add.create actual_proofs_verified)
-                  { evals = proof.proof.openings.evals; public_input = x_hat }
-                  ~r ~xi ~zeta ~zetaw
-                  ~old_bulletproof_challenges:prev_challenges ~env:tick_env
-                  ~domain:tick_domain ~ft_eval1:proof.proof.openings.ft_eval1
-                  ~plonk:tick_plonk_minimal)
-        ; branch_data =
-            { proofs_verified =
-                ( match actual_proofs_verified with
-                | Z ->
-                    Branch_data.Proofs_verified.N0
-                | S Z ->
-                    N1
-                | S (S Z) ->
-                    N2
-                | S _ ->
-                    assert false )
-            ; domain_log2 =
-                Branch_data.Domain_log2.of_int_exn
-                  step_vk.domain.log_size_of_group
-            }
-        ; plonk =
-            { plonk with
-              zeta = plonk0.zeta
-            ; alpha = plonk0.alpha
-            ; beta = chal plonk0.beta
-            ; gamma = chal plonk0.gamma
-            ; joint_combiner = Opt.of_option plonk0.joint_combiner
-            }
-        }
-    ; x_hat_evals = x_hat
-    ; sponge_digest_before_evaluations = O.digest_before_evaluations o
-    }
+    let res =
+      { deferred_values =
+          { Types.Wrap.Proof_state.Deferred_values.xi
+          ; b = shift_value b
+          ; bulletproof_challenges =
+              Vector.of_array_and_length_exn new_bulletproof_challenges
+                Tick.Rounds.n
+          ; combined_inner_product =
+              shift_value
+                As_field.(
+                  combined_inner_product (* Note: We do not pad here. *)
+                    ~actual_proofs_verified:
+                      (Nat.Add.create actual_proofs_verified)
+                    { evals = proof.proof.openings.evals; public_input = x_hat }
+                    ~r ~xi ~zeta ~zetaw
+                    ~old_bulletproof_challenges:prev_challenges ~env:tick_env
+                    ~domain:tick_domain ~ft_eval1:proof.proof.openings.ft_eval1
+                    ~plonk:tick_plonk_minimal)
+          ; branch_data =
+              { proofs_verified =
+                  ( match actual_proofs_verified with
+                  | Z ->
+                      Branch_data.Proofs_verified.N0
+                  | S Z ->
+                      N1
+                  | S (S Z) ->
+                      N2
+                  | S _ ->
+                      assert false )
+              ; domain_log2 =
+                  Branch_data.Domain_log2.of_int_exn
+                    step_vk.domain.log_size_of_group
+              }
+          ; plonk =
+              { plonk with
+                zeta = plonk0.zeta
+              ; alpha = plonk0.alpha
+              ; beta = chal plonk0.beta
+              ; gamma = chal plonk0.gamma
+              ; joint_combiner = Opt.of_option plonk0.joint_combiner
+              }
+          }
+      ; x_hat_evals = x_hat
+      ; sponge_digest_before_evaluations = O.digest_before_evaluations o
+      }
+    in
+    let time_8 = Time.now () in
+    printf
+      !"wrap#deferred_values took %f ms:\n\
+       \           1   %f (oracle creation)\n\
+       \           2   %f\n\
+       \           3   %f\n\
+       \           4   %f\n\
+       \           5   %f\n\
+       \           6   %f\n\
+       \           7   %f\n\
+       \           8   %f\n\n\
+        %!"
+      (Time.Span.to_ms (Time.diff time_8 time_0))
+      (Time.Span.to_ms (Time.diff time_1 time_0))
+      (Time.Span.to_ms (Time.diff time_2 time_1))
+      (Time.Span.to_ms (Time.diff time_3 time_2))
+      (Time.Span.to_ms (Time.diff time_4 time_3))
+      (Time.Span.to_ms (Time.diff time_5 time_4))
+      (Time.Span.to_ms (Time.diff time_6 time_5))
+      (Time.Span.to_ms (Time.diff time_7 time_6))
+      (Time.Span.to_ms (Time.diff time_8 time_7)) ;
+    res
 end
 
 include For_tests_only
@@ -312,6 +345,7 @@ let wrap
         Vector.t )
       P.Base.Step.t ) =
   let logger = Context_logger.get () in
+  let time_0 = Time.now () in
   [%log internal] "Pickles_wrap_proof" ;
   let messages_for_next_wrap_proof =
     let module M =
@@ -363,6 +397,7 @@ let wrap
           (M.f messages_for_next_wrap_proof) )
     }
   in
+  let time_1 = Time.now () in
   let handler (Snarky_backendless.Request.With { request; respond }) =
     let open Req in
     let k x = respond (Provide x) in
@@ -462,11 +497,13 @@ let wrap
          (M.f messages_for_next_wrap_proof) )
       lte
   in
+  let time_2 = Time.now () in
   [%log internal] "Wrap_compute_deferred_values" ;
   let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
     deferred_values ~sgs ~prev_challenges ~step_vk ~public_input ~proof
       ~actual_proofs_verified ~actual_feature_flags
   in
+  let time_3 = Time.now () in
   [%log internal] "Wrap_compute_deferred_values_done" ;
   let next_statement : _ Types.Wrap.Statement.In_circuit.t =
     let messages_for_next_wrap_proof :
@@ -488,6 +525,7 @@ let wrap
         prev_statement.proof_state.messages_for_next_step_proof
     }
   in
+  let time_4 = Time.now () in
   let next_statement =
     match tweak_statement with
     | None ->
@@ -502,10 +540,12 @@ let wrap
         *)
         f next_statement
   in
+  let time_5 = Time.now () in
   let messages_for_next_wrap_proof_prepared =
     P.Base.Messages_for_next_proof_over_same_field.Wrap.prepare
       next_statement.proof_state.messages_for_next_wrap_proof
   in
+  let time_6 = Time.now () in
   let next_accumulator =
     Vector.map2
       (Vector.extend_front_exn
@@ -519,6 +559,7 @@ let wrap
         } )
     |> Wrap_hack.pad_accumulator
   in
+  let time_7 = Time.now () in
   let%map.Promise next_proof =
     let (T (input, conv, _conv_inv)) = Impls.Wrap.input ~feature_flags () in
     Common.time "wrap proof" (fun () ->
@@ -580,6 +621,28 @@ let wrap
               }
           } )
   in
+  let time_8 = Time.now () in
+  printf
+    !"wrap took %f ms:\n\
+     \           1   %f\n\
+     \           2   %f\n\
+     \           3   %f (deferred values)\n\
+     \           4   %f\n\
+     \           5   %f\n\
+     \           6   %f\n\
+     \           7   %f\n\
+     \           8   %f\n\n\
+      %!"
+    (Time.Span.to_ms (Time.diff time_8 time_0))
+    (Time.Span.to_ms (Time.diff time_1 time_0))
+    (Time.Span.to_ms (Time.diff time_2 time_1))
+    (Time.Span.to_ms (Time.diff time_3 time_2))
+    (Time.Span.to_ms (Time.diff time_4 time_3))
+    (Time.Span.to_ms (Time.diff time_5 time_4))
+    (Time.Span.to_ms (Time.diff time_6 time_5))
+    (Time.Span.to_ms (Time.diff time_7 time_6))
+    (Time.Span.to_ms (Time.diff time_8 time_7)) ;
+
   [%log internal] "Pickles_wrap_proof_done" ;
   ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof.proof
     ; statement =
