@@ -69,7 +69,6 @@ function export_suffixes () {
         ;;
     esac
 }
-    
 
 function export_docker_tag() {
     export_suffixes
