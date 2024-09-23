@@ -10,7 +10,6 @@ set -x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-
 VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'itn-orchestrator')
 
 function usage() {
