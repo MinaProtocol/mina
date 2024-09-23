@@ -22,16 +22,16 @@ function download-docker {
 function try_docker_shas {
     DOCKER_SHAS=$1
     GOT_DOCKER=0
-
+    set -x
     for sha in $DOCKER_SHAS; do
-	download-docker $sha
-	if [ $? -eq 0 ] ; then
-	    GOT_DOCKER=1
-	    image_tag $sha
-	    break
-	else
-	    echo "No docker available for SHA=$sha"
-	fi
+        download-docker $sha
+        if [ $? -eq 0 ] ; then
+            GOT_DOCKER=1
+            image_tag $sha
+            break
+        else
+            echo "No docker available for SHA=$sha"
+        fi
     done
 }
 
