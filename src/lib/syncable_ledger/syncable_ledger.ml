@@ -24,14 +24,6 @@ module Query = struct
             (** How many accounts are there? Used to size data structure and
             figure out what part of the tree is filled in. *)
       [@@deriving sexp, yojson, hash, compare]
-
-      let to_latest = function
-        | What_child_hashes addr ->
-            What_child_hashes addr
-        | What_contents addr ->
-            What_contents addr
-        | Num_accounts ->
-            Num_accounts
     end
   end]
 end
