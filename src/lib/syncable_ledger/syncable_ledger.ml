@@ -491,31 +491,34 @@ end = struct
          'a t
       -> Addr.t
       -> Hash.t list
-      -> [ `Good of (Addr.t * Hash.t) list | `Hash_mismatch of Hash.t * Hash.t ]
-      =
+      -> [ `Good of (Addr.t * Hash.t) list
+         | `Hash_mismatch of Hash.t * Hash.t
+         | `Non_power ] =
    fun t addr nodes ->
     (* let prefix_depth = Addr.depth addr in *)
-    let ledger_depth = MT.depth t.tree in
-    let expected =
-      Option.value_exn ~message:"Forgot to wait for a node"
-        (Addr.Table.find t.waiting_parents addr)
-    in
-    let merged = merge_many nodes (ledger_depth - Addr.depth addr) in
-    if Hash.equal expected merged then (
-      Addr.Table.remove t.waiting_parents addr ;
-      let addresses = intermediate_range ledger_depth addr subtree_depth in
-      let addresses_and_hashes = List.(zip_exn addresses nodes) in
+    if Int.is_pow2 (List.length nodes) then
+      let ledger_depth = MT.depth t.tree in
+      let expected =
+        Option.value_exn ~message:"Forgot to wait for a node"
+          (Addr.Table.find t.waiting_parents addr)
+      in
+      let merged = merge_many nodes (ledger_depth - Addr.depth addr) in
+      if Hash.equal expected merged then (
+        Addr.Table.remove t.waiting_parents addr ;
+        let addresses = intermediate_range ledger_depth addr subtree_depth in
+        let addresses_and_hashes = List.(zip_exn addresses nodes) in
 
-      (* Filter to fetch only those that differ *)
-      let should_fetch_children addr hash =
-        not @@ Hash.equal (MT.get_inner_hash_at_addr_exn t.tree addr) hash
-      in
-      let subtrees_to_fetch =
-        addresses_and_hashes
-        |> List.filter ~f:(Tuple2.uncurry should_fetch_children)
-      in
-      `Good subtrees_to_fetch )
-    else `Hash_mismatch (expected, merged)
+        (* Filter to fetch only those that differ *)
+        let should_fetch_children addr hash =
+          not @@ Hash.equal (MT.get_inner_hash_at_addr_exn t.tree addr) hash
+        in
+        let subtrees_to_fetch =
+          addresses_and_hashes
+          |> List.filter ~f:(Tuple2.uncurry should_fetch_children)
+        in
+        `Good subtrees_to_fetch )
+      else `Hash_mismatch (expected, merged)
+    else `Non_power
 
   (** Given an address and the hashes of the children of the corresponding node,
       check the children hash to the expected value. If they do, queue the
@@ -723,6 +726,16 @@ end = struct
                           , [ ("actualmerge", Hash.to_yojson actual)
                             ; ("expectedmerge", Hash.to_yojson expected)
                             ] ) )
+                  in
+                  requeue_query ()
+              | `Non_power ->
+                  let%map () =
+                    record_envelope_sender t.trust_system t.logger sender
+                      ( Actions.Sent_bad_hash
+                      , Some
+                          ( "hashes sent for subtree on address $address are \
+                             not a power of 2"
+                          , [] ) )
                   in
                   requeue_query ()
               | `Good children_to_verify ->
