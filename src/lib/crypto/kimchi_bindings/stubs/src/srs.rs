@@ -74,6 +74,18 @@ macro_rules! impl_srs {
 
             #[ocaml_gen::func]
             #[ocaml::func]
+            /// This is same as _lagrange_commitments, but returns the result for every
+            /// i <= domain_size.
+            pub fn [<$name:snake _lagrange_commitments_whole_domain>](
+                srs: $name,
+                domain_size: ocaml::Int,
+            ) -> Result<Vec<CamlPolyComm<$CamlG>>, ocaml::Error> {
+                Ok(srs.get_lagrange_basis_from_domain_size(domain_size as usize).clone().into_iter().map(|x| x.into()).collect())
+            }
+
+
+            #[ocaml_gen::func]
+            #[ocaml::func]
             pub fn [<$name:snake _lagrange_commitment>](
                 srs: $name,
                 domain_size: ocaml::Int,
