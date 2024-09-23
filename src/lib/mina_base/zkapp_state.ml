@@ -44,7 +44,7 @@ let _type_equal :
     Type_equal.t =
   Type_equal.T
 
-let typ t = Vector.typ t Max_state_size.V2.n
+let typ t = Vector.typ t Max_state_size.V1.n
 
 open Core_kernel
 
@@ -53,26 +53,42 @@ module Value = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t = Zkapp_basic.F.Stable.V1.t V.Stable.V2.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
+
+      let to_input (t : _ V.Stable.V1.t) ~f =
+        Vector.(reduce_exn (map t ~f) ~f:Random_oracle_input.Chunked.append)
+
+      let deriver inner obj =
+        let open Fields_derivers_zkapps.Derivers in
+        iso ~map:V.Stable.V2.of_list_exn ~contramap:V.to_list
+          (( list ~static_length:(Nat.to_int Max_state_size.V2.n)
+           @@ inner @@ o () )
+             (o ()) )
+          obj
+    end
+
+    module V1 = struct
+      type t = Zkapp_basic.F.Stable.V1.t V.Stable.V1.t
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+
+      let (_ : (t, t) Type_equal.t) = Type_equal.T
+
+      let to_input (t : _ V.Stable.V1.t) ~f =
+        Vector.(reduce_exn (map t ~f) ~f:Random_oracle_input.Chunked.append)
+
+      let deriver inner obj =
+        let open Fields_derivers_zkapps.Derivers in
+        iso ~map:V.Stable.V1.of_list_exn ~contramap:V.to_list
+          (( list ~static_length:(Nat.to_int Max_state_size.V1.n)
+           @@ inner @@ o () )
+             (o ()) )
+          obj
     end
   end]
-
-  type t = Zkapp_basic.F.t V.Stable.V2.t
-  [@@deriving sexp, equal, yojson, hash, compare]
-
-  let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 end
-
-let to_input (t : _ V.Stable.V2.t) ~f =
-  Vector.(reduce_exn (map t ~f) ~f:Random_oracle_input.Chunked.append)
-
-let deriver inner obj =
-  let open Fields_derivers_zkapps.Derivers in
-  iso ~map:V.Stable.V2.of_list_exn ~contramap:V.to_list
-    ((list ~static_length:(Nat.to_int Max_state_size.V2.n) @@ inner @@ o ())
-       (o ()) )
-    obj
