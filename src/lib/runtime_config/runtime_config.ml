@@ -274,6 +274,8 @@ module type Config_loader = sig
     -> constants Deferred.t
 
   val of_json_layout : Json_layout.t -> (t, string) Result.t
+
+  val merge_json : Yojson.Safe.t -> Yojson.Safe.t -> (Yojson.Safe.t,string) result
 end
 
 module Config_loader : Config_loader = struct
@@ -497,6 +499,90 @@ module Config_loader : Config_loader = struct
       { genesis_constants; constraint_constants; proof_level; compile_config }
   end
 
+  (* right-biased merging of json values *)
+  let rec merge_json (a : Yojson.Safe.t) (b : Yojson.Safe.t) : (Yojson.Safe.t,string) result =
+    let module T = Monad_lib.Make_ext2(Result) in
+    let open Result.Let_syntax in
+    match (a, b) with
+    | (`Assoc obj_a, `Assoc obj_b) ->
+        Result.map ~f:(fun kvs -> `Assoc (List.rev kvs)) @@ 
+          T.fold_m ~f:(fun acc (key, value) ->
+              let%bind merged_value =
+                match List.find ~f:(fun (key',_) -> String.equal key key') obj_a with
+                | Some (_,value') -> merge_json value' value
+                | None -> Result.return value
+              in Result.return @@ (key, merged_value) :: 
+                (List.filter ~f:(fun (x,_) -> String.(key <> x)) acc)
+            ) ~init:obj_a obj_b
+    | (`List _, `List _) -> Result.return b
+    | (`Bool _, `Bool _) -> Result.return b
+    | (`Int _, `Int _) -> Result.return b
+    | (`Float _, `Float _) -> Result.return b
+    | (`String _, `String _) -> Result.return b
+    (*Null values overwrites anything*)
+    | (_, `Null) -> Result.return `Null
+    (*Anything overwrites a Null value*)
+    | (`Null, _) -> Result.return b
+    | (a,b) -> Error (sprintf "Cannot merge %s and %s" (Yojson.Safe.to_string a) (Yojson.Safe.to_string b))
+
+  let%test_module _ = (module struct
+      let assert_equal a b =
+        if not (Yojson.Safe.equal a b) then
+          failwithf "Expected %s but got %s" (Yojson.Safe.pretty_to_string a) (Yojson.Safe.pretty_to_string b) () 
+  
+      let%test_unit "simple object union" =
+        let json1 = `Assoc [("a", `Int 1); ("b", `Int 2)] in
+        let json2 = `Assoc [("c", `Int 3); ("d", `Int 4)] in
+        let expected = `Assoc [("a", `Int 1); ("b", `Int 2); ("c", `Int 3); ("d", `Int 4)] in
+        assert_equal (merge_json json1 json2 |> Result.ok_or_failwith) expected
+
+      let%test_unit "simple object overwrite" =
+          let json1 = `Assoc [("a", `Int 1)] in
+          let json2 = `Assoc [("a", `Int 2)] in
+          let expected = `Assoc [("a", `Int 2)] in
+          assert_equal (merge_json json1 json2 |> Result.ok_or_failwith) expected
+  
+      let%test_unit "nested object union" =
+        let json1 = `Assoc [("a", `Assoc [("b", `Int 1)])] in
+        let json2 = `Assoc [("a", `Assoc [("c", `Int 2)])] in
+        let expected = `Assoc [("a", `Assoc [("b", `Int 1); ("c", `Int 2)])] in
+        assert_equal (merge_json json1 json2 |> Result.ok_or_failwith) expected
+
+      let%test_unit "nested object overwrite" =
+        let json1 = `Assoc [("a", `Assoc [("b", `Int 1)])] in
+        let json2 = `Assoc [("a", `Assoc [("b", `Int 2)])] in
+        let expected = `Assoc [("a", `Assoc [("b", `Int 2)])] in
+        assert_equal (merge_json json1 json2 |> Result.ok_or_failwith) expected
+
+
+      let%test_unit "Null values get overridden" = 
+        let json1 = `Assoc [("a", `Int 1); ("b", `Null)] in
+        let json1' = `Assoc [("a", `Int 1)] in
+        let json2 = `Assoc [("a", `Int 2); ("b", `Int 3)] in
+        let expected = `Assoc [("a", `Int 2); ("b", `Int 3)] in
+        let result = merge_json json1 json2 |> Result.ok_or_failwith in
+        let result' = merge_json json1' json2 |> Result.ok_or_failwith in
+        assert_equal expected result;
+        assert_equal expected result'
+
+    end)
+
+  let load_json_files (files : string Mina_stdlib.Nonempty_list.t) : Yojson.Safe.t Deferred.t =
+    let module T = Monad_lib.Make_ext(Deferred) in
+    let open Deferred.Let_syntax in
+    let read_json_file x = 
+      Reader.file_contents x |> Deferred.map ~f:Yojson.Safe.from_string
+    in
+    let (file,rest) = Mina_stdlib.Nonempty_list.uncons files in
+    let%bind init = read_json_file file in
+    let f acc filename = 
+        let%bind json = read_json_file filename in
+        match merge_json acc json with 
+        | Error e -> Deferred.Or_error.error_string e |> Deferred.Or_error.ok_exn
+        | Ok x -> Deferred.return x 
+    in T.fold_m ~f ~init rest
+
+
   let load_constants ?(cli_proof_level : Genesis_constants.Proof_level.t option)
       ~config_file () : constants Deferred.Or_error.t =
     let open Deferred.Or_error.Let_syntax in
@@ -528,8 +614,10 @@ module Config_loader : Config_loader = struct
   let load_constants_exn ?cli_proof_level ~config_file () =
     Deferred.Or_error.ok_exn @@ load_constants ?cli_proof_level ~config_file ()
 
+
   let load_config_json filename : Json_layout.t Deferred.Or_error.t =
     let open Deferred.Or_error.Let_syntax in
+    let module T = Monad_lib.Make_ext(Deferred.Or_error) in
     let%bind json =
       Monitor.try_with_or_error (fun () ->
           Deferred.map ~f:Yojson.Safe.from_string
