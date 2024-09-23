@@ -45,8 +45,8 @@ in  Pipeline.build
                   (     "./buildkite/scripts/lint-check-format.sh && "
                     ++  "./scripts/require-ppxs.py"
                   )
-            , label = "OCaml Lints; Check-format, Require-ppx-version"
-            , key = "check"
+            , label = "Lint: OCaml"
+            , key = "lint-ocaml-check"
             , target = Size.Large
             , docker = None Docker.Type
             }

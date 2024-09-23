@@ -20,7 +20,7 @@ in  { step =
                   RunInToolchain.runInToolchain
                     ([] : List Text)
                     "./buildkite/scripts/connect-to-testnet.sh ${testnet} ${wait_between_graphql_poll} ${wait_before_final_check}"
-              , label = "Connect to ${testnet}"
+              , label = "Connectivity: ${testnet}"
               , soft_fail = Some soft_fail
               , key = "connect-to-${testnet}"
               , target = Size.Large

@@ -36,7 +36,7 @@ in  Pipeline.build
                 RunInToolchain.runInToolchain
                   ([] : List Text)
                   "cd src/app/trace-tool ; PATH=/home/opam/.cargo/bin:\$PATH cargo check"
-            , label = "Rust lint steps; trace-tool"
+            , label = "Lint: rust"
             , key = "lint-trace-tool"
             , target = Size.Small
             , docker = None Docker.Type

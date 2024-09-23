@@ -67,8 +67,8 @@ in  Pipeline.build
                   }
                   "buildkite/scripts/rosetta-integration-tests-fast.sh"
               ]
-            , label = "Rosetta integration tests Bullseye"
-            , key = "rosetta-integration-tests-bullseye"
+            , label = "Test: Rosetta integration"
+            , key = "rosetta-integration-tests"
             , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Small
             , depends_on =

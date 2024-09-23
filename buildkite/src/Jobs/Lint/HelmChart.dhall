@@ -37,7 +37,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run "HELM_LINT=true buildkite/scripts/helm-ci.sh" ]
-            , label = "Helm chart lint steps"
+            , label = "Lint: helm"
             , key = "lint-helm-chart"
             , target = Size.Small
             , docker = None Docker.Type

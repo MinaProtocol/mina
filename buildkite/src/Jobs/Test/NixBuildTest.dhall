@@ -48,7 +48,7 @@ in  Pipeline.build
                   }
                   "./buildkite/scripts/test-nix.sh \$BUILDKITE_BRANCH"
               ]
-            , label = "nix build tests"
+            , label = "Test: Nix build"
             , key = "nix-build-tests"
             , target = Size.Small
             , docker = None Docker.Type

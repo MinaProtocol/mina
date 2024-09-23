@@ -34,7 +34,7 @@ in  Pipeline.build
               [ Cmd.run
                   "PSQL=\"docker exec replayer-postgres psql\" ./scripts/archive/emergency_hf/test/runner.sh "
               ]
-            , label = "Emergency HF test"
+            , label = "Test: Emergency HF"
             , key = "emergency-hf-test"
             , target = Size.Large
             }

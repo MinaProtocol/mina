@@ -62,7 +62,7 @@ in  Pipeline.build
                           "eval \\\$(opam config env) && dune runtest src/app/archive && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
                       ]
                   )
-            , label = "Archive node unit tests"
+            , label = "Test: Archive node unit"
             , key = command_key
             , target = Size.Large
             , docker = None Docker.Type

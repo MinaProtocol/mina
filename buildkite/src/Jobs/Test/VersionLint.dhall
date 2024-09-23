@@ -50,7 +50,7 @@ let buildTestCmd
                 # RunInToolchain.runInToolchain
                     ([] : List Text)
                     "buildkite/scripts/version-linter.sh ${release_branch}"
-            , label = "Versioned type linter for ${release_branch}"
+            , label = "Lint: Version Type Shapes ${release_branch}"
             , key = "version-linter-${release_branch}"
             , soft_fail = Some soft_fail
             , target = cmd_target
