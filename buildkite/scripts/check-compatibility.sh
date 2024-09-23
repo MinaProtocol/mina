@@ -26,7 +26,6 @@ function try_docker_shas {
 
         set +e
         download-docker $sha
-        set -e
 
         if [ $? -eq 0 ] ; then
             GOT_DOCKER=1
@@ -35,7 +34,13 @@ function try_docker_shas {
         else
             echo "No docker available for SHA=$sha"
         fi
+        set -e
     done
+
+    if [[ $GOT_DOCKER == 0 ]]; then
+        echo "docker cannot be found for given shas: $DOCKER_SHAS"
+        exit 1
+    fi
 }
 
 function image_id {
