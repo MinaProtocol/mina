@@ -33,15 +33,15 @@ module Answer = struct
   module Stable = struct
     module V2 = struct
       type ('hash, 'account) t =
-        | Child_hashes_are of 'hash * 'hash
-            (** The requested address's children have these hashes **)
+        | Child_hashes_are of 'hash list
+            (** The requested address's children have these hashes.
+            May be any power of 2 number of children, and not necessarily 
+            immediate children  *)
         | Contents_are of 'account list
             (** The requested address has these accounts *)
         | Num_accounts of int * 'hash
             (** There are this many accounts and the smallest subtree that
                 contains all non-empty nodes has this hash. *)
-        | Subtree of 'hash list
-            (** The subtree rooted on the requested address has these leaves *)
       [@@deriving sexp, yojson]
     end
 
@@ -58,7 +58,7 @@ module Answer = struct
 
       let to_latest acct_to_latest = function
         | Child_hashes_are (h1, h2) ->
-            V2.Child_hashes_are (h1, h2)
+            V2.Child_hashes_are [ h1; h2 ]
         | Contents_are accts ->
             V2.Contents_are (List.map ~f:acct_to_latest accts)
         | Num_accounts (i, h) ->
@@ -358,7 +358,7 @@ end = struct
             let addresses = intermediate_range ledger_depth a subtree_depth in
             let get_hash a = MT.get_inner_hash_at_addr_exn mt a in
             let hashes = List.map addresses ~f:get_hash in
-            Either.First (Subtree hashes)
+            Either.First (Child_hashes_are hashes)
       in
 
       match response_or_punish with
@@ -673,28 +673,6 @@ end = struct
         in
         let%bind _ =
           match (query, answer) with
-          | Query.What_child_hashes addr, Answer.Child_hashes_are (lh, rh) -> (
-              match add_child_hashes_to t addr lh rh with
-              | `Hash_mismatch (expected, actual) ->
-                  let%map () =
-                    record_envelope_sender t.trust_system t.logger sender
-                      ( Actions.Sent_bad_hash
-                      , Some
-                          ( "sent child hashes $lhash and $rhash for address \
-                             $addr, they merge hash to $actualmerge but we \
-                             expected $expectedmerge"
-                          , [ ("lhash", Hash.to_yojson lh)
-                            ; ("rhash", Hash.to_yojson rh)
-                            ; ("actualmerge", Hash.to_yojson actual)
-                            ; ("expectedmerge", Hash.to_yojson expected)
-                            ] ) )
-                  in
-                  requeue_query ()
-              | `Good children_to_verify ->
-                  (* TODO #312: Make sure we don't write too much *)
-                  List.iter children_to_verify ~f:(fun (addr, hash) ->
-                      handle_node t addr hash ) ;
-                  credit_fulfilled_request () )
           | Query.What_contents addr, Answer.Contents_are leaves -> (
               match add_content t addr leaves with
               | `Success ->
@@ -733,7 +711,7 @@ end = struct
                             ] ) )
                   in
                   requeue_query () )
-          | Query.What_child_hashes address, Answer.Subtree hashes -> (
+          | Query.What_child_hashes address, Answer.Child_hashes_are hashes -> (
               match add_subtree t address hashes with
               | `Hash_mismatch (expected, actual) ->
                   let%map () =
