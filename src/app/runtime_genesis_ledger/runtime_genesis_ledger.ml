@@ -90,7 +90,7 @@ let main ~config_file ~genesis_dir ~hash_output_file () =
     , Option.map ~f:extract_accounts_exn staking_ledger
     , Option.map ~f:extract_accounts_exn next_ledger )
   in
-  let constraint_constants = config.constraint_config.constraint_constants in
+  let constraint_constants = config.proof.constraint_constants in
   let ledger = load_ledger ~constraint_constants accounts in
   let staking_ledger : Ledger.t =
     Option.value_map ~default:ledger

@@ -619,7 +619,7 @@ let setup_daemon logger ~itn_features =
             @@ Genesis_ledger_helper.Config_initializer.initialize ?genesis_dir
                  ~logger conf
           in
-          let compile_config = config.compile_config in
+          let compile_config = config.daemon.compile_config in
           let rest_server_port =
             Option.value ~default:rest_server_port.default
               rest_server_port.value
@@ -917,6 +917,9 @@ let setup_daemon logger ~itn_features =
               Internal_tracing.toggle ~commit_id:Mina_version.commit_id ~logger
                 `Enabled
             else Deferred.unit
+          in
+          let seed_peer_list_url =
+            Option.first_some seed_peer_list_url config.daemon.peer_list_url
           in
           if is_seed then [%log info] "Starting node as a seed node"
           else if demo_mode then [%log info] "Starting node in demo mode"
@@ -1372,10 +1375,10 @@ let internal_commands logger ~itn_features =
           let logger = Logger.create () in
           let open Deferred.Let_syntax in
           let%bind config =
-            Runtime_config.Config_loader.load_config_exn ~config_file ()
+            Runtime_config.Config_loader.load_constants_exn ~config_file ()
           in
           let { Runtime_config.Constraint.constraint_constants; proof_level } =
-            config.constraint_config
+            config.proof
           in
           Parallel.init_master () ;
           match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
@@ -1402,10 +1405,10 @@ let internal_commands logger ~itn_features =
           let open Deferred.Let_syntax in
           let logger = Logger.create () in
           let%bind config =
-            Runtime_config.Config_loader.load_config_exn ~config_file ()
+            Runtime_config.Config_loader.load_constants_exn ~config_file ()
           in
           let { Runtime_config.Constraint.constraint_constants; proof_level } =
-            config.constraint_config
+            config.proof
           in
           Parallel.init_master () ;
           match%bind
@@ -1455,10 +1458,10 @@ let internal_commands logger ~itn_features =
           let open Async in
           let logger = Logger.create () in
           let%bind config =
-            Runtime_config.Config_loader.load_config_exn ~config_file ()
+            Runtime_config.Config_loader.load_constants_exn ~config_file ()
           in
           let { Runtime_config.Constraint.constraint_constants; proof_level } =
-            config.constraint_config
+            config.proof
           in
           Parallel.init_master () ;
           let%bind conf_dir = Unix.mkdtemp "/tmp/mina-verifier" in

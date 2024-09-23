@@ -47,7 +47,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let node = List.hd_exn block_producer_nodes in
     let constraint_constants =
-      (Network.network_config network).constraint_config.constraint_constants
+      (Network.network_config network).proof.constraint_constants
     in
     let block_window_duration_ms =
       constraint_constants.block_window_duration_ms

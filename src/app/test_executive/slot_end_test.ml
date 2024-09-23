@@ -104,7 +104,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           return ([%log info] "sender: %s" (pk_to_string pk)) )
     in
     let window_ms =
-      (Network.network_config network).constraint_config.constraint_constants
+      (Network.network_config network).proof.constraint_constants
         .block_window_duration_ms
     in
     let all_nodes = Network.all_mina_nodes network in

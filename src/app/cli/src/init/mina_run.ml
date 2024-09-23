@@ -212,7 +212,9 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
 let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ?limited_graphql_port ?itn_graphql_port ?auth_keys
     ?(open_limited_graphql_port = false) ?(insecure_rest_server = false) mina =
-  let compile_config = (Mina_lib.config mina).runtime_config.compile_config in
+  let compile_config =
+    (Mina_lib.config mina).runtime_config.daemon.compile_config
+  in
   let client_trustlist =
     ref
       (Unix.Cidr.Set.of_list

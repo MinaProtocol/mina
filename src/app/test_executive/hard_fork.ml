@@ -218,9 +218,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let logger = Logger.create () in
     let fork_constants : Genesis_constants.Fork_constants.t =
       Option.value_exn
-        (Engine.Network.network_config network).constraint_config
-          .constraint_constants
-          .fork
+        (Engine.Network.network_config network).proof.constraint_constants.fork
     in
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
@@ -311,7 +309,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         List.init 3 ~f:(fun _ -> Signature_lib.Keypair.create ())
       in
       let constraint_constants =
-        (Network.network_config network).constraint_config.constraint_constants
+        (Network.network_config network).proof.constraint_constants
       in
       let amount = Currency.Amount.of_mina_int_exn 10 in
       let nonce = Account.Nonce.zero in
@@ -374,7 +372,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       let constraint_constants =
-        (Network.network_config network).constraint_config.constraint_constants
+        (Network.network_config network).proof.constraint_constants
       in
       let%bind vk_proof =
         Malleable_error.lift

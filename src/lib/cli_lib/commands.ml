@@ -235,8 +235,8 @@ module Vrf = struct
       @@ fun () ->
       let env = Secrets.Keypair.env in
       let open Deferred.Let_syntax in
-      let%bind { constraint_config = { constraint_constants; _ }; _ } =
-        Runtime_config.Config_loader.load_config_exn ~config_file ()
+      let%bind { proof = { constraint_constants; _ }; _ } =
+        Runtime_config.Config_loader.load_constants_exn ~config_file ()
       in
       if Option.is_some (Sys.getenv env) then
         eprintf "Using password from environment variable %s\n" env ;
@@ -305,8 +305,8 @@ module Vrf = struct
       if Option.is_some (Sys.getenv env) then
         eprintf "Using password from environment variable %s\n" env ;
       let open Deferred.Let_syntax in
-      let%bind { constraint_config = { constraint_constants; _ }; _ } =
-        Runtime_config.Config_loader.load_config_exn ~config_file ()
+      let%bind { proof = { constraint_constants; _ }; _ } =
+        Runtime_config.Config_loader.load_constants_exn ~config_file ()
       in
       let%bind () =
         let password =
@@ -367,8 +367,8 @@ module Vrf = struct
       Exceptions.handle_nicely
       @@ fun () ->
       let open Deferred.Let_syntax in
-      let%bind { constraint_config = { constraint_constants; _ }; _ } =
-        Runtime_config.Config_loader.load_config_exn ~config_file ()
+      let%bind { proof = { constraint_constants; _ }; _ } =
+        Runtime_config.Config_loader.load_constants_exn ~config_file ()
       in
       (* TODO-someday: constraint constants from config file. *)
       let lexbuf = Lexing.from_channel In_channel.stdin in

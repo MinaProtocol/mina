@@ -57,7 +57,7 @@ module Constraint_constants = struct
       ; account_creation_fee_int : string
       ; ledger_depth : int
       ; sub_windows_per_window : int
-      ; fork : Fork_constants.t option
+      ; fork : Fork_constants.Inputs.t option
       }
     [@@deriving yojson]
   end
@@ -138,7 +138,7 @@ module Constraint_constants = struct
     ; supercharged_coinbase_factor
     ; account_creation_fee =
         Currency.Fee.of_mina_string_exn inputs.account_creation_fee_int
-    ; fork = inputs.fork
+    ; fork = Option.map ~f:Fork_constants.make inputs.fork
     }
 
   let to_snark_keys_header (t : t) : Snark_keys_header.Constraint_constants.t =

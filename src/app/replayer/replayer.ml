@@ -640,10 +640,10 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         () ) ;
   let logger = Logger.create () in
   let%bind config =
-    Runtime_config.Config_loader.load_config_exn ~config_file ()
+    Runtime_config.Config_loader.load_constants_exn ~config_file ()
   in
   let { Runtime_config.Constraint.constraint_constants; proof_level } =
-    config.constraint_config
+    config.proof
   in
   let json = Yojson.Safe.from_file input_file in
   let input =

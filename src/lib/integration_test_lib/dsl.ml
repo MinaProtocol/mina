@@ -111,8 +111,7 @@ module Make (Engine : Intf.Engine.S) () :
       (Engine.Network.network_config t.network).genesis_constants
     in
     let constraint_constants =
-      (Engine.Network.network_config t.network).constraint_config
-        .constraint_constants
+      (Engine.Network.network_config t.network).proof.constraint_constants
     in
     let soft_timeout =
       Network_time_span.to_span ~genesis_constants ~constraint_constants

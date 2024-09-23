@@ -114,7 +114,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind whale1_pk = pub_key_of_node whale1 in
     let%bind whale1_sk = priv_key_of_node whale1 in
     let constraint_constants =
-      (Network.network_config network).constraint_config.constraint_constants
+      (Network.network_config network).proof.constraint_constants
     in
     let (whale1_kp : Keypair.t) =
       { public_key = whale1_pk |> Public_key.decompress_exn

@@ -126,7 +126,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     (*Start sending padding transactions to get snarked ledger sooner*)
     let constraint_constants =
-      (Network.network_config network).constraint_config.constraint_constants
+      (Network.network_config network).proof.constraint_constants
     in
     let%bind () =
       let fee = Currency.Fee.of_nanomina_int_exn 3_000_000 in

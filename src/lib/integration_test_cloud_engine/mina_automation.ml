@@ -223,7 +223,7 @@ module Network_config = struct
           } =
         test_config
       in
-      { Runtime_config.compile_config
+      { Runtime_config.daemon = { compile_config; peer_list_url = None }
       ; genesis_constants =
           { genesis_constants with
             protocol =
@@ -235,8 +235,7 @@ module Network_config = struct
                     |> of_time)
               }
           }
-      ; constraint_config =
-          { Runtime_config.Constraint.constraint_constants; proof_level }
+      ; proof = { Runtime_config.Constraint.constraint_constants; proof_level }
       ; ledger =
           { base =
               Accounts
@@ -460,7 +459,7 @@ module Network_config = struct
         ; snark_coordinator_config
         ; snark_worker_fee =
             Currency.Fee.to_mina_string
-              runtime_config.compile_config.default_snark_worker_fee
+              runtime_config.daemon.compile_config.default_snark_worker_fee
         ; aws_route53_zone_id
         ; cpu_request = 6
         ; mem_request = "12Gi"

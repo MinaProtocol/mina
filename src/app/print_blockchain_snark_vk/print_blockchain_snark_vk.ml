@@ -12,10 +12,10 @@ let () =
       in
       let open Async.Deferred.Let_syntax in
       let%bind config =
-        Runtime_config.Config_loader.load_config_exn ~config_file ()
+        Runtime_config.Config_loader.load_constants_exn ~config_file ()
       in
       let { Runtime_config.Constraint.constraint_constants; _ } =
-        config.constraint_config
+        config.proof
       in
       let () = Format.eprintf "Generating transaction snark circuit..@." in
       let module Transaction_snark_instance = Transaction_snark.Make (struct

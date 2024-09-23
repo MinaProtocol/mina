@@ -44,7 +44,10 @@ let%test_module "Epoch ledger sync tests" =
     let make_context () : (module CONTEXT) Deferred.t =
       let%bind precomputed_values =
         let runtime_config : Runtime_config.Json_layout.t =
-          { daemon = Mina_compile_config.For_unit_tests.inputs
+          { daemon =
+              { compile_config = Mina_compile_config.For_unit_tests.inputs
+              ; peer_list_url = None
+              }
           ; genesis = Genesis_constants.For_unit_tests.inputs
           ; proof =
               { constraint_constants =

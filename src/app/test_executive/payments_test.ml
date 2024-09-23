@@ -414,7 +414,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (pubk |> Signature_lib.Public_key.compress)
         Token_id.default
     in
-    let compile_config = (Network.network_config network).compile_config in
+    let compile_config =
+      (Network.network_config network).daemon.compile_config
+    in
     let%bind () =
       section_hard
         "check account balances.  snark-node-key1 should be greater than or \

@@ -669,7 +669,7 @@ module Genesis_proof = struct
       ~blockchain_proof_system_id =
     let consensus_constants =
       Consensus.Constants.create
-        ~constraint_constants:config.constraint_config.constraint_constants
+        ~constraint_constants:config.proof.constraint_constants
         ~protocol_constants:config.genesis_constants.protocol
     in
     let open Staged_ledger_diff in
@@ -677,13 +677,13 @@ module Genesis_proof = struct
       Mina_state.Genesis_protocol_state.t
         ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
         ~genesis_epoch_data
-        ~constraint_constants:config.constraint_config.constraint_constants
+        ~constraint_constants:config.proof.constraint_constants
         ~consensus_constants ~genesis_body_reference
     in
     { Genesis_proof.Inputs.constraint_constants =
-        config.constraint_config.constraint_constants
-    ; proof_level = config.constraint_config.proof_level
-    ; compile_config = config.compile_config
+        config.proof.constraint_constants
+    ; proof_level = config.proof.proof_level
+    ; compile_config = config.daemon.compile_config
     ; blockchain_proof_system_id
     ; genesis_ledger = ledger
     ; genesis_epoch_data
@@ -775,7 +775,7 @@ module Config_initializer : Config_initializer_intf = struct
       (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
     let open Deferred.Or_error.Let_syntax in
     let { Runtime_config.Constraint.constraint_constants; proof_level } =
-      config.constraint_config
+      config.proof
     in
     let%bind genesis_ledger, runtime_ledger =
       let%bind genesis_ledger, runtime_ledger, ledger_file =

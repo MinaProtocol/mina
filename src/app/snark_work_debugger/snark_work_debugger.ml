@@ -41,10 +41,10 @@ let cmd =
       fun () ->
         let open Deferred.Let_syntax in
         let%bind config =
-          Runtime_config.Config_loader.load_config_exn ~config_file ()
+          Runtime_config.Config_loader.load_constants_exn ~config_file ()
         in
         let { Runtime_config.Constraint.constraint_constants; proof_level } =
-          config.constraint_config
+          config.proof
         in
         Obj.magic (main path ~constraint_constants ~proof_level))
 

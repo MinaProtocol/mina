@@ -1,3 +1,1 @@
-val network : string
-
-val block_window_duration : int
+include Node_config_intf.S

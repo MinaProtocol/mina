@@ -21,9 +21,8 @@ let command =
      fun () ->
        let open Async in
        let open Deferred.Let_syntax in
-       let%bind { constraint_config = { constraint_constants; proof_level }; _ }
-           =
-         Runtime_config.Config_loader.load_config_exn ~cli_proof_level
+       let%bind { proof = { constraint_constants; proof_level }; _ } =
+         Runtime_config.Config_loader.load_constants_exn ~cli_proof_level
            ~config_file ()
        in
        let%bind worker_state =

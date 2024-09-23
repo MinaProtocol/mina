@@ -143,7 +143,7 @@ module Network_config = struct
                -> String.equal name1 name2 )
     in
     let runtime_config =
-      { Runtime_config.compile_config
+      { Runtime_config.daemon = { compile_config; peer_list_url = None }
       ; genesis_constants =
           { genesis_constants with
             protocol =
@@ -155,8 +155,7 @@ module Network_config = struct
                     |> of_time)
               }
           }
-      ; constraint_config =
-          { Runtime_config.Constraint.constraint_constants; proof_level }
+      ; proof = { Runtime_config.Constraint.constraint_constants; proof_level }
       ; ledger =
           { base =
               Accounts

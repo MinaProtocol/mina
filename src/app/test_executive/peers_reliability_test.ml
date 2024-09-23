@@ -141,8 +141,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Malleable_error.lift
            @@ Transaction_snark.For_tests.deploy_snapp
                 ~constraint_constants:
-                  (Network.network_config network).constraint_config
-                    .constraint_constants parties_spec
+                  (Network.network_config network).proof.constraint_constants
+                parties_spec
          in
          let%bind () =
            send_zkapp ~logger

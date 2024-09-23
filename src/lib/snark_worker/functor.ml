@@ -230,11 +230,11 @@ module Make (Inputs : Intf.Inputs_intf) :
         with type Work.ledger_proof = Inputs.Ledger_proof.t ) ~logger
       ~config_file ~cli_proof_level daemon_address shutdown_on_disconnect =
     let%bind config =
-      Runtime_config.Config_loader.load_config_exn ?cli_proof_level ~config_file
-        ()
+      Runtime_config.Config_loader.load_constants_exn ?cli_proof_level
+        ~config_file ()
     in
     let { Runtime_config.Constraint.constraint_constants; proof_level } =
-      config.constraint_config
+      config.proof
     in
     let%bind state =
       Worker_state.create ~constraint_constants ~proof_level ()

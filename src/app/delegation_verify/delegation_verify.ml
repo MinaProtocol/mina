@@ -46,11 +46,11 @@ let timestamp =
 let instantiate_verify_functions ~config_file =
   let open Deferred.Let_syntax in
   let%map config =
-    Runtime_config.Config_loader.load_config_exn ~cli_proof_level:Full
+    Runtime_config.Config_loader.load_constants_exn ~cli_proof_level:Full
       ~config_file ()
   in
   let { Runtime_config.Constraint.constraint_constants; proof_level } =
-    config.constraint_config
+    config.proof
   in
   Verifier.verify_functions ~constraint_constants ~proof_level ()
 

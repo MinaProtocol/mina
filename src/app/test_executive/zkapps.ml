@@ -139,7 +139,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Core.String.Map.find_exn (Network.block_producers network) "node-a"
     in
     let constraint_constants =
-      (Network.network_config network).constraint_config.constraint_constants
+      (Network.network_config network).proof.constraint_constants
     in
     let fish1_kp =
       (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1")

@@ -45,10 +45,10 @@ let get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
   second_pass_ledger
 
 let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t)
-    ~(config : Runtime_config.t) =
+    ~(config : Runtime_config.constants) =
   let genesis_constants = config.genesis_constants in
   let { Runtime_config.Constraint.constraint_constants; proof_level } =
-    config.constraint_config
+    config.proof
   in
   let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
   let _v =
@@ -162,7 +162,7 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
     }
   in
   let { Runtime_config.Constraint.constraint_constants; proof_level } =
-    config.constraint_config
+    config.proof
   in
   let genesis_constants = config.genesis_constants in
   let consensus_constants =
@@ -347,8 +347,7 @@ let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
     in
     let packed =
       Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-        ~depth:config.constraint_config.constraint_constants.ledger_depth
-        accounts
+        ~depth:config.proof.constraint_constants.ledger_depth accounts
     in
     Lazy.force (Genesis_ledger.Packed.t packed)
   in
@@ -375,10 +374,10 @@ let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
     }
   in
   let%bind config =
-    Runtime_config.Config_loader.load_config_exn ~config_file
+    Runtime_config.Config_loader.load_constants_exn ~config_file
       ~cli_proof_level:Full ()
   in
-  let constraint_constants = config.constraint_config.constraint_constants in
+  let constraint_constants = config.proof.constraint_constants in
   let%bind zkapp_command =
     Transaction_snark.For_tests.deploy_snapp
       ~permissions:Permissions.user_default ~constraint_constants spec
@@ -421,10 +420,10 @@ let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~config_file
     }
   in
   let%bind config =
-    Runtime_config.Config_loader.load_config_exn ~config_file
+    Runtime_config.Config_loader.load_constants_exn ~config_file
       ~cli_proof_level:Full ()
   in
-  let constraint_constants = config.constraint_config.constraint_constants in
+  let constraint_constants = config.proof.constraint_constants in
   let%bind zkapp_command =
     let `VK vk, `Prover prover =
       Lazy.force @@ vk_and_prover ~constraint_constants
@@ -471,7 +470,7 @@ let transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer ~fee_payer_nonce
     }
   in
   let%bind config =
-    Runtime_config.Config_loader.load_config_exn ~config_file
+    Runtime_config.Config_loader.load_constants_exn ~config_file
       ~cli_proof_level:Full ()
   in
   let zkapp_command =
@@ -509,10 +508,10 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
     }
   in
   let%bind config =
-    Runtime_config.Config_loader.load_config_exn ~config_file
+    Runtime_config.Config_loader.load_constants_exn ~config_file
       ~cli_proof_level:Full ()
   in
-  let constraint_constants = config.constraint_config.constraint_constants in
+  let constraint_constants = config.proof.constraint_constants in
   let%bind zkapp_command =
     let `VK vk, `Prover prover =
       Lazy.force @@ vk_and_prover ~constraint_constants
@@ -553,10 +552,10 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
     }
   in
   let%bind config =
-    Runtime_config.Config_loader.load_config_exn ~config_file
+    Runtime_config.Config_loader.load_constants_exn ~config_file
       ~cli_proof_level:Full ()
   in
-  let constraint_constants = config.constraint_config.constraint_constants in
+  let constraint_constants = config.proof.constraint_constants in
   let%bind zkapp_command =
     let `VK vk, `Prover prover =
       Lazy.force @@ vk_and_prover ~constraint_constants
@@ -599,10 +598,10 @@ let update_action_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     }
   in
   let%bind config =
-    Runtime_config.Config_loader.load_config_exn ~config_file
+    Runtime_config.Config_loader.load_constants_exn ~config_file
       ~cli_proof_level:Full ()
   in
-  let constraint_constants = config.constraint_config.constraint_constants in
+  let constraint_constants = config.proof.constraint_constants in
   let%bind zkapp_command =
     let `VK vk, `Prover prover =
       Lazy.force @@ vk_and_prover ~constraint_constants
@@ -643,10 +642,10 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     }
   in
   let%bind config =
-    Runtime_config.Config_loader.load_config_exn ~config_file
+    Runtime_config.Config_loader.load_constants_exn ~config_file
       ~cli_proof_level:Full ()
   in
-  let constraint_constants = config.constraint_config.constraint_constants in
+  let constraint_constants = config.proof.constraint_constants in
   let%bind zkapp_command =
     let `VK vk, `Prover prover =
       Lazy.force @@ vk_and_prover ~constraint_constants
@@ -688,10 +687,10 @@ let update_snapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~snapp_update
     }
   in
   let%bind config =
-    Runtime_config.Config_loader.load_config_exn ~config_file
+    Runtime_config.Config_loader.load_constants_exn ~config_file
       ~cli_proof_level:Full ()
   in
-  let constraint_constants = config.constraint_config.constraint_constants in
+  let constraint_constants = config.proof.constraint_constants in
   let%bind zkapp_command =
     let `VK vk, `Prover prover =
       Lazy.force @@ vk_and_prover ~constraint_constants

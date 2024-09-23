@@ -150,7 +150,7 @@ let command =
      fun () ->
        let open Deferred.Let_syntax in
        let%map config =
-         Runtime_config.Config_loader.load_config_exn ~config_file
+         Runtime_config.Config_loader.load_constants_exn ~config_file
            ~cli_proof_level:Full ()
        in
        let num_transactions =
@@ -179,7 +179,7 @@ let command =
              (String.concat !incompatible_flags ~sep:", ") ) ;
        let repeats = Option.value repeats ~default:1 in
        let { Runtime_config.Constraint.constraint_constants; proof_level } =
-         config.constraint_config
+         config.proof
        in
        let genesis_constants = config.genesis_constants in
        if witness_only then

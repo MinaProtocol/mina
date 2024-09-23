@@ -2,7 +2,7 @@
 open Core_kernel
 open Async
 
-let main ({ genesis_constants; _ } : Runtime_config.t) =
+let main ({ genesis_constants; _ } : Runtime_config.constants) =
   let cost_limit = genesis_constants.zkapp_transaction_cost_limit in
   let max_event_elements = genesis_constants.max_event_elements in
   let max_action_elements = genesis_constants.max_action_elements in
@@ -38,6 +38,6 @@ let () =
      fun () ->
        let open Deferred.Let_syntax in
        let%map config =
-         Runtime_config.Config_loader.load_config_exn ~config_file ()
+         Runtime_config.Config_loader.load_constants_exn ~config_file ()
        in
        main config )

@@ -2487,7 +2487,7 @@ module Queries = struct
                   Deferred.Result.fail "Daemon is bootstrapping"
               | `Active breadcrumb -> (
                   let txn_stop_slot_opt =
-                    runtime_config.compile_config.slot_tx_end
+                    runtime_config.daemon.compile_config.slot_tx_end
                   in
                   match txn_stop_slot_opt with
                   | None ->
@@ -2573,9 +2573,8 @@ module Queries = struct
           Runtime_config.make_fork_config ~staged_ledger
             ~global_slot_since_genesis ~state_hash ~staking_ledger
             ~staking_epoch_seed ~next_epoch_ledger:(Some next_epoch_ledger)
-            ~next_epoch_seed ~blockchain_length
-            ~compile_config:runtime_config.compile_config
-            ~constraint_config:runtime_config.constraint_config
+            ~next_epoch_seed ~blockchain_length ~daemon:runtime_config.daemon
+            ~proof:runtime_config.proof
             ~genesis_constants:runtime_config.genesis_constants
         in
         let%map () =
@@ -2675,7 +2674,7 @@ module Queries = struct
       ~args:Arg.[]
       ~resolve:(fun { ctx = mina; _ } () ->
         let cfg = Mina_lib.config mina in
-        "mina:" ^ cfg.runtime_config.compile_config.network_id )
+        "mina:" ^ cfg.runtime_config.daemon.compile_config.network_id )
 
   let signature_kind =
     field "signatureKind"
