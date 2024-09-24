@@ -353,12 +353,29 @@ end = struct
             Either.First
               (Num_accounts
                  (len, MT.get_inner_hash_at_addr_exn mt content_root_addr) )
-        | What_child_hashes a ->
+        | What_child_hashes a -> (
             let ledger_depth = MT.depth mt in
             let addresses = intermediate_range ledger_depth a subtree_depth in
-            let get_hash a = MT.get_inner_hash_at_addr_exn mt a in
-            let hashes = List.map addresses ~f:get_hash in
-            Either.First (Child_hashes_are hashes)
+            match
+              let open Or_error.Let_syntax in
+              Or_error.try_with (fun () ->
+                  let get_hash a = MT.get_inner_hash_at_addr_exn mt a in
+                  let hashes = List.map addresses ~f:get_hash in
+                  Answer.Child_hashes_are hashes )
+            with
+            | Ok answer ->
+                Either.First answer
+            | Error e ->
+                let logger = Logger.create () in
+                [%log error]
+                  ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+                  "When handling What_child_hashes request, the following \
+                   error happended: $error" ;
+                Either.Second
+                  ( Actions.Violated_protocol
+                  , Some
+                      ( "invalid address $addr in What_child_hashes request"
+                      , [ ("addr", Addr.to_yojson a) ] ) ) )
       in
 
       match response_or_punish with
