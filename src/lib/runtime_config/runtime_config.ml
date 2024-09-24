@@ -916,14 +916,14 @@ end
 
 module Proof_keys = struct
   module Level = struct
-    type t = Full | Check | None [@@deriving bin_io_unversioned, equal]
+    type t = Full | Check | No_check [@@deriving bin_io_unversioned, equal]
 
     let to_string = function
       | Full ->
           "full"
       | Check ->
           "check"
-      | None ->
+      | No_check ->
           "none"
 
     let of_string str =
@@ -933,7 +933,7 @@ module Proof_keys = struct
       | "check" ->
           Ok Check
       | "none" ->
-          Ok None
+          Ok No_check
       | _ ->
           Error "Expected one of 'full', 'check', or 'none'"
 
@@ -954,7 +954,7 @@ module Proof_keys = struct
             "Runtime_config.Proof_keys.Level.of_json_layout: Expected the \
              field 'level' to contain a string"
 
-    let gen = Quickcheck.Generator.of_list [ Full; Check; None ]
+    let gen = Quickcheck.Generator.of_list [ Full; Check; No_check ]
   end
 
   module Transaction_capacity = struct
