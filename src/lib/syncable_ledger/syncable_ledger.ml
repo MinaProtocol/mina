@@ -34,7 +34,7 @@ module Answer = struct
     module V2 = struct
       type ('hash, 'account) t =
         | Child_hashes_are of 'hash list
-            (** The requested address's children have these hashes.
+            (** The requested addresses' children have these hashes.
             May be any power of 2 number of children, and not necessarily 
             immediate children  *)
         | Contents_are of 'account list
@@ -482,10 +482,16 @@ end = struct
       -> Hash.t list
       -> [ `Good of (Addr.t * Hash.t) list
          | `Hash_mismatch of Hash.t * Hash.t
-         | `Non_power ] =
+         | `Invalid_length ] =
    fun t addr nodes ->
-    (* let prefix_depth = Addr.depth addr in *)
-    if Int.is_pow2 (List.length nodes) then
+    let len = List.length nodes in
+    let is_power = Int.is_pow2 len in
+    let is_more_than_two = len >= 2 in
+    let less_than_max = len <= Int.pow 2 subtree_depth in
+
+    let valid_length = is_power && is_more_than_two && less_than_max in
+
+    if valid_length then
       let ledger_depth = MT.depth t.tree in
       let expected =
         Option.value_exn ~message:"Forgot to wait for a node"
@@ -507,7 +513,7 @@ end = struct
         in
         `Good subtrees_to_fetch )
       else `Hash_mismatch (expected, merged)
-    else `Non_power
+    else `Invalid_length
 
   let all_done t =
     if not (Root_hash.equal (MT.merkle_root t.tree) (desired_root_exn t)) then
@@ -671,14 +677,14 @@ end = struct
                             ] ) )
                   in
                   requeue_query ()
-              | `Non_power ->
+              | `Invalid_length ->
                   let%map () =
                     record_envelope_sender t.trust_system t.logger sender
                       ( Actions.Sent_bad_hash
                       , Some
-                          ( "hashes sent for subtree on address $address are \
-                             not a power of 2"
-                          , [] ) )
+                          ( "hashes sent for subtree on address $address must \
+                             be a power of 2 in the range 2-2^$depth"
+                          , [ ("depth", `Int subtree_depth) ] ) )
                   in
                   requeue_query ()
               | `Good children_to_verify ->
