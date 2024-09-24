@@ -19,7 +19,7 @@ in  { step =
                     ]
                     "./src/test/archive/sample_db/archive_db.sql"
                     Artifacts.Type.FunctionalTestSuite
-                    Network.Type.Devnet
+                    (None Network.Type)
                     "./scripts/patch-archive-test.sh"
                 ]
               , label = "Archive: Patch Archive test"
