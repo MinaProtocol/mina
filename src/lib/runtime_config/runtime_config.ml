@@ -427,15 +427,19 @@ module Json_loader : Json_loader_intf = struct
     let provided_files = List.map ~f:(fun f -> (f, `Must_exist)) config_files in
     let all_files = magic_config_files @ provided_files in
     let%bind fs = read_files ~logger all_files in
-    match Mina_stdlib.Nonempty_list.of_list_opt fs with
-    | None ->
-        let all_files = List.map ~f:fst all_files in
-        Mina_user_error.raisef ~where:"reading configuration files"
-          "Failed to find any configuration file, searched the files: %s"
-          ("[" ^ String.concat ~sep:", " all_files ^ "]")
-    | Some files -> (
+    match fs with
+    | [] ->
+        (* NOTE: This looks bad, but as long as we still have compile time config we can still load the constants *)
+        [%log warn]
+          "Could not read configuration from any of the suggested files \
+           $all_files"
+          ~metadata:
+            [ ( "all_files"
+              , `List (List.map ~f:(fun a -> `String (fst a)) all_files) )
+            ] ;
+        Deferred.Or_error.return (Yojson.Safe.from_string "{}")
+    | init :: rest -> (
         let module T = Monad_lib.Make_ext2 (Result) in
-        let init, rest = Mina_stdlib.Nonempty_list.uncons files in
         match T.fold_m ~f:merge_json ~init rest with
         | Ok c ->
             Deferred.Or_error.return c
