@@ -6,6 +6,10 @@ let Text/concatMap = P.Text.concatMap
 
 let Cmd = ../Lib/Cmds.dhall
 
+let Optional/map = Prelude.Optional.map
+
+let Optional/default = Prelude.Optional.default
+
 let ContainerImages = ../Constants/ContainerImages.dhall
 
 let Artifacts = ../Constants/Artifacts.dhall
@@ -13,11 +17,16 @@ let Artifacts = ../Constants/Artifacts.dhall
 let Network = ../Constants/Network.dhall
 
 let runInDockerWithPostgresConn
-    : List Text -> Text -> Artifacts.Type -> Network.Type -> Text -> Cmd.Type
+    :     List Text
+      ->  Text
+      ->  Artifacts.Type
+      ->  Optional Network.Type
+      ->  Text
+      ->  Cmd.Type
     =     \(environment : List Text)
       ->  \(initScript : Text)
       ->  \(docker : Artifacts.Type)
-      ->  \(network : Network.Type)
+      ->  \(network : Optional Network.Type)
       ->  \(innerScript : Text)
       ->  let port = "5432"
 
@@ -55,6 +64,15 @@ let runInDockerWithPostgresConn
               : Text
               = "\\\$MINA_DOCKER_TAG"
 
+          let maybeNetwork =
+                Optional/map
+                  Network.Type
+                  Text
+                  (\(network : Network.Type) -> "-${Network.lowerName network}")
+                  network
+
+          let networkOrDefault = Optional/default Text "" maybeNetwork
+
           in  Cmd.chain
                 [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
                 , "source buildkite/scripts/export-git-env-vars.sh"
@@ -62,7 +80,7 @@ let runInDockerWithPostgresConn
                 , "sleep 5"
                 , "docker exec ${postgresDockerName} psql ${pg_conn} -f /workdir/${initScript}"
                 , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --entrypoint bash ${envVars} gcr.io/o1labs-192920/${Artifacts.dockerName
-                                                                                                                                                    docker}:${minaDockerTag} ${innerScript}"
+                                                                                                                                                    docker}:${minaDockerTag}${networkOrDefault} ${innerScript}"
                 ]
 
 in  { runInDockerWithPostgresConn = runInDockerWithPostgresConn }
