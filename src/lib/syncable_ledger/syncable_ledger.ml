@@ -236,7 +236,7 @@ end = struct
   type query = Addr.t Query.t
 
   (* TODO: parameterize *)
-  let subtree_depth : index = 4
+  let subtree_depth : int = 4
 
   (* Provides addresses at an specific depth from this address *)
   let rec intermediate_range : index -> Addr.t -> index -> Addr.t list =
@@ -473,8 +473,8 @@ end = struct
     | l :: r :: rest ->
         Hash.merge ~height l r :: merge_siblings rest height
     | _ ->
-        (* TODO: give some error as this shouldn't really happen *)
-        []
+        (* Shouldn't happen as the length is being constrained *)
+        raise (Failure "length is odd")
 
   (* Assumes nodes to be a power of 2 and merges them into their common root *)
   let rec merge_many : Hash.t list -> index -> Hash.t =
@@ -688,9 +688,9 @@ end = struct
                       ( Actions.Sent_bad_hash
                       , Some
                           ( "hashes sent for subtree on address $address merge \
-                             to $actualmerge but we expected $expectedmerge"
-                          , [ ("actualmerge", Hash.to_yojson actual)
-                            ; ("expectedmerge", Hash.to_yojson expected)
+                             to $actual_merge but we expected $expected_merge"
+                          , [ ("actual_merge", Hash.to_yojson actual)
+                            ; ("expected_merge", Hash.to_yojson expected)
                             ] ) )
                   in
                   requeue_query ()
