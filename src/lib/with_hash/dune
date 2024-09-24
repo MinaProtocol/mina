@@ -2,12 +2,14 @@
  (name with_hash)
  (public_name with_hash)
  (libraries
-   ;; opam libraries
-   bin_prot.shape sexplib0 base.caml core_kernel
-   ;; local libraries
-   mina_wire_types
-   ppx_version.runtime
- )
+  ;; opam libraries
+  bin_prot.shape
+  sexplib0
+  base.caml
+  core_kernel
+  ;; local libraries
+  mina_wire_types
+  ppx_version.runtime)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

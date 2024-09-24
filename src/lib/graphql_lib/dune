@@ -1,45 +1,47 @@
 (library
  (name graphql_lib)
  (public_name graphql_lib)
- (inline_tests (flags -verbose -show-counts))
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
-   ;; opam libraries
-   uri
-   core_kernel
-   integers
-   async
-   cohttp
-   core
-   cohttp-async
-   graphql-async
-   graphql-cohttp
-   graphql
-   graphql_parser
-   async_kernel
-   result
+  ;; opam libraries
+  uri
+  core_kernel
+  integers
+  async
+  cohttp
+  core
+  cohttp-async
+  graphql-async
+  graphql-cohttp
+  graphql
+  graphql_parser
+  async_kernel
+  result
   ;; local libraries
   graphql_wrapper
   (re_export mina_numbers_graphql)
-   mina_numbers
+  mina_numbers
   (re_export currency_graphql)
-   currency
+  currency
   (re_export signature_lib_graphql)
-   signature_lib
+  signature_lib
   (re_export mina_base_graphql)
-   mina_transaction
-   mina_base
+  mina_transaction
+  mina_base
   (re_export block_time_graphql)
-   block_time
+  block_time
   (re_export graphql_basic_scalars)
   (re_export mina_block_graphql)
-   mina_block
+  mina_block
   (re_export filtered_external_transition_graphql)
-   filtered_external_transition
+  filtered_external_transition
   (re_export mina_transaction_graphql)
   (re_export snark_params_graphql)
   (re_export data_hash_lib_graphql)
   (re_export pickles_graphql)
-  (re_export consensus_graphql)
- )
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_version ppx_compare ppx_deriving_yojson)))
+  (re_export consensus_graphql))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane ppx_version ppx_compare ppx_deriving_yojson)))
