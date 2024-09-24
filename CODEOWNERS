@@ -15,7 +15,6 @@
 /src/app/cli/src/mina.ml @MinaProtocol/protocol-eng-reviewers
 /src/app/cli/src/init @MinaProtocol/protocol-eng-reviewers
 /src/app/libp2p_helper @MinaProtocol/protocol-eng-reviewers
-/src/app/reformat/ @MinaProtocol/infra-eng-reviewers
 /src/app/trace-tool/ @MinaProtocol/protocol-eng-reviewers
 /src/app/runtime_genesis_ledger/ @MinaProtocol/protocol-eng-reviewers
 /src/app/archive_blocks/ @MinaProtocol/protocol-eng-reviewers
