@@ -33,7 +33,7 @@ module Answer = struct
   module Stable = struct
     module V2 = struct
       type ('hash, 'account) t =
-        | Child_hashes_are of 'hash list
+        | Child_hashes_are of 'hash Bounded_types.ArrayN4000.Stable.V1.t
             (** The requested addresses' children have these hashes.
             May be any power of 2 number of children, and not necessarily 
             immediate children  *)
@@ -58,7 +58,7 @@ module Answer = struct
 
       let to_latest acct_to_latest = function
         | Child_hashes_are (h1, h2) ->
-            V2.Child_hashes_are [ h1; h2 ]
+            V2.Child_hashes_are (List.to_array [ h1; h2 ])
         | Contents_are accts ->
             V2.Contents_are (List.map ~f:acct_to_latest accts)
         | Num_accounts (i, h) ->
@@ -356,11 +356,11 @@ end = struct
         | What_child_hashes a -> (
             let ledger_depth = MT.depth mt in
             let addresses = intermediate_range ledger_depth a subtree_depth in
+            let addresses = List.to_array addresses in
             match
-              let open Or_error.Let_syntax in
               Or_error.try_with (fun () ->
                   let get_hash a = MT.get_inner_hash_at_addr_exn mt a in
-                  let hashes = List.map addresses ~f:get_hash in
+                  let hashes = Array.map addresses ~f:get_hash in
                   Answer.Child_hashes_are hashes )
             with
             | Ok answer ->
@@ -464,29 +464,27 @@ end = struct
     if Hash.equal actual expected then `Success
     else `Hash_mismatch (expected, actual)
 
-  (* Merges each 2 contigous nodes, halving the size of the list *)
-  let rec merge_siblings : Hash.t list -> index -> Hash.t list =
+  (* Merges each 2 contigous nodes, halving the size of the array *)
+  let merge_siblings : Hash.t array -> index -> Hash.t array =
    fun nodes height ->
-    match nodes with
-    | [ l; r ] ->
-        [ Hash.merge ~height l r ]
-    | l :: r :: rest ->
-        Hash.merge ~height l r :: merge_siblings rest height
-    | _ ->
-        (* Shouldn't happen as the length is being constrained *)
-        raise (Failure "length is odd")
+    let len = Array.length nodes in
+    if len mod 2 <> 0 then failwith "length must be even" ;
+    let half_len = len / 2 in
+    let f i = Hash.merge ~height nodes.(2 * i) nodes.((2 * i) + 1) in
+    Array.init half_len ~f
 
   (* Assumes nodes to be a power of 2 and merges them into their common root *)
-  let rec merge_many : Hash.t list -> index -> Hash.t =
+  let rec merge_many : Hash.t array -> index -> Hash.t =
    fun nodes depth ->
-    match nodes with
-    | [ single ] ->
-        single
-    | many ->
-        let half = merge_siblings many depth in
+    let len = Array.length nodes in
+    match len with
+    | 1 ->
+        nodes.(0)
+    | _ ->
+        let half = merge_siblings nodes depth in
         merge_many half (depth - 1)
 
-  let merge_many : Hash.t list -> index -> Hash.t =
+  let merge_many : Hash.t array -> index -> Hash.t =
    fun nodes depth ->
     let final_depth = depth + subtree_depth in
     merge_many nodes final_depth
@@ -496,12 +494,12 @@ end = struct
   let add_subtree :
          'a t
       -> Addr.t
-      -> Hash.t list
-      -> [ `Good of (Addr.t * Hash.t) list
+      -> Hash.t array
+      -> [ `Good of (Addr.t * Hash.t) array
          | `Hash_mismatch of Hash.t * Hash.t
          | `Invalid_length ] =
    fun t addr nodes ->
-    let len = List.length nodes in
+    let len = Array.length nodes in
     let is_power = Int.is_pow2 len in
     let is_more_than_two = len >= 2 in
     let less_than_max = len <= Int.pow 2 subtree_depth in
@@ -518,7 +516,8 @@ end = struct
       if Hash.equal expected merged then (
         Addr.Table.remove t.waiting_parents addr ;
         let addresses = intermediate_range ledger_depth addr subtree_depth in
-        let addresses_and_hashes = List.(zip_exn addresses nodes) in
+        let addresses = List.to_array addresses in
+        let addresses_and_hashes = Array.zip_exn addresses nodes in
 
         (* Filter to fetch only those that differ *)
         let should_fetch_children addr hash =
@@ -526,7 +525,7 @@ end = struct
         in
         let subtrees_to_fetch =
           addresses_and_hashes
-          |> List.filter ~f:(Tuple2.uncurry should_fetch_children)
+          |> Array.filter ~f:(Tuple2.uncurry should_fetch_children)
         in
         `Good subtrees_to_fetch )
       else `Hash_mismatch (expected, merged)
@@ -705,7 +704,7 @@ end = struct
                   in
                   requeue_query ()
               | `Good children_to_verify ->
-                  List.iter children_to_verify ~f:(fun (addr, hash) ->
+                  Array.iter children_to_verify ~f:(fun (addr, hash) ->
                       handle_node t addr hash ) ;
                   credit_fulfilled_request () )
           | query, answer ->
