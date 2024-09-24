@@ -151,7 +151,7 @@
   (= %{env:MARLIN_PLONK_STUBS=n} n))
  (mode promote)
  (deps
-  ../../../../.ocamlformat
+  %{project_root}/../.ocamlformat
   Cargo.toml
   rust-toolchain.toml
   (source_tree src)
@@ -178,7 +178,7 @@
   (<> %{env:MARLIN_PLONK_STUBS=n} n))
  (mode promote)
  (deps
-  ../../../../.ocamlformat
+  %{project_root}/../.ocamlformat
   (env_var MARLIN_PLONK_STUBS))
  (action
   (progn
