@@ -2,7 +2,7 @@
  (public_name mina_base.import)
  (name mina_base_import)
  (libraries signature_lib)
- (preprocess (pps
-    ppx_version
-    ))
- (instrumentation (backend bisect_ppx)))
+ (preprocess
+  (pps ppx_version))
+ (instrumentation
+  (backend bisect_ppx)))
