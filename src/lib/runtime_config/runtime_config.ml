@@ -265,6 +265,10 @@ module type Json_loader_intf = sig
 end
 
 module Json_loader : Json_loader_intf = struct
+  (* Right biased recursively merge of two json values 'a' and 'b'. Used to handle cases where we allow providing
+      multiple configuration files with the assumption that the later files will overwrite the earlier ones.
+     See test cases for examples
+  *)
   let rec merge_json (a : Yojson.Safe.t) (b : Yojson.Safe.t) :
       (Yojson.Safe.t, string) result =
     let module T = Monad_lib.Make_ext2 (Result) in
@@ -425,8 +429,10 @@ module Json_loader : Json_loader_intf = struct
     let%bind fs = read_files ~logger all_files in
     match Mina_stdlib.Nonempty_list.of_list_opt fs with
     | None ->
+        let all_files = List.map ~f:fst all_files in
         Mina_user_error.raisef ~where:"reading configuration files"
-          "Failed to find any configuration file"
+          "Failed to find any configuration file, searched the files: %s"
+          ("[" ^ String.concat ~sep:", " all_files ^ "]")
     | Some files -> (
         let module T = Monad_lib.Make_ext2 (Result) in
         let init, rest = Mina_stdlib.Nonempty_list.uncons files in
@@ -460,6 +466,9 @@ module Constants_loader : Constants_loader_intf = struct
     ; compile_config : Mina_compile_config.t
     }
 
+  (* NOTE: This 'Compiled' module is internal and will eventually be deleted.
+     These values should not be referenced except for temporary usage in Runtime_config.
+  *)
   module Compiled = struct
     type t =
       { genesis_constants : Genesis_constants.Inputs.t
@@ -541,6 +550,9 @@ module Constants_loader : Constants_loader_intf = struct
       in
       { genesis_constants; constraint_constants; proof_level; compile_config }
 
+    (* TODO: We can remove this kind of step once we remove the compile time configuration and settle on a final
+       json schema.
+    *)
     let combine (a : t) (b : Runtime_config_v1.Json_layout.t) : t =
       let genesis_constants =
         { a.genesis_constants with
@@ -739,6 +751,7 @@ module Config_loader : Config_loader = struct
     }
 end
 
+(* Use this function if you don't need/want the ledger configuration *)
 let load_constants ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
     ~logger config_files =
   Deferred.Or_error.ok_exn
@@ -750,6 +763,9 @@ let load_constants ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
   in
   Constants_loader.load_constants ?itn_features ?cli_proof_level json
 
+(* Use this function if you need the ledger configuration. NOTE: this function simply loads the json,
+   see Genesis_ledger_helper.Config_initializer to initialize the ledger with this config.
+*)
 let load_config ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
     ~logger config_files =
   Deferred.Or_error.ok_exn
