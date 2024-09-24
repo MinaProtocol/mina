@@ -423,17 +423,6 @@ end = struct
       "Expecting content addr $address, expected: $hash" ;
     Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
 
-  (* Waits for a subtree with root at the given address *)
-  let expect_subtree : 'a t -> Addr.t -> Hash.t -> unit =
-   fun t parent_addr expected ->
-    [%log' trace t.logger]
-      ~metadata:
-        [ ("subtree prefix address", Addr.to_yojson parent_addr)
-        ; ("hash", Hash.to_yojson expected)
-        ]
-      "Expecting subtree at address $parent_address, expected: $hash" ;
-    Addr.Table.add_exn t.waiting_parents ~key:parent_addr ~data:expected
-
   (** Given an address and the accounts below that address, fill in the tree
       with them. *)
   let add_content :
@@ -519,52 +508,6 @@ end = struct
         `Good subtrees_to_fetch )
       else `Hash_mismatch (expected, merged)
     else `Non_power
-
-  (** Given an address and the hashes of the children of the corresponding node,
-      check the children hash to the expected value. If they do, queue the
-      children for retrieval if the values in the underlying ledger don't match
-      the hashes we got from the network. *)
-  let add_child_hashes_to :
-         'a t
-      -> Addr.t
-      -> Hash.t
-      -> Hash.t
-      -> [ `Good of (Addr.t * Hash.t) list
-           (** The addresses and expected hashes of the now-retrievable children *)
-         | `Hash_mismatch of Hash.t * Hash.t
-           (** Hash check failed, peer lied. First parameter expected, second parameter actual. *)
-         ] =
-   fun t parent_addr lh rh ->
-    let ledger_depth = MT.depth t.tree in
-    let la, ra =
-      Option.value_exn ~message:"Tried to fetch a leaf as if it was a node"
-        ( Or_error.ok
-        @@ Or_error.both
-             (Addr.child ~ledger_depth parent_addr Direction.Left)
-             (Addr.child ~ledger_depth parent_addr Direction.Right) )
-    in
-    let expected =
-      Option.value_exn ~message:"Forgot to wait for a node"
-        (Addr.Table.find t.waiting_parents parent_addr)
-    in
-    let merged_hash =
-      (* Height here is the height of the things we're merging, so one less than
-         the parent height. *)
-      Hash.merge ~height:(ledger_depth - Addr.depth parent_addr - 1) lh rh
-    in
-    if Hash.equal merged_hash expected then (
-      (* Fetch the children of a node if the hash in the underlying ledger
-         doesn't match what we got. *)
-      let should_fetch_children addr hash =
-        not @@ Hash.equal (MT.get_inner_hash_at_addr_exn t.tree addr) hash
-      in
-      let subtrees_to_fetch =
-        [ (la, lh); (ra, rh) ]
-        |> List.filter ~f:(Tuple2.uncurry should_fetch_children)
-      in
-      Addr.Table.remove t.waiting_parents parent_addr ;
-      `Good subtrees_to_fetch )
-    else `Hash_mismatch (expected, merged_hash)
 
   let all_done t =
     if not (Root_hash.equal (MT.merkle_root t.tree) (desired_root_exn t)) then
