@@ -476,10 +476,7 @@ let debug_arg =
 let help_term = Term.(ret @@ const (`Help (`Plain, None)))
 
 let engine_cmd ((engine_name, (module Engine)) : engine) =
-  let info =
-    let doc = "Run mina integration test(s) on remote cloud provider." in
-    Term.info engine_name ~doc ~exits:Term.default_exits
-  in
+  let info = Term.info engine_name ~doc:Engine.doc ~exits:Term.default_exits in
   let test_inputs_with_cli_inputs_arg =
     let wrap_cli_inputs cli_inputs =
       Test_inputs_with_cli_inputs
