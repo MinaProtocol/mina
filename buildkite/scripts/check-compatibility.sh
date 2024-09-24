@@ -2,8 +2,7 @@
 
 # start mainline branch daemon as seed, see if PR branch daemon can sync to it
 
-# don't exit if docker download fails
-set +e
+set -eox pipefail
 
 function get_shas {
   SHAS=$(git log -n 10 --format="%h" --abbrev=7 --first-parent)
@@ -11,7 +10,7 @@ function get_shas {
 
 function image_tag {
     SHA=$1
-    IMAGE_TAG="$SHA-bullseye-berkeley"
+    IMAGE_TAG="$SHA-bullseye-devnet"
 }
 
 function download-docker {

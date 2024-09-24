@@ -28,18 +28,6 @@ module InputConfig = struct
     }
   [@@deriving yojson]
 
-  let of_runtime_config_file_exn config target_epoch_ledgers_state_hash =
-    let runtime_config =
-      Yojson.Safe.from_file config
-      |> Runtime_config.of_yojson |> Result.ok_or_failwith
-    in
-    { target_epoch_ledgers_state_hash
-    ; start_slot_since_genesis = 0L
-    ; genesis_ledger = Option.value_exn runtime_config.ledger
-    ; first_pass_ledger_hashes = []
-    ; last_snarked_ledger_hash = None
-    }
-
   let to_yojson_file t output = Yojson.Safe.to_file output (to_yojson t)
 
   let of_ledger_file_exn ledger_file ~target_epoch_ledgers_state_hash =

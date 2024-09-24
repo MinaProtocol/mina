@@ -1632,19 +1632,23 @@ let lock_account =
          in
          printf "🔒 Locked account!\nPublic key: %s\n" pk_string ) )
 
-let generate_libp2p_keypair_do privkey_path =
+let generate_libp2p_keypair_do privkey_path ~config_file =
   Cli_lib.Exceptions.handle_nicely
   @@ fun () ->
   Deferred.ignore_m
     (let open Deferred.Let_syntax in
     (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
     let logger = Logger.null () in
+    let%bind { compile_config; _ } =
+      Runtime_config.load_constants ~logger config_file
+    in
     (* Using the helper only for keypair generation requires no state. *)
     File_system.with_temp_dir "mina-generate-libp2p-keypair" ~f:(fun tmpd ->
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore
+            ~block_window_duration:compile_config.block_window_duration ()
         with
         | Ok net ->
             let%bind me = Mina_net2.generate_random_keypair net in
@@ -1662,21 +1666,26 @@ let generate_libp2p_keypair =
   Command.async
     ~summary:"Generate a new libp2p keypair and print out the peer ID"
     (let open Command.Let_syntax in
-    let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
-    generate_libp2p_keypair_do privkey_path)
+    let%map_open privkey_path = Cli_lib.Flag.privkey_write_path
+    and config_file = Cli_lib.Flag.conf_file in
+    generate_libp2p_keypair_do privkey_path ~config_file)
 
-let dump_libp2p_keypair_do privkey_path =
+let dump_libp2p_keypair_do privkey_path ~config_file =
   Cli_lib.Exceptions.handle_nicely
   @@ fun () ->
   Deferred.ignore_m
     (let open Deferred.Let_syntax in
     let logger = Logger.null () in
+    let%bind { compile_config; _ } =
+      Runtime_config.load_constants ~logger config_file
+    in
     (* Using the helper only for keypair generation requires no state. *)
     File_system.with_temp_dir "mina-dump-libp2p-keypair" ~f:(fun tmpd ->
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore
+            ~block_window_duration:compile_config.block_window_duration ()
         with
         | Ok net ->
             let%bind () = Mina_net2.shutdown net in
@@ -1690,8 +1699,9 @@ let dump_libp2p_keypair_do privkey_path =
 let dump_libp2p_keypair =
   Command.async ~summary:"Print an existing libp2p keypair"
     (let open Command.Let_syntax in
-    let%map_open privkey_path = Cli_lib.Flag.privkey_read_path in
-    dump_libp2p_keypair_do privkey_path)
+    let%map_open privkey_path = Cli_lib.Flag.privkey_read_path
+    and config_file = Cli_lib.Flag.conf_file in
+    dump_libp2p_keypair_do privkey_path ~config_file)
 
 let trustlist_ip_flag =
   Command.Param.(

@@ -68,4 +68,5 @@
    mina_net2
    internal_tracing
    mina_runtime_config
+   mina_compile_config
 ))

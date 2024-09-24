@@ -975,6 +975,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ; time_controller
               ; pubsub_v1
               ; pubsub_v0
+              ; block_window_duration = compile_config.block_window_duration
               }
           in
           let net_config =
@@ -1448,7 +1449,11 @@ let internal_commands logger ~itn_features =
         and format =
           flag "--format" ~aliases:[ "-format" ] (optional string)
             ~doc:"sexp/json the format to parse input in"
-        and config_file = Cli_lib.Flag.conf_file in
+        and config_file = Cli_lib.Flag.conf_file
+        and limit =
+          flag "--limit" ~aliases:[ "-limit" ] (optional int)
+            ~doc:"limit the number of proofs taken from the file"
+        in
         fun () ->
           let open Async in
           let logger = Logger.create () in
@@ -1535,11 +1540,14 @@ let internal_commands logger ~itn_features =
               ~conf_dir:(Some conf_dir) ()
           in
           let%bind result =
+            let cap lst =
+              Option.value_map ~default:Fn.id ~f:(Fn.flip List.take) limit lst
+            in
             match input with
             | `Transaction input ->
-                Verifier.verify_transaction_snarks verifier input
+                input |> cap |> Verifier.verify_transaction_snarks verifier
             | `Blockchain input ->
-                Verifier.verify_blockchain_snarks verifier input
+                input |> cap |> Verifier.verify_blockchain_snarks verifier
           in
           match result with
           | Ok (Ok ()) ->

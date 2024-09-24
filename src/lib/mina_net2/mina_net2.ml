@@ -94,6 +94,7 @@ type t =
   ; mutable banned_ips : Unix.Inet_addr.t list
   ; peer_connected_callback : string -> unit
   ; peer_disconnected_callback : string -> unit
+  ; block_window_duration : Time.Span.t
   }
 
 let banned_ips t = t.banned_ips
@@ -382,7 +383,8 @@ let handle_push_message t push_message =
               upon
                 (O1trace.thread "validate_libp2p_gossip" (fun () ->
                      Subscription.handle_and_validate sub ~validation_expiration
-                       ~sender ~data ) )
+                       ~sender ~data
+                       ~block_window_duration:t.block_window_duration ) )
                 (function
                   | `Validation_timeout ->
                       [%log' warn t.logger]
@@ -543,7 +545,8 @@ let handle_push_message t push_message =
       Libp2p_ipc.undefined_union ~context:"DaemonInterface.PushMessage" n
 
 let create ?(allow_multiple_instances = false) ~all_peers_seen_metric ~logger
-    ~pids ~conf_dir ~on_peer_connected ~on_peer_disconnected () =
+    ~pids ~conf_dir ~on_peer_connected ~on_peer_disconnected
+    ~block_window_duration () =
   let open Deferred.Or_error.Let_syntax in
   let push_message_handler =
     ref (fun _msg ->
@@ -574,6 +577,7 @@ let create ?(allow_multiple_instances = false) ~all_peers_seen_metric ~logger
     ; peer_disconnected_callback =
         (fun peer_id -> on_peer_disconnected (Peer.Id.unsafe_of_string peer_id))
     ; protocol_handlers = Hashtbl.create (module String)
+    ; block_window_duration
     }
   in
   (push_message_handler := fun msg -> handle_push_message t msg) ;
