@@ -1,4 +1,5 @@
 open Core_kernel
+open Typed_containers
 
 type ('a, 'n, 'm) t =
   { without_degree_bound : 'n Nat.t; with_degree_bound : ('a, 'm) Vector.t }

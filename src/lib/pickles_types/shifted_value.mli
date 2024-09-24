@@ -1,3 +1,5 @@
+open Typed_containers
+
 module type Field_intf = sig
   (** Represents an element of the field *)
   type t

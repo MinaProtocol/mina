@@ -1,4 +1,4 @@
-(* Undocumented *)
+open Typed_containers
 
 module Stable : sig
   module V2 : sig

@@ -1,4 +1,5 @@
 open Core_kernel
+open Typed_containers
 
 let padded_array_typ ~length ~dummy elt =
   Snarky_backendless.Typ.array ~length elt

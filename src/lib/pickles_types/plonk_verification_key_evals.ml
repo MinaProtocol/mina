@@ -1,4 +1,5 @@
 open Core_kernel
+open Typed_containers
 module H_list = Snarky_backendless.H_list
 
 [%%versioned

@@ -3,6 +3,8 @@
 
 (** {2 Type definitions} *)
 
+open Typed_containers
+
 type ('a, 'b) t
 
 type ('a, 'n) at_most = ('a, 'n) t

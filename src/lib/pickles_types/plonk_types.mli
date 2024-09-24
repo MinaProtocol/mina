@@ -1,5 +1,7 @@
 (* Module and type signatures helpful for Plonk *)
 
+open Typed_containers
+
 val hash_fold_array : 'a Sigs.hashable -> 'a array Sigs.hashable
 
 (** Features are custom gates, lookup tables or runtime tables *)

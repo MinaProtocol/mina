@@ -1,3 +1,5 @@
+open Typed_containers
+
 type ('a, _) t =
   | [] : ('a, 'n) t
   | ( :: ) : 'a * ('a, 'n) t -> ('a, 'n Nat.s) t

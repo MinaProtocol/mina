@@ -1,5 +1,7 @@
 (** Batch of Polynomial Commitment Scheme *)
 
+open Typed_containers
+
 type ('a, 'n, 'm) t
 
 val map : ('a, 'n, 'm) t -> f:('a -> 'b) -> ('b, 'n, 'm) t

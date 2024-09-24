@@ -1,4 +1,5 @@
 open Core_kernel
+open Typed_containers
 
 module type Field_intf = sig
   type t
