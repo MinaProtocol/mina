@@ -99,8 +99,8 @@ val scalars_env :
   -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
   -> 't Scalars.Env.t
 
-  module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : sig
-    val ft_eval0 :
+module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : sig
+  val ft_eval0 :
        't field
     -> domain:< shifts : 't array ; .. >
     -> env:'t Scalars.Env.t
