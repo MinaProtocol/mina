@@ -5,15 +5,15 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let)))
 
-;; (rule
-;;  (deps print_blockchain_snark_vk.exe)
-;;  (targets blockchain_snark_vk.json.computed)
-;;  (action
-;;   (with-stdout-to %{targets}
-;;    (run %{deps}))))
-;; 
-;; (rule
-;;  (deps (:orig blockchain_snark_vk.json) (:computed blockchain_snark_vk.json.computed))
-;;  (alias runtest)
-;;  (action
-;;   (diff %{orig} %{computed})))
+(rule
+ (deps print_blockchain_snark_vk.exe)
+ (targets blockchain_snark_vk.json.computed)
+ (action
+  (with-stdout-to %{targets}
+   (run %{deps}))))
+
+(rule
+ (deps (:orig blockchain_snark_vk.json) (:computed blockchain_snark_vk.json.computed))
+ (alias runtest)
+ (action
+  (diff %{orig} %{computed})))

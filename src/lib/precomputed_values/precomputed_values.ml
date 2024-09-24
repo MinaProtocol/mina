@@ -17,12 +17,7 @@ let hashes =
      in
      ts @ bs )
 
-let for_unit_tests : T.t Lazy.t =
-  let constraint_constants =
-    Genesis_constants.For_unit_tests.Constraint_constants.t
-  in
-  let genesis_constants = Genesis_constants.For_unit_tests.t in
-  let compile_config = Mina_compile_config.For_unit_tests.t in
+let for_unit_tests =
   lazy
     (let open Staged_ledger_diff in
     let protocol_state_with_hashes =
@@ -36,10 +31,11 @@ let for_unit_tests : T.t Lazy.t =
         ~consensus_constants:(Lazy.force Consensus.Constants.for_unit_tests)
         ~genesis_body_reference
     in
-    { constraint_constants
-    ; compile_config
+    { constraint_constants =
+        Genesis_constants.For_unit_tests.Constraint_constants.t
     ; proof_level = Genesis_constants.For_unit_tests.Proof_level.t
-    ; genesis_constants
+    ; genesis_constants = Genesis_constants.For_unit_tests.t
+    ; compile_config = Mina_compile_config.For_unit_tests.t
     ; genesis_ledger = Genesis_ledger.for_unit_tests
     ; genesis_epoch_data = Consensus.Genesis_epoch_data.for_unit_tests
     ; genesis_body_reference

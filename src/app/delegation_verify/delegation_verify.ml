@@ -42,13 +42,12 @@ let timestamp =
   let open Command.Param in
   anon ("timestamp" %: string)
 
-(*We use the cli_proof_level arg to overide the config settings *)
 let instantiate_verify_functions ~logger config_file =
   let open Deferred.Let_syntax in
-  let%map { constraint_constants; proof_level; _ } =
-    Runtime_config.load_constants ~cli_proof_level:Full ~logger config_file
+  let%map { constraint_constants; _ } =
+    Runtime_config.load_constants ~logger config_file
   in
-  Verifier.verify_functions ~constraint_constants ~proof_level ()
+  Verifier.verify_functions ~constraint_constants ~proof_level:Full ()
 
 module Make_verifier (Source : Submission.Data_source) = struct
   let verify_transaction_snarks = Source.verify_transaction_snarks

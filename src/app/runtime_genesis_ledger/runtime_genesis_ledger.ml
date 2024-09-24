@@ -74,7 +74,9 @@ let extract_accounts_exn = function
 let main ~config_file ~genesis_dir ~hash_output_file () =
   let%bind config =
     let logger = Logger.create () in
-    Runtime_config.load_config ~logger config_file
+    let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+    let commit_id_short = Mina_version.commit_id in
+    Runtime_config.load_config ~conf_dir ~commit_id_short ~logger config_file
   in
   let accounts, staking_accounts_opt, next_accounts_opt =
     let ledger = config.ledger in

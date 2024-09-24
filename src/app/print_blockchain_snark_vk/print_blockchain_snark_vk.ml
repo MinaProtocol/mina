@@ -5,7 +5,7 @@ let () =
       let config_file = Sys.getenv_opt "MINA_CONFIG_FILE" in
       let open Async.Deferred.Let_syntax in
       let%bind { constraint_constants; _ } =
-        let logger = Logger.create () in
+        let logger = Logger.null () in
         Runtime_config.load_constants ~logger (Option.to_list config_file)
       in
       let () = Format.eprintf "Generating transaction snark circuit..@." in

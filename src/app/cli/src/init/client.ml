@@ -1836,7 +1836,12 @@ let compile_time_constants =
        let open Deferred.Let_syntax in
        let%map ({ consensus_constants; _ } as precomputed_values), _ =
          let logger = Logger.create () in
-         let%bind config = Runtime_config.load_config ~logger config_file in
+         let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+         let commit_id_short = Mina_version.commit_id in
+         let%bind config =
+           Runtime_config.load_config ~conf_dir ~commit_id_short ~logger
+             config_file
+         in
          Deferred.Or_error.ok_exn
          @@ Genesis_ledger_helper.Config_initializer.initialize ~logger config
        in

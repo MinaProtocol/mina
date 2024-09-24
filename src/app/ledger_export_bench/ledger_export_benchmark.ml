@@ -2,15 +2,16 @@ open Core
 open Core_bench
 
 let load_daemon_cfg filename () =
+  Result.ok_or_failwith
+  @@
   let json = Yojson.Safe.from_file filename in
-  match Runtime_config.Json_layout.of_yojson json with
-  | Ok cfg ->
-      cfg
-  | Error err ->
-      raise (Failure err)
+  let logger = Logger.null () in
+  let%bind.Result constants =
+    Runtime_config.Constants_loader.load_constants ~logger json
+  in
+  Runtime_config.Config_loader.load_config constants json
 
-let serialize cfg () =
-  Runtime_config.Json_layout.to_yojson cfg |> Yojson.Safe.to_string
+let serialize cfg () = Runtime_config.to_yojson cfg |> Yojson.Safe.to_string
 
 let map_results ~f =
   List.fold ~init:(Ok []) ~f:(fun acc x ->
@@ -26,9 +27,7 @@ let () =
   let runtime_config = Sys.getenv_exn "RUNTIME_CONFIG" in
   let cfg = load_daemon_cfg runtime_config () in
   let accounts =
-    match
-      Runtime_config.Ledger.of_json_layout cfg.ledger |> Result.ok_or_failwith
-    with
+    match cfg.ledger with
     | { base = Named _; _ } | { base = Hash; _ } ->
         []
     | { base = Accounts accs; _ } ->

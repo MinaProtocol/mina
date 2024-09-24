@@ -45,10 +45,9 @@ let get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
   second_pass_ledger
 
 let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) ~config
-    =
+    ~proof_level =
   let { Runtime_config.Constants_loader.genesis_constants
       ; constraint_constants
-      ; proof_level
       ; _
       } =
     config
@@ -338,7 +337,11 @@ let test_zkapp_with_genesis_ledger_main ~logger keyfile zkapp_keyfile
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_kp = Util.snapp_keypair_of_file zkapp_keyfile in
-  let%bind config = Runtime_config.load_config ~logger config_file in
+  let%bind config =
+    let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+    let commit_id_short = Mina_version.commit_id in
+    Runtime_config.load_config ~commit_id_short ~conf_dir ~logger config_file
+  in
   let ledger =
     let accounts =
       match config.ledger.base with
@@ -383,7 +386,10 @@ let create_zkapp_account ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
     Transaction_snark.For_tests.deploy_snapp
       ~permissions:Permissions.user_default ~constraint_constants spec
   in
-  let%map () = if debug then gen_proof ~config zkapp_command else return () in
+  let%map () =
+    if debug then gen_proof ~config zkapp_command ~proof_level:Full
+    else return ()
+  in
   zkapp_command
 
 let upgrade_zkapp ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
@@ -433,7 +439,7 @@ let upgrade_zkapp ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
   in
   let%map () =
     if debug then
-      gen_proof zkapp_command ~config
+      gen_proof zkapp_command ~config ~proof_level:Full
         ~zkapp_account:
           (Some
              (Signature_lib.Public_key.compress zkapp_account_keypair.public_key)
@@ -478,7 +484,8 @@ let transfer_funds ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
         Genesis_constants.For_unit_tests.Constraint_constants.t spec
   in
   let%map () =
-    if debug then gen_proof zkapp_command ~zkapp_account:None ~config
+    if debug then
+      gen_proof zkapp_command ~proof_level:Full ~zkapp_account:None ~config
     else return ()
   in
   zkapp_command
@@ -519,7 +526,7 @@ let update_state ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
   in
   let%map () =
     if debug then
-      gen_proof zkapp_command ~config
+      gen_proof zkapp_command ~config ~proof_level:Full
         ~zkapp_account:
           (Some (Signature_lib.Public_key.compress zkapp_keypair.public_key))
     else return ()
@@ -562,7 +569,7 @@ let update_zkapp_uri ~logger ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   in
   let%map () =
     if debug then
-      gen_proof zkapp_command ~config
+      gen_proof zkapp_command ~config ~proof_level:Full
         ~zkapp_account:
           (Some
              (Signature_lib.Public_key.compress zkapp_account_keypair.public_key)
@@ -607,7 +614,7 @@ let update_action_state ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
   in
   let%map () =
     if debug then
-      gen_proof zkapp_command ~config
+      gen_proof zkapp_command ~config ~proof_level:Full
         ~zkapp_account:
           (Some (Signature_lib.Public_key.compress zkapp_keypair.public_key))
     else return ()
@@ -650,7 +657,7 @@ let update_token_symbol ~logger ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   in
   let%map () =
     if debug then
-      gen_proof zkapp_command ~config
+      gen_proof zkapp_command ~config ~proof_level:Full
         ~zkapp_account:
           (Some
              (Signature_lib.Public_key.compress zkapp_account_keypair.public_key)
@@ -695,7 +702,7 @@ let update_snapp ~logger debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
   (*Util.print_snapp_transaction zkapp_command ;*)
   let%map () =
     if debug then
-      gen_proof zkapp_command ~config
+      gen_proof zkapp_command ~config ~proof_level:Full
         ~zkapp_account:
           (Some (Signature_lib.Public_key.compress zkapp_keypair.public_key))
     else return ()

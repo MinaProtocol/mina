@@ -631,7 +631,7 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
 let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
     ~checkpoint_interval ~checkpoint_output_folder_opt ~checkpoint_file_prefix
     ~genesis_dir_opt ~log_json ~log_level ~log_filename ~file_log_level
-    ~config_file () =
+    ~config_file ~cli_proof_level () =
   Cli_lib.Stdout_log.setup log_json log_level ;
   Option.iter log_filename ~f:(fun log_filename ->
       Logger.Consumer_registry.register ~id:"default"
@@ -640,7 +640,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         () ) ;
   let logger = Logger.create () in
   let%bind { constraint_constants; proof_level; _ } =
-    Runtime_config.load_constants ~logger config_file
+    Runtime_config.load_constants ~cli_proof_level ~logger config_file
   in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -1731,4 +1731,4 @@ let () =
          main ~input_file ~output_file_opt ~archive_uri ~checkpoint_interval
            ~continue_on_error ~checkpoint_output_folder_opt
            ~checkpoint_file_prefix ~genesis_dir_opt ~log_json ~log_level
-           ~file_log_level ~log_filename ~config_file )))
+           ~file_log_level ~log_filename ~config_file ~cli_proof_level:Full )))

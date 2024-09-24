@@ -89,7 +89,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let older_version = Mina_numbers.Txn_version.of_int 1
 
-  let fork_config : Genesis_constants.Fork_constants.t =
+  let fork_constants : Genesis_constants.Fork_constants.t =
     Genesis_constants.Fork_constants.make
       { state_hash = "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
       ; blockchain_length = 300000
@@ -209,17 +209,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { default_config.constraint_constants with
           work_delay = 1
         ; transaction_capacity_log_2 = 2
-        ; fork = Some fork_config
+        ; fork = Some fork_constants
         }
     }
 
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let fork_constants : Genesis_constants.Fork_constants.t =
-      Option.value_exn
-        (Engine.Network.network_config network).proof.constraint_constants.fork
-    in
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
@@ -569,7 +565,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                let bad_slot =
                  Mina_numbers.Global_slot_since_genesis.(
                    global_slot_since_genesis
-                   < fork_config.global_slot_since_genesis)
+                   < fork_constants.global_slot_since_genesis)
                in
                if bad_height && bad_slot then
                  Malleable_error.hard_error

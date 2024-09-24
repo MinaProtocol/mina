@@ -30,7 +30,7 @@ type inputs =
   ; mina_image : string
   ; archive_image : string option
   ; debug : bool
-  ; config_file : string
+  ; config_file : string list
   }
 
 let validate_inputs ~logger inputs (test_config : Test_config.t) :
@@ -330,9 +330,7 @@ let main inputs =
     ; points = "codaprotocol/coda-points-hack:32b.4"
     }
   in
-  let%bind config =
-    Runtime_config.load_constants ~logger [ inputs.config_file ]
-  in
+  let%bind config = Runtime_config.load_constants ~logger inputs.config_file in
   let constants =
     { genesis_constants = config.genesis_constants
     ; constraint_constants = config.constraint_constants
@@ -500,9 +498,9 @@ let config_file_arg =
   let doc = "The path to the node configuration file." in
   let env = Arg.env_var "MINA_CONFIG_FILE" ~doc in
   Arg.(
-    required
-    & pos 1 (some string) None
-    & info [ "config-file" ] ~env ~docv:"MINA_CONFIG_FILE" ~doc)
+    value
+      ( opt (some string) None
+      & info [ "config-file" ] ~env ~docv:"MINA_CONFIG_FILE" ~doc ))
 
 let mina_image_arg =
   let doc = "Identifier of the Mina docker image to test." in
@@ -544,7 +542,13 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
   let inputs_term =
     let cons_inputs test_inputs test mina_image archive_image debug config_file
         =
-      { test_inputs; test; mina_image; archive_image; debug; config_file }
+      { test_inputs
+      ; test
+      ; mina_image
+      ; archive_image
+      ; debug
+      ; config_file = Option.to_list config_file
+      }
     in
     Term.(
       const cons_inputs $ test_inputs_with_cli_inputs_arg $ test_arg

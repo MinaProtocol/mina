@@ -460,7 +460,7 @@ module type Constants_loader_intf = sig
     -> ?cli_proof_level:Genesis_constants.Proof_level.t
     -> logger:Logger.t
     -> Yojson.Safe.t
-    -> t Deferred.Or_error.t
+    -> (t, string) result
 end
 
 module Constants_loader : Constants_loader_intf = struct
@@ -699,44 +699,42 @@ module Constants_loader : Constants_loader_intf = struct
 
   let load_constants ?(itn_features = false)
       ?(cli_proof_level : Genesis_constants.Proof_level.t option) ~logger json :
-      t Deferred.Or_error.t =
-    match Runtime_config_v1.Json_layout.of_yojson json with
-    | Error e ->
-        Deferred.Or_error.error_string e
-    | Ok config -> (
-        let a = Compiled.combine Compiled.constants config in
-        let res =
-          { genesis_constants = Genesis_constants.make a.genesis_constants
-          ; compile_config =
-              { (Mina_compile_config.make a.compile_config) with itn_features }
-          ; constraint_constants =
-              Genesis_constants.Constraint_constants.make a.constraint_constants
-          ; proof_level =
-              Option.value
-                ~default:(Genesis_constants.Proof_level.of_string a.proof_level)
-                cli_proof_level
-          }
-        in
-        match
-          ( Genesis_constants.Proof_level.of_string a.proof_level
-          , Genesis_constants.Proof_level.of_string
-              Compiled.constants.proof_level )
-        with
-        | _, Full | (Genesis_constants.Proof_level.Check | No_check), _ ->
-            Deferred.Or_error.return res
-        | Full, ((Check | No_check) as compiled) ->
-            let str = Genesis_constants.Proof_level.to_string in
-            [%log fatal]
-              "Proof level $proof_level is not compatible with compile-time \
-               proof level $compiled_proof_level"
-              ~metadata:
-                [ ("proof_level", `String a.proof_level)
-                ; ("compiled_proof_level", `String (str compiled))
-                ] ;
-            Deferred.Or_error.errorf
-              "Proof level %s is not compatible with compile-time proof level \
-               %s"
-              a.proof_level (str compiled) )
+      (t, string) result =
+    let open Result.Let_syntax in
+    let%bind json_layout = Runtime_config_v1.Json_layout.of_yojson json in
+    let a = Compiled.combine Compiled.constants json_layout in
+    let res =
+      { genesis_constants = Genesis_constants.make a.genesis_constants
+      ; compile_config =
+          { (Mina_compile_config.make a.compile_config) with itn_features }
+      ; constraint_constants =
+          Genesis_constants.Constraint_constants.make a.constraint_constants
+      ; proof_level =
+          Option.value
+            ~default:(Genesis_constants.Proof_level.of_string a.proof_level)
+            cli_proof_level
+      }
+    in
+    match
+      ( Genesis_constants.Proof_level.of_string a.proof_level
+      , Genesis_constants.Proof_level.of_string Compiled.constants.proof_level
+      )
+    with
+    | _, Full | (Genesis_constants.Proof_level.Check | No_check), _ ->
+        Ok res
+    | Full, ((Check | No_check) as compiled) ->
+        let str = Genesis_constants.Proof_level.to_string in
+        [%log fatal]
+          "Proof level $proof_level is not compatible with compile-time proof \
+           level $compiled_proof_level"
+          ~metadata:
+            [ ("proof_level", `String a.proof_level)
+            ; ("compiled_proof_level", `String (str compiled))
+            ] ;
+        Error
+          (sprintf
+             "Proof level %s is not compatible with compile-time proof level %s"
+             a.proof_level (str compiled) )
 end
 
 module type Config_loader = sig
@@ -787,7 +785,13 @@ let load_constants ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
     Json_loader.load_config_files ?conf_dir ?commit_id_short ~logger
       config_files
   in
-  Constants_loader.load_constants ?itn_features ?cli_proof_level ~logger json
+  match
+    Constants_loader.load_constants ?itn_features ?cli_proof_level ~logger json
+  with
+  | Ok res ->
+      return res
+  | Error e ->
+      Deferred.Or_error.error_string @@ "Error loading runtime config: " ^ e
 
 (* Use this function if you need the ledger configuration. NOTE: this function simply loads the json,
    see Genesis_ledger_helper.Config_initializer to initialize the ledger with this config.
@@ -801,10 +805,13 @@ let load_config ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
     Json_loader.load_config_files ?conf_dir ?commit_id_short ~logger
       config_files
   in
-  let%bind constants =
-    Constants_loader.load_constants ?itn_features ?cli_proof_level ~logger json
+  let e_res =
+    let%bind.Result constants =
+      Constants_loader.load_constants ?itn_features ?cli_proof_level ~logger
+        json
+    in
+    Config_loader.load_config constants json
   in
-  let e_res = Config_loader.load_config constants json in
   match e_res with
   | Ok res ->
       return res

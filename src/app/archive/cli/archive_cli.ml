@@ -34,22 +34,31 @@ let command_run =
          ~doc:
            "int Delete blocks that are more than n blocks lower than the \
             maximum seen block."
-     and config_file = Cli_lib.Flag.conf_file
-     and add_genesis_accounts_opt =
-       Command.Param.flag "--add-genesis-accounts"
-         ~doc:"add genesis accounts to the db" Command.Param.no_arg
-     in
+     and config_file = Cli_lib.Flag.conf_file in
      fun () ->
        let logger = Logger.create () in
        let open Deferred.Let_syntax in
        let%bind precomputed_values, _ =
-         let%bind config = Runtime_config.load_config ~logger config_file in
+         let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+         let commit_id_short = Mina_version.commit_id in
+         let%bind config =
+           Runtime_config.load_config ~conf_dir ~commit_id_short ~logger
+             config_file
+         in
          Deferred.Or_error.ok_exn
          @@ Genesis_ledger_helper.Config_initializer.initialize ~logger config
        in
        Stdout_log.setup log_json log_level ;
        [%log info] "Starting archive process; built with commit $commit"
          ~metadata:[ ("commit", `String Mina_version.commit_id) ] ;
+       let add_genesis_accounts_opt =
+         (* This is just to match the behaviour which was here before -- previously if you
+            supplied a --config-file option then this would eventually call add_genesis_accounts.
+            My suspicion is that this relies on being able to load a runtime config value from
+            "compiled config" alone.
+         *)
+         not @@ List.is_empty config_file
+       in
        Archive_lib.Processor.setup_server ~metrics_server_port ~logger
          ~postgres_address:postgres.value
          ~server_port:
