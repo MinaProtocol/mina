@@ -1,5 +1,7 @@
 let name = "cloud"
 
+let doc = "Run mina integration test(s) on remote cloud provider."
+
 module Network = Kubernetes_network
 module Network_config = Mina_automation.Network_config
 module Network_manager = Mina_automation.Network_manager
