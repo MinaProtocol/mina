@@ -78,6 +78,21 @@ type t =
   }
 [@@deriving to_yojson]
 
+let of_json_layout (json : Json_layout.t) : (t, string) result =
+  let open Result.Let_syntax in
+  let daemon = Daemon.of_json_layout json.daemon in
+  let genesis_constants = Genesis_constants.make json.genesis in
+  let proof = Constraint.of_json_layout json.proof in
+  let%bind ledger = Ledger.of_json_layout json.ledger in
+  let%map epoch_data =
+    match json.epoch_data with
+    | None ->
+        Ok None
+    | Some epoch_data ->
+        Epoch_data.of_json_layout epoch_data |> Result.map ~f:Option.some
+  in
+  { daemon; genesis_constants; proof; ledger; epoch_data }
+
 let format_as_json_without_accounts (x : t) =
   let genesis_accounts =
     let ({ accounts; _ } : Json_layout.Ledger.t) =
@@ -240,45 +255,225 @@ let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
   ; daemon
   }
 
-type constants =
-  { genesis_constants : Genesis_constants.t
-  ; proof : Constraint.t
-  ; compile_config : Mina_compile_config.t
-  }
-
-module type Config_loader = sig
-  val load_config :
-       ?itn_features:bool
-    -> ?cli_proof_level:Genesis_constants.Proof_level.t
-    -> config_file:string
-    -> unit
-    -> t Deferred.Or_error.t
-
-  val load_config_exn :
-       ?itn_features:bool
-    -> ?cli_proof_level:Genesis_constants.Proof_level.t
-    -> config_file:string
-    -> unit
-    -> t Deferred.t
-
-  val load_constants :
-       ?cli_proof_level:Genesis_constants.Proof_level.t
-    -> config_file:string
-    -> unit
-    -> constants Deferred.Or_error.t
-
-  val load_constants_exn :
-       ?cli_proof_level:Genesis_constants.Proof_level.t
-    -> config_file:string
-    -> unit
-    -> constants Deferred.t
-
-  val of_json_layout : Json_layout.t -> (t, string) Result.t
-
-  val merge_json : Yojson.Safe.t -> Yojson.Safe.t -> (Yojson.Safe.t,string) result
+module type Json_loader_intf = sig
+  val load_config_files_exn :
+       ?conf_dir:string
+    -> ?commit_id_short:string
+    -> logger:Logger.t
+    -> string list
+    -> Yojson.Safe.t Deferred.Or_error.t
 end
 
-module Config_loader : Config_loader = struct
+module Json_loader : Json_loader_intf = struct
+  let rec merge_json (a : Yojson.Safe.t) (b : Yojson.Safe.t) :
+      (Yojson.Safe.t, string) result =
+    let module T = Monad_lib.Make_ext2 (Result) in
+    let open Result.Let_syntax in
+    match (a, b) with
+    | `Assoc obj_a, `Assoc obj_b ->
+        Result.map ~f:(fun kvs -> `Assoc (List.rev kvs))
+        @@ T.fold_m
+             ~f:(fun acc (key, value) ->
+               let%bind merged_value =
+                 match
+                   List.find ~f:(fun (key', _) -> String.equal key key') obj_a
+                 with
+                 | Some (_, value') ->
+                     merge_json value' value
+                 | None ->
+                     Result.return value
+               in
+               Result.return
+               @@ (key, merged_value)
+                  :: List.filter ~f:(fun (x, _) -> String.(key <> x)) acc )
+             ~init:obj_a obj_b
+    | `List _, `List _ ->
+        Result.return b
+    | `Bool _, `Bool _ ->
+        Result.return b
+    | `Int _, `Int _ ->
+        Result.return b
+    | `Float _, `Float _ ->
+        Result.return b
+    | `String _, `String _ ->
+        Result.return b
+    (*Null values overwrites anything*)
+    | _, `Null ->
+        Result.return `Null
+    (*Anything overwrites a Null value*)
+    | `Null, _ ->
+        Result.return b
+    | a, b ->
+        Error
+          (sprintf "Cannot merge %s and %s" (Yojson.Safe.to_string a)
+             (Yojson.Safe.to_string b) )
+
+  let%test_module _ =
+    ( module struct
+      let assert_equal a b =
+        if not (Yojson.Safe.equal a b) then
+          failwithf "Expected %s but got %s"
+            (Yojson.Safe.pretty_to_string a)
+            (Yojson.Safe.pretty_to_string b)
+            ()
+
+      let%test_unit "simple object union" =
+        let json1 = `Assoc [ ("a", `Int 1); ("b", `Int 2) ] in
+        let json2 = `Assoc [ ("c", `Int 3); ("d", `Int 4) ] in
+        let expected =
+          `Assoc [ ("a", `Int 1); ("b", `Int 2); ("c", `Int 3); ("d", `Int 4) ]
+        in
+        assert_equal (merge_json json1 json2 |> Result.ok_or_failwith) expected
+
+      let%test_unit "simple object overwrite" =
+        let json1 = `Assoc [ ("a", `Int 1) ] in
+        let json2 = `Assoc [ ("a", `Int 2) ] in
+        let expected = `Assoc [ ("a", `Int 2) ] in
+        assert_equal (merge_json json1 json2 |> Result.ok_or_failwith) expected
+
+      let%test_unit "nested object union" =
+        let json1 = `Assoc [ ("a", `Assoc [ ("b", `Int 1) ]) ] in
+        let json2 = `Assoc [ ("a", `Assoc [ ("c", `Int 2) ]) ] in
+        let expected =
+          `Assoc [ ("a", `Assoc [ ("b", `Int 1); ("c", `Int 2) ]) ]
+        in
+        assert_equal (merge_json json1 json2 |> Result.ok_or_failwith) expected
+
+      let%test_unit "nested object overwrite" =
+        let json1 = `Assoc [ ("a", `Assoc [ ("b", `Int 1) ]) ] in
+        let json2 = `Assoc [ ("a", `Assoc [ ("b", `Int 2) ]) ] in
+        let expected = `Assoc [ ("a", `Assoc [ ("b", `Int 2) ]) ] in
+        assert_equal (merge_json json1 json2 |> Result.ok_or_failwith) expected
+
+      let%test_unit "Null values get overridden" =
+        let json1 = `Assoc [ ("a", `Int 1); ("b", `Null) ] in
+        let json1' = `Assoc [ ("a", `Int 1) ] in
+        let json2 = `Assoc [ ("a", `Int 2); ("b", `Int 3) ] in
+        let expected = `Assoc [ ("a", `Int 2); ("b", `Int 3) ] in
+        let result = merge_json json1 json2 |> Result.ok_or_failwith in
+        let result' = merge_json json1' json2 |> Result.ok_or_failwith in
+        assert_equal expected result ;
+        assert_equal expected result'
+    end )
+
+  let get_magic_config_files ?conf_dir ?commit_id_short () =
+    let config_file_configdir =
+      Option.map
+        ~f:(fun dir -> (Core.(dir ^/ "daemon.json"), `May_be_missing))
+        conf_dir
+    in
+    (* Search for config files installed as part of a deb/brew package.
+       These files are commit-dependent, to ensure that we don't clobber
+       configuration for dev builds or use incompatible configs.
+    *)
+    let config_file_installed =
+      let f commit_id_short =
+        let json = "config_" ^ commit_id_short ^ ".json" in
+        List.fold_until ~init:None
+          (Cache_dir.possible_paths json)
+          ~f:(fun _acc f ->
+            match Core.Sys.file_exists f with
+            | `Yes ->
+                Stop (Some (f, `Must_exist))
+            | _ ->
+                Continue None )
+          ~finish:Fn.id
+      in
+      Option.(commit_id_short >>= f)
+    in
+    let config_file_envvar =
+      match Sys.getenv "MINA_CONFIG_FILE" with
+      | Some config_file ->
+          Some (config_file, `Must_exist)
+      | None ->
+          None
+    in
+    List.filter_opt
+      [ config_file_installed; config_file_configdir; config_file_envvar ]
+
+  let read_files ~logger config_files : string list Deferred.t =
+    let module T = Monad_lib.Make_ext (Deferred) in
+    let f (config_file, s) : string option T.t =
+      let%bind e_contents =
+        Monitor.try_with_or_error (fun () -> Reader.file_contents config_file)
+      in
+      match e_contents with
+      | Ok a ->
+          Deferred.return (Some a)
+      | Error err -> (
+          match s with
+          | `Must_exist ->
+              Mina_user_error.raisef ~where:"reading configuration file"
+                "The configuration file %s could not be read:\n%s" config_file
+                (Error.to_string_hum err)
+          | `May_be_missing ->
+              [%log warn] "Could not read configuration from $config_file"
+                ~metadata:
+                  [ ("config_file", `String config_file)
+                  ; ("error", Error_json.error_to_yojson err)
+                  ] ;
+              return None )
+    in
+    Deferred.map ~f:List.filter_opt @@ T.map_m ~f config_files
+
+  let load_config_files (files : string Mina_stdlib.Nonempty_list.t) :
+      Yojson.Safe.t Deferred.Or_error.t =
+    let module T = Monad_lib.Make_ext (Deferred.Or_error) in
+    let read_json_file x : Yojson.Safe.t Deferred.Or_error.t =
+      let%map a = Reader.file_contents x in
+      Ok (Yojson.Safe.from_string a)
+    in
+    let open Deferred.Or_error.Let_syntax in
+    let file, rest = Mina_stdlib.Nonempty_list.uncons files in
+    let%bind init = read_json_file file in
+    let f acc filename =
+      let%bind json = read_json_file filename in
+      match merge_json acc json with
+      | Error e ->
+          Deferred.Or_error.error_string e
+      | Ok x ->
+          Deferred.Or_error.return x
+    in
+    T.fold_m ~f ~init rest
+
+  let load_config_files_exn ?conf_dir ?commit_id_short ~logger config_files =
+    let magic_config_files =
+      get_magic_config_files ?conf_dir ?commit_id_short ()
+    in
+    let provided_files = List.map ~f:(fun f -> (f, `Must_exist)) config_files in
+    let all_files = magic_config_files @ provided_files in
+    let%bind fs = read_files ~logger all_files in
+    match Mina_stdlib.Nonempty_list.of_list_opt fs with
+    | None ->
+        Mina_user_error.raisef ~where:"reading configuration files"
+          "Failed to find any configuration file"
+    | Some files ->
+        load_config_files files
+end
+
+module type Constants_loader_intf = sig
+  type t =
+    { genesis_constants : Genesis_constants.t
+    ; constraint_constants : Genesis_constants.Constraint_constants.t
+    ; proof_level : Genesis_constants.Proof_level.t
+    ; compile_config : Mina_compile_config.t
+    }
+
+  val load_constants :
+       ?itn_features:bool
+    -> ?cli_proof_level:Genesis_constants.Proof_level.t
+    -> Yojson.Safe.t
+    -> t Deferred.Or_error.t
+end
+
+module Constants_loader : Constants_loader_intf = struct
+  type t =
+    { genesis_constants : Genesis_constants.t
+    ; constraint_constants : Genesis_constants.Constraint_constants.t
+    ; proof_level : Genesis_constants.Proof_level.t
+    ; compile_config : Mina_compile_config.t
+    }
+
   module Compiled = struct
     type t =
       { genesis_constants : Genesis_constants.Inputs.t
@@ -499,195 +694,91 @@ module Config_loader : Config_loader = struct
       { genesis_constants; constraint_constants; proof_level; compile_config }
   end
 
-  (* right-biased merging of json values *)
-  let rec merge_json (a : Yojson.Safe.t) (b : Yojson.Safe.t) : (Yojson.Safe.t,string) result =
-    let module T = Monad_lib.Make_ext2(Result) in
-    let open Result.Let_syntax in
-    match (a, b) with
-    | (`Assoc obj_a, `Assoc obj_b) ->
-        Result.map ~f:(fun kvs -> `Assoc (List.rev kvs)) @@ 
-          T.fold_m ~f:(fun acc (key, value) ->
-              let%bind merged_value =
-                match List.find ~f:(fun (key',_) -> String.equal key key') obj_a with
-                | Some (_,value') -> merge_json value' value
-                | None -> Result.return value
-              in Result.return @@ (key, merged_value) :: 
-                (List.filter ~f:(fun (x,_) -> String.(key <> x)) acc)
-            ) ~init:obj_a obj_b
-    | (`List _, `List _) -> Result.return b
-    | (`Bool _, `Bool _) -> Result.return b
-    | (`Int _, `Int _) -> Result.return b
-    | (`Float _, `Float _) -> Result.return b
-    | (`String _, `String _) -> Result.return b
-    (*Null values overwrites anything*)
-    | (_, `Null) -> Result.return `Null
-    (*Anything overwrites a Null value*)
-    | (`Null, _) -> Result.return b
-    | (a,b) -> Error (sprintf "Cannot merge %s and %s" (Yojson.Safe.to_string a) (Yojson.Safe.to_string b))
-
-  let%test_module _ = (module struct
-      let assert_equal a b =
-        if not (Yojson.Safe.equal a b) then
-          failwithf "Expected %s but got %s" (Yojson.Safe.pretty_to_string a) (Yojson.Safe.pretty_to_string b) () 
-  
-      let%test_unit "simple object union" =
-        let json1 = `Assoc [("a", `Int 1); ("b", `Int 2)] in
-        let json2 = `Assoc [("c", `Int 3); ("d", `Int 4)] in
-        let expected = `Assoc [("a", `Int 1); ("b", `Int 2); ("c", `Int 3); ("d", `Int 4)] in
-        assert_equal (merge_json json1 json2 |> Result.ok_or_failwith) expected
-
-      let%test_unit "simple object overwrite" =
-          let json1 = `Assoc [("a", `Int 1)] in
-          let json2 = `Assoc [("a", `Int 2)] in
-          let expected = `Assoc [("a", `Int 2)] in
-          assert_equal (merge_json json1 json2 |> Result.ok_or_failwith) expected
-  
-      let%test_unit "nested object union" =
-        let json1 = `Assoc [("a", `Assoc [("b", `Int 1)])] in
-        let json2 = `Assoc [("a", `Assoc [("c", `Int 2)])] in
-        let expected = `Assoc [("a", `Assoc [("b", `Int 1); ("c", `Int 2)])] in
-        assert_equal (merge_json json1 json2 |> Result.ok_or_failwith) expected
-
-      let%test_unit "nested object overwrite" =
-        let json1 = `Assoc [("a", `Assoc [("b", `Int 1)])] in
-        let json2 = `Assoc [("a", `Assoc [("b", `Int 2)])] in
-        let expected = `Assoc [("a", `Assoc [("b", `Int 2)])] in
-        assert_equal (merge_json json1 json2 |> Result.ok_or_failwith) expected
-
-
-      let%test_unit "Null values get overridden" = 
-        let json1 = `Assoc [("a", `Int 1); ("b", `Null)] in
-        let json1' = `Assoc [("a", `Int 1)] in
-        let json2 = `Assoc [("a", `Int 2); ("b", `Int 3)] in
-        let expected = `Assoc [("a", `Int 2); ("b", `Int 3)] in
-        let result = merge_json json1 json2 |> Result.ok_or_failwith in
-        let result' = merge_json json1' json2 |> Result.ok_or_failwith in
-        assert_equal expected result;
-        assert_equal expected result'
-
-    end)
-
-  let load_json_files (files : string Mina_stdlib.Nonempty_list.t) : Yojson.Safe.t Deferred.t =
-    let module T = Monad_lib.Make_ext(Deferred) in
-    let open Deferred.Let_syntax in
-    let read_json_file x = 
-      Reader.file_contents x |> Deferred.map ~f:Yojson.Safe.from_string
-    in
-    let (file,rest) = Mina_stdlib.Nonempty_list.uncons files in
-    let%bind init = read_json_file file in
-    let f acc filename = 
-        let%bind json = read_json_file filename in
-        match merge_json acc json with 
-        | Error e -> Deferred.Or_error.error_string e |> Deferred.Or_error.ok_exn
-        | Ok x -> Deferred.return x 
-    in T.fold_m ~f ~init rest
-
-
-  let load_constants ?(cli_proof_level : Genesis_constants.Proof_level.t option)
-      ~config_file () : constants Deferred.Or_error.t =
-    let open Deferred.Or_error.Let_syntax in
-    let%bind json =
-      Monitor.try_with_or_error (fun () ->
-          Deferred.map ~f:Yojson.Safe.from_string
-          @@ Reader.file_contents config_file )
-    in
+  let load_constants ?(itn_features = false)
+      ?(cli_proof_level : Genesis_constants.Proof_level.t option) json :
+      t Deferred.Or_error.t =
     match Runtime_config_v1.Json_layout.of_yojson json with
     | Ok config ->
         let a = Compiled.combine Compiled.constants config in
         Deferred.Or_error.return
           { genesis_constants = Genesis_constants.make a.genesis_constants
-          ; compile_config = Mina_compile_config.make a.compile_config
-          ; proof =
-              { constraint_constants =
-                  Genesis_constants.Constraint_constants.make
-                    a.constraint_constants
-              ; proof_level =
-                  Option.value
-                    ~default:
-                      (Genesis_constants.Proof_level.of_string a.proof_level)
-                    cli_proof_level
-              }
+          ; compile_config =
+              { (Mina_compile_config.make a.compile_config) with itn_features }
+          ; constraint_constants =
+              Genesis_constants.Constraint_constants.make a.constraint_constants
+          ; proof_level =
+              Option.value
+                ~default:(Genesis_constants.Proof_level.of_string a.proof_level)
+                cli_proof_level
           }
     | Error e ->
         Deferred.Or_error.error_string e
+end
 
-  let load_constants_exn ?cli_proof_level ~config_file () =
-    Deferred.Or_error.ok_exn @@ load_constants ?cli_proof_level ~config_file ()
+module type Config_loader = sig
+  val load_config : Constants_loader.t -> Yojson.Safe.t -> (t, string) result
+end
 
-
-  let load_config_json filename : Json_layout.t Deferred.Or_error.t =
-    let open Deferred.Or_error.Let_syntax in
-    let module T = Monad_lib.Make_ext(Deferred.Or_error) in
-    let%bind json =
-      Monitor.try_with_or_error (fun () ->
-          Deferred.map ~f:Yojson.Safe.from_string
-          @@ Reader.file_contents filename )
-    in
-    match Runtime_config_v1.Json_layout.of_yojson json with
-    | Ok config ->
-        let a = Compiled.combine Compiled.constants config in
-        let config =
-          { Json_layout.daemon =
-              { compile_config = a.compile_config
-              ; peer_list_url =
-                  Option.(config.daemon >>= fun x -> x.peer_list_url)
-              }
-          ; genesis = a.genesis_constants
-          ; proof =
-              { constraint_constants = a.constraint_constants
-              ; proof_level = a.proof_level
-              }
-          ; ledger =
-              ( match config.ledger with
-              | Some ledger ->
-                  ledger
-              | None ->
-                  failwithf "ledger not found in %s" filename () )
-          ; epoch_data = config.epoch_data
-          }
-        in
-        Deferred.Or_error.return config
-    | Error e ->
-        Deferred.Or_error.error_string e
-
-  let of_json_layout (config : Json_layout.t) : (t, string) result =
+module Config_loader : Config_loader = struct
+  let load_config (constants : Constants_loader.t) (json : Yojson.Safe.t) :
+      (t, string) result =
     let open Result.Let_syntax in
-    let proof = Constraint.of_json_layout config.proof in
-    let genesis_constants = Genesis_constants.make config.genesis in
-    let daemon = Daemon.of_json_layout config.daemon in
-    let%bind ledger = Ledger.of_json_layout config.ledger in
+    let%bind json_layout = Runtime_config_v1.Json_layout.of_yojson json in
+    let%bind ledger =
+      match json_layout.ledger with
+      | Some ledger ->
+          Ledger.of_json_layout ledger
+      | None ->
+          Error "ledger field is missing in config json"
+    in
     let%map epoch_data =
-      match config.epoch_data with
+      match json_layout.epoch_data with
       | None ->
           Ok None
       | Some conf ->
           Epoch_data.of_json_layout conf |> Result.map ~f:Option.some
     in
-    { proof; genesis_constants; daemon; ledger; epoch_data }
-
-  let load_config ?(itn_features = false) ?cli_proof_level ~config_file () =
-    let open Deferred.Or_error.Let_syntax in
-    let%bind config = load_config_json config_file in
-    let e_config = of_json_layout config in
-    match e_config with
-    | Ok config ->
-        let { Constraint.proof_level; _ } = config.proof in
-        Deferred.Or_error.return
-          { config with
-            proof =
-              { config.proof with
-                proof_level = Option.value ~default:proof_level cli_proof_level
-              }
-          ; daemon =
-              { config.daemon with
-                compile_config =
-                  { config.daemon.compile_config with itn_features }
-              }
-          }
-    | Error e ->
-        Deferred.Or_error.error_string e
-
-  let load_config_exn ?itn_features ?cli_proof_level ~config_file () =
-    Deferred.Or_error.ok_exn
-    @@ load_config ?itn_features ?cli_proof_level ~config_file ()
+    { genesis_constants = constants.genesis_constants
+    ; proof =
+        { constraint_constants = constants.constraint_constants
+        ; proof_level = constants.proof_level
+        }
+    ; daemon =
+        { compile_config = constants.compile_config
+        ; peer_list_url =
+            Option.(json_layout.daemon >>= fun a -> a.peer_list_url)
+        }
+    ; ledger
+    ; epoch_data
+    }
 end
+
+let load_constants ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
+    ~logger config_files =
+  Deferred.Or_error.ok_exn
+  @@
+  let open Deferred.Or_error.Let_syntax in
+  let%bind json =
+    Json_loader.load_config_files_exn ?conf_dir ?commit_id_short ~logger
+      config_files
+  in
+  Constants_loader.load_constants ?itn_features ?cli_proof_level json
+
+let load_config ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
+    ~logger config_files =
+  Deferred.Or_error.ok_exn
+  @@
+  let open Deferred.Or_error.Let_syntax in
+  let%bind json =
+    Json_loader.load_config_files_exn ?conf_dir ?commit_id_short ~logger
+      config_files
+  in
+  let%bind constants =
+    Constants_loader.load_constants ?itn_features ?cli_proof_level json
+  in
+  let e_res = Config_loader.load_config constants json in
+  match e_res with
+  | Ok res ->
+      return res
+  | Error e ->
+      Deferred.Or_error.error_string @@ "Error loading runtime config: " ^ e

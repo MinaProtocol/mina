@@ -34,6 +34,7 @@
    block_time
    kimchi_pasta
    kimchi_pasta.basic
+   mina_compile_config
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let)))

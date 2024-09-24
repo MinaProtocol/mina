@@ -43,9 +43,7 @@ let command_run =
        let logger = Logger.create () in
        let open Deferred.Let_syntax in
        let%bind precomputed_values, _ =
-         let%bind config =
-           Runtime_config.Config_loader.load_config_exn ~config_file ()
-         in
+         let%bind config = Runtime_config.load_config ~logger config_file in
          Deferred.Or_error.ok_exn
          @@ Genesis_ledger_helper.Config_initializer.initialize ~logger config
        in

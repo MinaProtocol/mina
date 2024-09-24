@@ -3,19 +3,10 @@ open Core_kernel
 let () =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let config_file = Sys.getenv_opt "MINA_CONFIG_FILE" in
-      let config_file =
-        match config_file with
-        | Some config_file ->
-            config_file
-        | None ->
-            failwith "MINA_CONFIG_FILE environment variable not set"
-      in
       let open Async.Deferred.Let_syntax in
-      let%bind config =
-        Runtime_config.Config_loader.load_constants_exn ~config_file ()
-      in
-      let { Runtime_config.Constraint.constraint_constants; _ } =
-        config.proof
+      let%bind { constraint_constants; _ } =
+        let logger = Logger.create () in
+        Runtime_config.load_constants ~logger (Option.to_list config_file)
       in
       let () = Format.eprintf "Generating transaction snark circuit..@." in
       let module Transaction_snark_instance = Transaction_snark.Make (struct

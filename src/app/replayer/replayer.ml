@@ -639,11 +639,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         ~transport:(Logger_file_system.evergrowing ~log_filename)
         () ) ;
   let logger = Logger.create () in
-  let%bind config =
-    Runtime_config.Config_loader.load_constants_exn ~config_file ()
-  in
-  let { Runtime_config.Constraint.constraint_constants; proof_level } =
-    config.proof
+  let%bind { constraint_constants; proof_level; _ } =
+    Runtime_config.load_constants ~logger config_file
   in
   let json = Yojson.Safe.from_file input_file in
   let input =

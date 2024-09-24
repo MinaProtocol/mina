@@ -612,8 +612,9 @@ let setup_daemon logger ~itn_features =
         let mina_initialization_deferred () =
           let%bind precomputed_values, (*config_jsons,*) config =
             let%bind conf =
-              Runtime_config.Config_loader.load_config_exn ?cli_proof_level
-                ~config_file ()
+              Runtime_config.load_config ~conf_dir
+                ~commit_id_short:Mina_version.commit_id ?cli_proof_level ~logger
+                config_file
             in
             Deferred.Or_error.ok_exn
             @@ Genesis_ledger_helper.Config_initializer.initialize ?genesis_dir
@@ -1374,11 +1375,8 @@ let internal_commands logger ~itn_features =
         fun () ->
           let logger = Logger.create () in
           let open Deferred.Let_syntax in
-          let%bind config =
-            Runtime_config.Config_loader.load_constants_exn ~config_file ()
-          in
-          let { Runtime_config.Constraint.constraint_constants; proof_level } =
-            config.proof
+          let%bind { constraint_constants; proof_level; _ } =
+            Runtime_config.load_constants ~logger config_file
           in
           Parallel.init_master () ;
           match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
@@ -1402,13 +1400,10 @@ let internal_commands logger ~itn_features =
             ~doc:"File containing the s-expression of the snark work to execute"
         and config_file = Cli_lib.Flag.conf_file in
         fun () ->
-          let open Deferred.Let_syntax in
           let logger = Logger.create () in
-          let%bind config =
-            Runtime_config.Config_loader.load_constants_exn ~config_file ()
-          in
-          let { Runtime_config.Constraint.constraint_constants; proof_level } =
-            config.proof
+          let open Deferred.Let_syntax in
+          let%bind { constraint_constants; proof_level; _ } =
+            Runtime_config.load_constants ~logger config_file
           in
           Parallel.init_master () ;
           match%bind
@@ -1457,11 +1452,8 @@ let internal_commands logger ~itn_features =
         fun () ->
           let open Async in
           let logger = Logger.create () in
-          let%bind config =
-            Runtime_config.Config_loader.load_constants_exn ~config_file ()
-          in
-          let { Runtime_config.Constraint.constraint_constants; proof_level } =
-            config.proof
+          let%bind { constraint_constants; proof_level; _ } =
+            Runtime_config.load_constants ~logger config_file
           in
           Parallel.init_master () ;
           let%bind conf_dir = Unix.mkdtemp "/tmp/mina-verifier" in
@@ -1615,8 +1607,9 @@ let internal_commands logger ~itn_features =
           let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
           let%bind precomputed_values, _ =
             let%bind config =
-              Runtime_config.Config_loader.load_config_exn ~cli_proof_level:Full
-                ~config_file ()
+              Runtime_config.load_config ~conf_dir
+                ~commit_id_short:Mina_version.commit_id ~cli_proof_level:Full
+                ~logger config_file
             in
             Deferred.Or_error.ok_exn
             @@ Genesis_ledger_helper.Config_initializer.initialize ?genesis_dir

@@ -2478,7 +2478,7 @@ module Queries = struct
           ]
       ~resolve:(fun { ctx = mina; _ } () state_hash_opt block_height_opt ->
         let open Deferred.Result.Let_syntax in
-        let runtime_config = Mina_lib.runtime_config mina in
+        let runtime_config = (Mina_lib.config mina).runtime_config in
         let%bind breadcrumb =
           match (state_hash_opt, block_height_opt) with
           | None, None -> (

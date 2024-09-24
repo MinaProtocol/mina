@@ -53,11 +53,11 @@ module Flags = struct
 end
 
 let create_zkapp_account =
-  let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+  let create_command ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
       ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ~config_file () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
+      create_zkapp_account ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
         ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ~config_file
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
@@ -84,19 +84,20 @@ let create_zkapp_account =
        and config_file = Cli_lib.Flag.conf_file
        and amount = Flags.amount in
        let fee = Option.value ~default:Flags.default_fee fee in
+       let logger = Logger.create () in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+       create_command ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
          ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ~config_file ))
 
 let upgrade_zkapp =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+  let create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
       ~verification_key ~zkapp_uri ~auth ~config_file () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+      upgrade_zkapp ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
         ~verification_key ~zkapp_uri ~auth ~config_file
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
@@ -126,6 +127,7 @@ let upgrade_zkapp =
               to change the verification key"
            Param.(required string)
        in
+       let logger = Logger.create () in
        let fee = Option.value ~default:Flags.default_fee fee in
        let auth = Util.auth_of_string auth in
        if Currency.Fee.(fee < Flags.min_fee) then
@@ -133,15 +135,15 @@ let upgrade_zkapp =
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        let zkapp_uri = Zkapp_basic.Set_or_keep.of_option zkapp_uri_str in
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+       create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~verification_key ~zkapp_uri ~auth ~config_file ))
 
 let transfer_funds_one_receiver =
-  let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+  let create_command ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
       ~fee_payer_nonce ~memo ~receiver ~amount ~config_file () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer
+      transfer_funds ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
         ~fee_payer_nonce ~memo ~config_file
         ~receivers:(Deferred.return [ (receiver, amount) ])
     in
@@ -171,19 +173,20 @@ let transfer_funds_one_receiver =
        and config_file = Cli_lib.Flag.conf_file
        and amount = Flags.amount in
        let fee = Option.value ~default:Flags.default_fee fee in
+       let logger = Logger.create () in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwithf "Fee must at least be %s"
            (Currency.Fee.to_mina_string Flags.min_fee)
            () ;
-       create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+       create_command ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
          ~fee_payer_nonce ~memo ~receiver ~amount ~config_file ))
 
 let transfer_funds =
-  let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+  let create_command ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
       ~fee_payer_nonce ~memo ~receivers ~config_file () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer
+      transfer_funds ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
         ~fee_payer_nonce ~memo ~receivers ~config_file
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
@@ -253,16 +256,17 @@ let transfer_funds =
            () ;
        let max_keys = 10 in
        let receivers = read_key_and_amount max_keys in
-       create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+       let logger = Logger.create () in
+       create_command ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
          ~fee_payer_nonce ~memo ~receivers ~config_file ))
 
 let update_state =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
-      ~config_file () =
+  let create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+      ~app_state ~config_file () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
-        ~config_file
+      update_state ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+        ~app_state ~config_file
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -284,19 +288,20 @@ let update_state =
            Param.(listed string)
        and config_file = Cli_lib.Flag.conf_file in
        let fee = Option.value ~default:Flags.default_fee fee in
+       let logger = Logger.create () in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+       create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~app_state ~config_file ))
 
 let update_zkapp_uri =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
-      ~auth ~config_file () =
+  let create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+      ~zkapp_uri ~auth ~config_file () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+      update_zkapp_uri ~logger ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
         ~zkapp_uri ~auth ~config_file
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
@@ -323,21 +328,22 @@ let update_zkapp_uri =
            Param.(required string)
        and config_file = Cli_lib.Flag.conf_file in
        let fee = Option.value ~default:Flags.default_fee fee in
+       let logger = Logger.create () in
        let auth = Util.auth_of_string auth in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+       create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
          ~zkapp_uri ~auth ~config_file ))
 
 let update_action_state =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+  let create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
       ~action_state ~config_file () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      update_action_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-        ~action_state ~config_file
+      update_action_state ~logger ~debug ~keyfile ~fee ~nonce ~memo
+        ~zkapp_keyfile ~action_state ~config_file
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -381,6 +387,7 @@ let update_action_state =
                   ~strip_whitespace:true string ))
        and config_file = Cli_lib.Flag.conf_file in
        let fee = Option.value ~default:Flags.default_fee fee in
+       let logger = Logger.create () in
        let action_state =
          List.filter_map
            ~f:(fun s -> if List.is_empty s then None else Some (Array.of_list s))
@@ -390,16 +397,16 @@ let update_action_state =
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+       create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~action_state ~config_file ))
 
 let update_token_symbol =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+  let create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
       ~token_symbol ~auth ~config_file () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-        ~token_symbol ~auth ~config_file
+      update_token_symbol ~logger ~debug ~keyfile ~fee ~nonce ~memo
+        ~snapp_keyfile ~token_symbol ~auth ~config_file
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -426,19 +433,20 @@ let update_token_symbol =
        and config_file = Cli_lib.Flag.conf_file in
        let fee = Option.value ~default:Flags.default_fee fee in
        let auth = Util.auth_of_string auth in
+       let logger = Logger.create () in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+       create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
          ~token_symbol ~auth ~config_file ))
 
 let update_permissions =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+  let create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
       ~snapp_update ~current_auth ~config_file () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      update_snapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+      update_snapp ~logger debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
         ~snapp_update ~current_auth ~config_file
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
@@ -522,20 +530,21 @@ let update_permissions =
            }
        in
        let snapp_update = { Account_update.Update.dummy with permissions } in
+       let logger = Logger.create () in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+       create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~config_file ~snapp_update
          ~current_auth:(Util.auth_of_string current_auth) ))
 
 let update_timings =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+  let create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
       ~snapp_update ~current_auth ~config_file () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      update_snapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+      update_snapp ~logger debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
         ~snapp_update ~current_auth ~config_file
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
@@ -590,11 +599,12 @@ let update_timings =
              : Account_update.Update.Timing_info.value )
        in
        let snapp_update = { Account_update.Update.dummy with timing } in
+       let logger = Logger.create () in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+       create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~snapp_update ~config_file
          ~current_auth:(Util.auth_of_string current_auth) ))
 
@@ -616,7 +626,9 @@ let test_zkapp_with_genesis_ledger =
            ~doc:"KEYFILE Private key file to create a new zkApp account"
            Param.(required string)
        and config_file = Cli_lib.Flag.conf_file in
-       test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file ))
+       let logger = Logger.create () in
+       test_zkapp_with_genesis_ledger_main ~logger keyfile zkapp_keyfile
+         config_file ))
 
 let txn_commands =
   [ ("create-zkapp-account", create_zkapp_account)

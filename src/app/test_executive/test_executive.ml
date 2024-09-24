@@ -331,14 +331,13 @@ let main inputs =
     }
   in
   let%bind config =
-    Runtime_config.Config_loader.load_constants_exn
-      ~config_file:inputs.config_file ()
+    Runtime_config.load_constants ~logger [ inputs.config_file ]
   in
   let constants =
     { genesis_constants = config.genesis_constants
-    ; constraint_constants = config.proof.constraint_constants
+    ; constraint_constants = config.constraint_constants
     ; compile_config = config.compile_config
-    ; proof_level = config.proof.proof_level
+    ; proof_level = config.proof_level
     }
   in
   let default_config = make_default_config ~constants in

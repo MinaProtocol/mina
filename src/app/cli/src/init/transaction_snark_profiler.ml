@@ -150,8 +150,8 @@ let command =
      fun () ->
        let open Deferred.Let_syntax in
        let%map config =
-         Runtime_config.Config_loader.load_constants_exn ~config_file
-           ~cli_proof_level:Full ()
+         let logger = Logger.create () in
+         Runtime_config.load_constants ~logger ~cli_proof_level:Full config_file
        in
        let num_transactions =
          Option.map n ~f:(fun n -> `Count (Int.pow 2 n))
@@ -178,10 +178,9 @@ let command =
            eprintf "These flags are incompatible with --zkapps: %s\n"
              (String.concat !incompatible_flags ~sep:", ") ) ;
        let repeats = Option.value repeats ~default:1 in
-       let { Runtime_config.Constraint.constraint_constants; proof_level } =
-         config.proof
-       in
        let genesis_constants = config.genesis_constants in
+       let constraint_constants = config.constraint_constants in
+       let proof_level = config.proof_level in
        if witness_only then
          witness ~genesis_constants ~constraint_constants ~proof_level
            ~max_num_updates ?min_num_updates num_transactions repeats preeval

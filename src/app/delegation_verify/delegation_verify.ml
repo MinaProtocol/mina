@@ -43,14 +43,10 @@ let timestamp =
   anon ("timestamp" %: string)
 
 (*We use the cli_proof_level arg to overide the config settings *)
-let instantiate_verify_functions ~config_file =
+let instantiate_verify_functions ~logger config_file =
   let open Deferred.Let_syntax in
-  let%map config =
-    Runtime_config.Config_loader.load_constants_exn ~cli_proof_level:Full
-      ~config_file ()
-  in
-  let { Runtime_config.Constraint.constraint_constants; proof_level } =
-    config.proof
+  let%map { constraint_constants; proof_level; _ } =
+    Runtime_config.load_constants ~cli_proof_level:Full ~logger config_file
   in
   Verifier.verify_functions ~constraint_constants ~proof_level ()
 
@@ -123,7 +119,7 @@ module Make_verifier (Source : Submission.Data_source) = struct
     |> Deferred.Or_error.all_unit
 end
 
-let filesystem_command =
+let filesystem_command ~logger =
   Command.async ~summary:"Verify submissions and block read from the filesystem"
     Command.Let_syntax.(
       let%map_open block_dir = block_dir_flag
@@ -132,7 +128,7 @@ let filesystem_command =
       and config_file = config_flag in
       fun () ->
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~config_file
+          instantiate_verify_functions ~logger config_file
         in
 
         let submission_paths = get_filenames inputs in
@@ -153,7 +149,7 @@ let filesystem_command =
             Output.display_error @@ Error.to_string_hum e ;
             exit 1)
 
-let cassandra_command =
+let cassandra_command ~logger =
   Command.async ~summary:"Verify submissions and block read from Cassandra"
     Command.Let_syntax.(
       let%map_open cqlsh = cassandra_executable_flag
@@ -165,7 +161,7 @@ let cassandra_command =
       fun () ->
         let open Deferred.Let_syntax in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~config_file
+          instantiate_verify_functions ~logger config_file
         in
         let module V = Make_verifier (struct
           include Submission.Cassandra
@@ -188,7 +184,7 @@ let cassandra_command =
             Output.display_error @@ Error.to_string_hum e ;
             exit 1)
 
-let stdin_command =
+let stdin_command ~logger =
   Command.async
     ~summary:"Verify submissions and blocks read from standard input"
     Command.Let_syntax.(
@@ -196,7 +192,7 @@ let stdin_command =
       fun () ->
         let open Deferred.Let_syntax in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~config_file
+          instantiate_verify_functions ~logger config_file
         in
         let module V = Make_verifier (struct
           include Submission.Stdin
@@ -213,11 +209,12 @@ let stdin_command =
             exit 1)
 
 let command =
+  let logger = Logger.create () in
   Command.group
     ~summary:"A tool for verifying JSON payload submitted by the uptime service"
-    [ ("fs", filesystem_command)
-    ; ("cassandra", cassandra_command)
-    ; ("stdin", stdin_command)
+    [ ("fs", filesystem_command ~logger)
+    ; ("cassandra", cassandra_command ~logger)
+    ; ("stdin", stdin_command ~logger)
     ]
 
 let () = Async.Command.run command

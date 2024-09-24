@@ -849,8 +849,9 @@ let () =
      fun () ->
        let open Async.Deferred.Let_syntax in
        let%map config =
-         Runtime_config.Config_loader.load_constants_exn ~config_file ()
+         let logger = Logger.create () in
+         Runtime_config.load_constants ~logger config_file
        in
        let genesis_constants = config.genesis_constants in
-       let constraint_constants = config.proof.constraint_constants in
+       let constraint_constants = config.constraint_constants in
        main { genesis_constants; constraint_constants } () )

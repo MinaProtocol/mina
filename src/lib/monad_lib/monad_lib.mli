@@ -7,6 +7,8 @@ module Make_ext : functor (M : Monad.S) -> sig
 
   val fold_m : f:('a -> 'b -> 'a t) -> init:'a -> 'b list -> 'a t
 
+  val foldr_m : f:('a -> 'b -> 'a t) -> init:'a -> 'b list -> 'a t
+
   val map_m : f:('a -> 'b t) -> 'a list -> 'b list t
 
   val concat_map_m : f:('a -> 'b list t) -> 'a list -> 'b list t
@@ -20,6 +22,8 @@ module Make_ext2 : functor (M : Monad.S2) -> sig
   type ('a, 'b) t = ('a, 'b) M.t
 
   val fold_m : f:('a -> 'b -> ('a, 'c) t) -> init:'a -> 'b list -> ('a, 'c) t
+
+  val foldr_m : f:('a -> 'b -> ('a, 'c) t) -> init:'a -> 'b list -> ('a, 'c) t
 
   val map_m : f:('a -> ('b, 'c) t) -> 'a list -> ('b list, 'c) t
 

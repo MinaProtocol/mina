@@ -529,7 +529,8 @@ let send_payment_graphql =
           ->
          let open Deferred.Let_syntax in
          let%bind config =
-           Runtime_config.Config_loader.load_constants_exn ~config_file ()
+           let logger = Logger.create () in
+           Runtime_config.load_constants ~logger config_file
          in
          let fee =
            Option.value ~default:config.compile_config.default_transaction_fee
@@ -568,7 +569,8 @@ let delegate_stake_graphql =
           ->
          let open Deferred.Let_syntax in
          let%bind config =
-           Runtime_config.Config_loader.load_constants_exn ~config_file ()
+           let logger = Logger.create () in
+           Runtime_config.load_constants ~logger config_file
          in
          let fee =
            Option.value ~default:config.compile_config.default_transaction_fee
@@ -834,12 +836,13 @@ let hash_ledger =
      fun () ->
        let open Deferred.Let_syntax in
        let%bind config =
-         Runtime_config.Config_loader.load_constants_exn ~config_file ()
+         let logger = Logger.create () in
+         Runtime_config.load_constants ~logger config_file
        in
        let process_accounts accounts =
          let packed_ledger =
            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-             ~depth:config.proof.constraint_constants.ledger_depth accounts
+             ~depth:config.constraint_constants.ledger_depth accounts
          in
          let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
          Format.printf "%s@."
@@ -948,11 +951,9 @@ let constraint_system_digests =
     (let%map_open config_file = Cli_lib.Flag.conf_file in
      fun () ->
        let open Deferred.Let_syntax in
-       let%bind config =
-         Runtime_config.Config_loader.load_constants_exn ~config_file ()
-       in
-       let { Runtime_config.Constraint.constraint_constants; proof_level } =
-         config.proof
+       let%bind { constraint_constants; proof_level; _ } =
+         let logger = Logger.create () in
+         Runtime_config.load_constants ~logger config_file
        in
        let all =
          Transaction_snark.constraint_system_digests ~constraint_constants ()
@@ -1825,9 +1826,7 @@ let compile_time_constants =
        let open Deferred.Let_syntax in
        let%map ({ consensus_constants; _ } as precomputed_values), _ =
          let logger = Logger.create () in
-         let%bind config =
-           Runtime_config.Config_loader.load_config_exn ~config_file ()
-         in
+         let%bind config = Runtime_config.load_config ~logger config_file in
          Deferred.Or_error.ok_exn
          @@ Genesis_ledger_helper.Config_initializer.initialize ~logger config
        in
@@ -2316,7 +2315,8 @@ let test_ledger_application =
      @@ fun () ->
      let open Deferred.Let_syntax in
      let%bind config =
-       Runtime_config.Config_loader.load_constants_exn ~config_file ()
+       let logger = Logger.create () in
+       Runtime_config.load_constants ~logger config_file
      in
      let first_partition_slots =
        Option.value ~default:128 first_partition_slots
@@ -2324,7 +2324,7 @@ let test_ledger_application =
      let num_txs_per_round = Option.value ~default:3 num_txs_per_round in
      let rounds = Option.value ~default:580 rounds in
      let max_depth = Option.value ~default:290 max_depth in
-     let constraint_constants = config.proof.constraint_constants in
+     let constraint_constants = config.constraint_constants in
      let genesis_constants = config.genesis_constants in
      Test_ledger_application.test ~privkey_path ~ledger_path ?prev_block_path
        ~first_partition_slots ~no_new_stack ~has_second_partition
@@ -2361,11 +2361,12 @@ let itn_create_accounts =
          ->
         let open Deferred.Let_syntax in
         let%bind config =
-          Runtime_config.Config_loader.load_constants_exn ~config_file ()
+          let logger = Logger.create () in
+          Runtime_config.load_constants ~logger config_file
         in
         let args' = (privkey_path, key_prefix, num_accounts, fee, amount) in
         let genesis_constants = config.genesis_constants in
-        let constraint_constants = config.proof.constraint_constants in
+        let constraint_constants = config.constraint_constants in
         Itn.create_accounts ~genesis_constants ~constraint_constants ~port args' ))
 
 module Visualization = struct

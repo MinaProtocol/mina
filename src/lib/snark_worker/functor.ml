@@ -229,12 +229,8 @@ module Make (Inputs : Intf.Inputs_intf) :
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
         with type Work.ledger_proof = Inputs.Ledger_proof.t ) ~logger
       ~config_file ~cli_proof_level daemon_address shutdown_on_disconnect =
-    let%bind config =
-      Runtime_config.Config_loader.load_constants_exn ?cli_proof_level
-        ~config_file ()
-    in
-    let { Runtime_config.Constraint.constraint_constants; proof_level } =
-      config.proof
+    let%bind { constraint_constants; proof_level; _ } =
+      Runtime_config.load_constants ~logger ?cli_proof_level config_file
     in
     let%bind state =
       Worker_state.create ~constraint_constants ~proof_level ()

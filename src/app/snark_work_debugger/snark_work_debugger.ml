@@ -40,11 +40,9 @@ let cmd =
       and config_file = Cli_lib.Flag.conf_file in
       fun () ->
         let open Deferred.Let_syntax in
-        let%bind config =
-          Runtime_config.Config_loader.load_constants_exn ~config_file ()
-        in
-        let { Runtime_config.Constraint.constraint_constants; proof_level } =
-          config.proof
+        let%bind { constraint_constants; proof_level; _ } =
+          let logger = Logger.create () in
+          Runtime_config.load_constants ~logger config_file
         in
         Obj.magic (main path ~constraint_constants ~proof_level))
 

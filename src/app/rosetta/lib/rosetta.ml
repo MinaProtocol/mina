@@ -176,11 +176,9 @@ let command =
   fun () ->
     let logger = Logger.create () in
     Cli.logger_setup log_json log_level ;
-    let%bind config =
-      Runtime_config.Config_loader.load_constants_exn ~config_file ()
-    in
+    let%bind config = Runtime_config.load_constants ~logger config_file in
     let account_creation_fee =
-      config.proof.constraint_constants.account_creation_fee
+      config.constraint_constants.account_creation_fee
     in
     let minimum_user_command_fee =
       config.genesis_constants.minimum_user_command_fee

@@ -73,7 +73,8 @@ let extract_accounts_exn = function
 
 let main ~config_file ~genesis_dir ~hash_output_file () =
   let%bind config =
-    Runtime_config.Config_loader.load_config_exn ~config_file ()
+    let logger = Logger.create () in
+    Runtime_config.load_config ~logger config_file
   in
   let accounts, staking_accounts_opt, next_accounts_opt =
     let ledger = config.ledger in

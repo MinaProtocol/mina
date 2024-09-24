@@ -68,8 +68,7 @@ let%test_module "Epoch ledger sync tests" =
           }
         in
         let config =
-          Runtime_config.Config_loader.of_json_layout runtime_config
-          |> Result.ok_or_failwith
+          Runtime_config.of_json_layout runtime_config |> Result.ok_or_failwith
         in
         match%map
           Genesis_ledger_helper.Config_initializer.initialize

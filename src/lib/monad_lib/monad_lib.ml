@@ -12,6 +12,14 @@ module Make_ext (M : Monad.S) = struct
         let%bind y = f init x in
         fold_m ~f ~init:y xs
 
+  let rec foldr_m ~f ~init = function
+    | [] ->
+        M.return init
+    | x :: xs ->
+        let open M.Let_syntax in
+        let%bind init' = foldr_m ~f ~init xs in
+        f init' x
+
   let map_m ~f xs =
     let open M.Let_syntax in
     fold_m xs ~init:[] ~f:(fun acc x ->
@@ -44,6 +52,14 @@ module Make_ext2 (M : Monad.S2) = struct
         let open M.Let_syntax in
         let%bind y = f init x in
         fold_m ~f ~init:y xs
+
+  let rec foldr_m ~f ~init = function
+    | [] ->
+        M.return init
+    | x :: xs ->
+        let open M.Let_syntax in
+        let%bind init' = foldr_m ~f ~init xs in
+        f init' x
 
   let map_m ~f xs =
     let open M.Let_syntax in

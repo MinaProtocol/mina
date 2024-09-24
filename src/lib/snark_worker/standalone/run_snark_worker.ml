@@ -21,9 +21,9 @@ let command =
      fun () ->
        let open Async in
        let open Deferred.Let_syntax in
-       let%bind { proof = { constraint_constants; proof_level }; _ } =
-         Runtime_config.Config_loader.load_constants_exn ~cli_proof_level
-           ~config_file ()
+       let%bind { constraint_constants; proof_level; _ } =
+         let logger = Logger.create () in
+         Runtime_config.load_constants ~cli_proof_level ~logger config_file
        in
        let%bind worker_state =
          Prod.Worker_state.create ~constraint_constants ~proof_level ()
