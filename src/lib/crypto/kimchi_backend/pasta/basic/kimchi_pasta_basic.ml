@@ -2,7 +2,7 @@ open Core_kernel
 open Kimchi_backend_common
 
 module Rounds : sig
-  open Pickles_types
+  open Typed_containers
   module Wrap = Nat.N15
 
   module Wrap_vector : Vector.With_version(Wrap).S
@@ -11,7 +11,7 @@ module Rounds : sig
 
   module Step_vector : Vector.With_version(Step).S
 end = struct
-  open Pickles_types
+  open Typed_containers
   module Wrap = Nat.N15
   module Step = Nat.N16
 
