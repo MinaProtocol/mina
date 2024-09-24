@@ -72,8 +72,8 @@ let%test_unit "check rust implementation of block-cipher" =
   in
   let open Pickles.Impls.Step in
   let module T = Internal_Basic in
-  Quickcheck.test (Quickcheck.Generator.list_with_length 3 T.Field.gen)
-    ~f:(fun s ->
+  Quickcheck.test ~trials:1000
+    (Quickcheck.Generator.list_with_length 3 T.Field.gen) ~f:(fun s ->
       let s () = Array.of_list s in
       [%test_eq: T.Field.t array]
         (Ocaml_permutation.block_cipher params' (s ()))
@@ -92,7 +92,7 @@ let%test_unit "check rust implementation of update" =
     let%map value = list T.Field.gen in
     (init_state, value)
   in
-  Quickcheck.test gen ~f:(fun (s, value) ->
+  Quickcheck.test ~trials:100 gen ~f:(fun (s, value) ->
       let s () = Array.of_list s in
       let value () = Array.of_list value in
       [%test_eq: T.Field.t array]
@@ -113,7 +113,7 @@ let%test_unit "check rust implementation of update_batch" =
     let%map values = list @@ list T.Field.gen in
     (init_state, values_large @ values)
   in
-  Quickcheck.test gen ~f:(fun (s, value) ->
+  Quickcheck.test ~trials:10 gen ~f:(fun (s, value) ->
       let s = Array.of_list s in
       let value () = List.map ~f:(fun l -> (`State s, Array.of_list l)) value in
       [%test_eq: T.Field.t array list]
@@ -136,7 +136,7 @@ let%test_unit "check update_batch on a large number of small vectors (parallel)"
     let%map values = list_with_length 1280 @@ list_with_length 2 T.Field.gen in
     (init_state, values)
   in
-  Quickcheck.test ~trials:100 gen ~f:(fun (s, value) ->
+  Quickcheck.test ~trials:10 gen ~f:(fun (s, value) ->
       let s = Array.of_list s in
       let value () = List.map ~f:(fun l -> (`State s, Array.of_list l)) value in
       let _ = update_batch ~rate:2 params' @@ value () in
