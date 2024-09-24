@@ -256,7 +256,7 @@ let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
   }
 
 module type Json_loader_intf = sig
-  val load_config_files_exn :
+  val load_config_files :
        ?conf_dir:string
     -> ?commit_id_short:string
     -> logger:Logger.t
@@ -391,15 +391,15 @@ module Json_loader : Json_loader_intf = struct
     List.filter_opt
       [ config_file_installed; config_file_configdir; config_file_envvar ]
 
-  let read_files ~logger config_files : string list Deferred.t =
+  let read_files ~logger config_files : Yojson.Safe.t list Deferred.t =
     let module T = Monad_lib.Make_ext (Deferred) in
-    let f (config_file, s) : string option T.t =
+    let f (config_file, s) =
       let%bind e_contents =
         Monitor.try_with_or_error (fun () -> Reader.file_contents config_file)
       in
       match e_contents with
       | Ok a ->
-          Deferred.return (Some a)
+          Deferred.return (Some (Yojson.Safe.from_string a))
       | Error err -> (
           match s with
           | `Must_exist ->
@@ -416,27 +416,7 @@ module Json_loader : Json_loader_intf = struct
     in
     Deferred.map ~f:List.filter_opt @@ T.map_m ~f config_files
 
-  let load_config_files (files : string Mina_stdlib.Nonempty_list.t) :
-      Yojson.Safe.t Deferred.Or_error.t =
-    let module T = Monad_lib.Make_ext (Deferred.Or_error) in
-    let read_json_file x : Yojson.Safe.t Deferred.Or_error.t =
-      let%map a = Reader.file_contents x in
-      Ok (Yojson.Safe.from_string a)
-    in
-    let open Deferred.Or_error.Let_syntax in
-    let file, rest = Mina_stdlib.Nonempty_list.uncons files in
-    let%bind init = read_json_file file in
-    let f acc filename =
-      let%bind json = read_json_file filename in
-      match merge_json acc json with
-      | Error e ->
-          Deferred.Or_error.error_string e
-      | Ok x ->
-          Deferred.Or_error.return x
-    in
-    T.fold_m ~f ~init rest
-
-  let load_config_files_exn ?conf_dir ?commit_id_short ~logger config_files =
+  let load_config_files ?conf_dir ?commit_id_short ~logger config_files =
     let magic_config_files =
       get_magic_config_files ?conf_dir ?commit_id_short ()
     in
@@ -447,8 +427,14 @@ module Json_loader : Json_loader_intf = struct
     | None ->
         Mina_user_error.raisef ~where:"reading configuration files"
           "Failed to find any configuration file"
-    | Some files ->
-        load_config_files files
+    | Some files -> (
+        let module T = Monad_lib.Make_ext2 (Result) in
+        let init, rest = Mina_stdlib.Nonempty_list.uncons files in
+        match T.fold_m ~f:merge_json ~init rest with
+        | Ok c ->
+            Deferred.Or_error.return c
+        | Error err ->
+            Deferred.Or_error.error_string err )
 end
 
 module type Constants_loader_intf = sig
@@ -759,7 +745,7 @@ let load_constants ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
   @@
   let open Deferred.Or_error.Let_syntax in
   let%bind json =
-    Json_loader.load_config_files_exn ?conf_dir ?commit_id_short ~logger
+    Json_loader.load_config_files ?conf_dir ?commit_id_short ~logger
       config_files
   in
   Constants_loader.load_constants ?itn_features ?cli_proof_level json
@@ -770,7 +756,7 @@ let load_config ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
   @@
   let open Deferred.Or_error.Let_syntax in
   let%bind json =
-    Json_loader.load_config_files_exn ?conf_dir ?commit_id_short ~logger
+    Json_loader.load_config_files ?conf_dir ?commit_id_short ~logger
       config_files
   in
   let%bind constants =
