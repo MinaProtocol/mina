@@ -1,7 +1,8 @@
 (library
  (name signature_lib_graphql)
  (public_name graphql_lib.signature_lib)
- (inline_tests (flags -verbose -show-counts))
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
   graphql-async

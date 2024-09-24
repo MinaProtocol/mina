@@ -1,7 +1,9 @@
 (library
  (name web_request)
  (public_name web_request)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version))
  (libraries core async core_kernel base async_kernel async_unix)
  (synopsis "Web tools that are used to send put requests"))
