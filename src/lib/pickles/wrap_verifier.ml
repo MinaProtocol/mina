@@ -279,8 +279,8 @@ struct
                         ( Boolean.Unsafe.of_cvar Field.(mul (b :> t) (b_g :> t))
                         , Array.map g ~f:(Double.map ~f:(( * ) (b :> t))) ) )
                  |> List.reduce
-                        ~f:(fun ((b1 : Boolean.var), g1) ((b2 : Boolean.var), g2)
-                           ->
+                      ~f:(fun ((b1 : Boolean.var), g1) ((b2 : Boolean.var), g2)
+                         ->
                         ( Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t))
                         , Array.map2_exn ~f:(Double.map2 ~f:( + )) g1 g2 ) )
                  |> fun x -> (Option.map ~f:fst x, Option.map ~f:snd x)

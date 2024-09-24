@@ -412,8 +412,8 @@ struct
       }
     in
     Timer.start __LOC__ ;
-    let module Max_proofs_verified = (val max_proofs_verified : Nat.Add.Intf
-                                        with type n = max_proofs_verified)
+    let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
+                                         with type n = max_proofs_verified )
     in
     let T = Max_proofs_verified.eq in
     let choices = choices ~self in
@@ -870,7 +870,7 @@ struct
             ~f:
               (Promise.map ~f:(fun x ->
                    Plonk_verification_key_evals.map
-                     (Verification_key.commitments x) ~f:(fun x -> [| x |] ) ) )
+                     (Verification_key.commitments x) ~f:(fun x -> [| x |]) ) )
       ; wrap_vk = Lazy.map wrap_vk ~f:(Promise.map ~f:Verification_key.index)
       ; wrap_domains
       ; step_domains
@@ -957,7 +957,7 @@ module Side_loaded = struct
     in
     (* TODO: This should be the actual max width on a per proof basis *)
     let max_proofs_verified =
-      ( module Verification_key.Max_width : Nat.Intf
+      (module Verification_key.Max_width : Nat.Intf
         with type n = Verification_key.Max_width.n )
     in
     with_return (fun { return } ->
@@ -1152,9 +1152,9 @@ let compile_with_wrap_main_override_promise :
           domains
           |> Vector.reduce_exn
                ~f:(fun
-                  { h = Pow_2_roots_of_unity d1 }
-                  { h = Pow_2_roots_of_unity d2 }
-                -> { h = Pow_2_roots_of_unity (Int.max d1 d2) } )
+                    { h = Pow_2_roots_of_unity d1 }
+                    { h = Pow_2_roots_of_unity d2 }
+                  -> { h = Pow_2_roots_of_unity (Int.max d1 d2) } )
         in
         Some
           { Verify.Instance.num_chunks
