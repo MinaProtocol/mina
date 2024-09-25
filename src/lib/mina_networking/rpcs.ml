@@ -368,7 +368,7 @@ module Answer_sync_ledger_query = struct
 
   module V4 = struct
     module T = struct
-      type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
+      type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V2.t
       [@@deriving sexp]
 
       type response =
@@ -411,19 +411,21 @@ module Answer_sync_ledger_query = struct
         [@version_asserted] )
       [@@deriving sexp]
 
-      let query_of_caller_model = Fn.id
+      let query_of_caller_model : Master.T.query -> query =
+       fun (h, q) -> (h, Sync_ledger.Query.Stable.V1.from_v2 q)
 
-      let callee_model_of_query = Fn.id
-
-      let caller_model_of_response : response -> Master.T.response = function
-        | Ok a ->
-            Ok (Sync_ledger.Answer.Stable.V2.to_latest a)
-        | Error e ->
-            Error e
+      let callee_model_of_query : query -> Master.T.query =
+       fun (h, q) -> (h, Sync_ledger.Query.Stable.V1.to_latest q)
 
       let response_of_callee_model : Master.T.response -> response = function
         | Ok a ->
             Ok (Sync_ledger.Answer.Stable.V2.from_v3 a)
+        | Error e ->
+            Error e
+
+      let caller_model_of_response : response -> Master.T.response = function
+        | Ok a ->
+            Ok (Sync_ledger.Answer.Stable.V2.to_latest a)
         | Error e ->
             Error e
     end
