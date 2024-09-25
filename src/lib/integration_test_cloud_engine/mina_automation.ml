@@ -231,30 +231,22 @@ module Network_config = struct
     let runtime_config =
       { Runtime_config.daemon =
           Some
-            { network_id =
+            { txpool_max_size = Some txpool_max_size
+            ; peer_list_url = None
+            ; zkapp_proof_update_cost = None
+            ; zkapp_signed_single_update_cost = None
+            ; zkapp_signed_pair_update_cost = None
+            ; zkapp_transaction_cost_limit = None
+            ; max_event_elements = None
+            ; max_action_elements = None
+            ; zkapp_cmd_limit_hardcap = None
+            ; slot_tx_end
+            ; slot_chain_end
+            ; minimum_user_command_fee = None
+            ; network_id =
                 Some
                   (Option.value ~default:constants.compile_config.network_id
                      network_id )
-            ; slot_tx_end
-            ; slot_chain_end
-            ; txpool_max_size = Some txpool_max_size
-            ; zkapp_proof_update_cost =
-                Some constants.compile_config.zkapp_proof_update_cost
-            ; zkapp_signed_single_update_cost =
-                Some constants.compile_config.zkapp_signed_single_update_cost
-            ; zkapp_signed_pair_update_cost =
-                Some constants.compile_config.zkapp_signed_pair_update_cost
-            ; zkapp_transaction_cost_limit =
-                Some constants.compile_config.zkapp_transaction_cost_limit
-            ; max_action_elements =
-                Some constants.compile_config.max_action_elements
-            ; max_event_elements =
-                Some constants.compile_config.max_event_elements
-            ; zkapp_cmd_limit_hardcap =
-                Some constants.compile_config.zkapp_cmd_limit_hardcap
-            ; minimum_user_command_fee =
-                Some constants.compile_config.minimum_user_command_fee
-            ; peer_list_url = None
             }
       ; genesis =
           Some
@@ -269,8 +261,7 @@ module Network_config = struct
       ; proof =
           Some
             { level = (None : Runtime_config.Proof_keys.Level.t option)
-            ; sub_windows_per_window =
-                Some constants.constraint_constants.sub_windows_per_window
+            ; sub_windows_per_window = None
             ; ledger_depth = Some constants.constraint_constants.ledger_depth
             ; work_delay = Some work_delay
             ; block_window_duration_ms = Some block_window_duration_ms
@@ -278,12 +269,9 @@ module Network_config = struct
                 Some
                   (Runtime_config.Proof_keys.Transaction_capacity.Log_2
                      transaction_capacity_log_2 )
-            ; coinbase_amount =
-                Some constants.constraint_constants.coinbase_amount
-            ; supercharged_coinbase_factor =
-                Some constants.constraint_constants.supercharged_coinbase_factor
-            ; account_creation_fee =
-                Some constants.constraint_constants.account_creation_fee
+            ; coinbase_amount = None
+            ; supercharged_coinbase_factor = None
+            ; account_creation_fee = None
             ; fork
             }
       ; ledger =
