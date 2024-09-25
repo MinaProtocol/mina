@@ -414,6 +414,35 @@ module Accounts = struct
       with Stop -> accounts
 end
 
+let make_compile_config ~(default : Mina_compile_config.t)
+    (config : Runtime_config.Daemon.t) : Mina_compile_config.t =
+  { default with
+    zkapp_proof_update_cost =
+      Option.value ~default:default.zkapp_proof_update_cost
+        config.zkapp_proof_update_cost
+  ; zkapp_signed_single_update_cost =
+      Option.value ~default:default.zkapp_signed_single_update_cost
+        config.zkapp_signed_single_update_cost
+  ; zkapp_signed_pair_update_cost =
+      Option.value ~default:default.zkapp_signed_pair_update_cost
+        config.zkapp_signed_pair_update_cost
+  ; zkapp_transaction_cost_limit =
+      Option.value ~default:default.zkapp_transaction_cost_limit
+        config.zkapp_transaction_cost_limit
+  ; max_event_elements =
+      Option.value ~default:default.max_event_elements config.max_event_elements
+  ; max_action_elements =
+      Option.value ~default:default.max_action_elements
+        config.max_action_elements
+  ; zkapp_cmd_limit_hardcap =
+      Option.value ~default:default.zkapp_cmd_limit_hardcap
+        config.zkapp_cmd_limit_hardcap
+  ; minimum_user_command_fee =
+      Option.value ~default:default.minimum_user_command_fee
+        config.minimum_user_command_fee
+  ; network_id = Option.value ~default:default.network_id config.network_id
+  }
+
 let make_constraint_constants
     ~(default : Genesis_constants.Constraint_constants.t)
     (config : Runtime_config.Proof_keys.t) :

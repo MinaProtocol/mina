@@ -141,70 +141,39 @@ let default ~constants =
           } )
   }
 
-let apply_config ~test_config ~constants : constants =
-  let { requires_graphql = _
-      ; genesis_ledger = _
-      ; epoch_data = _
-      ; block_producers = _
-      ; snark_coordinator = _
-      ; snark_worker_fee = _
-      ; num_archive_nodes = _
-      ; log_precomputed_blocks = _
-      ; start_filtered_logs = _
-      ; k
-      ; delta
-      ; slots_per_epoch
-      ; slots_per_sub_window
-      ; grace_period_slots
-      ; txpool_max_size
-      ; work_delay
-      ; slot_tx_end = _
-      ; slot_chain_end = _
-      ; network_id
-      ; block_window_duration_ms
-      ; transaction_capacity_log_2
-      ; fork
-      } =
-    test_config
+let apply_runtime_config ~logger runtime_config constants =
+  let genesis_constants =
+    Or_error.ok_exn
+      (Genesis_ledger_helper.make_genesis_constants ~logger
+         ~default:constants.genesis_constants runtime_config )
   in
-  { constants with
-    genesis_constants =
-      { constants.genesis_constants with
-        protocol =
-          { constants.genesis_constants.protocol with
-            k
-          ; slots_per_epoch
-          ; slots_per_sub_window
-          ; grace_period_slots
-          ; delta
-          }
-      ; txpool_max_size
-      }
-  ; constraint_constants =
-      { constants.constraint_constants with
-        work_delay
-      ; transaction_capacity_log_2
-      ; block_window_duration_ms
-      ; fork =
-          Option.map fork ~f:(fun fork_constants ->
-              { Genesis_constants.Fork_constants.state_hash =
-                  Mina_base.State_hash.of_base58_check_exn
-                    fork_constants.state_hash
-              ; blockchain_length =
-                  Mina_numbers.Length.of_int fork_constants.blockchain_length
-              ; global_slot_since_genesis =
-                  Mina_numbers.Global_slot_since_genesis.of_int
-                    fork_constants.global_slot_since_genesis
-              } )
-      }
-  ; compile_config =
-      { constants.compile_config with
-        network_id =
-          Option.value network_id ~default:constants.compile_config.network_id
-      ; block_window_duration =
-          Time.Span.of_ms @@ Float.of_int block_window_duration_ms
-      }
-  }
+  let constraint_constants =
+    Option.value ~default:constants.constraint_constants
+      Option.(
+        runtime_config.proof
+        >>| Genesis_ledger_helper.make_constraint_constants
+              ~default:constants.constraint_constants)
+  in
+  let compile_config =
+    Option.value ~default:constants.compile_config
+      Option.(
+        runtime_config.daemon
+        >>| Genesis_ledger_helper.make_compile_config
+              ~default:constants.compile_config)
+  in
+  let proof_level =
+    let coerce_proof_level = function
+      | Runtime_config.Proof_keys.Level.Full ->
+          Genesis_constants.Proof_level.Full
+      | Check ->
+          Check
+      | None ->
+          None
+    in
+    Option.value ~default:constants.proof_level
+      Option.(runtime_config.proof >>= fun a -> a.level >>| coerce_proof_level)
+  in
+  { genesis_constants; constraint_constants; compile_config; proof_level }
 
 let transaction_capacity config = Int.pow 2 config.transaction_capacity_log_2
 

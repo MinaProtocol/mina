@@ -108,7 +108,7 @@ module Network_config = struct
     in
     assoc
 
-  let expand ~logger:_ ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
+  let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ~(images : Test_config.Container_images.t) ~test_config
       ~(constants : Test_config.constants) =
     let ({ requires_graphql
@@ -414,7 +414,9 @@ module Network_config = struct
     (* This value for constants is what gets stored in the network config,
        it's important to apply any configuration patching here as well for coherence
     *)
-    let constants = Test_config.apply_config ~test_config ~constants in
+    let constants =
+      Test_config.apply_runtime_config ~logger runtime_config constants
+    in
     (* BLOCK PRODUCER CONFIG *)
     let mk_net_keypair keypair_name (pk, sk) =
       let keypair =
