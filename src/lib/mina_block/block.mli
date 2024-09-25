@@ -38,4 +38,6 @@ val transactions :
 val payments : t -> Signed_command.t With_status.t list
 
 val account_ids_accessed :
-  t -> (Account_id.t * [ `Accessed | `Not_accessed ]) list
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> t
+  -> (Account_id.t * [ `Accessed | `Not_accessed ]) list

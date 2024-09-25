@@ -38,7 +38,7 @@ let%test_module "Roundtrip tests" =
           let gen =
             Mina_base.Coinbase.Gen.gen
               ~constraint_constants:
-                Genesis_constants.Constraint_constants.for_unit_tests
+                Genesis_constants.For_unit_tests.Constraint_constants.t
             |> Quickcheck.Generator.map ~f:(fun (coinbase, _) ->
                    hash_coinbase coinbase )
         end
