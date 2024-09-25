@@ -791,8 +791,8 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
               Genesis_constants.Proof_level.Full
           | Check ->
               Check
-          | None ->
-              None)
+          | No_check ->
+              No_check)
       ; Some compiled_proof_level
       ]
   in
@@ -818,9 +818,9 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   let%bind () =
     match (proof_level, compiled_proof_level) with
-    | _, Full | (Check | None), _ ->
+    | _, Full | (Check | No_check), _ ->
         return ()
-    | Full, ((Check | None) as compiled) ->
+    | Full, ((Check | No_check) as compiled) ->
         let str = Genesis_constants.Proof_level.to_string in
         [%log fatal]
           "Proof level $proof_level is not compatible with compile-time proof \

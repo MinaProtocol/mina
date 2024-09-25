@@ -203,7 +203,7 @@ module Worker_state = struct
 
             let set_itn_logger_data ~daemon_port:_ = ()
           end : S )
-    | None ->
+    | No_check ->
         Deferred.return
           ( module struct
             module Transaction_snark = Transaction_snark

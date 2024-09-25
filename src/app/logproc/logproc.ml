@@ -81,8 +81,9 @@ let process_line ~timezone ~interpolation_config ~filter line =
 
 type parser_state =
   | Start_of_line
-  | Processable_line of {line_start_pos: int; previous_elements: string list}
-  | Unprocessable_line of {line_start_pos: int}
+  | Processable_line of
+      { line_start_pos : int; previous_elements : string list }
+  | Unprocessable_line of { line_start_pos : int }
 
 (* Iterates over lines prefixed by `prefix`, invoking `on_hit` for each
  * line. If a line does not start with `prefix`, `on_miss` is invoked,
@@ -105,11 +106,11 @@ let iter_lines_prefixed_with input_channel output_channel ~prefix ~on_hit
     match state with
     | Start_of_line ->
         failwith "cannot extract start of line state"
-    | Processable_line {line_start_pos; previous_elements} ->
+    | Processable_line { line_start_pos; previous_elements } ->
         let this_element = extract_input_string line_start_pos i in
         let elements = List.rev (this_element :: previous_elements) in
         on_hit (String.concat elements ~sep:"")
-    | Unprocessable_line {line_start_pos} ->
+    | Unprocessable_line { line_start_pos } ->
         forward_input line_start_pos i ;
         Out_channel.output_char output_channel '\n'
   in
@@ -117,14 +118,15 @@ let iter_lines_prefixed_with input_channel output_channel ~prefix ~on_hit
     match state with
     | Start_of_line ->
         Start_of_line
-    | Processable_line {line_start_pos; previous_elements} ->
+    | Processable_line { line_start_pos; previous_elements } ->
         let this_element = extract_input_string line_start_pos buf_len in
         Processable_line
-          { line_start_pos= 0
-          ; previous_elements= this_element :: previous_elements }
-    | Unprocessable_line {line_start_pos} ->
+          { line_start_pos = 0
+          ; previous_elements = this_element :: previous_elements
+          }
+    | Unprocessable_line { line_start_pos } ->
         forward_input line_start_pos buf_len ;
-        Unprocessable_line {line_start_pos= 0}
+        Unprocessable_line { line_start_pos = 0 }
   in
   let parse_char ~buf_len i state =
     if i >= buf_len then `Stop (carryover_state ~buf_len state)
@@ -133,10 +135,10 @@ let iter_lines_prefixed_with input_channel output_channel ~prefix ~on_hit
       | Start_of_line ->
           let next_state =
             if Char.equal (Bytes.unsafe_get input_buffer i) prefix then
-              Processable_line {line_start_pos= i; previous_elements= []}
+              Processable_line { line_start_pos = i; previous_elements = [] }
             else (
               on_miss () ;
-              Unprocessable_line {line_start_pos= i} )
+              Unprocessable_line { line_start_pos = i } )
           in
           `Continue next_state
       | Processable_line _ | Unprocessable_line _ ->
@@ -209,9 +211,9 @@ let () =
       Arg.(
         value
         & opt
-            (enum [("hidden", Hidden); ("inline", Inline); ("after", After)])
+            (enum [ ("hidden", Hidden); ("inline", Inline); ("after", After) ])
             Inline
-        & info ["i"; "interpolation-mode"] ~docv:"MODE" ~doc)
+        & info [ "i"; "interpolation-mode" ] ~docv:"MODE" ~doc)
     in
     let max_interpolation_length =
       let doc =
@@ -221,16 +223,17 @@ let () =
       Arg.(
         value & opt int 25
         & info
-            ["m"; "max-interpolation-length"]
+            [ "m"; "max-interpolation-length" ]
             ~docv:"MAX_INTERPOLATION_LENGTH" ~doc)
     in
     let pretty_print =
       let doc = "Pretty print json values." in
-      Arg.(value & flag & info ["p"; "pretty-print"] ~docv:"PRETTY_PRINT" ~doc)
+      Arg.(
+        value & flag & info [ "p"; "pretty-print" ] ~docv:"PRETTY_PRINT" ~doc)
     in
     let lift_interpolation_config mode max_interpolation_length pretty_print =
       let open Interpolator in
-      {mode; max_interpolation_length; pretty_print}
+      { mode; max_interpolation_length; pretty_print }
     in
     Term.(
       const lift_interpolation_config
@@ -240,23 +243,23 @@ let () =
     let doc =
       "Timezone to display timestamps in. Defaults to the system's timezone."
     in
-    Arg.(value & opt string "" & info ["z"; "zone"] ~docv:"TIMEZONE" ~doc)
+    Arg.(value & opt string "" & info [ "z"; "zone" ] ~docv:"TIMEZONE" ~doc)
   in
   let filter =
     let doc =
       "Filter displayed log lines. The filter language has similar syntax to \
-       javascript, with a few notable differences. Similar to \"jq\", doing \
-       an anymous access like \"[\"a\"]\" or \".a\" will refer to that key on \
-       the javascript object being processed, which in the context of \
-       logproc, is the json log entry itself. Basic literals (such as strings \
-       and integers) are supported, as is structural equality (\"==\") and \
-       boolean operations (\"!\", \"&&\", \"||\"). There is also support for \
-       the \"in\" operator for checking existence in arrays (works like \
+       javascript, with a few notable differences. Similar to \"jq\", doing an \
+       anymous access like \"[\"a\"]\" or \".a\" will refer to that key on the \
+       javascript object being processed, which in the context of logproc, is \
+       the json log entry itself. Basic literals (such as strings and \
+       integers) are supported, as is structural equality (\"==\") and boolean \
+       operations (\"!\", \"&&\", \"||\"). There is also support for the \
+       \"in\" operator for checking existence in arrays (works like \
        javascript, not like jq). Regexes can also be expressed \
        (\"/some_regex/\") and can be matched on using a special \"match\" \
        operator. See examples for more information."
     in
-    Arg.(value & opt string "" & info ["f"; "filter"] ~docv:"FILTER" ~doc)
+    Arg.(value & opt string "" & info [ "f"; "filter" ] ~docv:"FILTER" ~doc)
   in
   let main_term =
     Term.(const main $ timezone $ interpolation_config $ filter)
@@ -289,7 +292,8 @@ let () =
       ; `I
           ( "a complex filter:"
           , {|logproc -f '.message match /broadcast/ && .metadata.peer.host == "182.9.63.3" || .metadata.peer.discover_port == 8302|}
-          ) ]
+          )
+      ]
     in
     Term.info ~version:"0.1" ~doc ~exits:Term.default_exits ~man "logproc"
   in

@@ -350,14 +350,14 @@ let%snarkydef_ step ~(logger : Logger.t)
   in
   let txn_snark_must_verify =
     match proof_level with
-    | Check | None ->
+    | Check | No_check ->
         Boolean.false_
     | Full ->
         txn_snark_must_verify
   in
   let prev_must_verify =
     match proof_level with
-    | Check | None ->
+    | Check | No_check ->
         Boolean.false_
     | Full ->
         Boolean.not is_base_case

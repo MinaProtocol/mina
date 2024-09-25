@@ -24,7 +24,7 @@ make -C src/app/libp2p_helper
 MAINNET_TARGETS=""
 [[ ${MINA_BUILD_MAINNET} ]] && MAINNET_TARGETS="src/app/cli/src/mina_mainnet_signatures.exe src/app/rosetta/rosetta_mainnet_signatures.exe src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe"
 
-echo "--- Build all major tagets required for packaging"
+echo "--- Build all major targets required for packaging"
 echo "Building from Commit SHA: ${MINA_COMMIT_SHA1}"
 echo "Rust Version: $(rustc --version)"
 dune build "--profile=${DUNE_PROFILE}" $INSTRUMENTED_PARAM \
