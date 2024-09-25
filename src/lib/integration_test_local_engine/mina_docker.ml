@@ -167,10 +167,7 @@ module Network_config = struct
             ; slot_tx_end
             ; slot_chain_end
             ; minimum_user_command_fee = None
-            ; network_id =
-                Some
-                  (Option.value ~default:constants.compile_config.network_id
-                     network_id )
+            ; network_id
             }
       ; genesis =
           Some

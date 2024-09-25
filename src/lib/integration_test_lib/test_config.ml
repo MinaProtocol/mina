@@ -150,18 +150,21 @@ let apply_runtime_config ~logger runtime_config constants =
               ~default:constants.constraint_constants)
   in
   let compile_config =
-    Option.value ~default:constants.compile_config
-      Option.(
-        runtime_config.daemon
-        >>| Genesis_ledger_helper.make_compile_config
-              ~default:constants.compile_config)
+    Genesis_ledger_helper.make_compile_config runtime_config
+      ~default:constants.compile_config
   in
   { genesis_constants; constraint_constants; compile_config }
 
-let transaction_capacity config = Int.pow 2 config.transaction_capacity_log_2
+let transaction_capacity_log_2 (config : t) = config.transaction_capacity_log_2
+
+let transaction_capacity config =
+  let i = transaction_capacity_log_2 config in
+  Int.pow 2 i
 
 let blocks_for_first_ledger_proof (config : t) =
-  ((config.work_delay + 1) * (config.transaction_capacity_log_2 + 1)) + 1
+  let work_delay = config.work_delay in
+  let transaction_capacity_log_2 = transaction_capacity_log_2 config in
+  ((work_delay + 1) * (transaction_capacity_log_2 + 1)) + 1
 
 let slots_for_blocks blocks =
   (*Given 0.75 slots are filled*)

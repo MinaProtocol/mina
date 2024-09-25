@@ -243,10 +243,7 @@ module Network_config = struct
             ; slot_tx_end
             ; slot_chain_end
             ; minimum_user_command_fee = None
-            ; network_id =
-                Some
-                  (Option.value ~default:constants.compile_config.network_id
-                     network_id )
+            ; network_id
             }
       ; genesis =
           Some
@@ -262,7 +259,7 @@ module Network_config = struct
           Some
             { level = (None : Runtime_config.Proof_keys.Level.t option)
             ; sub_windows_per_window = None
-            ; ledger_depth = Some constants.constraint_constants.ledger_depth
+            ; ledger_depth = None
             ; work_delay = Some work_delay
             ; block_window_duration_ms = Some block_window_duration_ms
             ; transaction_capacity =
