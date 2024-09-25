@@ -106,9 +106,12 @@ macro_rules! impl_srs {
                 println!("rust ..._lagrange_commitment_whole_domain 1 {:.2?}", time_0.elapsed());
 
                 {
-                    // We're single-threaded, so it's safe to grab this pointer as mutable.
-                    // Do not try this at home.
-                    let srs = unsafe { &mut *((&**srs as *const SRS<$G>) as *mut SRS<$G>) as &mut SRS<$G> };
+                    //// We're single-threaded, so it's safe to grab this pointer as mutable.
+                    //// Do not try this at home.
+                    //let srs = unsafe { &mut *((&**srs as *const SRS<$G>) as *mut SRS<$G>) as &mut SRS<$G> };
+                    let srs: &mut poly_commitment::srs::SRS<$G> =
+                        unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
+
                     srs.with_lagrange_basis(x_domain);
                 }
                 println!("rust ..._lagrange_commitment_whole_domain 2 {:.2?}", time_0.elapsed());
@@ -145,10 +148,15 @@ macro_rules! impl_srs {
                 println!("rust ..._lagrange_commitment 1 {:.2?}", time_0.elapsed());
 
                 {
-                    // We're single-threaded, so it's safe to grab this pointer as mutable.
-                    // Do not try this at home.
-                    let srs = unsafe { &mut *((&**srs as *const SRS<$G>) as *mut SRS<$G>) as &mut SRS<$G> };
+                    //// We're single-threaded, so it's safe to grab this pointer as mutable.
+                    //// Do not try this at home.
+                    //let srs = unsafe { &mut *((&**srs as *const SRS<$G>) as *mut SRS<$G>) as &mut SRS<$G> };
+                    //srs.with_lagrange_basis(x_domain);
+                    let srs: &mut poly_commitment::srs::SRS<$G> =
+                        unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
+
                     srs.with_lagrange_basis(x_domain);
+
                 }
                 println!("rust ..._lagrange_commitment 2 {:.2?}", time_0.elapsed());
 
