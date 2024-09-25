@@ -78,19 +78,25 @@ let hash_batch data : hash list t =
         @@ List.init request_len ~f:(fun i ->
                Array.get hashes @@ (i + start_ix) ) )
 
-let preserving_impure () =
-  let cont_ref = ref None in
-  let impure : request_t -> (hash array -> int -> unit) -> unit =
-   fun xreq xcont -> cont_ref := Some (xreq, xcont)
-  in
-  (cont_ref, impure)
-
 let ( <*> ) : type a b. (a -> b) t -> a t -> b t =
  fun f a ~impure handle_res ->
   let a_res_ref = ref None in
   let f_res_ref = ref None in
-  let f_cont_ref, impure_f = preserving_impure () in
-  let a_cont_ref, impure_a = preserving_impure () in
+  let req = ref None in
+  let impure_f freq fcont =
+    if Option.is_none !req then req := Some (freq, fcont) else impure freq fcont
+  in
+  let impure_a areq acont =
+    let req' = !req in
+    req := None ;
+    match req' with
+    | None ->
+        impure areq acont
+    | Some (r, c) ->
+        impure (join_requests r areq) (fun hashes ix ->
+            c hashes ix ;
+            acont hashes (r.request_len + ix) )
+  in
   f ~impure:impure_f (fun f' ->
       match !a_res_ref with
       | Some a' ->
@@ -98,64 +104,45 @@ let ( <*> ) : type a b. (a -> b) t -> a t -> b t =
       | None ->
           f_res_ref := Some f' ) ;
   a ~impure:impure_a (fun a' ->
-      match !f_res_ref with
+      ( match !f_res_ref with
       | None ->
           a_res_ref := Some a'
       | Some f' ->
           handle_res (f' a') ) ;
-  let rec process_conts () =
-    let f_cont_opt = !f_cont_ref in
-    let a_cont_opt = !a_cont_ref in
-    f_cont_ref := None ;
-    a_cont_ref := None ;
-    let merge (freq, fcont) (areq, acont) =
-      ( join_requests freq areq
-      , fun hashes ix ->
-          fcont hashes ix ;
-          acont hashes (ix + freq.request_len) )
-    in
-    Option.merge f_cont_opt a_cont_opt ~f:merge |> Option.iter ~f
-  and f (req, cont) =
-    impure req (fun hashes ix -> cont hashes ix ; process_conts ())
-  in
-  process_conts ()
+      Option.iter !req ~f:(Tuple2.uncurry impure) )
 
 let lift2 f a b ~impure handle = (M_basic.map ~f a <*> b) ~impure handle
 
-let initialize_preserving_impures ~set_result lst =
-  List.mapi
-    ~f:(fun i action ->
-      let cont_ref, impure' = preserving_impure () in
-      action ~impure:impure' (set_result i) ;
-      cont_ref )
-    lst
-
-(* let cont_refs = ref (initialize lst) in *)
-let process_conts ~on_ready ~impure =
-  let rec impl cont_refs =
-    (* Filter our cont_refs that contain empty conts, they won't be filled again *)
-    let new_cont_refs, reqs_and_conts =
-      List.filter_map
-        ~f:(fun r ->
-          let rval = !r in
-          r := None ;
-          Option.map ~f:(Tuple2.create r) rval )
-        cont_refs
-      |> List.unzip
+let all_impl ~impure ~set_result ~on_ready lst =
+  let no_cont _hashes _ix = () in
+  let empty_acc = (0, empty_request, no_cont) in
+  let active = ref (List.length lst) in
+  let req_acc = ref empty_acc in
+  let init i action =
+    let impure' ireq icont =
+      let contributed, req, cont = !req_acc in
+      let req' = join_requests req ireq in
+      let cont' hashes ix =
+        cont hashes ix ;
+        icont hashes (req.request_len + ix)
+      in
+      let contributed' = contributed + 1 in
+      if contributed' = !active then (
+        req_acc := empty_acc ;
+        impure req' cont' )
+      else req_acc := (contributed', req', cont')
     in
-    let req, conts =
-      List.fold_map reqs_and_conts ~init:(0, empty_request)
-        ~f:(fun (ix, racc) (req, cont) ->
-          ((ix + req.request_len, join_requests racc req), (ix, cont)) )
-      |> Tuple2.map_fst ~f:snd
-    in
-    if List.is_empty new_cont_refs then on_ready ()
-    else
-      impure req (fun hashes start_ix ->
-          List.iter conts ~f:(fun (ix, cont) -> cont hashes (start_ix + ix)) ;
-          impl new_cont_refs )
+    action ~impure:impure' (fun a ->
+        set_result i a ;
+        let active' = !active - 1 in
+        active := active' ;
+        let contributed, req, cont = !req_acc in
+        if active' = 0 then on_ready ()
+        else if active' = contributed then (
+          req_acc := empty_acc ;
+          impure req cont ) )
   in
-  impl
+  List.iteri ~f:init lst
 
 module M : Core_kernel.Monad.S with type 'a t := 'a t = struct
   include M_basic
@@ -196,14 +183,12 @@ module M : Core_kernel.Monad.S with type 'a t := 'a t = struct
              Option.value_exn ~message:"some elements not evaluated" r )
       |> handle_res
     in
-    process_conts ~on_ready ~impure
-      (initialize_preserving_impures ~set_result lst)
+    all_impl ~set_result ~impure ~on_ready lst
 
   let all_unit : unit t list -> unit t =
    fun lst ~impure on_ready ->
     let set_result _ () = () in
-    process_conts ~impure ~on_ready
-      (initialize_preserving_impures ~set_result lst)
+    all_impl ~set_result ~impure ~on_ready lst
 end
 
 include M
