@@ -83,66 +83,60 @@ let ( <*> ) : type a b. (a -> b) t -> a t -> b t =
   let a_res_ref = ref None in
   let f_res_ref = ref None in
   let req = ref None in
-  let impure_f freq fcont =
-    if Option.is_none !req then req := Some (freq, fcont) else impure freq fcont
-  in
+  let impure_f freq fcont = req := Some (freq, fcont) in
   let impure_a areq acont =
-    let req' = !req in
-    req := None ;
-    match req' with
-    | None ->
-        impure areq acont
-    | Some (r, c) ->
-        impure (join_requests r areq) (fun hashes ix ->
-            c hashes ix ;
-            acont hashes (r.request_len + ix) )
+    req :=
+      Some
+        (Option.value_map ~default:(areq, acont)
+           ~f:(fun (r, c) ->
+             ( join_requests r areq
+             , fun hashes ix ->
+                 c hashes ix ;
+                 acont hashes (r.request_len + ix) ) )
+           !req )
   in
-  f ~impure:impure_f (fun f' ->
-      match !a_res_ref with
-      | Some a' ->
-          handle_res (f' a')
-      | None ->
-          f_res_ref := Some f' ) ;
-  a ~impure:impure_a (fun a' ->
-      ( match !f_res_ref with
-      | None ->
-          a_res_ref := Some a'
-      | Some f' ->
-          handle_res (f' a') ) ;
-      Option.iter !req ~f:(Tuple2.uncurry impure) )
+  f ~impure:impure_f (fun f' -> f_res_ref := Some f') ;
+  a ~impure:impure_a (fun a' -> a_res_ref := Some a') ;
+  let rec handle () =
+    let r = !req in
+    req := None ;
+    match r with
+    | None ->
+        let f' = Option.value_exn ~message:"<*>: no value for f" !f_res_ref in
+        let a' = Option.value_exn ~message:"<*>: no value for a" !a_res_ref in
+        handle_res (f' a')
+    | Some (r, c) ->
+        impure r (fun hashes ix -> c hashes ix ; handle ())
+  in
+  handle ()
 
 let lift2 f a b ~impure handle = (M_basic.map ~f a <*> b) ~impure handle
 
 let all_impl ~impure ~set_result ~on_ready lst =
-  let no_cont _hashes _ix = () in
-  let empty_acc = (0, empty_request, no_cont) in
+  let empty_acc = (empty_request, []) in
   let active = ref (List.length lst) in
   let req_acc = ref empty_acc in
   let init i action =
     let impure' ireq icont =
-      let contributed, req, cont = !req_acc in
+      let req, cont = !req_acc in
       let req' = join_requests req ireq in
-      let cont' hashes ix =
-        cont hashes ix ;
-        icont hashes (req.request_len + ix)
-      in
-      let contributed' = contributed + 1 in
-      if contributed' = !active then (
-        req_acc := empty_acc ;
-        impure req' cont' )
-      else req_acc := (contributed', req', cont')
+      req_acc := (req', (icont, req.request_len) :: cont)
     in
     action ~impure:impure' (fun a ->
         set_result i a ;
-        let active' = !active - 1 in
-        active := active' ;
-        let contributed, req, cont = !req_acc in
-        if active' = 0 then on_ready ()
-        else if active' = contributed then (
-          req_acc := empty_acc ;
-          impure req cont ) )
+        active := !active - 1 )
   in
-  List.iteri ~f:init lst
+  List.iteri ~f:init lst ;
+  let rec handle () =
+    if !active = 0 then on_ready ()
+    else
+      let req, cont = !req_acc in
+      req_acc := empty_acc ;
+      impure req (fun hashes start_ix ->
+          List.iter cont ~f:(fun (exec, ix) -> exec hashes (start_ix + ix)) ;
+          handle () )
+  in
+  handle ()
 
 module M : Core_kernel.Monad.S with type 'a t := 'a t = struct
   include M_basic
@@ -177,18 +171,16 @@ module M : Core_kernel.Monad.S with type 'a t := 'a t = struct
    fun lst ~impure handle_res ->
     let results = Array.init (List.length lst) ~f:(const None) in
     let set_result i a = Array.set results i (Some a) in
-    let on_ready () =
-      Array.to_list results
-      |> List.map ~f:(fun r ->
-             Option.value_exn ~message:"some elements not evaluated" r )
-      |> handle_res
-    in
-    all_impl ~set_result ~impure ~on_ready lst
+    all_impl ~set_result ~impure lst ~on_ready:(fun () ->
+        Array.to_list results
+        |> List.map ~f:(fun r ->
+               Option.value_exn ~message:"some elements not evaluated" r )
+        |> handle_res )
 
   let all_unit : unit t list -> unit t =
    fun lst ~impure on_ready ->
     let set_result _ () = () in
-    all_impl ~set_result ~impure ~on_ready lst
+    all_impl ~set_result ~impure lst ~on_ready
 end
 
 include M
@@ -386,5 +378,24 @@ let%test_module "simple test" =
         , [%test_eq: (Field.t * Field.t * Field.t) list]
             (List.init 10 ~f:(const (one, one, zero)))
         , 280
+        , 2 )
+
+    let comp12 =
+      lift2 Tuple3.create
+        ( List.init 10 ~f:(const (single_one, triple_one, ten_zero))
+        |> map_list ~f:(fun (a, b, c) ->
+               lift2 Tuple3.create
+                 (double_comp @@ hash ~init a)
+                 (double_comp @@ hash ~init b)
+               <*> double_comp @@ hash ~init c ) )
+        (double_comp @@ hash ~init triple_one)
+      <*> double_comp @@ hash ~init ten_zero
+
+    let%test "test12" =
+      execute
+        ( comp12
+        , [%test_eq: (Field.t * Field.t * Field.t) list * Field.t * Field.t]
+            (List.init 10 ~f:(const (one, one, zero)), one, zero)
+        , 306
         , 2 )
   end )
