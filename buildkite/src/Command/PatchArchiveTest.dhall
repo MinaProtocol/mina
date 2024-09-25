@@ -2,9 +2,11 @@ let Artifacts = ../Constants/Artifacts.dhall
 
 let Command = ./Base.dhall
 
-let RunWithPostgres = ./RunWithPostgres.dhall
+let Size = ./Size.dhall
 
 let Network = ../Constants/Network.dhall
+
+let RunWithPostgres = ./RunWithPostgres.dhall
 
 in  { step =
             \(dependsOn : List Command.TaggedKey.Type)
@@ -12,14 +14,17 @@ in  { step =
               Command.Config::{
               , commands =
                 [ RunWithPostgres.runInDockerWithPostgresConn
-                    ([] : List Text)
+                    [ "PATCH_ARCHIVE_TEST_APP=mina-patch-archive-test"
+                    , "NETWORK_DATA_FOLDER=/etc/mina/test/archive/sample_db"
+                    ]
                     "./src/test/archive/sample_db/archive_db.sql"
-                    Artifacts.Type.Archive
+                    Artifacts.Type.FunctionalTestSuite
                     (None Network.Type)
-                    "./buildkite/scripts/replayer-test.sh"
+                    "./scripts/patch-archive-test.sh"
                 ]
-              , label = "Archive: Replayer test"
-              , key = "replayer-test"
+              , label = "Archive: Patch Archive test"
+              , key = "patch-archive-test"
+              , target = Size.Large
               , depends_on = dependsOn
               }
     }

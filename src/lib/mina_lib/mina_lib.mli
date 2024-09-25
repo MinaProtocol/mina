@@ -36,6 +36,14 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val commit_id : string
+
+  val vrf_poll_interval : Time.Span.t
+
+  val zkapp_cmd_limit : int option ref
+
+  val compaction_interval : Time.Span.t option
+
+  val compile_config : Mina_compile_config.t
 end
 
 exception Snark_worker_error of int
@@ -219,6 +227,8 @@ val net : t -> Mina_networking.t
 
 val runtime_config : t -> Runtime_config.t
 
+val compile_config : t -> Mina_compile_config.t
+
 val start_filtered_log : t -> string list -> unit Or_error.t
 
 val get_filtered_log_entries : t -> int -> string list * bool
@@ -236,3 +246,5 @@ val best_chain_block_by_height :
 
 val best_chain_block_by_state_hash :
   t -> State_hash.t -> (Transition_frontier.Breadcrumb.t, string) Result.t
+
+val zkapp_cmd_limit : t -> int option ref

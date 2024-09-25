@@ -514,13 +514,12 @@ let send_payment_graphql =
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
   let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let compile_config = Mina_compile_config.Compiled.t in
   let args =
     Args.zip3
       (Cli_lib.Flag.signed_command_common
          ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
-         ~default_transaction_fee:
-           (Currency.Fee.of_mina_string_exn
-              Mina_compile_config.default_transaction_fee_string ) )
+         ~default_transaction_fee:compile_config.default_transaction_fee )
       receiver_flag amount_flag
   in
   Command.async ~summary:"Send payment to an address"
@@ -550,13 +549,12 @@ let delegate_stake_graphql =
       (required public_key_compressed)
   in
   let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let compile_config = Mina_compile_config.Compiled.t in
   let args =
     Args.zip2
       (Cli_lib.Flag.signed_command_common
          ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
-         ~default_transaction_fee:
-           (Currency.Fee.of_mina_string_exn
-              Mina_compile_config.default_transaction_fee_string ) )
+         ~default_transaction_fee:compile_config.default_transaction_fee )
       receiver_flag
   in
   Command.async ~summary:"Delegate your stake to another public key"
@@ -1614,12 +1612,14 @@ let generate_libp2p_keypair_do privkey_path =
     (let open Deferred.Let_syntax in
     (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
     let logger = Logger.null () in
+    let compile_config = Mina_compile_config.Compiled.t in
     (* Using the helper only for keypair generation requires no state. *)
     File_system.with_temp_dir "mina-generate-libp2p-keypair" ~f:(fun tmpd ->
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore
+            ~block_window_duration:compile_config.block_window_duration ()
         with
         | Ok net ->
             let%bind me = Mina_net2.generate_random_keypair net in
@@ -1646,12 +1646,14 @@ let dump_libp2p_keypair_do privkey_path =
   Deferred.ignore_m
     (let open Deferred.Let_syntax in
     let logger = Logger.null () in
+    let compile_config = Mina_compile_config.Compiled.t in
     (* Using the helper only for keypair generation requires no state. *)
     File_system.with_temp_dir "mina-dump-libp2p-keypair" ~f:(fun tmpd ->
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore
+            ~block_window_duration:compile_config.block_window_duration ()
         with
         | Ok net ->
             let%bind () = Mina_net2.shutdown net in
@@ -2325,6 +2327,7 @@ let test_ledger_application =
        ~constraint_constants ~genesis_constants )
 
 let itn_create_accounts =
+  let compile_config = Mina_compile_config.Compiled.t in
   Command.async ~summary:"Fund new accounts for incentivized testnet"
     (let open Command.Param in
     let privkey_path = Cli_lib.Flag.privkey_read_path in
@@ -2338,7 +2341,7 @@ let itn_create_accounts =
       flag "--fee"
         ~doc:
           (sprintf "NN Fee in nanomina paid to create an account (minimum: %s)"
-             Mina_compile_config.minimum_user_command_fee_string )
+             (Currency.Fee.to_string compile_config.minimum_user_command_fee) )
         (required int)
     in
     let amount =
@@ -2434,7 +2437,7 @@ let client_trustlist_group =
     ; ("remove", trustlist_remove)
     ]
 
-let advanced =
+let advanced ~itn_features =
   let cmds0 =
     [ ("get-nonce", get_nonce_cmd)
     ; ("client-trustlist", client_trustlist_group)
@@ -2480,8 +2483,7 @@ let advanced =
     ]
   in
   let cmds =
-    if Mina_compile_config.itn_features then
-      ("itn-create-accounts", itn_create_accounts) :: cmds0
+    if itn_features then ("itn-create-accounts", itn_create_accounts) :: cmds0
     else cmds0
   in
   Command.group ~summary:"Advanced client commands" cmds

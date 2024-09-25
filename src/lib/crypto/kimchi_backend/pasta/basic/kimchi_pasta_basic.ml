@@ -3,12 +3,11 @@ open Kimchi_backend_common
 
 module Rounds : sig
   open Pickles_types
-
-  module Wrap : Nat.Add.Intf_transparent
+  module Wrap = Nat.N15
 
   module Wrap_vector : Vector.With_version(Wrap).S
 
-  module Step : Nat.Add.Intf_transparent
+  module Step = Nat.N16
 
   module Step_vector : Vector.With_version(Step).S
 end = struct

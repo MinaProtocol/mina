@@ -177,7 +177,7 @@ let docker_step
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = Artifacts.Type.BatchTxn
-                    , network = Network.lowerName Network.Type.Devnet
+                    , network = Network.lowerName spec.network
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
