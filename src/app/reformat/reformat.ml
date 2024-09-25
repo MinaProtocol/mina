@@ -18,6 +18,7 @@ let dirs_trustlist =
   ; "proof-systems"
   ; "snarky"
   ; "_opam"
+  ; "opam_switches"
   ; ".direnv" ]
 
 let rec fold_over_files ~path ~process_path ~init ~f =

@@ -52,20 +52,6 @@ module Plonk_types = struct
     end
   end
 
-  module Openings = struct
-    module Bulletproof = struct
-      module V1 = struct
-        type ('g, 'fq) t =
-          { lr : ('g * 'g) array
-          ; z_1 : 'fq
-          ; z_2 : 'fq
-          ; delta : 'g
-          ; challenge_polynomial_commitment : 'g
-          }
-      end
-    end
-  end
-
   module Evals = struct
     module V2 = struct
       type 'a t =
@@ -111,6 +97,63 @@ module Plonk_types = struct
         { evals :
             ('f_multi * 'f_multi, 'f_multi * 'f_multi) With_public_input.V1.t
         ; ft_eval1 : 'f
+        }
+    end
+  end
+
+  module Openings = struct
+    module Bulletproof = struct
+      module V1 = struct
+        type ('g, 'fq) t =
+          { lr : ('g * 'g) array
+          ; z_1 : 'fq
+          ; z_2 : 'fq
+          ; delta : 'g
+          ; challenge_polynomial_commitment : 'g
+          }
+      end
+    end
+
+    module V2 = struct
+      type ('g, 'fq, 'fqv) t =
+        { proof : ('g, 'fq) Bulletproof.V1.t
+        ; evals : ('fqv * 'fqv) Evals.V2.t
+        ; ft_eval1 : 'fq
+        }
+    end
+  end
+
+  module Poly_comm = struct
+    module Without_degree_bound = struct
+      module V1 = struct
+        type 'g t = 'g array
+      end
+    end
+  end
+
+  module Messages = struct
+    module Lookup = struct
+      module V1 = struct
+        type 'g t = { sorted : 'g array; aggreg : 'g; runtime : 'g option }
+      end
+    end
+
+    module V2 = struct
+      type 'g t =
+        { w_comm :
+            ('g Poly_comm.Without_degree_bound.V1.t, Nat.fifteen) Vector.t
+        ; z_comm : 'g Poly_comm.Without_degree_bound.V1.t
+        ; t_comm : 'g Poly_comm.Without_degree_bound.V1.t
+        ; lookup : 'g Poly_comm.Without_degree_bound.V1.t Lookup.V1.t option
+        }
+    end
+  end
+
+  module Proof = struct
+    module V2 = struct
+      type ('g, 'fq, 'fqv) t =
+        { messages : 'g Messages.V2.t
+        ; openings : ('g, 'fq, 'fqv) Openings.V2.t
         }
     end
   end
