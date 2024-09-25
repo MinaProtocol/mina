@@ -2,10 +2,11 @@
  (name cstubs_applicative)
  (public_name cstubs_applicative)
  (libraries
-   ;; opam libraries
-   base
-   ctypes
-   ctypes.stubs
-)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version)))
+  ;; opam libraries
+  base
+  ctypes
+  ctypes.stubs)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

@@ -3,6 +3,9 @@
  (mode promote)
  (deps
   (:< src/app/graphql_schema_dump/graphql_schema_dump.exe))
- (action (with-stdout-to %{target} (run %{<}))))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{<}))))
 
 (dirs :standard \ opam_switches)

@@ -179,13 +179,22 @@ update-graphql:
 ## Lint
 
 reformat: ocaml_checks
-	dune exec --profile=$(DUNE_PROFILE) src/app/reformat/reformat.exe -- -path .
+	@cd src/app && dune fmt && cd ../../
+	@cd src/config && dune fmt && cd ../../
+	@cd src/lib && dune fmt && cd ../../
+	@cd src/libp2p_ipc && dune fmt && cd ../../
+	@cd src/test && dune fmt && cd ../../
 
 reformat-diff:
-	@ocamlformat --doc-comments=before --inplace $(shell git status -s | cut -c 4- | grep '\.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
+	@make check-format
 
 check-format: ocaml_checks
-	dune exec --profile=$(DUNE_PROFILE) src/app/reformat/reformat.exe -- -path . -check
+	@cd src/app && dune build @fmt && cd ../../
+	@cd src/config && dune build @fmt && cd ../../
+	@cd src/lib && dune build @fmt && cd ../../
+	@cd src/libp2p_ipc && dune build @fmt && cd ../../
+	@cd src/test && dune build @fmt && cd ../../
+
 
 check-snarky-submodule:
 	./scripts/check-snarky-submodule.sh

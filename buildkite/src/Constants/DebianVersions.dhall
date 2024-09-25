@@ -4,6 +4,8 @@ let Optional/default = Prelude.Optional.default
 
 let Profiles = ./Profiles.dhall
 
+let Network = ./Network.dhall
+
 let BuildFlags = ./BuildFlags.dhall
 
 let S = ../Lib/SelectFiles.dhall
@@ -33,6 +35,7 @@ let lowerName =
 let dependsOnStep =
           \(prefix : Optional Text)
       ->  \(debVersion : DebVersion)
+      ->  \(network : Network.Type)
       ->  \(profile : Profiles.Type)
       ->  \(buildFlag : BuildFlags.Type)
       ->  \(step : Text)
@@ -40,47 +43,28 @@ let dependsOnStep =
 
           let prefix = Optional/default Text "MinaArtifact" prefix
 
+          let name =
+                "${prefix}${capitalName
+                              debVersion}${Network.capitalName
+                                             network}${profileSuffix}${BuildFlags.toSuffixUppercase
+                                                                         buildFlag}"
+
           in  merge
-                { Bookworm =
-                  [ { name =
-                        "${prefix}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                      buildFlag}"
-                    , key = "${step}-deb-pkg"
-                    }
-                  ]
-                , Bullseye =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      debVersion}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                                     buildFlag}"
-                    , key = "${step}-deb-pkg"
-                    }
-                  ]
-                , Jammy =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      debVersion}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                                     buildFlag}"
-                    , key = "${step}-deb-pkg"
-                    }
-                  ]
-                , Focal =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      debVersion}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                                     buildFlag}"
-                    , key = "${step}-deb-pkg"
-                    }
-                  ]
+                { Bookworm = [ { name = name, key = "${step}-deb-pkg" } ]
+                , Bullseye = [ { name = name, key = "${step}-deb-pkg" } ]
+                , Jammy = [ { name = name, key = "${step}-deb-pkg" } ]
+                , Focal = [ { name = name, key = "${step}-deb-pkg" } ]
                 }
                 debVersion
 
 let dependsOn =
           \(debVersion : DebVersion)
+      ->  \(network : Network.Type)
       ->  \(profile : Profiles.Type)
       ->  dependsOnStep
             (None Text)
             debVersion
+            network
             profile
             BuildFlags.Type.None
             "build"

@@ -2,5 +2,7 @@
  (public_name key_cache.native)
  (name key_cache_native)
  (libraries key_cache key_cache.async key_cache.sync)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version)))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
