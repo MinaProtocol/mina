@@ -2,8 +2,6 @@ let B = ../External/Buildkite.dhall
 
 let Command = ./Base.dhall
 
-let Size = ./Size.dhall
-
 let RunInToolchain = ./RunInToolchain.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
@@ -23,7 +21,6 @@ in  { step =
               , label = "Connect to ${testnet}"
               , soft_fail = Some soft_fail
               , key = "connect-to-${testnet}"
-              , target = Size.Large
               , depends_on = dependsOn
               }
     }

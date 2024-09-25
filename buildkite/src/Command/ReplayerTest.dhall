@@ -2,8 +2,6 @@ let Artifacts = ../Constants/Artifacts.dhall
 
 let Command = ./Base.dhall
 
-let Size = ./Size.dhall
-
 let RunWithPostgres = ./RunWithPostgres.dhall
 
 let Network = ../Constants/Network.dhall
@@ -22,7 +20,6 @@ in  { step =
                 ]
               , label = "Archive: Replayer test"
               , key = "replayer-test"
-              , target = Size.Large
               , depends_on = dependsOn
               }
     }

@@ -53,5 +53,5 @@ in  Pipeline.build
                 , PipelineTag.Type.Stable
                 ]
               }
-      , steps = [ buildTestCmd "dev" "src/app/rosetta" Size.Small ]
+      , steps = [ buildTestCmd "dev" "src/app/rosetta" Size.Multi ]
       }

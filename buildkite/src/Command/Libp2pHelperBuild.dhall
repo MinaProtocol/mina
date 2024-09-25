@@ -1,7 +1,5 @@
 let Command = ./Base.dhall
 
-let Size = ./Size.dhall
-
 let Toolchain = ../Constants/Toolchain.dhall
 
 let BuildFlags = ../Constants/BuildFlags.dhall
@@ -35,7 +33,6 @@ let cmdConfig =
                                              debVersion} ${BuildFlags.toSuffixUppercase
                                                              buildFlags}"
             , key = "libp2p-helper${BuildFlags.toLabelSegment buildFlags}"
-            , target = Size.Small
             }
 
 in  { step = cmdConfig }

@@ -12,8 +12,6 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
 
-let Size = ../../Command/Size.dhall
-
 let Profiles = ../../Constants/Profiles.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
@@ -70,7 +68,6 @@ in  Pipeline.build
             , label = "Rosetta integration tests Bullseye"
             , key = "rosetta-integration-tests-bullseye"
             , soft_fail = Some (B/SoftFail.Boolean True)
-            , target = Size.Small
             , depends_on =
                 Dockers.dependsOn
                   Dockers.Type.Bullseye

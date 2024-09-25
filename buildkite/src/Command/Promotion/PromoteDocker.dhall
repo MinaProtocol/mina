@@ -16,8 +16,6 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Command = ../Base.dhall
 
-let Size = ../Size.dhall
-
 let Cmd = ../../Lib/Cmds.dhall
 
 let PromoteDockerSpec =
@@ -87,7 +85,6 @@ let promoteDockerStep =
                 , commands = commands
                 , label = "Docker: ${spec.step_key}"
                 , key = spec.step_key
-                , target = Size.XLarge
                 , depends_on = spec.deps
                 , if = spec.if
                 }

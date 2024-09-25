@@ -65,7 +65,6 @@ in  Pipeline.build
             , label = "Rosetta integration tests Bullseye Long"
             , key = "rosetta-integration-tests-bullseye-long"
             , soft_fail = Some (B/SoftFail.Boolean True)
-            , target = Size.Small
             , depends_on =
                 Dockers.dependsOn
                   Dockers.Type.Bullseye

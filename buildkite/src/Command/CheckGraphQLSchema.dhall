@@ -1,7 +1,5 @@
 let Command = ./Base.dhall
 
-let Size = ./Size.dhall
-
 let RunInToolchain = ./RunInToolchain.dhall
 
 in  { step =
@@ -14,7 +12,6 @@ in  { step =
                     "./buildkite/scripts/check-graphql-schema.sh"
               , label = "Check GraphQL Schema"
               , key = "check-graphql-schema"
-              , target = Size.Large
               , depends_on = dependsOn
               }
     }
