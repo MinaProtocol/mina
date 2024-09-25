@@ -268,15 +268,7 @@ module Network_config = struct
             }
       ; proof =
           Some
-            { level =
-                Some
-                  ( match constants.proof_level with
-                  | Full ->
-                      Full
-                  | Check ->
-                      Check
-                  | None ->
-                      None )
+            { level = (None : Runtime_config.Proof_keys.Level.t option)
             ; sub_windows_per_window =
                 Some constants.constraint_constants.sub_windows_per_window
             ; ledger_depth = Some constants.constraint_constants.ledger_depth

@@ -346,6 +346,12 @@ type t =
 
 let constants { constants; _ } = constants
 
+let constraint_constants { constants; _ } = constants.constraint_constants
+
+let genesis_constants { constants; _ } = constants.genesis_constants
+
+let compile_config { constants; _ } = constants.compile_config
+
 let seeds { seeds; _ } = seeds
 
 let block_producers { block_producers; _ } = block_producers

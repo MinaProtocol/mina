@@ -18,7 +18,6 @@ module Test_account = struct
     ; permissions : Mina_base.Permissions.t option
     ; zkapp : Mina_base.Zkapp_account.t option
     }
-  [@@deriving to_yojson]
 
   let create ~account_name ~balance ?timing ?permissions ?zkapp () =
     { account_name
@@ -38,26 +37,23 @@ module Epoch_data = struct
   module Data = struct
     (* the seed is a field value in Base58Check format *)
     type t = { epoch_ledger : Test_account.t list; epoch_seed : string }
-    [@@deriving to_yojson]
   end
 
-  type t = { staking : Data.t; next : Data.t option } [@@deriving to_yojson]
+  type t = { staking : Data.t; next : Data.t option }
 end
 
 module Block_producer_node = struct
-  type t = { node_name : string; account_name : string } [@@deriving to_yojson]
+  type t = { node_name : string; account_name : string }
 end
 
 module Snark_coordinator_node = struct
   type t = { node_name : string; account_name : string; worker_nodes : int }
-  [@@deriving to_yojson]
 end
 
 type constants =
   { constraint_constants : Genesis_constants.Constraint_constants.t
   ; genesis_constants : Genesis_constants.t
   ; compile_config : Mina_compile_config.t
-  ; proof_level : Genesis_constants.Proof_level.t
   }
 [@@deriving to_yojson]
 
@@ -87,7 +83,6 @@ type t =
   ; transaction_capacity_log_2 : int
   ; fork : Runtime_config.Fork_config.t option
   }
-[@@deriving to_yojson]
 
 let log_filter_of_event_type ev_existential =
   let open Event_type in
@@ -126,7 +121,7 @@ let default ~constants =
   ; slot_tx_end = None
   ; slot_chain_end = None
   ; network_id = Some compile_config.network_id
-  ; block_window_duration_ms = constraint_constants.block_window_duration_ms
+  ; block_window_duration_ms = 120000
   ; transaction_capacity_log_2 = constraint_constants.transaction_capacity_log_2
   ; work_delay = constraint_constants.work_delay
   ; fork =
@@ -161,19 +156,7 @@ let apply_runtime_config ~logger runtime_config constants =
         >>| Genesis_ledger_helper.make_compile_config
               ~default:constants.compile_config)
   in
-  let proof_level =
-    let coerce_proof_level = function
-      | Runtime_config.Proof_keys.Level.Full ->
-          Genesis_constants.Proof_level.Full
-      | Check ->
-          Check
-      | None ->
-          None
-    in
-    Option.value ~default:constants.proof_level
-      Option.(runtime_config.proof >>= fun a -> a.level >>| coerce_proof_level)
-  in
-  { genesis_constants; constraint_constants; compile_config; proof_level }
+  { genesis_constants; constraint_constants; compile_config }
 
 let transaction_capacity config = Int.pow 2 config.transaction_capacity_log_2
 

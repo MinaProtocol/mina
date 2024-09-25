@@ -284,7 +284,6 @@ let main inputs =
         }
     ; constraint_constants = Genesis_constants.Compiled.constraint_constants
     ; compile_config = Mina_compile_config.Compiled.t
-    ; proof_level = Genesis_constants.Compiled.proof_level
     }
   in
   let images =
