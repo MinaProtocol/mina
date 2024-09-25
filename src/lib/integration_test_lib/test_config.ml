@@ -18,6 +18,7 @@ module Test_account = struct
     ; permissions : Mina_base.Permissions.t option
     ; zkapp : Mina_base.Zkapp_account.t option
     }
+  [@@deriving to_yojson]
 
   let create ~account_name ~balance ?timing ?permissions ?zkapp () =
     { account_name
@@ -37,13 +38,14 @@ module Epoch_data = struct
   module Data = struct
     (* the seed is a field value in Base58Check format *)
     type t = { epoch_ledger : Test_account.t list; epoch_seed : string }
+    [@@deriving to_yojson]
   end
 
-  type t = { staking : Data.t; next : Data.t option }
+  type t = { staking : Data.t; next : Data.t option } [@@deriving to_yojson]
 end
 
 module Block_producer_node = struct
-  type t = { node_name : string; account_name : string }
+  type t = { node_name : string; account_name : string } [@@deriving to_yojson]
 end
 
 module Snark_coordinator_node = struct
@@ -55,6 +57,7 @@ type constants =
   { constraint_constants : Genesis_constants.Constraint_constants.t
   ; genesis_constants : Genesis_constants.t
   ; compile_config : Mina_compile_config.t
+  ; proof_level : Genesis_constants.Proof_level.t
   }
 [@@deriving to_yojson]
 
@@ -70,34 +73,21 @@ type t =
   ; num_archive_nodes : int
   ; log_precomputed_blocks : bool
   ; start_filtered_logs : string list
-        (* ; num_plain_nodes : int  *)
-        (* blockchain constants *)
-  ; proof_config : Runtime_config.Proof_keys.t
   ; k : int
   ; delta : int
   ; slots_per_epoch : int
   ; slots_per_sub_window : int
   ; grace_period_slots : int
   ; txpool_max_size : int
+  ; work_delay : int
   ; slot_tx_end : int option
   ; slot_chain_end : int option
   ; network_id : string option
   ; block_window_duration_ms : int
   ; transaction_capacity_log_2 : int
+  ; fork : Runtime_config.Fork_config.t option
   }
-
-let proof_config_default : Runtime_config.Proof_keys.t =
-  { level = Some Full
-  ; sub_windows_per_window = None
-  ; ledger_depth = None
-  ; work_delay = None
-  ; block_window_duration_ms = Some 120000
-  ; transaction_capacity = None
-  ; coinbase_amount = None
-  ; supercharged_coinbase_factor = None
-  ; account_creation_fee = None
-  ; fork = None
-  }
+[@@deriving to_yojson]
 
 let log_filter_of_event_type ev_existential =
   let open Event_type in
@@ -110,10 +100,11 @@ let log_filter_of_event_type ev_existential =
       [ Structured_log_events.string_of_id struct_id ]
   | From_puppeteer_log _ ->
       []
-(* TODO: Do we need this? *)
 
-let default ~(constants : constants) =
-  let { constraint_constants; genesis_constants; _ } = constants in
+let default ~constants =
+  let { constraint_constants; genesis_constants; compile_config; _ } =
+    constants
+  in
   { requires_graphql =
       true
       (* require_graphql maybe should just be phased out, because it always needs to be enable.  Now with the graphql polling engine, everything will definitely fail if graphql is not enabled.  But even before that, most tests relied on some sort of graphql interaction *)
@@ -126,7 +117,6 @@ let default ~(constants : constants) =
   ; log_precomputed_blocks = false (* ; num_plain_nodes = 0 *)
   ; start_filtered_logs =
       List.bind ~f:log_filter_of_event_type Event_type.all_event_types
-  ; proof_config = proof_config_default
   ; k = genesis_constants.protocol.k
   ; slots_per_epoch = genesis_constants.protocol.slots_per_epoch
   ; slots_per_sub_window = genesis_constants.protocol.slots_per_sub_window
@@ -135,49 +125,91 @@ let default ~(constants : constants) =
   ; txpool_max_size = genesis_constants.txpool_max_size
   ; slot_tx_end = None
   ; slot_chain_end = None
-  ; network_id = None
+  ; network_id = Some compile_config.network_id
   ; block_window_duration_ms = constraint_constants.block_window_duration_ms
   ; transaction_capacity_log_2 = constraint_constants.transaction_capacity_log_2
+  ; work_delay = constraint_constants.work_delay
+  ; fork =
+      Option.map constraint_constants.fork ~f:(fun fork_constants ->
+          { Runtime_config.Fork_config.state_hash =
+              Pickles.Backend.Tick.Field.to_string fork_constants.state_hash
+          ; blockchain_length =
+              Mina_numbers.Length.to_int fork_constants.blockchain_length
+          ; global_slot_since_genesis =
+              Mina_numbers.Global_slot_since_genesis.to_int
+                fork_constants.global_slot_since_genesis
+          } )
   }
 
-let transaction_capacity_log_2 (config : t) =
-  match config.proof_config.transaction_capacity with
-  | None ->
-      config.transaction_capacity_log_2
-  | Some (Log_2 i) ->
-      i
-  | Some (Txns_per_second_x10 tps_goal_x10) ->
-      let max_coinbases = 2 in
-      let block_window_duration_ms =
-        Option.value ~default:config.block_window_duration_ms
-          config.proof_config.block_window_duration_ms
-      in
-      let max_user_commands_per_block =
-        (* block_window_duration is in milliseconds, so divide by 1000 divide
-           by 10 again because we have tps * 10
-        *)
-        tps_goal_x10 * block_window_duration_ms / (1000 * 10)
-      in
-      (* Log of the capacity of transactions per transition.
-          - 1 will only work if we don't have prover fees.
-          - 2 will work with prover fees, but not if we want a transaction
-            included in every block.
-          - At least 3 ensures a transaction per block and the staged-ledger
-            unit tests pass.
-      *)
-      1 + Core_kernel.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
+let apply_config ~test_config ~constants : constants =
+  let { requires_graphql = _
+      ; genesis_ledger = _
+      ; epoch_data = _
+      ; block_producers = _
+      ; snark_coordinator = _
+      ; snark_worker_fee = _
+      ; num_archive_nodes = _
+      ; log_precomputed_blocks = _
+      ; start_filtered_logs = _
+      ; k
+      ; delta
+      ; slots_per_epoch
+      ; slots_per_sub_window
+      ; grace_period_slots
+      ; txpool_max_size
+      ; work_delay
+      ; slot_tx_end = _
+      ; slot_chain_end = _
+      ; network_id
+      ; block_window_duration_ms
+      ; transaction_capacity_log_2
+      ; fork
+      } =
+    test_config
+  in
+  { constants with
+    genesis_constants =
+      { constants.genesis_constants with
+        protocol =
+          { constants.genesis_constants.protocol with
+            k
+          ; slots_per_epoch
+          ; slots_per_sub_window
+          ; grace_period_slots
+          ; delta
+          }
+      ; txpool_max_size
+      }
+  ; constraint_constants =
+      { constants.constraint_constants with
+        work_delay
+      ; transaction_capacity_log_2
+      ; block_window_duration_ms
+      ; fork =
+          Option.map fork ~f:(fun fork_constants ->
+              { Genesis_constants.Fork_constants.state_hash =
+                  Mina_base.State_hash.of_base58_check_exn
+                    fork_constants.state_hash
+              ; blockchain_length =
+                  Mina_numbers.Length.of_int fork_constants.blockchain_length
+              ; global_slot_since_genesis =
+                  Mina_numbers.Global_slot_since_genesis.of_int
+                    fork_constants.global_slot_since_genesis
+              } )
+      }
+  ; compile_config =
+      { constants.compile_config with
+        network_id =
+          Option.value network_id ~default:constants.compile_config.network_id
+      ; block_window_duration =
+          Time.Span.of_ms @@ Float.of_int block_window_duration_ms
+      }
+  }
 
-let transaction_capacity config =
-  let i = transaction_capacity_log_2 config in
-  Int.pow 2 i
+let transaction_capacity config = Int.pow 2 config.transaction_capacity_log_2
 
 let blocks_for_first_ledger_proof (config : t) =
-  let work_delay =
-    Option.value ~default:config.block_window_duration_ms
-      config.proof_config.work_delay
-  in
-  let transaction_capacity_log_2 = transaction_capacity_log_2 config in
-  ((work_delay + 1) * (transaction_capacity_log_2 + 1)) + 1
+  ((config.work_delay + 1) * (config.transaction_capacity_log_2 + 1)) + 1
 
 let slots_for_blocks blocks =
   (*Given 0.75 slots are filled*)

@@ -201,19 +201,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           }
     ; snark_worker_fee = "0.0002"
     ; num_archive_nodes = 1
-    ; proof_config =
-        { proof_config_default with
-          work_delay = Some 1
-        ; transaction_capacity =
-            Some Runtime_config.Proof_keys.Transaction_capacity.small
-        ; fork = Some fork_config
-        }
+    ; work_delay = 1
+    ; transaction_capacity_log_2 = 2
+    ; fork = Some fork_config
     }
 
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_mina_nodes = Network.all_mina_nodes network in
+    let constants = Network.constants network in
+    let constraint_constants = constants.constraint_constants in
     let%bind () =
       wait_for t
         (Wait_condition.nodes_to_initialize
@@ -301,7 +299,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let zkapp_keypairs =
         List.init 3 ~f:(fun _ -> Signature_lib.Keypair.create ())
       in
-      let constraint_constants = Network.constraint_constants network in
       let amount = Currency.Amount.of_mina_int_exn 10 in
       let nonce = Account.Nonce.zero in
       let memo =
@@ -362,7 +359,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; sender = (fish1.keypair, Account.Nonce.(succ one))
         }
       in
-      let constraint_constants = Network.constraint_constants network in
       let%bind vk_proof =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
@@ -479,12 +475,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind _ =
            send_payments ~logger ~sender_pub_key ~receiver_pub_key
              ~amount:Currency.Amount.one ~fee ~node:sender 10
-         in
-         let constants : Test_config.constants =
-           { genesis_constants = Network.genesis_constants network
-           ; constraint_constants = Network.constraint_constants network
-           ; compile_config = Network.compile_config network
-           }
          in
          wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis

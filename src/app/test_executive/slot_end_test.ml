@@ -54,12 +54,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; txpool_max_size = 10_000_000
     ; snark_worker_fee = "0.0002"
     ; num_archive_nodes = 0
-    ; proof_config =
-        { proof_config_default with
-          work_delay = Some 1
-        ; transaction_capacity =
-            Some Runtime_config.Proof_keys.Transaction_capacity.small
-        }
+    ; work_delay = 1
+    ; transaction_capacity_log_2 = 2
     ; slot_tx_end = Some slot_tx_end
     ; slot_chain_end = Some slot_chain_end
     }
@@ -73,6 +69,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
+    let { Test_config.genesis_constants; constraint_constants; _ } =
+      Network.constants network
+    in
     let num_slots = slot_chain_end + 2 in
     let receiver =
       String.Map.find_exn (Network.block_producers network) "receiver"
@@ -98,9 +97,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           let pk = s.keypair.public_key |> Signature_lib.Public_key.compress in
           return ([%log info] "sender: %s" (pk_to_string pk)) )
     in
-    let window_ms =
-      (Network.constraint_constants network).block_window_duration_ms
-    in
+    let window_ms = constraint_constants.block_window_duration_ms in
     let all_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
@@ -108,8 +105,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let genesis_timestamp =
       Block_time.to_time_exn
-      @@ Block_time.of_int64
-           (Network.genesis_constants network).protocol.genesis_state_timestamp
+      @@ Block_time.of_int64 genesis_constants.protocol.genesis_state_timestamp
     in
     let end_t =
       Time.add genesis_timestamp

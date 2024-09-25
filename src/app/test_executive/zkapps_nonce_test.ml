@@ -40,12 +40,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; worker_nodes = 5
           }
     ; snark_worker_fee = "0.0001"
-    ; proof_config =
-        { proof_config_default with
-          work_delay = Some 1
-        ; transaction_capacity =
-            Some Runtime_config.Proof_keys.Transaction_capacity.medium
-        }
+    ; work_delay = 1
+    ; transaction_capacity_log_2 = 3
     }
 
   let transactions_sent = ref 0
@@ -89,12 +85,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let run network t =
     let open Malleable_error.Let_syntax in
-    let constants : Test_config.constants =
-      { genesis_constants = Network.genesis_constants network
-      ; constraint_constants = Network.constraint_constants network
-      ; compile_config = Network.compile_config network
-      }
-    in
+    let constants = Network.constants network in
     let logger = Logger.create () in
     let block_producer_nodes =
       Network.block_producers network |> Core.String.Map.data

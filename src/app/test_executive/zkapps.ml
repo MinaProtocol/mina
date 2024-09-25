@@ -40,12 +40,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; worker_nodes = 2
           }
     ; snark_worker_fee = "0.0001"
-    ; proof_config =
-        { proof_config_default with
-          work_delay = Some 1
-        ; transaction_capacity =
-            Some Runtime_config.Proof_keys.Transaction_capacity.small
-        }
+    ; work_delay = 1
+    ; transaction_capacity_log_2 = 2
     }
 
   let transactions_sent = ref 0
@@ -123,12 +119,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let constants : Test_config.constants =
-      { genesis_constants = Network.genesis_constants network
-      ; constraint_constants = Network.constraint_constants network
-      ; compile_config = Network.compile_config network
-      }
-    in
+    let constants = Network.constants network in
+    let constraint_constants = constants.constraint_constants in
     let block_producer_nodes =
       Network.block_producers network |> Core.String.Map.data
     in
@@ -142,7 +134,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let node =
       Core.String.Map.find_exn (Network.block_producers network) "node-a"
     in
-    let constraint_constants = Network.constraint_constants network in
     let fish1_kp =
       (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1")
         .keypair

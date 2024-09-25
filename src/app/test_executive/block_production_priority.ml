@@ -50,12 +50,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           }
     ; txpool_max_size = 10_000_000
     ; snark_worker_fee = "0.0001"
-    ; proof_config =
-        { proof_config_default with
-          work_delay = Some 1
-        ; transaction_capacity =
-            Some Runtime_config.Proof_keys.Transaction_capacity.small
-        }
+    ; work_delay = 1
+    ; transaction_capacity_log_2 = 2
     }
 
   let fee = Currency.Fee.of_nanomina_int_exn 10_000_000
@@ -71,6 +67,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
+    let constants = Network.constants network in
+    let constraint_constants = constants.constraint_constants in
     let receiver =
       Core.String.Map.find_exn (Network.block_producers network) "receiver"
     in
@@ -107,9 +105,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           let pk = s.keypair.public_key |> Signature_lib.Public_key.compress in
           return ([%log info] "sender: %s" (pk_to_string pk)) )
     in
-    let window_ms =
-      (Network.constraint_constants network).block_window_duration_ms
-    in
+    let window_ms = constraint_constants.block_window_duration_ms in
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t

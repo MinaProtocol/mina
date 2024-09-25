@@ -84,12 +84,6 @@ module Engine = struct
 
     val constants : t -> Test_config.constants
 
-    val constraint_constants : t -> Genesis_constants.Constraint_constants.t
-
-    val genesis_constants : t -> Genesis_constants.t
-
-    val compile_config : t -> Mina_compile_config.t
-
     val seeds : t -> Node.t Core.String.Map.t
 
     val all_non_seed_nodes : t -> Node.t Core.String.Map.t

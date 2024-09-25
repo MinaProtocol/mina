@@ -37,6 +37,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
+    let constants = Network.constants network in
+    let constraint_constants = constants.constraint_constants in
     let all_mina_nodes = Network.all_mina_nodes network in
     [%log info] "peers_list"
       ~metadata:
@@ -139,8 +141,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              }
            in
            Malleable_error.lift
-           @@ Transaction_snark.For_tests.deploy_snapp
-                ~constraint_constants:(Network.constraint_constants network)
+           @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants
                 parties_spec
          in
          let%bind () =

@@ -14,6 +14,14 @@ module Proof_level = struct
         None
     | s ->
         failwithf "unrecognised proof level %s" s ()
+
+  let to_yojson t = `String (to_string t)
+
+  let of_yojson = function
+    | `String s ->
+        Ok (of_string s)
+    | _ ->
+        Error "proof_level must be a string"
 end
 
 module Fork_constants = struct

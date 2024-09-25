@@ -36,6 +36,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
+    let constants = Network.constants network in
+    let constraint_constants = constants.constraint_constants in
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
@@ -46,7 +48,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Network.block_producers network |> Core.String.Map.data
     in
     let node = List.hd_exn block_producer_nodes in
-    let constraint_constants = Network.constraint_constants network in
     let block_window_duration_ms =
       constraint_constants.block_window_duration_ms
     in
