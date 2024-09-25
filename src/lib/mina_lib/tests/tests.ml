@@ -41,6 +41,8 @@ let%test_module "Epoch ledger sync tests" =
     let constraint_constants =
       Genesis_constants.For_unit_tests.Constraint_constants.t
 
+    let compile_config = Mina_compile_config.For_unit_tests.t
+
     let make_dirname s =
       let open Core in
       let uuid = Uuid_unix.create () |> Uuid.to_string in
@@ -69,7 +71,7 @@ let%test_module "Epoch ledger sync tests" =
           Genesis_ledger_helper.Config_loader.init_from_config_file
             ~genesis_dir:(make_dirname "genesis_dir")
             ~constraint_constants ~genesis_constants ~logger ~proof_level:None
-            runtime_config ~cli_proof_level:None
+            runtime_config ~cli_proof_level:None ~compile_config
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
