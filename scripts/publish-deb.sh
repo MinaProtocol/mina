@@ -60,25 +60,33 @@ for i in {1..10}; do (
 ) && break || scripts/clear-deb-s3-lockfile.sh; done
 
 # Verify integrity of debs on remote repo
-function verify_o1test_repo_has_package {
-  sudo apt-get update
-  ${DEBS3_SHOW} ${1} ${DEB_VERSION} $ARCH -c $DEB_CODENAME -m $DEB_RELEASE
-  return $?
+function verify_o1test_repo_has_packages {
+  for deb in $DEB_NAMES; do
+    deb_split=(${deb//_/ })
+    deb="${deb_split[0]}"
+    deb=$(basename $deb)
+
+    ${DEBS3_SHOW} ${deb} ${DEB_VERSION} $ARCH -c $DEB_CODENAME -m $DEB_RELEASE
+    res=$?
+    if [ $res -ne 0 ]; then
+        return $res
+    fi
+  done
 }
 
-for deb in $DEB_NAMES
-do
-  echo "Adding packages.o1test.net $DEB_CODENAME $DEB_RELEASE"
-  sudo echo "deb [trusted=yes] http://packages.o1test.net $DEB_CODENAME $DEB_RELEASE" | sudo tee /etc/apt/sources.list.d/mina.list
+echo "Adding packages.o1test.net $DEB_CODENAME $DEB_RELEASE"
+sudo echo "deb [trusted=yes] http://packages.o1test.net $DEB_CODENAME $DEB_RELEASE" | sudo tee /etc/apt/sources.list.d/mina.list
+sudo apt-get update
 
-  DEBS3_SHOW="deb-s3 show $BUCKET_ARG $S3_REGION_ARG"
-
-  deb_split=(${deb//_/ })
-  deb="${deb_split[0]}"
-  deb=$(basename $deb)
+DEBS3_SHOW="deb-s3 show $BUCKET_ARG $S3_REGION_ARG"
   
-  for i in {1..10}; do (verify_o1test_repo_has_package $deb) && break || sleep 60; done
-
+for i in {1..10}; do
+    verify_o1test_repo_has_packages
+    res=$?
+    if [ $res -eq 0 ]; then
+      break
+    fi
+    sleep 60s
 done
 
-
+exit $res
