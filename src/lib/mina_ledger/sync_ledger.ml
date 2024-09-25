@@ -54,6 +54,16 @@ module Answer = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
+    module V3 = struct
+      type t =
+        ( Ledger_hash.Stable.V1.t
+        , Account.Stable.V2.t )
+        Syncable_ledger.Answer.Stable.V2.t
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       type t =
         ( Ledger_hash.Stable.V1.t
@@ -61,7 +71,8 @@ module Answer = struct
         Syncable_ledger.Answer.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
-      let to_latest = Fn.id
+      let to_latest (a, b, c) =
+        (a, b, Syncable_ledger.Answer.Stable.V1.to_latest c)
     end
   end]
 

@@ -366,13 +366,13 @@ module Answer_sync_ledger_query = struct
     include Master
   end)
 
-  module V3 = struct
+  module V4 = struct
     module T = struct
       type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
       [@@deriving sexp]
 
       type response =
-        (( Sync_ledger.Answer.Stable.V2.t
+        (( Sync_ledger.Answer.Stable.V3.t
          , Bounded_types.Wrapped_error.Stable.V1.t )
          Result.t
         [@version_asserted] )
