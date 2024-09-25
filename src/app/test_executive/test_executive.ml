@@ -30,6 +30,7 @@ type inputs =
   ; mina_image : string
   ; archive_image : string option
   ; debug : bool
+  ; config_file : string list
   }
 
 let validate_inputs ~logger inputs (test_config : Test_config.t) :
@@ -267,9 +268,13 @@ let main inputs =
    *   Exec.execute ~logger ~engine_cli_inputs ~images (module Test (Engine))
    *)
   let logger = Logger.create () in
+  let%bind config =
+    let logger = Logger.create () in
+    Runtime_config.Constants_loader.load_constants ~logger inputs.config_file
+  in
   let constants : Test_config.constants =
     let protocol =
-      { Genesis_constants.Compiled.genesis_constants.protocol with
+      { config.genesis_constants.protocol with
         k = 20
       ; delta = 0
       ; slots_per_epoch = 3 * 8 * 20
@@ -278,12 +283,9 @@ let main inputs =
       }
     in
     { genesis_constants =
-        { Genesis_constants.Compiled.genesis_constants with
-          protocol
-        ; txpool_max_size = 3000
-        }
-    ; constraint_constants = Genesis_constants.Compiled.constraint_constants
-    ; compile_config = Mina_compile_config.Compiled.t
+        { config.genesis_constants with protocol; txpool_max_size = 3000 }
+    ; constraint_constants = config.constraint_constants
+    ; compile_config = config.compile_config
     }
   in
   let images =
@@ -473,6 +475,14 @@ let debug_arg =
   in
   Arg.(value & flag & info [ "debug"; "d" ] ~doc)
 
+let config_file_arg =
+  let doc = "The path to the node configuration file." in
+  let env = Arg.env_var "MINA_CONFIG_FILE" ~doc in
+  Arg.(
+    value
+      ( opt (some string) None
+      & info [ "config-file" ] ~env ~docv:"MINA_CONFIG_FILE" ~doc ))
+
 let help_term = Term.(ret @@ const (`Help (`Plain, None)))
 
 let engine_cmd ((engine_name, (module Engine)) : engine) =
@@ -488,12 +498,19 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
     Term.(const wrap_cli_inputs $ Engine.Network_config.Cli_inputs.term)
   in
   let inputs_term =
-    let cons_inputs test_inputs test mina_image archive_image debug =
-      { test_inputs; test; mina_image; archive_image; debug }
+    let cons_inputs test_inputs test mina_image archive_image debug config_file
+        =
+      { test_inputs
+      ; test
+      ; mina_image
+      ; archive_image
+      ; debug
+      ; config_file = Option.to_list config_file
+      }
     in
     Term.(
       const cons_inputs $ test_inputs_with_cli_inputs_arg $ test_arg
-      $ mina_image_arg $ archive_image_arg $ debug_arg)
+      $ mina_image_arg $ archive_image_arg $ debug_arg $ config_file_arg)
   in
   let term = Term.(const start $ inputs_term) in
   (term, info)

@@ -667,7 +667,7 @@ module Genesis_proof = struct
 
   let generate_inputs ~runtime_config ~proof_level ~ledger ~genesis_epoch_data
       ~constraint_constants ~blockchain_proof_system_id
-      ~(genesis_constants : Genesis_constants.t) =
+      ~(genesis_constants : Genesis_constants.t) ~compile_config =
     let consensus_constants =
       Consensus.Constants.create ~constraint_constants
         ~protocol_constants:genesis_constants.protocol
@@ -690,6 +690,7 @@ module Genesis_proof = struct
     ; constraint_system_digests = None
     ; genesis_constants
     ; genesis_body_reference
+    ; compile_config
     }
 
   let generate (inputs : Genesis_proof.Inputs.t) =
@@ -708,6 +709,7 @@ module Genesis_proof = struct
              ; consensus_constants = inputs.consensus_constants
              ; constraint_constants = inputs.constraint_constants
              ; genesis_body_reference = inputs.genesis_body_reference
+             ; compile_config = inputs.compile_config
              }
     | _ ->
         Deferred.return (Genesis_proof.create_values_no_proof inputs)
@@ -775,7 +777,6 @@ let print_config ~logger config =
     ~metadata
 
 module type Config_loader = sig
-
   val load_config :
        ?genesis_dir:string
     -> ?conf_dir:string
@@ -787,15 +788,16 @@ module type Config_loader = sig
     -> Precomputed_values.t Deferred.t
 
   val init_from_config_file :
-    ?genesis_dir:string ->
-    ?cli_proof_level:Genesis_constants.Proof_level.t ->
-    ?overwrite_version:Mina_numbers.Txn_version.t ->
-    logger:Logger.t -> 
-    constraint_constants:Genesis_constants.Constraint_constants.t -> 
-    genesis_constants:Genesis_constants.t ->
-    proof_level:Genesis_constants.Proof_level.t ->
-    Runtime_config.t ->
-    (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t
+       ?genesis_dir:string
+    -> ?cli_proof_level:Genesis_constants.Proof_level.t
+    -> ?overwrite_version:Mina_numbers.Txn_version.t
+    -> logger:Logger.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> genesis_constants:Genesis_constants.t
+    -> proof_level:Genesis_constants.Proof_level.t
+    -> compile_config:Mina_compile_config.t
+    -> Runtime_config.t
+    -> (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t
 end
 
 module Config_loader : Config_loader = struct
@@ -807,7 +809,7 @@ module Config_loader : Config_loader = struct
   let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
       ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~proof_level:compiled_proof_level ?overwrite_version
+      ~proof_level:compiled_proof_level ?overwrite_version ~compile_config
       (config : Runtime_config.t) =
     print_config ~logger config ;
     let open Deferred.Or_error.Let_syntax in
@@ -893,23 +895,19 @@ module Config_loader : Config_loader = struct
     let proof_inputs =
       Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
         ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
-        ~blockchain_proof_system_id ~genesis_epoch_data
+        ~blockchain_proof_system_id ~genesis_epoch_data ~compile_config
     in
     (proof_inputs, config)
 
-  let init_from_config_file 
-    ?genesis_dir 
-    ?cli_proof_level  
-    ?overwrite_version
-    ~logger
-    ~constraint_constants
-    ~genesis_constants
-    ~proof_level
-    (config : Runtime_config.t) : (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
+  let init_from_config_file ?genesis_dir ?cli_proof_level ?overwrite_version
+      ~logger ~constraint_constants ~genesis_constants ~proof_level
+      ~compile_config (config : Runtime_config.t) :
+      (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
     let open Deferred.Or_error.Let_syntax in
     let%map inputs, config =
       inputs_from_config_file ?genesis_dir ~cli_proof_level ~genesis_constants
-        ~constraint_constants ~logger ~proof_level ?overwrite_version config
+        ~constraint_constants ~logger ~proof_level ?overwrite_version
+        ~compile_config config
     in
     let values = Genesis_proof.create_values_no_proof inputs in
     (values, config)
@@ -941,7 +939,8 @@ module Config_loader : Config_loader = struct
           init_from_config_file ?genesis_dir ~logger ?cli_proof_level
             ~genesis_constants:constants.genesis_constants
             ~constraint_constants:constants.constraint_constants
-            ~proof_level:constants.proof_level config
+            ~proof_level:constants.proof_level
+            ~compile_config:constants.compile_config config
         in
         a
     | Error e ->

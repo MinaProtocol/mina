@@ -13,6 +13,7 @@
    yojson
    async_unix
    ;;local libraries
+   cli_lib
    genesis_constants
    mina_runtime_config
    mina_ledger
@@ -24,6 +25,8 @@
    coda_genesis_ledger
    consensus
    mina_base
+   mina_lib
+   mina_version
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_let ppx_deriving_yojson)))

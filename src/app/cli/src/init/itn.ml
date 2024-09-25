@@ -7,7 +7,7 @@ open Mina_base
 open Mina_transaction
 
 let create_accounts ~(genesis_constants : Genesis_constants.t)
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t) port
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~port
     (privkey_path, key_prefix, num_accounts, fee, amount) =
   let keys_per_zkapp = 8 in
   let zkapps_per_block = 10 in

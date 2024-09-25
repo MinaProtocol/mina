@@ -52,6 +52,8 @@
    mina_transaction
    staged_ledger_diff
    mina_wire_types
+   mina_lib
+   mina_version
  )
  (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))

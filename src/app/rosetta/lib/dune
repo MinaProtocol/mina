@@ -52,6 +52,7 @@
   mina_numbers
   mina_transaction
   mina_version
+  cli_lib
  )
  (preprocessor_deps
   ../../../graphql-ppx-config.inc

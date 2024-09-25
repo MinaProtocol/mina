@@ -22,6 +22,7 @@ module Inputs = struct
            [None] here.
         *)
         Pickles.Verification_key.Id.t option
+    ; compile_config : Mina_compile_config.t
     }
 
   let runtime_config { runtime_config; _ } = runtime_config
@@ -93,6 +94,7 @@ module T = struct
         Protocol_state.value State_hash.With_state_hashes.t
     ; constraint_system_digests : (string * Md5_lib.t) list Lazy.t
     ; proof_data : Proof_data.t option
+    ; compile_config : Mina_compile_config.t
     }
 
   let runtime_config { runtime_config; _ } = runtime_config
@@ -102,6 +104,8 @@ module T = struct
   let genesis_constants { genesis_constants; _ } = genesis_constants
 
   let proof_level { proof_level; _ } = proof_level
+
+  let compile_config { compile_config; _ } = compile_config
 
   let protocol_constants t = (genesis_constants t).protocol
 
@@ -233,6 +237,7 @@ let create_values_no_proof (t : Inputs.t) =
         (let txn, b = blockchain_snark_state t in
          Lazy.force (digests txn b) )
   ; proof_data = None
+  ; compile_config = t.compile_config
   }
 
 let to_inputs (t : t) : Inputs.t =
@@ -255,4 +260,5 @@ let to_inputs (t : t) : Inputs.t =
           Some blockchain_proof_system_id
       | None ->
           None )
+  ; compile_config = t.compile_config
   }

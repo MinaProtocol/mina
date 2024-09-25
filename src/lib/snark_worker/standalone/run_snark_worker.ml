@@ -23,7 +23,8 @@ let command =
        let open Deferred.Let_syntax in
        let%bind { constraint_constants; proof_level; _ } =
          let logger = Logger.create () in
-         Runtime_config.Constants_loader.load_constants ~cli_proof_level ~logger config_file
+         Runtime_config.Constants_loader.load_constants ~cli_proof_level ~logger
+           config_file
        in
        let%bind worker_state =
          Prod.Worker_state.create ~constraint_constants ~proof_level ()

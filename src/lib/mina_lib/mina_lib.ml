@@ -131,7 +131,7 @@ let subscription t = t.subscriptions
 
 let commit_id t = t.commit_id
 
-let compile_config t = t.config.compile_config
+let compile_config t = t.config.precomputed_values.compile_config
 
 let peek_frontier frontier_broadcast_pipe =
   Broadcast_pipe.Reader.peek frontier_broadcast_pipe
@@ -1159,7 +1159,7 @@ let check_and_stop_daemon t ~wait =
             else `Check_in wait_for
         | Evaluating_vrf _last_checked_slot ->
             let vrf_poll_interval =
-              (config t).compile_config.vrf_poll_interval
+              (config t).precomputed_values.compile_config.vrf_poll_interval
             in
             `Check_in (Core.Time.Span.scale vrf_poll_interval 2.0) )
 
@@ -1262,13 +1262,15 @@ let context ~commit_id (config : Config.t) : (module CONTEXT) =
 
     let commit_id = commit_id
 
-    let vrf_poll_interval = config.compile_config.vrf_poll_interval
+    let vrf_poll_interval =
+      config.precomputed_values.compile_config.vrf_poll_interval
 
     let zkapp_cmd_limit = config.zkapp_cmd_limit
 
-    let compaction_interval = config.compile_config.compaction_interval
+    let compaction_interval =
+      config.precomputed_values.compile_config.compaction_interval
 
-    let compile_config = config.compile_config
+    let compile_config = config.precomputed_values.compile_config
   end )
 
 let start t =
@@ -1357,7 +1359,8 @@ let start t =
       ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net
       ~zkapp_cmd_limit_hardcap:
         t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap ) ;
-  perform_compaction t.config.compile_config.compaction_interval t ;
+  perform_compaction
+    t.config.precomputed_values.compile_config.compaction_interval t ;
   let () =
     match t.config.node_status_url with
     | Some node_status_url ->
@@ -1498,12 +1501,14 @@ let create ~commit_id ?wallets (config : Config.t) =
   let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
-  let block_window_duration = config.compile_config.block_window_duration in
+  let block_window_duration =
+    config.precomputed_values.compile_config.block_window_duration
+  in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
           =
-        if config.compile_config.itn_features then
+        if config.precomputed_values.compile_config.itn_features then
           let ({ client_port; _ } : Node_addrs_and_ports.t) =
             config.gossip_net_params.addrs_and_ports
           in

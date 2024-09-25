@@ -1600,7 +1600,6 @@ let slot_tx_end, slot_chain_end =
   in
   (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))
 
-
 module type Json_loader_intf = sig
   val load_config_files :
        ?conf_dir:string
@@ -1808,14 +1807,14 @@ module type Constants_loader_intf = sig
     -> Yojson.Safe.t
     -> (t, string) result
 
-  val load_constants : 
-      ?conf_dir:string ->
-      ?commit_id_short:string -> 
-      ?itn_features:bool -> 
-      ?cli_proof_level:Genesis_constants.Proof_level.t ->
-      logger:Logger.t ->
-      string list ->
-      t Deferred.t
+  val load_constants :
+       ?conf_dir:string
+    -> ?commit_id_short:string
+    -> ?itn_features:bool
+    -> ?cli_proof_level:Genesis_constants.Proof_level.t
+    -> logger:Logger.t
+    -> string list
+    -> t Deferred.t
 end
 
 module Constants_loader : Constants_loader_intf = struct
@@ -2091,21 +2090,19 @@ module Constants_loader : Constants_loader_intf = struct
              "Proof level %s is not compatible with compile-time proof level %s"
              a.proof_level (str compiled) )
 
-(* Use this function if you don't need/want the ledger configuration *)
-let load_constants ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
-    ~logger config_files =
-  Deferred.Or_error.ok_exn
-  @@
-  let open Deferred.Or_error.Let_syntax in
-  let%bind json =
-    Json_loader.load_config_files ?conf_dir ?commit_id_short ~logger
-      config_files
-  in
-  match
-    parse_constants ?itn_features ?cli_proof_level ~logger json
-  with
-  | Ok res ->
-      return res
-  | Error e ->
-      Deferred.Or_error.error_string @@ "Error loading runtime config: " ^ e
+  (* Use this function if you don't need/want the ledger configuration *)
+  let load_constants ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
+      ~logger config_files =
+    Deferred.Or_error.ok_exn
+    @@
+    let open Deferred.Or_error.Let_syntax in
+    let%bind json =
+      Json_loader.load_config_files ?conf_dir ?commit_id_short ~logger
+        config_files
+    in
+    match parse_constants ?itn_features ?cli_proof_level ~logger json with
+    | Ok res ->
+        return res
+    | Error e ->
+        Deferred.Or_error.error_string @@ "Error loading runtime config: " ^ e
 end

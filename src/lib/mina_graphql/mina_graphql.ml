@@ -2672,7 +2672,7 @@ module Queries = struct
       ~args:Arg.[]
       ~resolve:(fun { ctx = mina; _ } () ->
         let cfg = Mina_lib.config mina in
-        "mina:" ^ cfg.compile_config.network_id )
+        "mina:" ^ cfg.precomputed_values.compile_config.network_id )
 
   let signature_kind =
     field "signatureKind"

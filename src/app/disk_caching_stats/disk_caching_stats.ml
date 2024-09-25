@@ -721,21 +721,21 @@ let compute_ram_usage ~config (sizes : size_params) =
   in
   Printf.printf "TOTAL: %fGB\n" (format_gb total_size)
 
-let () =
+let main config () =
   Async.Thread_safe.block_on_async_exn
   @@ fun () ->
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
-  let config = { constraint_constants; genesis_constants } in
   let%bind.Async_kernel.Deferred _, generated_zkapps =
     let num_updates = 1 in
-    Snark_profiler_lib.create_ledger_and_zkapps ~genesis_constants
-      ~constraint_constants ~min_num_updates:num_updates
-      ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
+    Snark_profiler_lib.create_ledger_and_zkapps
+      ~genesis_constants:config.genesis_constants
+      ~constraint_constants:config.constraint_constants
+      ~min_num_updates:num_updates ~num_proof_updates:num_updates
+      ~max_num_updates:num_updates ()
   in
   let%map.Async_kernel.Deferred vk =
     let `VK vk, `Prover _ =
-      Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+      Transaction_snark.For_tests.create_trivial_snapp
+        ~constraint_constants:config.constraint_constants ()
     in
     vk
   in
@@ -836,3 +836,22 @@ let () =
          *. Time.Span.to_ns ledger_proof_serial_times.read )
      in
      Time.Span.(zkapps + snark_works) )
+
+let () =
+  Command.run
+  @@
+  let open Command.Let_syntax in
+  Async.Command.async
+    ~summary:
+      "Estimate the memory usage of the daemon in the fully saturated max-cost \
+       transaction environment"
+    (let%map_open config_file = Cli_lib.Flag.conf_file in
+     fun () ->
+       let open Async.Deferred.Let_syntax in
+       let%map config =
+         let logger = Logger.create () in
+         Runtime_config.Constants_loader.load_constants ~logger config_file
+       in
+       let genesis_constants = config.genesis_constants in
+       let constraint_constants = config.constraint_constants in
+       main { genesis_constants; constraint_constants } () )
