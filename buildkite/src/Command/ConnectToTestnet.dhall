@@ -2,9 +2,11 @@ let B = ../External/Buildkite.dhall
 
 let Command = ./Base.dhall
 
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+let Size = ./Size.dhall
 
-let Cmd = ../Lib/Cmds.dhall
+let RunInToolchain = ./RunInToolchain.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 in  { step =
             \(dependsOn : List Command.TaggedKey.Type)
@@ -15,12 +17,9 @@ in  { step =
         ->  Command.build
               Command.Config::{
               , commands =
-                [ Cmd.runInDocker
-                    Cmd.Docker::{
-                    , image = (../Constants/ContainerImages.dhall).ubuntu2004
-                    }
+                  RunInToolchain.runInToolchain
+                    ([] : List Text)
                     "./buildkite/scripts/connect-to-testnet.sh ${testnet} ${wait_between_graphql_poll} ${wait_before_final_check}"
-                ]
               , label = "Connect to ${testnet}"
               , soft_fail = Some soft_fail
               , key = "connect-to-${testnet}"

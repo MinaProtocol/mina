@@ -8,6 +8,10 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let DockerImage = ../../Command/DockerImage.dhall
 
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
+let Artifacts = ../../Constants/Artifacts.dhall
+
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -27,10 +31,9 @@ in  Pipeline.build
       , steps =
         [ let toolchainBullseyeSpec =
                 DockerImage.ReleaseSpec::{
-                , service = "mina-toolchain"
-                , deb_codename = "bullseye"
+                , service = Artifacts.Type.Toolchain
+                , deb_codename = DebianVersions.DebVersion.Bullseye
                 , no_cache = True
-                , step_key = "toolchain-bullseye-docker-image"
                 }
 
           in  DockerImage.generateStep toolchainBullseyeSpec
