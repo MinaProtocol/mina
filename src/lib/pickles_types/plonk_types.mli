@@ -138,7 +138,9 @@ module Messages : sig
   module Lookup : sig
     module Stable : sig
       module V1 : sig
-        type 'g t = { sorted : 'g array; aggreg : 'g; runtime : 'g option }
+        type 'g t =
+              'g Mina_wire_types.Pickles_types.Plonk_types.Messages.Lookup.V1.t =
+          { sorted : 'g array; aggreg : 'g; runtime : 'g option }
         [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
       end
     end
@@ -171,7 +173,7 @@ module Messages : sig
           - [lookup] contains the commitments to the polynomials involved the
             lookup arguments.
       *)
-      type 'g t =
+      type 'g t = 'g Mina_wire_types.Pickles_types.Plonk_types.Messages.V2.t =
         { w_comm : 'g Poly_comm.Without_degree_bound.t Columns_vec.t
         ; z_comm : 'g Poly_comm.Without_degree_bound.t
         ; t_comm : 'g Poly_comm.Without_degree_bound.t
@@ -352,6 +354,10 @@ module Openings : sig
   module Stable : sig
     module V2 : sig
       type ('g, 'fq, 'fqv) t =
+            ( 'g
+            , 'fq
+            , 'fqv )
+            Mina_wire_types.Pickles_types.Plonk_types.Openings.V2.t =
         { proof : ('g, 'fq) Bulletproof.t
         ; evals : ('fqv * 'fqv) Evals.t
         ; ft_eval1 : 'fq
@@ -366,6 +372,7 @@ module Proof : sig
   module Stable : sig
     module V2 : sig
       type ('g, 'fq, 'fqv) t =
+            ('g, 'fq, 'fqv) Mina_wire_types.Pickles_types.Plonk_types.Proof.V2.t =
         { messages : 'g Messages.Stable.V2.t
         ; openings : ('g, 'fq, 'fqv) Openings.t
         }
