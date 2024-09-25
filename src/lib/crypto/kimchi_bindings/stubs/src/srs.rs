@@ -98,23 +98,23 @@ macro_rules! impl_srs {
                 use std::time::{Duration, Instant};
                 let time_0 = Instant::now();
                 println!("entering _lagrange_commitment_whole_domain");
-                let x_domain = EvaluationDomain::<$F>::new(domain_size as usize).ok_or_else(|| {
+                let x_domain: ark_poly::Radix2EvaluationDomain<_> = EvaluationDomain::<$F>::new(domain_size as usize).ok_or_else(|| {
                     ocaml::Error::invalid_argument("CamlSRS::lagrange_commitment")
                         .err()
                         .unwrap()
                 })?;
                 println!("rust ..._lagrange_commitment_whole_domain 1 {:.2?}", time_0.elapsed());
 
-                {
-                    //// We're single-threaded, so it's safe to grab this pointer as mutable.
-                    //// Do not try this at home.
-                    //let srs = unsafe { &mut *((&**srs as *const SRS<$G>) as *mut SRS<$G>) as &mut SRS<$G> };
-                    let srs: &mut poly_commitment::srs::SRS<$G> =
-                        unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
+                //{
+                //    //// We're single-threaded, so it's safe to grab this pointer as mutable.
+                //    //// Do not try this at home.
+                //    //let srs = unsafe { &mut *((&**srs as *const SRS<$G>) as *mut SRS<$G>) as &mut SRS<$G> };
+                //    let srs: &mut poly_commitment::srs::SRS<$G> =
+                //        unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
 
-                    srs.with_lagrange_basis(x_domain);
-                }
-                println!("rust ..._lagrange_commitment_whole_domain 2 {:.2?}", time_0.elapsed());
+                //    srs.with_lagrange_basis(x_domain);
+                //}
+                //println!("rust ..._lagrange_commitment_whole_domain 2 {:.2?}", time_0.elapsed());
 
 
                 //let mut res = unsafe { ocaml::Array::alloc(domain_size as usize) };
@@ -140,7 +140,7 @@ macro_rules! impl_srs {
             ) -> Result<CamlPolyComm<$CamlG>, ocaml::Error> {
                 use std::time::{Duration, Instant};
                 let time_0 = Instant::now();
-                let x_domain = EvaluationDomain::<$F>::new(domain_size as usize).ok_or_else(|| {
+                let x_domain: ark_poly::Radix2EvaluationDomain<_> = EvaluationDomain::<$F>::new(domain_size as usize).ok_or_else(|| {
                     ocaml::Error::invalid_argument("CamlSRS::lagrange_commitment")
                         .err()
                         .unwrap()
