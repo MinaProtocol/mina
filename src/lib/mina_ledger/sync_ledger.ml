@@ -71,8 +71,13 @@ module Answer = struct
         Syncable_ledger.Answer.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
-      let to_latest (a, b, c) =
-        (a, b, Syncable_ledger.Answer.Stable.V1.to_latest c)
+      let to_latest x = Syncable_ledger.Answer.Stable.V1.to_latest Fn.id x
+
+      (* Not a standard versioning function *)
+
+      (** Attempts to downgrade v3 -> v2 *)
+      let from_v3 : V3.t -> t =
+       fun x -> Syncable_ledger.Answer.Stable.V1.from_v2 x
     end
   end]
 

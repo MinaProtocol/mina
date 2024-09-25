@@ -63,6 +63,18 @@ module Answer = struct
             V2.Contents_are (List.map ~f:acct_to_latest accts)
         | Num_accounts (i, h) ->
             V2.Num_accounts (i, h)
+
+      (* Not a standard versioning function *)
+
+      (** Attempts to downgrade v2 -> v1 *)
+      let from_v2 : ('a, 'b) V2.t -> ('a, 'b) t = function
+        | Child_hashes_are h ->
+            if Array.length h = 2 then Child_hashes_are (h.(0), h.(1))
+            else failwith "can't downgrade wide query"
+        | Contents_are accs ->
+            Contents_are accs
+        | Num_accounts (n, h) ->
+            Num_accounts (n, h)
     end
   end]
 end
