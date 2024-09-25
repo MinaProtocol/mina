@@ -8,7 +8,8 @@ let command =
     (let%map_open spec =
        flag "--spec-sexp" ~doc:""
          (required (sexp_conv Prod.single_spec_of_sexp))
-     and proof_level =
+     and config_file = Cli_lib.Flag.conf_file
+     and cli_proof_level =
        flag "--proof-level" ~doc:""
          (optional_with_default Genesis_constants.Proof_level.Full
             (Command.Arg_type.of_alist_exn
@@ -19,8 +20,10 @@ let command =
      in
      fun () ->
        let open Async in
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
+       let open Deferred.Let_syntax in
+       let%bind { constraint_constants; proof_level; _ } =
+         let logger = Logger.create () in
+         Runtime_config.Constants_loader.load_constants ~cli_proof_level ~logger config_file
        in
        let%bind worker_state =
          Prod.Worker_state.create ~constraint_constants ~proof_level ()
