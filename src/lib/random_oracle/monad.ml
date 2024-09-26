@@ -35,12 +35,9 @@ let join_requests areq breq =
   }
 
 let impure_default : request_t -> (hash array -> int -> unit) -> unit =
- fun { request; request_len; _ } cont ->
+ fun { request; _ } cont ->
   let request = Sequence.(to_list request) in
-  let start = Time_ns.now () in
   let response = Oracle.hash_batch request |> Array.of_list in
-  printf "Hashing batch of %d requests took %s\n" request_len
-    Time_ns.(diff (now ()) start |> Span.to_short_string) ;
   cont response 0
 
 let evaluate : 'a t -> 'a =
@@ -66,6 +63,8 @@ let hash ~init data : hash t =
     { request = Sequence.return (`State init, data); request_len = 1 }
     (fun h i -> handler @@ Array.get h i)
 
+let batch_drain = 1024
+
 let hash_batch data : hash list t =
  fun ~(impure : impure_t) handler ->
   let request_len = List.length data in
@@ -83,7 +82,10 @@ let ( <*> ) : type a b. (a -> b) t -> a t -> b t =
   let a_res_ref = ref None in
   let f_res_ref = ref None in
   let req = ref None in
-  let impure_f freq fcont = req := Some (freq, fcont) in
+  let impure_f freq fcont =
+    if freq.request_len > batch_drain then impure freq fcont
+    else req := Some (freq, fcont)
+  in
   let impure_a areq acont =
     req :=
       Some
@@ -120,7 +122,13 @@ let all_impl ~impure ~set_result ~on_ready lst =
     let impure' ireq icont =
       let req, cont = !req_acc in
       let req' = join_requests req ireq in
-      req_acc := (req', (icont, req.request_len) :: cont)
+      if req'.request_len > batch_drain then (
+        req_acc := empty_acc ;
+        impure req' (fun hashes start_ix ->
+            icont hashes (start_ix + req.request_len) ;
+            List.iter cont ~f:(fun (exec, ix) -> exec hashes (start_ix + ix)) )
+        )
+      else req_acc := (req', (icont, req.request_len) :: cont)
     in
     action ~impure:impure' (fun a ->
         set_result i a ;
@@ -382,7 +390,9 @@ let%test_module "simple test" =
 
     let comp12 =
       lift2 Tuple3.create
-        ( List.init 10 ~f:(const (single_one, triple_one, ten_zero))
+        ( List.init
+            ((batch_drain * 3) + 5)
+            ~f:(const (single_one, triple_one, ten_zero))
         |> map_list ~f:(fun (a, b, c) ->
                lift2 Tuple3.create
                  (double_comp @@ hash ~init a)
@@ -395,7 +405,9 @@ let%test_module "simple test" =
       execute
         ( comp12
         , [%test_eq: (Field.t * Field.t * Field.t) list * Field.t * Field.t]
-            (List.init 10 ~f:(const (one, one, zero)), one, zero)
-        , 306
-        , 2 )
+            ( List.init ((batch_drain * 3) + 5) ~f:(const (one, one, zero))
+            , one
+            , zero )
+        , (((batch_drain * 3) + 5) * 28) + 26
+        , 20 )
   end )
