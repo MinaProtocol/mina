@@ -26,7 +26,6 @@
    rosetta_models
    mina_base
    currency
-   mina_compile_config
    unsigned_extended
    mina_base.import
  )

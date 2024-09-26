@@ -1,6 +1,6 @@
-type z = Z of z
+type z = Mina_wire_types.Pickles_types.Nat.z = Z of z
 
-type 'a s = Z | S of 'a
+type 'a s = 'a Mina_wire_types.Pickles_types.Nat.s = Z | S of 'a
 
 type _ t = Z : z t | S : 'n t -> 'n s t
 

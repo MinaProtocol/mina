@@ -49,7 +49,6 @@
    block_time
    base58_check
    bignum_bigint
-   mina_compile_config
    codable
    crypto_params
    debug_assert
@@ -69,7 +68,6 @@
    pickles.backend
    mina_signature_kind
    mina_base.util
-   mina_node_config
    kimchi_backend
    hex
    snark_bits

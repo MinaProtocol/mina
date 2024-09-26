@@ -158,6 +158,4 @@ module For_itn_logger : sig
     -> (Core.Time.t * string * (string * Yojson.Safe.t) list) list
 end
 
-module Context_logger : module type of Internal_tracing_context_logger
-
 module Context_call : module type of Internal_tracing_context_call
