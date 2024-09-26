@@ -172,11 +172,18 @@ let command =
            (String.concat !incompatible_flags ~sep:", ") ;
          exit 1 ) ) ;
      let repeats = Option.value repeats ~default:1 in
-     let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-     let constraint_constants =
-       Genesis_constants.Compiled.constraint_constants
-     in
-     let proof_level = Genesis_constants.Proof_level.Full in
+     let proof_level, genesis_constants, constraint_constants =
+       Async.Thread_safe.block_on_async_exn (fun () ->
+           let proof_level = Genesis_constants.Proof_level.Full in
+           let genesis_constants =
+             Genesis_constants.Compiled.genesis_constants
+           in
+           let constraint_constants =
+             Genesis_constants.Compiled.constraint_constants
+           in
+           Async.Deferred.return
+             (proof_level, genesis_constants, constraint_constants) )
+      in
      if witness_only then
        witness ~genesis_constants ~constraint_constants ~proof_level
          ~max_num_updates ?min_num_updates num_transactions repeats preeval
