@@ -61,7 +61,7 @@ let verify_heterogenous (ts : Instance.t list) =
         let non_chunking, expected_num_chunks =
           let expected_num_chunks =
             Option.value_map ~default:Plonk_checks.num_chunks_by_default
-                chunking_data ~f:(fun x -> x.Instance.num_chunks )
+              chunking_data ~f:(fun x -> x.Instance.num_chunks)
           in
           let exception Is_chunked in
           match
@@ -118,7 +118,7 @@ let verify_heterogenous (ts : Instance.t list) =
         let deferred_values =
           let zk_rows =
             Option.value_map ~default:Plonk_checks.zk_rows_by_default
-                chunking_data ~f:(fun x -> x.Instance.zk_rows )
+              chunking_data ~f:(fun x -> x.Instance.zk_rows)
           in
           Wrap_deferred_values.expand_deferred ~evals ~zk_rows
             ~old_bulletproof_challenges ~proof_state
