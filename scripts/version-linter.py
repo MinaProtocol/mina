@@ -24,6 +24,7 @@ import io
 import sys
 import re
 import sexpdata
+import requests
 
 exit_code=0
 
@@ -43,7 +44,19 @@ def branch_commit(branch):
 def download_type_shapes(role,branch,sha1) :
   file=type_shape_file(sha1)
   print ('Downloading type shape file',file,'for',role,'branch',branch,'at commit',sha1)
-  result=subprocess.run(['wget','--no-clobber',f'https://storage.googleapis.com/mina-type-shapes/{file}'])
+  url = f'https://storage.googleapis.com/mina-type-shapes/{file}'
+  r = requests.head(url, allow_redirects=True)
+  if r.status_code != 200:
+    print ("cannot fetch file reference from non-existing path: ${url}")
+    print ("looks like you need to generate it. Please use below steps")
+    print (f"git checkout ${sha1}")
+    print ("nix develop mina")
+    print (f"dune exec src/app/cli/src/mina.exe internal dump-type-shape > ${sha1}-type_shape.txt")
+    print ("gsutil cp gs://mina-type-shapes ${sha1}-type_shape.txt ")
+
+    sys.exit(1)
+
+  result=subprocess.run(['wget','--no-clobber',url])
 
 def type_shape_file(sha1) :
   # created by buildkite build-artifact script

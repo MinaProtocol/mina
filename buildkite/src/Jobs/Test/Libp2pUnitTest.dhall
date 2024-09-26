@@ -27,7 +27,11 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "Libp2pUnitTest"
-        , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Test ]
+        , tags =
+          [ PipelineTag.Type.Fast
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
         }
       , steps =
         [ Command.build

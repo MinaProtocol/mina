@@ -1,8 +1,6 @@
 open Core_kernel
 open Mina_base
 
-[%%import "/src/config.mlh"]
-
 module T = struct
   include Blake2.Make ()
 end

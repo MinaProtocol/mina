@@ -29,6 +29,7 @@ val handle_and_validate :
   -> validation_expiration:Time_ns.t
   -> sender:Peer.t
   -> data:string
+  -> block_window_duration:Time.Span.t
   -> [ `Validation_result of Libp2p_ipc.validation_result
      | `Validation_timeout
      | `Decoding_error of Error.t ]

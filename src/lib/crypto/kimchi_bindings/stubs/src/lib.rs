@@ -29,6 +29,9 @@ pub mod projective;
 /// SRS
 pub mod srs;
 
+pub mod lagrange_basis;
+pub use lagrange_basis::WithLagrangeBasis;
+
 /// Indexes
 pub mod pasta_fp_plonk_index;
 pub mod pasta_fq_plonk_index;
