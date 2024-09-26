@@ -1,1 +1,0 @@
-<*.{ml,byte,native}>: debug, package(bigarray), package(bytes), package(ctypes.stubs), package(oUnit), use_sodium_stubs

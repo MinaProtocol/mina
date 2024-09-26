@@ -32,11 +32,6 @@
 (*END src/config/scan_state/medium.mlh*)
 
 
-(*BEGIN src/config/debug_level/some.mlh*)
-[%%define cache_exceptions true]
-(*END src/config/debug_level/some.mlh*)
-
-
 (*BEGIN src/config/proof_level/check.mlh*)
 [%%define proof_level "check"]
 (*END src/config/proof_level/check.mlh*)
@@ -62,14 +57,6 @@
 (*END src/config/amount_defaults/standard.mlh*)
 
 
-(*BEGIN src/config/protocol_version/current.mlh*)
-(* transaction >= 1, network >= 0, patch >= 0 *)
-[%%define protocol_version_transaction 3]
-[%%define protocol_version_network 0]
-[%%define protocol_version_patch 0]
-(*END src/config/protocol_version/current.mlh*)
-
-
 (*BEGIN src/config/supercharged_coinbase_factor/one.mlh*)
 [%%define supercharged_coinbase_factor 1]
 (*END src/config/supercharged_coinbase_factor/one.mlh*)
@@ -87,8 +74,6 @@
 [%%undef fork_state_hash]
 [%%undef fork_global_slot_since_genesis]
 [%%undef zkapp_cmd_limit]
-[%%undef slot_tx_end]
-[%%undef slot_chain_end]
 (*END src/config/fork.mlh*)
 
 
@@ -99,5 +84,3 @@
 [%%undef compaction_interval]
 [%%define vrf_poll_interval 0]
 [%%undef zkapp_cmd_limit]
-[%%undef slot_tx_end]
-[%%undef slot_chain_end]

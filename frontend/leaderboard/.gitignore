@@ -1,6 +1,0 @@
-.merlin
-.next
-lib/
-*.bs.js
-.bsb.lock
-yarn-error.log
