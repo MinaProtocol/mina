@@ -12,8 +12,6 @@ let Command = ../../Command/Base.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
 
-let Size = ../../Command/Size.dhall
-
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -39,7 +37,6 @@ in  Pipeline.build
               [ Cmd.run "HELM_LINT=true buildkite/scripts/helm-ci.sh" ]
             , label = "Helm chart lint steps"
             , key = "lint-helm-chart"
-            , target = Size.Small
             , docker = None Docker.Type
             }
         ]

@@ -4,8 +4,6 @@ let Docker = ./Docker/Type.dhall
 
 let Base = ./Base.dhall
 
-let Size = ./Size.dhall
-
 let dockerImage = (../Constants/ContainerImages.dhall).minaToolchain
 
 let fixPermissionsScript = "sudo chown -R opam ."
@@ -23,7 +21,6 @@ let build
             , commands = [ Cmd.run fixPermissionsScript ] # c.commands
             , label = c.label
             , key = c.key
-            , target = Size.Small
             , docker = Some Docker::{ image = dockerImage }
             }
 

@@ -22,21 +22,19 @@ let PipelineMode = ../Pipeline/Mode.dhall
 
 let JobSpec = ../Pipeline/JobSpec.dhall
 
-let Size = ./Size.dhall
-
 let DockerImage = ./DockerImage.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
 
 let DebianRepo = ../Constants/DebianRepo.dhall
 
-let Artifacts = ../Constants/Artifacts.dhall
-
 let Profiles = ../Constants/Profiles.dhall
 
 let Toolchain = ../Constants/Toolchain.dhall
 
 let Network = ../Constants/Network.dhall
+
+let Artifacts = ../Constants/Artifacts.dhall
 
 let Spec =
       { Type =
@@ -98,6 +96,17 @@ let pipeline
                 "gcr.io/o1labs-192920/mina-daemon:\${BUILDKITE_COMMIT:0:7}-${DebianVersions.lowerName
                                                                                debVersion}-${network_name}"
 
+          let dockerSpec =
+                DockerImage.ReleaseSpec::{
+                , deps =
+                  [ { name = pipelineName, key = generateLedgersJobKey } ]
+                , service = Artifacts.Type.Daemon
+                , network = network_name
+                , deb_codename = debVersion
+                , deb_profile = profile
+                , deb_repo = DebianRepo.Type.Local
+                }
+
           in  Pipeline.Config::{
               , spec = JobSpec::{
                 , dirtyWhen = [ S.everything ]
@@ -134,7 +143,6 @@ let pipeline
                         "Build Mina Hardfork Package for ${DebianVersions.capitalName
                                                              debVersion}"
                     , key = generateLedgersJobKey
-                    , target = Size.XLarge
                     }
                 , Command.build
                     Command.Config::{
@@ -153,22 +161,8 @@ let pipeline
                     , depends_on =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
                     , key = "publish-hardfork-deb-pkg"
-                    , target = Size.Small
                     }
-                , DockerImage.generateStep
-                    DockerImage.ReleaseSpec::{
-                    , deps =
-                      [ { name = pipelineName, key = generateLedgersJobKey } ]
-                    , service = Artifacts.dockerName Artifacts.Type.Daemon
-                    , network = network_name
-                    , deb_codename = "${DebianVersions.lowerName debVersion}"
-                    , deb_profile = profile
-                    , deb_repo = DebianRepo.Type.Local
-                    , step_key =
-                        "daemon-berkeley-${DebianVersions.lowerName
-                                             debVersion}${Profiles.toLabelSegment
-                                                            profile}-docker-image"
-                    }
+                , DockerImage.generateStep dockerSpec
                 , Command.build
                     Command.Config::{
                     , commands =
@@ -179,13 +173,9 @@ let pipeline
                     , label =
                         "Assert corrupted packaged artifacts are unverifiable"
                     , key = "assert-unverify-corrupted-packaged-artifacts"
-                    , target = Size.XLarge
                     , depends_on =
                       [ { name = pipelineName
-                        , key =
-                            "daemon-berkeley-${DebianVersions.lowerName
-                                                 debVersion}${Profiles.toLabelSegment
-                                                                profile}-docker-image"
+                        , key = DockerImage.stepKey dockerSpec
                         }
                       ]
                     , if = None B/If
@@ -199,13 +189,9 @@ let pipeline
                       ]
                     , label = "Verify packaged artifacts"
                     , key = "verify-packaged-artifacts"
-                    , target = Size.XLarge
                     , depends_on =
                       [ { name = pipelineName
-                        , key =
-                            "daemon-berkeley-${DebianVersions.lowerName
-                                                 debVersion}${Profiles.toLabelSegment
-                                                                profile}-docker-image"
+                        , key = DockerImage.stepKey dockerSpec
                         }
                       ]
                     , if = None B/If
@@ -214,28 +200,20 @@ let pipeline
                     DockerImage.ReleaseSpec::{
                     , deps =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
-                    , service = Artifacts.dockerName Artifacts.Type.Archive
+                    , service = Artifacts.Type.Archive
                     , network = network_name
-                    , deb_codename = "${DebianVersions.lowerName debVersion}"
+                    , deb_codename = debVersion
                     , deb_profile = profile
                     , deb_repo = DebianRepo.Type.Local
-                    , step_key =
-                        "archive-${DebianVersions.lowerName
-                                     debVersion}${Profiles.toLabelSegment
-                                                    profile}-docker-image"
                     }
                 , DockerImage.generateStep
                     DockerImage.ReleaseSpec::{
                     , deps =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
-                    , service = Artifacts.dockerName Artifacts.Type.Rosetta
+                    , service = Artifacts.Type.Rosetta
                     , network = network_name
                     , deb_repo = DebianRepo.Type.Local
-                    , deb_codename = "${DebianVersions.lowerName debVersion}"
-                    , step_key =
-                        "rosetta-${DebianVersions.lowerName
-                                     debVersion}${Profiles.toLabelSegment
-                                                    profile}-docker-image"
+                    , deb_codename = debVersion
                     }
                 ]
               }

@@ -1,9 +1,15 @@
 open Core_kernel
 
 module Proof_level = struct
-  type t = Full | Check | None [@@deriving bin_io_unversioned, equal]
+  type t = Full | Check | No_check [@@deriving bin_io_unversioned, equal]
 
-  let to_string = function Full -> "full" | Check -> "check" | None -> "none"
+  let to_string = function
+    | Full ->
+        "full"
+    | Check ->
+        "check"
+    | No_check ->
+        "none"
 
   let of_string = function
     | "full" ->
@@ -11,7 +17,7 @@ module Proof_level = struct
     | "check" ->
         Check
     | "none" ->
-        None
+        No_check
     | s ->
         failwithf "unrecognised proof level %s" s ()
 end

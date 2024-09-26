@@ -13,8 +13,6 @@ let JobSpec = ../Pipeline/JobSpec.dhall
 
 let Pipeline = ../Pipeline/Dsl.dhall
 
-let Size = ../Command/Size.dhall
-
 let HardforkPackageGeneration = ../Command/HardforkPackageGeneration.dhall
 
 let generate_hardfork_package =
@@ -39,7 +37,6 @@ let generate_hardfork_package =
                         ]
                       , label = "Generate hardfork package"
                       , key = "generate-hardfork-package"
-                      , target = Size.Small
                       , docker = Some Docker::{
                         , image =
                             (../Constants/ContainerImages.dhall).toolchainBase

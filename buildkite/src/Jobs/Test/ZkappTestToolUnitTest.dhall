@@ -56,5 +56,5 @@ in  Pipeline.build
                 ]
               }
       , steps =
-        [ buildTestCmd "dev" "src/app/zkapp_test_transaction" Size.Small ]
+        [ buildTestCmd "dev" "src/app/zkapp_test_transaction" Size.Multi ]
       }

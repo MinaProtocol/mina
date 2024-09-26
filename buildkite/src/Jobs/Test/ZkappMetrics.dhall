@@ -10,8 +10,6 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
 
-let Size = ../../Command/Size.dhall
-
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 in  Pipeline.build
@@ -38,7 +36,6 @@ in  Pipeline.build
                   "./buildkite/scripts/zkapp_metrics.sh"
             , label = "Zkapp Metrics"
             , key = "zkapp-metrics"
-            , target = Size.Medium
             , docker = None Docker.Type
             }
         ]

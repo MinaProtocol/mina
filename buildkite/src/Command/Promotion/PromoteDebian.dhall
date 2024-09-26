@@ -16,8 +16,6 @@ let Toolchain = ../../Constants/Toolchain.dhall
 
 let Command = ../Base.dhall
 
-let Size = ../Size.dhall
-
 let PromoteDebianSpec =
       { Type =
           { deps : List Command.TaggedKey.Type
@@ -40,7 +38,7 @@ let PromoteDebianSpec =
           , version = "\\\\\$MINA_DEB_VERSION"
           , new_version = "\\\\\$MINA_DEB_VERSION"
           , architecture = "amd64"
-          , network = Network.Type.Berkeley
+          , network = Network.Type.Devnet
           , codename = DebianVersions.DebVersion.Bullseye
           , from_channel = DebianChannel.Type.Unstable
           , to_channel = DebianChannel.Type.NightlyCompatible
@@ -82,7 +80,6 @@ let promoteDebianStep =
                                                                                                                                                                                                                                                                                                                                      spec.to_channel} ${new_name}"
                 , label = "Debian: ${spec.step_key}"
                 , key = spec.step_key
-                , target = Size.Small
                 , depends_on = spec.deps
                 , if = spec.if
                 }

@@ -14,11 +14,17 @@ let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
 
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
+let Network = ../../Constants/Network.dhall
+
+let Profiles = ../../Constants/Profiles.dhall
+
 let dependsOn =
-      [ { name = "MinaArtifactBullseye"
-        , key = "daemon-berkeley-bullseye-docker-image"
-        }
-      ]
+      DebianVersions.dependsOn
+        DebianVersions.DebVersion.Bullseye
+        Network.Type.Devnet
+        Profiles.Type.Lightnet
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -39,7 +45,6 @@ in  Pipeline.build
               [ Cmd.run "buildkite/scripts/check-compatibility.sh develop" ]
             , label = "Test: develop compatibilty test"
             , key = "develop-compatibilty-test"
-            , target = Size.XLarge
             , docker = None Docker.Type
             , depends_on = dependsOn
             , timeout_in_minutes = Some +60

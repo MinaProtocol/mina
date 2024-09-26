@@ -16,8 +16,6 @@ let WithCargo = ../../Command/WithCargo.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
 
-let Size = ../../Command/Size.dhall
-
 let user = "admin"
 
 let password = "codarules"
@@ -64,7 +62,6 @@ in  Pipeline.build
                   )
             , label = "Archive node unit tests"
             , key = command_key
-            , target = Size.Large
             , docker = None Docker.Type
             , artifact_paths = [ S.contains "test_output/artifacts/*" ]
             }

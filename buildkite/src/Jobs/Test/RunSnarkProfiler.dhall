@@ -16,11 +16,14 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
 
+let Network = ../../Constants/Network.dhall
+
 let Size = ../../Command/Size.dhall
 
 let dependsOn =
       DebianVersions.dependsOn
         DebianVersions.DebVersion.Bullseye
+        Network.Type.Devnet
         Profiles.Type.Standard
 
 let buildTestCmd
@@ -63,5 +66,5 @@ in  Pipeline.build
                 , PipelineTag.Type.Stable
                 ]
               }
-      , steps = [ buildTestCmd Size.Small dependsOn ]
+      , steps = [ buildTestCmd Size.Multi dependsOn ]
       }

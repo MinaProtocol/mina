@@ -10,7 +10,7 @@ function get_shas {
 
 function image_tag {
     SHA=$1
-    IMAGE_TAG="$SHA-bullseye-berkeley"
+    IMAGE_TAG="$SHA-bullseye-devnet"
 }
 
 function download-docker {
