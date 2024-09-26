@@ -120,8 +120,6 @@ let user_command =
 
 module Work_selection_method = struct
   type t = Sequence | Random | Random_offset
-
-  let to_latest = Fn.id
 end
 
 let work_selection_method_val = function
