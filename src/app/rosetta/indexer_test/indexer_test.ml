@@ -768,12 +768,12 @@ module Offset_limit = struct
     Quickcheck.async_test ~trials:5 generator ~f:(fun (value_1, value_2) ->
         let open Deferred.Let_syntax in
         let%bind info_1 = run' value_1 pool in
-        let%bind transactions_1_result = Ops.to_transactions info_1 in
+        let%bind transactions_1_result = Ops.to_transactions ~search_include_timestamp:false info_1 in
         let transactions_1' =
           ok_or_failwith Rosetta_lib.Errors.show transactions_1_result
         in
         let%bind info_2 = run' value_2 pool in
-        let%map transactions_2_result = Ops.to_transactions info_2 in
+        let%map transactions_2_result = Ops.to_transactions ~search_include_timestamp:false info_2 in
         let transactions_2' =
           ok_or_failwith Rosetta_lib.Errors.show transactions_2_result
         in
