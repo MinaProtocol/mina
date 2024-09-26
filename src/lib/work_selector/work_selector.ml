@@ -13,4 +13,5 @@ module type Selection_method_intf =
 module Selection_methods = struct
   module Random = Random.Make (Inputs.Implementation_inputs) (Lib)
   module Sequence = Sequence.Make (Inputs.Implementation_inputs) (Lib)
+  module Random_offset = Random_offset.Make (Inputs.Implementation_inputs) (Lib)
 end

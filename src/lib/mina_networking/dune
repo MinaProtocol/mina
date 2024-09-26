@@ -49,6 +49,8 @@
    o1trace
    ppx_version.runtime
    bounded_types
+   sync_handler
+   transition_chain_prover
  )
  (inline_tests (flags -verbose -show-counts))
  (preprocess
