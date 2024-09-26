@@ -1087,7 +1087,6 @@ module Specific = struct
            graphql_uri:Uri.t
         -> minimum_user_command_fee:Mina_currency.Fee.t
         -> env:'gql Env.T(M).t
-        -> search_include_timestamp:bool
         -> Search_transactions_request.t
         -> (Search_transactions_response.t, Errors.t) M.t =
      fun ~graphql_uri ~minimum_user_command_fee ~env req ->
