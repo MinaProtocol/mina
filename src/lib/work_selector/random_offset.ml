@@ -12,18 +12,18 @@ module Make
     (Lib : Intf.Lib_intf with module Inputs := Inputs) =
 struct
   module Offset = struct
-    (** The initialization for the first offset can be 0; as the first
-   [previous_length] 0, any non-empty list will trigger an update of the offset. *)
+    (* The initialization for the first offset can be 0; as the first
+       [previous_length] 0, any non-empty list will trigger an update of the offset. *)
     let offset = ref 0
 
-    (** The previous length of expensive works [work] got through *)
+    (* The previous length of expensive works [work] got through *)
     let prev_length = ref 0
 
-    (** This function maintains [prev_length] & [offset] up do date.
-        When the pool is not updated, we consider that its length should
-        decrease by 1 ([new_length = !prev_length - 1]). If an other behavior
-        is observed, the pool is considered updated and a new [offset] is
-        generated randomly, uniformly chosen between 0 and [new_length]. *)
+    (* This function maintains [prev_length] & [offset] up do date.
+       When the pool is not updated, we consider that its length should
+       decrease by 1 ([new_length = !prev_length - 1]). If an other behavior
+       is observed, the pool is considered updated and a new [offset] is
+       generated randomly, uniformly chosen between 0 and [new_length]. *)
     let update ~new_length =
       let () =
         if new_length = !prev_length - 1 then ()
@@ -31,11 +31,11 @@ struct
       in
       prev_length := new_length
 
-    (** Because of the [offset] being constant and the [expensive_work] list
-    reducing in size, a case where [offset] ends up greater than the list
-    length may happen. In that case, we go back to the beginning of the list,
-    by resetting [offset] to 0.
-  /!\ fails if [expensive_work] is empty! *)
+    (* Because of the [offset] being constant and the [expensive_work] list
+       reducing in size, a case where [offset] ends up greater than the list
+       length may happen. In that case, we go back to the beginning of the list,
+       by resetting [offset] to 0.
+       /!\ fails if [expensive_work] is empty! *)
     let get_nth expensive_work =
       try List.nth_exn expensive_work !offset
       with _ ->
