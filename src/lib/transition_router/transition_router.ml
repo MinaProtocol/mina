@@ -274,15 +274,16 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
                 enveloped_candidate_best_tip ) )
   in
   Option.iter res ~f:(fun best ->
+      let best_tip = best.data.data in
       let best_tip_length =
-        Validation.block best.data.data
-        |> Mina_block.blockchain_length |> Length.to_int
+        Validation.block best_tip |> Mina_block.blockchain_length
+        |> Length.to_int
       in
       Mina_metrics.Transition_frontier.update_max_blocklength_observed
         best_tip_length ;
       don't_wait_for
       @@ Broadcast_pipe.Writer.write most_recent_valid_block_writer
-           best.data.data ) ;
+      @@ Validation.to_header best_tip ) ;
   Option.map res
     ~f:
       (Envelope.Incoming.map ~f:(fun (x : _ Proof_carrying_data.t) ->
@@ -636,15 +637,19 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                  (Consensus.Hooks.select
                     ~context:(module Context)
                     ~existing:
-                      ( Validation.block_with_hash current_transition
-                      |> With_hash.map ~f:Mina_block.consensus_state )
+                      ( Validation.header_with_hash current_transition
+                      |> With_hash.map
+                           ~f:
+                             (Fn.compose
+                                Mina_state.Protocol_state.consensus_state
+                                Mina_block.Header.protocol_state ) )
                     ~candidate:
                       ( Validation.block_with_hash incoming_transition
                       |> With_hash.map ~f:Mina_block.consensus_state ) )
              then
                (* TODO: do we need to push valid_cb? *)
                Broadcast_pipe.Writer.write most_recent_valid_block_writer
-                 incoming_transition
+               @@ Validation.to_header incoming_transition
              else Deferred.unit ) ;
       don't_wait_for
       @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2

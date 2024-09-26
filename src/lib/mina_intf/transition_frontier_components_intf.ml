@@ -347,9 +347,9 @@ module type Transition_router_intf = sig
          * [ `Valid_cb of Mina_net2.Validation_callback.t ] )
          Strict_pipe.Reader.t
     -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
-    -> get_most_recent_valid_block:(unit -> Mina_block.initial_valid_block)
+    -> get_most_recent_valid_block:(unit -> Mina_block.initial_valid_header)
     -> most_recent_valid_block_writer:
-         Mina_block.initial_valid_block Broadcast_pipe.Writer.t
+         Mina_block.initial_valid_header Broadcast_pipe.Writer.t
     -> get_completed_work:
          (   Transaction_snark_work.Statement.t
           -> Transaction_snark_work.Checked.t option )

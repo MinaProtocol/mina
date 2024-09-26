@@ -274,10 +274,13 @@ let validate ~logger ~trust_system ~verifier ~initialization_finish_signal
               Interruptible.lift Deferred.unit
                 (Mina_net2.Validation_callback.await_timeout valid_cb)
             in
+            let header_hashed : Header.with_hash =
+              With_hash.map ~f:Mina_block.header transition_with_hash
+            in
             match%bind
               let open Interruptible.Result.Let_syntax in
               Validation.(
-                wrap transition_with_hash
+                wrap_header header_hashed
                 |> defer
                      (validate_time_received ~precomputed_values ~time_received)
                 >>= defer (validate_genesis_protocol_state ~genesis_state_hash)
@@ -286,18 +289,21 @@ let validate ~logger ~trust_system ~verifier ~initialization_finish_signal
                 >>= defer validate_delta_block_chain
                 >>= defer validate_protocol_versions)
             with
-            | Ok verified_transition ->
+            | Ok verified_header ->
                 Mina_metrics.Transition_frontier.update_max_blocklength_observed
                   blockchain_length ;
                 Queue.enqueue Transition_frontier.validated_blocks
                   ( State_hash.With_state_hashes.state_hash transition_with_hash
                   , sender
                   , time_received ) ;
+                let verified_block =
+                  Validation.with_body verified_header
+                    (With_hash.data transition_with_hash |> Mina_block.body)
+                in
                 return
                   (Ok
                      ( `Block
-                         (Envelope.Incoming.wrap ~data:verified_transition
-                            ~sender )
+                         (Envelope.Incoming.wrap ~data:verified_block ~sender)
                      , `Valid_cb valid_cb ) )
             | Error error ->
                 Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb

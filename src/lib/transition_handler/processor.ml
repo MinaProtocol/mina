@@ -112,6 +112,9 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
     ~verifier ~get_completed_work ~frontier ~catchup_scheduler
     ~processed_transition_writer ~time_controller
     ~transition:cached_initially_validated_transition ~valid_cb =
+  let is_block_in_frontier =
+    Fn.compose Option.is_some @@ Transition_frontier.find frontier
+  in
   let open Context in
   let enveloped_initially_validated_transition =
     Cached.peek cached_initially_validated_transition
@@ -151,10 +154,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
           ~context:(module Context)
           ~root_block:
             Transition_frontier.(Breadcrumb.block_with_hash @@ root frontier)
-          ~get_block_by_hash:
-            Transition_frontier.(
-              Fn.compose (Option.map ~f:Breadcrumb.block_with_hash)
-              @@ find frontier)
+          ~is_block_in_frontier ~to_header:Mina_block.header
           initially_validated_transition
       with
       | Ok t ->
