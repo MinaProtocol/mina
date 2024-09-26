@@ -1799,6 +1799,8 @@ module type Constants_loader_intf = sig
     ; proof_level : Genesis_constants.Proof_level.t
     ; compile_config : Mina_compile_config.t
     }
+  
+  val t : t
 
   val parse_constants :
        ?itn_features:bool
@@ -2050,12 +2052,20 @@ module Constants_loader : Constants_loader_intf = struct
       in
       { genesis_constants; constraint_constants; proof_level; compile_config }
   end
+  let t = {
+    genesis_constants = Genesis_constants.make Compiled.constants.genesis_constants;
+    constraint_constants = Genesis_constants.Constraint_constants.make Compiled.constants.constraint_constants;
+    proof_level = Genesis_constants.Proof_level.of_string Compiled.constants.proof_level;
+    compile_config = Mina_compile_config.make Compiled.constants.compile_config;
+  }
 
   let parse_constants ?(itn_features = false)
       ?(cli_proof_level : Genesis_constants.Proof_level.t option) ~logger json :
       (t, string) result =
     let open Result.Let_syntax in
     let%bind json_layout = Json_layout.of_yojson json in
+    [%log debug] "Parsed JSON layout: $json_layout"
+      ~metadata:[("json_layout", Json_layout.to_yojson json_layout)] ;
     let a = Compiled.combine Compiled.constants json_layout in
     let res =
       { genesis_constants = Genesis_constants.make a.genesis_constants
@@ -2069,6 +2079,11 @@ module Constants_loader : Constants_loader_intf = struct
             cli_proof_level
       }
     in
+    [%log debug] "Merged JSON layout with compiled constants: $genesis_constants $constraint_constants"
+      ~metadata:[ ("genesis_constants", Genesis_constants.to_yojson res.genesis_constants)
+                ; ("constraint_constants", Genesis_constants.Constraint_constants.to_yojson res.constraint_constants)
+                ; ("proof_level", `String (Genesis_constants.Proof_level.to_string res.proof_level))
+                ];
     match
       ( Genesis_constants.Proof_level.of_string a.proof_level
       , Genesis_constants.Proof_level.of_string Compiled.constants.proof_level

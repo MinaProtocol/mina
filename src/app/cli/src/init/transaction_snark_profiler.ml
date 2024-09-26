@@ -1,5 +1,6 @@
 open Core
 open Snark_profiler_lib
+open Async
 
 let name = "transaction-snark-profiler"
 
@@ -57,6 +58,7 @@ let run ~genesis_constants ~constraint_constants ~proof_level
     in
     go repeats
 
+
 let dry ~genesis_constants ~constraint_constants ~proof_level ~max_num_updates
     ?min_num_updates num_transactions repeats preeval use_zkapps () =
   let zkapp_profiler ~verifier:_ _ _ =
@@ -106,7 +108,7 @@ let load_constants' ?cli_proof_level ~logger ~config_file () =
 
 let command =
   let open Command.Let_syntax in
-  Command.basic ~summary:"transaction snark profiler"
+  Command.async ~summary:"transaction snark profiler"
     (let%map_open n =
        flag "--k" ~aliases:[ "-k" ]
          ~doc:
@@ -149,7 +151,27 @@ let command =
            "Minimum number of account updates per transaction (excluding the \
             fee payer). Minimum: 1 Default: 1 "
          (optional int)
-     and config_file = Cli_lib.Flag.conf_file in
+     and config_file = Cli_lib.Flag.conf_file in fun () ->
+     let open Deferred.Let_syntax in
+     let proof_level = Genesis_constants.Proof_level.Full in
+     (*
+     let%bind.Deferred config =
+           let logger = Logger.create () in
+           let%map res = load_constants' ~cli_proof_level:proof_level ~logger ~config_file ()
+           in 
+          [%log fatal]
+            "Loaded $genesis_constants and $constraint_constants"
+            ~metadata:
+              [ ("genesis_constants", Genesis_constants.to_yojson res.genesis_constants)
+              ; ("constraint_constants", Genesis_constants.Constraint_constants.to_yojson res.constraint_constants)
+              ] ;
+           res
+     in
+     let genesis_constants = config.genesis_constants in
+     let constraint_constants = config.constraint_constants in
+     *)
+     let genesis_constants = Runtime_config.Constants_loader.t.genesis_constants in
+     let constraint_constants = Runtime_config.Constants_loader.t.constraint_constants in
      let num_transactions =
        Option.map n ~f:(fun n -> `Count (Int.pow 2 n))
        |> Option.value ~default:`Two_from_same
@@ -159,7 +181,7 @@ let command =
          if m > max_num_updates then
            failwith
              "min-num-updates should be less than or equal to max-num-updates" ) ;
-     if use_zkapps then (
+     let%bind () = if use_zkapps then (
        let incompatible_flags = ref [] in
        let add_incompatible_flag flag =
          incompatible_flags := flag :: !incompatible_flags
@@ -174,25 +196,20 @@ let command =
        if not @@ List.is_empty !incompatible_flags then (
          eprintf "These flags are incompatible with --zkapps: %s\n"
            (String.concat !incompatible_flags ~sep:", ") ;
-         exit 1 ) ) ;
-     let repeats = Option.value repeats ~default:1 in
-     let proof_level = Genesis_constants.Proof_level.Full in
-     let config =
-       Async.Thread_safe.block_on_async_exn (fun () ->
-           let logger = Logger.create () in
-           load_constants' ~cli_proof_level:proof_level ~logger ~config_file () )
+         exit 1 ) else Deferred.unit) else Deferred.unit
      in
-     let genesis_constants = config.genesis_constants in
-     let constraint_constants = config.constraint_constants in
+     let repeats = Option.value repeats ~default:1 in
+     Deferred.return
+       (
      if witness_only then
        witness ~genesis_constants ~constraint_constants ~proof_level
          ~max_num_updates ?min_num_updates num_transactions repeats preeval
-         use_zkapps
+         use_zkapps ()
      else if check_only then
        dry ~genesis_constants ~constraint_constants ~proof_level
          ~max_num_updates ?min_num_updates num_transactions repeats preeval
-         use_zkapps
+         use_zkapps ()
      else
        main ~genesis_constants ~constraint_constants ~proof_level
          ~max_num_updates ?min_num_updates num_transactions repeats preeval
-         use_zkapps )
+         use_zkapps ()))
