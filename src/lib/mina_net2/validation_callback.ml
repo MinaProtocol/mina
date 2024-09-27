@@ -136,9 +136,6 @@ let await_exn ~block_window_duration cb =
       result
 
 let fire_if_not_already_fired cb result =
-  if not (is_expired cb) then (
-    if Ivar.is_full cb.signal then
-      [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-    Ivar.fill cb.signal result )
+  if not (is_expired cb) then Ivar.fill_if_empty cb.signal result
 
 let set_message_type t x = t.message_type <- x
