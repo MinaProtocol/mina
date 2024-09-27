@@ -25,47 +25,6 @@ end
 type Structured_log_events.t += Block_produced
   [@@deriving register_event { msg = "Successfully produced a new block" }]
 
-module Singleton_supervisor : sig
-  type ('data, 'a) t
-
-  val create :
-    task:(unit Ivar.t -> 'data -> ('a, unit) Interruptible.t) -> ('data, 'a) t
-
-  val cancel : (_, _) t -> unit
-
-  val dispatch : ('data, 'a) t -> 'data -> ('a, unit) Interruptible.t
-end = struct
-  type ('data, 'a) t =
-    { mutable task : (unit Ivar.t * ('a, unit) Interruptible.t) option
-    ; f : unit Ivar.t -> 'data -> ('a, unit) Interruptible.t
-    }
-
-  let create ~task = { task = None; f = task }
-
-  let cancel t =
-    match t.task with
-    | Some (ivar, _) ->
-        if Ivar.is_full ivar then
-          [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-        Ivar.fill ivar () ;
-        t.task <- None
-    | None ->
-        ()
-
-  let dispatch t data =
-    cancel t ;
-    let ivar = Ivar.create () in
-    let interruptible =
-      let open Interruptible.Let_syntax in
-      t.f ivar data
-      >>| fun x ->
-      t.task <- None ;
-      x
-    in
-    t.task <- Some (ivar, interruptible) ;
-    interruptible
-end
-
 let time_to_ms = Fn.compose Block_time.Span.to_ms Block_time.to_span_since_epoch
 
 let time_of_ms = Fn.compose Block_time.of_span_since_epoch Block_time.Span.of_ms
@@ -76,54 +35,6 @@ let lift_sync f =
          if Ivar.is_full ivar then
            [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
          Ivar.fill ivar (f ()) ) )
-
-module Singleton_scheduler : sig
-  type t
-
-  val create : Block_time.Controller.t -> t
-
-  (** If you reschedule when already scheduled, take the min of the two schedulings *)
-  val schedule : t -> Block_time.t -> f:(unit -> unit) -> unit
-end = struct
-  type t =
-    { mutable timeout : unit Block_time.Timeout.t option
-    ; time_controller : Block_time.Controller.t
-    }
-
-  let create time_controller = { time_controller; timeout = None }
-
-  let cancel t =
-    match t.timeout with
-    | Some timeout ->
-        Block_time.Timeout.cancel t.time_controller timeout () ;
-        t.timeout <- None
-    | None ->
-        ()
-
-  let schedule t time ~f =
-    let remaining_time =
-      Option.map t.timeout ~f:Block_time.Timeout.remaining_time
-    in
-    cancel t ;
-    let span_till_time =
-      Block_time.diff time (Block_time.now t.time_controller)
-    in
-    let wait_span =
-      match remaining_time with
-      | Some remaining
-        when Block_time.Span.(remaining > Block_time.Span.of_ms Int64.zero) ->
-          let min a b = if Block_time.Span.(a < b) then a else b in
-          min remaining span_till_time
-      | None | Some _ ->
-          span_till_time
-    in
-    let timeout =
-      Block_time.Timeout.create t.time_controller wait_span ~f:(fun _ ->
-          t.timeout <- None ;
-          f () )
-    in
-    t.timeout <- Some timeout
-end
 
 (** Sends an error to the reporting service containing as many failed transactions as we can fit. *)
 let report_transaction_inclusion_failures ~commit_id ~logger failed_txns =
@@ -705,7 +616,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
         Runtime_config.slot_chain_end precomputed_values.runtime_config
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
-      let produce ivar (scheduled_time, block_data, winner_pubkey) =
+      let produce ~cancel (scheduled_time, block_data, winner_pubkey) =
         let open Interruptible.Let_syntax in
         match Broadcast_pipe.Reader.peek frontier_reader with
         | None ->
@@ -795,7 +706,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                    ~f:Transaction_hash.User_command_with_valid_signature.data
             in
             let%bind () =
-              Interruptible.lift (Deferred.return ()) (Ivar.read ivar)
+              Interruptible.lift (Deferred.return ()) (Ivar.read cancel)
             in
             [%log internal] "Generate_next_state" ;
             let%bind next_state_opt =
@@ -1069,8 +980,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     ~time_taken:span ~previous_protocol_state ~protocol_state
                     res) )
       in
-      let production_supervisor = Singleton_supervisor.create ~task:produce in
-      let scheduler = Singleton_scheduler.create time_controller in
+      let production_supervisor = Restartable.create ~task:produce in
+      let scheduler = Block_time.Timeout.scheduler () in
       let rec check_next_block_timing slot i () =
         (* Begin checking for the ability to produce a block *)
         match Broadcast_pipe.Reader.peek frontier_reader with
@@ -1180,8 +1091,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                        Vrf_evaluation_state.poll ~vrf_evaluator ~logger
                          vrf_evaluation_state ~vrf_poll_interval
                      in
-                     Singleton_scheduler.schedule scheduler
-                       (Block_time.now time_controller)
+                     Block_time.Timeout.reschedule scheduler time_controller
+                       ~new_deadline:(Block_time.now time_controller)
                        ~f:(check_next_block_timing new_global_slot i')
                    in
                    match
@@ -1197,7 +1108,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                          consensus_state ;
                        [%log info] "No more slots won in this epoch" ;
                        return
-                         (Singleton_scheduler.schedule scheduler epoch_end_time
+                         (Block_time.Timeout.reschedule scheduler
+                            time_controller ~new_deadline:epoch_end_time
                             ~f:(check_next_block_timing new_global_slot i') )
                    | At last_slot ->
                        set_next_producer_timing (`Evaluating_vrf last_slot)
@@ -1247,7 +1159,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                      let%map () = generate_genesis_proof_if_needed () in
                      ignore
                        ( Interruptible.finally
-                           (Singleton_supervisor.dispatch production_supervisor
+                           (Restartable.restart production_supervisor
                               (now, data, winner_pk) )
                            ~f:(check_next_block_timing new_global_slot i')
                          : (_, _) Interruptible.t ) )
@@ -1314,12 +1226,11 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                             in
                             let%bind () = after span_till_time in
                             generate_genesis_proof_if_needed () ) ;
-                         Singleton_scheduler.schedule scheduler scheduled_time
-                           ~f:(fun () ->
+                         Block_time.Timeout.reschedule scheduler time_controller
+                           ~new_deadline:scheduled_time ~f:(fun () ->
                              ignore
                                ( Interruptible.finally
-                                   (Singleton_supervisor.dispatch
-                                      production_supervisor
+                                   (Restartable.restart production_supervisor
                                       (scheduled_time, data, winner_pk) )
                                    ~f:
                                      (check_next_block_timing new_global_slot i')

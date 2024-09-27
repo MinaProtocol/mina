@@ -1,5 +1,4 @@
 module type S = sig
-  open Async_kernel
   open Core_kernel
   open Snark_params
   open Snark_bits
@@ -214,31 +213,13 @@ module type S = sig
     val gen : t Quickcheck.Generator.t
   end
 
-  include module type of Time with type t = Time.t
+  include
+    module type of Time
+      with type t = Time.t
+       and module Controller = Time.Controller
+       and module Span = Time.Span
 
   module Timeout : sig
-    type 'a t
-
-    type time
-
-    val create : Controller.t -> Span.t -> f:(time -> 'a) -> 'a t
-
-    val to_deferred : 'a t -> 'a Async_kernel.Deferred.t
-
-    val peek : 'a t -> 'a option
-
-    val cancel : Controller.t -> 'a t -> 'a -> unit
-
-    val remaining_time : 'a t -> Span.t
-
-    val await :
-         timeout_duration:Span.t
-      -> Controller.t
-      -> 'a Deferred.t
-      -> [ `Ok of 'a | `Timeout ] Deferred.t
-
-    val await_exn :
-      timeout_duration:Span.t -> Controller.t -> 'a Deferred.t -> 'a Deferred.t
+    include Timeout_lib.Timeout_intf(Time).S
   end
-  with type time := t
 end
