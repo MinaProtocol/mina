@@ -40,6 +40,15 @@ let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
   in
   Blake2.to_hex b2
 
+let plugin_flag =
+  if Node_config.plugins then
+    let open Command.Param in
+    flag "--load-plugin" ~aliases:[ "load-plugin" ] (listed string)
+      ~doc:
+        "PATH The path to load a .cmxs plugin from. May be passed multiple \
+         times"
+  else Command.Param.return []
+
 let setup_daemon logger ~itn_features =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
@@ -68,6 +77,16 @@ let setup_daemon logger ~itn_features =
             `block-producer-pubkey`. (default: don't produce blocks) %s"
            receiver_key_warning )
       (optional public_key_compressed)
+  and block_production_password =
+    flag "--block-producer-password"
+      ~aliases:[ "block-producer-password" ]
+      ~doc:
+        "PASSWORD Password associated with the block-producer key. Setting \
+         this is equivalent to setting the MINA_PRIVKEY_PASS environment \
+         variable. Be careful when setting it in the commandline as it will \
+         likely get tracked in your history. Mainly to be used from the \
+         daemon.json config file"
+      (optional string)
   and itn_keys =
     if itn_features then
       flag "--itn-keys" ~aliases:[ "itn-keys" ] (optional string)
@@ -125,12 +144,12 @@ let setup_daemon logger ~itn_features =
         "NUM Run the SNARK worker using this many threads. Equivalent to \
          setting OMP_NUM_THREADS, but doesn't affect block production."
       (optional int)
-  and work_selection_method =
+  and work_selection_method_flag =
     flag "--work-selection" ~aliases:[ "work-selection" ]
       ~doc:
         "seq|rand|roffset Choose work sequentially (seq), randomly (rand), or \
          sequentially with a random offset (roffset) (default: rand)"
-      (optional_with_default Work_selection_method.Random work_selection_method)
+      (optional work_selection_method)
   and libp2p_port = Flag.Port.Daemon.external_
   and client_port = Flag.Port.Daemon.client
   and rest_server_port = Flag.Port.Daemon.rest_server
@@ -197,8 +216,9 @@ let setup_daemon logger ~itn_features =
   and snark_work_fee =
     flag "--snark-worker-fee" ~aliases:[ "snark-worker-fee" ]
       ~doc:
-        "FEE Amount a worker wants to get compensated for generating a snark \
-         proof"
+        (sprintf
+           "FEE Amount a worker wants to get compensated for generating a \
+            snark proof" )
       (optional txn_fee)
   and work_reassignment_wait =
     flag "--work-reassignment-wait"
@@ -235,19 +255,19 @@ let setup_daemon logger ~itn_features =
     flag "--log-snark-work-gossip"
       ~aliases:[ "log-snark-work-gossip" ]
       ~doc:"true|false Log snark-pool diff received from peers (default: false)"
-      (optional_with_default false bool)
+      (optional bool)
   and log_transaction_pool_diff =
     flag "--log-txn-pool-gossip" ~aliases:[ "log-txn-pool-gossip" ]
       ~doc:
         "true|false Log transaction-pool diff received from peers (default: \
          false)"
-      (optional_with_default false bool)
+      (optional bool)
   and log_block_creation =
     flag "--log-block-creation" ~aliases:[ "log-block-creation" ]
       ~doc:
         "true|false Log the steps involved in including transactions and snark \
          work in a block (default: true)"
-      (optional_with_default true bool)
+      (optional bool)
   and libp2p_keypair =
     flag "--libp2p-keypair" ~aliases:[ "libp2p-keypair" ] (optional string)
       ~doc:
@@ -264,13 +284,13 @@ let setup_daemon logger ~itn_features =
       ~doc:
         "true|false Publish our own blocks/transactions to every peer we can \
          find (default: false)"
-      (optional_with_default false bool)
+      (optional bool)
   and peer_exchange =
     flag "--enable-peer-exchange" ~aliases:[ "enable-peer-exchange" ]
       ~doc:
         "true|false Help keep the mesh connected when closing connections \
          (default: false)"
-      (optional_with_default false bool)
+      (optional bool)
   and peer_protection_ratio =
     flag "--peer-protection-rate" ~aliases:[ "peer-protection-rate" ]
       ~doc:"float Proportion of peers to be marked as protected (default: 0.2)"
@@ -319,7 +339,7 @@ let setup_daemon logger ~itn_features =
       ~doc:
         "true|false Only allow connections to the peers passed on the command \
          line or configured through GraphQL. (default: false)"
-      (optional_with_default false bool)
+      (optional bool)
   and libp2p_peers_raw =
     flag "--peer" ~aliases:[ "peer" ]
       ~doc:
@@ -341,7 +361,13 @@ let setup_daemon logger ~itn_features =
       ~aliases:[ "proposed-protocol-version" ]
       (optional string)
       ~doc:"NN.NN.NN Proposed protocol version to signal other nodes"
-  and config_file = Cli_lib.Flag.conf_file
+  and config_files =
+    flag "--config-file" ~aliases:[ "config-file" ]
+      ~doc:
+        "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
+         default: <config_dir>/daemon.json). Pass multiple times to override \
+         fields from earlier config files"
+      (listed string)
   and _may_generate =
     flag "--generate-genesis-proof"
       ~aliases:[ "generate-genesis-proof" ]
@@ -357,14 +383,7 @@ let setup_daemon logger ~itn_features =
         "full|check|none Internal, for testing. Start or connect to a network \
          with full proving (full), snark-testing with dummy proofs (check), or \
          dummy proofs (none)"
-  and plugins =
-    if itn_features then
-      let open Command.Param in
-      flag "--load-plugin" ~aliases:[ "load-plugin" ] (listed string)
-        ~doc:
-          "PATH The path to load a .cmxs plugin from. May be passed multiple \
-           times"
-    else Command.Param.return []
+  and plugins = plugin_flag
   and precomputed_blocks_path =
     flag "--precomputed-blocks-file"
       ~aliases:[ "precomputed-blocks-file" ]
@@ -460,6 +479,18 @@ let setup_daemon logger ~itn_features =
         "true|false Whether to send the commit SHA used to build the node to \
          the uptime service. (default: false)"
       no_arg
+  in
+  let to_pubsub_topic_mode_option =
+    let open Gossip_net.Libp2p in
+    function
+    | "ro" ->
+        Some RO
+    | "rw" ->
+        Some RW
+    | "none" ->
+        Some N
+    | _ ->
+        raise (Error.to_exn (Error.of_string "Invalid pubsub topic mode"))
   in
   fun () ->
     O1trace.thread "mina" (fun () ->
@@ -611,23 +642,102 @@ let setup_daemon logger ~itn_features =
         let pids = Child_processes.Termination.create_pid_table () in
         let mina_initialization_deferred () =
           let%bind precomputed_values =
-            Genesis_ledger_helper.Config_loader.load_config ~conf_dir
-              ~commit_id_short:Mina_version.commit_id ?genesis_dir
-              ?cli_proof_level ~logger config_file
+            Genesis_ledger_helper.Config_loader.load_config ~logger ~conf_dir
+              ?genesis_dir ?cli_proof_level config_files
           in
           let compile_config = precomputed_values.compile_config in
-          let rest_server_port =
-            Option.value ~default:rest_server_port.default
-              rest_server_port.value
+          let constraint_constants = precomputed_values.constraint_constants in
+          let runtime_config = precomputed_values.runtime_config in
+
+          constraint_constants.block_window_duration_ms |> Float.of_int
+          |> Time.Span.of_ms |> Mina_metrics.initialize_all ;
+
+          let from_config ~cli_opt ~config_file_opt ~default =
+            Option.value ~default @@ Option.first_some cli_opt config_file_opt
           in
-          let limited_graphql_port = limited_graphql_port.value in
-          let snark_work_fee =
-            Option.value ~default:compile_config.default_snark_worker_fee
-              snark_work_fee
+
+          let maybe_from_config ~cli_opt ~config_file_opt =
+            Option.first_some cli_opt config_file_opt
+          in
+
+          let libp2p_port =
+            from_config ~default:libp2p_port.default ~cli_opt:libp2p_port.value
+              ~config_file_opt:
+                Option.(runtime_config.daemon >>= fun a -> a.libp2p_port)
+          in
+          let rest_server_port =
+            from_config ~default:rest_server_port.default
+              ~cli_opt:rest_server_port.value
+              ~config_file_opt:
+                Option.(runtime_config.daemon >>= fun a -> a.rest_port)
+          in
+          let limited_graphql_port =
+            maybe_from_config ~cli_opt:limited_graphql_port.value
+              ~config_file_opt:
+                Option.(runtime_config.daemon >>= fun a -> a.graphql_port)
+          in
+          let client_port =
+            from_config ~default:client_port.default ~cli_opt:client_port.value
+              ~config_file_opt:
+                Option.(runtime_config.daemon >>= fun a -> a.client_port)
+          in
+          let snark_work_fee_flag =
+            from_config ~default:compile_config.default_snark_worker_fee
+              ~cli_opt:snark_work_fee
+              ~config_file_opt:
+                Option.(
+                  runtime_config.daemon
+                  >>= fun a ->
+                  a.snark_worker_fee >>| Currency.Fee.of_nanomina_int_exn)
+          in
+
+          let node_status_url =
+            maybe_from_config ~cli_opt:node_status_url
+              ~config_file_opt:
+                Option.(runtime_config.daemon >>= fun a -> a.node_status_url)
+          in
+          (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
+          let _max_concurrent_connections =
+            (*if
+                 or_from_config YJ.Util.to_bool_option "max-concurrent-connections"
+                   ~default:true limit_connections
+               then Some 40
+               else *)
+            None
+          in
+          let work_selection_method =
+            from_config ~default:Work_selection_method.Random
+              ~cli_opt:work_selection_method_flag
+              ~config_file_opt:
+                Option.(
+                  runtime_config.daemon
+                  >>= fun a ->
+                  a.work_selection
+                  >>| Cli_lib.Arg_type.work_selection_method_val)
           in
           let work_reassignment_wait =
-            Option.value ~default:Cli_lib.Default.work_reassignment_wait
-              work_reassignment_wait
+            from_config ~default:Cli_lib.Default.work_reassignment_wait
+              ~cli_opt:work_reassignment_wait
+              ~config_file_opt:
+                Option.(
+                  runtime_config.daemon >>= fun a -> a.work_reassignment_wait)
+          in
+          let log_received_snark_pool_diff =
+            from_config ~default:false ~cli_opt:log_received_snark_pool_diff
+              ~config_file_opt:
+                Option.(
+                  runtime_config.daemon >>= fun a -> a.log_snark_work_gossip)
+          in
+          let log_transaction_pool_diff =
+            from_config ~default:false ~cli_opt:log_transaction_pool_diff
+              ~config_file_opt:
+                Option.(
+                  runtime_config.daemon >>= fun a -> a.log_txn_pool_gossip)
+          in
+          let log_block_creation =
+            from_config ~default:true ~cli_opt:log_block_creation
+              ~config_file_opt:
+                Option.(runtime_config.daemon >>= fun a -> a.log_block_creation)
           in
           let log_gossip_heard =
             { Mina_networking.Config.snark_pool_diff =
@@ -636,31 +746,97 @@ let setup_daemon logger ~itn_features =
             ; new_state = true
             }
           in
-          let%bind addrs_and_ports =
-            let%map external_ip =
-              match external_ip_opt with
-              | None ->
-                  Find_ip.find ~logger
-              | Some ip ->
-                  return @@ Unix.Inet_addr.of_string ip
-            in
-            let bind_ip =
-              Option.value bind_ip_opt ~default:"0.0.0.0"
-              |> Unix.Inet_addr.of_string
-            in
-            let client_port =
-              Option.value ~default:client_port.default client_port.value
-            in
-            let libp2p_port =
-              Option.value ~default:libp2p_port.default libp2p_port.value
-            in
-            { Node_addrs_and_ports.external_ip
-            ; bind_ip
-            ; peer = None
-            ; client_port
-            ; libp2p_port
-            }
+          let parse_pub_key ~which pk_str =
+            match Public_key.Compressed.of_base58_check pk_str with
+            | Ok key -> (
+                match Public_key.decompress key with
+                | None ->
+                    Mina_user_error.raisef ~where:"decompressing a public key"
+                      "The %s public key %s could not be decompressed." which
+                      pk_str
+                | Some _ ->
+                    Some key )
+            | Error _e ->
+                Mina_user_error.raisef ~where:"decoding a public key"
+                  "The %s public key %s could not be decoded." which pk_str
           in
+          let run_snark_worker_flag =
+            maybe_from_config ~cli_opt:run_snark_worker_flag
+              ~config_file_opt:
+                Option.(
+                  runtime_config.daemon
+                  >>= fun a ->
+                  a.run_snark_worker >>= parse_pub_key ~which:"snark_worker")
+          in
+          let run_snark_coordinator_flag =
+            maybe_from_config ~cli_opt:run_snark_coordinator_flag
+              ~config_file_opt:
+                Option.(
+                  runtime_config.daemon
+                  >>= fun a ->
+                  a.run_snark_coordinator
+                  >>= parse_pub_key ~which:"snark_coordinator")
+          in
+          let snark_worker_parallelism_flag =
+            maybe_from_config ~cli_opt:snark_worker_parallelism_flag
+              ~config_file_opt:
+                Option.(
+                  runtime_config.daemon >>= fun a -> a.snark_worker_parallelism)
+          in
+          let coinbase_receiver_flag =
+            maybe_from_config ~cli_opt:coinbase_receiver_flag
+              ~config_file_opt:
+                Option.(
+                  runtime_config.daemon
+                  >>= fun a ->
+                  a.coinbase_receiver
+                  >>= parse_pub_key ~which:"coinbase_receiver")
+          in
+          let%bind external_ip =
+            match external_ip_opt with
+            | None ->
+                Find_ip.find ~logger
+            | Some ip ->
+                return @@ Unix.Inet_addr.of_string ip
+          in
+          let bind_ip =
+            Option.value bind_ip_opt ~default:"0.0.0.0"
+            |> Unix.Inet_addr.of_string
+          in
+          let addrs_and_ports : Node_addrs_and_ports.t =
+            { external_ip; bind_ip; peer = None; client_port; libp2p_port }
+          in
+          let block_production_key =
+            maybe_from_config ~cli_opt:block_production_key
+              ~config_file_opt:
+                Option.(runtime_config.daemon >>= fun a -> a.block_producer_key)
+          in
+          let block_production_pubkey =
+            maybe_from_config ~cli_opt:block_production_pubkey
+              ~config_file_opt:
+                Option.(
+                  runtime_config.daemon
+                  >>= fun a ->
+                  a.block_producer_pubkey
+                  >>= parse_pub_key ~which:"block_producer")
+          in
+          let block_production_password =
+            maybe_from_config ~cli_opt:block_production_password
+              ~config_file_opt:
+                Option.(
+                  runtime_config.daemon >>= fun a -> a.block_producer_password)
+          in
+          Option.iter
+            ~f:(fun password ->
+              match Sys.getenv Secrets.Keypair.env with
+              | Some env_pass when not (String.equal env_pass password) ->
+                  [%log warn]
+                    "$envkey environment variable doesn't match value provided \
+                     on command-line or daemon.json. Using value from $envkey"
+                    ~metadata:[ ("envkey", `String Secrets.Keypair.env) ]
+              | _ ->
+                  Unix.putenv ~key:Secrets.Keypair.env ~data:password )
+            block_production_password ;
           let%bind block_production_keypair =
             match
               ( block_production_key
@@ -878,18 +1054,25 @@ let setup_daemon logger ~itn_features =
             List.concat
               [ List.map ~f:Mina_net2.Multiaddr.of_string libp2p_peers_raw
               ; peer_list_file_contents_or_empty
+              ; List.map ~f:Mina_net2.Multiaddr.of_string
+                @@ Option.value ~default:[]
+                     Option.(runtime_config.daemon >>= fun a -> a.peers)
               ]
           in
           let direct_peers =
             List.map ~f:Mina_net2.Multiaddr.of_string direct_peers_raw
           in
           let min_connections =
-            Option.value ~default:Cli_lib.Default.min_connections
-              min_connections
+            from_config ~cli_opt:min_connections
+              ~config_file_opt:
+                Option.(runtime_config.daemon >>= fun a -> a.min_connections)
+              ~default:Cli_lib.Default.min_connections
           in
           let max_connections =
-            Option.value ~default:Cli_lib.Default.max_connections
-              max_connections
+            from_config ~cli_opt:max_connections
+              ~config_file_opt:
+                Option.(runtime_config.daemon >>= fun a -> a.max_connections)
+              ~default:Cli_lib.Default.max_connections
           in
           let pubsub_v1 = Gossip_net.Libp2p.N in
           (* TODO uncomment after introducing Bitswap-based block retrieval *)
@@ -898,14 +1081,25 @@ let setup_daemon logger ~itn_features =
                  ~default:Cli_lib.Default.pubsub_v1 pubsub_v1
              in *)
           let pubsub_v0 =
-            Option.value ~default:Cli_lib.Default.pubsub_v0 None
+            from_config ~cli_opt:None
+              ~config_file_opt:
+                Option.(
+                  runtime_config.daemon
+                  >>= fun a -> a.pubsub_v0 >>= to_pubsub_topic_mode_option)
+              ~default:Cli_lib.Default.pubsub_v0
           in
           let validation_queue_size =
-            Option.value ~default:Cli_lib.Default.validation_queue_size
-              validation_queue_size
+            from_config ~cli_opt:validation_queue_size
+              ~config_file_opt:
+                Option.(
+                  runtime_config.daemon >>= fun a -> a.validation_queue_size)
+              ~default:Cli_lib.Default.validation_queue_size
           in
           let stop_time =
-            Option.value ~default:Cli_lib.Default.stop_time stop_time
+            from_config ~cli_opt:stop_time
+              ~config_file_opt:
+                Option.(runtime_config.daemon >>= fun a -> a.stop_time)
+              ~default:Cli_lib.Default.stop_time
           in
           if enable_tracing then Mina_tracing.start conf_dir |> don't_wait_for ;
           let%bind () =
@@ -915,10 +1109,9 @@ let setup_daemon logger ~itn_features =
             else Deferred.unit
           in
           let seed_peer_list_url =
-            Option.first_some seed_peer_list_url
-              Option.(
-                precomputed_values.runtime_config.daemon
-                >>= fun a -> a.peer_list_url)
+            maybe_from_config ~cli_opt:seed_peer_list_url
+              ~config_file_opt:
+                Option.(runtime_config.daemon >>= fun a -> a.peer_list_url)
           in
           if is_seed then [%log info] "Starting node as a seed node"
           else if demo_mode then [%log info] "Starting node in demo mode"
@@ -958,14 +1151,14 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ; addrs_and_ports
               ; metrics_port = libp2p_metrics_port
               ; trust_system
-              ; flooding = enable_flooding
+              ; flooding = Option.value ~default:false enable_flooding
               ; direct_peers
               ; peer_protection_ratio
-              ; peer_exchange
+              ; peer_exchange = Option.value ~default:false peer_exchange
               ; min_connections
               ; max_connections
               ; validation_queue_size
-              ; isolate
+              ; isolate = Option.value ~default:false isolate
               ; keypair = libp2p_keypair
               ; all_peers_seen_metric
               ; known_private_ip_nets =
@@ -1076,16 +1269,16 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~persistent_root_location:(conf_dir ^/ "root")
                  ~persistent_frontier_location:(conf_dir ^/ "frontier")
-                 ~epoch_ledger_location ~snark_work_fee ~time_controller
-                 ~block_production_keypairs ~monitor ~consensus_local_state
-                 ~is_archive_rocksdb ~work_reassignment_wait
-                 ~archive_process_location ~log_block_creation
-                 ~precomputed_values ~start_time ?precomputed_blocks_path
-                 ~log_precomputed_blocks ~start_filtered_logs
-                 ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-                 ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
-                 ~node_status_url ~graphql_control_port:itn_graphql_port
-                 ~simplified_node_stats
+                 ~epoch_ledger_location ~snark_work_fee:snark_work_fee_flag
+                 ~time_controller ~block_production_keypairs ~monitor
+                 ~consensus_local_state ~is_archive_rocksdb
+                 ~work_reassignment_wait ~archive_process_location
+                 ~log_block_creation ~precomputed_values ~start_time
+                 ?precomputed_blocks_path ~log_precomputed_blocks
+                 ~start_filtered_logs ~upload_blocks_to_gcloud
+                 ~block_reward_threshold ~uptime_url ~uptime_submitter_keypair
+                 ~uptime_send_node_commit ~stop_time ~node_status_url
+                 ~graphql_control_port:itn_graphql_port ~simplified_node_stats
                  ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
                  () )
           in

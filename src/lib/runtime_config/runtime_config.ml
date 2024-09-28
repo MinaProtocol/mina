@@ -475,7 +475,45 @@ module Json_layout = struct
       ; slot_tx_end : int option [@default None]
       ; slot_chain_end : int option [@default None]
       ; minimum_user_command_fee : Currency.Fee.t option [@default None]
-      ; network_id : string option [@default None]
+      ; network_id : string option
+            [@default None] (* fields coming from some config file upgrade ?*)
+      ; client_port : int option [@default None] [@key "--client-port"]
+      ; libp2p_port : int option [@default None] [@key "--external-port"]
+      ; rest_port : int option [@default None] [@key "--rest-port"]
+      ; graphql_port : int option
+            [@default None] [@key "--limited-graphql-port"]
+      ; node_status_url : string option [@default None] [@key "node-status-url"]
+      ; block_producer_key : string option
+            [@default None] [@key "block-producer-key"]
+      ; block_producer_pubkey : string option
+            [@default None] [@key "block-producer-pubkey"]
+      ; block_producer_password : string option
+            [@default None] [@key "block-producer-password"]
+      ; coinbase_receiver : string option
+            [@default None] [@key "coinbase-receiver"]
+      ; run_snark_worker : string option
+            [@default None] [@key "run-snark-worker"]
+      ; run_snark_coordinator : string option
+            [@default None] [@key "run-snark-coordinator"]
+      ; snark_worker_fee : int option [@default None] [@key "snark-worker-fee"]
+      ; snark_worker_parallelism : int option
+            [@default None] [@key "snark-worker-parallelism"]
+      ; work_selection : string option [@default None] [@key "work-selection"]
+      ; work_reassignment_wait : int option
+            [@default None] [@key "work-reassignment-wait"]
+      ; log_txn_pool_gossip : bool option
+            [@default None] [@key "log-txn-pool-gossip"]
+      ; log_snark_work_gossip : bool option
+            [@default None] [@key "log-snark-work-gossip"]
+      ; log_block_creation : bool option
+            [@default None] [@key "log-block-creation"]
+      ; min_connections : int option [@default None] [@key "min-connections"]
+      ; max_connections : int option [@default None] [@key "max-connections"]
+      ; pubsub_v0 : string option [@default None] [@key "pubsub-v0"]
+      ; validation_queue_size : int option
+            [@default None] [@key "validation-queue-size"]
+      ; stop_time : int option [@default None] [@key "stop-time"]
+      ; peers : string list option [@default None] [@key "peers"]
       }
     [@@deriving yojson, fields]
 
@@ -1224,7 +1262,32 @@ module Daemon = struct
     ; slot_chain_end : int option [@default None]
     ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t option
           [@default None]
-    ; network_id : string option [@default None]
+    ; network_id : string option
+          [@default None] (* fields coming from some config file upgrade ?*)
+    ; client_port : int option [@default None]
+    ; libp2p_port : int option [@default None]
+    ; rest_port : int option [@default None]
+    ; graphql_port : int option [@default None]
+    ; node_status_url : string option [@default None]
+    ; block_producer_key : string option [@default None]
+    ; block_producer_pubkey : string option [@default None]
+    ; block_producer_password : string option [@default None]
+    ; coinbase_receiver : string option [@default None]
+    ; run_snark_worker : string option [@default None]
+    ; run_snark_coordinator : string option [@default None]
+    ; snark_worker_fee : int option [@default None]
+    ; snark_worker_parallelism : int option [@default None]
+    ; work_selection : string option [@default None]
+    ; work_reassignment_wait : int option [@default None]
+    ; log_txn_pool_gossip : bool option [@default None]
+    ; log_snark_work_gossip : bool option [@default None]
+    ; log_block_creation : bool option [@default None]
+    ; min_connections : int option [@default None]
+    ; max_connections : int option [@default None]
+    ; pubsub_v0 : string option [@default None]
+    ; validation_queue_size : int option [@default None]
+    ; stop_time : int option [@default None]
+    ; peers : string list option [@default None]
     }
   [@@deriving bin_io_unversioned]
 
@@ -1238,64 +1301,44 @@ module Daemon = struct
   let of_yojson json =
     Result.bind ~f:of_json_layout (Json_layout.Daemon.of_yojson json)
 
-  let combine t1 t2 =
-    { txpool_max_size =
-        opt_fallthrough ~default:t1.txpool_max_size t2.txpool_max_size
-    ; peer_list_url = opt_fallthrough ~default:t1.peer_list_url t2.peer_list_url
-    ; zkapp_proof_update_cost =
-        opt_fallthrough ~default:t1.zkapp_proof_update_cost
-          t2.zkapp_proof_update_cost
-    ; zkapp_signed_single_update_cost =
-        opt_fallthrough ~default:t1.zkapp_signed_single_update_cost
-          t2.zkapp_signed_single_update_cost
-    ; zkapp_signed_pair_update_cost =
-        opt_fallthrough ~default:t1.zkapp_signed_pair_update_cost
-          t2.zkapp_signed_pair_update_cost
-    ; zkapp_transaction_cost_limit =
-        opt_fallthrough ~default:t1.zkapp_transaction_cost_limit
-          t2.zkapp_transaction_cost_limit
-    ; max_event_elements =
-        opt_fallthrough ~default:t1.max_event_elements t2.max_event_elements
-    ; max_action_elements =
-        opt_fallthrough ~default:t1.max_action_elements t2.max_action_elements
-    ; zkapp_cmd_limit_hardcap =
-        opt_fallthrough ~default:t1.zkapp_cmd_limit_hardcap
-          t2.zkapp_cmd_limit_hardcap
-    ; slot_tx_end = opt_fallthrough ~default:t1.slot_tx_end t2.slot_tx_end
-    ; slot_chain_end =
-        opt_fallthrough ~default:t1.slot_chain_end t2.slot_chain_end
-    ; minimum_user_command_fee =
-        opt_fallthrough ~default:t1.minimum_user_command_fee
-          t2.minimum_user_command_fee
-    ; network_id = opt_fallthrough ~default:t1.network_id t2.network_id
-    }
-
-  let gen =
-    let open Quickcheck.Generator.Let_syntax in
-    let%bind txpool_max_size = Int.gen_incl 0 1000 in
-    let%bind zkapp_proof_update_cost = Float.gen_incl 0.0 100.0 in
-    let%bind zkapp_signed_single_update_cost = Float.gen_incl 0.0 100.0 in
-    let%bind zkapp_signed_pair_update_cost = Float.gen_incl 0.0 100.0 in
-    let%bind zkapp_transaction_cost_limit = Float.gen_incl 0.0 100.0 in
-    let%bind max_event_elements = Int.gen_incl 0 100 in
-    let%bind zkapp_cmd_limit_hardcap = Int.gen_incl 0 1000 in
-    let%bind minimum_user_command_fee =
-      Currency.Fee.(gen_incl one (of_mina_int_exn 10))
-    in
-    let%map max_action_elements = Int.gen_incl 0 1000 in
-    { txpool_max_size = Some txpool_max_size
+  let default =
+    { txpool_max_size = None
     ; peer_list_url = None
-    ; zkapp_proof_update_cost = Some zkapp_proof_update_cost
-    ; zkapp_signed_single_update_cost = Some zkapp_signed_single_update_cost
-    ; zkapp_signed_pair_update_cost = Some zkapp_signed_pair_update_cost
-    ; zkapp_transaction_cost_limit = Some zkapp_transaction_cost_limit
-    ; max_event_elements = Some max_event_elements
-    ; max_action_elements = Some max_action_elements
-    ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
+    ; zkapp_proof_update_cost = None
+    ; zkapp_signed_single_update_cost = None
+    ; zkapp_signed_pair_update_cost = None
+    ; zkapp_transaction_cost_limit = None
+    ; max_event_elements = None
+    ; max_action_elements = None
+    ; zkapp_cmd_limit_hardcap = None
     ; slot_tx_end = None
     ; slot_chain_end = None
-    ; minimum_user_command_fee = Some minimum_user_command_fee
+    ; minimum_user_command_fee = None
     ; network_id = None
+    ; client_port = None
+    ; libp2p_port = None
+    ; rest_port = None
+    ; graphql_port = None
+    ; node_status_url = None
+    ; block_producer_key = None
+    ; block_producer_pubkey = None
+    ; block_producer_password = None
+    ; coinbase_receiver = None
+    ; run_snark_worker = None
+    ; run_snark_coordinator = None
+    ; snark_worker_parallelism = None
+    ; snark_worker_fee = None
+    ; work_selection = None
+    ; work_reassignment_wait = None
+    ; log_txn_pool_gossip = None
+    ; log_snark_work_gossip = None
+    ; log_block_creation = None
+    ; min_connections = None
+    ; max_connections = None
+    ; pubsub_v0 = None
+    ; validation_queue_size = None
+    ; stop_time = None
+    ; peers = None
     }
 end
 
@@ -1461,37 +1504,6 @@ let default =
   ; proof = None
   ; ledger = None
   ; epoch_data = None
-  }
-
-let combine t1 t2 =
-  let merge ~combine t1 t2 =
-    match (t1, t2) with
-    | Some t1, Some t2 ->
-        Some (combine t1 t2)
-    | Some t, None | None, Some t ->
-        Some t
-    | None, None ->
-        None
-  in
-  { daemon = merge ~combine:Daemon.combine t1.daemon t2.daemon
-  ; genesis = merge ~combine:Genesis.combine t1.genesis t2.genesis
-  ; proof = merge ~combine:Proof_keys.combine t1.proof t2.proof
-  ; ledger = opt_fallthrough ~default:t1.ledger t2.ledger
-  ; epoch_data = opt_fallthrough ~default:t1.epoch_data t2.epoch_data
-  }
-
-let gen =
-  let open Quickcheck.Generator.Let_syntax in
-  let%map daemon = Daemon.gen
-  and genesis = Genesis.gen
-  and proof = Proof_keys.gen
-  and ledger = Ledger.gen
-  and epoch_data = Epoch_data.gen in
-  { daemon = Some daemon
-  ; genesis = Some genesis
-  ; proof = Some proof
-  ; ledger = Some ledger
-  ; epoch_data = Some epoch_data
   }
 
 let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
@@ -1799,7 +1811,7 @@ module type Constants_loader_intf = sig
     ; proof_level : Genesis_constants.Proof_level.t
     ; compile_config : Mina_compile_config.t
     }
-  
+
   val t : t
 
   val parse_constants :
@@ -2052,12 +2064,18 @@ module Constants_loader : Constants_loader_intf = struct
       in
       { genesis_constants; constraint_constants; proof_level; compile_config }
   end
-  let t = {
-    genesis_constants = Genesis_constants.make Compiled.constants.genesis_constants;
-    constraint_constants = Genesis_constants.Constraint_constants.make Compiled.constants.constraint_constants;
-    proof_level = Genesis_constants.Proof_level.of_string Compiled.constants.proof_level;
-    compile_config = Mina_compile_config.make Compiled.constants.compile_config;
-  }
+
+  let t =
+    { genesis_constants =
+        Genesis_constants.make Compiled.constants.genesis_constants
+    ; constraint_constants =
+        Genesis_constants.Constraint_constants.make
+          Compiled.constants.constraint_constants
+    ; proof_level =
+        Genesis_constants.Proof_level.of_string Compiled.constants.proof_level
+    ; compile_config =
+        Mina_compile_config.make Compiled.constants.compile_config
+    }
 
   let parse_constants ?(itn_features = false)
       ?(cli_proof_level : Genesis_constants.Proof_level.t option) ~logger json :
@@ -2065,7 +2083,7 @@ module Constants_loader : Constants_loader_intf = struct
     let open Result.Let_syntax in
     let%bind json_layout = Json_layout.of_yojson json in
     [%log debug] "Parsed JSON layout: $json_layout"
-      ~metadata:[("json_layout", Json_layout.to_yojson json_layout)] ;
+      ~metadata:[ ("json_layout", Json_layout.to_yojson json_layout) ] ;
     let a = Compiled.combine Compiled.constants json_layout in
     let res =
       { genesis_constants = Genesis_constants.make a.genesis_constants
@@ -2079,11 +2097,18 @@ module Constants_loader : Constants_loader_intf = struct
             cli_proof_level
       }
     in
-    [%log debug] "Merged JSON layout with compiled constants: $genesis_constants $constraint_constants"
-      ~metadata:[ ("genesis_constants", Genesis_constants.to_yojson res.genesis_constants)
-                ; ("constraint_constants", Genesis_constants.Constraint_constants.to_yojson res.constraint_constants)
-                ; ("proof_level", `String (Genesis_constants.Proof_level.to_string res.proof_level))
-                ];
+    [%log debug]
+      "Merged JSON layout with compiled constants: $genesis_constants \
+       $constraint_constants"
+      ~metadata:
+        [ ( "genesis_constants"
+          , Genesis_constants.to_yojson res.genesis_constants )
+        ; ( "constraint_constants"
+          , Genesis_constants.Constraint_constants.to_yojson
+              res.constraint_constants )
+        ; ( "proof_level"
+          , `String (Genesis_constants.Proof_level.to_string res.proof_level) )
+        ] ;
     match
       ( Genesis_constants.Proof_level.of_string a.proof_level
       , Genesis_constants.Proof_level.of_string Compiled.constants.proof_level
