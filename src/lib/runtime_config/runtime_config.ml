@@ -1718,29 +1718,36 @@ module Json_loader : Json_loader_intf = struct
     end )
 
   let get_magic_config_files ?conf_dir ?commit_id_short () =
-    let config_file_configdir =
-      Option.map
-        ~f:(fun dir -> (Core.(dir ^/ "daemon.json"), `May_be_missing))
-        conf_dir
-    in
-    (* Search for config files installed as part of a deb/brew package.
-       These files are commit-dependent, to ensure that we don't clobber
-       configuration for dev builds or use incompatible configs.
-    *)
     let config_file_installed =
-      let f commit_id_short =
-        let json = "config_" ^ commit_id_short ^ ".json" in
-        List.fold_until ~init:None
-          (Cache_dir.possible_paths json)
-          ~f:(fun _acc f ->
-            match Core.Sys.file_exists f with
-            | `Yes ->
-                Stop (Some (f, `Must_exist))
-            | _ ->
-                Continue None )
-          ~finish:Fn.id
-      in
-      Option.(commit_id_short >>= f)
+      Option.(
+        commit_id_short
+        >>= fun cid ->
+        (* Search for config files installed as part of a deb/brew package.
+           These files are commit-dependent, to ensure that we don't clobber
+           configuration for dev builds or use incompatible configs.
+        *)
+        let config_file_installed =
+          let json = "config_" ^ cid ^ ".json" in
+          List.fold_until ~init:None
+            (Cache_dir.possible_paths json)
+            ~f:(fun _acc f ->
+              match Core.Sys.file_exists f with
+              | `Yes ->
+                  Stop (Some f)
+              | _ ->
+                  Continue None )
+            ~finish:Fn.id
+        in
+        match config_file_installed with
+        | Some config_file ->
+            Some (config_file, `Must_exist)
+        | None ->
+            None)
+    in
+
+    let config_file_configdir =
+      Option.map conf_dir ~f:(fun dir ->
+          (dir ^ "/" ^ "daemon.json", `May_be_missing) )
     in
     let config_file_envvar =
       match Sys.getenv "MINA_CONFIG_FILE" with
