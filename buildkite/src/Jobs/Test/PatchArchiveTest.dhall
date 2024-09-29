@@ -6,39 +6,39 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
-let ReplayerTest = ../../Command/ReplayerTest.dhall
+let PatchArchiveTest = ../../Command/PatchArchiveTest.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
-
-let Dockers = ../../Constants/DockerVersions.dhall
 
 let Network = ../../Constants/Network.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
+
+let Dockers = ../../Constants/DockerVersions.dhall
 
 let dependsOn =
       Dockers.dependsOn
         Dockers.Type.Bullseye
         Network.Type.Devnet
         Profiles.Type.Standard
-        Artifacts.Type.Archive
+        Artifacts.Type.FunctionalTestSuite
 
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
-          , S.exactly "buildkite/scripts/replayer-test" "sh"
-          , S.exactly "buildkite/src/Jobs/Test/ReplayerTest" "dhall"
-          , S.exactly "buildkite/src/Command/ReplayerTest" "dhall"
+          , S.exactly "scripts/path-archive-test" "sh"
+          , S.exactly "buildkite/src/Jobs/Test/PatchArchiveTest" "dhall"
+          , S.exactly "buildkite/src/Command/PatchArchiveTest" "dhall"
           ]
         , path = "Test"
-        , name = "ReplayerTest"
+        , name = "PatchArchiveTest"
         , tags =
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
           ]
         }
-      , steps = [ ReplayerTest.step dependsOn ]
+      , steps = [ PatchArchiveTest.step dependsOn ]
       }

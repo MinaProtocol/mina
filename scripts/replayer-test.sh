@@ -5,7 +5,7 @@ set -x
 
 INPUT_FILE=src/test/archive/sample_db/replayer_input_file.json
 REPLAYER_APP=_build/default/src/app/replayer/replayer.exe
-PG_CONN=postgres://postgres:postgres@localhost:5433/archive
+PG_CONN=postgres://postgres:postgres@localhost:5432/archive
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -i|--input-file) INPUT_FILE="$2"; shift;;
