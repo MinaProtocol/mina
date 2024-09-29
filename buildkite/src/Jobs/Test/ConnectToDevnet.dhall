@@ -14,18 +14,15 @@ let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
-
 let dependsOn =
-      Dockers.dependsOn
-        Dockers.Type.Bullseye
-        (Some Network.Type.Berkeley)
+      DebianVersions.dependsOn
+        DebianVersions.DebVersion.Bullseye
+        Network.Type.Devnet
         Profiles.Type.Standard
-        Artifacts.Type.Daemon
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -33,17 +30,17 @@ in  Pipeline.build
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
           , S.exactly "buildkite/scripts/connect-to-testnet" "sh"
-          , S.exactly "buildkite/src/Jobs/Test/ConnectToBerkeley" "dhall"
+          , S.exactly "buildkite/src/Jobs/Test/ConnectToDevnet" "dhall"
           , S.exactly "buildkite/src/Command/ConnectToTestnet" "dhall"
           ]
         , path = "Test"
-        , name = "ConnectToBerkeley"
+        , name = "ConnectToDevnet"
         , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
         }
       , steps =
         [ ConnectToTestnet.step
             dependsOn
-            "berkeley"
+            "${Network.lowerName Network.Type.Devnet}"
             "40s"
             "2m"
             (B/SoftFail.Boolean True)
