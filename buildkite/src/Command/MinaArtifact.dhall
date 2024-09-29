@@ -250,7 +250,7 @@ let docker_step
                     , deb_repo = DebianRepo.Type.Local
                     , deb_profile = spec.profile
                     , step_key =
-                        "functional-test-suite-${DebianVersions.lowerName
+                        "functional_test_suite-${DebianVersions.lowerName
                                                    spec.debVersion}${Profiles.toLabelSegment
                                                                        spec.profile}${BuildFlags.toLabelSegment
                                                                                         spec.buildFlags}-docker-image"
