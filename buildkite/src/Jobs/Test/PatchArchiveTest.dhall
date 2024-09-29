@@ -19,7 +19,7 @@ let Dockers = ../../Constants/DockerVersions.dhall
 let dependsOn =
       Dockers.dependsOn
         Dockers.Type.Bullseye
-        Network.Type.Devnet
+        (Some Network.Type.Devnet)
         Profiles.Type.Standard
         Artifacts.Type.FunctionalTestSuite
 
