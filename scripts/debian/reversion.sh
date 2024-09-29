@@ -49,8 +49,8 @@ if [[ -z "$SUITE" ]]; then NEW_SUITE=$SUITE; fi;
 function rebuild_deb() {
   rm -f "${DEB}_${VERSION}.deb"
   rm -rf "${NEW_NAME}_${NEW_VERSION}"
-    
-  wget https://s3.us-west-2.amazonaws.com/packages.o1test.net/pool/${CODENAME}/m/mi/${DEB}_${VERSION}.deb
+
+  wget https://s3.us-west-2.amazonaws.com/packages.o1test.net/pool/"${CODENAME}"/m/mi/"${DEB}"_"${VERSION}".deb
   dpkg-deb -R "${DEB}_${VERSION}.deb" "${NEW_NAME}_${NEW_VERSION}"
   sed -i 's/Version: '"${VERSION}"'/Version: '"${NEW_VERSION}"'/g' "${NEW_NAME}_${NEW_VERSION}/DEBIAN/control"
   sed -i 's/Package: '"${DEB}"'/Package: '"${NEW_NAME}"'/g' "${NEW_NAME}_${NEW_VERSION}/DEBIAN/control"
@@ -60,4 +60,4 @@ function rebuild_deb() {
 
 rebuild_deb
 
-source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}.deb" --version ${NEW_VERSION} --codename ${CODENAME} --release ${NEW_RELEASE}
+source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}.deb" --version "${NEW_VERSION}" --codename "${CODENAME}" --release "${NEW_RELEASE}"
