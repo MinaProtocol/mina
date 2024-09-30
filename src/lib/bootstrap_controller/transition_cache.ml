@@ -56,6 +56,16 @@ let add (t : t) ~parent new_child =
     | Some children ->
         let children', b =
           List.fold children ~init:([], false) ~f:(fun (acc, b) child ->
+              (* If state hash was already among children, existing child is
+                 merged with the new transition.
+                 It's needed to maintain consistency about transitions that may
+                 come from gossip or other ways; we want to preserve some
+                 validation callback (and we don't expect two gossips for the
+                 same).
+                 Also, if we received a block after receiving a header
+                 (possible when we'll simultaneously support both old and new
+                 gossip topics), we want to preserve a block because it's more
+                 than a header. *)
               if
                 (not b)
                 && State_hash.equal

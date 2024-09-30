@@ -85,7 +85,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         | `Block b ->
             Some (map x ~f:(const b), vc)
         | _ ->
-            (* TODO: handle headers too *)
+            (* TODO: handle headers too (headers can't be actually received at
+               this point, so this TODO is safe to be left for future.) *)
             None )
   in
   List.iter collected_transitions ~f:(fun (t, vc) ->

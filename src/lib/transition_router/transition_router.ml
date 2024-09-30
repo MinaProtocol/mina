@@ -109,6 +109,11 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
     Strict_pipe.create ~name:"transition frontier: producer transition"
       Synchronous
   in
+  (* No block production happens when bootstrap is running. The
+     [producer_transition_writer_ref] pipe was created just to substitute a
+     value for the type and was never actually used. It could have been read
+     only by the transition frontier controller, and it's not running when
+     bootstrap controller is active *)
   producer_transition_writer_ref := Some producer_transition_writer ;
   Broadcast_pipe.Writer.write frontier_w (Some frontier) |> don't_wait_for ;
   let new_verified_transition_reader =
@@ -547,7 +552,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~pipe_name:name ~logger ?valid_cb )
       ()
   in
-  (* Ref is None when bootstrap is in progress and Some writer when it's catch-up.query
+  (* Ref is None when bootstrap is in progress and Some writer when it's catch-up.
      In fact, we don't expect any produced blocks during bootstrap (possible only in rare case
      of race condition between bootstrap and block creation) *)
   let producer_transition_writer_ref = ref None in
