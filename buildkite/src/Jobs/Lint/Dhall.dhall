@@ -33,7 +33,7 @@ in  Pipeline.build
             , commands = [ Cmd.run "cd buildkite && make check_syntax" ]
             , label = "Dhall: syntax"
             , key = "check-dhall-syntax"
-            , target = Size.Small
+            , target = Size.Multi
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
@@ -43,7 +43,7 @@ in  Pipeline.build
             , commands = [ Cmd.run "cd buildkite && make check_lint" ]
             , label = "Dhall: lint"
             , key = "check-dhall-lint"
-            , target = Size.Small
+            , target = Size.Multi
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
@@ -53,7 +53,7 @@ in  Pipeline.build
             , commands = [ Cmd.run "cd buildkite && make check_format" ]
             , label = "Dhall: format"
             , key = "check-dhall-format"
-            , target = Size.Small
+            , target = Size.Multi
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
