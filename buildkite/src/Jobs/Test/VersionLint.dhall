@@ -12,11 +12,11 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
 
+let RunInToolchain = ../../Command/RunInToolchain.dhall
+
 let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
-
-let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let dependsOn = [ { name = "MinaArtifactBullseye", key = "build-deb-pkg" } ]
 
