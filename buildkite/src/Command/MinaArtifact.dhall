@@ -224,9 +224,10 @@ let docker_step
                             , build_flags = spec.buildFlags
                             , deb_repo = DebianRepo.Type.Local
                             , step_key =
-                                "rosetta-${DebianVersions.lowerName
-                                             spec.debVersion}${BuildFlags.toLabelSegment
-                                                                 spec.buildFlags}-docker-image"
+                                "rosetta-${Network.lowerName
+                                             n}-${DebianVersions.lowerName
+                                                    spec.debVersion}${BuildFlags.toLabelSegment
+                                                                        spec.buildFlags}-docker-image"
                             }
                       )
                       spec.networks
