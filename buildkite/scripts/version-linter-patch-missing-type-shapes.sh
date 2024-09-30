@@ -34,7 +34,7 @@ function checkout_and_dump() {
     source buildkite/scripts/gsutil-upload.sh /tmp/${TYPE_SHAPE_FILE} gs://mina-type-shapes
 }
 
-if ! $(gsutil ls gs://mina-type-shapes/$BUILDKITE_COMMIT 2>/dev/null); then
+if ! $(gsutil ls gs://mina-type-shapes/${BUILDKITE_COMMIT:0:7} 2>/dev/null); then
     checkout_and_dump $BUILDKITE_COMMIT
 fi
 
