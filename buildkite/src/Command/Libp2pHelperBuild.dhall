@@ -35,7 +35,7 @@ let cmdConfig =
                                              debVersion} ${BuildFlags.toSuffixUppercase
                                                              buildFlags}"
             , key = "libp2p-helper${BuildFlags.toLabelSegment buildFlags}"
-            , target = Size.Small
+            , target = Size.Multi
             }
 
 in  { step = cmdConfig }
