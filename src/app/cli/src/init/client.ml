@@ -1837,9 +1837,8 @@ let compile_time_constants =
        let%map ({ consensus_constants; _ } as precomputed_values) =
          let logger = Logger.create () in
          let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
-         let commit_id_short = Mina_version.commit_id in
-         Genesis_ledger_helper.Config_loader.load_config ~conf_dir
-           ~commit_id_short ~logger config_file
+         Genesis_ledger_helper.Config_loader.load_config ~conf_dir ~logger
+           config_file
        in
        let all_constants =
          `Assoc

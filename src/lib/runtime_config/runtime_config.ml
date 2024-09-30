@@ -1619,6 +1619,15 @@ module type Json_loader_intf = sig
     -> logger:Logger.t
     -> string list
     -> Yojson.Safe.t Deferred.Or_error.t
+
+  module Sync : sig
+    val load_config_files :
+         ?conf_dir:string
+      -> ?commit_id_short:string
+      -> logger:Logger.t
+      -> string list
+      -> (Yojson.Safe.t, string) Result.t
+  end
 end
 
 module Json_loader : Json_loader_intf = struct
@@ -1717,32 +1726,30 @@ module Json_loader : Json_loader_intf = struct
         assert_equal expected result'
     end )
 
-  let get_magic_config_files ?conf_dir ?commit_id_short () =
+  let get_magic_config_files ?conf_dir
+      ?(commit_id_short = Mina_version.commit_id_short) () =
     let config_file_installed =
-      Option.(
-        commit_id_short
-        >>= fun cid ->
-        (* Search for config files installed as part of a deb/brew package.
-           These files are commit-dependent, to ensure that we don't clobber
-           configuration for dev builds or use incompatible configs.
-        *)
-        let config_file_installed =
-          let json = "config_" ^ cid ^ ".json" in
-          List.fold_until ~init:None
-            (Cache_dir.possible_paths json)
-            ~f:(fun _acc f ->
-              match Core.Sys.file_exists f with
-              | `Yes ->
-                  Stop (Some f)
-              | _ ->
-                  Continue None )
-            ~finish:Fn.id
-        in
-        match config_file_installed with
-        | Some config_file ->
-            Some (config_file, `Must_exist)
-        | None ->
-            None)
+      (* Search for config files installed as part of a deb/brew package.
+         These files are commit-dependent, to ensure that we don't clobber
+         configuration for dev builds or use incompatible configs.
+      *)
+      let config_file_installed =
+        let json = "config_" ^ commit_id_short ^ ".json" in
+        List.fold_until ~init:None
+          (Cache_dir.possible_paths json)
+          ~f:(fun _acc f ->
+            match Core.Sys.file_exists f with
+            | `Yes ->
+                Stop (Some f)
+            | _ ->
+                Continue None )
+          ~finish:Fn.id
+      in
+      match config_file_installed with
+      | Some config_file ->
+          Some (config_file, `Must_exist)
+      | None ->
+          None
     in
 
     let config_file_configdir =
@@ -1801,7 +1808,7 @@ module Json_loader : Json_loader_intf = struct
             [ ( "all_files"
               , `List (List.map ~f:(fun a -> `String (fst a)) all_files) )
             ] ;
-        Deferred.Or_error.return (Yojson.Safe.from_string "{}")
+        Deferred.Or_error.return (`Assoc [])
     | init :: rest -> (
         let module T = Monad_lib.Make_ext2 (Result) in
         match T.fold_m ~f:merge_json ~init rest with
@@ -1809,6 +1816,54 @@ module Json_loader : Json_loader_intf = struct
             Deferred.Or_error.return c
         | Error err ->
             Deferred.Or_error.error_string err )
+
+  (* This is direct copy-pasta  *)
+  module Sync = struct
+    let read_files ~logger config_files : (Yojson.Safe.t list, string) result =
+      let f (config_file, s) =
+        try Ok (Some (Yojson.Safe.from_file config_file))
+        with err -> (
+          match s with
+          | `Must_exist ->
+              Mina_user_error.raisef ~where:"reading configuration file"
+                "The configuration file %s could not be read:\n%s" config_file
+                (Exn.to_string err)
+          | `May_be_missing ->
+              [%log warn] "Could not read configuration from $config_file"
+                ~metadata:
+                  [ ("config_file", `String config_file)
+                  ; ("error", `String (Exn.to_string err))
+                  ] ;
+              Ok None )
+      in
+      let module T = Monad_lib.Make_ext2 (Result) in
+      Result.map ~f:List.filter_opt @@ T.map_m ~f config_files
+
+    let load_config_files ?conf_dir ?commit_id_short ~logger config_files :
+        (Yojson.Safe.t, string) result =
+      let magic_config_files =
+        get_magic_config_files ?conf_dir ?commit_id_short ()
+      in
+      let provided_files =
+        List.map ~f:(fun f -> (f, `Must_exist)) config_files
+      in
+      let all_files = magic_config_files @ provided_files in
+      let%bind.Result fs = read_files ~logger all_files in
+      match fs with
+      | [] ->
+          (* NOTE: This looks bad, but as long as we still have compile time config we can still load the constants *)
+          [%log warn]
+            "Could not read configuration from any of the suggested files \
+             $all_files"
+            ~metadata:
+              [ ( "all_files"
+                , `List (List.map ~f:(fun a -> `String (fst a)) all_files) )
+              ] ;
+          Ok (`Assoc [])
+      | init :: rest ->
+          let module T = Monad_lib.Make_ext2 (Result) in
+          T.fold_m ~f:merge_json ~init rest
+  end
 end
 
 module type Constants_loader_intf = sig
@@ -1836,6 +1891,18 @@ module type Constants_loader_intf = sig
     -> logger:Logger.t
     -> string list
     -> t Deferred.t
+
+  (*TODO: Delete Sync module when we solve weird bug in Transaction Snark Profiler *)
+  module Sync : sig
+    val load_constants :
+         ?conf_dir:string
+      -> ?commit_id_short:string
+      -> ?itn_features:bool
+      -> ?cli_proof_level:Genesis_constants.Proof_level.t
+      -> logger:Logger.t
+      -> string list
+      -> (t, string) result
+  end
 end
 
 module Constants_loader : Constants_loader_intf = struct
@@ -2152,4 +2219,14 @@ module Constants_loader : Constants_loader_intf = struct
         return res
     | Error e ->
         Deferred.Or_error.error_string @@ "Error loading runtime config: " ^ e
+
+  (*TODO: Delete Sync module when we solve weird bug in Transaction Snark Profiler *)
+  module Sync = struct
+    let load_constants ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
+        ~logger config_files =
+      Result.(
+        Json_loader.Sync.load_config_files ?conf_dir ?commit_id_short ~logger
+          config_files
+        >>= parse_constants ?itn_features ?cli_proof_level ~logger)
+  end
 end

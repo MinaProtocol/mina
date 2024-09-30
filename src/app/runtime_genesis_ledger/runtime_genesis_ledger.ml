@@ -58,19 +58,6 @@ let generate_hash_json ~genesis_dir ledger staking_ledger next_ledger =
   in
   { Hash_json.ledger = ledger_hashes; epoch_data = { staking; next } }
 
-let extract_accounts_exn = function
-  | { Runtime_config.Ledger.base = Accounts accounts
-    ; num_accounts = None
-    ; balances = []
-    ; hash = _
-    ; name = None
-    ; add_genesis_winner = Some false
-    ; s3_data_hash = _
-    } ->
-      accounts
-  | _ ->
-      failwith "Wrong ledger supplied"
-
 let is_dirty_proof = function
   | Runtime_config.Proof_keys.
       { level = None
@@ -88,13 +75,25 @@ let is_dirty_proof = function
   | _ ->
       true
 
+let extract_accounts_exn = function
+  | { Runtime_config.Ledger.base = Accounts accounts
+    ; num_accounts = None
+    ; balances = []
+    ; hash = _
+    ; name = None
+    ; add_genesis_winner = Some false
+    ; s3_data_hash = _
+    } ->
+      accounts
+  | _ ->
+      failwith "Wrong ledger supplied"
+
 let main ~config_file ~genesis_dir ~hash_output_file () =
   let%bind config =
     let logger = Logger.create () in
     let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
-    let commit_id_short = Mina_version.commit_id in
-    Genesis_ledger_helper.Config_loader.load_config ~conf_dir ~commit_id_short
-      ~logger config_file
+    Genesis_ledger_helper.Config_loader.load_config ~conf_dir ~logger
+      config_file
   in
   if
     Option.(

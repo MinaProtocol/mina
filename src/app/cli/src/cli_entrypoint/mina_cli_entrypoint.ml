@@ -1806,8 +1806,7 @@ let internal_commands logger ~itn_features =
           let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
           let%bind precomputed_values =
             Genesis_ledger_helper.Config_loader.load_config ~conf_dir
-              ~commit_id_short:Mina_version.commit_id ?genesis_dir
-              ~cli_proof_level:Full ~logger config_file
+              ?genesis_dir ~cli_proof_level:Full ~logger config_file
           in
           let pids = Child_processes.Termination.create_pid_table () in
           let%bind prover =

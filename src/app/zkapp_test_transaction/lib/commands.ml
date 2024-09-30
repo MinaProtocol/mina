@@ -337,9 +337,8 @@ let test_zkapp_with_genesis_ledger_main ~logger keyfile zkapp_keyfile
   let%bind zkapp_kp = Util.snapp_keypair_of_file zkapp_keyfile in
   let%bind config =
     let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
-    let commit_id_short = Mina_version.commit_id in
-    Genesis_ledger_helper.Config_loader.load_config ~commit_id_short ~conf_dir
-      ~logger config_file
+    Genesis_ledger_helper.Config_loader.load_config ~conf_dir ~logger
+      config_file
   in
   let ledger =
     let accounts =

@@ -920,6 +920,11 @@ module Config_loader : Config_loader = struct
     Deferred.Or_error.ok_exn
     @@
     let open Deferred.Or_error.Let_syntax in
+    (*TODO: Is this a default that is used with any installation?*)
+    let genesis_dir =
+      Option.first_some genesis_dir
+      @@ Option.(conf_dir >>| fun cd -> String.(cd ^ "/" ^ "genesis"))
+    in
     let%bind json =
       Runtime_config.Json_loader.load_config_files ?conf_dir ?commit_id_short
         ~logger config_files
