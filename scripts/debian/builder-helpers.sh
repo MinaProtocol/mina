@@ -241,7 +241,7 @@ build_functional_test_suite_deb() {
 
   # Binaries
   cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
-  cp ./default/src/test/patch_archive_tests/patch_archive_tests.exe "${BUILDDIR}/usr/local/bin/mina-patch-archive-tests"
+  cp ./default/src/test/archive/patch_archive_test/patch_archive_test.exe "${BUILDDIR}/usr/local/bin/mina-patch-archive-test"
 
   build_deb mina-test-suite
 
