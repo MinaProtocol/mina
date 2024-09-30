@@ -563,7 +563,8 @@ end = struct
           (Addr.Table.find t.waiting_parents addr)
       in
       let merged =
-        merge_many nodes (ledger_depth - Addr.depth addr) subtree_depth
+        (* Subtracting 2 as we ultimately add 2 1-indexed depths *)
+        merge_many nodes (ledger_depth - Addr.depth addr - 2) subtree_depth
       in
       if Hash.equal expected merged then (
         Addr.Table.remove t.waiting_parents addr ;
@@ -619,9 +620,10 @@ end = struct
       expect_content t addr exp_hash ;
       Linear_pipe.write_without_pushback_if_open t.queries
         (desired_root_exn t, What_contents addr) )
-    else expect_children t addr exp_hash ;
-    Linear_pipe.write_without_pushback_if_open t.queries
-      (desired_root_exn t, What_child_hashes (addr, default_subtree_depth))
+    else (
+      expect_children t addr exp_hash ;
+      Linear_pipe.write_without_pushback_if_open t.queries
+        (desired_root_exn t, What_child_hashes (addr, default_subtree_depth)) )
 
   (** Handle the initial Num_accounts message, starting the main syncing
       process. *)
