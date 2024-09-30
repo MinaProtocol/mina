@@ -3,8 +3,8 @@ open Core
 open Network_peer
 
 type initial_valid_block_or_header =
-  | Block of Mina_block.initial_valid_block
-  | Header of Mina_block.initial_valid_header
+  [ `Block of Mina_block.initial_valid_block
+  | `Header of Mina_block.initial_valid_header ]
 
 type element =
   initial_valid_block_or_header Envelope.Incoming.t
@@ -12,10 +12,10 @@ type element =
 
 let header_with_hash e =
   match e with
-  | Block b ->
+  | `Block b ->
       With_hash.map ~f:Mina_block.header
       @@ Mina_block.Validation.block_with_hash b
-  | Header h ->
+  | `Header h ->
       Mina_block.Validation.header_with_hash h
 
 (* Cache represents a graph. The key is a State_hash, which is the node in
@@ -46,7 +46,7 @@ let merge (old_env, old_vc) (new_env, new_vc) =
         old_vc
   in
   ( Envelope.Incoming.map new_env ~f:(fun new_b ->
-        match new_b with Block _ -> new_b | _ -> old_b )
+        match new_b with `Block _ -> new_b | _ -> old_b )
   , vc )
 
 let add (t : t) ~parent new_child =

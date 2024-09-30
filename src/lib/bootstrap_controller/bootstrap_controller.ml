@@ -205,10 +205,7 @@ let sync_ledger ({ context = (module Context); _ } as t) ~preferred
       in
       let sender = Envelope.Incoming.remote_sender_exn incoming_transition in
       Transition_cache.add transition_graph ~parent:previous_state_hash
-        ( Envelope.Incoming.map
-            ~f:(fun x -> Transition_cache.Block x)
-            incoming_transition
-        , vc ) ;
+        (Envelope.Incoming.map ~f:(fun x -> `Block x) incoming_transition, vc) ;
       (* TODO: Efficiently limiting the number of green threads in #1337 *)
       if
         worth_getting_root t

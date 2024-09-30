@@ -28,5 +28,4 @@
    with_hash
    genesis_constants
    consensus
-   bootstrap_controller
 ))

@@ -433,8 +433,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
                 ]
               "Network best tip is recent enough to catchup to (best_tip with \
                $length); syncing local state and starting participation" ;
-            let f x = Bootstrap_controller.Transition_cache.Block x in
-            [ (Envelope.Incoming.map ~f best_tip, None) ]
+            [ (Envelope.Incoming.map ~f:(fun x -> `Block x) best_tip, None) ]
         | None ->
             [%log info]
               "Successfully loaded frontier, but failed downloaded best tip \

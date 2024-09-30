@@ -82,7 +82,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     List.filter_map collected_transitions ~f:(fun (x, vc) ->
         let open Network_peer.Envelope.Incoming in
         match data x with
-        | Bootstrap_controller.Transition_cache.Block b ->
+        | `Block b ->
             Some (map x ~f:(const b), vc)
         | _ ->
             (* TODO: handle headers too *)

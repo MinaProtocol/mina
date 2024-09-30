@@ -2,8 +2,8 @@ open Mina_base
 open Network_peer
 
 type initial_valid_block_or_header =
-  | Block of Mina_block.initial_valid_block
-  | Header of Mina_block.initial_valid_header
+  [ `Block of Mina_block.initial_valid_block
+  | `Header of Mina_block.initial_valid_header ]
 
 val header_with_hash :
   initial_valid_block_or_header -> Mina_block.Header.with_hash
