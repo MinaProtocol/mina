@@ -40,10 +40,10 @@ let buildTestCmd
                     "buildkite/scripts/version-linter.sh ${release_branch}"
             , label = "Versioned type linter for ${release_branch}"
             , key = "version-linter-${release_branch}"
+            , soft_fail = Some soft_fail
             , target = cmd_target
             , docker = None Docker.Type
             , depends_on = dependsOn
-            , soft_fail = Some soft_fail
             , artifact_paths = [ S.contains "core_dumps/*" ]
             }
 
