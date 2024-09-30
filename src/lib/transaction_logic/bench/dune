@@ -1,3 +1,6 @@
+(env
+  (_
+    (flags (:standard -w @a-32-26-4-16-29-40-41-42-44-45-48-58-59-60-66-67-69-70))))
 (executable
  (name transaction_logic_bench)
  (libraries

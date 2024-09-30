@@ -23,7 +23,9 @@ type request_t =
   ; request_len : int
   }
 
-type impure_t = request_t -> (hash array -> int -> unit) -> unit
+(* Contract: some implementations of this function may schedule continuation
+   to be executed within an async job, they should then return true *)
+type impure_t = request_t -> (int -> hash array -> unit) -> unit
 
 type 'a t = impure:impure_t -> ('a -> unit) -> unit
 
@@ -34,17 +36,101 @@ let join_requests areq breq =
   ; request_len = areq.request_len + breq.request_len
   }
 
-let impure_default : request_t -> (hash array -> int -> unit) -> unit =
- fun { request; _ } cont ->
-  let request = Sequence.(to_list request) in
-  let response = Oracle.hash_batch request |> Array.of_list in
-  cont response 0
+let execute_request request =
+  Sequence.to_list request |> Oracle.hash_batch |> Array.of_list
+
+let impure_default : impure_t =
+ fun { request; _ } cont -> execute_request request |> cont 0
 
 let evaluate : 'a t -> 'a =
  fun v ->
   let res = ref None in
   v ~impure:impure_default (fun r -> res := Some r) ;
   Option.value_exn ~message:"unexpected evaluation" !res
+
+let impure_async ~schedule { request; _ } cont =
+  Async.upon (schedule @@ fun () -> execute_request request) (cont 0)
+
+let handle_result_under_mutex ~ready ~not_ready mutex par_job_res =
+  match Nano_mutex.try_lock_exn mutex with
+  | `Acquired -> (
+      let prev_res = !par_job_res in
+      par_job_res := None ;
+      Nano_mutex.unlock_exn mutex ;
+      (* If prev_res is None, this means that there is another job recently launched,
+         which didn't acquire the lock yet *)
+      match prev_res with None -> not_ready () | Some r -> ready r )
+  | `Not_acquired ->
+      not_ready ()
+
+let evaluate_async :
+       ?how:[ `Alternating | `Parallel | `Max_concurrent_jobs of int ]
+    -> ?when_finished:Async.In_thread.When_finished.t
+    -> 'a t
+    -> 'a Async.Deferred.t =
+ fun ?(how = `Parallel) ?when_finished v ->
+  let in_thread = Async.In_thread.run ?when_finished ~name:"hash_batch" in
+  let impure =
+    match how with
+    | `Alternating -> (
+        let mutex = Nano_mutex.create () in
+        (* owned by the thread holding the mutex *)
+        let par_job_res = ref None in
+        (* owned by main thread *)
+        let par_job_cont = ref None in
+        let ensure_cont_executed () =
+          Option.iter !par_job_cont ~f:(fun prev_cont ->
+              handle_result_under_mutex mutex par_job_res ~not_ready:Fn.id
+                ~ready:(fun prev_res ->
+                  printf "[%s]     handling continuation of parallel (after-check)\n" Time_ns.(now () |> to_string);
+                  par_job_cont := None ;
+                  prev_cont 0 prev_res ) )
+        in
+        let schedule_parallel req cont =
+          par_job_cont := Some cont ;
+          Async.upon
+            ( in_thread
+            @@ fun () ->
+            Nano_mutex.critical_section mutex ~f:(fun () ->
+                par_job_res := Some (execute_request req.request) );
+                  printf "[%s] finished parallel\n" Time_ns.(now () |> to_string) ;
+                )
+            (fun () ->
+              printf "[%s] async handles par job result\n"Time_ns.(now () |> to_string) ;
+              ensure_cont_executed ())
+        in
+        fun req cont ->
+          match !par_job_cont with
+          | None ->
+              printf "[%s] launching parallel\n" Time_ns.(now () |> to_string) ;
+              schedule_parallel req cont
+          | Some prev_cont ->
+              handle_result_under_mutex mutex par_job_res
+                ~not_ready:(fun () ->
+                  printf "[%s] parallel is running, continuing sequentially\n" Time_ns.(now () |> to_string) ;
+                  impure_default req cont;
+                  printf "[%s]    finished sequential\n"  Time_ns.(now () |> to_string)
+                  )
+                ~ready:(fun prev_res ->
+                  printf "[%s] launching new parallel instead of recently finished\n" Time_ns.(now () |> to_string) ;
+                  schedule_parallel req cont ; 
+                  printf "[%s] handling continuation of parallel\n"  Time_ns.(now () |> to_string);
+                  prev_cont 0 prev_res ) ;
+              (* This call is optional, to avoid unnecessary switch of async context *)
+              printf "[%s] checking if parallel finished\n"Time_ns.(now () |> to_string) ;
+              ensure_cont_executed () )
+    | `Parallel ->
+        impure_async ~schedule:in_thread
+    | `Max_concurrent_jobs n ->
+        let throttle =
+          Async.Throttle.create ~max_concurrent_jobs:n ~continue_on_error:true
+        in
+        impure_async ~schedule:(fun f ->
+            Async.Throttle.enqueue throttle @@ fun () -> in_thread f )
+  in
+  let res = Async.Ivar.create () in
+  v ~impure (Async.Ivar.fill res) ;
+  Async.Ivar.read res
 
 module M_basic = struct
   let bind : type a b. a t -> f:(a -> b t) -> b t =
@@ -61,9 +147,9 @@ let hash ~init data : hash t =
  fun ~(impure : impure_t) handler ->
   impure
     { request = Sequence.return (`State init, data); request_len = 1 }
-    (fun h i -> handler @@ Array.get h i)
+    (fun i h -> handler @@ Array.get h i)
 
-let batch_drain = 1024
+let batch_drain = 512
 
 let hash_batch data : hash list t =
  fun ~(impure : impure_t) handler ->
@@ -72,79 +158,70 @@ let hash_batch data : hash list t =
   else
     impure
       { request = Sequence.of_list data; request_len }
-      (fun hashes start_ix ->
+      (fun start_ix hashes ->
         handler
         @@ List.init request_len ~f:(fun i ->
                Array.get hashes @@ (i + start_ix) ) )
+
+(* TODO write a test with random elements to cjeck the order of indexes in continuations *)
+let app_impl ~impure ~on_ready start =
+  let empty_accum = (empty_request, []) in
+  let req_accum = ref empty_accum in
+  (* When we start impure, we pass a continuation to it.
+     We don't have control over how and when impure will be executed,
+     hence we need to count how many continuations were set sail.
+     When the last continuation we spawned is finsihed, we need to check that
+     request accumulator is emptied.
+      Initial value is 1 because `start` routine is treated as initial continuation *)
+  let unfinished_continuations = ref 1 in
+  let rec on_continuation_done () =
+    if !unfinished_continuations = 0 then
+      let r, cs = !req_accum in
+      if r.request_len = 0 then on_ready ()
+      else (
+        req_accum := empty_accum ;
+        spawn_impure r cs )
+  and spawn_impure req conts =
+    let cont' start_ix hashes =
+      List.iter conts ~f:(fun (exec, ix) -> exec (start_ix + ix) hashes) ;
+      unfinished_continuations := !unfinished_continuations - 1 ;
+      on_continuation_done ()
+    in
+    unfinished_continuations := !unfinished_continuations + 1 ;
+    impure req cont'
+  in
+  let impure' req cont =
+    let joint_req, conts =
+      let r, cs = !req_accum in
+      (join_requests r req, (cont, r.request_len) :: cs)
+    in
+    if joint_req.request_len >= batch_drain then (
+      req_accum := empty_accum ;
+      spawn_impure joint_req conts )
+    else req_accum := (joint_req, conts)
+  in
+  start impure' ;
+  unfinished_continuations := !unfinished_continuations - 1 ;
+  on_continuation_done ()
 
 let ( <*> ) : type a b. (a -> b) t -> a t -> b t =
  fun f a ~impure handle_res ->
   let a_res_ref = ref None in
   let f_res_ref = ref None in
-  let req = ref None in
-  let impure_f freq fcont =
-    if freq.request_len > batch_drain then impure freq fcont
-    else req := Some (freq, fcont)
+  let on_ready () =
+    let f' = Option.value_exn ~message:"<*>: no value for f" !f_res_ref in
+    let a' = Option.value_exn ~message:"<*>: no value for a" !a_res_ref in
+    handle_res (f' a')
   in
-  let impure_a areq acont =
-    req :=
-      Some
-        (Option.value_map ~default:(areq, acont)
-           ~f:(fun (r, c) ->
-             ( join_requests r areq
-             , fun hashes ix ->
-                 c hashes ix ;
-                 acont hashes (r.request_len + ix) ) )
-           !req )
-  in
-  f ~impure:impure_f (fun f' -> f_res_ref := Some f') ;
-  a ~impure:impure_a (fun a' -> a_res_ref := Some a') ;
-  let rec handle () =
-    let r = !req in
-    req := None ;
-    match r with
-    | None ->
-        let f' = Option.value_exn ~message:"<*>: no value for f" !f_res_ref in
-        let a' = Option.value_exn ~message:"<*>: no value for a" !a_res_ref in
-        handle_res (f' a')
-    | Some (r, c) ->
-        impure r (fun hashes ix -> c hashes ix ; handle ())
-  in
-  handle ()
+  app_impl ~impure ~on_ready (fun impure' ->
+      f ~impure:impure' (fun f' -> f_res_ref := Some f') ;
+      a ~impure:impure' (fun a' -> a_res_ref := Some a') )
 
 let lift2 f a b ~impure handle = (M_basic.map ~f a <*> b) ~impure handle
 
 let all_impl ~impure ~set_result ~on_ready lst =
-  let empty_acc = (empty_request, []) in
-  let active = ref (List.length lst) in
-  let req_acc = ref empty_acc in
-  let init i action =
-    let impure' ireq icont =
-      let req, cont = !req_acc in
-      let req' = join_requests req ireq in
-      if req'.request_len > batch_drain then (
-        req_acc := empty_acc ;
-        impure req' (fun hashes start_ix ->
-            icont hashes (start_ix + req.request_len) ;
-            List.iter cont ~f:(fun (exec, ix) -> exec hashes (start_ix + ix)) )
-        )
-      else req_acc := (req', (icont, req.request_len) :: cont)
-    in
-    action ~impure:impure' (fun a ->
-        set_result i a ;
-        active := !active - 1 )
-  in
-  List.iteri ~f:init lst ;
-  let rec handle () =
-    if !active = 0 then on_ready ()
-    else
-      let req, cont = !req_acc in
-      req_acc := empty_acc ;
-      impure req (fun hashes start_ix ->
-          List.iter cont ~f:(fun (exec, ix) -> exec hashes (start_ix + ix)) ;
-          handle () )
-  in
-  handle ()
+  let init impure' i action = action ~impure:impure' (set_result i) in
+  app_impl ~impure ~on_ready (fun impure' -> List.iteri ~f:(init impure') lst)
 
 module M : Core_kernel.Monad.S with type 'a t := 'a t = struct
   include M_basic
@@ -180,10 +257,17 @@ module M : Core_kernel.Monad.S with type 'a t := 'a t = struct
     let results = Array.init (List.length lst) ~f:(const None) in
     let set_result i a = Array.set results i (Some a) in
     all_impl ~set_result ~impure lst ~on_ready:(fun () ->
-        Array.to_list results
-        |> List.map ~f:(fun r ->
-               Option.value_exn ~message:"some elements not evaluated" r )
-        |> handle_res )
+        let missing =
+          Array.to_list results
+          |> List.filter_mapi ~f:(fun i -> function
+               | None -> Some i | Some _ -> None )
+        in
+        if List.is_empty missing then
+          handle_res @@ List.filter_map ~f:Fn.id @@ Array.to_list results
+        else
+          failwithf "elements missing: %s"
+            (String.concat ~sep:", " (List.map ~f:Int.to_string missing))
+            () )
 
   let all_unit : unit t list -> unit t =
    fun lst ~impure on_ready ->
@@ -204,7 +288,7 @@ module For_tests = struct
 
     let total = ref 0
 
-    let test_impure : 'a. request_t -> (hash array -> int -> unit) -> unit =
+    let test_impure : impure_t =
      fun { request; _ } cont ->
       calls := !calls + 1 ;
       let total_els =
@@ -216,7 +300,7 @@ module For_tests = struct
         List.map ~f:(Fn.compose (Fn.flip Array.get 0) snd) request
         |> Array.of_list
       in
-      cont response 0
+      cont 0 response
 
     let test_evaluate : 'a t -> 'a =
      fun v ->
@@ -354,38 +438,35 @@ let%test_module "simple test" =
       in
       (Field.add a c, Field.add b d)
 
-    let double_comp c = c >>= const c
-
     let%test "test9" =
       execute (comp9, [%test_eq: Field.t * Field.t] (two, one), 8, 2)
 
+    let double_hash x =
+      hash ~init x >>= fun y -> hash ~init (Array.of_list [ y ])
+
     let comp10 =
-      lift2 Tuple3.create
-        (double_comp @@ hash ~init single_zero)
-        (double_comp @@ hash ~init ten_zero)
-      <*> double_comp @@ hash ~init triple_zero
+      lift2 Tuple3.create (double_hash single_zero) (double_hash ten_zero)
+      <*> double_hash triple_zero
 
     let%test "test10" =
       execute
         ( comp10
         , [%test_eq: Field.t * Field.t * Field.t] (zero, zero, zero)
-        , 28
+        , 17
         , 2 )
 
     let comp11 =
       List.init 10 ~f:(const (single_one, triple_one, ten_zero))
       |> map_list ~f:(fun (a, b, c) ->
-             lift2 Tuple3.create
-               (double_comp @@ hash ~init a)
-               (double_comp @@ hash ~init b)
-             <*> double_comp @@ hash ~init c )
+             lift2 Tuple3.create (double_hash a) (double_hash b)
+             <*> double_hash c )
 
     let%test "test11" =
       execute
         ( comp11
         , [%test_eq: (Field.t * Field.t * Field.t) list]
             (List.init 10 ~f:(const (one, one, zero)))
-        , 280
+        , 170
         , 2 )
 
     let comp12 =
@@ -394,12 +475,10 @@ let%test_module "simple test" =
             ((batch_drain * 3) + 5)
             ~f:(const (single_one, triple_one, ten_zero))
         |> map_list ~f:(fun (a, b, c) ->
-               lift2 Tuple3.create
-                 (double_comp @@ hash ~init a)
-                 (double_comp @@ hash ~init b)
-               <*> double_comp @@ hash ~init c ) )
-        (double_comp @@ hash ~init triple_one)
-      <*> double_comp @@ hash ~init ten_zero
+               lift2 Tuple3.create (double_hash a) (double_hash b)
+               <*> double_hash c ) )
+        (double_hash triple_one)
+      <*> double_hash ten_zero
 
     let%test "test12" =
       execute
@@ -408,6 +487,18 @@ let%test_module "simple test" =
             ( List.init ((batch_drain * 3) + 5) ~f:(const (one, one, zero))
             , one
             , zero )
-        , (((batch_drain * 3) + 5) * 28) + 26
+        , (((batch_drain * 3) + 5) * 17) + 15
         , 20 )
+
+    let comp13 =
+      map_list ~f:double_hash
+        (List.init ((batch_drain * 2) + 1) ~f:(const triple_one))
+
+    let%test "test13" =
+      execute
+        ( comp13
+        , [%test_eq: Field.t list]
+            (List.init ((batch_drain * 2) + 1) ~f:(const one))
+        , ((batch_drain * 2) + 1) * 4
+        , 6 )
   end )

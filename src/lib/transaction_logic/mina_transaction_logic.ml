@@ -384,7 +384,9 @@ module type S = sig
 
   val precomputed_token_ids : precomputed_t -> Token_id.t Account_id.Map.t
 
-  val precompute_transaction_hashes :
+  val precompute_transaction_hashes : User_command.t -> precomputed_t
+
+  val precompute_transaction_hashes_m :
     User_command.t -> precomputed_t Random_oracle.Monad.t
 
   val apply_user_command :
@@ -1953,17 +1955,66 @@ module Make (L : Ledger_intf.S) :
          ~caller_caller:default_caller )
       (Inputs.Call_stack.empty ())
 
-  (* let commitments_on_start ~memo_hash
-       { M.account_update; new_frame = remaining; _ } =
-     let tx_commitment_on_start =
-       Inputs.Transaction_commitment.commitment
-         ~account_updates:(Stack_frame.calls remaining)
-     in
-     ( tx_commitment_on_start
-     , Inputs.Transaction_commitment.full_commitment ~account_update ~memo_hash
-         ~commitment:tx_commitment_on_start ) *)
+  let commitments_on_start ~memo_hash
+      { M.account_update; new_frame = remaining; _ } =
+    let tx_commitment_on_start =
+      Inputs.Transaction_commitment.commitment
+        ~account_updates:(Stack_frame.calls remaining)
+    in
+    ( tx_commitment_on_start
+    , Inputs.Transaction_commitment.full_commitment ~account_update ~memo_hash
+        ~commitment:tx_commitment_on_start )
 
-  let precompute_transaction_hashes :
+  let precompute_transaction_hashes : User_command.t -> precomputed_t =
+    let mk_token_ids ids =
+      Account_id.Map.of_key_set
+        ~f:(fun owner -> Account_id.derive_token_id ~owner)
+        (Account_id.Set.of_list ids)
+    in
+    function
+    | Signed_command tx ->
+        let memo_hash = Signed_command_memo.hash (Signed_command.memo tx) in
+        let derived_token_ids =
+          mk_token_ids
+            [ Signed_command.receiver tx; Signed_command.fee_payer tx ]
+        in
+        { memo_hash; derived_token_ids; zkapp_precomputed = None }
+    | Zkapp_command tx ->
+        let derived_token_ids =
+          mk_token_ids (Zkapp_command.accounts_referenced tx)
+        in
+        let memo_hash = Signed_command_memo.hash tx.memo in
+        let all_account_updates = Zkapp_command.all_account_updates tx in
+        let init_account_update_result =
+          get_init_account_update
+            ~lookup_precomputed_token_id:(Map.find derived_token_ids)
+            all_account_updates
+        in
+        let tx_commitment_on_start, full_commitment_on_start =
+          commitments_on_start ~memo_hash init_account_update_result
+        in
+        let actions_hash_map =
+          Zkapp_command.Call_forest.fold all_account_updates
+            ~init:Account_update.Actions.Map.empty ~f:(fun acc el ->
+              let actions = el.body.actions in
+              if not @@ Map.mem acc actions then
+                Map.add_exn acc ~key:actions
+                  ~data:(Account_update.Actions.hash actions)
+              else acc )
+        in
+        { memo_hash
+        ; derived_token_ids
+        ; zkapp_precomputed =
+            Some
+              { all_account_updates
+              ; init_account_update_result
+              ; tx_commitment_on_start
+              ; full_commitment_on_start
+              ; lookup_actions_hash = Map.find actions_hash_map
+              }
+        }
+
+  let precompute_transaction_hashes_m :
       User_command.t -> precomputed_t Random_oracle.Monad.t =
     let open Random_oracle.Monad in
     let open Let_syntax in

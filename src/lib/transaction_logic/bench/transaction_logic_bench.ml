@@ -63,12 +63,11 @@ let () =
   let precompute_parallel n () =
     let open Random_oracle.Monad in
     evaluate
-    @@ map_list ~f:Logic.precompute_transaction_hashes
+    @@ map_list ~f:Logic.precompute_transaction_hashes_m
          (List.init n ~f:(const tx))
   in
   let precompute_serial n () =
-    List.init n ~f:(fun _ ->
-        Random_oracle.Monad.evaluate @@ Logic.precompute_transaction_hashes tx )
+    List.init n ~f:(fun _ -> Logic.precompute_transaction_hashes tx)
   in
   let precompute_chunked ~chunk n () =
     let chunks = (n / chunk) + min 1 (n % chunk) in
@@ -77,16 +76,40 @@ let () =
         let m = if m = 0 then chunk else m in
         let open Random_oracle.Monad in
         evaluate
-        @@ map_list ~f:Logic.precompute_transaction_hashes
+        @@ map_list ~f:Logic.precompute_transaction_hashes_m
              (List.init m ~f:(const tx)) )
+  in
+  let precompute_parallel_async ?how n () =
+    printf "==== Running parallel async =====\n" ;
+    Async.Thread_safe.block_on_async_exn
+    @@ fun () ->
+    let open Random_oracle.Monad in
+    evaluate_async ~when_finished:Take_the_async_lock ?how
+    @@ map_list ~f:Logic.precompute_transaction_hashes_m
+         (List.init n ~f:(const tx))
   in
   let precompute_group n =
     Bench.Test.create_group
       ~name:(sprintf "precompute %d txs" n)
       [ Bench.Test.create ~name:"parallel" (precompute_parallel n)
-      ; Bench.Test.create ~name:"serial" (precompute_serial n)
-      ; Bench.Test.create ~name:"chunked-128" (precompute_chunked ~chunk:128 n)
+        (* ; Bench.Test.create ~name:"parallel-async" (precompute_parallel_async n) *)
+      ; Bench.Test.create ~name:"parallel-async-alt"
+          (precompute_parallel_async ~how:`Alternating n)
+        (* ; Bench.Test.create ~name:"chunked-128" (precompute_chunked ~chunk:128 n)
+           ; Bench.Test.create ~name:"serial" (precompute_serial n) *)
+        (* ; Bench.Test.create ~name:"parallel-async-3"
+               (precompute_parallel_async ~how:(`Max_concurrent_jobs 3) n)
+           ; Bench.Test.create ~name:"parallel-async-2"
+               (precompute_parallel_async ~how:(`Max_concurrent_jobs 2) n)
+           ; Bench.Test.create ~name:"chunked-128" (precompute_chunked ~chunk:128 n)
+           ; Bench.Test.create ~name:"chunked-128-async"
+               (precompute_chunked_async ~chunk:128 ~how:`Parallel n)
+           ; Bench.Test.create ~name:"chunked-128-async-3"
+               (precompute_chunked_async ~chunk:128 ~how:(`Max_concurrent_jobs 3) n)
+           ; Bench.Test.create ~name:"chunked-128-async-2"
+               (precompute_chunked_async ~chunk:128 ~how:(`Max_concurrent_jobs 2) n) *)
       ]
   in
+
   Core.Command.run @@ Bench.make_command
-  @@ List.map ~f:precompute_group [ 16; 32; 64; 128; 256; 512; 1280; 2560 ]
+  @@ List.map ~f:precompute_group [ 2560 ]

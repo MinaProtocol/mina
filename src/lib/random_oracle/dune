@@ -21,4 +21,5 @@
    kimchi_pasta.basic
    fold_lib
    random_oracle.permutation
+   async
 ))

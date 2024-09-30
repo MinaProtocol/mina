@@ -12,6 +12,12 @@ val ( <*> ) : ('a -> 'b) t -> 'a t -> 'b t
 
 val evaluate : 'a t -> 'a
 
+val evaluate_async :
+     ?how:[ `Alternating | `Max_concurrent_jobs of int | `Parallel ]
+  -> ?when_finished:Async.In_thread.When_finished.t
+  -> 'a t
+  -> 'a Async.Deferred.t
+
 val hash : init:field Oracle.State.t -> field array -> field t
 
 val hash_batch :

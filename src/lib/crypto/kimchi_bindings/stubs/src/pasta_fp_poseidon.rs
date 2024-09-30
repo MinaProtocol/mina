@@ -8,6 +8,7 @@ use mina_poseidon::{
 };
 use rayon::iter::ParallelIterator;
 use rayon::prelude::ParallelSliceMut;
+use std::time::Instant;
 
 pub struct CamlPastaFpPoseidonParams(ArithmeticSpongeParams<Fp>);
 pub type CamlPastaFpPoseidonParamsPtr<'a> = ocaml::Pointer<'a, CamlPastaFpPoseidonParams>;
@@ -118,6 +119,8 @@ pub fn caml_pasta_fp_poseidon_update_batch(
     chunk_size: usize,
     mut state_and_inputs: CamlFpBatchVector,
 ) {
+    println!("hash_batch started");
+    let start = Instant::now();
     let params_ = &params.as_ref().0;
     state_and_inputs
         .par_chunks_mut(chunk_size)
@@ -126,4 +129,6 @@ pub fn caml_pasta_fp_poseidon_update_batch(
                 caml_pasta_fp_poseidon_update_impl(params_, state_and_input);
             })
         });
+    let duration = start.elapsed();
+    println!("hash_batch finished: {:?}", duration);
 }
