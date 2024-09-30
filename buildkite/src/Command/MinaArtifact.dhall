@@ -117,6 +117,7 @@ let docker_step
 
           let deps =
                 DebianVersions.dependsOnStep
+                  (None Text)
                   debVersion
                   profile
                   buildFlags
@@ -308,6 +309,7 @@ let publish_to_debian_repo =
             , key = "publish-deb-pkg"
             , depends_on =
                 DebianVersions.dependsOnStep
+                  (Some spec.prefix)
                   spec.debVersion
                   spec.profile
                   spec.buildFlags
