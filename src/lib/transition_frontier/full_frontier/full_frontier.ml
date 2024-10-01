@@ -212,7 +212,7 @@ let path_map ?max_length t breadcrumb ~f =
     | Some count when count <= 0 ->
         acc
     | _ ->
-        let count_opt = Option.map ~f:(fun x -> x - 1) count_opt in
+        let count_opt = Option.map ~f:Int.pred count_opt in
         let elem = f b in
         let parent_hash = Breadcrumb.parent_hash b in
         if State_hash.equal (Breadcrumb.state_hash b) t.root then acc
@@ -866,12 +866,12 @@ let apply_diffs ({ context = (module Context); _ } as t) diffs
   in
   [%log' trace t.logger] "after applying diffs to full frontier" ;
   if
-    (not
-       ([%equal: [ `Enabled of _ | `Disabled ]] enable_epoch_ledger_sync
-          `Disabled ) )
-    && not has_long_catchup_job
+    not
+  ([%equal: [ `Enabled of _ | `Disabled ]] enable_epoch_ledger_sync
+  `Disabled )
   then
     Debug_assert.debug_assert (fun () ->
+      if not (Lazy.force has_long_catchup_job) then
         match
           Consensus.Hooks.required_local_state_sync
             ~constants:consensus_constants
@@ -884,8 +884,8 @@ let apply_diffs ({ context = (module Context); _ } as t) diffs
             (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)
             if local_state_was_synced_at_start then (
               [%log' fatal t.logger]
-                "after lock transition, the best tip consensus state is out of \
-                 sync with the local state -- bug in either \
+                "after lock transition, the best tip consensus state is out \
+                 of sync with the local state -- bug in either \
                  required_local_state_sync or frontier_root_transition."
                 ~metadata:
                   [ ( "sync_jobs"

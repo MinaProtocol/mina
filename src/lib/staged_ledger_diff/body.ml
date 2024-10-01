@@ -6,12 +6,6 @@ module Make_sig (A : Wire_types.Types.S) = struct
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
-  (* TODO Consider moving to a different location. as in future this won't be only about block body *)
-  module Tag = struct
-    type t = Body [@@deriving enum]
-    (* In future: | EpochLedger |... *)
-  end
-
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -66,19 +60,21 @@ module Make_str (A : Wire_types.Concrete) = struct
     ignore (Stable.V1.bin_write_t buf ~pos:0 b : int) ;
     buf
 
-  let serialize_with_len_and_tag b =
+  let serialize_with_len_and_tag ~tag b =
     let len = Stable.V1.bin_size_t b in
     let bs' = Bigstring.create (len + 5) in
     ignore (Stable.V1.bin_write_t bs' ~pos:5 b : int) ;
-    Bigstring.set_uint8_exn ~pos:4 bs' (Tag.to_enum Body) ;
+    Bigstring.set_uint8_exn ~pos:4 bs' tag ;
     Bigstring.set_uint32_le_exn ~pos:0 bs' (len + 1) ;
     bs'
 
-  let compute_reference =
+  let compute_reference ~tag =
     Fn.compose snd
     @@ Fn.compose
          (Bitswap_block.blocks_of_data ~max_block_size:262144)
-         serialize_with_len_and_tag
+         (serialize_with_len_and_tag ~tag)
+
+  let to_raw_string = Fn.compose Bigstring.to_string to_binio_bigstring
 end
 
 include Wire_types.Make (Make_sig) (Make_str)

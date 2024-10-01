@@ -192,8 +192,15 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
   let `VK verification_key, `Prover prover =
     Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
   in
+  print_endline "Created zkapp prover and verifier" ;
   let zkapp_prover_and_vk = (prover, verification_key) in
-  let%bind.Async.Deferred verification_key = verification_key in
+  print_endline "Created zkapp prover and verifier after" ;
+  let verification_key = 
+  Async.Thread_safe.block_on_async_exn (fun () ->
+    verification_key 
+  ) in 
+  print_endline "Created zkapp verifier" ;
+
   let num_keypairs = max_num_updates + 10 in
   let keypairs = List.init num_keypairs ~f:(fun _ -> Keypair.create ()) in
   let num_keypairs_in_ledger = max_num_updates + 1 in

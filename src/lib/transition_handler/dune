@@ -44,7 +44,7 @@
    genesis_constants
    mina_stdlib
    network_pool
-   mina_net2
+   mina_networking
    mina_numbers
    mina_wire_types
    pickles.backend

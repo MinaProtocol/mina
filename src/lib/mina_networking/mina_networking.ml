@@ -28,6 +28,11 @@ type Structured_log_events.t +=
   [@@deriving
     register_event { msg = "Broadcasting snark pool diff over gossip net" }]
 
+    type Structured_log_events.t +=
+    | Rebroadcast_transition of { state_hash : State_hash.t }
+    [@@deriving register_event { msg = "Rebroadcasting $state_hash" }]
+
+
 module type CONTEXT = sig
   val logger : Logger.t
 
@@ -42,6 +47,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val compile_config : Mina_compile_config.t
 end
 
 module Node_status = Node_status
@@ -70,7 +77,9 @@ type t =
   }
 [@@deriving fields]
 
-let create (module Context : CONTEXT) (config : Config.t) ~sinks
+let create (module Context : CONTEXT) (config : Config.t) 
+    ~on_bitswap_update
+    ~sinks
     ~(get_transition_frontier : unit -> Transition_frontier.t option)
     ~(get_node_status : unit -> Node_status.t Deferred.Or_error.t) =
   let open Context in
@@ -93,6 +102,7 @@ let create (module Context : CONTEXT) (config : Config.t) ~sinks
     O1trace.thread "gossip_net" (fun () ->
         Gossip_net.Any.create config.creatable_gossip_net
           (module Rpc_context)
+          ~on_bitswap_update
           (Gossip_net.Message.Any_sinks ((module Sinks), sinks)) )
   in
   gossip_net_ref := Some gossip_net ;
@@ -189,13 +199,24 @@ let get_node_status_from_peers (t : t)
                  Or_error.error_string
                    "Could not parse peers in node status request" ) ) )
 
+
+                   let rebroadcast_transition ~origin_topics t b_or_h =
+                    let state_hash, b_or_h' =
+                      match b_or_h with
+                      | `Header h ->
+                          (State_hash.With_state_hashes.state_hash h, `Header (With_hash.data h))
+                      | `Block b ->
+                          (State_hash.With_state_hashes.state_hash b, `Block (With_hash.data b))
+                    in
+                    [%str_log' trace t.logger] (Rebroadcast_transition { state_hash }) ;
+                    Gossip_net.Any.broadcast_transition ~origin_topics t.gossip_net b_or_h'
 (* TODO: Have better pushback behavior *)
-let broadcast_state t state =
+let broadcast_transition t state =
   [%str_log' trace t.logger]
     (Gossip_new_state
        { state_hash = State_hash.With_state_hashes.state_hash state } ) ;
   Mina_metrics.(Gauge.inc_one Network.new_state_broadcasted) ;
-  Gossip_net.Any.broadcast_state t.gossip_net (With_hash.data state)
+  Gossip_net.Any.broadcast_transition t.gossip_net (`Block (With_hash.data state))
 
 let broadcast_transaction_pool_diff ?nonce t diff =
   [%str_log' trace t.logger]
@@ -251,6 +272,16 @@ let get_transition_chain_proof ?heartbeat_timeout ?timeout t =
 let get_transition_chain ?heartbeat_timeout ?timeout t =
   make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_transition_chain
     ~label:"chain of transitions" t
+
+
+    let add_bitswap_resource { gossip_net; _ } =
+      Gossip_net.Any.add_bitswap_resource gossip_net
+    
+    let download_bitswap_resource { gossip_net; _ } =
+      Gossip_net.Any.download_bitswap_resource gossip_net
+    
+    let remove_bitswap_resource { gossip_net; _ } =
+      Gossip_net.Any.remove_bitswap_resource gossip_net
 
 let get_best_tip ?heartbeat_timeout ?timeout t peer =
   make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_best_tip

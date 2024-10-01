@@ -15,6 +15,7 @@ module Persistent_frontier = Persistent_frontier
 module Catchup_state = Catchup_state
 module Full_catchup_tree = Full_catchup_tree
 module Catchup_hash_tree = Catchup_hash_tree
+module Gossip = Gossip
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -446,7 +447,7 @@ let add_breadcrumb_exn t breadcrumb =
     (* Root DB moves here *)
     Full_frontier.apply_diffs t.full_frontier diffs
       ~has_long_catchup_job:
-        (Catchup_state.max_catchup_chain_length t.catchup_state > 5)
+        (lazy (Catchup_state.max_catchup_chain_length t.catchup_state > 5))
       ~enable_epoch_ledger_sync:(`Enabled (root_snarked_ledger t))
   in
   [%log internal] "Apply_full_frontier_diffs_done" ;
