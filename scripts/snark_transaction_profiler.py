@@ -66,7 +66,7 @@ if __name__ == "__main__":
     errors = ["Error", "Failure", "zkapp failed"]
 
     if any(x in output for x in errors):
-        print(f'Error detected in output ({" or ".join(error)}). Failing the build')
+        print(f'Error detected in output ({" or ".join(errors)}). Failing the build')
         sys.exit(1)
 
     if not process_exit_code == 0:
