@@ -12,8 +12,6 @@ let Command = ../../Command/Base.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
 
-let RunInToolchain = ../../Command/RunInToolchain.dhall
-
 let Size = ../../Command/Size.dhall
 
 in  Pipeline.build
@@ -58,10 +56,7 @@ in  Pipeline.build
             }
         , Command.build
             Command.Config::{
-            , commands =
-                RunInToolchain.runInToolchainBullseye
-                  ([] : List Text)
-                  "cd buildkite && make check_deps"
+            , commands = [ Cmd.run "cd buildkite && make check_deps" ]
             , label = "Dhall: deps"
             , key = "check-dhall-deps"
             , target = Size.Multi
@@ -69,10 +64,7 @@ in  Pipeline.build
             }
         , Command.build
             Command.Config::{
-            , commands =
-                RunInToolchain.runInToolchainBullseye
-                  ([] : List Text)
-                  "cd buildkite && make check_dirty"
+            , commands = [ Cmd.run "cd buildkite && make check_dirty" ]
             , label = "Dhall: dirtyWhen"
             , key = "check-dhall-dirty"
             , target = Size.Multi
