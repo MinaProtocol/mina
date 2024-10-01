@@ -65,9 +65,9 @@ class PipelineInfoBuilder:
             path = dirtyWhen["dir"][0] if "dir" in dirtyWhen else ""
             exts = dirtyWhen["exts"][0] if "exts" in dirtyWhen else ""
             strictEnd = bool(dirtyWhen["strictEnd"]) if (
-                not "strictEnd" in dirtyWhen) else False
+                "strictEnd" in dirtyWhen) else False
             strictStart = bool(dirtyWhen["strictStart"]) if (
-                not "strictStart" in dirtyWhen) else False
+                "strictStart" in dirtyWhen) else False
             dirty.append(DirtyWhen(path=path, strictStart=strictStart,
                          strictEnd=strictEnd, extension=exts))
         return dirty
@@ -86,30 +86,20 @@ class DirtyWhen:
         self.strictStart = strictStart
         self.strictEnd = strictEnd
 
-    def calculate_path(self):
-        if self.extension and self.path:
-            return glob(f"{self.path}.{self.extension}")
-        if self.strictEnd and not self.strictStart:
-            if not self.extension:
-                return glob(f"**/*/{self.path}")
-            else:
-                return glob(f"*/{self.path}.{self.extension}")
-        if self.strictStart and self.strictEnd:
-            if not self.extension:
-                return glob(f"{self.path}*")
-            else:
-                return glob(f"{self.path}.{self.extension}")
-        if self.strictStart and not self.strictEnd:
-            return glob(self.path + '.*')
-        if not self.strictStart and not self.strictEnd:
-            if not self.extension:
-                if "." in self.path:
-                    return glob(f"**/*/{self.path}", recursive=True)
-                else:
-                    return glob(f"{self.path}*")
-            else:
-                return glob(f"*.{self.extension}")
-        raise RuntimeError("invalid state dirty when")
+    def calculate_path(self,repo):
+        if not self.path:
+            return glob(os.path.join(repo,f'**/*{self.extension}'))
+        if not self.extension:
+            if self.strictEnd and self.strictStart:
+                return glob(os.path.join(repo, f'{self.path}'))
+            if not self.strictEnd and self.strictStart:
+                return glob(os.path.join(repo, f'{self.path}*'))
+            if not self.strictStart and self.strictEnd:
+                return glob(os.path.join(repo, f'**/{self.path}'), recursive= True)
+            if not self.strictStart and not self.strictEnd:
+                return glob(os.path.join(repo, f'*{self.path}*'))
+        return glob(os.path.join(repo, f'{self.path}.{self.extension}'))
+        #raise RuntimeError("invalid state dirty when")
 
     def __str__(self):
         return f"path: '{self.path}', exts: '{self.extension}', startStrict:{self.strictStart}, startEnd:{self.strictEnd}"
@@ -140,7 +130,10 @@ parser.add_argument("--root", required=True,
                     help="root folder where all dhall files resides")
 
 subparsers = parser.add_subparsers(dest="cmd")
-subparsers.add_parser('dirty-when')
+dirty_when = subparsers.add_parser('dirty-when')
+dirty_when.add_argument("--repo", required=True,
+                    help="root folder for mina repo")
+
 subparsers.add_parser('deps')
 run = subparsers.add_parser('print-cmd')
 run.add_argument("--job", required=True, help="job to run")
@@ -207,7 +200,7 @@ if args.cmd == "dirty-when":
 
     for pipeline in pipelinesInfo:
         for dirty in pipeline.dirty:
-            if not bool(dirty.calculate_path()):
+            if not bool(dirty.calculate_path(args.repo)):
                 failedSteps.append((pipeline, dirty))
 
     if any(failedSteps):

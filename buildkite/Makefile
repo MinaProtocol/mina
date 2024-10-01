@@ -20,6 +20,6 @@ check_deps:
 	python3 scripts/dhall/checker.py --root ./src/Jobs deps
 
 check_dirty:
-	python3 scripts/dhall/checker.py --root ./src/Jobs dirty-when
+	python3 scripts/dhall/checker.py --root $(PWD)/src/Jobs dirty-when  --repo "$(PWD)/../"
 
 all: check_syntax lint format check_deps check_dirty
