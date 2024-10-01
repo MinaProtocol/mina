@@ -65,7 +65,7 @@ if __name__ == "__main__":
     
     errors = ["Error", "Failure", "zkapp failed"]
 
-    if any(x in a_string for x in matches):
+    if any(x in a_string for x in errors):
         print(f'Error detected in output ({" or ".join(error)}). Failing the build')
         sys.exit(1)
 
