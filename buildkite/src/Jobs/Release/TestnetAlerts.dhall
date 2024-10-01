@@ -40,8 +40,6 @@ in  Pipeline.build
             , label = "Deploy Testnet alert rules"
             , key = "deploy-testnet-alerts"
             , target = Size.Medium
-            , depends_on =
-              [ { name = "TestnetAlerts", key = "lint-testnet-alerts" } ]
             , docker = None Docker.Type
             , if = Some "build.env('DEPLOY_ALERTS') == 'true'"
             }

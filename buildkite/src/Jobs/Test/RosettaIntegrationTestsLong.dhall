@@ -56,7 +56,7 @@ in  Pipeline.build
                   Dockers.Type.Bullseye
                   (Some Network.Type.Berkeley)
                   Profiles.Type.Standard
-                  Artifacts.Type.Rosetta
+                  Artifacts.Type.Daemon
             }
         ]
       }

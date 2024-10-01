@@ -39,18 +39,18 @@ in  Pipeline.build
           , S.strictlyStart
               (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest")
           , S.strictlyStart
-              (S.contains "buildkite/src/Jobs/Command/TestExecutive")
+              (S.contains "buildkite/src/Command/TestExecutive")
           , S.strictlyStart
               (S.contains "automation/terraform/modules/o1-integration")
           , S.strictlyStart
               (S.contains "automation/terraform/modules/kubernetes/testnet")
           , S.strictlyStart
               ( S.contains
-                  "automation/buildkite/script/run-test-executive-cloud"
+                  "buildkite/scripts/run-test-executive-cloud"
               )
           , S.strictlyStart
               ( S.contains
-                  "automation/buildkite/script/run-test-executive-local"
+                  "buildkite/scripts/run-test-executive-local"
               )
           ]
         , path = "Test"

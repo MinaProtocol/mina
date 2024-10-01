@@ -39,7 +39,7 @@ in  Pipeline.build
           , S.strictlyStart
               (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest")
           , S.strictlyStart
-              (S.contains "buildkite/src/Jobs/Command/TestExecutive")
+              (S.contains "buildkite/src/Command/TestExecutive")
           , S.strictlyStart
               (S.contains "automation/terraform/modules/o1-integration")
           , S.strictlyStart
