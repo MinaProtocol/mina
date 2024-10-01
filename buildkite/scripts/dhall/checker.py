@@ -99,7 +99,6 @@ class DirtyWhen:
             if not self.strictStart and not self.strictEnd:
                 return glob(os.path.join(repo, f'*{self.path}*'))
         return glob(os.path.join(repo, f'{self.path}.{self.extension}'))
-        #raise RuntimeError("invalid state dirty when")
 
     def __str__(self):
         return f"path: '{self.path}', exts: '{self.extension}', startStrict:{self.strictStart}, startEnd:{self.strictEnd}"
