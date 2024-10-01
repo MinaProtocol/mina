@@ -41,7 +41,7 @@ module Inputs = struct
 
                 let proof_level = proof_level
               end) : S )
-        | Check | None ->
+        | Check | No_check ->
             None
       in
       Deferred.return { m; cache = Cache.create (); proof_level }
@@ -273,7 +273,7 @@ module Inputs = struct
                                       w.first_pass_ledger ) ) ) )
               | Merge (_, proof1, proof2) ->
                   process (fun () -> M.merge ~sok_digest proof1 proof2) ) )
-      | Check | None ->
+      | Check | No_check ->
           (* Use a dummy proof. *)
           let stmt =
             match single with
