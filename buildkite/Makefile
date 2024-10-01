@@ -15,3 +15,11 @@ lint:
 
 format:
 	find ./src/ -name "*.dhall" -print0 | xargs -I{} -0 -n1 bash -c 'echo "{}" && dhall --ascii format --inplace {} || exit 255'
+
+check_deps:
+	python3 scripts/dhall/checker.py --root ./src/Jobs deps
+
+check_dirty:
+	python3 scripts/dhall/checker.py --root ./src/Jobs dirty-when
+
+all: check_syntax lint format check_deps check_dirty

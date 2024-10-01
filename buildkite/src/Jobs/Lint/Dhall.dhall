@@ -54,5 +54,25 @@ in  Pipeline.build
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
             }
+        , Command.build
+            Command.Config::{
+            , commands = [ Cmd.run "cd buildkite && make check_deps" ]
+            , label = "Dhall: deps"
+            , key = "check-dhall-deps"
+            , target = Size.Multi
+            , docker = Some Docker::{
+              , image = (../../Constants/ContainerImages.dhall).toolchainBase
+              }
+            }
+        , Command.build
+            Command.Config::{
+            , commands = [ Cmd.run "cd buildkite && make check_dirty" ]
+            , label = "Dhall: dirtyWhen"
+            , key = "check-dhall-dirty"
+            , target = Size.Multi
+            , docker = Some Docker::{
+              , image = (../../Constants/ContainerImages.dhall).toolchainBase
+              }
+            }
         ]
       }

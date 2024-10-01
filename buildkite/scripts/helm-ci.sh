@@ -4,7 +4,7 @@ set -eou pipefail
 
 
 diff=$(
-  ./buildkite/scripts/generate-diff.sh
+  ./buildkite/scripts/git/generate-diff.sh
 )
 echo "--- Generated change DIFF: ${diff}"
 
