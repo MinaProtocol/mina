@@ -9,12 +9,7 @@ import argparse
 import json
 import re
 
-exit_code=0
 prog = 'mina'
-
-def set_error():
-  global exit_code
-  exit_code=1
 
 def parse_stats (output) :
 
@@ -63,13 +58,19 @@ if __name__ == "__main__":
 
     print(f'running snark transaction profiler: {args}')
     (process_exit_code,output) = subprocess.getstatusoutput(args)
+    
     stats = parse_stats (output)
     #TODO: add code to check against some threshold
     print(stats)
     
+    errors = ["Error", "Failure", "zkapp failed"]
+
+    if any(x in a_string for x in matches):
+        print(f'Error detected in output ({" or ".join(error)}). Failing the build')
+        sys.exit(1)
 
     if not process_exit_code == 0:
         print('non-zero exit code from program, failing build')
-        sys.exit(process_exit_code)
+        sys.exit(1)
     else:
-        sys.exit(exit_code)
+        sys.exit(0)
