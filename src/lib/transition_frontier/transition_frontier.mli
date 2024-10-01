@@ -17,6 +17,7 @@ module Root_data = Root_data
 module Catchup_state = Catchup_state
 module Full_catchup_tree = Full_catchup_tree
 module Catchup_hash_tree = Catchup_hash_tree
+module Gossip = Gossip
 
 module type CONTEXT = sig
   val logger : Logger.t
