@@ -306,7 +306,11 @@ module type Transition_frontier_controller_intf = sig
          Mina_block.initial_valid_block Envelope.Incoming.t list
     -> frontier:transition_frontier
     -> network_transition_reader:
-         Mina_block.initial_valid_block Envelope.Incoming.t Strict_pipe.Reader.t
+         ( [ `Block of Mina_block.t Envelope.Incoming.t
+           | `Header of Mina_block.Header.t Envelope.Incoming.t ]
+         * [ `Time_received of Block_time.t ]
+         * [ `Valid_cb of Mina_net2.Validation_callback.t ] )
+         Strict_pipe.Reader.t
     -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> clear_reader:[ `Clear ] Strict_pipe.Reader.t
     -> unit
@@ -342,7 +346,8 @@ module type Transition_router_intf = sig
     -> frontier_broadcast_writer:
          transition_frontier option Pipe_lib.Broadcast_pipe.Writer.t
     -> network_transition_reader:
-         ( [ `Transition of Mina_block.t Envelope.Incoming.t ]
+         ( [ `Block of Mina_block.t Envelope.Incoming.t
+           | `Header of Mina_block.Header.t Envelope.Incoming.t ]
          * [ `Time_received of Block_time.t ]
          * [ `Valid_cb of Mina_net2.Validation_callback.t ] )
          Strict_pipe.Reader.t
