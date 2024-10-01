@@ -21,6 +21,9 @@
 /src/app/archive_blocks/ @MinaProtocol/protocol-eng-reviewers
 /src/app/extract_blocks/ @MinaProtocol/protocol-eng-reviewers
 /src/app/rosetta/ @MinaProtocol/mina-foundation-eng
+/src/lib/rosetta_coding/ @MinaProtocol/mina-foundation-eng
+/src/lib/rosetta_lib/ @MinaProtocol/mina-foundation-eng
+/src/lib/rosetta_models/ @MinaProtocol/mina-foundation-eng
 
 /src/lib/ @MinaProtocol/protocol-eng-reviewers
 
