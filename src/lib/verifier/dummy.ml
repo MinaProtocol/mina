@@ -42,7 +42,7 @@ let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
                ( Blockchain_snark.Blockchain.state snark
                , Blockchain_snark.Blockchain.proof snark ) ) )
         |> Deferred.Or_error.map ~f:Or_error.return
-    | Check | None ->
+    | Check | No_check ->
         Deferred.Or_error.return (Ok ())
   in
   let verify_transaction_snarks ts =
@@ -53,7 +53,7 @@ let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
             result |> Deferred.map ~f:Or_error.return
         | Error e ->
             failwith (Error.to_string_hum e) )
-    | Check | None ->
+    | Check | No_check ->
         (* Don't check if the proof has default sok, becasue they were probably not
            intended to be checked. If it has some value then check that against the
            message passed.
@@ -99,7 +99,7 @@ let verify_commands { proof_level; _ }
     list
     Deferred.Or_error.t =
   match proof_level with
-  | Check | None ->
+  | Check | No_check ->
       List.map cs ~f:(fun c ->
           match Common.check c with
           | `Valid c ->
