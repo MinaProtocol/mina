@@ -82,7 +82,6 @@ let evaluate_async :
           Option.iter !par_job_cont ~f:(fun prev_cont ->
               handle_result_under_mutex mutex par_job_res ~not_ready:Fn.id
                 ~ready:(fun prev_res ->
-                  printf "[%s]     handling continuation of parallel (after-check)\n" Time_ns.(now () |> to_string);
                   par_job_cont := None ;
                   prev_cont 0 prev_res ) )
         in
@@ -92,32 +91,19 @@ let evaluate_async :
             ( in_thread
             @@ fun () ->
             Nano_mutex.critical_section mutex ~f:(fun () ->
-                par_job_res := Some (execute_request req.request) );
-                  printf "[%s] finished parallel\n" Time_ns.(now () |> to_string) ;
-                )
-            (fun () ->
-              printf "[%s] async handles par job result\n"Time_ns.(now () |> to_string) ;
-              ensure_cont_executed ())
+                par_job_res := Some (execute_request req.request) ) )
+            (fun () -> ensure_cont_executed ())
         in
         fun req cont ->
           match !par_job_cont with
           | None ->
-              printf "[%s] launching parallel\n" Time_ns.(now () |> to_string) ;
               schedule_parallel req cont
           | Some prev_cont ->
               handle_result_under_mutex mutex par_job_res
-                ~not_ready:(fun () ->
-                  printf "[%s] parallel is running, continuing sequentially\n" Time_ns.(now () |> to_string) ;
-                  impure_default req cont;
-                  printf "[%s]    finished sequential\n"  Time_ns.(now () |> to_string)
-                  )
+                ~not_ready:(fun () -> impure_default req cont)
                 ~ready:(fun prev_res ->
-                  printf "[%s] launching new parallel instead of recently finished\n" Time_ns.(now () |> to_string) ;
-                  schedule_parallel req cont ; 
-                  printf "[%s] handling continuation of parallel\n"  Time_ns.(now () |> to_string);
-                  prev_cont 0 prev_res ) ;
+                  schedule_parallel req cont ; prev_cont 0 prev_res ) ;
               (* This call is optional, to avoid unnecessary switch of async context *)
-              printf "[%s] checking if parallel finished\n"Time_ns.(now () |> to_string) ;
               ensure_cont_executed () )
     | `Parallel ->
         impure_async ~schedule:in_thread
@@ -149,7 +135,7 @@ let hash ~init data : hash t =
     { request = Sequence.return (`State init, data); request_len = 1 }
     (fun i h -> handler @@ Array.get h i)
 
-let batch_drain = 512
+let batch_drain = 256
 
 let hash_batch data : hash list t =
  fun ~(impure : impure_t) handler ->

@@ -135,10 +135,11 @@ let apply_txs ~action_elements ~event_elements ~constraint_constants
     |> Or_error.ok_exn
   in
   let start_precompute = Time.now () in
-  let precomputed_batch =
+  let%map precomputed_batch =
     let open Random_oracle.Monad in
-    evaluate
-    @@ map_list ~f:Ledger.precompute_transaction_hashes
+    evaluate_async ~when_finished:Take_the_async_lock
+      ~how:(`Max_concurrent_jobs 3)
+    @@ map_list ~f:Ledger.precompute_transaction_hashes_m
     @@ List.map ~f:(fun tx -> User_command.Zkapp_command tx) zkapps
   in
   let zkapps' =
@@ -245,17 +246,17 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
   printf !"Init root %s\n%!" (Ledger_hash.to_base58_check init_root) ;
   Deferred.List.fold (List.init rounds ~f:ident) ~init:(init_ledger, [])
     ~f:(fun (ledger, ledgers) i ->
-      let%map () =
+      let%bind () =
         if tracing && i = 1 then Mina_tracing.start "." else Deferred.unit
       in
       List.hd (List.drop ledgers (max_depth - 1))
       |> Option.iter ~f:drop_old_ledger ;
       apply ~action_elements:0 ~event_elements:0 ~num_txs:num_txs_per_round ~i
         ledger
-      |> mask_handler ledger
-      |> Fn.flip Tuple2.create (ledger :: ledgers) )
+      >>| mask_handler ledger
+      >>| Fn.flip Tuple2.create (ledger :: ledgers) )
   >>| fst
-  >>| apply ~num_txs:num_txs_final
+  >>= apply ~num_txs:num_txs_final
         ~action_elements:genesis_constants.max_action_elements
         ~event_elements:genesis_constants.max_event_elements ~i:rounds
   >>| stop_tracing

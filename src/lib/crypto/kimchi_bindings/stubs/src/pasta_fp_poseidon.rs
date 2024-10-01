@@ -113,14 +113,18 @@ pub fn caml_pasta_fp_poseidon_update(
     caml_pasta_fp_poseidon_update_impl(&params.as_ref().0, &mut state_and_input);
 }
 
+extern "C" {
+    pub fn caml_enter_blocking_section();
+    pub fn caml_leave_blocking_section();
+}
+
 #[ocaml::func]
 pub fn caml_pasta_fp_poseidon_update_batch(
     params: CamlPastaFpPoseidonParamsPtr,
     chunk_size: usize,
     mut state_and_inputs: CamlFpBatchVector,
 ) {
-    println!("hash_batch started");
-    let start = Instant::now();
+    unsafe {caml_enter_blocking_section ()}
     let params_ = &params.as_ref().0;
     state_and_inputs
         .par_chunks_mut(chunk_size)
@@ -129,6 +133,5 @@ pub fn caml_pasta_fp_poseidon_update_batch(
                 caml_pasta_fp_poseidon_update_impl(params_, state_and_input);
             })
         });
-    let duration = start.elapsed();
-    println!("hash_batch finished: {:?}", duration);
+    unsafe {caml_leave_blocking_section ()}
 }
