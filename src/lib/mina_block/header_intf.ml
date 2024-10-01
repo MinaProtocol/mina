@@ -40,4 +40,6 @@ module type Full = sig
   val protocol_version_status : t -> protocol_version_status
 
   val blockchain_length : t -> Mina_numbers.Length.t
+
+  val body_reference : t -> Consensus.Body_reference.t
 end
