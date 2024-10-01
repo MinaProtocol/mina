@@ -52,17 +52,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           }
     ; snark_worker_fee = "0.0002"
     ; num_archive_nodes = 1
-    ; proof_config =
-        { proof_config_default with
-          work_delay = Some 1
-        ; transaction_capacity =
-            Some Runtime_config.Proof_keys.Transaction_capacity.small
-        }
+    ; work_delay = 1
+    ; transaction_capacity_log_2 = 2
     }
 
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
+    let constants = Network.constants network in
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
@@ -377,12 +374,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  err_str ;
                Malleable_error.soft_error_format ~value:()
                  "Payment failed for unexpected reason: %s" err_str ) )
-    in
-    let constants : Test_config.constants =
-      { genesis_constants = Network.genesis_constants network
-      ; constraint_constants = Network.constraint_constants network
-      ; compile_config = Network.compile_config network
-      }
     in
     let config = config ~constants in
     let%bind () =

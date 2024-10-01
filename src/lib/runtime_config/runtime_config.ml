@@ -955,6 +955,22 @@ module Proof_keys = struct
              field 'level' to contain a string"
 
     let gen = Quickcheck.Generator.of_list [ Full; Check; None ]
+
+    let of_genesis_proof_level = function
+      | Genesis_constants.Proof_level.Full ->
+          Full
+      | Check ->
+          Check
+      | None ->
+          None
+
+    let to_genesis_proof_level = function
+      | Full ->
+          Genesis_constants.Proof_level.Full
+      | Check ->
+          Check
+      | None ->
+          None
   end
 
   module Transaction_capacity = struct

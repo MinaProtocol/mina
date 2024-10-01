@@ -120,7 +120,7 @@ module Network_config = struct
          ; num_archive_nodes
          ; log_precomputed_blocks (* ; num_plain_nodes *)
          ; start_filtered_logs
-         ; proof_config
+         ; work_delay
          ; k
          ; delta
          ; slots_per_epoch
@@ -130,7 +130,9 @@ module Network_config = struct
          ; slot_tx_end
          ; slot_chain_end
          ; network_id
-         ; _
+         ; block_window_duration_ms
+         ; transaction_capacity_log_2
+         ; fork
          }
           : Test_config.t ) =
       test_config
@@ -219,10 +221,6 @@ module Network_config = struct
     let genesis_accounts_and_keys = List.zip_exn genesis_ledger keypairs in
     let genesis_ledger_accounts = add_accounts genesis_accounts_and_keys in
     (* DAEMON CONFIG *)
-    let constraint_constants =
-      Genesis_ledger_helper.make_constraint_constants
-        ~default:constants.constraint_constants proof_config
-    in
     let ledger_is_prefix ledger1 ledger2 =
       List.is_prefix ledger2 ~prefix:ledger1
         ~equal:(fun
@@ -257,7 +255,22 @@ module Network_config = struct
             ; genesis_state_timestamp =
                 Some Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
             }
-      ; proof = Some proof_config (* TODO: prebake ledger and only set hash *)
+      ; proof =
+          Some
+            { level = (None : Runtime_config.Proof_keys.Level.t option)
+            ; sub_windows_per_window = None
+            ; ledger_depth = None
+            ; work_delay = Some work_delay
+            ; block_window_duration_ms = Some block_window_duration_ms
+            ; transaction_capacity =
+                Some
+                  (Runtime_config.Proof_keys.Transaction_capacity.Log_2
+                     transaction_capacity_log_2 )
+            ; coinbase_amount = None
+            ; supercharged_coinbase_factor = None
+            ; account_creation_fee = None
+            ; fork
+            }
       ; ledger =
           Some
             { base =
@@ -375,13 +388,11 @@ module Network_config = struct
               ({ staking; next } : Runtime_config.Epoch_data.t) )
       }
     in
-    let genesis_constants =
-      Or_error.ok_exn
-        (Genesis_ledger_helper.make_genesis_constants ~logger
-           ~default:constants.genesis_constants runtime_config )
-    in
-    let constants : Test_config.constants =
-      { constants with genesis_constants; constraint_constants }
+    (* This value for constants is what gets stored in the network config,
+       it's important to apply any configuration patching here as well for coherence
+    *)
+    let constants =
+      Test_config.apply_runtime_config ~logger runtime_config constants
     in
     (* BLOCK PRODUCER CONFIG *)
     let mk_net_keypair keypair_name (pk, sk) =
@@ -679,33 +690,6 @@ module Network_manager = struct
       | None ->
           (Core.String.Map.of_alist_exn [], Core.String.Map.of_alist_exn [])
     in
-    (*
-         let snark_coordinator_id =
-           String.lowercase
-             (String.sub network_config.terraform.snark_worker_public_key
-                ~pos:
-                  (String.length network_config.terraform.snark_worker_public_key - 6)
-                ~len:6 )
-         in
-         let snark_coordinator_workloads =
-           if network_config.terraform.snark_worker_replicas > 0 then
-             [ Kubernetes_network.Workload_to_deploy.construct_workload
-                 ("snark-coordinator-" ^ snark_coordinator_id)
-                 [ Kubernetes_network.Workload_to_deploy.cons_pod_info "mina" ]
-             ]
-           else []
-         in
-         let snark_worker_workloads =
-           if network_config.terraform.snark_worker_replicas > 0 then
-             [ Kubernetes_network.Workload_to_deploy.construct_workload
-                 ("snark-worker-" ^ snark_coordinator_id)
-                 (List.init network_config.terraform.snark_worker_replicas
-                    ~f:(fun _i ->
-                      Kubernetes_network.Workload_to_deploy.cons_pod_info "worker" )
-                 )
-             ]
-           else []
-         in *)
     let block_producer_workloads =
       List.map network_config.terraform.block_producer_configs
         ~f:(fun bp_config ->
