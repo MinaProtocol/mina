@@ -30,6 +30,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val compile_config : Mina_compile_config.t
 end
 
 module Node_status = Node_status
@@ -70,11 +72,10 @@ module Rpcs : sig
   end
 
   module Get_transition_chain_proof : sig
-    type query = State_hash.t * State_hash.t list
+    type query = State_hash.t 
 
     type response =
-    (State_hash.t * State_body_hash.t list * Mina_block.Header.with_hash list)
-    option
+    (State_hash.t * State_body_hash.t list ) option
   end
 
   module Get_transition_knowledge : sig
@@ -198,8 +199,8 @@ val get_transition_chain_proof :
   -> ?timeout:Time.Span.t
   -> t
   -> Network_peer.Peer.t
-  -> State_hash.t * State_hash.t list
-  -> (State_hash.t * State_body_hash.t list * Mina_block.Header.with_hash list)
+  -> State_hash.t 
+  -> (State_hash.t * State_body_hash.t list )
      Deferred.Or_error.t
 
 val get_transition_chain :

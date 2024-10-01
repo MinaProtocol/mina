@@ -33,6 +33,8 @@ module type CONTEXT = sig
   val list_peers : unit -> Peer.t list Deferred.t
 
   val get_transition_frontier : unit -> Transition_frontier.t option
+
+  val compile_config : Mina_compile_config.t
 end
 
 type ctx = (module CONTEXT)
@@ -651,14 +653,9 @@ module Get_transition_chain_proof = struct
     let name = "get_transition_chain_proof"
 
     module T = struct
-      type query = State_hash.t * State_hash.t list [@@deriving sexp, to_yojson]
+      type query = State_hash.t [@@deriving sexp, to_yojson]
 
-      type response =
-      ( State_hash.t
-      * State_body_hash.t list
-      * Mina_block.Header.with_hash list )
-      option
-
+      type response = (State_hash.t * State_body_hash.t list) option
     end
 
     module Caller = T
@@ -702,6 +699,16 @@ module Get_transition_chain_proof = struct
       let caller_model_of_response = Fn.id
     end
 
+    module T' =
+      Perf_histograms.Rpc.Plain.Decorate_bin_io
+        (struct
+          include M
+          include Master
+        end)
+        (T)
+
+    include T'
+    include Register (T')
   end
 
   let receipt_trust_action_message query =
