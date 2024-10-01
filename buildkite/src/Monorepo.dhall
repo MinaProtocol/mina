@@ -35,8 +35,8 @@ let jobs
 let prefixCommands =
       [ Cmd.run
           "git config --global http.sslCAInfo /etc/ssl/certs/ca-bundle.crt"
-      , Cmd.run "./buildkite/scripts/git/refresh_code.sh"
-      , Cmd.run "./buildkite/scripts/git/generate-diff.sh > _computed_diff.txt"
+      , Cmd.run "./buildkite/scripts/refresh_code.sh"
+      , Cmd.run "./buildkite/scripts/generate-diff.sh > _computed_diff.txt"
       ]
 
 let commands
