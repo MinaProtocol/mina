@@ -1591,6 +1591,9 @@ let slot_tx_end, slot_chain_end =
   (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))
 
 module Config_loader = struct
+  (* Use the prefered value if available. Otherwise, given a list of confs
+     find the first conf such that the getter returns a Some.
+  *)
   let maybe_from_config (type conf a) ~(logger : Logger.t)
       ~(configs : (string * conf) list) ~(getter : conf -> a option)
       ~(keyname : string) ~(preferred_value : a option) : a option =
@@ -1598,9 +1601,6 @@ module Config_loader = struct
     | Some v ->
         Some v
     | None ->
-        (* Load value from the latest config file that both
-         * has the key we are looking for, and
-         *)
         let open Option.Let_syntax in
         let%map config_file, data =
           List.find_map configs ~f:(fun (config_file, daemon_config) ->

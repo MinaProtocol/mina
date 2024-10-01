@@ -785,6 +785,9 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           constraint_constants.block_window_duration_ms |> Float.of_int
           |> Time.Span.of_ms |> Mina_metrics.initialize_all ;
 
+          (* We reverse the list because we want to find the "most relevant" value, i.e. the
+             last time it was declared in the list of supplied config files
+          *)
           let rev_daemon_configs =
             List.rev_filter_map config_jsons
               ~f:(fun (config_file, config_json) ->
