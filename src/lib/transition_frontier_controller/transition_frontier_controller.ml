@@ -78,7 +78,17 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     Transition_handler.Unprocessed_transition_cache.create ~logger
       ~cache_exceptions
   in
-  List.iter collected_transitions ~f:(fun t ->
+  let collected_transitions =
+    List.filter_map collected_transitions ~f:(fun (x, vc) ->
+        let open Network_peer.Envelope.Incoming in
+        match data x with
+        | Bootstrap_controller.Transition_cache.Block b ->
+            Some (map x ~f:(const b), vc)
+        | _ ->
+            (* TODO: handle headers too *)
+            None )
+  in
+  List.iter collected_transitions ~f:(fun (t, vc) ->
       (* since the cache was just built, it's safe to assume
        * registering these will not fail, so long as there
        * are no duplicates in the list *)
@@ -87,9 +97,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
           unprocessed_transition_cache t
       in
       Strict_pipe.Writer.write primary_transition_writer
-        (`Block block_cached, `Valid_cb None) ) ;
+        (`Block block_cached, `Valid_cb vc) ) ;
   let initial_state_hashes =
-    List.map collected_transitions ~f:(fun envelope ->
+    List.map collected_transitions ~f:(fun (envelope, _) ->
         Network_peer.Envelope.Incoming.data envelope
         |> Validation.block_with_hash
         |> Mina_base.State_hash.With_state_hashes.state_hash )
