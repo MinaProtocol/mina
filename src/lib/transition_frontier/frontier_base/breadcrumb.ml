@@ -88,10 +88,30 @@ let compute_block_trace_metadata transition_with_validation =
     ; ("coinbase_receiver", Account.key_to_yojson @@ coinbase_receiver cs)
     ]
 
-let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
-    ~trust_system ~parent
+    let build_no_reporting ?skip_staged_ledger_verification ~logger
+    ~precomputed_values ~verifier ~parent
     ~transition:(transition_with_validation : Mina_block.almost_valid_block)
-    ~get_completed_work ~sender ~transition_receipt_time () =
+    ~get_completed_work ~transition_receipt_time () =
+  let create_do
+      ( `Just_emitted_a_proof just_emitted_a_proof
+      , `Block_with_validation fully_valid_block
+      , `Staged_ledger transitioned_staged_ledger ) =
+    [%log internal] "Create_breadcrumb" ;
+    create
+      ~validated_transition:(Mina_block.Validated.lift fully_valid_block)
+      ~staged_ledger:transitioned_staged_ledger ~just_emitted_a_proof
+      ~transition_receipt_time
+  in
+let build_do () =
+  Validation.validate_staged_ledger_diff ?skip_staged_ledger_verification
+    ~get_completed_work ~logger ~precomputed_values ~verifier
+    ~parent_staged_ledger:(staged_ledger parent)
+    ~parent_protocol_state:
+      ( parent.validated_transition |> Mina_block.Validated.header
+      |> Mina_block.Header.protocol_state )
+    transition_with_validation
+  |> Deferred.Result.map ~f:create_do
+in
   let state_hash =
     ( With_hash.hash
     @@ Mina_block.Validation.block_with_hash transition_with_validation )
@@ -102,69 +122,88 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
   [%log internal] "Build_breadcrumb" ;
   let metadata = compute_block_trace_metadata transition_with_validation in
   [%log internal] "@block_metadata" ~metadata ;
-  O1trace.thread "build_breadcrumb" (fun () ->
-      let open Deferred.Let_syntax in
-      match%bind
-        Validation.validate_staged_ledger_diff ?skip_staged_ledger_verification
-          ~get_completed_work ~logger ~precomputed_values ~verifier
-          ~parent_staged_ledger:(staged_ledger parent)
-          ~parent_protocol_state:
-            ( parent.validated_transition |> Mina_block.Validated.header
-            |> Mina_block.Header.protocol_state )
-          transition_with_validation
-      with
-      | Ok
-          ( `Just_emitted_a_proof just_emitted_a_proof
-          , `Block_with_validation fully_valid_block
-          , `Staged_ledger transitioned_staged_ledger ) ->
-          [%log internal] "Create_breadcrumb" ;
-          Deferred.Result.return
-            (create
-               ~validated_transition:
-                 (Mina_block.Validated.lift fully_valid_block)
-               ~staged_ledger:transitioned_staged_ledger ~just_emitted_a_proof
-               ~transition_receipt_time )
-      | Error `Invalid_body_reference ->
-          let message = "invalid body reference" in
-          let%map () =
-            match sender with
-            | None | Some Envelope.Sender.Local ->
+  O1trace.thread "build_breadcrumb" build_do
+
+  let simplify_breadcrumb_building_error =
+    let invalid str = `Invalid (Error.of_string @@ "invalid " ^ str, `Other) in
+    let open Staged_ledger.Staged_ledger_error in
+    function
+    | `Invalid_body_reference ->
+        invalid "body reference"
+    | `Invalid_staged_ledger_diff `Incorrect_target_snarked_ledger_hash ->
+        invalid "snarked ledger hash"
+    | `Invalid_staged_ledger_diff
+        `Incorrect_target_staged_and_snarked_ledger_hashes ->
+        invalid "snarked ledger hash && staged ledger hash"
+    | `Invalid_staged_ledger_diff `Incorrect_target_staged_ledger_hash ->
+        invalid "staged ledger hash"
+    | `Staged_ledger_application_failed (Couldn't_reach_verifier _ as e)
+    | `Staged_ledger_application_failed (Pre_diff (Unexpected _) as e) ->
+        `Verifier_error (to_error e)
+    | `Staged_ledger_application_failed (Invalid_proofs _ as e) ->
+        `Invalid (to_error e, `Proof)
+    | `Staged_ledger_application_failed (Pre_diff (Verification_failed _) as e) ->
+        `Invalid (to_error e, `Signature_or_proof)
+    | `Staged_ledger_application_failed (Pre_diff _ as e)
+    | `Staged_ledger_application_failed (Non_zero_fee_excess _ as e)
+    | `Staged_ledger_application_failed (Insufficient_work _ as e)
+    | `Staged_ledger_application_failed (Mismatched_statuses _ as e)
+    | `Staged_ledger_application_failed (Invalid_public_key _ as e)
+    | `Staged_ledger_application_failed (ZkApps_exceed_limit (_, _) as e)
+    | `Staged_ledger_application_failed (Unexpected _ as e) ->
+        `Invalid (to_error e, `Other)
+  
+  let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
+      ~trust_system ~parent ~transition ~get_completed_work ~senders
+      ~transition_receipt_time () =
+    match%bind
+      build_no_reporting ?skip_staged_ledger_verification ~logger
+        ~precomputed_values ~verifier ~parent ~transition ~get_completed_work
+        ~transition_receipt_time ()
+    with
+    | Ok b ->
+        Deferred.Result.return b
+    | Error `Invalid_body_reference ->
+        let message = "invalid body reference" in
+        let%map () =
+          Deferred.List.iter senders ~f:(function
+            | Envelope.Sender.Local ->
                 return ()
-            | Some (Envelope.Sender.Remote peer) ->
+            | Envelope.Sender.Remote peer ->
                 Trust_system.(
                   record trust_system logger peer
-                    Actions.(Gossiped_invalid_transition, Some (message, [])))
-          in
-          Error (`Invalid_staged_ledger_diff (Error.of_string message))
-      | Error (`Invalid_staged_ledger_diff errors) ->
-          let reasons =
-            String.concat ~sep:" && "
-              (List.map errors ~f:(function
-                | `Incorrect_target_staged_ledger_hash ->
-                    "staged ledger hash"
-                | `Incorrect_target_snarked_ledger_hash ->
-                    "snarked ledger hash" ) )
-          in
-          let message = "invalid staged ledger diff: incorrect " ^ reasons in
-          let%map () =
-            match sender with
-            | None | Some Envelope.Sender.Local ->
+                    Actions.(Gossiped_invalid_transition, Some (message, []))) )
+        in
+        Error (`Invalid_staged_ledger_diff (Error.of_string message))
+    | Error (`Invalid_staged_ledger_diff error) ->
+        let reasons =
+          match error with
+          | `Incorrect_target_snarked_ledger_hash ->
+              "snarked ledger hash"
+          | `Incorrect_target_staged_and_snarked_ledger_hashes ->
+              "snarked ledger hash && staged ledger hash"
+          | `Incorrect_target_staged_ledger_hash ->
+              "staged ledger hash"
+        in
+        let message = "invalid staged ledger diff: incorrect " ^ reasons in
+        let%map () =
+          Deferred.List.iter senders ~f:(function
+            | Envelope.Sender.Local ->
                 return ()
-            | Some (Envelope.Sender.Remote peer) ->
+            | Envelope.Sender.Remote peer ->
                 Trust_system.(
                   record trust_system logger peer
-                    Actions.(Gossiped_invalid_transition, Some (message, [])))
-          in
-          Error (`Invalid_staged_ledger_hash (Error.of_string message))
-      | Error (`Staged_ledger_application_failed staged_ledger_error) ->
-          let%map () =
-            match sender with
-            | None | Some Envelope.Sender.Local ->
+                    Actions.(Gossiped_invalid_transition, Some (message, []))) )
+        in
+        Error (`Invalid_staged_ledger_hash (Error.of_string message))
+    | Error (`Staged_ledger_application_failed staged_ledger_error) ->
+        let%map () =
+          Deferred.List.iter senders ~f:(function
+            | Envelope.Sender.Local ->
                 return ()
-            | Some (Envelope.Sender.Remote peer) ->
+            | Envelope.Sender.Remote peer ->
                 let error_string =
-                  Staged_ledger.Staged_ledger_error.to_string
-                    staged_ledger_error
+                  Staged_ledger.Staged_ledger_error.to_string staged_ledger_error
                 in
                 let make_actions action =
                   ( action
@@ -189,16 +228,15 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
                       | Insufficient_work _
                       | Mismatched_statuses _
                       | Invalid_public_key _
-                      | ZkApps_exceed_limit _
+                      | ZkApps_exceed_limit (_, _)
                       | Unexpected _ ->
                           make_actions Gossiped_invalid_transition
                     in
-                    Trust_system.record trust_system logger peer action )
-          in
-          Error
-            (`Invalid_staged_ledger_diff
-              (Staged_ledger.Staged_ledger_error.to_error staged_ledger_error)
-              ) )
+                    Trust_system.record trust_system logger peer action ) )
+        in
+        Error
+          (`Invalid_staged_ledger_diff
+            (Staged_ledger.Staged_ledger_error.to_error staged_ledger_error) )
 
 let block_with_hash =
   Fn.compose Mina_block.Validated.forget validated_transition
@@ -437,7 +475,12 @@ module For_tests = struct
         Blockchain_state.create_value
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
           ~staged_ledger_hash:next_staged_ledger_hash ~genesis_ledger_hash
-          ~body_reference:(Body.compute_reference body)
+          ~body_reference:
+          (
+            (Body.compute_reference
+               ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
+               body )
+          )
           ~ledger_proof_statement
       in
       let previous_state_hashes =
@@ -489,7 +532,7 @@ module For_tests = struct
           ~transition:
             ( next_block |> Mina_block.Validated.remember
             |> Validation.reset_staged_ledger_diff_validation )
-          ~sender:None ~skip_staged_ledger_verification:`All
+          ~senders:[] ~skip_staged_ledger_verification:`All
           ~transition_receipt_time ()
       with
       | Ok new_breadcrumb ->

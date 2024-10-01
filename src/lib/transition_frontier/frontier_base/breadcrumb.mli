@@ -27,6 +27,41 @@ val create :
   -> transition_receipt_time:Time.t option
   -> t
 
+  val build_no_reporting :
+  ?skip_staged_ledger_verification:[ `All | `Proofs ]
+-> logger:Logger.t
+-> precomputed_values:Precomputed_values.t
+-> verifier:Verifier.t
+-> parent:t
+-> transition:Mina_block.almost_valid_block
+-> get_completed_work:
+    (   Transaction_snark_work.Statement.t
+     -> Transaction_snark_work.Checked.t option )
+-> transition_receipt_time:Time.t option
+-> unit
+-> ( t
+  , [> `Invalid_body_reference
+    | `Invalid_staged_ledger_diff of
+      [ `Incorrect_target_snarked_ledger_hash
+      | `Incorrect_target_staged_ledger_hash
+      | `Incorrect_target_staged_and_snarked_ledger_hashes ]
+    | `Staged_ledger_application_failed of
+      Staged_ledger.Staged_ledger_error.t ] )
+  Result.t
+  Deferred.t
+
+val simplify_breadcrumb_building_error :
+  [< `Invalid_body_reference
+  | `Invalid_staged_ledger_diff of
+    [ `Incorrect_target_snarked_ledger_hash
+    | `Incorrect_target_staged_and_snarked_ledger_hashes
+    | `Incorrect_target_staged_ledger_hash ]
+  | `Staged_ledger_application_failed of Staged_ledger.Staged_ledger_error.t
+  ]
+-> [> `Invalid of Error.t * [ `Other | `Proof | `Signature_or_proof ]
+  | `Verifier_error of Error.t ]
+
+
 val build :
      ?skip_staged_ledger_verification:[ `All | `Proofs ]
   -> logger:Logger.t
@@ -38,7 +73,7 @@ val build :
   -> get_completed_work:
        (   Transaction_snark_work.Statement.t
         -> Transaction_snark_work.Checked.t option )
-  -> sender:Envelope.Sender.t option
+  -> senders:Envelope.Sender.t list
   -> transition_receipt_time:Time.t option
   -> unit
   -> ( t

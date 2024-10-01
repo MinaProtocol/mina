@@ -274,7 +274,7 @@ module Instance = struct
     let apply_diff diff =
       [%log internal] "Apply_full_frontier_diffs" ;
       let (`New_root_and_diffs_with_mutants (_, diffs_with_mutants)) =
-        Full_frontier.apply_diffs frontier [ diff ] ~has_long_catchup_job:false
+        Full_frontier.apply_diffs frontier [ diff ] ~has_long_catchup_job:(lazy false)
           ~enable_epoch_ledger_sync:
             ( if ignore_consensus_local_state then `Disabled
             else `Enabled root_ledger )
@@ -326,7 +326,7 @@ module Instance = struct
                  ~logger:t.factory.logger ~precomputed_values
                  ~verifier:t.factory.verifier
                  ~trust_system:(Trust_system.null ()) ~parent ~transition
-                 ~get_completed_work:(Fn.const None) ~sender:None
+                 ~get_completed_work:(Fn.const None) ~senders:[]
                  ~transition_receipt_time ()
              in
              let%map () = apply_diff Diff.(E (New_node (Full breadcrumb))) in

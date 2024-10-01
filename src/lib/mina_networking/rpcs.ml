@@ -702,16 +702,6 @@ module Get_transition_chain_proof = struct
       let caller_model_of_response = Fn.id
     end
 
-    module T' =
-      Perf_histograms.Rpc.Plain.Decorate_bin_io
-        (struct
-          include M
-          include Master
-        end)
-        (T)
-
-    include T'
-    include Register (T')
   end
 
   let receipt_trust_action_message query =
