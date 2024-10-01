@@ -83,10 +83,7 @@ module Kind = struct
 end
 
 module Account_creation_fees_paid = struct
-  type t =
-    | By_no_one
-    | By_fee_payer of Unsigned_extended.UInt64.t
-    | By_receiver of Unsigned_extended.UInt64.t
+  type t = By_no_one | By_receiver of Unsigned_extended.UInt64.t
   [@@deriving equal, to_yojson, sexp, compare]
 end
 
@@ -418,11 +415,6 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
             ; related_to = None
             }
           ]
-      | Some (`Applied (Account_creation_fees_paid.By_fee_payer amount)) ->
-          [ { Op.label = `Account_creation_fee_via_fee_payer amount
-            ; related_to = None
-            }
-          ]
       | _ ->
           [] )
     @
@@ -517,16 +509,6 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
           ; status = Option.map ~f:Operation_statuses.name status
           ; account = Some (account_id t.receiver t.token)
           ; _type = Operation_types.name `Account_creation_fee_via_payment
-          ; amount = Some Amount_of.(negated @@ mina account_creation_fee)
-          ; coin_change = None
-          ; metadata
-          }
-      | `Account_creation_fee_via_fee_payer account_creation_fee ->
-          { Operation.operation_identifier
-          ; related_operations
-          ; status = Option.map ~f:Operation_statuses.name status
-          ; account = Some (account_id t.fee_payer t.fee_token)
-          ; _type = Operation_types.name `Account_creation_fee_via_fee_payer
           ; amount = Some Amount_of.(negated @@ mina account_creation_fee)
           ; coin_change = None
           ; metadata

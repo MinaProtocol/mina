@@ -73,7 +73,11 @@ in  Pipeline.build
               , dirtyWhen = lintDirtyWhen
               , path = "Test"
               , name = "VersionLint"
-              , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
+              , tags =
+                [ PipelineTag.Type.Long
+                , PipelineTag.Type.Test
+                , PipelineTag.Type.Stable
+                ]
               }
       , steps =
         [ buildTestCmd
