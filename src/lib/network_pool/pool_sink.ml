@@ -145,7 +145,7 @@ module Base
         ; throttle
         ; on_push
         ; log_gossip_heard
-        ; block_window_duration
+        ; _
         } ->
         O1trace.sync_thread (sprintf "handle_%s_gossip" trace_label)
         @@ fun () ->
@@ -157,10 +157,7 @@ module Base
         | BC.External cb'' ->
             Diff.update_metrics env' cb'' ~log_gossip_heard ~logger ;
             don't_wait_for
-              ( match%map
-                  Mina_net2.Validation_callback.await ~block_window_duration
-                    cb''
-                with
+              ( match%map Mina_net2.Validation_callback.await cb'' with
               | None ->
                   let diff = Envelope.Incoming.data env' in
                   [%log error]

@@ -100,7 +100,6 @@ type t =
   ; mutable banned_ips : Unix.Inet_addr.t list
   ; peer_connected_callback : string -> unit
   ; peer_disconnected_callback : string -> unit
-  ; block_window_duration : Time.Span.t
   ; resource_update_callback : on_bitswap_update_t
   ; outstanding_resource_requests : outstanding_request_t Blake2.Table.t
   }
@@ -392,8 +391,7 @@ let handle_push_message t push_message =
               upon
                 (O1trace.thread "validate_libp2p_gossip" (fun () ->
                      Subscription.handle_and_validate sub ~validation_expiration
-                       ~sender ~data
-                       ~block_window_duration:t.block_window_duration ) )
+                       ~sender ~data ) )
                 (function
                   | `Validation_timeout ->
                       [%log' warn t.logger]
@@ -587,7 +585,7 @@ let handle_push_message t push_message =
 let create ?(allow_multiple_instances = false)
     ?(outstanding_resource_requests = Blake2.Table.create ())
     ~all_peers_seen_metric ~logger ~pids ~conf_dir ~on_peer_connected
-    ~on_peer_disconnected ~on_bitswap_update ~block_window_duration () =
+    ~on_peer_disconnected ~on_bitswap_update () =
   let open Deferred.Or_error.Let_syntax in
   let push_message_handler =
     ref (fun _msg ->
@@ -618,7 +616,6 @@ let create ?(allow_multiple_instances = false)
     ; peer_disconnected_callback =
         (fun peer_id -> on_peer_disconnected (Peer.Id.unsafe_of_string peer_id))
     ; protocol_handlers = Hashtbl.create (module String)
-    ; block_window_duration
     ; resource_update_callback = on_bitswap_update
     ; outstanding_resource_requests
     }
