@@ -1056,8 +1056,6 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~block_reward_threshold ~block_produced_bvar ~vrf_evaluation_state ~net
     ~zkapp_cmd_limit_hardcap =
   let open Context in
-  let constraint_constants = precomputed_values.constraint_constants in
-  let consensus_constants = precomputed_values.consensus_constants in
   O1trace.sync_thread "produce_blocks" (fun () ->
       let genesis_breadcrumb =
         genesis_breadcrumb_creator ~context:(module Context) prover
