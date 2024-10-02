@@ -221,9 +221,16 @@ pub fn caml_pasta_fq_plonk_verifier_index_create(
     index: CamlPastaFqPlonkIndexPtr,
 ) -> CamlPastaFqPlonkVerifierIndex {
     {
-        let ptr: &mut poly_commitment::srs::SRS<Pallas> =
-            unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
-        ptr.with_lagrange_basis(index.as_ref().0.cs.domain.d1);
+        //let ptr: &mut poly_commitment::srs::SRS<Pallas> =
+        //    unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
+        //ptr.with_lagrange_basis(index.as_ref().0.cs.domain.d1);
+        index
+            .as_ref()
+            .0
+            .srs
+            .write()
+            .unwrap()
+            .with_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
     let verifier_index = index.as_ref().0.verifier_index();
     verifier_index.into()

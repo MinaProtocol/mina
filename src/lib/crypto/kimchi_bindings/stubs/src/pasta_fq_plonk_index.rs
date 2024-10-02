@@ -88,9 +88,9 @@ pub fn caml_pasta_fq_plonk_index_create(
 
     // Unsafe if we are in a multi-core ocaml
     {
-        let ptr: &mut poly_commitment::srs::SRS<Pallas> =
-            unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-        ptr.with_lagrange_basis(cs.domain.d1);
+        //let ptr: &mut poly_commitment::srs::SRS<Pallas> =
+        //    unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+        srs.0.write().unwrap().with_lagrange_basis(cs.domain.d1);
     }
 
     // create index

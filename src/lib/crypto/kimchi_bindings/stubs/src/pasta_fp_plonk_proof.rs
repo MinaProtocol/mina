@@ -122,9 +122,15 @@ pub fn caml_pasta_fp_plonk_proof_create_and_verify(
     prev_sgs: Vec<CamlGVesta>,
 ) -> Result<CamlProofWithPublic<CamlGVesta, CamlFp>, ocaml::Error> {
     {
-        let ptr: &mut poly_commitment::srs::SRS<Vesta> =
-            unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
-        ptr.with_lagrange_basis(index.as_ref().0.cs.domain.d1);
+        //let ptr: &mut poly_commitment::srs::SRS<Vesta> =
+        //    unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
+        index
+            .as_ref()
+            .0
+            .srs
+            .write()
+            .unwrap()
+            .with_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
     let prev = if prev_challenges.is_empty() {
         Vec::new()
@@ -208,7 +214,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
         polynomial::COLUMNS,
         wires::Wire,
     };
-    use poly_commitment::srs::{endos, SRS};
+    use poly_commitment::srs::endos;
 
     let num_gates = 1000;
     let num_tables: usize = 5;
@@ -285,8 +291,8 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
         .build()
         .unwrap();
 
-    let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.with_lagrange_basis(cs.domain.d1);
+    //let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+    srs.0.write().unwrap().with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
@@ -329,7 +335,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     use num_bigint::BigUint;
     use num_bigint::RandBigInt;
     use o1_utils::{foreign_field::BigUintForeignFieldHelpers, FieldHelpers};
-    use poly_commitment::srs::{endos, SRS};
+    use poly_commitment::srs::endos;
     use rand::{rngs::StdRng, SeedableRng};
 
     let foreign_field_modulus = Fq::modulus_biguint();
@@ -449,8 +455,8 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     // Create constraint system
     let cs = ConstraintSystem::<Fp>::create(gates).build().unwrap();
 
-    let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.with_lagrange_basis(cs.domain.d1);
+    //let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+    srs.0.write().unwrap().with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
@@ -485,7 +491,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
     use num_bigint::BigUint;
     use num_bigint::RandBigInt;
     use o1_utils::{foreign_field::BigUintForeignFieldHelpers, BigUintFieldHelpers};
-    use poly_commitment::srs::{endos, SRS};
+    use poly_commitment::srs::endos;
     use rand::{rngs::StdRng, SeedableRng};
 
     let rng = &mut StdRng::from_seed([255u8; 32]);
@@ -515,8 +521,9 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
     // Create constraint system
     let cs = ConstraintSystem::<Fp>::create(gates).build().unwrap();
 
-    let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.with_lagrange_basis(cs.domain.d1);
+    //let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+    //ptr.with_lagrange_basis(cs.domain.d1);
+    srs.0.write().unwrap().with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
@@ -552,7 +559,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check0(
         polynomials::{generic::GenericGateSpec, range_check},
         wires::Wire,
     };
-    use poly_commitment::srs::{endos, SRS};
+    use poly_commitment::srs::endos;
 
     let gates = {
         // Public input row with value 0
@@ -587,8 +594,9 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check0(
     // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates).build().unwrap();
 
-    let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.with_lagrange_basis(cs.domain.d1);
+    //let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+    //ptr.with_lagrange_basis(cs.domain.d1);
+    srs.0.write().unwrap().with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
@@ -630,7 +638,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
         wires::Wire,
     };
     use num_bigint::BigUint;
-    use poly_commitment::srs::{endos, SRS};
+    use poly_commitment::srs::endos;
 
     // Includes a row to store value 1
     let num_public_inputs = 1;
@@ -711,8 +719,9 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
         .build()
         .unwrap();
 
-    let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.with_lagrange_basis(cs.domain.d1);
+    //let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+    //ptr.with_lagrange_basis(cs.domain.d1);
+    srs.0.write().unwrap().with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
@@ -842,7 +851,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
         },
         wires::Wire,
     };
-    use poly_commitment::srs::{endos, SRS};
+    use poly_commitment::srs::endos;
 
     // Includes the actual input of the rotation and a row with the zero value
     let num_public_inputs = 2;
@@ -892,8 +901,9 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
         .build()
         .unwrap();
 
-    let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.with_lagrange_basis(cs.domain.d1);
+    //let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+    //ptr.with_lagrange_basis(cs.domain.d1);
+    srs.0.write().unwrap().with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
