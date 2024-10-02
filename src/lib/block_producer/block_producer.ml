@@ -1036,6 +1036,19 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
             handle_block_production_errors ~logger ~rejected_blocks_logger
               ~time_taken:span ~previous_protocol_state ~protocol_state res) )
 
+let generate_genesis_proof_if_needed ~genesis_breadcrumb ~frontier_reader () =
+  match Broadcast_pipe.Reader.peek frontier_reader with
+  | Some transition_frontier ->
+      let consensus_state =
+        Transition_frontier.best_tip transition_frontier
+        |> Transition_frontier.Breadcrumb.consensus_state
+      in
+      if Consensus.Data.Consensus_state.is_genesis_state consensus_state then
+        genesis_breadcrumb () |> Deferred.ignore_m
+      else Deferred.return ()
+  | None ->
+      Deferred.return ()
+
 let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~trust_system ~get_completed_work ~transaction_resource_pool
     ~time_controller ~consensus_local_state ~coinbase_receiver ~frontier_reader
@@ -1125,22 +1138,6 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                 "Block producer will begin producing only empty blocks after \
                  $slot_diff slots"
               slot_tx_end ;
-
-            let generate_genesis_proof_if_needed () =
-              match Broadcast_pipe.Reader.peek frontier_reader with
-              | Some transition_frontier ->
-                  let consensus_state =
-                    Transition_frontier.best_tip transition_frontier
-                    |> Breadcrumb.consensus_state
-                  in
-                  if
-                    Consensus.Data.Consensus_state.is_genesis_state
-                      consensus_state
-                  then genesis_breadcrumb () |> Deferred.ignore_m
-                  else Deferred.return ()
-              | None ->
-                  Deferred.return ()
-            in
             (* TODO: Re-enable this assertion when it doesn't fail dev demos
              *       (see #5354)
              * assert (
@@ -1240,7 +1237,10 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                        (`Produce_now (data, winner_pk))
                        consensus_state ;
                      Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
-                     let%map () = generate_genesis_proof_if_needed () in
+                     let%map () =
+                       generate_genesis_proof_if_needed ~genesis_breadcrumb
+                         ~frontier_reader ()
+                     in
                      ignore
                        ( Interruptible.finally
                            (Singleton_supervisor.dispatch production_supervisor
@@ -1309,7 +1309,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                               |> Block_time.Span.to_time_span
                             in
                             let%bind () = after span_till_time in
-                            generate_genesis_proof_if_needed () ) ;
+                            generate_genesis_proof_if_needed ~genesis_breadcrumb
+                              ~frontier_reader () ) ;
                          Singleton_scheduler.schedule scheduler scheduled_time
                            ~f:(fun () ->
                              ignore
