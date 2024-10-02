@@ -38,22 +38,29 @@ let command_run =
            "int Delete blocks that are more than n blocks lower than the \
             maximum seen block."
      in
-     let runtime_config_opt =
-       Option.map runtime_config_file ~f:(fun file ->
-           Yojson.Safe.from_file file |> Runtime_config.of_yojson
-           |> Result.ok_or_failwith )
-     in
      fun () ->
        let logger = Logger.create () in
-       let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
+       let open Deferred.Let_syntax in
+       let%bind constants =
+         Runtime_config.Constants.load_constants ~logger
+           (Option.to_list runtime_config_file)
+       in
+       let%bind runtime_config_opt =
+         match runtime_config_file with
+         | None ->
+             return None
+         | Some file -> Deferred.Or_error.(
+             Runtime_config.Json_loader.load_config_files ~logger [file] >>=
+             Genesis_ledger_helper.init_from_config_file ~logger ~constants
+             >>| fun (a,_) -> Option.some a
+          ) |> Deferred.Or_error.ok_exn
        in
        Stdout_log.setup log_json log_level ;
        [%log info] "Starting archive process; built with commit $commit"
          ~metadata:[ ("commit", `String Mina_version.commit_id) ] ;
        Archive_lib.Processor.setup_server ~metrics_server_port ~logger
-         ~genesis_constants ~constraint_constants
+         ~genesis_constants:(Runtime_config.Constants.genesis_constants constants)
+         ~constraint_constants:(Runtime_config.Constants.constraint_constants constants)
          ~postgres_address:postgres.value
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)
