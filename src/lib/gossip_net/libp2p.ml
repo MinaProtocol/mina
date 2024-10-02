@@ -951,35 +951,44 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       List.map peers ~f:(fun peer -> query_peer t peer.peer_id rpc query)
 
     (* Do not broadcast to the topic from which message was originally received *)
-    let guard_topic ?origin_topic topic f msg =
-      if Option.equal String.equal origin_topic (Some topic) then Deferred.unit
+    let guard_topic ~origin_topics topic f msg =
+      if List.mem ~equal:String.equal origin_topics topic then Deferred.unit
       else f msg
 
     (* broadcast to new topics  *)
-    let broadcast_state ?origin_topic t state =
+    let broadcast_transition ?(origin_topics = []) t b_or_h =
+      let header, block_opt =
+        match b_or_h with
+        | `Block b ->
+            (Mina_block.header b, Some b)
+        | `Header h ->
+            (h, None)
+      in
       let pfs = !(t.publish_functions) in
       let%bind () =
-        guard_topic ?origin_topic v1_topic_block pfs.publish_v1_block
-          (Mina_block.header state)
+        guard_topic ~origin_topics v1_topic_block pfs.publish_v1_block header
       in
-      guard_topic ?origin_topic v0_topic pfs.publish_v0 (Message.New_state state)
+      Option.value_map block_opt ~default:Deferred.unit ~f:(fun block ->
+          guard_topic ~origin_topics v0_topic pfs.publish_v0
+            (Message.New_state block) )
 
-    let broadcast_transaction_pool_diff ?origin_topic ?(nonce = 0) t diff =
+    let broadcast_transaction_pool_diff ?(origin_topics = []) ?(nonce = 0) t
+        diff =
       let pfs = !(t.publish_functions) in
       let%bind () =
-        guard_topic ?origin_topic v1_topic_tx pfs.publish_v1_tx diff
+        guard_topic ~origin_topics v1_topic_tx pfs.publish_v1_tx diff
       in
-      guard_topic ?origin_topic v0_topic pfs.publish_v0
+      guard_topic ~origin_topics v0_topic pfs.publish_v0
         (Message.Transaction_pool_diff
            { Network_pool.With_nonce.nonce; message = diff } )
 
-    let broadcast_snark_pool_diff ?origin_topic ?(nonce = 0) t diff =
+    let broadcast_snark_pool_diff ?(origin_topics = []) ?(nonce = 0) t diff =
       let pfs = !(t.publish_functions) in
       let%bind () =
-        guard_topic ?origin_topic v1_topic_snark_work pfs.publish_v1_snark_work
+        guard_topic ~origin_topics v1_topic_snark_work pfs.publish_v1_snark_work
           diff
       in
-      guard_topic ?origin_topic v0_topic pfs.publish_v0
+      guard_topic ~origin_topics v0_topic pfs.publish_v0
         (Message.Snark_pool_diff
            { Network_pool.With_nonce.nonce; message = diff } )
 

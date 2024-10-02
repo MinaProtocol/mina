@@ -219,7 +219,7 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
 
 val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
 
-val broadcast_state :
+val broadcast_transition :
   t -> Mina_block.t State_hash.With_state_hashes.t -> unit Deferred.t
 
 val broadcast_snark_pool_diff :
