@@ -37,12 +37,14 @@ let cmd =
       let%map path =
         let open Command.Param in
         flag "--spec" ~doc:"PATH Spec path" (required string)
-      in
+      and config_file = Cli_lib.Flag.conf_file in
       fun () ->
-        let constraint_constants =
-          Genesis_constants.Compiled.constraint_constants
+        let open Deferred.Let_syntax in
+        let%bind (constraint_constants, proof_level) =
+          let logger = Logger.create () in
+          let%map constants =Runtime_config.Constants.load_constants ~logger config_file
+      in  (Runtime_config.Constants.constraint_constants constants, Runtime_config.Constants.proof_level constants)
         in
-        let proof_level = Genesis_constants.Compiled.proof_level in
         Obj.magic (main path ~constraint_constants ~proof_level))
 
 let () = Command.run cmd
