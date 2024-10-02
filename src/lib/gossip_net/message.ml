@@ -82,9 +82,10 @@ module Latest = V2
 [%%define_locally Latest.(summary)]
 
 type block_sink_msg =
-  [ `Transition of state_msg Envelope.Incoming.t ]
+  [ `Block of Mina_block.t Envelope.Incoming.t
+  | `Header of Mina_block.Header.t Envelope.Incoming.t ]
   * [ `Time_received of Block_time.t ]
-  * [ `Valid_cb of Mina_net2.Validation_callback.t ]
+  * [ `Topic_and_vc of string * Mina_net2.Validation_callback.t ]
 
 type tx_sink_msg =
   transaction_pool_diff_msg Envelope.Incoming.t
