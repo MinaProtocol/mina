@@ -99,28 +99,31 @@ macro_rules! impl_shared_mutable_reference {
         // useful implementations
         //
 
-        impl ::std::ops::Deref for $name {
-            type Target = ::std::sync::Arc<::std::sync::RwLock<$typ>;
+        //impl ::std::ops::Deref for $name {
+        //    type Target = ::std::sync::Arc<::std::sync::RwLock<$typ>;
 
-            fn deref(&self) -> &Self::Target {
-                &self.0
-            }
-        }
+        //    fn deref(&self) -> &Self::Target {
+        //        &self.0
+        //    }
+        //}
     };
 }
 
+#[derive(Debug, Clone)]
+pub struct MyStruct(u64);
+
 #[derive(Debug, ::ocaml_gen::CustomType)]
-pub struct MutArc(pub std::sync::Arc<::std::sync::RwLock<u64>>);
+pub struct MutArc(pub std::sync::Arc<::std::sync::RwLock<MyStruct>>);
 
 impl MutArc {
     fn modify_mut_arc(data: MutArc) {
         let mut data = data.0.write().unwrap();
-        *data += 1;
+        data.0 += 1;
     }
 
-    fn read_mut_arc(data: MutArc) -> u64 {
+    fn read_mut_arc(data: MutArc) -> MyStruct {
         let data = data.0.read().unwrap();
-        *data
+        data.clone()
     }
 
     extern "C" fn caml_pointer_finalize(v: ::ocaml::Raw) {
@@ -136,7 +139,7 @@ impl MutArc {
         0
     }
 
-    pub fn new(x: u64) -> Self {
+    pub fn new(x: MyStruct) -> Self {
         Self(::std::sync::Arc::new(::std::sync::RwLock::new(x)))
     }
 }
@@ -157,13 +160,13 @@ unsafe impl<'a> ::ocaml::FromValue<'a> for MutArc {
 // useful implementations
 //
 
-impl ::std::ops::Deref for MutArc {
-    type Target = u64;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0.read().unwrap()
-    }
-}
+//impl ::std::ops::Deref for MutArc {
+//    type Target = MyStruct;
+//
+//    fn deref(&self) -> &Self::Target {
+//        self.0.read().as_deref().unwrap()
+//    }
+//}
 
 //macro_rules! impl_shared_mutable_reference {
 //    ($name: ident => $typ: ty) => {

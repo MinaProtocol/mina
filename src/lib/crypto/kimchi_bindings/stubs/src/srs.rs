@@ -31,7 +31,7 @@ use std::{
 macro_rules! impl_srs {
     ($name: ident, $CamlF: ty, $CamlG: ty, $F: ty, $G: ty) => {
 
-        impl_shared_reference!($name => SRS<$G>);
+        impl_shared_mutable_reference!($name => SRS<$G>);
 
         paste! {
             #[ocaml_gen::func]
@@ -125,7 +125,8 @@ macro_rules! impl_srs {
                 //    };
                 //}
 
-                let res = Ok(srs.lagrange_bases[&x_domain.size()].clone().into_iter().map(|x| x.into()).collect());
+
+                let res = Ok(srs.0.read().unwrap().lagrange_bases[&x_domain.size()].clone().into_iter().map(|x| x.into()).collect());
                 println!("rust ..._lagrange_commitment_whole_domain total {:.2?}", time_0.elapsed());
                 res
             }
@@ -147,20 +148,21 @@ macro_rules! impl_srs {
                 })?;
                 println!("rust ..._lagrange_commitment 1 {:.2?}", time_0.elapsed());
 
-                {
-                    //// We're single-threaded, so it's safe to grab this pointer as mutable.
-                    //// Do not try this at home.
-                    //let srs = unsafe { &mut *((&**srs as *const SRS<$G>) as *mut SRS<$G>) as &mut SRS<$G> };
-                    //srs.with_lagrange_basis(x_domain);
-                    let srs: &mut poly_commitment::srs::SRS<$G> =
-                        unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
+                // TODO resurrect
+                //{
+                //    //// We're single-threaded, so it's safe to grab this pointer as mutable.
+                //    //// Do not try this at home.
+                //    //let srs = unsafe { &mut *((&**srs as *const SRS<$G>) as *mut SRS<$G>) as &mut SRS<$G> };
+                //    //srs.with_lagrange_basis(x_domain);
+                //    let srs: &mut poly_commitment::srs::SRS<$G> =
+                //        unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
 
-                    srs.with_lagrange_basis(x_domain);
+                //    srs.with_lagrange_basis(x_domain);
 
-                }
+                //}
                 println!("rust ..._lagrange_commitment 2 {:.2?}", time_0.elapsed());
 
-                let res = Ok(srs.lagrange_bases[&x_domain.size()][i as usize].clone().into());
+                let res = Ok(srs.0.read().unwrap().lagrange_bases[&x_domain.size()][i as usize].clone().into());
                 println!("rust ..._lagrange_commitment total {:.2?}", time_0.elapsed());
                 res
             }
@@ -171,10 +173,10 @@ macro_rules! impl_srs {
                 srs: $name,
                 log2_size: ocaml::Int,
             ) {
-                let ptr: &mut poly_commitment::srs::SRS<$G> =
-                    unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
+                //let ptr: &mut poly_commitment::srs::SRS<$G> =
+                //    unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
                 let domain = EvaluationDomain::<$F>::new(1 << (log2_size as usize)).expect("invalid domain size");
-                ptr.with_lagrange_basis(domain);
+                srs.0.write().unwrap().with_lagrange_basis(domain);
             }
 
             #[ocaml_gen::func]
@@ -193,7 +195,7 @@ macro_rules! impl_srs {
                 let evals = evals.into_iter().map(Into::into).collect();
                 let p = Evaluations::<$F>::from_vec_and_domain(evals, x_domain).interpolate();
 
-                Ok(srs.commit_non_hiding(&p, 1).into())
+                Ok(srs.0.read().unwrap().commit_non_hiding(&p, 1).into())
             }
 
             #[ocaml_gen::func]
@@ -206,7 +208,7 @@ macro_rules! impl_srs {
                 let coeffs = b_poly_coefficients(&chals);
                 let p = DensePolynomial::<$F>::from_coefficients_vec(coeffs);
 
-                Ok(srs.commit_non_hiding(&p, 1).into())
+                Ok(srs.0.read().unwrap().commit_non_hiding(&p, 1).into())
             }
 
             #[ocaml_gen::func]
@@ -218,7 +220,7 @@ macro_rules! impl_srs {
             ) -> bool {
                 let comms: Vec<_> = comms.into_iter().map(Into::into).collect();
                 let chals: Vec<_> = chals.into_iter().map(Into::into).collect();
-                crate::urs_utils::batch_dlog_accumulator_check(&srs, &comms, &chals)
+                crate::urs_utils::batch_dlog_accumulator_check(&srs.0.read().unwrap().g, &comms, &chals)
             }
 
             #[ocaml_gen::func]
@@ -229,7 +231,7 @@ macro_rules! impl_srs {
                 chals: Vec<$CamlF>,
             ) -> Vec<$CamlG> {
                 crate::urs_utils::batch_dlog_accumulator_generate::<$G>(
-                    &srs,
+                    &srs.0.read().unwrap().g,
                     comms as usize,
                     &chals.into_iter().map(From::from).collect(),
                 ).into_iter().map(Into::into).collect()
@@ -238,7 +240,7 @@ macro_rules! impl_srs {
             #[ocaml_gen::func]
             #[ocaml::func]
             pub fn [<$name:snake _h>](srs: $name) -> $CamlG {
-                srs.h.into()
+                srs.0.read().unwrap().h.into()
             }
         }
     }

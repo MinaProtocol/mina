@@ -1,4 +1,4 @@
-use ark_ec::{VariableBaseMSM, CurveGroup};
+use ark_ec::{CurveGroup, VariableBaseMSM};
 use ark_ff::{batch_inversion, One, PrimeField, UniformRand, Zero};
 use poly_commitment::{
     commitment::{b_poly_coefficients, CommitmentCurve},
@@ -8,7 +8,7 @@ use rayon::prelude::*;
 
 // TODO: Not compatible with variable rounds
 pub fn batch_dlog_accumulator_check<G: CommitmentCurve>(
-    urs: &SRS<G>,
+    urs_g: &Vec<G>,
     comms: &[G],
     chals: &[G::ScalarField],
 ) -> bool {
@@ -31,7 +31,7 @@ pub fn batch_dlog_accumulator_check<G: CommitmentCurve>(
         rs
     };
 
-    let mut points = urs.g.clone();
+    let mut points = urs_g.clone();
     let n = points.len();
     points.extend(comms);
 
@@ -69,7 +69,7 @@ pub fn batch_dlog_accumulator_check<G: CommitmentCurve>(
 }
 
 pub fn batch_dlog_accumulator_generate<G: CommitmentCurve>(
-    urs: &SRS<G>,
+    urs_g: &Vec<G>,
     num_comms: usize,
     chals: &Vec<G::ScalarField>,
 ) -> Vec<G> {
@@ -92,7 +92,7 @@ pub fn batch_dlog_accumulator_generate<G: CommitmentCurve>(
                 .into_iter()
                 .map(|x| x.into_bigint())
                 .collect();
-            let points: Vec<_> = urs.g.clone();
+            let points: Vec<_> = urs_g.clone();
             G::Group::msm_bigint(&points, &scalars).into_affine()
         })
         .collect();

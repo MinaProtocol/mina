@@ -71,7 +71,7 @@ pub fn caml_pasta_fp_plonk_index_create(
     let cs = match ConstraintSystem::<Fp>::create(gates)
         .public(public as usize)
         .prev_challenges(prev_challenges as usize)
-        .max_poly_size(Some(srs.0.max_poly_size()))
+        .max_poly_size(Some(srs.0.read().unwrap().max_poly_size()))
         .lookup(lookup_tables)
         .runtime(if runtime_tables.is_empty() {
             None
@@ -95,7 +95,7 @@ pub fn caml_pasta_fp_plonk_index_create(
     }
 
     // create index
-    let mut index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.clone());
+    let mut index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     // Compute and cache the verifier index digest
     index.compute_verifier_index_digest::<DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>>();
 
@@ -105,7 +105,7 @@ pub fn caml_pasta_fp_plonk_index_create(
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_index_max_degree(index: CamlPastaFpPlonkIndexPtr) -> ocaml::Int {
-    index.as_ref().0.srs.max_degree() as isize
+    index.as_ref().0.srs.read().unwrap().max_degree() as isize
 }
 
 #[ocaml_gen::func]
@@ -161,7 +161,7 @@ pub fn caml_pasta_fp_plonk_index_read(
     let mut t = ProverIndex::<Vesta, OpeningProof<Vesta>>::deserialize(
         &mut rmp_serde::Deserializer::new(r),
     )?;
-    t.srs = srs.clone();
+    t.srs = srs.0;
 
     let (linearization, powers_of_alpha) = expr_linearization(Some(&t.cs.feature_flags), true);
     t.linearization = linearization;

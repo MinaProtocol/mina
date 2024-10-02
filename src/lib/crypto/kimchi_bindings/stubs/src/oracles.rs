@@ -62,6 +62,8 @@ macro_rules! impl_oracles {
                 let p_comm = {
                     index
                         .srs()
+                        .read()
+                        .unwrap()
                         .mask_custom(
                             p_comm.clone(),
                             &p_comm.map(|_| $F::one()),
@@ -146,6 +148,8 @@ macro_rules! impl_oracles {
                 let p_comm = {
                     index
                         .srs()
+                        .read()
+                        .unwrap()
                         .mask_custom(
                             p_comm.clone(),
                             &p_comm.map(|_| $F::one()),
