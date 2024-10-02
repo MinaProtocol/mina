@@ -7,8 +7,7 @@ module Impl = Pickles.Impls.Step
 module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 module Statement = Transaction_snark.Statement
 
-let constraint_constants =
-  Genesis_constants.Compiled.constraint_constants
+let constraint_constants = Genesis_constants.Compiled.constraint_constants
 
 let genesis_constants = Genesis_constants.Compiled.genesis_constants
 
