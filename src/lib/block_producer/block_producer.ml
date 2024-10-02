@@ -656,6 +656,9 @@ let validate_genesis_protocol_state_block ~genesis_state_hash (b, v) =
   |> Result.map
        ~f:(Fn.flip Validation.with_body (Mina_block.body @@ With_hash.data b))
 
+let log_bootstrap_mode ~logger () =
+  [%log info] "Pausing block production while bootstrapping"
+
 let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~trust_system ~get_completed_work ~transaction_resource_pool
     ~time_controller ~consensus_local_state ~coinbase_receiver ~frontier_reader
@@ -701,9 +704,6 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
       let rejected_blocks_logger =
         Logger.create ~id:Logger.Logger_id.rejected_blocks ()
       in
-      let log_bootstrap_mode () =
-        [%log info] "Pausing block production while bootstrapping"
-      in
       let slot_tx_end =
         Runtime_config.slot_tx_end precomputed_values.runtime_config
       in
@@ -715,7 +715,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
         let open Interruptible.Let_syntax in
         match Broadcast_pipe.Reader.peek frontier_reader with
         | None ->
-            log_bootstrap_mode () ; Interruptible.return ()
+            log_bootstrap_mode ~logger () ;
+            Interruptible.return ()
         | Some frontier -> (
             let global_slot =
               Consensus.Data.Block_data.global_slot_since_genesis block_data
@@ -1081,7 +1082,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
         (* Begin checking for the ability to produce a block *)
         match Broadcast_pipe.Reader.peek frontier_reader with
         | None ->
-            log_bootstrap_mode () ;
+            log_bootstrap_mode ~logger () ;
             don't_wait_for
               (let%map () =
                  Broadcast_pipe.Reader.iter_until frontier_reader
@@ -1361,9 +1362,6 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
 let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
     ~time_controller ~frontier_reader ~transition_writer ~precomputed_blocks =
   let open Context in
-  let log_bootstrap_mode () =
-    [%log info] "Pausing block production while bootstrapping"
-  in
   let rejected_blocks_logger =
     Logger.create ~id:Logger.Logger_id.rejected_blocks ()
   in
@@ -1393,7 +1391,8 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
     in
     match Broadcast_pipe.Reader.peek frontier_reader with
     | None ->
-        log_bootstrap_mode () ; return ()
+        log_bootstrap_mode ~logger () ;
+        return ()
     | Some frontier ->
         let open Transition_frontier.Extensions in
         let transition_registry =
@@ -1552,7 +1551,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
     (* Begin checking for the ability to produce a block *)
     match Broadcast_pipe.Reader.peek frontier_reader with
     | None ->
-        log_bootstrap_mode () ;
+        log_bootstrap_mode ~logger () ;
         let%bind () =
           Broadcast_pipe.Reader.iter_until frontier_reader
             ~f:(Fn.compose Deferred.return Option.is_some)
