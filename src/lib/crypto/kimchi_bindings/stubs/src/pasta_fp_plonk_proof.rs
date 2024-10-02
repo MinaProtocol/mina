@@ -47,11 +47,17 @@ pub fn caml_pasta_fp_plonk_proof_create(
 ) -> Result<CamlProofWithPublic<CamlGVesta, CamlFp>, ocaml::Error> {
     //use std::time::Instant;
     //let time_0 = Instant::now();
-    //{
-    //    let ptr: &mut poly_commitment::srs::SRS<Vesta> =
-    //        unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
-    //    ptr.with_lagrange_basis(index.as_ref().0.cs.domain.d1);
-    //}
+    {
+        //let ptr: &mut poly_commitment::srs::SRS<Vesta> =
+        //    unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
+        index
+            .as_ref()
+            .0
+            .srs
+            .write()
+            .unwrap()
+            .with_lagrange_basis(index.as_ref().0.cs.domain.d1);
+    }
     let prev = if prev_challenges.is_empty() {
         Vec::new()
     } else {
