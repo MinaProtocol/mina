@@ -1902,30 +1902,14 @@ module Constants : Constants_intf = struct
         block_window_duration =
           constraint_constants.block_window_duration_ms |> Float.of_int
           |> Time.Span.of_ms
-      ; zkapp_proof_update_cost =
-          Option.value ~default:a.compile_config.zkapp_proof_update_cost
-            Option.(b.daemon >>= fun d -> d.zkapp_proof_update_cost)
-      ; zkapp_signed_single_update_cost =
-          Option.value ~default:a.compile_config.zkapp_signed_single_update_cost
-            Option.(b.daemon >>= fun d -> d.zkapp_signed_single_update_cost)
-      ; zkapp_signed_pair_update_cost =
-          Option.value ~default:a.compile_config.zkapp_signed_pair_update_cost
-            Option.(b.daemon >>= fun d -> d.zkapp_signed_pair_update_cost)
-      ; zkapp_transaction_cost_limit =
-          Option.value ~default:a.compile_config.zkapp_transaction_cost_limit
-            Option.(b.daemon >>= fun d -> d.zkapp_transaction_cost_limit)
-      ; max_event_elements =
-          Option.value ~default:a.compile_config.max_event_elements
-            Option.(b.daemon >>= fun d -> d.max_event_elements)
-      ; max_action_elements =
-          Option.value ~default:a.compile_config.max_action_elements
-            Option.(b.daemon >>= fun d -> d.max_action_elements)
-      ; zkapp_cmd_limit_hardcap =
-          Option.value ~default:a.compile_config.zkapp_cmd_limit_hardcap
-            Option.(b.daemon >>= fun d -> d.zkapp_cmd_limit_hardcap)
-      ; minimum_user_command_fee =
-          Option.value ~default:a.compile_config.minimum_user_command_fee
-            Option.(b.daemon >>= fun d -> d.minimum_user_command_fee)
+      ; zkapp_proof_update_cost = genesis_constants.zkapp_proof_update_cost
+      ; zkapp_signed_single_update_cost = genesis_constants.zkapp_signed_single_update_cost
+      ; zkapp_signed_pair_update_cost = genesis_constants.zkapp_signed_pair_update_cost
+      ; zkapp_transaction_cost_limit = genesis_constants.zkapp_transaction_cost_limit
+      ; max_event_elements = genesis_constants.max_event_elements
+      ; max_action_elements = genesis_constants.max_action_elements
+      ; zkapp_cmd_limit_hardcap = genesis_constants.zkapp_cmd_limit_hardcap
+      ; minimum_user_command_fee = genesis_constants.minimum_user_command_fee
       ; network_id =
           Option.value ~default:a.compile_config.network_id
             Option.(b.daemon >>= fun d -> d.network_id)
