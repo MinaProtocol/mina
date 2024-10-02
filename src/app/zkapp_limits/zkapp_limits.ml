@@ -41,6 +41,7 @@ let () =
          let logger = Logger.create () in
          let%map config =
            Runtime_config.Constants.load_constants ~logger config_file
-         in  Runtime_config.Constants.genesis_constants config
+         in
+         Runtime_config.Constants.genesis_constants config
        in
        main genesis_constants )
