@@ -194,8 +194,7 @@ let rec remove_tree t parent_hash =
       let transition, _ = Envelope.Incoming.data (Cached.peek child) in
       remove_tree t (State_hash.With_state_hashes.state_hash transition) )
 
-let watch t ~timeout_duration ~cached_transition ~valid_cb
-    ~block_window_duration =
+let watch t ~timeout_duration ~cached_transition ~valid_cb =
   let transition_with_hash, _ =
     Envelope.Incoming.data (Cached.peek cached_transition)
   in
@@ -215,7 +214,7 @@ let watch t ~timeout_duration ~cached_transition ~valid_cb
           (* Clean up entry upon callback resolution *)
           upon
             ( Deferred.ignore_m
-            @@ Mina_net2.Validation_callback.await ~block_window_duration data
+            @@ Mina_net2.Validation_callback.await  data
             )
             (fun () -> Hashtbl.remove t.validation_callbacks hash)
       | `Duplicate ->
@@ -373,8 +372,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
-              (Cached.pure @@ downcast_breadcrumb disjoint_breadcrumb)
-            ~block_window_duration ;
+              (Cached.pure @@ downcast_breadcrumb disjoint_breadcrumb);
           Async.Thread_safe.block_on_async_exn (fun () ->
               match%map
                 Block_time.Timeout.await
@@ -434,8 +432,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
-              (Cached.transform ~f:downcast_breadcrumb breadcrumb_2)
-            ~block_window_duration ;
+              (Cached.transform ~f:downcast_breadcrumb breadcrumb_2);
           Async.Thread_safe.block_on_async_exn (fun () ->
               Transition_frontier.add_breadcrumb_exn frontier
                 (Cached.peek breadcrumb_1) ) ;
@@ -514,8 +511,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
-              (Cached.pure @@ downcast_breadcrumb oldest_breadcrumb)
-            ~block_window_duration ;
+              (Cached.pure @@ downcast_breadcrumb oldest_breadcrumb);
           assert (
             has_timeout_parent_hash scheduler
               (Transition_frontier.Breadcrumb.parent_hash oldest_breadcrumb) ) ;
@@ -524,8 +520,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                 ~f:(fun prev_breadcrumb curr_breadcrumb ->
                   watch scheduler ~timeout_duration ~valid_cb:None
                     ~cached_transition:
-                      (Cached.pure @@ downcast_breadcrumb curr_breadcrumb)
-                    ~block_window_duration ;
+                      (Cached.pure @@ downcast_breadcrumb curr_breadcrumb) ;
                   assert (
                     not
                     @@ has_timeout_parent_hash scheduler
