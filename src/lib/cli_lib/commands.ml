@@ -237,7 +237,9 @@ module Vrf = struct
       let open Deferred.Let_syntax in
       let%bind constraint_constants =
         let logger = Logger.create () in
-        let%map conf = Runtime_config.Constants.load_constants ~logger config_file in
+        let%map conf =
+          Runtime_config.Constants.load_constants ~logger config_file
+        in
         Runtime_config.Constants.constraint_constants conf
       in
       if Option.is_some (Sys.getenv env) then
@@ -309,8 +311,10 @@ module Vrf = struct
       let open Deferred.Let_syntax in
       let%bind constraint_constants =
         let logger = Logger.create () in
-        let%map conf = Runtime_config.Constants.load_constants ~logger config_file
-        in Runtime_config.Constants.constraint_constants conf
+        let%map conf =
+          Runtime_config.Constants.load_constants ~logger config_file
+        in
+        Runtime_config.Constants.constraint_constants conf
       in
       let%bind () =
         let password =
@@ -373,7 +377,9 @@ module Vrf = struct
       let open Deferred.Let_syntax in
       let%bind constraint_constants =
         let logger = Logger.create () in
-        let%map conf = Runtime_config.Constants.load_constants ~logger config_file in
+        let%map conf =
+          Runtime_config.Constants.load_constants ~logger config_file
+        in
         Runtime_config.Constants.constraint_constants conf
       in
       (* TODO-someday: constraint constants from config file. *)

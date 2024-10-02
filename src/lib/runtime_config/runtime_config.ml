@@ -1733,10 +1733,14 @@ module type Constants_intf = sig
 
   val genesis_constants : constants -> Genesis_constants.t
 
-  val constraint_constants : constants -> Genesis_constants.Constraint_constants.t
+  val constraint_constants :
+    constants -> Genesis_constants.Constraint_constants.t
+
   val proof_level : constants -> Genesis_constants.Proof_level.t
+
   val compile_config : constants -> Mina_compile_config.t
-  
+
+  val magic_for_unit_tests : t -> constants
 end
 
 module Constants : Constants_intf = struct
@@ -1748,8 +1752,11 @@ module Constants : Constants_intf = struct
     }
 
   let genesis_constants t = t.genesis_constants
+
   let constraint_constants t = t.constraint_constants
+
   let proof_level t = t.proof_level
+
   let compile_config t = t.compile_config
 
   let combine (a : constants) (b : t) : constants =
@@ -1892,8 +1899,9 @@ module Constants : Constants_intf = struct
     in
     let compile_config =
       { a.compile_config with
-        block_window_duration = 
-          constraint_constants.block_window_duration_ms |> Float.of_int |> Time.Span.of_ms
+        block_window_duration =
+          constraint_constants.block_window_duration_ms |> Float.of_int
+          |> Time.Span.of_ms
       ; zkapp_proof_update_cost =
           Option.value ~default:a.compile_config.zkapp_proof_update_cost
             Option.(b.daemon >>= fun d -> d.zkapp_proof_update_cost)
@@ -1938,7 +1946,8 @@ module Constants : Constants_intf = struct
     let constants =
       let compile_constants =
         { genesis_constants = Genesis_constants.Compiled_.genesis_constants
-        ; constraint_constants = Genesis_constants.Compiled_.constraint_constants
+        ; constraint_constants =
+            Genesis_constants.Compiled_.constraint_constants
         ; proof_level = Genesis_constants.Compiled_.proof_level
         ; compile_config = Mina_compile_config.Compiled_.t
         }
@@ -1954,4 +1963,15 @@ module Constants : Constants_intf = struct
       }
     in
     constants
+
+  let magic_for_unit_tests t =
+    let compile_constants =
+      { genesis_constants = Genesis_constants.For_unit_tests.t
+      ; constraint_constants =
+          Genesis_constants.For_unit_tests.Constraint_constants.t
+      ; proof_level = Genesis_constants.For_unit_tests.Proof_level.t
+      ; compile_config = Mina_compile_config.For_unit_tests.t
+      }
+    in
+    combine compile_constants t
 end
