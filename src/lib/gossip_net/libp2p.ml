@@ -257,7 +257,9 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                   ~all_peers_seen_metric:config.all_peers_seen_metric
                   ~on_peer_connected:(fun _ -> record_peer_connection ())
                   ~on_peer_disconnected:ignore ~logger:config.logger ~conf_dir
-                  ~pids ~on_bitswap_update:(fun ~tag:_ _ _ -> ()) () ) )
+                  ~pids
+                  ~on_bitswap_update:(fun ~tag:_ _ _ -> ())
+                  () ) )
       with
       | Ok (Ok net2) -> (
           let open Mina_net2 in
@@ -625,11 +627,14 @@ module Make (Rpc_interface : RPC_INTERFACE) :
               [%log' trace config.logger] ~metadata:[]
                 "Successfully restarted libp2p" )
         and start_libp2p () =
-          let empty_table : Mina_net2.outstanding_request_t Blake2.Table.t = Blake2.Table.of_alist_exn []  in 
+          let empty_table : Mina_net2.outstanding_request_t Blake2.Table.t =
+            Blake2.Table.of_alist_exn []
+          in
           let libp2p =
             create_libp2p ~allow_multiple_instances config rpc_handlers
               first_peer_ivar high_connectivity_ivar ~added_seeds ~pids
-              ~on_unexpected_termination:(fun () -> restart_libp2p empty_table) ~sinks
+              ~on_unexpected_termination:(fun () -> restart_libp2p empty_table)
+              ~sinks
           in
           on_libp2p_create libp2p ; Deferred.ignore_m libp2p
         and restart_libp2p _ = don't_wait_for (start_libp2p ()) in

@@ -157,10 +157,7 @@ module Base
         | BC.External cb'' ->
             Diff.update_metrics env' cb'' ~log_gossip_heard ~logger ;
             don't_wait_for
-              ( match%map
-                  Mina_net2.Validation_callback.await 
-                    cb''
-                with
+              ( match%map Mina_net2.Validation_callback.await cb'' with
               | None ->
                   let diff = Envelope.Incoming.data env' in
                   [%log error]

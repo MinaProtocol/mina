@@ -213,9 +213,7 @@ let watch t ~timeout_duration ~cached_transition ~valid_cb =
       | `Ok ->
           (* Clean up entry upon callback resolution *)
           upon
-            ( Deferred.ignore_m
-            @@ Mina_net2.Validation_callback.await  data
-            )
+            (Deferred.ignore_m @@ Mina_net2.Validation_callback.await data)
             (fun () -> Hashtbl.remove t.validation_callbacks hash)
       | `Duplicate ->
           [%log' warn t.logger] "Double validation callback for $state_hash"
@@ -369,7 +367,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
-              (Cached.pure @@ downcast_breadcrumb disjoint_breadcrumb);
+              (Cached.pure @@ downcast_breadcrumb disjoint_breadcrumb) ;
           Async.Thread_safe.block_on_async_exn (fun () ->
               match%map
                 Block_time.Timeout.await
@@ -429,7 +427,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
-              (Cached.transform ~f:downcast_breadcrumb breadcrumb_2);
+              (Cached.transform ~f:downcast_breadcrumb breadcrumb_2) ;
           Async.Thread_safe.block_on_async_exn (fun () ->
               Transition_frontier.add_breadcrumb_exn frontier
                 (Cached.peek breadcrumb_1) ) ;
@@ -508,7 +506,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
-              (Cached.pure @@ downcast_breadcrumb oldest_breadcrumb);
+              (Cached.pure @@ downcast_breadcrumb oldest_breadcrumb) ;
           assert (
             has_timeout_parent_hash scheduler
               (Transition_frontier.Breadcrumb.parent_hash oldest_breadcrumb) ) ;
