@@ -44,9 +44,8 @@ let timestamp =
 
 let instantiate_verify_functions ~logger config_file =
   let open Deferred.Let_syntax in
-  let%map { constraint_constants; _ } =
-    Genesis_ledger_helper.Config_loader.load_config ~logger config_file
-  in
+  let%map constants = Runtime_config.Constants.load_constants ~logger config_file in
+  let constraint_constants = Runtime_config.Constants.constraint_constants constants in
   Verifier.verify_functions ~constraint_constants ~proof_level:Full ()
 
 module Make_verifier (Source : Submission.Data_source) = struct
