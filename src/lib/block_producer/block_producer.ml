@@ -659,6 +659,39 @@ let validate_genesis_protocol_state_block ~genesis_state_hash (b, v) =
 let log_bootstrap_mode ~logger () =
   [%log info] "Pausing block production while bootstrapping"
 
+let genesis_breadcrumb_creator ~context:(module Context : CONTEXT) prover =
+  let open Context in
+  let started = ref false in
+  let genesis_breadcrumb_ivar = Ivar.create () in
+  fun () ->
+    if !started then Ivar.read genesis_breadcrumb_ivar
+    else (
+      started := true ;
+      let max_num_retries = 3 in
+      let rec go retries =
+        [%log info]
+          "Generating genesis proof ($attempts_remaining / $max_attempts)"
+          ~metadata:
+            [ ("attempts_remaining", `Int retries)
+            ; ("max_attempts", `Int max_num_retries)
+            ] ;
+        match%bind
+          Prover.create_genesis_block prover
+            (Genesis_proof.to_inputs precomputed_values)
+        with
+        | Ok res ->
+            Ivar.fill genesis_breadcrumb_ivar (Ok res) ;
+            return (Ok res)
+        | Error err ->
+            [%log error] "Failed to generate genesis breadcrumb: $error"
+              ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
+            if retries > 0 then go (retries - 1)
+            else (
+              Ivar.fill genesis_breadcrumb_ivar (Error err) ;
+              return (Error err) )
+      in
+      go max_num_retries )
+
 let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~trust_system ~get_completed_work ~transaction_resource_pool
     ~time_controller ~consensus_local_state ~coinbase_receiver ~frontier_reader
@@ -670,36 +703,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
   let consensus_constants = precomputed_values.consensus_constants in
   O1trace.sync_thread "produce_blocks" (fun () ->
       let genesis_breadcrumb =
-        let started = ref false in
-        let genesis_breadcrumb_ivar = Ivar.create () in
-        fun () ->
-          if !started then Ivar.read genesis_breadcrumb_ivar
-          else (
-            started := true ;
-            let max_num_retries = 3 in
-            let rec go retries =
-              [%log info]
-                "Generating genesis proof ($attempts_remaining / $max_attempts)"
-                ~metadata:
-                  [ ("attempts_remaining", `Int retries)
-                  ; ("max_attempts", `Int max_num_retries)
-                  ] ;
-              match%bind
-                Prover.create_genesis_block prover
-                  (Genesis_proof.to_inputs precomputed_values)
-              with
-              | Ok res ->
-                  Ivar.fill genesis_breadcrumb_ivar (Ok res) ;
-                  return (Ok res)
-              | Error err ->
-                  [%log error] "Failed to generate genesis breadcrumb: $error"
-                    ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
-                  if retries > 0 then go (retries - 1)
-                  else (
-                    Ivar.fill genesis_breadcrumb_ivar (Error err) ;
-                    return (Error err) )
-            in
-            go max_num_retries )
+        genesis_breadcrumb_creator ~context:(module Context) prover
       in
       let rejected_blocks_logger =
         Logger.create ~id:Logger.Logger_id.rejected_blocks ()
