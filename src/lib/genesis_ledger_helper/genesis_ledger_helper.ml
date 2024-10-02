@@ -760,63 +760,17 @@ let print_config ~logger (config : Runtime_config.t) =
     ~metadata
 
 let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~proof_level:compiled_proof_level ?overwrite_version
+    ~(constants : Runtime_config.Constants.constants) ?overwrite_version
     (config : Runtime_config.t) =
   print_config ~logger config ;
   let open Deferred.Or_error.Let_syntax in
-  let proof_level =
-    List.find_map_exn ~f:Fn.id
-      [ cli_proof_level
-      ; Option.Let_syntax.(
-          let%bind proof = config.proof in
-          match%map proof.level with
-          | Full ->
-              Genesis_constants.Proof_level.Full
-          | Check ->
-              Check
-          | None ->
-              None)
-      ; Some compiled_proof_level
-      ]
+  let blockchain_proof_system_id = None in
+  let constraint_constants =
+    Runtime_config.Constants.constraint_constants constants
   in
-  let constraint_constants, blockchain_proof_system_id =
-    match config.proof with
-    | None ->
-        [%log info] "Using the compiled constraint constants" ;
-        (constraint_constants, Some (Pickles.Verification_key.Id.dummy ()))
-    | Some config ->
-        [%log info] "Using the constraint constants from the configuration file" ;
-        let blockchain_proof_system_id =
-          (* We pass [None] here, which will force the constraint systems to be
-             set up and their hashes evaluated before we can calculate the
-             genesis proof's filename.
-             This adds no overhead if we are generating a genesis proof, since
-             we will do these evaluations anyway to load the blockchain proving
-             key. Otherwise, this will in a slight slowdown.
-          *)
-          None
-        in
-        ( make_constraint_constants ~default:constraint_constants config
-        , blockchain_proof_system_id )
-  in
-  let%bind () =
-    match (proof_level, compiled_proof_level) with
-    | _, Full | (Check | None), _ ->
-        return ()
-    | Full, ((Check | None) as compiled) ->
-        let str = Genesis_constants.Proof_level.to_string in
-        [%log fatal]
-          "Proof level $proof_level is not compatible with compile-time proof \
-           level $compiled_proof_level"
-          ~metadata:
-            [ ("proof_level", `String (str proof_level))
-            ; ("compiled_proof_level", `String (str compiled))
-            ] ;
-        Deferred.Or_error.errorf
-          "Proof level %s is not compatible with compile-time proof level %s"
-          (str proof_level) (str compiled)
+  let proof_level = Runtime_config.Constants.proof_level constants in
+  let genesis_constants =
+    Runtime_config.Constants.genesis_constants constants
   in
   let%bind genesis_ledger, ledger_config, ledger_file =
     match config.ledger with
@@ -851,14 +805,14 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   (proof_inputs, config)
 
-let init_from_config_file ?genesis_dir ~cli_proof_level ~genesis_constants
-    ~constraint_constants ~logger ~proof_level ?overwrite_version
+let init_from_config_file ?genesis_dir
+    ~(constants : Runtime_config.Constants.constants) ~logger ?overwrite_version
     (config : Runtime_config.t) :
     (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
   let open Deferred.Or_error.Let_syntax in
   let%map inputs, config =
-    inputs_from_config_file ?genesis_dir ~cli_proof_level ~genesis_constants
-      ~constraint_constants ~logger ~proof_level ?overwrite_version config
+    inputs_from_config_file ?genesis_dir ~constants ~logger ?overwrite_version
+      config
   in
   let values = Genesis_proof.create_values_no_proof inputs in
   (values, config)

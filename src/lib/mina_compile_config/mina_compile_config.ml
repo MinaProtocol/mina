@@ -128,7 +128,7 @@ let to_yojson t =
     ]
 
 (*TODO: Delete this module and read in a value from the environment*)
-module Compiled = struct
+module Compiled_ = struct
   let t : t =
     let (inputs : Inputs.t) =
       { curve_size = Node_config.curve_size

@@ -434,7 +434,7 @@ end
 
 module For_unit_tests = Make (Node_config_for_unit_tests)
 
-module Compiled : sig
+module Compiled_ : sig
   val genesis_constants : t
 
   val constraint_constants : Constraint_constants.t
