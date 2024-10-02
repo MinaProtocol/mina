@@ -45,8 +45,8 @@ pub fn caml_pasta_fp_plonk_proof_create(
     prev_challenges: Vec<CamlFp>,
     prev_sgs: Vec<CamlGVesta>,
 ) -> Result<CamlProofWithPublic<CamlGVesta, CamlFp>, ocaml::Error> {
-    use std::time::{Duration, Instant};
-    let time_0 = Instant::now();
+    //use std::time::Instant;
+    //let time_0 = Instant::now();
     //{
     //    let ptr: &mut poly_commitment::srs::SRS<Vesta> =
     //        unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
@@ -745,7 +745,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
         polynomials::{generic::GenericGateSpec, xor},
         wires::Wire,
     };
-    use poly_commitment::srs::{endos, SRS};
+    use poly_commitment::srs::endos;
 
     let num_public_inputs = 2;
 

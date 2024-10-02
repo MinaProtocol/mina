@@ -3,7 +3,6 @@ use crate::{
     field_vector::fq::CamlFqVector,
     pasta_fq_plonk_index::CamlPastaFqPlonkIndexPtr,
     pasta_fq_plonk_verifier_index::CamlPastaFqPlonkVerifierIndex,
-    WithLagrangeBasis,
 };
 use ark_ec::AffineRepr;
 use ark_ff::One;
@@ -40,7 +39,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
     prev_challenges: Vec<CamlFq>,
     prev_sgs: Vec<CamlGPallas>,
 ) -> Result<CamlProofWithPublic<CamlGPallas, CamlFq>, ocaml::Error> {
-    use std::time::{Duration, Instant};
+    use std::time::Instant;
     let time_0 = Instant::now();
     //{
     //    let ptr: &mut poly_commitment::srs::SRS<Pallas> =

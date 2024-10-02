@@ -35,7 +35,7 @@ macro_rules! impl_oracles {
                 index: $index,
                 proof: CamlProofWithPublic<$CamlG, $CamlF>,
             ) -> Result<CamlOracles<$CamlF>, ocaml::Error> {
-                use std::time::{Duration, Instant};
+                use std::time::{Instant};
                 let time_0 = Instant::now();
                 let index: VerifierIndex<$G, OpeningProof<$G>> = index.into();
 

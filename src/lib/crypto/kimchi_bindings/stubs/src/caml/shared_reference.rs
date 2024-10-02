@@ -1,6 +1,7 @@
 //! [impl_shared_reference] implements an OCaml custom type that wraps
 //! around a shared reference to a Rust object.
 
+#[allow(unused_macros)]
 macro_rules! impl_shared_reference {
     ($name: ident => $typ: ty) => {
         #[derive(Debug, ::ocaml_gen::CustomType)]
@@ -116,12 +117,12 @@ pub struct MyStruct(u64);
 pub struct MutArc(pub std::sync::Arc<::std::sync::RwLock<MyStruct>>);
 
 impl MutArc {
-    fn modify_mut_arc(data: MutArc) {
+    pub fn modify_mut_arc(data: MutArc) {
         let mut data = data.0.write().unwrap();
         data.0 += 1;
     }
 
-    fn read_mut_arc(data: MutArc) -> MyStruct {
+    pub fn read_mut_arc(data: MutArc) -> MyStruct {
         let data = data.0.read().unwrap();
         data.clone()
     }

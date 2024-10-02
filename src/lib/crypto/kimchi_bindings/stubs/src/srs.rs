@@ -95,7 +95,7 @@ macro_rules! impl_srs {
                 srs: $name,
                 domain_size: ocaml::Int,
             ) -> Result<Vec<CamlPolyComm<$CamlG>>, ocaml::Error> {
-                use std::time::{Duration, Instant};
+                use std::time::{Instant};
                 let time_0 = Instant::now();
                 println!("entering _lagrange_commitment_whole_domain");
                 let x_domain: ark_poly::Radix2EvaluationDomain<_> = EvaluationDomain::<$F>::new(domain_size as usize).ok_or_else(|| {
@@ -139,7 +139,7 @@ macro_rules! impl_srs {
                 domain_size: ocaml::Int,
                 i: ocaml::Int,
             ) -> Result<CamlPolyComm<$CamlG>, ocaml::Error> {
-                use std::time::{Duration, Instant};
+                use std::time::{Instant};
                 let time_0 = Instant::now();
                 let x_domain: ark_poly::Radix2EvaluationDomain<_> = EvaluationDomain::<$F>::new(domain_size as usize).ok_or_else(|| {
                     ocaml::Error::invalid_argument("CamlSRS::lagrange_commitment")
