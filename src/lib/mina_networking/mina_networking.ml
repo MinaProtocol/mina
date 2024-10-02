@@ -95,6 +95,7 @@ let create (module Context : CONTEXT) (config : Config.t) ~sinks
     O1trace.thread "gossip_net" (fun () ->
         Gossip_net.Any.create config.creatable_gossip_net
           (module Rpc_context)
+          ~on_bitswap_update:(fun ~tag:_ _ _ -> ())
           (Gossip_net.Message.Any_sinks ((module Sinks), sinks)) )
   in
   gossip_net_ref := Some gossip_net ;
@@ -192,12 +193,12 @@ let get_node_status_from_peers (t : t)
                    "Could not parse peers in node status request" ) ) )
 
 (* TODO: Have better pushback behavior *)
-let broadcast_state t state =
+let broadcast_transition t state =
   [%str_log' trace t.logger]
     (Gossip_new_state
        { state_hash = State_hash.With_state_hashes.state_hash state } ) ;
   Mina_metrics.(Gauge.inc_one Network.new_state_broadcasted) ;
-  Gossip_net.Any.broadcast_state t.gossip_net (With_hash.data state)
+  Gossip_net.Any.broadcast_transition t.gossip_net (With_hash.data state)
 
 let broadcast_transaction_pool_diff ?nonce t diff =
   [%str_log' trace t.logger]

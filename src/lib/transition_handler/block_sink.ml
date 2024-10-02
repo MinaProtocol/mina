@@ -6,11 +6,19 @@ open Mina_base
 open Mina_state
 
 type stream_msg =
-  [ `Transition of Mina_block.t Envelope.Incoming.t ]
-  * [ `Time_received of Block_time.t ]
-  * [ `Valid_cb of Mina_net2.Validation_callback.t ]
+[ `Block of
+Mina_block__Block.Stable.V2.t Network_peer.Envelope.Incoming.t
+| `Header of
+Mina_wire_types.Mina_block_header.M.V2.t
+Network_peer.Envelope.Incoming.t ] *
+  [ `Time_received of Block_time.t ]
+  * [ `Valid_cb of string * Mina_net2.Validation_callback.t ]
 
-type block_sink_config =
+  type block_or_header =
+  [ `Block of Mina_block.t Envelope.Incoming.t
+  | `Header of Mina_block.Header.t Envelope.Incoming.t ]
+
+  type block_sink_config =
   { logger : Logger.t
   ; slot_duration_ms : Block_time.Span.t
   ; on_push : unit -> unit Deferred.t
@@ -19,7 +27,6 @@ type block_sink_config =
   ; consensus_constants : Consensus.Constants.t
   ; genesis_constants : Genesis_constants.t
   ; constraint_constants : Genesis_constants.Constraint_constants.t
-  ; block_window_duration : Time.Span.t
   }
 
 type t =
@@ -33,7 +40,6 @@ type t =
       ; consensus_constants : Consensus.Constants.t
       ; genesis_constants : Genesis_constants.t
       ; constraint_constants : Genesis_constants.Constraint_constants.t
-      ; block_window_duration : Time.Span.t
       }
   | Void
 
@@ -41,7 +47,11 @@ type Structured_log_events.t +=
   | Block_received of { state_hash : State_hash.t; sender : Envelope.Sender.t }
   [@@deriving register_event { msg = "Received a block from $sender" }]
 
-let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
+let push sink ((block: [> `Block of Mina_block.t Envelope.Incoming.t | `Header of Mina_block.Header.t Envelope.Incoming.t ]) , `Time_received tm, `Valid_cb (topic, cb)) =
+  let e = match block with
+    | `Block b -> b
+    | `Header _ -> failwith "Header not supported"
+  in
   match sink with
   | Void ->
       Deferred.unit
@@ -141,7 +151,7 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
             Mina_net2.Validation_callback.fire_if_not_already_fired cb `Reject ;
             Deferred.unit
         | `Within_capacity ->
-            Writer.write writer (`Transition e, `Time_received tm, `Valid_cb cb)
+            Writer.write writer (`Block e, `Time_received tm, `Valid_cb (topic, cb))
       in
       let transactions = Mina_block.transactions state ~constraint_constants in
       let exists_well_formedness_errors =
@@ -210,7 +220,7 @@ let create
     ; consensus_constants
     ; genesis_constants
     ; constraint_constants
-    ; block_window_duration
+    ; _
     } =
   let rate_limiter =
     Network_pool.Rate_limiter.create
@@ -232,7 +242,6 @@ let create
       ; consensus_constants
       ; genesis_constants
       ; constraint_constants
-      ; block_window_duration
       } )
 
 let void = Void

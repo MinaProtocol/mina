@@ -1030,8 +1030,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                           "Generated transition $state_hash was accepted into \
                            transition frontier" ;
                         Deferred.map ~f:Result.return
-                          (Mina_networking.broadcast_state net
-                             (Breadcrumb.block_with_hash breadcrumb) )
+                          (Mina_networking.broadcast_transition net
+                             (`Block (Breadcrumb.block_with_hash breadcrumb)) )
                     | `Timed_out ->
                         (* FIXME #3167: this should be fatal, and more
                            importantly, shouldn't happen.
