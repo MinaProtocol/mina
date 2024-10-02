@@ -134,25 +134,17 @@ dirty_when.add_argument("--repo", required=True,
                     help="root folder for mina repo")
 
 subparsers.add_parser('deps')
+
+
 run = subparsers.add_parser('print-cmd')
 run.add_argument("--job", required=True, help="job to run")
 run.add_argument("--step", required=False, help="job to run")
 
 
 args = parser.parse_args()
-tmp = tempfile.mkdtemp()
 
-print(f"Artifacts are stored in {tmp}")
-
-for file in [y for x in os.walk(args.root) for y in glob(os.path.join(x[0], '*.dhall'))]:
-    name = Path(file).stem
-    with open(f"{tmp}/{name}.yml", "w") as outfile:
-        subprocess.run(["dhall-to-yaml", "--quoted", "--file",
-                       file], stdout=outfile, check=True)
-
-
-pipelinesInfo = [PipelineInfoBuilder(tmp, file).build()
-                 for file in os.listdir(path=tmp)]
+pipelinesInfo = [PipelineInfoBuilder(args.root, file).build()
+                 for file in os.listdir(path=args.root)]
 
 if args.cmd == "deps":
 
@@ -175,7 +167,8 @@ if args.cmd == "deps":
             print(
                 f"\t{CmdColors.FAIL}[FATAL] Unresolved dependency for step '{step.key}' in '{file}' depends on non existing job '{dep}'{CmdColors.ENDC}")
         exit(1)
-
+    else:
+        print('Pipelines definitions correct')
 
 if args.cmd == "print-cmd":
     pipeline = next(filter(lambda x: args.job in x.file, pipelinesInfo))
@@ -209,3 +202,5 @@ if args.cmd == "dirty-when":
             print(
                 f"\t{CmdColors.FAIL}[FATAL] Unresolved dirtyWhen path  in '{file}' ('{str(dirty)}'){CmdColors.ENDC}")
         exit(1)
+    else:
+        print('Pipelines definitions correct')
