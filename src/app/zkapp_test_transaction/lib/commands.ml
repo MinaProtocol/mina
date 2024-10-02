@@ -338,7 +338,7 @@ let test_zkapp_with_genesis_ledger_main ~logger keyfile zkapp_keyfile
     Runtime_config.Constants.load_constants ~logger config_file
   in
   let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
-  let%map config, _ =
+  let%bind config, _ =
     Deferred.Or_error.(
       Runtime_config.Json_loader.load_config_files ~conf_dir ~logger
         config_file
