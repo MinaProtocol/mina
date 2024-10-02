@@ -8,10 +8,10 @@ let main ~config_file ~archive_uri ~precomputed ~extensional ~success_file
     ~failure_file ~log_successes ~files () =
   let%bind config =
     let logger = Logger.create () in
-    Runtime_config.Constants_loader.load_constants ~logger config_file
+    Runtime_config.Constants.load_constants ~logger config_file
   in
-  let genesis_constants = config.genesis_constants in
-  let constraint_constants = config.constraint_constants in
+  let genesis_constants = Runtime_config.Constants.genesis_constants config in
+  let constraint_constants = Runtime_config.Constants.constraint_constants config in
   let output_file_line path =
     match path with
     | Some path ->

@@ -6,9 +6,11 @@ let () =
       let open Async.Deferred.Let_syntax in
       let%bind constraint_constants =
         let logger = Logger.null () in
-        let%map conf = Runtime_config.Constants.load_constants ~logger
-          (Option.to_list config_file)
-        in Runtime_config.Constants.constraint_constants conf
+        let%map conf =
+          Runtime_config.Constants.load_constants ~logger
+            (Option.to_list config_file)
+        in
+        Runtime_config.Constants.constraint_constants conf
       in
       let () = Format.eprintf "Generating transaction snark circuit..@." in
       let module Transaction_snark_instance = Transaction_snark.Make (struct
