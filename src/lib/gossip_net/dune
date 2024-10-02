@@ -41,6 +41,7 @@
    block_time
    genesis_constants
    bounded_types
+   blake2
 )
  (preprocess
   (pps ppx_mina ppx_version ppx_inline_test ppx_compare ppx_deriving.make ppx_deriving_yojson
