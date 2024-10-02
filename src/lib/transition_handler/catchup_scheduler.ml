@@ -332,9 +332,6 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let create = create ~logger ~trust_system ~time_controller
 
-    let block_window_duration =
-      Mina_compile_config.For_unit_tests.t.block_window_duration
-
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants

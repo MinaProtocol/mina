@@ -207,8 +207,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
               in
               Catchup_scheduler.watch catchup_scheduler ~timeout_duration
                 ~cached_transition:cached_initially_validated_transition
-                ~valid_cb
-                ~block_window_duration:compile_config.block_window_duration ;
+                ~valid_cb;
               return (Error ()) )
     in
     (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)

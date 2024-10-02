@@ -55,7 +55,7 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       ; consensus_constants
       ; genesis_constants
       ; constraint_constants
-      ; block_window_duration
+      ; _
       } ->
       O1trace.sync_thread "handle_block_gossip"
       @@ fun () ->
@@ -89,7 +89,7 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       in
       don't_wait_for
         ( match%map
-            Mina_net2.Validation_callback.await ~block_window_duration cb
+            Mina_net2.Validation_callback.await cb
           with
         | Some `Accept ->
             let processing_time_span =
