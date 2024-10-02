@@ -24,6 +24,7 @@ module type S = sig
     -> rpc_mocks:rpc_mocks
     -> local_ip:Peer.t
     -> Rpc_interface.ctx
+    -> on_bitswap_update:Mina_net2.on_bitswap_update_t
     -> Message.sinks
     -> t Deferred.t
 end
@@ -174,7 +175,8 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       in
       Network.{ hook }
 
-    let create ~network ~rpc_mocks ~(local_ip : Peer.t) ctx sinks =
+    let create ~network ~rpc_mocks ~(local_ip : Peer.t) ctx ~on_bitswap_update:_
+        sinks =
       let initial_peers = Network.get_initial_peers network local_ip.host in
       let peer_table = Hashtbl.create (module Peer.Id) in
       List.iter initial_peers ~f:(fun peer ->

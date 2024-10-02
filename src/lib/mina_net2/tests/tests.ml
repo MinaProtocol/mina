@@ -18,25 +18,28 @@ let%test_module "Mina network tests" =
       let%bind a_tmp = Unix.mkdtemp "p2p_helper_test_a" in
       let%bind b_tmp = Unix.mkdtemp "p2p_helper_test_b" in
       let%bind c_tmp = Unix.mkdtemp "p2p_helper_test_c" in
+      let on_bitswap_update ~tag:_ _ _ =
+        failwith "no bitswap update handler in tests"
+      in
       let%bind a =
         create ~all_peers_seen_metric:false
           ~logger:(Logger.extend logger [ ("name", `String "a") ])
           ~conf_dir:a_tmp ~pids ~on_peer_connected:Fn.ignore
-          ~on_peer_disconnected:Fn.ignore ~block_window_duration ()
+          ~on_peer_disconnected:Fn.ignore ~block_window_duration ~on_bitswap_update ()
         >>| Or_error.ok_exn
       in
       let%bind b =
         create ~all_peers_seen_metric:false
           ~logger:(Logger.extend logger [ ("name", `String "b") ])
           ~conf_dir:b_tmp ~pids ~on_peer_connected:Fn.ignore
-          ~on_peer_disconnected:Fn.ignore ~block_window_duration ()
+          ~on_peer_disconnected:Fn.ignore ~block_window_duration ~on_bitswap_update ()
         >>| Or_error.ok_exn
       in
       let%bind c =
         create ~all_peers_seen_metric:false
           ~logger:(Logger.extend logger [ ("name", `String "c") ])
           ~conf_dir:c_tmp ~pids ~on_peer_connected:Fn.ignore
-          ~on_peer_disconnected:Fn.ignore ~block_window_duration ()
+          ~on_peer_disconnected:Fn.ignore ~block_window_duration ~on_bitswap_update ()
         >>| Or_error.ok_exn
       in
       let%bind kp_a = generate_random_keypair a in
@@ -93,9 +96,9 @@ let%test_module "Mina network tests" =
       (* Give the helpers time to announce and discover each other on localhost *)
       let%map () = after (Time.Span.of_sec 2.5) in
       let shutdown () =
-        let%bind () = shutdown a in
-        let%bind () = shutdown b in
-        let%bind () = shutdown c in
+        let%bind _ = shutdown a in
+        let%bind _ = shutdown b in
+        let%bind _ = shutdown c in
         let%bind () = File_system.remove_dir a_tmp in
         let%bind () = File_system.remove_dir b_tmp in
         File_system.remove_dir c_tmp

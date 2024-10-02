@@ -13,7 +13,11 @@ module type S = sig
 
   include IMPLEMENTATION with type t := t
 
-  type 't creator = Rpc_interface.ctx -> Message.sinks -> 't Deferred.t
+  type 't creator =
+       Rpc_interface.ctx
+    -> on_bitswap_update:Mina_net2.on_bitswap_update_t
+    -> Message.sinks
+    -> 't Deferred.t
 
   type creatable = Creatable : 't implementation * 't creator -> creatable
 
@@ -29,12 +33,16 @@ module Make (Rpc_interface : RPC_INTERFACE) :
 
   type t = Any : 't implementation * 't -> t
 
-  type 't creator = Rpc_interface.ctx -> Message.sinks -> 't Deferred.t
+  type 't creator =
+       Rpc_interface.ctx
+    -> on_bitswap_update:Mina_net2.on_bitswap_update_t
+    -> Message.sinks
+    -> 't Deferred.t
 
   type creatable = Creatable : 't implementation * 't creator -> creatable
 
-  let create (Creatable ((module M), creator)) ctx sinks =
-    let%map gossip_net = creator ctx sinks in
+  let create (Creatable ((module M), creator)) ctx ~on_bitswap_update sinks =
+    let%map gossip_net = creator ctx ~on_bitswap_update sinks in
     Any ((module M), gossip_net)
 
   let peers (Any ((module M), t)) = M.peers t
