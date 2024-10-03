@@ -470,7 +470,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                   Sinks.Block_sink.push sink_block
                     ( `Header env
                     , `Time_received (Block_time.now config.time_controller)
-                    , `Valid_cb (v1_topic_block, vc) ) )
+                    , `Valid_cb (vc) ) )
                 header_bin_prot v1_topic_block
             in
             let map_v0_msg msg =
@@ -490,7 +490,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                       Sinks.Block_sink.push sink_block
                         ( `Block (Envelope.Incoming.map ~f:(const state) env)
                         , `Time_received (Block_time.now config.time_controller)
-                        , `Valid_cb (v0_topic, vc) )
+                        , `Valid_cb ( vc) )
                   | Message.Latest.T.Transaction_pool_diff
                       Network_pool.With_nonce.{ message = diff; _ } ->
                       Sinks.Tx_sink.push sink_tx

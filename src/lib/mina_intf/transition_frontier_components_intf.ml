@@ -342,7 +342,9 @@ module type Transition_router_intf = sig
     -> frontier_broadcast_writer:
          transition_frontier option Pipe_lib.Broadcast_pipe.Writer.t
     -> network_transition_reader:
-         ( [ `Transition of Mina_block.t Envelope.Incoming.t ]
+         ( [ `Block of Mina_block.Stable.V2.t Network_peer.Envelope.Incoming.t
+         | `Header of Mina_block.Header.t Network_peer.Envelope.Incoming.t
+         | `Transition of Mina_block.Stable.V2.t Network_peer.Envelope.Incoming.t ] 
          * [ `Time_received of Block_time.t ]
          * [ `Valid_cb of Mina_net2.Validation_callback.t ] )
          Strict_pipe.Reader.t
