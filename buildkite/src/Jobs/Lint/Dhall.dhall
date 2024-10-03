@@ -81,7 +81,7 @@ in  Pipeline.build
                   [ dump_pipelines_cmd ]
                 # RunInToolchain.runInToolchainBullseye
                     ([] : List Text)
-                    "python3 scripts/dhall/checker.py --root _pipelines dirty-when  --repo ."
+                    "python3 ./buildkite/scripts/dhall/checker.py --root _pipelines dirty-when  --repo ."
             , label = "Dhall: dirtyWhen"
             , key = "check-dhall-dirty"
             , target = Size.Multi
