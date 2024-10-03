@@ -16,7 +16,6 @@ lint:
 format:
 	find ./src/ -name "*.dhall" -print0 | xargs -I{} -0 -n1 bash -c 'echo "{}" && dhall --ascii format --inplace {} || exit 255'
 
-
 check_deps:
 	 $(eval TMP := $(shell mktemp -d))
 	scripts/dhall/dump_dhall_to_pipelines.sh src/Jobs "$(TMP)"
