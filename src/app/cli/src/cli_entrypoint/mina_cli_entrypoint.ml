@@ -1839,7 +1839,7 @@ let internal_commands ~itn_features logger =
   ; ( "test-genesis-block-generation"
     , Command.async ~summary:"Generate a genesis proof"
         (let open Command.Let_syntax in
-        let%map_open config_file = Cli_lib.Flag.conf_dir
+        let%map_open config_file = Cli_lib.Flag.conf_file
         and conf_dir = Cli_lib.Flag.conf_dir
         and genesis_dir =
           flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
@@ -1854,7 +1854,6 @@ let internal_commands ~itn_features logger =
           let logger = Logger.create () in
           let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
           let cli_proof_level = Genesis_constants.Proof_level.Full in
-          let config_file = Option.to_list config_file in
           let%bind constants =
             Runtime_config.Constants.load_constants ~cli_proof_level ~logger
               config_file

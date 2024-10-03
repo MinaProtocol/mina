@@ -176,15 +176,15 @@ let command =
   fun () ->
     let logger = Logger.create () in
     Cli.logger_setup log_json log_level ;
-    let%bind (genesis_constants, constraint_constants) =
-      let%map conf = Runtime_config.Constants.load_constants ~logger config_file in
-      Runtime_config.Constants.(genesis_constants conf, constraint_constants conf)
+    let%bind genesis_constants, constraint_constants =
+      let%map conf =
+        Runtime_config.Constants.load_constants ~logger config_file
+      in
+      Runtime_config.Constants.
+        (genesis_constants conf, constraint_constants conf)
     in
-    let account_creation_fee = constraint_constants.account_creation_fee
-    in
-    let minimum_user_command_fee =
-      genesis_constants.minimum_user_command_fee
-    in
+    let account_creation_fee = constraint_constants.account_creation_fee in
+    let minimum_user_command_fee = genesis_constants.minimum_user_command_fee in
     let pool =
       lazy
         (let open Deferred.Result.Let_syntax in

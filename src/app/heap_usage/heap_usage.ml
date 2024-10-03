@@ -54,6 +54,10 @@ let () =
          let logger = Logger.create () in
          Runtime_config.Constants.load_constants ~logger config_file
        in
-       let genesis_constants = Runtime_config.Constants.genesis_constants config in
-       let constraint_constants = Runtime_config.Constants.constraint_constants config in
+       let genesis_constants =
+         Runtime_config.Constants.genesis_constants config
+       in
+       let constraint_constants =
+         Runtime_config.Constants.constraint_constants config
+       in
        main ~genesis_constants ~constraint_constants () )

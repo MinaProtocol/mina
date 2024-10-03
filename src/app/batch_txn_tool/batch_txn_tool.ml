@@ -161,7 +161,9 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   let logger = Logger.create () in
   let%bind minimum_user_command_fee =
     let%map genesis_constants =
-      let%map conf = Runtime_config.Constants.load_constants ~logger config_file in
+      let%map conf =
+        Runtime_config.Constants.load_constants ~logger config_file
+      in
       Runtime_config.Constants.genesis_constants conf
     in
     Option.value ~default:genesis_constants.minimum_user_command_fee

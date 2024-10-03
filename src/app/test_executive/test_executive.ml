@@ -283,8 +283,12 @@ let main inputs =
       }
     in
     { genesis_constants =
-        { (Runtime_config.Constants.genesis_constants config) with protocol; txpool_max_size = 3000 }
-    ; constraint_constants = Runtime_config.Constants.constraint_constants config
+        { (Runtime_config.Constants.genesis_constants config) with
+          protocol
+        ; txpool_max_size = 3000
+        }
+    ; constraint_constants =
+        Runtime_config.Constants.constraint_constants config
     ; compile_config = Runtime_config.Constants.compile_config config
     }
   in

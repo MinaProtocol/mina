@@ -11,7 +11,9 @@ let main ~config_file ~archive_uri ~precomputed ~extensional ~success_file
     Runtime_config.Constants.load_constants ~logger config_file
   in
   let genesis_constants = Runtime_config.Constants.genesis_constants config in
-  let constraint_constants = Runtime_config.Constants.constraint_constants config in
+  let constraint_constants =
+    Runtime_config.Constants.constraint_constants config
+  in
   let output_file_line path =
     match path with
     | Some path ->

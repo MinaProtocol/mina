@@ -49,18 +49,22 @@ let command_run =
          match runtime_config_file with
          | None ->
              return None
-         | Some file -> Deferred.Or_error.(
-             Runtime_config.Json_loader.load_config_files ~logger [file] >>=
-             Genesis_ledger_helper.init_from_config_file ~logger ~constants
-             >>| fun (a,_) -> Option.some a
-          ) |> Deferred.Or_error.ok_exn
+         | Some file ->
+             Deferred.Or_error.(
+               Runtime_config.Json_loader.load_config_files ~logger [ file ]
+               >>= Genesis_ledger_helper.init_from_config_file ~logger
+                     ~constants
+               >>| fun (a, _) -> Option.some a)
+             |> Deferred.Or_error.ok_exn
        in
        Stdout_log.setup log_json log_level ;
        [%log info] "Starting archive process; built with commit $commit"
          ~metadata:[ ("commit", `String Mina_version.commit_id) ] ;
        Archive_lib.Processor.setup_server ~metrics_server_port ~logger
-         ~genesis_constants:(Runtime_config.Constants.genesis_constants constants)
-         ~constraint_constants:(Runtime_config.Constants.constraint_constants constants)
+         ~genesis_constants:
+           (Runtime_config.Constants.genesis_constants constants)
+         ~constraint_constants:
+           (Runtime_config.Constants.constraint_constants constants)
          ~postgres_address:postgres.value
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)

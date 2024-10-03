@@ -530,12 +530,13 @@ let send_payment_graphql =
          let open Deferred.Let_syntax in
          let%bind compile_config =
            let logger = Logger.create () in
-           let%map conf = Runtime_config.Constants.load_constants ~logger config_file in
+           let%map conf =
+             Runtime_config.Constants.load_constants ~logger config_file
+           in
            Runtime_config.Constants.compile_config conf
          in
          let fee =
-           Option.value ~default:compile_config.default_transaction_fee
-             fee
+           Option.value ~default:compile_config.default_transaction_fee fee
          in
          let%map response =
            let input =
@@ -571,12 +572,13 @@ let delegate_stake_graphql =
          let open Deferred.Let_syntax in
          let%bind compile_config =
            let logger = Logger.create () in
-           let%map conf = Runtime_config.Constants.load_constants ~logger config_file in
-            Runtime_config.Constants.compile_config conf
+           let%map conf =
+             Runtime_config.Constants.load_constants ~logger config_file
+           in
+           Runtime_config.Constants.compile_config conf
          in
          let fee =
-           Option.value ~default:compile_config.default_transaction_fee
-             fee
+           Option.value ~default:compile_config.default_transaction_fee fee
          in
          let%map response =
            Graphql_client.query_exn
@@ -839,7 +841,9 @@ let hash_ledger =
        let open Deferred.Let_syntax in
        let%bind constraint_constants =
          let logger = Logger.create () in
-         let%map conf = Runtime_config.Constants.load_constants ~logger config_file in
+         let%map conf =
+           Runtime_config.Constants.load_constants ~logger config_file
+         in
          Runtime_config.Constants.constraint_constants conf
        in
        let process_accounts accounts =
@@ -954,9 +958,11 @@ let constraint_system_digests =
     (let%map_open config_file = Cli_lib.Flag.conf_file in
      fun () ->
        let open Deferred.Let_syntax in
-       let%bind (constraint_constants, proof_level) =
+       let%bind constraint_constants, proof_level =
          let logger = Logger.create () in
-         let%map conf = Runtime_config.Constants.load_constants ~logger config_file in
+         let%map conf =
+           Runtime_config.Constants.load_constants ~logger config_file
+         in
          Runtime_config.Constants.(constraint_constants conf, proof_level conf)
        in
        let all =
@@ -1644,8 +1650,10 @@ let generate_libp2p_keypair_do privkey_path ~config_file =
     (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
     let logger = Logger.null () in
     let%bind compile_config =
-      let%map conf = Runtime_config.Constants.load_constants ~logger config_file
-      in Runtime_config.Constants.compile_config conf 
+      let%map conf =
+        Runtime_config.Constants.load_constants ~logger config_file
+      in
+      Runtime_config.Constants.compile_config conf
     in
     (* Using the helper only for keypair generation requires no state. *)
     File_system.with_temp_dir "mina-generate-libp2p-keypair" ~f:(fun tmpd ->
@@ -1682,10 +1690,12 @@ let dump_libp2p_keypair_do privkey_path ~config_file =
     (let open Deferred.Let_syntax in
     let logger = Logger.null () in
     let%bind compile_config =
-      let%map conf = Runtime_config.Constants.load_constants ~logger config_file in
+      let%map conf =
+        Runtime_config.Constants.load_constants ~logger config_file
+      in
       Runtime_config.Constants.compile_config conf
-
     in
+
     (* Using the helper only for keypair generation requires no state. *)
     File_system.with_temp_dir "mina-dump-libp2p-keypair" ~f:(fun tmpd ->
         match%bind
@@ -2340,10 +2350,13 @@ let test_ledger_application =
      Cli_lib.Exceptions.handle_nicely
      @@ fun () ->
      let open Deferred.Let_syntax in
-     let%bind (genesis_constants, constraint_constants) =
+     let%bind genesis_constants, constraint_constants =
        let logger = Logger.create () in
-       let%map conf = Runtime_config.Constants.load_constants ~logger config_file in
-       Runtime_config.Constants.(genesis_constants conf, constraint_constants conf)
+       let%map conf =
+         Runtime_config.Constants.load_constants ~logger config_file
+       in
+       Runtime_config.Constants.
+         (genesis_constants conf, constraint_constants conf)
      in
      let first_partition_slots =
        Option.value ~default:128 first_partition_slots
@@ -2385,10 +2398,13 @@ let itn_create_accounts =
            (privkey_path, key_prefix, num_accounts, fee, amount, config_file)
          ->
         let open Deferred.Let_syntax in
-        let%bind (genesis_constants, constraint_constants) =
+        let%bind genesis_constants, constraint_constants =
           let logger = Logger.create () in
-          let%map conf = Runtime_config.Constants.load_constants ~logger config_file in
-          Runtime_config.Constants.(genesis_constants conf, constraint_constants conf)
+          let%map conf =
+            Runtime_config.Constants.load_constants ~logger config_file
+          in
+          Runtime_config.Constants.
+            (genesis_constants conf, constraint_constants conf)
         in
         let args' = (privkey_path, key_prefix, num_accounts, fee, amount) in
         let genesis_constants = genesis_constants in
