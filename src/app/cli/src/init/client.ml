@@ -869,11 +869,7 @@ let hash_ledger =
              process_accounts accounts )
        else
          let json = Yojson.Safe.from_file ledger_file in
-         match
-           Result.(
-             Runtime_config.Json_layout.Accounts.of_yojson json
-             >>= Runtime_config.Accounts.of_json_layout)
-         with
+         match Runtime_config.Accounts.of_yojson json with
          | Ok runtime_accounts ->
              let accounts =
                lazy (Genesis_ledger_helper.Accounts.to_full runtime_accounts)
@@ -936,11 +932,7 @@ let currency_in_ledger =
              process_accounts accounts )
        else
          let json = Yojson.Safe.from_file ledger_file in
-         match
-           Result.(
-             Runtime_config.Json_layout.Accounts.of_yojson json
-             >>= Runtime_config.Accounts.of_json_layout)
-         with
+         match Runtime_config.Accounts.of_yojson json with
          | Ok runtime_accounts ->
              let accounts =
                Genesis_ledger_helper.Accounts.to_full runtime_accounts

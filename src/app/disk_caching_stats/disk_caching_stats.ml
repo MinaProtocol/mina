@@ -848,14 +848,12 @@ let () =
     (let%map_open config_file = Cli_lib.Flag.conf_file in
      fun () ->
        let open Async.Deferred.Let_syntax in
-       let%map config =
+       let%map genesis_constants, constraint_constants =
          let logger = Logger.create () in
-         Runtime_config.Constants.load_constants ~logger config_file
-       in
-       let genesis_constants =
-         Runtime_config.Constants.genesis_constants config
-       in
-       let constraint_constants =
-         Runtime_config.Constants.constraint_constants config
+         let%map config =
+           Runtime_config.Constants.load_constants ~logger config_file
+         in
+         Runtime_config.Constants.
+           (genesis_constants config, constraint_constants config)
        in
        main { genesis_constants; constraint_constants } () )

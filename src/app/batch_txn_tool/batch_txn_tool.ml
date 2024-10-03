@@ -160,14 +160,13 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   let open Logger in
   let logger = Logger.create () in
   let%bind minimum_user_command_fee =
-    let%map genesis_constants =
-      let%map conf =
-        Runtime_config.Constants.load_constants ~logger config_file
-      in
-      Runtime_config.Constants.genesis_constants conf
+    let%map conf =
+      Runtime_config.Constants.load_constants ~logger config_file
     in
-    Option.value ~default:genesis_constants.minimum_user_command_fee
-      minimum_user_command_fee_opt
+    Option.value
+      ~default:
+        (Runtime_config.Constants.genesis_constants conf)
+          .minimum_user_command_fee minimum_user_command_fee_opt
   in
   let limit_level =
     let slot_limit =

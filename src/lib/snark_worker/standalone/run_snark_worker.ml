@@ -27,8 +27,7 @@ let command =
            Runtime_config.Constants.load_constants ~cli_proof_level ~logger
              config_file
          in
-         ( Runtime_config.Constants.constraint_constants conf
-         , Runtime_config.Constants.proof_level conf )
+         Runtime_config.Constants.(constraint_constants conf, proof_level conf)
        in
        let%bind worker_state =
          Prod.Worker_state.create ~constraint_constants ~proof_level ()

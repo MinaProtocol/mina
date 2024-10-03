@@ -1825,32 +1825,19 @@ module Constants : Constants_intf = struct
       }
     in
     let constraint_constants =
-      let fork : Genesis_constants.Fork_constants.t option =
-        let%map.Option a = a.constraint_constants.fork in
-        { Genesis_constants.Fork_constants.state_hash =
-            Option.value ~default:a.state_hash
-              Option.(
-                b.proof
-                >>= fun x ->
-                x.fork
-                >>| fun x -> Pickles.Backend.Tick.Field.of_string x.state_hash)
-        ; blockchain_length =
-            Option.value ~default:a.blockchain_length
-              Option.(
-                b.proof
-                >>= fun x ->
-                x.fork
-                >>| fun x -> Mina_numbers.Length.of_int x.blockchain_length)
-        ; global_slot_since_genesis =
-            Option.value ~default:a.global_slot_since_genesis
-              Option.(
-                b.proof
-                >>= fun x ->
-                x.fork
-                >>| fun x ->
-                Mina_numbers.Global_slot_since_genesis.of_int
-                  x.global_slot_since_genesis)
-        }
+      let fork =
+        let a = a.constraint_constants.fork in
+        let b =
+          let%map.Option f = Option.(b.proof >>= fun x -> x.fork) in
+          { Genesis_constants.Fork_constants.state_hash =
+              Pickles.Backend.Tick.Field.of_string f.state_hash
+          ; blockchain_length = Mina_numbers.Length.of_int f.blockchain_length
+          ; global_slot_since_genesis =
+              Mina_numbers.Global_slot_since_genesis.of_int
+                f.global_slot_since_genesis
+          }
+        in
+        Option.first_some b a
       in
       { a.constraint_constants with
         sub_windows_per_window =

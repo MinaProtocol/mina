@@ -1600,8 +1600,8 @@ let internal_commands ~itn_features logger =
         (let open Command.Let_syntax in
         let%map_open config_file = Cli_lib.Flag.conf_file in
         fun () ->
-          let open Deferred.Let_syntax in
           let logger = Logger.create () in
+          let open Deferred.Let_syntax in
           let%bind constraint_constants, proof_level =
             let%map conf =
               Runtime_config.Constants.load_constants ~logger config_file
@@ -1609,7 +1609,6 @@ let internal_commands ~itn_features logger =
             Runtime_config.Constants.
               (constraint_constants conf, proof_level conf)
           in
-          let logger = Logger.create () in
           Parallel.init_master () ;
           match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
           | `Ok sexp ->
@@ -1854,16 +1853,9 @@ let internal_commands ~itn_features logger =
           let logger = Logger.create () in
           let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
           let cli_proof_level = Genesis_constants.Proof_level.Full in
-          let%bind constants =
-            Runtime_config.Constants.load_constants ~cli_proof_level ~logger
-              config_file
-          in
           let%bind precomputed_values, _ =
-            Deferred.Or_error.(
-              Runtime_config.Json_loader.load_config_files ~conf_dir ~logger
-                config_file
-              >>= Genesis_ledger_helper.init_from_config_file ?genesis_dir
-                    ~logger ~constants)
+            load_config_files ~logger ~conf_dir ~genesis_dir ~cli_proof_level
+              ~itn_features config_file
             |> Deferred.Or_error.ok_exn
           in
           let pids = Child_processes.Termination.create_pid_table () in

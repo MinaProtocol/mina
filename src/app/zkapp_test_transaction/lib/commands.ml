@@ -47,8 +47,8 @@ let get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
 let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) ~config
     ~proof_level =
   let genesis_constants, constraint_constants =
-    ( Runtime_config.Constants.genesis_constants config
-    , Runtime_config.Constants.constraint_constants config )
+    Runtime_config.Constants.
+      (genesis_constants config, constraint_constants config)
   in
   let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
   let _v =

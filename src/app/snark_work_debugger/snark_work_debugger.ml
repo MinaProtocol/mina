@@ -45,8 +45,8 @@ let cmd =
           let%map constants =
             Runtime_config.Constants.load_constants ~logger config_file
           in
-          ( Runtime_config.Constants.constraint_constants constants
-          , Runtime_config.Constants.proof_level constants )
+          Runtime_config.Constants.
+            (constraint_constants constants, proof_level constants)
         in
         Obj.magic (main path ~constraint_constants ~proof_level))
 

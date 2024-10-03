@@ -208,8 +208,11 @@ module User_command_info = struct
                 let open Mina_base.Signed_command_memo in
                 base58_check |> of_base58_check_exn |> to_string_hum
               in
-              if String.is_empty memo then None
-              else Some (`Assoc [ ("memo", `String memo) ])
+              let nonce = ("nonce", `Int (Unsigned.UInt32.to_int info.nonce)) in
+              Some
+                (`Assoc
+                  ( if String.is_empty memo then [ nonce ]
+                  else [ nonce; ("memo", `String memo) ] ) )
             with _ -> None )
     ; related_transactions = []
     }
