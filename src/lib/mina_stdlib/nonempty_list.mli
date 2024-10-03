@@ -1,13 +1,11 @@
 (** A non-empty list that is safe by construction. *)
 
+[%%versioned:
 module Stable : sig
   module V1 : sig
-    type 'a t
-    [@@deriving sexp, compare, equal, hash, bin_io, version, to_yojson]
+    type 'a t [@@deriving sexp, compare, equal, hash, to_yojson]
   end
-
-  module Latest = V1
-end
+end]
 
 (* no bin_io on purpose *)
 type 'a t = 'a Stable.Latest.t

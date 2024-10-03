@@ -99,6 +99,8 @@ module type Full = sig
     module Stable : sig
       module V2 : sig
         type t [@@deriving equal, compare, sexp, bin_io, yojson, version]
+
+        val path_to_type : string
       end
     end
     with type V2.t = t
@@ -113,6 +115,8 @@ module type Full = sig
       [@@deriving equal, compare, sexp, compare, yojson, bin_io, version]
 
       val to_latest : t -> t
+
+      val path_to_type : string
     end
 
     module Latest = V2
