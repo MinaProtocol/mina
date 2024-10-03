@@ -733,8 +733,7 @@ let profile_zkapps ~verifier ledger zkapp_commands =
               (* workaround for SNARK failures *)
               printf !"Error: %s\n%!" (Exn.to_string exn) ;
               printf "zkApp failed, exiting ...\n" ;
-              exit 1
-              ()
+              exit 1 ()
         in
         let tm_zkapp1 = Core.Unix.gettimeofday () in
         let zkapp_span = Time.Span.of_sec (tm_zkapp1 -. tm_zkapp0) in
