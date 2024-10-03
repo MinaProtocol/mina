@@ -542,17 +542,16 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
   let verified_transition_reader, verified_transition_writer =
     let name = "verified transitions" in
     create_buffered_pipe ~name
-      ~f:(fun ( message
-              , _
-              , `Valid_cb valid_cb ) ->
-
-        let head = 
+      ~f:(fun (message, _, `Valid_cb valid_cb) ->
+        let head =
           match message with
-          | `Block b -> b
-          | `Transition t -> t
-          | `Header _ -> 
-            (* TODO this may introduce a DOS add proper error handling*)
-            failwith "Header not supported"
+          | `Block b ->
+              b
+          | `Transition t ->
+              t
+          | `Header _ ->
+              (* TODO this may introduce a DOS add proper error handling*)
+              failwith "Header not supported"
         in
         Mina_metrics.(
           Counter.inc_one Pipe.Drop_on_overflow.router_verified_transitions) ;
@@ -596,18 +595,17 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
         in
         O1trace.background_thread "initially_validate_blocks" (fun () ->
             Pipe_lib.Strict_pipe.Reader.iter network_transition_reader
-              ~f:(fun
-                   ( message
-                   , `Time_received time_received
-                   , `Valid_cb valid_cb )
+              ~f:(fun (message, `Time_received time_received, `Valid_cb valid_cb)
                  ->
-                let transition_env = 
+                let transition_env =
                   match message with
-                  | `Block b -> b
-                  | `Transition t -> t
-                  | `Header _ -> 
-                    (* TODO this may introduce a DOS add proper error handling*)
-                    failwith "Header not supported"
+                  | `Block b ->
+                      b
+                  | `Transition t ->
+                      t
+                  | `Header _ ->
+                      (* TODO this may introduce a DOS add proper error handling*)
+                      failwith "Header not supported"
                 in
                 match%map
                   initial_validate ~transition_env ~time_received ~valid_cb

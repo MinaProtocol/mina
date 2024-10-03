@@ -83,9 +83,8 @@ module Latest = V2
 
 type block_sink_msg =
   [ `Block of Mina_block.t Envelope.Incoming.t
-  | `Header of Mina_block.Header.t Envelope.Incoming.t 
-  | `Transition of Mina_block.t Envelope.Incoming.t
-  ]
+  | `Header of Mina_block.Header.t Envelope.Incoming.t
+  | `Transition of Mina_block.t Envelope.Incoming.t ]
   * [ `Time_received of Block_time.t ]
   * [ `Valid_cb of Mina_net2.Validation_callback.t ]
 

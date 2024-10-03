@@ -193,7 +193,8 @@ let get_node_status_from_peers (t : t)
                    "Could not parse peers in node status request" ) ) )
 
 (* TODO: Have better pushback behavior *)
-let broadcast_transition t (state :  Mina_block.t State_hash.With_state_hashes.t) =
+let broadcast_transition t (state : Mina_block.t State_hash.With_state_hashes.t)
+    =
   let data = With_hash.data state in
   [%str_log' trace t.logger]
     (Gossip_new_state

@@ -7,20 +7,17 @@ type Structured_log_events.t +=
 
 type block_or_header =
   [ `Block of Mina_block.t Envelope.Incoming.t
-  | `Header of Mina_block.Header.t Envelope.Incoming.t 
-  | `Transition of Mina_block.t Envelope.Incoming.t
-  ]
-
+  | `Header of Mina_block.Header.t Envelope.Incoming.t
+  | `Transition of Mina_block.t Envelope.Incoming.t ]
 
 include
   Mina_net2.Sink.S_with_void
     with type msg :=
-      [ `Block of Mina_block.t Envelope.Incoming.t 
+      [ `Block of Mina_block.t Envelope.Incoming.t
       | `Header of
-      Mina_wire_types.Mina_block_header.M.V2.t
-      Network_peer.Envelope.Incoming.t  
-      | `Transition of Mina_block.t Envelope.Incoming.t
-      ]
+        Mina_wire_types.Mina_block_header.M.V2.t
+        Network_peer.Envelope.Incoming.t
+      | `Transition of Mina_block.t Envelope.Incoming.t ]
       * [ `Time_received of Block_time.t ]
       * [ `Valid_cb of Mina_net2.Validation_callback.t ]
 
@@ -37,17 +34,13 @@ type block_sink_config =
 
 val create :
      block_sink_config
-  -> ( 
-    [ `Block of
-    Mina_block__Block.Stable.V2.t
-    Network_peer.Envelope.Incoming.t
-| `Header of
-    Mina_wire_types.Mina_block_header.M.V2.t
-    Network_peer.Envelope.Incoming.t 
- | `Transition of Mina_block__Block.Stable.V2.t Network_peer.Envelope.Incoming.t   
-    ] * 
-[ `Time_received of Mina_wire_types.Block_time.M.V1.t ] *
-[ `Valid_cb of Mina_net2.Validation_callback.t ]   
-  )
+  -> ( [ `Block of Mina_block__Block.Stable.V2.t Network_peer.Envelope.Incoming.t
+       | `Header of
+         Mina_wire_types.Mina_block_header.M.V2.t
+         Network_peer.Envelope.Incoming.t
+       | `Transition of
+         Mina_block__Block.Stable.V2.t Network_peer.Envelope.Incoming.t ]
+     * [ `Time_received of Mina_wire_types.Block_time.M.V1.t ]
+     * [ `Valid_cb of Mina_net2.Validation_callback.t ] )
      Pipe_lib.Strict_pipe.Reader.t
      * t

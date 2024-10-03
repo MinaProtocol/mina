@@ -284,8 +284,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
           in
           let time = Block_time.now t.time_controller in
           let module M = (val sinksM) in
-          M.Block_sink.push sink_block
-            (env', `Time_received time, `Valid_cb (vc)) )
+          M.Block_sink.push sink_block (env', `Time_received time, `Valid_cb vc) )
 
     let broadcast_snark_pool_diff ?origin_topics:_ ?nonce t diff =
       ignore nonce ;
