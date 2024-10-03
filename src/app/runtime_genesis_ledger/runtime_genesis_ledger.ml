@@ -15,12 +15,14 @@ end
 
 let logger = Logger.create ()
 
-let load_ledger
+let load_ledger ~ignore_missing_fields
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     (accounts : Runtime_config.Accounts.t) =
   let accounts =
     List.map accounts ~f:(fun account ->
-        (None, Runtime_config.Accounts.Single.to_account account) )
+        ( None
+        , Runtime_config.Accounts.Single.to_account ~ignore_missing_fields
+            account ) )
   in
   let packed =
     Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
@@ -78,11 +80,9 @@ let is_dirty_proof = function
 let extract_accounts_exn = function
   | { Runtime_config.Ledger.base = Accounts accounts
     ; num_accounts = None
-    ; balances = []
-    ; hash = _
     ; name = None
-    ; add_genesis_winner = Some false
-    ; s3_data_hash = _
+    ; add_genesis_winner = None
+    ; _
     } ->
       accounts
   | _ ->
@@ -119,19 +119,21 @@ let load_config_exn config_file =
   , Option.map ~f:extract_accounts_exn next_ledger )
 
 let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~config_file ~genesis_dir ~hash_output_file () =
+    ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields () =
   let%bind accounts, staking_accounts_opt, next_accounts_opt =
     load_config_exn config_file
   in
-  let ledger = load_ledger ~constraint_constants accounts in
+  let ledger =
+    load_ledger ~ignore_missing_fields ~constraint_constants accounts
+  in
   let staking_ledger : Ledger.t =
     Option.value_map ~default:ledger
-      ~f:(load_ledger ~constraint_constants)
+      ~f:(load_ledger ~ignore_missing_fields ~constraint_constants)
       staking_accounts_opt
   in
   let next_ledger =
     Option.value_map ~default:staking_ledger
-      ~f:(load_ledger ~constraint_constants)
+      ~f:(load_ledger ~ignore_missing_fields ~constraint_constants)
       next_accounts_opt
   in
   let%bind hash_json =
@@ -167,5 +169,11 @@ let () =
              ~doc:
                "PATH path to the file where the hashes of the ledgers are to \
                 be saved"
+         and ignore_missing_fields =
+           flag "--ignore-missing" no_arg
+             ~doc:
+               "BOOL whether to ignore missing fields in account definition \
+                (and replace with default values)"
          in
-         main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file) )
+         main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
+           ~ignore_missing_fields) )
