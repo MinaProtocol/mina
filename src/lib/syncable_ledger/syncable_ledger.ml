@@ -16,7 +16,12 @@ module Query = struct
     module V2 = struct
       type 'addr t =
         | What_child_hashes of 'addr * int
-            (** What are the hashes of the children of this address? *)
+            (** What are the hashes of the children of this address? 
+            If depth > 1 then we get the leaves of a subtree rooted
+            at address and of the given depth. 
+            For depth = 1 we have the simplest case with just the 2
+            direct children.
+            *)
         | What_contents of 'addr
             (** What accounts are at this address? addr must have depth
             tree_depth - account_subtree_height *)
