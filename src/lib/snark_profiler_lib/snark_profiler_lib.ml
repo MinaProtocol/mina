@@ -732,7 +732,8 @@ let profile_zkapps ~verifier ledger zkapp_commands =
           | Error exn ->
               (* workaround for SNARK failures *)
               printf !"Error: %s\n%!" (Exn.to_string exn) ;
-              printf "zkApp failed, continuing ...\n" ;
+              printf "zkApp failed, exiting ...\n" ;
+              exit 1
               ()
         in
         let tm_zkapp1 = Core.Unix.gettimeofday () in
