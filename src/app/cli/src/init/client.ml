@@ -1846,17 +1846,11 @@ let compile_time_constants =
        let%map ({ consensus_constants; _ } as precomputed_values) =
          let logger = Logger.create () in
          let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
-         let%bind constants =
-           Runtime_config.Constants.load_constants ~logger config_file
-         in
-         let%map config, _ =
-           Deferred.Or_error.(
-             Runtime_config.Json_loader.load_config_files ~conf_dir ~logger
-               config_file
-             >>= Genesis_ledger_helper.init_from_config_file ~logger ~constants)
-           |> Deferred.Or_error.ok_exn
-         in
-         config
+         Deferred.Or_error.(
+           Genesis_ledger_helper.Config_loader.load_config_files ~conf_dir
+             ~logger config_file
+           >>| fst)
+         |> Deferred.Or_error.ok_exn
        in
        let all_constants =
          `Assoc

@@ -333,14 +333,12 @@ let test_zkapp_with_genesis_ledger_main ~logger keyfile zkapp_keyfile
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_kp = Util.snapp_keypair_of_file zkapp_keyfile in
-  let%bind constants =
-    Runtime_config.Constants.load_constants ~logger config_file
-  in
   let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
-  let%bind config, _ =
+  let%bind config =
     Deferred.Or_error.(
-      Runtime_config.Json_loader.load_config_files ~conf_dir ~logger config_file
-      >>= Genesis_ledger_helper.init_from_config_file ~logger ~constants)
+      Genesis_ledger_helper.Config_loader.load_config_files ~logger ~conf_dir
+        config_file
+      >>| fst)
     |> Deferred.Or_error.ok_exn
   in
   let ledger =

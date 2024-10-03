@@ -49,54 +49,6 @@ let plugin_flag =
          times"
   else Command.Param.return []
 
-let load_config_files ~logger ~conf_dir ~genesis_dir ~itn_features
-    ?cli_proof_level (config_files : string list) =
-  let open Deferred.Or_error.Let_syntax in
-  let genesis_dir = Option.value ~default:(conf_dir ^/ "genesis") genesis_dir in
-  let%bind.Deferred constants =
-    Runtime_config.Constants.load_constants ~conf_dir ?cli_proof_level
-      ~itn_features ~logger config_files
-  in
-  let%bind config =
-    Runtime_config.Json_loader.load_config_files ~conf_dir ~logger config_files
-  in
-  match%bind.Deferred
-    Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger ~constants
-      config
-  with
-  | Ok a ->
-      return a
-  | Error err ->
-      let ( json_config
-          , `Accounts_omitted
-              ( `Genesis genesis_accounts_omitted
-              , `Staking staking_accounts_omitted
-              , `Next next_accounts_omitted ) ) =
-        Runtime_config.to_yojson_without_accounts config
-      in
-      let append_accounts_omitted s =
-        Option.value_map
-          ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
-          ~default:Fn.id
-      in
-      let metadata =
-        append_accounts_omitted "genesis" genesis_accounts_omitted
-        @@ append_accounts_omitted "staking" staking_accounts_omitted
-        @@ append_accounts_omitted "next" next_accounts_omitted []
-        @ [ ("config", json_config)
-          ; ( "name"
-            , `String
-                (Option.value ~default:"not provided"
-                   (let%bind.Option ledger = config.ledger in
-                    Option.first_some ledger.name ledger.hash ) ) )
-          ; ("error", Error_json.error_to_yojson err)
-          ]
-      in
-      [%log info]
-        "Initializing with runtime configuration. Ledger source: $name"
-        ~metadata ;
-      Error.raise err
-
 let setup_daemon logger ~itn_features =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
@@ -690,8 +642,8 @@ let setup_daemon logger ~itn_features =
         let pids = Child_processes.Termination.create_pid_table () in
         let mina_initialization_deferred () =
           let%bind precomputed_values, config =
-            load_config_files ~logger ~conf_dir ~genesis_dir ?cli_proof_level
-              ~itn_features config_files
+            Genesis_ledger_helper.Config_loader.load_config_files ~logger
+              ~conf_dir ?genesis_dir ?cli_proof_level ~itn_features config_files
             |> Deferred.Or_error.ok_exn
           in
           let constraint_constants = precomputed_values.consensus_constants in
@@ -1854,8 +1806,8 @@ let internal_commands ~itn_features logger =
           let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
           let cli_proof_level = Genesis_constants.Proof_level.Full in
           let%bind precomputed_values, _ =
-            load_config_files ~logger ~conf_dir ~genesis_dir ~cli_proof_level
-              ~itn_features config_file
+            Genesis_ledger_helper.Config_loader.load_config_files ~logger
+              ~conf_dir ?genesis_dir ~cli_proof_level ~itn_features config_file
             |> Deferred.Or_error.ok_exn
           in
           let pids = Child_processes.Termination.create_pid_table () in

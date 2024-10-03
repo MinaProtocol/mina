@@ -61,7 +61,7 @@ let%test_module "Epoch ledger sync tests" =
           }
         in
         match%map
-          Genesis_ledger_helper.init_from_config_file
+          Genesis_ledger_helper.Config_loader.init_from_config_file
             ~genesis_dir:(make_dirname "genesis_dir")
             ~constants:
               (Runtime_config.Constants.magic_for_unit_tests runtime_config)

@@ -51,10 +51,9 @@ let command_run =
              return None
          | Some file ->
              Deferred.Or_error.(
-               Runtime_config.Json_loader.load_config_files ~logger [ file ]
-               >>= Genesis_ledger_helper.init_from_config_file ~logger
-                     ~constants
-               >>| fun (a, _) -> Option.some a)
+               Genesis_ledger_helper.Config_loader.load_config_files ~logger
+                 [ file ]
+               >>| fun a -> Option.some @@ fst a)
              |> Deferred.Or_error.ok_exn
        in
        Stdout_log.setup log_json log_level ;
