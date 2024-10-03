@@ -524,19 +524,21 @@ end = struct
 
   (* Assumes nodes to be a power of 2 and merges them into their common root *)
   let rec merge_many : Hash.t array -> index -> Hash.t =
-   fun nodes depth ->
+   fun nodes height ->
     let len = Array.length nodes in
     match len with
     | 1 ->
         nodes.(0)
     | _ ->
-        let half = merge_siblings nodes depth in
-        merge_many half (depth - 1)
+        let half = merge_siblings nodes height in
+        merge_many half (height + 1)
 
   let merge_many : Hash.t array -> index -> index -> Hash.t =
-   fun nodes depth subtree_depth ->
-    let final_depth = depth + subtree_depth in
-    merge_many nodes final_depth
+   fun nodes height subtree_depth ->
+    let bottom_height = height - subtree_depth in
+    let hash = merge_many nodes bottom_height in
+    Printf.printf "merged: %s \n" (Hash.to_base58_check hash) ;
+    hash
 
   (* Adds the subtree given as the 2^k subtree leaves with the given prefix address *)
   (* Returns next nodes to be checked *)
@@ -563,8 +565,7 @@ end = struct
           (Addr.Table.find t.waiting_parents addr)
       in
       let merged =
-        (* Subtracting 2 as we ultimately add 2 1-indexed depths *)
-        merge_many nodes (ledger_depth - Addr.depth addr - 2) subtree_depth
+        merge_many nodes (ledger_depth - Addr.depth addr) subtree_depth
       in
       if Hash.equal expected merged then (
         Addr.Table.remove t.waiting_parents addr ;
