@@ -708,7 +708,9 @@ macro_rules! impl_proof {
                     let maybe_proof = ProverProof::create_recursive::<
                         DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
                         DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
-                        >(&group_map, witness, &rust_runtime_tables, index, prev, None);
+                        _>(&group_map, witness, &rust_runtime_tables, index, prev, None,
+                           &mut rand::rngs::OsRng
+                    );
                     (maybe_proof, public_input)
                 });
 
