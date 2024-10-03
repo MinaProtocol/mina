@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -11,6 +12,8 @@ import (
 
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 )
 
 func testAddStreamHandlerDo(t *testing.T, protocol string, app *app, rpcSeqno uint64) {
@@ -86,6 +89,23 @@ func testOpenStreamDo(t *testing.T, appA *app, appBHost host.Host, appBPort uint
 	return respStreamId
 }
 
+func waitForPeerConnection(t *testing.T, host host.Host, peerID peer.ID) {
+	timeout := time.After(5 * time.Second)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			t.Fatalf("Timed out waiting for peer connection: %s", peerID)
+		case <-ticker.C:
+			if host.Network().Connectedness(peerID) == network.Connected {
+				return // Peer is connected
+			}
+		}
+	}
+}
+
 func testOpenStreamImpl(t *testing.T, rpcSeqno uint64, protocol string) (*app, uint64) {
 	appA, _ := newTestApp(t, nil, true)
 	appAInfos, err := addrInfos(appA.P2p.Host)
@@ -93,7 +113,10 @@ func testOpenStreamImpl(t *testing.T, rpcSeqno uint64, protocol string) (*app, u
 
 	appB, appBPort := newTestApp(t, appAInfos, true)
 	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
+
 	require.NoError(t, err)
+
+	waitForPeerConnection(t, appB.P2p.Host, appA.P2p.Host.ID())
 
 	return appA, testOpenStreamDo(t, appA, appB.P2p.Host, appBPort, rpcSeqno, protocol)
 }

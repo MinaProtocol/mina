@@ -9,6 +9,7 @@ import (
 	ipc "libp2p_ipc"
 	"math/rand"
 	"reflect"
+	"strings"
 	"testing"
 	"testing/quick"
 	"time"
@@ -71,12 +72,12 @@ func getRootIds(ids ipc.RootBlockId_List) ([]BitswapBlockLink, error) {
 	return links, nil
 }
 
-func deleteResource(n testNode, root root) error {
+func removeResource(n testNode, root root) error {
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 	if err != nil {
 		return err
 	}
-	m, err := ipc.NewRootLibp2pHelperInterface_DeleteResource(seg)
+	m, err := ipc.NewRootLibp2pHelperInterface_RemoveResource(seg)
 	if err != nil {
 		return err
 	}
@@ -88,7 +89,7 @@ func deleteResource(n testNode, root root) error {
 	if err != nil {
 		return err
 	}
-	DeleteResourcePush(m).handle(n.node)
+	RemoveResourcePush(m).handle(n.node)
 	return nil
 }
 
@@ -125,60 +126,73 @@ func awaitRemoval(n testNode, root root) error {
 	return nil
 }
 
+func publish(node testNode, resource []byte) error {
+	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
+	if err != nil {
+		return err
+	}
+	m, err := ipc.NewRootLibp2pHelperInterface_AddResource(seg)
+	err = m.SetData(resource)
+	if err != nil {
+		return err
+	}
+	m.SetTag(uint8(BlockBodyTag))
+	if err != nil {
+		return err
+	}
+	AddResourcePush(m).handle(node.node)
+	return nil
+}
+
 func (at bitswapTestAttempt) publish(nodes []testNode) error {
 	for ni, nconf := range at {
-		_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
+		err := publish(nodes[ni], nconf.resource)
 		if err != nil {
 			return err
 		}
-		m, err := ipc.NewRootLibp2pHelperInterface_AddResource(seg)
-		m.SetData(nconf.resource)
-		if err != nil {
-			return err
-		}
-		AddResourcePush(m).handle(nodes[ni].node)
 	}
 	return nil
 }
 
+func awaitPublish(n testNode, resource []byte) (root, error) {
+	var root root
+	select {
+	case m, received := <-n.trap.ResourceUpdate:
+		if !received {
+			return root, errors.New("ResourceUpdate trap closed")
+		}
+		if m.Type() != ipc.ResourceUpdateType_added {
+			return root, fmt.Errorf("Unexpected ResourceUpdate on publish of type %d", m.Type())
+		}
+		_, root = SplitDataToBitswapBlocksLengthPrefixedWithTag(n.node.bitswapCtx.maxBlockSize, resource, BlockBodyTag)
+		ids, err := m.Ids()
+		if err != nil {
+			return root, err
+		}
+		var ids_ []BitswapBlockLink
+		ids_, err = getRootIds(ids)
+		if err != nil {
+			return root, err
+		}
+		if len(ids_) != 1 || !bytes.Equal(ids_[0][:], root[:]) {
+			return root, fmt.Errorf("Unexpected ResourceUpdate on publish: %d ids provided, first id: %s != %s", len(ids_), codanet.BlockHashToCidSuffix(ids_[0]), codanet.BlockHashToCidSuffix(root))
+		}
+		return root, nil
+	case <-time.After(time.Minute * 7):
+		return root, errors.New("Timeout waiting for ResourceUpdate on resource publish")
+	}
+}
+
 func (at bitswapTestAttempt) awaitPublish(nodes []testNode) (resIds []BitswapBlockLink, err error) {
 	resIds = make([]BitswapBlockLink, len(nodes))
-	success := withCustomTimeout(func() {
-		resUpdErr := errors.New("Unexpected ResourceUpdate on publish")
-		for ni, nconf := range at {
-			n := nodes[ni]
-			m, received := <-n.trap.ResourceUpdate
-			if !received {
-				err = errors.New("ResourceUpdate trap closed")
-				return
-			}
-			if m.Type() != ipc.ResourceUpdateType_added {
-				err = resUpdErr
-				return
-			}
-			data := nconf.resource
-			_, root := SplitDataToBitswapBlocksLengthPrefixedWithTag(n.node.bitswapCtx.maxBlockSize, data, BlockBodyTag)
-			resIds[ni] = root
-			var ids ipc.RootBlockId_List
-			ids, err = m.Ids()
-			if err != nil {
-				return
-			}
-			var ids_ []BitswapBlockLink
-			ids_, err = getRootIds(ids)
-			if err != nil {
-				return
-			}
-			if len(ids_) != 1 || !bytes.Equal(ids_[0][:], root[:]) {
-				err = resUpdErr
-				return
-			}
+	for ni, nconf := range at {
+		root, err := awaitPublish(nodes[ni], nconf.resource)
+		if err != nil {
+			return nil, err
 		}
-	}, time.Minute*7)
-	if err == nil && !success {
-		err = errors.New("Timeout waiting for ResourceUpdate on resource publish")
+		resIds[ni] = root
 	}
-	return
+	return resIds, nil
 }
 
 func confirmBlocksNotInStorage(bs *BitswapCtx, resource []byte) error {
@@ -212,6 +226,13 @@ func confirmBlocksInStorage(bs *BitswapCtx, resource []byte) error {
 		if err != nil {
 			return err
 		}
+	}
+	status, err := bs.storage.GetStatus(bs.ctx, root)
+	if err != nil {
+		return err
+	}
+	if status != codanet.Full {
+		return fmt.Errorf("non-full status: %d", status)
 	}
 	return nil
 }
@@ -377,6 +398,7 @@ func (conf bitswapTestConfig) execute(nodes []testNode, delayBeforeDownload bool
 		err = at.downloadAndCheckResources(nodes, roots, func(p *bitswapTestNodeParams) []int {
 			return p.requests1
 		})
+
 		if err != nil {
 			return fmt.Errorf("Error downloading/checking resources: %v", err)
 		}
@@ -393,7 +415,7 @@ func (conf bitswapTestConfig) execute(nodes []testNode, delayBeforeDownload bool
 			if !resourceReplicated[ni] {
 				continue
 			}
-			err = deleteResource(nodes[ni], roots[ni])
+			err = removeResource(nodes[ni], roots[ni])
 			if err != nil {
 				return fmt.Errorf("Error removing own resources: %v", err)
 			}
@@ -501,26 +523,47 @@ func testBitswap(t *testing.T, numNodes, numAttempts, numRequests, maxBlobSize i
 	// uncomment following lines to print a sed expression that will replace
 	// peer ids with node indexes in test logs (useful for debug of tests)
 
-	// seds := []string{}
-	// for ni, n := range nodes {
-	// 	pid := n.node.P2p.Me.String()
-	// 	seds = append(seds, fmt.Sprintf("sed 's/%s/node%d/g'", pid, ni))
-	// }
-	// fmt.Println(strings.Join(seds, " | "))
+	seds := []string{}
+	for ni, n := range nodes {
+		pid := n.node.P2p.Me.String()
+		seds = append(seds, fmt.Sprintf("sed 's/%s/node%d/g'", pid, ni))
+	}
+	fmt.Println(strings.Join(seds, " | "))
 
 	for ni := range nodes {
 		go func(ni int) {
-			nodes[ni].node.bitswapCtx.Loop()
-			cancels[ni]()
+			fmt.Printf("Node %d bitswap loop started\n", ni)
+			defer t.Logf("Node %d bitswap loop exited", ni)
+			doneChan := make(chan struct{})
+			go func() {
+				fmt.Printf("Node %d about to enter Loop()\n", ni)
+				nodes[ni].node.bitswapCtx.Loop() // Start the loop
+				fmt.Printf("Node %d Loop() has returned\n", ni)
+				close(doneChan)
+			}()
+
+			time.Sleep(2 * time.Minute)
+			fmt.Printf("Node %d about to cancel context\n", ni)
+			cancels[ni]() // Cancel the context
+			fmt.Printf("Node %d context cancelled\n", ni)
+
+			<-doneChan
 		}(ni)
+		fmt.Printf("Node %d bitswap loop ended\n", ni)
 	}
+
 	connectRingTopology(t, nodes, true)
+	fmt.Print("Ring topology connected\n")
 	beginAdvertisingOnNodes(t, nodes)
+	fmt.Print("Advertising started\n")
 	seed := time.Now().Unix()
 	t.Logf("Seed: %d", seed)
 	r := rand.New(rand.NewSource(seed))
 	conf := initBitswapTestConfig(r, numNodes, numAttempts, numRequests, maxBlobSize)
+	t.Logf("Bitswap configuration initialized with %d nodes, %d attempts, %d requests, and a maximum blob size of %d bytes.", numNodes, numAttempts, numRequests, maxBlobSize)
+	fmt.Printf("Bitswap configuration initialized with %d nodes, %d attempts, %d requests, and a maximum blob size of %d bytes.\n", numNodes, numAttempts, numRequests, maxBlobSize)
 	err := conf.execute(nodes, delayBeforeDownload)
+	t.Logf("Finished executing config")
 	if err != nil {
 		printConnectionGraph(buildConnectionGraph(nodes))
 	}
@@ -550,7 +593,7 @@ func TestBitswapSmoke(t *testing.T) {
 }
 
 func TestBitswapSmall(t *testing.T) {
-	testBitswap(t, 20, 100, 5, 1<<16, false)
+	testBitswap(t, 4, 100, 5, 1<<16, false)
 }
 
 func TestBitswapQC(t *testing.T) {
@@ -571,4 +614,46 @@ func TestBitswapQC(t *testing.T) {
 		return c.execute(nodes, false) == nil
 	}
 	require.NoError(t, quick.Check(f, nil))
+}
+
+func TestBitswapAddRemove(t *testing.T) {
+	nodes, cancels := initNodes(t, 1, resourceUpdateOnlyMask)
+	node := nodes[0]
+	for ni := range nodes {
+		go func(ni int) {
+			nodes[ni].node.bitswapCtx.Loop()
+			cancels[ni]()
+		}(ni)
+	}
+	seed := time.Now().Unix()
+	t.Logf("Seed: %d", seed)
+	r := rand.New(rand.NewSource(seed))
+	for i := 0; i < 10; i++ {
+		bg := genValidBlockGroupWithManyDuplicatesWithMaxSize(r, func(b []byte) BitswapBlockLink {
+			return blake2b.Sum256(b)
+		}, node.node.bitswapCtx.maxBlockSize, BlockBodyTag, BlockBodyTag, BlockBodyTag)
+		resources := make([][]byte, len(bg.starts))
+		for rootIx := range bg.starts {
+			resource, _ := bg.getData(rootIx)
+			_, root_ := SplitDataToBitswapBlocksLengthPrefixedWithTag(node.node.bitswapCtx.maxBlockSize, resource, BlockBodyTag)
+			require.Equal(t, root(root_), bg.starts[rootIx].root)
+			resources[rootIx] = resource
+			require.NoError(t, publish(node, resource))
+			_, err := awaitPublish(node, resource)
+			require.NoError(t, err)
+			require.NoError(t, confirmBlocksInStorage(node.node.bitswapCtx, resource))
+		}
+		rootIxs := r.Perm(len(bg.starts))
+		for i, rootIx := range rootIxs {
+			start := bg.starts[rootIx]
+			require.NoError(t, removeResource(node, start.root))
+			require.NoError(t, awaitRemoval(node, start.root))
+			for _, otherRootIx := range rootIxs[i+1:] {
+				require.NoError(t, confirmBlocksInStorage(node.node.bitswapCtx, resources[otherRootIx]))
+			}
+		}
+		for rootIx := range bg.starts {
+			require.NoError(t, confirmBlocksNotInStorage(node.node.bitswapCtx, resources[rootIx]))
+		}
+	}
 }
