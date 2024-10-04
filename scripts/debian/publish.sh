@@ -74,7 +74,7 @@ do
   for i in {1..10}; do 
     
     sudo apt-get update
-    ${DEBS3_SHOW} "${1}" "${DEB_VERSION}" ${ARCH} -c "${DEB_CODENAME}" -m "${DEB_RELEASE}"
+    ${DEBS3_SHOW} "$deb" "${DEB_VERSION}" "${ARCH}" -c "${DEB_CODENAME}" -m "${DEB_RELEASE}"
     LAST_VERIFY_STATUS=$?
     
     if [[ $LAST_VERIFY_STATUS == 0 ]]; then
