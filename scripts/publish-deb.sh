@@ -62,7 +62,7 @@ for i in {1..10}; do (
 # Verify integrity of debs on remote repo
 function verify_o1test_repo_has_package {
   sudo apt-get update
-  ${DEBS3_SHOW} ${1} ${DEB_VERSION} $ARCH -c $DEB_CODENAME -m $DEB_RELEASE
+  ${DEBS3_SHOW} "${1}" "${DEB_VERSION}" $ARCH -c "$DEB_CODENAME" -m "$DEB_RELEASE"
   return $?
 }
 
@@ -73,9 +73,11 @@ do
 
   DEBS3_SHOW="deb-s3 show $BUCKET_ARG $S3_REGION_ARG"
 
-  deb_split=(${deb//_/ })
-  deb="${deb_split[0]}"
-  deb=$(basename $deb)
+  # extracting name from debian package path. E.g:
+  # _build/mina-archive_3.0.1-develop-a2a872a.deb -> mina-archive
+  deb=$(basename "$deb")
+  deb="${deb%_*}"
+  
   
   for i in {1..10}; do 
     LAST_VERIFY_STATUS=verify_o1test_repo_has_package $deb
