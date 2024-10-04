@@ -1,19 +1,23 @@
 (executable
  (name print_blockchain_snark_vk)
- (libraries
-   blockchain_snark genesis_constants)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version)))
+ (libraries blockchain_snark genesis_constants)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
 
 (rule
  (deps print_blockchain_snark_vk.exe)
  (targets blockchain_snark_vk.json.computed)
  (action
-  (with-stdout-to %{targets}
+  (with-stdout-to
+   %{targets}
    (run %{deps}))))
 
 (rule
- (deps (:orig blockchain_snark_vk.json) (:computed blockchain_snark_vk.json.computed))
+ (deps
+  (:orig blockchain_snark_vk.json)
+  (:computed blockchain_snark_vk.json.computed))
  (alias runtest)
  (action
   (diff %{orig} %{computed})))
