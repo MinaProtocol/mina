@@ -153,7 +153,7 @@ let server_handler ~pool ~graphql_uri ~logger ~minimum_user_command_fee
       [%log warn] ~metadata "Error response: $error" ;
       respond_500 error
 
-let command ~minimum_user_command_fee ~account_creation_fee =
+let command =
   let open Command.Let_syntax in
   let%map_open archive_uri =
     flag "--archive-uri" ~aliases:[ "archive-uri" ]
@@ -171,11 +171,20 @@ let command ~minimum_user_command_fee ~account_creation_fee =
   and port =
     flag "--port" ~aliases:[ "port" ] ~doc:"Port to expose Rosetta server"
       (required int)
-  in
+  and config_file = Cli_lib.Flag.conf_file in
   let open Deferred.Let_syntax in
   fun () ->
     let logger = Logger.create () in
     Cli.logger_setup log_json log_level ;
+    let%bind genesis_constants, constraint_constants =
+      let%map conf =
+        Runtime_config.Constants.load_constants ~logger config_file
+      in
+      Runtime_config.Constants.
+        (genesis_constants conf, constraint_constants conf)
+    in
+    let account_creation_fee = constraint_constants.account_creation_fee in
+    let minimum_user_command_fee = genesis_constants.minimum_user_command_fee in
     let pool =
       lazy
         (let open Deferred.Result.Let_syntax in
