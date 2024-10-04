@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eo pipefail
+set -eox pipefail
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
@@ -42,7 +42,7 @@ S3_REGION_ARG='--s3-region=us-west-2'
 #>> Checking for existing lock file
 #>> Repository is locked by another user:  at host dc7eaad3c537
 #>> Attempting to obtain a lock
-#/var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
+#var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
 DEBS3_UPLOAD="deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
   --fail-if-exists \
   --lock \
@@ -73,10 +73,27 @@ do
 
   DEBS3_SHOW="deb-s3 show $BUCKET_ARG $S3_REGION_ARG"
 
-  deb_split=("${deb//_/ }")
-  deb="${deb_split[0]}"
-  deb=$(basename "${deb}")
+  # extracting name from debian package path. E.g:
+  # _build/mina-archive_3.0.1-develop-a2a872a.deb -> mina-archive
+  deb=$(basename "$deb")
+  deb="${deb%_*}"
+  
+  for i in {1..10}; do 
+    LAST_VERIFY_STATUS=verify_o1test_repo_has_package $deb
+    
+    if [[ $LAST_VERIFY_STATUS == 0 ]]; then
+        echo "succesfully validated that package is uploaded to deb-s3"
+        break
+    fi
+    
+    sleep 60
+    i=$((i+1)) 
+  done
 
-  for _i in {1..10}; do (verify_o1test_repo_has_package "${deb}") && break || sleep 60; done
+  if [[ $LAST_VERIFY_STATUS != 0 ]]; then
+    echo "Cannot locate '$deb' in debian repo. failing job..."
+    echo "You may still try to rerun job as debian repository is known from imperfect performance"
+    exit 1
+  fi
 
 done
