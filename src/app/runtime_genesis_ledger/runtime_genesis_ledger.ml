@@ -88,42 +88,30 @@ let extract_accounts_exn = function
   | _ ->
       failwith "Wrong ledger supplied"
 
-let main ~config_file ~genesis_dir ~hash_output_file () =
-  let%bind config =
-    let logger = Logger.create () in
-    let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
-    Deferred.Or_error.(
-      Genesis_ledger_helper.Config_loader.load_config_files ~logger ~conf_dir
-        config_file
-      >>| fst)
-    |> Deferred.Or_error.ok_exn
-  in
+let load_config_exn ~(config : Runtime_config.t) =
   if
     Option.(
-      is_some config.runtime_config.daemon
-      || is_some config.runtime_config.genesis
-      || Option.value_map ~default:false ~f:is_dirty_proof
-           config.runtime_config.proof)
+      is_some config.daemon || is_some config.genesis
+      || Option.value_map ~default:false ~f:is_dirty_proof config.proof)
   then failwith "Runtime config has unexpected fields" ;
-  let accounts, staking_accounts_opt, next_accounts_opt =
-    let ledger =
-      Option.value_exn ~message:"No ledger provided"
-        config.runtime_config.ledger
-    in
-    let staking_ledger =
-      let%map.Option { staking; _ } = config.runtime_config.epoch_data in
-      staking.ledger
-    in
-    let next_ledger =
-      let%bind.Option { next; _ } = config.runtime_config.epoch_data in
-      let%map.Option { ledger; _ } = next in
-      ledger
-    in
-    ( extract_accounts_exn ledger
-    , Option.map ~f:extract_accounts_exn staking_ledger
-    , Option.map ~f:extract_accounts_exn next_ledger )
+  let ledger = Option.value_exn ~message:"No ledger provided" config.ledger in
+  let staking_ledger =
+    let%map.Option { staking; _ } = config.epoch_data in
+    staking.ledger
   in
-  let constraint_constants = config.constraint_constants in
+  let next_ledger =
+    let%bind.Option { next; _ } = config.epoch_data in
+    let%map.Option { ledger; _ } = next in
+    ledger
+  in
+  ( extract_accounts_exn ledger
+  , Option.map ~f:extract_accounts_exn staking_ledger
+  , Option.map ~f:extract_accounts_exn next_ledger )
+
+let main ~constraint_constants ~config ~genesis_dir ~hash_output_file () =
+  let accounts, staking_accounts_opt, next_accounts_opt =
+    load_config_exn ~config
+  in
   let ledger = load_ledger ~constraint_constants accounts in
   let staking_ledger : Ledger.t =
     Option.value_map ~default:ledger
@@ -166,4 +154,14 @@ let () =
                "PATH path to the file where the hashes of the ledgers are to \
                 be saved"
          in
-         main ~config_file ~genesis_dir ~hash_output_file) )
+         fun () ->
+           let open Deferred.Let_syntax in
+           let%bind precomputed_values, config =
+             let logger = Logger.create () in
+             let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+             Genesis_ledger_helper.Config_loader.load_config_files ~logger
+               ~conf_dir config_file
+             |> Deferred.Or_error.ok_exn
+           in
+           main ~constraint_constants:precomputed_values.constraint_constants
+             ~config ~genesis_dir ~hash_output_file ()) )

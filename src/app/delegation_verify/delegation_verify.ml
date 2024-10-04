@@ -210,8 +210,7 @@ let stdin_command ~logger =
             Output.display_error @@ Error.to_string_hum e ;
             exit 1)
 
-let command =
-  let logger = Logger.create () in
+let command ~logger =
   Command.group
     ~summary:"A tool for verifying JSON payload submitted by the uptime service"
     [ ("fs", filesystem_command ~logger)
@@ -219,4 +218,6 @@ let command =
     ; ("stdin", stdin_command ~logger)
     ]
 
-let () = Async.Command.run command
+let () =
+  let logger = Logger.create () in
+  Async.Command.run @@ command ~logger

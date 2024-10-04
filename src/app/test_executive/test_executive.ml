@@ -269,7 +269,6 @@ let main inputs =
    *)
   let logger = Logger.create () in
   let%bind config =
-    let logger = Logger.create () in
     Runtime_config.Constants.load_constants ~logger inputs.config_file
   in
   let constants : Test_config.constants =

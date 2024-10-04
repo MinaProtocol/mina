@@ -53,11 +53,11 @@ module Flags = struct
 end
 
 let create_zkapp_account =
-  let create_command ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
+  let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
       ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ~config_file () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      create_zkapp_account ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
+      create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
         ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ~config_file
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
@@ -81,24 +81,25 @@ let create_zkapp_account =
          Param.flag "--zkapp-account-key"
            ~doc:"KEYFILE Private key file for the zkApp account to be created"
            Param.(required string)
-       and config_file = Cli_lib.Flag.conf_file
-       and amount = Flags.amount in
+       and amount = Flags.amount
+       and config_file = Cli_lib.Flag.conf_file in
        let fee = Option.value ~default:Flags.default_fee fee in
-       let logger = Logger.create () in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
+       create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
          ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ~config_file ))
 
 let upgrade_zkapp =
-  let create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-      ~verification_key ~zkapp_uri ~auth ~config_file () =
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+      ~verification_key ~zkapp_uri ~auth ~constraint_constants
+      ~genesis_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      upgrade_zkapp ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-        ~verification_key ~zkapp_uri ~auth ~config_file
+      upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+        ~verification_key ~zkapp_uri ~auth ~constraint_constants
+        ~genesis_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -119,32 +120,41 @@ let upgrade_zkapp =
        and zkapp_uri_str =
          Param.flag "--zkapp-uri" ~doc:"URI the URI for the zkApp account"
            Param.(optional string)
-       and config_file = Cli_lib.Flag.conf_file
        and auth =
          Param.flag "--auth"
            ~doc:
              "Proof|Signature|Either|None Current authorization in the account \
               to change the verification key"
            Param.(required string)
-       in
-       let logger = Logger.create () in
-       let fee = Option.value ~default:Flags.default_fee fee in
-       let auth = Util.auth_of_string auth in
-       if Currency.Fee.(fee < Flags.min_fee) then
-         failwith
-           (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       let zkapp_uri = Zkapp_basic.Set_or_keep.of_option zkapp_uri_str in
-       create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~verification_key ~zkapp_uri ~auth ~config_file ))
+       and config_file = Cli_lib.Flag.conf_file in
+       fun () ->
+         let fee = Option.value ~default:Flags.default_fee fee in
+         let auth = Util.auth_of_string auth in
+         let%bind.Deferred genesis_constants, constraint_constants =
+           let logger = Logger.create () in
+           let%map.Deferred constants =
+             Runtime_config.Constants.load_constants ~logger config_file
+           in
+           Runtime_config.Constants.
+             (genesis_constants constants, constraint_constants constants)
+         in
+         if Currency.Fee.(fee < Flags.min_fee) then
+           failwith
+             (sprintf "Fee must at least be %s"
+                (Currency.Fee.to_mina_string Flags.min_fee) ) ;
+         let zkapp_uri = Zkapp_basic.Set_or_keep.of_option zkapp_uri_str in
+         create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+           ~verification_key ~zkapp_uri ~auth ~constraint_constants
+           ~genesis_constants () ))
 
 let transfer_funds_one_receiver =
-  let create_command ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
-      ~fee_payer_nonce ~memo ~receiver ~amount ~config_file () =
+  let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+      ~fee_payer_nonce ~memo ~receiver ~amount ~genesis_constants
+      ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      transfer_funds ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
-        ~fee_payer_nonce ~memo ~config_file
+      transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer
+        ~fee_payer_nonce ~memo ~genesis_constants ~constraint_constants
         ~receivers:(Deferred.return [ (receiver, amount) ])
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
@@ -170,24 +180,35 @@ let transfer_funds_one_receiver =
          Param.flag "--receiver"
            ~doc:"PUBLIC_KEY the public key of the receiver"
            Param.(required public_key_compressed)
-       and config_file = Cli_lib.Flag.conf_file
-       and amount = Flags.amount in
+       and amount = Flags.amount
+       and config_file = Cli_lib.Flag.conf_file in
        let fee = Option.value ~default:Flags.default_fee fee in
-       let logger = Logger.create () in
-       if Currency.Fee.(fee < Flags.min_fee) then
-         failwithf "Fee must at least be %s"
-           (Currency.Fee.to_mina_string Flags.min_fee)
-           () ;
-       create_command ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
-         ~fee_payer_nonce ~memo ~receiver ~amount ~config_file ))
+       fun () ->
+         if Currency.Fee.(fee < Flags.min_fee) then
+           failwithf "Fee must at least be %s"
+             (Currency.Fee.to_mina_string Flags.min_fee)
+             () ;
+         let%bind.Deferred genesis_constants, constraint_constants =
+           let logger = Logger.create () in
+           let%map.Deferred constants =
+             Runtime_config.Constants.load_constants ~logger config_file
+           in
+           Runtime_config.Constants.
+             (genesis_constants constants, constraint_constants constants)
+         in
+         create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+           ~fee_payer_nonce ~memo ~receiver ~amount ~genesis_constants
+           ~constraint_constants () ))
 
 let transfer_funds =
-  let create_command ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
-      ~fee_payer_nonce ~memo ~receivers ~config_file () =
+  let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+      ~fee_payer_nonce ~memo ~receivers ~genesis_constants ~constraint_constants
+      () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      transfer_funds ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
-        ~fee_payer_nonce ~memo ~receivers ~config_file
+      transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer
+        ~fee_payer_nonce ~memo ~receivers ~genesis_constants
+        ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -249,24 +270,33 @@ let transfer_funds =
          Param.flag "--sender-nonce" ~doc:"NN Nonce of the sender account"
            Param.(required txn_nonce)
        and config_file = Cli_lib.Flag.conf_file in
-       let fee = Option.value ~default:Flags.default_fee fee in
-       if Currency.Fee.(fee < Flags.min_fee) then
-         failwithf "Fee must at least be %s"
-           (Currency.Fee.to_mina_string Flags.min_fee)
-           () ;
-       let max_keys = 10 in
-       let receivers = read_key_and_amount max_keys in
-       let logger = Logger.create () in
-       create_command ~logger ~debug ~sender ~sender_nonce ~fee ~fee_payer
-         ~fee_payer_nonce ~memo ~receivers ~config_file ))
+       fun () ->
+         let fee = Option.value ~default:Flags.default_fee fee in
+         if Currency.Fee.(fee < Flags.min_fee) then
+           failwithf "Fee must at least be %s"
+             (Currency.Fee.to_mina_string Flags.min_fee)
+             () ;
+         let max_keys = 10 in
+         let receivers = read_key_and_amount max_keys in
+         let%bind.Deferred genesis_constants, constraint_constants =
+           let logger = Logger.create () in
+           let%map.Deferred constants =
+             Runtime_config.Constants.load_constants ~logger config_file
+           in
+           Runtime_config.Constants.
+             (genesis_constants constants, constraint_constants constants)
+         in
+         create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+           ~fee_payer_nonce ~memo ~receivers ~genesis_constants
+           ~constraint_constants () ))
 
 let update_state =
-  let create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-      ~app_state ~config_file () =
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
+      ~genesis_constants ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      update_state ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-        ~app_state ~config_file
+      update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
+        ~genesis_constants ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -287,22 +317,30 @@ let update_state =
               represent the zkApp state (Use empty string for no-op)"
            Param.(listed string)
        and config_file = Cli_lib.Flag.conf_file in
-       let fee = Option.value ~default:Flags.default_fee fee in
-       let logger = Logger.create () in
-       if Currency.Fee.(fee < Flags.min_fee) then
-         failwith
-           (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~app_state ~config_file ))
+       fun () ->
+         let fee = Option.value ~default:Flags.default_fee fee in
+         let%bind.Deferred genesis_constants, constraint_constants =
+           let logger = Logger.create () in
+           let%map.Deferred constants =
+             Runtime_config.Constants.load_constants ~logger config_file
+           in
+           Runtime_config.Constants.
+             (genesis_constants constants, constraint_constants constants)
+         in
+         if Currency.Fee.(fee < Flags.min_fee) then
+           failwith
+             (sprintf "Fee must at least be %s"
+                (Currency.Fee.to_mina_string Flags.min_fee) ) ;
+         create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+           ~app_state ~genesis_constants ~constraint_constants () ))
 
 let update_zkapp_uri =
-  let create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-      ~zkapp_uri ~auth ~config_file () =
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
+      ~auth ~genesis_constants ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      update_zkapp_uri ~logger ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-        ~zkapp_uri ~auth ~config_file
+      update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+        ~zkapp_uri ~auth ~genesis_constants ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -327,23 +365,31 @@ let update_zkapp_uri =
               to change the zkApp URI"
            Param.(required string)
        and config_file = Cli_lib.Flag.conf_file in
-       let fee = Option.value ~default:Flags.default_fee fee in
-       let logger = Logger.create () in
-       let auth = Util.auth_of_string auth in
-       if Currency.Fee.(fee < Flags.min_fee) then
-         failwith
-           (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~zkapp_uri ~auth ~config_file ))
+       fun () ->
+         let fee = Option.value ~default:Flags.default_fee fee in
+         let auth = Util.auth_of_string auth in
+         if Currency.Fee.(fee < Flags.min_fee) then
+           failwith
+             (sprintf "Fee must at least be %s"
+                (Currency.Fee.to_mina_string Flags.min_fee) ) ;
+         let%bind.Deferred genesis_constants, constraint_constants =
+           let logger = Logger.create () in
+           let%map.Deferred constants =
+             Runtime_config.Constants.load_constants ~logger config_file
+           in
+           Runtime_config.Constants.
+             (genesis_constants constants, constraint_constants constants)
+         in
+         create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+           ~zkapp_uri ~auth ~genesis_constants ~constraint_constants () ))
 
 let update_action_state =
-  let create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-      ~action_state ~config_file () =
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+      ~action_state ~genesis_constants ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      update_action_state ~logger ~debug ~keyfile ~fee ~nonce ~memo
-        ~zkapp_keyfile ~action_state ~config_file
+      update_action_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+        ~action_state ~genesis_constants ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -386,27 +432,36 @@ let update_action_state =
                (Arg_type.comma_separated ~allow_empty:false
                   ~strip_whitespace:true string ))
        and config_file = Cli_lib.Flag.conf_file in
-       let fee = Option.value ~default:Flags.default_fee fee in
-       let logger = Logger.create () in
-       let action_state =
-         List.filter_map
-           ~f:(fun s -> if List.is_empty s then None else Some (Array.of_list s))
-           [ action_state0; action_state1; action_state2; action_state3 ]
-       in
-       if Currency.Fee.(fee < Flags.min_fee) then
-         failwith
-           (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~action_state ~config_file ))
+       fun () ->
+         let fee = Option.value ~default:Flags.default_fee fee in
+         let action_state =
+           List.filter_map
+             ~f:(fun s ->
+               if List.is_empty s then None else Some (Array.of_list s) )
+             [ action_state0; action_state1; action_state2; action_state3 ]
+         in
+         let%bind.Deferred genesis_constants, constraint_constants =
+           let logger = Logger.create () in
+           let%map.Deferred constants =
+             Runtime_config.Constants.load_constants ~logger config_file
+           in
+           Runtime_config.Constants.
+             (genesis_constants constants, constraint_constants constants)
+         in
+         if Currency.Fee.(fee < Flags.min_fee) then
+           failwith
+             (sprintf "Fee must at least be %s"
+                (Currency.Fee.to_mina_string Flags.min_fee) ) ;
+         create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+           ~action_state ~genesis_constants ~constraint_constants () ))
 
 let update_token_symbol =
-  let create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-      ~token_symbol ~auth ~config_file () =
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+      ~token_symbol ~auth ~genesis_constants ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      update_token_symbol ~logger ~debug ~keyfile ~fee ~nonce ~memo
-        ~snapp_keyfile ~token_symbol ~auth ~config_file
+      update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+        ~token_symbol ~auth ~genesis_constants ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -431,23 +486,31 @@ let update_token_symbol =
               to change the token symbol"
            Param.(required string)
        and config_file = Cli_lib.Flag.conf_file in
-       let fee = Option.value ~default:Flags.default_fee fee in
-       let auth = Util.auth_of_string auth in
-       let logger = Logger.create () in
-       if Currency.Fee.(fee < Flags.min_fee) then
-         failwith
-           (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~token_symbol ~auth ~config_file ))
+       fun () ->
+         let fee = Option.value ~default:Flags.default_fee fee in
+         let auth = Util.auth_of_string auth in
+         let%bind.Deferred genesis_constants, constraint_constants =
+           let logger = Logger.create () in
+           let%map.Deferred constants =
+             Runtime_config.Constants.load_constants ~logger config_file
+           in
+           Runtime_config.Constants.
+             (genesis_constants constants, constraint_constants constants)
+         in
+         if Currency.Fee.(fee < Flags.min_fee) then
+           failwith
+             (sprintf "Fee must at least be %s"
+                (Currency.Fee.to_mina_string Flags.min_fee) ) ;
+         create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+           ~token_symbol ~auth ~genesis_constants ~constraint_constants () ))
 
 let update_permissions =
-  let create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-      ~snapp_update ~current_auth ~config_file () =
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+      ~snapp_update ~current_auth ~genesis_constants ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      update_snapp ~logger debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-        ~snapp_update ~current_auth ~config_file
+      update_snapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+        ~snapp_update ~current_auth ~genesis_constants ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -509,43 +572,52 @@ let update_permissions =
               to change permissions"
            Param.(required string)
        and config_file = Cli_lib.Flag.conf_file in
-       let fee = Option.value ~default:Flags.default_fee fee in
-       let permissions : Permissions.t Zkapp_basic.Set_or_keep.t =
-         Zkapp_basic.Set_or_keep.Set
-           { Permissions.Poly.edit_state = Util.auth_of_string edit_state
-           ; send = Util.auth_of_string send
-           ; receive = Util.auth_of_string receive
-           ; access = Util.auth_of_string access
-           ; set_permissions = Util.auth_of_string set_permissions
-           ; set_delegate = Util.auth_of_string set_delegate
-           ; set_verification_key =
-               ( Util.auth_of_string set_verification_key
-               , Mina_numbers.Txn_version.current )
-           ; set_zkapp_uri = Util.auth_of_string set_zkapp_uri
-           ; edit_action_state = Util.auth_of_string edit_action_state
-           ; set_token_symbol = Util.auth_of_string set_token_symbol
-           ; increment_nonce = Util.auth_of_string increment_nonce
-           ; set_voting_for = Util.auth_of_string set_voting_for
-           ; set_timing = Util.auth_of_string set_timing
-           }
-       in
-       let snapp_update = { Account_update.Update.dummy with permissions } in
-       let logger = Logger.create () in
-       if Currency.Fee.(fee < Flags.min_fee) then
-         failwith
-           (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~config_file ~snapp_update
-         ~current_auth:(Util.auth_of_string current_auth) ))
+       fun () ->
+         let fee = Option.value ~default:Flags.default_fee fee in
+         let permissions : Permissions.t Zkapp_basic.Set_or_keep.t =
+           Zkapp_basic.Set_or_keep.Set
+             { Permissions.Poly.edit_state = Util.auth_of_string edit_state
+             ; send = Util.auth_of_string send
+             ; receive = Util.auth_of_string receive
+             ; access = Util.auth_of_string access
+             ; set_permissions = Util.auth_of_string set_permissions
+             ; set_delegate = Util.auth_of_string set_delegate
+             ; set_verification_key =
+                 ( Util.auth_of_string set_verification_key
+                 , Mina_numbers.Txn_version.current )
+             ; set_zkapp_uri = Util.auth_of_string set_zkapp_uri
+             ; edit_action_state = Util.auth_of_string edit_action_state
+             ; set_token_symbol = Util.auth_of_string set_token_symbol
+             ; increment_nonce = Util.auth_of_string increment_nonce
+             ; set_voting_for = Util.auth_of_string set_voting_for
+             ; set_timing = Util.auth_of_string set_timing
+             }
+         in
+         let snapp_update = { Account_update.Update.dummy with permissions } in
+         let%bind.Deferred genesis_constants, constraint_constants =
+           let logger = Logger.create () in
+           let%map.Deferred constants =
+             Runtime_config.Constants.load_constants ~logger config_file
+           in
+           Runtime_config.Constants.
+             (genesis_constants constants, constraint_constants constants)
+         in
+         if Currency.Fee.(fee < Flags.min_fee) then
+           failwith
+             (sprintf "Fee must at least be %s"
+                (Currency.Fee.to_mina_string Flags.min_fee) ) ;
+         create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+           ~genesis_constants ~constraint_constants ~snapp_update
+           ~current_auth:(Util.auth_of_string current_auth)
+           () ))
 
 let update_timings =
-  let create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-      ~snapp_update ~current_auth ~config_file () =
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+      ~snapp_update ~current_auth ~genesis_constants ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      update_snapp ~logger debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-        ~snapp_update ~current_auth ~config_file
+      update_snapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+        ~snapp_update ~current_auth ~genesis_constants ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -583,30 +655,39 @@ let update_timings =
               to change permissions"
            Param.(required string)
        and config_file = Cli_lib.Flag.conf_file in
-       let fee = Option.value ~default:Flags.default_fee fee in
-       let timing =
-         Zkapp_basic.Set_or_keep.Set
-           ( { initial_minimum_balance =
-                 Currency.Balance.of_mina_int_exn initial_minimum_balance
-             ; cliff_time =
-                 Mina_numbers.Global_slot_since_genesis.of_int cliff_time
-             ; cliff_amount = Currency.Amount.of_mina_int_exn cliff_amount
-             ; vesting_period =
-                 Mina_numbers.Global_slot_span.of_int vesting_period
-             ; vesting_increment =
-                 Currency.Amount.of_mina_int_exn vesting_increment
-             }
-             : Account_update.Update.Timing_info.value )
-       in
-       let snapp_update = { Account_update.Update.dummy with timing } in
-       let logger = Logger.create () in
-       if Currency.Fee.(fee < Flags.min_fee) then
-         failwith
-           (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~logger ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~snapp_update ~config_file
-         ~current_auth:(Util.auth_of_string current_auth) ))
+       fun () ->
+         let fee = Option.value ~default:Flags.default_fee fee in
+         let timing =
+           Zkapp_basic.Set_or_keep.Set
+             ( { initial_minimum_balance =
+                   Currency.Balance.of_mina_int_exn initial_minimum_balance
+               ; cliff_time =
+                   Mina_numbers.Global_slot_since_genesis.of_int cliff_time
+               ; cliff_amount = Currency.Amount.of_mina_int_exn cliff_amount
+               ; vesting_period =
+                   Mina_numbers.Global_slot_span.of_int vesting_period
+               ; vesting_increment =
+                   Currency.Amount.of_mina_int_exn vesting_increment
+               }
+               : Account_update.Update.Timing_info.value )
+         in
+         let snapp_update = { Account_update.Update.dummy with timing } in
+         let%bind.Deferred genesis_constants, constraint_constants =
+           let logger = Logger.create () in
+           let%map.Deferred constants =
+             Runtime_config.Constants.load_constants ~logger config_file
+           in
+           Runtime_config.Constants.
+             (genesis_constants constants, constraint_constants constants)
+         in
+         if Currency.Fee.(fee < Flags.min_fee) then
+           failwith
+             (sprintf "Fee must at least be %s"
+                (Currency.Fee.to_mina_string Flags.min_fee) ) ;
+         create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+           ~snapp_update ~genesis_constants ~constraint_constants
+           ~current_auth:(Util.auth_of_string current_auth)
+           () ))
 
 let test_zkapp_with_genesis_ledger =
   Command.(
@@ -625,10 +706,13 @@ let test_zkapp_with_genesis_ledger =
          Param.flag "--zkapp-account-key"
            ~doc:"KEYFILE Private key file to create a new zkApp account"
            Param.(required string)
-       and config_file = Cli_lib.Flag.conf_file in
-       let logger = Logger.create () in
-       test_zkapp_with_genesis_ledger_main ~logger keyfile zkapp_keyfile
-         config_file ))
+       and config_file =
+         Param.flag "--config-file" ~aliases:[ "config-file" ]
+           ~doc:
+             "PATH path to a configuration file consisting the genesis ledger"
+           Param.(required string)
+       in
+       test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file ))
 
 let txn_commands =
   [ ("create-zkapp-account", create_zkapp_account)

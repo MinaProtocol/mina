@@ -1842,14 +1842,39 @@ let compile_time_constants =
     ~summary:"Print a JSON map of the compile-time consensus parameters"
     (let%map_open config_file = Cli_lib.Flag.conf_file in
      fun () ->
+       let home = Core.Sys.home_directory () in
+       let conf_dir = home ^/ Cli_lib.Default.conf_dir_name in
+       let genesis_dir =
+         let home = Core.Sys.home_directory () in
+         home ^/ Cli_lib.Default.conf_dir_name
+       in
        let open Deferred.Let_syntax in
-       let%map ({ consensus_constants; _ } as precomputed_values) =
+       let%map ({ consensus_constants; _ } as precomputed_values), _ =
+         (* This is kind of ugly because we are allowing for supplying a runtime_config value directly, rather than force what is read from the environment *)
+         (* TODO: See if we can initialize consensus_constants without also initializing the ledger *)
          let logger = Logger.create () in
-         let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
-         Deferred.Or_error.(
-           Genesis_ledger_helper.Config_loader.load_config_files ~conf_dir
-             ~logger config_file
-           >>| fst)
+         let%bind m_conf =
+           Runtime_config.Json_loader.load_config_files ~conf_dir ~logger
+             config_file
+           >>| Or_error.ok
+         in
+         let default =
+           Runtime_config.of_json_layout
+             { Runtime_config.Json_layout.default with
+               ledger =
+                 Some
+                   { Runtime_config.Json_layout.Ledger.default with
+                     accounts = Some []
+                   }
+             }
+           |> Result.ok_or_failwith
+         in
+         let runtime_config = Option.value ~default m_conf in
+         let constants =
+           Runtime_config.Constants.load_constants' runtime_config
+         in
+         Genesis_ledger_helper.Config_loader.init_from_config_file ~genesis_dir
+           ~logger ~constants runtime_config
          |> Deferred.Or_error.ok_exn
        in
        let all_constants =

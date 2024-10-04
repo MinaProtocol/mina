@@ -365,14 +365,14 @@ module Make (Inputs : Intf.Inputs_intf) :
         let logger =
           Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
         in
-        let%bind.Deferred constants =
-          Runtime_config.Constants.load_constants ?conf_dir ?cli_proof_level
-            ~logger config_file
+        let%bind.Deferred constraint_constants, proof_level =
+          let%map.Deferred config =
+            Runtime_config.Constants.load_constants ?conf_dir ?cli_proof_level
+              ~logger config_file
+          in
+          Runtime_config.Constants.
+            (constraint_constants config, proof_level config)
         in
-        let constraint_constants =
-          Runtime_config.Constants.constraint_constants constants
-        in
-        let proof_level = Runtime_config.Constants.proof_level constants in
         Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
             let logrotate_max_size = 1024 * 10 in
             let logrotate_num_rotate = 1 in

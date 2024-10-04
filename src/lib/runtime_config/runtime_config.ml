@@ -1047,6 +1047,19 @@ module Proof_keys = struct
     ; fork
     }
 
+  let default =
+    { level = None
+    ; sub_windows_per_window = None
+    ; ledger_depth = None
+    ; work_delay = None
+    ; block_window_duration_ms = None
+    ; transaction_capacity = None
+    ; coinbase_amount = None
+    ; supercharged_coinbase_factor = None
+    ; account_creation_fee = None
+    ; fork = None
+    }
+
   let to_json_layout
       { level
       ; sub_windows_per_window
@@ -1731,6 +1744,12 @@ module type Constants_intf = sig
     -> string list
     -> constants Deferred.t
 
+  val load_constants' :
+       ?itn_features:bool
+    -> ?cli_proof_level:Genesis_constants.Proof_level.t
+    -> t
+    -> constants
+
   val genesis_constants : constants -> Genesis_constants.t
 
   val constraint_constants :
@@ -1907,16 +1926,7 @@ module Constants : Constants_intf = struct
     in
     { genesis_constants; constraint_constants; proof_level; compile_config }
 
-  (* Use this function if you don't need/want the ledger configuration *)
-  let load_constants ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
-      ~logger config_files =
-    Deferred.Or_error.ok_exn
-    @@
-    let open Deferred.Or_error.Let_syntax in
-    let%map json =
-      Json_loader.load_config_files ?conf_dir ?commit_id_short ~logger
-        config_files
-    in
+  let load_constants' ?itn_features ?cli_proof_level runtime_config =
     let constants =
       let compile_constants =
         { genesis_constants = Genesis_constants.Compiled_.genesis_constants
@@ -1926,7 +1936,7 @@ module Constants : Constants_intf = struct
         ; compile_config = Mina_compile_config.Compiled_.t
         }
       in
-      let cs = combine compile_constants json in
+      let cs = combine compile_constants runtime_config in
       { cs with
         proof_level = Option.value ~default:cs.proof_level cli_proof_level
       ; compile_config =
@@ -1937,6 +1947,18 @@ module Constants : Constants_intf = struct
       }
     in
     constants
+
+  (* Use this function if you don't need/want the ledger configuration *)
+  let load_constants ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
+      ~logger config_files =
+    Deferred.Or_error.ok_exn
+    @@
+    let open Deferred.Or_error.Let_syntax in
+    let%map runtime_config =
+      Json_loader.load_config_files ?conf_dir ?commit_id_short ~logger
+        config_files
+    in
+    load_constants' ?itn_features ?cli_proof_level runtime_config
 
   let magic_for_unit_tests t =
     let compile_constants =
