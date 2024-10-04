@@ -12,11 +12,11 @@ in  Pipeline.build
       ( Command.pipeline
           Command.Spec::{
           , job_path = "Test"
-          , job_name = "FuzzyZkappTest"
-          , tags = [ PipelineTag.Type.VeryLong, PipelineTag.Type.Test ]
-          , mode = PipelineMode.Type.Stable
+          , job_name = "FuzzyZkappTestQuick"
+          , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Test ]
+          , mode = PipelineMode.Type.PullRequest
           , additional_dirty_when =
-            [ S.exactly "buildkite/src/Jobs/Test/FuzzyZkappTest" "dhall" ]
-          , timeout = 1200
+            [ S.exactly "buildkite/src/Jobs/Test/FuzzyZkappTestQuick" "dhall" ]
+          , timeout = 300
           }
       )
