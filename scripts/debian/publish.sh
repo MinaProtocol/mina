@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eox pipefail
+set -eo pipefail
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
@@ -42,7 +42,7 @@ S3_REGION_ARG='--s3-region=us-west-2'
 #>> Checking for existing lock file
 #>> Repository is locked by another user:  at host dc7eaad3c537
 #>> Attempting to obtain a lock
-#var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
+#/var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
 DEBS3_UPLOAD="deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
   --fail-if-exists \
   --lock \
