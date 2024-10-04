@@ -339,11 +339,7 @@ let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
     Runtime_config.Constants.
       (genesis_constants constants, constraint_constants constants)
   in
-  let%bind ledger =
-    let%map config_json =
-      Runtime_config.Json_loader.load_config_files ~logger [ config_file ]
-    in
-    let runtime_config = Or_error.ok_exn config_json in
+  let ledger =
     let accounts =
       let config = Option.value_exn runtime_config.Runtime_config.ledger in
       match config.base with
