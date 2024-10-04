@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eox pipefail
+set -eo pipefail
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
