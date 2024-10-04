@@ -41,7 +41,7 @@ in  Pipeline.build
                     ++  "--allow 403,401 "
                     ++  "--skip-save-results "
                     ++  "--files "
-                    ++  "`find . -name \"*.md\""
+                    ++  "`find . -name \"*.md\" "
                     ++  "! -path \"./src/lib/crypto/kimchi_bindings/*\" "
                     ++  "! -path \"./src/lib/crypto/proof-systems/*\" "
                     ++  "! -path \"./src/external/*\" "
