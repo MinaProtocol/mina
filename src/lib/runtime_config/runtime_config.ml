@@ -1849,7 +1849,7 @@ module Constants : Constants_intf = struct
         let b =
           let%map.Option f = Option.(b.proof >>= fun x -> x.fork) in
           { Genesis_constants.Fork_constants.state_hash =
-              Pickles.Backend.Tick.Field.of_string f.state_hash
+              Mina_base.State_hash.of_base58_check_exn f.state_hash
           ; blockchain_length = Mina_numbers.Length.of_int f.blockchain_length
           ; global_slot_since_genesis =
               Mina_numbers.Global_slot_since_genesis.of_int
@@ -1930,8 +1930,7 @@ module Constants : Constants_intf = struct
     let constants =
       let compile_constants =
         { genesis_constants = Genesis_constants.Compiled.genesis_constants
-        ; constraint_constants =
-            Genesis_constants.Compiled.constraint_constants
+        ; constraint_constants = Genesis_constants.Compiled.constraint_constants
         ; proof_level = Genesis_constants.Compiled.proof_level
         ; compile_config = Mina_compile_config.Compiled.t
         }
