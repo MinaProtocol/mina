@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eo pipefail
+set -eox pipefail
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
@@ -59,13 +59,6 @@ for _i in {1..10}; do (
     "${DEB_NAMES}"
 ) && break || scripts/debian/clear-s3-lockfile.sh; done
 
-# Verify integrity of debs on remote repo
-function verify_o1test_repo_has_package {
-  sudo apt-get update
-  ${DEBS3_SHOW} "${1}" "${DEB_VERSION}" ${ARCH} -c "${DEB_CODENAME}" -m "${DEB_RELEASE}"
-  return $?
-}
-
 for deb in $DEB_NAMES
 do
   echo "Adding packages.o1test.net ${DEB_CODENAME} ${DEB_RELEASE}"
@@ -79,7 +72,10 @@ do
   deb="${deb%_*}"
   
   for i in {1..10}; do 
-    LAST_VERIFY_STATUS=$(verify_o1test_repo_has_package "$deb")
+    
+    sudo apt-get update
+    ${DEBS3_SHOW} "${1}" "${DEB_VERSION}" ${ARCH} -c "${DEB_CODENAME}" -m "${DEB_RELEASE}"
+    LAST_VERIFY_STATUS=$?
     
     if [[ $LAST_VERIFY_STATUS == 0 ]]; then
         echo "succesfully validated that package is uploaded to deb-s3"
