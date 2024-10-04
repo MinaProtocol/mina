@@ -542,7 +542,6 @@ end = struct
    fun nodes height subtree_depth ->
     let bottom_height = height - subtree_depth in
     let hash = merge_many nodes bottom_height in
-    Printf.printf "merged: %s \n" (Hash.to_base58_check hash) ;
     hash
 
   (* Adds the subtree given as the 2^k subtree leaves with the given prefix address *)
