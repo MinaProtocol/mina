@@ -77,8 +77,23 @@ do
   deb="${deb_split[0]}"
   deb=$(basename $deb)
   
-  for i in {1..10}; do (verify_o1test_repo_has_package $deb) && break || sleep 60; done
+  for i in {1..10}; do 
+    LAST_VERIFY_STATUS=verify_o1test_repo_has_package $deb
+    
+    if [[ $LAST_VERIFY_STATUS == 0 ]]; then
+        echo "succesfully validated that package is uploaded to deb-s3"
+        break
+    fi
+    
+    sleep 60
+    i=$((i+1)) 
+  done
 
+  if [[ $LAST_VERIFY_STATUS != 0 ]]; then
+    echo "Cannot locate '$deb' in debian repo. failing job..."
+    echo "You may still try to rerun job as debian repository is known from imperfect performance"
+    exit 1
+  fi
 done
 
 
