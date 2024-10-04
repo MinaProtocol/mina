@@ -32,7 +32,7 @@ def set_error():
   global exit_code
   exit_code=1
 
-def branch_commits(branch):
+def latest_branch_commit(branch):
   print ('Retrieving', branch, 'head commit...')
   result=subprocess.run(['git','log','-n','1','--format="%h"','--abbrev=7',f'{branch}'],
                         capture_output=True)
@@ -65,7 +65,7 @@ def find_latest_type_shape_ref_on(branch):
     Function tries to find best type shape reference commit by retrieving n last commits 
     and iterate over collection testing if any item points to valid url   
   '''
-  commits = branch_commits(branch)
+  commits = latest_branch_commit(branch)
   candidates = list(filter(lambda x: sha_exists(x), commits))
   if not any(candidates): 
     raise Exception(f'Cannot find type shape file for {branch}. I tried {n} last commits')
