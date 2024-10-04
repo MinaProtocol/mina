@@ -79,7 +79,7 @@ do
   deb="${deb%_*}"
   
   for i in {1..10}; do 
-    LAST_VERIFY_STATUS=verify_o1test_repo_has_package $deb
+    LAST_VERIFY_STATUS=$(verify_o1test_repo_has_package "$deb")
     
     if [[ $LAST_VERIFY_STATUS == 0 ]]; then
         echo "succesfully validated that package is uploaded to deb-s3"
