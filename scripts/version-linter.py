@@ -32,7 +32,7 @@ def set_error():
   global exit_code
   exit_code=1
 
-def branch_commits(branch,n):
+def branch_commits(branch):
   print ('Retrieving', branch, 'head commit...')
   result=subprocess.run(['git','log','-n','1','--format="%h"','--abbrev=7',f'{branch}'],
                         capture_output=True)
@@ -60,12 +60,12 @@ def url_exists(url):
   '''
   return requests.head(url).status_code == 200
 
-def find_latest_type_shape_ref_on(branch,n=1):
+def find_latest_type_shape_ref_on(branch):
   '''
     Function tries to find best type shape reference commit by retrieving n last commits 
     and iterate over collection testing if any item points to valid url   
   '''
-  commits = branch_commits(branch, n)
+  commits = branch_commits(branch)
   candidates = list(filter(lambda x: sha_exists(x), commits))
   if not any(candidates): 
     raise Exception(f'Cannot find type shape file for {branch}. I tried {n} last commits')
@@ -269,12 +269,12 @@ if __name__ == "__main__":
 
   subprocess.run(['git','fetch'],capture_output=False)
 
-  base_branch_commit = find_latest_type_shape_ref_on(base_branch,n=10)
+  base_branch_commit = find_latest_type_shape_ref_on(base_branch)
   download_type_shape('base',base_branch,base_branch_commit)
 
   print('')
 
-  release_branch_commit=find_latest_type_shape_ref_on(release_branch, n=10)
+  release_branch_commit=find_latest_type_shape_ref_on(release_branch)
   download_type_shape('release',release_branch,release_branch_commit)
 
   print('')
