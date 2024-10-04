@@ -52,6 +52,7 @@ in  Pipeline.build
             , soft_fail = Some (B/SoftFail.Boolean True)
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).xrefcheck
+              , shell = None (List Text)
               }
             }
         ]
