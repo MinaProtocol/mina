@@ -23,7 +23,8 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen =
           [ SelectFiles.strictly SelectFiles::{ exts = Some [ "md" ] }
-          , SelectFiles.strictly (SelectFiles.contains ".xrefcheck.yml")
+          , SelectFiles.strictlyStart
+              (SelectFiles.contains "buildkite/src/Jobs/Lint/Xrefcheck.dhall")
           ]
         , path = "Lint"
         , name = "Xrefcheck"
@@ -32,14 +33,25 @@ in  Pipeline.build
       , steps =
         [ Command.build
             Command.Config::{
-            , commands = [] : List Cmd.Type
+            , commands =
+              [ Cmd.run
+                  (     "-allow-dupe"
+                    ++  "--allow-redirect"
+                    ++  "--allow 403,401"
+                    ++  "--skip-save-results"
+                    ++  "`find . -name \"*.md\""
+                    ++  "! -path \"./src/lib/crypto/kimchi_bindings/*\" "
+                    ++  "! -path \"./src/lib/crypto/proof-systems/*\" "
+                    ++  "! -path \"./src/external/*\" "
+                    ++  "` "
+                  )
+              ]
             , label = "Verifies references in markdown"
             , key = "xrefcheck"
             , target = Size.Small
             , soft_fail = Some (B/SoftFail.Boolean True)
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).xrefcheck
-              , shell = None (List Text)
               }
             }
         ]
