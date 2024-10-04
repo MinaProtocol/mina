@@ -12,8 +12,6 @@ let Cmd = ../../Lib/Cmds.dhall
 
 let Command = ../../Command/Base.dhall
 
-let Docker = ../../Command/Docker/Type.dhall
-
 let Size = ../../Command/Size.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
@@ -34,11 +32,15 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run
-                  (     "-allow-dupe"
-                    ++  "--allow-redirect"
-                    ++  "--allow 403,401"
-                    ++  "--skip-save-results"
+              [ Cmd.runInDocker
+                  Cmd.Docker::{
+                  , image = (../../Constants/ContainerImages.dhall).xrefcheck
+                  }
+                  (     "awesome_bot -allow-dupe "
+                    ++  "--allow-redirect "
+                    ++  "--allow 403,401 "
+                    ++  "--skip-save-results "
+                    ++  "--files "
                     ++  "`find . -name \"*.md\""
                     ++  "! -path \"./src/lib/crypto/kimchi_bindings/*\" "
                     ++  "! -path \"./src/lib/crypto/proof-systems/*\" "
@@ -50,10 +52,6 @@ in  Pipeline.build
             , key = "xrefcheck"
             , target = Size.Small
             , soft_fail = Some (B/SoftFail.Boolean True)
-            , docker = Some Docker::{
-              , image = (../../Constants/ContainerImages.dhall).xrefcheck
-              , shell = None (List Text)
-              }
             }
         ]
       }
