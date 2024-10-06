@@ -46,7 +46,7 @@ In this case, you should:
    [Google Cloud](https://console.cloud.google.com/gcr/images/o1labs-192920/global/mina-toolchain)
    where they have been automatically uploaded. Look for your branch name and
    commit hash in the second column. You should find several images suffixed
-   with `-bullseye` and `-focal` (Debian versions).
+   with `-bullseye` or `-focal` (Debian versions).
 3. For each such image, retrieve its full name and hash by hovering its link and
    clicking the `Copy full image name` tooltip that appears (or retrieve it on
    the image's page).
