@@ -21,13 +21,6 @@ module Inputs = struct
     ; rpc_handshake_timeout_sec : float
     ; rpc_heartbeat_timeout_sec : float
     ; rpc_heartbeat_send_every_sec : float
-    ; zkapp_proof_update_cost : float
-    ; zkapp_signed_pair_update_cost : float
-    ; zkapp_signed_single_update_cost : float
-    ; zkapp_transaction_cost_limit : float
-    ; max_event_elements : int
-    ; max_action_elements : int
-    ; zkapp_cmd_limit_hardcap : int
     ; zkapps_disabled : bool
     }
   [@@deriving yojson]
@@ -47,15 +40,9 @@ type t =
   ; rpc_handshake_timeout : Time.Span.t
   ; rpc_heartbeat_timeout : Time.Span.t
   ; rpc_heartbeat_send_every : Time.Span.t
-  ; zkapp_proof_update_cost : float
-  ; zkapp_signed_pair_update_cost : float
-  ; zkapp_signed_single_update_cost : float
-  ; zkapp_transaction_cost_limit : float
-  ; max_event_elements : int
-  ; max_action_elements : int
-  ; zkapp_cmd_limit_hardcap : int
   ; zkapps_disabled : bool
   }
+[@@deriving sexp_of]
 
 let make (inputs : Inputs.t) =
   { curve_size = inputs.curve_size
@@ -78,15 +65,8 @@ let make (inputs : Inputs.t) =
   ; rpc_heartbeat_timeout = Time.Span.of_sec inputs.rpc_heartbeat_timeout_sec
   ; rpc_heartbeat_send_every =
       Time.Span.of_sec inputs.rpc_heartbeat_send_every_sec
-  ; zkapp_proof_update_cost = inputs.zkapp_proof_update_cost
-  ; zkapp_signed_pair_update_cost = inputs.zkapp_signed_pair_update_cost
-  ; zkapp_signed_single_update_cost = inputs.zkapp_signed_single_update_cost
-  ; zkapp_transaction_cost_limit = inputs.zkapp_transaction_cost_limit
-  ; max_event_elements = inputs.max_event_elements
-  ; max_action_elements = inputs.max_action_elements
   ; network_id = inputs.network_id
   ; zkapp_cmd_limit = inputs.zkapp_cmd_limit
-  ; zkapp_cmd_limit_hardcap = inputs.zkapp_cmd_limit_hardcap
   ; zkapps_disabled = inputs.zkapps_disabled
   }
 
@@ -112,18 +92,10 @@ let to_yojson t =
       , `Float (Time.Span.to_sec t.rpc_heartbeat_timeout) )
     ; ( "rpc_heartbeat_send_every"
       , `Float (Time.Span.to_sec t.rpc_heartbeat_send_every) )
-    ; ("zkapp_proof_update_cost", `Float t.zkapp_proof_update_cost)
-    ; ("zkapp_signed_pair_update_cost", `Float t.zkapp_signed_pair_update_cost)
-    ; ( "zkapp_signed_single_update_cost"
-      , `Float t.zkapp_signed_single_update_cost )
-    ; ("zkapp_transaction_cost_limit", `Float t.zkapp_transaction_cost_limit)
-    ; ("max_event_elements", `Int t.max_event_elements)
-    ; ("max_action_elements", `Int t.max_action_elements)
     ; ("network_id", `String t.network_id)
     ; ( "zkapp_cmd_limit"
       , Option.value_map ~default:`Null ~f:(fun x -> `Int x) t.zkapp_cmd_limit
       )
-    ; ("zkapp_cmd_limit_hardcap", `Int t.zkapp_cmd_limit_hardcap)
     ; ("zkapps_disabled", `Bool t.zkapps_disabled)
     ]
 
@@ -139,21 +111,12 @@ module Compiled = struct
       ; compaction_interval_ms = Node_config.compaction_interval
       ; block_window_duration_ms = Node_config.block_window_duration
       ; vrf_poll_interval_ms = Node_config.vrf_poll_interval
-      ; rpc_handshake_timeout_sec = Node_config.rpc_handshake_timeout_sec
-      ; rpc_heartbeat_timeout_sec = Node_config.rpc_heartbeat_timeout_sec
-      ; rpc_heartbeat_send_every_sec = Node_config.rpc_heartbeat_send_every_sec
-      ; zkapp_proof_update_cost = Node_config.zkapp_proof_update_cost
-      ; zkapp_signed_pair_update_cost =
-          Node_config.zkapp_signed_pair_update_cost
-      ; zkapp_signed_single_update_cost =
-          Node_config.zkapp_signed_single_update_cost
-      ; zkapp_transaction_cost_limit = Node_config.zkapp_transaction_cost_limit
-      ; max_event_elements = Node_config.max_event_elements
-      ; max_action_elements = Node_config.max_action_elements
       ; network_id = Node_config.network
       ; zkapp_cmd_limit = Node_config.zkapp_cmd_limit
-      ; zkapp_cmd_limit_hardcap = Node_config.zkapp_cmd_limit_hardcap
-      ; zkapps_disabled = Node_config.zkapps_disabled
+      ; rpc_handshake_timeout_sec = 60.0
+      ; rpc_heartbeat_timeout_sec = 60.0
+      ; rpc_heartbeat_send_every_sec = 10.0
+      ; zkapps_disabled = false
       }
     in
     make inputs
@@ -180,20 +143,8 @@ module For_unit_tests = struct
           Node_config_for_unit_tests.rpc_heartbeat_timeout_sec
       ; rpc_heartbeat_send_every_sec =
           Node_config_for_unit_tests.rpc_heartbeat_send_every_sec
-      ; zkapp_proof_update_cost =
-          Node_config_for_unit_tests.zkapp_proof_update_cost
-      ; zkapp_signed_pair_update_cost =
-          Node_config_for_unit_tests.zkapp_signed_pair_update_cost
-      ; zkapp_signed_single_update_cost =
-          Node_config_for_unit_tests.zkapp_signed_single_update_cost
-      ; zkapp_transaction_cost_limit =
-          Node_config_for_unit_tests.zkapp_transaction_cost_limit
-      ; max_event_elements = Node_config_for_unit_tests.max_event_elements
-      ; max_action_elements = Node_config_for_unit_tests.max_action_elements
       ; network_id = Node_config_for_unit_tests.network
       ; zkapp_cmd_limit = Node_config_for_unit_tests.zkapp_cmd_limit
-      ; zkapp_cmd_limit_hardcap =
-          Node_config_for_unit_tests.zkapp_cmd_limit_hardcap
       ; zkapps_disabled = Node_config_for_unit_tests.zkapps_disabled
       }
     in
