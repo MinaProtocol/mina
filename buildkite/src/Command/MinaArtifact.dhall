@@ -75,6 +75,9 @@ let build_artifacts
                         , "MINA_COMMIT_SHA1=\$BUILDKITE_COMMIT"
                         , "MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                  spec.debVersion}"
+                        , "DUNE_CACHE"
+                        , "DUNE_CACHE_STORAGE_MODE"
+                        , "XDG_CACHE_HOME"
                         , Network.foldMinaBuildMainnetEnv spec.networks
                         ]
                       # BuildFlags.buildEnvs spec.buildFlags
