@@ -18,7 +18,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-export MINA_NETWORK=${MINA_NETWORK:=sandbox}
+export MINA_NETWORK=${MINA_NETWORK:=testnet}
 export LOG_LEVEL="${LOG_LEVEL:=Info}"
 
 # Postgres database connection string and related variables
