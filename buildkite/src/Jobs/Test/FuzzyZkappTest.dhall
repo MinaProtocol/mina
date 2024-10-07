@@ -17,6 +17,5 @@ in  Pipeline.build
           , mode = PipelineMode.Type.Stable
           , additional_dirty_when =
             [ S.exactly "buildkite/src/Jobs/Test/FuzzyZkappTest" "dhall" ]
-          , timeout = 1200
           }
       )
