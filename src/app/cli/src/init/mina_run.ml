@@ -364,7 +364,19 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             List.map metadata ~f:(fun (s, value) ->
                 (s, Yojson.Safe.from_string value) )
           in
-          return @@ Itn_logger.log ~process ~timestamp ~message ~metadata () )
+          let config =
+            { Itn_logger.rpc_handshake_timeout =
+                compile_config.rpc_handshake_timeout
+            ; rpc_heartbeat_timeout =
+                compile_config.rpc_heartbeat_timeout |> Time.Span.to_sec
+                |> Time_ns.Span.of_sec
+            ; rpc_heartbeat_send_every =
+                compile_config.rpc_heartbeat_send_every |> Time.Span.to_sec
+                |> Time_ns.Span.of_sec
+            }
+          in
+          return
+          @@ Itn_logger.log ~process ~timestamp ~message ~metadata ~config () )
     ]
   in
   let log_snark_work_metrics (work : Snark_worker.Work.Result.t) =

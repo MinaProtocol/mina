@@ -49,6 +49,22 @@ let plugin_flag =
          times"
   else Command.Param.return []
 
+let with_itn_logger ~itn_features ~(compile_config : Mina_compile_config.t)
+    ~logger =
+  if itn_features then
+    let conf =
+      Logger.make_itn_logger_config
+        ~rpc_handshake_timeout:compile_config.rpc_handshake_timeout
+        ~rpc_heartbeat_timeout:
+          ( compile_config.rpc_heartbeat_timeout |> Time.Span.to_sec
+          |> Time_ns.Span.of_sec )
+        ~rpc_heartbeat_send_every:
+          ( compile_config.rpc_heartbeat_send_every |> Time.Span.to_sec
+          |> Time_ns.Span.of_sec )
+    in
+    Logger.with_itn conf logger
+  else logger
+
 let setup_daemon logger ~itn_features =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
@@ -648,6 +664,7 @@ let setup_daemon logger ~itn_features =
           in
           let constraint_constants = precomputed_values.consensus_constants in
           let compile_config = precomputed_values.compile_config in
+          let logger = with_itn_logger ~itn_features ~compile_config ~logger in
           constraint_constants.block_window_duration_ms |> Block_time.Span.to_ms
           |> Float.of_int64 |> Time.Span.of_ms |> Mina_metrics.initialize_all ;
 
@@ -1552,15 +1569,15 @@ let internal_commands ~itn_features logger =
         (let open Command.Let_syntax in
         let%map_open config_file = Cli_lib.Flag.conf_file in
         fun () ->
-          let logger = Logger.create () in
           let open Deferred.Let_syntax in
-          let%bind constraint_constants, proof_level =
+          let%bind constraint_constants, proof_level, compile_config =
             let%map conf =
               Runtime_config.Constants.load_constants ~logger config_file
             in
             Runtime_config.Constants.
-              (constraint_constants conf, proof_level conf)
+              (constraint_constants conf, proof_level conf, compile_config conf)
           in
+          let logger = with_itn_logger ~itn_features ~compile_config ~logger in
           Parallel.init_master () ;
           match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
           | `Ok sexp ->
@@ -1585,14 +1602,14 @@ let internal_commands ~itn_features logger =
 
         fun () ->
           let open Deferred.Let_syntax in
-          let logger = Logger.create () in
-          let%bind constraint_constants, proof_level =
+          let%bind constraint_constants, proof_level, compile_config =
             let%map conf =
               Runtime_config.Constants.load_constants ~logger config_file
             in
             Runtime_config.Constants.
-              (constraint_constants conf, proof_level conf)
+              (constraint_constants conf, proof_level conf, compile_config conf)
           in
+          let logger = with_itn_logger ~itn_features ~compile_config ~logger in
           Parallel.init_master () ;
           match%bind
             Reader.with_file filename ~f:(fun reader ->
@@ -1642,14 +1659,14 @@ let internal_commands ~itn_features logger =
         and config_file = Cli_lib.Flag.conf_file in
         fun () ->
           let open Async in
-          let logger = Logger.create () in
-          let%bind constraint_constants, proof_level =
+          let%bind constraint_constants, proof_level, compile_config =
             let%map conf =
               Runtime_config.Constants.load_constants ~logger config_file
             in
             Runtime_config.Constants.
-              (constraint_constants conf, proof_level conf)
+              (constraint_constants conf, proof_level conf, compile_config conf)
           in
+          let logger = with_itn_logger ~itn_features ~compile_config ~logger in
           Parallel.init_master () ;
           let%bind conf_dir = Unix.mkdtemp "/tmp/mina-verifier" in
           let mode =
@@ -1802,13 +1819,16 @@ let internal_commands ~itn_features logger =
         fun () ->
           let open Deferred.Let_syntax in
           Parallel.init_master () ;
-          let logger = Logger.create () in
           let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
           let cli_proof_level = Genesis_constants.Proof_level.Full in
           let%bind precomputed_values, _ =
             Genesis_ledger_helper.Config_loader.load_config_files ~logger
               ~conf_dir ?genesis_dir ~cli_proof_level ~itn_features config_file
             |> Deferred.Or_error.ok_exn
+          in
+          let logger =
+            with_itn_logger ~itn_features
+              ~compile_config:precomputed_values.compile_config ~logger
           in
           let pids = Child_processes.Termination.create_pid_table () in
           let%bind prover =
