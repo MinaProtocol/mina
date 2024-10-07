@@ -20,6 +20,7 @@ type block_sink_config =
   ; genesis_constants : Genesis_constants.t
   ; constraint_constants : Genesis_constants.Constraint_constants.t
   ; block_window_duration : Time.Span.t
+  ; compile_config : Mina_compile_config.t
   }
 
 type t =
@@ -34,6 +35,7 @@ type t =
       ; genesis_constants : Genesis_constants.t
       ; constraint_constants : Genesis_constants.Constraint_constants.t
       ; block_window_duration : Time.Span.t
+      ; compile_config : Mina_compile_config.t
       }
   | Void
 
@@ -56,6 +58,7 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       ; genesis_constants
       ; constraint_constants
       ; block_window_duration
+      ; compile_config
       } ->
       O1trace.sync_thread "handle_block_gossip"
       @@ fun () ->
@@ -150,7 +153,7 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
         List.exists transactions ~f:(fun txn ->
             match
               Mina_transaction.Transaction.check_well_formedness
-                ~genesis_constants txn.data
+                ~genesis_constants ~compile_config txn.data
             with
             | Ok () ->
                 false
@@ -213,6 +216,7 @@ let create
     ; genesis_constants
     ; constraint_constants
     ; block_window_duration
+    ; compile_config
     } =
   let rate_limiter =
     Network_pool.Rate_limiter.create
@@ -235,6 +239,7 @@ let create
       ; genesis_constants
       ; constraint_constants
       ; block_window_duration
+      ; compile_config
       } )
 
 let void = Void

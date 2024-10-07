@@ -23,6 +23,7 @@ type block_sink_config =
   ; genesis_constants : Genesis_constants.t
   ; constraint_constants : Genesis_constants.Constraint_constants.t
   ; block_window_duration : Time.Span.t
+  ; compile_config : Mina_compile_config.t
   }
 
 val create :
