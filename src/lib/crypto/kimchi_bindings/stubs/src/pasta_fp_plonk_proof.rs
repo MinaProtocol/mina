@@ -88,13 +88,14 @@ pub fn caml_pasta_fp_plonk_proof_create(
     // Release the runtime lock so that other threads can run using it while we generate the proof.
     runtime.releasing_runtime(|| {
         let group_map = GroupMap::<Fq>::setup();
-        let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+        let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
             &group_map,
             witness,
             &runtime_tables,
             index,
             prev,
             None,
+            &mut rand::rngs::OsRng,
         )
         .map_err(|e| ocaml::Error::Error(e.into()))?;
         Ok((proof, public_input).into())
@@ -153,13 +154,14 @@ pub fn caml_pasta_fp_plonk_proof_create_and_verify(
     // Release the runtime lock so that other threads can run using it while we generate the proof.
     runtime.releasing_runtime(|| {
         let group_map = GroupMap::<Fq>::setup();
-        let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+        let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
             &group_map,
             witness,
             &runtime_tables,
             index,
             prev,
             None,
+            &mut rand::rngs::OsRng,
         )
         .map_err(|e| ocaml::Error::Error(e.into()))?;
 
@@ -281,13 +283,14 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let public_input = witness[0][0];
-    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
         &group_map,
         witness,
         &runtime_tables,
         &index,
         vec![],
         None,
+        &mut rand::rngs::OsRng,
     )
     .unwrap();
 
@@ -444,13 +447,14 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
-    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
         &group_map,
         witness,
         &[],
         &index,
         vec![],
         None,
+        &mut rand::rngs::OsRng,
     )
     .unwrap();
     (
@@ -510,13 +514,14 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
-    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
         &group_map,
         witness,
         &[],
         &index,
         vec![],
         None,
+        &mut rand::rngs::OsRng,
     )
     .unwrap();
     (
@@ -582,13 +587,14 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check0(
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
-    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
         &group_map,
         witness,
         &[],
         &index,
         vec![],
         None,
+        &mut rand::rngs::OsRng,
     )
     .unwrap();
     (
@@ -707,13 +713,14 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let public_input = witness[0][0];
-    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
         &group_map,
         witness,
         &[],
         &index,
         vec![],
         None,
+        &mut rand::rngs::OsRng,
     )
     .unwrap();
     (
@@ -795,13 +802,14 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let public_input = (witness[0][0], witness[0][1]);
-    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
         &group_map,
         witness,
         &[],
         &index,
         vec![],
         None,
+        &mut rand::rngs::OsRng,
     )
     .unwrap();
     (
@@ -888,13 +896,14 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let public_input = (witness[0][0], witness[0][1]);
-    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
         &group_map,
         witness,
         &[],
         &index,
         vec![],
         None,
+        &mut rand::rngs::OsRng,
     )
     .unwrap();
     (

@@ -46,7 +46,9 @@ let%test_module "Epoch ledger sync tests" =
         let runtime_config : Runtime_config.t =
           { daemon = None
           ; genesis = None
-          ; proof = Some { Runtime_config.Proof_keys.default with level = None }
+          ; proof =
+              Some
+                { Runtime_config.Proof_keys.default with level = Some No_check }
           ; ledger =
               Some
                 { base = Named "test"
