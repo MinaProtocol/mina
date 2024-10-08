@@ -63,7 +63,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
                     .iter()
                     .map(Into::<Fp>::into)
                     .collect();
-                let comm = PolyComm::<Vesta> { chunks: vec![sg] };
+                let comm = PolyComm::<Vesta>::new(vec![sg]);
                 RecursionChallenge { chals, comm }
             })
             .collect()
@@ -129,7 +129,7 @@ pub fn caml_pasta_fp_plonk_proof_create_and_verify(
                     .iter()
                     .map(Into::<Fp>::into)
                     .collect();
-                let comm = PolyComm::<Vesta> { chunks: vec![sg] };
+                let comm = PolyComm::<Vesta>::new(vec![sg]);
                 RecursionChallenge { chals, comm }
             })
             .collect()
@@ -978,9 +978,7 @@ pub fn caml_pasta_fp_plonk_proof_batch_verify(
 pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProofWithPublic<CamlGVesta, CamlFp> {
     fn comm() -> PolyComm<Vesta> {
         let g = Vesta::generator();
-        PolyComm {
-            chunks: vec![g, g, g],
-        }
+        PolyComm::new(vec![g, g, g])
     }
 
     let prev = RecursionChallenge {
