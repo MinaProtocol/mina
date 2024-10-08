@@ -58,7 +58,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
                     .iter()
                     .map(Into::<Fq>::into)
                     .collect();
-                let comm = PolyComm::<Pallas> { elems: vec![sg] };
+                let comm = PolyComm::<Pallas> { chunks: vec![sg] };
                 RecursionChallenge { chals, comm }
             })
             .collect()
@@ -168,7 +168,7 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProofWithPublic<CamlGPallas, Cam
     fn comm() -> PolyComm<Pallas> {
         let g = Pallas::generator();
         PolyComm {
-            elems: vec![g, g, g],
+            chunks: vec![g, g, g],
         }
     }
 
