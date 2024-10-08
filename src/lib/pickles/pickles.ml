@@ -254,8 +254,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ; branches = Verification_key.Max_branches.n
         ; feature_flags =
             Plonk_types.(Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags)
-        ; num_chunks = 1
-        ; zk_rows = 3
+        ; num_chunks = Plonk_checks.num_chunks_by_default
+        ; zk_rows = Plonk_checks.zk_rows_by_default
         }
 
     module Proof = struct
@@ -1834,8 +1834,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 Lazy.map wrap_vk ~f:(Promise.map ~f:Verification_key.index)
             ; wrap_domains
             ; step_domains
-            ; num_chunks = 1
-            ; zk_rows = 3
+            ; num_chunks = Plonk_checks.num_chunks_by_default
+            ; zk_rows = Plonk_checks.zk_rows_by_default
             }
           in
           Types_map.add_exn self data ;
