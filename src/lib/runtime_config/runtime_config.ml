@@ -685,7 +685,8 @@ module Accounts = struct
         ; permissions = Some (Permissions.of_permissions a.permissions)
         }
 
-    let to_account (a : t) : Mina_base.Account.t =
+    let to_account ?(ignore_missing_fields = false) (a : t) :
+        Mina_base.Account.t =
       let open Signature_lib in
       let timing =
         let open Mina_base.Account_timing.Poly in
@@ -707,8 +708,7 @@ module Accounts = struct
               ; vesting_increment
               }
       in
-      let permissions =
-        let perms = Option.value_exn a.permissions in
+      let to_permissions (perms : Permissions.t) =
         Mina_base.Permissions.Poly.
           { edit_state =
               Json_layout.Accounts.Single.Permissions.Auth_required
@@ -752,6 +752,15 @@ module Accounts = struct
               .to_account_perm perms.set_timing
           }
       in
+      let permissions =
+        match (ignore_missing_fields, a.permissions) with
+        | _, Some perms ->
+            to_permissions perms
+        | false, None ->
+            failwithf "no permissions set for account %s" a.pk ()
+        | true, _ ->
+            Mina_base.Permissions.user_default
+      in
       let mk_zkapp (app : Zkapp_account.t) :
           ( Mina_base.Zkapp_state.Value.t
           , Mina_base.Verification_key_wire.t option
@@ -776,20 +785,34 @@ module Accounts = struct
           ; zkapp_uri = app.zkapp_uri
           }
       in
+      let receipt_chain_hash =
+        match (ignore_missing_fields, a.receipt_chain_hash) with
+        | _, Some rch ->
+            Mina_base.Receipt.Chain_hash.of_base58_check_exn rch
+        | false, None ->
+            failwithf "no receipt_chain_hash set for account %s" a.pk ()
+        | true, _ ->
+            Mina_base.Receipt.Chain_hash.empty
+      in
+      let voting_for =
+        match (ignore_missing_fields, a.voting_for) with
+        | _, Some voting_for ->
+            Mina_base.State_hash.of_base58_check_exn voting_for
+        | false, None ->
+            failwithf "no voting_for set for account %s" a.pk ()
+        | true, _ ->
+            Mina_base.State_hash.dummy
+      in
       { public_key = Public_key.Compressed.of_base58_check_exn a.pk
       ; token_id =
           Mina_base.Token_id.(Option.value_map ~default ~f:of_string a.token)
       ; token_symbol = Option.value ~default:"" a.token_symbol
       ; balance = a.balance
       ; nonce = a.nonce
-      ; receipt_chain_hash =
-          Mina_base.Receipt.Chain_hash.of_base58_check_exn
-            (Option.value_exn a.receipt_chain_hash)
+      ; receipt_chain_hash
       ; delegate =
           Option.map ~f:Public_key.Compressed.of_base58_check_exn a.delegate
-      ; voting_for =
-          Mina_base.State_hash.of_base58_check_exn
-            (Option.value_exn a.voting_for)
+      ; voting_for
       ; timing
       ; permissions
       ; zkapp = Option.map ~f:mk_zkapp a.zkapp
@@ -935,14 +958,14 @@ end
 
 module Proof_keys = struct
   module Level = struct
-    type t = Full | Check | None [@@deriving bin_io_unversioned, equal]
+    type t = Full | Check | No_check [@@deriving bin_io_unversioned, equal]
 
     let to_string = function
       | Full ->
           "full"
       | Check ->
           "check"
-      | None ->
+      | No_check ->
           "none"
 
     let of_string str =
@@ -952,7 +975,7 @@ module Proof_keys = struct
       | "check" ->
           Ok Check
       | "none" ->
-          Ok None
+          Ok No_check
       | _ ->
           Error "Expected one of 'full', 'check', or 'none'"
 

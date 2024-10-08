@@ -3,7 +3,7 @@
 set -e
 set -o pipefail
 
-# Number of keys in ledger that won't be re-delegated
+# Balance of keys to which delegation will happpen
 KEY_BALANCE=${KEY_BALANCE:-1000}
 
 # Do not touch accounts with balance below $DELEGATEE_CUTOFF
@@ -16,7 +16,7 @@ NORM=${NORM:-}
 # Replace top N delegate keys with the specified keys
 REPLACE_TOP=${REPLACE_TOP:-}
 
-MAINNET_START='2021-03-17 00:00:00'
+MAINNET_START='2024-06-05T00:00:00Z'
 now=$(date +%s)
 mainnet_start=$(date --date="$MAINNET_START" -u +%s)
 
@@ -80,7 +80,7 @@ if [[ ! -f "$ledger_file" ]]; then
   fi
   curl "$ledger_url" >"$ledger_file"
   not_finalized_msg="Ledger not found: next staking ledger is not finalized yet"
-  if [[ "$(head -c ${#not_finalized_msg})" == "$not_finalized_msg" ]]; then
+  if [[ "$(head -c ${#not_finalized_msg} "$ledger_file")" == "$not_finalized_msg" ]]; then
     echo "Next ledger not finalized yet" >&2 && rm "$ledger_file" && exit 2
   fi
 fi

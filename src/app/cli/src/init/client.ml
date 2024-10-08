@@ -1818,7 +1818,7 @@ let compile_time_constants =
          let logger = Logger.create () in
          let%map ({ consensus_constants; _ } as precomputed_values), _ =
            let%bind runtime_config =
-             let%map.Deferred config_file =
+             let%map config_file =
                Runtime_config.Json_loader.load_config_files ~conf_dir ~logger
                  [ config_file ]
                >>| Or_error.ok

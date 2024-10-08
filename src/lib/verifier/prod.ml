@@ -202,7 +202,7 @@ module Worker_state = struct
                Itn_logger.set_data ~process_kind:"verifier" ~daemon_port
            end in
           (module M : S) )
-    | Check | None ->
+    | Check | No_check ->
         Deferred.return
         @@ ( module struct
              let verify_commands tagged_commands =
