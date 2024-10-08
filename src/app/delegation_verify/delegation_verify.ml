@@ -51,13 +51,8 @@ let instantiate_verify_functions ~logger ~genesis_constants
         (Verifier.verify_functions ~constraint_constants ~proof_level ())
   | Some config_file ->
       let%bind.Deferred precomputed_values =
-        let%bind.Deferred.Or_error config_json =
-          Genesis_ledger_helper.load_config_json config_file
-        in
         let%bind.Deferred.Or_error config =
-          Deferred.return
-          @@ Result.map_error ~f:Error.of_string
-          @@ Runtime_config.of_yojson config_json
+          Runtime_config.Json_loader.load_config_files ~logger [ config_file ]
         in
         Genesis_ledger_helper.init_from_config_file ~logger ~proof_level
           ~constraint_constants ~genesis_constants config ~cli_proof_level
