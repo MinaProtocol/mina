@@ -76,10 +76,8 @@ let minimalDirtyWhen =
       , S.exactly "buildkite/src/Command/MinaArtifact" "dhall"
       , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact")
       , S.strictlyStart (S.contains "dockerfiles/stages")
-      , S.exactly "scripts/debian/build" "sh"
-      , S.exactly "scripts/debian/builder-helpers" "sh"
-      , S.exactly "scripts/docker/release" "sh"
-      , S.exactly "scripts/docker/build" "sh"
+      , S.strictlyStart (S.contains "scripts/debian")
+      , S.strictlyStart (S.contains "scripts/docker")
       , S.exactly "buildkite/scripts/build-artifact" "sh"
       , S.exactly "buildkite/scripts/build-hardfork-package" "sh"
       , S.exactly "buildkite/scripts/check-compatibility" "sh"
