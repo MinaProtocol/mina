@@ -14,7 +14,7 @@ let command =
             (Command.Arg_type.of_alist_exn
                [ ("Full", Genesis_constants.Proof_level.Full)
                ; ("Check", Check)
-               ; ("None", None)
+               ; ("None", No_check)
                ] ) )
      in
      fun () ->
