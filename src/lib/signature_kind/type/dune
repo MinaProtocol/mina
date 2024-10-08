@@ -1,5 +1,0 @@
-(library
- (name mina_signature_kind_type)
- (public_name mina_signature_kind.type)
- (preprocess (pps ppx_version))
- (instrumentation (backend bisect_ppx)))
