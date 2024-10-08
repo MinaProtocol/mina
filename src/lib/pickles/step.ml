@@ -454,7 +454,7 @@ struct
           (module Env_bool)
           (module Env_field)
           ~domain:tock_domain ~srs_length_log2:Common.Max_degree.wrap_log2
-          ~zk_rows:3
+          ~zk_rows:Plonk_checks.zk_rows_by_default
           ~field_of_hex:(fun s ->
             Kimchi_pasta.Pasta.Bigint256.of_hex_string s
             |> Kimchi_pasta.Pasta.Fq.of_bigint )
