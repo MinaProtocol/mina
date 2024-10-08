@@ -7,6 +7,7 @@ module type S = sig
   open Hlist
   module Tick_field_sponge = Tick_field_sponge
   module Util = Util
+  module Dummy = Dummy
   module Step_main_inputs = Step_main_inputs
   module Backend = Backend
   module Sponge_inputs = Sponge_inputs
