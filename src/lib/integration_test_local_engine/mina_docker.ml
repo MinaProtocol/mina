@@ -156,7 +156,8 @@ module Network_config = struct
     let runtime_config =
       { Runtime_config.daemon =
           Some
-            { txpool_max_size = Some txpool_max_size
+            { Runtime_config.Daemon.default with
+              txpool_max_size = Some txpool_max_size
             ; peer_list_url = None
             ; zkapp_proof_update_cost = Some 10.26
             ; zkapp_signed_single_update_cost = Some 9.140000000000001
