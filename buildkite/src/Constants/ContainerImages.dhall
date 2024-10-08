@@ -18,6 +18,6 @@
 , ubuntu2004 = "ubuntu:20.04"
 , postgres = "postgres:12.4-alpine"
 , xrefcheck =
-    "serokell/xrefcheck@sha256:8fbb35a909abc353364f1bd3148614a1160ef3c111c0c4ae84e58fdf16019eeb"
+    "dkhamsing/awesome_bot@sha256:a8adaeb3b3bd5745304743e4d8a6d512127646e420544a6d22d9f58a07f35884"
 , nixos = "gcr.io/o1labs-192920/nix-unstable:1.0.0"
 }
