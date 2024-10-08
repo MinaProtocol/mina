@@ -1815,16 +1815,30 @@ let compile_time_constants =
                conf_dir ^/ "daemon.json"
          in
          let open Async in
+         let logger = Logger.create () in
          let%map ({ consensus_constants; _ } as precomputed_values), _ =
-           config_file |> Genesis_ledger_helper.load_config_json >>| Or_error.ok
-           >>| Option.value
-                 ~default:
-                   (`Assoc [ ("ledger", `Assoc [ ("accounts", `List []) ]) ])
-           >>| Runtime_config.of_yojson >>| Result.ok
-           >>| Option.value ~default:Runtime_config.default
-           >>= Genesis_ledger_helper.init_from_config_file ~genesis_constants
-                 ~constraint_constants ~logger:(Logger.null ()) ~proof_level
-                 ~cli_proof_level:None ~genesis_dir
+           let%bind runtime_config =
+             let%map config_file =
+               Runtime_config.Json_loader.load_config_files ~conf_dir ~logger
+                 [ config_file ]
+               >>| Or_error.ok
+             in
+             let default =
+               Runtime_config.of_json_layout
+                 { Runtime_config.Json_layout.default with
+                   ledger =
+                     Some
+                       { Runtime_config.Json_layout.Ledger.default with
+                         accounts = Some []
+                       }
+                 }
+               |> Result.ok_or_failwith
+             in
+             Option.value ~default config_file
+           in
+           Genesis_ledger_helper.init_from_config_file ~genesis_constants
+             ~constraint_constants ~logger:(Logger.null ()) ~proof_level
+             ~cli_proof_level:None ~genesis_dir runtime_config
            >>| Or_error.ok_exn
          in
          let all_constants =

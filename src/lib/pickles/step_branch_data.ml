@@ -193,11 +193,11 @@ let create
         ; num_chunks
         ; zk_rows =
             ( match num_chunks with
-            | 1 ->
-                3
+            | 1 (* cannot match with Plonk_checks.num_chunks_by_default *) ->
+                Plonk_checks.zk_rows_by_default
             | num_chunks ->
                 let permuts = 7 in
-                ((2 * (permuts + 1) * num_chunks) - 1 + permuts) / permuts )
+                ((2 * (permuts + 1) * num_chunks) - 2 + permuts) / permuts )
         }
       ~public_input ~auxiliary_typ ~self_branches:branches ~proofs_verified
       ~local_signature:widths ~local_signature_length ~local_branches:heights
