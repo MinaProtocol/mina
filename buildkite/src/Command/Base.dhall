@@ -124,11 +124,11 @@ let Config =
 let targetToAgent =
           \(target : Size)
       ->  merge
-            { XLarge = toMap { size = "generic" }
-            , Large = toMap { size = "generic" }
-            , Medium = toMap { size = "generic" }
-            , Small = toMap { size = "generic" }
-            , Integration = toMap { size = "integration" }
+            { XLarge = toMap { size = "docker-generic" }
+            , Large = toMap { size = "docker-generic" }
+            , Medium = toMap { size = "docker-generic" }
+            , Small = toMap { size = "docker-generic" }
+            , Integration = toMap { size = "docker-generic" }
             , QA = toMap { size = "qa" }
             , Hardfork = toMap { size = "hardfork" }
             , Multi = toMap { size = "generic-multi" }
