@@ -30,7 +30,7 @@ type inputs =
   ; mina_image : string
   ; archive_image : string option
   ; debug : bool
-  ; config_file : string list
+  ; config_files : string list
   }
 
 let validate_inputs ~logger inputs (test_config : Test_config.t) :
@@ -269,7 +269,7 @@ let main inputs =
    *)
   let logger = Logger.create () in
   let%bind config =
-    Runtime_config.Constants.load_constants ~logger inputs.config_file
+    Runtime_config.Constants.load_constants ~logger inputs.config_files
   in
   let constants : Test_config.constants =
     let protocol =
@@ -508,7 +508,7 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
       ; mina_image
       ; archive_image
       ; debug
-      ; config_file = Option.to_list config_file
+      ; config_files = Option.to_list config_file
       }
     in
     Term.(
