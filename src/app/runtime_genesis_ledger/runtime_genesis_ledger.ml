@@ -90,16 +90,10 @@ let extract_accounts_exn = function
   | _ ->
       failwith "Wrong ledger supplied"
 
-let load_config_exn config_file =
-  let%map config_json =
+let load_config_exn ~logger config_file =
+  let%map config =
     Deferred.Or_error.ok_exn
-    @@ Genesis_ledger_helper.load_config_json config_file
-  in
-  let config =
-    Runtime_config.of_yojson config_json
-    |> Result.map_error ~f:(fun err ->
-           Failure ("Could not parse configuration: " ^ err) )
-    |> Result.ok_exn
+    @@ Runtime_config.Json_loader.load_config_files ~logger [ config_file ]
   in
   if
     Option.(
@@ -123,7 +117,7 @@ let load_config_exn config_file =
 let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields () =
   let%bind accounts, staking_accounts_opt, next_accounts_opt =
-    load_config_exn config_file
+    load_config_exn ~logger config_file
   in
   let ledger =
     load_ledger ~ignore_missing_fields ~constraint_constants accounts

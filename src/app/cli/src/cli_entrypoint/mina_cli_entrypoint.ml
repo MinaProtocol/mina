@@ -50,92 +50,48 @@ let plugin_flag =
   else Command.Param.return []
 
 let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
-    ~genesis_dir ~cli_proof_level ~proof_level config_files =
-  let%bind config_jsons =
-    let config_files_paths =
-      List.map config_files ~f:(fun (config_file, _) -> `String config_file)
-    in
-    [%log info] "Reading configuration files $config_files"
-      ~metadata:[ ("config_files", `List config_files_paths) ] ;
-    Deferred.List.filter_map config_files
-      ~f:(fun (config_file, handle_missing) ->
-        match%bind Genesis_ledger_helper.load_config_json config_file with
-        | Ok config_json ->
-            let%map config_json =
-              Genesis_ledger_helper.upgrade_old_config ~logger config_file
-                config_json
-            in
-            Some (config_file, config_json)
-        | Error err -> (
-            match handle_missing with
-            | `Must_exist ->
-                Mina_user_error.raisef ~where:"reading configuration file"
-                  "The configuration file %s could not be read:\n%s" config_file
-                  (Error.to_string_hum err)
-            | `May_be_missing ->
-                [%log warn] "Could not read configuration from $config_file"
-                  ~metadata:
-                    [ ("config_file", `String config_file)
-                    ; ("error", Error_json.error_to_yojson err)
-                    ] ;
-                return None ) )
-  in
-  let config =
-    List.fold ~init:Runtime_config.default config_jsons
-      ~f:(fun config (config_file, config_json) ->
-        match Runtime_config.of_yojson config_json with
-        | Ok loaded_config ->
-            Runtime_config.combine config loaded_config
-        | Error err ->
-            [%log fatal]
-              "Could not parse configuration from $config_file: $error"
-              ~metadata:
-                [ ("config_file", `String config_file)
-                ; ("config_json", config_json)
-                ; ("error", `String err)
-                ] ;
-            failwithf "Could not parse configuration file: %s" err () )
-  in
+    ~genesis_dir ~cli_proof_level ~proof_level (config_files : string list) =
+  let open Deferred.Or_error.Let_syntax in
   let genesis_dir = Option.value ~default:(conf_dir ^/ "genesis") genesis_dir in
-  let%bind precomputed_values =
-    match%map
-      Genesis_ledger_helper.init_from_config_file ~cli_proof_level ~genesis_dir
-        ~logger ~genesis_constants ~constraint_constants ~proof_level config
-    with
-    | Ok (precomputed_values, _) ->
-        precomputed_values
-    | Error err ->
-        let ( json_config
-            , `Accounts_omitted
-                ( `Genesis genesis_accounts_omitted
-                , `Staking staking_accounts_omitted
-                , `Next next_accounts_omitted ) ) =
-          Runtime_config.to_yojson_without_accounts config
-        in
-        let append_accounts_omitted s =
-          Option.value_map
-            ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
-            ~default:Fn.id
-        in
-        let metadata =
-          append_accounts_omitted "genesis" genesis_accounts_omitted
-          @@ append_accounts_omitted "staking" staking_accounts_omitted
-          @@ append_accounts_omitted "next" next_accounts_omitted []
-          @ [ ("config", json_config)
-            ; ( "name"
-              , `String
-                  (Option.value ~default:"not provided"
-                     (let%bind.Option ledger = config.ledger in
-                      Option.first_some ledger.name ledger.hash ) ) )
-            ; ("error", Error_json.error_to_yojson err)
-            ]
-        in
-        [%log info]
-          "Initializing with runtime configuration. Ledger source: $name"
-          ~metadata ;
-        Error.raise err
+  let%bind config =
+    Runtime_config.Json_loader.load_config_files ~conf_dir ~logger config_files
   in
-  return (precomputed_values, config_jsons, config)
+  match%bind.Deferred
+    Genesis_ledger_helper.init_from_config_file ~cli_proof_level ~genesis_dir
+      ~logger ~genesis_constants ~constraint_constants ~proof_level config
+  with
+  | Ok a ->
+      return a
+  | Error err ->
+      let ( json_config
+          , `Accounts_omitted
+              ( `Genesis genesis_accounts_omitted
+              , `Staking staking_accounts_omitted
+              , `Next next_accounts_omitted ) ) =
+        Runtime_config.to_yojson_without_accounts config
+      in
+      let append_accounts_omitted s =
+        Option.value_map
+          ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
+          ~default:Fn.id
+      in
+      let metadata =
+        append_accounts_omitted "genesis" genesis_accounts_omitted
+        @@ append_accounts_omitted "staking" staking_accounts_omitted
+        @@ append_accounts_omitted "next" next_accounts_omitted []
+        @ [ ("config", json_config)
+          ; ( "name"
+            , `String
+                (Option.value ~default:"not provided"
+                   (let%bind.Option ledger = config.ledger in
+                    Option.first_some ledger.name ledger.hash ) ) )
+          ; ("error", Error_json.error_to_yojson err)
+          ]
+      in
+      [%log info]
+        "Initializing with runtime configuration. Ledger source: $name"
+        ~metadata ;
+      Error.raise err
 
 let setup_daemon logger ~itn_features ~default_snark_worker_fee =
   let open Command.Let_syntax in
@@ -730,45 +686,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
         in
         let pids = Child_processes.Termination.create_pid_table () in
         let mina_initialization_deferred () =
-          let config_file_installed =
-            (* Search for config files installed as part of a deb/brew package.
-               These files are commit-dependent, to ensure that we don't clobber
-               configuration for dev builds or use incompatible configs.
-            *)
-            let config_file_installed =
-              let json = "config_" ^ Mina_version.commit_id_short ^ ".json" in
-              List.fold_until ~init:None
-                (Cache_dir.possible_paths json)
-                ~f:(fun _acc f ->
-                  match Core.Sys.file_exists f with
-                  | `Yes ->
-                      Stop (Some f)
-                  | _ ->
-                      Continue None )
-                ~finish:Fn.id
-            in
-            match config_file_installed with
-            | Some config_file ->
-                Some (config_file, `Must_exist)
-            | None ->
-                None
-          in
-          let config_file_configdir =
-            (conf_dir ^/ "daemon.json", `May_be_missing)
-          in
-          let config_file_envvar =
-            match Sys.getenv "MINA_CONFIG_FILE" with
-            | Some config_file ->
-                Some (config_file, `Must_exist)
-            | None ->
-                None
-          in
-          let config_files =
-            Option.to_list config_file_installed
-            @ (config_file_configdir :: Option.to_list config_file_envvar)
-            @ List.map config_files ~f:(fun config_file ->
-                  (config_file, `Must_exist) )
-          in
           let genesis_constants =
             Genesis_constants.Compiled.genesis_constants
           in
@@ -776,74 +693,55 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             Genesis_constants.Compiled.constraint_constants
           in
           let compile_config = Mina_compile_config.Compiled.t in
-          let%bind precomputed_values, config_jsons, config =
+          let%bind precomputed_values, config =
             load_config_files ~logger ~conf_dir ~genesis_dir
               ~proof_level:Genesis_constants.Compiled.proof_level config_files
               ~genesis_constants ~constraint_constants ~cli_proof_level
+            |> Deferred.Or_error.ok_exn
           in
 
           constraint_constants.block_window_duration_ms |> Float.of_int
           |> Time.Span.of_ms |> Mina_metrics.initialize_all ;
-
-          (* We reverse the list because we want to find the "most relevant" value, i.e. the
-             last time it was declared in the list of supplied config files
-          *)
-          let rev_daemon_configs =
-            List.rev_filter_map config_jsons
-              ~f:(fun (config_file, config_json) ->
-                Yojson.Safe.Util.member "daemon" config_json
-                |> fun x ->
-                Runtime_config.Daemon.of_yojson x
-                |> Result.ok
-                |> Option.map ~f:(fun daemon_config ->
-                       (config_file, daemon_config) ) )
-          in
 
           let module DC = Runtime_config.Daemon in
           (* The explicit typing here is necessary to prevent type inference from specializing according
              to the first usage.
           *)
           let maybe_from_config (type a) :
-                 getter:(DC.t -> a option)
-              -> keyname:string
-              -> preferred_value:a option
-              -> a option =
-           fun ~getter ~keyname ~preferred_value ->
-            Runtime_config.Config_loader.maybe_from_config ~logger
-              ~configs:rev_daemon_configs ~getter ~keyname ~preferred_value
+              getter:(DC.t -> a option) -> preferred_value:a option -> a option
+              =
+           fun ~getter ~preferred_value ->
+            Option.first_some preferred_value Option.(config.daemon >>= getter)
           in
           let or_from_config (type a) :
                  getter:(DC.t -> a option)
-              -> keyname:string
               -> preferred_value:a option
               -> default:a
               -> a =
-           fun ~getter ~keyname ~preferred_value ~default ->
-            Runtime_config.Config_loader.or_from_config ~logger
-              ~configs:rev_daemon_configs ~getter ~keyname ~preferred_value
-              ~default
+           fun ~getter ~preferred_value ~default ->
+            Option.first_some preferred_value Option.(config.daemon >>= getter)
+            |> Option.value ~default
           in
 
           let libp2p_port =
-            or_from_config ~keyname:"libp2p-port" ~getter:DC.libp2p_port
+            or_from_config ~getter:DC.libp2p_port
               ~preferred_value:libp2p_port.value ~default:libp2p_port.default
           in
           let rest_server_port =
-            or_from_config ~keyname:"rest-port" ~getter:DC.rest_port
+            or_from_config ~getter:DC.rest_port
               ~preferred_value:rest_server_port.value
               ~default:rest_server_port.default
           in
           let limited_graphql_port =
-            maybe_from_config ~keyname:"limited-graphql-port"
-              ~getter:DC.graphql_port
+            maybe_from_config ~getter:DC.graphql_port
               ~preferred_value:limited_graphql_port.value
           in
           let client_port =
-            or_from_config ~keyname:"client-port" ~getter:DC.client_port
+            or_from_config ~getter:DC.client_port
               ~preferred_value:client_port.value ~default:client_port.default
           in
           let snark_work_fee =
-            or_from_config ~keyname:"snark-worker-fee"
+            or_from_config
               ~getter:(fun x ->
                 DC.snark_worker_fee x
                 |> Option.map ~f:Currency.Fee.of_nanomina_int_exn )
@@ -851,8 +749,8 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               ~default:compile_config.default_snark_worker_fee
           in
           let node_status_url =
-            maybe_from_config ~keyname:"node-status-url"
-              ~getter:DC.node_status_url ~preferred_value:node_status_url
+            maybe_from_config ~getter:DC.node_status_url
+              ~preferred_value:node_status_url
           in
           (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
           let _max_concurrent_connections =
@@ -864,7 +762,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             None
           in
           let work_selection_method =
-            or_from_config ~keyname:"work-selection"
+            or_from_config
               ~getter:(fun x ->
                 DC.work_selection x
                 |> Option.map ~f:Cli_lib.Arg_type.work_selection_method_val )
@@ -872,25 +770,21 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               ~default:Cli_lib.Arg_type.Work_selection_method.Random
           in
           let work_reassignment_wait =
-            or_from_config ~keyname:"work-reassignment-wait"
-              ~getter:DC.work_reassignment_wait
+            or_from_config ~getter:DC.work_reassignment_wait
               ~preferred_value:work_reassignment_wait
               ~default:Cli_lib.Default.work_reassignment_wait
           in
           let log_received_snark_pool_diff =
-            or_from_config ~keyname:"log-snark-work-gossip"
-              ~getter:DC.log_snark_work_gossip
+            or_from_config ~getter:DC.log_snark_work_gossip
               ~preferred_value:log_received_snark_pool_diff ~default:false
           in
           let log_transaction_pool_diff =
-            or_from_config ~keyname:"log-txn-pool-gossip"
-              ~getter:DC.log_txn_pool_gossip
+            or_from_config ~getter:DC.log_txn_pool_gossip
               ~preferred_value:log_transaction_pool_diff ~default:false
           in
           let log_block_creation =
-            or_from_config ~keyname:"log-block-creation"
-              ~getter:DC.log_block_creation ~preferred_value:log_block_creation
-              ~default:true
+            or_from_config ~getter:DC.log_block_creation
+              ~preferred_value:log_block_creation ~default:true
           in
           let log_gossip_heard =
             { Mina_networking.Config.snark_pool_diff =
@@ -914,7 +808,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                   "The %s public key %s could not be decoded." which pk_str
           in
           let run_snark_worker_flag =
-            maybe_from_config ~keyname:"run-snark-worker"
+            maybe_from_config
               ~getter:
                 Option.(
                   fun x ->
@@ -923,7 +817,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               ~preferred_value:run_snark_worker_flag
           in
           let run_snark_coordinator_flag =
-            maybe_from_config ~keyname:"run-snark-coordinator"
+            maybe_from_config
               ~getter:
                 Option.(
                   fun x ->
@@ -932,12 +826,11 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               ~preferred_value:run_snark_coordinator_flag
           in
           let snark_worker_parallelism_flag =
-            maybe_from_config ~keyname:"snark-worker-parallelism"
-              ~getter:DC.snark_worker_parallelism
+            maybe_from_config ~getter:DC.snark_worker_parallelism
               ~preferred_value:snark_worker_parallelism_flag
           in
           let coinbase_receiver_flag =
-            maybe_from_config ~keyname:"coinbase-receiver"
+            maybe_from_config
               ~getter:
                 Option.(
                   fun x ->
@@ -960,12 +853,11 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             { external_ip; bind_ip; peer = None; client_port; libp2p_port }
           in
           let block_production_key =
-            maybe_from_config ~keyname:"block-producer-key"
-              ~getter:DC.block_producer_key
+            maybe_from_config ~getter:DC.block_producer_key
               ~preferred_value:block_production_key
           in
           let block_production_pubkey =
-            maybe_from_config ~keyname:"block-producer-pubkey"
+            maybe_from_config
               ~getter:
                 Option.(
                   fun x ->
@@ -974,8 +866,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               ~preferred_value:block_production_pubkey
           in
           let block_production_password =
-            maybe_from_config ~keyname:"block-producer-password"
-              ~getter:DC.block_producer_password
+            maybe_from_config ~getter:DC.block_producer_password
               ~preferred_value:block_production_password
           in
           Option.iter
@@ -1204,8 +1095,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                   raw_peer ) ;
           let initial_peers =
             let peers =
-              or_from_config ~keyname:"peers" ~getter:DC.peers
-                ~preferred_value:None ~default:[]
+              or_from_config ~getter:DC.peers ~preferred_value:None ~default:[]
             in
             List.concat
               [ List.map ~f:Mina_net2.Multiaddr.of_string libp2p_peers_raw
@@ -1217,12 +1107,12 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             List.map ~f:Mina_net2.Multiaddr.of_string direct_peers_raw
           in
           let min_connections =
-            or_from_config ~keyname:"min-connections" ~getter:DC.min_connections
+            or_from_config ~getter:DC.min_connections
               ~preferred_value:min_connections
               ~default:Cli_lib.Default.min_connections
           in
           let max_connections =
-            or_from_config ~keyname:"max-connections" ~getter:DC.max_connections
+            or_from_config ~getter:DC.max_connections
               ~preferred_value:max_connections
               ~default:Cli_lib.Default.max_connections
           in
@@ -1233,21 +1123,20 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                  ~default:Cli_lib.Default.pubsub_v1 pubsub_v1
              in *)
           let pubsub_v0 =
-            or_from_config ~keyname:"pubsub-v0"
+            or_from_config
               ~getter:
                 Option.(fun x -> DC.pubsub_v0 x >>= to_pubsub_topic_mode_option)
               ~preferred_value:None ~default:Cli_lib.Default.pubsub_v0
           in
 
           let validation_queue_size =
-            or_from_config ~keyname:"validation-queue-size"
-              ~getter:DC.validation_queue_size
+            or_from_config ~getter:DC.validation_queue_size
               ~preferred_value:validation_queue_size
               ~default:Cli_lib.Default.validation_queue_size
           in
           let stop_time =
-            or_from_config ~keyname:"stop-time" ~getter:DC.stop_time
-              ~preferred_value:stop_time ~default:Cli_lib.Default.stop_time
+            or_from_config ~getter:DC.stop_time ~preferred_value:stop_time
+              ~default:Cli_lib.Default.stop_time
           in
           if enable_tracing then Mina_tracing.start conf_dir |> don't_wait_for ;
           let%bind () =
@@ -1974,14 +1863,11 @@ let internal_commands logger =
             Genesis_constants.Compiled.constraint_constants
           in
           let proof_level = Genesis_constants.Proof_level.Full in
-          let config_files =
-            List.map config_files ~f:(fun config_file ->
-                (config_file, `Must_exist) )
-          in
-          let%bind precomputed_values, _config_jsons, _config =
+          let%bind precomputed_values, _ =
             load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
               ~constraint_constants ~proof_level config_files
               ~cli_proof_level:None
+            |> Deferred.Or_error.ok_exn
           in
           let pids = Child_processes.Termination.create_pid_table () in
           let%bind prover =
