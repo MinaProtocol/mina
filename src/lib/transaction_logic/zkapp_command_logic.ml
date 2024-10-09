@@ -496,6 +496,7 @@ module type Ledger_intf = sig
 
   val check_inclusion : t -> account * inclusion_proof -> unit
 
+  (* inclusion proof seems to be the merkle proof in for the public key existing in the ledger *)
   val check_account :
     public_key -> token_id -> account * inclusion_proof -> [ `Is_new of bool ]
 end

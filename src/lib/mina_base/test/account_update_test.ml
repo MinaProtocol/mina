@@ -45,6 +45,7 @@ let update_json_roundtrip () =
     ; token_symbol = Set_or_keep.Set token
     ; timing = Set_or_keep.Set timing
     ; voting_for = Set_or_keep.Set voting_for
+    ; account_deletion = Set_or_keep.Keep
     })
     ~f:(fun update ->
       let module Fd = Fields_derivers_zkapps.Derivers in

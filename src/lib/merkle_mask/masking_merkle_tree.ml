@@ -520,6 +520,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         ; locations = Map.remove t.maps.locations account_id
         } ;
       (* reuse location if possible *)
+      (* maybe we can use a hashmap to make this operation O(1)? *)
       Option.iter t.current_location ~f:(fun curr_loc ->
           if Location.equal location curr_loc then
             match Location.prev location with
@@ -985,6 +986,15 @@ module Make (Inputs : Inputs_intf.S) = struct
       Location.Account
         ( Addr.of_directions
         @@ List.init ledger_depth ~f:(fun _ -> Direction.Left) )
+
+    let delete_account_exn t account_id =
+      assert_is_attached t ;
+      let maps, _ancestor = maps_and_ancestor t in
+      match Map.find maps.locations account_id with
+      | None ->
+          ()
+      | Some location ->
+          remove_account_and_update_hashes t location
 
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t account_id account =

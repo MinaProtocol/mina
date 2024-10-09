@@ -111,6 +111,9 @@ module L = struct
   let create_new_account t id to_set =
     get_or_create_account t id to_set |> Or_error.map ~f:ignore
 
+  let delete_existing_account _t _id =
+    failwith "you can't delete an account from a sparse ledger"
+
   let merkle_root : t -> Ledger_hash.t = fun t -> M.merkle_root !t
 
   let with_ledger : depth:int -> f:(t -> 'a) -> 'a =

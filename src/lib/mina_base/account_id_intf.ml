@@ -97,6 +97,8 @@ module type S = sig
     open Snark_params
     open Tick
 
+    type t
+
     val create : Public_key.Compressed.var -> Digest.Checked.t -> var
 
     val public_key : var -> Public_key.Compressed.var

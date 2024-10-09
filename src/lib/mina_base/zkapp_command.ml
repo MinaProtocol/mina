@@ -485,6 +485,29 @@ module Call_forest = struct
     cons_aux ~digest_account_update:Digest.Account_update.create ?calls
       account_update xs
 
+  module Deprecated = struct
+    let rec accumulate_hashes ~hash_account_update (xs : _ t) =
+      let go = accumulate_hashes ~hash_account_update in
+      match xs with
+      | [] ->
+          []
+      | { elt = { account_update; calls; account_update_digest = _ }
+        ; stack_hash = _
+        }
+        :: xs ->
+          let calls = go calls in
+          let xs = go xs in
+          let node =
+            { Tree.account_update
+            ; calls
+            ; account_update_digest = hash_account_update account_update
+            }
+          in
+          let node_hash = Digest.Tree.create node in
+          { elt = node; stack_hash = Digest.Forest.cons node_hash (hash xs) }
+          :: xs
+  end
+
   let rec accumulate_hashes ~hash_account_update (xs : _ t) =
     let go = accumulate_hashes ~hash_account_update in
     match xs with
@@ -519,6 +542,17 @@ module Call_forest = struct
   module With_hashes_and_data = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type 'data t =
+          ( Account_update.Stable.V2.t * 'data
+          , Digest.Account_update.Stable.V1.t
+          , Digest.Forest.Stable.V1.t )
+          Stable.V1.t
+        [@@deriving sexp, compare, equal, hash, yojson]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type 'data t =
           ( Account_update.Stable.V1.t * 'data
@@ -569,6 +603,17 @@ module Call_forest = struct
   module With_hashes = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type t =
+          ( Account_update.Stable.V2.t
+          , Digest.Account_update.Stable.V1.t
+          , Digest.Forest.Stable.V1.t )
+          Stable.V1.t
+        [@@deriving sexp, compare, equal, hash, yojson]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t =
           ( Account_update.Stable.V1.t
@@ -628,6 +673,17 @@ end
 module Graphql_repr = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        { fee_payer : Account_update.Fee_payer.Stable.V1.t
+        ; account_updates : Account_update.Graphql_repr.Stable.V2.t list
+        ; memo : Signed_command_memo.Stable.V1.t
+        }
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t =
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
@@ -645,6 +701,17 @@ module Simple = struct
   (* For easily constructing values *)
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        { fee_payer : Account_update.Fee_payer.Stable.V1.t
+        ; account_updates : Account_update.Simple.Stable.V2.t list
+        ; memo : Signed_command_memo.Stable.V1.t
+        }
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t =
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
@@ -653,6 +720,7 @@ module Simple = struct
         }
       [@@deriving sexp, compare, equal, hash, yojson]
 
+      (* TODO sai modify this to convert to the latest version? *)
       let to_latest = Fn.id
     end
   end]
@@ -674,11 +742,11 @@ module T = struct
        add hash_zkapp_command_vn for that version
     *)
 
-    module V1 = struct
-      type t = Mina_wire_types.Mina_base.Zkapp_command.V1.t =
+    module V2 = struct
+      type t = Mina_wire_types.Mina_base.Zkapp_command.V2.t =
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
         ; account_updates :
-            ( Account_update.Stable.V1.t
+            ( Account_update.Stable.V2.t
             , Digest.Account_update.Stable.V1.t
             , Digest.Forest.Stable.V1.t )
             Call_forest.Stable.V1.t
@@ -695,7 +763,7 @@ module T = struct
             type t =
               { fee_payer : Account_update.Fee_payer.Stable.V1.t
               ; account_updates :
-                  ( Account_update.Stable.V1.t
+                  ( Account_update.Stable.V2.t
                   , unit
                   , unit )
                   Call_forest.Stable.V1.t
@@ -1027,6 +1095,22 @@ let check_authorization (p : Account_update.t) : unit Or_error.t =
 module Verifiable : sig
   [%%versioned:
   module Stable : sig
+    module V2 : sig
+      type t = private
+        { fee_payer : Account_update.Fee_payer.Stable.V1.t
+        ; account_updates :
+            ( Side_loaded_verification_key.Stable.V2.t
+            , Zkapp_basic.F.Stable.V1.t )
+            With_hash.Stable.V1.t
+            option
+            Call_forest.With_hashes_and_data.Stable.V2.t
+        ; memo : Signed_command_memo.Stable.V1.t
+        }
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      val to_latest : t -> t
+    end
+
     module V1 : sig
       type t = private
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
@@ -1097,6 +1181,22 @@ module Verifiable : sig
 end = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        { fee_payer : Account_update.Fee_payer.Stable.V1.t
+        ; account_updates :
+            ( Side_loaded_verification_key.Stable.V2.t
+            , Zkapp_basic.F.Stable.V1.t )
+            With_hash.Stable.V1.t
+            option
+            Call_forest.With_hashes_and_data.Stable.V2.t
+        ; memo : Signed_command_memo.Stable.V1.t
+        }
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t =
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
@@ -1110,6 +1210,7 @@ end = struct
         }
       [@@deriving sexp, compare, equal, hash, yojson]
 
+      (* fix this sai todo *)
       let to_latest = Fn.id
     end
   end]
@@ -1447,8 +1548,8 @@ let weight (zkapp_command : t) : int =
 module type Valid_intf = sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
-      type t = private { zkapp_command : T.Stable.V1.t }
+    module V2 : sig
+      type t = private { zkapp_command : T.Stable.V2.t }
       [@@deriving sexp, compare, equal, hash, yojson]
     end
   end]
@@ -1472,7 +1573,7 @@ end
 
 module Valid :
   Valid_intf
-    with type Stable.V1.t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V1.t =
+    with type Stable.V2.t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V2.t =
 struct
   module S = Stable
 
@@ -1490,9 +1591,9 @@ struct
 
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V1.t =
-        { zkapp_command : S.V1.t }
+    module V2 = struct
+      type t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V2.t =
+        { zkapp_command : S.V2.t }
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id

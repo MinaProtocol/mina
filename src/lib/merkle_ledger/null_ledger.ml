@@ -113,6 +113,9 @@ end = struct
   let get_or_create_account _t =
     failwith "get_or_create_account: null ledgers cannot be mutated"
 
+  let delete_account_exn _t _ =
+    failwith "delete_account_exn: null ledgers cannot be mutated"
+
   let location_of_account _t _ = None
 
   let location_of_account_batch _t accts =

@@ -313,6 +313,9 @@ module Ledger_inner = struct
   let create_new_account t account_id account =
     Or_error.try_with (fun () -> create_new_account_exn t account_id account)
 
+  let delete_existing_account t account_id =
+    Or_error.try_with (fun () -> delete_account_exn t account_id)
+
   (* shadows definition in MaskedLedger, extra assurance hash is of right type  *)
   let merkle_root t =
     Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)
