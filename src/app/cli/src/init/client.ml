@@ -513,7 +513,7 @@ let send_payment_graphql =
     flag "--amount" ~aliases:[ "amount" ]
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
-  let config_file = Cli_lib.Flag.conf_file in
+  let config_file = Cli_lib.Flag.config_files in
   let args =
     Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
       config_file
@@ -558,7 +558,7 @@ let delegate_stake_graphql =
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
-  let config_file = Cli_lib.Flag.conf_file in
+  let config_file = Cli_lib.Flag.config_files in
   let args =
     Args.zip3 Cli_lib.Flag.signed_command_common receiver_flag config_file
   in
@@ -835,7 +835,7 @@ let hash_ledger =
          flag "--ledger-file"
            ~doc:"LEDGER-FILE File containing an exported ledger"
            (required string))
-     and config_file = Cli_lib.Flag.conf_file
+     and config_file = Cli_lib.Flag.config_files
      and plaintext = Cli_lib.Flag.plaintext in
      fun () ->
        let open Deferred.Let_syntax in
@@ -947,7 +947,7 @@ let currency_in_ledger =
 let constraint_system_digests =
   let open Command.Let_syntax in
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
-    (let%map_open config_file = Cli_lib.Flag.conf_file in
+    (let%map_open config_file = Cli_lib.Flag.config_files in
      fun () ->
        let open Deferred.Let_syntax in
        let%bind constraint_constants, proof_level =
@@ -1672,7 +1672,7 @@ let generate_libp2p_keypair =
     ~summary:"Generate a new libp2p keypair and print out the peer ID"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path
-    and config_file = Cli_lib.Flag.conf_file in
+    and config_file = Cli_lib.Flag.config_files in
     generate_libp2p_keypair_do privkey_path ~config_file)
 
 let dump_libp2p_keypair_do privkey_path ~config_file =
@@ -1709,7 +1709,7 @@ let dump_libp2p_keypair =
   Command.async ~summary:"Print an existing libp2p keypair"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_read_path
-    and config_file = Cli_lib.Flag.conf_file in
+    and config_file = Cli_lib.Flag.config_files in
     dump_libp2p_keypair_do privkey_path ~config_file)
 
 let trustlist_ip_flag =
@@ -1840,7 +1840,7 @@ let compile_time_constants =
   let open Command.Let_syntax in
   Command.async
     ~summary:"Print a JSON map of the compile-time consensus parameters"
-    (let%map_open config_file = Cli_lib.Flag.conf_file in
+    (let%map_open config_file = Cli_lib.Flag.config_files in
      fun () ->
        let home = Core.Sys.home_directory () in
        let conf_dir = home ^/ Cli_lib.Default.conf_dir_name in
@@ -2356,7 +2356,7 @@ let test_ledger_application =
        flag "--has-second-partition"
          ~doc:"Assume there is a second partition (scan state)" no_arg
      and tracing = flag "--tracing" ~doc:"Wrap test into tracing" no_arg
-     and config_file = Cli_lib.Flag.conf_file
+     and config_file = Cli_lib.Flag.config_files
      and no_masks = flag "--no-masks" ~doc:"Do not create masks" no_arg in
      Cli_lib.Exceptions.handle_nicely
      @@ fun () ->
@@ -2399,7 +2399,7 @@ let itn_create_accounts =
         ~doc:"NN Amount in nanomina to be divided among new accounts"
         (required int)
     in
-    let config_file = Cli_lib.Flag.conf_file in
+    let config_file = Cli_lib.Flag.config_files in
     let args =
       Args.zip6 privkey_path key_prefix num_accounts fee amount config_file
     in

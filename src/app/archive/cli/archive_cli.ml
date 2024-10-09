@@ -41,19 +41,21 @@ let command_run =
      fun () ->
        let logger = Logger.create () in
        let open Deferred.Let_syntax in
-       let%bind constants =
-         Runtime_config.Constants.load_constants ~logger
+       let%bind config =
+         Runtime_config.Json_loader.load_config_files ~logger
            (Option.to_list runtime_config_file)
+         |> Deferred.Or_error.ok_exn
        in
-       let%bind runtime_config_opt =
+       let constants = Runtime_config.Constants.load_constants' config in
+       let%bind precomputed_values_opt =
          match runtime_config_file with
          | None ->
              return None
-         | Some file ->
+         | Some _ ->
              Deferred.Or_error.(
-               Genesis_ledger_helper.Config_loader.load_config_files ~logger
-                 [ file ]
-               >>| fun a -> Option.some @@ fst a)
+               Genesis_ledger_helper.Config_loader.init_from_config_file ~logger
+                 ~constants config
+               >>| fun (a, _) -> Option.some a)
              |> Deferred.Or_error.ok_exn
        in
        Stdout_log.setup log_json log_level ;
@@ -67,7 +69,7 @@ let command_run =
          ~postgres_address:postgres.value
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)
-         ~delete_older_than ~runtime_config_opt ~missing_blocks_width )
+         ~delete_older_than ~precomputed_values_opt ~missing_blocks_width )
 
 let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)

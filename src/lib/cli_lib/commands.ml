@@ -230,7 +230,7 @@ module Vrf = struct
         flag "--total-stake"
           ~doc:"AMOUNT The total balance of all accounts in the epoch ledger"
           (optional int)
-      and config_file = Flag.conf_file in
+      and config_file = Flag.config_files in
       Exceptions.handle_nicely
       @@ fun () ->
       let env = Secrets.Keypair.env in
@@ -302,7 +302,7 @@ module Vrf = struct
          stdin"
       (let open Command.Let_syntax in
       let%map_open privkey_path = Flag.privkey_read_path
-      and config_file = Flag.conf_file in
+      and config_file = Flag.config_files in
       Exceptions.handle_nicely
       @@ fun () ->
       let env = Secrets.Keypair.env in
@@ -371,7 +371,7 @@ module Vrf = struct
          ledger; this should be done manually to confirm whether threshold_met \
          in the output corresponds to an actual won block."
       (let open Command.Let_syntax in
-      let%map_open config_file = Flag.conf_file in
+      let%map_open config_file = Flag.config_files in
       Exceptions.handle_nicely
       @@ fun () ->
       let open Deferred.Let_syntax in
@@ -382,7 +382,6 @@ module Vrf = struct
         in
         Runtime_config.Constants.constraint_constants conf
       in
-      (* TODO-someday: constraint constants from config file. *)
       let lexbuf = Lexing.from_channel In_channel.stdin in
       let lexer = Yojson.init_lexer () in
       let%bind () =

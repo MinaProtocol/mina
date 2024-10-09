@@ -1001,14 +1001,6 @@ module Proof_keys = struct
     type t = Log_2 of int | Txns_per_second_x10 of int
     [@@deriving bin_io_unversioned]
 
-    let log2 = function Log_2 i -> Some i | Txns_per_second_x10 _ -> None
-
-    let txns_per_second_x10 = function
-      | Log_2 _ ->
-          None
-      | Txns_per_second_x10 i ->
-          Some i
-
     let to_json_layout : t -> Json_layout.Proof_keys.Transaction_capacity.t =
       function
       | Log_2 i ->
@@ -1039,6 +1031,30 @@ module Proof_keys = struct
     let small : t = Log_2 2
 
     let medium : t = Log_2 3
+
+    let to_transaction_capacity_log_2 ~block_window_duration_ms
+        ~transaction_capacity =
+      match transaction_capacity with
+      | Log_2 i ->
+          i
+      | Txns_per_second_x10 tps_goal_x10 ->
+          let max_coinbases = 2 in
+          let max_user_commands_per_block =
+            (* block_window_duration is in milliseconds, so divide by 1000 divide
+               by 10 again because we have tps * 10
+            *)
+            tps_goal_x10 * block_window_duration_ms / (1000 * 10)
+          in
+          (* Log of the capacity of transactions per transition.
+              - 1 will only work if we don't have prover fees.
+              - 2 will work with prover fees, but not if we want a transaction
+                included in every block.
+              - At least 3 ensures a transaction per block and the staged-ledger
+                unit tests pass.
+          *)
+          1
+          + Core_kernel.Int.ceil_log2
+              (max_user_commands_per_block + max_coinbases)
   end
 
   type t =
@@ -1881,6 +1897,10 @@ module Constants : Constants_intf = struct
         in
         Option.first_some b a
       in
+      let block_window_duration_ms =
+        Option.value ~default:a.constraint_constants.block_window_duration_ms
+          Option.(b.proof >>= fun p -> p.block_window_duration_ms)
+      in
       { a.constraint_constants with
         sub_windows_per_window =
           Option.value ~default:a.constraint_constants.sub_windows_per_window
@@ -1891,16 +1911,17 @@ module Constants : Constants_intf = struct
       ; work_delay =
           Option.value ~default:a.constraint_constants.work_delay
             Option.(b.proof >>= fun p -> p.work_delay)
-      ; block_window_duration_ms =
-          Option.value ~default:a.constraint_constants.block_window_duration_ms
-            Option.(b.proof >>= fun p -> p.block_window_duration_ms)
+      ; block_window_duration_ms
       ; transaction_capacity_log_2 =
           Option.value
             ~default:a.constraint_constants.transaction_capacity_log_2
             Option.(
               b.proof
               >>= fun p ->
-              p.transaction_capacity >>= Proof_keys.Transaction_capacity.log2)
+              p.transaction_capacity
+              >>| fun transaction_capacity ->
+              Proof_keys.Transaction_capacity.to_transaction_capacity_log_2
+                ~block_window_duration_ms ~transaction_capacity)
       ; coinbase_amount =
           Option.value ~default:a.constraint_constants.coinbase_amount
             Option.(b.proof >>= fun p -> p.coinbase_amount)
@@ -1950,25 +1971,22 @@ module Constants : Constants_intf = struct
     { genesis_constants; constraint_constants; proof_level; compile_config }
 
   let load_constants' ?itn_features ?cli_proof_level runtime_config =
-    let constants =
-      let compile_constants =
-        { genesis_constants = Genesis_constants.Compiled.genesis_constants
-        ; constraint_constants = Genesis_constants.Compiled.constraint_constants
-        ; proof_level = Genesis_constants.Compiled.proof_level
-        ; compile_config = Mina_compile_config.Compiled.t
-        }
-      in
-      let cs = combine compile_constants runtime_config in
-      { cs with
-        proof_level = Option.value ~default:cs.proof_level cli_proof_level
-      ; compile_config =
-          { cs.compile_config with
-            itn_features =
-              Option.value ~default:cs.compile_config.itn_features itn_features
-          }
+    let compile_constants =
+      { genesis_constants = Genesis_constants.Compiled.genesis_constants
+      ; constraint_constants = Genesis_constants.Compiled.constraint_constants
+      ; proof_level = Genesis_constants.Compiled.proof_level
+      ; compile_config = Mina_compile_config.Compiled.t
       }
     in
-    constants
+    let cs = combine compile_constants runtime_config in
+    { cs with
+      proof_level = Option.value ~default:cs.proof_level cli_proof_level
+    ; compile_config =
+        { cs.compile_config with
+          itn_features =
+            Option.value ~default:cs.compile_config.itn_features itn_features
+        }
+    }
 
   (* Use this function if you don't need/want the ledger configuration *)
   let load_constants ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level

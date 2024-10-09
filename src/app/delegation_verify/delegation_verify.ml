@@ -13,7 +13,7 @@ let get_filenames =
 let verify_snark_work ~verify_transaction_snarks ~proof ~message =
   verify_transaction_snarks [ (proof, message) ]
 
-let config_flag = Cli_lib.Flag.conf_file
+let config_flag = Cli_lib.Flag.config_files
 
 let keyspace_flag =
   let open Command.Param in

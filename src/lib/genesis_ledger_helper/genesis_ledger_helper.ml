@@ -772,6 +772,7 @@ module type Config_loader_intf = sig
     -> string list
     -> (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t
 
+  (* Mostly loads genesis ledger and epoch data *)
   val init_from_config_file :
        ?overwrite_version:Mina_numbers.Txn_version.t
     -> ?genesis_dir:string
@@ -787,7 +788,6 @@ module Config_loader : Config_loader_intf = struct
       (config : Runtime_config.t) =
     print_config ~logger config ;
     let open Deferred.Or_error.Let_syntax in
-    let blockchain_proof_system_id = None in
     let constraint_constants =
       Runtime_config.Constants.constraint_constants constants
     in
@@ -825,7 +825,7 @@ module Config_loader : Config_loader_intf = struct
     let proof_inputs =
       Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
         ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
-        ~compile_config ~blockchain_proof_system_id ~genesis_epoch_data
+        ~compile_config ~blockchain_proof_system_id:None ~genesis_epoch_data
     in
     (proof_inputs, config)
 
@@ -840,19 +840,6 @@ module Config_loader : Config_loader_intf = struct
     in
     let values = Genesis_proof.create_values_no_proof inputs in
     (values, config)
-
-  let%test_module "Account config test" =
-    ( module struct
-      let%test_unit "Runtime config <=> Account" =
-        let module Ledger = (val Genesis_ledger.for_unit_tests) in
-        let accounts = Lazy.force Ledger.accounts in
-        List.iter accounts ~f:(fun (sk, acc) ->
-            let acc_config = Accounts.Single.of_account acc sk in
-            let acc' =
-              Accounts.Single.to_account_with_pk acc_config |> Or_error.ok_exn
-            in
-            [%test_eq: Account.t] acc acc' )
-    end )
 
   let load_config_files ?overwrite_version ?genesis_dir ?(itn_features = false)
       ?cli_proof_level ?conf_dir ~logger (config_files : string list) =
@@ -906,3 +893,16 @@ module Config_loader : Config_loader_intf = struct
           ~metadata ;
         Error.raise err
 end
+
+let%test_module "Account config test" =
+  ( module struct
+    let%test_unit "Runtime config <=> Account" =
+      let module Ledger = (val Genesis_ledger.for_unit_tests) in
+      let accounts = Lazy.force Ledger.accounts in
+      List.iter accounts ~f:(fun (sk, acc) ->
+          let acc_config = Accounts.Single.of_account acc sk in
+          let acc' =
+            Accounts.Single.to_account_with_pk acc_config |> Or_error.ok_exn
+          in
+          [%test_eq: Account.t] acc acc' )
+  end )
