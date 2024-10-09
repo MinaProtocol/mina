@@ -604,14 +604,12 @@ module Protocol_circuits = struct
   (* Full because we want to be sure nothing changes *)
   let proof_level = Genesis_constants.Proof_level.Full
 
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants
-
   let print_hash print expected digest : unit =
     if print then (
       Format.printf "expected:\n%s\n" expected ;
       Format.printf "obtained:\n%s\n" digest )
 
-  let blockchain () : unit =
+  let blockchain ~constraint_constants () : unit =
     let expected = "36786c300e37c2a2f1341ad6374aa113" in
     let digest =
       Blockchain_snark.Blockchain_snark_state.constraint_system_digests
@@ -626,7 +624,7 @@ module Protocol_circuits = struct
     assert digests_match ;
     ()
 
-  let transaction () : unit =
+  let transaction ~constraint_constants () : unit =
     let expected1 = "b8879f677f622a1d86648030701f43e1" in
     let expected2 = "740db2397b0b01806a48f061a2e2b063" in
     let digest =
@@ -651,9 +649,9 @@ module Protocol_circuits = struct
     assert check ;
     ()
 
-  let tests =
-    [ ("test blockchain circuit", `Quick, blockchain)
-    ; ("test transaction circuit", `Quick, transaction)
+  let tests ~constraint_constants =
+    [ ("test blockchain circuit", `Quick, blockchain ~constraint_constants)
+    ; ("test transaction circuit", `Quick, transaction ~constraint_constants)
     ]
 end
 
@@ -666,8 +664,17 @@ let api_tests =
   ]
 
 let () =
+  Async.Thread_safe.block_on_async_exn
+  @@ fun () ->
   let range_checks =
     List.map ~f:QCheck_alcotest.to_alcotest [ RangeCircuits.test_range_gates ]
+  in
+  let logger = Logger.create () in
+  let%map.Async.Deferred constraint_constants =
+    let%map.Async.Deferred config =
+      Runtime_config.Constants.load_constants ~logger []
+    in
+    Runtime_config.Constants.constraint_constants config
   in
   Alcotest.run "Simple snarky tests"
     [ ("outside of circuit tests before", outside_circuit_tests)
@@ -675,7 +682,7 @@ let () =
     ; ("circuit tests", circuit_tests)
     ; ("As_prover tests", As_prover_circuits.as_prover_tests)
     ; ("range checks", range_checks)
-    ; ("protocol circuits", Protocol_circuits.tests)
+    ; ("protocol circuits", Protocol_circuits.tests ~constraint_constants)
     ; ("improper calls", Improper_calls.tests)
       (* We run the pure functions before and after other tests,
          because we've had bugs in the past where it would only work after the global state was initialized by an API function
