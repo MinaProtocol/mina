@@ -23,7 +23,7 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen =
           [ SelectFiles.strictly SelectFiles::{ exts = Some [ "md" ] }
-          , SelectFiles.strictly (SelectFiles.contains ".xrefcheck.yml")
+          , SelectFiles.strictly (SelectFiles.contains ".xrefcheck.yaml")
           ]
         , path = "Lint"
         , name = "Xrefcheck"
