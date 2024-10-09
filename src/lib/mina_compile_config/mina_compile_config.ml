@@ -38,8 +38,8 @@ type t =
   ; network_id : string
   ; zkapp_cmd_limit : int option
   ; rpc_handshake_timeout : Time.Span.t
-  ; rpc_heartbeat_timeout : Time.Span.t
-  ; rpc_heartbeat_send_every : Time.Span.t
+  ; rpc_heartbeat_timeout : Time_ns.Span.t
+  ; rpc_heartbeat_send_every : Time_ns.Span.t
   ; zkapps_disabled : bool
   }
 [@@deriving sexp_of]
@@ -62,9 +62,9 @@ let make (inputs : Inputs.t) =
   ; vrf_poll_interval =
       Float.of_int inputs.vrf_poll_interval_ms |> Time.Span.of_ms
   ; rpc_handshake_timeout = Time.Span.of_sec inputs.rpc_handshake_timeout_sec
-  ; rpc_heartbeat_timeout = Time.Span.of_sec inputs.rpc_heartbeat_timeout_sec
+  ; rpc_heartbeat_timeout = Time_ns.Span.of_sec inputs.rpc_heartbeat_timeout_sec
   ; rpc_heartbeat_send_every =
-      Time.Span.of_sec inputs.rpc_heartbeat_send_every_sec
+      Time_ns.Span.of_sec inputs.rpc_heartbeat_send_every_sec
   ; network_id = inputs.network_id
   ; zkapp_cmd_limit = inputs.zkapp_cmd_limit
   ; zkapps_disabled = inputs.zkapps_disabled
@@ -89,9 +89,9 @@ let to_yojson t =
     ; ( "rpc_handshake_timeout"
       , `Float (Time.Span.to_sec t.rpc_handshake_timeout) )
     ; ( "rpc_heartbeat_timeout"
-      , `Float (Time.Span.to_sec t.rpc_heartbeat_timeout) )
+      , `Float (Time_ns.Span.to_sec t.rpc_heartbeat_timeout) )
     ; ( "rpc_heartbeat_send_every"
-      , `Float (Time.Span.to_sec t.rpc_heartbeat_send_every) )
+      , `Float (Time_ns.Span.to_sec t.rpc_heartbeat_send_every) )
     ; ("network_id", `String t.network_id)
     ; ( "zkapp_cmd_limit"
       , Option.value_map ~default:`Null ~f:(fun x -> `Int x) t.zkapp_cmd_limit

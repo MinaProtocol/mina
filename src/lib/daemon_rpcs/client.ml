@@ -17,14 +17,8 @@ let dispatch ~(compile_config : Mina_compile_config.t) rpc query
               ~handshake_timeout:compile_config.rpc_handshake_timeout
               ~heartbeat_config:
                 (Rpc.Connection.Heartbeat_config.create
-                   ~timeout:
-                     ( compile_config.rpc_heartbeat_timeout |> Time.Span.to_sec
-                     |> Time_ns.Span.of_sec )
-                   ~send_every:
-                     ( compile_config.rpc_heartbeat_send_every
-                     |> Time.Span.to_sec |> Time_ns.Span.of_sec )
-                   () )
-              r w
+                   ~timeout:compile_config.rpc_heartbeat_timeout
+                   ~send_every:compile_config.rpc_heartbeat_send_every () ) r w
               ~connection_state:(fun _ -> ())
           with
           | Error exn ->

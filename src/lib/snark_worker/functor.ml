@@ -125,15 +125,10 @@ module Make (Inputs : Intf.Inputs_intf) :
         ~handshake_timeout:compile_config.rpc_handshake_timeout
         ~heartbeat_config:
           (Rpc.Connection.Heartbeat_config.create
-             ~timeout:
-               ( compile_config.rpc_heartbeat_timeout |> Time.Span.to_sec
-               |> Time_ns.Span.of_sec )
-             ~send_every:
-               ( compile_config.rpc_heartbeat_send_every |> Time.Span.to_sec
-               |> Time_ns.Span.of_sec )
-             () )
-        (Tcp.Where_to_connect.of_host_and_port address)
-        (fun conn -> Rpc.Rpc.dispatch rpc conn query)
+             ~timeout:compile_config.rpc_heartbeat_timeout
+             ~send_every:compile_config.rpc_heartbeat_send_every () )
+        (Tcp.Where_to_connect.of_host_and_port address) (fun conn ->
+          Rpc.Rpc.dispatch rpc conn query )
     in
     match res with
     | Error exn ->

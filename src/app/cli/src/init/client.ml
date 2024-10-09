@@ -39,19 +39,17 @@ let or_error_str ~f_ok ~error = function
   | Error e ->
       sprintf "%s\n%s\n" error (Error.to_string_hum e)
 
+let load_compile_config ?(logger = Logger.create ()) config_file =
+  let%map conf = Runtime_config.Constants.load_constants ~logger config_file in
+  Runtime_config.Constants.compile_config conf
+
 let stop_daemon =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
   Command.async ~summary:"Stop the daemon"
     (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.conf_file
        ~f:(fun port config_file ->
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          let%map res =
            Daemon_rpcs.Client.dispatch ~compile_config Stop_daemon.rpc () port
          in
@@ -182,13 +180,7 @@ let get_trust_status =
   Command.async ~summary:"Get the trust status associated with an IP address"
     (Cli_lib.Background_daemon.rpc_init flags
        ~f:(fun port (config_file, ip_address, json) ->
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          match%map
            Daemon_rpcs.Client.dispatch ~compile_config
              Daemon_rpcs.Get_trust_status.rpc ip_address port
@@ -227,13 +219,7 @@ let get_trust_status_all =
     ~summary:"Get trust statuses for all peers known to the trust system"
     (Cli_lib.Background_daemon.rpc_init flags
        ~f:(fun port (config_file, nonzero, json) ->
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          match%map
            Daemon_rpcs.Client.dispatch ~compile_config
              Daemon_rpcs.Get_trust_status_all.rpc () port
@@ -272,13 +258,7 @@ let reset_trust_status =
   Command.async ~summary:"Reset the trust status associated with an IP address"
     (Cli_lib.Background_daemon.rpc_init flags
        ~f:(fun port (config_file, ip_address, json) ->
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          match%map
            Daemon_rpcs.Client.dispatch ~compile_config
              Daemon_rpcs.Reset_trust_status.rpc ip_address port
@@ -302,13 +282,7 @@ let get_public_keys =
     (Cli_lib.Background_daemon.rpc_init
        (Args.zip3 config_file with_details_flag Cli_lib.Flag.json)
        ~f:(fun port (config_file, is_balance_included, json) ->
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          if is_balance_included then
            Daemon_rpcs.Client.dispatch_pretty_message ~compile_config ~json
              ~join_error:Or_error.join ~error_ctx
@@ -364,13 +338,7 @@ let verify_receipt =
        (Args.zip5 config_file payment_path_flag proof_path_flag address_flag
           token_flag )
        ~f:(fun port (config_file, payment_path, proof_path, pk, token_id) ->
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          let account_id = Account_id.create pk token_id in
          let dispatch_result =
            let open Deferred.Or_error.Let_syntax in
@@ -444,13 +412,7 @@ let get_nonce_cmd =
     (Cli_lib.Background_daemon.rpc_init flags
        ~f:(fun port (config_file, pk, token_flag) ->
          let account_id = Account_id.create pk token_flag in
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          match%bind
            get_nonce ~compile_config ~rpc:Daemon_rpcs.Get_nonce.rpc account_id
              port
@@ -470,13 +432,7 @@ let status =
   Command.async ~summary:"Get running daemon status"
     (Cli_lib.Background_daemon.rpc_init flag
        ~f:(fun port (config_file, json, performance) ->
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          Daemon_rpcs.Client.dispatch_pretty_message ~compile_config ~json
            ~join_error:Fn.id ~error_ctx:"Failed to get status"
            (module Daemon_rpcs.Types.Status)
@@ -492,13 +448,7 @@ let status_clear_hist =
   Command.async ~summary:"Clear histograms reported in status"
     (Cli_lib.Background_daemon.rpc_init flag
        ~f:(fun port (config_file, json, performance) ->
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          Daemon_rpcs.Client.dispatch_pretty_message ~compile_config ~json
            ~join_error:Fn.id
            ~error_ctx:"Failed to clear histograms reported in status"
@@ -559,13 +509,7 @@ let batch_send_payments =
   in
   let main port (config_file, privkey_path, payments_path) =
     let open Deferred.Let_syntax in
-    let%bind compile_config =
-      let logger = Logger.create () in
-      let%map conf =
-        Runtime_config.Constants.load_constants ~logger config_file
-      in
-      Runtime_config.Constants.compile_config conf
-    in
+    let%bind compile_config = load_compile_config config_file in
     let%bind keypair =
       Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair" privkey_path
     and infos = get_infos payments_path in
@@ -623,13 +567,7 @@ let send_payment_graphql =
             , config_file )
           ->
          let open Deferred.Let_syntax in
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          let fee =
            Option.value ~default:compile_config.default_transaction_fee fee
          in
@@ -665,13 +603,7 @@ let delegate_stake_graphql =
             ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver, config_file)
           ->
          let open Deferred.Let_syntax in
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          let fee =
            Option.value ~default:compile_config.default_transaction_fee fee
          in
@@ -887,13 +819,7 @@ let export_ledger =
     (Cli_lib.Background_daemon.rpc_init flags
        ~f:(fun port (config_file, state_hash, plaintext, ledger_kind) ->
          let open Deferred.Let_syntax in
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          let check_for_state_hash () =
            if Option.is_some state_hash then (
              Format.eprintf "A state hash should not be given for %s@."
@@ -1082,13 +1008,7 @@ let snark_job_list =
        blocks"
     (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.conf_file
        ~f:(fun port config_file ->
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          match%map
            Daemon_rpcs.Client.dispatch_join_errors ~compile_config
              Daemon_rpcs.Snark_job_list.rpc () port
@@ -1215,13 +1135,7 @@ let start_tracing =
     ~summary:"Start async tracing to $config-directory/trace/$pid.trace"
     (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.conf_file
        ~f:(fun port config_file ->
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          match%map
            Daemon_rpcs.Client.dispatch ~compile_config
              Daemon_rpcs.Start_tracing.rpc () port
@@ -1235,13 +1149,7 @@ let stop_tracing =
   Command.async ~summary:"Stop async tracing"
     (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.conf_file
        ~f:(fun port config_file ->
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          match%map
            Daemon_rpcs.Client.dispatch ~compile_config
              Daemon_rpcs.Stop_tracing.rpc () port
@@ -1258,13 +1166,7 @@ let start_internal_tracing =
        $config-directory/internal-tracing/internal-trace.jsonl"
     (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.conf_file
        ~f:(fun port config_file ->
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          match%map
            Daemon_rpcs.Client.dispatch ~compile_config
              Daemon_rpcs.Start_internal_tracing.rpc () port
@@ -1278,13 +1180,7 @@ let stop_internal_tracing =
   Command.async ~summary:"Stop internal tracing"
     (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.conf_file
        ~f:(fun port config_file ->
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          match%map
            Daemon_rpcs.Client.dispatch ~compile_config
              Daemon_rpcs.Stop_internal_tracing.rpc () port
@@ -1777,12 +1673,7 @@ let generate_libp2p_keypair_do privkey_path ~config_file =
     (let open Deferred.Let_syntax in
     (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
     let logger = Logger.null () in
-    let%bind compile_config =
-      let%map conf =
-        Runtime_config.Constants.load_constants ~logger config_file
-      in
-      Runtime_config.Constants.compile_config conf
-    in
+    let%bind compile_config = load_compile_config config_file in
     (* Using the helper only for keypair generation requires no state. *)
     File_system.with_temp_dir "mina-generate-libp2p-keypair" ~f:(fun tmpd ->
         match%bind
@@ -1817,12 +1708,7 @@ let dump_libp2p_keypair_do privkey_path ~config_file =
   Deferred.ignore_m
     (let open Deferred.Let_syntax in
     let logger = Logger.null () in
-    let%bind compile_config =
-      let%map conf =
-        Runtime_config.Constants.load_constants ~logger config_file
-      in
-      Runtime_config.Constants.compile_config conf
-    in
+    let%bind compile_config = load_compile_config config_file in
 
     (* Using the helper only for keypair generation requires no state. *)
     File_system.with_temp_dir "mina-dump-libp2p-keypair" ~f:(fun tmpd ->
@@ -1862,13 +1748,7 @@ let trustlist_add =
        (Args.zip2 Cli_lib.Flag.conf_file trustlist_ip_flag)
        ~f:(fun port (config_file, trustlist_ip) ->
          let trustlist_ip_string = Unix.Cidr.to_string trustlist_ip in
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          match%map
            Client.dispatch ~compile_config Add_trustlist.rpc trustlist_ip port
          with
@@ -1889,13 +1769,7 @@ let trustlist_remove =
        (Args.zip2 Cli_lib.Flag.conf_file trustlist_ip_flag)
        ~f:(fun port (config_file, trustlist_ip) ->
          let trustlist_ip_string = Unix.Cidr.to_string trustlist_ip in
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          match%map
            Client.dispatch ~compile_config Remove_trustlist.rpc trustlist_ip
              port
@@ -1914,13 +1788,7 @@ let trustlist_list =
   Command.async ~summary:"List the CIDR masks in the trustlist"
     (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.conf_file
        ~f:(fun port config_file ->
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          match%map
            Client.dispatch ~compile_config Get_trustlist.rpc () port
          with
@@ -2113,13 +1981,7 @@ let node_status =
            Option.map peers ~f:(fun peers ->
                List.map peers ~f:Mina_net2.Multiaddr.of_string )
          in
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          match%map
            Daemon_rpcs.Client.dispatch ~compile_config
              Daemon_rpcs.Get_node_status.rpc peer_ids_opt port
@@ -2145,13 +2007,7 @@ let object_lifetime_statistics =
   Command.async ~summary:"Dump internal object lifetime statistics to JSON"
     (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.conf_file
        ~f:(fun port config_file ->
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          match%map
            Client.dispatch ~compile_config Get_object_lifetime_statistics.rpc ()
              port
@@ -2263,13 +2119,7 @@ let archive_blocks =
          in
          let add_to_success_file = output_file_line success_file in
          let add_to_failure_file = output_file_line failure_file in
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          let send_precomputed_block =
            make_send_block
              ~graphql_make:(fun block ->
@@ -2393,13 +2243,7 @@ let chain_id_inputs =
     (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.conf_file
        ~f:(fun port config_file ->
          let open Daemon_rpcs in
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
+         let%bind compile_config = load_compile_config config_file in
          match%map
            Client.dispatch ~compile_config Chain_id_inputs.rpc () port
          with
@@ -2638,13 +2482,7 @@ module Visualization = struct
          (Args.zip2 Cli_lib.Flag.conf_file
             Command.Param.(anon @@ ("output-filepath" %: string)) )
          ~f:(fun port (config_file, filename) ->
-           let%bind compile_config =
-             let logger = Logger.create () in
-             let%map conf =
-               Runtime_config.Constants.load_constants ~logger config_file
-             in
-             Runtime_config.Constants.compile_config conf
-           in
+           let%bind compile_config = load_compile_config config_file in
            let%map message =
              match%map
                Daemon_rpcs.Client.dispatch ~compile_config rpc filename port

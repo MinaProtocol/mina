@@ -367,12 +367,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           let config =
             { Itn_logger.rpc_handshake_timeout =
                 compile_config.rpc_handshake_timeout
-            ; rpc_heartbeat_timeout =
-                compile_config.rpc_heartbeat_timeout |> Time.Span.to_sec
-                |> Time_ns.Span.of_sec
-            ; rpc_heartbeat_send_every =
-                compile_config.rpc_heartbeat_send_every |> Time.Span.to_sec
-                |> Time_ns.Span.of_sec
+            ; rpc_heartbeat_timeout = compile_config.rpc_heartbeat_timeout
+            ; rpc_heartbeat_send_every = compile_config.rpc_heartbeat_send_every
             }
           in
           return
@@ -612,15 +608,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                  ~handshake_timeout:compile_config.rpc_handshake_timeout
                  ~heartbeat_config:
                    (Rpc.Connection.Heartbeat_config.create
-                      ~timeout:
-                        (Time_ns.Span.of_sec
-                           (Time.Span.to_sec
-                              compile_config.rpc_heartbeat_timeout ) )
-                      ~send_every:
-                        (Time_ns.Span.of_sec
-                           (Time.Span.to_sec
-                              compile_config.rpc_heartbeat_send_every ) )
-                      () )
+                      ~timeout:compile_config.rpc_heartbeat_timeout
+                      ~send_every:compile_config.rpc_heartbeat_send_every () )
                  reader writer
                  ~implementations:
                    (Rpc.Implementations.create_exn

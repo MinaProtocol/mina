@@ -55,12 +55,8 @@ let with_itn_logger ~itn_features ~(compile_config : Mina_compile_config.t)
     let conf =
       Logger.make_itn_logger_config
         ~rpc_handshake_timeout:compile_config.rpc_handshake_timeout
-        ~rpc_heartbeat_timeout:
-          ( compile_config.rpc_heartbeat_timeout |> Time.Span.to_sec
-          |> Time_ns.Span.of_sec )
-        ~rpc_heartbeat_send_every:
-          ( compile_config.rpc_heartbeat_send_every |> Time.Span.to_sec
-          |> Time_ns.Span.of_sec )
+        ~rpc_heartbeat_timeout:compile_config.rpc_heartbeat_timeout
+        ~rpc_heartbeat_send_every:compile_config.rpc_heartbeat_send_every
     in
     Logger.with_itn conf logger
   else logger
