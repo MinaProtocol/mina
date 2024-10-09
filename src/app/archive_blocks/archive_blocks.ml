@@ -99,10 +99,6 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
 
 let () =
   Command.(
-    let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-    let constraint_constants =
-      Genesis_constants.Compiled.constraint_constants
-    in
     run
       (let open Let_syntax in
       async ~summary:"Write blocks to an archive database"
@@ -133,6 +129,18 @@ let () =
                "true/false Whether to log messages for files that were \
                 processed successfully"
              (Flag.optional_with_default true Param.bool)
+         and config_file = Cli_lib.Flag.config_files
          and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
-         main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
-           ~extensional ~success_file ~failure_file ~log_successes ~files )))
+         fun () ->
+           let open Deferred.Let_syntax in
+           let%bind genesis_constants, constraint_constants =
+             let logger = Logger.create () in
+             let%map config =
+               Runtime_config.Constants.load_constants ~logger config_file
+             in
+             Runtime_config.Constants.
+               (genesis_constants config, constraint_constants config)
+           in
+           main ~genesis_constants ~constraint_constants ~archive_uri
+             ~precomputed ~extensional ~success_file ~failure_file
+             ~log_successes ~files () )))
