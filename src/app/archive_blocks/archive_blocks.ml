@@ -129,7 +129,7 @@ let () =
                "true/false Whether to log messages for files that were \
                 processed successfully"
              (Flag.optional_with_default true Param.bool)
-         and config_file = Cli_lib.Flag.conf_file
+         and config_file = Cli_lib.Flag.config_files
          and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
          fun () ->
            let open Deferred.Let_syntax in

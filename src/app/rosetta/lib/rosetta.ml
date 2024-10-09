@@ -171,7 +171,7 @@ let command =
   and port =
     flag "--port" ~aliases:[ "port" ] ~doc:"Port to expose Rosetta server"
       (required int)
-  and config_file = Cli_lib.Flag.conf_file in
+  and config_file = Cli_lib.Flag.config_files in
   let open Deferred.Let_syntax in
   fun () ->
     let logger = Logger.create () in

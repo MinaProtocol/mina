@@ -33,7 +33,7 @@ let conf_dir =
   flag "--config-directory" ~aliases:[ "config-directory" ]
     ~doc:"DIR Configuration directory" (optional string)
 
-let conf_file =
+let config_files =
   let open Command.Param in
   flag "--config-file" ~aliases:[ "config-file" ]
     ~doc:

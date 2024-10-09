@@ -685,7 +685,8 @@ module Accounts = struct
         ; permissions = Some (Permissions.of_permissions a.permissions)
         }
 
-    let to_account (a : t) : Mina_base.Account.t =
+    let to_account ?(ignore_missing_fields = false) (a : t) :
+        Mina_base.Account.t =
       let open Signature_lib in
       let timing =
         let open Mina_base.Account_timing.Poly in
@@ -707,8 +708,7 @@ module Accounts = struct
               ; vesting_increment
               }
       in
-      let permissions =
-        let perms = Option.value_exn a.permissions in
+      let to_permissions (perms : Permissions.t) =
         Mina_base.Permissions.Poly.
           { edit_state =
               Json_layout.Accounts.Single.Permissions.Auth_required
@@ -752,6 +752,15 @@ module Accounts = struct
               .to_account_perm perms.set_timing
           }
       in
+      let permissions =
+        match (ignore_missing_fields, a.permissions) with
+        | _, Some perms ->
+            to_permissions perms
+        | false, None ->
+            failwithf "no permissions set for account %s" a.pk ()
+        | true, _ ->
+            Mina_base.Permissions.user_default
+      in
       let mk_zkapp (app : Zkapp_account.t) :
           ( Mina_base.Zkapp_state.Value.t
           , Mina_base.Verification_key_wire.t option
@@ -776,20 +785,34 @@ module Accounts = struct
           ; zkapp_uri = app.zkapp_uri
           }
       in
+      let receipt_chain_hash =
+        match (ignore_missing_fields, a.receipt_chain_hash) with
+        | _, Some rch ->
+            Mina_base.Receipt.Chain_hash.of_base58_check_exn rch
+        | false, None ->
+            failwithf "no receipt_chain_hash set for account %s" a.pk ()
+        | true, _ ->
+            Mina_base.Receipt.Chain_hash.empty
+      in
+      let voting_for =
+        match (ignore_missing_fields, a.voting_for) with
+        | _, Some voting_for ->
+            Mina_base.State_hash.of_base58_check_exn voting_for
+        | false, None ->
+            failwithf "no voting_for set for account %s" a.pk ()
+        | true, _ ->
+            Mina_base.State_hash.dummy
+      in
       { public_key = Public_key.Compressed.of_base58_check_exn a.pk
       ; token_id =
           Mina_base.Token_id.(Option.value_map ~default ~f:of_string a.token)
       ; token_symbol = Option.value ~default:"" a.token_symbol
       ; balance = a.balance
       ; nonce = a.nonce
-      ; receipt_chain_hash =
-          Mina_base.Receipt.Chain_hash.of_base58_check_exn
-            (Option.value_exn a.receipt_chain_hash)
+      ; receipt_chain_hash
       ; delegate =
           Option.map ~f:Public_key.Compressed.of_base58_check_exn a.delegate
-      ; voting_for =
-          Mina_base.State_hash.of_base58_check_exn
-            (Option.value_exn a.voting_for)
+      ; voting_for
       ; timing
       ; permissions
       ; zkapp = Option.map ~f:mk_zkapp a.zkapp
@@ -935,14 +958,14 @@ end
 
 module Proof_keys = struct
   module Level = struct
-    type t = Full | Check | None [@@deriving bin_io_unversioned, equal]
+    type t = Full | Check | No_check [@@deriving bin_io_unversioned, equal]
 
     let to_string = function
       | Full ->
           "full"
       | Check ->
           "check"
-      | None ->
+      | No_check ->
           "none"
 
     let of_string str =
@@ -952,7 +975,7 @@ module Proof_keys = struct
       | "check" ->
           Ok Check
       | "none" ->
-          Ok None
+          Ok No_check
       | _ ->
           Error "Expected one of 'full', 'check', or 'none'"
 
@@ -977,14 +1000,6 @@ module Proof_keys = struct
   module Transaction_capacity = struct
     type t = Log_2 of int | Txns_per_second_x10 of int
     [@@deriving bin_io_unversioned]
-
-    let log2 = function Log_2 i -> Some i | Txns_per_second_x10 _ -> None
-
-    let txns_per_second_x10 = function
-      | Log_2 _ ->
-          None
-      | Txns_per_second_x10 i ->
-          Some i
 
     let to_json_layout : t -> Json_layout.Proof_keys.Transaction_capacity.t =
       function
@@ -1016,6 +1031,30 @@ module Proof_keys = struct
     let small : t = Log_2 2
 
     let medium : t = Log_2 3
+
+    let to_transaction_capacity_log_2 ~block_window_duration_ms
+        ~transaction_capacity =
+      match transaction_capacity with
+      | Log_2 i ->
+          i
+      | Txns_per_second_x10 tps_goal_x10 ->
+          let max_coinbases = 2 in
+          let max_user_commands_per_block =
+            (* block_window_duration is in milliseconds, so divide by 1000 divide
+               by 10 again because we have tps * 10
+            *)
+            tps_goal_x10 * block_window_duration_ms / (1000 * 10)
+          in
+          (* Log of the capacity of transactions per transition.
+              - 1 will only work if we don't have prover fees.
+              - 2 will work with prover fees, but not if we want a transaction
+                included in every block.
+              - At least 3 ensures a transaction per block and the staged-ledger
+                unit tests pass.
+          *)
+          1
+          + Core_kernel.Int.ceil_log2
+              (max_user_commands_per_block + max_coinbases)
   end
 
   type t =
@@ -1858,6 +1897,10 @@ module Constants : Constants_intf = struct
         in
         Option.first_some b a
       in
+      let block_window_duration_ms =
+        Option.value ~default:a.constraint_constants.block_window_duration_ms
+          Option.(b.proof >>= fun p -> p.block_window_duration_ms)
+      in
       { a.constraint_constants with
         sub_windows_per_window =
           Option.value ~default:a.constraint_constants.sub_windows_per_window
@@ -1868,16 +1911,17 @@ module Constants : Constants_intf = struct
       ; work_delay =
           Option.value ~default:a.constraint_constants.work_delay
             Option.(b.proof >>= fun p -> p.work_delay)
-      ; block_window_duration_ms =
-          Option.value ~default:a.constraint_constants.block_window_duration_ms
-            Option.(b.proof >>= fun p -> p.block_window_duration_ms)
+      ; block_window_duration_ms
       ; transaction_capacity_log_2 =
           Option.value
             ~default:a.constraint_constants.transaction_capacity_log_2
             Option.(
               b.proof
               >>= fun p ->
-              p.transaction_capacity >>= Proof_keys.Transaction_capacity.log2)
+              p.transaction_capacity
+              >>| fun transaction_capacity ->
+              Proof_keys.Transaction_capacity.to_transaction_capacity_log_2
+                ~block_window_duration_ms ~transaction_capacity)
       ; coinbase_amount =
           Option.value ~default:a.constraint_constants.coinbase_amount
             Option.(b.proof >>= fun p -> p.coinbase_amount)
@@ -1897,10 +1941,10 @@ module Constants : Constants_intf = struct
             Genesis_constants.Proof_level.Full
         | Check ->
             Genesis_constants.Proof_level.Check
-        | None ->
-            Genesis_constants.Proof_level.None
+        | No_check ->
+            Genesis_constants.Proof_level.No_check
       in
-      Option.value ~default:Genesis_constants.Proof_level.None
+      Option.value ~default:a.proof_level
         Option.(b.proof >>= fun p -> p.level >>| coerce_proof_level)
     in
     let compile_config =
@@ -1927,25 +1971,22 @@ module Constants : Constants_intf = struct
     { genesis_constants; constraint_constants; proof_level; compile_config }
 
   let load_constants' ?itn_features ?cli_proof_level runtime_config =
-    let constants =
-      let compile_constants =
-        { genesis_constants = Genesis_constants.Compiled.genesis_constants
-        ; constraint_constants = Genesis_constants.Compiled.constraint_constants
-        ; proof_level = Genesis_constants.Compiled.proof_level
-        ; compile_config = Mina_compile_config.Compiled.t
-        }
-      in
-      let cs = combine compile_constants runtime_config in
-      { cs with
-        proof_level = Option.value ~default:cs.proof_level cli_proof_level
-      ; compile_config =
-          { cs.compile_config with
-            itn_features =
-              Option.value ~default:cs.compile_config.itn_features itn_features
-          }
+    let compile_constants =
+      { genesis_constants = Genesis_constants.Compiled.genesis_constants
+      ; constraint_constants = Genesis_constants.Compiled.constraint_constants
+      ; proof_level = Genesis_constants.Compiled.proof_level
+      ; compile_config = Mina_compile_config.Compiled.t
       }
     in
-    constants
+    let cs = combine compile_constants runtime_config in
+    { cs with
+      proof_level = Option.value ~default:cs.proof_level cli_proof_level
+    ; compile_config =
+        { cs.compile_config with
+          itn_features =
+            Option.value ~default:cs.compile_config.itn_features itn_features
+        }
+    }
 
   (* Use this function if you don't need/want the ledger configuration *)
   let load_constants ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level

@@ -845,7 +845,7 @@ let () =
     ~summary:
       "Estimate the memory usage of the daemon in the fully saturated max-cost \
        transaction environment"
-    (let%map_open config_file = Cli_lib.Flag.conf_file in
+    (let%map_open config_file = Cli_lib.Flag.config_files in
      fun () ->
        let open Async.Deferred.Let_syntax in
        let%map genesis_constants, constraint_constants =

@@ -82,7 +82,7 @@ let create_zkapp_account =
            ~doc:"KEYFILE Private key file for the zkApp account to be created"
            Param.(required string)
        and amount = Flags.amount
-       and config_file = Cli_lib.Flag.conf_file in
+       and config_file = Cli_lib.Flag.config_files in
        let fee = Option.value ~default:Flags.default_fee fee in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
@@ -126,7 +126,7 @@ let upgrade_zkapp =
              "Proof|Signature|Either|None Current authorization in the account \
               to change the verification key"
            Param.(required string)
-       and config_file = Cli_lib.Flag.conf_file in
+       and config_file = Cli_lib.Flag.config_files in
        fun () ->
          let fee = Option.value ~default:Flags.default_fee fee in
          let auth = Util.auth_of_string auth in
@@ -181,7 +181,7 @@ let transfer_funds_one_receiver =
            ~doc:"PUBLIC_KEY the public key of the receiver"
            Param.(required public_key_compressed)
        and amount = Flags.amount
-       and config_file = Cli_lib.Flag.conf_file in
+       and config_file = Cli_lib.Flag.config_files in
        let fee = Option.value ~default:Flags.default_fee fee in
        fun () ->
          if Currency.Fee.(fee < Flags.min_fee) then
@@ -269,7 +269,7 @@ let transfer_funds =
        and sender_nonce =
          Param.flag "--sender-nonce" ~doc:"NN Nonce of the sender account"
            Param.(required txn_nonce)
-       and config_file = Cli_lib.Flag.conf_file in
+       and config_file = Cli_lib.Flag.config_files in
        fun () ->
          let fee = Option.value ~default:Flags.default_fee fee in
          if Currency.Fee.(fee < Flags.min_fee) then
@@ -316,7 +316,7 @@ let update_state =
              "String(hash)|Integer(field element) a list of 8 elements that \
               represent the zkApp state (Use empty string for no-op)"
            Param.(listed string)
-       and config_file = Cli_lib.Flag.conf_file in
+       and config_file = Cli_lib.Flag.config_files in
        fun () ->
          let fee = Option.value ~default:Flags.default_fee fee in
          let%bind.Deferred genesis_constants, constraint_constants =
@@ -364,7 +364,7 @@ let update_zkapp_uri =
              "Proof|Signature|Either|None Current authorization in the account \
               to change the zkApp URI"
            Param.(required string)
-       and config_file = Cli_lib.Flag.conf_file in
+       and config_file = Cli_lib.Flag.config_files in
        fun () ->
          let fee = Option.value ~default:Flags.default_fee fee in
          let auth = Util.auth_of_string auth in
@@ -431,7 +431,7 @@ let update_action_state =
              optional_with_default []
                (Arg_type.comma_separated ~allow_empty:false
                   ~strip_whitespace:true string ))
-       and config_file = Cli_lib.Flag.conf_file in
+       and config_file = Cli_lib.Flag.config_files in
        fun () ->
          let fee = Option.value ~default:Flags.default_fee fee in
          let action_state =
@@ -485,7 +485,7 @@ let update_token_symbol =
              "Proof|Signature|Either|None Current authorization in the account \
               to change the token symbol"
            Param.(required string)
-       and config_file = Cli_lib.Flag.conf_file in
+       and config_file = Cli_lib.Flag.config_files in
        fun () ->
          let fee = Option.value ~default:Flags.default_fee fee in
          let auth = Util.auth_of_string auth in
@@ -571,7 +571,7 @@ let update_permissions =
              "Proof|Signature|Either|None Current authorization in the account \
               to change permissions"
            Param.(required string)
-       and config_file = Cli_lib.Flag.conf_file in
+       and config_file = Cli_lib.Flag.config_files in
        fun () ->
          let fee = Option.value ~default:Flags.default_fee fee in
          let permissions : Permissions.t Zkapp_basic.Set_or_keep.t =
@@ -654,7 +654,7 @@ let update_timings =
              "Proof|Signature|Either|None Current authorization in the account \
               to change permissions"
            Param.(required string)
-       and config_file = Cli_lib.Flag.conf_file in
+       and config_file = Cli_lib.Flag.config_files in
        fun () ->
          let fee = Option.value ~default:Flags.default_fee fee in
          let timing =

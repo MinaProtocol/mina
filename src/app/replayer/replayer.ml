@@ -1719,7 +1719,7 @@ let () =
            Param.flag "--checkpoint-file-prefix"
              ~doc:"string Checkpoint file prefix (default: 'replayer')"
              Param.(optional_with_default "replayer" string)
-         and config_file = Cli_lib.Flag.conf_file
+         and config_file = Cli_lib.Flag.config_files
          and log_json = Cli_lib.Flag.Log.json
          and log_level = Cli_lib.Flag.Log.level
          and file_log_level = Cli_lib.Flag.Log.file_log_level

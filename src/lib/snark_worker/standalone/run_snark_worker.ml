@@ -8,14 +8,14 @@ let command =
     (let%map_open spec =
        flag "--spec-sexp" ~doc:""
          (required (sexp_conv Prod.single_spec_of_sexp))
-     and config_file = Cli_lib.Flag.conf_file
+     and config_file = Cli_lib.Flag.config_files
      and cli_proof_level =
        flag "--proof-level" ~doc:""
          (optional_with_default Genesis_constants.Proof_level.Full
             (Command.Arg_type.of_alist_exn
                [ ("Full", Genesis_constants.Proof_level.Full)
                ; ("Check", Check)
-               ; ("None", None)
+               ; ("None", No_check)
                ] ) )
      in
      fun () ->

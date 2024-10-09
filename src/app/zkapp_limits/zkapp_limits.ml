@@ -34,7 +34,7 @@ let () =
   @@
   let open Command.Let_syntax in
   Command.async ~summary:"All the limits set for zkApp transactions"
-    (let%map_open config_file = Cli_lib.Flag.conf_file in
+    (let%map_open config_file = Cli_lib.Flag.config_files in
      fun () ->
        let open Deferred.Let_syntax in
        let%map genesis_constants =

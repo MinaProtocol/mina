@@ -47,7 +47,7 @@ let () =
   @@
   let open Command.Let_syntax in
   Command.async ~summary:"Print heap usage of selected Mina data structures"
-    (let%map_open config_file = Cli_lib.Flag.conf_file in
+    (let%map_open config_file = Cli_lib.Flag.config_files in
      fun () ->
        let open Deferred.Let_syntax in
        let%bind genesis_constants, constraint_constants =

@@ -37,7 +37,7 @@ let cmd =
       let%map path =
         let open Command.Param in
         flag "--spec" ~doc:"PATH Spec path" (required string)
-      and config_file = Cli_lib.Flag.conf_file in
+      and config_file = Cli_lib.Flag.config_files in
       fun () ->
         let open Deferred.Let_syntax in
         let%bind constraint_constants, proof_level =
