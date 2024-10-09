@@ -4,14 +4,13 @@ let BuildFlags = ./BuildFlags.dhall
 
 let S = ../Lib/SelectFiles.dhall
 
-let DebVersion = < Bookworm | Bullseye | Buster | Jammy | Focal >
+let DebVersion = < Bookworm | Bullseye | Jammy | Focal >
 
 let capitalName =
           \(debVersion : DebVersion)
       ->  merge
             { Bookworm = "Bookworm"
             , Bullseye = "Bullseye"
-            , Buster = "Buster"
             , Jammy = "Jammy"
             , Focal = "Focal"
             }
@@ -22,7 +21,6 @@ let lowerName =
       ->  merge
             { Bookworm = "bookworm"
             , Bullseye = "bullseye"
-            , Buster = "buster"
             , Jammy = "jammy"
             , Focal = "focal"
             }
@@ -46,14 +44,6 @@ let dependsOnStep =
                     }
                   ]
                 , Bullseye =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      debVersion}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                                     buildFlag}"
-                    , key = "${step}-deb-pkg"
-                    }
-                  ]
-                , Buster =
                   [ { name =
                         "${prefix}${capitalName
                                       debVersion}${profileSuffix}${BuildFlags.toSuffixUppercase
@@ -122,7 +112,6 @@ let dirtyWhen =
       ->  merge
             { Bookworm = minimalDirtyWhen
             , Bullseye = bullseyeDirtyWhen
-            , Buster = minimalDirtyWhen
             , Jammy = minimalDirtyWhen
             , Focal = minimalDirtyWhen
             }

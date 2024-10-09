@@ -33,15 +33,6 @@ let runInToolchainBullseye
             environment
             innerScript
 
-let runInToolchainBuster
-    : List Text -> Text -> List Cmd.Type
-    =     \(environment : List Text)
-      ->  \(innerScript : Text)
-      ->  runInToolchainImage
-            ContainerImages.minaToolchainBuster
-            environment
-            innerScript
-
 let runInToolchain
     : List Text -> Text -> List Cmd.Type
     =     \(environment : List Text)
@@ -55,5 +46,4 @@ in  { runInToolchain = runInToolchain
     , runInToolchainImage = runInToolchainImage
     , runInToolchainBookworm = runInToolchainBookworm
     , runInToolchainBullseye = runInToolchainBullseye
-    , runInToolchainBuster = runInToolchainBuster
     }
