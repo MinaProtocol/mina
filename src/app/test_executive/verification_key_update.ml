@@ -190,6 +190,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
             ; account = Zkapp_precondition.Account.accept
+            ; permissions = Zkapp_precondition.Permissions.accept
             ; valid_while = Ignore
             }
         ; authorization_kind = Signature

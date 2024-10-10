@@ -66,6 +66,7 @@ let%test_module "Access permission tests" =
                     { account =
                         Zkapp_precondition.Account.nonce
                           Mina_numbers.Account_nonce.(succ zero)
+                    ; permissions = Zkapp_precondition.Permissions.accept
                     ; network = account_update.body.preconditions.network
                     ; valid_while = Ignore
                     }
@@ -91,6 +92,7 @@ let%test_module "Access permission tests" =
             { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
             ; account = Zkapp_precondition.Account.accept
+            ; permissions = Zkapp_precondition.Permissions.accept
             ; valid_while = Ignore
             }
         ; may_use_token = No

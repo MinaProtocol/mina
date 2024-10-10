@@ -164,6 +164,7 @@ module Values (S : Sample) = struct
             }
         }
     ; account = Mina_base.Zkapp_precondition.Account.accept
+    ; permissions = Mina_base.Zkapp_precondition.Permissions.accept
     ; valid_while =
         Check
           { lower = global_slot_since_genesis ()

@@ -1907,6 +1907,18 @@ module Make (L : Ledger_intf.S) :
           Zkapp_precondition.Protocol_state.check pred
             global_state.protocol_state
           |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
+      | Check_permissions_precondition (account_update, account, local_state) ->
+          (* TODO why does account use local_state?
+           * should permisions do the same or use global state like the others?
+           *)
+          let local_state = ref local_state in
+          let permissions : Permissions.t = account.permissions in
+          let check failure b =
+            local_state := Inputs.Local_state.add_check !local_state failure b
+          in
+          Zkapp_precondition.Permissions.check ~check
+            account_update.body.preconditions.permissions permissions ;
+          !local_state
       | Check_account_precondition
           (account_update, account, new_account, local_state) ->
           let local_state = ref local_state in
@@ -2794,6 +2806,7 @@ module For_tests = struct
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Zkapp_precondition.Account.accept
+                    ; permissions = Zkapp_precondition.Permissions.accept
                     ; valid_while = Ignore
                     }
                 ; may_use_token = No
@@ -2821,6 +2834,7 @@ module For_tests = struct
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Zkapp_precondition.Account.accept
+                    ; permissions = Zkapp_precondition.Permissions.accept
                     ; valid_while = Ignore
                     }
                 ; may_use_token = No

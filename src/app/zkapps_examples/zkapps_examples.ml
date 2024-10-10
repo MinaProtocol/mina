@@ -274,6 +274,11 @@ module Account_update_under_construction = struct
                       }
                   }
             ; account = Account_condition.to_predicate t.account_condition
+            ; permissions =
+                var_of_t
+                  (Zkapp_precondition.Permissions.typ ())
+                  Zkapp_precondition.Permissions.accept
+                (* TODO this is probably wrong *)
             ; valid_while = var_of_t Zkapp_precondition.Valid_while.typ Ignore
             }
         ; use_full_commitment = Boolean.false_
@@ -772,6 +777,7 @@ module Deploy_account_update = struct
         { Account_update.Preconditions.network =
             Zkapp_precondition.Protocol_state.accept
         ; account = Zkapp_precondition.Account.accept
+        ; permissions = Zkapp_precondition.Permissions.accept
         ; valid_while = Ignore
         }
     ; authorization_kind = Signature

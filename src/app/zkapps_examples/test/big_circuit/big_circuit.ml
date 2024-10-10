@@ -55,6 +55,7 @@ let deploy_account_update_body : Account_update.Body.t =
       { Account_update.Preconditions.network =
           Zkapp_precondition.Protocol_state.accept
       ; account = Zkapp_precondition.Account.accept
+      ; permissions = Zkapp_precondition.Permissions.accept
       ; valid_while = Ignore
       }
   ; may_use_token = No

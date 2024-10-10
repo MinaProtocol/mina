@@ -623,6 +623,7 @@ let get_account_update_body ~pool body_id =
       ; preconditions =
           { Account_update.Preconditions.network = protocol_state_precondition
           ; account = account_precondition
+          ; permissions = Zkapp_precondition.Permissions.accept
           ; valid_while = valid_while_precondition
           }
       ; use_full_commitment

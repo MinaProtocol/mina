@@ -75,3 +75,49 @@ module Account = struct
       }
   end
 end
+
+module Permissions = struct
+  module V2 = struct
+    type t =
+      { edit_state :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; access :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; send :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; receive :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; set_delegate :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; set_permissions :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; set_verification_key :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; set_zkapp_uri :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; edit_action_state :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; set_token_symbol :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; increment_nonce :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; set_voting_for :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; set_timing :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      }
+  end
+end

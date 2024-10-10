@@ -27,8 +27,12 @@ module Auth_required : sig
 
   val verification_key_perm_fallback_to_signature_with_older_version : t -> t
 
+  val gen : t Quickcheck.Generator.t
+
   module Checked : sig
     type t
+
+    val equal : t -> t -> Boolean.var Snark_params.Tick.Checked.t
 
     val if_ : Boolean.var -> then_:t -> else_:t -> t
 
