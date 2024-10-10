@@ -309,7 +309,7 @@ let%test_module "Epoch ledger sync tests" =
         let notify_online () = Deferred.unit in
         let most_recent_valid_block_reader, most_recent_valid_block_writer =
           Broadcast_pipe.create
-            ( Mina_block.genesis ~precomputed_values
+            ( Mina_block.genesis_header ~precomputed_values
             |> Mina_block.Validation.reset_frontier_dependencies_validation
             |> Mina_block.Validation.reset_staged_ledger_diff_validation )
         in
