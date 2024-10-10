@@ -136,6 +136,7 @@
 (package (name parallel_scan))
 (package (name participating_state))
 (package (name pasta_bindings))
+(package (name patch_archive_test))
 (package (name perf_histograms))
 (package (name pickles_base))
 (package (name pickles))
