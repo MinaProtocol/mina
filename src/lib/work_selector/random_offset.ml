@@ -7,10 +7,7 @@ two cases:
     2. As long as the pool stays the same, the works are selected sequentially
     from the offset. If the end of the work list is reached, the next works are
     selected sequentially from the beginning of the list. *)
-module Make
-    (Inputs : Intf.Inputs_intf)
-    (Lib : Intf.Lib_intf with module Inputs := Inputs) =
-struct
+module Make (Lib : Intf.Lib_intf) = struct
   module Offset = struct
     (* The initialization for the first offset can be 0; as the first
        [previous_length] 0, any non-empty list will trigger an update of the offset. *)

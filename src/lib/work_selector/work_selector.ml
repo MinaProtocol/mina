@@ -15,9 +15,9 @@ module type Selection_method_intf =
      and module State := State
 
 module Selection_methods = struct
-  module Random = Random.Make (Inputs.Implementation_inputs) (Lib)
-  module Sequence = Sequence.Make (Inputs.Implementation_inputs) (Lib)
-  module Random_offset = Random_offset.Make (Inputs.Implementation_inputs) (Lib)
+  module Random = Random.Make (Lib)
+  module Sequence = Sequence.Make (Lib)
+  module Random_offset = Random_offset.Make (Lib)
 end
 
 let remove = Lib.State.remove
