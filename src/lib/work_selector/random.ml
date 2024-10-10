@@ -14,10 +14,6 @@ struct
         let i = Random.int (List.length expensive_work) in
         let x = List.nth_exn expensive_work i in
         Lib.State.set state x ; Some x
-
-  let remove = Lib.State.remove
-
-  let pending_work_statements = Lib.pending_work_statements
 end
 
 let%test_module "test" =

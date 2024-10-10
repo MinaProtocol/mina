@@ -10,10 +10,6 @@ struct
         None
     | x :: _ ->
         Lib.State.set state x ; Some x
-
-  let remove = Lib.State.remove
-
-  let pending_work_statements = Lib.pending_work_statements
 end
 
 let%test_module "test" =

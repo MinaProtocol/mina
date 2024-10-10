@@ -161,20 +161,12 @@ module type Selection_method_intf = sig
 
   module State : State_intf with type transition_frontier := transition_frontier
 
-  val remove : State.t -> work One_or_two.t -> unit
-
   val work :
        snark_pool:snark_pool
     -> fee:Currency.Fee.t
     -> logger:Logger.t
     -> State.t
     -> work One_or_two.t option
-
-  val pending_work_statements :
-       snark_pool:snark_pool
-    -> fee_opt:Currency.Fee.t option
-    -> State.t
-    -> Transaction_snark.Statement.t One_or_two.t list
 end
 
 module type Make_selection_method_intf = functor
