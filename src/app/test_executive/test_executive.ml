@@ -6,7 +6,7 @@ open Integration_test_lib
 
 type test = string * (module Intf.Test.Functor_intf)
 
-type engine = string * (module Intf.Engine.S)
+type engine = (module Intf.Engine.S)
 
 module Make_test_inputs (Engine : Intf.Engine.S) () :
   Intf.Test.Inputs_intf
@@ -47,8 +47,8 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
   else Deferred.return ()
 
 let engines : engine list =
-  [ ("cloud", (module Integration_test_cloud_engine : Intf.Engine.S))
-  ; ("local", (module Integration_test_local_engine : Intf.Engine.S))
+  [ (module Integration_test_cloud_engine : Intf.Engine.S)
+  ; (module Integration_test_local_engine : Intf.Engine.S)
   ]
 
 let tests : test list =
@@ -475,11 +475,8 @@ let debug_arg =
 
 let help_term = Term.(ret @@ const (`Help (`Plain, None)))
 
-let engine_cmd ((engine_name, (module Engine)) : engine) =
-  let info =
-    let doc = "Run mina integration test(s) on remote cloud provider." in
-    Term.info engine_name ~doc ~exits:Term.default_exits
-  in
+let engine_cmd ((module Engine) : engine) =
+  let info = Term.info Engine.name ~doc:Engine.doc ~exits:Term.default_exits in
   let test_inputs_with_cli_inputs_arg =
     let wrap_cli_inputs cli_inputs =
       Test_inputs_with_cli_inputs
