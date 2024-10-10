@@ -1770,10 +1770,17 @@ let internal_commands logger =
                     | Error err ->
                         failwithf "Could not parse JSON: %s" err () ) )
           in
+
+        
+ 
+
+          let%bind verification_key = Lazy.force (Verifier.For_test.get_blockchain_verification_key ~constraint_constants ~proof_level) in
           let%bind verifier =
             Verifier.create ~commit_id:Mina_version.commit_id ~logger
-              ~proof_level ~constraint_constants ~pids:(Pid.Table.create ())
-              ~conf_dir:(Some conf_dir) ()
+              ~proof_level ~pids:(Pid.Table.create ())
+              ~conf_dir:(Some conf_dir)
+              ~verification_key
+              ()
           in
           let%bind result =
             let cap lst =
