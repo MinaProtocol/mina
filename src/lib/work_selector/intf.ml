@@ -161,32 +161,21 @@ module type Selection_method_intf = sig
 
   module State : State_intf with type transition_frontier := transition_frontier
 
-  val remove : State.t -> work One_or_two.t -> unit
-
   val work :
        snark_pool:snark_pool
     -> fee:Currency.Fee.t
     -> logger:Logger.t
     -> State.t
     -> work One_or_two.t option
-
-  val pending_work_statements :
-       snark_pool:snark_pool
-    -> fee_opt:Currency.Fee.t option
-    -> State.t
-    -> Transaction_snark.Statement.t One_or_two.t list
 end
 
-module type Make_selection_method_intf = functor
-  (Inputs : Inputs_intf)
-  (Lib : Lib_intf with module Inputs := Inputs)
-  ->
+module type Make_selection_method_intf = functor (Lib : Lib_intf) ->
   Selection_method_intf
-    with type staged_ledger := Inputs.Staged_ledger.t
+    with type staged_ledger := Lib.Inputs.Staged_ledger.t
      and type work :=
-      ( Inputs.Transaction_witness.t
-      , Inputs.Ledger_proof.t )
+      ( Lib.Inputs.Transaction_witness.t
+      , Lib.Inputs.Ledger_proof.t )
       Snark_work_lib.Work.Single.Spec.t
-     and type snark_pool := Inputs.Snark_pool.t
-     and type transition_frontier := Inputs.Transition_frontier.t
+     and type snark_pool := Lib.Inputs.Snark_pool.t
+     and type transition_frontier := Lib.Inputs.Transition_frontier.t
      and module State := Lib.State
