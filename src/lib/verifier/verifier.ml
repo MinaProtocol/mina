@@ -1,6 +1,7 @@
 module Failure = Verification_failure
 module Prod = Prod
 module Dummy = Dummy
+module For_test = For_test
 
 let m =
   if Base__Import.am_testing then

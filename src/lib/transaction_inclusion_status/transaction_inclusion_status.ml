@@ -90,12 +90,15 @@ let%test_module "transaction_status" =
     let block_window_duration =
       Mina_compile_config.For_unit_tests.t.block_window_duration
 
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
+        let%bind verification_key = Lazy.force (Verifier.For_test.get_blockchain_verification_key ~constraint_constants ~proof_level) in
+          Verifier.create ~logger ~proof_level
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~commit_id:"not specified for unit tests" () )
+            ~commit_id:"not specified for unit tests"
+            ~verification_key () )
 
     let key_gen =
       let open Quickcheck.Generator in
