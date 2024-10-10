@@ -1561,15 +1561,14 @@ let create ~commit_id ?wallets (config : Config.t) =
                       ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
               (fun () ->
                 O1trace.thread "manage_verifier_subprocess" (fun () ->
-                    let%bind verifier =
+                  let%bind verification_key = Prover.get_blockchain_verification_key prover >>| Or_error.ok_exn in
+                  let%bind verifier =
                       Verifier.create ~commit_id ~logger:config.logger
                         ~enable_internal_tracing:
                           (Internal_tracing.is_enabled ())
                         ~internal_trace_filename:"verifier-internal-trace.jsonl"
                         ~proof_level:config.precomputed_values.proof_level
-                        ~constraint_constants:
-                          config.precomputed_values.constraint_constants
-                        ~pids:config.pids ~conf_dir:(Some config.conf_dir) ()
+                        ~pids:config.pids ~conf_dir:(Some config.conf_dir) ~verification_key ()
                     in
                     let%map () = set_itn_data (module Verifier) verifier in
                     verifier ) )
