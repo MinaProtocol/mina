@@ -149,32 +149,43 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
         , Mina_numbers.Length.to_yojson (Header.blockchain_length header) )
       ] ;
   [%log internal] "Begin_external_block_processing" ;
+  let handle_not_selected () =
+    [%log internal] "Failure"
+      ~metadata:[ ("reason", `String "Not_selected_over_frontier_root") ] ;
+    Trust_system.record_envelope_sender trust_system logger sender
+      ( Trust_system.Actions.Gossiped_invalid_transition
+      , Some
+          ( "The transition with hash $state_hash was not selected over the \
+             transition frontier root"
+          , metadata ) )
+  in
   match block_or_header with
   | `Header env -> (
       let header_with_hash, _ = Envelope.Incoming.data env in
       [%log internal] "Validate_frontier_dependencies" ;
-      return
-      @@
       match
         Mina_block.Validation.validate_frontier_dependencies
           ~context:(module Context)
           ~root_block ~is_block_in_frontier ~to_header:ident
           (Envelope.Incoming.data env)
       with
-      (* TODO need more internal logging? *)
-      | Ok _ ->
-          Catchup_scheduler.watch_header catchup_scheduler ~valid_cb
-            ~block_window_duration:compile_config.block_window_duration
-            ~header_with_hash
-      | Error `Parent_missing_from_frontier ->
+      | Ok _ | Error `Parent_missing_from_frontier ->
           [%log internal] "Schedule_catchup" ;
           Catchup_scheduler.watch_header catchup_scheduler ~valid_cb
             ~block_window_duration:compile_config.block_window_duration
-            ~header_with_hash
-      | _ ->
-          () )
+            ~header_with_hash ;
+          return ()
+      | Error `Not_selected_over_frontier_root ->
+          handle_not_selected ()
+      | Error `Already_in_frontier ->
+          [%log internal] "Failure"
+            ~metadata:[ ("reason", `String "Already_in_frontier") ] ;
+          [%log warn] ~metadata
+            "Refusing to process the transition with hash $state_hash because \
+             is is already in the transition frontier" ;
+          return () )
   | `Block cached_initially_validated_transition ->
-      Deferred.map ~f:(Fn.const ())
+      Deferred.ignore_m
       @@
       let open Deferred.Result.Let_syntax in
       let%bind mostly_validated_transition =
@@ -193,21 +204,11 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
         | Ok t ->
             return (Ok t)
         | Error `Not_selected_over_frontier_root ->
-            [%log internal] "Failure"
-              ~metadata:
-                [ ("reason", `String "Not_selected_over_frontier_root") ] ;
-            let%map () =
-              Trust_system.record_envelope_sender trust_system logger sender
-                ( Trust_system.Actions.Gossiped_invalid_transition
-                , Some
-                    ( "The transition with hash $state_hash was not selected \
-                       over the transition frontier root"
-                    , metadata ) )
-            in
             let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
               Cached.invalidate_with_failure
                 cached_initially_validated_transition
             in
+            let%map () = handle_not_selected () in
             Error ()
         | Error `Already_in_frontier ->
             [%log internal] "Failure"

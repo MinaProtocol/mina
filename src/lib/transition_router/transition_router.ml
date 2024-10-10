@@ -58,12 +58,12 @@ let to_consensus_state h =
             Mina_block.Header.protocol_state )
 
 let is_transition_for_bootstrap ~context:(module Context : CONTEXT) frontier
-    new_header_hash =
+    new_header =
   let root_consensus_state =
     Transition_frontier.root frontier
     |> Transition_frontier.Breadcrumb.consensus_state_with_hashes
   in
-  let new_consensus_state = to_consensus_state new_header_hash in
+  let new_consensus_state = to_consensus_state new_header in
   match
     Consensus.Hooks.select
       ~context:(module Context)
@@ -187,10 +187,16 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
         r )
   in
   producer_transition_writer_ref := None ;
-  let f block =
-    Strict_pipe.Writer.write bootstrap_controller_writer
-      (`Block block, `Valid_cb None) ;
-    match Envelope.Incoming.sender block with Remote r -> [ r ] | Local -> []
+  let f b_or_h =
+    Strict_pipe.Writer.write bootstrap_controller_writer (b_or_h, `Valid_cb None) ;
+    let sender =
+      match b_or_h with
+      | `Block b ->
+          Envelope.Incoming.sender b
+      | `Header h ->
+          Envelope.Incoming.sender h
+    in
+    match sender with Remote r -> [ r ] | Local -> []
   in
   let preferred_peers = Option.value_map ~f ~default:[] best_seen_transition in
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
@@ -422,7 +428,9 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ?transition_writer_ref:None ~consensus_local_state
         ~frontier_w ~persistent_root ~persistent_frontier ~cache_exceptions
-        ~initial_root_transition ~catchup_mode ~best_seen_transition
+        ~initial_root_transition ~catchup_mode
+        ~best_seen_transition:
+          (Option.map ~f:(fun x -> `Block x) best_seen_transition)
   | Some best_tip, Some frontier
     when is_transition_for_bootstrap
            ~context:(module Context)
@@ -450,7 +458,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
         ~clear_reader ?transition_writer_ref:None ~consensus_local_state
         ~frontier_w ~initial_root_transition ~persistent_root
         ~persistent_frontier ~cache_exceptions ~catchup_mode
-        ~best_seen_transition:(Some best_tip)
+        ~best_seen_transition:(Some (`Block best_tip))
   | best_tip_opt, Some frontier ->
       let collected_transitions =
         match best_tip_opt with
@@ -670,9 +678,6 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                   let header_with_hash =
                     block_or_header_to_header_hashed_with_validation b_or_h
                   in
-                  let best_seen_transition =
-                    match b_or_h with `Block b_env -> Some b_env | _ -> None
-                  in
                   match get_current_frontier () with
                   | Some frontier ->
                       if
@@ -702,7 +707,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                              ~clear_reader ~transition_writer_ref
                              ~consensus_local_state ~frontier_w ~persistent_root
                              ~persistent_frontier ~initial_root_transition
-                             ~best_seen_transition ~catchup_mode )
+                             ~best_seen_transition:(Some b_or_h) ~catchup_mode )
                       else Deferred.unit
                   | None ->
                       Deferred.unit

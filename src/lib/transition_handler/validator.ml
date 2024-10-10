@@ -33,11 +33,11 @@ let validate_header_is_relevant ~context:(module Context : CONTEXT) ~frontier
   let get_consensus_constants h =
     Mina_block.Header.protocol_state h |> Protocol_state.consensus_state
   in
-  let header_data = With_hash.data header_with_hash in
+  let header = With_hash.data header_with_hash in
   let block_slot =
     Consensus.Data.Consensus_state.curr_global_slot
     @@ Protocol_state.consensus_state
-    @@ Header.protocol_state header_data
+    @@ Header.protocol_state header
   in
   let%bind () =
     match slot_chain_end with
@@ -49,9 +49,7 @@ let validate_header_is_relevant ~context:(module Context : CONTEXT) ~frontier
     | None | Some _ ->
         Result.return ()
   in
-  let blockchain_length =
-    With_hash.data header_with_hash |> Mina_block.Header.blockchain_length
-  in
+  let blockchain_length = Mina_block.Header.blockchain_length header in
   let root_breadcrumb = Transition_frontier.root frontier in
   [%log' internal Context.logger] "@block_metadata"
     ~metadata:
@@ -64,7 +62,7 @@ let validate_header_is_relevant ~context:(module Context : CONTEXT) ~frontier
       ~init:Result.(Ok ())
       ~f:(fun _ _ -> Result.Error (`In_frontier transition_hash))
   in
-  [%log' internal Context.logger] "Check_transition_not_in_process" ;
+  [%log' internal Context.logger] "Check_transition_can_be_connected" ;
   Result.ok_if_true
     (Consensus.Hooks.equal_select_status `Take
        (Consensus.Hooks.select
@@ -108,13 +106,6 @@ let validate_transition_is_relevant ~context:(module Context : CONTEXT)
     | None | Some _ ->
         Result.(Ok ())
   in
-  let blockchain_length =
-    Envelope.Incoming.data enveloped_transition
-    |> Mina_block.Validation.block |> Mina_block.blockchain_length
-  in
-  [%log' internal Context.logger] "@block_metadata"
-    ~metadata:
-      [ ("blockchain_length", Mina_numbers.Length.to_yojson blockchain_length) ] ;
   [%log' internal Context.logger] "Check_transition_not_in_process" ;
   let%bind () =
     Option.fold
@@ -123,7 +114,6 @@ let validate_transition_is_relevant ~context:(module Context : CONTEXT)
       ~init:Result.(Ok ())
       ~f:(fun _ final_state -> Result.Error (`In_process final_state))
   in
-  [%log' internal Context.logger] "Check_transition_can_be_connected" ;
   let header_with_hash = With_hash.map ~f:Mina_block.header transition in
   let%map () =
     validate_header_is_relevant
@@ -140,14 +130,14 @@ let validate_transition_or_header_is_relevant
     ~unprocessed_transition_cache b_or_h =
   match b_or_h with
   | `Block b ->
-      Result.map ~f:(fun x -> `Block x)
+      Result.map ~f:(fun cached_block -> `Block cached_block)
       @@ validate_transition_is_relevant
            ~context:(module Context)
            ~slot_tx_end ~slot_chain_end ~frontier ~unprocessed_transition_cache
            b
   | `Header h ->
       let header_with_hash, _ = Envelope.Incoming.data h in
-      Result.map ~f:(fun _ -> `Header h)
+      Result.map ~f:(fun () -> `Header h)
       @@ validate_header_is_relevant
            ~context:(module Context)
            ~slot_chain_end ~frontier header_with_hash
@@ -281,8 +271,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
                   ; ( "block_slot"
                     , Mina_numbers.Global_slot_since_hard_fork.to_yojson
                       @@ Consensus.Data.Consensus_state.curr_global_slot
-                      @@ Protocol_state.consensus_state @@ Header.protocol_state
-                      @@ header )
+                      @@ Protocol_state.consensus_state
+                      @@ Header.protocol_state header )
                   ]
                 "Validation error: external transition with state hash \
                  $state_hash was rejected for reason $reason" ;
@@ -295,8 +285,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
                   ; ( "block_slot"
                     , Mina_numbers.Global_slot_since_hard_fork.to_yojson
                       @@ Consensus.Data.Consensus_state.curr_global_slot
-                      @@ Protocol_state.consensus_state @@ Header.protocol_state
-                      @@ header )
+                      @@ Protocol_state.consensus_state
+                      @@ Header.protocol_state header )
                   ]
                 "Validation error: external transition with state hash \
                  $state_hash was rejected for reason $reason" ;
