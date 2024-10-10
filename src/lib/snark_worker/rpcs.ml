@@ -22,7 +22,8 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       let name = "get_work"
 
       module T = struct
-        type query = unit
+        (* Contains constraint systems digest for compatibility check *)
+        type query = Intf.constraint_system_digests_t
 
         type response =
           ( (Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t
