@@ -45,4 +45,9 @@ dune build "--profile=${DUNE_PROFILE}" $INSTRUMENTED_PARAM \
   src/app/rosetta/indexer_test/indexer_test.exe \
   src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe \
   src/app/test_executive/test_executive.exe  \
+  src/app/benchmarks/benchmarks.exe \
+  src/app/ledger_export_bench/ledger_export_benchmark.exe \
+  src/app/disk_caching_stats/disk_caching_stats.exe \
+  src/app/heap_usage/heap_usage.exe \
+  src/app/zkapp_limits/zkapp_limits.exe \
   src/test/command_line_tests/command_line_tests.exe # 2>&1 | tee /tmp/buildocaml.log
