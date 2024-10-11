@@ -44,7 +44,6 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val compile_config : Mina_compile_config.t
-
 end
 
 module Node_status = Node_status
@@ -93,7 +92,7 @@ let create (module Context : CONTEXT) (config : Config.t) ~sinks
 
     let get_transition_frontier = get_transition_frontier
 
-    let get_snark_pool = get_snark_pool 
+    let get_snark_pool = get_snark_pool
   end in
   let%map gossip_net =
     O1trace.thread "gossip_net" (fun () ->

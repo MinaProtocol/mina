@@ -749,6 +749,7 @@ end]
 [%%versioned_rpc
 module Get_completed_snarks = struct
   let max_size = 10
+
   type nonrec ctx = ctx
 
   module Master = struct
@@ -784,9 +785,8 @@ module Get_completed_snarks = struct
     include Master
   end)
 
-  let receipt_trust_action_message query = (
-  "Get_completed_snarks query", 
-  ["query", query_to_yojson query])
+  let receipt_trust_action_message query =
+    ("Get_completed_snarks query", [ ("query", query_to_yojson query) ])
 
   let log_request_received ~logger ~sender _request =
     [%log debug] "Sending completed snarks to $peer"
@@ -795,16 +795,16 @@ module Get_completed_snarks = struct
   let response_is_successful = Fn.compose not List.is_empty
 
   let handle_request (module Context : CONTEXT) ~version:_ _request =
-   let open Context in
-   match get_snark_pool () with
-    | None -> return []
+    let open Context in
+    match get_snark_pool () with
+    | None ->
+        return []
     | Some snark_pool ->
-    snark_pool |> Network_pool.Snark_pool.get_all_completed_work |> return 
+        snark_pool |> Network_pool.Snark_pool.get_all_completed_work |> return
 
   let rate_limit_budget = (1, `Per Time.Span.minute)
 
   let rate_limit_cost = Fn.const 1
-
 end]
 
 [%%versioned_rpc
@@ -1134,8 +1134,6 @@ module Get_best_tip = struct
 
   let rate_limit_cost = Fn.const 1
 end]
-
-
 
 type ('query, 'response) rpc =
   | Get_some_initial_peers

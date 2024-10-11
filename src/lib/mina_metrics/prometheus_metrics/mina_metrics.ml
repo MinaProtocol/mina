@@ -829,7 +829,6 @@ module Network = struct
     let help = "# of Get_ancestry rpc requests failed to respond" in
     Counter.v "get_ancestry_rpc_responses_failed" ~help ~namespace ~subsystem
 
-    
   let get_completed_snarks_rpcs_sent =
     let help = "# of Get_completed_snarks rpc requests sent" in
     let name = "get_completed_snarks_rpcs_sent" in
@@ -844,11 +843,13 @@ module Network = struct
 
   let get_completed_snarks_rpc_requests_failed : Counter.t =
     let help = "# of Get_completed_snarks rpc requests failed" in
-    Counter.v "get_completed_snarks_rpc_requests_failed" ~help ~namespace ~subsystem
+    Counter.v "get_completed_snarks_rpc_requests_failed" ~help ~namespace
+      ~subsystem
 
   let get_completed_snarks_rpc_responses_failed : Counter.t =
     let help = "# of Get_completed_snarks rpc requests failed to respond" in
-    Counter.v "get_completed_snarks_rpc_responses_failed" ~help ~namespace ~subsystem
+    Counter.v "get_completed_snarks_rpc_responses_failed" ~help ~namespace
+      ~subsystem
 
   let ban_notify_rpcs_sent =
     let help = "# of Ban_notify rpc requests sent" in

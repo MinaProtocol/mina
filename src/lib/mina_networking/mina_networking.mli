@@ -109,7 +109,7 @@ module Rpcs : sig
       option
   end
 
-  module Get_completed_snarks : sig 
+  module Get_completed_snarks : sig
     type query = unit
 
     type response = Transaction_snark_work.Info.Stable.V2.t list
@@ -139,7 +139,8 @@ module Rpcs : sig
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
-    | Get_completed_snarks : (Get_completed_snarks.query, Get_completed_snarks.response) rpc
+    | Get_completed_snarks
+        : (Get_completed_snarks.query, Get_completed_snarks.response) rpc
 end
 
 module Config : sig
