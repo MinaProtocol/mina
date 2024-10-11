@@ -126,7 +126,7 @@ let create (module Context : CONTEXT) (config : Config.t) ~sinks
   (* TODO: Think about buffering:
         I.e., what do we do when too many messages are coming in, or going out.
         For example, some things you really want to not drop (like your outgoing
-        block announcment).
+        block announcement).
   *)
   { gossip_net; logger; trust_system }
 

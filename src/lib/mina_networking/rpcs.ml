@@ -748,8 +748,7 @@ end]
 
 [%%versioned_rpc
 module Get_completed_snarks = struct
-  let max_size = 10
-
+  
   type nonrec ctx = ctx
 
   module Master = struct
@@ -794,13 +793,16 @@ module Get_completed_snarks = struct
 
   let response_is_successful = Fn.compose not List.is_empty
 
+
   let handle_request (module Context : CONTEXT) ~version:_ _request =
     let open Context in
+    (* the maximum number of completed snarks to return over rpc *)
+    let limit = 10 in 
     match get_snark_pool () with
     | None ->
         return []
     | Some snark_pool ->
-        snark_pool |> Network_pool.Snark_pool.get_all_completed_work |> return
+        snark_pool |> Network_pool.Snark_pool.get_all_completed_work ~limit |> return
 
   let rate_limit_budget = (1, `Per Time.Span.minute)
 
