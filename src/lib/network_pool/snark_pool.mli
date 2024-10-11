@@ -19,6 +19,7 @@ module type S = sig
          Resource_pool.t
       -> has_timed_out:(Core.Time.t -> [ `Timed_out | `Ok ])
       -> Resource_pool.Diff.t list
+
   end
 
   include
@@ -36,6 +37,8 @@ module type S = sig
        t
     -> Transaction_snark_work.Statement.t
     -> Transaction_snark_work.Checked.t option
+
+  val get_all_completed_work : t -> Transaction_snark_work.Info.t list
 end
 
 module type Transition_frontier_intf = sig
@@ -70,6 +73,7 @@ module Make
       type t
 
       val ledger : t -> Base_ledger.t
+
     end)
     (Transition_frontier : Transition_frontier_intf
                              with type staged_ledger := Staged_ledger.t) :

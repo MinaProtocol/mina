@@ -34,6 +34,8 @@ module type CONTEXT = sig
 
   val get_transition_frontier : unit -> Transition_frontier.t option
 
+  val get_snark_pool : unit -> Network_pool.Snark_pool.t option
+
   val compile_config : Mina_compile_config.t
 end
 
@@ -745,6 +747,67 @@ module Get_transition_chain_proof = struct
 end]
 
 [%%versioned_rpc
+module Get_completed_snarks = struct
+  let max_size = 10
+  type nonrec ctx = ctx
+
+  module Master = struct
+    let name = "get_completed_snarks"
+
+    module T = struct
+      type query = unit [@@deriving sexp, to_yojson]
+
+      type response = Transaction_snark_work.Info.Stable.V2.t list
+    end
+
+    module Caller = T
+    module Callee = T
+  end
+
+  include Master.T
+
+  let sent_counter = Mina_metrics.Network.get_completed_snarks_rpcs_sent
+
+  let received_counter = Mina_metrics.Network.get_completed_snarks_rpcs_received
+
+  let failed_request_counter =
+    Mina_metrics.Network.get_completed_snarks_rpc_requests_failed
+
+  let failed_response_counter =
+    Mina_metrics.Network.get_completed_snarks_rpc_responses_failed
+
+  module M = Versioned_rpc.Both_convert.Plain.Make (Master)
+  include M
+
+  include Perf_histograms.Rpc.Plain.Extend (struct
+    include M
+    include Master
+  end)
+
+  let receipt_trust_action_message query = (
+  "Get_completed_snarks query", 
+  ["query", query_to_yojson query])
+
+  let log_request_received ~logger ~sender _request =
+    [%log debug] "Sending completed snarks to $peer"
+      ~metadata:[ ("peer", Peer.to_yojson sender) ]
+
+  let response_is_successful = Fn.compose not List.is_empty
+
+  let handle_request (module Context : CONTEXT) ~version:_ _request =
+   let open Context in
+   match get_snark_pool () with
+    | None -> return []
+    | Some snark_pool ->
+    snark_pool |> Network_pool.Snark_pool.get_all_completed_work |> return 
+
+  let rate_limit_budget = (1, `Per Time.Span.minute)
+
+  let rate_limit_cost = Fn.const 1
+
+end]
+
+[%%versioned_rpc
 module Get_ancestry = struct
   type nonrec ctx = ctx
 
@@ -1072,6 +1135,8 @@ module Get_best_tip = struct
   let rate_limit_cost = Fn.const 1
 end]
 
+
+
 type ('query, 'response) rpc =
   | Get_some_initial_peers
       : (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
@@ -1092,6 +1157,8 @@ type ('query, 'response) rpc =
   | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
   | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
   | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
+  | Get_completed_snarks
+      : (Get_completed_snarks.query, Get_completed_snarks.response) rpc
 
 type any_rpc = Rpc : ('q, 'r) rpc -> any_rpc
 
@@ -1105,6 +1172,7 @@ let all_rpcs =
   ; Rpc Get_transition_chain
   ; Rpc Get_transition_chain_proof
   ; Rpc Ban_notify
+  ; Rpc Get_completed_snarks
   ]
 
 let implementation :
@@ -1127,3 +1195,5 @@ let implementation :
       (module Ban_notify)
   | Get_best_tip ->
       (module Get_best_tip)
+  | Get_completed_snarks ->
+      (module Get_completed_snarks)

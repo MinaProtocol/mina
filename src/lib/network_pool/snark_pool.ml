@@ -33,6 +33,7 @@ module type S = sig
          Resource_pool.t
       -> has_timed_out:(Time.t -> [ `Timed_out | `Ok ])
       -> Resource_pool.Diff.t list
+
   end
 
   include
@@ -50,6 +51,9 @@ module type S = sig
        t
     -> Transaction_snark_work.Statement.t
     -> Transaction_snark_work.Checked.t option
+  
+  val get_all_completed_work : t -> Transaction_snark_work.Info.t list
+
 end
 
 module type Transition_frontier_intf = sig
@@ -492,12 +496,14 @@ struct
         { all = Map.remove !(t.snark_tables).all work
         ; rebroadcastable = Map.remove !(t.snark_tables).rebroadcastable work
         }
+
   end
 
   include Network_pool_base.Make (Transition_frontier) (Resource_pool)
 
   module For_tests = struct
     let get_rebroadcastable = Resource_pool.get_rebroadcastable
+
   end
 
   let get_completed_work t statement =
@@ -506,6 +512,10 @@ struct
       ~f:(fun Priced_proof.{ proof; fee = { fee; prover } } ->
         Transaction_snark_work.Checked.create_unsafe
           { Transaction_snark_work.fee; proofs = proof; prover } )
+
+  let get_all_completed_work t =
+    Resource_pool.all_completed_work (resource_pool t)
+
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
@@ -562,9 +572,12 @@ end
 (* Only show stdout for failed inline tests. *)
 open Inline_test_quiet_logs
 
-let%test_module "random set test" =
-  ( module struct
-    open Mina_base
+module Mock_snark_pool =
+Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
+open Ledger_proof.For_tests
+
+module Test = struct
+     open Mina_base
 
     let trust_system = Mocks.trust_system
 
@@ -596,9 +609,7 @@ let%test_module "random set test" =
             ~pids:(Child_processes.Termination.create_pid_table ())
             ~commit_id:"not specified for unit tests" () )
 
-    module Mock_snark_pool =
-      Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
-    open Ledger_proof.For_tests
+
 
     let apply_diff resource_pool work
         ?(proof = One_or_two.map ~f:mk_dummy_proof)
@@ -657,6 +668,14 @@ let%test_module "random set test" =
             assert (Result.is_ok res) )
       in
       (pool, tf)
+ 
+end
+
+let%test_module "random set test" =
+  ( module struct
+    open Mina_base
+    open Test
+    open Ledger_proof.For_tests
 
     let%test_unit "Invalid proofs are not accepted" =
       let open Quickcheck.Generator.Let_syntax in

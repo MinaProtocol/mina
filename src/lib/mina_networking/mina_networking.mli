@@ -109,6 +109,12 @@ module Rpcs : sig
       option
   end
 
+  module Get_completed_snarks : sig 
+    type query = unit
+
+    type response = Transaction_snark_work.Info.Stable.V2.t list
+  end
+
   type ('query, 'response) rpc = ('query, 'response) Rpcs.rpc =
     | Get_some_initial_peers
         : (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
@@ -133,6 +139,7 @@ module Rpcs : sig
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
+    | Get_completed_snarks : (Get_completed_snarks.query, Get_completed_snarks.response) rpc
 end
 
 module Config : sig
@@ -267,5 +274,6 @@ val create :
   -> Config.t
   -> sinks:Sinks.t
   -> get_transition_frontier:(unit -> Transition_frontier.t option)
+  -> get_snark_pool:(unit -> Snark_pool.t option)
   -> get_node_status:(unit -> Node_status.t Deferred.Or_error.t)
   -> t Deferred.t
