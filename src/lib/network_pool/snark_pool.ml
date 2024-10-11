@@ -570,7 +570,8 @@ module Mock_snark_pool =
   Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
 open Ledger_proof.For_tests
 
-module Test = struct
+let%test_module "random set test" =
+  ( module struct
   open Mina_base
 
   let trust_system = Mocks.trust_system
@@ -659,13 +660,6 @@ module Test = struct
           assert (Result.is_ok res) )
     in
     (pool, tf)
-end
-
-let%test_module "random set test" =
-  ( module struct
-    open Mina_base
-    open Test
-    open Ledger_proof.For_tests
 
     let%test_unit "Invalid proofs are not accepted" =
       let open Quickcheck.Generator.Let_syntax in
