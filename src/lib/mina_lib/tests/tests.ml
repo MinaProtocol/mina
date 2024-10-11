@@ -202,20 +202,20 @@ let%test_module "Epoch ledger sync tests" =
           ~log_gossip_heard:false
           ~block_window_duration:compile_config.block_window_duration
       in
-      let snark_remote_sink =
+      let snark_remote_sink, snark_pool =
         let config =
           Network_pool.Snark_pool.Resource_pool.make_config ~verifier
             ~trust_system
             ~disk_location:(make_dirname "snark_pool_config")
         in
-        let _snark_pool, snark_remote_sink, _snark_local_sink =
+        let snark_pool, snark_remote_sink, _snark_local_sink =
           Network_pool.Snark_pool.create ~config ~constraint_constants
             ~consensus_constants ~time_controller ~logger
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r ~on_remote_push
             ~log_gossip_heard:false
             ~block_window_duration:compile_config.block_window_duration
         in
-        snark_remote_sink
+        snark_remote_sink, snark_pool
       in
       let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
       let genesis_ledger_hash =
@@ -301,6 +301,7 @@ let%test_module "Epoch ledger sync tests" =
           config ~sinks
           ~get_transition_frontier:(fun () ->
             Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r )
+          ~get_snark_pool:(fun () -> Some snark_pool)
           ~get_node_status:(rpc_error "get_node_status")
       in
       (* create transition frontier *)
