@@ -1878,6 +1878,8 @@ let create ~commit_id ?wallets (config : Config.t) =
                   config.net_config ~sinks
                   ~get_transition_frontier:(fun () ->
                     Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r )
+                  ~get_snark_pool:( fun () -> Some snark_pool
+                  )
                   ~get_node_status )
           in
           (* tie the first knot *)

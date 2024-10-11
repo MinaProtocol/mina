@@ -44,6 +44,7 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val compile_config : Mina_compile_config.t
+
 end
 
 module Node_status = Node_status
@@ -74,6 +75,7 @@ type t =
 
 let create (module Context : CONTEXT) (config : Config.t) ~sinks
     ~(get_transition_frontier : unit -> Transition_frontier.t option)
+    ~(get_snark_pool : unit -> Snark_pool.t option)
     ~(get_node_status : unit -> Node_status.t Deferred.Or_error.t) =
   let open Context in
   let gossip_net_ref = ref None in
@@ -90,6 +92,8 @@ let create (module Context : CONTEXT) (config : Config.t) ~sinks
           Gossip_net.Any.peers gossip_net
 
     let get_transition_frontier = get_transition_frontier
+
+    let get_snark_pool = get_snark_pool 
   end in
   let%map gossip_net =
     O1trace.thread "gossip_net" (fun () ->
