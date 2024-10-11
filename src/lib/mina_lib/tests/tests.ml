@@ -215,7 +215,7 @@ let%test_module "Epoch ledger sync tests" =
             ~log_gossip_heard:false
             ~block_window_duration:compile_config.block_window_duration
         in
-        snark_remote_sink, snark_pool
+        (snark_remote_sink, snark_pool)
       in
       let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
       let genesis_ledger_hash =
