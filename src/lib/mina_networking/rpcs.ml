@@ -756,7 +756,7 @@ module Get_completed_snarks = struct
     module T = struct
       type query = unit [@@deriving sexp, to_yojson]
 
-      type response = Transaction_snark_work.Info.Stable.V2.t list
+      type response = Transaction_snark_work.Info.Stable.V2.t list option
     end
 
     module Caller = T
@@ -790,7 +790,7 @@ module Get_completed_snarks = struct
     [%log debug] "Sending completed snarks to $peer"
       ~metadata:[ ("peer", Peer.to_yojson sender) ]
 
-  let response_is_successful = Fn.compose not List.is_empty
+  let response_is_successful = Option.is_some
 
   let handle_request (module Context : CONTEXT) ~version:_ _request =
     let open Context in
@@ -798,11 +798,11 @@ module Get_completed_snarks = struct
     let limit = 10 in
     match get_snark_pool () with
     | None ->
-        return []
+        return None
     | Some snark_pool ->
         snark_pool
         |> Network_pool.Snark_pool.get_all_completed_work ~limit
-        |> return
+        |> Option.some |> return
 
   let rate_limit_budget = (1, `Per Time.Span.minute)
 

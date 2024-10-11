@@ -112,7 +112,7 @@ module Rpcs : sig
   module Get_completed_snarks : sig
     type query = unit
 
-    type response = Transaction_snark_work.Info.Stable.V2.t list
+    type response = Transaction_snark_work.Info.Stable.V2.t list option
   end
 
   type ('query, 'response) rpc = ('query, 'response) Rpcs.rpc =
@@ -224,6 +224,10 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      * Pending_coinbase.t
      * Mina_state.Protocol_state.value list )
      Deferred.Or_error.t
+
+val get_completed_snarks : t ->
+  Peer.t ->
+  (Transaction_snark_work.Info.Stable.V2.t list, Error.t) result Deferred.t
 
 val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
 
