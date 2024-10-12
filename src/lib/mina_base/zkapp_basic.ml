@@ -361,7 +361,6 @@ end
 module F = Pickles.Backend.Tick.Field
 
 module F_map = struct
-  include Hashable.Make (F)
   include Comparable.Make (F)
 end
 
