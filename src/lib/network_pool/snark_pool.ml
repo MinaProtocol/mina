@@ -51,8 +51,8 @@ module type S = sig
     -> Transaction_snark_work.Statement.t
     -> Transaction_snark_work.Checked.t option
 
-  val get_all_completed_work :
-    ?limit:int -> t -> Transaction_snark_work.Info.t list
+  val get_all_completed_checked_work :
+    ?limit:int -> t -> Transaction_snark_work.Checked.Stable.V2.t list 
 end
 
 module type Transition_frontier_intf = sig
@@ -150,6 +150,15 @@ struct
                        prover )
                  ]
                :: acc ) )
+
+      let all_completed_checked_work t =
+        Map.fold ~init:[] !(t.snark_tables).all
+          ~f:(fun ~key:_ ~data:{ proof; fee = { fee; prover } } acc ->
+            let checked = { Transaction_snark_work.Checked.fee = fee 
+            ; proofs = proof
+            ; prover
+            } |> Transaction_snark_work.Checked.create_unsafe in 
+            checked :: acc )
 
       let all_completed_work (t : t) : Transaction_snark_work.Info.t list =
         Map.fold ~init:[] !(t.snark_tables).all
@@ -510,8 +519,8 @@ struct
         Transaction_snark_work.Checked.create_unsafe
           { Transaction_snark_work.fee; proofs = proof; prover } )
 
-  let get_all_completed_work ?limit t =
-    let work = Resource_pool.all_completed_work (resource_pool t) in
+  let get_all_completed_checked_work ?limit t =
+    let work = Resource_pool.all_completed_checked_work (resource_pool t) in
     match limit with
     | None ->
         work
