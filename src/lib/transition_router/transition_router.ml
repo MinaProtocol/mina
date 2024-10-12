@@ -170,38 +170,54 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
   let preferred_peers = Option.value_map ~f ~default:[] best_seen_transition in
   (* TODO find a better place for this *)
   let fetch_completed_snarks () =
-     Deferred.List.iter ~f:( fun peer ->
-      let completed_works =
-      Mina_networking.get_completed_checked_snarks network peer in
-      let%bind completed_works = completed_works in 
-      let completed_works = match completed_works with
-      | Error e -> 
-          [%log error]
-            ~metadata:
-              [ ("peer", Network_peer.Peer.to_yojson peer)
-              ; ("error", Error_json.error_to_yojson e) ]
-            "Failed to fetch completed snarks from peer: $error" ;
-          []
-      | Ok completed_works -> completed_works 
-    in
-    let () = List.iter completed_works ~f:(fun work ->
-      let callback = 
-        let cb = Mina_net2.Validation_callback.create_without_expiration () in 
-        Network_pool.Snark_pool.Broadcast_callback.External cb
-      in 
-      (* proofs should be verified in apply and broadcast *)
-      let msg = 
-        let statement = Transaction_snark_work.Checked.statement work in
-        let snark = Network_pool.Priced_proof.{proof=work.proofs; fee = {fee=work.fee;prover=work.prover }} in
-        let diff = Network_pool.Snark_pool.Diff_versioned.Add_solved_work (statement, snark) in 
-        Envelope.Incoming.wrap_peer ~data:diff ~sender:peer
-      in 
-      Network_pool.Snark_pool.apply_and_broadcast snark_pool msg callback
-        ) 
-     in 
-    Deferred.unit
-  ) 
-  preferred_peers in 
+    Deferred.List.iter
+      ~f:(fun peer ->
+        let completed_works =
+          Mina_networking.get_completed_checked_snarks network peer
+        in
+        let%bind completed_works = completed_works in
+        let completed_works =
+          match completed_works with
+          | Error e ->
+              [%log error]
+                ~metadata:
+                  [ ("peer", Network_peer.Peer.to_yojson peer)
+                  ; ("error", Error_json.error_to_yojson e)
+                  ]
+                "Failed to fetch completed snarks from peer: $error" ;
+              []
+          | Ok completed_works ->
+              completed_works
+        in
+        let () =
+          List.iter completed_works ~f:(fun work ->
+              let callback =
+                let cb =
+                  Mina_net2.Validation_callback.create_without_expiration ()
+                in
+                Network_pool.Snark_pool.Broadcast_callback.External cb
+              in
+              (* proofs should be verified in apply and broadcast *)
+              let msg =
+                let statement = Transaction_snark_work.Checked.statement work in
+                let snark =
+                  Network_pool.Priced_proof.
+                    { proof = work.proofs
+                    ; fee = { fee = work.fee; prover = work.prover }
+                    }
+                in
+                let diff =
+                  Network_pool.Snark_pool.Diff_versioned.Add_solved_work
+                    (statement, snark)
+                in
+                Envelope.Incoming.wrap_peer ~data:diff ~sender:peer
+              in
+              Network_pool.Snark_pool.apply_and_broadcast snark_pool msg
+                callback )
+        in
+        Deferred.unit )
+      preferred_peers
+  in
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
   don't_wait_for (fetch_completed_snarks ()) ;
   upon
