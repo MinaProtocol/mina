@@ -51,8 +51,7 @@ module type S = sig
     -> Transaction_snark_work.Statement.t
     -> Transaction_snark_work.Checked.t option
 
-  val get_all_completed_work :
-    ?limit:int -> t -> Transaction_snark_work.Info.t list
+  val get_all_completed_work : ?limit:int -> t -> Transaction_snark_work.Info.t list
 end
 
 module type Transition_frontier_intf = sig
@@ -511,13 +510,12 @@ struct
           { Transaction_snark_work.fee; proofs = proof; prover } )
 
   let get_all_completed_work ?limit t =
-    let work = Resource_pool.all_completed_work (resource_pool t) in
-    match limit with
-    | None ->
-        work
-    | Some limit ->
-        (* gets the limit number of completed work at a random order *)
-        List.take work limit
+    let work = Resource_pool.all_completed_work (resource_pool t) in 
+    match limit with 
+    | None -> work
+    | Some limit -> 
+      (* gets the limit number of completed work at a random order *)
+      List.take work limit
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
@@ -579,95 +577,94 @@ open Ledger_proof.For_tests
 
 let%test_module "random set test" =
   ( module struct
-    open Mina_base
+  open Mina_base
 
-    let trust_system = Mocks.trust_system
+  let trust_system = Mocks.trust_system
 
-    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+  let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
-    let block_window_duration =
-      Mina_compile_config.For_unit_tests.t.block_window_duration
+  let block_window_duration =
+    Mina_compile_config.For_unit_tests.t.block_window_duration
 
-    (* SNARK work is rejected if the prover doesn't have an account and the fee
-       is below the account creation fee. So, just to make generating valid SNARK
-       work easier for testing, we set the account creation fee to 0. *)
-    let constraint_constants =
-      { precomputed_values.constraint_constants with
-        account_creation_fee = Currency.Fee.zero
-      }
+  (* SNARK work is rejected if the prover doesn't have an account and the fee
+     is below the account creation fee. So, just to make generating valid SNARK
+     work easier for testing, we set the account creation fee to 0. *)
+  let constraint_constants =
+    { precomputed_values.constraint_constants with
+      account_creation_fee = Currency.Fee.zero
+    }
 
-    let consensus_constants = precomputed_values.consensus_constants
+  let consensus_constants = precomputed_values.consensus_constants
 
-    let proof_level = precomputed_values.proof_level
+  let proof_level = precomputed_values.proof_level
 
-    let logger = Logger.null ()
+  let logger = Logger.null ()
 
-    let time_controller = Block_time.Controller.basic ~logger
+  let time_controller = Block_time.Controller.basic ~logger
 
-    let verifier =
-      Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            ~commit_id:"not specified for unit tests" () )
+  let verifier =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        Verifier.create ~logger ~proof_level ~constraint_constants
+          ~conf_dir:None
+          ~pids:(Child_processes.Termination.create_pid_table ())
+          ~commit_id:"not specified for unit tests" () )
 
-    let apply_diff resource_pool work
-        ?(proof = One_or_two.map ~f:mk_dummy_proof)
-        ?(sender = Envelope.Sender.Local) fee =
-      let diff =
-        Mock_snark_pool.Resource_pool.Diff.Add_solved_work
-          (work, { Priced_proof.Stable.Latest.proof = proof work; fee })
-      in
-      let enveloped_diff = Envelope.Incoming.wrap ~data:diff ~sender in
-      match%map
-        Mock_snark_pool.Resource_pool.Diff.verify resource_pool enveloped_diff
-      with
-      | Ok _ ->
-          Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool
-            enveloped_diff
-      | Error _ ->
-          Error (`Other (Error.of_string "Invalid diff"))
+  let apply_diff resource_pool work ?(proof = One_or_two.map ~f:mk_dummy_proof)
+      ?(sender = Envelope.Sender.Local) fee =
+    let diff =
+      Mock_snark_pool.Resource_pool.Diff.Add_solved_work
+        (work, { Priced_proof.Stable.Latest.proof = proof work; fee })
+    in
+    let enveloped_diff = Envelope.Incoming.wrap ~data:diff ~sender in
+    match%map
+      Mock_snark_pool.Resource_pool.Diff.verify resource_pool enveloped_diff
+    with
+    | Ok _ ->
+        Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool
+          enveloped_diff
+    | Error _ ->
+        Error (`Other (Error.of_string "Invalid diff"))
 
-    let config =
-      Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
-        ~disk_location:"/tmp/snark-pool"
+  let config =
+    Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
+      ~disk_location:"/tmp/snark-pool"
 
-    let gen ?length () =
-      let open Quickcheck.Generator.Let_syntax in
-      let gen_entry =
-        Quickcheck.Generator.tuple2 Mocks.Transaction_snark_work.Statement.gen
-          Fee_with_prover.gen
-      in
-      let%map sample_solved_work =
-        match length with
-        | None ->
-            Quickcheck.Generator.list gen_entry
-        | Some n ->
-            Quickcheck.Generator.list_with_length n gen_entry
-      in
-      let tf = Mocks.Transition_frontier.create [] in
-      let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create (Some tf) in
-      let open Deferred.Let_syntax in
-      let mock_pool, _r_sink, _l_sink =
-        Mock_snark_pool.create ~config ~logger ~constraint_constants
-          ~consensus_constants ~time_controller
-          ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-          ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
-          ~block_window_duration
-        (* |>  *)
-      in
-      let pool = Mock_snark_pool.resource_pool mock_pool in
-      (*Statements should be referenced before work for those can be included*)
-      let%bind () =
-        Mocks.Transition_frontier.refer_statements tf
-          (List.unzip sample_solved_work |> fst)
-      in
-      let%map () =
-        Deferred.List.iter sample_solved_work ~f:(fun (work, fee) ->
-            let%map res = apply_diff pool work fee in
-            assert (Result.is_ok res) )
-      in
-      (pool, tf)
+  let gen ?length () =
+    let open Quickcheck.Generator.Let_syntax in
+    let gen_entry =
+      Quickcheck.Generator.tuple2 Mocks.Transaction_snark_work.Statement.gen
+        Fee_with_prover.gen
+    in
+    let%map sample_solved_work =
+      match length with
+      | None ->
+          Quickcheck.Generator.list gen_entry
+      | Some n ->
+          Quickcheck.Generator.list_with_length n gen_entry
+    in
+    let tf = Mocks.Transition_frontier.create [] in
+    let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create (Some tf) in
+    let open Deferred.Let_syntax in
+    let mock_pool, _r_sink, _l_sink =
+      Mock_snark_pool.create ~config ~logger ~constraint_constants
+        ~consensus_constants ~time_controller
+        ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+        ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
+        ~block_window_duration
+      (* |>  *)
+    in
+    let pool = Mock_snark_pool.resource_pool mock_pool in
+    (*Statements should be referenced before work for those can be included*)
+    let%bind () =
+      Mocks.Transition_frontier.refer_statements tf
+        (List.unzip sample_solved_work |> fst)
+    in
+    let%map () =
+      Deferred.List.iter sample_solved_work ~f:(fun (work, fee) ->
+          let%map res = apply_diff pool work fee in
+          assert (Result.is_ok res) )
+    in
+    (pool, tf)
 
     let%test_unit "Invalid proofs are not accepted" =
       let open Quickcheck.Generator.Let_syntax in

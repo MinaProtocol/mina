@@ -136,7 +136,7 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
     ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
     ?transition_writer_ref ~consensus_local_state ~frontier_w
     ~initial_root_transition ~persistent_root ~persistent_frontier
-    ~cache_exceptions ~best_seen_transition ~catchup_mode =
+    ~cache_exceptions ~best_seen_transition ~catchup_mode ~snark_pool =
   let open Context in
   [%str_log info] Starting_bootstrap_controller ;
   [%log info] "Starting Bootstrap Controller phase" ;
@@ -168,6 +168,42 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
     match Envelope.Incoming.sender block with Remote r -> [ r ] | Local -> []
   in
   let preferred_peers = Option.value_map ~f ~default:[] best_seen_transition in
+  (* TODO find a better place for this *)
+  let fetch_completed_snarks () =
+     Deferred.List.iter ~f:( fun peer ->
+      let completed_works =
+      Mina_networking.get_completed_snarks network peer in
+      let%bind completed_works = completed_works in 
+      let completed_works = match completed_works with
+      | Error e -> 
+          [%log error]
+            ~metadata:
+              [ ("peer", Network_peer.Peer.to_yojson peer)
+              ; ("error", Error_json.error_to_yojson e) ]
+            "Failed to fetch completed snarks from peer: $error" ;
+          []
+      | Ok completed_works -> completed_works 
+    in
+    let () = List.iter completed_works ~f:(fun work ->
+      let callback = 
+        let cb = Mina_net2.Validation_callback.create_without_expiration () in 
+        Network_pool.Snark_pool.Broadcast_callback.External cb
+      in 
+      (* proofs should be verified in apply and broadcast *)
+      let checked_work = 
+        Transaction_snark_work.{
+          fee = work.fee ;
+          proofs = work.proofs ;
+          prover = work.prover ;
+        } in 
+        Transaction_snark_work.Checked.create_unsafe work in  
+
+      Network_pool.Snark_pool.apply_and_broadcast snark_pool work callback
+        ) 
+     in 
+    Deferred.unit
+  ) 
+  preferred_peers in 
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
   upon
     (Bootstrap_controller.run
@@ -362,7 +398,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
     ~get_completed_work ~frontier_w ~producer_transition_writer_ref
     ~clear_reader ~verified_transition_writer ~cache_exceptions
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
-    ~consensus_local_state ~catchup_mode ~notify_online =
+    ~consensus_local_state ~catchup_mode ~notify_online ~snark_pool =
   let open Context in
   [%log info] "Initializing transition router" ;
   let%bind () =
@@ -396,7 +432,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ?transition_writer_ref:None ~consensus_local_state
         ~frontier_w ~persistent_root ~persistent_frontier ~cache_exceptions
-        ~initial_root_transition ~catchup_mode ~best_seen_transition
+        ~initial_root_transition ~catchup_mode ~best_seen_transition ~snark_pool
   | Some best_tip, Some frontier
     when is_transition_for_bootstrap
            ~context:(module Context)

@@ -1949,6 +1949,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~network_transition_reader:block_reader
               ~producer_transition_reader ~get_most_recent_valid_block
               ~most_recent_valid_block_writer
+              ~snark_pool
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
               ~notify_online ()
