@@ -582,13 +582,13 @@ end
 
 (* Only show stdout for failed inline tests. *)
 open Inline_test_quiet_logs
-module Mock_snark_pool =
-  Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
-open Ledger_proof.For_tests
 
 let%test_module "random set test" =
   ( module struct
     open Mina_base
+    module Mock_snark_pool =
+      Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
+    open Ledger_proof.For_tests
 
     let trust_system = Mocks.trust_system
 
