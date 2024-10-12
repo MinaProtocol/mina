@@ -27,8 +27,10 @@ module type S = sig
 
   module Addr = Location.Addr
 
+  type derived_token_ids_t
+
   (** create a mask with no parent *)
-  val create : depth:int -> unit -> t
+  val create : ?derived_token_ids:derived_token_ids_t -> depth:int -> unit -> t
 
   val get_uuid : t -> Uuid.t
 
@@ -51,6 +53,8 @@ module type S = sig
     exception
       Dangling_parent_reference of
         Uuid.t * (* Location where null was set*) string
+
+    val derived_token_ids : t -> derived_token_ids_t
 
     (** get hash from mask, if present, else from its parent *)
     val get_hash : t -> Addr.t -> hash option
@@ -85,7 +89,8 @@ module type S = sig
        from parent on each lookup. I.e. these accounts will be cached in mask and accessing
        them during processing of a transaction won't use disk I/O.
     *)
-    val unsafe_preload_accounts_from_parent : t -> account_id list -> unit
+    val unsafe_preload_accounts_from_parent :
+      t -> derived_token_ids:derived_token_ids_t -> account_id list -> unit
 
     val to_accumulated : t -> accumulated_t
 

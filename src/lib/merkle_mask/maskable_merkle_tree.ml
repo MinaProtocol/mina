@@ -17,6 +17,7 @@ module type Inputs_intf = sig
        and type account_id := Account_id.t
        and type account_id_set := Account_id.Set.t
        and type parent := Base.t
+       and type derived_token_ids_t := Token_id.t Account_id.Map.t
 
   val mask_to_base : Mask.Attached.t -> Base.t
 end
