@@ -34,6 +34,7 @@
 (package (name debug_assert))
 (package (name direction))
 (package (name downloader))
+(package (name dsu))
 (package (name dummy_values))
 (package (name empty_hashes))
 (package (name error_json))
