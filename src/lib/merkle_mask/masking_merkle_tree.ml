@@ -692,7 +692,6 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     include Merkle_ledger.Util.Make (struct
       module Location = Location
-      module Location_binable = Location_binable
       module Key = Key
       module Token_id = Token_id
       module Account_id = Account_id

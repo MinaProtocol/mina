@@ -266,8 +266,6 @@ module Inputs = struct
   module type DATABASE = sig
     include Intf
 
-    module Location_binable : Hashable.S_binable with type t := Location.t
-
     module Kvdb : Key_value_database with type config := string
 
     module Storage_locations : Storage_locations

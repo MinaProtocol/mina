@@ -442,7 +442,6 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     module Account_id = Account_id
     module Balance = Balance
     module Location = Location
-    module Location_binable = Location_binable
     module Account = Account
     module Hash = Hash
 
