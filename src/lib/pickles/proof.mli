@@ -163,9 +163,10 @@ module Proofs_verified_2 : sig
     module V2 : sig
       include module type of T with module Repr := T.Repr
 
-      include Pickles_types.Sigs.VERSIONED
-
       include Pickles_types.Sigs.Binable.S with type t := t
+
+      (* %%versioned adds type path *)
+      include Pickles_types.Sigs.VERSIONED_NO_TYPE_PATH
     end
   end]
 
@@ -184,9 +185,10 @@ module Proofs_verified_max : sig
     module V2 : sig
       include module type of T with module Repr := T.Repr
 
-      include Pickles_types.Sigs.VERSIONED
-
       include Pickles_types.Sigs.Binable.S with type t := t
+
+      (* %%versioned adds type path *)
+      include Pickles_types.Sigs.VERSIONED_NO_TYPE_PATH
     end
   end]
 

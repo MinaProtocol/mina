@@ -26,6 +26,8 @@ module Stable : sig
     (* pickles required *)
     val __versioned__ : unit
 
+    val path_to_type : string
+
     (* pickles required *)
     val t_of_sexp :
       (Ppx_sexp_conv_lib.Sexp.t -> 'f) -> Ppx_sexp_conv_lib.Sexp.t -> 'f t

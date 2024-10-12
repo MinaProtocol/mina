@@ -112,6 +112,13 @@ module Versioned_v1 = struct
           include M.Stable.V1
         end)
 
+        let path_to_type =
+          let module_path =
+            Core_kernel.String.chop_suffix_if_exists ~suffix:".path_to_type"
+              __FUNCTION__
+          in
+          sprintf "%s:%s.%s" __FILE__ module_path "t"
+
         let __versioned__ = ()
 
         type 'a creator = 'a M.Stable.V1.creator
@@ -137,6 +144,13 @@ module Versioned_v1 = struct
           include M.Stable.V1
         end)
 
+        let path_to_type =
+          let module_path =
+            Core_kernel.String.chop_suffix_if_exists ~suffix:".path_to_type"
+              __FUNCTION__
+          in
+          sprintf "%s:%s.%s" __FILE__ module_path "t"
+
         let __versioned__ = ()
 
         type 'a creator = 'a M.Stable.V1.creator
@@ -161,6 +175,13 @@ module Versioned_v1 = struct
 
           include M.Stable.V1
         end)
+
+        let path_to_type =
+          let module_path =
+            Core_kernel.String.chop_suffix_if_exists ~suffix:".path_to_type"
+              __FUNCTION__
+          in
+          sprintf "%s:%s.%s" __FILE__ module_path "t"
 
         let __versioned__ = ()
 
@@ -196,6 +217,13 @@ module Versioned_v1 = struct
 
         let hash_fold_t = M.Stable.V1.hash_fold_t
 
+        let path_to_type =
+          let module_path =
+            Core_kernel.String.chop_suffix_if_exists ~suffix:".path_to_type"
+              __FUNCTION__
+          in
+          sprintf "%s:%s.%s" __FILE__ module_path "t"
+
         let __versioned__ = ()
 
         type 'a creator = 'a M.Stable.V1.creator
@@ -229,6 +257,13 @@ module Versioned_v1 = struct
           include M.Stable.V1
         end)
 
+        let path_to_type =
+          let module_path =
+            Core_kernel.String.chop_suffix_if_exists ~suffix:".path_to_type"
+              __FUNCTION__
+          in
+          sprintf "%s:%s.%s" __FILE__ module_path "t"
+
         let __versioned__ = ()
 
         type 'a creator = 'a M.Stable.V1.creator
@@ -258,6 +293,13 @@ module Versioned_v2 = struct
           include M.Stable.V2
         end)
 
+        let path_to_type =
+          let module_path =
+            Core_kernel.String.chop_suffix_if_exists ~suffix:".path_to_type"
+              __FUNCTION__
+          in
+          sprintf "%s:%s.%s" __FILE__ module_path "t"
+
         let __versioned__ = ()
 
         type 'a creator = 'a M.Stable.V2.creator
@@ -269,6 +311,13 @@ module Versioned_v2 = struct
 
           include M.Stable.V1
         end)
+
+        let path_to_type =
+          let module_path =
+            Core_kernel.String.chop_suffix_if_exists ~suffix:".path_to_type"
+              __FUNCTION__
+          in
+          sprintf "%s:%s.%s" __FILE__ module_path "t"
 
         let __versioned__ = ()
 

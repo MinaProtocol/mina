@@ -27,6 +27,8 @@ module type S = sig
 
       val __versioned__ : unit
 
+      val path_to_type : string
+
       val t_of_sexp : Ppx_sexp_conv_lib.Sexp.t -> t
 
       val sexp_of_t : t -> Ppx_sexp_conv_lib.Sexp.t

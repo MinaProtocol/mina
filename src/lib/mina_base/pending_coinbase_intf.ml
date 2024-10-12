@@ -23,6 +23,8 @@ module type S = sig
   module Stable : sig
     module V2 : sig
       type nonrec t = t [@@deriving bin_io, sexp, to_yojson, version]
+
+      val path_to_type : string
     end
 
     module Latest = V2
@@ -33,6 +35,8 @@ module type S = sig
       module V1 : sig
         type t = Public_key.Compressed.Stable.V1.t * Amount.Stable.V1.t
         [@@deriving sexp, bin_io, to_yojson]
+
+        val path_to_type : string
       end
 
       module Latest = V1
