@@ -145,12 +145,14 @@ let rec wait_until_zkapps_deployed ?(deployed = false) ~scheduler_tbl ~mina
 
 let insert_account_queue ~account_queue ~account_queue_size ~account_state_tbl
     id =
-  let a = Account_id.Table.find_and_remove account_state_tbl id in
-  Queue.enqueue account_queue (Option.value_exn a) ;
+  let a = Account_id.Map.find_exn !account_state_tbl id in
+  account_state_tbl := Account_id.Map.remove !account_state_tbl id ;
+  Queue.enqueue account_queue a ;
   if Queue.length account_queue > account_queue_size then
     let a, role = Queue.dequeue_exn account_queue in
-    Account_id.Table.add_exn account_state_tbl ~key:(Account.identifier a)
-      ~data:(a, role)
+    account_state_tbl :=
+      Account_id.Map.add_exn !account_state_tbl ~key:(Account.identifier a)
+        ~data:(a, role)
   else ()
 
 let send_zkapps ~(genesis_constants : Genesis_constants.t)
@@ -213,7 +215,7 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
       | Some (ledger, _) ->
           let number_of_accounts_generated =
             let f = function _, `New_account -> true | _ -> false in
-            Account_id.Table.count ~f account_state_tbl
+            Account_id.Map.count ~f !account_state_tbl
             + Queue.count ~f account_queue
           in
           let generate_new_accounts =

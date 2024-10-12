@@ -2097,7 +2097,7 @@ let%test_module _ =
                     Mina_ledger.Ledger.get best_tip_ledger loc )
                in
                (id, (state, `Fee_payer)) )
-        |> Account_id.Table.of_alist_exn
+        |> Account_id.Map.of_alist_exn |> ref
       in
       let rec go n cmds =
         let open Quickcheck.Generator.Let_syntax in
