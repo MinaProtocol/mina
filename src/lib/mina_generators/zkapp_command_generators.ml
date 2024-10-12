@@ -827,7 +827,7 @@ let gen_account_update_body_components (type a b c d) ?global_slot
         true
     | Some hash_set ->
         (* other account_updates *)
-        not @@ Hash_set.mem hash_set account_id
+        not @@ Set.mem !hash_set account_id
   in
   let%bind account_precondition =
     f_account_precondition ~first_use_of_account account
@@ -1062,7 +1062,7 @@ let gen_account_update_from ?(no_account_precondition = false)
     Account_update_body_components.to_typical_account_update body_components
   in
   let account_id = Account_id.create body.public_key body.token_id in
-  Hash_set.add account_ids_seen account_id ;
+  account_ids_seen := Set.add !account_ids_seen account_id ;
   return { Account_update.Simple.body; authorization }
 
 (* takes an account id, if we want to sign this data *)
@@ -1198,7 +1198,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
   (* account ids seen, to generate receipt chain hash precondition only if
      a account_update with a given account id has not been encountered before
   *)
-  let account_ids_seen = Account_id.Hash_set.create () in
+  let account_ids_seen = ref Account_id.Set.empty in
   let%bind num_zkapp_command = Int.gen_uniform_incl 1 max_account_updates in
   let%bind fee_payer =
     gen_fee_payer ?global_slot ?fee_range ?failure
@@ -1215,7 +1215,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
             Option.is_some a.zkapp )
     |> Account_id.Map.keys
   in
-  Hash_set.add account_ids_seen fee_payer_acct_id ;
+  account_ids_seen := Set.add !account_ids_seen fee_payer_acct_id ;
   let mk_forest ps =
     List.map ps ~f:(fun p -> { With_stack_hash.elt = p; stack_hash = () })
   in
