@@ -144,7 +144,7 @@ let () =
        Command.(
          let open Let_syntax in
          let open Command.Param in
-         let%map config_file = Cli_lib.Flag.conf_file
+         let%map config_files = Cli_lib.Flag.config_files
          and genesis_dir =
            flag "--genesis-dir"
              ~doc:
@@ -170,7 +170,7 @@ let () =
              let logger = Logger.create () in
              let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
              Genesis_ledger_helper.Config_loader.load_config_files ~logger
-               ~conf_dir config_file
+               ~conf_dir config_files
              |> Deferred.Or_error.ok_exn
            in
            main ~constraint_constants:precomputed_values.constraint_constants
