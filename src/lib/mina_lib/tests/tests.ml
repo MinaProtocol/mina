@@ -68,8 +68,8 @@ let%test_module "Epoch ledger sync tests" =
         match%map
           Genesis_ledger_helper.init_from_config_file
             ~genesis_dir:(make_dirname "genesis_dir")
-            ~constraint_constants ~genesis_constants ~logger ~proof_level:None
-            runtime_config ~cli_proof_level:None
+            ~constraint_constants ~genesis_constants ~logger
+            ~proof_level:No_check runtime_config ~cli_proof_level:None
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
@@ -309,7 +309,7 @@ let%test_module "Epoch ledger sync tests" =
         let notify_online () = Deferred.unit in
         let most_recent_valid_block_reader, most_recent_valid_block_writer =
           Broadcast_pipe.create
-            ( Mina_block.genesis ~precomputed_values
+            ( Mina_block.genesis_header ~precomputed_values
             |> Mina_block.Validation.reset_frontier_dependencies_validation
             |> Mina_block.Validation.reset_staged_ledger_diff_validation )
         in

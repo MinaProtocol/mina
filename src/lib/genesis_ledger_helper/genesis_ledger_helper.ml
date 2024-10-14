@@ -731,22 +731,7 @@ module Genesis_proof = struct
   let create_values_no_proof = Genesis_proof.create_values_no_proof
 end
 
-let load_config_json filename =
-  Monitor.try_with_or_error ~here:[%here] (fun () ->
-      let%map json = Reader.file_contents filename in
-      Yojson.Safe.from_string json )
-
-let load_config_file filename =
-  let open Deferred.Or_error.Let_syntax in
-  Monitor.try_with_join_or_error ~here:[%here] (fun () ->
-      let%map json = load_config_json filename in
-      match Runtime_config.of_yojson json with
-      | Ok config ->
-          Ok config
-      | Error err ->
-          Or_error.error_string err )
-
-let print_config ~logger config =
+let print_config ~logger (config : Runtime_config.t) =
   let ledger_name_json =
     Option.value ~default:`Null
     @@ let%bind.Option ledger = config.Runtime_config.ledger in
@@ -791,8 +776,8 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
               Genesis_constants.Proof_level.Full
           | Check ->
               Check
-          | None ->
-              None)
+          | No_check ->
+              No_check)
       ; Some compiled_proof_level
       ]
   in
@@ -818,9 +803,9 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   let%bind () =
     match (proof_level, compiled_proof_level) with
-    | _, Full | (Check | None), _ ->
+    | _, Full | (Check | No_check), _ ->
         return ()
-    | Full, ((Check | None) as compiled) ->
+    | Full, ((Check | No_check) as compiled) ->
         let str = Genesis_constants.Proof_level.to_string in
         [%log fatal]
           "Proof level $proof_level is not compatible with compile-time proof \
@@ -877,71 +862,6 @@ let init_from_config_file ?genesis_dir ~cli_proof_level ~genesis_constants
   in
   let values = Genesis_proof.create_values_no_proof inputs in
   (values, config)
-
-let upgrade_old_config ~logger filename json =
-  match json with
-  | `Assoc fields ->
-      (* Fields previously part of daemon.json *)
-      let old_fields =
-        [ "client_port"
-        ; "libp2p-port"
-        ; "rest-port"
-        ; "block-producer-key"
-        ; "block-producer-pubkey"
-        ; "block-producer-password"
-        ; "coinbase-receiver"
-        ; "run-snark-worker"
-        ; "snark-worker-fee"
-        ; "peers"
-        ; "work-selection"
-        ; "work-reassignment-wait"
-        ; "log-received-blocks"
-        ; "log-txn-pool-gossip"
-        ; "log-snark-work-gossip"
-        ; "log-block-creation"
-        ]
-      in
-      let found_daemon = ref false in
-      let old_fields, remaining_fields =
-        List.partition_tf fields ~f:(fun (key, _) ->
-            if String.equal key "daemon" then (
-              found_daemon := true ;
-              false )
-            else List.mem ~equal:String.equal old_fields key )
-      in
-      if List.is_empty old_fields then return json
-      else if !found_daemon then (
-        (* This file has already been upgraded, or was written for the new
-           format. Do not accept old-style fields.
-        *)
-        [%log warn]
-          "Ignoring old-format values $values from the config file $filename. \
-           These flags are now fields in the 'daemon' object of the config \
-           file."
-          ~metadata:
-            [ ("values", `Assoc old_fields); ("filename", `String filename) ] ;
-        return (`Assoc remaining_fields) )
-      else (
-        (* This file was written for the old format. Upgrade it. *)
-        [%log warn]
-          "Automatically upgrading the config file $filename. The values \
-           $values have been moved to the 'daemon' object."
-          ~metadata:
-            [ ("filename", `String filename); ("values", `Assoc old_fields) ] ;
-        let upgraded_json =
-          `Assoc (("daemon", `Assoc old_fields) :: remaining_fields)
-        in
-        let%map () =
-          Deferred.Or_error.try_with ~here:[%here] (fun () ->
-              Writer.with_file filename ~f:(fun w ->
-                  Deferred.return
-                  @@ Writer.write w (Yojson.Safe.pretty_to_string upgraded_json) ) )
-          |> Deferred.ignore_m
-        in
-        upgraded_json )
-  | _ ->
-      (* This error will get handled properly elsewhere, do nothing here. *)
-      return json
 
 let%test_module "Account config test" =
   ( module struct
