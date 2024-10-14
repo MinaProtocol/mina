@@ -16,8 +16,6 @@ let JobSpec = ../Pipeline/JobSpec.dhall
 
 let Size = ./Size.dhall
 
-let Libp2p = ./Libp2pHelperBuild.dhall
-
 let DockerImage = ./DockerImage.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
@@ -319,8 +317,7 @@ let pipeline
     : MinaBuildSpec.Type -> Pipeline.Config.Type
     =     \(spec : MinaBuildSpec.Type)
       ->  let steps =
-                [ Libp2p.step spec.debVersion spec.buildFlags
-                , build_artifacts spec
+                [ build_artifacts spec
                 , publish_to_debian_repo spec
                 ]
 
