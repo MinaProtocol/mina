@@ -380,7 +380,8 @@ struct
        ~storables:
          { step_storable; step_vk_storable; wrap_storable; wrap_vk_storable }
        ~proof_cache ?disk_keys ?override_wrap_domain ?override_wrap_main
-       ?(num_chunks = 1) ~branches:(module Branches) ~max_proofs_verified ~name
+       ?(num_chunks = Plonk_checks.num_chunks_by_default)
+       ~branches:(module Branches) ~max_proofs_verified ~name
        ?constraint_constants ~public_input ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       let constraint_constants : Snark_keys_header.Constraint_constants.t =
@@ -877,11 +878,11 @@ struct
       ; num_chunks
       ; zk_rows =
           ( match num_chunks with
-          | 1 ->
-              3
+          | 1 (* cannot match with Plonk_checks.num_chunks_by_default *) ->
+              Plonk_checks.zk_rows_by_default
           | num_chunks ->
               let permuts = 7 in
-              ((2 * (permuts + 1) * num_chunks) - 1 + permuts) / permuts )
+              ((2 * (permuts + 1) * num_chunks) - 2 + permuts) / permuts )
       }
     in
     Timer.clock __LOC__ ;
@@ -932,8 +933,8 @@ module Side_loaded = struct
       ; branches = Verification_key.Max_branches.n
       ; feature_flags =
           Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
-      ; num_chunks = 1
-      ; zk_rows = 3
+      ; num_chunks = Plonk_checks.num_chunks_by_default
+      ; zk_rows = Plonk_checks.zk_rows_by_default
       }
 
   module Proof = struct
