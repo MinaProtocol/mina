@@ -3,8 +3,9 @@ use crate::{
     field_vector::fq::CamlFqVector,
     pasta_fq_plonk_index::CamlPastaFqPlonkIndexPtr,
     pasta_fq_plonk_verifier_index::CamlPastaFqPlonkVerifierIndex,
+    WithLagrangeBasis,
 };
-use ark_ec::AffineCurve;
+use ark_ec::AffineRepr;
 use ark_ff::One;
 use array_init::array_init;
 use groupmap::GroupMap;
@@ -42,7 +43,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
     {
         let ptr: &mut poly_commitment::srs::SRS<Pallas> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
-        ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
+        ptr.with_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
     let prev = if prev_challenges.is_empty() {
         Vec::new()
@@ -86,7 +87,16 @@ pub fn caml_pasta_fq_plonk_proof_create(
         let proof = ProverProof::create_recursive::<
             DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
             DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
-        >(&group_map, witness, &runtime_tables, index, prev, None)
+            _,
+        >(
+            &group_map,
+            witness,
+            &runtime_tables,
+            index,
+            prev,
+            None,
+            &mut rand::rngs::OsRng,
+        )
         .map_err(|e| ocaml::Error::Error(e.into()))?;
         Ok((proof, public_input).into())
     })
@@ -156,7 +166,7 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProofWithPublic<CamlGPallas, CamlFq> {
     fn comm() -> PolyComm<Pallas> {
-        let g = Pallas::prime_subgroup_generator();
+        let g = Pallas::generator();
         PolyComm {
             elems: vec![g, g, g],
         }
@@ -168,7 +178,7 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProofWithPublic<CamlGPallas, Cam
     };
     let prev_challenges = vec![prev.clone(), prev.clone(), prev];
 
-    let g = Pallas::prime_subgroup_generator();
+    let g = Pallas::generator();
     let proof = OpeningProof {
         lr: vec![(g, g), (g, g), (g, g)],
         z1: Fq::one(),

@@ -11,10 +11,12 @@
  * limitations under the License.
  */
 
-use js_sys::JsString;
 use js_sys::Promise;
 use spmc::{channel, Receiver, Sender};
 use wasm_bindgen::prelude::*;
+
+#[cfg(feature = "nodejs")]
+use js_sys::JsString;
 
 static mut THREAD_POOL: Option<rayon::ThreadPool> = None;
 

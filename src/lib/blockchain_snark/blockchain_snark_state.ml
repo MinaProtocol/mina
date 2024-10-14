@@ -350,14 +350,14 @@ let%snarkydef_ step ~(logger : Logger.t)
   in
   let txn_snark_must_verify =
     match proof_level with
-    | Check | None ->
+    | Check | No_check ->
         Boolean.false_
     | Full ->
         txn_snark_must_verify
   in
   let prev_must_verify =
     match proof_level with
-    | Check | None ->
+    | Check | No_check ->
         Boolean.false_
     | Full ->
         Boolean.not is_base_case
@@ -487,7 +487,6 @@ end) : S = struct
       ~constraint_constants:
         (Genesis_constants.Constraint_constants.to_snark_keys_header
            constraint_constants )
-      ~commit:Mina_version.commit_id
       ~choices:(fun ~self ->
         [ rule ~proof_level ~constraint_constants T.tag self ] )
 

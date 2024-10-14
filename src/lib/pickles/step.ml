@@ -81,7 +81,7 @@ struct
       * auxiliary_value
       * (int, prevs_length) Vector.t )
       Promise.t =
-    let logger = Internal_tracing_context_logger.get () in
+    let logger = Context_logger.get () in
     [%log internal] "Pickles_step_proof" ;
     let _ = auxiliary_typ in
     (* unused *)
@@ -454,7 +454,7 @@ struct
           (module Env_bool)
           (module Env_field)
           ~domain:tock_domain ~srs_length_log2:Common.Max_degree.wrap_log2
-          ~zk_rows:3
+          ~zk_rows:Plonk_checks.zk_rows_by_default
           ~field_of_hex:(fun s ->
             Kimchi_pasta.Pasta.Bigint256.of_hex_string s
             |> Kimchi_pasta.Pasta.Fq.of_bigint )
@@ -803,7 +803,6 @@ struct
                     , _next_statement_hashed ) =
       let (T (input, _conv, conv_inv)) =
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-          ~wrap_rounds:Tock.Rounds.n
       in
       let%bind.Promise main = branch_data.main ~step_domains in
       let%bind.Promise step_domains = step_domains in

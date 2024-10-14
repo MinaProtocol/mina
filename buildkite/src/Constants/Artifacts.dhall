@@ -11,8 +11,8 @@ let Network = ./Network.dhall
 let Artifact
     : Type
     = < Daemon
+      | LogProc
       | Archive
-      | ArchiveMigration
       | TestExecutive
       | BatchTxn
       | Rosetta
@@ -22,15 +22,16 @@ let Artifact
 
 let AllButTests =
       [ Artifact.Daemon
+      , Artifact.LogProc
       , Artifact.Archive
-      , Artifact.ArchiveMigration
       , Artifact.BatchTxn
       , Artifact.TestExecutive
       , Artifact.Rosetta
       , Artifact.ZkappTestTransaction
       ]
 
-let Main = [ Artifact.Daemon, Artifact.Archive, Artifact.Rosetta ]
+let Main =
+      [ Artifact.Daemon, Artifact.LogProc, Artifact.Archive, Artifact.Rosetta ]
 
 let All = AllButTests # [ Artifact.FunctionalTestSuite ]
 
@@ -38,8 +39,8 @@ let capitalName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "Daemon"
+            , LogProc = "LogProc"
             , Archive = "Archive"
-            , ArchiveMigration = "ArchiveMigration"
             , TestExecutive = "TestExecutive"
             , BatchTxn = "BatchTxn"
             , Rosetta = "Rosetta"
@@ -52,8 +53,8 @@ let lowerName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "daemon"
+            , LogProc = "logproc"
             , Archive = "archive"
-            , ArchiveMigration = "archive_migration"
             , TestExecutive = "test_executive"
             , BatchTxn = "batch_txn"
             , Rosetta = "rosetta"
@@ -68,7 +69,7 @@ let dockerName =
             { Daemon = "mina-daemon"
             , Archive = "mina-archive"
             , TestExecutive = "mina-test-executive"
-            , ArchiveMigration = "mina-archive-migration"
+            , LogProc = "mina-logproc"
             , BatchTxn = "mina-batch-txn"
             , Rosetta = "mina-rosetta"
             , ZkappTestTransaction = "mina-zkapp-test-transaction"
@@ -81,11 +82,11 @@ let toDebianName =
       ->  \(network : Network.Type)
       ->  merge
             { Daemon = "daemon_${Network.lowerName network}"
+            , LogProc = "logproc"
             , Archive = "archive"
-            , ArchiveMigration = "archive_migration"
             , TestExecutive = "test_executive"
             , BatchTxn = "batch_txn"
-            , Rosetta = ""
+            , Rosetta = "rosetta_${Network.lowerName network}"
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             }
@@ -104,15 +105,20 @@ let toDebianNames =
                               Prelude.List.map
                                 Network.Type
                                 Text
-                                (     \(n : Network.Type)
-                                  ->  "daemon_${Network.lowerName n}"
-                                )
+                                (\(n : Network.Type) -> toDebianName a n)
                                 networks
                           , Archive = [ "archive" ]
-                          , ArchiveMigration = [ "archive_migration" ]
+                          , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
                           , BatchTxn = [ "batch_txn" ]
-                          , Rosetta = [ "" ]
+                          , Rosetta =
+                              Prelude.List.map
+                                Network.Type
+                                Text
+                                (     \(n : Network.Type)
+                                  ->  "rosetta_${Network.lowerName n}"
+                                )
+                                networks
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]
                           }
@@ -152,7 +158,7 @@ let dockerTag =
                     "${version_and_codename}-${Network.lowerName
                                                  network}${profile_part}"
                 , Archive = "${version_and_codename}"
-                , ArchiveMigration = "${version_and_codename}"
+                , LogProc = "${version_and_codename}"
                 , TestExecutive = "${version_and_codename}"
                 , BatchTxn = "${version_and_codename}"
                 , Rosetta =

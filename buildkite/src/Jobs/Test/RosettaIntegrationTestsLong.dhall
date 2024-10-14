@@ -1,10 +1,14 @@
 let Cmd = ../../Lib/Cmds.dhall
 
+let B = ../../External/Buildkite.dhall
+
 let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineMode = ../../Pipeline/Mode.dhall
+
+let PipelineTag = ../../Pipeline/Tag.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
@@ -12,13 +16,15 @@ let Command = ../../Command/Base.dhall
 
 let Size = ../../Command/Size.dhall
 
+let Network = ../../Constants/Network.dhall
+
 let Profiles = ../../Constants/Profiles.dhall
+
+let Artifacts = ../../Constants/Artifacts.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
-let Network = ../../Constants/Network.dhall
-
-let Artifacts = ../../Constants/Artifacts.dhall
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
@@ -34,6 +40,11 @@ in  Pipeline.build
         , path = "Test"
         , name = "RosettaIntegrationTestsLong"
         , mode = PipelineMode.Type.Stable
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
         }
       , steps =
         [ Command.build
@@ -50,6 +61,7 @@ in  Pipeline.build
               ]
             , label = "Rosetta integration tests Bullseye Long"
             , key = "rosetta-integration-tests-bullseye-long"
+            , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Small
             , depends_on =
                 Dockers.dependsOn
