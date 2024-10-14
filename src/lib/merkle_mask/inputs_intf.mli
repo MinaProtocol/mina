@@ -21,8 +21,6 @@ module type S = sig
   module Location : Merkle_ledger.Location_intf.S
 
   module Location_binable : sig
-    include Core_kernel.Hashable.S_binable with type t := Location.t
-
     include Core_kernel.Comparable.S_binable with type t := Location.t
   end
 

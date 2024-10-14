@@ -12,7 +12,7 @@ module type S = sig
   end
 
   type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
-  [@@deriving sexp, hash, compare]
+  [@@deriving sexp, compare]
 
   val is_generic : t -> bool
 

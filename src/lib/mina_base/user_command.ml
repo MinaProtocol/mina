@@ -8,14 +8,14 @@ module Poly = struct
             ('u, 's) Mina_wire_types.Mina_base.User_command.Poly.V2.t =
         | Signed_command of 'u
         | Zkapp_command of 's
-      [@@deriving sexp, compare, equal, hash, yojson]
+      [@@deriving sexp, compare, equal, yojson]
 
       let to_latest = Fn.id
     end
 
     module V1 = struct
       type ('u, 's) t = Signed_command of 'u | Snapp_command of 's
-      [@@deriving sexp, compare, equal, hash, yojson]
+      [@@deriving sexp, compare, equal, yojson]
 
       let to_latest : _ t -> _ V2.t = function
         | Signed_command x ->
@@ -78,7 +78,7 @@ module Stable = struct
   module V2 = struct
     type t =
       (Signed_command.Stable.V2.t, Zkapp_command.Stable.V1.t) Poly.Stable.V2.t
-    [@@deriving sexp, compare, equal, hash, yojson]
+    [@@deriving sexp, compare, equal, yojson]
 
     let to_latest = Fn.id
   end
@@ -132,7 +132,7 @@ module Zero_one_or_two = struct
   module Stable = struct
     module V1 = struct
       type 'a t = [ `Zero | `One of 'a | `Two of 'a * 'a ]
-      [@@deriving sexp, compare, equal, hash, yojson]
+      [@@deriving sexp, compare, equal, yojson]
     end
   end]
 end
@@ -145,7 +145,7 @@ module Verifiable = struct
         ( Signed_command.Stable.V2.t
         , Zkapp_command.Verifiable.Stable.V1.t )
         Poly.Stable.V2.t
-      [@@deriving sexp, compare, equal, hash, yojson]
+      [@@deriving sexp, compare, equal, yojson]
 
       let to_latest = Fn.id
     end
@@ -308,7 +308,7 @@ module Valid = struct
         ( Signed_command.With_valid_signature.Stable.V2.t
         , Zkapp_command.Valid.Stable.V1.t )
         Poly.Stable.V2.t
-      [@@deriving sexp, compare, equal, hash, yojson]
+      [@@deriving sexp, compare, equal, yojson]
 
       let to_latest = Fn.id
     end
@@ -457,7 +457,7 @@ let check_well_formedness ~(genesis_constants : Genesis_constants.t) t :
   if List.is_empty errs then Ok () else Error errs
 
 type fee_payer_summary_t = Signature.t * Account.key * int
-[@@deriving yojson, hash]
+[@@deriving hash, yojson]
 
 let fee_payer_summary : t -> fee_payer_summary_t = function
   | Zkapp_command cmd ->

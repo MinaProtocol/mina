@@ -46,7 +46,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     module Stable = struct
       module V1 = struct
         type t = Pickles.Backend.Tick.Field.Stable.V1.t
-        [@@deriving sexp, equal, compare, hash]
+        [@@deriving sexp, equal, compare]
 
         let to_yojson (t : t) : Yojson.Safe.t = `String (to_string t)
 
@@ -62,7 +62,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     module Binables = struct
       include Comparable.Make_binable (Stable.Latest)
-      include Hashable.Make_binable (Stable.Latest)
     end
 
     include Binables
@@ -109,7 +108,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Stable = struct
     module V2 = struct
       type t = Public_key.Compressed.Stable.V1.t * Digest.Stable.V1.t
-      [@@deriving sexp, equal, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, yojson]
 
       let to_latest = Fn.id
     end
@@ -140,7 +139,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
     (key, tid)
 
   include Comparable.Make_binable (Stable.Latest)
-  include Hashable.Make_binable (Stable.Latest)
 
   let to_input ((key, tid) : t) =
     Random_oracle.Input.Chunked.append

@@ -67,29 +67,29 @@ module First_pass_ledger_hashes = struct
 
   module T = struct
     type t = Ledger_hash.Stable.Latest.t * int
-    [@@deriving bin_io_unversioned, compare, sexp, hash]
+    [@@deriving bin_io_unversioned, compare, sexp]
   end
 
   include T
-  include Hashable.Make_binable (T)
+  include Comparable.Make_binable (T)
 
-  let hash_set = Hash_set.create ()
+  let set = ref Set.empty
 
   let add =
     let count = ref 0 in
     fun ledger_hash ->
-      Base.Hash_set.add hash_set (ledger_hash, !count) ;
+      set := Base.Set.add !set (ledger_hash, !count) ;
       incr count
 
   let find ledger_hash =
-    Base.Hash_set.find hash_set ~f:(fun (hash, _n) ->
+    Base.Set.find !set ~f:(fun (hash, _n) ->
         Ledger_hash.equal hash ledger_hash )
 
   (* once we find a snarked ledger hash corresponding to a ledger hash, don't need to store earlier ones *)
   let flush_older_than ndx =
-    let elts = Base.Hash_set.to_list hash_set in
+    let elts = Base.Set.to_list !set in
     List.iter elts ~f:(fun ((_hash, n) as elt) ->
-        if n < ndx then Base.Hash_set.remove hash_set elt )
+        if Int.(n < ndx) then set := Base.Set.remove !set elt )
 
   let get_last_snarked_hash, set_last_snarked_hash =
     let last_snarked_hash = ref Ledger_hash.empty_hash in
@@ -144,7 +144,7 @@ let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
     }
   in
   let first_pass_ledger_hashes =
-    let elts = Base.Hash_set.to_list First_pass_ledger_hashes.hash_set in
+    let elts = Base.Set.to_list !First_pass_ledger_hashes.set in
     List.sort elts ~compare:(fun (_h1, n1) (_h2, n2) -> Int.compare n1 n2)
     |> List.map ~f:(fun (h, _n) -> h)
   in

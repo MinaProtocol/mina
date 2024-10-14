@@ -1,7 +1,7 @@
 module type Inputs_intf = sig
   module Location : Location_intf.S
 
-  module Location_binable : Hashable.S_binable with type t := Location.t
+  module Location_binable : Comparable.S_binable with type t := Location.t
 
   module Key : Intf.Key
 

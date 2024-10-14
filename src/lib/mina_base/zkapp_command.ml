@@ -21,7 +21,7 @@ module Call_forest = struct
               With_stack_hash.Stable.V1.t
               list
           }
-        [@@deriving sexp, compare, equal, hash, yojson]
+        [@@deriving sexp, compare, equal, yojson]
 
         let to_latest = Fn.id
       end
@@ -211,7 +211,7 @@ module Call_forest = struct
       module Stable = struct
         module V1 = struct
           type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
-          [@@deriving sexp, compare, equal, hash, yojson]
+          [@@deriving sexp, compare, equal, yojson]
 
           let to_latest = Fn.id
         end
@@ -223,7 +223,7 @@ module Call_forest = struct
       module Stable = struct
         module V1 = struct
           type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
-          [@@deriving sexp, compare, equal, hash, yojson]
+          [@@deriving sexp, compare, equal, yojson]
 
           let to_latest = Fn.id
         end
@@ -235,7 +235,7 @@ module Call_forest = struct
       module Stable = struct
         module V1 = struct
           type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
-          [@@deriving sexp, compare, equal, hash, yojson]
+          [@@deriving sexp, compare, equal, yojson]
 
           let to_latest = Fn.id
         end
@@ -339,7 +339,7 @@ module Call_forest = struct
         , 'digest )
         With_stack_hash.Stable.V1.t
         list
-      [@@deriving sexp, compare, equal, hash, yojson]
+      [@@deriving sexp, compare, equal, yojson]
 
       let to_latest = Fn.id
     end
@@ -525,7 +525,7 @@ module Call_forest = struct
           , Digest.Account_update.Stable.V1.t
           , Digest.Forest.Stable.V1.t )
           Stable.V1.t
-        [@@deriving sexp, compare, equal, hash, yojson]
+        [@@deriving sexp, compare, equal, yojson]
 
         let to_latest = Fn.id
       end
@@ -575,7 +575,7 @@ module Call_forest = struct
           , Digest.Account_update.Stable.V1.t
           , Digest.Forest.Stable.V1.t )
           Stable.V1.t
-        [@@deriving sexp, compare, equal, hash, yojson]
+        [@@deriving sexp, compare, equal, yojson]
 
         let to_latest = Fn.id
       end
@@ -634,7 +634,7 @@ module Graphql_repr = struct
         ; account_updates : Account_update.Graphql_repr.Stable.V1.t list
         ; memo : Signed_command_memo.Stable.V1.t
         }
-      [@@deriving sexp, compare, equal, hash, yojson]
+      [@@deriving sexp, compare, equal, yojson]
 
       let to_latest = Fn.id
     end
@@ -651,7 +651,7 @@ module Simple = struct
         ; account_updates : Account_update.Simple.Stable.V1.t list
         ; memo : Signed_command_memo.Stable.V1.t
         }
-      [@@deriving sexp, compare, equal, hash, yojson]
+      [@@deriving sexp, compare, equal, yojson]
 
       let to_latest = Fn.id
     end
@@ -684,7 +684,7 @@ module T = struct
             Call_forest.Stable.V1.t
         ; memo : Signed_command_memo.Stable.V1.t
         }
-      [@@deriving annot, sexp, compare, equal, hash, yojson, fields]
+      [@@deriving annot, sexp, compare, equal, yojson, fields]
 
       let to_latest = Fn.id
 
@@ -701,7 +701,7 @@ module T = struct
                   Call_forest.Stable.V1.t
               ; memo : Signed_command_memo.Stable.V1.t
               }
-            [@@deriving sexp, compare, equal, hash, yojson]
+            [@@deriving sexp, compare, equal, yojson]
 
             let to_latest = Fn.id
           end
@@ -1038,7 +1038,7 @@ module Verifiable : sig
             Call_forest.With_hashes_and_data.Stable.V1.t
         ; memo : Signed_command_memo.Stable.V1.t
         }
-      [@@deriving sexp, compare, equal, hash, yojson]
+      [@@deriving sexp, compare, equal, yojson]
 
       val to_latest : t -> t
     end
@@ -1108,7 +1108,7 @@ end = struct
             Call_forest.With_hashes_and_data.Stable.V1.t
         ; memo : Signed_command_memo.Stable.V1.t
         }
-      [@@deriving sexp, compare, equal, hash, yojson]
+      [@@deriving sexp, compare, equal, yojson]
 
       let to_latest = Fn.id
     end
@@ -1166,7 +1166,7 @@ end = struct
   let create ({ fee_payer; account_updates; memo } : T.t) ~failed ~find_vk :
       t Or_error.t =
     With_return.with_return (fun { return } ->
-        let tbl = Account_id.Table.create () in
+        let tbl = ref Account_id.Map.empty in
         let vks_overridden =
           (* Keep track of the verification keys that have been set so far
              during this transaction.
@@ -1227,8 +1227,9 @@ end = struct
                   in
                   match prioritized_vk with
                   | Some prioritized_vk ->
-                      Account_id.Table.update tbl account_id ~f:(fun _ ->
-                          With_hash.hash prioritized_vk ) ;
+                      tbl :=
+                        Account_id.Map.update !tbl account_id ~f:(fun _ ->
+                            With_hash.hash prioritized_vk ) ;
                       (* return the updated overrides *)
                       vks_overridden := vks_overriden' ;
                       (p, Some prioritized_vk)
@@ -1449,7 +1450,7 @@ module type Valid_intf = sig
   module Stable : sig
     module V1 : sig
       type t = private { zkapp_command : T.Stable.V1.t }
-      [@@deriving sexp, compare, equal, hash, yojson]
+      [@@deriving sexp, compare, equal, yojson]
     end
   end]
 
@@ -1481,7 +1482,7 @@ struct
     module Stable = struct
       module V1 = struct
         type t = Zkapp_basic.F.Stable.V1.t
-        [@@deriving sexp, compare, equal, hash, yojson]
+        [@@deriving sexp, compare, equal, yojson]
 
         let to_latest = Fn.id
       end
@@ -1493,7 +1494,7 @@ struct
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V1.t =
         { zkapp_command : S.V1.t }
-      [@@deriving sexp, compare, equal, hash, yojson]
+      [@@deriving sexp, compare, equal, yojson]
 
       let to_latest = Fn.id
     end

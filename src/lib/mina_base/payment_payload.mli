@@ -7,12 +7,11 @@ module Poly : sig
         , 'amount )
         Mina_wire_types.Mina_base.Payment_payload.Poly.V2.t =
     { receiver_pk : 'public_key; amount : 'amount }
-  [@@deriving equal, sexp, hash, yojson]
+  [@@deriving equal, sexp, yojson]
 
   module Stable : sig
     module V2 : sig
-      type ('pk, 'amount) t
-      [@@deriving bin_io, equal, sexp, hash, yojson, version]
+      type ('pk, 'amount) t [@@deriving bin_io, equal, sexp, yojson, version]
     end
 
     module V1 : sig
@@ -22,7 +21,7 @@ module Poly : sig
         ; token_id : 'token_id
         ; amount : 'amount
         }
-      [@@deriving bin_io, equal, sexp, hash, yojson, version]
+      [@@deriving bin_io, equal, sexp, yojson, version]
     end
 
     module Latest = V2
@@ -37,7 +36,7 @@ module Stable : sig
       ( Public_key.Compressed.Stable.V1.t
       , Currency.Amount.Stable.V1.t )
       Poly.Stable.V2.t
-    [@@deriving compare, equal, sexp, hash, compare, yojson]
+    [@@deriving compare, equal, sexp, compare, yojson]
   end
 
   module V1 : sig
@@ -48,7 +47,7 @@ module Stable : sig
       , Token_id.Stable.V1.t
       , Currency.Amount.Stable.V1.t )
       Poly.Stable.V1.t
-    [@@deriving compare, equal, sexp, hash, compare, yojson]
+    [@@deriving compare, equal, sexp, compare, yojson]
 
     val to_latest : t -> Latest.t
   end

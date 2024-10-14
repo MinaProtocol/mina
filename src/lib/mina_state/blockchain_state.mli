@@ -40,7 +40,7 @@ module Poly : sig
         ; timestamp : 'time
         ; body_reference : 'body_reference
         }
-      [@@deriving sexp, fields, equal, compare, hash, yojson, hlist]
+      [@@deriving sexp, fields, equal, compare, yojson, hlist]
     end
   end]
 end
@@ -60,7 +60,7 @@ module Value : sig
         , Fee_excess.Stable.V1.t
         , unit )
         Poly.Stable.V2.t
-      [@@deriving sexp, equal, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, yojson]
 
       val to_latest : t -> t
     end

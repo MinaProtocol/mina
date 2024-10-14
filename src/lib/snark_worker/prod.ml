@@ -4,19 +4,20 @@ open Mina_base
 open Mina_transaction
 
 module Cache = struct
-  module T = Hash_heap.Make (Transaction_snark.Statement)
+  module Map = Transaction_snark.Statement.Map
 
-  type t = (Time.t * Transaction_snark.t) T.t
+  type t = (Time.t * Transaction_snark.t) Map.t ref
 
   let max_size = 100
 
-  let create () : t = T.create (fun (t1, _) (t2, _) -> Time.compare t1 t2)
+  let create () : t = ref Transaction_snark.Statement.Map.empty
 
   let add t ~statement ~proof =
-    T.push_exn t ~key:statement ~data:(Time.now (), proof) ;
-    if Int.( > ) (T.length t) max_size then ignore (T.pop_exn t)
+    t := Map.add_exn !t ~key:statement ~data:(Time.now (), proof) ;
+    if Int.( > ) (Map.length !t) max_size then
+      t := Map.remove !t (fst @@ Map.min_elt_exn !t)
 
-  let find (t : t) statement = Option.map ~f:snd (T.find t statement)
+  let find (t : t) statement = Option.map ~f:snd (Map.find !t statement)
 end
 
 module Inputs = struct

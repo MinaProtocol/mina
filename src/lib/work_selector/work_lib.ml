@@ -19,7 +19,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     module Seen_key = struct
       module T = struct
         type t = Transaction_snark.Statement.t One_or_two.t
-        [@@deriving compare, sexp, to_yojson, hash]
+        [@@deriving compare, sexp, to_yojson]
       end
 
       include T
