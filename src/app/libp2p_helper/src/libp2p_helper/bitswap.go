@@ -47,6 +47,10 @@ type BitswapCtx struct {
 
 func NewBitswapCtx(ctx context.Context, outMsgChan chan<- *capnp.Message) *BitswapCtx {
 	maxBlockSize := 1 << 18 // 256 KiB
+	return NewBitswapCtxWithMaxBlockSize(maxBlockSize, ctx, outMsgChan)
+}
+
+func NewBitswapCtxWithMaxBlockSize(maxBlockSize int, ctx context.Context, outMsgChan chan<- *capnp.Message) *BitswapCtx {
 	return &BitswapCtx{
 		downloadCmds:       make(chan bitswapDownloadCmd, 100),
 		addCmds:            make(chan bitswapAddCmd, 100),
