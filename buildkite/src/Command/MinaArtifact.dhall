@@ -316,10 +316,7 @@ let publish_to_debian_repo =
 let pipeline
     : MinaBuildSpec.Type -> Pipeline.Config.Type
     =     \(spec : MinaBuildSpec.Type)
-      ->  let steps =
-                [ build_artifacts spec
-                , publish_to_debian_repo spec
-                ]
+      ->  let steps = [ build_artifacts spec, publish_to_debian_repo spec ]
 
           in  Pipeline.Config::{
               , spec = JobSpec::{
