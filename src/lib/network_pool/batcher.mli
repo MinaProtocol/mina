@@ -9,7 +9,7 @@ module Snark_pool : sig
 
   type t [@@deriving sexp]
 
-  val create : Verifier.t -> t
+  val create : logger:Logger.t -> Verifier.t -> t
 
   val verify : t -> proof_envelope -> bool Deferred.Or_error.t
 end

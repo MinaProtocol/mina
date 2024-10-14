@@ -431,8 +431,7 @@ module Snark_pool = struct
     let open Deferred.Or_error.Let_syntax in
     match%map verify t p with Ok () -> true | Error _ -> false
 
-  let create verifier : t =
-    let logger = Logger.create () in
+  let create ~logger verifier : t =
     create
     (* TODO: Make this a proper config detail once we have data on what a
            good default would be.
@@ -539,7 +538,7 @@ module Snark_pool = struct
         Envelope.Incoming.gen data_gen
 
       let run_test proof_lists =
-        let batcher = create verifier in
+        let batcher = create ~logger verifier in
         Deferred.List.iter proof_lists ~f:(fun (invalid_proofs, proof_list) ->
             let%map r = verify' batcher proof_list in
             let (`Invalid ps) = Or_error.ok_exn r in

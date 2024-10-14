@@ -256,7 +256,7 @@ struct
                 }
           ; frontier =
               (fun () -> Broadcast_pipe.Reader.peek frontier_broadcast_pipe)
-          ; batcher = Batcher.Snark_pool.create config.verifier
+          ; batcher = Batcher.Snark_pool.create ~logger config.verifier
           ; logger
           ; config
           ; account_creation_fee =
