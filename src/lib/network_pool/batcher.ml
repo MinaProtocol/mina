@@ -2,9 +2,6 @@ open Core_kernel
 open Async_kernel
 open Network_peer
 
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
-
 module Id = Unique_id.Int ()
 
 type ('init, 'result) elt =
