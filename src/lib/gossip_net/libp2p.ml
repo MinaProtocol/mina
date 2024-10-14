@@ -1002,6 +1002,18 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       Mina_net2.set_connection_gating_config ?clean_added_peers net2 config
 
     let restart_helper t = t.restart_helper ()
+
+    let add_bitswap_resource t ~id ~tag ~data =
+      let%map net2 = !(t.net2) in
+      Mina_net2.add_bitswap_resource net2 ~id ~tag ~data
+
+    let download_bitswap_resource t ~tag ~ids =
+      let%map net2 = !(t.net2) in
+      Mina_net2.download_bitswap_resource net2 ~tag ~ids
+
+    let remove_bitswap_resource t ~ids =
+      let%map net2 = !(t.net2) in
+      Mina_net2.remove_bitswap_resource net2 ~ids
   end
 
   include T

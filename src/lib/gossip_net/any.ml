@@ -93,4 +93,12 @@ module Make (Rpc_interface : RPC_INTERFACE) :
     M.set_connection_gating ?clean_added_peers t config
 
   let restart_helper (Any ((module M), t)) = M.restart_helper t
+
+  let add_bitswap_resource (Any ((module M), t)) = M.add_bitswap_resource t
+
+  let remove_bitswap_resource (Any ((module M), t)) =
+    M.remove_bitswap_resource t
+
+  let download_bitswap_resource (Any ((module M), t)) =
+    M.download_bitswap_resource t
 end

@@ -301,6 +301,18 @@ module Make (Rpc_interface : RPC_INTERFACE) :
     let set_connection_gating ?clean_added_peers:_ t config =
       t.connection_gating := config ;
       Deferred.return config
+
+    let add_bitswap_resource _ ~id:_ ~tag:_ ~data:_ =
+      (* TODO is this implementation what it should be? *)
+      Deferred.unit
+
+    let remove_bitswap_resource _ ~ids:_ =
+      (* TODO is this implementation what it should be? *)
+      Deferred.unit
+
+    let download_bitswap_resource _ ~tag:_ ~ids:_ =
+      (* TODO is this implementation what it should be? *)
+      Deferred.unit
   end
 
   type network = Network.t
