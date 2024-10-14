@@ -743,7 +743,6 @@ let%test_module "Bootstrap_controller tests" =
       let compile_config = compile_config
     end
 
-   
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
         let%bind verification_key = Lazy.force (Verifier.For_test.get_blockchain_verification_key ~constraint_constants ~proof_level) in

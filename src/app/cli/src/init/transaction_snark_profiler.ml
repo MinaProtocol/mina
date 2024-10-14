@@ -15,8 +15,6 @@ let run ~genesis_constants ~constraint_constants ~proof_level
             ?min_num_updates ~max_num_updates () )
     in
     Parallel.init_master () ;
-
-    
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
         let open Async.Deferred.Let_syntax in
