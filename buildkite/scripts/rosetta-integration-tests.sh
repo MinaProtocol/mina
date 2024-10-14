@@ -18,7 +18,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-export MINA_NETWORK=${MINA_NETWORK:=sandbox}
+export MINA_NETWORK=${MINA_NETWORK:=testnet}
 export LOG_LEVEL="${LOG_LEVEL:=Info}"
 
 # Postgres database connection string and related variables
@@ -96,7 +96,7 @@ cat <<EOF >"$MINA_CONFIG_FILE"
   "daemon": { "network_id": "${MINA_NETWORK}" },
   "ledger": {
     "accounts": [
-      { "pk": "${BLOCK_PRODUCER_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
+      { "pk": "${BLOCK_PRODUCER_PUB_KEY}", "balance": "600000000", "delegate": null, "sk": null },
       { "pk": "${SNARK_PRODUCER_PK}", "balance": "2000000", "delegate": "${BLOCK_PRODUCER_PUB_KEY}", "sk": null },
       { "pk": "${ZKAPP_FEE_PAYER_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
       { "pk": "${ZKAPP_SENDER_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },

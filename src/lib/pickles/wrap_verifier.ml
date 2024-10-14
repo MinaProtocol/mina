@@ -254,7 +254,9 @@ struct
                      Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t)) )
                in
                let none_sum =
-                 let num_chunks = (* TODO *) 1 in
+                 let num_chunks =
+                   (* TODO *) Plonk_checks.num_chunks_by_default
+                 in
                  Option.map is_none ~f:(fun (b : Boolean.var) ->
                      Array.init num_chunks ~f:(fun _ ->
                          Double.map Inner_curve.one ~f:(( * ) (b :> t)) ) )
@@ -369,8 +371,20 @@ struct
           (* TODO: num_bits should maybe be input_length - 1. *)
           Ops.bits_per_chunk * Ops.chunks_needed ~num_bits:input_length
         in
-        let rec pow2pow x i =
-          if i = 0 then x else pow2pow Inner_curve.Constant.(x + x) (i - 1)
+        (* computes 2^i *)
+        let rec field2pow f i =
+          if i = 1 then f
+          else
+            let j = i - 1 in
+            Inner_curve.Constant.Scalar.(f * field2pow f j)
+        in
+        (* computes 2^actual_shift *)
+        let two_to_actual_shift =
+          field2pow (Inner_curve.Constant.Scalar.of_int 2) actual_shift
+        in
+        (* computes [2^actual_shift] G *)
+        let field_to_two_to_shift g =
+          Inner_curve.Constant.scale g two_to_actual_shift
         in
         let base_and_correction (h : Domain.t) =
           let d = Int.pow 2 (Domain.log2_size h) in
@@ -383,7 +397,7 @@ struct
                 let open Inner_curve.Constant in
                 let g = of_affine g in
                 ( Inner_curve.constant g
-                , Inner_curve.constant (negate (pow2pow g actual_shift)) )
+                , Inner_curve.constant (negate (field_to_two_to_shift g)) )
             | Infinity ->
                 (* Point at infinity should be impossible in the SRS *)
                 assert false )
@@ -1373,6 +1387,7 @@ struct
 
   let challenge_polynomial = G.challenge_polynomial (module Field)
 
+  (* computes pt^{2^n} *)
   let pow2pow (pt : Field.t) (n : int) : Field.t =
     with_label __LOC__ (fun () ->
         let rec go acc i =
@@ -1563,7 +1578,8 @@ struct
       Plonk_checks.scalars_env
         (module Env_bool)
         (module Env_field)
-        ~srs_length_log2:Common.Max_degree.wrap_log2 ~zk_rows:3
+        ~srs_length_log2:Common.Max_degree.wrap_log2
+        ~zk_rows:Plonk_checks.zk_rows_by_default
         ~endo:(Impl.Field.constant Endo.Wrap_inner_curve.base)
         ~mds:sponge_params.mds
         ~field_of_hex:(fun s ->

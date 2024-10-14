@@ -1,28 +1,32 @@
-use ark_ec::AffineCurve;
+use ark_ec::AffineRepr;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as D};
 use cache::LagrangeCache;
 use mina_curves::pasta::{Pallas, Vesta};
 use poly_commitment::{commitment::CommitmentCurve, srs::SRS};
 use std::env;
 
-pub trait WithLagrangeBasis<G: AffineCurve> {
+pub trait WithLagrangeBasis<G: AffineRepr> {
     fn with_lagrange_basis(&mut self, domain: D<G::ScalarField>);
 }
 
 impl WithLagrangeBasis<Vesta> for SRS<Vesta> {
-    fn with_lagrange_basis(&mut self, domain: D<<Vesta as AffineCurve>::ScalarField>) {
+    fn with_lagrange_basis(&mut self, domain: D<<Vesta as AffineRepr>::ScalarField>) {
         match env::var("LAGRANGE_CACHE_DIR") {
             Ok(_) => add_lagrange_basis_with_cache(self, domain, cache::get_vesta_file_cache()),
-            Err(_) => self.add_lagrange_basis(domain),
+            Err(_) => {
+                self.get_lagrange_basis(domain);
+            }
         }
     }
 }
 
 impl WithLagrangeBasis<Pallas> for SRS<Pallas> {
-    fn with_lagrange_basis(&mut self, domain: D<<Pallas as AffineCurve>::ScalarField>) {
+    fn with_lagrange_basis(&mut self, domain: D<<Pallas as AffineRepr>::ScalarField>) {
         match env::var("LAGRANGE_CACHE_DIR") {
             Ok(_) => add_lagrange_basis_with_cache(self, domain, cache::get_pallas_file_cache()),
-            Err(_) => self.add_lagrange_basis(domain),
+            Err(_) => {
+                self.get_lagrange_basis(domain);
+            }
         }
     }
 }
@@ -37,17 +41,16 @@ fn add_lagrange_basis_with_cache<G: CommitmentCurve, C: LagrangeCache<G>>(
         return;
     }
     if let Some(basis) = cache.load_lagrange_basis_from_cache(srs.g.len(), &domain) {
-        srs.lagrange_bases.insert(n, basis);
+        srs.lagrange_bases.get_or_generate(n, || { basis });
         return;
     } else {
-        srs.add_lagrange_basis(domain);
-        let basis = srs.lagrange_bases.get(&domain.size()).unwrap();
+        let basis = srs.get_lagrange_basis(domain);
         cache.cache_lagrange_basis(srs.g.len(), &domain, basis);
     }
 }
 
 mod cache {
-    use ark_ec::AffineCurve;
+    use ark_ec::AffineRepr;
     use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as D};
     use mina_curves::pasta::{Pallas, Vesta};
     use once_cell::sync::Lazy;
@@ -59,7 +62,7 @@ mod cache {
         path::{Path, PathBuf},
     };
 
-    pub trait LagrangeCache<G: AffineCurve> {
+    pub trait LagrangeCache<G: AffineRepr> {
         type CacheKey;
 
         fn lagrange_basis_cache_key(
@@ -101,7 +104,7 @@ mod cache {
     The FileCache implementation uses a directory as a cache for the Lagrange basis hash map --
     i.e every file corresponds to a Lagrange basis for a given G-basis and domain size.
     */
-    impl<G: AffineCurve> LagrangeCache<G> for FileCache<G> {
+    impl<G: AffineRepr> LagrangeCache<G> for FileCache<G> {
         type CacheKey = PathBuf;
 
         fn lagrange_basis_cache_key(

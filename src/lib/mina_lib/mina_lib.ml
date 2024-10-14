@@ -7,7 +7,6 @@ open Mina_block
 open Pipe_lib
 open Strict_pipe
 open Signature_lib
-open Network_peer
 module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
@@ -65,7 +64,7 @@ type components =
   ; snark_pool : Network_pool.Snark_pool.t
   ; transition_frontier : Transition_frontier.t option Broadcast_pipe.Reader.t
   ; most_recent_valid_block :
-      Mina_block.initial_valid_block Broadcast_pipe.Reader.t
+      Mina_block.initial_valid_header Broadcast_pipe.Reader.t
   ; block_produced_bvar : (Transition_frontier.Breadcrumb.t, read_write) Bvar.t
   }
 
@@ -131,6 +130,8 @@ let time_controller t = t.config.time_controller
 let subscription t = t.subscriptions
 
 let commit_id t = t.commit_id
+
+let compile_config t = t.config.compile_config
 
 let peek_frontier frontier_broadcast_pipe =
   Broadcast_pipe.Reader.peek frontier_broadcast_pipe
@@ -408,11 +409,11 @@ let get_node_state t =
     | None ->
         None
     | Some tf -> (
-        match Transition_frontier.catchup_tree tf with
-        | Full catchup_tree ->
+        match Transition_frontier.catchup_state tf with
+        | Full catchup_state ->
             Some
               (Transition_frontier.Full_catchup_tree.to_node_status_report
-                 catchup_tree )
+                 catchup_state )
         | _ ->
             None )
   in
@@ -875,14 +876,13 @@ let request_work t =
 let work_selection_method t = t.config.work_selection_method
 
 let add_work t (work : Snark_worker_lib.Work.Result.t) =
-  let (module Work_selection_method) = t.config.work_selection_method in
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =
       Option.map (snark_worker_key t) ~f:(fun _ -> snark_work_fee t)
     in
     let pending_work =
-      Work_selection_method.pending_work_statements ~snark_pool ~fee_opt
+      Work_selector.pending_work_statements ~snark_pool ~fee_opt
         t.snark_job_state
       |> List.length
     in
@@ -894,7 +894,7 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
      * If the diff is accepted then remove it from the seen jobs.
      * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
-    Work_selection_method.remove t.snark_job_state spec
+    Work_selector.remove t.snark_job_state spec
   in
   ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
   Network_pool.Snark_pool.Local_sink.push t.pipes.snark_local_sink
@@ -1063,8 +1063,8 @@ let last_epoch_delegators t ~pk =
   in
   find_delegators last_epoch_delegatee_table pk
 
-let perform_compaction t =
-  match Mina_compile_config.compaction_interval_ms with
+let perform_compaction compaction_interval t =
+  match compaction_interval with
   | None ->
       ()
   | Some compaction_interval_compiled ->
@@ -1086,7 +1086,7 @@ let perform_compaction t =
         | Some ms ->
             Time.Span.of_ms (Float.of_string ms)
         | None ->
-            span compaction_interval_compiled
+            compaction_interval_compiled
       in
       if Time.Span.(interval_configured <= of_ms expected_time_for_compaction)
       then (
@@ -1157,10 +1157,10 @@ let check_and_stop_daemon t ~wait =
             if Time.Span.(wait_for > max_catchup_time) then `Now
             else `Check_in wait_for
         | Evaluating_vrf _last_checked_slot ->
-            `Check_in
-              (Core.Time.Span.of_ms
-                 (Mina_compile_config.vrf_poll_interval_ms * 2 |> Int.to_float) )
-        )
+            let vrf_poll_interval =
+              (config t).compile_config.vrf_poll_interval
+            in
+            `Check_in (Core.Time.Span.scale vrf_poll_interval 2.0) )
 
 let stop_long_running_daemon t =
   let wait_mins = (t.config.stop_time * 60) + (Random.int 10 * 60) in
@@ -1220,6 +1220,12 @@ let online_broadcaster ~constraint_constants time_controller =
 module type CONTEXT = sig
   val logger : Logger.t
 
+  val time_controller : Block_time.Controller.t
+
+  val trust_system : Trust_system.t
+
+  val consensus_local_state : Consensus.Data.Local_state.t
+
   val precomputed_values : Precomputed_values.t
 
   val constraint_constants : Genesis_constants.Constraint_constants.t
@@ -1227,11 +1233,25 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val commit_id : string
+
+  val vrf_poll_interval : Time.Span.t
+
+  val zkapp_cmd_limit : int option ref
+
+  val compaction_interval : Time.Span.t option
+
+  val compile_config : Mina_compile_config.t
 end
 
 let context ~commit_id (config : Config.t) : (module CONTEXT) =
   ( module struct
     let logger = config.logger
+
+    let time_controller = config.time_controller
+
+    let trust_system = config.trust_system
+
+    let consensus_local_state = config.consensus_local_state
 
     let precomputed_values = config.precomputed_values
 
@@ -1240,6 +1260,14 @@ let context ~commit_id (config : Config.t) : (module CONTEXT) =
     let constraint_constants = precomputed_values.constraint_constants
 
     let commit_id = commit_id
+
+    let vrf_poll_interval = config.compile_config.vrf_poll_interval
+
+    let zkapp_cmd_limit = config.zkapp_cmd_limit
+
+    let compaction_interval = config.compile_config.compaction_interval
+
+    let compile_config = config.compile_config
   end )
 
 let start t =
@@ -1302,12 +1330,13 @@ let start t =
     t.block_production_status := block_production_status ;
     t.next_producer_timing <- Some next_producer_timing
   in
-  if
+  ( if
     not
       (Keypair.And_compressed_pk.Set.is_empty t.config.block_production_keypairs)
   then
+    let module Context = (val context ~commit_id:t.commit_id t.config) in
     Block_producer.run
-      ~context:(context ~commit_id:t.commit_id t.config)
+      ~context:(module Context)
       ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
       ~set_next_producer_timing ~prover:t.processes.prover
       ~trust_system:t.config.trust_system
@@ -1326,8 +1355,8 @@ let start t =
       ~block_produced_bvar:t.components.block_produced_bvar
       ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net
       ~zkapp_cmd_limit_hardcap:
-        t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap ;
-  perform_compaction t ;
+        t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap ) ;
+  perform_compaction t.config.compile_config.compaction_interval t ;
   let () =
     match t.config.node_status_url with
     | Some node_status_url ->
@@ -1380,9 +1409,10 @@ let start t =
   Snark_worker.start t
 
 let start_with_precomputed_blocks t blocks =
+  let module Context = (val context ~commit_id:t.commit_id t.config) in
   let%bind () =
     Block_producer.run_precomputed
-      ~context:(context ~commit_id:t.commit_id t.config)
+      ~context:(module Context)
       ~verifier:t.processes.verifier ~trust_system:t.config.trust_system
       ~time_controller:t.config.time_controller
       ~frontier_reader:t.components.transition_frontier
@@ -1395,8 +1425,8 @@ let send_resource_pool_diff_or_wait ~rl ~diff_score ~max_per_15_seconds diff =
   (* HACK: Pretend we're a remote peer so that we can rate limit
                  ourselves.
   *)
-  let us =
-    { Network_peer.Peer.host = Unix.Inet_addr.of_string "127.0.0.1"
+  let us : Network_peer.Peer.t =
+    { host = Unix.Inet_addr.of_string "127.0.0.1"
     ; libp2p_port = 0
     ; peer_id = ""
     }
@@ -1467,11 +1497,12 @@ let create ~commit_id ?wallets (config : Config.t) =
   let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
+  let block_window_duration = config.compile_config.block_window_duration in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
           =
-        if Mina_compile_config.itn_features then
+        if config.compile_config.itn_features then
           let ({ client_port; _ } : Node_addrs_and_ports.t) =
             config.gossip_net_params.addrs_and_ports
           in
@@ -1638,15 +1669,6 @@ let create ~commit_id ?wallets (config : Config.t) =
                   Deferred.unit
               | Some frontier ->
                   Transition_frontier.close ~loc:__LOC__ frontier ) ;
-          let handle_request name ~f query_env =
-            O1trace.thread ("handle_request_" ^ name) (fun () ->
-                let input = Envelope.Incoming.data query_env in
-                Deferred.return
-                @@
-                let open Option.Let_syntax in
-                let%bind frontier = get_current_frontier () in
-                f ~frontier input )
-          in
           (* knot-tying hacks so we can pass a get_node_status function before net, Mina_lib.t created *)
           let net_ref = ref None in
           let sync_status_ref = ref None in
@@ -1765,7 +1787,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                               @@ Consensus.Data.Consensus_state
                                  .blockchain_length consensus_state )
                       in
-                      Mina_networking.Rpcs.Get_node_status.Node_status.
+                      Mina_networking.Node_status.Stable.V2.
                         { node_ip_addr
                         ; node_peer_id
                         ; sync_status
@@ -1779,20 +1801,8 @@ let create ~commit_id ?wallets (config : Config.t) =
                         ; block_height_opt
                         } )
           in
-          let get_some_initial_peers _ =
-            O1trace.thread "handle_request_get_some_initial_peers" (fun () ->
-                match !net_ref with
-                | None ->
-                    (* should be unreachable; without a network, we wouldn't receive this RPC call *)
-                    [%log' error config.logger]
-                      "Network not instantiated when initial peers requested" ;
-                    Deferred.return []
-                | Some net ->
-                    Mina_networking.peers net )
-          in
           let slot_tx_end =
-            Runtime_config.slot_tx_end
-              config.Config.precomputed_values.runtime_config
+            Runtime_config.slot_tx_end config.precomputed_values.runtime_config
           in
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
@@ -1805,7 +1815,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =
             online_broadcaster
-              ~constraint_constants:config.net_config.constraint_constants
+              ~constraint_constants:Context.constraint_constants
               config.time_controller
           in
           let on_first_received_message ~f =
@@ -1828,6 +1838,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~on_remote_push:notify_online
               ~log_gossip_heard:
                 config.net_config.log_gossip_heard.transaction_pool_diff
+              ~block_window_duration
           in
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
@@ -1842,6 +1853,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~on_remote_push:notify_online
               ~log_gossip_heard:
                 config.net_config.log_gossip_heard.snark_pool_diff
+              ~block_window_duration
           in
           let block_reader, block_sink =
             Transition_handler.Block_sink.create
@@ -1850,114 +1862,22 @@ let create ~commit_id ?wallets (config : Config.t) =
                   config.precomputed_values.consensus_constants.slot_duration_ms
               ; on_push = notify_online
               ; log_gossip_heard = config.net_config.log_gossip_heard.new_state
-              ; time_controller = config.net_config.time_controller
+              ; time_controller = Context.time_controller
               ; consensus_constants
               ; genesis_constants = config.precomputed_values.genesis_constants
               ; constraint_constants
+              ; block_window_duration
               }
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
           let%bind net =
             O1trace.thread "mina_networking" (fun () ->
-                Mina_networking.create config.net_config ~get_some_initial_peers
-                  ~sinks
-                  ~get_staged_ledger_aux_and_pending_coinbases_at_hash:(fun query_env
-                                                                            ->
-                    O1trace.thread
-                      "handle_request_get_staged_ledger_aux_and_pending_coinbases_at_hash"
-                      (fun () ->
-                        let input = Envelope.Incoming.data query_env in
-                        Deferred.return
-                        @@
-                        let open Option.Let_syntax in
-                        let%bind frontier = get_current_frontier () in
-                        let%map ( scan_state
-                                , expected_merkle_root
-                                , pending_coinbases
-                                , protocol_states ) =
-                          Sync_handler
-                          .get_staged_ledger_aux_and_pending_coinbases_at_hash
-                            ~frontier input
-                        in
-                        let staged_ledger_hash =
-                          Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-                            (Staged_ledger.Scan_state.hash scan_state)
-                            expected_merkle_root pending_coinbases
-                        in
-                        [%log' debug config.logger]
-                          ~metadata:
-                            [ ( "staged_ledger_hash"
-                              , Staged_ledger_hash.to_yojson staged_ledger_hash
-                              )
-                            ]
-                          "sending scan state and pending coinbase" ;
-                        ( scan_state
-                        , expected_merkle_root
-                        , pending_coinbases
-                        , protocol_states ) ) )
-                  ~answer_sync_ledger_query:(fun query_env ->
-                    let open Deferred.Or_error.Let_syntax in
-                    O1trace.thread "handle_request_answer_sync_ledger_query"
-                      (fun () ->
-                        let ledger_hash, _ = Envelope.Incoming.data query_env in
-                        let%bind frontier =
-                          Deferred.return
-                          @@ peek_frontier frontier_broadcast_pipe_r
-                        in
-                        Sync_handler.answer_query ~frontier ledger_hash
-                          (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
-                          ~logger:config.logger
-                          ~trust_system:config.trust_system
-                        |> Deferred.map
-                           (* begin error string prefix so we can pattern-match *)
-                             ~f:
-                               (Result.of_option
-                                  ~error:
-                                    (Error.createf
-                                       !"%s for ledger_hash: \
-                                         %{sexp:Ledger_hash.t}"
-                                       Mina_networking
-                                       .refused_answer_query_string ledger_hash ) ) )
-                    )
-                  ~get_ancestry:
-                    (handle_request "get_ancestry" ~f:(fun ~frontier s ->
-                         s
-                         |> With_hash.map_hash ~f:(fun state_hash ->
-                                { State_hash.State_hashes.state_hash
-                                ; state_body_hash = None
-                                } )
-                         |> Sync_handler.Root.prove
-                              ~context:(module Context)
-                              ~frontier ) )
-                  ~get_best_tip:
-                    (handle_request "get_best_tip" ~f:(fun ~frontier () ->
-                         let open Option.Let_syntax in
-                         let open Proof_carrying_data in
-                         let%map proof_with_data =
-                           Best_tip_prover.prove
-                             ~context:(module Context)
-                             frontier
-                         in
-                         { proof_with_data with
-                           data = With_hash.data proof_with_data.data
-                         } ) )
-                  ~get_node_status
-                  ~get_transition_chain_proof:
-                    (handle_request "get_transition_chain_proof"
-                       ~f:(fun ~frontier hash ->
-                         Transition_chain_prover.prove ~frontier hash ) )
-                  ~get_transition_chain:
-                    (handle_request "get_transition_chain"
-                       ~f:Sync_handler.get_transition_chain )
-                  ~get_transition_knowledge:(fun _q ->
-                    O1trace.thread "handle_request_get_transition_knowledge"
-                      (fun () ->
-                        return
-                          ( match get_current_frontier () with
-                          | None ->
-                              []
-                          | Some frontier ->
-                              Sync_handler.best_tip_path ~frontier ) ) ) )
+                Mina_networking.create
+                  (module Context)
+                  config.net_config ~sinks
+                  ~get_transition_frontier:(fun () ->
+                    Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r )
+                  ~get_node_status )
           in
           (* tie the first knot *)
           net_ref := Some net ;
@@ -2006,7 +1926,8 @@ let create ~commit_id ?wallets (config : Config.t) =
           |> Deferred.don't_wait_for ;
           let most_recent_valid_block_reader, most_recent_valid_block_writer =
             Broadcast_pipe.create
-              ( Mina_block.genesis ~precomputed_values:config.precomputed_values
+              ( Mina_block.genesis_header
+                  ~precomputed_values:config.precomputed_values
               |> Validation.reset_frontier_dependencies_validation
               |> Validation.reset_staged_ledger_diff_validation )
           in
@@ -2297,8 +2218,7 @@ let create ~commit_id ?wallets (config : Config.t) =
 
 let net { components = { net; _ }; _ } = net
 
-let runtime_config { config = { precomputed_values; _ }; _ } =
-  Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values
+let runtime_config t = t.config.precomputed_values.runtime_config
 
 let start_filtered_log
     ({ in_memory_reverse_structured_log_messages_for_integration_test
@@ -2364,3 +2284,5 @@ let best_chain_block_by_state_hash (t : t) hash =
        ~error:
          (sprintf "Block with state hash %s not found in transition frontier"
             (State_hash.to_base58_check hash) )
+
+let zkapp_cmd_limit t = t.config.zkapp_cmd_limit

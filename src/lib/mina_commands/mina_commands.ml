@@ -347,7 +347,7 @@ let get_status ~flag t =
   in
   let new_block_length_received =
     let open Mina_block in
-    Length.to_int @@ Mina_block.blockchain_length @@ Validation.block
+    Length.to_int @@ Mina_block.Header.blockchain_length @@ Validation.header
     @@ Pipe_lib.Broadcast_pipe.Reader.peek
          (Mina_lib.most_recent_valid_transition t)
   in
@@ -442,7 +442,7 @@ let get_status ~flag t =
     let%bind frontier =
       Mina_lib.transition_frontier t |> Pipe_lib.Broadcast_pipe.Reader.peek
     in
-    match Transition_frontier.catchup_tree frontier with
+    match Transition_frontier.catchup_state frontier with
     | Full full ->
         Some
           (List.map (Hashtbl.to_alist full.states) ~f:(fun (state, hashes) ->

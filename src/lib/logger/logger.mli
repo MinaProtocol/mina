@@ -1,11 +1,6 @@
 open Core_kernel
 
-[%%versioned:
-module Stable : sig
-  module V1 : sig
-    type t
-  end
-end]
+type t [@@deriving bin_io]
 
 module Level : sig
   type t =
@@ -141,7 +136,11 @@ type 'a log_function =
   -> 'a
 
 val create :
-  ?metadata:(string, Yojson.Safe.t) List.Assoc.t -> ?id:string -> unit -> t
+     ?metadata:(string, Yojson.Safe.t) List.Assoc.t
+  -> ?id:string
+  -> ?itn_features:bool
+  -> unit
+  -> t
 
 val null : unit -> t
 

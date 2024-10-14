@@ -37,8 +37,9 @@ module Engine = struct
       -> test_name:string
       -> cli_inputs:Cli_inputs.t
       -> debug:bool
-      -> test_config:Test_config.t
       -> images:Test_config.Container_images.t
+      -> test_config:Test_config.t
+      -> constants:Test_config.constants
       -> t
   end
 
@@ -86,6 +87,8 @@ module Engine = struct
     val constraint_constants : t -> Genesis_constants.Constraint_constants.t
 
     val genesis_constants : t -> Genesis_constants.t
+
+    val compile_config : t -> Mina_compile_config.t
 
     val seeds : t -> Node.t Core.String.Map.t
 
@@ -340,7 +343,7 @@ module Test = struct
 
     type dsl
 
-    val config : Test_config.t
+    val config : constants:Test_config.constants -> Test_config.t
 
     val run : network -> dsl -> unit Malleable_error.t
   end
