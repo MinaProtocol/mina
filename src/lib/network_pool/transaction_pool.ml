@@ -1667,13 +1667,14 @@ let%test_module _ =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-        let%bind verification_key = Lazy.force (Verifier.For_test.get_blockchain_verification_key ~constraint_constants ~proof_level) in 
-          Verifier.create ~logger ~proof_level
-            ~conf_dir:None
+          let%bind verification_key =
+            Lazy.force
+              (Verifier.For_test.get_blockchain_verification_key
+                 ~constraint_constants ~proof_level )
+          in
+          Verifier.create ~logger ~proof_level ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~commit_id:"not specified for unit tests" () 
-            ~verification_key
-            )
+            ~commit_id:"not specified for unit tests" () ~verification_key )
 
     let `VK vk, `Prover prover =
       Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
@@ -3087,13 +3088,15 @@ let%test_module _ =
     let%test "account update with a different network id that uses proof \
               authorization would be rejected" =
       Thread_safe.block_on_async_exn (fun () ->
-        let%bind verification_key = Lazy.force (Verifier.For_test.get_blockchain_verification_key ~constraint_constants ~proof_level) in
+          let%bind verification_key =
+            Lazy.force
+              (Verifier.For_test.get_blockchain_verification_key
+                 ~constraint_constants ~proof_level )
+          in
           let%bind verifier_full =
-            Verifier.create ~logger ~proof_level:Full
-              ~conf_dir:None
+            Verifier.create ~logger ~proof_level:Full ~conf_dir:None
               ~pids:(Child_processes.Termination.create_pid_table ())
-              ~commit_id:"not specified for unit tests" ()
-              ~verification_key
+              ~commit_id:"not specified for unit tests" () ~verification_key
           in
           let%bind test =
             setup_test ~verifier:verifier_full

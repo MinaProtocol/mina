@@ -69,7 +69,7 @@ module Worker_state = struct
     ; logger : Logger.t
     ; proof_level : Genesis_constants.Proof_level.t
     ; commit_id : string
-    ; verification_key: Pickles.Verification_key.Stable.Latest.t
+    ; verification_key : Pickles.Verification_key.Stable.Latest.t
     }
   [@@deriving bin_io_unversioned]
 
@@ -82,7 +82,6 @@ module Worker_state = struct
         Pickles.Side_loaded.srs_precomputation () ;
         Deferred.return
           (let module M = struct
-           
              let verify_commands
                  (cs :
                    User_command.Verifiable.t With_status.t With_id_tag.t list )
@@ -144,20 +143,23 @@ module Worker_state = struct
                [%log internal] "Verifier_verify_commands_done" ;
                result
 
-             
-
              let verify_blockchain_snarks bs =
                Context_logger.with_logger (Some logger)
                @@ fun () ->
                Internal_tracing.Context_call.with_call_id
                @@ fun () ->
                [%log internal] "Verifier_verify_blockchain_snarks" ;
-               let%map result = Blockchain_snark_state.verify ~key:verification_key bs in
+               let%map result =
+                 Blockchain_snark_state.verify ~key:verification_key bs
+               in
                [%log internal] "Verifier_verify_blockchain_snarks_done" ;
                result
 
              let verify_transaction_snarks ts =
-               match Or_error.try_with (fun () -> Transaction_snark.verify ts ~key:verification_key) with
+               match
+                 Or_error.try_with (fun () ->
+                     Transaction_snark.verify ts ~key:verification_key )
+               with
                | Ok result ->
                    result
                | Error e ->
@@ -178,7 +180,7 @@ module Worker_state = struct
                result
 
              let get_blockchain_verification_key () =
-                Deferred.return verification_key
+               Deferred.return verification_key
 
              let toggle_internal_tracing enabled =
                don't_wait_for
@@ -220,7 +222,8 @@ module Worker_state = struct
 
              let verify_transaction_snarks _ = Deferred.return (Ok ())
 
-             let get_blockchain_verification_key () = Deferred.return verification_key
+             let get_blockchain_verification_key () =
+               Deferred.return verification_key
 
              let toggle_internal_tracing _ = ()
 
@@ -252,7 +255,7 @@ module Worker = struct
             list )
           F.t
       ; get_blockchain_verification_key :
-          ('w, unit, Pickles.Verification_key.t ) F.t
+          ('w, unit, Pickles.Verification_key.t) F.t
       ; toggle_internal_tracing : ('w, bool, unit) F.t
       ; set_itn_logger_data : ('w, int, unit) F.t
       }
@@ -416,8 +419,8 @@ type t = { worker : worker Ivar.t ref; logger : Logger.t }
 
 (* TODO: investigate why conf_dir wasn't being used *)
 let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
-    ~proof_level ~pids ~conf_dir ~commit_id ~verification_key () :
-    t Deferred.t =
+    ~proof_level ~pids ~conf_dir ~commit_id ~verification_key () : t Deferred.t
+    =
   let on_failure err =
     [%log error] "Verifier process failed with error $err"
       ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
@@ -727,7 +730,7 @@ let get_blockchain_verification_key { worker; logger } =
           Worker.Connection.run connection
             ~f:Worker.functions.get_blockchain_verification_key ~arg:()
           |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ) )
-  
+
 let toggle_internal_tracing { worker; logger } enabled =
   with_retry ~logger (fun () ->
       let%bind { connection; _ } = Ivar.read !worker in
@@ -741,4 +744,3 @@ let set_itn_logger_data { worker; logger } ~daemon_port =
       Worker.Connection.run connection ~f:Worker.functions.set_itn_logger_data
         ~arg:daemon_port
       |> Deferred.Or_error.map ~f:(fun x -> `Continue x) )
-

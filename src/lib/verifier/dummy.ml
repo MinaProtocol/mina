@@ -24,7 +24,7 @@ let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
   let verify_blockchain_snarks chains =
     match proof_level with
     | Genesis_constants.Proof_level.Full ->
-        Blockchain_snark.Blockchain_snark_state.verify  ~key:verification_key
+        Blockchain_snark.Blockchain_snark_state.verify ~key:verification_key
           (List.map chains ~f:(fun snark ->
                ( Blockchain_snark.Blockchain.state snark
                , Blockchain_snark.Blockchain.proof snark ) ) )
@@ -35,7 +35,10 @@ let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
   let verify_transaction_snarks ts =
     match proof_level with
     | Full -> (
-        match Or_error.try_with (fun () -> Transaction_snark.verify ~key:verification_key ts) with
+        match
+          Or_error.try_with (fun () ->
+              Transaction_snark.verify ~key:verification_key ts )
+        with
         | Ok result ->
             result |> Deferred.map ~f:Or_error.return
         | Error e ->
@@ -148,7 +151,7 @@ let verify_transaction_snarks { verify_transaction_snarks; _ } ts =
   verify_transaction_snarks ts
 
 let get_blockchain_verification_key { verification_key; _ } =
-    Deferred.Or_error.return verification_key
+  Deferred.Or_error.return verification_key
 
 let toggle_internal_tracing _ _ = Deferred.Or_error.ok_unit
 
