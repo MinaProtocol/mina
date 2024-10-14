@@ -2,6 +2,7 @@ package codanet
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ipfs/boxo/blockstore"
@@ -129,6 +130,16 @@ func (bs *BitswapStorageLmdb) DeleteBlocks(ctx context.Context, keys [][32]byte)
 		cids[i] = BlockHashToCid(key)
 	}
 	return bs.blockstore.DeleteMany(ctx, cids)
+}
+
+func CidToBlockHash(id cid.Cid) ([32]byte, error) {
+	mh, err := multihash.Decode(id.Hash())
+	var res [32]byte
+	if err == nil && mh.Code == MULTI_HASH_CODE && id.Prefix().Codec == cid.Raw && len(mh.Digest) == 32 {
+		copy(res[:], mh.Digest)
+		return res, nil
+	}
+	return res, errors.New("unexpected format of cid")
 }
 
 const (
