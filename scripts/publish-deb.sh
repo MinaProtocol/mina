@@ -59,11 +59,8 @@ for i in {1..10}; do (
     "${DEB_NAMES}"
 ) && break || scripts/clear-deb-s3-lockfile.sh; done
 
-
 for deb in $DEB_NAMES
 do
-  echo "Adding packages.o1test.net $DEB_CODENAME $DEB_RELEASE"
-  sudo echo "deb [trusted=yes] http://packages.o1test.net $DEB_CODENAME $DEB_RELEASE" | sudo tee /etc/apt/sources.list.d/mina.list
 
   DEBS3_SHOW="deb-s3 show $BUCKET_ARG $S3_REGION_ARG"
 
@@ -71,11 +68,9 @@ do
   # _build/mina-archive_3.0.1-develop-a2a872a.deb -> mina-archive
   deb=$(basename "$deb")
   deb="${deb%_*}"
-  
-  
+
   for i in {1..10}; do 
 
-    sudo apt-get update
     ${DEBS3_SHOW} "$deb" "${DEB_VERSION}" "${ARCH}" -c "${DEB_CODENAME}" -m "${DEB_RELEASE}"
     LAST_VERIFY_STATUS=$?
     

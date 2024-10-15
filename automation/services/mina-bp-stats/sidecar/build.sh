@@ -10,7 +10,7 @@ rm -rf "${BUILDDIR}"
 mkdir -p "${BUILDDIR}/DEBIAN"
 
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
-Package: mina-bp-stats-sidecar
+Package: mina-sidecar
 Version: ${MINA_DEB_VERSION}
 License: Apache-2.0
 Vendor: none
