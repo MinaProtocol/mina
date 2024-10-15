@@ -99,7 +99,7 @@ let generate_zkapp_commands_and_apply_them_consecutively_5_times ~successful
   let ledger, fee_payer_keypairs, keymap =
     mk_ledgers_and_fee_payers ~num_of_fee_payers:5 ()
   in
-  let account_state_tbl = Account_id.Table.create () in
+  let account_state_tbl = ref Account_id.Map.empty in
   let global_slot = Mina_numbers.Global_slot_since_genesis.one in
   let test i random =
     let zkapp_command_dummy_auths =
