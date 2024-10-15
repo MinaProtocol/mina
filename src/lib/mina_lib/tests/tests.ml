@@ -144,7 +144,7 @@ let%test_module "Epoch ledger sync tests" =
       let open Context in
       let%bind blockchain_verification_key, transaction_verification_key =
         Verifier.For_test.get_verification_keys_eagerly ~constraint_constants
-          ~proof_level
+          ~proof_level:precomputed_values.proof_level
       in
       Verifier.create ~logger ~proof_level:precomputed_values.proof_level ~pids
         ~conf_dir:(Some (make_dirname "verifier"))
