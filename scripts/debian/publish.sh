@@ -71,9 +71,11 @@ do
 
   for i in {1..10}; do 
 
+    set +e
     ${DEBS3_SHOW} "$deb" "${DEB_VERSION}" "${ARCH}" -c "${DEB_CODENAME}" -m "${DEB_RELEASE}"
     LAST_VERIFY_STATUS=$?
-    
+    set -eo pipefail
+
     if [[ $LAST_VERIFY_STATUS == 0 ]]; then
         echo "succesfully validated that package is uploaded to deb-s3"
         break
