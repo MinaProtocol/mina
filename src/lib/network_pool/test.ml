@@ -27,14 +27,14 @@ let%test_module "network pool test" =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let%bind verification_key =
-            Lazy.force
-              (Verifier.For_test.get_blockchain_verification_key
-                 ~constraint_constants ~proof_level )
+          let%bind blockchain_verification_key, transaction_verification_key =
+            Verifier.For_test.get_verification_keys_eagerly
+              ~constraint_constants ~proof_level
           in
           Verifier.create ~logger ~proof_level ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~commit_id:"not specified for unit tests" () ~verification_key )
+            ~commit_id:"not specified for unit tests" ()
+            ~blockchain_verification_key ~transaction_verification_key )
 
     module Mock_snark_pool =
       Snark_pool.Make (Mocks.Base_ledger) (Mocks.Staged_ledger)

@@ -60,4 +60,7 @@ module type S = sig
 
   val get_blockchain_verification_key :
     t -> Pickles.Verification_key.t Deferred.Or_error.t
+
+  val get_transaction_verification_key :
+    t -> Pickles.Verification_key.t Deferred.Or_error.t
 end
