@@ -384,18 +384,17 @@ class SnarkBenchmark(Benchmark):
     category = TagColumn("category", 6)
     branch = TagColumn("gitbranch", 7)
 
-    k = 1
-    max_num_updates = 4
-    min_num_updates = 2
-
     def name_header(self):
         return self.name
 
     def branch_header(self):
         return self.branch
 
-    def __init__(self):
+    def __init__(self, k , max_num_updates, min_num_updates ):
         Benchmark.__init__(self, BenchmarkType.snark)
+        self.k = k
+        self.max_num_updates = max_num_updates
+        self.min_num_updates = min_num_updates
 
     def headers(self):
         return [

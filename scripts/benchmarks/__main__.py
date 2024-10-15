@@ -23,7 +23,10 @@ run_bench.add_argument("--influx", action='store_true', help = "Required only if
 run_bench.add_argument("--format", type=Format, help="output file format [text,csv]", default=Format.text)
 run_bench.add_argument("--path", help="override path to benchmark")
 run_bench.add_argument("--branch", default="test", help="Required only if --format=csv. Add branch name to csv file")
-run_bench.add_argument("--genesis-ledger-path")
+run_bench.add_argument("--genesis-ledger-path", default="./genesis_ledgers/devnet.json",  help="Applicable only for ledger-export benchmark. Location of genesis config file")
+run_bench.add_argument("--k", default=1)
+run_bench.add_argument("--max-num-updates", default=4 , type=int)
+run_bench.add_argument("--min-num-updates", default=2, type=int)
 
 parse_bench = subparsers.add_parser('parse',help="parse textual benchmark output to csv")
 parse_bench.add_argument("--benchmark", type= BenchmarkType, help="benchmark to run")
@@ -62,8 +65,11 @@ test_bench.add_argument("--red-threshold",
                         choices=[Range(0.0, 1.0)],
                         default=0.2)
 test_bench.add_argument("--branch", help="branch which was used in tests")
-test_bench.add_argument("--genesis-ledger-path", help="Applicable only for ledger-export benchmark. Location of genesis config file")
+test_bench.add_argument("--genesis-ledger-path", default="./genesis_ledgers/devnet.json", help="Applicable only for ledger-export benchmark. Location of genesis config file")
 test_bench.add_argument('-m','--mainline-branches', action='append', help='Defines mainline branch. If values of \'--branch\' parameter is among mainline branches then result will be uploaded')
+test_bench.add_argument("--k", default=1)
+test_bench.add_argument("--max-num-updates", default=4 , type=int)
+test_bench.add_argument("--min-num-updates", default=2, type=int)
 
 
 upload_bench = subparsers.add_parser('ls')
@@ -83,7 +89,7 @@ def select_benchmark(kind):
     elif kind == BenchmarkType.heap_usage:
         return HeapUsageBenchmark()
     elif kind == BenchmarkType.snark:
-        return SnarkBenchmark()
+        return SnarkBenchmark(args.k, args.max_num_updates, args.min_num_updates)
     elif kind == BenchmarkType.ledger_export:
         if args.genesis_ledger_path is None:
             print(
