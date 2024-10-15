@@ -1618,7 +1618,7 @@ let generate_libp2p_keypair_do privkey_path =
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~on_peer_connected:ignore ~on_peer_disconnected:ignore 
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore
             ~on_bitswap_update ()
         with
         | Ok net ->
@@ -1652,7 +1652,7 @@ let dump_libp2p_keypair_do privkey_path =
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~on_peer_connected:ignore ~on_peer_disconnected:ignore 
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore
             ~on_bitswap_update ()
         with
         | Ok net ->
