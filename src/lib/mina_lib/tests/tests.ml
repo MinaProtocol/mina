@@ -140,9 +140,14 @@ let%test_module "Epoch ledger sync tests" =
 
     let make_verifier (module Context : CONTEXT) =
       let open Context in
+      let%bind blockchain_verification_key, transaction_verification_key =
+        Verifier.For_test.get_verification_keys_eagerly ~constraint_constants
+          ~proof_level
+      in
       Verifier.create ~logger ~proof_level:precomputed_values.proof_level ~pids
         ~conf_dir:(Some (make_dirname "verifier"))
-        ~commit_id:"not specified for unit tests" ()
+        ~commit_id:"not specified for unit tests" ~blockchain_verification_key
+        ~transaction_verification_key ()
 
     let make_empty_ledger (module Context : CONTEXT) =
       Mina_ledger.Ledger.create
