@@ -33,7 +33,7 @@ in  Pipeline.build
               [ Cmd.run "buildkite/scripts/merges-cleanly.sh compatible" ]
             , label = "Check merges cleanly into compatible"
             , key = "clean-merge-compatible"
-            , target = Size.Small
+            , target = Size.Multi
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
@@ -44,7 +44,7 @@ in  Pipeline.build
               [ Cmd.run "buildkite/scripts/merges-cleanly.sh develop" ]
             , label = "Check merges cleanly into develop"
             , key = "clean-merge-develop"
-            , target = Size.Small
+            , target = Size.Multi
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
@@ -55,7 +55,7 @@ in  Pipeline.build
               [ Cmd.run "buildkite/scripts/merges-cleanly.sh master" ]
             , label = "Check merges cleanly into master"
             , key = "clean-merge-master"
-            , target = Size.Small
+            , target = Size.Multi
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
