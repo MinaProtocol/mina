@@ -1,11 +1,10 @@
 let Spec =
       { Type = { tokenEnvName : Text, bucket : Text, org : Text, host : Text }
       , default =
-          { tokenEnvName =
-              "hxEc4COeR59kJXDyQp9g1TB_kKqxDspyBKdl0omdNY615j_2Opf-URZO2NeA3gy4dotlJ8vBrdds_ribgl58dw=="
-          , bucket = "mina-benchmarks"
-          , org = "Dev"
-          , host = "https://eu-central-1-1.aws.cloud2.influxdata.com/"
+          { tokenEnvName = "\\\${INFLUX_TOKEN}"
+          , bucket = "\\\${INFLUX_BUCKET_NAME}"
+          , org = "\\\${INFLUX_ORG}"
+          , host = "\\\${INFLUX_HOST}"
           }
       }
 
