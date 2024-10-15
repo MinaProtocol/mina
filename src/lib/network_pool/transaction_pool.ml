@@ -2203,19 +2203,22 @@ let%test_module _ =
       let tm1 = Time.now () in
       [%log' info test.txn_pool.logger] "Time for add_commands: %0.04f sec"
         (Time.diff tm1 tm0 |> Time.Span.to_sec) ;
+      let debug = false in
       ( match result with
       | Ok (`Accept, _, rejects) ->
-          List.iter rejects ~f:(fun (cmd, err) ->
-              Core.Printf.printf
-                !"command was rejected because %s: %{Yojson.Safe}\n%!"
-                (Diff_versioned.Diff_error.to_string_name err)
-                (User_command.to_yojson cmd) )
+          if debug then
+            List.iter rejects ~f:(fun (cmd, err) ->
+                Core.Printf.printf
+                  !"command was rejected because %s: %{Yojson.Safe}\n%!"
+                  (Diff_versioned.Diff_error.to_string_name err)
+                  (User_command.to_yojson cmd) )
       | Ok (`Reject, _, _) ->
           failwith "diff was rejected during application"
       | Error (`Other err) ->
-          Core.Printf.printf
-            !"failed to apply diff to pool: %s\n%!"
-            (Error.to_string_hum err) ) ;
+          if debug then
+            Core.Printf.printf
+              !"failed to apply diff to pool: %s\n%!"
+              (Error.to_string_hum err) ) ;
       result
 
     let add_commands' ?local test cs =
