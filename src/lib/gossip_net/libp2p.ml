@@ -2,7 +2,7 @@ open Core
 open Async
 open Network_peer
 open Pipe_lib
-open Network_peer.Rpc_intf
+open Intf
 
 type ('q, 'r) dispatch =
   Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
@@ -52,18 +52,19 @@ module Config = struct
     ; mutable keypair : Mina_net2.Keypair.t option
     ; all_peers_seen_metric : bool
     ; known_private_ip_nets : Core.Unix.Cidr.t list
+    ; block_window_duration : Time.Span.t
     }
   [@@deriving make]
 end
 
 module type S = sig
-  include Intf.Gossip_net_intf
+  include GOSSIP_NET
 
   val create :
        ?allow_multiple_instances:bool
     -> Config.t
     -> pids:Child_processes.Termination.t
-    -> Rpc_intf.rpc_handler list
+    -> Rpc_interface.ctx
     -> Message.sinks
     -> t Deferred.t
 end
@@ -77,7 +78,7 @@ let download_seed_peer_list uri =
 
 type publish_functions =
   { publish_v0 : Message.msg -> unit Deferred.t
-  ; publish_v1_block : Message.state_msg -> unit Deferred.t
+  ; publish_v1_block : Mina_block.Header.t -> unit Deferred.t
   ; publish_v1_tx : Message.transaction_pool_diff_msg -> unit Deferred.t
   ; publish_v1_snark_work : Message.snark_pool_diff_msg -> unit Deferred.t
   }
@@ -121,10 +122,8 @@ let on_gossip_decode_failure (config : Config.t) envelope (err : Error.t) =
   |> don't_wait_for ;
   ()
 
-module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
-  S with module Rpc_intf := Rpc_intf = struct
-  open Rpc_intf
-
+module Make (Rpc_interface : RPC_INTERFACE) :
+  S with module Rpc_interface := Rpc_interface = struct
   module T = struct
     type t =
       { config : Config.t
@@ -137,28 +136,29 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       ; restart_helper : unit -> unit
       }
 
-    let create_rpc_implementations
-        (Rpc_handler { rpc; f = handler; cost; budget }) =
-      let (module Impl) = implementation_of_rpc rpc in
-      let logger = Logger.create () in
+    (* TODO: should we share this with the Fake network impl? *)
+    let setup_rpc (type query response) ctx logger trust_system
+        (rpc : (query, response) Rpc_interface.rpc) =
+      let (module Impl) = Rpc_interface.implementation rpc in
       let log_rate_limiter_occasionally rl =
         let t = Time.Span.of_min 1. in
         every t (fun () ->
-            [%log' debug logger]
+            [%log debug]
               ~metadata:
                 [ ("rate_limiter", Network_pool.Rate_limiter.summary rl) ]
               !"%s $rate_limiter" Impl.name )
       in
-      let rl = Network_pool.Rate_limiter.create ~capacity:budget in
+      let rl =
+        Network_pool.Rate_limiter.create ~capacity:Impl.rate_limit_budget
+      in
       log_rate_limiter_occasionally rl ;
-      let handler (peer : Network_peer.Peer.t) ~version q =
+      let handler (peer : Network_peer.Peer.t) ~version request =
         Mina_metrics.(Counter.inc_one Network.rpc_requests_received) ;
         Mina_metrics.(Counter.inc_one @@ fst Impl.received_counter) ;
         Mina_metrics.(Gauge.inc_one @@ snd Impl.received_counter) ;
-        let score = cost q in
         match
           Network_pool.Rate_limiter.add rl (Remote peer) ~now:(Time.now ())
-            ~score
+            ~score:(Impl.rate_limit_cost request)
         with
         | `Capacity_exceeded ->
             failwithf "peer exceeded capacity: %s"
@@ -166,7 +166,24 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
               ()
         | `Within_capacity ->
             O1trace.thread (Printf.sprintf "handle_rpc_%s" Impl.name) (fun () ->
-                handler peer ~version q )
+                Impl.log_request_received ~logger ~sender:peer request ;
+                let request_env =
+                  Envelope.Incoming.wrap_peer ~data:request ~sender:peer
+                in
+                let sender = Envelope.Incoming.sender request_env in
+                let%bind () =
+                  let msg = Impl.receipt_trust_action_message request in
+                  (* TODO: kill trust system (#11723) *)
+                  Trust_system.(
+                    record_envelope_sender trust_system logger sender
+                      Actions.(Made_request, Some msg))
+                in
+                let%map response =
+                  Impl.handle_request ctx ~version request_env
+                in
+                if not (Impl.response_is_successful response) then
+                  Mina_metrics.Counter.inc_one Impl.failed_response_counter ;
+                response )
       in
       Impl.implement_multi handler
 
@@ -200,10 +217,11 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
     (* Creates just the helper, making sure to register everything
        BEFORE we start listening/advertise ourselves for discovery. *)
     let create_libp2p ?(allow_multiple_instances = false) (config : Config.t)
-        rpc_handlers first_peer_ivar high_connectivity_ivar ~added_seeds ~pids
+        ctx first_peer_ivar high_connectivity_ivar ~added_seeds ~pids
         ~on_unexpected_termination
         ~sinks:
-          (Message.Any_sinks (sinksM, (sink_block, sink_tx, sink_snark_work))) =
+          (Message.Any_sinks (sinksM, (sink_block, sink_tx, sink_snark_work)))
+        ~block_window_duration =
       let module Sinks = (val sinksM) in
       let ctr = ref 0 in
       let record_peer_connection () =
@@ -240,7 +258,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                   ~all_peers_seen_metric:config.all_peers_seen_metric
                   ~on_peer_connected:(fun _ -> record_peer_connection ())
                   ~on_peer_disconnected:ignore ~logger:config.logger ~conf_dir
-                  ~pids () ) )
+                  ~pids ~block_window_duration () ) )
       with
       | Ok (Ok net2) -> (
           let open Mina_net2 in
@@ -334,7 +352,8 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                 ~topic_config:[ [ v0_topic ]; v1_topics ]
             in
             let implementation_list =
-              List.bind rpc_handlers ~f:create_rpc_implementations
+              List.bind Rpc_interface.all_rpcs ~f:(fun (Rpc rpc) ->
+                  setup_rpc ctx config.logger config.trust_system rpc )
             in
             let implementations =
               let handle_unknown_rpc conn_state ~rpc_tag ~version =
@@ -424,7 +443,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
             let snark_bin_prot =
               Network_pool.Snark_pool.Diff_versioned.Stable.Latest.bin_t
             in
-            let block_bin_prot = Mina_block.Stable.Latest.bin_t in
+            let header_bin_prot = Mina_block.Header.Stable.Latest.bin_t in
             let unit_f _ = Deferred.unit in
             let publish_v1_impl push_impl bin_prot topic =
               match config.pubsub_v1 with
@@ -449,10 +468,10 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
               publish_v1_impl
                 (fun (env, vc) ->
                   Sinks.Block_sink.push sink_block
-                    ( `Transition env
+                    ( `Header env
                     , `Time_received (Block_time.now config.time_controller)
                     , `Valid_cb vc ) )
-                block_bin_prot v1_topic_block
+                header_bin_prot v1_topic_block
             in
             let map_v0_msg msg =
               match msg with
@@ -469,8 +488,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                   match Envelope.Incoming.data env with
                   | Message.Latest.T.New_state state ->
                       Sinks.Block_sink.push sink_block
-                        ( `Transition
-                            (Envelope.Incoming.map ~f:(const state) env)
+                        ( `Block (Envelope.Incoming.map ~f:(const state) env)
                         , `Time_received (Block_time.now config.time_controller)
                         , `Valid_cb vc )
                   | Message.Latest.T.Transaction_pool_diff
@@ -611,6 +629,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
             create_libp2p ~allow_multiple_instances config rpc_handlers
               first_peer_ivar high_connectivity_ivar ~added_seeds ~pids
               ~on_unexpected_termination:restart_libp2p ~sinks
+              ~block_window_duration:config.block_window_duration
           in
           on_libp2p_create libp2p ; Deferred.ignore_m libp2p
         and restart_libp2p () = don't_wait_for (start_libp2p ()) in
@@ -865,11 +884,11 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
         -> t
         -> Peer.t
         -> _
-        -> (q, r) rpc
+        -> (q, r) Rpc_interface.rpc
         -> q
         -> r Deferred.Or_error.t =
      fun ?heartbeat_timeout ?timeout t peer transport rpc query ->
-      let (module Impl) = implementation_of_rpc rpc in
+      let (module Impl) = Rpc_interface.implementation rpc in
       try_call_rpc_with_dispatch ?heartbeat_timeout ?timeout
         ~rpc_counter:Impl.sent_counter
         ~rpc_failed_counter:Impl.failed_request_counter ~rpc_name:Impl.name t
@@ -893,7 +912,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
           return (Failed_to_connect e)
 
     let query_peer' (type q r) ?how ?heartbeat_timeout ?timeout t
-        (peer_id : Peer.Id.t) (rpc : (q, r) rpc) (qs : q list) =
+        (peer_id : Peer.Id.t) (rpc : (q, r) Rpc_interface.rpc) (qs : q list) =
       let%bind net2 = !(t.net2) in
       match%bind
         Mina_net2.open_stream net2 ~protocol:rpc_transport_proto ~peer:peer_id
@@ -901,7 +920,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       | Ok stream ->
           let peer = Mina_net2.Libp2p_stream.remote_peer stream in
           let transport = prepare_stream_transport stream in
-          let (module Impl) = implementation_of_rpc rpc in
+          let (module Impl) = Rpc_interface.implementation rpc in
           try_call_rpc_with_dispatch ?heartbeat_timeout ?timeout
             ~rpc_counter:Impl.sent_counter
             ~rpc_failed_counter:Impl.failed_request_counter ~rpc_name:Impl.name
@@ -932,7 +951,8 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
     let broadcast_state ?origin_topic t state =
       let pfs = !(t.publish_functions) in
       let%bind () =
-        guard_topic ?origin_topic v1_topic_block pfs.publish_v1_block state
+        guard_topic ?origin_topic v1_topic_block pfs.publish_v1_block
+          (Mina_block.header state)
       in
       guard_topic ?origin_topic v0_topic pfs.publish_v0 (Message.New_state state)
 

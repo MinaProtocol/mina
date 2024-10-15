@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 
 let blockchain_dummy = lazy (Dummy_values.blockchain_proof ())

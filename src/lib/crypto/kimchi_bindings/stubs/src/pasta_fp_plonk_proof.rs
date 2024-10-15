@@ -4,8 +4,9 @@ use crate::{
     pasta_fp_plonk_index::{CamlPastaFpPlonkIndex, CamlPastaFpPlonkIndexPtr},
     pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex,
     srs::fp::CamlFpSrs,
+    WithLagrangeBasis,
 };
-use ark_ec::AffineCurve;
+use ark_ec::AffineRepr;
 use ark_ff::One;
 use array_init::array_init;
 use groupmap::GroupMap;
@@ -47,7 +48,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
     {
         let ptr: &mut poly_commitment::srs::SRS<Vesta> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
-        ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
+        ptr.with_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
     let prev = if prev_challenges.is_empty() {
         Vec::new()
@@ -87,13 +88,14 @@ pub fn caml_pasta_fp_plonk_proof_create(
     // Release the runtime lock so that other threads can run using it while we generate the proof.
     runtime.releasing_runtime(|| {
         let group_map = GroupMap::<Fq>::setup();
-        let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+        let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
             &group_map,
             witness,
             &runtime_tables,
             index,
             prev,
             None,
+            &mut rand::rngs::OsRng,
         )
         .map_err(|e| ocaml::Error::Error(e.into()))?;
         Ok((proof, public_input).into())
@@ -112,7 +114,7 @@ pub fn caml_pasta_fp_plonk_proof_create_and_verify(
     {
         let ptr: &mut poly_commitment::srs::SRS<Vesta> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
-        ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
+        ptr.with_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
     let prev = if prev_challenges.is_empty() {
         Vec::new()
@@ -152,13 +154,14 @@ pub fn caml_pasta_fp_plonk_proof_create_and_verify(
     // Release the runtime lock so that other threads can run using it while we generate the proof.
     runtime.releasing_runtime(|| {
         let group_map = GroupMap::<Fq>::setup();
-        let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+        let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
             &group_map,
             witness,
             &runtime_tables,
             index,
             prev,
             None,
+            &mut rand::rngs::OsRng,
         )
         .map_err(|e| ocaml::Error::Error(e.into()))?;
 
@@ -274,19 +277,20 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
         .unwrap();
 
     let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.add_lagrange_basis(cs.domain.d1);
+    ptr.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let public_input = witness[0][0];
-    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
         &group_map,
         witness,
         &runtime_tables,
         &index,
         vec![],
         None,
+        &mut rand::rngs::OsRng,
     )
     .unwrap();
 
@@ -418,9 +422,9 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
 
     // Multi-range check bounds for left and right inputs
     let left_hi_bound =
-        foreign_field_mul::witness::compute_high_bound(&left_input, &foreign_field_modulus);
+        foreign_field_mul::witness::compute_bound(&left_input, &foreign_field_modulus);
     let right_hi_bound =
-        foreign_field_mul::witness::compute_high_bound(&right_input, &foreign_field_modulus);
+        foreign_field_mul::witness::compute_bound(&right_input, &foreign_field_modulus);
     external_checks.add_limb_check(&left_hi_bound.into());
     external_checks.add_limb_check(&right_hi_bound.into());
     gates.connect_cell_pair((15, 2), (25, 0)); // left_bound
@@ -438,18 +442,19 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     let cs = ConstraintSystem::<Fp>::create(gates).build().unwrap();
 
     let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.add_lagrange_basis(cs.domain.d1);
+    ptr.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
-    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
         &group_map,
         witness,
         &[],
         &index,
         vec![],
         None,
+        &mut rand::rngs::OsRng,
     )
     .unwrap();
     (
@@ -504,18 +509,19 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
     let cs = ConstraintSystem::<Fp>::create(gates).build().unwrap();
 
     let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.add_lagrange_basis(cs.domain.d1);
+    ptr.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
-    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
         &group_map,
         witness,
         &[],
         &index,
         vec![],
         None,
+        &mut rand::rngs::OsRng,
     )
     .unwrap();
     (
@@ -576,18 +582,19 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check0(
     let cs = ConstraintSystem::<Fp>::create(gates).build().unwrap();
 
     let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.add_lagrange_basis(cs.domain.d1);
+    ptr.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
-    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
         &group_map,
         witness,
         &[],
         &index,
         vec![],
         None,
+        &mut rand::rngs::OsRng,
     )
     .unwrap();
     (
@@ -700,19 +707,20 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
         .unwrap();
 
     let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.add_lagrange_basis(cs.domain.d1);
+    ptr.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let public_input = witness[0][0];
-    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
         &group_map,
         witness,
         &[],
         &index,
         vec![],
         None,
+        &mut rand::rngs::OsRng,
     )
     .unwrap();
     (
@@ -788,19 +796,20 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
         .unwrap();
 
     let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.add_lagrange_basis(cs.domain.d1);
+    ptr.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let public_input = (witness[0][0], witness[0][1]);
-    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
         &group_map,
         witness,
         &[],
         &index,
         vec![],
         None,
+        &mut rand::rngs::OsRng,
     )
     .unwrap();
     (
@@ -881,19 +890,20 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
         .unwrap();
 
     let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.add_lagrange_basis(cs.domain.d1);
+    ptr.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let public_input = (witness[0][0], witness[0][1]);
-    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
         &group_map,
         witness,
         &[],
         &index,
         vec![],
         None,
+        &mut rand::rngs::OsRng,
     )
     .unwrap();
     (
@@ -967,7 +977,7 @@ pub fn caml_pasta_fp_plonk_proof_batch_verify(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProofWithPublic<CamlGVesta, CamlFp> {
     fn comm() -> PolyComm<Vesta> {
-        let g = Vesta::prime_subgroup_generator();
+        let g = Vesta::generator();
         PolyComm {
             elems: vec![g, g, g],
         }
@@ -979,7 +989,7 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProofWithPublic<CamlGVesta, Caml
     };
     let prev_challenges = vec![prev.clone(), prev.clone(), prev];
 
-    let g = Vesta::prime_subgroup_generator();
+    let g = Vesta::generator();
     let proof = OpeningProof {
         lr: vec![(g, g), (g, g), (g, g)],
         z1: Fp::one(),

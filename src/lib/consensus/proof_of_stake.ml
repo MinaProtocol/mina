@@ -760,9 +760,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let eval = T.eval
 
       module Precomputed = struct
-        let keypairs = Lazy.force Key_gen.Sample_keypairs.keypairs
-
-        let genesis_winner = keypairs.(0)
+        let genesis_winner = Key_gen.Sample_keypairs.genesis_winner
 
         let genesis_stake_proof :
             genesis_epoch_ledger:Mina_ledger.Ledger.t Lazy.t -> Stake_proof.t =
@@ -1146,8 +1144,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       let of_global_slot ~(constants : Constants.t) slot =
         of_slot_number ~constants slot
     end
-
-    [%%if true]
 
     module Min_window_density = struct
       (* Three cases for updating the densities of sub-windows
@@ -1620,25 +1616,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                   (slots, min_window_densities, constants) )
         end )
     end
-
-    [%%else]
-
-    module Min_window_density = struct
-      let update_min_window_density ~constants:_ ~prev_global_slot:_
-          ~next_global_slot:_ ~prev_sub_window_densities
-          ~prev_min_window_density =
-        (prev_min_window_density, prev_sub_window_densities)
-
-      module Checked = struct
-        let update_min_window_density ~constants:_ ~prev_global_slot:_
-            ~next_global_slot:_ ~prev_sub_window_densities
-            ~prev_min_window_density =
-          Tick.Checked.return
-            (prev_min_window_density, prev_sub_window_densities)
-      end
-    end
-
-    [%%endif]
 
     (* We have a list of state hashes. When we extend the blockchain,
        we see if the **previous** state should be saved as a checkpoint.
@@ -2134,7 +2111,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Global_slot.Checked.of_slot_number ~constants transition_data
         in
         let%bind slot_diff =
-          [%with_label_ "Next global slot is less than previous global slot"]
+          [%with_label_ "Next global slot is larger than previous global slot"]
             (fun () ->
               Global_slot.Checked.diff_slots next_global_slot prev_global_slot )
         in
@@ -3127,7 +3104,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let logger = Logger.create ()
 
         let constraint_constants =
-          Genesis_constants.Constraint_constants.for_unit_tests
+          Genesis_constants.For_unit_tests.Constraint_constants.t
 
         let consensus_constants = Lazy.force Constants.for_unit_tests
       end in
@@ -3149,7 +3126,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         Consensus_state.negative_one ~genesis_ledger ~genesis_epoch_data
           ~constants
           ~constraint_constants:
-            Genesis_constants.Constraint_constants.for_unit_tests
+            Genesis_constants.For_unit_tests.Constraint_constants.t
       in
       let curr_epoch, curr_slot =
         Consensus_state.curr_epoch_and_slot negative_one
@@ -3172,7 +3149,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         Consensus_state.negative_one ~genesis_ledger ~genesis_epoch_data
           ~constants
           ~constraint_constants:
-            Genesis_constants.Constraint_constants.for_unit_tests
+            Genesis_constants.For_unit_tests.Constraint_constants.t
       in
       let start_time = Epoch.start_time ~constants epoch in
       let ((curr_epoch, curr_slot) as curr) =
@@ -3442,7 +3419,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       open Consensus_state
 
       let constraint_constants =
-        Genesis_constants.Constraint_constants.for_unit_tests
+        Genesis_constants.For_unit_tests.Constraint_constants.t
 
       let constants = Lazy.force Constants.for_unit_tests
 
@@ -3596,7 +3573,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               ~compute:
                 (As_prover.return
                    (Mina_base.Protocol_constants_checked.value_of_t
-                      Genesis_constants.for_unit_tests.protocol ) )
+                      Genesis_constants.For_unit_tests.t.protocol ) )
           in
           let result =
             update_var previous_state transition_data
@@ -3678,7 +3655,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%test_unit "vrf win rate" =
         let constants = Lazy.force Constants.for_unit_tests in
         let constraint_constants =
-          Genesis_constants.Constraint_constants.for_unit_tests
+          Genesis_constants.For_unit_tests.Constraint_constants.t
         in
         let previous_protocol_state_hash =
           Mina_base.State_hash.(of_hash zero)
@@ -3804,7 +3781,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let open Quickcheck.Generator.Let_syntax in
         let constants = Lazy.force Constants.for_unit_tests in
         let constraint_constants =
-          Genesis_constants.Constraint_constants.for_unit_tests
+          Genesis_constants.For_unit_tests.Constraint_constants.t
         in
         let gen_sub_window_density =
           gen_num_blocks_in_slots ~slot_fill_rate ~slot_fill_rate_delta
@@ -3824,7 +3801,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       (* Computes currency at height, assuming every block contains coinbase (ignoring inflation scheduling). *)
       let currency_at_height ~genesis_currency height =
         let constraint_constants =
-          Genesis_constants.Constraint_constants.for_unit_tests
+          Genesis_constants.For_unit_tests.Constraint_constants.t
         in
         Option.value_exn
           Amount.(
