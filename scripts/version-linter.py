@@ -40,7 +40,7 @@ def latest_branch_commit(branch):
   output=result.stdout.decode('ascii')
   print ('command stdout:', output)
   print ('command stderr:', result.stderr.decode('ascii'))
-  return output.replace('"','')
+  return output.replace('"','').strip()
   
 def url_to_type_shape_file(file):
   '''
