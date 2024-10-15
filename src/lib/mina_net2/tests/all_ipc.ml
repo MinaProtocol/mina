@@ -543,8 +543,7 @@ let%test_module "all-ipc test" =
       let%bind node =
         create ~all_peers_seen_metric:false
           ~logger:(Logger.extend logger [ ("name", `String local_name) ])
-          ~conf_dir ~pids ~on_peer_connected ~on_peer_disconnected
-          ~block_window_duration ()
+          ~conf_dir ~pids ~on_peer_connected ~on_peer_disconnected ()
         >>| Or_error.ok_exn
       in
       let%bind kp_a =

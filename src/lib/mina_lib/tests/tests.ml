@@ -185,7 +185,6 @@ let%test_module "Epoch ledger sync tests" =
           ; consensus_constants
           ; genesis_constants = precomputed_values.genesis_constants
           ; constraint_constants
-          ; block_window_duration = compile_config.block_window_duration
           }
       in
       let _transaction_pool, tx_remote_sink, _tx_local_sink =
@@ -273,7 +272,6 @@ let%test_module "Epoch ledger sync tests" =
           ; time_controller
           ; pubsub_v1
           ; pubsub_v0
-          ; block_window_duration = compile_config.block_window_duration
           }
         in
         Mina_networking.Gossip_net.(
