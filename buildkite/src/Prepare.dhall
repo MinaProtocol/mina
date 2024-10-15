@@ -39,7 +39,7 @@ let config
               ]
             , label = "Prepare monorepo triage"
             , key = "monorepo-${mode}-${filter}"
-            , target = Size.Small
+            , target = Size.Multi
             , docker = Some Docker::{
               , image = (./Constants/ContainerImages.dhall).toolchainBase
               , environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ]

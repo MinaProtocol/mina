@@ -121,7 +121,7 @@ in      \(args : { filter : PipelineFilter.Type, mode : PipelineMode.Type })
                       , label =
                           "Monorepo triage ${PipelineFilter.show args.filter}"
                       , key = "cmds-${PipelineFilter.show args.filter}"
-                      , target = Size.Small
+                      , target = Size.Multi
                       , docker = Some Docker::{
                         , image =
                             (./Constants/ContainerImages.dhall).toolchainBase
