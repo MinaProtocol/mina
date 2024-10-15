@@ -1,5 +1,11 @@
 open Pickles_types
 
+(** The default number of chunks in a circuit is one (< 2^16 rows) *)
+val num_chunks_by_default : int
+
+(** The number of rows required for zero knowledge in circuits with one single chunk *)
+val zk_rows_by_default : int
+
 type 'field plonk_domain =
   < vanishing_polynomial : 'field -> 'field
   ; shifts : 'field Pickles_types.Plonk_types.Shifts.t
