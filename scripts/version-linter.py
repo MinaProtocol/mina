@@ -19,8 +19,6 @@ see `check_command_types`, below. There is also a special rule for RPC types; se
 """
 
 import subprocess
-import os
-import io
 import sys
 import re
 import sexpdata
@@ -33,26 +31,22 @@ def set_error():
   exit_code=1
 
 def latest_branch_commit(branch):
+  '''
+    Retrieves latest commit on branch
+  '''
   print ('Retrieving', branch, 'head commit...')
   result=subprocess.run(['git','log','-n','1','--format="%h"','--abbrev=7',f'{branch}'],
                         capture_output=True)
   output=result.stdout.decode('ascii')
   print ('command stdout:', output)
   print ('command stderr:', result.stderr.decode('ascii'))
-  return output.replace('"','').splitlines()
-
+  return output.replace('"','').strip()
+  
 def url_to_type_shape_file(file):
   '''
     Return url to mina type shape file
   '''
   return f'https://storage.googleapis.com/mina-type-shapes/{file}'
-
-def sha_exists(sha1):
-  '''
-    Checks if mina type shape with given sha exists
-  '''
-  file = type_shape_file(sha1)
-  return url_exists(url_to_type_shape_file(file))
 
 def url_exists(url):
   '''
@@ -60,22 +54,14 @@ def url_exists(url):
   '''
   return requests.head(url).status_code == 200
 
-def find_latest_type_shape_ref_on(branch):
-  '''
-    Function tries to find best type shape reference commit by retrieving n last commits 
-    and iterate over collection testing if any item points to valid url   
-  '''
-  commits = latest_branch_commit(branch)
-  candidates = list(filter(lambda x: sha_exists(x), commits))
-  if not any(candidates): 
-    raise Exception(f'Cannot find type shape file for {branch}. I tried {n} last commits')
-  else: 
-    return candidates[0]
-
 def download_type_shape(role,branch,sha1) :
   file=type_shape_file(sha1)
+  url=url_to_type_shape_file(file)
+  if not url_exists(url):
+    raise Exception(f"reference file for '{sha1}' commit does not exists. Url does not exists {url} ")
+
   print ('Downloading type shape file',file,'for',role,'branch',branch,'at commit',sha1)
-  result=subprocess.run(['wget','--no-clobber',url_to_type_shape_file(file)])
+  subprocess.run(['wget','--no-clobber',url], check=True)
 
 def type_shape_file(sha1) :
   # created by buildkite build-artifact script
@@ -269,17 +255,17 @@ if __name__ == "__main__":
 
   subprocess.run(['git','fetch'],capture_output=False)
 
-  base_branch_commit = find_latest_type_shape_ref_on(base_branch)
+  base_branch_commit = latest_branch_commit(base_branch)
   download_type_shape('base',base_branch,base_branch_commit)
 
   print('')
 
-  release_branch_commit=find_latest_type_shape_ref_on(release_branch)
+  release_branch_commit=latest_branch_commit(release_branch)
   download_type_shape('release',release_branch,release_branch_commit)
 
   print('')
 
-  pr_branch_commit=find_latest_type_shape_ref_on(pr_branch)
+  pr_branch_commit=latest_branch_commit(pr_branch)
   download_type_shape('pr',pr_branch,pr_branch_commit)
 
   print('')
