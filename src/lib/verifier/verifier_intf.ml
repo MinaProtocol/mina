@@ -68,7 +68,8 @@ module type S = sig
     -> pids:Child_processes.Termination.t
     -> conf_dir:string option
     -> commit_id:string
-    -> verification_key:Pickles.Verification_key.t
+    -> blockchain_verification_key:Pickles.Verification_key.t
+    -> transaction_verification_key:Pickles.Verification_key.t
     -> unit
     -> t Deferred.t
 end
