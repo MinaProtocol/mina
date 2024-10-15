@@ -831,7 +831,7 @@ struct
         ; remaining_in_batch = max_per_15_seconds
         ; config
         ; logger
-        ; batcher = Batcher.create config.verifier
+        ; batcher = Batcher.create ~logger config.verifier
         ; best_tip_diff_relay = None
         ; best_tip_ledger = None
         ; verification_key_table = Vk_refcount_table.create ()
@@ -1661,7 +1661,7 @@ let%test_module _ =
     let minimum_fee =
       Currency.Fee.to_nanomina_int genesis_constants.minimum_user_command_fee
 
-    let logger = Logger.create ()
+    let logger = Logger.null ()
 
     let time_controller = Block_time.Controller.basic ~logger
 

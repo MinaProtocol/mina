@@ -42,7 +42,7 @@ type ('init, 'partially_validated, 'result) t =
   }
 [@@deriving sexp]
 
-let create ?(how_to_add = `Enqueue_back) ?logger ?compare_init
+let create ?(how_to_add = `Enqueue_back) ~logger ?compare_init
     ?(weight = fun _ -> 1) ?max_weight_per_call verifier =
   { state = Waiting
   ; queue = Q.create ()
@@ -51,7 +51,7 @@ let create ?(how_to_add = `Enqueue_back) ?logger ?compare_init
   ; verifier
   ; weight
   ; max_weight_per_call
-  ; logger = Option.value logger ~default:(Logger.create ())
+  ; logger
   }
 
 let call_verifier t (ps : 'proof list) = t.verifier ps
@@ -75,7 +75,7 @@ let rec determine_outcome :
       (* First separate out all the known results. That information will definitely be included
          in the outcome.
       *)
-      let logger = Logger.create () in
+      let logger = v.logger in
       let potentially_invalid =
         List.filter_map (List.zip_exn ps res) ~f:(fun (elt, r) ->
             match r with
@@ -300,8 +300,7 @@ module Transaction_pool = struct
       (Array.to_list
          (Array.map a ~f:(function `Valid c -> Some c | _ -> None)) )
 
-  let create verifier : t =
-    let logger = Logger.create () in
+  let create ~logger verifier : t =
     create ~compare_init:compare_envelope ~logger (fun (ds : input list) ->
         O1trace.thread "dispatching_transaction_pool_batcher_verification"
           (fun () ->
