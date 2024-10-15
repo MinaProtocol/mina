@@ -361,12 +361,21 @@ let send_validation ~validation_id ~validation_result =
       (Libp2p_ipc.create_validation_push_message ~validation_id
          ~validation_result )
 
-let send_add_resource ~tag ~body =
-  let open Staged_ledger_diff in
-  let tag = Body.Tag.to_enum tag in
-  let data = Body.to_binio_bigstring body |> Bigstring.to_string in
+let send_add_resource ~tag ~data =
+  let tag = Bitswap_tag.to_enum tag in
   send_push ~name:"AddResource"
     ~msg:(Libp2p_ipc.create_add_resource_push_message ~tag ~data)
+
+let send_download_resource ~tag ~ids =
+  let tag = Bitswap_tag.to_enum tag in
+  let ids = List.map ids ~f:Consensus.Body_reference.to_raw_string in
+  send_push ~name:"DownloadResource"
+    ~msg:(Libp2p_ipc.create_download_resource_push_message ~tag ~ids)
+
+let send_remove_resource ~ids =
+  let ids = List.map ids ~f:Consensus.Body_reference.to_raw_string in
+  send_push ~name:"RemoveResource"
+    ~msg:(Libp2p_ipc.create_remove_resource_push_message ~ids)
 
 let send_heartbeat ~peer_id =
   send_push ~name:"HeartbeatPeer"
