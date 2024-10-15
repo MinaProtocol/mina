@@ -79,16 +79,9 @@ do
     done
 done
 
-# Build mina block producer sidecar
 if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
 then
-  ../automation/services/mina-bp-stats/sidecar/build.sh # only builds on mainnet-like branches
-  rm -rf "${BUILDDIR}"
-fi
-
-if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
-then
-  echo "---- Built all packages including mainnet, devnet, and the sidecar"
+  echo "---- Built all packages including mainnet and devnet"
 else
   echo "---- Not a mainnet-like branch, only built berkeley and beyond packages"
 fi
