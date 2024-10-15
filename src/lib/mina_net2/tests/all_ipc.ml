@@ -78,9 +78,6 @@ let%test_module "all-ipc test" =
     let bob_status =
       "This is major Tom to ground control\nI'm stepping through the door"
 
-    let block_window_duration =
-      Mina_compile_config.For_unit_tests.t.block_window_duration
-
     type messages =
       { topic_a_msg_1 : string
       ; topic_a_msg_2 : string
