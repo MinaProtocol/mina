@@ -5,6 +5,10 @@ module Scalars = Scalars
 module Domain = Domain
 module Opt = Opt
 
+let num_chunks_by_default = 1
+
+let zk_rows_by_default = 3
+
 type 'field plonk_domain =
   < vanishing_polynomial : 'field -> 'field
   ; shifts : 'field Plonk_types.Shifts.t
@@ -248,7 +252,7 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
       let next_term = ref omega_to_minus_2 in
       let omega_to_intermediate_powers =
         Array.init
-          Stdlib.(zk_rows - 3)
+          Stdlib.(zk_rows - zk_rows_by_default)
           ~f:(fun _ ->
             let term = !next_term in
             next_term := term * omega_to_minus_1 ;

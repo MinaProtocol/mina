@@ -229,7 +229,7 @@ module Stable = struct
                    } )
               ; shifts = Common.tock_shifts ~log2_size
               ; lookup_index = None
-              ; zk_rows = 3
+              ; zk_rows = Plonk_checks.zk_rows_by_default
               } )
         in
         { Poly.max_proofs_verified
