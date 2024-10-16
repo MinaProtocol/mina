@@ -22,14 +22,6 @@ ENV DEBIAN_FRONTEND noninteractive
 # We do not install the below platform-specific dependencies,
 # and instead assume that apt will install the proper deps based on the package definition.
 # The packages are noted here just for clarity/documentation.
-# Stretch-only Deps:
-#    libffi6
-#    libprocps6
-#    libjemalloc1
-# Buster-only Deps:
-#    libffi7
-#    libprocps7
-#    libjemalloc2
 # Bullseye/Focal-only Deps:
 #    libffi7
 #    libprocps8
