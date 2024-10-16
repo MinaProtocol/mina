@@ -29,9 +29,7 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run
-                  "git config --global http.sslCAInfo /etc/ssl/certs/ca-bundle.crt"
-              , Cmd.run "./buildkite/scripts/refresh_code.sh"
+              [ Cmd.run "./buildkite/scripts/refresh_code.sh"
               , Cmd.run
                   "./buildkite/scripts/generate-diff.sh > _computed_diff.txt"
               , Cmd.run
