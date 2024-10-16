@@ -30,13 +30,14 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run "./buildkite/scripts/refresh_code.sh"
+              , Cmd.run "git clean -fd"
               , Cmd.run
                   "./buildkite/scripts/generate-diff.sh > _computed_diff.txt"
               , Cmd.run "cat _computed_diff.txt"
               , Cmd.run
                   ''
                       if (cat _computed_diff.txt | egrep -q '${triggerChange}'); then
-                          if ! (cat _computed_diff.txt | egrep -q 'Changelog.md'); then
+                          if ! (cat _computed_diff.txt | egrep -q 'CHANGES.md'); then
                               echo "Missing changelog entry detected for this change"
                               exit 1
                           fi
