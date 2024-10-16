@@ -1641,6 +1641,9 @@ let%test_module _ =
 
     let num_extra_keys = 30
 
+    let block_window_duration =
+      Mina_compile_config.For_unit_tests.t.block_window_duration
+
     (* keys that can be used when generating new accounts *)
     let extra_keys =
       Array.init num_extra_keys ~f:(fun _ -> Signature_lib.Keypair.create ())
@@ -1922,6 +1925,7 @@ let%test_module _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
           ~time_controller ~frontier_broadcast_pipe:frontier_pipe_r
           ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
+          ~block_window_duration
       in
       let txn_pool = Test.resource_pool pool_ in
       let%map () = Async.Scheduler.yield_until_no_jobs_remain () in

@@ -52,6 +52,7 @@ module Config = struct
     ; mutable keypair : Mina_net2.Keypair.t option
     ; all_peers_seen_metric : bool
     ; known_private_ip_nets : Core.Unix.Cidr.t list
+    ; block_window_duration : Time.Span.t
     }
   [@@deriving make]
 end
@@ -77,7 +78,7 @@ let download_seed_peer_list uri =
 
 type publish_functions =
   { publish_v0 : Message.msg -> unit Deferred.t
-  ; publish_v1_block : Message.state_msg -> unit Deferred.t
+  ; publish_v1_block : Mina_block.Header.t -> unit Deferred.t
   ; publish_v1_tx : Message.transaction_pool_diff_msg -> unit Deferred.t
   ; publish_v1_snark_work : Message.snark_pool_diff_msg -> unit Deferred.t
   }
@@ -219,7 +220,8 @@ module Make (Rpc_interface : RPC_INTERFACE) :
         ctx first_peer_ivar high_connectivity_ivar ~added_seeds ~pids
         ~on_unexpected_termination
         ~sinks:
-          (Message.Any_sinks (sinksM, (sink_block, sink_tx, sink_snark_work))) =
+          (Message.Any_sinks (sinksM, (sink_block, sink_tx, sink_snark_work)))
+        ~block_window_duration =
       let module Sinks = (val sinksM) in
       let ctr = ref 0 in
       let record_peer_connection () =
@@ -256,7 +258,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                   ~all_peers_seen_metric:config.all_peers_seen_metric
                   ~on_peer_connected:(fun _ -> record_peer_connection ())
                   ~on_peer_disconnected:ignore ~logger:config.logger ~conf_dir
-                  ~pids () ) )
+                  ~pids ~block_window_duration () ) )
       with
       | Ok (Ok net2) -> (
           let open Mina_net2 in
@@ -441,7 +443,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
             let snark_bin_prot =
               Network_pool.Snark_pool.Diff_versioned.Stable.Latest.bin_t
             in
-            let block_bin_prot = Mina_block.Stable.Latest.bin_t in
+            let header_bin_prot = Mina_block.Header.Stable.Latest.bin_t in
             let unit_f _ = Deferred.unit in
             let publish_v1_impl push_impl bin_prot topic =
               match config.pubsub_v1 with
@@ -466,10 +468,10 @@ module Make (Rpc_interface : RPC_INTERFACE) :
               publish_v1_impl
                 (fun (env, vc) ->
                   Sinks.Block_sink.push sink_block
-                    ( `Transition env
+                    ( `Header env
                     , `Time_received (Block_time.now config.time_controller)
                     , `Valid_cb vc ) )
-                block_bin_prot v1_topic_block
+                header_bin_prot v1_topic_block
             in
             let map_v0_msg msg =
               match msg with
@@ -486,8 +488,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                   match Envelope.Incoming.data env with
                   | Message.Latest.T.New_state state ->
                       Sinks.Block_sink.push sink_block
-                        ( `Transition
-                            (Envelope.Incoming.map ~f:(const state) env)
+                        ( `Block (Envelope.Incoming.map ~f:(const state) env)
                         , `Time_received (Block_time.now config.time_controller)
                         , `Valid_cb vc )
                   | Message.Latest.T.Transaction_pool_diff
@@ -628,6 +629,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
             create_libp2p ~allow_multiple_instances config rpc_handlers
               first_peer_ivar high_connectivity_ivar ~added_seeds ~pids
               ~on_unexpected_termination:restart_libp2p ~sinks
+              ~block_window_duration:config.block_window_duration
           in
           on_libp2p_create libp2p ; Deferred.ignore_m libp2p
         and restart_libp2p () = don't_wait_for (start_libp2p ()) in
@@ -949,7 +951,8 @@ module Make (Rpc_interface : RPC_INTERFACE) :
     let broadcast_state ?origin_topic t state =
       let pfs = !(t.publish_functions) in
       let%bind () =
-        guard_topic ?origin_topic v1_topic_block pfs.publish_v1_block state
+        guard_topic ?origin_topic v1_topic_block pfs.publish_v1_block
+          (Mina_block.header state)
       in
       guard_topic ?origin_topic v0_topic pfs.publish_v0 (Message.New_state state)
 

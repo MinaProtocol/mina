@@ -436,6 +436,8 @@ module Transition_frontier = struct
     let update : float -> unit = fun _ -> ()
 
     let clear : unit -> unit = fun _ -> ()
+
+    let initialize = Fn.ignore
   end
 
   let recently_finalized_staged_txns : Gauge.t = ()
@@ -498,6 +500,8 @@ module Block_latency = struct
     let update : float -> unit = fun _ -> ()
 
     let clear : unit -> unit = fun _ -> ()
+
+    let initialize = Fn.ignore
   end
 
   module Gossip_time = struct
@@ -506,6 +510,8 @@ module Block_latency = struct
     let update : Time.Span.t -> unit = fun _ -> ()
 
     let clear : unit -> unit = fun _ -> ()
+
+    let initialize = Fn.ignore
   end
 
   module Inclusion_time = struct
@@ -514,6 +520,8 @@ module Block_latency = struct
     let update : Time.Span.t -> unit = fun _ -> ()
 
     let clear : unit -> unit = fun _ -> ()
+
+    let initialize = Fn.ignore
   end
 
   module Validation_acceptance_time = struct
@@ -522,6 +530,8 @@ module Block_latency = struct
     let update : Time.Span.t -> unit = fun _ -> ()
 
     let clear : unit -> unit = fun _ -> ()
+
+    let initialize = Fn.ignore
   end
 end
 
@@ -571,3 +581,5 @@ module Archive = struct
    fun ?forward_uri:_ ~port:_ ~logger:_ _ ->
     failwith "No metrics server available"
 end
+
+let initialize_all = Fn.ignore

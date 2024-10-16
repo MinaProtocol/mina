@@ -8,7 +8,7 @@
 
 (** Encode a vector at the type level with its size *)
 module T : sig
-  type ('a, _) t =
+  type ('a, 'b) t = ('a, 'b) Mina_wire_types.Pickles_types.Vector.t =
     | [] : ('a, Nat.z) t
     | ( :: ) : 'a * ('a, 'n) t -> ('a, 'n Nat.s) t
 end

@@ -254,7 +254,9 @@ struct
                      Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t)) )
                in
                let none_sum =
-                 let num_chunks = (* TODO *) 1 in
+                 let num_chunks =
+                   (* TODO *) Plonk_checks.num_chunks_by_default
+                 in
                  Option.map is_none ~f:(fun (b : Boolean.var) ->
                      Array.init num_chunks ~f:(fun _ ->
                          Double.map Inner_curve.one ~f:(( * ) (b :> t)) ) )
@@ -1576,7 +1578,8 @@ struct
       Plonk_checks.scalars_env
         (module Env_bool)
         (module Env_field)
-        ~srs_length_log2:Common.Max_degree.wrap_log2 ~zk_rows:3
+        ~srs_length_log2:Common.Max_degree.wrap_log2
+        ~zk_rows:Plonk_checks.zk_rows_by_default
         ~endo:(Impl.Field.constant Endo.Wrap_inner_curve.base)
         ~mds:sponge_params.mds
         ~field_of_hex:(fun s ->

@@ -7,10 +7,9 @@ module Impl = Pickles.Impls.Step
 module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 module Statement = Transaction_snark.Statement
 
-let constraint_constants =
-  Genesis_constants.For_unit_tests.Constraint_constants.t
+let constraint_constants = Genesis_constants.Compiled.constraint_constants
 
-let genesis_constants = Genesis_constants.For_unit_tests.t
+let genesis_constants = Genesis_constants.Compiled.genesis_constants
 
 (* Always run tests with proof-level Full *)
 let proof_level = Genesis_constants.Proof_level.Full

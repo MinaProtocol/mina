@@ -14,6 +14,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val compile_config : Mina_compile_config.t
 end
 
 (* There must be at least 2 peers to create a network *)
@@ -298,7 +300,7 @@ module Generator = struct
 
   let gen ?(logger = Logger.null ()) ~precomputed_values ~verifier
       ~max_frontier_length ~use_super_catchup
-      (configs : (peer_config, 'n num_peers) Gadt_lib.Vect.t) =
+      (configs : (peer_config, 'n num_peers) Gadt_lib.Vect.t) ~compile_config =
     (* TODO: Pass in *)
     let module Context = struct
       let logger = logger
@@ -310,6 +312,8 @@ module Generator = struct
 
       let consensus_constants =
         precomputed_values.Precomputed_values.consensus_constants
+
+      let compile_config = compile_config
     end in
     let open Quickcheck.Generator.Let_syntax in
     let%map states =

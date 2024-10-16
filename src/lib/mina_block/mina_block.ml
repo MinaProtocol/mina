@@ -12,7 +12,11 @@ type fully_invalid_block = Validation.fully_invalid_with_block
 
 type initial_valid_block = Validation.initial_valid_with_block
 
+type initial_valid_header = Validation.initial_valid_with_header
+
 type almost_valid_block = Validation.almost_valid_with_block
+
+type almost_valid_header = Validation.almost_valid_with_header
 
 type fully_valid_block = Validation.fully_valid_with_block
 
@@ -47,6 +51,10 @@ let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
   in
   (block_with_hash, validation)
 
+let genesis_header ~precomputed_values =
+  let b, v = genesis ~precomputed_values in
+  (With_hash.map ~f:Block.header b, v)
+
 let handle_dropped_transition ?pipe_name ?valid_cb ~logger block =
   [%log warn] "Dropping state_hash $state_hash from $pipe transition pipe"
     ~metadata:
@@ -57,10 +65,7 @@ let handle_dropped_transition ?pipe_name ?valid_cb ~logger block =
     ~f:(Fn.flip Mina_net2.Validation_callback.fire_if_not_already_fired `Reject)
     valid_cb
 
-let blockchain_length block =
-  block |> Block.header |> Header.protocol_state
-  |> Mina_state.Protocol_state.consensus_state
-  |> Consensus.Data.Consensus_state.blockchain_length
+let blockchain_length block = block |> Block.header |> Header.blockchain_length
 
 let consensus_state =
   Fn.compose Protocol_state.consensus_state

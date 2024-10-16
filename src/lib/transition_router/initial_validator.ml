@@ -17,13 +17,10 @@ type validation_error =
 [@@deriving sexp_of]
 
 let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
-    ~trust_system ~sender ~transition_with_hash ~delta (error : validation_error)
-    =
+    ~trust_system ~sender ~header_with_hash ~delta (error : validation_error) =
   let open Trust_system.Actions in
-  let state_hash =
-    State_hash.With_state_hashes.state_hash transition_with_hash
-  in
-  let transition = With_hash.data transition_with_hash in
+  let state_hash = State_hash.With_state_hashes.state_hash header_with_hash in
+  let header = With_hash.data header_with_hash in
   let punish action message =
     let message' =
       "external transition with state hash $state_hash"
@@ -53,11 +50,8 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     | `Invalid_proof err ->
         [ ("reason", `String "invalid proof")
         ; ( "protocol_state"
-          , Header.protocol_state (Mina_block.header transition)
-            |> Protocol_state.value_to_yojson )
-        ; ( "proof"
-          , Header.protocol_state_proof @@ Mina_block.header transition
-            |> Proof.to_yojson )
+          , Header.protocol_state header |> Protocol_state.value_to_yojson )
+        ; ("proof", Header.protocol_state_proof header |> Proof.to_yojson)
         ; ("error", Error_json.error_to_yojson err)
         ]
     | `Invalid_delta_block_chain_proof ->
@@ -87,8 +81,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
   [%log' debug rejected_blocks_logger]
     ~metadata:
       ( ( "protocol_state"
-        , Protocol_state.Value.to_yojson
-            (Header.protocol_state (Mina_block.header transition)) )
+        , Protocol_state.Value.to_yojson (Header.protocol_state header) )
       :: metadata )
     "Validation error: external transition with state hash $state_hash was \
      rejected for reason $reason" ;
@@ -190,13 +183,15 @@ module Duplicate_block_detector = struct
   let create () = { table = Map.empty (module Blocks); latest_epoch = 0 }
 
   let check ~precomputed_values ~rejected_blocks_logger ~time_received t logger
-      external_transition_with_hash =
-    let external_transition = external_transition_with_hash.With_hash.data in
+      header_with_hash =
+    let header = header_with_hash.With_hash.data in
     let protocol_state_hash =
-      State_hash.With_state_hashes.state_hash external_transition_with_hash
+      State_hash.With_state_hashes.state_hash header_with_hash
     in
     let open Consensus.Data.Consensus_state in
-    let consensus_state = Mina_block.consensus_state external_transition in
+    let consensus_state =
+      Mina_block.Header.protocol_state header |> Protocol_state.consensus_state
+    in
     let consensus_time = consensus_time consensus_state in
     let block_producer =
       Consensus.Data.Consensus_state.block_creator consensus_state
@@ -244,27 +239,32 @@ let validate ~logger ~trust_system ~verifier ~initialization_finish_signal
     Logger.create ~id:Logger.Logger_id.rejected_blocks ()
   in
   let duplicate_checker = Duplicate_block_detector.create () in
-  stage (fun ~transition_env ~time_received ~valid_cb ->
+  stage (fun ~b_or_h ~time_received ~valid_cb ->
+      let header, sender =
+        match b_or_h with
+        | `Block b_env ->
+            ( Mina_block.header (Envelope.Incoming.data b_env)
+            , Envelope.Incoming.sender b_env )
+        | `Header h_env ->
+            (Envelope.Incoming.data h_env, Envelope.Incoming.sender h_env)
+      in
       let open Deferred.Let_syntax in
       if Ivar.is_full initialization_finish_signal then (
         let blockchain_length =
-          Envelope.Incoming.data transition_env
-          |> Mina_block.blockchain_length |> Mina_numbers.Length.to_int
+          Mina_block.Header.blockchain_length header
+          |> Mina_numbers.Length.to_int
         in
         Mina_metrics.Transition_frontier
         .update_max_unvalidated_blocklength_observed blockchain_length ;
         ( if not (Mina_net2.Validation_callback.is_expired valid_cb) then (
-          let transition_with_hash =
-            Envelope.Incoming.data transition_env
-            |> With_hash.of_data
-                 ~hash_data:
-                   (Fn.compose Protocol_state.hashes
-                      (Fn.compose Header.protocol_state Mina_block.header) )
+          let header_hashed =
+            With_hash.of_data header
+              ~hash_data:
+                (Fn.compose Protocol_state.hashes Header.protocol_state)
           in
           Duplicate_block_detector.check ~precomputed_values
             ~rejected_blocks_logger ~time_received duplicate_checker logger
-            transition_with_hash ;
-          let sender = Envelope.Incoming.sender transition_env in
+            header_hashed ;
           let computation =
             let open Interruptible.Let_syntax in
             let defer f x =
@@ -277,7 +277,7 @@ let validate ~logger ~trust_system ~verifier ~initialization_finish_signal
             match%bind
               let open Interruptible.Result.Let_syntax in
               Validation.(
-                wrap transition_with_hash
+                wrap_header header_hashed
                 |> defer
                      (validate_time_received ~precomputed_values ~time_received)
                 >>= defer (validate_genesis_protocol_state ~genesis_state_hash)
@@ -286,19 +286,30 @@ let validate ~logger ~trust_system ~verifier ~initialization_finish_signal
                 >>= defer validate_delta_block_chain
                 >>= defer validate_protocol_versions)
             with
-            | Ok verified_transition ->
+            | Ok verified_header ->
+                [%log internal] "Initial_validation_done" ;
+                let b_or_h' =
+                  match b_or_h with
+                  | `Block b_env ->
+                      `Block
+                        (Envelope.Incoming.map
+                           ~f:
+                             (Fn.compose
+                                (Mina_block.Validation.with_body verified_header)
+                                Mina_block.body )
+                           b_env )
+                  | `Header h_env ->
+                      `Header
+                        (Envelope.Incoming.map ~f:(Fn.const verified_header)
+                           h_env )
+                in
                 Mina_metrics.Transition_frontier.update_max_blocklength_observed
                   blockchain_length ;
                 Queue.enqueue Transition_frontier.validated_blocks
-                  ( State_hash.With_state_hashes.state_hash transition_with_hash
+                  ( State_hash.With_state_hashes.state_hash header_hashed
                   , sender
                   , time_received ) ;
-                return
-                  (Ok
-                     ( `Block
-                         (Envelope.Incoming.wrap ~data:verified_transition
-                            ~sender )
-                     , `Valid_cb valid_cb ) )
+                return (Ok (b_or_h', `Valid_cb valid_cb))
             | Error error ->
                 Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb
                   `Reject ;
@@ -306,7 +317,7 @@ let validate ~logger ~trust_system ~verifier ~initialization_finish_signal
                   Interruptible.uninterruptible
                   @@ handle_validation_error ~logger ~rejected_blocks_logger
                        ~time_received ~trust_system ~sender
-                       ~transition_with_hash
+                       ~header_with_hash:header_hashed
                        ~delta:genesis_constants.protocol.delta error
                 in
                 Error ()
@@ -320,10 +331,7 @@ let validate ~logger ~trust_system ~verifier ~initialization_finish_signal
             Error ()
         | Error () ->
             let state_hash =
-              ( Envelope.Incoming.data transition_env
-              |> Mina_block.header |> Header.protocol_state
-              |> Protocol_state.hashes )
-                .state_hash
+              (Header.protocol_state header |> Protocol_state.hashes).state_hash
             in
             let metadata =
               [ ("state_hash", State_hash.to_yojson state_hash)

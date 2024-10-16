@@ -24,6 +24,8 @@ let password = "codarules"
 
 let db = "archiver"
 
+let port = "5433"
+
 let command_key = "archive-unit-tests"
 
 in  Pipeline.build
@@ -50,14 +52,14 @@ in  Pipeline.build
                   [ "POSTGRES_PASSWORD=${password}"
                   , "POSTGRES_USER=${user}"
                   , "POSTGRES_DB=${db}"
-                  , "MINA_TEST_POSTGRES=postgres://${user}:${password}@localhost:5434/${db}"
+                  , "MINA_TEST_POSTGRES=postgres://${user}:${password}@localhost:${port}/${db}"
                   , "GO=/usr/lib/go/bin/go"
                   , "DUNE_INSTRUMENT_WITH=bisect_ppx"
                   , "COVERALLS_TOKEN"
                   ]
                   ( Prelude.Text.concatSep
                       " && "
-                      [ "bash buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db}"
+                      [ "bash buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db} ${port}"
                       , WithCargo.withCargo
                           "eval \\\$(opam config env) && dune runtest src/app/archive && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
                       ]

@@ -16,6 +16,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val compile_config : Mina_compile_config.t
 end
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -128,6 +130,25 @@ let write_graph (_ : t) =
   let _ = G.output_graph in
   ()
 
+let validate_block ~genesis_state_hash (b, v) =
+  let open Mina_block.Validation in
+  let open Result.Let_syntax in
+  let h = (With_hash.map ~f:Mina_block.header b, v) in
+  validate_genesis_protocol_state ~genesis_state_hash h
+  >>= validate_protocol_versions >>= validate_delta_block_chain
+  >>| Fn.flip with_body (Mina_block.body @@ With_hash.data b)
+
+let validate_proofs_block ~verifier ~genesis_state_hash blocks =
+  let open Mina_block.Validation in
+  let open Deferred.Result.Let_syntax in
+  let f ((b, _), h) = with_body h (Mina_block.body @@ With_hash.data b) in
+  let hs =
+    List.map blocks ~f:(fun (b, v) ->
+        (With_hash.map ~f:Mina_block.header b, v) )
+  in
+  validate_proofs ~verifier ~genesis_state_hash hs
+  >>| List.zip_exn blocks >>| List.map ~f
+
 let verify_transition ~context:(module Context : CONTEXT) ~trust_system
     ~frontier ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
     enveloped_transition =
@@ -136,15 +157,10 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
   let transition_with_hash = Envelope.Incoming.data enveloped_transition in
   let cached_initially_validated_transition_result =
-    let open Result.Let_syntax in
-    let open Mina_block in
-    let%bind initially_validated_transition =
-      transition_with_hash
-      |> Validation.skip_time_received_validation
-           `This_block_was_not_received_via_gossip
-      |> Validation.validate_genesis_protocol_state ~genesis_state_hash
-      >>= Validation.validate_protocol_versions
-      >>= Validation.validate_delta_block_chain
+    let%bind.Result initially_validated_transition =
+      Mina_block.Validation.skip_time_received_validation
+        `This_block_was_not_received_via_gossip transition_with_hash
+      |> validate_block ~genesis_state_hash
     in
     let enveloped_initially_validated_transition =
       Envelope.Incoming.map enveloped_transition
@@ -521,7 +537,7 @@ module Initial_validate_batcher = struct
                    ; state_body_hash = None
                    } )
             |> Mina_block.Validation.wrap )
-        |> Mina_block.Validation.validate_proofs ~verifier ~genesis_state_hash
+        |> validate_proofs_block ~verifier ~genesis_state_hash
         >>| function
         | Ok tvs ->
             Ok (List.map tvs ~f:(fun x -> `Valid x))
@@ -1433,6 +1449,8 @@ let%test_module "Ledger_catchup tests" =
 
     let use_super_catchup = true
 
+    let compile_config = Mina_compile_config.For_unit_tests.t
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
@@ -1448,6 +1466,8 @@ let%test_module "Ledger_catchup tests" =
       let constraint_constants = constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let compile_config = compile_config
     end
 
     (* let mock_verifier =
@@ -1626,7 +1646,7 @@ let%test_module "Ledger_catchup tests" =
             Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
+            ~use_super_catchup ~compile_config
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size
             ])
@@ -1646,7 +1666,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
+            ~use_super_catchup ~compile_config
             [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
         ~f:(fun network ->
           let open Fake_network in
@@ -1662,7 +1682,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
+            ~use_super_catchup ~compile_config
             [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
         ~f:(fun network ->
           let open Fake_network in
@@ -1679,7 +1699,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
+            ~use_super_catchup ~compile_config
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 3) + 1)
@@ -1757,7 +1777,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
+            ~use_super_catchup ~compile_config
             [ fresh_peer
               (* ; peer_with_branch ~frontier_branch_size:(max_frontier_length / 2) *)
             ; peer_with_branch_custom_rpc

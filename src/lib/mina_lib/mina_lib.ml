@@ -64,7 +64,7 @@ type components =
   ; snark_pool : Network_pool.Snark_pool.t
   ; transition_frontier : Transition_frontier.t option Broadcast_pipe.Reader.t
   ; most_recent_valid_block :
-      Mina_block.initial_valid_block Broadcast_pipe.Reader.t
+      Mina_block.initial_valid_header Broadcast_pipe.Reader.t
   ; block_produced_bvar : (Transition_frontier.Breadcrumb.t, read_write) Bvar.t
   }
 
@@ -876,14 +876,13 @@ let request_work t =
 let work_selection_method t = t.config.work_selection_method
 
 let add_work t (work : Snark_worker_lib.Work.Result.t) =
-  let (module Work_selection_method) = t.config.work_selection_method in
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =
       Option.map (snark_worker_key t) ~f:(fun _ -> snark_work_fee t)
     in
     let pending_work =
-      Work_selection_method.pending_work_statements ~snark_pool ~fee_opt
+      Work_selector.pending_work_statements ~snark_pool ~fee_opt
         t.snark_job_state
       |> List.length
     in
@@ -895,7 +894,7 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
      * If the diff is accepted then remove it from the seen jobs.
      * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
-    Work_selection_method.remove t.snark_job_state spec
+    Work_selector.remove t.snark_job_state spec
   in
   ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
   Network_pool.Snark_pool.Local_sink.push t.pipes.snark_local_sink
@@ -1240,6 +1239,8 @@ module type CONTEXT = sig
   val zkapp_cmd_limit : int option ref
 
   val compaction_interval : Time.Span.t option
+
+  val compile_config : Mina_compile_config.t
 end
 
 let context ~commit_id (config : Config.t) : (module CONTEXT) =
@@ -1265,6 +1266,8 @@ let context ~commit_id (config : Config.t) : (module CONTEXT) =
     let zkapp_cmd_limit = config.zkapp_cmd_limit
 
     let compaction_interval = config.compile_config.compaction_interval
+
+    let compile_config = config.compile_config
   end )
 
 let start t =
@@ -1494,6 +1497,7 @@ let create ~commit_id ?wallets (config : Config.t) =
   let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
+  let block_window_duration = config.compile_config.block_window_duration in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
@@ -1834,6 +1838,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~on_remote_push:notify_online
               ~log_gossip_heard:
                 config.net_config.log_gossip_heard.transaction_pool_diff
+              ~block_window_duration
           in
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
@@ -1848,6 +1853,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~on_remote_push:notify_online
               ~log_gossip_heard:
                 config.net_config.log_gossip_heard.snark_pool_diff
+              ~block_window_duration
           in
           let block_reader, block_sink =
             Transition_handler.Block_sink.create
@@ -1860,6 +1866,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ; consensus_constants
               ; genesis_constants = config.precomputed_values.genesis_constants
               ; constraint_constants
+              ; block_window_duration
               }
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
@@ -1919,7 +1926,8 @@ let create ~commit_id ?wallets (config : Config.t) =
           |> Deferred.don't_wait_for ;
           let most_recent_valid_block_reader, most_recent_valid_block_writer =
             Broadcast_pipe.create
-              ( Mina_block.genesis ~precomputed_values:config.precomputed_values
+              ( Mina_block.genesis_header
+                  ~precomputed_values:config.precomputed_values
               |> Validation.reset_frontier_dependencies_validation
               |> Validation.reset_staged_ledger_diff_validation )
           in

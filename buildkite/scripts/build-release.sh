@@ -14,7 +14,7 @@ echo " Includes mina daemon, archive-node, rosetta, generate keypair for berkele
 
 
 echo "--- Prepare debian packages"
-BRANCH_NAME="$BUILDKIE_BRANCH" ./scripts/debian/build.sh $@
+BRANCH_NAME="$BUILDKITE_BRANCH" ./scripts/debian/build.sh $@
 
 echo "--- Git diff after build is complete:"
 git diff --exit-code -- .

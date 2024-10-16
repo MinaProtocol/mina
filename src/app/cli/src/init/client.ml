@@ -1612,12 +1612,14 @@ let generate_libp2p_keypair_do privkey_path =
     (let open Deferred.Let_syntax in
     (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
     let logger = Logger.null () in
+    let compile_config = Mina_compile_config.Compiled.t in
     (* Using the helper only for keypair generation requires no state. *)
     File_system.with_temp_dir "mina-generate-libp2p-keypair" ~f:(fun tmpd ->
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore
+            ~block_window_duration:compile_config.block_window_duration ()
         with
         | Ok net ->
             let%bind me = Mina_net2.generate_random_keypair net in
@@ -1644,12 +1646,14 @@ let dump_libp2p_keypair_do privkey_path =
   Deferred.ignore_m
     (let open Deferred.Let_syntax in
     let logger = Logger.null () in
+    let compile_config = Mina_compile_config.Compiled.t in
     (* Using the helper only for keypair generation requires no state. *)
     File_system.with_temp_dir "mina-dump-libp2p-keypair" ~f:(fun tmpd ->
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore
+            ~block_window_duration:compile_config.block_window_duration ()
         with
         | Ok net ->
             let%bind () = Mina_net2.shutdown net in
@@ -1811,16 +1815,30 @@ let compile_time_constants =
                conf_dir ^/ "daemon.json"
          in
          let open Async in
+         let logger = Logger.create () in
          let%map ({ consensus_constants; _ } as precomputed_values), _ =
-           config_file |> Genesis_ledger_helper.load_config_json >>| Or_error.ok
-           >>| Option.value
-                 ~default:
-                   (`Assoc [ ("ledger", `Assoc [ ("accounts", `List []) ]) ])
-           >>| Runtime_config.of_yojson >>| Result.ok
-           >>| Option.value ~default:Runtime_config.default
-           >>= Genesis_ledger_helper.init_from_config_file ~genesis_constants
-                 ~constraint_constants ~logger:(Logger.null ()) ~proof_level
-                 ~cli_proof_level:None ~genesis_dir
+           let%bind runtime_config =
+             let%map config_file =
+               Runtime_config.Json_loader.load_config_files ~conf_dir ~logger
+                 [ config_file ]
+               >>| Or_error.ok
+             in
+             let default =
+               Runtime_config.of_json_layout
+                 { Runtime_config.Json_layout.default with
+                   ledger =
+                     Some
+                       { Runtime_config.Json_layout.Ledger.default with
+                         accounts = Some []
+                       }
+                 }
+               |> Result.ok_or_failwith
+             in
+             Option.value ~default config_file
+           in
+           Genesis_ledger_helper.init_from_config_file ~genesis_constants
+             ~constraint_constants ~logger:(Logger.null ()) ~proof_level
+             ~cli_proof_level:None ~genesis_dir runtime_config
            >>| Or_error.ok_exn
          in
          let all_constants =

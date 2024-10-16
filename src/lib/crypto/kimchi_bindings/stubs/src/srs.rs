@@ -92,7 +92,7 @@ macro_rules! impl_srs {
                     srs.with_lagrange_basis(x_domain);
                 }
 
-                Ok(srs.lagrange_bases[&x_domain.size()][i as usize].clone().into())
+                Ok(srs.get_lagrange_basis(x_domain)[i as usize].clone().into())
             }
 
             #[ocaml_gen::func]

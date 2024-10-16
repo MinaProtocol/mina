@@ -221,8 +221,7 @@ let handle_incoming_message t msg ~handle_push_message =
               handle_push_message t (DaemonInterface.PushMessage.get push_msg) )
           )
   | Undefined n ->
-      Libp2p_ipc.undefined_union ~context:"DaemonInterface.Message" n ;
-      Deferred.unit
+      Libp2p_ipc.undefined_union ~context:"DaemonInterface.Message" n
 
 let spawn ?(allow_multiple_instances = false) ~logger ~pids ~conf_dir
     ~handle_push_message () =

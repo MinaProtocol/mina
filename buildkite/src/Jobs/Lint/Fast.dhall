@@ -45,7 +45,7 @@ in  Pipeline.build
             , label =
                 "Fast lint steps; CODEOWNERs, RFCs, Check Snarky & Proof-Systems submodules, Preprocessor Deps"
             , key = "lint"
-            , target = Size.Small
+            , target = Size.Multi
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }

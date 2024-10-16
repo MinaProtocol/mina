@@ -2111,7 +2111,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Global_slot.Checked.of_slot_number ~constants transition_data
         in
         let%bind slot_diff =
-          [%with_label_ "Next global slot is less than previous global slot"]
+          [%with_label_ "Next global slot is larger than previous global slot"]
             (fun () ->
               Global_slot.Checked.diff_slots next_global_slot prev_global_slot )
         in

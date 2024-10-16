@@ -4,7 +4,7 @@ use ark_poly::DenseUVPolynomial;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
 use paste::paste;
 use poly_commitment::SRS as ISRS;
-use poly_commitment::{commitment::b_poly_coefficients, srs::SRS};
+use poly_commitment::{commitment::b_poly_coefficients, srs::SRS, hash_map_cache::HashMapCache};
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 use std::{
@@ -76,10 +76,8 @@ macro_rules! impl_srs {
                 log2_size: i32,
             ) {
                 crate::rayon::run_in_pool(|| {
-                    let ptr: &mut poly_commitment::srs::SRS<$G> =
-                        unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
                     let domain = EvaluationDomain::<$F>::new(1 << (log2_size as usize)).expect("invalid domain size");
-                    ptr.add_lagrange_basis(domain);
+                    srs.get_lagrange_basis(domain);
                 });
             }
 
@@ -135,15 +133,12 @@ macro_rules! impl_srs {
                 let x_domain = EvaluationDomain::<$F>::new(domain_size as usize).ok_or_else(|| {
                     JsValue::from_str("caml_pasta_fp_urs_lagrange_commitment")
                 })?;
-                crate::rayon::run_in_pool(|| {
-                    // We're single-threaded, so it's safe to grab this pointer as mutable.
-                    // Do not try this at home.
-                    let ptr: &mut poly_commitment::srs::SRS<$G> =
-                        unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
-                    ptr.add_lagrange_basis(x_domain);
-                });
+                let basis =
+                    crate::rayon::run_in_pool(|| {
+                        srs.get_lagrange_basis(x_domain)
+                    });
 
-                Ok(srs.lagrange_bases[&x_domain.size()][i as usize].clone().into())
+                Ok(basis[i as usize].clone().into())
             }
 
             #[wasm_bindgen]
@@ -215,13 +210,10 @@ macro_rules! impl_srs {
 //
 
 pub mod fp {
-    use std::collections::HashMap;
-
     use super::*;
     use crate::arkworks::{WasmGVesta as WasmG, WasmPastaFp};
     use crate::poly_comm::vesta::WasmFpPolyComm as WasmPolyComm;
     use mina_curves::pasta::{Fp, Vesta as G};
-    use poly_commitment::PolyComm;
 
     impl_srs!(caml_fp_srs, WasmPastaFp, WasmG, Fp, G, WasmPolyComm, Fp);
 
@@ -249,7 +241,7 @@ pub mod fp {
         let srs = SRS::<G> {
             h,
             g,
-            lagrange_bases: HashMap::new(),
+            lagrange_bases: HashMapCache::new(),
         };
         Arc::new(srs).into()
     }
@@ -261,8 +253,8 @@ pub mod fp {
         domain_size: i32,
         i: i32,
     ) -> Option<WasmPolyComm> {
-        let bases = srs.0.lagrange_bases.get(&(domain_size as usize));
-        bases.map(|bases| bases[i as usize].clone().into())
+        let basis = srs.get_lagrange_basis_from_domain_size(domain_size as usize);
+        Some(basis[i as usize].clone().into())
     }
 
     // set entire lagrange basis from input
@@ -272,12 +264,9 @@ pub mod fp {
         domain_size: i32,
         input_bases: WasmVector<WasmPolyComm>,
     ) {
-        let bases: Vec<PolyComm<G>> = input_bases.into_iter().map(Into::into).collect();
-
-        // add to srs
-        let ptr: &mut poly_commitment::srs::SRS<G> =
-            unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
-        ptr.lagrange_bases.insert(domain_size as usize, bases);
+        srs.lagrange_bases.get_or_generate(domain_size as usize, || {
+            input_bases.into_iter().map(Into::into).collect()
+        });
     }
 
     // compute & add lagrange basis internally, return the entire basis
@@ -287,26 +276,21 @@ pub mod fp {
         domain_size: i32,
     ) -> WasmVector<WasmPolyComm> {
         // compute lagrange basis
+        let basis =
         crate::rayon::run_in_pool(|| {
-            let ptr: &mut poly_commitment::srs::SRS<G> =
-                unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
             let domain =
                 EvaluationDomain::<Fp>::new(domain_size as usize).expect("invalid domain size");
-            ptr.add_lagrange_basis(domain);
+            srs.get_lagrange_basis(domain)
         });
-        let bases = &srs.0.lagrange_bases[&(domain_size as usize)];
-        bases.into_iter().map(Into::into).collect()
+        basis.into_iter().map(Into::into).collect()
     }
 }
 
 pub mod fq {
-    use std::collections::HashMap;
-
     use super::*;
     use crate::arkworks::{WasmGPallas as WasmG, WasmPastaFq};
     use crate::poly_comm::pallas::WasmFqPolyComm as WasmPolyComm;
     use mina_curves::pasta::{Fq, Pallas as G};
-    use poly_commitment::PolyComm;
 
     impl_srs!(caml_fq_srs, WasmPastaFq, WasmG, Fq, G, WasmPolyComm, Fq);
 
@@ -334,7 +318,7 @@ pub mod fq {
         let srs = SRS::<G> {
             h,
             g,
-            lagrange_bases: HashMap::new(),
+            lagrange_bases: HashMapCache::new(),
         };
         Arc::new(srs).into()
     }
@@ -346,8 +330,8 @@ pub mod fq {
         domain_size: i32,
         i: i32,
     ) -> Option<WasmPolyComm> {
-        let bases = srs.0.lagrange_bases.get(&(domain_size as usize));
-        bases.map(|bases| bases[i as usize].clone().into())
+        let basis = srs.0.get_lagrange_basis_from_domain_size(domain_size as usize);
+        Some(basis[i as usize].clone().into())
     }
 
     // set entire lagrange basis from input
@@ -357,12 +341,9 @@ pub mod fq {
         domain_size: i32,
         input_bases: WasmVector<WasmPolyComm>,
     ) {
-        let bases: Vec<PolyComm<G>> = input_bases.into_iter().map(Into::into).collect();
-
-        // add to srs
-        let ptr: &mut poly_commitment::srs::SRS<G> =
-            unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
-        ptr.lagrange_bases.insert(domain_size as usize, bases);
+        srs.lagrange_bases.get_or_generate(domain_size as usize, || {
+            input_bases.into_iter().map(Into::into).collect()
+        });
     }
 
     // compute & add lagrange basis internally, return the entire basis
@@ -372,14 +353,12 @@ pub mod fq {
         domain_size: i32,
     ) -> WasmVector<WasmPolyComm> {
         // compute lagrange basis
+        let basis =
         crate::rayon::run_in_pool(|| {
-            let ptr: &mut poly_commitment::srs::SRS<G> =
-                unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
             let domain =
                 EvaluationDomain::<Fq>::new(domain_size as usize).expect("invalid domain size");
-            ptr.add_lagrange_basis(domain);
+            srs.get_lagrange_basis(domain)
         });
-        let bases = &srs.0.lagrange_bases[&(domain_size as usize)];
-        bases.into_iter().map(Into::into).collect()
+        basis.into_iter().map(Into::into).collect()
     }
 }

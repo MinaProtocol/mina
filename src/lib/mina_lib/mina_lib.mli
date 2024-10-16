@@ -42,6 +42,8 @@ module type CONTEXT = sig
   val zkapp_cmd_limit : int option ref
 
   val compaction_interval : Time.Span.t option
+
+  val compile_config : Mina_compile_config.t
 end
 
 exception Snark_worker_error of int
@@ -212,7 +214,7 @@ val wallets : t -> Secrets.Wallets.t
 val subscriptions : t -> Mina_subscriptions.t
 
 val most_recent_valid_transition :
-  t -> Mina_block.initial_valid_block Broadcast_pipe.Reader.t
+  t -> Mina_block.initial_valid_header Broadcast_pipe.Reader.t
 
 val block_produced_bvar :
   t -> (Transition_frontier.Breadcrumb.t, read_write) Bvar.t

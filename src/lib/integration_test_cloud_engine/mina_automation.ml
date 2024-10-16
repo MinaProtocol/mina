@@ -233,18 +233,10 @@ module Network_config = struct
     let runtime_config =
       { Runtime_config.daemon =
           Some
-            { txpool_max_size = Some txpool_max_size
-            ; peer_list_url = None
-            ; zkapp_proof_update_cost = None
-            ; zkapp_signed_single_update_cost = None
-            ; zkapp_signed_pair_update_cost = None
-            ; zkapp_transaction_cost_limit = None
-            ; max_event_elements = None
-            ; max_action_elements = None
-            ; zkapp_cmd_limit_hardcap = None
+            { Runtime_config.Daemon.default with
+              txpool_max_size = Some txpool_max_size
             ; slot_tx_end
             ; slot_chain_end
-            ; minimum_user_command_fee = None
             ; network_id
             }
       ; genesis =

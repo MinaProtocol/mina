@@ -9,11 +9,8 @@
     ; Keep these dependencies to an absolute minimum
     integers
     pasta_bindings
-    pickles_types
     kimchi_types
     kimchi_bindings
-    kimchi_pasta
-    kimchi_pasta.basic
     blake2
     )
   (preprocess (pps ppx_version))

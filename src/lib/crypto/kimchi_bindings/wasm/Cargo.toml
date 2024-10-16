@@ -27,10 +27,10 @@ web-sys = { version = "0.3.35", features = [
 ] }
 
 once_cell = "1.10.0"
-libc = { version = "0.2.0" }
+libc = "0.2.62"
 
 # arkworks
-ark-ff = { version = "0.4.2", features = ["parallel"] }
+ark-ff = { version = "0.4.2", features = ["parallel", "asm"] }
 ark-serialize = "0.4.2"
 ark-ec = { version = "0.4.2", features = ["parallel"] }
 ark-poly = { version = "0.4.2", features = ["parallel"] }
@@ -54,7 +54,7 @@ rmp-serde = "1.0.0"
 sprs = { version = "0.11.0" }
 spmc = { version = "0.3.0" }
 serde = "1.0.171"
-serde_json = "1.0"
+serde_json = "1.0.103"
 serde_with = ">=2.1.0"
 serde-wasm-bindgen = ">=0.4"
 js-sys = "0.3"
