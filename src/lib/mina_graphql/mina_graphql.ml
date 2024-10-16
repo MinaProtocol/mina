@@ -2209,8 +2209,8 @@ module Queries = struct
           Mina_lib.(
             Option.map (snark_worker_key mina) ~f:(fun _ -> snark_work_fee mina))
         in
-        let (module S) = Mina_lib.work_selection_method mina in
-        S.pending_work_statements ~snark_pool ~fee_opt snark_job_state )
+        Work_selector.pending_work_statements ~snark_pool ~fee_opt
+          snark_job_state )
 
   module SnarkedLedgerMembership = struct
     let resolve_membership :

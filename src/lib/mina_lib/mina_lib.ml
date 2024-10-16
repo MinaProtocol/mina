@@ -64,7 +64,7 @@ type components =
   ; snark_pool : Network_pool.Snark_pool.t
   ; transition_frontier : Transition_frontier.t option Broadcast_pipe.Reader.t
   ; most_recent_valid_block :
-      Mina_block.initial_valid_block Broadcast_pipe.Reader.t
+      Mina_block.initial_valid_header Broadcast_pipe.Reader.t
   ; block_produced_bvar : (Transition_frontier.Breadcrumb.t, read_write) Bvar.t
   }
 
@@ -876,14 +876,13 @@ let request_work t =
 let work_selection_method t = t.config.work_selection_method
 
 let add_work t (work : Snark_worker_lib.Work.Result.t) =
-  let (module Work_selection_method) = t.config.work_selection_method in
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =
       Option.map (snark_worker_key t) ~f:(fun _ -> snark_work_fee t)
     in
     let pending_work =
-      Work_selection_method.pending_work_statements ~snark_pool ~fee_opt
+      Work_selector.pending_work_statements ~snark_pool ~fee_opt
         t.snark_job_state
       |> List.length
     in
@@ -895,7 +894,7 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
      * If the diff is accepted then remove it from the seen jobs.
      * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
-    Work_selection_method.remove t.snark_job_state spec
+    Work_selector.remove t.snark_job_state spec
   in
   ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
   Network_pool.Snark_pool.Local_sink.push t.pipes.snark_local_sink
@@ -1927,7 +1926,8 @@ let create ~commit_id ?wallets (config : Config.t) =
           |> Deferred.don't_wait_for ;
           let most_recent_valid_block_reader, most_recent_valid_block_writer =
             Broadcast_pipe.create
-              ( Mina_block.genesis ~precomputed_values:config.precomputed_values
+              ( Mina_block.genesis_header
+                  ~precomputed_values:config.precomputed_values
               |> Validation.reset_frontier_dependencies_validation
               |> Validation.reset_staged_ledger_diff_validation )
           in
