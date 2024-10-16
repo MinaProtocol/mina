@@ -331,12 +331,12 @@ let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_kp = Util.snapp_keypair_of_file zkapp_keyfile in
+  let logger = Logger.create () in
   let%bind ledger =
-    let%map config_json = Genesis_ledger_helper.load_config_json config_file in
-    let runtime_config =
-      Or_error.ok_exn config_json
-      |> Runtime_config.of_yojson |> Result.ok_or_failwith
+    let%map config_json =
+      Runtime_config.Json_loader.load_config_files ~logger [ config_file ]
     in
+    let runtime_config = Or_error.ok_exn config_json in
     let accounts =
       let config = Option.value_exn runtime_config.Runtime_config.ledger in
       match config.base with
