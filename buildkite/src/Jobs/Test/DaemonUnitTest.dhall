@@ -52,5 +52,5 @@ in  Pipeline.build
               , name = "DaemonUnitTest"
               , tags = [ PipelineTag.Type.VeryLong, PipelineTag.Type.Test ]
               }
-      , steps = [ buildTestCmd "dev" "src/lib" Size.XLarge ]
+      , steps = [ buildTestCmd "dev" "src/lib" Size.QA ]
       }

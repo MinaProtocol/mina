@@ -75,6 +75,9 @@ let build_artifacts
                         , "MINA_COMMIT_SHA1=\$BUILDKITE_COMMIT"
                         , "MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                  spec.debVersion}"
+                        , "DUNE_CACHE"
+                        , "DUNE_CACHE_STORAGE_MODE"
+                        , "XDG_CACHE_HOME"
                         , Network.foldMinaBuildMainnetEnv spec.networks
                         ]
                       # BuildFlags.buildEnvs spec.buildFlags
@@ -92,7 +95,7 @@ let build_artifacts
                                                          spec.profile} ${BuildFlags.toSuffixUppercase
                                                                            spec.buildFlags}"
             , key = "build-deb-pkg"
-            , target = Size.XLarge
+            , target = Size.QA
             , retries =
               [ Command.Retry::{
                 , exit_status = Command.ExitStatus.Code +2
