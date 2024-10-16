@@ -10,7 +10,6 @@ import (
 
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
-	ipld "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
 )
 
@@ -144,7 +143,7 @@ func kickStartRootDownload(root_ BitswapBlockLink, tag BitswapDataTag, bs Bitswa
 		copy(rootBlock, b)
 		return nil
 	}
-	if err := bs.ViewBlock(root_, rootBlockViewF); err != nil && err != (ipld.ErrNotFound{Cid: codanet.BlockHashToCid(root_)}) {
+	if err := bs.ViewBlock(root_, rootBlockViewF); err != nil && !isBlockNotFound(root_, err) {
 		handleError(err)
 		return
 	}
@@ -328,7 +327,7 @@ func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 			b, _ := blocks.NewBlockWithCid(blockBytes, childId)
 			blocksToProcess = append(blocksToProcess, b)
 		} else {
-			if err != (ipld.ErrNotFound{Cid: codanet.BlockHashToCid(link)}) {
+			if !isBlockNotFound(link, err) {
 				// we still schedule blocks for downloading
 				// this case should rarely happen in practice
 				bitswapLogger.Warnf("Failed to retrieve block %s from storage: %s", childId, err)
