@@ -8,11 +8,20 @@ let Command = ../../Command/Base.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
+let Profiles = ../../Constants/Profiles.dhall
+
 let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
+
+let dependsOn =
+      DebianVersions.dependsOn
+        DebianVersions.DebVersion.Bullseye
+        Profiles.Type.Standard
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -42,6 +51,7 @@ in  Pipeline.build
             , key = "zkapp-metrics"
             , target = Size.Medium
             , docker = None Docker.Type
+            , depends_on = dependsOn
             }
         ]
       }
