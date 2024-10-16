@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_bits
 open Snark_params.Tick
@@ -287,12 +285,6 @@ module type Full = sig
     include Arithmetic_intf with type t := t
 
     include Codable.S with type t := t
-
-    val minimum_user_command_fee : t
-
-    val default_transaction_fee : t
-
-    val default_snark_worker_fee : t
 
     (* TODO: Get rid of signed fee, use signed amount *)
     module Signed :

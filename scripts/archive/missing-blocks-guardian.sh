@@ -26,6 +26,8 @@ usage() {
     echo ""
     echo "  Optional:"
     echo "    MISSING_BLOCKS_AUDITOR  Path to the missing-blocks-auditor exe (default: mina-missing-blocks-auditor)"
+    echo "    ARCHIVE_BLOCKS          Path to the archive blocks exe (default: mina-archive-blocks)"
+    echo "    BLOCKS_FORMAT           Block format type. Possible values: [precomputed/extensional] (default: precomputed)"
     echo "    TIMEOUT                 Time to sleep in seconds when in daemon mode. After recovery it will sleep six times more (default: 600)"
     echo ""
     echo "Example:"
@@ -77,7 +79,17 @@ check_env_vars() {
       echo -e "[INFO] The MISSING_BLOCKS_AUDITOR environment variable is not set or is empty. Defaulting to \033[31mmina-missing-block-auditor\e[m."
       MISSING_BLOCKS_AUDITOR=mina-missing-blocks-auditor
   fi
+
+  if [ -z "$BLOCKS_FORMAT" ]; then
+      echo -e "[INFO] The BLOCKS_FORMAT environment variable is not set or is empty. Defaulting to \033[31mprecomputed\e[m."
+      BLOCKS_FORMAT=precomputed
+  fi
   
+  if [ -z "$ARCHIVE_BLOCKS" ]; then
+      echo -e "[INFO] The ARCHIVE_BLOCKS environment variable is not set or is empty. Defaulting to \033[31mmina-archive-blocks\e[m."
+      ARCHIVE_BLOCKS=mina-archive-blocks
+  fi
+
   if [ -z "$TIMEOUT" ]; then
       echo -e "[INFO] The TIMEOUT environment variable is not set or is empty. Defaulting to \033[31m600\e[m."
       TIMEOUT=600
@@ -95,7 +107,9 @@ jq_parent_hash() {
 
 populate_db() {
   tempfile=$(mktemp)
-  mina-archive-blocks --precomputed --archive-uri "${1}" "${2}" > tempfile
+  echo  "${ARCHIVE_BLOCKS} --${BLOCKS_FORMAT} --archive-uri ${1} ${2}"
+  ${ARCHIVE_BLOCKS} "--${BLOCKS_FORMAT}" --archive-uri "${1}" "${2}" > tempfile
+  
   if [ $? -ne 0 ]; then
     echo $'[ERROR] mina-archive-blocks failed. The database remains unhealthy.\n Make sure the environment variables are set correctly and the database is accessible.'
     rm "${2}" tempfile

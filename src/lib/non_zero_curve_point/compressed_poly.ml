@@ -1,7 +1,5 @@
 (* compressed_poly.ml -- versioned type with parameters for compressed curve point *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 
 module Poly = struct

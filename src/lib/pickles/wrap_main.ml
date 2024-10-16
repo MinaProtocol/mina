@@ -163,7 +163,7 @@ let wrap_main
           , _
           , Field.t )
           Types.Wrap.Statement.In_circuit.t ) ->
-      let logger = Internal_tracing_context_logger.get () in
+      let logger = Context_logger.get () in
       with_label __LOC__ (fun () ->
           let which_branch' =
             exists

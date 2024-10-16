@@ -105,6 +105,7 @@ end)
     ; write_broadcasts : Resource_pool.Diff.t With_nonce.t Linear_pipe.Writer.t
     ; read_broadcasts : Resource_pool.Diff.t With_nonce.t Linear_pipe.Reader.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
+    ; block_window_duration : Time.Span.t
     }
 
   let resource_pool { resource_pool; _ } = resource_pool
@@ -167,7 +168,7 @@ end)
     | Transition_frontier_extension of Resource_pool.transition_frontier_diff
 
   let of_resource_pool_and_diffs resource_pool ~logger ~constraint_constants
-      ~tf_diffs ~log_gossip_heard ~on_remote_push =
+      ~tf_diffs ~log_gossip_heard ~on_remote_push ~block_window_duration =
     let read_broadcasts, write_broadcasts = Linear_pipe.create () in
     let network_pool =
       { resource_pool
@@ -175,6 +176,7 @@ end)
       ; read_broadcasts
       ; write_broadcasts
       ; constraint_constants
+      ; block_window_duration
       }
     in
     let remote_r, remote_w, remote_rl =
@@ -183,6 +185,7 @@ end)
         ~unwrap:(function
           | Diff m -> m | _ -> failwith "unexpected message type" )
         ~trace_label:Resource_pool.label ~logger resource_pool
+        ~block_window_duration
     in
     let local_r, local_w, _ =
       Local_sink.create
@@ -190,6 +193,7 @@ end)
         ~unwrap:(function
           | Diff m -> m | _ -> failwith "unexpected message type" )
         ~trace_label:Resource_pool.label ~logger resource_pool
+        ~block_window_duration
     in
     log_rate_limiter_occasionally network_pool remote_rl ;
     (*priority: Transition frontier diffs > local diffs > incoming diffs*)
@@ -262,7 +266,8 @@ end)
     go ()
 
   let create ~config ~constraint_constants ~consensus_constants ~time_controller
-      ~frontier_broadcast_pipe ~logger ~log_gossip_heard ~on_remote_push =
+      ~frontier_broadcast_pipe ~logger ~log_gossip_heard ~on_remote_push
+      ~block_window_duration =
     (* Diffs from transition frontier extensions *)
     let tf_diff_reader, tf_diff_writer =
       Strict_pipe.(
@@ -274,7 +279,7 @@ end)
            ~time_controller ~config ~logger ~frontier_broadcast_pipe
            ~tf_diff_writer )
         ~constraint_constants ~logger ~tf_diffs:tf_diff_reader ~log_gossip_heard
-        ~on_remote_push
+        ~on_remote_push ~block_window_duration
     in
     O1trace.background_thread rebroadcast_loop_thread_label (fun () ->
         rebroadcast_loop t logger ) ;

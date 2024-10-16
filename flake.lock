@@ -1,5 +1,51 @@
 {
   "nodes": {
+    "describe-dune": {
+      "inputs": {
+        "flake-utils": [
+          "utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1724407960,
+        "narHash": "sha256-pUKTVMYEtsD1AGlHFTdPourowt+tJ3htKhRu7VALFzc=",
+        "owner": "o1-labs",
+        "repo": "describe-dune",
+        "rev": "be828239c05671209e979f9d5c2e3094e3be7a46",
+        "type": "github"
+      },
+      "original": {
+        "owner": "o1-labs",
+        "repo": "describe-dune",
+        "type": "github"
+      }
+    },
+    "dune-nix": {
+      "inputs": {
+        "flake-utils": [
+          "utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1724418497,
+        "narHash": "sha256-HjTh7o02QhGXmbxmpE5HRWei3H/pyh/NKCMCnucDaYs=",
+        "owner": "o1-labs",
+        "repo": "dune-nix",
+        "rev": "26dc164a4c3976888e13eabd73a210b78505820f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "o1-labs",
+        "repo": "dune-nix",
+        "type": "github"
+      }
+    },
     "flake-buildkite-pipeline": {
       "inputs": {
         "nixpkgs-lib": "nixpkgs-lib"
@@ -277,6 +323,22 @@
         "type": "github"
       }
     },
+    "o1-opam-repository": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1715294616,
+        "narHash": "sha256-W2p9Vs8PqpKGvMByxVqpxAljjpEMqNcuNnjMBAAKicI=",
+        "owner": "o1-labs",
+        "repo": "opam-repository",
+        "rev": "38d6995e307c82b3c0b3bc86a867213db724d1c5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "o1-labs",
+        "repo": "opam-repository",
+        "type": "github"
+      }
+    },
     "opam-nix": {
       "inputs": {
         "flake-compat": "flake-compat_2",
@@ -360,6 +422,8 @@
     },
     "root": {
       "inputs": {
+        "describe-dune": "describe-dune",
+        "dune-nix": "dune-nix",
         "flake-buildkite-pipeline": "flake-buildkite-pipeline",
         "flake-compat": "flake-compat",
         "flockenzeit": "flockenzeit",
@@ -370,6 +434,7 @@
         "nix-utils": "nix-utils",
         "nixpkgs": "nixpkgs_2",
         "nixpkgs-mozilla": "nixpkgs-mozilla",
+        "o1-opam-repository": "o1-opam-repository",
         "opam-nix": "opam-nix",
         "opam-repository": "opam-repository",
         "utils": "utils"

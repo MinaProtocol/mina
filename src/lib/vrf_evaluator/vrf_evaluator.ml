@@ -76,12 +76,18 @@ module Worker_state = struct
     { constraint_constants : Genesis_constants.Constraint_constants.t
     ; consensus_constants : Consensus.Constants.Stable.Latest.t
     ; conf_dir : string
-    ; logger : Logger.Stable.Latest.t
+    ; logger : Logger.t
+    ; commit_id : string
     }
   [@@deriving bin_io_unversioned]
 
   let context_of_config
-      ({ constraint_constants; consensus_constants; logger; conf_dir = _ } :
+      ({ constraint_constants
+       ; consensus_constants
+       ; logger
+       ; conf_dir = _
+       ; commit_id = _
+       } :
         init_arg ) : (module CONTEXT) =
     ( module struct
       let constraint_constants = constraint_constants
@@ -385,10 +391,11 @@ module Worker = struct
         let max_size = 200 * 1024 * 1024 in
         let num_rotate = 1 in
         Logger.Consumer_registry.register ~id:"default"
-          ~processor:(Logger.Processor.raw ())
+          ~commit_id:init_arg.commit_id ~processor:(Logger.Processor.raw ())
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:init_arg.conf_dir
-               ~log_filename:"mina-vrf-evaluator.log" ~max_size ~num_rotate ) ;
+               ~log_filename:"mina-vrf-evaluator.log" ~max_size ~num_rotate )
+          () ;
         [%log info] "Vrf_evaluator started" ;
         return (Worker_state.create init_arg)
 
@@ -407,7 +414,7 @@ let update_block_producer_keys { connection; process = _ } ~keypairs =
     ~arg:(Keypair.And_compressed_pk.Set.to_list keypairs)
 
 let create ~constraint_constants ~pids ~consensus_constants ~conf_dir ~logger
-    ~keypairs =
+    ~keypairs ~commit_id =
   let on_failure err =
     [%log error] "VRF evaluator process failed with error $err"
       ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
@@ -417,7 +424,7 @@ let create ~constraint_constants ~pids ~consensus_constants ~conf_dir ~logger
   let%bind connection, process =
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
       ~on_failure ~shutdown_on:Connection_closed ~connection_state_init_arg:()
-      { constraint_constants; consensus_constants; conf_dir; logger }
+      { constraint_constants; consensus_constants; conf_dir; logger; commit_id }
   in
   [%log info]
     "Daemon started process of kind $process_kind with pid $vrf_evaluator_pid"

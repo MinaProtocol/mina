@@ -23,11 +23,27 @@ type Structured_log_events.t +=
 module type CONTEXT = sig
   val logger : Logger.t
 
+  val time_controller : Block_time.Controller.t
+
+  val trust_system : Trust_system.t
+
+  val consensus_local_state : Consensus.Data.Local_state.t
+
   val precomputed_values : Precomputed_values.t
 
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val commit_id : string
+
+  val vrf_poll_interval : Time.Span.t
+
+  val zkapp_cmd_limit : int option ref
+
+  val compaction_interval : Time.Span.t option
+
+  val compile_config : Mina_compile_config.t
 end
 
 exception Snark_worker_error of int
@@ -41,6 +57,8 @@ exception Bootstrap_stuck_shutdown
 val time_controller : t -> Block_time.Controller.t
 
 val subscription : t -> Mina_subscriptions.t
+
+val commit_id : t -> string
 
 val daemon_start_time : Time_ns.t
 
@@ -175,7 +193,8 @@ val start_with_precomputed_blocks :
 
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
-val create : ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
+val create :
+  commit_id:string -> ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
 
 val staged_ledger_ledger_proof : t -> Ledger_proof.t option
 
@@ -208,6 +227,8 @@ val net : t -> Mina_networking.t
 
 val runtime_config : t -> Runtime_config.t
 
+val compile_config : t -> Mina_compile_config.t
+
 val start_filtered_log : t -> string list -> unit Or_error.t
 
 val get_filtered_log_entries : t -> int -> string list * bool
@@ -225,3 +246,5 @@ val best_chain_block_by_height :
 
 val best_chain_block_by_state_hash :
   t -> State_hash.t -> (Transition_frontier.Breadcrumb.t, string) Result.t
+
+val zkapp_cmd_limit : t -> int option ref

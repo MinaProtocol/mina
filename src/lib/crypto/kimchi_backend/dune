@@ -20,7 +20,6 @@
   kimchi_types
   pasta_bindings
   snarkette
-  snarky.backendless
   key_cache
   hex
   kimchi_backend_common

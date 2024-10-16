@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 type uint64 = Unsigned.uint64
 
 (** Here, we simply include the full expected signature, while clarifying that

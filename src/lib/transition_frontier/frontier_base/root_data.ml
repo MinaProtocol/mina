@@ -29,18 +29,11 @@ module Common = struct
 end
 
 module Historical = struct
-  [%%versioned
-  module Stable = struct
-    module V3 = struct
-      type t =
-        { transition : Mina_block.Validated.Stable.V2.t
-        ; common : Common.Stable.V2.t
-        ; staged_ledger_target_ledger_hash : Ledger_hash.Stable.V1.t
-        }
-
-      let to_latest = Fn.id
-    end
-  end]
+  type t =
+    { transition : Mina_block.Validated.t
+    ; common : Common.t
+    ; staged_ledger_target_ledger_hash : Ledger_hash.t
+    }
 
   let transition t = t.transition
 

@@ -9,7 +9,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -n|--name) NAME="$2"; shift;;
   -v|--version) VERSION="$2"; shift;;
   -t|--tag) TAG="$2"; shift;;
-  -p|--publish) PUBLISH=1 ;;
+  -p|--publish) PUBLISH=1; ;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
@@ -43,7 +43,9 @@ echo "Adding new tag ($TAG) for docker ${GCR_REPO}/${NAME}:${VERSION}"
 
 docker pull ${GCR_REPO}/${NAME}:${VERSION}
 
-if [[ "$PUBLISH" -eq 1 ]]; then
+source buildkite/scripts/export-git-env-vars.sh
+
+if [[ -v PUBLISH ]]; then
   TARGET_REPO=docker.io/minaprotocol
   docker tag ${GCR_REPO}/${NAME}:${VERSION} ${TARGET_REPO}/${NAME}:${TAG}
   docker push "${TARGET_REPO}/${NAME}:${TAG}"

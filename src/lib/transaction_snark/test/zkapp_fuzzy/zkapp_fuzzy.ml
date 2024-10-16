@@ -105,9 +105,11 @@ let generate_zkapp_commands_and_apply_them_consecutively_5_times ~successful
     let zkapp_command_dummy_auths =
       Quickcheck.Generator.generate ~size:10 ~random
         (Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-           ~global_slot ~protocol_state_view:U.genesis_state_view
-           ~account_state_tbl ~fee_payer_keypair:fee_payer_keypairs.(i)
-           ~max_account_updates ~keymap ~ledger ~vk () )
+           ~constraint_constants:U.constraint_constants
+           ~genesis_constants:U.genesis_constants ~global_slot
+           ~protocol_state_view:U.genesis_state_view ~account_state_tbl
+           ~fee_payer_keypair:fee_payer_keypairs.(i) ~max_account_updates
+           ~keymap ~ledger ~vk () )
     in
     let%bind.Deferred zkapp_command =
       Zkapp_command_builder.replace_authorizations ~prover ~keymap
@@ -155,7 +157,9 @@ let generate_zkapp_commands_and_apply_them_freshly ~successful
   let zkapp_command_dummy_auths =
     Quickcheck.Generator.generate ~size:10 ~random
       (Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-         ~global_slot ~protocol_state_view:U.genesis_state_view
+         ~constraint_constants:U.constraint_constants
+         ~genesis_constants:U.genesis_constants ~global_slot
+         ~protocol_state_view:U.genesis_state_view
          ~fee_payer_keypair:fee_payer_keypairs.(0) ~max_account_updates ~keymap
          ~ledger ~vk () )
   in
@@ -201,8 +205,9 @@ let mk_invalid_test ~successful ~max_account_updates ~type_of_failure
   let zkapp_command_dummy_auths =
     Quickcheck.Generator.generate ~size:10 ~random
       (Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-         ~global_slot ~failure:type_of_failure
-         ~protocol_state_view:U.genesis_state_view
+         ~constraint_constants:U.constraint_constants
+         ~genesis_constants:U.genesis_constants ~global_slot
+         ~failure:type_of_failure ~protocol_state_view:U.genesis_state_view
          ~fee_payer_keypair:fee_payer_keypairs.(0) ~max_account_updates ~keymap
          ~ledger ~vk () )
   in
@@ -256,6 +261,8 @@ let test_timed_account ~successful ~max_account_updates ~individual_test_timeout
   let zkapp_command_dummy_auths =
     Quickcheck.Generator.generate ~size:10 ~random
       (Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
+         ~constraint_constants:U.constraint_constants
+         ~genesis_constants:U.genesis_constants
          ~protocol_state_view:U.genesis_state_view
          ~fee_payer_keypair:fee_payer_keypairs.(0) ~max_account_updates ~keymap
          ~ledger ~vk () )

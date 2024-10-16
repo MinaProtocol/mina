@@ -101,14 +101,18 @@ let%test_module "Zkapp with optional custom gates" =
 
     let%test_unit "Zkapp using a combination of optional custom gates verifies"
         =
+      Async.Thread_safe.block_on_async_exn
+      @@ fun () ->
+      let%map.Async_kernel.Deferred vk =
+        Pickles.Side_loaded.Verification_key.of_compiled Circuits.tag
+      in
       let account_update = Lazy.force account_update in
       let account_updates =
         []
         |> Zkapp_command.Call_forest.cons_tree account_update
         |> Zkapp_command.Call_forest.cons
              (Zkapps_examples.Deploy_account_update.full ~access:Either
-                Account_info.public_key Account_info.token_id
-                (Pickles.Side_loaded.Verification_key.of_compiled Circuits.tag) )
+                Account_info.public_key Account_info.token_id vk )
       in
       test_zkapp_command account_updates ~fee_payer_pk:Account_info.public_key
         ~signers:

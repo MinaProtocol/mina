@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base_util
 open Snark_params.Tick
@@ -14,6 +12,10 @@ module type Type = sig
   type t
 end
 
+module Events = Zkapp_account.Events
+module Actions = Zkapp_account.Actions
+module Zkapp_uri = Zkapp_account.Zkapp_uri
+
 module Authorization_kind = struct
   [%%versioned
   module Stable = struct
@@ -22,19 +24,7 @@ module Authorization_kind = struct
       type t =
             Mina_wire_types.Mina_base.Account_update.Authorization_kind.V1.t =
         | Signature
-        | Proof of
-            (Field.t
-            [@version_asserted]
-            [@to_yojson fun t -> `String (Snark_params.Tick.Field.to_string t)]
-            [@of_yojson
-              function
-              | `String s ->
-                  let field = Snark_params.Tick.Field.of_string s in
-                  let s' = Snark_params.Tick.Field.to_string field in
-                  if String.equal s s' then Ok field
-                  else Error "Invalid JSON for field"
-              | _ ->
-                  Error "expected JSON string"] )
+        | Proof of (Field.t[@version_asserted])
         | None_given
       [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -477,8 +467,17 @@ module May_use_token = struct
 
   let deriver obj =
     let open Fields_derivers_zkapps in
-    iso_record ~of_record:As_record.to_variant ~to_record:As_record.of_variant
-      As_record.deriver obj
+    let may_use_token =
+      iso_record ~of_record:As_record.to_variant ~to_record:As_record.of_variant
+        As_record.deriver
+    in
+    needs_custom_js
+      ~js_type:
+        (js_record
+           [ ("parentsOwnToken", js_layout bool)
+           ; ("inheritFromParent", js_layout bool)
+           ] )
+      ~name:"MayUseToken" may_use_token obj
 
   module Checked = struct
     type t = Boolean.var As_record.t
@@ -681,7 +680,7 @@ module Update = struct
         ; verification_key :
             Verification_key_wire.Stable.V1.t Set_or_keep.Stable.V1.t
         ; permissions : Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
-        ; zkapp_uri : Bounded_types.String.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; zkapp_uri : Zkapp_uri.Stable.V1.t Set_or_keep.Stable.V1.t
         ; token_symbol :
             Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
         ; timing : Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
@@ -932,9 +931,6 @@ module Update = struct
          ~voting_for:!.(Set_or_keep.deriver State_hash.deriver)
          obj
 end
-
-module Events = Zkapp_account.Events
-module Actions = Zkapp_account.Actions
 
 module Account_precondition = struct
   [%%versioned

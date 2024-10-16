@@ -119,6 +119,8 @@ module String = struct
         module With_all_version_tags = Stable.V1
       end
     end
+
+    include Stable.V1
   end
 
   module Of_stringable (M : Stringable.S) =

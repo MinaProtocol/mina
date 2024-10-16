@@ -1,5 +1,3 @@
-[%%import "../../config.mlh"]
-
 open Core_kernel
 open Async
 open Unsigned
@@ -284,97 +282,85 @@ let create_genesis_data () =
   in
   (genesis_transition, Or_error.ok_exn genesis_staged_ledger_res)
 
-[%%if proof_level = "full"]
-
 let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
     (chain : Blockchain.t) (next_state : Protocol_state.Value.t)
     (block : Snark_transition.value) state_for_handler pending_coinbase =
-  let wrap hash proof =
-    let module Wrap = Keys.Wrap in
-    Tock.prove
-      (Tock.Keypair.pk Wrap.keys)
-      Wrap.input
-      { Wrap.Prover_state.proof }
-      Wrap.main
-      (Wrap_input.of_tick_field hash)
-  in
-  let next_state_top_hash = Keys.Step.instance_hash next_state in
-  let prover_state =
-    { Keys.Step.Prover_state.prev_proof = chain.proof
-    ; wrap_vk = Tock.Keypair.vk Keys.Wrap.keys
-    ; prev_state = chain.state
-    ; expected_next_state = Some next_state
-    ; update = block
-    }
-  in
-  let main x =
-    Tick.handle (Keys.Step.main ~logger x)
-      (Consensus.Data.Prover_state.handler state_for_handler ~pending_coinbase)
-  in
-  let res =
-    Or_error.try_with ~here:[%here] (fun () ->
-        let prev_proof =
-          Tick.prove
-            (Tick.Keypair.pk Keys.Step.keys)
-            (Keys.Step.input ()) prover_state main next_state_top_hash
-        in
-        { Blockchain.state = next_state
-        ; proof = wrap next_state_top_hash prev_proof
-        } )
-  in
-  Or_error.iter_error res ~f:(fun e ->
-      [%log error]
-        ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-        "Prover threw an error while extending block: $error" ) ;
-  res
-
-[%%elif proof_level = "check"]
-
-let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
-    (chain : Blockchain.t) (next_state : Protocol_state.Value.t)
-    (block : Snark_transition.value) state_for_handler pending_coinbase =
-  let next_state_top_hash = Keys.Step.instance_hash next_state in
-  let prover_state =
-    { Keys.Step.Prover_state.prev_proof = chain.proof
-    ; wrap_vk = Tock.Keypair.vk Keys.Wrap.keys
-    ; prev_state = chain.state
-    ; expected_next_state = Some next_state
-    ; update = block
-    ; genesis_state_hash = With_hash.hash genesis_protocol_state
-    }
-  in
-  let main x =
-    Tick.handle (Keys.Step.main ~logger x)
-      (Consensus.Data.Prover_state.handler state_for_handler ~pending_coinbase)
-  in
-  let res =
-    Or_error.map
-      (Tick.check
-         (main @@ Tick.Field.Var.constant next_state_top_hash)
-         prover_state )
-      ~f:(fun () ->
-        { Blockchain.state = next_state
-        ; proof = precomputed_values.genesis_proof
-        } )
-  in
-  Or_error.iter_error res ~f:(fun e ->
-      [%log error]
-        ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-        "Prover threw an error while extending block: $error" ) ;
-  res
-
-[%%elif proof_level = "none"]
-
-let prove_blockchain ~logger:_ _ _ _ _ _ _ =
-  failwith "cannot run fuzzer with proof_level = \"none\""
-
-[%%else]
-
-[%%show proof_level]
-
-[%%error "invalid proof_level"]
-
-[%%endif]
+  match Node_config.proof_level with
+  | "full" ->
+      let wrap hash proof =
+        let module Wrap = Keys.Wrap in
+        Tock.prove
+          (Tock.Keypair.pk Wrap.keys)
+          Wrap.input
+          { Wrap.Prover_state.proof }
+          Wrap.main
+          (Wrap_input.of_tick_field hash)
+      in
+      let next_state_top_hash = Keys.Step.instance_hash next_state in
+      let prover_state =
+        { Keys.Step.Prover_state.prev_proof = chain.proof
+        ; wrap_vk = Tock.Keypair.vk Keys.Wrap.keys
+        ; prev_state = chain.state
+        ; expected_next_state = Some next_state
+        ; update = block
+        }
+      in
+      let main x =
+        Tick.handle (Keys.Step.main ~logger x)
+          (Consensus.Data.Prover_state.handler state_for_handler
+             ~pending_coinbase )
+      in
+      let res =
+        Or_error.try_with ~here:[%here] (fun () ->
+            let prev_proof =
+              Tick.prove
+                (Tick.Keypair.pk Keys.Step.keys)
+                (Keys.Step.input ()) prover_state main next_state_top_hash
+            in
+            { Blockchain.state = next_state
+            ; proof = wrap next_state_top_hash prev_proof
+            } )
+      in
+      Or_error.iter_error res ~f:(fun e ->
+          [%log error]
+            ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+            "Prover threw an error while extending block: $error" ) ;
+      res
+  | "check" ->
+      let next_state_top_hash = Keys.Step.instance_hash next_state in
+      let prover_state =
+        { Keys.Step.Prover_state.prev_proof = chain.proof
+        ; wrap_vk = Tock.Keypair.vk Keys.Wrap.keys
+        ; prev_state = chain.state
+        ; expected_next_state = Some next_state
+        ; update = block
+        ; genesis_state_hash = With_hash.hash genesis_protocol_state
+        }
+      in
+      let main x =
+        Tick.handle (Keys.Step.main ~logger x)
+          (Consensus.Data.Prover_state.handler state_for_handler
+             ~pending_coinbase )
+      in
+      let res =
+        Or_error.map
+          (Tick.check
+             (main @@ Tick.Field.Var.constant next_state_top_hash)
+             prover_state )
+          ~f:(fun () ->
+            { Blockchain.state = next_state
+            ; proof = precomputed_values.genesis_proof
+            } )
+      in
+      Or_error.iter_error res ~f:(fun e ->
+          [%log error]
+            ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+            "Prover threw an error while extending block: $error" ) ;
+      res
+  | "none" ->
+      failwith "cannot run fuzzer with proof_level = \"none\""
+  | _ ->
+      failwith "invalid proof_level"
 
 (* TODO: update stakers' relative local_states *)
 let propose_block_onto_chain ~logger ~keys

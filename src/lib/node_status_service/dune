@@ -26,7 +26,6 @@
    logger
    rfc3339_time
    transition_frontier_base
-   mina_version
    node_addrs_and_ports
    block_time
    mina_numbers

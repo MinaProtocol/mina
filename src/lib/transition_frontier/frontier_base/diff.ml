@@ -5,53 +5,10 @@ type full = Full
 
 type lite = Lite
 
-[@@@alert "-deprecated"]
-
-module Dummy_binable1 (T : sig
-  type 'a t
-end) =
-  Binable.Of_binable1
-    (struct
-      type 'a t = unit [@@deriving bin_io_unversioned]
-    end)
-    (struct
-      type 'a t = 'a T.t
-
-      let to_binable _ = ()
-
-      let of_binable _ = assert false
-    end)
-
-module Dummy_binable2 (T : sig
-  type (_, _) t
-end) =
-  Binable.Of_binable2
-    (struct
-      type (_, _) t = unit [@@deriving bin_io_unversioned]
-    end)
-    (struct
-      type ('a, 'b) t = ('a, 'b) T.t
-
-      let to_binable _ = ()
-
-      let of_binable _ = assert false
-    end)
-
-[@@@alert "+deprecated"]
-
 module Node = struct
-  [%%versioned_binable
-  module Stable = struct
-    module V3 = struct
-      type 'a t =
-        | Full : Breadcrumb.t -> full t
-        | Lite : Mina_block.Validated.Stable.V2.t -> lite t
-
-      include Dummy_binable1 (struct
-        type nonrec 'a t = 'a t
-      end)
-    end
-  end]
+  type 'a t =
+    | Full : Breadcrumb.t -> full t
+    | Lite : Mina_block.Validated.Stable.V2.t -> lite t
 end
 
 module Node_list = struct
@@ -187,28 +144,12 @@ module Root_transition = struct
   end
 end
 
-module T = struct
-  [%%versioned_binable
-  module Stable = struct
-    module V2 = struct
-      type ('repr, 'mutant) t =
-        | New_node : 'repr Node.Stable.V3.t -> ('repr, unit) t
-        | Root_transitioned : 'repr Root_transition.t -> ('repr, State_hash.t) t
-        | Best_tip_changed : State_hash.t -> (_, State_hash.t) t
-
-      include Dummy_binable2 (struct
-        type nonrec ('a, 'b) t = ('a, 'b) t
-      end)
-    end
-  end]
-end
-
-type ('repr, 'mutant) t = ('repr, 'mutant) T.t =
+type ('repr, 'mutant) t =
   | New_node : 'repr Node.t -> ('repr, unit) t
   | Root_transitioned : 'repr Root_transition.t -> ('repr, State_hash.t) t
   | Best_tip_changed : State_hash.t -> (_, State_hash.t) t
 
-type ('repr, 'mutant) diff = ('repr, 'mutant) T.t
+type ('repr, 'mutant) diff = ('repr, 'mutant) t
 
 let name : type repr mutant. (repr, mutant) t -> string = function
   | Root_transitioned _ ->
@@ -266,73 +207,11 @@ let to_lite (type mutant) (diff : (full, mutant) t) : (lite, mutant) t =
   | Best_tip_changed b ->
       Best_tip_changed b
 
-module Lite_binable = struct
-  [%%versioned
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
-
-    module V3 = struct
-      type t =
-        | New_node of Mina_block.Validated.Stable.V2.t
-        | Root_transitioned of Root_transition.Lite.Stable.V4.t
-        | Best_tip_changed of State_hash.Stable.V1.t
-
-      let to_latest = Fn.id
-    end
-  end]
-end
-
 module Lite = struct
   type 'mutant t = (lite, 'mutant) diff
 
   module E = struct
-    module Binable_arg = struct
-      [%%versioned
-      module Stable = struct
-        [@@@no_toplevel_latest_type]
-
-        module V3 = struct
-          type t = Lite_binable.Stable.V3.t
-
-          let to_latest = Fn.id
-        end
-      end]
-    end
-
-    [%%versioned_binable
-    module Stable = struct
-      [@@@no_toplevel_latest_type]
-
-      module V3 = struct
-        type t = E : (lite, 'mutant) diff -> t [@@unboxed]
-
-        module T_nonbinable = struct
-          type nonrec t = t
-
-          let to_binable = function
-            | E (New_node (Lite x)) ->
-                (New_node x : Binable_arg.Stable.V3.t)
-            | E (Root_transitioned x) ->
-                Root_transitioned x
-            | E (Best_tip_changed x) ->
-                Best_tip_changed x
-
-          let of_binable = function
-            | (New_node x : Binable_arg.Stable.V3.t) ->
-                E (New_node (Lite x))
-            | Root_transitioned x ->
-                E (Root_transitioned x)
-            | Best_tip_changed x ->
-                E (Best_tip_changed x)
-        end
-
-        include Binable.Of_binable (Binable_arg.Stable.V3) (T_nonbinable)
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    include (Stable.Latest : module type of Stable.Latest)
+    type t = E : (lite, 'mutant) diff -> t [@@unboxed]
   end
 end
 

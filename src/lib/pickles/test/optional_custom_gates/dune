@@ -38,7 +38,6 @@
   pickles.limb_vector
   pickles_base
   kimchi_backend
-  mina_version
   base58_check
   codable
   random_oracle_input
@@ -54,7 +53,7 @@
   promise
   kimchi_backend_common
   logger
-  internal_tracing.context_logger
+  logger.context_logger
   ppx_version.runtime
   error_json
   pickles_optional_custom_gates_circuits)

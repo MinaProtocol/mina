@@ -15,6 +15,7 @@ in  Pipeline.build
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon
+            , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.BatchTxn
             , Artifacts.Type.Rosetta

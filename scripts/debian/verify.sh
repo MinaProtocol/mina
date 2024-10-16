@@ -37,7 +37,6 @@ SCRIPT=' set -x \
     '
 
 case $CODENAME in
-  buster) DOCKER_IMAGE="debian:buster" ;;
   bullseye) DOCKER_IMAGE="debian:bullseye" ;;
   focal) DOCKER_IMAGE="ubuntu:focal" ;;
   *) echo "Unknown codename passed: $CODENAME"; exit 1;;

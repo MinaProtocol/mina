@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Pickles.Impls.Step.Internal_Basic
 

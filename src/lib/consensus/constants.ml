@@ -306,8 +306,8 @@ let for_unit_tests =
   lazy
     (create
        ~constraint_constants:
-         Genesis_constants.Constraint_constants.for_unit_tests
-       ~protocol_constants:Genesis_constants.for_unit_tests.protocol )
+         Genesis_constants.For_unit_tests.Constraint_constants.t
+       ~protocol_constants:Genesis_constants.For_unit_tests.t.protocol )
 
 let to_protocol_constants
     ({ k
@@ -454,9 +454,9 @@ end
 
 let%test_unit "checked = unchecked" =
   let open Mina_base in
-  let for_unit_tests = Genesis_constants.for_unit_tests.protocol in
+  let for_unit_tests = Genesis_constants.For_unit_tests.t.protocol in
   let constraint_constants =
-    Genesis_constants.Constraint_constants.for_unit_tests
+    Genesis_constants.For_unit_tests.Constraint_constants.t
   in
   let test =
     Test_util.test_equal Protocol_constants_checked.typ typ

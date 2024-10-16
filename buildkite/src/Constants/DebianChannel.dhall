@@ -1,7 +1,8 @@
 let Channel
     : Type
     = < Unstable
-      | Nightly
+      | NightlyDevelop
+      | NightlyCompatible
       | Itn
       | Umt
       | UmtMainnet
@@ -16,7 +17,8 @@ let capitalName =
           \(channel : Channel)
       ->  merge
             { Unstable = "Unstable"
-            , Nightly = "Nightly"
+            , NightlyDevelop = "NightlyDevelop"
+            , NightlyCompatible = "NightlyCompatible"
             , Itn = "Itn"
             , Umt = "Umt"
             , UmtMainnet = "UmtMainnet"
@@ -32,7 +34,8 @@ let lowerName =
           \(channel : Channel)
       ->  merge
             { Unstable = "unstable"
-            , Nightly = "nightly"
+            , NightlyDevelop = "nightly-develop"
+            , NightlyCompatible = "nightly-compatible"
             , Itn = "itn"
             , Umt = "umt"
             , UmtMainnet = "umt-mainnet"

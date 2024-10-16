@@ -183,9 +183,8 @@ let%test_module "Test transaction logic." =
                           Predicates.verify_balance_change ~balance_change orig
                             updt
                           && not
-                               Account.Poly.(
-                                 Account.Token_symbol.equal orig.token_symbol
-                                   updt.token_symbol)
+                               (Account.Token_symbol.equal orig.token_symbol
+                                  updt.token_symbol )
                       | _ ->
                           false ) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )

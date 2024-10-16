@@ -33,7 +33,6 @@
    mina_wire_types
  )
  (instrumentation (backend bisect_ppx))
- (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps
     h_list.ppx
@@ -42,6 +41,5 @@
     ppx_compare
     ppx_deriving_yojson
     ppx_hash
-    ppx_optcomp
     ppx_sexp_conv
     ppx_version)))

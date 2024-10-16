@@ -30,11 +30,6 @@ end
 
 module Sql = struct
   module Balance_from_last_relevant_command = struct
-    let max_txns =
-      Int.pow 2
-        Genesis_constants.Constraint_constants.compiled
-          .transaction_capacity_log_2
-
     let query_pending =
       Caqti_request.find_opt
         Caqti_type.(tup3 string int64 string)
@@ -268,6 +263,7 @@ module Balance = struct
                M.t
         ; validate_network_choice :
                network_identifier:Network_identifier.t
+            -> minimum_user_command_fee:Mina_currency.Fee.t
             -> graphql_uri:Uri.t
             -> (unit, Errors.t) M.t
         }
@@ -279,11 +275,15 @@ module Balance = struct
     (* But for tests, we want things to go fast *)
     module Mock = T (Result)
 
-    let real : with_db:_ -> graphql_uri:Uri.t -> 'gql Real.t =
-     fun ~with_db ~graphql_uri ->
+    let real :
+           with_db:_
+        -> graphql_uri:Uri.t
+        -> minimum_user_command_fee:Mina_currency.Fee.t
+        -> 'gql Real.t =
+     fun ~with_db ~graphql_uri ~minimum_user_command_fee ->
       { gql =
           (fun ?token_id ~address () ->
-            Graphql.query
+            Graphql.query ~minimum_user_command_fee
               Get_balance.(
                 make
                 @@ makeVariables ~public_key:(`String address)
@@ -342,16 +342,17 @@ module Balance = struct
 
     let handle :
            graphql_uri:Uri.t
+        -> minimum_user_command_fee:Mina_currency.Fee.t
         -> env:'gql E.t
         -> Account_balance_request.t
         -> (Account_balance_response.t, Errors.t) M.t =
-     fun ~graphql_uri ~env req ->
+     fun ~graphql_uri ~minimum_user_command_fee ~env req ->
       let open M.Let_syntax in
       let address = req.account_identifier.address in
       let%bind token_id = Token_id.decode req.account_identifier.metadata in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
-          ~graphql_uri
+          ~graphql_uri ~minimum_user_command_fee
       in
       let make_balance_amount ~liquid_balance ~total_balance =
         let amount =
@@ -448,7 +449,7 @@ module Balance = struct
           ~expected:
             (Mock.handle
                ~graphql_uri:(Uri.of_string "http://minaprotocol.com")
-               ~env:Env.mock
+               ~minimum_user_command_fee:Mina_currency.Fee.one ~env:Env.mock
                (Account_balance_request.create
                   (Network_identifier.create "x" "y")
                   (Account_identifier.create "x") ) )
@@ -487,7 +488,7 @@ module Balance = struct
           ~expected:
             (Mock.handle
                ~graphql_uri:(Uri.of_string "http://minaprotocol.com")
-               ~env:Env.mock
+               ~minimum_user_command_fee:Mina_currency.Fee.one ~env:Env.mock
                Account_balance_request.
                  { block_identifier =
                      Some
@@ -528,7 +529,8 @@ module Balance = struct
     end )
 end
 
-let router ~graphql_uri ~logger ~with_db (route : string list) body =
+let router ~graphql_uri ~minimum_user_command_fee ~logger ~with_db
+    (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /account/ $route"
     ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
@@ -565,8 +567,9 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
         |> Errors.Lift.wrap
       in
       let%map res =
-        Balance.Real.handle ~graphql_uri
-          ~env:(Balance.Env.real ~with_db ~graphql_uri)
+        Balance.Real.handle ~graphql_uri ~minimum_user_command_fee
+          ~env:
+            (Balance.Env.real ~with_db ~graphql_uri ~minimum_user_command_fee)
           req
         |> Errors.Lift.wrap
       in

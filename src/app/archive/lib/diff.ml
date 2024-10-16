@@ -74,7 +74,10 @@ module Builder = struct
     let block = With_hash.data block_with_hash in
     let state_hash = (With_hash.hash block_with_hash).state_hash in
     let start = Time.now () in
-    let account_ids_accessed = Mina_block.account_ids_accessed block in
+    let account_ids_accessed =
+      Mina_block.account_ids_accessed
+        ~constraint_constants:precomputed_values.constraint_constants block
+    in
     let accounts_accessed =
       List.filter_map account_ids_accessed ~f:(fun (acct_id, status) ->
           match status with

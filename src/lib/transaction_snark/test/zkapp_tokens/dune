@@ -8,6 +8,8 @@
    async_unix
    core_kernel
    sexplib0
+   ppx_deriving_yojson.runtime
+   result
    ;; local libraries
    mina_base.import
    transaction_snark
@@ -26,7 +28,7 @@
    mina_transaction_logic
    )
   (library_flags -linkall)
-  (inline_tests (flags -verbose -show-counts))
+  (inline_tests (flags -verbose -show-counts) (deps proof_cache.json))
   (preprocess
     (pps ppx_snarky ppx_version ppx_jane ppx_mina))
   (instrumentation (backend bisect_ppx)))

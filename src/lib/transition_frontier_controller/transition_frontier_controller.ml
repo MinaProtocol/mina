@@ -11,11 +11,14 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val compile_config : Mina_compile_config.t
 end
 
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~time_controller ~collected_transitions ~frontier ~get_completed_work
-    ~network_transition_reader ~producer_transition_reader ~clear_reader =
+    ~network_transition_reader ~producer_transition_reader ~clear_reader
+    ~cache_exceptions =
   let open Context in
   let valid_transition_pipe_capacity = 50 in
   let start_time = Time.now () in
@@ -73,6 +76,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   in
   let unprocessed_transition_cache =
     Transition_handler.Unprocessed_transition_cache.create ~logger
+      ~cache_exceptions
   in
   List.iter collected_transitions ~f:(fun t ->
       (* since the cache was just built, it's safe to assume

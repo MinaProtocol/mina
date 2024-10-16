@@ -223,7 +223,8 @@ let%test_module "Zkapp payments tests" =
                     }
                   in
                   let zkapp_command =
-                    Transaction_snark.For_tests.multiple_transfers test_spec
+                    Transaction_snark.For_tests.multiple_transfers
+                      ~constraint_constants test_spec
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -289,7 +290,8 @@ let%test_module "Zkapp payments tests" =
                     }
                   in
                   let zkapp_command =
-                    Transaction_snark.For_tests.multiple_transfers test_spec
+                    Transaction_snark.For_tests.multiple_transfers
+                      ~constraint_constants test_spec
                   in
                   U.check_zkapp_command_with_merges_exn
                     ~expected_failure:

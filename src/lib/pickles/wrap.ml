@@ -311,7 +311,7 @@ let wrap
         , max_proofs_verified )
         Vector.t )
       P.Base.Step.t ) =
-  let logger = Internal_tracing_context_logger.get () in
+  let logger = Context_logger.get () in
   [%log internal] "Pickles_wrap_proof" ;
   let messages_for_next_wrap_proof =
     let module M =

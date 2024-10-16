@@ -6,18 +6,17 @@ open Signature_lib
 open Mina_base
 open Mina_transaction
 
-let create_accounts port (privkey_path, key_prefix, num_accounts, fee, amount) =
+let create_accounts ~(genesis_constants : Genesis_constants.t)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) port
+    (privkey_path, key_prefix, num_accounts, fee, amount) =
   let keys_per_zkapp = 8 in
   let zkapps_per_block = 10 in
   let pk_check_wait = Time.Span.of_sec 10. in
   let pk_check_timeout = Time.Span.of_min 30. in
   let min_fee =
-    Currency.Fee.to_nanomina_int Currency.Fee.minimum_user_command_fee
+    Currency.Fee.to_nanomina_int genesis_constants.minimum_user_command_fee
   in
   let account_creation_fee_int =
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.compiled
-    in
     Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
   in
   if fee < min_fee then (
@@ -178,7 +177,8 @@ let create_accounts port (privkey_path, key_prefix, num_accounts, fee, amount) =
           }
         in
         fee_payer_current_nonce := Account.Nonce.succ !fee_payer_current_nonce ;
-        Transaction_snark.For_tests.multiple_transfers multispec )
+        Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+          multispec )
   in
   let zkapps_batches = List.chunks_of zkapps ~length:zkapps_per_block in
   Deferred.List.iter zkapps_batches ~f:(fun zkapps_batch ->

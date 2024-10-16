@@ -16,12 +16,14 @@ let%test_module "Archive node unit tests" =
 
     let constraint_constants = precomputed_values.constraint_constants
 
+    let genesis_constants = precomputed_values.genesis_constants
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            () )
+            ~commit_id:"not specified for unit tests" () )
 
     module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
 
@@ -112,7 +114,8 @@ let%test_module "Archive node unit tests" =
       let%map (zkapp_command : Zkapp_command.t) =
         Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
           ~fee_payer_keypair ~keymap ~ledger
-          ~protocol_state_view:genesis_state_view ()
+          ~protocol_state_view:genesis_state_view ~constraint_constants
+          ~genesis_constants ()
       in
       User_command.Zkapp_command zkapp_command
 
@@ -306,6 +309,7 @@ let%test_module "Archive node unit tests" =
           Strict_pipe.Writer.close writer ;
           let%bind () =
             Processor.run
+              ~genesis_constants:precomputed_values.genesis_constants
               ~constraint_constants:precomputed_values.constraint_constants pool
               reader ~logger ~delete_older_than:None
           in

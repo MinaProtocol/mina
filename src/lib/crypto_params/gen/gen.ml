@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Ppxlib
 open Core_kernel
 module Impl = Pickles.Impls.Step.Internal_Basic

@@ -27,21 +27,6 @@ module Timing = struct
         }
 end
 
-module Public_accounts = struct
-  type account_data =
-    { pk : Public_key.Compressed.t
-    ; balance : int
-    ; delegate : Public_key.Compressed.t option
-    ; timing : Timing.t
-    }
-
-  module type S = sig
-    val name : string
-
-    val accounts : account_data list Lazy.t
-  end
-end
-
 module Private_accounts = struct
   type account_data =
     { pk : Public_key.Compressed.t

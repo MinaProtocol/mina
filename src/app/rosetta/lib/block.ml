@@ -1,5 +1,6 @@
 open Core_kernel
 open Async
+module Mina_currency = Currency
 open Rosetta_lib
 open Rosetta_models
 open Commands_common
@@ -934,6 +935,7 @@ module Specific = struct
         ; db_block : Block_query.t -> (Block_info.t, Errors.t) M.t
         ; validate_network_choice :
                network_identifier:Network_identifier.t
+            -> minimum_user_command_fee:Mina_currency.Fee.t
             -> graphql_uri:Uri.t
             -> (unit, Errors.t) M.t
         }
@@ -971,16 +973,17 @@ module Specific = struct
 
     let handle :
            graphql_uri:Uri.t
+        -> minimum_user_command_fee:Mina_currency.Fee.t
         -> env:'gql Env.T(M).t
         -> Block_request.t
         -> (Block_response.t, Errors.t) M.t =
-     fun ~graphql_uri ~env req ->
+     fun ~graphql_uri ~minimum_user_command_fee ~env req ->
       let open M.Let_syntax in
       let logger = env.logger in
       let%bind query = Query.of_partial_identifier req.block_identifier in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
-          ~graphql_uri
+          ~graphql_uri ~minimum_user_command_fee
       in
       let%bind block_info = env.db_block query in
       let%bind internal_transactions =
@@ -1049,7 +1052,8 @@ module Specific = struct
     end )
 end
 
-let router ~graphql_uri ~logger ~with_db (route : string list) body =
+let router ~graphql_uri ~minimum_user_command_fee ~logger ~with_db
+    (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /block/ $route"
     ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
@@ -1062,7 +1066,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
             |> Errors.Lift.wrap
           in
           let%map res =
-            Specific.Real.handle ~graphql_uri
+            Specific.Real.handle ~graphql_uri ~minimum_user_command_fee
               ~env:(Specific.Env.real ~logger ~db)
               req
             |> Errors.Lift.wrap

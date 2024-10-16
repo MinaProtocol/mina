@@ -28,9 +28,11 @@
    pickles
    pickles.backend
    kimchi_backend
+   mina_metrics.none
+   logger.fake
  )
- (preprocessor_deps ../../../config.mlh)
+ (forbidden_libraries mina_node_config)
  (preprocess
-  (pps ppx_version ppx_bin_prot ppx_optcomp ppxlib.metaquot))
+  (pps ppx_version ppx_bin_prot ppxlib.metaquot))
  (instrumentation (backend bisect_ppx))
  (modes native))

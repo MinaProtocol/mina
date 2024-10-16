@@ -348,22 +348,27 @@ type signed_command_common =
   ; memo : string option
   }
 
-let signed_command_common : signed_command_common Command.Param.t =
+let fee_common ~default_transaction_fee ~minimum_user_command_fee :
+    Currency.Fee.t Command.Param.t =
+  Command.Param.flag "--fee" ~aliases:[ "fee" ]
+    ~doc:
+      (Printf.sprintf
+         "FEE Amount you are willing to pay to process the transaction \
+          (default: %s) (minimum: %s)"
+         (Currency.Fee.to_mina_string default_transaction_fee)
+         (Currency.Fee.to_mina_string minimum_user_command_fee) )
+    (Command.Param.optional_with_default default_transaction_fee
+       Arg_type.txn_fee )
+
+let signed_command_common ~default_transaction_fee ~minimum_user_command_fee :
+    signed_command_common Command.Param.t =
   let open Command.Let_syntax in
   let open Arg_type in
   let%map_open sender =
     flag "--sender" ~aliases:[ "sender" ]
       (required public_key_compressed)
       ~doc:"PUBLICKEY Public key from which you want to send the transaction"
-  and fee =
-    flag "--fee" ~aliases:[ "fee" ]
-      ~doc:
-        (Printf.sprintf
-           "FEE Amount you are willing to pay to process the transaction \
-            (default: %s) (minimum: %s)"
-           (Currency.Fee.to_mina_string Currency.Fee.default_transaction_fee)
-           (Currency.Fee.to_mina_string Mina_base.Signed_command.minimum_fee) )
-      (optional txn_fee)
+  and fee = fee_common ~default_transaction_fee ~minimum_user_command_fee
   and nonce =
     flag "--nonce" ~aliases:[ "nonce" ]
       ~doc:
@@ -375,11 +380,7 @@ let signed_command_common : signed_command_common Command.Param.t =
     flag "--memo" ~aliases:[ "memo" ]
       ~doc:"STRING Memo accompanying the transaction" (optional string)
   in
-  { sender
-  ; fee = Option.value fee ~default:Currency.Fee.default_transaction_fee
-  ; nonce
-  ; memo
-  }
+  { sender; fee; nonce; memo }
 
 module Signed_command = struct
   open Arg_type
@@ -400,15 +401,15 @@ module Signed_command = struct
     flag "--amount" ~aliases:[ "amount" ]
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
 
-  let fee =
+  let fee ~default_transaction_fee ~minimum_user_command_fee =
     let open Command.Param in
     flag "--fee" ~aliases:[ "fee" ]
       ~doc:
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
-           (Currency.Fee.to_mina_string Currency.Fee.default_transaction_fee)
-           (Currency.Fee.to_mina_string Mina_base.Signed_command.minimum_fee) )
+           (Currency.Fee.to_mina_string default_transaction_fee)
+           (Currency.Fee.to_mina_string minimum_user_command_fee) )
       (optional txn_fee)
 
   let valid_until =

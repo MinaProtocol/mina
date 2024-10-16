@@ -473,6 +473,7 @@ module Json_layout = struct
       ; zkapp_cmd_limit_hardcap : int option [@default None]
       ; slot_tx_end : int option [@default None]
       ; slot_chain_end : int option [@default None]
+      ; minimum_user_command_fee : Currency.Fee.t option [@default None]
       ; network_id : string option [@default None]
       }
     [@@deriving yojson, fields]
@@ -639,7 +640,6 @@ module Accounts = struct
 
     let to_account (a : t) : Mina_base.Account.t =
       let open Signature_lib in
-      let open Mina_base.Account.Poly in
       let timing =
         let open Mina_base.Account_timing.Poly in
         match a.timing with
@@ -1221,6 +1221,8 @@ module Daemon = struct
     ; zkapp_cmd_limit_hardcap : int option [@default None]
     ; slot_tx_end : int option [@default None]
     ; slot_chain_end : int option [@default None]
+    ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t option
+          [@default None]
     ; network_id : string option [@default None]
     }
   [@@deriving bin_io_unversioned]
@@ -1261,6 +1263,9 @@ module Daemon = struct
     ; slot_tx_end = opt_fallthrough ~default:t1.slot_tx_end t2.slot_tx_end
     ; slot_chain_end =
         opt_fallthrough ~default:t1.slot_chain_end t2.slot_chain_end
+    ; minimum_user_command_fee =
+        opt_fallthrough ~default:t1.minimum_user_command_fee
+          t2.minimum_user_command_fee
     ; network_id = opt_fallthrough ~default:t1.network_id t2.network_id
     }
 
@@ -1273,6 +1278,9 @@ module Daemon = struct
     let%bind zkapp_transaction_cost_limit = Float.gen_incl 0.0 100.0 in
     let%bind max_event_elements = Int.gen_incl 0 100 in
     let%bind zkapp_cmd_limit_hardcap = Int.gen_incl 0 1000 in
+    let%bind minimum_user_command_fee =
+      Currency.Fee.(gen_incl one (of_mina_int_exn 10))
+    in
     let%map max_action_elements = Int.gen_incl 0 1000 in
     { txpool_max_size = Some txpool_max_size
     ; peer_list_url = None
@@ -1285,6 +1293,7 @@ module Daemon = struct
     ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
     ; slot_tx_end = None
     ; slot_chain_end = None
+    ; minimum_user_command_fee = Some minimum_user_command_fee
     ; network_id = None
     }
 end
@@ -1513,11 +1522,12 @@ let ledger_of_accounts accounts =
     ; add_genesis_winner = Some false
     }
 
-let make_fork_config ~staged_ledger ~global_slot ~state_hash ~blockchain_length
-    ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger ~next_epoch_seed =
+let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
+    ~blockchain_length ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
+    ~next_epoch_seed =
   let open Async.Deferred.Result.Let_syntax in
   let global_slot_since_genesis =
-    Mina_numbers.Global_slot_since_hard_fork.to_int global_slot
+    Mina_numbers.Global_slot_since_genesis.to_int global_slot_since_genesis
   in
   let blockchain_length = Unsigned.UInt32.to_int blockchain_length in
   let yield () =
@@ -1582,116 +1592,9 @@ let make_fork_config ~staged_ledger ~global_slot ~state_hash ~blockchain_length
       }
     ~proof:(Proof_keys.make ~fork ()) ()
 
-let slot_tx_end_or_default, slot_chain_end_or_default =
-  let f compile get_runtime t =
-    Option.map ~f:Mina_numbers.Global_slot_since_hard_fork.of_int
-    @@ Option.value_map t.daemon ~default:compile ~f:(fun daemon ->
-           Option.merge compile ~f:(fun _c r -> r) @@ get_runtime daemon )
+let slot_tx_end, slot_chain_end =
+  let f get_runtime t =
+    let open Option.Let_syntax in
+    t.daemon >>= get_runtime >>| Mina_numbers.Global_slot_since_hard_fork.of_int
   in
-  ( f Mina_compile_config.slot_tx_end (fun d -> d.slot_tx_end)
-  , f Mina_compile_config.slot_chain_end (fun d -> d.slot_chain_end) )
-
-module Test_configs = struct
-  let bootstrap =
-    lazy
-      ( (* test_postake_bootstrap *)
-        {json|
-  { "daemon":
-      { "txpool_max_size": 3000 }
-  , "genesis":
-      { "k": 6
-      , "delta": 0
-      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
-  , "proof":
-      { "level": "none"
-      , "sub_windows_per_window": 8
-      , "ledger_depth": 6
-      , "work_delay": 2
-      , "block_window_duration_ms": 1500
-      , "transaction_capacity": {"2_to_the": 3}
-      , "coinbase_amount": "20"
-      , "supercharged_coinbase_factor": 2
-      , "account_creation_fee": "1" }
-  , "ledger": { "name": "test", "add_genesis_winner": false } }
-      |json}
-      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
-
-  let transactions =
-    lazy
-      ( (* test_postake_txns *)
-        {json|
-  { "daemon":
-      { "txpool_max_size": 3000 }
-  , "genesis":
-      { "k": 6
-      , "delta": 0
-      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
-  , "proof":
-      { "level": "check"
-      , "sub_windows_per_window": 8
-      , "ledger_depth": 6
-      , "work_delay": 2
-      , "block_window_duration_ms": 15000
-      , "transaction_capacity": {"2_to_the": 3}
-      , "coinbase_amount": "20"
-      , "supercharged_coinbase_factor": 2
-      , "account_creation_fee": "1" }
-  , "ledger":
-      { "name": "test_split_two_stakers"
-      , "add_genesis_winner": false } }
-      |json}
-      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
-
-  let split_snarkless =
-    lazy
-      ( (* test_postake_split_snarkless *)
-        {json|
-  { "daemon":
-      { "txpool_max_size": 3000 }
-  , "genesis":
-      { "k": 24
-      , "delta": 0
-      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
-  , "proof":
-      { "level": "check"
-      , "sub_windows_per_window": 8
-      , "ledger_depth": 30
-      , "work_delay": 1
-      , "block_window_duration_ms": 10000
-      , "transaction_capacity": {"2_to_the": 2}
-      , "coinbase_amount": "20"
-      , "supercharged_coinbase_factor": 2
-      , "account_creation_fee": "1" }
-  , "ledger":
-      { "name": "test_split_two_stakers"
-      , "add_genesis_winner": false } }
-      |json}
-      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
-
-  let delegation =
-    lazy
-      ( (* test_postake_delegation *)
-        {json|
-  { "daemon":
-      { "txpool_max_size": 3000 }
-  , "genesis":
-      { "k": 4
-      , "delta": 0
-      , "slots_per_epoch": 72
-      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
-  , "proof":
-      { "level": "check"
-      , "sub_windows_per_window": 4
-      , "ledger_depth": 6
-      , "work_delay": 1
-      , "block_window_duration_ms": 5000
-      , "transaction_capacity": {"2_to_the": 2}
-      , "coinbase_amount": "20"
-      , "supercharged_coinbase_factor": 2
-      , "account_creation_fee": "1" }
-  , "ledger":
-      { "name": "test_delegation"
-      , "add_genesis_winner": false } }
-      |json}
-      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
-end
+  (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))

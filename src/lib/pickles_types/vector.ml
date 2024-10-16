@@ -7,7 +7,9 @@ type z = Nat.z
 type 'a s = 'a Nat.s
 
 module T = struct
-  type ('a, _) t = [] : ('a, z) t | ( :: ) : 'a * ('a, 'n) t -> ('a, 'n s) t
+  type ('a, 'n) t = ('a, 'n) Mina_wire_types.Pickles_types.Vector.t =
+    | [] : ('a, z) t
+    | ( :: ) : 'a * ('a, 'n) t -> ('a, 'n s) t
 end
 
 include T

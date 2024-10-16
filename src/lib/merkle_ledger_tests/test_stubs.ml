@@ -29,11 +29,11 @@ module Account = struct
 
   let create = Mina_base.Account.create
 
-  let balance Mina_base.Account.Poly.{ balance; _ } = balance
+  let balance Mina_base.Account.{ balance; _ } = balance
 
-  let update_balance t bal = { t with Mina_base.Account.Poly.balance = bal }
+  let update_balance t bal = { t with Mina_base.Account.balance = bal }
 
-  let token Mina_base.Account.Poly.{ token_id; _ } = token_id
+  let token Mina_base.Account.{ token_id; _ } = token_id
 end
 
 module Receipt = Mina_base.Receipt

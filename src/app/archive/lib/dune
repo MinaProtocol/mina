@@ -64,13 +64,11 @@
    consensus
    genesis_constants
    genesis_ledger_helper.lib
-   mina_compile_config
    verifier
    quickcheck_lib
    snark_params
    mina_transaction
    protocol_version
-   mina_version
    staged_ledger_diff
    error_json
    ppx_deriving_yojson.runtime

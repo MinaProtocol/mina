@@ -49,7 +49,6 @@
    block_time
    base58_check
    bignum_bigint
-   mina_compile_config
    codable
    crypto_params
    debug_assert
@@ -75,10 +74,9 @@
    error_json
    ppx_version.runtime
  )
- (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_annot ppx_snarky ppx_here ppx_mina ppx_version ppx_compare ppx_deriving.enum ppx_deriving.ord ppx_deriving.make
-       ppx_base base_quickcheck.ppx_quickcheck ppx_bench ppx_let ppx_optcomp ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson ppx_inline_test h_list.ppx
+       ppx_base base_quickcheck.ppx_quickcheck ppx_bench ppx_let ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson ppx_inline_test h_list.ppx
        ppx_variants_conv ppx_pipebang
  ))
  (instrumentation (backend bisect_ppx))

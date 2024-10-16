@@ -54,10 +54,6 @@ end
 
 let error_count = ref 0
 
-let constraint_constants = Genesis_constants.Constraint_constants.compiled
-
-let proof_level = Genesis_constants.Proof_level.Full
-
 let json_ledger_hash_of_ledger ledger =
   Ledger_hash.to_yojson @@ Ledger.merkle_root ledger
 
@@ -199,7 +195,7 @@ let update_epoch_ledger ~logger ~name ~ledger ~epoch_ledger epoch_ledger_hash =
     let epoch_ledger = Ledger.create ~depth:(Ledger.depth ledger) () in
     List.iter accounts ~f:(fun account ->
         let pk = Account.public_key account in
-        let token = Account.token account in
+        let token = Account.token_id account in
         let account_id = Account_id.create pk token in
         match Ledger.get_or_create_account epoch_ledger account_id account with
         | Ok (`Added, _loc) ->
@@ -634,12 +630,14 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
 
 let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
     ~checkpoint_interval ~checkpoint_output_folder_opt ~checkpoint_file_prefix
-    ~genesis_dir_opt ~log_json ~log_level ~log_filename ~file_log_level () =
+    ~genesis_dir_opt ~log_json ~log_level ~log_filename ~file_log_level
+    ~constraint_constants ~proof_level () =
   Cli_lib.Stdout_log.setup log_json log_level ;
   Option.iter log_filename ~f:(fun log_filename ->
       Logger.Consumer_registry.register ~id:"default"
         ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
-        ~transport:(Logger_file_system.evergrowing ~log_filename) ) ;
+        ~transport:(Logger_file_system.evergrowing ~log_filename)
+        () ) ;
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -1685,6 +1683,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                 exit 1 ) ) )
 
 let () =
+  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let proof_level = Genesis_constants.Proof_level.Full in
   Command.(
     run
       (let open Let_syntax in
@@ -1729,4 +1729,4 @@ let () =
          main ~input_file ~output_file_opt ~archive_uri ~checkpoint_interval
            ~continue_on_error ~checkpoint_output_folder_opt
            ~checkpoint_file_prefix ~genesis_dir_opt ~log_json ~log_level
-           ~file_log_level ~log_filename )))
+           ~file_log_level ~log_filename ~constraint_constants ~proof_level )))

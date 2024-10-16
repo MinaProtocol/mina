@@ -34,8 +34,7 @@ let gen_account_precondition_from_account ?failure
   let open Quickcheck.Let_syntax in
   if no_account_precondition then return Zkapp_precondition.Account.accept
   else
-    let { Account.Poly.balance; nonce; delegate; receipt_chain_hash; zkapp; _ }
-        =
+    let { Account.balance; nonce; delegate; receipt_chain_hash; zkapp; _ } =
       account
     in
     (* choose constructor *)
@@ -241,18 +240,20 @@ let gen_account_precondition_from_account ?failure
           return predicate_account
     else
       (* Nonce *)
-      let { Account.Poly.nonce; _ } = account in
+      let { Account.nonce; _ } = account in
       match failure with
       | Some Invalid_account_precondition ->
           return @@ Zkapp_precondition.Account.nonce (Account.Nonce.succ nonce)
       | _ ->
           return @@ Zkapp_precondition.Account.nonce nonce
 
-let gen_fee ?fee_range ~num_updates (account : Account.t) =
+let gen_fee ?fee_range ~num_updates ~(genesis_constants : Genesis_constants.t)
+    (account : Account.t) =
   let balance = account.balance in
   let lo_fee =
     Option.value_exn
-      Currency.Fee.(scale minimum_user_command_fee (num_updates * 2))
+      Currency.Fee.(
+        scale genesis_constants.minimum_user_command_fee (num_updates * 2))
   in
   let hi_fee = Option.value_exn Currency.Fee.(scale lo_fee 2) in
   assert (
@@ -1066,7 +1067,7 @@ let gen_account_update_from ?(no_account_precondition = false)
 (* takes an account id, if we want to sign this data *)
 let gen_account_update_body_fee_payer ?global_slot ?fee_range ?failure
     ?permissions_auth ~account_id ?vk ?protocol_state_view ~account_state_tbl
-    ~num_account_updates () :
+    ~num_account_updates ~genesis_constants () :
     Account_update.Body.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let account_precondition_gen (account : Account.t) =
@@ -1076,7 +1077,8 @@ let gen_account_update_body_fee_payer ?global_slot ?fee_range ?failure
     gen_account_update_body_components ?global_slot ?failure ?permissions_auth
       ~account_id ~account_state_tbl ?vk ~zkapp_account_ids:[]
       ~is_fee_payer:true ~increment_nonce:((), true)
-      ~gen_balance_change:(gen_fee ?fee_range ~num_updates:num_account_updates)
+      ~gen_balance_change:
+        (gen_fee ?fee_range ~num_updates:num_account_updates ~genesis_constants)
       ~f_balance_change:fee_to_amt
       ~f_token_id:(fun token_id ->
         (* make sure the fee payer's token id is the default,
@@ -1094,13 +1096,13 @@ let gen_account_update_body_fee_payer ?global_slot ?fee_range ?failure
   Account_update_body_components.to_fee_payer body_components
 
 let gen_fee_payer ?global_slot ?fee_range ?failure ?permissions_auth ~account_id
-    ?protocol_state_view ?vk ~account_state_tbl ~num_account_updates () :
-    Account_update.Fee_payer.t Quickcheck.Generator.t =
+    ?protocol_state_view ?vk ~account_state_tbl ~num_account_updates
+    ~genesis_constants () : Account_update.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map body =
     gen_account_update_body_fee_payer ?global_slot ?fee_range ?failure
       ?permissions_auth ~account_id ?vk ?protocol_state_view ~account_state_tbl
-      ~num_account_updates ()
+      ~num_account_updates ~genesis_constants ()
   in
   (* real signature to be added when this data inserted into a Zkapp_command.t *)
   let authorization = Signature.dummy in
@@ -1130,7 +1132,8 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
     ?account_state_tbl ~ledger ?protocol_state_view ?vk ?available_public_keys
-    () =
+    ~genesis_constants
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) () =
   let open Quickcheck.Let_syntax in
   let fee_payer_pk =
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
@@ -1206,7 +1209,8 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
   let%bind fee_payer =
     gen_fee_payer ?global_slot ?fee_range ?failure
       ~permissions_auth:Control.Tag.Signature ~account_id:fee_payer_acct_id ?vk
-      ~account_state_tbl ~num_account_updates:num_zkapp_command ()
+      ~account_state_tbl ~num_account_updates:num_zkapp_command
+      ~genesis_constants ()
   in
   let zkapp_account_ids =
     Account_id.Table.filteri account_state_tbl ~f:(fun ~key:_ ~data:(a, role) ->
@@ -1443,9 +1447,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
           Currency.Amount.(
             Signed.of_unsigned
               ( scale
-                  (of_fee
-                     Genesis_constants.Constraint_constants.compiled
-                       .account_creation_fee )
+                  (of_fee constraint_constants.account_creation_fee)
                   num_new_accounts
               |> Option.value_exn )) )
       ~f:(fun acc node ->
@@ -1485,9 +1487,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
             Currency.Amount.(
               Signed.negate
                 (Signed.of_unsigned
-                   (of_fee
-                      Genesis_constants.Constraint_constants.compiled
-                        .account_creation_fee ) ))
+                   (of_fee constraint_constants.account_creation_fee) ))
           in
           gen_account_update_from ~no_account_precondition ?balance_change_range
             ?global_slot ~zkapp_account_ids ~account_ids_seen ~authorization
@@ -1557,7 +1557,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
         let receipt_chain_hash =
           Receipt.Chain_hash.cons_zkapp_command_commitment
             Mina_numbers.Index.zero receipt_elt
-            account.Account.Poly.receipt_chain_hash
+            account.Account.receipt_chain_hash
         in
         ({ account with receipt_chain_hash }, `Fee_payer) ) ;
   let account_updates =
@@ -1580,7 +1580,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                   in
                   Receipt.Chain_hash.cons_zkapp_command_commitment
                     account_update_index receipt_elt
-                    account.Account.Poly.receipt_chain_hash
+                    account.Account.receipt_chain_hash
                 in
                 ({ account with receipt_chain_hash }, role) )
       | Control.None_given ->
@@ -1589,7 +1589,8 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
 
 let gen_list_of_zkapp_command_from ?global_slot ?failure ?max_account_updates
     ?max_token_updates ~(fee_payer_keypairs : Signature_lib.Keypair.t list)
-    ~keymap ?account_state_tbl ~ledger ?protocol_state_view ?vk ?length () =
+    ~keymap ?account_state_tbl ~ledger ?protocol_state_view ?vk ?length
+    ~genesis_constants ~constraint_constants () =
   (* Since when generating multiple zkapp_command the fee payer's nonce should only
      be incremented as the `Fee_payer` role, this is why we pre-computed the
      `account_state_tbl` here.
@@ -1633,7 +1634,8 @@ let gen_list_of_zkapp_command_from ?global_slot ?failure ?max_account_updates
       let%bind new_zkapp_command =
         gen_zkapp_command_from ?global_slot ?failure ?max_account_updates
           ?max_token_updates ~fee_payer_keypair ~keymap ~account_state_tbl
-          ~ledger ?protocol_state_view ?vk ()
+          ~ledger ?protocol_state_view ?vk ~genesis_constants
+          ~constraint_constants ()
       in
       go (n - 1) (new_zkapp_command :: acc)
     else return (List.rev acc)
@@ -1739,10 +1741,16 @@ let gen_max_cost_zkapp_command_from ?memo ?fee_range
 
 let%test_module _ =
   ( module struct
-    module U = Transaction_snark_tests.Util
     open Signature_lib
 
-    let `VK vk, `Prover _ = Lazy.force U.trivial_zkapp
+    (* TODO: Should be For_unit_tests *)
+    let genesis_constants = Genesis_constants.For_unit_tests.t
+
+    let constraint_constants =
+      Genesis_constants.For_unit_tests.Constraint_constants.t
+
+    let `VK vk, `Prover _ =
+      Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
 
     let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
 
@@ -1798,8 +1806,8 @@ let%test_module _ =
         Quickcheck.Generator.(
           generate
             (list_with_length 100
-               (gen_zkapp_command_from ~fee_payer_keypair ~keymap
-                  ~no_token_accounts:true
+               (gen_zkapp_command_from ~genesis_constants ~constraint_constants
+                  ~fee_payer_keypair ~keymap ~no_token_accounts:true
                   ~account_state_tbl:(Account_id.Table.create ())
                   ~generate_new_accounts:false ~ledger () ) )
             ~size:100
@@ -1815,8 +1823,9 @@ let%test_module _ =
         Quickcheck.Generator.(
           generate
             (list_with_length 100
-               (gen_zkapp_command_from ~no_account_precondition:true
-                  ~fee_payer_keypair ~keymap ~no_token_accounts:true
+               (gen_zkapp_command_from ~genesis_constants ~constraint_constants
+                  ~no_account_precondition:true ~fee_payer_keypair ~keymap
+                  ~no_token_accounts:true
                   ~fee_range:
                     Currency.Fee.(of_mina_string_exn "2", of_mina_string_exn "4")
                   ~balance_change_range:

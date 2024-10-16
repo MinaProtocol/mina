@@ -71,13 +71,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let `VK vk, `Prover prover =
-    Transaction_snark.For_tests.create_trivial_snapp
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled ()
-
-  let config =
+  let config ~constants =
     let open Test_config in
-    { default with
+    { (default ~constants) with
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in

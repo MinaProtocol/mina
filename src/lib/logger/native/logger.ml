@@ -255,10 +255,18 @@ module Transport = struct
 end
 
 module Consumer_registry = struct
-  type consumer = { processor : Processor.t; transport : Transport.t }
+  type consumer =
+    { processor : Processor.t
+    ; transport : Transport.t
+    ; commit_id : string option
+    }
 
   let default_consumer =
-    lazy { processor = Processor.raw (); transport = Transport.stdout () }
+    lazy
+      { processor = Processor.raw ()
+      ; transport = Transport.stdout ()
+      ; commit_id = None
+      }
 
   module Consumer_tbl = Hashtbl.Make (String)
 
@@ -268,8 +276,8 @@ module Consumer_registry = struct
 
   type id = string
 
-  let register ~(id : id) ~processor ~transport =
-    Consumer_tbl.add_multi t ~key:id ~data:{ processor; transport }
+  let register ?commit_id ~(id : id) ~processor ~transport () =
+    Consumer_tbl.add_multi t ~key:id ~data:{ processor; transport; commit_id }
 
   let rec broadcast_log_message ~id msg =
     let consumers =
@@ -282,8 +290,20 @@ module Consumer_registry = struct
     List.iter consumers ~f:(fun consumer ->
         let { processor = Processor.T ((module Processor), processor)
             ; transport = Transport.T ((module Transport), transport)
+            ; commit_id
             } =
           consumer
+        in
+        let commit_id' =
+          if Level.compare msg.Message.level Warn >= 0 then commit_id else None
+        in
+        let msg =
+          Option.value_map ~default:msg commit_id' ~f:(fun cid ->
+              let metadata =
+                String.Map.set ~key:"commit_id" ~data:(`String cid)
+                  msg.Message.metadata
+              in
+              { msg with metadata } )
         in
         match Processor.process processor msg with
         | Some str ->
@@ -309,30 +329,34 @@ module Consumer_registry = struct
             () )
 end
 
-[%%versioned
-module Stable = struct
-  module V1 = struct
-    type t =
-      { null : bool
-      ; metadata : Metadata.Stable.V1.t
-      ; id : Bounded_types.String.Stable.V1.t
-      }
-
-    let to_latest = Fn.id
-  end
-end]
+type t =
+  { null : bool
+  ; metadata : Metadata.Stable.Latest.t
+  ; id : Bounded_types.String.Stable.V1.t
+  ; itn_features : bool
+  }
+[@@deriving bin_io_unversioned]
 
 let metadata t = t.metadata
 
-let create ?(metadata = []) ?(id = "default") () =
-  { null = false; metadata = Metadata.extend Metadata.empty metadata; id }
+let create ?(metadata = []) ?(id = "default") ?(itn_features = false) () =
+  { null = false
+  ; metadata = Metadata.extend Metadata.empty metadata
+  ; id
+  ; itn_features
+  }
 
-let null () = { null = true; metadata = Metadata.empty; id = "default" }
+let null () =
+  { null = true
+  ; metadata = Metadata.empty
+  ; id = "default"
+  ; itn_features = false
+  }
 
 let extend t metadata =
   { t with metadata = Metadata.extend t.metadata metadata }
 
-let change_id { null; metadata; id = _ } ~id = { null; metadata; id }
+let change_id t ~id = { t with id }
 
 let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
     ~skip_merge_global_metadata =
@@ -390,7 +414,7 @@ let log t ~level ~module_ ~location ?(metadata = []) ?event_id fmt =
     raw t message' ;
     match level with
     | Internal ->
-        if Mina_compile_config.itn_features then
+        if t.itn_features then
           let timestamp = message'.timestamp in
           let entries =
             Itn_logger.postprocess_message ~timestamp ~message ~metadata

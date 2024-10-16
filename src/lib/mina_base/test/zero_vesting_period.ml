@@ -281,7 +281,7 @@ let zkapp_zero_vesting_period = mk_zkapp_with_vesting_period 0
 let zero_vesting_period_is_error () =
   match
     User_command.check_well_formedness
-      ~genesis_constants:Genesis_constants.for_unit_tests
+      ~genesis_constants:Genesis_constants.For_unit_tests.t
       (Zkapp_command zkapp_zero_vesting_period)
   with
   | Error [ Zero_vesting_period ] ->
@@ -294,7 +294,7 @@ let zkapp_nonzero_vesting_period = mk_zkapp_with_vesting_period 1
 let nonzero_vesting_period_ok () =
   match
     User_command.check_well_formedness
-      ~genesis_constants:Genesis_constants.for_unit_tests
+      ~genesis_constants:Genesis_constants.For_unit_tests.t
       (Zkapp_command zkapp_nonzero_vesting_period)
   with
   | Ok () ->

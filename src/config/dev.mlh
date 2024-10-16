@@ -1,39 +1,86 @@
-[%%import "/src/config/ledger_depth/small.mlh"]
-[%%import "/src/config/curve/medium.mlh"]
-[%%import "/src/config/coinbase/standard.mlh"]
-[%%import "/src/config/consensus/postake_short.mlh"]
-[%%import "/src/config/scan_state/medium.mlh"]
-[%%import "/src/config/debug_level/some.mlh"]
-[%%import "/src/config/proof_level/check.mlh"]
-[%%import "/src/config/txpool_size.mlh"]
-[%%import "/src/config/account_creation_fee/low.mlh"]
-[%%import "/src/config/amount_defaults/standard.mlh"]
-[%%import "/src/config/protocol_version/current.mlh"]
-[%%import "/src/config/supercharged_coinbase_factor/one.mlh"]
 
-[%%define time_offsets true]
+(*BEGIN src/config/ledger_depth/small.mlh*)
+[%%define ledger_depth 10]
+(*END src/config/ledger_depth/small.mlh*)
+
+
+(*BEGIN src/config/curve/medium.mlh*)
+[%%define curve_size 255]
+(*END src/config/curve/medium.mlh*)
+
+
+(*BEGIN src/config/coinbase/standard.mlh*)
+[%%define coinbase "20"]
+(*END src/config/coinbase/standard.mlh*)
+
+
+(*BEGIN src/config/consensus/postake_short.mlh*)
+[%%define k 24]
+[%%define delta 0]
+[%%define slots_per_epoch 576]
+[%%define slots_per_sub_window 2]
+[%%define sub_windows_per_window 3]
+[%%define grace_period_slots 180]
+(*END src/config/consensus/postake_short.mlh*)
+
+
+(*BEGIN src/config/scan_state/medium.mlh*)
+[%%define scan_state_with_tps_goal false]
+[%%undef scan_state_tps_goal_x10]
+[%%define scan_state_transaction_capacity_log_2 3]
+[%%define scan_state_work_delay 2]
+(*END src/config/scan_state/medium.mlh*)
+
+
+(*BEGIN src/config/proof_level/check.mlh*)
+[%%define proof_level "check"]
+(*END src/config/proof_level/check.mlh*)
+
+
+(*BEGIN src/config/txpool_size.mlh*)
+(* Note this value needs to be consistent across nodes to prevent spurious bans.
+   see comment in transaction_pool.ml for more details. *)
+[%%define pool_max_size 3000]
+[%%undef zkapp_cmd_limit]
+(*END src/config/txpool_size.mlh*)
+
+
+(*BEGIN src/config/account_creation_fee/low.mlh*)
+[%%define account_creation_fee_int "0.001"]
+(*END src/config/account_creation_fee/low.mlh*)
+
+
+(*BEGIN src/config/amount_defaults/standard.mlh*)
+[%%define default_transaction_fee "5"]
+[%%define default_snark_worker_fee "1"]
+[%%define minimum_user_command_fee "2"]
+(*END src/config/amount_defaults/standard.mlh*)
+
+
+(*BEGIN src/config/supercharged_coinbase_factor/one.mlh*)
+[%%define supercharged_coinbase_factor 1]
+(*END src/config/supercharged_coinbase_factor/one.mlh*)
 
 [%%define plugins true]
-
 [%%define genesis_ledger "test"]
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
 [%%define block_window_duration 2000]
-
-[%%define integration_tests true]
-[%%define force_updates false]
-
-[%%define download_snark_keys false]
-[%%define generate_genesis_proof false]
-
 [%%define itn_features true]
-
 [%%define print_versioned_types false]
-
 [%%define test_full_epoch false]
-[%%import "/src/config/fork.mlh"]
-[%%import "/src/config/features/dev.mlh"]
+
+(*BEGIN src/config/fork.mlh*)
+[%%undef fork_blockchain_length]
+[%%undef fork_state_hash]
+[%%undef fork_global_slot_since_genesis]
+[%%undef zkapp_cmd_limit]
+(*END src/config/fork.mlh*)
+
+
+(*BEGIN src/config/features/dev.mlh*)
+[%%define network "testnet"]
+(*END src/config/features/dev.mlh*)
+
 [%%undef compaction_interval]
 [%%define vrf_poll_interval 0]
 [%%undef zkapp_cmd_limit]
-[%%undef slot_tx_end]
-[%%undef slot_chain_end]

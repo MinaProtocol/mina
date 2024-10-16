@@ -53,13 +53,21 @@ impl From<&AffineVesta> for WasmGVesta {
 
 impl From<WasmGVesta> for AffineVesta {
     fn from(point: WasmGVesta) -> Self {
-        AffineVesta::new(point.x.into(), point.y.into(), point.infinity)
+        AffineVesta {
+            x: point.x.into(),
+            y: point.y.into(),
+            infinity: point.infinity,
+        }
     }
 }
 
 impl From<&WasmGVesta> for AffineVesta {
     fn from(point: &WasmGVesta) -> Self {
-        AffineVesta::new(point.x.into(), point.y.into(), point.infinity)
+        AffineVesta {
+            x: point.x.into(),
+            y: point.y.into(),
+            infinity: point.infinity,
+        }
     }
 }
 
@@ -87,13 +95,21 @@ impl From<&AffinePallas> for WasmGPallas {
 
 impl From<WasmGPallas> for AffinePallas {
     fn from(point: WasmGPallas) -> Self {
-        AffinePallas::new(point.x.into(), point.y.into(), point.infinity)
+        AffinePallas {
+            x: point.x.into(),
+            y: point.y.into(),
+            infinity: point.infinity,
+        }
     }
 }
 
 impl From<&WasmGPallas> for AffinePallas {
     fn from(point: &WasmGPallas) -> Self {
-        AffinePallas::new(point.x.into(), point.y.into(), point.infinity)
+        AffinePallas {
+            x: point.x.into(),
+            y: point.y.into(),
+            infinity: point.infinity,
+        }
     }
 }
 
@@ -189,7 +205,7 @@ pub fn caml_pasta_pallas_of_affine(x: &WasmPallasGAffine) -> WasmPallasGProjecti
 
 #[wasm_bindgen]
 pub fn caml_pasta_pallas_of_affine_coordinates(x: WasmPastaFp, y: WasmPastaFp) -> WasmPallasGProjective {
-    GProjective::new(x.0, y.0, Fp::one()).into()
+    GProjective::new_unchecked(x.0, y.0, Fp::one()).into()
 }
 
 #[wasm_bindgen]

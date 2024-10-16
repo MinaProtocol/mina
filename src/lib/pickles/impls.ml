@@ -112,9 +112,46 @@ module Step = struct
   module Digest = Digest.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
-  let input ~proofs_verified ~wrap_rounds =
+  type unfinalized_proof =
+    ( Challenge.Constant.t
+    , Challenge.Constant.t Scalar_challenge.t
+    , Tock.Field.t Shifted_value.Type2.t
+    , ( Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
+      , Tock.Rounds.n )
+      Vector.t
+    , Digest.Constant.t
+    , bool )
+    Types.Step.Proof_state.Per_proof.In_circuit.t
+
+  type 'proofs_verified statement =
+    ( (unfinalized_proof, 'proofs_verified) Pickles_types.Vector.t
+    , Import.Types.Digest.Constant.t
+    , (Import.Types.Digest.Constant.t, 'proofs_verified) Pickles_types.Vector.t
+    )
+    Import.Types.Step.Statement.t
+
+  type unfinalized_proof_var =
+    ( Field.t
+    , Field.t Scalar_challenge.t
+    , Other_field.t Shifted_value.Type2.t
+    , ( Field.t Scalar_challenge.t Bulletproof_challenge.t
+      , Tock.Rounds.n )
+      Pickles_types.Vector.t
+    , Field.t
+    , Boolean.var )
+    Types.Step.Proof_state.Per_proof.In_circuit.t
+
+  type 'proofs_verified statement_var =
+    ( (unfinalized_proof_var, 'proofs_verified) Pickles_types.Vector.t
+    , Impl.field Snarky_backendless.Cvar.t
+    , ( Impl.field Snarky_backendless.Cvar.t
+      , 'proofs_verified )
+      Pickles_types.Vector.t )
+    Import.Types.Step.Statement.t
+
+  let input ~proofs_verified =
     let open Types.Step.Statement in
-    let spec = spec proofs_verified wrap_rounds in
+    let spec = spec proofs_verified Tock.Rounds.n in
     let (T (typ, f, f_inv)) =
       Spec.packed_typ
         (module Impl)

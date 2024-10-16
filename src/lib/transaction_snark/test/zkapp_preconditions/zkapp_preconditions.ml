@@ -444,7 +444,7 @@ let%test_module "Account precondition tests" =
       let interval v =
         { Closed_interval.lower = v; Closed_interval.upper = v }
       in
-      let { Mina_base.Account.Poly.balance
+      let { Mina_base.Account.balance
           ; nonce
           ; receipt_chain_hash
           ; delegate

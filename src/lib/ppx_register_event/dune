@@ -16,6 +16,5 @@
    interpolator_lib
  )
  (instrumentation (backend bisect_ppx))
- (preprocessor_deps ../../config.mlh)
  (preprocess (pps ppx_version ppxlib.metaquot))
  (ppx_runtime_libraries structured_log_events yojson))

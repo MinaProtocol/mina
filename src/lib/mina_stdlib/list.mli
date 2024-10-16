@@ -1,3 +1,7 @@
+open Core_kernel
+
+include module type of List
+
 (** {1 Predicates over list lengths}*)
 
 module Length : sig

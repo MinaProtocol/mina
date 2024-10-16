@@ -8,9 +8,12 @@ use kimchi::{
 };
 
 /// Converts the linearization of the kimchi circuit polynomial into a printable string.
-pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
+pub fn linearization_strings<F: ark_ff::PrimeField>(
     uses_custom_gates: bool,
-) -> (String, Vec<(String, String)>) {
+) -> (String, Vec<(String, String)>)
+    where
+        num_bigint::BigUint: From<F::BigInt>,
+{
     let features = if uses_custom_gates {
         None
     } else {

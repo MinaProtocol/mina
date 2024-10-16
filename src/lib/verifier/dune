@@ -27,7 +27,6 @@
    blockchain_snark
    mina_base
    mina_state
-   mina_compile_config
    pickles
    genesis_constants
    signature_lib

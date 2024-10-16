@@ -1,3 +1,5 @@
+let B = ../../External/Buildkite.dhall
+
 let Cmd = ../../Lib/Cmds.dhall
 
 let S = ../../Lib/SelectFiles.dhall
@@ -16,11 +18,13 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
-let RunWithPostgres = ../../Command/RunWithPostgres.dhall
+let Artifacts = ../../Constants/Artifacts.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let RunWithPostgres = ../../Command/RunWithPostgres.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
@@ -35,7 +39,11 @@ in  Pipeline.build
         , dirtyWhen = dirtyWhen
         , path = "Test"
         , name = "RosettaIntegrationTests"
-        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
         }
       , steps =
         [ Command.build
@@ -58,6 +66,7 @@ in  Pipeline.build
               ]
             , label = "Rosetta integration tests Bullseye"
             , key = "rosetta-integration-tests-bullseye"
+            , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Small
             , depends_on =
                 Dockers.dependsOn

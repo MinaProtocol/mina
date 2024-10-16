@@ -543,7 +543,7 @@ let compile :
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = max_proofs_verified)
     -> name:string
-    -> constraint_constants:_
+    -> ?constraint_constants:_
     -> choices:
          (   self:
                ( Zkapp_statement.Checked.t
@@ -586,7 +586,7 @@ let compile :
            Deferred.t )
          H3_2.T(Pickles.Prover).t =
  fun ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain ~auxiliary_typ
-     ~branches ~max_proofs_verified ~name ~constraint_constants ~choices () ->
+     ~branches ~max_proofs_verified ~name ?constraint_constants ~choices () ->
   let vk_hash = ref None in
   let choices ~self =
     let rec go :
@@ -647,7 +647,7 @@ let compile :
     Pickles.compile_async () ?self ?cache ?proof_cache ?disk_keys
       ?override_wrap_domain ~public_input:(Output Zkapp_statement.typ)
       ~auxiliary_typ:Typ.(Prover_value.typ () * auxiliary_typ)
-      ~branches ~max_proofs_verified ~name ~constraint_constants ~choices
+      ~branches ~max_proofs_verified ~name ?constraint_constants ~choices
   in
   let () =
     vk_hash :=

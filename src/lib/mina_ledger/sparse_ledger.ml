@@ -93,7 +93,7 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
       |> Signature_lib.Public_key.compress )
   in
   Ledger.with_ledger
-    ~depth:Genesis_constants.Constraint_constants.for_unit_tests.ledger_depth
+    ~depth:Genesis_constants.For_unit_tests.Constraint_constants.t.ledger_depth
     ~f:(fun ledger ->
       let _, pub1 = keygen () in
       let _, pub2 = keygen () in

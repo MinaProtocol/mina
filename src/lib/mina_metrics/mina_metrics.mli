@@ -424,6 +424,8 @@ module Transition_frontier : sig
     val update : float -> unit
 
     val clear : unit -> unit
+
+    val initialize : Core_kernel.Time.Span.t -> unit
   end
 
   val recently_finalized_staged_txns : Gauge.t
@@ -486,6 +488,8 @@ module Block_latency : sig
     val update : float -> unit
 
     val clear : unit -> unit
+
+    val initialize : Core_kernel.Time.Span.t -> unit
   end
 
   module Gossip_time : sig
@@ -494,6 +498,8 @@ module Block_latency : sig
     val update : Time.Span.t -> unit
 
     val clear : unit -> unit
+
+    val initialize : Core_kernel.Time.Span.t -> unit
   end
 
   module Inclusion_time : sig
@@ -502,6 +508,8 @@ module Block_latency : sig
     val update : Time.Span.t -> unit
 
     val clear : unit -> unit
+
+    val initialize : Core_kernel.Time.Span.t -> unit
   end
 
   module Validation_acceptance_time : sig
@@ -510,6 +518,8 @@ module Block_latency : sig
     val update : Time.Span.t -> unit
 
     val clear : unit -> unit
+
+    val initialize : Core_kernel.Time.Span.t -> unit
   end
 end
 
@@ -553,3 +563,5 @@ module Archive : sig
   val create_archive_server :
     ?forward_uri:Uri.t -> port:int -> logger:Logger.t -> unit -> t Deferred.t
 end
+
+val initialize_all : Time.Span.t -> unit

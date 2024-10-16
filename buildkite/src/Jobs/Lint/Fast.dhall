@@ -18,7 +18,6 @@ let commands =
       [ Cmd.run "./scripts/lint_codeowners.sh"
       , Cmd.run "./scripts/lint_rfcs.sh"
       , Cmd.run "make check-snarky-submodule"
-      , Cmd.run "./scripts/lint_preprocessor_deps.sh"
       ]
 
 in  Pipeline.build
@@ -33,7 +32,11 @@ in  Pipeline.build
           ]
         , path = "Lint"
         , name = "Fast"
-        , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Lint ]
+        , tags =
+          [ PipelineTag.Type.Fast
+          , PipelineTag.Type.Lint
+          , PipelineTag.Type.Stable
+          ]
         }
       , steps =
         [ Command.build

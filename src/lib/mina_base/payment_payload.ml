@@ -1,7 +1,5 @@
 (* payment_payload.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Signature_lib
 module Amount = Currency.Amount

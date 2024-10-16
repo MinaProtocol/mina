@@ -6,7 +6,6 @@ let Package
     : Type
     = < Daemon
       | Archive
-      | ArchiveMigration
       | TestExecutive
       | BatchTxn
       | LogProc
@@ -14,12 +13,7 @@ let Package
       | FunctionalTestSuite
       >
 
-let MainPackages =
-      [ Package.Daemon
-      , Package.Archive
-      , Package.ArchiveMigration
-      , Package.LogProc
-      ]
+let MainPackages = [ Package.Daemon, Package.Archive, Package.LogProc ]
 
 let AuxiliaryPackages =
       [ Package.TestExecutive
@@ -33,7 +27,6 @@ let capitalName =
       ->  merge
             { Daemon = "Daemon"
             , Archive = "Archive"
-            , ArchiveMigration = "ArchiveMigration"
             , TestExecutive = "TestExecutive"
             , BatchTxn = "BatchTxn"
             , LogProc = "Logproc"
@@ -47,7 +40,6 @@ let lowerName =
       ->  merge
             { Daemon = "daemon"
             , Archive = "archive"
-            , ArchiveMigration = "archive_migration"
             , TestExecutive = "test_executive"
             , BatchTxn = "batch_txn"
             , LogProc = "logproc"
@@ -65,7 +57,6 @@ let debianName =
                 "mina-${Network.lowerName network}${Profile.toLabelSegment
                                                       profile}"
             , Archive = "mina-archive"
-            , ArchiveMigration = "mina-archive-migration"
             , TestExecutive = "mina-test-executive"
             , BatchTxn = "mina-batch-txn"
             , LogProc = "mina-logproc"

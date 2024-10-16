@@ -26,9 +26,11 @@
  ))
 
 (rule
- (targets scalars.ml)
+ (target scalars.ml)
  (mode promote)
+ (deps
+  (:< gen_scalars/gen_scalars.exe))
  (action
   (progn
-   (run gen_scalars/gen_scalars.exe scalars.ml)
+   (run %{<} %{target})
    (run ocamlformat -i scalars.ml))))

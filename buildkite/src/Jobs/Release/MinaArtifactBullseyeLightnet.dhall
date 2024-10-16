@@ -9,7 +9,7 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
-          , artifacts = [ Artifacts.Type.Daemon ]
+          , artifacts = [ Artifacts.Type.Daemon, Artifacts.Type.LogProc ]
           , profile = Profiles.Type.Lightnet
           }
       )

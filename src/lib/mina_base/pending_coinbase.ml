@@ -1314,7 +1314,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let%test_unit "add stack + remove stack = initial tree " =
     let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+      Genesis_constants.For_unit_tests.Constraint_constants.t
     in
     let depth = constraint_constants.pending_coinbase_depth in
     let coinbases_gen =
@@ -1399,7 +1399,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   let%test_unit "Checked_stack = Unchecked_stack" =
     let open Quickcheck in
     let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+      Genesis_constants.For_unit_tests.Constraint_constants.t
     in
     test ~trials:20
       (Generator.tuple2 Stack.gen (Coinbase.Gen.gen ~constraint_constants))
@@ -1422,7 +1422,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   let%test_unit "Checked_tree = Unchecked_tree" =
     let open Quickcheck in
     let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+      Genesis_constants.For_unit_tests.Constraint_constants.t
     in
     let depth = constraint_constants.pending_coinbase_depth in
     let pending_coinbases = create ~depth () |> Or_error.ok_exn in
@@ -1487,7 +1487,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   let%test_unit "Checked_tree = Unchecked_tree after pop" =
     let open Quickcheck in
     let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+      Genesis_constants.For_unit_tests.Constraint_constants.t
     in
     let depth = constraint_constants.pending_coinbase_depth in
     test ~trials:20
@@ -1579,7 +1579,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let open Quickcheck in
     let module Pending_coinbase = T in
     let constraint_constants =
-      { Genesis_constants.Constraint_constants.for_unit_tests with
+      { Genesis_constants.For_unit_tests.Constraint_constants.t with
         pending_coinbase_depth = 3
       }
     in

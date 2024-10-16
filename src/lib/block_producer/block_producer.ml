@@ -14,6 +14,12 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val commit_id : string
+
+  val zkapp_cmd_limit : int option ref
+
+  val vrf_poll_interval : Time.Span.t
 end
 
 type Structured_log_events.t += Block_produced
@@ -71,8 +77,6 @@ let lift_sync f =
            [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
          Ivar.fill ivar (f ()) ) )
 
-let zkapp_cmd_limit = ref Mina_compile_config.zkapp_cmd_limit
-
 module Singleton_scheduler : sig
   type t
 
@@ -122,7 +126,7 @@ end = struct
 end
 
 (** Sends an error to the reporting service containing as many failed transactions as we can fit. *)
-let report_transaction_inclusion_failures ~logger failed_txns =
+let report_transaction_inclusion_failures ~commit_id ~logger failed_txns =
   let num_failures = List.length failed_txns in
   let count_size = Fn.compose String.length Yojson.Safe.to_string in
   let wrap_error failed_txns_json =
@@ -154,7 +158,7 @@ let report_transaction_inclusion_failures ~logger failed_txns =
           :: generate_errors remaining_failures
                (available_bytes - element_size - 1)
   in
-  Node_error_service.send_dynamic_report ~logger
+  Node_error_service.send_dynamic_report ~commit_id ~logger
     ~generate_error:(fun available_bytes ->
       (* subtract 2 bytes to account for empty string *)
       let base_error_size = count_size (wrap_error (`String "")) - 2 in
@@ -162,7 +166,7 @@ let report_transaction_inclusion_failures ~logger failed_txns =
       let leftover_bytes = available_bytes - base_error_size - 2 in
       wrap_error (`List (generate_errors failed_txns leftover_bytes)) )
 
-let generate_next_state ~zkapp_cmd_limit ~constraint_constants
+let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
     ~previous_protocol_state ~time_controller ~staged_ledger ~transactions
     ~get_completed_work ~logger ~(block_data : Consensus.Data.Block_data.t)
     ~winner_pk ~scheduled_time ~log_block_creation ~block_reward_threshold
@@ -238,7 +242,7 @@ let generate_next_state ~zkapp_cmd_limit ~constraint_constants
                              if not (List.is_empty failed_txns) then
                                don't_wait_for
                                  (report_transaction_inclusion_failures ~logger
-                                    failed_txns ) ;
+                                    ~commit_id failed_txns ) ;
                              diff )
                       |> Result.map_error ~f:(fun err ->
                              Staged_ledger.Staged_ledger_error.Pre_diff err )
@@ -604,18 +608,14 @@ module Vrf_evaluation_state = struct
     | Completed ->
         t.vrf_evaluator_status <- Completed
 
-  let poll ~vrf_evaluator ~logger t =
+  let poll ~vrf_evaluator ~logger ~vrf_poll_interval t =
     [%log info] "Polling VRF evaluator process" ;
     let%bind vrf_result = poll_vrf_evaluator vrf_evaluator ~logger in
     let%map vrf_result =
       match (vrf_result.evaluator_status, vrf_result.slots_won) with
       | At _, [] ->
           (*try again*)
-          let%bind () =
-            Async.after
-              (Time.Span.of_ms
-                 (Mina_compile_config.vrf_poll_interval_ms |> Int.to_float) )
-          in
+          let%bind () = Async.after vrf_poll_interval in
           poll_vrf_evaluator vrf_evaluator ~logger
       | _ ->
           return vrf_result
@@ -632,7 +632,8 @@ module Vrf_evaluation_state = struct
                      s.global_slot ) ) )
         ]
 
-  let update_epoch_data ~vrf_evaluator ~logger ~epoch_data_for_vrf t =
+  let update_epoch_data ~vrf_evaluator ~logger ~epoch_data_for_vrf
+      ~vrf_poll_interval t =
     let set_epoch_data () =
       let f () =
         O1trace.thread "set_vrf_evaluator_epoch_state" (fun () ->
@@ -646,7 +647,7 @@ module Vrf_evaluation_state = struct
         [ ("epoch", Mina_numbers.Length.to_yojson epoch_data_for_vrf.epoch) ] ;
     t.vrf_evaluator_status <- Start ;
     let%bind () = set_epoch_data () in
-    poll ~logger ~vrf_evaluator t
+    poll ~logger ~vrf_evaluator ~vrf_poll_interval t
 end
 
 let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
@@ -698,11 +699,10 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
         [%log info] "Pausing block production while bootstrapping"
       in
       let slot_tx_end =
-        Runtime_config.slot_tx_end_or_default precomputed_values.runtime_config
+        Runtime_config.slot_tx_end precomputed_values.runtime_config
       in
       let slot_chain_end =
-        Runtime_config.slot_chain_end_or_default
-          precomputed_values.runtime_config
+        Runtime_config.slot_chain_end precomputed_values.runtime_config
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
       let produce ivar (scheduled_time, block_data, winner_pubkey) =
@@ -799,8 +799,9 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
             in
             [%log internal] "Generate_next_state" ;
             let%bind next_state_opt =
-              generate_next_state ~constraint_constants ~scheduled_time
-                ~block_data ~previous_protocol_state ~time_controller
+              generate_next_state ~commit_id ~constraint_constants
+                ~scheduled_time ~block_data ~previous_protocol_state
+                ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~log_block_creation
                 ~winner_pk:winner_pubkey ~block_reward_threshold
@@ -1156,6 +1157,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                  if Mina_numbers.Length.(i' > i) then
                    Vrf_evaluation_state.update_epoch_data ~vrf_evaluator
                      ~epoch_data_for_vrf ~logger vrf_evaluation_state
+                     ~vrf_poll_interval
                  else Deferred.unit
                in
                let%bind () =
@@ -1166,22 +1168,17 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                    && not (Vrf_evaluation_state.finished vrf_evaluation_state)
                  then
                    Vrf_evaluation_state.poll ~vrf_evaluator ~logger
-                     vrf_evaluation_state
+                     vrf_evaluation_state ~vrf_poll_interval
                  else Deferred.unit
                in
                match Core.Queue.dequeue vrf_evaluation_state.queue with
                | None -> (
                    (*Keep trying until we get some slots*)
                    let poll () =
-                     let%bind () =
-                       Async.after
-                         (Time.Span.of_ms
-                            ( Mina_compile_config.vrf_poll_interval_ms
-                            |> Int.to_float ) )
-                     in
+                     let%bind () = Async.after vrf_poll_interval in
                      let%map () =
                        Vrf_evaluation_state.poll ~vrf_evaluator ~logger
-                         vrf_evaluation_state
+                         vrf_evaluation_state ~vrf_poll_interval
                      in
                      Singleton_scheduler.schedule scheduler
                        (Block_time.now time_controller)

@@ -106,10 +106,7 @@ val typ :
            Bulletproof_challenge.t
        ; challenge1 : Limb_vector.Challenge.Constant.t
        ; challenge2 : 'a Limb_vector.Challenge.t
-       ; digest1 :
-           ( Limb_vector.Constant.Hex64.t
-           , Digest.Limbs.n )
-           Pickles_types.Vector.vec
+       ; digest1 : Digest.Constant.t
        ; digest2 : 'a Snarky_backendless.Cvar.t
        ; field1 : 'c
        ; field2 : 'b
@@ -145,10 +142,7 @@ val packed_typ :
            Bulletproof_challenge.t
        ; challenge1 : Limb_vector.Challenge.Constant.t
        ; challenge2 : 'a Snarky_backendless.Cvar.t
-       ; digest1 :
-           ( Limb_vector.Constant.Hex64.t
-           , Digest.Limbs.n )
-           Pickles_types.Vector.vec
+       ; digest1 : Digest.Constant.t
        ; digest2 : 'a Snarky_backendless.Cvar.t
        ; field1 : 'c
        ; field2 : 'b
@@ -174,10 +168,7 @@ val pack :
            Bulletproof_challenge.t
        ; challenge1 : Limb_vector.Challenge.Constant.t
        ; challenge2 : 'f Limb_vector.Challenge.t
-       ; digest1 :
-           ( Limb_vector.Constant.Hex64.t
-           , Digest.Limbs.n )
-           Pickles_types.Vector.vec
+       ; digest1 : Digest.Constant.t
        ; digest2 : 'f Snarky_backendless.Cvar.t
        ; field1 : 'c
        ; field2 : 'd
