@@ -521,6 +521,7 @@ struct
 
   let get_all_completed_checked_work ?limit t =
     let work = Resource_pool.all_completed_checked_work (resource_pool t) in
+    print_endline @@ Fmt.strf ">>>>>>>>>>>>>get_all_completed_checked_work of size %d" (List.length work) ;
     match limit with
     | None ->
         work

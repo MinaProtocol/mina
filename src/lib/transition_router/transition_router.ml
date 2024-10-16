@@ -136,7 +136,7 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
     ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
     ?transition_writer_ref ~consensus_local_state ~frontier_w
     ~initial_root_transition ~persistent_root ~persistent_frontier
-    ~cache_exceptions ~best_seen_transition ~catchup_mode =
+    ~cache_exceptions ~best_seen_transition ~catchup_mode ~snark_pool =
   let open Context in
   [%str_log info] Starting_bootstrap_controller ;
   [%log info] "Starting Bootstrap Controller phase" ;
@@ -168,7 +168,60 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
     match Envelope.Incoming.sender block with Remote r -> [ r ] | Local -> []
   in
   let preferred_peers = Option.value_map ~f ~default:[] best_seen_transition in
+  (* TODO find a better place for this *)
+  let fetch_completed_snarks () =
+    Deferred.List.iter
+      ~f:(fun peer ->
+        print_endline @@ "PEER IS " ^ Network_peer.Peer.to_string peer ;
+        let completed_works =
+          Mina_networking.get_completed_checked_snarks network peer
+        in
+        let%bind completed_works = completed_works in
+        let completed_works =
+          match completed_works with
+          | Error e ->
+              [%log error]
+                ~metadata:
+                  [ ("peer", Network_peer.Peer.to_yojson peer)
+                  ; ("error", Error_json.error_to_yojson e)
+                  ]
+                "Failed to fetch completed snarks from peer: $error" ;
+              []
+          | Ok completed_works ->
+              completed_works
+        in
+        let () =
+          List.iter completed_works ~f:(fun work ->
+              let callback =
+                let cb =
+                  Mina_net2.Validation_callback.create_without_expiration ()
+                in
+                Network_pool.Snark_pool.Broadcast_callback.External cb
+              in
+              (* proofs should be verified in apply and broadcast *)
+              let msg =
+                let statement = Transaction_snark_work.Checked.statement work in
+                let snark =
+                  Network_pool.Priced_proof.
+                    { proof = work.proofs
+                    ; fee = { fee = work.fee; prover = work.prover }
+                    }
+                in
+                let diff =
+                  Network_pool.Snark_pool.Diff_versioned.Add_solved_work
+                    (statement, snark)
+                in
+                Envelope.Incoming.wrap_peer ~data:diff ~sender:peer
+              in
+              print_endline "fetch and broadcasting completed snarks";
+              Network_pool.Snark_pool.apply_and_broadcast snark_pool msg
+                callback )
+        in
+        Deferred.unit )
+      preferred_peers
+  in
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
+  don't_wait_for (fetch_completed_snarks ()) ;
   upon
     (Bootstrap_controller.run
        ~context:(module Context)
@@ -362,7 +415,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
     ~get_completed_work ~frontier_w ~producer_transition_writer_ref
     ~clear_reader ~verified_transition_writer ~cache_exceptions
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
-    ~consensus_local_state ~catchup_mode ~notify_online =
+    ~consensus_local_state ~catchup_mode ~notify_online ~snark_pool =
   let open Context in
   [%log info] "Initializing transition router" ;
   let%bind () =
@@ -396,7 +449,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ?transition_writer_ref:None ~consensus_local_state
         ~frontier_w ~persistent_root ~persistent_frontier ~cache_exceptions
-        ~initial_root_transition ~catchup_mode ~best_seen_transition
+        ~initial_root_transition ~catchup_mode ~best_seen_transition ~snark_pool
   | Some best_tip, Some frontier
     when is_transition_for_bootstrap
            ~context:(module Context)
@@ -423,7 +476,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
         ~clear_reader ?transition_writer_ref:None ~consensus_local_state
         ~frontier_w ~initial_root_transition ~persistent_root
         ~persistent_frontier ~cache_exceptions ~catchup_mode
-        ~best_seen_transition:(Some best_tip)
+        ~best_seen_transition:(Some best_tip) ~snark_pool
   | best_tip_opt, Some frontier ->
       let collected_transitions =
         match best_tip_opt with
@@ -532,7 +585,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
     ~get_current_frontier ~frontier_broadcast_writer:frontier_w
     ~network_transition_reader ~producer_transition_reader
     ~get_most_recent_valid_block ~most_recent_valid_block_writer
-    ~get_completed_work ~catchup_mode ~notify_online () =
+    ~get_completed_work ~catchup_mode ~notify_online ~snark_pool () =
   let open Context in
   [%log info] "Starting transition router" ;
   let initialization_finish_signal = Ivar.create () in
@@ -618,7 +671,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~get_completed_work ~frontier_w ~catchup_mode
           ~producer_transition_writer_ref ~clear_reader
           ~verified_transition_writer ~most_recent_valid_block_writer
-          ~consensus_local_state ~notify_online
+          ~consensus_local_state ~notify_online ~snark_pool
       in
       Ivar.fill_if_empty initialization_finish_signal () ;
       let valid_transition_reader1, valid_transition_reader2 =
@@ -684,7 +737,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                              ~consensus_local_state ~frontier_w ~persistent_root
                              ~persistent_frontier ~initial_root_transition
                              ~best_seen_transition:(Some enveloped_transition)
-                             ~catchup_mode )
+                             ~catchup_mode ~snark_pool )
                       else Deferred.unit
                   | None ->
                       Deferred.unit
