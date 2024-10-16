@@ -172,6 +172,7 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
   let fetch_completed_snarks () =
     Deferred.List.iter
       ~f:(fun peer ->
+        print_endline @@ "PEER IS " ^ Network_peer.Peer.to_string peer ;
         let completed_works =
           Mina_networking.get_completed_checked_snarks network peer
         in
@@ -212,6 +213,7 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
                 in
                 Envelope.Incoming.wrap_peer ~data:diff ~sender:peer
               in
+              print_endline "fetch and broadcasting completed snarks";
               Network_pool.Snark_pool.apply_and_broadcast snark_pool msg
                 callback )
         in

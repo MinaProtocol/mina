@@ -796,10 +796,12 @@ module Get_completed_snarks = struct
     let open Context in
     (* the maximum number of completed snarks to return over rpc *)
     let limit = 10 in
+
     match get_snark_pool () with
     | None ->
         return None
     | Some snark_pool ->
+      print_endline "get_snark_pool ()";
         snark_pool
         |> Network_pool.Snark_pool.get_all_completed_checked_work ~limit
         |> Option.some |> return
