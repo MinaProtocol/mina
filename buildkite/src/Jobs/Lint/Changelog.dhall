@@ -32,6 +32,7 @@ in  Pipeline.build
               [ Cmd.run "./buildkite/scripts/refresh_code.sh"
               , Cmd.run
                   "./buildkite/scripts/generate-diff.sh > _computed_diff.txt"
+              , Cmd.run "cat _computed_diff.txt"
               , Cmd.run
                   ''
                       if (cat _computed_diff.txt | egrep -q '${triggerChange}'); then
