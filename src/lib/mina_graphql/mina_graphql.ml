@@ -2198,19 +2198,59 @@ module Queries = struct
         Mina_lib.snark_pool mina |> Network_pool.Snark_pool.resource_pool
         |> Network_pool.Snark_pool.Resource_pool.all_completed_work )
 
+  (* Auxiliary function to fetch all pending work *)
+  let get_pending_work mina =
+    let snark_job_state = Mina_lib.snark_job_state mina in
+    let snark_pool = Mina_lib.snark_pool mina in
+    let fee_opt =
+      Mina_lib.(
+        Option.map (snark_worker_key mina) ~f:(fun _ -> snark_work_fee mina))
+    in
+    Work_selector.pending_work_statements ~snark_pool ~fee_opt snark_job_state
+
   let pending_snark_work =
     field "pendingSnarkWork" ~doc:"List of snark works that are yet to be done"
       ~args:Arg.[]
       ~typ:(non_null @@ list @@ non_null Types.pending_work)
-      ~resolve:(fun { ctx = mina; _ } () ->
-        let snark_job_state = Mina_lib.snark_job_state mina in
-        let snark_pool = Mina_lib.snark_pool mina in
-        let fee_opt =
-          Mina_lib.(
-            Option.map (snark_worker_key mina) ~f:(fun _ -> snark_work_fee mina))
-        in
-        Work_selector.pending_work_statements ~snark_pool ~fee_opt
-          snark_job_state )
+      ~resolve:(fun { ctx = mina; _ } () -> get_pending_work mina)
+
+  let pending_snark_work_range =
+    field "pendingSnarkWorkRange"
+      ~doc:
+        "Find any sequence of pending snark works between two indexes in the \
+         pending snark work pool"
+      ~args:
+        Arg.
+          [ arg "startingIndex"
+              ~doc:
+                "The first index to be taken from the pending snark work pool"
+              ~typ:(non_null Types.Input.UInt32.arg_typ)
+          ; arg' "endingIndex"
+              ~doc:
+                "The last index to be taken from the pending snark work pool \
+                 (excluded). If not specified or greater than the pending \
+                 snark work list, all elements from index [startingIndex] will \
+                 be returned. An empty list will be returned if \
+                 [startingIndex, endingIndex] is not a valid range of the \
+                 pending snark work list."
+              ~typ:Types.Input.UInt32.arg_typ ~default:Unsigned.UInt32.max_int
+          ]
+      ~typ:(non_null @@ list @@ non_null Types.pending_work)
+      ~resolve:(fun { ctx = mina; _ } () start_idx end_idx ->
+        let start_idx = Unsigned.UInt32.to_int start_idx in
+        let end_idx = Unsigned.UInt32.to_int end_idx in
+        let pending_work = get_pending_work mina in
+        let len_pending_work = List.length pending_work in
+        (* end_idx is max_int in the default case, in that case we want to take
+           all elements after start_idx. If [start_idx, end_idx] is not a
+           valid range, [] is returned *)
+        if start_idx >= end_idx || start_idx >= len_pending_work then []
+        else
+          let len =
+            if start_idx >= end_idx then 0
+            else min (end_idx - start_idx) (len_pending_work - start_idx)
+          in
+          List.sub ~pos:start_idx ~len @@ pending_work )
 
   module SnarkedLedgerMembership = struct
     let resolve_membership :
@@ -2774,6 +2814,7 @@ module Queries = struct
     ; trust_status_all
     ; snark_pool
     ; pending_snark_work
+    ; pending_snark_work_range
     ; SnarkedLedgerMembership.snarked_ledger_account_membership
     ; SnarkedLedgerMembership.encoded_snarked_ledger_account_membership
     ; genesis_constants
