@@ -49,5 +49,5 @@ in  Pipeline.build
               , name = "RosettaUnitTest"
               , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
               }
-      , steps = [ buildTestCmd "dev" "src/app/rosetta" Size.Small ]
+      , steps = [ buildTestCmd "dev" "src/app/rosetta" Size.Multi ]
       }

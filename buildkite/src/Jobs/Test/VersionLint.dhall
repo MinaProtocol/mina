@@ -67,10 +67,10 @@ in  Pipeline.build
       , steps =
         [ buildTestCmd
             "compatible"
-            Size.Small
+            Size.Multi
             dependsOn
             (B/SoftFail.Boolean True)
-        , buildTestCmd "develop" Size.Small dependsOn (B/SoftFail.Boolean True)
-        , buildTestCmd "master" Size.Small dependsOn (B/SoftFail.Boolean True)
+        , buildTestCmd "develop" Size.Multi dependsOn (B/SoftFail.Boolean True)
+        , buildTestCmd "master" Size.Multi dependsOn (B/SoftFail.Boolean True)
         ]
       }

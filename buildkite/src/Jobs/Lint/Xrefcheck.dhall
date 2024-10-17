@@ -50,7 +50,7 @@ in  Pipeline.build
               ]
             , label = "Verifies references in markdown"
             , key = "xrefcheck"
-            , target = Size.Small
+            , target = Size.Multi
             , soft_fail = Some (B/SoftFail.Boolean True)
             }
         ]

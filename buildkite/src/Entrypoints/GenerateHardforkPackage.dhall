@@ -39,7 +39,7 @@ let generate_hardfork_package =
                         ]
                       , label = "Generate hardfork package"
                       , key = "generate-hardfork-package"
-                      , target = Size.Small
+                      , target = Size.Multi
                       , docker = Some Docker::{
                         , image =
                             (../Constants/ContainerImages.dhall).toolchainBase

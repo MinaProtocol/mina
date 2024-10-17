@@ -58,7 +58,7 @@ in  Pipeline.build
               ]
             , label = "Rosetta integration tests Bullseye"
             , key = "rosetta-integration-tests-bullseye"
-            , target = Size.Small
+            , target = Size.Multi
             , depends_on =
                 Dockers.dependsOn
                   Dockers.Type.Bullseye
