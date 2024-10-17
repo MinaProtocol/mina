@@ -1,5 +1,3 @@
-let Cmd = ../../Lib/Cmds.dhall
-
 let S = ../../Lib/SelectFiles.dhall
 
 let B = ../../External/Buildkite.dhall
@@ -16,21 +14,24 @@ let Command = ../../Command/Base.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
-let Docker = ../../Command/Docker/Type.dhall
-
-let Size = ../../Command/Size.dhall
-
-let DebianVersions = ../../Constants/DebianVersions.dhall
+let Dockers = ../../Constants/DockerVersions.dhall
 
 let Network = ../../Constants/Network.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
+let Artifacts = ../../Constants/Artifacts.dhall
+
+let Docker = ../../Command/Docker/Type.dhall
+
+let Size = ../../Command/Size.dhall
+
 let dependsOn =
-      DebianVersions.dependsOn
-        DebianVersions.DebVersion.Bullseye
+      Dockers.dependsOn
+        Dockers.Type.Bullseye
         Network.Type.Devnet
         Profiles.Type.Standard
+        Artifacts.Type.Daemon
 
 let buildTestCmd
     : Text -> Size -> List Command.TaggedKey.Type -> B/SoftFail -> Command.Type
@@ -44,9 +45,9 @@ let buildTestCmd
                   RunInToolchain.runInToolchain
                     ([] : List Text)
                     "buildkite/scripts/dump-mina-type-shapes.sh"
-                # [ Cmd.run
-                      "gsutil cp \$(git log -n 1 --format=%h --abbrev=7)-type_shape.txt \$MINA_TYPE_SHAPE gs://mina-type-shapes"
-                  ]
+                # RunInToolchain.runInToolchain
+                    ([] : List Text)
+                    "buildkite/scripts/version-linter-patch-missing-type-shapes.sh ${release_branch}"
                 # RunInToolchain.runInToolchain
                     ([] : List Text)
                     "buildkite/scripts/version-linter.sh ${release_branch}"
