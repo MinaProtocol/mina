@@ -83,13 +83,15 @@ class Influx:
         if Influx.bucket not in os.environ:
             raise RuntimeError(f"{Influx.bucket} env var not defined")
 
-    def __init__(self, moving_average_size=10):
+    def client(self):
         Influx.check_envs()
-        self.client = influxdb_client.InfluxDBClient(
+        return influxdb_client.InfluxDBClient(
             url=os.environ[Influx.host],
             token=os.environ[Influx.token],
             org=os.environ[Influx.org],
             bucket=os.environ[Influx.bucket])
+        
+    def __init__(self, moving_average_size=10):
         self.moving_average_size = moving_average_size
 
     def __get_moving_average_query(self, name, branch, field, branch_header):
@@ -115,7 +117,7 @@ class Influx:
         query = self.__get_moving_average_query(name, branch, field,
                                                 branch_header)
         logger.debug(f"running influx query: {query}")
-        query_api = self.client.query_api()
+        query_api = self.client().query_api()
         return query_api.query(query)
 
     def upload_csv(self, file):
