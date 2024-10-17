@@ -12,19 +12,15 @@ let Command = ../../Command/Base.dhall
 
 let Size = ../../Command/Size.dhall
 
-let triggerChange = S.compile [ S.strictlyStart (S.contains "src") ]
+let trigger = S.compile [ S.strictlyStart (S.contains "src") ]
+
+let reqFile = "^changes/\\\${BUILDKITE_PULL_REQUEST}-.*.md"
 
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen =
-          [ S.contains "src"
-          , S.exactly "buildkite/src/Jobs/Lint/Changlelog" "dhall"
-          ]
-        , path = "Lint"
-        , name = "Changelog"
-        , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Lint ]
-        }
+          [ S.contains "src"dkijania/changelog_job_check
       , steps =
         [ Command.build
             Command.Config::{
@@ -36,12 +32,14 @@ in  Pipeline.build
               , Cmd.run "cat _computed_diff.txt"
               , Cmd.quietly
                   ''
-                      if (cat _computed_diff.txt | egrep -q '${triggerChange}'); then
-                          if ! (cat _computed_diff.txt | egrep -q 'CHANGES.md'); then
+                      if (cat _computed_diff.txt | egrep -q '${trigger}'); then
+                          if ! (cat _computed_diff.txt | egrep -q '${reqFile}'); then
                               echo "Missing changelog entry detected !!"
                               echo ""
                               echo "This job detected that you modified important part of code and did not update changelog file."
-                              echo "Please ensure that you added this change to our changelog file: 'CHANGES.md'"
+                              echo "Please ensure that you added this change to our changelog file: "
+                              echo "'${reqFile}'"
+                              echo " - from example: changes/\\\${BUILDKITE_PULL_REQUEST}-new-fancy-daemon-feature.md
                               echo "It will help us to produce Release Notes for upcoming release"
                               exit 1
                           else
