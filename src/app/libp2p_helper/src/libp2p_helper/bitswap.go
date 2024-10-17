@@ -12,7 +12,6 @@ import (
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	exchange "github.com/ipfs/go-ipfs-exchange-interface"
-	ipld "github.com/ipfs/go-ipld-format"
 )
 
 type bitswapDeleteCmd struct {
@@ -91,62 +90,14 @@ func announceNewRootBlock(ctx context.Context, engine *bitswap.Bitswap, storage 
 	return storage.SetStatus(ctx, root, codanet.Full)
 }
 
-func (bs *BitswapCtx) deleteRoot(root BitswapBlockLink) error {
-	if err := bs.storage.SetStatus(bs.ctx, root, codanet.Deleting); err != nil {
-		return err
-	}
-	ClearRootDownloadState(bs, root)
-	allDescendants := []BitswapBlockLink{root}
-	viewBlockF := func(b []byte) error {
-		links, _, err := ReadBitswapBlock(b)
-		if err == nil {
-			for _, l := range links {
-				var l2 BitswapBlockLink
-				copy(l2[:], l[:])
-				allDescendants = append(allDescendants, l2)
-			}
-		}
-		return err
-	}
-	for _, block := range allDescendants {
-		if err := bs.storage.ViewBlock(bs.ctx, block, viewBlockF); err != nil && err != (ipld.ErrNotFound{Cid: codanet.BlockHashToCid(block)}) {
-			return err
-		}
-	}
-	if err := bs.storage.DeleteBlocks(bs.ctx, allDescendants); err != nil {
-		return err
-	}
-	return bs.storage.DeleteStatus(bs.ctx, root)
+func (bs *BitswapCtx) SendResourceUpdate(type_ ipc.ResourceUpdateType, tag BitswapDataTag, root root) {
+	bs.SendResourceUpdates(type_, tag, root)
 }
 
-func ClearRootDownloadState(bs BitswapState, root root) {
-	rootStates := bs.RootDownloadStates()
-	state, has := rootStates[root]
-	if !has {
-		return
-	}
-	nodeParams := bs.NodeDownloadParams()
-	delete(rootStates, root)
-	state.allDescendants.ForEach(func(c cid.Cid) error {
-		np, hasNp := nodeParams[c]
-		if hasNp {
-			delete(np, root)
-			if len(np) == 0 {
-				delete(nodeParams, c)
-			}
-		}
-		return nil
-	})
-	state.cancelF()
-}
-
-func (bs *BitswapCtx) SendResourceUpdate(type_ ipc.ResourceUpdateType, root root) {
-	bs.SendResourceUpdates(type_, root)
-}
-func (bs *BitswapCtx) SendResourceUpdates(type_ ipc.ResourceUpdateType, roots ...root) {
+func (bs *BitswapCtx) SendResourceUpdates(type_ ipc.ResourceUpdateType, tag BitswapDataTag, roots ...root) {
 	// Non-blocking upcall sending
 	select {
-	case bs.outMsgChan <- mkResourceUpdatedUpcall(type_, roots):
+	case bs.outMsgChan <- mkResourceUpdatedUpcall(type_, tag, roots):
 	default:
 		for _, root := range roots {
 			bitswapLogger.Errorf("Failed to send resource update of type %d"+
@@ -242,25 +193,27 @@ func (bs *BitswapCtx) Loop() {
 			ClearRootDownloadState(bs, root)
 		case cmd := <-bs.addCmds:
 			configuredCheck()
-			blocks, root := SplitDataToBitswapBlocksLengthPrefixedWithTag(bs.maxBlockSize, cmd.data, BlockBodyTag)
+			blocks, root := SplitDataToBitswapBlocksLengthPrefixedWithTag(bs.maxBlockSize, cmd.data, cmd.tag)
 			err := announceNewRootBlock(bs.ctx, bs.engine, bs.storage, blocks, root)
 			if err == nil {
-				bs.SendResourceUpdate(ipc.ResourceUpdateType_added, root)
+				bs.SendResourceUpdate(ipc.ResourceUpdateType_added, cmd.tag, root)
 			} else {
 				bitswapLogger.Errorf("Failed to announce root cid %s (%s)", codanet.BlockHashToCidSuffix(root), err)
 			}
 		case cmd := <-bs.deleteCmds:
 			configuredCheck()
-			success := []root{}
+			success := map[BitswapDataTag][]root{}
 			for _, root := range cmd.rootIds {
-				err := bs.deleteRoot(root)
+				tag, err := DeleteRoot(bs, root)
 				if err == nil {
-					success = append(success, root)
+					success[tag] = append(success[tag], root)
 				} else {
 					bitswapLogger.Errorf("Error processing delete request for %s: %s", codanet.BlockHashToCidSuffix(root), err)
 				}
 			}
-			bs.SendResourceUpdates(ipc.ResourceUpdateType_removed, success...)
+			for tag, roots := range success {
+				bs.SendResourceUpdates(ipc.ResourceUpdateType_removed, tag, roots...)
+			}
 		case cmd := <-bs.downloadCmds:
 			configuredCheck()
 			// We put all ids to map to avoid
