@@ -145,6 +145,9 @@ module Engine = struct
     (* unique name identifying the engine (used in test executive cli) *)
     val name : string
 
+    (* Short description of what the engine is used for. *)
+    val doc : string
+
     module Network_config : Network_config_intf
 
     module Network : Network_intf
