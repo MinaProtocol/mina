@@ -15,9 +15,11 @@ module Test_account = struct
     { account_name : string
     ; balance : string
     ; timing : Mina_base.Account_timing.t
-    ; permissions : Mina_base.Permissions.t option
-    ; zkapp : Mina_base.Zkapp_account.t option
+          [@default Mina_base.Account_timing.Untimed]
+    ; permissions : Mina_base.Permissions.t option [@default None]
+    ; zkapp : Mina_base.Zkapp_account.t option [@default None]
     }
+  [@@deriving yojson]
 
   let create ~account_name ~balance ?timing ?permissions ?zkapp () =
     { account_name
@@ -37,18 +39,19 @@ module Epoch_data = struct
   module Data = struct
     (* the seed is a field value in Base58Check format *)
     type t = { epoch_ledger : Test_account.t list; epoch_seed : string }
+    [@@deriving yojson]
   end
 
-  type t = { staking : Data.t; next : Data.t option }
+  type t = { staking : Data.t; next : Data.t option } [@@deriving yojson]
 end
 
 module Block_producer_node = struct
-  type t = { node_name : string; account_name : string }
+  type t = { node_name : string; account_name : string } [@@deriving yojson]
 end
 
 module Snark_coordinator_node = struct
   type t = { node_name : string; account_name : string; worker_nodes : int }
-  [@@deriving to_yojson]
+  [@@deriving yojson]
 end
 
 type constants =
@@ -57,34 +60,6 @@ type constants =
   ; compile_config : Mina_compile_config.t
   }
 [@@deriving to_yojson]
-
-type t =
-  { requires_graphql : bool
-        (* temporary flag to enable/disable graphql ingress deployments *)
-        (* testnet topography *)
-  ; genesis_ledger : Test_account.t list
-  ; epoch_data : Epoch_data.t option
-  ; block_producers : Block_producer_node.t list
-  ; snark_coordinator : Snark_coordinator_node.t option
-  ; snark_worker_fee : string
-  ; num_archive_nodes : int
-  ; log_precomputed_blocks : bool
-  ; start_filtered_logs : string list
-        (* ; num_plain_nodes : int  *)
-        (* blockchain constants *)
-  ; proof_config : Runtime_config.Proof_keys.t
-  ; k : int
-  ; delta : int
-  ; slots_per_epoch : int
-  ; slots_per_sub_window : int
-  ; grace_period_slots : int
-  ; txpool_max_size : int
-  ; slot_tx_end : int option
-  ; slot_chain_end : int option
-  ; network_id : string option
-  ; block_window_duration_ms : int
-  ; transaction_capacity_log_2 : int
-  }
 
 let proof_config_default : Runtime_config.Proof_keys.t =
   { level = Some Full
@@ -98,6 +73,37 @@ let proof_config_default : Runtime_config.Proof_keys.t =
   ; account_creation_fee = None
   ; fork = None
   }
+
+type t =
+  { requires_graphql : bool
+        [@default false]
+        (* temporary flag to enable/disable graphql ingress deployments *)
+        (* testnet topography *)
+  ; genesis_ledger : Test_account.t list
+  ; epoch_data : Epoch_data.t option [@default None]
+  ; block_producers : Block_producer_node.t list
+  ; snark_coordinator : Snark_coordinator_node.t option [@default None]
+  ; snark_worker_fee : string [@default "0.025"]
+  ; num_archive_nodes : int [@default 0]
+  ; log_precomputed_blocks : bool [@default false]
+  ; start_filtered_logs : string list
+        [@default []]
+        (* ; num_plain_nodes : int  *)
+        (* blockchain constants *)
+  ; proof_config : Runtime_config.Proof_keys.t [@default proof_config_default]
+  ; k : int [@default 159]
+  ; delta : int [@default 0]
+  ; slots_per_epoch : int [@default 3 * 8 * 20]
+  ; slots_per_sub_window : int [@default 2]
+  ; grace_period_slots : int [@default 140]
+  ; txpool_max_size : int [@default 3_000]
+  ; slot_tx_end : int option [@default None]
+  ; slot_chain_end : int option [@default None]
+  ; network_id : string option [@default None]
+  ; block_window_duration_ms : int [@default 0]
+  ; transaction_capacity_log_2 : int [@default 3]
+  }
+[@@deriving yojson]
 
 let log_filter_of_event_type ev_existential =
   let open Event_type in
