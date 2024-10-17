@@ -117,15 +117,6 @@ module Network_config = struct
          ; log_precomputed_blocks (* ; num_plain_nodes *)
          ; start_filtered_logs
          ; proof_config
-         ; k
-         ; delta
-         ; slots_per_epoch
-         ; slots_per_sub_window
-         ; grace_period_slots
-         ; txpool_max_size
-         ; slot_tx_end
-         ; slot_chain_end
-         ; network_id
          ; _
          }
           : Test_config.t ) =
