@@ -243,7 +243,8 @@ build_functional_test_suite_deb() {
   cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
   cp ./default/src/app/heap_usage/heap_usage.exe "${BUILDDIR}/usr/local/bin/mina-heap-usage"
   cp ./default/src/app/zkapp_limits/zkapp_limits.exe "${BUILDDIR}/usr/local/bin/mina-zkapp-limits"
-  
+  cp ./default/src/test/archive/patch_archive_test/patch_archive_test.exe "${BUILDDIR}/usr/local/bin/mina-patch-archive-test"
+
   build_deb mina-test-suite
 
 }
@@ -366,7 +367,7 @@ build_archive_deb () {
   cp ./default/src/app/extract_blocks/extract_blocks.exe "${BUILDDIR}/usr/local/bin/mina-extract-blocks"
   
   mkdir -p "${BUILDDIR}/etc/mina/archive"
-  cp ../scripts/archive/missing-blocks-guardian.sh "${BUILDDIR}/etc/mina/archive"
+  cp ../scripts/archive/missing-blocks-guardian.sh "${BUILDDIR}/usr/local/bin/mina-missing-blocks-guardian"
   
   cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILDDIR}/usr/local/bin/mina-missing-blocks-auditor"
   cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-replayer"

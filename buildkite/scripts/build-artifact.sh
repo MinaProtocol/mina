@@ -23,7 +23,7 @@ make -C src/app/libp2p_helper
 MAINNET_TARGETS=""
 [[ ${MINA_BUILD_MAINNET} ]] && MAINNET_TARGETS="src/app/cli/src/mina_mainnet_signatures.exe src/app/rosetta/rosetta_mainnet_signatures.exe src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe"
 
-echo "--- Build all major tagets required for packaging"
+echo "--- Build all major targets required for packaging"
 echo "Building from Commit SHA: ${MINA_COMMIT_SHA1}"
 echo "Rust Version: $(rustc --version)"
 dune build "--profile=${DUNE_PROFILE}" $INSTRUMENTED_PARAM \
@@ -49,4 +49,5 @@ dune build "--profile=${DUNE_PROFILE}" $INSTRUMENTED_PARAM \
   src/app/disk_caching_stats/disk_caching_stats.exe \
   src/app/heap_usage/heap_usage.exe \
   src/app/zkapp_limits/zkapp_limits.exe \
-  src/test/command_line_tests/command_line_tests.exe # 2>&1 | tee /tmp/buildocaml.log
+  src/test/command_line_tests/command_line_tests.exe \
+  src/test/archive/patch_archive_test/patch_archive_test.exe
