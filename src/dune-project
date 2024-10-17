@@ -46,6 +46,7 @@
 (package (name gadt_lib))
 (package (name generated_graphql_queries))
 (package (name generate_keypair))
+(package (name generate_random_ledger))
 (package (name genesis_constants))
 (package (name genesis_ledger_helper))
 (package (name global_signer_private_key))

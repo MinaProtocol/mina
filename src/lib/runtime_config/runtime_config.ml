@@ -1045,7 +1045,7 @@ module Proof_keys = struct
     ; account_creation_fee : Currency.Fee.Stable.Latest.t option
     ; fork : Fork_config.t option
     }
-  [@@deriving bin_io_unversioned]
+  [@@deriving bin_io_unversioned, yojson]
 
   let make ?level ?sub_windows_per_window ?ledger_depth ?work_delay
       ?block_window_duration_ms ?transaction_capacity ?coinbase_amount
