@@ -1771,7 +1771,8 @@ let internal_commands logger =
                         failwithf "Could not parse JSON: %s" err () ) )
           in
 
-          let%bind blockchain_verification_key, transaction_verification_key =
+          let%bind `Blockchain blockchain_verification_key, `Transaction transaction_verification_key =
+        
             Verifier.For_test.get_verification_keys_eagerly
               ~constraint_constants ~proof_level
           in

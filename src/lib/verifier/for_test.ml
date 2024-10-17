@@ -11,10 +11,15 @@ let get_verification_keys ~constraint_constants ~proof_level =
 
     let proof_level = proof_level
   end) in
-  (B.Proof.verification_key, T.verification_key)
+  (`Blockchain B.Proof.verification_key, `Transaction T.verification_key)
 
 let get_verification_keys_eagerly ~constraint_constants ~proof_level =
-  let blockchain, transaction =
+  let open Async.Deferred.Let_syntax in
+  let `Blockchain blockchain_vk, `Transaction transaction_vk =
     get_verification_keys ~constraint_constants ~proof_level
   in
-  Async.Deferred.both (Lazy.force blockchain) (Lazy.force transaction)
+  let%bind blockchain_vk = (Lazy.force blockchain_vk) in
+  let%bind transaction_vk = (Lazy.force transaction_vk) in
+  return (
+    `Blockchain blockchain_vk, `Transaction transaction_vk
+  )

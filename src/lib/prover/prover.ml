@@ -62,6 +62,8 @@ module Worker_state = struct
 
     val get_transaction_verification_key :
       unit -> Pickles.Verification_key.t Deferred.t
+
+    val get_config_modules: unit -> ((module Pickles_types.Nat.Intf) * (module Pickles.Statement_value_intf)) option
   end
 
   (* bin_io required by rpc_parallel *)
@@ -105,6 +107,7 @@ module Worker_state = struct
 
           let proof_level = proof_level
         end) in
+        
         let%map.Async.Deferred (_ : Pickles.Dirty.t) =
           Pickles.Cache_handle.generate_or_load B.cache_handle
           |> Promise.to_deferred
@@ -172,6 +175,9 @@ module Worker_state = struct
 
           let get_transaction_verification_key () =
             Lazy.force T.verification_key
+
+          let get_config_modules () =
+              Some (B.Proof.nat_module , B.Proof.statement_module)
         end : S )
     | Check ->
         Deferred.return
@@ -219,6 +225,9 @@ module Worker_state = struct
 
             let get_transaction_verification_key () =
               Deferred.return (Lazy.force Pickles.Verification_key.dummy)
+
+            let get_config_modules () =
+                None
           end : S )
     | No_check ->
         Deferred.return
@@ -244,6 +253,9 @@ module Worker_state = struct
 
             let get_transaction_verification_key () =
               Deferred.return (Lazy.force Pickles.Verification_key.dummy)
+
+            let get_config_modules () =
+                None
           end : S )
 
   let get = Fn.id
@@ -310,6 +322,12 @@ module Functions = struct
       (fun w () ->
         let (module M) = Worker_state.get w in
         M.get_transaction_verification_key () )
+
+  let get_config_modules =
+          create bin_unit [%bin_type_class: ((module Pickles_types.Nat.Intf with type = Max_proofs_verified) * (module Pickles.Statement_value_intf)) option]
+            (fun w () ->
+              let (module M) = Worker_state.get w in
+              M.get_config_modules () )
 end
 
 module Worker = struct
@@ -327,6 +345,7 @@ module Worker = struct
           ('w, unit, Pickles.Verification_key.t) F.t
       ; get_transaction_verification_key :
           ('w, unit, Pickles.Verification_key.t) F.t
+      ; get_config_modules: ('w, unit, ((module Pickles_types.Nat.Intf) * (module Pickles.Statement_value_intf)) option)
       }
 
     module Worker_state = Worker_state
@@ -357,6 +376,7 @@ module Worker = struct
         ; set_itn_logger_data = f set_itn_logger_data
         ; get_blockchain_verification_key = f get_blockchain_verification_key
         ; get_transaction_verification_key = f get_transaction_verification_key
+        ; get_config_modules = f get_config_modules
         }
 
       let init_worker_state
@@ -615,3 +635,7 @@ let get_blockchain_verification_key { connection; _ } =
 let get_transaction_verification_key { connection; _ } =
   Worker.Connection.run connection
     ~f:Worker.functions.get_transaction_verification_key ~arg:()
+
+let get_config_modules { connection; _ } =
+  Worker.Connection.run connection
+    ~f:Worker.functions.get_config_modules ~arg:()
