@@ -53,6 +53,12 @@ module Account_precondition = struct
   end
 end
 
+module Permissions_precondition = struct
+  module V1 = struct
+    type t = Mina_base_zkapp_precondition.Permissions.V2.t
+  end
+end
+
 module Preconditions = struct
   module V1 = struct
     type t =
