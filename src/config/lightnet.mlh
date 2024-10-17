@@ -37,7 +37,6 @@
 
 
 (*BEGIN src/config/amount_defaults/realistic.mlh*)
-[%%define default_transaction_fee "0.25"]
 [%%define default_snark_worker_fee "0.1"]
 [%%define minimum_user_command_fee "0.001"]
 (*END src/config/amount_defaults/realistic.mlh*)

@@ -68,4 +68,5 @@
   blockchain_snark
   transaction_snark
   genesis_constants
+  mina_runtime_config
   core))

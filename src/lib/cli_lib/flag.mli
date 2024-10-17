@@ -12,6 +12,8 @@ val privkey_read_path : string Command.Param.t
 
 val conf_dir : string option Command.Param.t
 
+val config_files : string list Command.Param.t
+
 module Types : sig
   type 'a with_name = { name : string; value : 'a }
 
@@ -81,20 +83,14 @@ end
 
 type signed_command_common =
   { sender : Signature_lib.Public_key.Compressed.t
-  ; fee : Currency.Fee.t
+  ; fee : Currency.Fee.t option
   ; nonce : Mina_base.Account.Nonce.t option
   ; memo : string option
   }
 
-val fee_common :
-     default_transaction_fee:Currency.Fee.t
-  -> minimum_user_command_fee:Currency.Fee.t
-  -> Currency.Fee.t Command.Param.t
+val fee_common : Currency.Fee.t option Command.Param.t
 
-val signed_command_common :
-     default_transaction_fee:Currency.Fee.t
-  -> minimum_user_command_fee:Currency.Fee.t
-  -> signed_command_common Command.Param.t
+val signed_command_common : signed_command_common Command.Param.t
 
 module Signed_command : sig
   val hd_index : Mina_numbers.Hd_index.t Command.Param.t
@@ -103,10 +99,7 @@ module Signed_command : sig
 
   val amount : Currency.Amount.t Command.Param.t
 
-  val fee :
-       default_transaction_fee:Currency.Fee.t
-    -> minimum_user_command_fee:Currency.Fee.t
-    -> Currency.Fee.t option Command.Param.t
+  val fee : Currency.Fee.t option Command.Param.t
 
   val valid_until :
     Mina_numbers.Global_slot_since_genesis.t option Command.Param.t
