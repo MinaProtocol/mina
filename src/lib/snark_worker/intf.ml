@@ -3,6 +3,8 @@ open Async
 
 let command_name = "snark-worker"
 
+type constraint_system_digests_t = (string * string) list
+
 module type Inputs_intf = sig
   open Snark_work_lib
 
@@ -87,7 +89,7 @@ module type Rpcs_versioned_S = sig
 
   module Get_work : sig
     module V2 : sig
-      type query = unit [@@deriving bin_io]
+      type query = constraint_system_digests_t [@@deriving bin_io]
 
       type response =
         (Work.Spec.t * Signature_lib.Public_key.Compressed.t) option
@@ -134,7 +136,8 @@ module type S0 = sig
   module Rpcs : sig
     module Get_work :
       Rpc_master
-        with type Master.T.query = unit
+      (* Contains constraint systems digest for compatibility check *)
+        with type Master.T.query = constraint_system_digests_t
          and type Master.T.response =
           (Work.Spec.t * Signature_lib.Public_key.Compressed.t) option
 
