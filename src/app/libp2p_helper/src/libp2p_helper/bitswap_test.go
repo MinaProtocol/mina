@@ -15,7 +15,6 @@ import (
 
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/ipfs/go-cid"
-	ipld "github.com/ipfs/go-ipld-format"
 	multihash "github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
@@ -71,12 +70,12 @@ func getRootIds(ids ipc.RootBlockId_List) ([]BitswapBlockLink, error) {
 	return links, nil
 }
 
-func deleteResource(n testNode, root root) error {
+func removeResource(n testNode, root root) error {
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 	if err != nil {
 		return err
 	}
-	m, err := ipc.NewRootLibp2pHelperInterface_DeleteResource(seg)
+	m, err := ipc.NewRootLibp2pHelperInterface_RemoveResource(seg)
 	if err != nil {
 		return err
 	}
@@ -88,7 +87,7 @@ func deleteResource(n testNode, root root) error {
 	if err != nil {
 		return err
 	}
-	DeleteResourcePush(m).handle(n.node)
+	RemoveResourcePush(m).handle(n.node)
 	return nil
 }
 
@@ -189,7 +188,7 @@ func confirmBlocksNotInStorage(bs *BitswapCtx, resource []byte) error {
 		})
 		if err == nil {
 			return fmt.Errorf("block %s wasn't deleted", codanet.BlockHashToCidSuffix(h))
-		} else if err != (ipld.ErrNotFound{Cid: codanet.BlockHashToCid(h)}) {
+		} else if !isBlockNotFound(h, err) {
 			return err
 		}
 	}
@@ -393,7 +392,7 @@ func (conf bitswapTestConfig) execute(nodes []testNode, delayBeforeDownload bool
 			if !resourceReplicated[ni] {
 				continue
 			}
-			err = deleteResource(nodes[ni], roots[ni])
+			err = removeResource(nodes[ni], roots[ni])
 			if err != nil {
 				return fmt.Errorf("Error removing own resources: %v", err)
 			}
