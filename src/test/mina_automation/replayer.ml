@@ -68,7 +68,7 @@ include Executor
 
 let of_context context =
   Executor.of_context ~context ~dune_name:"src/app/replayer/replayer.exe"
-    ~official_name:"/usr/local/bin/mina-replayer"
+    ~official_name:"mina-replayer"
 
 let run t ~archive_uri ~input_config ~interval_checkpoint
     ?checkpoint_output_folder ?checkpoint_file_prefix ~output_ledger =

@@ -395,7 +395,7 @@ func mkStreamMessageReceivedUpcall(streamIdx uint64, data []byte) *capnp.Message
 	})
 }
 
-func mkResourceUpdatedUpcall(type_ ipc.ResourceUpdateType, rootIds []root) *capnp.Message {
+func mkResourceUpdatedUpcall(type_ ipc.ResourceUpdateType, tag BitswapDataTag, rootIds []root) *capnp.Message {
 	return mkPushMsg(func(m ipc.DaemonInterface_PushMessage) {
 		im, err := m.NewResourceUpdated()
 		panicOnErr(err)
@@ -403,6 +403,7 @@ func mkResourceUpdatedUpcall(type_ ipc.ResourceUpdateType, rootIds []root) *capn
 			panic("too many root ids in a single upcall")
 		}
 		im.SetType(type_)
+		im.SetTag(uint8(tag))
 		mIds, err := im.NewIds(int32(len(rootIds)))
 		panicOnErr(err)
 		for i, rootId := range rootIds {

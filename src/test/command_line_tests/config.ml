@@ -29,8 +29,7 @@ module ConfigDirs = struct
   let generate_keys t =
     let open Deferred.Let_syntax in
     let%map () =
-      Init.Client.generate_libp2p_keypair_do (libp2p_keypair_folder t)
-        ~config_file:[] ()
+      Init.Client.generate_libp2p_keypair_do (libp2p_keypair_folder t) ()
     in
     ()
 
