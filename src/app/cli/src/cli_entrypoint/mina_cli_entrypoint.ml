@@ -1769,10 +1769,15 @@ let internal_commands logger =
                     | Error err ->
                         failwithf "Could not parse JSON: %s" err () ) )
           in
+
+          let%bind blockchain_verification_key, transaction_verification_key =
+            Verifier.For_test.get_verification_keys_eagerly
+              ~constraint_constants ~proof_level
+          in
           let%bind verifier =
             Verifier.create ~commit_id:Mina_version.commit_id ~logger
-              ~proof_level ~constraint_constants ~pids:(Pid.Table.create ())
-              ~conf_dir:(Some conf_dir) ()
+              ~proof_level ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir)
+              ~blockchain_verification_key ~transaction_verification_key ()
           in
           let%bind result =
             let cap lst =

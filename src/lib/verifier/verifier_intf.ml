@@ -65,10 +65,11 @@ module type S = sig
     -> ?enable_internal_tracing:bool
     -> ?internal_trace_filename:string
     -> proof_level:Genesis_constants.Proof_level.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> pids:Child_processes.Termination.t
     -> conf_dir:string option
     -> commit_id:string
+    -> blockchain_verification_key:Pickles.Verification_key.t
+    -> transaction_verification_key:Pickles.Verification_key.t
     -> unit
     -> t Deferred.t
 end

@@ -498,10 +498,14 @@ module Snark_pool = struct
 
       let verifier =
         Async.Thread_safe.block_on_async_exn (fun () ->
-            Verifier.create ~logger ~proof_level ~constraint_constants
-              ~conf_dir:None
+            let%bind blockchain_verification_key, transaction_verification_key =
+              Verifier.For_test.get_verification_keys_eagerly
+                ~constraint_constants ~proof_level
+            in
+            Verifier.create ~logger ~proof_level ~conf_dir:None
               ~pids:(Child_processes.Termination.create_pid_table ())
-              ~commit_id:"not specified for unit tests" () )
+              ~commit_id:"not specified for unit tests"
+              ~blockchain_verification_key ~transaction_verification_key () )
 
       let gen_proofs =
         let open Quickcheck.Generator.Let_syntax in
