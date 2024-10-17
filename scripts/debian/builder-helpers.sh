@@ -241,6 +241,8 @@ build_functional_test_suite_deb() {
 
   # Binaries
   cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
+  cp ./default/src/app/heap_usage/heap_usage.exe "${BUILDDIR}/usr/local/bin/mina-heap-usage"
+  cp ./default/src/app/zkapp_limits/zkapp_limits.exe "${BUILDDIR}/usr/local/bin/mina-zkapp-limits"
   
   build_deb mina-test-suite
 
