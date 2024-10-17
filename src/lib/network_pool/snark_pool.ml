@@ -50,6 +50,9 @@ module type S = sig
        t
     -> Transaction_snark_work.Statement.t
     -> Transaction_snark_work.Checked.t option
+
+  val get_all_completed_checked_work :
+    ?limit:int -> t -> Transaction_snark_work.Checked.Stable.V2.t list
 end
 
 module type Transition_frontier_intf = sig
@@ -147,6 +150,15 @@ struct
                        prover )
                  ]
                :: acc ) )
+
+      let all_completed_checked_work t =
+        Map.fold ~init:[] !(t.snark_tables).all
+          ~f:(fun ~key:_ ~data:{ proof; fee = { fee; prover } } acc ->
+            let checked =
+              { Transaction_snark_work.Checked.fee; proofs = proof; prover }
+              |> Transaction_snark_work.Checked.create_unsafe
+            in
+            checked :: acc )
 
       let all_completed_work (t : t) : Transaction_snark_work.Info.t list =
         Map.fold ~init:[] !(t.snark_tables).all
@@ -506,6 +518,15 @@ struct
       ~f:(fun Priced_proof.{ proof; fee = { fee; prover } } ->
         Transaction_snark_work.Checked.create_unsafe
           { Transaction_snark_work.fee; proofs = proof; prover } )
+
+  let get_all_completed_checked_work ?limit t =
+    let work = Resource_pool.all_completed_checked_work (resource_pool t) in
+    match limit with
+    | None ->
+        work
+    | Some limit ->
+        (* gets the limit number of completed work at a random order *)
+        List.take work limit
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
@@ -565,6 +586,9 @@ open Inline_test_quiet_logs
 let%test_module "random set test" =
   ( module struct
     open Mina_base
+    module Mock_snark_pool =
+      Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
+    open Ledger_proof.For_tests
 
     let trust_system = Mocks.trust_system
 
@@ -595,10 +619,6 @@ let%test_module "random set test" =
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
             ~commit_id:"not specified for unit tests" () )
-
-    module Mock_snark_pool =
-      Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
-    open Ledger_proof.For_tests
 
     let apply_diff resource_pool work
         ?(proof = One_or_two.map ~f:mk_dummy_proof)

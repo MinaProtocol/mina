@@ -74,6 +74,7 @@ type t =
 
 let create (module Context : CONTEXT) (config : Config.t) ~sinks
     ~(get_transition_frontier : unit -> Transition_frontier.t option)
+    ~(get_snark_pool : unit -> Snark_pool.t option)
     ~(get_node_status : unit -> Node_status.t Deferred.Or_error.t) =
   let open Context in
   let gossip_net_ref = ref None in
@@ -90,6 +91,8 @@ let create (module Context : CONTEXT) (config : Config.t) ~sinks
           Gossip_net.Any.peers gossip_net
 
     let get_transition_frontier = get_transition_frontier
+
+    let get_snark_pool = get_snark_pool
   end in
   let%map gossip_net =
     O1trace.thread "gossip_net" (fun () ->
@@ -123,7 +126,7 @@ let create (module Context : CONTEXT) (config : Config.t) ~sinks
   (* TODO: Think about buffering:
         I.e., what do we do when too many messages are coming in, or going out.
         For example, some things you really want to not drop (like your outgoing
-        block announcment).
+        block announcement).
   *)
   { gossip_net; logger; trust_system }
 
