@@ -44,6 +44,8 @@ in  Pipeline.build
                               echo "Please ensure that you added this change to our changelog file: 'CHANGES.md'"
                               echo "It will help us to produce Release Notes for upcoming release"
                               exit 1
+                          else
+                              echo "Changelog updated!"
                           fi
                       fi
                   ''
