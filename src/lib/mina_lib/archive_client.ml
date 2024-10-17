@@ -2,7 +2,7 @@ open Core_kernel
 open Async_kernel
 open Pipe_lib
 
-let dispatch ?(max_tries = 5) ~logger
+let dispatch ?(max_tries = 5) ~logger ~compile_config
     (archive_location : Host_and_port.t Cli_lib.Flag.Types.with_name) diff =
   let rec go tries_left errs =
     if Int.( <= ) tries_left 0 then
@@ -20,7 +20,7 @@ let dispatch ?(max_tries = 5) ~logger
               [%sexp_of: (string * Host_and_port.t) * (string * string)] ) )
     else
       match%bind
-        Daemon_rpcs.Client.dispatch Archive_lib.Rpc.t diff
+        Daemon_rpcs.Client.dispatch ~compile_config Archive_lib.Rpc.t diff
           archive_location.value
       with
       | Ok () ->
@@ -33,7 +33,7 @@ let dispatch ?(max_tries = 5) ~logger
   in
   go max_tries []
 
-let make_dispatch_block rpc ?(max_tries = 5)
+let make_dispatch_block ~compile_config rpc ?(max_tries = 5)
     (archive_location : Host_and_port.t Cli_lib.Flag.Types.with_name) block =
   let rec go tries_left errs =
     if Int.( <= ) tries_left 0 then
@@ -51,7 +51,8 @@ let make_dispatch_block rpc ?(max_tries = 5)
               [%sexp_of: (string * Host_and_port.t) * (string * string)] ) )
     else
       match%bind
-        Daemon_rpcs.Client.dispatch rpc block archive_location.value
+        Daemon_rpcs.Client.dispatch ~compile_config rpc block
+          archive_location.value
       with
       | Ok () ->
           return (Ok ())
@@ -111,7 +112,8 @@ let run ~logger ~precomputed_values
                     , `Float (Time.Span.to_ms (Time.diff diff_time start)) )
                   ] ;
               match%map
-                dispatch archive_location ~logger (Transition_frontier diff)
+                dispatch ~compile_config:precomputed_values.compile_config
+                  archive_location ~logger (Transition_frontier diff)
               with
               | Ok () ->
                   [%log debug]

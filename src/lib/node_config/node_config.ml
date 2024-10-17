@@ -7,7 +7,6 @@
 *)
 
 include Node_config_version
-include Node_config_unconfigurable_constants
 
 [%%inject "ledger_depth", ledger_depth]
 
