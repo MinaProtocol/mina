@@ -57,7 +57,7 @@ for _i in {1..10}; do (
     --component "${DEB_RELEASE}" \
     --codename "${DEB_CODENAME}" \
     "${DEB_NAMES}"
-) && break || scripts/debian/clear-s3-lockfile.sh; done
+) && break || scripts/clear-deb-s3-lockfile.sh; done
 
 for deb in $DEB_NAMES
 do
