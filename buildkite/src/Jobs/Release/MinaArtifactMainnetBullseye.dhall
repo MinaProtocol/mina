@@ -27,7 +27,7 @@ in  Pipeline.build
             , PipelineTag.Type.Release
             , PipelineTag.Type.Stable
             ]
-          , mode = PipelineMode.Type.Stable
+          , mode = PipelineMode.Type.PullRequest
           , prefix = "MinaArtifactMainnet"
           }
       )

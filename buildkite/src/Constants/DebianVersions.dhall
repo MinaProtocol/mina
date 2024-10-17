@@ -104,17 +104,21 @@ let minimalDirtyWhen =
       , S.exactly "scripts/snark_transaction_profiler" "py"
       , S.exactly "buildkite/scripts/version-linter" "sh"
       , S.exactly "scripts/version-linter" "py"
+      , S.exactly "buildkite/scripts/connect-to-testnet" "sh"
+      , S.exactly "buildkite/src/Jobs/Test/ConnectToMainnet" "dhall"
+      , S.exactly "buildkite/src/Command/ConnectToNetwork" "dhall"
       ]
 
 let bullseyeDirtyWhen =
         [ S.strictlyStart (S.contains "src")
         , S.strictlyStart (S.contains "automation")
         , S.strictly (S.contains "Makefile")
-        , S.exactly "buildkite/scripts/connect-to-berkeley" "sh"
-        , S.exactly "buildkite/scripts/connect-to-mainnet-on-compatible" "sh"
+        , S.exactly "buildkite/scripts/tests/connect-to-network" "sh"
         , S.exactly "buildkite/scripts/rosetta-integration-tests" "sh"
         , S.exactly "buildkite/scripts/rosetta-integration-tests-full" "sh"
-        , S.exactly "buildkite/scripts/rosetta-integration-tests-fast" "sh"
+        , S.exactly "buildkite/scripts/connect-to-testnet" "sh"
+        , S.exactly "buildkite/src/Jobs/Test/ConnectToMainnet" "dhall"
+        , S.exactly "buildkite/src/Command/ConnectToNetwork" "dhall"
         , S.strictlyStart (S.contains "buildkite/src/Jobs/Test")
         ]
       # minimalDirtyWhen

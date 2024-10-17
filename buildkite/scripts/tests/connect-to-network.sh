@@ -2,13 +2,14 @@
 
 set -eo pipefail
 
-case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
-  rampup|berkeley|release/2.0.0|develop)
-  ;;
-  *)
-    echo "Not pulling against rampup, not running the connect test"
-    exit 0 ;;
-esac
+if [[ $# -ne 3 ]]; then
+    echo "Usage: $0 '<testnet-name>' '<wait-between-polling-graphql>''<wait-after-final-check>'"
+    exit 1
+fi
+
+TESTNET_NAME=$1
+WAIT_BETWEEN_POLLING_GRAPHQL=$2
+WAIT_AFTER_FINAL_CHECK=$3
 
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
@@ -16,14 +17,11 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y git apt-transport-https ca-certificates tzdata curl
 
-TESTNET_VERSION_NAME="berkeley"
-TESTNET_NAME="testworld-2-0"
-
 git config --global --add safe.directory /workdir
 
 source buildkite/scripts/export-git-env-vars.sh
 
-source buildkite/scripts/debian/install.sh "mina-${TESTNET_VERSION_NAME}"
+source buildkite/scripts/debian/install.sh "mina-${TESTNET_NAME}" 1
 
 # Remove lockfile if present
 rm ~/.mina-config/.mina-lock ||:
@@ -41,10 +39,10 @@ mina daemon \
   --libp2p-keypair "/root/libp2p-keys/key" \
 & # -background
 
-# Attempt to connect to the GraphQL client every 30s for up to 12 minutes
+# Attempt to connect to the GraphQL client every 10s for up to 8 minutes
 num_status_retries=24
 for ((i=1;i<=$num_status_retries;i++)); do
-  sleep 30s
+  sleep $WAIT_BETWEEN_POLLING_GRAPHQL
   set +e
   mina client status
   status_exit_code=$?
@@ -57,12 +55,28 @@ for ((i=1;i<=$num_status_retries;i++)); do
 done
 
 # Check that the daemon has connected to peers and is still up after 2 mins
-sleep 2m
+sleep $WAIT_AFTER_FINAL_CHECK
 mina client status
 if [ $(mina advanced get-peers | wc -l) -gt 0 ]; then
     echo "Found some peers"
 else
     echo "No peers found"
+    exit 1
+fi
+
+# Check network id
+NETWORK_ID='http://localhost:3085/graphql' \
+   -H 'accept: application/json' \
+   -H 'content-type: application/json' \
+   --data-raw '{"query":"query MyQuery {\n  networkID\n}\n","variables":null,"operationName":"MyQuery"}' \ 
+   | jq .data.networkID
+
+EXPECTED_NETWORK="mina:$TESTNET_NAME"
+
+if [ $NETWORK_ID -eq $EXPECTED_NETWORK ]; then
+    echo "Network id correct ($NETWORK_ID)"
+else
+    echo "Network id incorrect (exected: $EXPECTED_NETWORK got: $NETWORK_ID)"
     exit 1
 fi
 
