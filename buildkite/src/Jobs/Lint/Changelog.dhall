@@ -4,8 +4,6 @@ let Cmd = ../../Lib/Cmds.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-let PipelineTag = ../../Pipeline/Tag.dhall
-
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
@@ -19,8 +17,10 @@ let reqFile = "^changes/\\\${BUILDKITE_PULL_REQUEST}-.*.md"
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
-        , dirtyWhen =
-          [ S.contains "src"dkijania/changelog_job_check
+        , dirtyWhen = [ S.contains "src" ]
+        , path = "Lint"
+        , name = "Changelog"
+        }
       , steps =
         [ Command.build
             Command.Config::{
@@ -39,7 +39,9 @@ in  Pipeline.build
                               echo "This job detected that you modified important part of code and did not update changelog file."
                               echo "Please ensure that you added this change to our changelog file: "
                               echo "'${reqFile}'"
-                              echo " - from example: changes/\\\${BUILDKITE_PULL_REQUEST}-new-fancy-daemon-feature.md
+                              echo " where syntax is like below: "
+                              echo " changes/{PR number}-{description}.md"
+                              echo " from example: changes/13523-new-fancy-daemon-feature.md"
                               echo "It will help us to produce Release Notes for upcoming release"
                               exit 1
                           else
