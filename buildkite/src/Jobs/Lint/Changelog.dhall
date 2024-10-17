@@ -34,11 +34,15 @@ in  Pipeline.build
               , Cmd.run
                   "./buildkite/scripts/generate-diff.sh > _computed_diff.txt"
               , Cmd.run "cat _computed_diff.txt"
-              , Cmd.run
+              , Cmd.quietly
                   ''
                       if (cat _computed_diff.txt | egrep -q '${triggerChange}'); then
                           if ! (cat _computed_diff.txt | egrep -q 'CHANGES.md'); then
-                              echo "Missing changelog entry detected for this change"
+                              echo "Missing changelog entry detected !!"
+                              echo ""
+                              echo "This job detected that you modified important part of code and did not update changelog file."
+                              echo "Please ensure that you added this change to our changelog file: 'CHANGES.md'"
+                              echo "It will help us to produce Release Notes for upcoming release"
                               exit 1
                           fi
                       fi
