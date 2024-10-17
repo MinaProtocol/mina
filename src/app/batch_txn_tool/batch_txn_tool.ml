@@ -387,7 +387,7 @@ let output_there_and_back_cmds =
             transactions, if this is not present then we use the env var \
             MINA_PRIVKEY_PASS"
          (optional string)
-     and config_file = Cli_lib.Flag.conf_file
+     and config_file = Cli_lib.Flag.config_files
      and graphql_target_node_option =
        flag "--graphql-target-node" ~aliases:[ "graphql-target-node" ]
          ~doc:

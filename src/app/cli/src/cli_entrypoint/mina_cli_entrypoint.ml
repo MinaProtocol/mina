@@ -1166,7 +1166,6 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ; time_controller
               ; pubsub_v1
               ; pubsub_v0
-              ; block_window_duration = compile_config.block_window_duration
               }
           in
           let net_config =
@@ -1563,7 +1562,7 @@ let internal_commands ~itn_features logger =
     , Command.async
         ~summary:"Run prover on a sexp provided on a single line of stdin"
         (let open Command.Let_syntax in
-        let%map_open config_file = Cli_lib.Flag.conf_file in
+        let%map_open config_file = Cli_lib.Flag.config_files in
         fun () ->
           let open Deferred.Let_syntax in
           let%bind constraint_constants, proof_level, compile_config =
@@ -1594,7 +1593,7 @@ let internal_commands ~itn_features logger =
         let%map_open filename =
           flag "--file" (required string)
             ~doc:"File containing the s-expression of the snark work to execute"
-        and config_file = Cli_lib.Flag.conf_file in
+        and config_file = Cli_lib.Flag.config_files in
 
         fun () ->
           let open Deferred.Let_syntax in
@@ -1652,7 +1651,7 @@ let internal_commands ~itn_features logger =
         and limit =
           flag "--limit" ~aliases:[ "-limit" ] (optional int)
             ~doc:"limit the number of proofs taken from the file"
-        and config_file = Cli_lib.Flag.conf_file in
+        and config_file = Cli_lib.Flag.config_files in
         fun () ->
           let open Async in
           let%bind constraint_constants, proof_level, compile_config =
@@ -1803,7 +1802,7 @@ let internal_commands ~itn_features logger =
   ; ( "test-genesis-block-generation"
     , Command.async ~summary:"Generate a genesis proof"
         (let open Command.Let_syntax in
-        let%map_open config_file = Cli_lib.Flag.conf_file
+        let%map_open config_file = Cli_lib.Flag.config_files
         and conf_dir = Cli_lib.Flag.conf_dir
         and genesis_dir =
           flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
@@ -1816,10 +1815,10 @@ let internal_commands ~itn_features logger =
           let open Deferred.Let_syntax in
           Parallel.init_master () ;
           let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
-          let cli_proof_level = Genesis_constants.Proof_level.Full in
           let%bind precomputed_values, _ =
             Genesis_ledger_helper.Config_loader.load_config_files ~logger
-              ~conf_dir ?genesis_dir ~cli_proof_level ~itn_features config_file
+              ~conf_dir ?genesis_dir ~cli_proof_level:Full ~itn_features
+              config_file
             |> Deferred.Or_error.ok_exn
           in
           let logger =
@@ -1897,10 +1896,7 @@ let () =
    | [| _mina_exe; version |] when is_version_cmd version ->
        Mina_version.print_version ()
    | _ ->
-       let itn_features =
-         Sys.getenv "MINA_ITN_FEATURES"
-         |> Option.value_map ~default:false ~f:bool_of_string
-       in
+       let itn_features = Mina_compile_config.Compiled.t.itn_features in
        Command.run
          (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
             (mina_commands logger ~itn_features) ) ) ;

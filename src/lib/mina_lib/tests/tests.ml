@@ -46,7 +46,9 @@ let%test_module "Epoch ledger sync tests" =
         let runtime_config : Runtime_config.t =
           { daemon = None
           ; genesis = None
-          ; proof = Some { Runtime_config.Proof_keys.default with level = None }
+          ; proof =
+              Some
+                { Runtime_config.Proof_keys.default with level = Some No_check }
           ; ledger =
               Some
                 { base = Named "test"
@@ -181,7 +183,6 @@ let%test_module "Epoch ledger sync tests" =
           ; consensus_constants
           ; genesis_constants = precomputed_values.genesis_constants
           ; constraint_constants
-          ; block_window_duration = compile_config.block_window_duration
           ; compile_config
           }
       in
@@ -270,7 +271,6 @@ let%test_module "Epoch ledger sync tests" =
           ; time_controller
           ; pubsub_v1
           ; pubsub_v0
-          ; block_window_duration = compile_config.block_window_duration
           }
         in
         Mina_networking.Gossip_net.(
@@ -306,7 +306,7 @@ let%test_module "Epoch ledger sync tests" =
         let notify_online () = Deferred.unit in
         let most_recent_valid_block_reader, most_recent_valid_block_writer =
           Broadcast_pipe.create
-            ( Mina_block.genesis ~precomputed_values
+            ( Mina_block.genesis_header ~precomputed_values
             |> Mina_block.Validation.reset_frontier_dependencies_validation
             |> Mina_block.Validation.reset_staged_ledger_diff_validation )
         in

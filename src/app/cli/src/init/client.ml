@@ -4,6 +4,10 @@ open Signature_lib
 open Mina_base
 open Mina_transaction
 
+(* TODO consider a better way of setting a default transaction fee than
+   a fixed compile-time value *)
+let default_transaction_fee = Currency.Fee.of_nanomina_int_exn 250000000
+
 module Client = Graphql_lib.Client.Make (struct
   let preprocess_variables_string = Fn.id
 
@@ -39,17 +43,17 @@ let or_error_str ~f_ok ~error = function
   | Error e ->
       sprintf "%s\n%s\n" error (Error.to_string_hum e)
 
-let load_compile_config ?(logger = Logger.create ()) config_file =
-  let%map conf = Runtime_config.Constants.load_constants ~logger config_file in
+let load_compile_config ?(logger = Logger.create ()) config_files =
+  let%map conf = Runtime_config.Constants.load_constants ~logger config_files in
   Runtime_config.Constants.compile_config conf
 
 let stop_daemon =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
   Command.async ~summary:"Stop the daemon"
-    (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.conf_file
-       ~f:(fun port config_file ->
-         let%bind compile_config = load_compile_config config_file in
+    (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.config_files
+       ~f:(fun port config_files ->
+         let%bind compile_config = load_compile_config config_files in
          let%map res =
            Daemon_rpcs.Client.dispatch ~compile_config Stop_daemon.rpc () port
          in
@@ -175,12 +179,12 @@ let get_trust_status =
       (required Cli_lib.Arg_type.ip_address)
   in
   let json_flag = Cli_lib.Flag.json in
-  let config_file = Cli_lib.Flag.conf_file in
-  let flags = Args.zip3 config_file address_flag json_flag in
+  let config_files = Cli_lib.Flag.config_files in
+  let flags = Args.zip3 config_files address_flag json_flag in
   Command.async ~summary:"Get the trust status associated with an IP address"
     (Cli_lib.Background_daemon.rpc_init flags
-       ~f:(fun port (config_file, ip_address, json) ->
-         let%bind compile_config = load_compile_config config_file in
+       ~f:(fun port (config_files, ip_address, json) ->
+         let%bind compile_config = load_compile_config config_files in
          match%map
            Daemon_rpcs.Client.dispatch ~compile_config
              Daemon_rpcs.Get_trust_status.rpc ip_address port
@@ -213,13 +217,13 @@ let get_trust_status_all =
       ~doc:"Only show trust statuses whose trust score is nonzero"
   in
   let json_flag = Cli_lib.Flag.json in
-  let config_file = Cli_lib.Flag.conf_file in
-  let flags = Args.zip3 config_file nonzero_flag json_flag in
+  let config_files = Cli_lib.Flag.config_files in
+  let flags = Args.zip3 config_files nonzero_flag json_flag in
   Command.async
     ~summary:"Get trust statuses for all peers known to the trust system"
     (Cli_lib.Background_daemon.rpc_init flags
-       ~f:(fun port (config_file, nonzero, json) ->
-         let%bind compile_config = load_compile_config config_file in
+       ~f:(fun port (config_files, nonzero, json) ->
+         let%bind compile_config = load_compile_config config_files in
          match%map
            Daemon_rpcs.Client.dispatch ~compile_config
              Daemon_rpcs.Get_trust_status_all.rpc () port
@@ -253,12 +257,12 @@ let reset_trust_status =
       (required Cli_lib.Arg_type.ip_address)
   in
   let json_flag = Cli_lib.Flag.json in
-  let config_file = Cli_lib.Flag.conf_file in
-  let flags = Args.zip3 config_file address_flag json_flag in
+  let config_files = Cli_lib.Flag.config_files in
+  let flags = Args.zip3 config_files address_flag json_flag in
   Command.async ~summary:"Reset the trust status associated with an IP address"
     (Cli_lib.Background_daemon.rpc_init flags
-       ~f:(fun port (config_file, ip_address, json) ->
-         let%bind compile_config = load_compile_config config_file in
+       ~f:(fun port (config_files, ip_address, json) ->
+         let%bind compile_config = load_compile_config config_files in
          match%map
            Daemon_rpcs.Client.dispatch ~compile_config
              Daemon_rpcs.Reset_trust_status.rpc ip_address port
@@ -277,12 +281,12 @@ let get_public_keys =
       ~doc:"Show extra details (eg. balance, nonce) in addition to public keys"
   in
   let error_ctx = "Failed to get public-keys" in
-  let config_file = Cli_lib.Flag.conf_file in
+  let config_files = Cli_lib.Flag.config_files in
   Command.async ~summary:"Get public keys"
     (Cli_lib.Background_daemon.rpc_init
-       (Args.zip3 config_file with_details_flag Cli_lib.Flag.json)
-       ~f:(fun port (config_file, is_balance_included, json) ->
-         let%bind compile_config = load_compile_config config_file in
+       (Args.zip3 config_files with_details_flag Cli_lib.Flag.json)
+       ~f:(fun port (config_files, is_balance_included, json) ->
+         let%bind compile_config = load_compile_config config_files in
          if is_balance_included then
            Daemon_rpcs.Client.dispatch_pretty_message ~compile_config ~json
              ~join_error:Or_error.join ~error_ctx
@@ -332,13 +336,13 @@ let verify_receipt =
       ~doc:"TOKEN_ID The token ID for the account"
       (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
-  let config_file = Cli_lib.Flag.conf_file in
+  let config_files = Cli_lib.Flag.config_files in
   Command.async ~summary:"Verify a receipt of a sent payment"
     (Cli_lib.Background_daemon.rpc_init
-       (Args.zip5 config_file payment_path_flag proof_path_flag address_flag
+       (Args.zip5 config_files payment_path_flag proof_path_flag address_flag
           token_flag )
-       ~f:(fun port (config_file, payment_path, proof_path, pk, token_id) ->
-         let%bind compile_config = load_compile_config config_file in
+       ~f:(fun port (config_files, payment_path, proof_path, pk, token_id) ->
+         let%bind compile_config = load_compile_config config_files in
          let account_id = Account_id.create pk token_id in
          let dispatch_result =
            let open Deferred.Or_error.Let_syntax in
@@ -406,13 +410,13 @@ let get_nonce_cmd =
       ~doc:"TOKEN_ID The token ID for the account"
       (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
-  let config_file = Cli_lib.Flag.conf_file in
-  let flags = Args.zip3 config_file address_flag token_flag in
+  let config_files = Cli_lib.Flag.config_files in
+  let flags = Args.zip3 config_files address_flag token_flag in
   Command.async ~summary:"Get the current nonce for an account"
     (Cli_lib.Background_daemon.rpc_init flags
-       ~f:(fun port (config_file, pk, token_flag) ->
+       ~f:(fun port (config_files, pk, token_flag) ->
          let account_id = Account_id.create pk token_flag in
-         let%bind compile_config = load_compile_config config_file in
+         let%bind compile_config = load_compile_config config_files in
          match%bind
            get_nonce ~compile_config ~rpc:Daemon_rpcs.Get_nonce.rpc account_id
              port
@@ -427,12 +431,13 @@ let get_nonce_cmd =
 let status =
   let open Daemon_rpcs in
   let flag =
-    Args.zip3 Cli_lib.Flag.conf_file Cli_lib.Flag.json Cli_lib.Flag.performance
+    Args.zip3 Cli_lib.Flag.config_files Cli_lib.Flag.json
+      Cli_lib.Flag.performance
   in
   Command.async ~summary:"Get running daemon status"
     (Cli_lib.Background_daemon.rpc_init flag
-       ~f:(fun port (config_file, json, performance) ->
-         let%bind compile_config = load_compile_config config_file in
+       ~f:(fun port (config_files, json, performance) ->
+         let%bind compile_config = load_compile_config config_files in
          Daemon_rpcs.Client.dispatch_pretty_message ~compile_config ~json
            ~join_error:Fn.id ~error_ctx:"Failed to get status"
            (module Daemon_rpcs.Types.Status)
@@ -443,12 +448,13 @@ let status =
 let status_clear_hist =
   let open Daemon_rpcs in
   let flag =
-    Args.zip3 Cli_lib.Flag.conf_file Cli_lib.Flag.json Cli_lib.Flag.performance
+    Args.zip3 Cli_lib.Flag.config_files Cli_lib.Flag.json
+      Cli_lib.Flag.performance
   in
   Command.async ~summary:"Clear histograms reported in status"
     (Cli_lib.Background_daemon.rpc_init flag
-       ~f:(fun port (config_file, json, performance) ->
-         let%bind compile_config = load_compile_config config_file in
+       ~f:(fun port (config_files, json, performance) ->
+         let%bind compile_config = load_compile_config config_files in
          Daemon_rpcs.Client.dispatch_pretty_message ~compile_config ~json
            ~join_error:Fn.id
            ~error_ctx:"Failed to clear histograms reported in status"
@@ -507,9 +513,9 @@ let batch_send_payments =
                 (List.init 3 ~f:(fun _ -> sample_info ())) ) ) ;
         exit 5
   in
-  let main port (config_file, privkey_path, payments_path) =
+  let main port (config_files, privkey_path, payments_path) =
     let open Deferred.Let_syntax in
-    let%bind compile_config = load_compile_config config_file in
+    let%bind compile_config = load_compile_config config_files in
     let%bind keypair =
       Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair" privkey_path
     and infos = get_infos payments_path in
@@ -533,7 +539,7 @@ let batch_send_payments =
   in
   Command.async ~summary:"Send multiple payments from a file"
     (Cli_lib.Background_daemon.rpc_init
-       (Args.zip3 Cli_lib.Flag.conf_file Cli_lib.Flag.privkey_read_path
+       (Args.zip3 Cli_lib.Flag.config_files Cli_lib.Flag.privkey_read_path
           payment_path_flag )
        ~f:main )
 
@@ -552,25 +558,17 @@ let send_payment_graphql =
     flag "--amount" ~aliases:[ "amount" ]
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
-  let config_file = Cli_lib.Flag.conf_file in
   let args =
-    Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
-      config_file
+    Args.zip3 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
   in
   Command.async ~summary:"Send payment to an address"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun
             graphql_endpoint
-            ( { Cli_lib.Flag.sender; fee; nonce; memo }
-            , receiver
-            , amount
-            , config_file )
+            ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver, amount)
           ->
          let open Deferred.Let_syntax in
-         let%bind compile_config = load_compile_config config_file in
-         let fee =
-           Option.value ~default:compile_config.default_transaction_fee fee
-         in
+         let fee = Option.value ~default:default_transaction_fee fee in
          let%map response =
            let input =
              Mina_graphql.Types.Input.SendPaymentInput.make_input ~to_:receiver
@@ -591,22 +589,15 @@ let delegate_stake_graphql =
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
-  let config_file = Cli_lib.Flag.conf_file in
-  let args =
-    Args.zip3 Cli_lib.Flag.signed_command_common receiver_flag config_file
-  in
-
+  let args = Args.zip2 Cli_lib.Flag.signed_command_common receiver_flag in
   Command.async ~summary:"Delegate your stake to another public key"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun
             graphql_endpoint
-            ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver, config_file)
+            ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver)
           ->
          let open Deferred.Let_syntax in
-         let%bind compile_config = load_compile_config config_file in
-         let fee =
-           Option.value ~default:compile_config.default_transaction_fee fee
-         in
+         let fee = Option.value ~default:default_transaction_fee fee in
          let%map response =
            Graphql_client.query_exn
              Graphql_queries.Send_delegation.(
@@ -809,7 +800,8 @@ let export_ledger =
   in
   let plaintext_flag = Cli_lib.Flag.plaintext in
   let flags =
-    Args.zip4 Cli_lib.Flag.conf_file state_hash_flag plaintext_flag ledger_kind
+    Args.zip4 Cli_lib.Flag.config_files state_hash_flag plaintext_flag
+      ledger_kind
   in
   Command.async
     ~summary:
@@ -817,9 +809,9 @@ let export_ledger =
        Note: Exporting snarked ledger is an expensive operation and can take a \
        few seconds"
     (Cli_lib.Background_daemon.rpc_init flags
-       ~f:(fun port (config_file, state_hash, plaintext, ledger_kind) ->
+       ~f:(fun port (config_files, state_hash, plaintext, ledger_kind) ->
          let open Deferred.Let_syntax in
-         let%bind compile_config = load_compile_config config_file in
+         let%bind compile_config = load_compile_config config_files in
          let check_for_state_hash () =
            if Option.is_some state_hash then (
              Format.eprintf "A state hash should not be given for %s@."
@@ -868,14 +860,14 @@ let hash_ledger =
          flag "--ledger-file"
            ~doc:"LEDGER-FILE File containing an exported ledger"
            (required string))
-     and config_file = Cli_lib.Flag.conf_file
+     and config_files = Cli_lib.Flag.config_files
      and plaintext = Cli_lib.Flag.plaintext in
      fun () ->
        let open Deferred.Let_syntax in
        let%bind constraint_constants =
          let logger = Logger.create () in
          let%map conf =
-           Runtime_config.Constants.load_constants ~logger config_file
+           Runtime_config.Constants.load_constants ~logger config_files
          in
          Runtime_config.Constants.constraint_constants conf
        in
@@ -980,13 +972,13 @@ let currency_in_ledger =
 let constraint_system_digests =
   let open Command.Let_syntax in
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
-    (let%map_open config_file = Cli_lib.Flag.conf_file in
+    (let%map_open config_files = Cli_lib.Flag.config_files in
      fun () ->
        let open Deferred.Let_syntax in
        let%bind constraint_constants, proof_level =
          let logger = Logger.create () in
          let%map conf =
-           Runtime_config.Constants.load_constants ~logger config_file
+           Runtime_config.Constants.load_constants ~logger config_files
          in
          Runtime_config.Constants.(constraint_constants conf, proof_level conf)
        in
@@ -1006,9 +998,9 @@ let snark_job_list =
     ~summary:
       "List of snark jobs in JSON format that are yet to be included in the \
        blocks"
-    (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.conf_file
-       ~f:(fun port config_file ->
-         let%bind compile_config = load_compile_config config_file in
+    (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.config_files
+       ~f:(fun port config_files ->
+         let%bind compile_config = load_compile_config config_files in
          match%map
            Daemon_rpcs.Client.dispatch_join_errors ~compile_config
              Daemon_rpcs.Snark_job_list.rpc () port
@@ -1133,9 +1125,9 @@ let pending_snark_work =
 let start_tracing =
   Command.async
     ~summary:"Start async tracing to $config-directory/trace/$pid.trace"
-    (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.conf_file
-       ~f:(fun port config_file ->
-         let%bind compile_config = load_compile_config config_file in
+    (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.config_files
+       ~f:(fun port config_files ->
+         let%bind compile_config = load_compile_config config_files in
          match%map
            Daemon_rpcs.Client.dispatch ~compile_config
              Daemon_rpcs.Start_tracing.rpc () port
@@ -1147,9 +1139,9 @@ let start_tracing =
 
 let stop_tracing =
   Command.async ~summary:"Stop async tracing"
-    (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.conf_file
-       ~f:(fun port config_file ->
-         let%bind compile_config = load_compile_config config_file in
+    (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.config_files
+       ~f:(fun port config_files ->
+         let%bind compile_config = load_compile_config config_files in
          match%map
            Daemon_rpcs.Client.dispatch ~compile_config
              Daemon_rpcs.Stop_tracing.rpc () port
@@ -1164,9 +1156,9 @@ let start_internal_tracing =
     ~summary:
       "Start internal tracing to \
        $config-directory/internal-tracing/internal-trace.jsonl"
-    (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.conf_file
-       ~f:(fun port config_file ->
-         let%bind compile_config = load_compile_config config_file in
+    (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.config_files
+       ~f:(fun port config_files ->
+         let%bind compile_config = load_compile_config config_files in
          match%map
            Daemon_rpcs.Client.dispatch ~compile_config
              Daemon_rpcs.Start_internal_tracing.rpc () port
@@ -1178,9 +1170,9 @@ let start_internal_tracing =
 
 let stop_internal_tracing =
   Command.async ~summary:"Stop internal tracing"
-    (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.conf_file
-       ~f:(fun port config_file ->
-         let%bind compile_config = load_compile_config config_file in
+    (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.config_files
+       ~f:(fun port config_files ->
+         let%bind compile_config = load_compile_config config_files in
          match%map
            Daemon_rpcs.Client.dispatch ~compile_config
              Daemon_rpcs.Stop_internal_tracing.rpc () port
@@ -1666,21 +1658,19 @@ let lock_account =
          in
          printf "🔒 Locked account!\nPublic key: %s\n" pk_string ) )
 
-let generate_libp2p_keypair_do privkey_path ~config_file =
+let generate_libp2p_keypair_do privkey_path =
   Cli_lib.Exceptions.handle_nicely
   @@ fun () ->
   Deferred.ignore_m
     (let open Deferred.Let_syntax in
     (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
     let logger = Logger.null () in
-    let%bind compile_config = load_compile_config config_file in
     (* Using the helper only for keypair generation requires no state. *)
     File_system.with_temp_dir "mina-generate-libp2p-keypair" ~f:(fun tmpd ->
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~on_peer_connected:ignore ~on_peer_disconnected:ignore
-            ~block_window_duration:compile_config.block_window_duration ()
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
         with
         | Ok net ->
             let%bind me = Mina_net2.generate_random_keypair net in
@@ -1698,25 +1688,21 @@ let generate_libp2p_keypair =
   Command.async
     ~summary:"Generate a new libp2p keypair and print out the peer ID"
     (let open Command.Let_syntax in
-    let%map_open privkey_path = Cli_lib.Flag.privkey_write_path
-    and config_file = Cli_lib.Flag.conf_file in
-    generate_libp2p_keypair_do privkey_path ~config_file)
+    let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
+    generate_libp2p_keypair_do privkey_path)
 
-let dump_libp2p_keypair_do privkey_path ~config_file =
+let dump_libp2p_keypair_do privkey_path =
   Cli_lib.Exceptions.handle_nicely
   @@ fun () ->
   Deferred.ignore_m
     (let open Deferred.Let_syntax in
     let logger = Logger.null () in
-    let%bind compile_config = load_compile_config config_file in
-
     (* Using the helper only for keypair generation requires no state. *)
     File_system.with_temp_dir "mina-dump-libp2p-keypair" ~f:(fun tmpd ->
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~on_peer_connected:ignore ~on_peer_disconnected:ignore
-            ~block_window_duration:compile_config.block_window_duration ()
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
         with
         | Ok net ->
             let%bind () = Mina_net2.shutdown net in
@@ -1730,9 +1716,8 @@ let dump_libp2p_keypair_do privkey_path ~config_file =
 let dump_libp2p_keypair =
   Command.async ~summary:"Print an existing libp2p keypair"
     (let open Command.Let_syntax in
-    let%map_open privkey_path = Cli_lib.Flag.privkey_read_path
-    and config_file = Cli_lib.Flag.conf_file in
-    dump_libp2p_keypair_do privkey_path ~config_file)
+    let%map_open privkey_path = Cli_lib.Flag.privkey_read_path in
+    dump_libp2p_keypair_do privkey_path)
 
 let trustlist_ip_flag =
   Command.Param.(
@@ -1745,10 +1730,10 @@ let trustlist_add =
   let open Daemon_rpcs in
   Command.async ~summary:"Add an IP to the trustlist"
     (Cli_lib.Background_daemon.rpc_init
-       (Args.zip2 Cli_lib.Flag.conf_file trustlist_ip_flag)
-       ~f:(fun port (config_file, trustlist_ip) ->
+       (Args.zip2 Cli_lib.Flag.config_files trustlist_ip_flag)
+       ~f:(fun port (config_files, trustlist_ip) ->
          let trustlist_ip_string = Unix.Cidr.to_string trustlist_ip in
-         let%bind compile_config = load_compile_config config_file in
+         let%bind compile_config = load_compile_config config_files in
          match%map
            Client.dispatch ~compile_config Add_trustlist.rpc trustlist_ip port
          with
@@ -1766,10 +1751,10 @@ let trustlist_remove =
   let open Daemon_rpcs in
   Command.async ~summary:"Remove a CIDR mask from the trustlist"
     (Cli_lib.Background_daemon.rpc_init
-       (Args.zip2 Cli_lib.Flag.conf_file trustlist_ip_flag)
-       ~f:(fun port (config_file, trustlist_ip) ->
+       (Args.zip2 Cli_lib.Flag.config_files trustlist_ip_flag)
+       ~f:(fun port (config_files, trustlist_ip) ->
          let trustlist_ip_string = Unix.Cidr.to_string trustlist_ip in
-         let%bind compile_config = load_compile_config config_file in
+         let%bind compile_config = load_compile_config config_files in
          match%map
            Client.dispatch ~compile_config Remove_trustlist.rpc trustlist_ip
              port
@@ -1786,9 +1771,9 @@ let trustlist_remove =
 let trustlist_list =
   let open Daemon_rpcs in
   Command.async ~summary:"List the CIDR masks in the trustlist"
-    (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.conf_file
-       ~f:(fun port config_file ->
-         let%bind compile_config = load_compile_config config_file in
+    (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.config_files
+       ~f:(fun port config_files ->
+         let%bind compile_config = load_compile_config config_files in
          match%map
            Client.dispatch ~compile_config Get_trustlist.rpc () port
          with
@@ -1873,7 +1858,7 @@ let compile_time_constants =
   let open Command.Let_syntax in
   Command.async
     ~summary:"Print a JSON map of the compile-time consensus parameters"
-    (let%map_open config_file = Cli_lib.Flag.conf_file in
+    (let%map_open config_files = Cli_lib.Flag.config_files in
      fun () ->
        let home = Core.Sys.home_directory () in
        let conf_dir = home ^/ Cli_lib.Default.conf_dir_name in
@@ -1888,7 +1873,7 @@ let compile_time_constants =
          let logger = Logger.create () in
          let%bind m_conf =
            Runtime_config.Json_loader.load_config_files ~conf_dir ~logger
-             config_file
+             config_files
            >>| Or_error.ok
          in
          let default =
@@ -1964,12 +1949,12 @@ let node_status =
       ~doc:"Include error responses in output"
   in
   let flags =
-    Args.zip4 Cli_lib.Flag.conf_file daemon_peers_flag peers_flag
+    Args.zip4 Cli_lib.Flag.config_files daemon_peers_flag peers_flag
       show_errors_flag
   in
   Command.async ~summary:"Get node statuses for a set of peers"
     (Cli_lib.Background_daemon.rpc_init flags
-       ~f:(fun port (config_file, daemon_peers, peers, show_errors) ->
+       ~f:(fun port (config_files, daemon_peers, peers, show_errors) ->
          if
            (Option.is_none peers && not daemon_peers)
            || (Option.is_some peers && daemon_peers)
@@ -1981,7 +1966,7 @@ let node_status =
            Option.map peers ~f:(fun peers ->
                List.map peers ~f:Mina_net2.Multiaddr.of_string )
          in
-         let%bind compile_config = load_compile_config config_file in
+         let%bind compile_config = load_compile_config config_files in
          match%map
            Daemon_rpcs.Client.dispatch ~compile_config
              Daemon_rpcs.Get_node_status.rpc peer_ids_opt port
@@ -2005,9 +1990,9 @@ let node_status =
 let object_lifetime_statistics =
   let open Daemon_rpcs in
   Command.async ~summary:"Dump internal object lifetime statistics to JSON"
-    (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.conf_file
-       ~f:(fun port config_file ->
-         let%bind compile_config = load_compile_config config_file in
+    (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.config_files
+       ~f:(fun port config_files ->
+         let%bind compile_config = load_compile_config config_files in
          match%map
            Client.dispatch ~compile_config Get_object_lifetime_statistics.rpc ()
              port
@@ -2045,7 +2030,7 @@ let archive_blocks =
     and extensional_flag =
       Command.Param.flag "--extensional" ~aliases:[ "extensional" ] no_arg
         ~doc:"Blocks are in extensional JSON format"
-    and config_file = Cli_lib.Flag.conf_file in
+    and config_files = Cli_lib.Flag.config_files in
     ( files
     , success_file
     , failure_file
@@ -2053,7 +2038,7 @@ let archive_blocks =
     , archive_process_location
     , precomputed_flag
     , extensional_flag
-    , config_file )
+    , config_files )
   in
   Command.async
     ~summary:
@@ -2071,7 +2056,7 @@ let archive_blocks =
             , archive_process_location
             , precomputed_flag
             , extensional_flag
-            , config_file )
+            , config_files )
           ->
          if Bool.equal precomputed_flag extensional_flag then
            failwith
@@ -2119,7 +2104,7 @@ let archive_blocks =
          in
          let add_to_success_file = output_file_line success_file in
          let add_to_failure_file = output_file_line failure_file in
-         let%bind compile_config = load_compile_config config_file in
+         let%bind compile_config = load_compile_config config_files in
          let send_precomputed_block =
            make_send_block
              ~graphql_make:(fun block ->
@@ -2240,10 +2225,10 @@ let receipt_chain_hash =
 let chain_id_inputs =
   let open Deferred.Let_syntax in
   Command.async ~summary:"Print the inputs that yield the current chain id"
-    (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.conf_file
-       ~f:(fun port config_file ->
+    (Cli_lib.Background_daemon.rpc_init Cli_lib.Flag.config_files
+       ~f:(fun port config_files ->
          let open Daemon_rpcs in
-         let%bind compile_config = load_compile_config config_file in
+         let%bind compile_config = load_compile_config config_files in
          match%map
            Client.dispatch ~compile_config Chain_id_inputs.rpc () port
          with
@@ -2403,7 +2388,7 @@ let test_ledger_application =
        flag "--has-second-partition"
          ~doc:"Assume there is a second partition (scan state)" no_arg
      and tracing = flag "--tracing" ~doc:"Wrap test into tracing" no_arg
-     and config_file = Cli_lib.Flag.conf_file
+     and config_files = Cli_lib.Flag.config_files
      and no_masks = flag "--no-masks" ~doc:"Do not create masks" no_arg in
      Cli_lib.Exceptions.handle_nicely
      @@ fun () ->
@@ -2411,7 +2396,7 @@ let test_ledger_application =
      let%bind genesis_constants, constraint_constants =
        let logger = Logger.create () in
        let%map conf =
-         Runtime_config.Constants.load_constants ~logger config_file
+         Runtime_config.Constants.load_constants ~logger config_files
        in
        Runtime_config.Constants.
          (genesis_constants conf, constraint_constants conf)
@@ -2446,20 +2431,20 @@ let itn_create_accounts =
         ~doc:"NN Amount in nanomina to be divided among new accounts"
         (required int)
     in
-    let config_file = Cli_lib.Flag.conf_file in
+    let config_files = Cli_lib.Flag.config_files in
     let args =
-      Args.zip6 privkey_path key_prefix num_accounts fee amount config_file
+      Args.zip6 privkey_path key_prefix num_accounts fee amount config_files
     in
     Cli_lib.Background_daemon.rpc_init args
       ~f:(fun
            port
-           (privkey_path, key_prefix, num_accounts, fee, amount, config_file)
+           (privkey_path, key_prefix, num_accounts, fee, amount, config_files)
          ->
         let open Deferred.Let_syntax in
         let%bind genesis_constants, constraint_constants, compile_config =
           let logger = Logger.create () in
           let%map conf =
-            Runtime_config.Constants.load_constants ~logger config_file
+            Runtime_config.Constants.load_constants ~logger config_files
           in
           Runtime_config.Constants.
             ( genesis_constants conf
@@ -2479,10 +2464,10 @@ module Visualization = struct
     Command.async
       ~summary:(sprintf !"Produce a visualization of the %s" name)
       (Cli_lib.Background_daemon.rpc_init
-         (Args.zip2 Cli_lib.Flag.conf_file
+         (Args.zip2 Cli_lib.Flag.config_files
             Command.Param.(anon @@ ("output-filepath" %: string)) )
-         ~f:(fun port (config_file, filename) ->
-           let%bind compile_config = load_compile_config config_file in
+         ~f:(fun port (config_files, filename) ->
+           let%bind compile_config = load_compile_config config_files in
            let%map message =
              match%map
                Daemon_rpcs.Client.dispatch ~compile_config rpc filename port

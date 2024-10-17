@@ -13,7 +13,7 @@ let get_filenames =
 let verify_snark_work ~verify_transaction_snarks ~proof ~message =
   verify_transaction_snarks [ (proof, message) ]
 
-let config_flag = Cli_lib.Flag.conf_file
+let config_flag = Cli_lib.Flag.config_files
 
 let keyspace_flag =
   let open Command.Param in
@@ -42,10 +42,10 @@ let timestamp =
   let open Command.Param in
   anon ("timestamp" %: string)
 
-let instantiate_verify_functions ~logger ~cli_proof_level config_file =
+let instantiate_verify_functions ~logger config_file =
   let open Deferred.Let_syntax in
   let%map constants =
-    Runtime_config.Constants.load_constants ~logger ~cli_proof_level config_file
+    Runtime_config.Constants.load_constants ~logger config_file
   in
   let constraint_constants =
     Runtime_config.Constants.constraint_constants constants
@@ -130,7 +130,7 @@ let filesystem_command ~logger =
       and config_file = config_flag in
       fun () ->
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger ~cli_proof_level:None config_file
+          instantiate_verify_functions ~logger config_file
         in
 
         let submission_paths = get_filenames inputs in
@@ -163,7 +163,7 @@ let cassandra_command ~logger =
       fun () ->
         let open Deferred.Let_syntax in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger ~cli_proof_level:None config_file
+          instantiate_verify_functions ~logger config_file
         in
         let module V = Make_verifier (struct
           include Submission.Cassandra
@@ -194,7 +194,7 @@ let stdin_command ~logger =
       fun () ->
         let open Deferred.Let_syntax in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger ~cli_proof_level:None config_file
+          instantiate_verify_functions ~logger config_file
         in
         let module V = Make_verifier (struct
           include Submission.Stdin
