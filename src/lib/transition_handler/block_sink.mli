@@ -1,6 +1,5 @@
 open Network_peer
 open Mina_base
-open Core_kernel
 
 type Structured_log_events.t +=
   | Block_received of { state_hash : State_hash.t; sender : Envelope.Sender.t }
@@ -26,7 +25,6 @@ type block_sink_config =
   ; consensus_constants : Consensus.Constants.t
   ; genesis_constants : Genesis_constants.t
   ; constraint_constants : Genesis_constants.Constraint_constants.t
-  ; block_window_duration : Time.Span.t
   }
 
 val create :
