@@ -13,6 +13,24 @@ let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
 module Query = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type 'addr t =
+        | What_child_hashes of 'addr * int
+            (** What are the hashes of the children of this address? 
+            If depth > 1 then we get the leaves of a subtree rooted
+            at address and of the given depth. 
+            For depth = 1 we have the simplest case with just the 2
+            direct children.
+            *)
+        | What_contents of 'addr
+            (** What accounts are at this address? addr must have depth
+            tree_depth - account_subtree_height *)
+        | Num_accounts
+            (** How many accounts are there? Used to size data structure and
+            figure out what part of the tree is filled in. *)
+      [@@deriving sexp, yojson, hash, compare]
+    end
+
     module V1 = struct
       type 'addr t =
         | What_child_hashes of 'addr
@@ -24,6 +42,14 @@ module Query = struct
             (** How many accounts are there? Used to size data structure and
             figure out what part of the tree is filled in. *)
       [@@deriving sexp, yojson, hash, compare]
+
+      let to_latest : 'a t -> 'a V2.t = function
+        | What_child_hashes a ->
+            What_child_hashes (a, 1)
+        | What_contents a ->
+            What_contents a
+        | Num_accounts ->
+            Num_accounts
     end
   end]
 end
@@ -31,6 +57,20 @@ end
 module Answer = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type ('hash, 'account) t =
+        | Child_hashes_are of 'hash Bounded_types.ArrayN4000.Stable.V1.t
+            (** The requested addresses' children have these hashes.
+            May be any power of 2 number of children, and not necessarily 
+            immediate children  *)
+        | Contents_are of 'account list
+            (** The requested address has these accounts *)
+        | Num_accounts of int * 'hash
+            (** There are this many accounts and the smallest subtree that
+                contains all non-empty nodes has this hash. *)
+      [@@deriving sexp, yojson]
+    end
+
     module V1 = struct
       type ('hash, 'account) t =
         | Child_hashes_are of 'hash * 'hash
@@ -44,11 +84,23 @@ module Answer = struct
 
       let to_latest acct_to_latest = function
         | Child_hashes_are (h1, h2) ->
-            Child_hashes_are (h1, h2)
+            V2.Child_hashes_are (List.to_array [ h1; h2 ])
         | Contents_are accts ->
-            Contents_are (List.map ~f:acct_to_latest accts)
+            V2.Contents_are (List.map ~f:acct_to_latest accts)
         | Num_accounts (i, h) ->
-            Num_accounts (i, h)
+            V2.Num_accounts (i, h)
+
+      (* Not a standard versioning function *)
+
+      (** Attempts to downgrade v2 -> v1 *)
+      let from_v2 : ('a, 'b) V2.t -> ('a, 'b) t = function
+        | Child_hashes_are h ->
+            if Array.length h = 2 then Child_hashes_are (h.(0), h.(1))
+            else failwith "can't downgrade wide query"
+        | Contents_are accs ->
+            Contents_are accs
+        | Num_accounts (n, h) ->
+            Num_accounts (n, h)
     end
   end]
 end
@@ -221,6 +273,29 @@ end = struct
 
   type query = Addr.t Query.t
 
+  let max_subtree_depth : int = 8
+
+  let default_subtree_depth : int = 4
+
+  (* Provides addresses at an specific depth from this address *)
+  let rec intermediate_range : index -> Addr.t -> index -> Addr.t list =
+   fun ledger_depth addr i ->
+    match i with
+    | 0 ->
+        [ addr ]
+    | i ->
+        let left, right =
+          (* TODO: may be better to propagate the error *)
+          Option.value_exn
+            ( Or_error.ok
+            @@ Or_error.both
+                 (Addr.child ~ledger_depth addr Direction.Left)
+                 (Addr.child ~ledger_depth addr Direction.Right) )
+        in
+        let left = intermediate_range ledger_depth left (i - 1) in
+        let right = intermediate_range ledger_depth right (i - 1) in
+        left @ right
+
   module Responder = struct
     type t =
       { mt : MT.t
@@ -247,29 +322,6 @@ end = struct
       f query ;
       let response_or_punish =
         match query with
-        | What_child_hashes a -> (
-            match
-              let open Or_error.Let_syntax in
-              let%bind lchild = Addr.child ~ledger_depth a Direction.Left in
-              let%bind rchild = Addr.child ~ledger_depth a Direction.Right in
-              Or_error.try_with (fun () ->
-                  Answer.Child_hashes_are
-                    ( MT.get_inner_hash_at_addr_exn mt lchild
-                    , MT.get_inner_hash_at_addr_exn mt rchild ) )
-            with
-            | Ok answer ->
-                Either.First answer
-            | Error e ->
-                let logger = Logger.create () in
-                [%log error]
-                  ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-                  "When handling What_child_hashes request, the following \
-                   error happended: $error" ;
-                Either.Second
-                  ( Actions.Violated_protocol
-                  , Some
-                      ( "invalid address $addr in What_child_hashes request"
-                      , [ ("addr", Addr.to_yojson a) ] ) ) )
         | What_contents a ->
             if Addr.height ~ledger_depth a > account_subtree_height then
               Either.Second
@@ -340,7 +392,46 @@ end = struct
             Either.First
               (Num_accounts
                  (len, MT.get_inner_hash_at_addr_exn mt content_root_addr) )
+        | What_child_hashes (a, subtree_depth) -> (
+            match subtree_depth with
+            | n when n >= 1 && n <= max_subtree_depth -> (
+                let ledger_depth = MT.depth mt in
+                let addresses =
+                  intermediate_range ledger_depth a subtree_depth
+                in
+                let addresses = List.to_array addresses in
+                match
+                  Or_error.try_with (fun () ->
+                      let get_hash a = MT.get_inner_hash_at_addr_exn mt a in
+                      let hashes = Array.map addresses ~f:get_hash in
+                      Answer.Child_hashes_are hashes )
+                with
+                | Ok answer ->
+                    Either.First answer
+                | Error e ->
+                    let logger = Logger.create () in
+                    [%log error]
+                      ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+                      "When handling What_child_hashes request, the following \
+                       error happended: $error" ;
+                    Either.Second
+                      ( Actions.Violated_protocol
+                      , Some
+                          ( "invalid address $addr in What_child_hashes request"
+                          , [ ("addr", Addr.to_yojson a) ] ) ) )
+            | _ ->
+                let logger = Logger.create () in
+                [%log error]
+                  "When handling What_child_hashes request, the depth was \
+                   outside the valid range" ;
+                Either.Second
+                  ( Actions.Violated_protocol
+                  , Some
+                      ( "invalid depth requested at $addr in What_child_hashes \
+                         request"
+                      , [ ("addr", Addr.to_yojson a) ] ) ) )
       in
+
       match response_or_punish with
       | Either.First answer ->
           Deferred.return @@ Some answer
@@ -427,51 +518,76 @@ end = struct
     if Hash.equal actual expected then `Success
     else `Hash_mismatch (expected, actual)
 
-  (** Given an address and the hashes of the children of the corresponding node,
-      check the children hash to the expected value. If they do, queue the
-      children for retrieval if the values in the underlying ledger don't match
-      the hashes we got from the network. *)
-  let add_child_hashes_to :
+  (* Merges each 2 contigous nodes, halving the size of the array *)
+  let merge_siblings : Hash.t array -> index -> Hash.t array =
+   fun nodes height ->
+    let len = Array.length nodes in
+    if len mod 2 <> 0 then failwith "length must be even" ;
+    let half_len = len / 2 in
+    let f i = Hash.merge ~height nodes.(2 * i) nodes.((2 * i) + 1) in
+    Array.init half_len ~f
+
+  (* Assumes nodes to be a power of 2 and merges them into their common root *)
+  let rec merge_many : Hash.t array -> index -> Hash.t =
+   fun nodes height ->
+    let len = Array.length nodes in
+    match len with
+    | 1 ->
+        nodes.(0)
+    | _ ->
+        let half = merge_siblings nodes height in
+        merge_many half (height + 1)
+
+  let merge_many : Hash.t array -> index -> index -> Hash.t =
+   fun nodes height subtree_depth ->
+    let bottom_height = height - subtree_depth in
+    let hash = merge_many nodes bottom_height in
+    hash
+
+  (* Adds the subtree given as the 2^k subtree leaves with the given prefix address *)
+  (* Returns next nodes to be checked *)
+  let add_subtree :
          'a t
       -> Addr.t
-      -> Hash.t
-      -> Hash.t
-      -> [ `Good of (Addr.t * Hash.t) list
-           (** The addresses and expected hashes of the now-retrievable children *)
+      -> Hash.t array
+      -> [ `Good of (Addr.t * Hash.t) array
          | `Hash_mismatch of Hash.t * Hash.t
-           (** Hash check failed, peer lied. First parameter expected, second parameter actual. *)
-         ] =
-   fun t parent_addr lh rh ->
-    let ledger_depth = MT.depth t.tree in
-    let la, ra =
-      Option.value_exn ~message:"Tried to fetch a leaf as if it was a node"
-        ( Or_error.ok
-        @@ Or_error.both
-             (Addr.child ~ledger_depth parent_addr Direction.Left)
-             (Addr.child ~ledger_depth parent_addr Direction.Right) )
-    in
-    let expected =
-      Option.value_exn ~message:"Forgot to wait for a node"
-        (Addr.Table.find t.waiting_parents parent_addr)
-    in
-    let merged_hash =
-      (* Height here is the height of the things we're merging, so one less than
-         the parent height. *)
-      Hash.merge ~height:(ledger_depth - Addr.depth parent_addr - 1) lh rh
-    in
-    if Hash.equal merged_hash expected then (
-      (* Fetch the children of a node if the hash in the underlying ledger
-         doesn't match what we got. *)
-      let should_fetch_children addr hash =
-        not @@ Hash.equal (MT.get_inner_hash_at_addr_exn t.tree addr) hash
+         | `Invalid_length ] =
+   fun t addr nodes ->
+    let len = Array.length nodes in
+    let is_power = Int.is_pow2 len in
+    let is_more_than_two = len >= 2 in
+    let subtree_depth = Int.ceil_log2 len in
+    let less_than_max = len <= Int.pow 2 max_subtree_depth in
+
+    let valid_length = is_power && is_more_than_two && less_than_max in
+
+    if valid_length then
+      let ledger_depth = MT.depth t.tree in
+      let expected =
+        Option.value_exn ~message:"Forgot to wait for a node"
+          (Addr.Table.find t.waiting_parents addr)
       in
-      let subtrees_to_fetch =
-        [ (la, lh); (ra, rh) ]
-        |> List.filter ~f:(Tuple2.uncurry should_fetch_children)
+      let merged =
+        merge_many nodes (ledger_depth - Addr.depth addr) subtree_depth
       in
-      Addr.Table.remove t.waiting_parents parent_addr ;
-      `Good subtrees_to_fetch )
-    else `Hash_mismatch (expected, merged_hash)
+      if Hash.equal expected merged then (
+        Addr.Table.remove t.waiting_parents addr ;
+        let addresses = intermediate_range ledger_depth addr subtree_depth in
+        let addresses = List.to_array addresses in
+        let addresses_and_hashes = Array.zip_exn addresses nodes in
+
+        (* Filter to fetch only those that differ *)
+        let should_fetch_children addr hash =
+          not @@ Hash.equal (MT.get_inner_hash_at_addr_exn t.tree addr) hash
+        in
+        let subtrees_to_fetch =
+          addresses_and_hashes
+          |> Array.filter ~f:(Tuple2.uncurry should_fetch_children)
+        in
+        `Good subtrees_to_fetch )
+      else `Hash_mismatch (expected, merged)
+    else `Invalid_length
 
   let all_done t =
     if not (Root_hash.equal (MT.merkle_root t.tree) (desired_root_exn t)) then
@@ -512,7 +628,7 @@ end = struct
     else (
       expect_children t addr exp_hash ;
       Linear_pipe.write_without_pushback_if_open t.queries
-        (desired_root_exn t, What_child_hashes addr) )
+        (desired_root_exn t, What_child_hashes (addr, default_subtree_depth)) )
 
   (** Handle the initial Num_accounts message, starting the main syncing
       process. *)
@@ -584,28 +700,6 @@ end = struct
         in
         let%bind _ =
           match (query, answer) with
-          | Query.What_child_hashes addr, Answer.Child_hashes_are (lh, rh) -> (
-              match add_child_hashes_to t addr lh rh with
-              | `Hash_mismatch (expected, actual) ->
-                  let%map () =
-                    record_envelope_sender t.trust_system t.logger sender
-                      ( Actions.Sent_bad_hash
-                      , Some
-                          ( "sent child hashes $lhash and $rhash for address \
-                             $addr, they merge hash to $actualmerge but we \
-                             expected $expectedmerge"
-                          , [ ("lhash", Hash.to_yojson lh)
-                            ; ("rhash", Hash.to_yojson rh)
-                            ; ("actualmerge", Hash.to_yojson actual)
-                            ; ("expectedmerge", Hash.to_yojson expected)
-                            ] ) )
-                  in
-                  requeue_query ()
-              | `Good children_to_verify ->
-                  (* TODO #312: Make sure we don't write too much *)
-                  List.iter children_to_verify ~f:(fun (addr, hash) ->
-                      handle_node t addr hash ) ;
-                  credit_fulfilled_request () )
           | Query.What_contents addr, Answer.Contents_are leaves -> (
               match add_content t addr leaves with
               | `Success ->
@@ -644,6 +738,37 @@ end = struct
                             ] ) )
                   in
                   requeue_query () )
+          (* query depth is not checked as the response is allowed to use any
+             depth within the valid range *)
+          | Query.What_child_hashes (address, _), Answer.Child_hashes_are hashes
+            -> (
+              match add_subtree t address hashes with
+              | `Hash_mismatch (expected, actual) ->
+                  let%map () =
+                    record_envelope_sender t.trust_system t.logger sender
+                      ( Actions.Sent_bad_hash
+                      , Some
+                          ( "hashes sent for subtree on address $address merge \
+                             to $actual_merge but we expected $expected_merge"
+                          , [ ("actual_merge", Hash.to_yojson actual)
+                            ; ("expected_merge", Hash.to_yojson expected)
+                            ] ) )
+                  in
+                  requeue_query ()
+              | `Invalid_length ->
+                  let%map () =
+                    record_envelope_sender t.trust_system t.logger sender
+                      ( Actions.Sent_bad_hash
+                      , Some
+                          ( "hashes sent for subtree on address $address must \
+                             be a power of 2 in the range 2-2^$depth"
+                          , [ ("depth", `Int max_subtree_depth) ] ) )
+                  in
+                  requeue_query ()
+              | `Good children_to_verify ->
+                  Array.iter children_to_verify ~f:(fun (addr, hash) ->
+                      handle_node t addr hash ) ;
+                  credit_fulfilled_request () )
           | query, answer ->
               let%map () =
                 record_envelope_sender t.trust_system t.logger sender
