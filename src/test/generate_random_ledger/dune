@@ -1,0 +1,17 @@
+(executable
+ (package generate_random_ledger)
+ (name generate_random_ledger)
+ (public_name generate_random_ledger)
+ (libraries
+   ;; opam libraries
+   async_kernel
+   core_kernel
+   async
+   core
+   cmdliner
+   ;; mina libraries
+   integration_test_lib
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_mina ppx_let ppx_hash ppx_compare ppx_sexp_conv h_list.ppx))
+)
