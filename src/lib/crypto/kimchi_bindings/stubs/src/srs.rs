@@ -97,7 +97,7 @@ macro_rules! impl_srs {
             ) -> Result<Vec<CamlPolyComm<$CamlG>>, ocaml::Error> {
                 use std::time::{Instant};
                 let time_0 = Instant::now();
-                println!("entering _lagrange_commitment_whole_domain");
+                //println!("entering _lagrange_commitment_whole_domain");
                 let x_domain: ark_poly::Radix2EvaluationDomain<_> = EvaluationDomain::<$F>::new(domain_size as usize).ok_or_else(|| {
                     ocaml::Error::invalid_argument("CamlSRS::lagrange_commitment")
                         .err()

@@ -91,10 +91,11 @@ pub fn caml_pasta_fp_plonk_proof_create(
     // NB: This method is designed only to be used by tests. However, since creating a new reference will cause `drop` to be called on it once we are done with it. Since `drop` calls `caml_shutdown` internally, we *really, really* do not want to do this, but we have no other way to get at the active runtime.
     // TODO: There's actually a way to get a handle to the runtime as a function argument. Switch
     // to doing this instead.
-    let runtime = unsafe { ocaml::Runtime::recover_handle() };
+    //let runtime = unsafe { ocaml::Runtime::recover_handle() };
 
     // Release the runtime lock so that other threads can run using it while we generate the proof.
-    runtime.releasing_runtime(|| {
+    //   runtime.releasing_runtime(|| {
+    {
         let group_map = GroupMap::<Fq>::setup();
         let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
             &group_map,
@@ -109,8 +110,22 @@ pub fn caml_pasta_fp_plonk_proof_create(
         //println!("pasta_fp_plonk_proof total {:.2?}", time_0.elapsed());
 
         Ok((proof, public_input).into())
-    })
+    }
+    //    })
 }
+
+//#[ocaml_gen::func]
+//#[ocaml::func(ocaml_runtime)]
+//pub fn caml_testkek_with_runtime(
+//    rt: &ocaml::Runtime,
+//    index: CamlPastaFpPlonkIndexPtr<'static>,
+//    witness: Vec<CamlFpVector>,
+//    runtime_tables: Vec<CamlRuntimeTable<CamlFp>>,
+//    prev_challenges: Vec<CamlFp>,
+//    prev_sgs: Vec<CamlGVesta>,
+//) -> Result<CamlProofWithPublic<CamlGVesta, CamlFp>, ocaml::Error> {
+//    unimplemented!()
+//}
 
 #[ocaml_gen::func]
 #[ocaml::func]
@@ -165,33 +180,33 @@ pub fn caml_pasta_fp_plonk_proof_create_and_verify(
     // NB: This method is designed only to be used by tests. However, since creating a new reference will cause `drop` to be called on it once we are done with it. Since `drop` calls `caml_shutdown` internally, we *really, really* do not want to do this, but we have no other way to get at the active runtime.
     // TODO: There's actually a way to get a handle to the runtime as a function argument. Switch
     // to doing this instead.
-    let runtime = unsafe { ocaml::Runtime::recover_handle() };
+    //let runtime = unsafe { ocaml::Runtime::recover_handle() };
 
     // Release the runtime lock so that other threads can run using it while we generate the proof.
-    runtime.releasing_runtime(|| {
-        let group_map = GroupMap::<Fq>::setup();
-        let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
-            &group_map,
-            witness,
-            &runtime_tables,
-            index,
-            prev,
-            None,
-        )
-        .map_err(|e| ocaml::Error::Error(e.into()))?;
+    //runtime.releasing_runtime(|| {
+    let group_map = GroupMap::<Fq>::setup();
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+        &group_map,
+        witness,
+        &runtime_tables,
+        index,
+        prev,
+        None,
+    )
+    .map_err(|e| ocaml::Error::Error(e.into()))?;
 
-        let verifier_index = index.verifier_index();
+    let verifier_index = index.verifier_index();
 
-        // Verify proof
-        verify::<Vesta, EFqSponge, EFrSponge, OpeningProof<Vesta>>(
-            &group_map,
-            &verifier_index,
-            &proof,
-            &public_input,
-        )?;
+    // Verify proof
+    verify::<Vesta, EFqSponge, EFrSponge, OpeningProof<Vesta>>(
+        &group_map,
+        &verifier_index,
+        &proof,
+        &public_input,
+    )?;
 
-        Ok((proof, public_input).into())
-    })
+    Ok((proof, public_input).into())
+    //    })
 }
 
 #[ocaml_gen::func]

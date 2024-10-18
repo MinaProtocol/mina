@@ -22,6 +22,7 @@ type ledger_proof = Ledger_proof.t
 
 let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
     ~proof_level ~constraint_constants ~pids:_ ~conf_dir:_ ~commit_id:_ () =
+  printf !"verifier/dummy.ml#create DEBUG very first line\n%!" ;
   let module T = Transaction_snark.Make (struct
     let constraint_constants = constraint_constants
 
@@ -73,6 +74,7 @@ let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
                "Transaction_snark.verify: Mismatched sok_message" )
   in
 
+  printf !"verifier/dummy.ml#create DEBUG LAST line\n%!" ;
   Deferred.return
     { proof_level
     ; constraint_constants

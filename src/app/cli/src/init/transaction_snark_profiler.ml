@@ -6,28 +6,53 @@ let name = "transaction-snark-profiler"
 let run ~genesis_constants ~constraint_constants ~proof_level
     ~user_command_profiler ~zkapp_profiler num_transactions ~max_num_updates
     ?min_num_updates repeats preeval use_zkapps : unit =
-  let logger = Logger.null () in
+  (*let logger = Logger.null () in*)
+  let logger = Logger.create () in
+  let stdout_log_processor =
+          Logger.Processor.pretty ~log_level:Logger.Level.Debug
+        ~config:
+          { Interpolator_lib.Interpolator.mode = Inline
+          ; max_interpolation_length = 50
+          ; pretty_print = true
+          } in
+  Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+    ~id:"default" ~processor:stdout_log_processor
+    ~transport:(Logger.Transport.stdout ())
+    ();
   let print n msg = printf !"[%i] %s\n%!" n msg in
   if use_zkapps then (
     let ledger, transactions =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          create_ledger_and_zkapps ~genesis_constants ~constraint_constants
-            ?min_num_updates ~max_num_updates () )
+          printf !"ASYNC DEBUGPOINT 1 ENTERED\n%!" ;
+          let res =
+            create_ledger_and_zkapps ~genesis_constants ~constraint_constants
+              ?min_num_updates ~max_num_updates ()
+          in
+          printf !"ASYNC DEBUGPOINT 1 EXITING\n%!" ;
+          res )
     in
     Parallel.init_master () ;
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~commit_id:Mina_version.commit_id ~logger ~proof_level
-            ~constraint_constants ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            () )
+          printf !"ASYNC DEBUGPOINT 2 ENTERED\n%!" ;
+          let res =
+            Verifier.create ~commit_id:Mina_version.commit_id ~logger
+              ~proof_level ~constraint_constants ~conf_dir:None
+              ~pids:(Child_processes.Termination.create_pid_table ())
+              ()
+          in
+          printf !"ASYNC DEBUGPOINT 2 EXITING\n%!" ;
+          res )
     in
     let rec go n =
       if n <= 0 then ()
       else
         let message =
           Async.Thread_safe.block_on_async_exn (fun () ->
-              zkapp_profiler ~verifier ledger transactions )
+              printf !"ASYNC DEBUGPOINT 3 ENTERED\n%!" ;
+              let res = zkapp_profiler ~verifier ledger transactions in
+              printf !"ASYNC DEBUGPOINT 3 EXITING\n%!" ;
+              res )
         in
         print n message ;
         go (n - 1)
@@ -50,7 +75,11 @@ let run ~genesis_constants ~constraint_constants ~proof_level
       else
         let message =
           Async.Thread_safe.block_on_async_exn (fun () ->
-              user_command_profiler sparse_ledger transactions preeval )
+              let res =
+                user_command_profiler sparse_ledger transactions preeval
+              in
+              printf !"ASYNC DEBUGPOINT 4\n%!" ;
+              res )
         in
         print n message ;
         go (n - 1)

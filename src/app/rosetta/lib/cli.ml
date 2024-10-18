@@ -14,7 +14,7 @@ let log_level =
          let log_level_str = String.lowercase log_level_str_with_case in
          match Level.of_string log_level_str with
          | Error _ ->
-             (* eprintf "Received unknown log-level %s. Expected one of: %s\n" *)
+             (* eprintf "Received unknow. log-level %s. Expected one of: %s\n" *)
              (*   log_level_str *)
              (*   ( Level.all |> List.map ~f:Level.show *)
              (*   |> List.map ~f:String.lowercase *)

@@ -436,6 +436,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
     generate_zkapp ~num_proof_updates ~num_updates:min_num_updates []
       Mina_base.Account.Nonce.zero
   in
+  printf !"DEBUG create_ledger_and_zkapps returning\n%!" ;
   (ledger, zkapp)
 
 let time thunk =
@@ -653,6 +654,7 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
 let profile_zkapps
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~verifier
     ledger zkapp_commands =
+  printf !"DEBUG entering profile_zkapps\n%!" ;
   let open Async.Deferred.Let_syntax in
   let tm0 = Core.Unix.gettimeofday () in
   let%map () =
@@ -665,6 +667,7 @@ let profile_zkapps
           (ndx + 1) num_zkapp_commands
           (List.length account_updates) ;
         let v_start_time = Time.now () in
+        printf !"LAUNCHING VERIFIER\n%!" ;
         let%bind res =
           Verifier.verify_commands verifier
             [ { With_status.data =
@@ -680,6 +683,7 @@ let profile_zkapps
               }
             ]
         in
+        printf !"VERIFIER PASSED, folding\n%!" ;
         let proof_count, signature_count =
           List.fold ~init:(0, 0)
             ( Account_update.of_fee_payer zkapp_command.fee_payer

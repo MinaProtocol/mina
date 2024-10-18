@@ -1493,6 +1493,7 @@ let start_filtered_log ~commit_id
     Ok () )
 
 let create ~commit_id ?wallets (config : Config.t) =
+  printf !"mina_lib.ml#create DEBUG very first line\n%!" ;
   let module Context = (val context ~commit_id config) in
   let commit_id_short = String.sub ~pos:0 ~len:8 commit_id in
   let catchup_mode = if config.super_catchup then `Super else `Normal in
@@ -1500,7 +1501,9 @@ let create ~commit_id ?wallets (config : Config.t) =
   let consensus_constants = config.precomputed_values.consensus_constants in
   let block_window_duration = config.compile_config.block_window_duration in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
+  printf !"mina_lib.ml#create DEBUG before first async\n%!" ;
   Async.Scheduler.within' ~monitor (fun () ->
+      printf !"mina_lib.ml#create DEBUG 1\n%!" ;
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
           =
         if config.compile_config.itn_features then
@@ -1576,6 +1579,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                     verifier ) )
             >>| Result.ok_exn
           in
+          printf !"mina_lib.ml#create DEBUG after prover and verifier\n%!" ;
           (* This setup is required for the dynamic enabling/disabling of internal
              tracing to also work with the verifier and prover sub-processes. *)
           Internal_tracing.register_toggle_callback (fun enabled ->
@@ -1663,6 +1667,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           let get_current_frontier () =
             Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
           in
+          printf !"mina_lib.ml#create DEBUG register_async_shutdown_handler\n%!" ;
           Exit_handlers.register_async_shutdown_handler ~logger:config.logger
             ~description:"Close transition frontier, if exists" (fun () ->
               match get_current_frontier () with
@@ -2177,6 +2182,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           in
           (* tie other knot *)
           sync_status_ref := Some sync_status ;
+          printf !"mina_lib.ml#create DEBUG LAST before return\n%!" ;
           Deferred.return
             { config
             ; next_producer_timing = None

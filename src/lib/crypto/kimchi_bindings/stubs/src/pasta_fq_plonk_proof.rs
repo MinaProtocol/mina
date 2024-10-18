@@ -87,10 +87,11 @@ pub fn caml_pasta_fq_plonk_proof_create(
     // NB: This method is designed only to be used by tests. However, since creating a new reference will cause `drop` to be called on it once we are done with it. Since `drop` calls `caml_shutdown` internally, we *really, really* do not want to do this, but we have no other way to get at the active runtime.
     // TODO: There's actually a way to get a handle to the runtime as a function argument. Switch
     // to doing this instead.
-    let runtime = unsafe { ocaml::Runtime::recover_handle() };
+    //let runtime = unsafe { ocaml::Runtime::recover_handle() };
 
     // Release the runtime lock so that other threads can run using it while we generate the proof.
-    runtime.releasing_runtime(|| {
+    //runtime.releasing_runtime(|| {
+    {
         let group_map = GroupMap::<Fp>::setup();
         let proof = ProverProof::create_recursive::<
             DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
@@ -101,7 +102,8 @@ pub fn caml_pasta_fq_plonk_proof_create(
         println!("pasta_fq_plonk_proof total {:.2?}", time_0.elapsed());
 
         Ok((proof, public_input).into())
-    })
+    }
+    //})
 }
 
 #[ocaml_gen::func]

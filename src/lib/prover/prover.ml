@@ -371,6 +371,7 @@ type t =
 
 let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
     ~pids ~conf_dir ~proof_level ~constraint_constants ~commit_id () =
+  printf !"prover.ml#create DEBUG very first line\n%!" ;
   [%log info] "Starting a new prover process" ;
   let on_failure err =
     [%log error] "Prover process failed with error $err"
