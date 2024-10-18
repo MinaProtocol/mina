@@ -4,6 +4,8 @@ let Cmd = ../../Lib/Cmds.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
+let PipelineTag = ../../Pipeline/Tag.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
@@ -23,9 +25,7 @@ in  Pipeline.build
           ]
         , path = "Lint"
         , name = "Changelog"
-        , tags =
-          [ PipelineTag.Type.Fast
-          ]
+        , tags = [ PipelineTag.Type.Fast ]
         }
       , steps =
         [ Command.build
