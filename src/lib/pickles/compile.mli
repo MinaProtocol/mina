@@ -41,10 +41,6 @@ module type Proof_intf = sig
 
   val id : Cache.Wrap.Key.Verification.t Deferred.t Lazy.t
 
-  val nat_module: (module Nat.Intf) 
-
-  val statement_module: (module Statement_value_intf) 
-  
   val verify : (statement * t) list -> unit Or_error.t Deferred.t
 
   val verify_promise : (statement * t) list -> unit Or_error.t Promise.t

@@ -97,10 +97,6 @@ module type Proof_intf = sig
 
   val id : Cache.Wrap.Key.Verification.t Deferred.t Lazy.t
 
-  val nat_module: (module Nat.Intf)
-
-  val statement_module: (module Statement_value_intf) 
-
   val verify : (statement * t) list -> unit Or_error.t Deferred.t
 
   val verify_promise : (statement * t) list -> unit Or_error.t Promise.t
@@ -1188,23 +1184,16 @@ let compile_with_wrap_main_override_promise :
 
     let verification_key = Lazy.map ~f:Promise.to_deferred wrap_vk
 
-    let nat_module: (module Nat.Intf) = (module struct
-      include Max_proofs_verified
-    end )
-
-    let statement_module: (module Statement_value_intf) = (module Value)
-
     let verify_promise ts =
       let%bind.Promise chunking_data = chunking_data in
       let%bind.Promise verification_key = Lazy.force verification_key_promise in
       verify_promise ?chunking_data
-      (module struct
-      include Max_proofs_verified
-    end )
-    (module Value)
+        ( module struct
+          include Max_proofs_verified
+        end )
+        (module Value)
         verification_key ts
 
-    
     let verify ts = verify_promise ts |> Promise.to_deferred
   end in
   (self, cache_handle, (module P), provers)
