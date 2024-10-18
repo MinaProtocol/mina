@@ -36,6 +36,17 @@ let create ~(test_config : Test_config.t) ~(genesis_ledger : Genesis_ledger.t) =
         ; name = None
         }
   ; epoch_data =
+      (* each staking epoch ledger account must also be a genesis ledger account, though
+         the balance may be different; the converse is not necessarily true, since
+         an account may have been added after the last epoch ledger was taken
+
+         each staking epoch ledger account must also be in the next epoch ledger, if provided
+
+         if provided, each next_epoch_ledger account must be in the genesis ledger
+
+         in all ledgers, the accounts must be in the same order, so that accounts will
+         be in the same leaf order
+      *)
       Option.map test_config.epoch_data
         ~f:(fun { staking = staking_ledger; next } ->
           let ledger_is_prefix ledger1 ledger2 =
