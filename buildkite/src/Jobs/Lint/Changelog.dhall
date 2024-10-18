@@ -10,18 +10,17 @@ let Command = ../../Command/Base.dhall
 
 let Size = ../../Command/Size.dhall
 
-let trigger =
-      S.compile
-        [ S.strictlyStart (S.contains "src")
-        , S.exactly "buildkite/src/Jobs/Lint/Changelog" "dhall"
-        ]
+let trigger = S.compile [ S.strictlyStart (S.contains "src") ]
 
 let reqFile = "^changes/\\\${BUILDKITE_PULL_REQUEST}-.*.md"
 
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
-        , dirtyWhen = [ S.contains "src" ]
+        , dirtyWhen =
+          [ S.contains "src"
+          , S.exactly "buildkite/src/Jobs/Lint/Changelog" "dhall"
+          ]
         , path = "Lint"
         , name = "Changelog"
         }
