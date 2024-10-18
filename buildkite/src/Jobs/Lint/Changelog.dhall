@@ -23,6 +23,9 @@ in  Pipeline.build
           ]
         , path = "Lint"
         , name = "Changelog"
+        , tags =
+          [ PipelineTag.Type.Fast
+          ]
         }
       , steps =
         [ Command.build

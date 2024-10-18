@@ -11,6 +11,11 @@ source "./buildkite/scripts/refresh_code.sh"
 git clean -fd
 
 
+if [[ $BUILDKITE_PIPELINE_SLUG == "mina-end-to-end-nightlies" ]]; then
+    echo "Skipping run on nightly"
+    exit 0
+fi
+
 if [[ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" ]]; then 
     echo "BUILDKITE_PULL_REQUEST_BASE_BRANCH env variable is not defined"
     echo "Did you run this job without !ci-build-me ?"
