@@ -185,7 +185,6 @@ end)
         ~unwrap:(function
           | Diff m -> m | _ -> failwith "unexpected message type" )
         ~trace_label:Resource_pool.label ~logger resource_pool
-        ~block_window_duration
     in
     let local_r, local_w, _ =
       Local_sink.create
@@ -193,7 +192,6 @@ end)
         ~unwrap:(function
           | Diff m -> m | _ -> failwith "unexpected message type" )
         ~trace_label:Resource_pool.label ~logger resource_pool
-        ~block_window_duration
     in
     log_rate_limiter_occasionally network_pool remote_rl ;
     (*priority: Transition frontier diffs > local diffs > incoming diffs*)

@@ -1866,7 +1866,6 @@ let create ~commit_id ?wallets (config : Config.t) =
               ; consensus_constants
               ; genesis_constants = config.precomputed_values.genesis_constants
               ; constraint_constants
-              ; block_window_duration
               }
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in

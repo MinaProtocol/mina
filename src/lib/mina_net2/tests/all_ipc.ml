@@ -78,9 +78,6 @@ let%test_module "all-ipc test" =
     let bob_status =
       "This is major Tom to ground control\nI'm stepping through the door"
 
-    let block_window_duration =
-      Mina_compile_config.For_unit_tests.t.block_window_duration
-
     type messages =
       { topic_a_msg_1 : string
       ; topic_a_msg_2 : string
@@ -543,8 +540,7 @@ let%test_module "all-ipc test" =
       let%bind node =
         create ~all_peers_seen_metric:false
           ~logger:(Logger.extend logger [ ("name", `String local_name) ])
-          ~conf_dir ~pids ~on_peer_connected ~on_peer_disconnected
-          ~block_window_duration ()
+          ~conf_dir ~pids ~on_peer_connected ~on_peer_disconnected ()
         >>| Or_error.ok_exn
       in
       let%bind kp_a =

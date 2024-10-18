@@ -47,6 +47,10 @@ type BitswapCtx struct {
 
 func NewBitswapCtx(ctx context.Context, outMsgChan chan<- *capnp.Message) *BitswapCtx {
 	maxBlockSize := 1 << 18 // 256 KiB
+	return NewBitswapCtxWithMaxBlockSize(maxBlockSize, ctx, outMsgChan)
+}
+
+func NewBitswapCtxWithMaxBlockSize(maxBlockSize int, ctx context.Context, outMsgChan chan<- *capnp.Message) *BitswapCtx {
 	return &BitswapCtx{
 		downloadCmds:       make(chan bitswapDownloadCmd, 100),
 		addCmds:            make(chan bitswapAddCmd, 100),
@@ -74,10 +78,16 @@ func announceNewRootBlock(ctx context.Context, engine *bitswap.Bitswap, storage 
 		return err
 	}
 	bs := make([]blocks.Block, 0, len(blockMap))
+	keys := make([][32]byte, 0, len(blockMap))
 	for h, b := range blockMap {
 		bitswapLogger.Debugf("Publishing block %s (%d bytes)", codanet.BlockHashToCidSuffix(h), len(b))
 		block, _ := blocks.NewBlockWithCid(b, codanet.BlockHashToCid(h))
 		bs = append(bs, block)
+		keys = append(keys, h)
+	}
+	err = storage.UpdateReferences(ctx, root, true, keys...)
+	if err != nil {
+		return err
 	}
 	err = storage.StoreBlocks(ctx, bs)
 	if err != nil {
@@ -137,6 +147,9 @@ func (bs *BitswapCtx) RegisterDeadlineTracker(root_ root, downloadTimeout time.D
 }
 func (bs *BitswapCtx) GetStatus(key [32]byte) (codanet.RootBlockStatus, error) {
 	return bs.storage.GetStatus(bs.ctx, key)
+}
+func (bs *BitswapCtx) UpdateReferences(root [32]byte, exists bool, keys ...[32]byte) error {
+	return bs.storage.UpdateReferences(bs.ctx, root, exists, keys...)
 }
 func (bs *BitswapCtx) SetStatus(key [32]byte, value codanet.RootBlockStatus) error {
 	return bs.storage.SetStatus(bs.ctx, key, value)

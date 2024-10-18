@@ -23,7 +23,6 @@ type block_sink_config =
   ; consensus_constants : Consensus.Constants.t
   ; genesis_constants : Genesis_constants.t
   ; constraint_constants : Genesis_constants.Constraint_constants.t
-  ; block_window_duration : Time.Span.t
   }
 
 type t =
@@ -37,7 +36,6 @@ type t =
       ; consensus_constants : Consensus.Constants.t
       ; genesis_constants : Genesis_constants.t
       ; constraint_constants : Genesis_constants.Constraint_constants.t
-      ; block_window_duration : Time.Span.t
       }
   | Void
 
@@ -59,7 +57,6 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
       ; consensus_constants
       ; genesis_constants
       ; constraint_constants
-      ; block_window_duration
       } ->
       O1trace.sync_thread "handle_block_gossip"
       @@ fun () ->
@@ -105,9 +102,7 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
           :: txs_meta ) ;
       [%log internal] "External_block_received" ;
       don't_wait_for
-        ( match%map
-            Mina_net2.Validation_callback.await ~block_window_duration cb
-          with
+        ( match%map Mina_net2.Validation_callback.await cb with
         | Some `Accept ->
             let processing_time_span =
               Time.diff
@@ -238,7 +233,6 @@ let create
     ; consensus_constants
     ; genesis_constants
     ; constraint_constants
-    ; block_window_duration
     } =
   let rate_limiter =
     Network_pool.Rate_limiter.create
@@ -260,7 +254,6 @@ let create
       ; consensus_constants
       ; genesis_constants
       ; constraint_constants
-      ; block_window_duration
       } )
 
 let void = Void

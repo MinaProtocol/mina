@@ -172,7 +172,6 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       | Ok _ | Error `Parent_missing_from_frontier ->
           [%log internal] "Schedule_catchup" ;
           Catchup_scheduler.watch_header catchup_scheduler ~valid_cb
-            ~block_window_duration:compile_config.block_window_duration
             ~header_with_hash ;
           return ()
       | Error `Not_selected_over_frontier_root ->
@@ -240,8 +239,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
                 in
                 Catchup_scheduler.watch catchup_scheduler ~timeout_duration
                   ~cached_transition:cached_initially_validated_transition
-                  ~valid_cb
-                  ~block_window_duration:compile_config.block_window_duration ;
+                  ~valid_cb ;
                 return (Error ()) )
       in
       (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)

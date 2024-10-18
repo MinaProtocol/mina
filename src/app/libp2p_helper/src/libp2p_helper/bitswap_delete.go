@@ -97,6 +97,9 @@ func DeleteRoot(bs BitswapState, root BitswapBlockLink) (BitswapDataTag, error) 
 			return tag, err
 		}
 	}
+	if err := bs.UpdateReferences(root, false, allDescendants...); err != nil {
+		return tag, err
+	}
 	if err := bs.DeleteBlocks(allDescendants); err != nil {
 		return tag, err
 	}
