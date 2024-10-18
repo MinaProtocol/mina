@@ -141,6 +141,14 @@ let gen_account_precondition_from_account ?failure
               in
               return (state, action_state, proved_state, is_new)
         in
+        let%bind permissions =
+          return @@ Account_update.Permissions_precondition.accept
+          (* Ideally this would be:
+             Account_update.Permissions_precondition.gen_valid account.permissions
+             AFAICT the permissions of the account passed in are not always the same
+             as the permissions of the final tx I don't know why
+          *)
+        in
         return
           { Zkapp_precondition.Account.balance
           ; nonce
@@ -150,6 +158,7 @@ let gen_account_precondition_from_account ?failure
           ; action_state
           ; proved_state
           ; is_new
+          ; permissions
           }
       in
       match failure with
@@ -592,6 +601,7 @@ module Account_update_body_components = struct
        , 'bool
        , 'protocol_state_precondition
        , 'account_precondition
+       , 'permissions_precondition
        , 'valid_while_precondition
        , 'may_use_token
        , 'authorization_kind )
@@ -607,6 +617,7 @@ module Account_update_body_components = struct
     ; call_depth : 'int
     ; protocol_state_precondition : 'protocol_state_precondition
     ; account_precondition : 'account_precondition
+    ; permissions_precondition : 'permissions_precondition
     ; valid_while_precondition : 'valid_while_precondition
     ; use_full_commitment : 'bool
     ; may_use_token : 'may_use_token
@@ -676,7 +687,7 @@ let gen_account_update_body_components (type a b c d) ?global_slot
        first_use_of_account:bool -> Account.t -> d Quickcheck.Generator.t )
     ~(f_account_update_account_precondition :
        d -> Account_update.Account_precondition.t ) ~authorization_tag () :
-    (_, _, _, a, _, _, _, b, _, d, _, _, _) Account_update_body_components.t
+    (_, _, _, a, _, _, _, b, _, d, _, _, _, _) Account_update_body_components.t
     Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   (* fee payers have to be in the ledger *)
@@ -831,6 +842,9 @@ let gen_account_update_body_components (type a b c d) ?global_slot
   in
   let%bind account_precondition =
     f_account_precondition ~first_use_of_account account
+  in
+  let%bind permissions_precondition =
+    Account_update.Permissions_precondition.gen_valid account.permissions
   in
   (* update the depth when generating `account_updates` in Zkapp_command.t *)
   let call_depth = 0 in
@@ -1010,6 +1024,7 @@ let gen_account_update_body_components (type a b c d) ?global_slot
   ; call_depth
   ; protocol_state_precondition
   ; account_precondition
+  ; permissions_precondition
   ; valid_while_precondition
   ; use_full_commitment
   ; may_use_token

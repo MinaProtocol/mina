@@ -72,6 +72,9 @@ module Auth_required = struct
     | t ->
         t
 
+  let gen : t Quickcheck.Generator.t =
+    Quickcheck.Generator.of_list [ None; Either; Proof; Signature ]
+
   (* permissions such that [check permission (Proof _)] is true *)
   let gen_for_proof_authorization : t Quickcheck.Generator.t =
     Quickcheck.Generator.of_list [ None; Either; Proof ]
@@ -244,6 +247,21 @@ module Auth_required = struct
     type t = Boolean.var Encoding.t
 
     let if_ = Encoding.if_
+
+    let equal (a : t) (b : t) : Boolean.var Checked.t =
+      let open Checked.Let_syntax in
+      Boolean.(
+        let%bind signature_necessary_equal =
+          equal
+            (Encoding.signature_necessary a)
+            (Encoding.signature_necessary b)
+        in
+        let%bind signature_sufficient_equal =
+          equal
+            (Encoding.signature_sufficient a)
+            (Encoding.signature_sufficient b)
+        in
+        signature_necessary_equal && signature_sufficient_equal)
 
     let to_input : t -> _ =
       Encoding.to_input ~field_of_bool:(fun (b : Boolean.var) ->

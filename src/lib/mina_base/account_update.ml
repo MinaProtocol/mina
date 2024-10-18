@@ -954,6 +954,8 @@ module Account_precondition = struct
 
   [%%define_locally Stable.Latest.(equal, compare)]
 
+  let accept : t = Zkapp_precondition.Account.accept
+
   let gen : t Quickcheck.Generator.t =
     (* we used to have 3 constructors, Full, Nonce, and Accept for the type t
        nowadays, the generator creates these 3 different kinds of values, but all mapped to t
@@ -1000,6 +1002,67 @@ module Account_precondition = struct
     Zkapp_precondition.Account.typ ()
 
   let nonce ({ nonce; _ } : t) = nonce
+end
+
+module Permissions_precondition = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Zkapp_precondition.Permissions.Stable.V2.t
+      [@@deriving sexp, yojson, hash]
+
+      let (_ :
+            ( t
+            , Mina_wire_types.Mina_base.Account_update.Permissions_precondition
+              .V1
+              .t )
+            Type_equal.t ) =
+        Type_equal.T
+
+      let to_latest = Fn.id
+
+      [%%define_locally Zkapp_precondition.Permissions.(equal, compare)]
+    end
+  end]
+
+  [%%define_locally Stable.Latest.(equal, compare)]
+
+  let accept : t = Zkapp_precondition.Permissions.accept
+
+  let from_perms : Permissions.t -> t =
+    Zkapp_precondition.Permissions.from_perms
+
+  let gen_valid : Permissions.t -> t Quickcheck.Generator.t =
+    Zkapp_precondition.Permissions.gen_valid
+
+  module Tag = struct
+    type t = Full | Nonce | Accept [@@deriving equal, compare, sexp, yojson]
+  end
+
+  let deriver obj = Zkapp_precondition.Permissions.deriver obj
+
+  let digest (t : t) =
+    let digest x =
+      Random_oracle.(
+        hash ~init:Hash_prefix_states.account_update_account_precondition
+          (pack_input x))
+    in
+    t |> Zkapp_precondition.Permissions.to_input |> digest
+
+  module Checked = struct
+    type t = Zkapp_precondition.Permissions.Checked.t
+
+    let digest (t : t) =
+      let digest x =
+        Random_oracle.Checked.(
+          hash ~init:Hash_prefix_states.account_update_account_precondition
+            (pack_input x))
+      in
+      Zkapp_precondition.Permissions.Checked.to_input t |> digest
+  end
+
+  let typ () : (Zkapp_precondition.Permissions.Checked.t, t) Typ.t =
+    Zkapp_precondition.Permissions.typ ()
 end
 
 module Preconditions = struct
