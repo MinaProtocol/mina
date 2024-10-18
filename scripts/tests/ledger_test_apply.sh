@@ -33,5 +33,5 @@ tar -zxf  $TEMP_FOLDER/genesis/genesis_ledger_*.tar.gz -C $TEMP_FOLDER/genesis/l
 
 
 echo "running test:"
-$MINA_APP ledger test-apply --ledger-path $TEMP_FOLDER/genesis/ledger  --privkey-path $TEMP_FOLDER/alice  --num-txs 200
+$MINA_APP ledger test apply --ledger-path $TEMP_FOLDER/genesis/ledger  --privkey-path $TEMP_FOLDER/alice  --num-txs 200
 

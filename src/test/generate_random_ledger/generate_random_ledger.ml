@@ -17,6 +17,7 @@ let constants : Test_config.constants =
       ; txpool_max_size = 3000
       }
   ; constraint_constants = Genesis_constants.Compiled.constraint_constants
+  ; compile_config = Mina_compile_config.Compiled.t
   }
 
 let default_test_config =
@@ -62,7 +63,9 @@ let () =
              Param.(optional_with_default "." string)
          and config =
            Param.(flag "--config" ~aliases:[ "config" ])
-             ~doc:"File input config. If not specified "
+             ~doc:
+               "File input config. If not specified default configuration will \
+                be applied"
              Param.(optional string)
          and no_num_accounts =
            Param.(flag "--no-num-accounts" no_arg)
