@@ -20,12 +20,16 @@ in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen =
-          [ S.contains "src"
+          [ S.strictlyStart (S.contains "src")
           , S.exactly "buildkite/src/Jobs/Lint/Changelog" "dhall"
           ]
         , path = "Lint"
         , name = "Changelog"
-        , tags = [ PipelineTag.Type.Fast ]
+        , tags =
+          [ PipelineTag.Type.Fast
+          , PipelineTag.Type.Lint
+          , PipelineTag.Type.Stable
+          ]
         }
       , steps =
         [ Command.build
