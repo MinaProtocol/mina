@@ -43,5 +43,5 @@ if (cat _computed_diff.txt | grep -E -q "$TRIGGER"); then
         echo "Changelog updated!"
     fi
 else
-    echo "No change in ${TIRGGER} detected. Changelog does not need to be updated"
+    echo "No change in ${TRIGGER} detected. Changelog does not need to be updated"
 fi
