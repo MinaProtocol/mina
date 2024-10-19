@@ -428,6 +428,7 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
   ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
   }
 
+
 module type S = sig
   module Proof :
     Pickles.Proof_intf
