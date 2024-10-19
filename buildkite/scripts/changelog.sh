@@ -7,7 +7,7 @@ set -eou pipefail
 
 source "./buildkite/scripts/refresh_code.sh"
 
-# make sure we cleaned gits
+# make sure we cleaned git
 git clean -fd
 
 
@@ -33,7 +33,7 @@ if (cat _computed_diff.txt | grep -E -q "$TRIGGER"); then
         echo ""
         echo "This job detected that you modified important part of code and did not update changelog file."
         echo "Please ensure that you added this change to our changelog file: "
-        echo "'${reqFile}'"
+        echo "'${REQUIRED_CHANGE}'"
         echo " where syntax is like below: "
         echo " changes/{PR number}-{description}.md"
         echo " from example: changes/13523-new-fancy-daemon-feature.md"
@@ -42,4 +42,6 @@ if (cat _computed_diff.txt | grep -E -q "$TRIGGER"); then
     else
         echo "Changelog updated!"
     fi
+else
+    echo "No change in ${TIRGGER} detected. Changelog does not need to be updated"
 fi
