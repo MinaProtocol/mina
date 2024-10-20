@@ -8,6 +8,8 @@ let Network = ../Constants/Network.dhall
 
 let RunWithPostgres = ./RunWithPostgres.dhall
 
+let key = "patch-archive-test"
+
 in  { step =
             \(dependsOn : List Command.TaggedKey.Type)
         ->  Command.build
@@ -20,10 +22,10 @@ in  { step =
                     "./src/test/archive/sample_db/archive_db.sql"
                     Artifacts.Type.FunctionalTestSuite
                     (None Network.Type)
-                    "./scripts/patch-archive-test.sh"
+                    "./scripts/patch-archive-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key} dev"
                 ]
               , label = "Archive: Patch Archive test"
-              , key = "patch-archive-test"
+              , key = key
               , target = Size.Large
               , depends_on = dependsOn
               }
