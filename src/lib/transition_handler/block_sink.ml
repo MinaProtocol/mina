@@ -23,7 +23,7 @@ type block_sink_config =
   ; consensus_constants : Consensus.Constants.t
   ; genesis_constants : Genesis_constants.t
   ; constraint_constants : Genesis_constants.Constraint_constants.t
-  ; block_window_duration : Time.Span.t
+  ; compile_config : Mina_compile_config.t
   }
 
 type t =
@@ -37,7 +37,7 @@ type t =
       ; consensus_constants : Consensus.Constants.t
       ; genesis_constants : Genesis_constants.t
       ; constraint_constants : Genesis_constants.Constraint_constants.t
-      ; block_window_duration : Time.Span.t
+      ; compile_config : Mina_compile_config.t
       }
   | Void
 
@@ -59,7 +59,7 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
       ; consensus_constants
       ; genesis_constants
       ; constraint_constants
-      ; block_window_duration
+      ; compile_config
       } ->
       O1trace.sync_thread "handle_block_gossip"
       @@ fun () ->
@@ -105,9 +105,7 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
           :: txs_meta ) ;
       [%log internal] "External_block_received" ;
       don't_wait_for
-        ( match%map
-            Mina_net2.Validation_callback.await ~block_window_duration cb
-          with
+        ( match%map Mina_net2.Validation_callback.await cb with
         | Some `Accept ->
             let processing_time_span =
               Time.diff
@@ -175,7 +173,7 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
             List.exists transactions ~f:(fun txn ->
                 match
                   Mina_transaction.Transaction.check_well_formedness
-                    ~genesis_constants txn.data
+                    ~genesis_constants ~compile_config txn.data
                 with
                 | Ok () ->
                     false
@@ -238,7 +236,7 @@ let create
     ; consensus_constants
     ; genesis_constants
     ; constraint_constants
-    ; block_window_duration
+    ; compile_config
     } =
   let rate_limiter =
     Network_pool.Rate_limiter.create
@@ -260,7 +258,7 @@ let create
       ; consensus_constants
       ; genesis_constants
       ; constraint_constants
-      ; block_window_duration
+      ; compile_config
       } )
 
 let void = Void
