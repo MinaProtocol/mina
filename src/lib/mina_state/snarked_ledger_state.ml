@@ -383,6 +383,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       Poly.typ Frozen_ledger_hash.typ Currency.Amount.Signed.typ
         Pending_coinbase.Stack.typ Fee_excess.typ Sok_message.Digest.typ
         Local_state.typ
+
+    let to_field_elements =
+      let (Typ { value_to_fields; _ }) = typ in
+      Fn.compose fst value_to_fields
   end
 
   let option lab =

@@ -40,6 +40,11 @@ module type Full = sig
     , Nat.N5.n )
     Pickles.Tag.t
 
+  val verify :
+       key:Pickles.Verification_key.t
+    -> (t * Sok_message.t) list
+    -> unit Or_error.t Async.Deferred.t
+
   module Verification : sig
     module type S = sig
       val tag : tag

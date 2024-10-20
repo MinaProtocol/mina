@@ -3509,6 +3509,20 @@ module Make_str (A : Wire_types.Concrete) = struct
           }
           init_stack pending_coinbase_stack_state handler
 
+  let verify_impl ~f ts =
+    if
+      List.for_all ts ~f:(fun (p, m) ->
+          Sok_message.Digest.equal (Sok_message.digest m) p.statement.sok_digest )
+    then f (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
+    else
+      Async.return
+        (Or_error.error_string
+           "Transaction_snark.verify: Mismatched sok_message" )
+
+  let verify ~key =
+    verify_impl
+      ~f:(Pickles.verify (module Nat.N2) (module Statement.With_sok) key)
+
   let constraint_system_digests ~constraint_constants () =
     let digest = Tick.R1CS_constraint_system.digest in
     [ ( "transaction-merge"
@@ -3947,18 +3961,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let verify_against_digest { statement; proof } =
       Proof.verify [ (statement, proof) ]
 
-    let verify ts =
-      if
-        List.for_all ts ~f:(fun (p, m) ->
-            Sok_message.Digest.equal (Sok_message.digest m)
-              p.statement.sok_digest )
-      then
-        Proof.verify
-          (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
-      else
-        Async.return
-          (Or_error.error_string
-             "Transaction_snark.verify: Mismatched sok_message" )
+    let verify = verify_impl ~f:Proof.verify
 
     let first_account_update
         (witness : Transaction_witness.Zkapp_command_segment_witness.t) =
