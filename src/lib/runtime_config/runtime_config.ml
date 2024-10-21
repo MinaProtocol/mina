@@ -995,6 +995,8 @@ module Proof_keys = struct
           Error
             "Runtime_config.Proof_keys.Level.of_json_layout: Expected the \
              field 'level' to contain a string"
+
+    let gen = Quickcheck.Generator.of_list [ Full; Check; No_check ]
   end
 
   module Transaction_capacity = struct
