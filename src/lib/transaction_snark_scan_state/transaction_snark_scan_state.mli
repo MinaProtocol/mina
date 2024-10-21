@@ -16,7 +16,7 @@ end]
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t =
-    { transaction_with_info : Ledger.Transaction_applied.t
+    { transaction_with_info : Mina_transaction_logic.Transaction_applied.t
     ; state_hash : State_hash.t * State_body_hash.t
     ; statement : Transaction_snark.Statement.t
     ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
@@ -137,7 +137,7 @@ val get_snarked_ledger_sync :
   -> apply_second_pass:
        (   Ledger.t
         -> Ledger.Transaction_partially_applied.t
-        -> Ledger.Transaction_applied.t Or_error.t )
+        -> Mina_transaction_logic.Transaction_applied.t Or_error.t )
   -> apply_first_pass_sparse_ledger:
        (   global_slot:Mina_numbers.Global_slot_since_genesis.t
         -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
@@ -162,7 +162,7 @@ val get_snarked_ledger_async :
   -> apply_second_pass:
        (   Ledger.t
         -> Ledger.Transaction_partially_applied.t
-        -> Ledger.Transaction_applied.t Or_error.t )
+        -> Mina_transaction_logic.Transaction_applied.t Or_error.t )
   -> apply_first_pass_sparse_ledger:
        (   global_slot:Mina_numbers.Global_slot_since_genesis.t
         -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
@@ -194,7 +194,7 @@ val get_staged_ledger_async :
   -> apply_second_pass:
        (   Ledger.t
         -> Ledger.Transaction_partially_applied.t
-        -> Ledger.Transaction_applied.t Or_error.t )
+        -> Mina_transaction_logic.Transaction_applied.t Or_error.t )
   -> apply_first_pass_sparse_ledger:
        (   global_slot:Mina_numbers.Global_slot_since_genesis.t
         -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
