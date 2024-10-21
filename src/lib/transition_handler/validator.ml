@@ -17,8 +17,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 end
 
-let validate_transition ~context:(module Context : CONTEXT) ~frontier
-    ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
+let validate_transition_is_relevant ~context:(module Context : CONTEXT)
+    ~frontier ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
     enveloped_transition =
   let logger = Context.logger in
   let open Result.Let_syntax in
@@ -137,15 +137,14 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
           let transition = With_hash.data transition_with_hash in
           let sender = Envelope.Incoming.sender transition_env in
           let slot_tx_end =
-            Runtime_config.slot_tx_end_or_default
+            Runtime_config.slot_tx_end
               precomputed_values.Precomputed_values.runtime_config
           in
           let slot_chain_end =
-            Runtime_config.slot_chain_end_or_default
-              precomputed_values.runtime_config
+            Runtime_config.slot_chain_end precomputed_values.runtime_config
           in
           match
-            validate_transition
+            validate_transition_is_relevant
               ~context:(module Context)
               ~frontier ~unprocessed_transition_cache ~slot_tx_end
               ~slot_chain_end transition_env

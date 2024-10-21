@@ -106,7 +106,9 @@ let of_block ~logger
   let state_hash =
     (With_hash.hash block_with_hash).State_hash.State_hashes.state_hash
   in
-  let account_ids_accessed = Block.account_ids_accessed block in
+  let account_ids_accessed =
+    Block.account_ids_accessed ~constraint_constants block
+  in
   let start = Time.now () in
   let accounts_accessed =
     List.filter_map account_ids_accessed ~f:(fun (acct_id, status) ->

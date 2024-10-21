@@ -50,8 +50,6 @@ done
 # Overwrite outdated ledgers that are being updated by the hardfork (backing up the outdated ledgers)
 mv "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.old.json"
 cp "${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
-mv "${BUILDDIR}/etc/mina/rosetta/genesis_ledgers/${NETWORK_NAME}.json" "${BUILDDIR}/etc/mina/rosetta/genesis_ledgers/${NETWORK_NAME}.old.json"
-cp "${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/etc/mina/rosetta/genesis_ledgers/${NETWORK_NAME}.json"
 
 build_deb "${NETWORK_TAG}"
 build_logproc_deb

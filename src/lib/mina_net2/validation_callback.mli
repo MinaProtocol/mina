@@ -11,9 +11,11 @@ val create_without_expiration : unit -> t
 
 val is_expired : t -> bool
 
-val await : t -> validation_result option Deferred.t
+val await :
+  block_window_duration:Time.Span.t -> t -> validation_result option Deferred.t
 
-val await_exn : t -> validation_result Deferred.t
+val await_exn :
+  block_window_duration:Time.Span.t -> t -> validation_result Deferred.t
 
 (** May return a deferred that never resolves, in the case of callbacks without expiration. *)
 val await_timeout : t -> unit Deferred.t
