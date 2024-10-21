@@ -943,7 +943,8 @@ let add_full_transactions t user_commands =
     List.find_map user_commands ~f:(fun cmd ->
         match
           User_command.check_well_formedness
-            ~genesis_constants:t.config.precomputed_values.genesis_constants cmd
+            ~genesis_constants:t.config.precomputed_values.genesis_constants
+            ~compile_config:t.config.precomputed_values.compile_config cmd
         with
         | Ok () ->
             None
@@ -975,6 +976,7 @@ let add_zkapp_transactions t (zkapp_commands : Zkapp_command.t list) =
         match
           User_command.check_well_formedness
             ~genesis_constants:t.config.precomputed_values.genesis_constants
+            ~compile_config:t.config.precomputed_values.compile_config
             (Zkapp_command cmd)
         with
         | Ok () ->
@@ -1497,6 +1499,7 @@ let create ~commit_id ?wallets (config : Config.t) =
   let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
+  let compile_config = config.precomputed_values.compile_config in
   let block_window_duration = config.compile_config.block_window_duration in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
@@ -1810,7 +1813,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
               ~genesis_constants:config.precomputed_values.genesis_constants
-              ~slot_tx_end
+              ~slot_tx_end ~compile_config
           in
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =
@@ -1866,6 +1869,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ; consensus_constants
               ; genesis_constants = config.precomputed_values.genesis_constants
               ; constraint_constants
+              ; compile_config
               }
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in

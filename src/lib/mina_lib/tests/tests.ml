@@ -36,11 +36,6 @@ let%test_module "Epoch ledger sync tests" =
 
     let dir_prefix = "sync_test_data"
 
-    let genesis_constants = Genesis_constants.For_unit_tests.t
-
-    let constraint_constants =
-      Genesis_constants.For_unit_tests.Constraint_constants.t
-
     let make_dirname s =
       let open Core in
       let uuid = Uuid_unix.create () |> Uuid.to_string in
@@ -51,7 +46,9 @@ let%test_module "Epoch ledger sync tests" =
         let runtime_config : Runtime_config.t =
           { daemon = None
           ; genesis = None
-          ; proof = None
+          ; proof =
+              Some
+                { Runtime_config.Proof_keys.default with level = Some No_check }
           ; ledger =
               Some
                 { base = Named "test"
@@ -66,10 +63,11 @@ let%test_module "Epoch ledger sync tests" =
           }
         in
         match%map
-          Genesis_ledger_helper.init_from_config_file
+          Genesis_ledger_helper.Config_loader.init_from_config_file
             ~genesis_dir:(make_dirname "genesis_dir")
-            ~constraint_constants ~genesis_constants ~logger
-            ~proof_level:No_check runtime_config ~cli_proof_level:None
+            ~constants:
+              (Runtime_config.Constants.magic_for_unit_tests runtime_config)
+            ~logger runtime_config
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
@@ -185,6 +183,7 @@ let%test_module "Epoch ledger sync tests" =
           ; consensus_constants
           ; genesis_constants = precomputed_values.genesis_constants
           ; constraint_constants
+          ; compile_config
           }
       in
       let _transaction_pool, tx_remote_sink, _tx_local_sink =
@@ -193,7 +192,7 @@ let%test_module "Epoch ledger sync tests" =
             ~trust_system
             ~pool_max_size:precomputed_values.genesis_constants.txpool_max_size
             ~genesis_constants:precomputed_values.genesis_constants
-            ~slot_tx_end:None
+            ~slot_tx_end:None ~compile_config
         in
         Network_pool.Transaction_pool.create ~config ~constraint_constants
           ~consensus_constants ~time_controller ~logger
