@@ -90,11 +90,7 @@ let extract_accounts_exn = function
   | _ ->
       failwith "Wrong ledger supplied"
 
-let load_config_exn ~logger config_file =
-  let%map config =
-    Deferred.Or_error.ok_exn
-    @@ Runtime_config.Json_loader.load_config_files ~logger [ config_file ]
-  in
+let load_config_exn ~(config : Runtime_config.t) =
   if
     Option.(
       is_some config.daemon || is_some config.genesis
@@ -114,10 +110,10 @@ let load_config_exn ~logger config_file =
   , Option.map ~f:extract_accounts_exn staking_ledger
   , Option.map ~f:extract_accounts_exn next_ledger )
 
-let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields () =
-  let%bind accounts, staking_accounts_opt, next_accounts_opt =
-    load_config_exn ~logger config_file
+let main ~constraint_constants ~config ~genesis_dir ~hash_output_file
+    ~ignore_missing_fields () =
+  let accounts, staking_accounts_opt, next_accounts_opt =
+    load_config_exn ~config
   in
   let ledger =
     load_ledger ~ignore_missing_fields ~constraint_constants accounts
@@ -139,7 +135,6 @@ let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~contents:(Yojson.Safe.to_string (Hash_json.to_yojson hash_json))
 
 let () =
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
   Command.run
     (Command.async
        ~summary:
@@ -149,9 +144,7 @@ let () =
        Command.(
          let open Let_syntax in
          let open Command.Param in
-         let%map config_file =
-           flag "--config-file" ~doc:"PATH path to the JSON configuration file"
-             (required string)
+         let%map config_files = Cli_lib.Flag.config_files
          and genesis_dir =
            flag "--genesis-dir"
              ~doc:
@@ -171,5 +164,14 @@ let () =
                "BOOL whether to ignore missing fields in account definition \
                 (and replace with default values)"
          in
-         main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
-           ~ignore_missing_fields) )
+         fun () ->
+           let open Deferred.Let_syntax in
+           let%bind precomputed_values, config =
+             let logger = Logger.create () in
+             let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+             Genesis_ledger_helper.Config_loader.load_config_files ~logger
+               ~conf_dir config_files
+             |> Deferred.Or_error.ok_exn
+           in
+           main ~constraint_constants:precomputed_values.constraint_constants
+             ~config ~genesis_dir ~hash_output_file ~ignore_missing_fields ()) )

@@ -23,7 +23,8 @@
   precomputed_values
   coda_genesis_ledger
   consensus
-  mina_base)
+  mina_base
+  mina_lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

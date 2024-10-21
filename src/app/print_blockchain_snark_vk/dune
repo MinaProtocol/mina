@@ -1,10 +1,10 @@
 (executable
  (name print_blockchain_snark_vk)
- (libraries blockchain_snark genesis_constants)
+ (libraries blockchain_snark genesis_constants mina_runtime_config)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version)))
+  (pps ppx_version ppx_let)))
 
 (rule
  (deps print_blockchain_snark_vk.exe)

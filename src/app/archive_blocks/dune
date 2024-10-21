@@ -23,7 +23,8 @@
   mina_block
   bounded_types
   genesis_constants
-  archive_lib)
+  archive_lib
+  cli_lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
