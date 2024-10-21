@@ -17,6 +17,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val compile_config : Mina_compile_config.t
 end
 
 type Structured_log_events.t += Bootstrap_complete
@@ -694,7 +696,7 @@ let%test_module "Bootstrap_controller tests" =
     open Pipe_lib
 
     let max_frontier_length =
-      Transition_frontier.global_max_length Genesis_constants.compiled
+      Transition_frontier.global_max_length Genesis_constants.For_unit_tests.t
 
     let logger = Logger.create ()
 
@@ -712,15 +714,19 @@ let%test_module "Bootstrap_controller tests" =
 
     let constraint_constants = precomputed_values.constraint_constants
 
+    let compile_config = Mina_compile_config.For_unit_tests.t
+
     module Context = struct
       let logger = Logger.create ()
 
       let precomputed_values = precomputed_values
 
       let constraint_constants =
-        Genesis_constants.Constraint_constants.for_unit_tests
+        Genesis_constants.For_unit_tests.Constraint_constants.t
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let compile_config = compile_config
     end
 
     let verifier =
@@ -728,7 +734,7 @@ let%test_module "Bootstrap_controller tests" =
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            () )
+            ~commit_id:"not specified for unit tests" () )
 
     module Genesis_ledger = (val precomputed_values.genesis_ledger)
 
@@ -769,7 +775,8 @@ let%test_module "Bootstrap_controller tests" =
         let%bind fake_network =
           Fake_network.Generator.(
             gen ~precomputed_values ~verifier ~max_frontier_length
-              [ fresh_peer; fresh_peer ] ~use_super_catchup:false)
+              ~compile_config [ fresh_peer; fresh_peer ]
+              ~use_super_catchup:false)
         in
         let%map make_branch =
           Transition_frontier.Breadcrumb.For_tests.gen_seq ~precomputed_values
@@ -806,7 +813,7 @@ let%test_module "Bootstrap_controller tests" =
               let sync_deferred =
                 sync_ledger bootstrap ~root_sync_ledger ~transition_graph
                   ~preferred:[] ~sync_ledger_reader
-                  ~genesis_constants:Genesis_constants.compiled
+                  ~genesis_constants:Genesis_constants.For_unit_tests.t
               in
               let%bind () =
                 Deferred.List.iter branch ~f:(fun breadcrumb ->
@@ -899,7 +906,7 @@ let%test_module "Bootstrap_controller tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup:false
+            ~use_super_catchup:false ~compile_config
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 2) + 2)

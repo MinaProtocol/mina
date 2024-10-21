@@ -13,8 +13,16 @@ let module =
           \(environment : List Text)
       ->  let Docker =
                 { Type =
-                    { image : Text, extraEnv : List Text, privileged : Bool }
-                , default = { extraEnv = [] : List Text, privileged = False }
+                    { image : Text
+                    , extraEnv : List Text
+                    , privileged : Bool
+                    , useBash : Bool
+                    }
+                , default =
+                    { extraEnv = [] : List Text
+                    , privileged = False
+                    , useBash = True
+                    }
                 }
 
           let Cmd = { line : Text, readable : Optional Text }
@@ -58,12 +66,16 @@ let module =
                         : Text
                         = "/var/buildkite/shared"
 
+                    let entrypoint
+                        : Text
+                        = if docker.useBash then "/bin/bash" else "/bin/sh"
+
                     in  { line =
-                            "docker run -it --rm --entrypoint /bin/sh --init --volume /var/secrets:/var/secrets --volume ${sharedDir}:/shared --volume ${outerDir}:/workdir --workdir /workdir${envVars}${      if docker.privileged
+                            "docker run -it --rm --entrypoint ${entrypoint} --init --volume ${sharedDir}:/shared --volume ${outerDir}:/workdir --workdir /workdir${envVars}${      if docker.privileged
 
-                                                                                                                                                                                                          then  " --privileged"
+                                                                                                                                                                             then  " --privileged"
 
-                                                                                                                                                                                                          else  ""} ${docker.image} -c '${inner.line}'"
+                                                                                                                                                                             else  ""} ${docker.image} -c '${inner.line}'"
                         , readable =
                             Optional/map
                               Text
