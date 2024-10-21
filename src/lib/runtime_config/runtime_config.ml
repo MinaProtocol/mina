@@ -1031,6 +1031,30 @@ module Proof_keys = struct
     let small : t = Log_2 2
 
     let medium : t = Log_2 3
+
+    let to_transaction_capacity_log_2 ~block_window_duration_ms
+        ~transaction_capacity =
+      match transaction_capacity with
+      | Log_2 i ->
+          i
+      | Txns_per_second_x10 tps_goal_x10 ->
+          let max_coinbases = 2 in
+          let max_user_commands_per_block =
+            (* block_window_duration is in milliseconds, so divide by 1000 divide
+               by 10 again because we have tps * 10
+            *)
+            tps_goal_x10 * block_window_duration_ms / (1000 * 10)
+          in
+          (* Log of the capacity of transactions per transition.
+              - 1 will only work if we don't have prover fees.
+              - 2 will work with prover fees, but not if we want a transaction
+                included in every block.
+              - At least 3 ensures a transaction per block and the staged-ledger
+                unit tests pass.
+          *)
+          1
+          + Core_kernel.Int.ceil_log2
+              (max_user_commands_per_block + max_coinbases)
   end
 
   type t =
@@ -1060,6 +1084,19 @@ module Proof_keys = struct
     ; supercharged_coinbase_factor
     ; account_creation_fee
     ; fork
+    }
+
+  let default =
+    { level = None
+    ; sub_windows_per_window = None
+    ; ledger_depth = None
+    ; work_delay = None
+    ; block_window_duration_ms = None
+    ; transaction_capacity = None
+    ; coinbase_amount = None
+    ; supercharged_coinbase_factor = None
+    ; account_creation_fee = None
+    ; fork = None
     }
 
   let to_json_layout
@@ -1732,4 +1769,234 @@ module Json_loader : Json_loader_intf = struct
                 ; ("error", `String err)
                 ] ;
             failwithf "Could not parse configuration file: %s" err () )
+end
+
+module type Constants_intf = sig
+  type constants
+
+  val load_constants :
+       ?conf_dir:string
+    -> ?commit_id_short:string
+    -> ?itn_features:bool
+    -> ?cli_proof_level:Genesis_constants.Proof_level.t
+    -> logger:Logger.t
+    -> string list
+    -> constants Deferred.t
+
+  val load_constants' :
+       ?itn_features:bool
+    -> ?cli_proof_level:Genesis_constants.Proof_level.t
+    -> t
+    -> constants
+
+  val genesis_constants : constants -> Genesis_constants.t
+
+  val constraint_constants :
+    constants -> Genesis_constants.Constraint_constants.t
+
+  val proof_level : constants -> Genesis_constants.Proof_level.t
+
+  val compile_config : constants -> Mina_compile_config.t
+
+  val magic_for_unit_tests : t -> constants
+end
+
+module Constants : Constants_intf = struct
+  type constants =
+    { genesis_constants : Genesis_constants.t
+    ; constraint_constants : Genesis_constants.Constraint_constants.t
+    ; proof_level : Genesis_constants.Proof_level.t
+    ; compile_config : Mina_compile_config.t
+    }
+
+  let genesis_constants t = t.genesis_constants
+
+  let constraint_constants t = t.constraint_constants
+
+  let proof_level t = t.proof_level
+
+  let compile_config t = t.compile_config
+
+  let combine (a : constants) (b : t) : constants =
+    let genesis_constants =
+      { Genesis_constants.protocol =
+          { k =
+              Option.value ~default:a.genesis_constants.protocol.k
+                Option.(b.genesis >>= fun g -> g.k)
+          ; delta =
+              Option.value ~default:a.genesis_constants.protocol.delta
+                Option.(b.genesis >>= fun g -> g.delta)
+          ; slots_per_epoch =
+              Option.value ~default:a.genesis_constants.protocol.slots_per_epoch
+                Option.(b.genesis >>= fun g -> g.slots_per_epoch)
+          ; slots_per_sub_window =
+              Option.value
+                ~default:a.genesis_constants.protocol.slots_per_sub_window
+                Option.(b.genesis >>= fun g -> g.slots_per_sub_window)
+          ; grace_period_slots =
+              Option.value
+                ~default:a.genesis_constants.protocol.grace_period_slots
+                Option.(b.genesis >>= fun g -> g.grace_period_slots)
+          ; genesis_state_timestamp =
+              Option.value
+                ~default:a.genesis_constants.protocol.genesis_state_timestamp
+                Option.(
+                  b.genesis
+                  >>= fun g ->
+                  g.genesis_state_timestamp
+                  >>| Genesis_constants.genesis_timestamp_of_string
+                  >>| Genesis_constants.of_time)
+          }
+      ; txpool_max_size =
+          Option.value ~default:a.genesis_constants.txpool_max_size
+            Option.(b.daemon >>= fun d -> d.txpool_max_size)
+      ; num_accounts =
+          Option.first_some
+            Option.(b.ledger >>= fun l -> l.num_accounts)
+            a.genesis_constants.num_accounts
+      ; zkapp_proof_update_cost =
+          Option.value ~default:a.genesis_constants.zkapp_proof_update_cost
+            Option.(b.daemon >>= fun d -> d.zkapp_proof_update_cost)
+      ; zkapp_signed_single_update_cost =
+          Option.value
+            ~default:a.genesis_constants.zkapp_signed_single_update_cost
+            Option.(b.daemon >>= fun d -> d.zkapp_signed_single_update_cost)
+      ; zkapp_signed_pair_update_cost =
+          Option.value
+            ~default:a.genesis_constants.zkapp_signed_pair_update_cost
+            Option.(b.daemon >>= fun d -> d.zkapp_signed_pair_update_cost)
+      ; zkapp_transaction_cost_limit =
+          Option.value ~default:a.genesis_constants.zkapp_transaction_cost_limit
+            Option.(b.daemon >>= fun d -> d.zkapp_transaction_cost_limit)
+      ; max_event_elements =
+          Option.value ~default:a.genesis_constants.max_event_elements
+            Option.(b.daemon >>= fun d -> d.max_event_elements)
+      ; max_action_elements =
+          Option.value ~default:a.genesis_constants.max_action_elements
+            Option.(b.daemon >>= fun d -> d.max_action_elements)
+      ; zkapp_cmd_limit_hardcap =
+          Option.value ~default:a.genesis_constants.zkapp_cmd_limit_hardcap
+            Option.(b.daemon >>= fun d -> d.zkapp_cmd_limit_hardcap)
+      ; minimum_user_command_fee =
+          Option.value ~default:a.genesis_constants.minimum_user_command_fee
+            Option.(b.daemon >>= fun d -> d.minimum_user_command_fee)
+      }
+    in
+    let constraint_constants =
+      let fork =
+        let a = a.constraint_constants.fork in
+        let b =
+          let%map.Option f = Option.(b.proof >>= fun x -> x.fork) in
+          { Genesis_constants.Fork_constants.state_hash =
+              Mina_base.State_hash.of_base58_check_exn f.state_hash
+          ; blockchain_length = Mina_numbers.Length.of_int f.blockchain_length
+          ; global_slot_since_genesis =
+              Mina_numbers.Global_slot_since_genesis.of_int
+                f.global_slot_since_genesis
+          }
+        in
+        Option.first_some b a
+      in
+      let block_window_duration_ms =
+        Option.value ~default:a.constraint_constants.block_window_duration_ms
+          Option.(b.proof >>= fun p -> p.block_window_duration_ms)
+      in
+      { a.constraint_constants with
+        sub_windows_per_window =
+          Option.value ~default:a.constraint_constants.sub_windows_per_window
+            Option.(b.proof >>= fun p -> p.sub_windows_per_window)
+      ; ledger_depth =
+          Option.value ~default:a.constraint_constants.ledger_depth
+            Option.(b.proof >>= fun p -> p.ledger_depth)
+      ; work_delay =
+          Option.value ~default:a.constraint_constants.work_delay
+            Option.(b.proof >>= fun p -> p.work_delay)
+      ; block_window_duration_ms
+      ; transaction_capacity_log_2 =
+          Option.value
+            ~default:a.constraint_constants.transaction_capacity_log_2
+            Option.(
+              b.proof
+              >>= fun p ->
+              p.transaction_capacity
+              >>| fun transaction_capacity ->
+              Proof_keys.Transaction_capacity.to_transaction_capacity_log_2
+                ~block_window_duration_ms ~transaction_capacity)
+      ; coinbase_amount =
+          Option.value ~default:a.constraint_constants.coinbase_amount
+            Option.(b.proof >>= fun p -> p.coinbase_amount)
+      ; supercharged_coinbase_factor =
+          Option.value
+            ~default:a.constraint_constants.supercharged_coinbase_factor
+            Option.(b.proof >>= fun p -> p.supercharged_coinbase_factor)
+      ; account_creation_fee =
+          Option.value ~default:a.constraint_constants.account_creation_fee
+            Option.(b.proof >>= fun p -> p.account_creation_fee)
+      ; fork
+      }
+    in
+    let proof_level =
+      let coerce_proof_level = function
+        | Proof_keys.Level.Full ->
+            Genesis_constants.Proof_level.Full
+        | Check ->
+            Genesis_constants.Proof_level.Check
+        | No_check ->
+            Genesis_constants.Proof_level.No_check
+      in
+      Option.value ~default:a.proof_level
+        Option.(b.proof >>= fun p -> p.level >>| coerce_proof_level)
+    in
+    let compile_config =
+      { a.compile_config with
+        block_window_duration =
+          constraint_constants.block_window_duration_ms |> Float.of_int
+          |> Time.Span.of_ms
+      ; network_id =
+          Option.value ~default:a.compile_config.network_id
+            Option.(b.daemon >>= fun d -> d.network_id)
+      }
+    in
+    { genesis_constants; constraint_constants; proof_level; compile_config }
+
+  let load_constants' ?itn_features ?cli_proof_level runtime_config =
+    let compile_constants =
+      { genesis_constants = Genesis_constants.Compiled.genesis_constants
+      ; constraint_constants = Genesis_constants.Compiled.constraint_constants
+      ; proof_level = Genesis_constants.Compiled.proof_level
+      ; compile_config = Mina_compile_config.Compiled.t
+      }
+    in
+    let cs = combine compile_constants runtime_config in
+    { cs with
+      proof_level = Option.value ~default:cs.proof_level cli_proof_level
+    ; compile_config =
+        { cs.compile_config with
+          itn_features =
+            Option.value ~default:cs.compile_config.itn_features itn_features
+        }
+    }
+
+  (* Use this function if you don't need/want the ledger configuration *)
+  let load_constants ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
+      ~logger config_files =
+    Deferred.Or_error.ok_exn
+    @@
+    let open Deferred.Or_error.Let_syntax in
+    let%map runtime_config =
+      Json_loader.load_config_files ?conf_dir ?commit_id_short ~logger
+        config_files
+    in
+    load_constants' ?itn_features ?cli_proof_level runtime_config
+
+  let magic_for_unit_tests t =
+    let compile_constants =
+      { genesis_constants = Genesis_constants.For_unit_tests.t
+      ; constraint_constants =
+          Genesis_constants.For_unit_tests.Constraint_constants.t
+      ; proof_level = Genesis_constants.For_unit_tests.Proof_level.t
+      ; compile_config = Mina_compile_config.For_unit_tests.t
+      }
+    in
+    combine compile_constants t
 end
