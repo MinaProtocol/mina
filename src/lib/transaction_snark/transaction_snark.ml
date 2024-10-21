@@ -1854,7 +1854,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   [ correct_coinbase_target_stack; valid_init_state ] ) )
 
       let main ?(witness : Witness.t option) (spec : Spec.t)
-          ~constraint_constants (statement : Statement.With_sok.Checked.t) =
+          ~constraint_constants (statement : Statement.With_sok.var) =
         let open Impl in
         run_checked (dummy_constraints ()) ;
         let ( ! ) x = Option.value_exn x in
@@ -3053,7 +3053,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           pc: Pending_coinbase_stack_state.t
     *)
     let%snarkydef_ main ~constraint_constants
-        (statement : Statement.With_sok.Checked.t) =
+        (statement : Statement.With_sok.var) =
       let%bind () = dummy_constraints () in
       let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
       let%bind t =
@@ -3199,7 +3199,7 @@ module Make_str (A : Wire_types.Concrete) = struct
        verify_transition tock_vk _ s1 s2 pending_coinbase_stack12.source, pending_coinbase_stack12.target is true
        verify_transition tock_vk _ s2 s3 pending_coinbase_stack23.source, pending_coinbase_stack23.target is true
     *)
-    let%snarkydef_ main (s : Statement.With_sok.Checked.t) =
+    let%snarkydef_ main (s : Statement.With_sok.var) =
       let%bind s1, s2 =
         exists
           Typ.(Statement.With_sok.typ * Statement.With_sok.typ)
@@ -3302,7 +3302,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   open Pickles_types
 
   type tag =
-    ( Statement.With_sok.Checked.t
+    ( Statement.With_sok.var
     , Statement.With_sok.t
     , Nat.N2.n
     , Nat.N5.n )
@@ -3508,23 +3508,6 @@ module Make_str (A : Wire_types.Concrete) = struct
             transaction = Transaction_union.of_transaction t
           }
           init_stack pending_coinbase_stack_state handler
-
-  let verify (ts : (t * _) list) ~key =
-    if
-      List.for_all ts ~f:(fun ({ statement; _ }, message) ->
-          Sok_message.Digest.equal
-            (Sok_message.digest message)
-            statement.sok_digest )
-    then
-      Pickles.verify
-        (module Nat.N2)
-        (module Statement.With_sok)
-        key
-        (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
-    else
-      Async.return
-        (Or_error.error_string
-           "Transaction_snark.verify: Mismatched sok_message" )
 
   let constraint_system_digests ~constraint_constants () =
     let digest = Tick.R1CS_constraint_system.digest in
