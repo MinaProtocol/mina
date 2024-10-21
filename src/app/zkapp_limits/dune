@@ -11,6 +11,8 @@
    mina_base
    genesis_constants
    bounded_types
+   mina_runtime_config
+   cli_lib
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_mina ppx_custom_printf ppx_let ppx_hash ppx_compare ppx_sexp_conv)))
