@@ -255,10 +255,10 @@ let docker_step
                     , deb_repo = DebianRepo.Type.Local
                     , deb_profile = spec.profile
                     , step_key =
-                        "test-suite-${DebianVersions.lowerName
-                                        spec.debVersion}${Profiles.toLabelSegment
-                                                            spec.profile}${BuildFlags.toLabelSegment
-                                                                             spec.buildFlags}--docker-image"
+                        "functional_test_suite-${DebianVersions.lowerName
+                                                   spec.debVersion}${Profiles.toLabelSegment
+                                                                       spec.profile}${BuildFlags.toLabelSegment
+                                                                                        spec.buildFlags}-docker-image"
                     , network = "berkeley"
                     }
                   ]
