@@ -240,9 +240,6 @@ module Make
 
   let verify ?signature_kind ((r, s) : Signature.t) (pk : Public_key.t)
       (m : Message.t) =
-    if Random.int 1000 = 0 then (
-      print_endline "SCHNORR BACKTRACE:" ;
-      Printexc.print_backtrace stdout ) ;
     let hash = Message.hash ?signature_kind in
     let e = hash ~public_key:pk ~r m in
     let r_pt = Curve.(scale one s + negate (scale pk e)) in
