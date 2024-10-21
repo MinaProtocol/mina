@@ -53,9 +53,6 @@ module Worker_state = struct
     val verify_transaction_snarks :
       (Transaction_snark.t * Sok_message.t) list -> unit Or_error.t Deferred.t
 
-    val get_blockchain_verification_key :
-      unit -> Pickles.Verification_key.t Deferred.t
-
     val toggle_internal_tracing : bool -> unit
 
     val set_itn_logger_data : daemon_port:int -> unit
@@ -188,9 +185,6 @@ module Worker_state = struct
                [%log internal] "Verifier_verify_transaction_snarks_done" ;
                result
 
-             let get_blockchain_verification_key () =
-               Deferred.return blockchain_verification_key
-
              let toggle_internal_tracing enabled =
                don't_wait_for
                @@ Internal_tracing.toggle ~commit_id ~logger
@@ -231,9 +225,6 @@ module Worker_state = struct
 
              let verify_transaction_snarks _ = Deferred.return (Ok ())
 
-             let get_blockchain_verification_key () =
-               Deferred.return blockchain_verification_key
-
              let toggle_internal_tracing _ = ()
 
              let set_itn_logger_data ~daemon_port:_ = ()
@@ -263,8 +254,6 @@ module Worker = struct
             With_id_tag.t
             list )
           F.t
-      ; get_blockchain_verification_key :
-          ('w, unit, Pickles.Verification_key.t) F.t
       ; toggle_internal_tracing : ('w, bool, unit) F.t
       ; set_itn_logger_data : ('w, int, unit) F.t
       }
@@ -297,10 +286,6 @@ module Worker = struct
       let verify_commands (w : Worker_state.t) ts =
         let (module M) = Worker_state.get w in
         M.verify_commands ts
-
-      let get_blockchain_verification_key (w : Worker_state.t) () =
-        let (module M) = Worker_state.get w in
-        M.get_blockchain_verification_key ()
 
       let toggle_internal_tracing (w : Worker_state.t) enabled =
         let (module M) = Worker_state.get w in
@@ -349,11 +334,6 @@ module Worker = struct
                   With_id_tag.t
                   list]
               , verify_commands )
-        ; get_blockchain_verification_key =
-            f
-              ( [%bin_type_class: unit]
-              , [%bin_type_class: Pickles.Verification_key.Stable.Latest.t]
-              , get_blockchain_verification_key )
         ; toggle_internal_tracing =
             f
               ( [%bin_type_class: bool]
@@ -734,14 +714,6 @@ let verify_commands t ts =
   let%map result = verify_commands t ts in
   [%log internal] "Verify_commands_done" ;
   result
-
-let get_blockchain_verification_key { worker; logger } =
-  O1trace.thread "dispatch_blockchain_verification_key" (fun () ->
-      with_retry ~logger (fun () ->
-          let%bind { connection; _ } = Ivar.read !worker in
-          Worker.Connection.run connection
-            ~f:Worker.functions.get_blockchain_verification_key ~arg:()
-          |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ) )
 
 let toggle_internal_tracing { worker; logger } enabled =
   with_retry ~logger (fun () ->

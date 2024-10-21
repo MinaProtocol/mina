@@ -45,9 +45,6 @@ module Base = struct
       -> (ledger_proof * Mina_base.Sok_message.t) list
       -> unit Or_error.t Or_error.t Deferred.t
 
-    val get_blockchain_verification_key :
-      t -> Pickles.Verification_key.t Or_error.t Deferred.t
-
     val toggle_internal_tracing : t -> bool -> unit Or_error.t Deferred.t
 
     (* in ITN logger, sets the client port of daemon to send RPC requests to
