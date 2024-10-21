@@ -326,17 +326,20 @@ module Util = struct
 end
 
 let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_kp = Util.snapp_keypair_of_file zkapp_keyfile in
   let logger = Logger.create () in
-  let%bind ledger =
-    let%map config_json =
-      Runtime_config.Json_loader.load_config_files ~logger [ config_file ]
-    in
-    let runtime_config = Or_error.ok_exn config_json in
+  let%bind runtime_config =
+    Runtime_config.Json_loader.load_config_files ~logger [ config_file ]
+    |> Deferred.Or_error.ok_exn
+  in
+  let constants = Runtime_config.Constants.load_constants' runtime_config in
+  let genesis_constants, constraint_constants =
+    Runtime_config.Constants.
+      (genesis_constants constants, constraint_constants constants)
+  in
+  let ledger =
     let accounts =
       let config = Option.value_exn runtime_config.Runtime_config.ledger in
       match config.base with
@@ -355,9 +358,15 @@ let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
     ~proof_level:Full ~genesis_constants
 
 let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
-    ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo =
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+    ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ~config_file =
+  let%bind genesis_constants, constraint_constants =
+    let logger = Logger.create () in
+    let%map constants =
+      Runtime_config.Constants.load_constants ~logger config_file
+    in
+    Runtime_config.Constants.
+      (genesis_constants constants, constraint_constants constants)
+  in
   let open Deferred.Let_syntax in
   let%bind sender_keypair = Util.keypair_of_file sender ~which:"Sender" in
   let%bind fee_payer_keypair = Util.fee_payer_keypair_of_file fee_payer in

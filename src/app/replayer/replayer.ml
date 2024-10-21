@@ -631,14 +631,13 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
 let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
     ~checkpoint_interval ~checkpoint_output_folder_opt ~checkpoint_file_prefix
     ~genesis_dir_opt ~log_json ~log_level ~log_filename ~file_log_level
-    ~constraint_constants ~proof_level () =
+    ~constraint_constants ~proof_level ~logger () =
   Cli_lib.Stdout_log.setup log_json log_level ;
   Option.iter log_filename ~f:(fun log_filename ->
       Logger.Consumer_registry.register ~id:"default"
         ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
         ~transport:(Logger_file_system.evergrowing ~log_filename)
         () ) ;
-  let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
     match input_of_yojson json with
@@ -1683,8 +1682,6 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                 exit 1 ) ) )
 
 let () =
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
-  let proof_level = Genesis_constants.Proof_level.Full in
   Command.(
     run
       (let open Let_syntax in
@@ -1722,11 +1719,24 @@ let () =
            Param.flag "--checkpoint-file-prefix"
              ~doc:"string Checkpoint file prefix (default: 'replayer')"
              Param.(optional_with_default "replayer" string)
+         and config_file = Cli_lib.Flag.config_files
          and log_json = Cli_lib.Flag.Log.json
          and log_level = Cli_lib.Flag.Log.level
          and file_log_level = Cli_lib.Flag.Log.file_log_level
          and log_filename = Cli_lib.Flag.Log.file in
-         main ~input_file ~output_file_opt ~archive_uri ~checkpoint_interval
-           ~continue_on_error ~checkpoint_output_folder_opt
-           ~checkpoint_file_prefix ~genesis_dir_opt ~log_json ~log_level
-           ~file_log_level ~log_filename ~constraint_constants ~proof_level )))
+         fun () ->
+           let open Deferred.Let_syntax in
+           let logger = Logger.create () in
+           let%bind constraint_constants, proof_level =
+             let%map conf =
+               Runtime_config.Constants.load_constants ~cli_proof_level:Full
+                 ~logger config_file
+             in
+             Runtime_config.Constants.
+               (constraint_constants conf, proof_level conf)
+           in
+           main ~input_file ~output_file_opt ~archive_uri ~checkpoint_interval
+             ~continue_on_error ~checkpoint_output_folder_opt
+             ~checkpoint_file_prefix ~genesis_dir_opt ~log_json ~log_level
+             ~file_log_level ~log_filename ~constraint_constants ~proof_level
+             ~logger () )))
