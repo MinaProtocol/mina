@@ -154,9 +154,6 @@ let verify_commands { proof_level; _ }
 let verify_transaction_snarks { verify_transaction_snarks; _ } ts =
   verify_transaction_snarks ts
 
-let get_blockchain_verification_key { blockchain_verification_key; _ } =
-  Deferred.Or_error.return blockchain_verification_key
-
 let toggle_internal_tracing _ _ = Deferred.Or_error.ok_unit
 
 let set_itn_logger_data _ ~daemon_port:_ = Deferred.Or_error.ok_unit

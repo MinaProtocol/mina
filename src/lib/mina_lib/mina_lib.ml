@@ -2258,7 +2258,7 @@ let get_filtered_log_entries
   in
   (get_from_idx curr_idx messages [], is_started)
 
-let verifier { processes = { verifier; _ }; _ } = verifier
+let prover { processes = { prover; _ }; _ } = prover
 
 let vrf_evaluator { processes = { vrf_evaluator; _ }; _ } = vrf_evaluator
 
