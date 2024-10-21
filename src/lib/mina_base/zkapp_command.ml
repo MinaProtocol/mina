@@ -320,7 +320,7 @@ let fee_excess (t : (_, _, _) unwired_t) =
 let account_access_statuses
     (({ account_updates; _ }, _) as t : (_, _, _) unwired_t)
     (status : Transaction_status.t) =
-  let init = [ (fee_payer t, `Accessed) ] in
+    let init = [ (fee_payer t, `Accessed) ] in
   let status_sym =
     match status with Applied -> `Accessed | Failed _ -> `Not_accessed
   in
