@@ -6,35 +6,8 @@ module type Version = sig
   val protocol_version_patch : int
 end
 
-(* It's stupid that this exists. TODO: Remove and make configurable. *)
-module type Unconfigurable_constants = sig
-  val zkapp_proof_update_cost : float
-
-  val zkapp_signed_pair_update_cost : float
-
-  val zkapp_signed_single_update_cost : float
-
-  val zkapp_transaction_cost_limit : float
-
-  val max_event_elements : int
-
-  val max_action_elements : int
-
-  val zkapp_cmd_limit_hardcap : int
-
-  val zkapps_disabled : bool
-
-  val rpc_handshake_timeout_sec : float
-
-  val rpc_heartbeat_timeout_sec : float
-
-  val rpc_heartbeat_send_every_sec : float
-end
-
 module type S = sig
   include Version
-
-  include Unconfigurable_constants
 
   val ledger_depth : int
 
@@ -65,8 +38,6 @@ module type S = sig
   val pool_max_size : int
 
   val account_creation_fee_int : string
-
-  val default_transaction_fee : string
 
   val default_snark_worker_fee : string
 

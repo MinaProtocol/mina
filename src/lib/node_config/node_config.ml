@@ -7,7 +7,6 @@
 *)
 
 include Node_config_version
-include Node_config_unconfigurable_constants
 
 [%%inject "ledger_depth", ledger_depth]
 
@@ -50,8 +49,6 @@ let scan_state_transaction_capacity_log_2 =
 [%%inject "pool_max_size", pool_max_size]
 
 [%%inject "account_creation_fee_int", account_creation_fee_int]
-
-[%%inject "default_transaction_fee", default_transaction_fee]
 
 [%%inject "default_snark_worker_fee", default_snark_worker_fee]
 
