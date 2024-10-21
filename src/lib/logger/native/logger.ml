@@ -333,25 +333,33 @@ type t =
   { null : bool
   ; metadata : Metadata.Stable.Latest.t
   ; id : Bounded_types.String.Stable.V1.t
-  ; itn_features : bool
+  ; itn_config : Itn_logger.config option
   }
 [@@deriving bin_io_unversioned]
 
 let metadata t = t.metadata
 
-let create ?(metadata = []) ?(id = "default") ?(itn_features = false) () =
+type itn_logger_config = Itn_logger.config
+
+let make_itn_logger_config ~rpc_handshake_timeout ~rpc_heartbeat_timeout
+    ~rpc_heartbeat_send_every =
+  { Itn_logger.rpc_handshake_timeout
+  ; rpc_heartbeat_timeout
+  ; rpc_heartbeat_send_every
+  }
+
+let create ?(metadata = []) ?(id = "default") ?itn_config () =
   { null = false
   ; metadata = Metadata.extend Metadata.empty metadata
   ; id
-  ; itn_features
+  ; itn_config
   }
 
+let with_itn itn_logger_config t =
+  { t with itn_config = Some itn_logger_config }
+
 let null () =
-  { null = true
-  ; metadata = Metadata.empty
-  ; id = "default"
-  ; itn_features = false
-  }
+  { null = true; metadata = Metadata.empty; id = "default"; itn_config = None }
 
 let extend t metadata =
   { t with metadata = Metadata.extend t.metadata metadata }
@@ -413,14 +421,17 @@ let log t ~level ~module_ ~location ?(metadata = []) ?event_id fmt =
     in
     raw t message' ;
     match level with
-    | Internal ->
-        if t.itn_features then
-          let timestamp = message'.timestamp in
-          let entries =
-            Itn_logger.postprocess_message ~timestamp ~message ~metadata
-          in
-          List.iter entries ~f:(fun (timestamp, message, metadata) ->
-              Itn_logger.log ~timestamp ~message ~metadata () )
+    | Internal -> (
+        match t.itn_config with
+        | Some config ->
+            let timestamp = message'.timestamp in
+            let entries =
+              Itn_logger.postprocess_message ~timestamp ~message ~metadata
+            in
+            List.iter entries ~f:(fun (timestamp, message, metadata) ->
+                Itn_logger.log ~timestamp ~message ~metadata ~config () )
+        | None ->
+            () )
     | _ ->
         ()
   in
