@@ -481,12 +481,13 @@ module Call_forest = struct
     let tree : _ Tree.t = { account_update; account_update_digest; calls } in
     cons_tree tree xs
 
-  let cons ?calls (account_update : Account_update.t) xs =
-    cons_aux ~digest_account_update:Digest.Account_update.create ?calls
-      account_update xs
+  let cons ~chain ?calls (account_update : Account_update.t) xs =
+    cons_aux
+      ~digest_account_update:(Digest.Account_update.create ~chain)
+      ?calls account_update xs
 
-  let rec accumulate_hashes ~hash_account_update (xs : _ t) =
-    let go = accumulate_hashes ~hash_account_update in
+  let rec accumulate_hashes ~hash_account_update ~chain (xs : _ t) =
+    let go = accumulate_hashes ~hash_account_update ~chain in
     match xs with
     | [] ->
         []
@@ -499,22 +500,18 @@ module Call_forest = struct
         let node =
           { Tree.account_update
           ; calls
-          ; account_update_digest = hash_account_update account_update
+          ; account_update_digest = hash_account_update ~chain account_update
           }
         in
         let node_hash = Digest.Tree.create node in
         { elt = node; stack_hash = Digest.Forest.cons node_hash (hash xs) }
         :: xs
 
-  let accumulate_hashes' (type a b) (xs : (Account_update.t, a, b) t) :
-      (Account_update.t, Digest.Account_update.t, Digest.Forest.t) t =
-    let hash_account_update (p : Account_update.t) =
-      Digest.Account_update.create p
-    in
-    accumulate_hashes ~hash_account_update xs
+  let accumulate_hashes' =
+    accumulate_hashes ~hash_account_update:Digest.Account_update.create
 
-  let accumulate_hashes_predicated xs =
-    accumulate_hashes ~hash_account_update:Digest.Account_update.create xs
+  let accumulate_hashes_predicated =
+    accumulate_hashes ~hash_account_update:Digest.Account_update.create
 
   module With_hashes_and_data = struct
     [%%versioned
@@ -533,34 +530,35 @@ module Call_forest = struct
 
     let empty = Digest.Forest.empty
 
-    let hash_account_update ((p : Account_update.t), _) =
-      Digest.Account_update.create p
+    let hash_account_update ~chain ((p : Account_update.t), _) =
+      Digest.Account_update.create ~chain p
 
-    let accumulate_hashes xs : _ t = accumulate_hashes ~hash_account_update xs
+    let accumulate_hashes ~chain xs =
+      accumulate_hashes ~hash_account_update ~chain xs
 
-    let of_zkapp_command_simple_list (xs : (Account_update.Simple.t * 'a) list)
-        : _ t =
+    let of_zkapp_command_simple_list ~chain
+        (xs : (Account_update.Simple.t * 'a) list) : _ t =
       of_account_updates xs
         ~account_update_depth:(fun ((p : Account_update.Simple.t), _) ->
           p.body.call_depth )
       |> map ~f:(fun (p, x) -> (Account_update.of_simple p, x))
-      |> accumulate_hashes
+      |> accumulate_hashes ~chain
 
-    let of_account_updates (xs : (Account_update.Graphql_repr.t * 'a) list) :
-        _ t =
+    let of_account_updates ~chain
+        (xs : (Account_update.Graphql_repr.t * 'a) list) : _ t =
       of_account_updates_map
         ~account_update_depth:(fun ((p : Account_update.Graphql_repr.t), _) ->
           p.body.call_depth )
         ~f:(fun (p, x) -> (Account_update.of_graphql_repr p, x))
         xs
-      |> accumulate_hashes
+      |> accumulate_hashes ~chain
 
     let to_account_updates (x : _ t) = to_account_updates x
 
     let to_zkapp_command_with_hashes_list (x : _ t) =
       to_zkapp_command_with_hashes_list x
 
-    let account_updates_hash' xs = of_account_updates xs |> hash
+    let account_updates_hash' ~chain xs = of_account_updates ~chain xs |> hash
 
     let account_updates_hash xs =
       List.map ~f:(fun x -> (x, ())) xs |> account_updates_hash'
@@ -583,32 +581,35 @@ module Call_forest = struct
 
     let empty = Digest.Forest.empty
 
-    let hash_account_update (p : Account_update.t) =
-      Digest.Account_update.create p
+    let hash_account_update ~chain (p : Account_update.t) =
+      Digest.Account_update.create ~chain p
 
-    let accumulate_hashes xs : t = accumulate_hashes ~hash_account_update xs
+    let accumulate_hashes ~chain xs : t =
+      accumulate_hashes ~chain ~hash_account_update xs
 
-    let of_zkapp_command_simple_list (xs : Account_update.Simple.t list) : t =
+    let of_zkapp_command_simple_list ~chain (xs : Account_update.Simple.t list)
+        : t =
       of_account_updates xs
         ~account_update_depth:(fun (p : Account_update.Simple.t) ->
           p.body.call_depth )
       |> map ~f:Account_update.of_simple
-      |> accumulate_hashes
+      |> accumulate_hashes ~chain
 
-    let of_account_updates (xs : Account_update.Graphql_repr.t list) : t =
+    let of_account_updates ~chain (xs : Account_update.Graphql_repr.t list) : t
+        =
       of_account_updates_map
         ~account_update_depth:(fun (p : Account_update.Graphql_repr.t) ->
           p.body.call_depth )
         ~f:(fun p -> Account_update.of_graphql_repr p)
         xs
-      |> accumulate_hashes
+      |> accumulate_hashes ~chain
 
     let to_account_updates (x : t) = to_account_updates x
 
     let to_zkapp_command_with_hashes_list (x : t) =
       to_zkapp_command_with_hashes_list x
 
-    let account_updates_hash' xs = of_account_updates xs |> hash
+    let account_updates_hash' ~chain xs = of_account_updates ~chain xs |> hash
 
     let account_updates_hash xs =
       List.map ~f:(fun x -> x) xs |> account_updates_hash'
@@ -768,9 +769,9 @@ module T = struct
         ; memo = w.memo
         ; account_updates =
             w.account_updates
-            |> Call_forest.accumulate_hashes
-                 ~hash_account_update:(fun (p : Account_update.t) ->
-                   Digest.Account_update.create p )
+            |> Call_forest.accumulate_hashes ~chain:(failwith "TODO")
+                 ~hash_account_update:(fun ~chain (p : Account_update.t) ->
+                   Digest.Account_update.create ~chain p )
         }
 
       let to_wire (t : t) : Wire.t =
@@ -816,7 +817,7 @@ include T
 
 [%%define_locally Stable.Latest.Wire.(gen)]
 
-let of_simple (w : Simple.t) : t =
+let of_simple ~chain (w : Simple.t) : t =
   { fee_payer = w.fee_payer
   ; memo = w.memo
   ; account_updates =
@@ -824,9 +825,9 @@ let of_simple (w : Simple.t) : t =
         ~account_update_depth:(fun (p : Account_update.Simple.t) ->
           p.body.call_depth )
       |> Call_forest.map ~f:Account_update.of_simple
-      |> Call_forest.accumulate_hashes
-           ~hash_account_update:(fun (p : Account_update.t) ->
-             Digest.Account_update.create p )
+      |> Call_forest.accumulate_hashes ~chain
+           ~hash_account_update:(fun ~chain (p : Account_update.t) ->
+             Digest.Account_update.create ~chain p )
   }
 
 let to_simple (t : t) : Simple.t =
@@ -857,14 +858,14 @@ let to_simple (t : t) : Simple.t =
              } )
   }
 
-let all_account_updates (t : t) : _ Call_forest.t =
+let all_account_updates ~chain (t : t) : _ Call_forest.t =
   let p = t.fee_payer in
   let body = Account_update.Body.of_fee_payer p.body in
   let fee_payer : Account_update.t =
     let p = t.fee_payer in
     { authorization = Control.Signature p.authorization; body }
   in
-  Call_forest.cons fee_payer t.account_updates
+  Call_forest.cons ~chain fee_payer t.account_updates
 
 let fee (t : t) : Currency.Fee.t = t.fee_payer.body.fee
 
@@ -1521,14 +1522,14 @@ include Codable.Make_base64 (Stable.Latest.With_top_version_tag)
 type account_updates =
   (Account_update.t, Digest.Account_update.t, Digest.Forest.t) Call_forest.t
 
-let account_updates_deriver obj =
+let account_updates_deriver ~chain obj =
   let of_zkapp_command_with_depth (ps : Account_update.Graphql_repr.t list) :
       account_updates =
     Call_forest.of_account_updates ps
       ~account_update_depth:(fun (p : Account_update.Graphql_repr.t) ->
         p.body.call_depth )
     |> Call_forest.map ~f:Account_update.of_graphql_repr
-    |> Call_forest.accumulate_hashes'
+    |> Call_forest.accumulate_hashes' ~chain
   and to_zkapp_command_with_depth (ps : account_updates) :
       Account_update.Graphql_repr.t list =
     ps
@@ -1540,22 +1541,26 @@ let account_updates_deriver obj =
   iso ~map:of_zkapp_command_with_depth ~contramap:to_zkapp_command_with_depth
     inner obj
 
-let deriver obj =
+let deriver ~chain obj =
   let open Fields_derivers_zkapps.Derivers in
   let ( !. ) = ( !. ) ~t_fields_annots in
   Fields.make_creator obj
     ~fee_payer:!.Account_update.Fee_payer.deriver
-    ~account_updates:!.account_updates_deriver
+    ~account_updates:!.(account_updates_deriver ~chain)
     ~memo:!.Signed_command_memo.deriver
   |> finish "ZkappCommand" ~t_toplevel_annots
 
-let arg_typ () = Fields_derivers_zkapps.(arg_typ (deriver @@ Derivers.o ()))
+let arg_typ ~chain () =
+  Fields_derivers_zkapps.(arg_typ (deriver ~chain @@ Derivers.o ()))
 
-let typ () = Fields_derivers_zkapps.(typ (deriver @@ Derivers.o ()))
+let typ ~chain () =
+  Fields_derivers_zkapps.(typ (deriver ~chain @@ Derivers.o ()))
 
-let to_json x = Fields_derivers_zkapps.(to_json (deriver @@ Derivers.o ())) x
+let to_json ~chain x =
+  Fields_derivers_zkapps.(to_json (deriver ~chain @@ Derivers.o ())) x
 
-let of_json x = Fields_derivers_zkapps.(of_json (deriver @@ Derivers.o ())) x
+let of_json ~chain x =
+  Fields_derivers_zkapps.(of_json (deriver ~chain @@ Derivers.o ())) x
 
 let account_updates_of_json x =
   Fields_derivers_zkapps.(
@@ -1563,13 +1568,13 @@ let account_updates_of_json x =
       ((list @@ Account_update.Graphql_repr.deriver @@ o ()) @@ derivers ()))
     x
 
-let zkapp_command_to_json x =
-  Fields_derivers_zkapps.(to_json (deriver @@ derivers ())) x
+let zkapp_command_to_json ~chain x =
+  Fields_derivers_zkapps.(to_json (deriver ~chain @@ derivers ())) x
 
-let arg_query_string x =
-  Fields_derivers_zkapps.Test.Loop.json_to_string_gql @@ to_json x
+let arg_query_string ~chain x =
+  Fields_derivers_zkapps.Test.Loop.json_to_string_gql @@ to_json ~chain x
 
-let dummy =
+let dummy ~chain =
   lazy
     (let account_update : Account_update.t =
        { body = Account_update.Body.dummy
@@ -1582,7 +1587,7 @@ let dummy =
        }
      in
      { fee_payer
-     ; account_updates = Call_forest.cons account_update []
+     ; account_updates = Call_forest.cons ~chain account_update []
      ; memo = Signed_command_memo.empty
      } )
 
@@ -2046,11 +2051,11 @@ let is_incompatible_version t =
       | Set { set_verification_key = _auth, txn_version; _ } ->
           not Mina_numbers.Txn_version.(equal_to_current txn_version) )
 
-let get_transaction_commitments (zkapp_command : t) =
+let get_transaction_commitments ~chain (zkapp_command : t) =
   let memo_hash = Signed_command_memo.hash zkapp_command.memo in
   let fee_payer_hash =
     Account_update.of_fee_payer zkapp_command.fee_payer
-    |> Digest.Account_update.create
+    |> Digest.Account_update.create ~chain
   in
   let account_updates_hash = account_updates_hash zkapp_command in
   let txn_commitment = Transaction_commitment.create ~account_updates_hash in
@@ -2060,10 +2065,10 @@ let get_transaction_commitments (zkapp_command : t) =
   in
   (txn_commitment, full_txn_commitment)
 
-let inner_query =
+let inner_query ~chain =
   lazy
     (Option.value_exn ~message:"Invariant: All projectable derivers are Some"
-       Fields_derivers_zkapps.(inner_query (deriver @@ Derivers.o ())) )
+       Fields_derivers_zkapps.(inner_query (deriver ~chain @@ Derivers.o ())) )
 
 module For_tests = struct
   let replace_vks t vk =
