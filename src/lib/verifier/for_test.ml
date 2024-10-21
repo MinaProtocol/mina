@@ -1,25 +1,8 @@
-let get_verification_keys ~constraint_constants ~proof_level =
-  let module T = Transaction_snark.Make (struct
-    let constraint_constants = constraint_constants
-
-    let proof_level = proof_level
-  end) in
-  let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
-    let tag = T.tag
-
-    let constraint_constants = constraint_constants
-
-    let proof_level = proof_level
-  end) in
-  (`Blockchain B.Proof.verification_key, `Transaction T.verification_key)
-
 let get_verification_keys_eagerly ~constraint_constants ~proof_level =
   let open Async.Deferred.Let_syntax in
   let `Blockchain blockchain_vk, `Transaction transaction_vk =
     get_verification_keys ~constraint_constants ~proof_level
   in
-  let%bind blockchain_vk = (Lazy.force blockchain_vk) in
-  let%bind transaction_vk = (Lazy.force transaction_vk) in
-  return (
-    `Blockchain blockchain_vk, `Transaction transaction_vk
-  )
+  let%bind blockchain_vk = Lazy.force blockchain_vk in
+  let%bind transaction_vk = Lazy.force transaction_vk in
+  return (`Blockchain blockchain_vk, `Transaction transaction_vk)
