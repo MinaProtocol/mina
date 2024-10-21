@@ -666,7 +666,7 @@ module Genesis_proof = struct
         return None
 
   let generate_inputs ~runtime_config ~proof_level ~ledger ~genesis_epoch_data
-      ~constraint_constants ~blockchain_proof_system_id
+      ~constraint_constants ~blockchain_proof_system_id ~compile_config
       ~(genesis_constants : Genesis_constants.t) =
     let consensus_constants =
       Consensus.Constants.create ~constraint_constants
@@ -682,6 +682,7 @@ module Genesis_proof = struct
     { Genesis_proof.Inputs.runtime_config
     ; constraint_constants
     ; proof_level
+    ; compile_config
     ; blockchain_proof_system_id
     ; genesis_ledger = ledger
     ; genesis_epoch_data
@@ -708,6 +709,7 @@ module Genesis_proof = struct
              ; consensus_constants = inputs.consensus_constants
              ; constraint_constants = inputs.constraint_constants
              ; genesis_body_reference = inputs.genesis_body_reference
+             ; compile_config = inputs.compile_config
              }
     | _ ->
         Deferred.return (Genesis_proof.create_values_no_proof inputs)
@@ -759,109 +761,138 @@ let print_config ~logger (config : Runtime_config.t) =
   [%log info] "Initializing with runtime configuration. Ledger name: $name"
     ~metadata
 
-let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~proof_level:compiled_proof_level ?overwrite_version
-    (config : Runtime_config.t) =
-  print_config ~logger config ;
-  let open Deferred.Or_error.Let_syntax in
-  let proof_level =
-    List.find_map_exn ~f:Fn.id
-      [ cli_proof_level
-      ; Option.Let_syntax.(
-          let%bind proof = config.proof in
-          match%map proof.level with
-          | Full ->
-              Genesis_constants.Proof_level.Full
-          | Check ->
-              Check
-          | No_check ->
-              No_check)
-      ; Some compiled_proof_level
-      ]
-  in
-  let constraint_constants, blockchain_proof_system_id =
-    match config.proof with
-    | None ->
-        [%log info] "Using the compiled constraint constants" ;
-        (constraint_constants, Some (Pickles.Verification_key.Id.dummy ()))
-    | Some config ->
-        [%log info] "Using the constraint constants from the configuration file" ;
-        let blockchain_proof_system_id =
-          (* We pass [None] here, which will force the constraint systems to be
-             set up and their hashes evaluated before we can calculate the
-             genesis proof's filename.
-             This adds no overhead if we are generating a genesis proof, since
-             we will do these evaluations anyway to load the blockchain proving
-             key. Otherwise, this will in a slight slowdown.
-          *)
-          None
-        in
-        ( make_constraint_constants ~default:constraint_constants config
-        , blockchain_proof_system_id )
-  in
-  let%bind () =
-    match (proof_level, compiled_proof_level) with
-    | _, Full | (Check | No_check), _ ->
-        return ()
-    | Full, ((Check | No_check) as compiled) ->
-        let str = Genesis_constants.Proof_level.to_string in
-        [%log fatal]
-          "Proof level $proof_level is not compatible with compile-time proof \
-           level $compiled_proof_level"
-          ~metadata:
-            [ ("proof_level", `String (str proof_level))
-            ; ("compiled_proof_level", `String (str compiled))
-            ] ;
-        Deferred.Or_error.errorf
-          "Proof level %s is not compatible with compile-time proof level %s"
-          (str proof_level) (str compiled)
-  in
-  let%bind genesis_ledger, ledger_config, ledger_file =
-    match config.ledger with
-    | Some ledger ->
-        Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-          ?overwrite_version ledger
-    | None ->
-        [%log fatal] "No ledger was provided in the runtime configuration" ;
-        Deferred.Or_error.errorf
-          "No ledger was provided in the runtime configuration"
-  in
-  [%log info] "Loaded genesis ledger from $ledger_file"
-    ~metadata:[ ("ledger_file", `String ledger_file) ] ;
-  let%bind genesis_epoch_data, genesis_epoch_data_config =
-    Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      config.epoch_data
-  in
-  let config =
-    { config with
-      ledger = Option.map config.ledger ~f:(fun _ -> ledger_config)
-    ; epoch_data = genesis_epoch_data_config
-    }
-  in
-  let%map genesis_constants =
-    Deferred.return
-    @@ make_genesis_constants ~logger ~default:genesis_constants config
-  in
-  let proof_inputs =
-    Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
-      ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
-      ~blockchain_proof_system_id ~genesis_epoch_data
-  in
-  (proof_inputs, config)
+module type Config_loader_intf = sig
+  val load_config_files :
+       ?overwrite_version:Mina_numbers.Txn_version.t
+    -> ?genesis_dir:string
+    -> ?itn_features:bool
+    -> ?cli_proof_level:Genesis_constants.Proof_level.t
+    -> ?conf_dir:string
+    -> logger:Logger.t
+    -> string list
+    -> (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t
 
-let init_from_config_file ?genesis_dir ~cli_proof_level ~genesis_constants
-    ~constraint_constants ~logger ~proof_level ?overwrite_version
-    (config : Runtime_config.t) :
-    (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
-  let open Deferred.Or_error.Let_syntax in
-  let%map inputs, config =
-    inputs_from_config_file ?genesis_dir ~cli_proof_level ~genesis_constants
-      ~constraint_constants ~logger ~proof_level ?overwrite_version config
-  in
-  let values = Genesis_proof.create_values_no_proof inputs in
-  (values, config)
+  (* Mostly loads genesis ledger and epoch data *)
+  val init_from_config_file :
+       ?overwrite_version:Mina_numbers.Txn_version.t
+    -> ?genesis_dir:string
+    -> logger:Logger.t
+    -> constants:Runtime_config.Constants.constants
+    -> Runtime_config.t
+    -> (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t
+end
+
+module Config_loader : Config_loader_intf = struct
+  let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
+      ~(constants : Runtime_config.Constants.constants) ?overwrite_version
+      (config : Runtime_config.t) =
+    print_config ~logger config ;
+    let open Deferred.Or_error.Let_syntax in
+    let constraint_constants =
+      Runtime_config.Constants.constraint_constants constants
+    in
+    let proof_level = Runtime_config.Constants.proof_level constants in
+    let compile_config = Runtime_config.Constants.compile_config constants in
+    let genesis_constants =
+      Runtime_config.Constants.genesis_constants constants
+    in
+    let%bind genesis_ledger, ledger_config, ledger_file =
+      match config.ledger with
+      | Some ledger ->
+          Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
+            ?overwrite_version ledger
+      | None ->
+          [%log fatal] "No ledger was provided in the runtime configuration" ;
+          Deferred.Or_error.errorf
+            "No ledger was provided in the runtime configuration"
+    in
+    [%log info] "Loaded genesis ledger from $ledger_file"
+      ~metadata:[ ("ledger_file", `String ledger_file) ] ;
+    let%bind genesis_epoch_data, genesis_epoch_data_config =
+      Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
+        config.epoch_data
+    in
+    let config =
+      { config with
+        ledger = Option.map config.ledger ~f:(fun _ -> ledger_config)
+      ; epoch_data = genesis_epoch_data_config
+      }
+    in
+    let%map genesis_constants =
+      Deferred.return
+      @@ make_genesis_constants ~logger ~default:genesis_constants config
+    in
+    let proof_inputs =
+      Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
+        ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
+        ~compile_config ~blockchain_proof_system_id:None ~genesis_epoch_data
+    in
+    (proof_inputs, config)
+
+  let init_from_config_file ?overwrite_version ?genesis_dir ~logger
+      ~(constants : Runtime_config.Constants.constants)
+      (config : Runtime_config.t) :
+      (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
+    let open Deferred.Or_error.Let_syntax in
+    let%map inputs, config =
+      inputs_from_config_file ?genesis_dir ~constants ~logger ?overwrite_version
+        config
+    in
+    let values = Genesis_proof.create_values_no_proof inputs in
+    (values, config)
+
+  let load_config_files ?overwrite_version ?genesis_dir ?(itn_features = false)
+      ?cli_proof_level ?conf_dir ~logger (config_files : string list) =
+    let open Deferred.Or_error.Let_syntax in
+    let genesis_dir =
+      let%map.Option conf_dir = conf_dir in
+      Option.value ~default:(conf_dir ^/ "genesis") genesis_dir
+    in
+    let%bind.Deferred constants =
+      Runtime_config.Constants.load_constants ?conf_dir ?cli_proof_level
+        ~itn_features ~logger config_files
+    in
+    let%bind config =
+      Runtime_config.Json_loader.load_config_files ?conf_dir ~logger
+        config_files
+    in
+    match%bind.Deferred
+      init_from_config_file ?overwrite_version ?genesis_dir ~logger ~constants
+        config
+    with
+    | Ok a ->
+        return a
+    | Error err ->
+        let ( json_config
+            , `Accounts_omitted
+                ( `Genesis genesis_accounts_omitted
+                , `Staking staking_accounts_omitted
+                , `Next next_accounts_omitted ) ) =
+          Runtime_config.to_yojson_without_accounts config
+        in
+        let append_accounts_omitted s =
+          Option.value_map
+            ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
+            ~default:Fn.id
+        in
+        let metadata =
+          append_accounts_omitted "genesis" genesis_accounts_omitted
+          @@ append_accounts_omitted "staking" staking_accounts_omitted
+          @@ append_accounts_omitted "next" next_accounts_omitted []
+          @ [ ("config", json_config)
+            ; ( "name"
+              , `String
+                  (Option.value ~default:"not provided"
+                     (let%bind.Option ledger = config.ledger in
+                      Option.first_some ledger.name ledger.hash ) ) )
+            ; ("error", Error_json.error_to_yojson err)
+            ]
+        in
+        [%log info]
+          "Initializing with runtime configuration. Ledger source: $name"
+          ~metadata ;
+        Error.raise err
+end
 
 let%test_module "Account config test" =
   ( module struct

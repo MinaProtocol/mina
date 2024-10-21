@@ -223,22 +223,7 @@ module type Full = sig
       , Local_state.Checked.t )
       Poly.t
 
-    open Tick
-
-    val typ : (var, t) Typ.t
-
-    val to_input : t -> Field.t Random_oracle.Input.Chunked.t
-
-    val to_field_elements : t -> Field.t array
-
-    module Checked : sig
-      type t = var
-
-      val to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t Checked.t
-
-      (* This is actually a checked function. *)
-      val to_field_elements : var -> Field.Var.t array
-    end
+    val typ : (var, t) Tick.Typ.t
   end
 
   val gen : t Quickcheck.Generator.t
