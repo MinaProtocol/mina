@@ -3,6 +3,7 @@
 module Stable : sig
   module V2 : sig
     type 'comm t =
+          'comm Mina_wire_types.Pickles_types.Plonk_verification_key_evals.V2.t =
       { sigma_comm : 'comm Plonk_types.Permuts_vec.Stable.V1.t
       ; coefficients_comm : 'comm Plonk_types.Columns_vec.Stable.V1.t
       ; generic_comm : 'comm

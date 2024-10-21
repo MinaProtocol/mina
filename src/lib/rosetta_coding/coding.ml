@@ -1,7 +1,4 @@
 (* coding.ml -- hex encoding/decoding for Rosetta *)
-
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 module Field = Snark_params.Tick.Field
 module Scalar = Snark_params.Tick.Inner_curve.Scalar

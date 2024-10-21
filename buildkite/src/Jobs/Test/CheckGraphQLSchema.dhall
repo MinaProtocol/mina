@@ -27,7 +27,11 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "CheckGraphQLSchema"
-        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
         }
       , steps = [ CheckGraphQLSchema.step dependsOn ]
       }

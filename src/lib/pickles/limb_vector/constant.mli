@@ -1,7 +1,3 @@
-type 'n t = (int64, 'n) Pickles_types.Vector.t [@@deriving sexp_of]
-
-val to_bits : 'a t -> bool list
-
 module Hex64 : sig
   include module type of Core_kernel.Int64
 

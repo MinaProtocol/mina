@@ -19,9 +19,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   (* let num_sender_nodes = 4 *)
 
-  let config =
+  let config ~(constants : Test_config.constants) =
     let open Test_config in
-    { default with
+    { (default ~constants) with
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in

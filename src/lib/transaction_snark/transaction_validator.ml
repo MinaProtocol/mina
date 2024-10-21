@@ -43,7 +43,9 @@ let%test_unit "invalid transactions do not dirty the ledger" =
   let open Mina_numbers in
   let open Currency in
   let open Signature_lib in
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let constraint_constants =
+    Genesis_constants.For_unit_tests.Constraint_constants.t
+  in
   let ledger = Ledger.create_ephemeral ~depth:4 () in
   let sender_sk, receiver_sk =
     Quickcheck.Generator.generate ~size:0

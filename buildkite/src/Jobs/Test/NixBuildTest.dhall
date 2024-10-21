@@ -30,7 +30,11 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "NixBuildTest"
-        , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Test ]
+        , tags =
+          [ PipelineTag.Type.Fast
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
         }
       , steps =
         [ Command.build
@@ -40,6 +44,7 @@ in  Pipeline.build
                   Cmd.Docker::{
                   , image = ContainerImages.nixos
                   , privileged = True
+                  , useBash = False
                   }
                   "./buildkite/scripts/test-nix.sh \$BUILDKITE_BRANCH"
               ]
