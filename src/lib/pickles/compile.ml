@@ -176,7 +176,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          , bool
          , 'max_proofs_verified
            Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
-         , (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.vec
+         , Import.Types.Digest.Constant.t
          , ( 'b
            , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
              , 'actual_proofs_verified )
@@ -205,9 +205,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          , bool
          , 'max_proofs_verified
            Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
-         , ( Limb_vector.Constant.Hex64.t
-           , Composition_types.Digest.Limbs.n )
-           Pickles_types.Vector.vec
+         , Import.Types.Digest.Constant.t
          , ( 'b
            , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
              , 'actual_proofs_verified )
@@ -353,7 +351,6 @@ struct
            (module Nat.Add.Intf with type n = max_proofs_verified)
       -> name:string
       -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
-      -> ?commit:string
       -> public_input:
            ( var
            , value
@@ -384,7 +381,7 @@ struct
          { step_storable; step_vk_storable; wrap_storable; wrap_vk_storable }
        ~proof_cache ?disk_keys ?override_wrap_domain ?override_wrap_main
        ?(num_chunks = 1) ~branches:(module Branches) ~max_proofs_verified ~name
-       ?constraint_constants ?commit ~public_input ~auxiliary_typ ~choices () ->
+       ?constraint_constants ~public_input ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       let constraint_constants : Snark_keys_header.Constraint_constants.t =
         match constraint_constants with
@@ -406,7 +403,6 @@ struct
       { Snark_keys_header.header_version = Snark_keys_header.header_version
       ; kind
       ; constraint_constants
-      ; commit = Option.value ~default:"[NOT SPECIFIED]" commit
       ; length = (* This is a dummy, it gets filled in on read/write. *) 0
       ; constraint_system_hash
       ; identifying_hash =
@@ -564,9 +560,7 @@ struct
       let module M =
         H4.Map (Branch_data) (E04 (Lazy_keys))
           (struct
-            let etyp =
-              Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-                ~wrap_rounds:Tock.Rounds.n
+            let etyp = Impls.Step.input ~proofs_verified:Max_proofs_verified.n
 
             let f (T b : _ Branch_data.t) =
               let open Impls.Step in
@@ -1021,7 +1015,6 @@ let compile_with_wrap_main_override_promise :
          (module Nat.Add.Intf with type n = max_proofs_verified)
     -> name:string
     -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
-    -> ?commit:string
     -> choices:
          (   self:(var, value, max_proofs_verified, branches) Tag.t
           -> ( prev_varss
@@ -1056,7 +1049,7 @@ let compile_with_wrap_main_override_promise :
  fun ?self ?(cache = []) ?(storables = Storables.default) ?proof_cache
      ?disk_keys ?override_wrap_domain ?override_wrap_main ?num_chunks
      ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
-     ?constraint_constants ?commit ~choices () ->
+     ?constraint_constants ~choices () ->
   let self =
     match self with
     | None ->
@@ -1125,7 +1118,7 @@ let compile_with_wrap_main_override_promise :
     M.compile ~self ~proof_cache ~cache ~storables ?disk_keys
       ?override_wrap_domain ?override_wrap_main ?num_chunks ~branches
       ~max_proofs_verified ~name ~public_input ~auxiliary_typ
-      ?constraint_constants ?commit
+      ?constraint_constants
       ~choices:(fun ~self -> conv_irs (choices ~self))
       ()
   in
@@ -1268,7 +1261,7 @@ module Make_adversarial_test (M : sig
        , bool
        , 'max_proofs_verified
          Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
-       , (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.vec
+       , Import.Types.Digest.Constant.t
        , ( 'b
          , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
            , 'actual_proofs_verified )
@@ -1297,9 +1290,7 @@ module Make_adversarial_test (M : sig
        , bool
        , 'max_proofs_verified
          Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
-       , ( Limb_vector.Constant.Hex64.t
-         , Composition_types.Digest.Limbs.n )
-         Pickles_types.Vector.vec
+       , Import.Types.Digest.Constant.t
        , ( 'b
          , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
            , 'actual_proofs_verified )

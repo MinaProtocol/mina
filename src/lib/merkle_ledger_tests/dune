@@ -5,7 +5,6 @@
  (flags
   (:standard -warn-error +a)
    -open Core_kernel )
- (modules (:standard \ "main"))
  (preprocess (pps ppx_version ppx_jane ppx_compare ppx_deriving.show ppx_deriving_yojson))
  (libraries
    ; Opam
@@ -40,16 +39,3 @@
    ppx_version.runtime
    signature_lib )
  (instrumentation (backend bisect_ppx)) )
-
-(tests
- (names main)
- (flags
-  (:standard -warn-error +a)
-   -open Merkle_ledger_tests )
- (modules main)
- (libraries
-   alcotest
-   merkle_ledger_tests )
- (action (run %{test}))
- (instrumentation (backend bisect_ppx))
- )

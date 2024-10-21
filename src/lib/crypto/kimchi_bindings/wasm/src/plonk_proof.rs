@@ -12,7 +12,7 @@ use wasm_bindgen::prelude::*;
 use kimchi::circuits::lookup::runtime_tables::RuntimeTable;
 // use kimchi::index::{expr_linearization, VerifierIndex as DlogVerifierIndex};
 // use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-use ark_ec::AffineCurve;
+use ark_ec::AffineRepr;
 use ark_ff::One;
 use array_init::array_init;
 use kimchi::circuits::wires::COLUMNS;
@@ -782,7 +782,7 @@ macro_rules! impl_proof {
             #[wasm_bindgen]
             pub fn [<$name:snake _dummy>]() -> WasmProverProof {
                 fn comm() -> PolyComm<$G> {
-                    let g = $G::prime_subgroup_generator();
+                    let g = $G::generator();
                     PolyComm {
                         elems: vec![g, g, g],
                     }
@@ -794,7 +794,7 @@ macro_rules! impl_proof {
                 };
                 let prev_challenges = vec![prev.clone(), prev.clone(), prev.clone()];
 
-                let g = $G::prime_subgroup_generator();
+                let g = $G::generator();
                 let proof = OpeningProof {
                     lr: vec![(g, g), (g, g), (g, g)],
                     z1: $F::one(),

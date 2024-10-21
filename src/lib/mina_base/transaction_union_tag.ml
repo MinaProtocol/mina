@@ -1,7 +1,4 @@
 (* transaction_union_tag.ml *)
-
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params.Tick
 

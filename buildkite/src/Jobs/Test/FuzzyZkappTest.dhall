@@ -19,3 +19,33 @@ in  Pipeline.build
             [ S.exactly "buildkite/src/Jobs/Test/FuzzyZkappTest" "dhall" ]
           }
       )
+      Pipeline.Config::{
+      , spec =
+          let unitDirtyWhen =
+                [ S.strictlyStart (S.contains "src/lib")
+                , S.strictlyStart
+                    (S.contains "src/lib/transaction_snark/test/zkapp_fuzzy")
+                , S.exactly "buildkite/src/Jobs/Test/FuzzyZkappTest" "dhall"
+                , S.exactly "buildkite/scripts/fuzzy-zkapp-test" "sh"
+                ]
+
+          in  JobSpec::{
+              , dirtyWhen = unitDirtyWhen
+              , path = "Test"
+              , name = "FuzzyZkappTest"
+              , tags =
+                [ PipelineTag.Type.VeryLong
+                , PipelineTag.Type.Test
+                , PipelineTag.Type.Stable
+                ]
+              , mode = PipelineMode.Type.Stable
+              }
+      , steps =
+        [ buildTestCmd
+            "dev"
+            "src/lib/transaction_snark/test/zkapp_fuzzy/zkapp_fuzzy.exe"
+            4200
+            150
+            Size.Small
+        ]
+      }
