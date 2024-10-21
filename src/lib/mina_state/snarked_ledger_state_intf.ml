@@ -224,6 +224,8 @@ module type Full = sig
       Poly.t
 
     val typ : (var, t) Tick.Typ.t
+
+    val to_field_elements : t -> Tick.Field.t array
   end
 
   val gen : t Quickcheck.Generator.t
