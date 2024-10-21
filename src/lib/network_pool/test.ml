@@ -27,8 +27,8 @@ let%test_module "network pool test" =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-        let%bind `Blockchain blockchain_verification_key, `Transaction transaction_verification_key =
-        
+          let%bind ( `Blockchain blockchain_verification_key
+                   , `Transaction transaction_verification_key ) =
             Verifier.For_test.get_verification_keys_eagerly
               ~constraint_constants ~proof_level
           in

@@ -1672,8 +1672,8 @@ let%test_module _ =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-        let%bind `Blockchain blockchain_verification_key, `Transaction transaction_verification_key =
-        
+          let%bind ( `Blockchain blockchain_verification_key
+                   , `Transaction transaction_verification_key ) =
             Verifier.For_test.get_verification_keys_eagerly
               ~constraint_constants ~proof_level
           in
@@ -3094,8 +3094,8 @@ let%test_module _ =
     let%test "account update with a different network id that uses proof \
               authorization would be rejected" =
       Thread_safe.block_on_async_exn (fun () ->
-        let%bind `Blockchain blockchain_verification_key, `Transaction transaction_verification_key =
-        
+          let%bind ( `Blockchain blockchain_verification_key
+                   , `Transaction transaction_verification_key ) =
             Verifier.For_test.get_verification_keys_eagerly
               ~constraint_constants ~proof_level
           in
