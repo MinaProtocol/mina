@@ -14,8 +14,6 @@
    core
    core_kernel
    yojson
-   ;; local libraries
-   mina_node_config.unconfigurable_constants
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_mina ppx_jane)))
