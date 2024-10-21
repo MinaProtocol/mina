@@ -1,8 +1,6 @@
 open Core
 open Async
-open Currency
 open Signature_lib
-open Mina_base
 open Integration_test_lib
 
 let docker_swarm_version = "3.8"
@@ -50,24 +48,13 @@ module Network_config = struct
       ~(images : Test_config.Container_images.t) ~(test_config : Test_config.t)
       ~(constants : Test_config.constants) =
     let _ = cli_inputs in
-    let ({ genesis_ledger
-         ; epoch_data
-         ; block_producers
+    let ({ block_producers
          ; snark_coordinator
          ; snark_worker_fee
          ; num_archive_nodes
          ; log_precomputed_blocks (* ; num_plain_nodes *)
          ; start_filtered_logs
          ; proof_config
-         ; k
-         ; delta
-         ; slots_per_epoch
-         ; slots_per_sub_window
-         ; grace_period_slots
-         ; txpool_max_size
-         ; slot_tx_end
-         ; slot_chain_end
-         ; network_id
          ; _
          }
           : Test_config.t ) =
@@ -75,13 +62,6 @@ module Network_config = struct
     in
     let git_commit = Mina_version.commit_id_short in
     let stack_name = "it-" ^ git_commit ^ "-" ^ test_name in
-    let key_names_list =
-      List.map genesis_ledger ~f:(fun acct -> acct.account_name)
-    in
-    if List.contains_dup ~compare:String.compare key_names_list then
-      failwith
-        "All accounts in genesis ledger must have unique names.  Check to make \
-         sure you are not using the same account_name more than once" ;
     let all_nodes_names_list =
       List.map block_producers ~f:(fun acct -> acct.node_name)
       @ match snark_coordinator with None -> [] | Some n -> [ n.node_name ]
@@ -90,185 +70,13 @@ module Network_config = struct
       failwith
         "All nodes in testnet must have unique names.  Check to make sure you \
          are not using the same node_name more than once" ;
-    let keypairs =
-      List.take
-        (List.tl_exn
-           (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs)) )
-        (List.length genesis_ledger)
-    in
-    let runtime_timing_of_timing = function
-      | Account.Timing.Untimed ->
-          None
-      | Timed t ->
-          Some
-            { Runtime_config.Accounts.Single.Timed.initial_minimum_balance =
-                t.initial_minimum_balance
-            ; cliff_time = t.cliff_time
-            ; cliff_amount = t.cliff_amount
-            ; vesting_period = t.vesting_period
-            ; vesting_increment = t.vesting_increment
-            }
-    in
-    let add_accounts accounts_and_keypairs =
-      List.map accounts_and_keypairs
-        ~f:(fun
-             ( { Test_config.Test_account.balance
-               ; account_name
-               ; timing
-               ; permissions
-               ; zkapp
-               }
-             , (pk, sk) )
-           ->
-          let timing = runtime_timing_of_timing timing in
-          let default = Runtime_config.Accounts.Single.default in
-          let account =
-            { default with
-              pk = Public_key.Compressed.to_string pk
-            ; sk = Some (Private_key.to_base58_check sk)
-            ; balance = Balance.of_mina_string_exn balance
-            ; delegate = None
-            ; timing
-            ; permissions =
-                Option.map
-                  ~f:Runtime_config.Accounts.Single.Permissions.of_permissions
-                  permissions
-            ; zkapp =
-                Option.map
-                  ~f:Runtime_config.Accounts.Single.Zkapp_account.of_zkapp zkapp
-            }
-          in
-          (account_name, account) )
-    in
-    let genesis_accounts_and_keys = List.zip_exn genesis_ledger keypairs in
-    let genesis_ledger_accounts = add_accounts genesis_accounts_and_keys in
+    let genesis_ledger = Genesis_ledger.create test_config.genesis_ledger in
     let constraint_constants =
       Genesis_ledger_helper.make_constraint_constants
         ~default:constants.constraint_constants proof_config
     in
-    let ledger_is_prefix ledger1 ledger2 =
-      List.is_prefix ledger2 ~prefix:ledger1
-        ~equal:(fun
-                 ({ account_name = name1; _ } : Test_config.Test_account.t)
-                 ({ account_name = name2; _ } : Test_config.Test_account.t)
-               -> String.equal name1 name2 )
-    in
     let runtime_config =
-      { Runtime_config.daemon =
-          Some
-            { Runtime_config.Daemon.default with
-              txpool_max_size = Some txpool_max_size
-            ; slot_tx_end
-            ; slot_chain_end
-            ; network_id
-            }
-      ; genesis =
-          Some
-            { k = Some k
-            ; delta = Some delta
-            ; slots_per_epoch = Some slots_per_epoch
-            ; slots_per_sub_window = Some slots_per_sub_window
-            ; grace_period_slots = Some grace_period_slots
-            ; genesis_state_timestamp =
-                Some Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
-            }
-      ; proof = Some proof_config (* TODO: prebake ledger and only set hash *)
-      ; ledger =
-          Some
-            { base =
-                Accounts
-                  (List.map genesis_ledger_accounts ~f:(fun (_name, acct) ->
-                       acct ) )
-            ; add_genesis_winner = None
-            ; num_accounts = None
-            ; balances = []
-            ; hash = None
-            ; s3_data_hash = None
-            ; name = None
-            }
-      ; epoch_data =
-          Option.map epoch_data ~f:(fun { staking = staking_ledger; next } ->
-              let genesis_winner_account : Runtime_config.Accounts.single =
-                Runtime_config.Accounts.Single.of_account
-                  Mina_state.Consensus_state_hooks.genesis_winner_account
-                |> Result.ok_or_failwith
-              in
-              let ledger_of_epoch_accounts
-                  (epoch_accounts : Test_config.Test_account.t list) =
-                let epoch_ledger_accounts =
-                  List.map epoch_accounts
-                    ~f:(fun
-                         { account_name; balance; timing; permissions; zkapp }
-                       ->
-                      let balance = Balance.of_mina_string_exn balance in
-                      let timing = runtime_timing_of_timing timing in
-                      let genesis_account =
-                        match
-                          List.Assoc.find genesis_ledger_accounts account_name
-                            ~equal:String.equal
-                        with
-                        | Some acct ->
-                            acct
-                        | None ->
-                            failwithf
-                              "Epoch ledger account %s not in genesis ledger"
-                              account_name ()
-                      in
-                      { genesis_account with
-                        balance
-                      ; timing
-                      ; permissions =
-                          Option.map
-                            ~f:
-                              Runtime_config.Accounts.Single.Permissions
-                              .of_permissions permissions
-                      ; zkapp =
-                          Option.map
-                            ~f:
-                              Runtime_config.Accounts.Single.Zkapp_account
-                              .of_zkapp zkapp
-                      } )
-                in
-                ( { base =
-                      Accounts (genesis_winner_account :: epoch_ledger_accounts)
-                  ; add_genesis_winner = None (* no effect *)
-                  ; num_accounts = None
-                  ; balances = []
-                  ; hash = None
-                  ; s3_data_hash = None
-                  ; name = None
-                  }
-                  : Runtime_config.Ledger.t )
-              in
-              let staking =
-                let ({ epoch_ledger; epoch_seed }
-                      : Test_config.Epoch_data.Data.t ) =
-                  staking_ledger
-                in
-                if not (ledger_is_prefix epoch_ledger genesis_ledger) then
-                  failwith "Staking epoch ledger not a prefix of genesis ledger" ;
-                let ledger = ledger_of_epoch_accounts epoch_ledger in
-                let seed = epoch_seed in
-                ({ ledger; seed } : Runtime_config.Epoch_data.Data.t)
-              in
-              let next =
-                Option.map next ~f:(fun { epoch_ledger; epoch_seed } ->
-                    if
-                      not
-                        (ledger_is_prefix staking_ledger.epoch_ledger
-                           epoch_ledger )
-                    then
-                      failwith
-                        "Staking epoch ledger not a prefix of next epoch ledger" ;
-                    if not (ledger_is_prefix epoch_ledger genesis_ledger) then
-                      failwith
-                        "Next epoch ledger not a prefix of genesis ledger" ;
-                    let ledger = ledger_of_epoch_accounts epoch_ledger in
-                    let seed = epoch_seed in
-                    ({ ledger; seed } : Runtime_config.Epoch_data.Data.t) )
-              in
-              ({ staking; next } : Runtime_config.Epoch_data.t) )
-      }
+      Runtime_config_builder.create ~test_config ~genesis_ledger
     in
     let genesis_constants =
       Or_error.ok_exn
@@ -278,12 +86,7 @@ module Network_config = struct
     let constants : Test_config.constants =
       { constants with genesis_constants; constraint_constants }
     in
-    let mk_net_keypair keypair_name (pk, sk) =
-      let keypair =
-        { Keypair.public_key = Public_key.decompress_exn pk; private_key = sk }
-      in
-      Network_keypair.create_network_keypair ~keypair_name ~keypair
-    in
+
     let long_commit_id =
       if String.is_substring Mina_version.commit_id ~substring:"[DIRTY]" then
         String.sub Mina_version.commit_id ~pos:7
@@ -296,12 +99,6 @@ module Network_config = struct
     in
     let mina_archive_schema_aux_files =
       [ sprintf "%screate_schema.sql" mina_archive_base_url ]
-    in
-    let genesis_keypairs =
-      List.fold genesis_accounts_and_keys ~init:String.Map.empty
-        ~f:(fun map ({ account_name; _ }, (pk, sk)) ->
-          let keypair = mk_net_keypair account_name (pk, sk) in
-          String.Map.add_exn map ~key:account_name ~data:keypair )
     in
     let open Docker_node_config in
     let open Docker_compose.Dockerfile in
@@ -424,12 +221,10 @@ module Network_config = struct
       List.map block_producers ~f:(fun node ->
           let keypair =
             match
-              List.find genesis_accounts_and_keys
-                ~f:(fun ({ account_name; _ }, _keypair) ->
-                  String.equal account_name node.account_name )
+              Core.String.Map.find genesis_ledger.keypairs node.account_name
             with
-            | Some (_acct, keypair) ->
-                keypair |> mk_net_keypair node.account_name
+            | Some keypair ->
+                keypair
             | None ->
                 let failstring =
                   Format.sprintf
@@ -472,7 +267,7 @@ module Network_config = struct
       | Some snark_coordinator_node ->
           let network_kp =
             match
-              String.Map.find genesis_keypairs
+              String.Map.find genesis_ledger.keypairs
                 snark_coordinator_node.account_name
             with
             | Some acct ->
@@ -542,7 +337,7 @@ module Network_config = struct
                ~config:snark_coordinator_config )
     in
     { debug_arg = debug
-    ; genesis_keypairs
+    ; genesis_keypairs = genesis_ledger.keypairs
     ; constants
     ; docker =
         { docker_swarm_version
