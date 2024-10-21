@@ -20,11 +20,6 @@ type tag =
   , Nat.N1.n )
   Pickles.Tag.t
 
-val verify :
-     (Protocol_state.Value.t * Proof.t) list
-  -> key:Pickles.Verification_key.t
-  -> unit Or_error.t Async.Deferred.t
-
 val check :
      Witness.t
   -> ?handler:

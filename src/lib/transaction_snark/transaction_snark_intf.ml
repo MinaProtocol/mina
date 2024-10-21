@@ -34,16 +34,11 @@ module type Full = sig
   open Pickles_types
 
   type tag =
-    ( Statement.With_sok.Checked.t
+    ( Statement.With_sok.var
     , Statement.With_sok.t
     , Nat.N2.n
     , Nat.N5.n )
     Pickles.Tag.t
-
-  val verify :
-       (t * Sok_message.t) list
-    -> key:Pickles.Verification_key.t
-    -> unit Or_error.t Async.Deferred.t
 
   module Verification : sig
     module type S = sig

@@ -381,18 +381,12 @@ let%snarkydef_ step ~(logger : Logger.t)
     ; proof_must_verify = txn_snark_must_verify
     } )
 
-module Statement = struct
-  type t = Protocol_state.Value.t
-
-  let to_field_elements (t : t) : Tick.Field.t array =
-    [| (Protocol_state.hashes t).state_hash |]
-end
-
-module Statement_var = struct
-  type t = Protocol_state.Value.t Data_as_hash.t
-end
-
-type tag = (Statement_var.t, Statement.t, Nat.N2.n, Nat.N1.n) Pickles.Tag.t
+type tag =
+  ( Protocol_state.Value.t Data_as_hash.t
+  , Protocol_state.Value.t
+  , Nat.N2.n
+  , Nat.N1.n )
+  Pickles.Tag.t
 
 let typ = Data_as_hash.typ ~hash:(fun t -> (Protocol_state.hashes t).state_hash)
 
@@ -448,8 +442,6 @@ module type S = sig
 
   val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
 end
-
-let verify ts ~key = Pickles.verify (module Nat.N2) (module Statement) key ts
 
 let constraint_system_digests ~proof_level ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
