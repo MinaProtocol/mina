@@ -84,7 +84,7 @@ module Vrf =
 
 let%test_unit "eval unchecked vs. checked equality" =
   let constraint_constants =
-    Genesis_constants.Constraint_constants.for_unit_tests
+    Genesis_constants.For_unit_tests.Constraint_constants.t
   in
   let gen =
     let open Quickcheck.Let_syntax in
@@ -107,7 +107,7 @@ let%test_unit "eval unchecked vs. checked equality" =
 let%bench_module "vrf bench module" =
   ( module struct
     let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+      Genesis_constants.For_unit_tests.Constraint_constants.t
 
     let gen =
       let open Quickcheck.Let_syntax in

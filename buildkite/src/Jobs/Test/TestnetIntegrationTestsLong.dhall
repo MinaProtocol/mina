@@ -47,7 +47,11 @@ in  Pipeline.build
         , path = "Test"
         , name = "TestnetIntegrationTestsLong"
         , mode = PipelineMode.Type.Stable
-        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
         }
-      , steps = [ TestExecutive.executeCloud "hard-fork" dependsOn ]
+      , steps = [ TestExecutive.executeLocal "hard-fork" dependsOn ]
       }
