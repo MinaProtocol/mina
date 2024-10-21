@@ -15283,6 +15283,58 @@
               "deprecationReason": null
             },
             {
+              "name": "pendingSnarkWorkRange",
+              "description":
+                "Find any sequence of pending snark works between two indexes in the pending snark work pool",
+              "args": [
+                {
+                  "name": "endingIndex",
+                  "description":
+                    "The last index to be taken from the pending snark work pool (excluded). If not specified or greater than the pending snark work list, all elements from index [startingIndex] will be returned. An empty list will be returned if startingIndex is not a valid index of the pending snark work list or if startingIndex >= endingIndex.",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "UInt32",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "startingIndex",
+                  "description":
+                    "The first index to be taken from the pending snark work pool",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "UInt32",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "PendingSnarkWork",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "snarkedLedgerAccountMembership",
               "description":
                 "obtain a membership proof for an account in the snarked ledger along with the account's balance, timing information, and nonce",
