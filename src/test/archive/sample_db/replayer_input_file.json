@@ -1,50 +1,48 @@
 {
-    "genesis_ledger": {
-      "name": "release",
-      "num_accounts": 250,
-      "accounts": [
-       {
-        "pk": "B62qo5raDfFWM6oaooevrgMxMXmp3NnxMGbus3yubqaexzNodKDmock",
+  "genesis_ledger": {
+    "accounts": [
+      {
+        "pk": "B62qpETs3j9TvFzUsP1eWSnATcFKoKsScQKoHX9Q5HYsCcW7KaYufJ7",
         "sk": null,
         "balance": "5.000000000",
         "delegate": null
-       },
-       {
-        "pk": "B62qpXKjMPqNsUBPeAGhpjao8BE8FqdYdk8zS2RwxaEBadByS3nbfD1",
+      },
+      {
+        "pk": "B62qizxyaNyfyHjYBnustpQMW4LzGRZwfcXtW1mK9JTofEVsV8dfzLR",
         "sk": null,
         "balance": "65500.000000000",
-        "delegate": "B62qov6t5ahQQMdoanV8tgeS8ddpqsL5MCntfh8qzr1aNqGsgnhhvV5"
-       },
-       {
-        "pk": "B62qov6t5ahQQMdoanV8tgeS8ddpqsL5MCntfh8qzr1aNqGsgnhhvV5",
+        "delegate": "B62qjkVoDmWtRNkaPA5Yq79bovnLsU9NVjAEWVuFni5Fqgzw1ij9ZmP"
+      },
+      {
+        "pk": "B62qjkVoDmWtRNkaPA5Yq79bovnLsU9NVjAEWVuFni5Fqgzw1ij9ZmP",
         "sk": null,
         "delegate": null,
         "balance": "500.000000000"
-       },
-       {
-        "pk": "B62qmYXqVz13eCpiHEEbvkWDU7jQAwfuf6zv4HLfiRthmLMZMQDXLPi",
+      },
+      {
+        "pk": "B62qidpaichaAd9sgFmPM4CRoKfHgFze94y2chvYV7buc8FaK3wdFw5",
         "sk": null,
         "balance": "11550000.000000000",
-        "delegate": "B62qr7HhRDB6Me7FFXme5MFcoqRa452etDR4mNgT9Zi6U73R238ytmz"
-       },
-       {
-        "pk": "B62qr7HhRDB6Me7FFXme5MFcoqRa452etDR4mNgT9Zi6U73R238ytmz",
+        "delegate": "B62qnw4PYSmrwa2fS1b6XpPNPJTUYrsd5QGiAs1r83c2kbsbGrUwNSx"
+      },
+      {
+        "pk": "B62qnw4PYSmrwa2fS1b6XpPNPJTUYrsd5QGiAs1r83c2kbsbGrUwNSx",
         "sk": null,
         "balance": "0.000000000",
         "delegate": null
-       },
-       {
-        "pk": "B62qkXPw6LbqeY3kaEYHrc6MeP6Wi7wcDc5fzbegn5yRoj2UvyCoe7M",
+      },
+      {
+        "pk": "B62qim6wZyqFkqjAhs6BPwpyZHoB2Z1193Y2DS8i7uUnY9dmjtkz7Gc",
         "sk": null,
         "balance": "11550000.000000000",
-        "delegate": "B62qmQsYKF97qxFVUuwHdmJySUM6F6qNnNYvxfrvYDPdLPzBspCPYLS"
-       },
-       {
-        "pk": "B62qmQsYKF97qxFVUuwHdmJySUM6F6qNnNYvxfrvYDPdLPzBspCPYLS",
+        "delegate": "B62qofVe3e35x124WjAQPSHVVFLJdsaMemNQSgdXBSisduQDJ3qQjBb"
+      },
+      {
+        "pk": "B62qofVe3e35x124WjAQPSHVVFLJdsaMemNQSgdXBSisduQDJ3qQjBb",
         "sk": null,
         "balance": "0.000000000",
         "delegate": null
-       }
-      ]
-     }
+      }
+    ]
   }
+}
