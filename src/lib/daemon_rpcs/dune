@@ -36,7 +36,6 @@
    perf_histograms
    sync_status
    node_addrs_and_ports
-   mina_node_config.unconfigurable_constants
    logger
    network_pool
    data_hash_lib
