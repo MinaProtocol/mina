@@ -143,7 +143,8 @@ let publish_to_debian_repo =
                 "Publish Mina for ${DebianVersions.capitalName
                                       spec.debVersion} ${Profiles.toSuffixUppercase
                                                            spec.profile}"
-            , key = "publish-deb-pkg"
+            , key =
+                "publish-${DebianVersions.lowerName spec.debVersion}-deb-pkg"
             , depends_on = dependsOn
             , target = Size.Small
             }
