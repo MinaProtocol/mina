@@ -14,13 +14,20 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
-let dependsOn = [] : List Command.TaggedKey.Type
+let name = "PublishDebians"
+
+let dependsOnCodename =
+          \(codename : DebianVersions.DebVersion)
+      ->  [ { name = name
+            , key = "publish-${DebianVersions.lowerName codename}-deb-pkg"
+            }
+          ]
 
 let specBuilder =
           \(debVersion : DebianVersions.DebVersion)
       ->  ArtifactPipelines.MinaBuildSpec::{
           , channel = DebianChannel.Type.Unstable
-          , prefix = "DebianPublish"
+          , prefix = name
           , debVersion = debVersion
           }
 
@@ -30,16 +37,16 @@ in  Pipeline.build
         , dirtyWhen =
             DebianVersions.dirtyWhen DebianVersions.DebVersion.Bullseye
         , path = "TearDown"
-        , name = "PublishDebians"
+        , name = name
         , tags = [ PipelineTag.Type.TearDown ]
         , mode = PipelineMode.Type.Stable
         }
       , steps =
         [ ArtifactPipelines.publishToDebian
             (specBuilder DebianVersions.DebVersion.Bullseye)
-            dependsOn
+            ([] : List Command.TaggedKey.Type)
         , ArtifactPipelines.publishToDebian
             (specBuilder DebianVersions.DebVersion.Focal)
-            dependsOn
+            (dependsOnCodename DebianVersions.DebVersion.Bullseye)
         ]
       }
