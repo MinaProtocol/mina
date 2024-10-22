@@ -23,6 +23,7 @@
    splittable_random
    lmdb
    integers
+   ppx_version.runtime
    ;; local libraries
    blake2
    error_json
@@ -37,11 +38,14 @@
    staged_ledger_diff
    consensus
    mina_net2
-   ;; test deps
-   inline_test_quiet_logs
+   mina_base
    transition_frontier_base
    mina_block
    transition_frontier_full_frontier
+   mina_numbers
+   data_hash_lib
+   ;; test deps
+   inline_test_quiet_logs
    )
  (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))

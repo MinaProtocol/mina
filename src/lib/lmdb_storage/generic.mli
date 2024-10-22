@@ -34,6 +34,9 @@ module Read_only : functor (F_func : F) -> sig
   val get : env:t -> ('k, 'v) Db.t -> 'k -> 'v option
 
   val with_txn : f:(Db.getter -> 'r) -> t -> 'r option
+
+  val iter :
+    env:t -> ('k, 'v) Db.t -> f:('k -> 'v -> [< `Continue | `Stop ]) -> unit
 end
 
 module Read_write : functor (F_func : F) -> sig
@@ -49,9 +52,28 @@ module Read_write : functor (F_func : F) -> sig
 
   val set : env:t -> ('k, 'v) Db.t -> 'k -> 'v -> unit
 
+  val remove : env:t -> ('k, 'v) Db.t -> 'k -> unit
+
   val with_txn :
        ?perm:[ `Read | `Write ] Lmdb.perm
     -> f:(Db.getter -> Db.setter -> 'r)
     -> t
     -> 'r option
+
+  val iter_ro :
+    env:t -> ('k, 'v) Db.t -> f:('k -> 'v -> [< `Continue | `Stop ]) -> unit
+
+  val iter :
+       env:t
+    -> ('k, 'v) Db.t
+    -> f:
+         (   'k
+          -> 'v
+          -> [< `Continue
+             | `Remove_continue
+             | `Remove_stop
+             | `Stop
+             | `Update_continue of 'v
+             | `Update_stop of 'v ] )
+    -> unit
 end
