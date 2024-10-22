@@ -1,4 +1,4 @@
-use crate::WithLagrangeBasis;
+use crate::lagrange_basis::WithLagrangeBasis;
 use ark_poly::DenseUVPolynomial;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
 use paste::paste;
@@ -84,15 +84,9 @@ macro_rules! impl_srs {
                         .err()
                         .unwrap()
                 })?;
-
-                {
-                    // We're single-threaded, so it's safe to grab this pointer as mutable.
-                    // Do not try this at home.
-                    let srs = unsafe { &mut *((&**srs as *const SRS<$G>) as *mut SRS<$G>) as &mut SRS<$G> };
-                    srs.with_lagrange_basis(x_domain);
-                }
-
-                Ok(srs.get_lagrange_basis(x_domain)[i as usize].clone().into())
+                srs.with_lagrange_basis(x_domain);
+                let vec_polycomm = srs.get_lagrange_basis_from_domain_size(domain_size as usize);
+                Ok(vec_polycomm[i as usize].clone().into())
             }
 
             #[ocaml_gen::func]
@@ -101,10 +95,8 @@ macro_rules! impl_srs {
                 srs: $name,
                 log2_size: ocaml::Int,
             ) {
-                let ptr: &mut poly_commitment::srs::SRS<$G> =
-                    unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
                 let domain = EvaluationDomain::<$F>::new(1 << (log2_size as usize)).expect("invalid domain size");
-                ptr.with_lagrange_basis(domain);
+                srs.with_lagrange_basis(domain);
             }
 
             #[ocaml_gen::func]
