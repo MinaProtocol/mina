@@ -2,7 +2,8 @@
  (name transition_frontier_controller)
  (public_name transition_frontier_controller)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_mina))
+ (preprocess (pps ppx_version ppx_mina ppx_jane 
+ ))
  (libraries
    ;; opam libraries
    base
@@ -10,6 +11,8 @@
    core_kernel
    core
    ;; local libraries
+   lmdb_storage
+   unix_timestamp
    transition_frontier
    data_hash_lib
    mina_metrics
