@@ -165,7 +165,7 @@ let pipeline
                     , deb_profile = profile
                     , deb_repo = DebianRepo.Type.Local
                     , step_key =
-                        "daemon-berkeley-${DebianVersions.lowerName
+                        "daemon-devnet-${DebianVersions.lowerName
                                              debVersion}${Profiles.toLabelSegment
                                                             profile}-docker-image"
                     }
@@ -183,7 +183,7 @@ let pipeline
                     , depends_on =
                       [ { name = pipelineName
                         , key =
-                            "daemon-berkeley-${DebianVersions.lowerName
+                            "daemon-devnet-${DebianVersions.lowerName
                                                  debVersion}${Profiles.toLabelSegment
                                                                 profile}-docker-image"
                         }
@@ -203,7 +203,7 @@ let pipeline
                     , depends_on =
                       [ { name = pipelineName
                         , key =
-                            "daemon-berkeley-${DebianVersions.lowerName
+                            "daemon-devnet-${DebianVersions.lowerName
                                                  debVersion}${Profiles.toLabelSegment
                                                                 profile}-docker-image"
                         }

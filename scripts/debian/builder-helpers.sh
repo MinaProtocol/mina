@@ -169,7 +169,6 @@ copy_common_daemon_configs() {
   # Include all useful genesis ledgers
   cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/mainnet.json"
   cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
-  cp ../genesis_ledgers/berkeley.json "${BUILDDIR}/var/lib/coda/berkeley.json"
   # Set the default configuration based on Network name ($1)
   cp ../genesis_ledgers/${1}.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
   cp ../scripts/hardfork/create_runtime_config.sh "${BUILDDIR}/usr/local/bin/mina-hf-create-runtime-config"
