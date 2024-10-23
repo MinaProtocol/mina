@@ -4,23 +4,18 @@ let List/any = Prelude.List.any
 
 let Network
     : Type
-    = < Devnet | Mainnet | Berkeley >
+    = < Devnet | Mainnet >
 
 let capitalName =
           \(network : Network)
-      ->  merge
-            { Devnet = "Devnet", Mainnet = "Mainnet", Berkeley = "Berkeley" }
-            network
+      ->  merge { Devnet = "Devnet", Mainnet = "Mainnet" } network
 
 let lowerName =
           \(network : Network)
-      ->  merge
-            { Devnet = "devnet", Mainnet = "mainnet", Berkeley = "berkeley" }
-            network
+      ->  merge { Devnet = "devnet", Mainnet = "mainnet" } network
 
 let requiresMainnetBuild =
-          \(network : Network)
-      ->  merge { Devnet = True, Mainnet = True, Berkeley = False } network
+      \(network : Network) -> merge { Devnet = True, Mainnet = True } network
 
 let foldMinaBuildMainnetEnv =
           \(networks : List Network)

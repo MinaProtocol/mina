@@ -278,7 +278,7 @@ build_rosetta_mainnet_deb() {
   build_deb mina-rosetta-mainnet
 }
 
-##################################### ROSETTA MAINNET PACKAGE #######################################
+##################################### ROSETTA DEVNET PACKAGE #######################################
 build_rosetta_devnet_deb() {
  
   echo "------------------------------------------------------------"
@@ -290,20 +290,6 @@ build_rosetta_devnet_deb() {
   
   build_deb mina-rosetta-devnet
 }
-
-##################################### ROSETTA BERKELEY PACKAGE #######################################
-build_rosetta_berkeley_deb() {
- 
-  echo "------------------------------------------------------------"
-  echo "--- Building rosetta berkeley deb"
-
-  create_control_file mina-rosetta-berkeley "${SHARED_DEPS}" 'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
-
-  copy_common_rosetta_configs "testnet"
-  
-  build_deb mina-rosetta-berkeley
-}
-
 
 ##################################### MAINNET PACKAGE #######################################
 build_daemon_mainnet_deb() {
@@ -332,21 +318,6 @@ build_daemon_devnet_deb() {
   build_deb mina-devnet
 }
 ##################################### END DEVNET PACKAGE #######################################
-
-##################################### BERKELEY PACKAGE #######################################
-build_daemon_berkeley_deb() {
-  
-  echo "------------------------------------------------------------"
-  echo "--- Building Mina Berkeley testnet signatures deb without keys:"
-
-  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
-
-  copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
-
-  build_deb "${MINA_DEB_NAME}"
-
-}
-##################################### END BERKELEY PACKAGE #######################################
 
 ##################################### ARCHIVE PACKAGE ##########################################
 build_archive_deb () {
@@ -379,7 +350,7 @@ build_archive_deb () {
 ##################################### ZKAPP TEST TXN #######################################
 build_zkapp_test_transaction_deb () {
   echo "------------------------------------------------------------"
-  echo "--- Building Mina Berkeley ZkApp test transaction tool:"
+  echo "--- Building Mina Devnet ZkApp test transaction tool:"
 
   create_control_file mina-zkapp-test-transaction "${SHARED_DEPS}${DAEMON_DEPS}" 'Utility to generate ZkApp transactions in Mina GraphQL format'
 

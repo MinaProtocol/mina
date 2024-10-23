@@ -75,11 +75,10 @@ in  Pipeline.build
             }
         , Command.build
             Command.Config::{
-            , commands =
-              [ Cmd.run "scripts/merged-to-proof-systems.sh berkeley" ]
+            , commands = [ Cmd.run "scripts/merged-to-proof-systems.sh devnet" ]
             , label =
-                "[proof-systems] Check merges cleanly into proof-systems berkeley branch"
-            , key = "merged-to-proof-systems-berkeley"
+                "[proof-systems] Check merges cleanly into proof-systems devnet branch"
+            , key = "merged-to-proof-systems-devnet"
             , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Small
             , docker = Some Docker::{
