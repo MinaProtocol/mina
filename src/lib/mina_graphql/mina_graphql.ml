@@ -2670,9 +2670,8 @@ module Queries = struct
          participating in"
       ~typ:(non_null string)
       ~args:Arg.[]
-      ~resolve:(fun { ctx = mina; _ } () ->
-        let cfg = Mina_lib.config mina in
-        "mina:" ^ cfg.compile_config.network_id )
+      ~resolve:(fun _ () ->
+        "mina:" ^ Node_config.network )
 
   let signature_kind =
     field "signatureKind"
