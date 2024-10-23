@@ -45,15 +45,23 @@ esac
 
 # Add suffix to debian to distinguish different profiles (mainnet/devnet/lightnet)
 case "${DUNE_PROFILE}" in
-  devnet|mainnet)
-    MINA_DEB_NAME="mina-berkeley"
+  devnet)
+    MINA_DEB_NAME="mina-devnet"
     DEB_SUFFIX=""
    ;;
-  *)
+  mainnet)
+    MINA_DEB_NAME="mina-mainnet"
+    DEB_SUFFIX=""
+   ;;
+  lightnet)
     # use dune profile as suffix but replace underscore to dashes so deb builder won't complain
     _SUFFIX=${DUNE_PROFILE//_/-}
-    MINA_DEB_NAME="mina-berkeley-${_SUFFIX}"
+    MINA_DEB_NAME="mina-devnet-${_SUFFIX}"
     DEB_SUFFIX="-${_SUFFIX}"
+    ;;
+  *)
+    echo "Unsupported dune profile"
+    exit 1
     ;;
 esac
 
@@ -137,9 +145,9 @@ copy_common_daemon_configs() {
 
   echo "------------------------------------------------------------"
   echo "copy_common_daemon_configs inputs:"
-  echo "Network Name: ${1} (like mainnet, devnet, berkeley)"
+  echo "Network Name: ${1} (like mainnet, devnet)"
   echo "Signature Type: ${2} (mainnet or testnet)"
-  echo "Seed List URL path: ${3} (like seed-lists/berkeley_seeds.txt)"
+  echo "Seed List URL path: ${3} (like seed-lists/devnet_seeds.txt)"
 
   # Copy shared binaries
   cp ../src/app/libp2p_helper/result/bin/libp2p_helper "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
