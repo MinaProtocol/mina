@@ -163,6 +163,7 @@ let wrap_main
           , _
           , Field.t )
           Types.Wrap.Statement.In_circuit.t ) ->
+      let time_0 = Time.now () in
       let logger = Context_logger.get () in
       with_label __LOC__ (fun () ->
           let which_branch' =
@@ -537,6 +538,11 @@ let wrap_main
                  ({ prechallenge = { inner = x2 } } :
                    _ SC.t Bulletproof_challenge.t )
                -> with_label __LOC__ (fun () -> Field.Assert.equal x1 x2) ) ;
+
+          let time_1_inner = Time.now () in
+          printf
+            !"wrap_main inner took %f ms:\n%!"
+            (Time.Span.to_ms (Time.diff time_1_inner time_0)) ;
           () )
   in
   Timer.clock __LOC__ ;

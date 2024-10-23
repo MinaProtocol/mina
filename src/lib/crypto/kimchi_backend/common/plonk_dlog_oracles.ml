@@ -50,8 +50,21 @@ module Make (Inputs : Inputs_intf) = struct
 
   let create_with_public_evals vk prev_challenge input
       (pi : Proof.with_public_evals) =
+    let time_0 = Time.now () in
     let pi = Proof.to_backend_with_public_evals prev_challenge input pi in
-    Backend.create_with_public_evals vk pi
+    let time_1 = Time.now () in
+    let res = Backend.create_with_public_evals vk pi in
+    let time_2 = Time.now () in
+    printf
+      !"plonk_dlog_oracles#create_with_public_input took %f ms:\n\
+       \           1   %f\n\
+       \           2   %f\n\n\
+        %!"
+      (Time.Span.to_ms (Time.diff time_2 time_0))
+      (Time.Span.to_ms (Time.diff time_1 time_0))
+      (Time.Span.to_ms (Time.diff time_2 time_1)) ;
+
+    res
 
   open Backend
 

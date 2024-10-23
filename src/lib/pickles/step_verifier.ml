@@ -490,6 +490,7 @@ struct
          , _ )
          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t ) =
     with_label "incrementally_verify_proof" (fun () ->
+        let time_0 = Time.now () in
         let receive ty f =
           with_label "receive" (fun () ->
               let x = f messages in
@@ -510,6 +511,7 @@ struct
           Wrap_hack.Checked.pad_commitments sg_old
         in
         Vector.iter ~f:(absorb sponge PC) sg_old ;
+        let time_1 = Time.now () in
         let x_hat =
           with_label "x_hat" (fun () ->
               match domain with
@@ -532,6 +534,7 @@ struct
                 (Inner_curve.constant (Lazy.force Generators.h)) )
         in
         absorb sponge PC x_hat ;
+        let time_2 = Time.now () in
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
         let beta = sample () in
@@ -554,6 +557,7 @@ struct
 
            Then, in the other proof, we can witness the evaluations and check their correctness
            against "combined_inner_product" *)
+        let time_3 = Time.now () in
         let sigma_comm_init, [ _ ] =
           Vector.split m.sigma_comm
             (snd (Plonk_types.Permuts_minus_1.add Nat.N1.n))
@@ -565,6 +569,7 @@ struct
                 ~scale:scale_fast2 ~negate:Inner_curve.negate
                 ~verification_key:m ~plonk ~t_comm )
         in
+        let time_4 = Time.now () in
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)
              1. The polynomial commitments
@@ -600,6 +605,7 @@ struct
                 ~sponge:sponge_before_evaluations ~xi ~advice ~opening
                 ~polynomials:(without_degree_bound, []) )
         in
+        let time_5 = Time.now () in
         let joint_combiner = None in
         assert_eq_deferred_values
           { alpha = plonk.alpha
@@ -616,6 +622,24 @@ struct
           ; joint_combiner
           ; feature_flags = plonk.feature_flags
           } ;
+        let time_6 = Time.now () in
+        printf
+          !"step_verifier incrementally_verify_proof took %f ms:\n\
+           \           1   %f\n\
+           \           2   %f\n\
+           \           3   %f\n\
+           \           4   %f\n\
+           \           5   %f\n\
+           \           6   %f\n\n\
+            %!"
+          (Time.Span.to_ms (Time.diff time_6 time_0))
+          (Time.Span.to_ms (Time.diff time_1 time_0))
+          (Time.Span.to_ms (Time.diff time_2 time_1))
+          (Time.Span.to_ms (Time.diff time_3 time_2))
+          (Time.Span.to_ms (Time.diff time_4 time_3))
+          (Time.Span.to_ms (Time.diff time_5 time_4))
+          (Time.Span.to_ms (Time.diff time_6 time_5)) ;
+
         (sponge_digest_before_evaluations, bulletproof_challenges) )
 
   let compute_challenges ~scalar chals =
