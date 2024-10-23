@@ -44,7 +44,6 @@ S3_REGION_ARG='--s3-region=us-west-2'
 #>> Attempting to obtain a lock
 #/var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
 DEBS3_UPLOAD="deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
-  --fail-if-exists \
   --lock \
   --preserve-versions \
   --cache-control=max-age=120"
