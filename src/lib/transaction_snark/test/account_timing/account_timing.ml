@@ -1431,6 +1431,7 @@ let%test_module "account timing check" =
           in
           Transaction_snark.For_tests.multiple_transfers ~constraint_constants
             zkapp_command_spec
+          |> Zkapp_command.of_wire
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1502,6 +1503,7 @@ let%test_module "account timing check" =
           in
           Transaction_snark.For_tests.multiple_transfers ~constraint_constants
             zkapp_command_spec
+          |> Zkapp_command.of_wire
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1584,6 +1586,7 @@ let%test_module "account timing check" =
           in
           Transaction_snark.For_tests.multiple_transfers ~constraint_constants
             zkapp_command_spec
+          |> Zkapp_command.of_wire
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1680,7 +1683,8 @@ let%test_module "account timing check" =
 
       return
         ( ledger_init_state
-        , Async.Thread_safe.block_on_async_exn (fun () -> zkapp_command) )
+        , Async.Thread_safe.block_on_async_exn (fun () -> zkapp_command)
+          |> Zkapp_command.of_wire )
 
     let%test_unit "zkApp command, timed account creation, min_balance > balance"
         =
@@ -1802,6 +1806,7 @@ let%test_module "account timing check" =
           in
           Transaction_snark.For_tests.multiple_transfers ~constraint_constants
             zkapp_command_spec
+          |> Zkapp_command.of_wire
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1889,6 +1894,7 @@ let%test_module "account timing check" =
           in
           Transaction_snark.For_tests.multiple_transfers ~constraint_constants
             zkapp_command_spec
+          |> Zkapp_command.of_wire
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1966,6 +1972,7 @@ let%test_module "account timing check" =
           in
           Transaction_snark.For_tests.multiple_transfers ~constraint_constants
             zkapp_command_spec
+          |> Zkapp_command.of_wire
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -2044,6 +2051,7 @@ let%test_module "account timing check" =
           in
           Transaction_snark.For_tests.multiple_transfers ~constraint_constants
             zkapp_command_spec
+          |> Zkapp_command.of_wire
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -2125,6 +2133,7 @@ let%test_module "account timing check" =
           in
           Transaction_snark.For_tests.multiple_transfers ~constraint_constants
             zkapp_command_spec
+          |> Zkapp_command.of_wire
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -2201,6 +2210,7 @@ let%test_module "account timing check" =
           in
           Transaction_snark.For_tests.multiple_transfers ~constraint_constants
             zkapp_command_spec
+          |> Zkapp_command.of_wire
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -2276,7 +2286,8 @@ let%test_module "account timing check" =
         Quickcheck.Generator.return
           ( ledger_init_state
           , Async.Thread_safe.block_on_async_exn (fun () ->
-                create_timed_account_zkapp_command ) )
+                create_timed_account_zkapp_command )
+            |> Zkapp_command.of_wire )
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
           Async.Quickcheck.async_test

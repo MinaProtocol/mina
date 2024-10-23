@@ -44,7 +44,8 @@ module Diff_versioned = struct
     [@@@no_toplevel_latest_type]
 
     module V2 = struct
-      type t = User_command.Stable.V2.t list [@@deriving sexp, yojson, hash]
+      type t = User_command.Wire.Stable.V2.t list
+      [@@deriving sexp, yojson, hash]
 
       let to_latest = Fn.id
     end
@@ -58,7 +59,7 @@ module Diff_versioned = struct
      the checks) and [set_from_gossip_exn] (which just does the mutating the pool),
      and do the same for snapp commands as well.
   *)
-  type t = User_command.t list [@@deriving sexp, yojson]
+  type t = User_command.Wire.t list [@@deriving sexp, yojson]
 
   module Diff_error = struct
     [%%versioned
@@ -167,7 +168,7 @@ module Diff_versioned = struct
       [@@@no_toplevel_latest_type]
 
       module V3 = struct
-        type t = (User_command.Stable.V2.t * Diff_error.Stable.V3.t) list
+        type t = (User_command.Wire.Stable.V2.t * Diff_error.Stable.V3.t) list
         [@@deriving sexp, yojson, compare]
 
         let to_latest = Fn.id
@@ -823,12 +824,10 @@ struct
               ~time_controller ~slot_tx_end:config.Config.slot_tx_end
         ; locally_generated_uncommitted =
             Hashtbl.create
-              ( module Transaction_hash.User_command_with_valid_signature.Stable
-                       .Latest )
+              (module Transaction_hash.User_command_with_valid_signature.T)
         ; locally_generated_committed =
             Hashtbl.create
-              ( module Transaction_hash.User_command_with_valid_signature.Stable
-                       .Latest )
+              (module Transaction_hash.User_command_with_valid_signature.T)
         ; current_batch = 0
         ; remaining_in_batch = max_per_15_seconds
         ; config
@@ -944,7 +943,7 @@ struct
     type pool = t
 
     module Diff = struct
-      type t = User_command.t list [@@deriving sexp, yojson]
+      type t = User_command.Wire.t list [@@deriving sexp, yojson]
 
       let (_ : (t, Diff_versioned.t) Type_equal.t) = Type_equal.T
 
@@ -995,7 +994,7 @@ struct
       end
 
       module Rejected = struct
-        type t = (User_command.t * Diff_error.t) list
+        type t = (User_command.Wire.t * Diff_error.t) list
         [@@deriving sexp, yojson, compare]
 
         let (_ : (t, Diff_versioned.Rejected.t) Type_equal.t) = Type_equal.T
@@ -1008,6 +1007,7 @@ struct
       let reject_overloaded_diff (diff : verified) : rejected =
         List.map diff ~f:(fun cmd ->
             ( Transaction_hash.User_command_with_valid_signature.command cmd
+              |> User_command.to_wire
             , Diff_error.Overloaded ) )
 
       let empty = []
@@ -1080,7 +1080,8 @@ struct
             ()
 
       (** DO NOT mutate any transaction pool state in this function, you may only mutate in the synchronous `apply` function. *)
-      let verify (t : pool) (diff : t Envelope.Incoming.t) :
+      let verify_impl (t : pool) (diff : User_command.t list Envelope.Incoming.t)
+          :
           ( verified Envelope.Incoming.t
           , Intf.Verification_error.t )
           Deferred.Result.t =
@@ -1193,7 +1194,9 @@ struct
               "Failed to batch verify $transaction_pool_diff"
               ~metadata:
                 [ ( "transaction_pool_diff"
-                  , Diff_versioned.to_yojson (Envelope.Incoming.data diff) )
+                  , `List
+                      ( List.map ~f:User_command.to_yojson
+                      @@ Envelope.Incoming.data diff ) )
                 ] ;
             Deferred.Result.fail (Failure e)
         | Ok (Error invalid) ->
@@ -1222,6 +1225,11 @@ struct
                           Transaction_hash.User_command_with_valid_signature
                           .create
                   } )
+
+      let verify t diff_wire =
+        verify_impl t
+          (Envelope.Incoming.map diff_wire
+             ~f:(List.map ~f:User_command.of_wire) )
 
       let register_locally_generated t txn =
         Hashtbl.update t.locally_generated_uncommitted txn ~f:(function
@@ -1463,7 +1471,8 @@ struct
                    in
                    x -. Mina_metrics.time_offset_sec )) ) ;
             let forget_cmd =
-              Transaction_hash.User_command_with_valid_signature.command
+              Fn.compose User_command.to_wire
+                Transaction_hash.User_command_with_valid_signature.command
             in
             Ok
               ( decision
@@ -1526,7 +1535,10 @@ struct
           [%log internal] "%s" ("Transaction_diff_" ^ msg) ~metadata
 
       let t_of_verified =
-        List.map ~f:Transaction_hash.User_command_with_valid_signature.command
+        List.map
+          ~f:
+            (Fn.compose User_command.to_wire
+               Transaction_hash.User_command_with_valid_signature.command )
     end
 
     let get_rebroadcastable (t : t) ~has_timed_out =
@@ -1589,8 +1601,9 @@ struct
         |> List.map
              ~f:
                (List.map ~f:(fun (txn, _) ->
-                    Transaction_hash.User_command_with_valid_signature.command
-                      txn ) )
+                    User_command.to_wire
+                    @@ Transaction_hash.User_command_with_valid_signature
+                       .command txn ) )
       in
       rebroadcastable_txs
   end
@@ -2056,6 +2069,7 @@ let%test_module _ =
       let zkapp_command =
         Transaction_snark.For_tests.multiple_transfers ~constraint_constants
           test_spec
+        |> Zkapp_command.of_wire
       in
       let zkapp_command =
         Or_error.ok_exn
@@ -2156,11 +2170,11 @@ let%test_module _ =
       replace_valid_zkapp_command_authorizations ~keymap ~ledger:best_tip_ledger
         valid_zkapp_commands
 
-    type pool_apply = (User_command.t list, [ `Other of Error.t ]) Result.t
+    type pool_apply = (User_command.Wire.t list, [ `Other of Error.t ]) Result.t
     [@@deriving sexp, compare]
 
     let canonicalize t =
-      Result.map t ~f:(List.sort ~compare:User_command.compare)
+      Result.map t ~f:(List.sort ~compare:User_command.Wire.compare)
 
     let compare_pool_apply (t1 : pool_apply) (t2 : pool_apply) =
       compare_pool_apply (canonicalize t1) (canonicalize t2)
@@ -2170,7 +2184,10 @@ let%test_module _ =
         Result.map result ~f:(fun (_, accepted, _) -> accepted)
       in
       [%test_eq: pool_apply] accepted_commands
-        (Ok (List.map ~f:User_command.forget_check expected_commands))
+        (Ok
+           (List.map
+              ~f:User_command.(Fn.compose to_wire forget_check)
+              expected_commands ) )
 
     let mk_with_status (cmd : User_command.Valid.t) =
       { With_status.data = cmd; status = Applied }
@@ -2188,7 +2205,7 @@ let%test_module _ =
       in
       let tm0 = Time.now () in
       let%map verified =
-        Test.Resource_pool.Diff.verify test.txn_pool
+        Test.Resource_pool.Diff.verify_impl test.txn_pool
           (Envelope.Incoming.wrap
              ~data:(List.map ~f:User_command.forget_check cs)
              ~sender )
@@ -2207,7 +2224,7 @@ let%test_module _ =
               Core.Printf.printf
                 !"command was rejected because %s: %{Yojson.Safe}\n%!"
                 (Diff_versioned.Diff_error.to_string_name err)
-                (User_command.to_yojson cmd) )
+                (User_command.Wire.to_yojson cmd) )
       | Ok (`Reject, _, _) ->
           failwith "diff was rejected during application"
       | Error (`Other err) ->
@@ -2782,7 +2799,12 @@ let%test_module _ =
       let actual =
         Test.Resource_pool.get_rebroadcastable test.txn_pool
           ~has_timed_out:(Fn.const `Ok)
-        |> List.map ~f:(List.map ~f:Transaction_hash.User_command.create)
+        |> List.map
+             ~f:
+               (List.map
+                  ~f:
+                    (Fn.compose Transaction_hash.User_command.create
+                       User_command.of_wire ) )
       in
       if List.length actual > 1 then
         failwith "unexpected number of rebroadcastable diffs" ;
@@ -2833,7 +2855,7 @@ let%test_module _ =
       ignore
         ( Test.Resource_pool.get_rebroadcastable t.txn_pool
             ~has_timed_out:(Fn.const `Timed_out)
-          : User_command.t list list ) ;
+          : User_command.Wire.t list list ) ;
       assert_rebroadcastable t [] ;
       Deferred.unit
 
@@ -2931,6 +2953,7 @@ let%test_module _ =
       |> mk_zkapp_command ~memo:"" ~fee
            ~fee_payer_pk:(Public_key.compress fee_payer_kp.public_key)
            ~fee_payer_nonce:(Account.Nonce.of_int nonce)
+      |> Zkapp_command.of_wire
 
     let%test_unit "zkapp cmd with same nonce should replace previous submitted \
                    zkapp with same nonce" =
@@ -3101,7 +3124,7 @@ let%test_module _ =
               ~ledger:(Option.value_exn test.txn_pool.best_tip_ledger)
           in
           match%map
-            Test.Resource_pool.Diff.verify test.txn_pool
+            Test.Resource_pool.Diff.verify_impl test.txn_pool
               (Envelope.Incoming.wrap
                  ~data:
                    [ User_command.forget_check

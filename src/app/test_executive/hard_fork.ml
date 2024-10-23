@@ -365,12 +365,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let constraint_constants = Network.constraint_constants network in
       let%bind vk_proof =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+        @@ Transaction_snark.For_tests.update_states_wire ~constraint_constants
              spec_proof
       in
       let%map vk_impossible =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+        @@ Transaction_snark.For_tests.update_states_wire ~constraint_constants
              spec_impossible
       in
       (vk_proof, vk_impossible)

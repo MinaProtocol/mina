@@ -8,7 +8,7 @@ type lite = Lite
 module Node = struct
   type 'a t =
     | Full : Breadcrumb.t -> full t
-    | Lite : Mina_block.Validated.Stable.V2.t -> lite t
+    | Lite : Mina_block.Validated.t -> lite t
 end
 
 module Node_list = struct

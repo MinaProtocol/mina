@@ -109,4 +109,4 @@ val gen_max_cost_zkapp_command_from :
   -> vk:(Side_loaded_verification_key.t, State_hash.t) With_hash.Stable.V1.t
   -> genesis_constants:Genesis_constants.t
   -> unit
-  -> Zkapp_command.t Quickcheck.Generator.t
+  -> Zkapp_command.Wire.t Quickcheck.Generator.t

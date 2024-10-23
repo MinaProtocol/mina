@@ -111,6 +111,7 @@ let%test_module "Zkapp tokens tests" =
                         ]
                       |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
+                      |> Zkapp_command.of_wire
                     in
                     replace_authorizations ~keymap with_dummy_signatures
                   in
@@ -140,6 +141,7 @@ let%test_module "Zkapp tokens tests" =
                         ]
                       |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
+                      |> Zkapp_command.of_wire
                     in
                     replace_authorizations ~keymap with_dummy_signatures
                   in
@@ -171,6 +173,7 @@ let%test_module "Zkapp tokens tests" =
                         ]
                       |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
+                      |> Zkapp_command.of_wire
                     in
                     replace_authorizations ~keymap with_dummy_signatures
                   in
@@ -247,6 +250,7 @@ let%test_module "Zkapp tokens tests" =
                         ]
                       |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
+                      |> Zkapp_command.of_wire
                     in
                     replace_authorizations ~keymap with_dummy_signatures
                   in

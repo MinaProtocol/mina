@@ -73,14 +73,15 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
             List.iter user_commands ~f:(fun user_command ->
                 Pipe.write_without_pushback_if_open writer user_command ) ) )
   in
-  let update_block_subscriptions { With_hash.data = external_transition; hash }
-      transactions participants =
+  let update_block_subscriptions header completed_works hash transactions
+      participants =
     Set.iter participants ~f:(fun participant ->
         Hashtbl.find_and_call subscribed_block_users (Some participant)
           ~if_found:(fun pipes ->
             List.iter pipes ~f:(fun (_, writer) ->
                 let data =
-                  Filtered_external_transition.of_transition external_transition
+                  Filtered_external_transition.of_transition header
+                    completed_works
                     (`Some (Public_key.Compressed.Set.singleton participant))
                     transactions
                 in
@@ -91,7 +92,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
       ~if_found:(fun pipes ->
         List.iter pipes ~f:(fun (_, writer) ->
             let data =
-              Filtered_external_transition.of_transition external_transition
+              Filtered_external_transition.of_transition header completed_works
                 `All transactions
             in
             if not (Pipe.is_closed writer) then
@@ -116,7 +117,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
   O1trace.background_thread "process_new_block_subscriptions" (fun () ->
       Strict_pipe.Reader.iter new_blocks ~f:(fun new_block_validated ->
           let new_block = Mina_block.Validated.forget new_block_validated in
-          let new_block_no_hash = With_hash.data new_block in
+          let new_block_header, new_block_body = With_hash.data new_block in
           let hash = State_hash.With_state_hashes.state_hash new_block in
           (let path, _ = !precomputed_block_writer in
            match Broadcast_pipe.Reader.peek transition_frontier with
@@ -142,9 +143,9 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                             Transition_frontier.Breadcrumb.staged_ledger
                               breadcrumb
                           in
-                          Mina_block.Precomputed.of_block ~logger
+                          Mina_block.Precomputed.of_validated_block ~logger
                             ~constraint_constants ~staged_ledger ~scheduled_time
-                            new_block
+                            new_block_validated
                         in
                         [%log debug] "Precomputed block generated in $time ms"
                           ~metadata:
@@ -187,7 +188,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                      | Some _, Some network, Some bucket ->
                          let hash_string = State_hash.to_base58_check hash in
                          let height =
-                           Mina_block.blockchain_length new_block_no_hash
+                           Mina_block.Header.blockchain_length new_block_header
                            |> Mina_numbers.Length.to_string
                          in
                          let name =
@@ -259,24 +260,37 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                        [ ( "state_hash"
                          , `String (State_hash.to_base58_check hash) )
                        ; ( "protocol_state"
-                         , Mina_block.header new_block_no_hash
-                           |> Mina_block.Header.protocol_state
+                         , Mina_block.Header.protocol_state new_block_header
                            |> Mina_state.Protocol_state.value_to_yojson )
                        ] ) ) ;
+          let new_consensus_state =
+            Mina_block.Header.protocol_state new_block_header
+            |> Mina_state.Protocol_state.consensus_state
+          in
+          let new_completed_works =
+            Staged_ledger_diff.With_hashes_computed.completed_works
+              new_block_body
+          in
           match
-            Filtered_external_transition.validate_transactions
-              ~constraint_constants new_block_no_hash
+            let open Consensus.Data in
+            Staged_ledger.Pre_diff_info.get_transactions ~constraint_constants
+              ~coinbase_receiver:
+                (Consensus_state.coinbase_receiver new_consensus_state)
+              ~supercharge_coinbase:
+                (Consensus_state.supercharge_coinbase new_consensus_state)
+              new_block_body.diff
           with
           | Ok verified_transactions ->
               let unfiltered_external_transition =
                 lazy
-                  (Filtered_external_transition.of_transition new_block_no_hash
-                     `All verified_transactions )
+                  (Filtered_external_transition.of_transition new_block_header
+                     new_completed_works `All verified_transactions )
               in
               let filtered_external_transition =
                 if is_storing_all then Lazy.force unfiltered_external_transition
                 else
-                  Filtered_external_transition.of_transition new_block_no_hash
+                  Filtered_external_transition.of_transition new_block_header
+                    new_completed_works
                     (`Some
                       ( Public_key.Compressed.Set.of_list
                       @@ List.filter_opt (Hashtbl.keys subscribed_block_users)
@@ -289,9 +303,8 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
               in
               update_payment_subscriptions filtered_external_transition
                 participants ;
-              update_block_subscriptions
-                { With_hash.data = new_block_no_hash; hash }
-                verified_transactions participants ;
+              update_block_subscriptions new_block_header new_completed_works
+                hash verified_transactions participants ;
               Deferred.unit
           | Error e ->
               [%log error]

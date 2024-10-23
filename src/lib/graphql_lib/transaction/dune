@@ -17,6 +17,6 @@
    mina_base
    genesis_constants
  )
- (preprocess (pps ppx_jane ppx_version))
+ (preprocess (pps ppx_jane ppx_version ppx_mina))
  (instrumentation (backend bisect_ppx))
  (synopsis "Definitions required for graphql implementation"))

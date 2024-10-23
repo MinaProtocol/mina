@@ -164,7 +164,7 @@ module Make (Inputs : Intf.Inputs_intf) :
                   let init =
                     match
                       (Mina_base.Account_update.of_fee_payer
-                         zkapp_command.Mina_base.Zkapp_command.fee_payer )
+                         zkapp_command.Mina_base.Zkapp_command.T.fee_payer )
                         .authorization
                     with
                     | Proof _ ->

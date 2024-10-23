@@ -467,6 +467,20 @@ let cons ?calls (account_update : Account_update.t) xs =
   cons_aux ~digest_account_update:Digest.Account_update.create ?calls
     account_update xs
 
+module Unit = struct
+  let cons_tree tree (forest : _ t) : _ t =
+    { elt = tree; stack_hash = () } :: forest
+
+  let cons_aux (type p) ?(calls = []) (account_update : p) (xs : _ t) : _ t =
+    let tree : _ Tree.t =
+      { account_update; account_update_digest = (); calls }
+    in
+    cons_tree tree xs
+
+  let cons ?calls (account_update : Account_update.t) xs =
+    cons_aux ?calls account_update xs
+end
+
 let rec accumulate_hashes ~hash_account_update (xs : _ t) =
   let go = accumulate_hashes ~hash_account_update in
   match xs with

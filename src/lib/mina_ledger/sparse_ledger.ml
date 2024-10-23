@@ -192,7 +192,7 @@ let apply_zkapp_second_pass_unchecked_with_states ~init ledger c =
                   [will_succeed = true], so we must leave them unchanged.
                *)
                let will_succeed =
-                 match account_update_applied.Applied.command.status with
+                 match account_update_applied.Applied.T.command.status with
                  | Applied ->
                      true
                  | Failed _ ->

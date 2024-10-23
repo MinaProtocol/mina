@@ -252,8 +252,8 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                     | Ok diff, Some threshold ->
                         let net_return =
                           Option.value ~default:Currency.Amount.zero
-                            (Staged_ledger_diff.net_return ~constraint_constants
-                               ~supercharge_coinbase
+                            (Staged_ledger_diff.With_hashes_computed.net_return
+                               ~constraint_constants ~supercharge_coinbase
                                (Staged_ledger_diff.forget diff) )
                         in
                         if Currency.Amount.(net_return >= threshold) then
@@ -364,7 +364,9 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 in
                 let body_reference =
                   Staged_ledger_diff.Body.compute_reference
-                    (Body.create @@ Staged_ledger_diff.forget diff)
+                    ( Body.create
+                    @@ Staged_ledger_diff.With_hashes_computed.forget
+                    @@ Staged_ledger_diff.forget diff )
                 in
                 let blockchain_state =
                   (* We use the time of the beginning of the slot because if things
@@ -406,7 +408,9 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                     Internal_transition.create ~snark_transition
                       ~prover_state:
                         (Consensus.Data.Block_data.prover_state block_data)
-                      ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
+                      ~staged_ledger_diff:
+                        ( Staged_ledger_diff.With_hashes_computed.forget
+                        @@ Staged_ledger_diff.forget diff )
                       ~ledger_proof:
                         (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
                              proof ) ) )
@@ -652,9 +656,8 @@ end
 
 let validate_genesis_protocol_state_block ~genesis_state_hash (b, v) =
   Validation.validate_genesis_protocol_state ~genesis_state_hash
-    (With_hash.map ~f:Mina_block.header b, v)
-  |> Result.map
-       ~f:(Fn.flip Validation.with_body (Mina_block.body @@ With_hash.data b))
+    (With_hash.map ~f:fst b, v)
+  |> Result.map ~f:(Fn.flip Validation.with_body (snd @@ With_hash.data b))
 
 let log_bootstrap_mode ~logger () =
   [%log info] "Pausing block production while bootstrapping"
@@ -754,8 +757,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
         "Producing new block with parent $parent_hash%!" ;
       let previous_transition = Breadcrumb.block_with_hash crumb in
       let previous_protocol_state =
-        Header.protocol_state
-        @@ Mina_block.header (With_hash.data previous_transition)
+        Header.protocol_state @@ fst (With_hash.data previous_transition)
       in
       let%bind previous_protocol_state_proof =
         if
@@ -775,7 +777,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
         else
           return
             ( Header.protocol_state_proof
-            @@ Mina_block.header (With_hash.data previous_transition) )
+            @@ fst (With_hash.data previous_transition) )
       in
       [%log internal] "Get_transactions_from_pool" ;
       let transactions =
@@ -825,7 +827,10 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 (Consensus.Hooks.select
                    ~context:(module Context)
                    ~existing:
-                     (With_hash.map ~f:Mina_block.consensus_state
+                     (With_hash.map
+                        ~f:(fun (h, _) ->
+                          Protocol_state.consensus_state
+                          @@ Header.protocol_state h )
                         previous_transition )
                    ~candidate:consensus_state_with_hashes )
                 ~expect:`Take
@@ -886,11 +891,10 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 Validation.wrap
                   { With_hash.hash = protocol_state_hashes
                   ; data =
-                      (let body = Body.create staged_ledger_diff in
-                       Mina_block.create ~body
-                         ~header:
-                           (Header.create ~protocol_state ~protocol_state_proof
-                              ~delta_block_chain_proof () ) )
+                      ( Header.create ~protocol_state ~protocol_state_proof
+                          ~delta_block_chain_proof ()
+                      , Staged_ledger_diff.With_hashes_computed.compute
+                          staged_ledger_diff )
                   }
                 |> Validation.skip_time_received_validation
                      `This_block_was_not_received_via_gossip
@@ -906,7 +910,6 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 >>| Validation.skip_delta_block_chain_validation
                       `This_block_was_not_received_via_gossip
                 >>= Validation.validate_frontier_dependencies
-                      ~to_header:Mina_block.header
                       ~context:(module Context)
                       ~root_block:
                         ( Transition_frontier.root frontier
@@ -938,16 +941,16 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                          err )
               in
               let txs =
-                Mina_block.transactions ~constraint_constants
-                  (Breadcrumb.block breadcrumb)
+                Mina_block.Validated.transactions ~constraint_constants
+                  (Breadcrumb.validated_transition breadcrumb)
                 |> List.map ~f:Transaction.yojson_summary_with_status
               in
               [%log internal] "@block_metadata"
                 ~metadata:
                   [ ( "blockchain_length"
                     , Mina_numbers.Length.to_yojson
-                      @@ Mina_block.blockchain_length
-                      @@ Breadcrumb.block breadcrumb )
+                      @@ Mina_block.Header.blockchain_length
+                      @@ Breadcrumb.header breadcrumb )
                   ; ("transactions", `List txs)
                   ] ;
               [%str_log info]
@@ -1003,7 +1006,8 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                      transition frontier" ;
                   Deferred.map ~f:Result.return
                     (Mina_networking.broadcast_state net
-                       (Breadcrumb.block_with_hash breadcrumb) )
+                       ( Breadcrumb.block_with_hash breadcrumb
+                       |> Mina_block.forget_computed_hashes ) )
               | `Timed_out ->
                   (* FIXME #3167: this should be fatal, and more
                      importantly, shouldn't happen.
@@ -1408,15 +1412,17 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
           "Emitting precomputed block with parent $breadcrumb%!" ;
         let previous_transition = Breadcrumb.block_with_hash crumb in
         let previous_protocol_state =
-          Header.protocol_state
-          @@ Mina_block.header (With_hash.data previous_transition)
+          Header.protocol_state @@ fst (With_hash.data previous_transition)
         in
         Debug_assert.debug_assert (fun () ->
             [%test_result: [ `Take | `Keep ]]
               (Consensus.Hooks.select
                  ~context:(module Context)
                  ~existing:
-                   (With_hash.map ~f:Mina_block.consensus_state
+                   (With_hash.map
+                      ~f:(fun (h, _) ->
+                        Protocol_state.consensus_state
+                        @@ Header.protocol_state h )
                       previous_transition )
                  ~candidate:consensus_state_with_hashes )
               ~expect:`Take
@@ -1446,11 +1452,10 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
             Validation.wrap
               { With_hash.hash = protocol_state_hashes
               ; data =
-                  (let body = Body.create staged_ledger_diff in
-                   Mina_block.create ~body
-                     ~header:
-                       (Header.create ~protocol_state ~protocol_state_proof
-                          ~delta_block_chain_proof () ) )
+                  ( Header.create ~protocol_state ~protocol_state_proof
+                      ~delta_block_chain_proof ()
+                  , Staged_ledger_diff.With_hashes_computed.compute
+                      staged_ledger_diff )
               }
             |> Validation.skip_time_received_validation
                  `This_block_was_not_received_via_gossip
@@ -1466,7 +1471,6 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                       ~state_hash:(Some previous_protocol_state_hash)
                       previous_protocol_state )
             >>= Validation.validate_frontier_dependencies
-                  ~to_header:Mina_block.header
                   ~context:(module Context)
                   ~root_block:
                     ( Transition_frontier.root frontier

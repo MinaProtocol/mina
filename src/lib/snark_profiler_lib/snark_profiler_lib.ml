@@ -393,6 +393,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
              ~f:(fun i (account_updates : Account_update.Simple.t list) ->
                let p =
                  Zkapp_command.of_simple { simple_parties with account_updates }
+                 |> Zkapp_command.of_wire
                in
                let combination =
                  Transaction_key.of_zkapp_command ~constraint_constants ~ledger

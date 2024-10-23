@@ -11,3 +11,5 @@ module Stable = struct
     type 'a t = { message : 'a; nonce : int } [@@deriving compare, sexp, yojson]
   end
 end]
+
+let map ~f { message; nonce } = { message = f message; nonce }

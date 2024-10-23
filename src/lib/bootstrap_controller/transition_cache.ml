@@ -13,8 +13,7 @@ type element =
 let header_with_hash e =
   match e with
   | `Block b ->
-      With_hash.map ~f:Mina_block.header
-      @@ Mina_block.Validation.block_with_hash b
+      With_hash.map ~f:fst @@ Mina_block.Validation.block_with_hash b
   | `Header h ->
       Mina_block.Validation.header_with_hash h
 

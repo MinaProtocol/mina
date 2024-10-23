@@ -31,9 +31,9 @@ val hash_signed_command : Signed_command.t -> t
 
 val hash_signed_command_v1 : Signed_command.Stable.V1.t -> t
 
-val hash_zkapp_command : Zkapp_command.t -> t
+val hash_zkapp_command : Zkapp_command.Wire.t -> t
 
-val hash_command : User_command.t -> t
+val hash_command : User_command.Wire.t -> t
 
 val hash_fee_transfer : Fee_transfer.Single.t -> t
 
@@ -51,19 +51,12 @@ include Comparable.S with type t := t
 module User_command_with_valid_signature : sig
   type hash = t [@@deriving sexp, compare, hash, yojson]
 
-  [%%versioned:
-  module Stable : sig
-    [@@@no_toplevel_latest_type]
+  module T : sig
+    type t = private (User_command.Valid.t, hash) With_hash.t
+    [@@deriving sexp, compare, hash, to_yojson]
+  end
 
-    module V2 : sig
-      type t =
-        private
-        (User_command.Valid.Stable.V2.t, hash) With_hash.Stable.V1.t
-      [@@deriving sexp, compare, hash, to_yojson]
-    end
-  end]
-
-  type t = Stable.Latest.t [@@deriving sexp, compare, to_yojson]
+  type t = T.t [@@deriving sexp, compare, to_yojson]
 
   val create : User_command.Valid.t -> t
 
@@ -83,17 +76,8 @@ end
 module User_command : sig
   type hash = t [@@deriving sexp, compare, hash, yojson]
 
-  [%%versioned:
-  module Stable : sig
-    [@@@no_toplevel_latest_type]
-
-    module V2 : sig
-      type t = private (User_command.Stable.V2.t, hash) With_hash.Stable.V1.t
-      [@@deriving sexp, compare, hash, to_yojson]
-    end
-  end]
-
-  type t = Stable.Latest.t [@@deriving sexp, compare, to_yojson]
+  type t = private (User_command.t, hash) With_hash.t
+  [@@deriving sexp, compare, hash, to_yojson]
 
   val create : User_command.t -> t
 

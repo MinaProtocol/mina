@@ -8,7 +8,7 @@
 open Core_kernel
 open Mina_base
 
-let feepayer_body_generator = Zkapp_command.gen
+let feepayer_body_generator = Zkapp_command.Wire.gen
 
 let test_fee () =
   Quickcheck.test ~trials:50 feepayer_body_generator ~f:(fun x ->

@@ -401,7 +401,7 @@ let%test_module "Protocol state precondition tests" =
                     ; account_updates =
                         [ sender_account_update; snapp_account_update ]
                     }
-                    |> Zkapp_command.of_simple
+                    |> Zkapp_command.of_simple |> Zkapp_command.of_wire
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Mina_ledger.Ledger.Ledger_inner)
@@ -993,6 +993,7 @@ let%test_module "Account precondition tests" =
                   ; account_updates =
                       [ sender_account_update; snapp_account_update ]
                   }
+                |> Zkapp_command.of_wire
               in
               Mina_transaction_logic.For_tests.Init_ledger.init
                 (module Mina_ledger.Ledger.Ledger_inner)
