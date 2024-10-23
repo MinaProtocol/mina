@@ -35,6 +35,8 @@ macro_rules! impl_oracles {
                 index: $index,
                 proof: CamlProofWithPublic<$CamlG, $CamlF>,
             ) -> Result<CamlOracles<$CamlF>, ocaml::Error> {
+                use std::time::{Duration, Instant};
+                let time_0 = Instant::now();
                 let index: VerifierIndex<$G, OpeningProof<$G>> = index.into();
 
                 let lgr_comm: Vec<PolyComm<$G>> = lgr_comm
@@ -43,6 +45,8 @@ macro_rules! impl_oracles {
                     .map(Into::into)
                     .collect();
                 let lgr_comm_refs: Vec<_> = lgr_comm.iter().collect();
+
+                println!("oracles 1 {:.2?}", time_0.elapsed());
 
                 let p_comm = PolyComm::<$G>::multi_scalar_mul(
                     &lgr_comm_refs,
@@ -65,6 +69,7 @@ macro_rules! impl_oracles {
                         .unwrap()
                         .commitment
                 };
+                println!("oracles 2 {:.2?}", time_0.elapsed());
 
                 let (proof, public_input): (ProverProof<$G, OpeningProof<$G>>, Vec<$F>) = proof.into();
 
@@ -81,6 +86,7 @@ macro_rules! impl_oracles {
                     oracles_result.digest,
                     oracles_result.oracles,
                 );
+                println!("oracles 3 {:.2?}", time_0.elapsed());
 
                 sponge.absorb_fr(&[shift_scalar::<$G>(combined_inner_product)]);
 
@@ -91,12 +97,18 @@ macro_rules! impl_oracles {
                     .map(|x| x.0.into())
                     .collect();
 
-                Ok(CamlOracles {
+                println!("oracles 4 {:.2?}", time_0.elapsed());
+
+                let res = Ok(CamlOracles {
                     o: oracles.into(),
                     p_eval: (p_eval[0][0].into(), p_eval[1][0].into()),
                     opening_prechallenges,
                     digest_before_evaluations: digest.into(),
-                })
+                });
+
+                println!("oracles total {:.2?}", time_0.elapsed());
+
+                res
             }
 
             #[ocaml_gen::func]
