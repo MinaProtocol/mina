@@ -40,6 +40,8 @@ pub fn caml_pasta_fq_plonk_proof_create(
     prev_challenges: Vec<CamlFq>,
     prev_sgs: Vec<CamlGPallas>,
 ) -> Result<CamlProofWithPublic<CamlGPallas, CamlFq>, ocaml::Error> {
+    use std::time::{Duration, Instant};
+    let time_0 = Instant::now();
     {
         index
             .as_ref()
@@ -100,6 +102,9 @@ pub fn caml_pasta_fq_plonk_proof_create(
             &mut rand::rngs::OsRng,
         )
         .map_err(|e| ocaml::Error::Error(e.into()))?;
+
+        println!("pasta_fq_plonk_proof total {:.2?}", time_0.elapsed());
+
         Ok((proof, public_input).into())
     })
 }
