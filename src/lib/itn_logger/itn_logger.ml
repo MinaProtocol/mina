@@ -67,7 +67,16 @@ module Submit_internal_log = struct
       ~bin_response
 end
 
-let dispatch_remote_log log =
+type config =
+  { rpc_handshake_timeout : Time.Span.t
+  ; rpc_heartbeat_timeout : Time_ns.Span.t
+  ; rpc_heartbeat_send_every : Time_ns.Span.t
+  }
+[@@deriving bin_io_unversioned]
+
+(* dispatch log to daemon *)
+
+let dispatch_remote_log config log =
   let open Async.Deferred.Let_syntax in
   let rpc = Submit_internal_log.rpc in
   match daemon_where_to_connect () with
@@ -80,21 +89,11 @@ let dispatch_remote_log log =
   | Some where_to_connect -> (
       let%map res =
         Async.Rpc.Connection.with_client
-          ~handshake_timeout:
-            (Time.Span.of_sec
-               Node_config_unconfigurable_constants.rpc_handshake_timeout_sec )
+          ~handshake_timeout:config.rpc_handshake_timeout
           ~heartbeat_config:
             (Async.Rpc.Connection.Heartbeat_config.create
-               ~timeout:
-                 (Time_ns.Span.of_sec
-                    Node_config_unconfigurable_constants
-                    .rpc_heartbeat_timeout_sec )
-               ~send_every:
-                 (Time_ns.Span.of_sec
-                    Node_config_unconfigurable_constants
-                    .rpc_heartbeat_send_every_sec )
-               () )
-          where_to_connect
+               ~timeout:config.rpc_heartbeat_timeout
+               ~send_every:config.rpc_heartbeat_send_every () ) where_to_connect
           (fun conn -> Async.Rpc.Rpc.dispatch rpc conn log)
       in
       (* not ideal that errors are not themselves logged *)
@@ -110,13 +109,13 @@ let dispatch_remote_log log =
 
 (* Used to ensure that no more than one log message is in-flight at
    a time to guarantee sequential processing. *)
-let sequential_dispatcher_loop () =
+let sequential_dispatcher_loop config () =
   let open Async in
   let pipe_r, pipe_w = Pipe.create () in
-  don't_wait_for (Pipe.iter pipe_r ~f:dispatch_remote_log) ;
+  don't_wait_for (Pipe.iter pipe_r ~f:(dispatch_remote_log config)) ;
   pipe_w
 
-let sequential_log_writer_pipe = sequential_dispatcher_loop ()
+let sequential_log_writer_pipe config = sequential_dispatcher_loop config ()
 
 (* this function can be called:
    (1) by the logging process (daemon, verifier, or prover) from the logger in Logger, or
@@ -125,7 +124,7 @@ let sequential_log_writer_pipe = sequential_dispatcher_loop ()
    for (1), if the process is the verifier or prover, the log is forwarded by RPC
     to the daemon, resulting in a recursive call of type (2)
 *)
-let log ?process ~timestamp ~message ~metadata () =
+let log ?process ~timestamp ~message ~metadata ~config () =
   match get_process_kind () with
   | Some process ->
       (* prover or verifier, send log to daemon
@@ -136,7 +135,9 @@ let log ?process ~timestamp ~message ~metadata () =
         List.map metadata ~f:(fun (s, json) -> (s, Yojson.Safe.to_string json))
       in
       let remote_log = { timestamp; message; metadata; process } in
-      Async.Pipe.write_without_pushback sequential_log_writer_pipe remote_log
+      Async.Pipe.write_without_pushback
+        (sequential_log_writer_pipe config)
+        remote_log
   | None ->
       (* daemon *)
       (* convert JSON to Basic.t in queue, so we don't have to in GraphQL response *)
