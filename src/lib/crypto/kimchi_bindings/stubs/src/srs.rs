@@ -91,6 +91,8 @@ macro_rules! impl_srs {
                 domain_size: ocaml::Int,
                 i: ocaml::Int,
             ) -> Result<CamlPolyComm<$CamlG>, ocaml::Error> {
+                use std::time::Instant;
+                let time_0 = Instant::now();
                 let x_domain = EvaluationDomain::<$F>::new(domain_size as usize).ok_or_else(|| {
                     ocaml::Error::invalid_argument("CamlSRS::lagrange_commitment")
                         .err()
@@ -98,7 +100,10 @@ macro_rules! impl_srs {
                 })?;
                 srs.with_lagrange_basis(x_domain);
                 let vec_polycomm = srs.get_lagrange_basis_from_domain_size(domain_size as usize);
-                Ok(vec_polycomm[i as usize].clone().into())
+                println!("rust ..._lagrange_commitment 1 {:.2?}", time_0.elapsed());
+                let res = Ok(vec_polycomm[i as usize].clone().into());
+                println!("rust ..._lagrange_commitment total {:.2?}", time_0.elapsed());
+                res
             }
 
             #[ocaml_gen::func]
