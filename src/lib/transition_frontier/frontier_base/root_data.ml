@@ -67,7 +67,7 @@ end
 module Limited = struct
   [%%versioned
   module Stable = struct
-    module V3 = struct
+    module V4 = struct
       type t =
         { transition :
             Mina_block.Stable.V2.t State_hash.With_state_hashes.Stable.V1.t
@@ -79,6 +79,24 @@ module Limited = struct
         }
 
       let to_latest = Fn.id
+    end
+
+    (* TODO remove this type in a hardfork *)
+    module V3 = struct
+      type t =
+        { transition :
+            Mina_block.Stable.V2.t State_hash.With_state_hashes.Stable.V1.t
+            * State_hash.Stable.V1.t Mina_stdlib.Nonempty_list.Stable.V1.t
+        ; protocol_states :
+            Mina_state.Protocol_state.Value.Stable.V2.t
+            Mina_base.State_hash.With_state_hashes.Stable.V1.t
+            list
+        ; common : Common.Wire.Stable.V2.t
+        }
+
+      let to_latest : t -> V4.t =
+       fun { transition = transition, _; protocol_states; common } ->
+        { V4.transition; protocol_states; common }
     end
   end]
 

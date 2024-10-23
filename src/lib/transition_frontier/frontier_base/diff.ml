@@ -83,6 +83,16 @@ module Root_transition = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
+      module V5 = struct
+        type t =
+          { new_root : Root_data.Limited.Stable.V4.t
+          ; garbage : Node_list.Lite.Stable.V1.t
+          ; just_emitted_a_proof : bool
+          }
+
+        let to_latest = Fn.id
+      end
+
       module V4 = struct
         type t =
           { new_root : Root_data.Limited.Stable.V3.t
@@ -90,7 +100,12 @@ module Root_transition = struct
           ; just_emitted_a_proof : bool
           }
 
-        let to_latest = Fn.id
+        let to_latest : t -> V5.t =
+         fun { new_root; garbage; just_emitted_a_proof } ->
+          { V5.new_root = Root_data.Limited.Stable.V3.to_latest new_root
+          ; garbage
+          ; just_emitted_a_proof
+          }
       end
     end]
   end
@@ -101,17 +116,23 @@ module Root_transition = struct
       module Stable = struct
         [@@@no_toplevel_latest_type]
 
+        module V5 = struct
+          type t = Lite_binable.Stable.V5.t
+
+          let to_latest = Fn.id
+        end
+
         module V4 = struct
           type t = Lite_binable.Stable.V4.t
 
-          let to_latest = Fn.id
+          let to_latest = Lite_binable.Stable.V4.to_latest
         end
       end]
     end
 
     [%%versioned_binable
     module Stable = struct
-      module V4 = struct
+      module V5 = struct
         type t = lite root_transition
 
         module T_nonbinable = struct
@@ -123,12 +144,12 @@ module Root_transition = struct
                ; just_emitted_a_proof
                ; old_root_scan_state = Lite
                } :
-                t ) : Binable_arg.Stable.V4.t =
+                t ) : Binable_arg.Stable.V5.t =
             { new_root; garbage; just_emitted_a_proof }
 
           let of_binable
               ({ new_root; garbage; just_emitted_a_proof } :
-                Binable_arg.Stable.V4.t ) : t =
+                Binable_arg.Stable.V5.t ) : t =
             { new_root
             ; garbage
             ; old_root_scan_state = Lite
@@ -136,9 +157,25 @@ module Root_transition = struct
             }
         end
 
-        include Binable.Of_binable (Binable_arg.Stable.V4) (T_nonbinable)
+        include Binable.Of_binable (Binable_arg.Stable.V5) (T_nonbinable)
 
         let to_latest = Fn.id
+      end
+
+      module V4 = struct
+        type t = Binable_arg.Stable.V4.t
+
+        module T_nonbinable = struct
+          type nonrec t = t
+
+          let to_binable = Fn.id
+
+          let of_binable = Fn.id
+        end
+
+        include Binable.Of_binable (Binable_arg.Stable.V4) (T_nonbinable)
+
+        let to_latest = Binable_arg.Stable.V4.to_latest
       end
     end]
   end
