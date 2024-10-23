@@ -23,8 +23,14 @@ end
 module Limited : sig
   [%%versioned:
   module Stable : sig
-    module V3 : sig
+    module V4 : sig
       type t [@@deriving to_yojson]
+    end
+
+    module V3 : sig
+      type t
+
+      val to_latest : t -> V4.t
     end
   end]
 
