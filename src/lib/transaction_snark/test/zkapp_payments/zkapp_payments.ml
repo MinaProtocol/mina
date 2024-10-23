@@ -115,6 +115,7 @@ let%test_module "Zkapp payments tests" =
             ]
         ; memo
         }
+      |> Zkapp_command.of_wire
 
     let%test_unit "merkle_root_after_zkapp_command_exn_immutable" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -225,6 +226,7 @@ let%test_module "Zkapp payments tests" =
                   let zkapp_command =
                     Transaction_snark.For_tests.multiple_transfers
                       ~constraint_constants test_spec
+                    |> Zkapp_command.of_wire
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -292,6 +294,7 @@ let%test_module "Zkapp payments tests" =
                   let zkapp_command =
                     Transaction_snark.For_tests.multiple_transfers
                       ~constraint_constants test_spec
+                    |> Zkapp_command.of_wire
                   in
                   U.check_zkapp_command_with_merges_exn
                     ~expected_failure:

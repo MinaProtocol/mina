@@ -57,19 +57,16 @@ end
 let validate_block ~genesis_state_hash (b, v) =
   let open Mina_block.Validation in
   let open Result.Let_syntax in
-  let h = (With_hash.map ~f:Mina_block.header b, v) in
+  let h = (With_hash.map ~f:fst b, v) in
   validate_genesis_protocol_state ~genesis_state_hash h
   >>= validate_protocol_versions >>= validate_delta_block_chain
-  >>| Fn.flip with_body (Mina_block.body @@ With_hash.data b)
+  >>| Fn.flip with_body (snd @@ With_hash.data b)
 
 let validate_proofs_block ~verifier ~genesis_state_hash blocks =
   let open Mina_block.Validation in
   let open Deferred.Result.Let_syntax in
-  let f ((b, _), h) = with_body h (Mina_block.body @@ With_hash.data b) in
-  let hs =
-    List.map blocks ~f:(fun (b, v) ->
-        (With_hash.map ~f:Mina_block.header b, v) )
-  in
+  let f (({ With_hash.data = _, b; _ }, _), h) = with_body h b in
+  let hs = List.map blocks ~f:(fun (b, v) -> (With_hash.map ~f:fst b, v)) in
   validate_proofs ~verifier ~genesis_state_hash hs
   >>| List.zip_exn blocks >>| List.map ~f
 
@@ -143,7 +140,7 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
       in
       Error (Error.of_string "invalid delta transition chain witness")
   | Error `Invalid_protocol_version ->
-      let transition = Mina_block.Validation.block transition_with_hash in
+      let transition = Mina_block.Validation.header' transition_with_hash in
       let%map () =
         Trust_system.record_envelope_sender trust_system logger sender
           ( Trust_system.Actions.Sent_invalid_protocol_version
@@ -151,20 +148,19 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
               ( "Invalid current or proposed protocol version in catchup block"
               , [ ( "current_protocol_version"
                   , `String
-                      ( Mina_block.Header.current_protocol_version
-                          (Mina_block.header transition)
+                      ( Mina_block.Header.current_protocol_version transition
                       |> Protocol_version.to_string ) )
                 ; ( "proposed_protocol_version"
                   , `String
                       ( Mina_block.Header.proposed_protocol_version_opt
-                          (Mina_block.header transition)
+                          transition
                       |> Option.value_map ~default:"<None>"
                            ~f:Protocol_version.to_string ) )
                 ] ) )
       in
       Error (Error.of_string "invalid protocol version")
   | Error `Mismatched_protocol_version ->
-      let transition = Mina_block.Validation.block transition_with_hash in
+      let transition = Mina_block.Validation.header' transition_with_hash in
       let%map () =
         Trust_system.record_envelope_sender trust_system logger sender
           ( Trust_system.Actions.Sent_mismatched_protocol_version
@@ -173,8 +169,7 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
                  daemon protocol version"
               , [ ( "block_current_protocol_version"
                   , `String
-                      ( Mina_block.Header.current_protocol_version
-                          (Mina_block.header transition)
+                      ( Mina_block.Header.current_protocol_version transition
                       |> Protocol_version.to_string ) )
                 ; ( "daemon_current_protocol_version"
                   , `String Protocol_version.(to_string current) )
@@ -401,7 +396,8 @@ end
 
 (* returns a list of transitions with old ones comes first *)
 let download_transitions ~target_hash ~logger ~trust_system ~network
-    ~preferred_peer ~hashes_of_missing_transitions =
+    ~preferred_peer ~hashes_of_missing_transitions :
+    Mina_block.with_hash Envelope.Incoming.t list Deferred.Or_error.t =
   let busy = Peer.Hash_set.create () in
   Deferred.Or_error.List.concat_map
     (partition Transition_frontier.max_catchup_chunk_length
@@ -460,13 +456,13 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                       ]
                     "downloaded $n blocks from $peer" ;
                   let hashed_transitions =
-                    List.map transitions
-                      ~f:
-                        (With_hash.of_data
-                           ~hash_data:
-                             (Fn.compose Mina_state.Protocol_state.hashes
-                                (Fn.compose Mina_block.Header.protocol_state
-                                   Mina_block.header ) ) )
+                    List.map transitions ~f:(fun b ->
+                        let body = Mina_block.staged_ledger_diff_hashed b in
+                        With_hash.of_data
+                          ~hash_data:(fun (h, _) ->
+                            Mina_state.Protocol_state.hashes
+                            @@ Mina_block.Header.protocol_state h )
+                          (Mina_block.header b, body) )
                   in
                   if not @@ verify_against_hashes hashed_transitions hashes then (
                     let error_msg =
@@ -495,8 +491,9 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
       go [] )
 
 let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
-    ~trust_system ~verifier ~frontier ~unprocessed_transition_cache ~transitions
-    ~target_hash ~subtrees =
+    ~trust_system ~verifier ~frontier ~unprocessed_transition_cache
+    ~(transitions : Mina_block.with_hash Envelope.Incoming.t list) ~target_hash
+    ~subtrees =
   let open Context in
   let open Deferred.Or_error.Let_syntax in
   let verification_start_time = Core.Time.now () in
@@ -590,12 +587,11 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
         if List.length transitions <= 0 then
           Deferred.Or_error.return ([], target_hash)
         else
-          let oldest_missing_transition =
+          let oldest_missing_header, _ =
             List.hd_exn transitions |> Envelope.Incoming.data |> With_hash.data
           in
           let initial_state_hash =
-            oldest_missing_transition |> Mina_block.header
-            |> Mina_block.Header.protocol_state
+            Mina_block.Header.protocol_state oldest_missing_header
             |> Mina_state.Protocol_state.previous_state_hash
           in
           Deferred.Or_error.return (acc, initial_state_hash) )
@@ -688,7 +684,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                let blockchain_length_of_dangling_block =
                  List.hd_exn subtrees |> Rose_tree.root |> Tuple2.get1
                  |> Cached.peek |> Envelope.Incoming.data
-                 |> Mina_block.Validation.block |> Mina_block.blockchain_length
+                 |> Mina_block.Validation.header'
+                 |> Mina_block.Header.blockchain_length
                in
                Unsigned.UInt32.pred blockchain_length_of_dangling_block
              in
@@ -786,8 +783,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                                          "no common ancestor with our \
                                           transition frontier" )
                                    ; ( "protocol_state"
-                                     , Mina_block.Validation.block transition
-                                       |> Mina_block.header
+                                     , Mina_block.Validation.header' transition
                                        |> Mina_block.Header.protocol_state
                                        |> Mina_state.Protocol_state
                                           .value_to_yojson )
@@ -1032,11 +1028,9 @@ let%test_module "Ledger_catchup tests" =
       let catchup_breadcrumbs_are_best_tip_path =
         Rose_tree.equal (Rose_tree.of_list_exn target_best_tip_path)
           catchup_breadcrumbs ~f:(fun breadcrumb_tree1 breadcrumb_tree2 ->
-            Mina_block.Validated.equal
-              (Transition_frontier.Breadcrumb.validated_transition
-                 breadcrumb_tree1 )
-              (Transition_frontier.Breadcrumb.validated_transition
-                 breadcrumb_tree2 ) )
+            State_hash.equal
+              (Transition_frontier.Breadcrumb.state_hash breadcrumb_tree1)
+              (Transition_frontier.Breadcrumb.state_hash breadcrumb_tree2) )
       in
       if not catchup_breadcrumbs_are_best_tip_path then
         failwith

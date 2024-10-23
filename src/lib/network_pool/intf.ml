@@ -337,7 +337,7 @@ end
 module type Transaction_pool_diff_intf = sig
   type resource_pool
 
-  type t = User_command.t list [@@deriving sexp, of_yojson]
+  type t = User_command.Wire.t list [@@deriving sexp, of_yojson]
 
   module Diff_error : sig
     type t =
@@ -359,7 +359,7 @@ module type Transaction_pool_diff_intf = sig
   end
 
   module Rejected : sig
-    type t = (User_command.t * Diff_error.t) list [@@deriving sexp, yojson]
+    type t = (User_command.Wire.t * Diff_error.t) list [@@deriving sexp, yojson]
   end
 
   type Structured_log_events.t +=

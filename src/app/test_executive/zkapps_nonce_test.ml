@@ -174,8 +174,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         account_updates
         |> mk_zkapp_command ~memo:"invalid zkapp from fish1" ~fee:12_000_000
              ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 0)
+        |> Zkapp_command.of_wire
       in
-      replace_authorizations ~keymap with_dummy_signatures
+      Deferred.map ~f:Zkapp_command.to_wire
+      @@ replace_authorizations ~keymap with_dummy_signatures
     in
     (*Transaction that updates fee payer account in account_updates but passes
        because the nonce precondition is true. There should be no other fee
@@ -201,8 +203,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         account_updates
         |> mk_zkapp_command ~memo:"valid zkapp from fish1" ~fee:12_000_000
              ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 1)
+        |> Zkapp_command.of_wire
       in
-      replace_authorizations ~keymap with_dummy_signatures
+      Deferred.map ~f:Zkapp_command.to_wire
+      @@ replace_authorizations ~keymap with_dummy_signatures
     in
     (*Set fee payer send permission to Proof. New transactions with the same
       fee payer are accepted into the pool.
@@ -228,8 +232,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         |> mk_zkapp_command ~memo:"precondition zkapp from fish1"
              ~fee:12_000_000 ~fee_payer_pk:fish1_pk
              ~fee_payer_nonce:(Account.Nonce.of_int 2)
+        |> Zkapp_command.of_wire
       in
-      replace_authorizations ~keymap with_dummy_signatures
+      Deferred.map ~f:Zkapp_command.to_wire
+      @@ replace_authorizations ~keymap with_dummy_signatures
     in
     (*Transaction with fee payer update in account_updates. The account update
       should fail if the send permission is changed to Proof*)
@@ -251,8 +257,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         account_updates
         |> mk_zkapp_command ~memo:"valid zkapp from fish1" ~fee:12_000_000
              ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 3)
+        |> Zkapp_command.of_wire
       in
-      replace_authorizations ~keymap with_dummy_signatures
+      Deferred.map ~f:Zkapp_command.to_wire
+      @@ replace_authorizations ~keymap with_dummy_signatures
     in
     (*Transaction that doesn't make it into a block and should be evicted from
       the pool after fee payer's send permission is changed
@@ -271,8 +279,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         account_updates
         |> mk_zkapp_command ~memo:"valid zkapp from fish1" ~fee:2_000_000
              ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 4)
+        |> Zkapp_command.of_wire
       in
-      replace_authorizations ~keymap with_dummy_signatures
+      Deferred.map ~f:Zkapp_command.to_wire
+      @@ replace_authorizations ~keymap with_dummy_signatures
     in
     let snark_work_event_subscription =
       Event_router.on (event_router t) Snark_work_gossip ~f:(fun _ _ ->

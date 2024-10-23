@@ -154,7 +154,7 @@ module type Full = sig
 
     val of_zkapp_command_segment_exn :
          statement:Statement.With_sok.t
-      -> witness:Zkapp_command_segment.Witness.t
+      -> witness:Zkapp_command.t Zkapp_command_segment.Witness.t
       -> spec:Zkapp_command_segment.Basic.t
       -> t Async.Deferred.t
 
@@ -197,7 +197,7 @@ module type Full = sig
        * [ `Connecting_ledger_hash of Ledger_hash.t ]
        * Zkapp_command.t )
        list
-    -> ( Zkapp_command_segment.Witness.t
+    -> ( Zkapp_command.t Zkapp_command_segment.Witness.t
        * Zkapp_command_segment.Basic.t
        * Statement.With_sok.t )
        list
@@ -253,7 +253,7 @@ module type Full = sig
 
     module Zkapp_command_snark : sig
       val main :
-           ?witness:Zkapp_command_segment.Witness.t
+           ?witness:Zkapp_command.t Zkapp_command_segment.Witness.t
         -> Zkapp_command_segment.Spec.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> Statement.With_sok.var
@@ -286,7 +286,7 @@ module type Full = sig
       -> ?permissions:Permissions.t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Deploy_snapp_spec.t
-      -> Zkapp_command.t Async.Deferred.t
+      -> Zkapp_command.Wire.t Async.Deferred.t
 
     module Single_account_update_spec : sig
       type t =
@@ -360,12 +360,31 @@ module type Full = sig
       -> Update_states_spec.t
       -> Zkapp_command.t Async.Deferred.t
 
+    val update_states_wire :
+         ?receiver_auth:Control.Tag.t
+      -> ?zkapp_prover_and_vk:
+           ( unit
+           , unit
+           , unit
+           , Zkapp_statement.t
+           , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
+             Async.Deferred.t )
+           Pickles.Prover.t
+           * ( Pickles.Side_loaded.Verification_key.t
+             , Snark_params.Tick.Field.t )
+             With_hash.t
+             Async.Deferred.t
+      -> ?empty_sender:bool
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
+      -> Update_states_spec.t
+      -> Zkapp_command.Wire.t Async.Deferred.t
+
     val create_trivial_predicate_snapp :
          ?protocol_state_predicate:Zkapp_precondition.Protocol_state.t
       -> snapp_kp:Signature_lib.Keypair.t
       -> Mina_transaction_logic.For_tests.Transaction_spec.t
       -> Mina_ledger.Ledger.t
-      -> Zkapp_command.t Async.Deferred.t
+      -> Zkapp_command.Wire.t Async.Deferred.t
 
     val trivial_zkapp_account :
          ?permissions:Permissions.t
@@ -420,7 +439,7 @@ module type Full = sig
     val multiple_transfers :
          constraint_constants:Genesis_constants.Constraint_constants.t
       -> Multiple_transfers_spec.t
-      -> Zkapp_command.t
+      -> Zkapp_command.Wire.t
 
     val set_proof_cache : Pickles.Proof_cache.t -> unit
   end

@@ -507,7 +507,7 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
   let nonce = Account.Nonce.of_int nonce_int in
   let sender_pk = Public_key.compress sender.public_key in
   let receiver_pk = Public_key.compress receiver.public_key in
-  let zkapp_command_wire : Zkapp_command.Stable.Latest.Wire.t =
+  let zkapp_command_wire : Zkapp_command.Wire.Stable.Latest.t =
     { fee_payer =
         { Account_update.Fee_payer.body =
             { public_key = sender_pk; fee; nonce; valid_until = None }

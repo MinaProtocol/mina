@@ -52,7 +52,7 @@ val validated_transition : t -> Mina_block.Validated.t
 
 val block_with_hash : t -> Mina_block.with_hash
 
-val block : t -> Mina_block.t
+val header : t -> Mina_block.Header.t
 
 val staged_ledger : t -> Staged_ledger.t
 

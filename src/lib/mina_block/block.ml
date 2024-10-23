@@ -51,7 +51,10 @@ module Stable = struct
   end
 end]
 
-type with_hash = t State_hash.With_state_hashes.t [@@deriving sexp]
+type with_hash =
+  (Header.t * Staged_ledger_diff.With_hashes_computed.t)
+  State_hash.With_state_hashes.t
+[@@deriving sexp]
 
 let to_yojson t =
   `Assoc
@@ -73,11 +76,25 @@ let to_yojson t =
 
 [%%define_locally Stable.Latest.(create, header, body, t_of_sexp, sexp_of_t)]
 
-let wrap_with_hash block =
+let with_hash_to_yojson =
+  State_hash.With_state_hashes.to_yojson
+  @@ fun (h, b) ->
+  let body =
+    Staged_ledger_diff.With_hashes_computed.forget b
+    |> Staged_ledger_diff.Body.create
+  in
+  to_yojson @@ create ~header:h ~body
+
+let staged_ledger_diff_hashed b =
+  Staged_ledger_diff.With_hashes_computed.compute
+  @@ Staged_ledger_diff.Body.staged_ledger_diff b.body
+
+let wrap_with_hash block : with_hash =
   With_hash.of_data block
     ~hash_data:
       ( Fn.compose Protocol_state.hashes
       @@ Fn.compose Header.protocol_state header )
+  |> With_hash.map ~f:(fun b -> (b.header, staged_ledger_diff_hashed b))
 
 let timestamp block =
   block |> header |> Header.protocol_state |> Protocol_state.blockchain_state
@@ -90,21 +107,14 @@ let transactions ~constraint_constants block =
   let staged_ledger_diff =
     block |> body |> Staged_ledger_diff.Body.staged_ledger_diff
   in
-  let coinbase_receiver =
-    Consensus.Data.Consensus_state.coinbase_receiver consensus_state
-  in
-  let supercharge_coinbase =
-    Consensus.Data.Consensus_state.supercharge_coinbase consensus_state
-  in
-  Staged_ledger.Pre_diff_info.get_transactions ~constraint_constants
-    ~coinbase_receiver ~supercharge_coinbase staged_ledger_diff
-  |> Result.map_error ~f:Staged_ledger.Pre_diff_info.Error.to_error
-  |> Or_error.ok_exn
+  Staged_ledger.Pre_diff_info.get_transactions_exn ~constraint_constants
+    ~consensus_state staged_ledger_diff.diff
 
-let account_ids_accessed ~constraint_constants t =
-  let transactions = transactions ~constraint_constants t in
-  List.map transactions ~f:(fun { data = txn; status } ->
-      Mina_transaction.Transaction.account_access_statuses txn status )
-  |> List.concat
-  |> List.dedup_and_sort
-       ~compare:[%compare: Account_id.t * [ `Accessed | `Not_accessed ]]
+let block_of_header_and_body_with_hashes (header, body_hashed) =
+  create ~header
+    ~body:
+      ( Staged_ledger_diff.Body.create
+      @@ Staged_ledger_diff.With_hashes_computed.forget body_hashed )
+
+let forget_computed_hashes =
+  With_hash.map ~f:block_of_header_and_body_with_hashes

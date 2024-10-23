@@ -23,6 +23,7 @@ module State = struct
         "UNKOWN"
 end
 
+(* TODO consider using User_command.Wire.t as the parameter *)
 (* TODO: this is extremely expensive as implemented and needs to be replaced with an extension *)
 let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
   let resource_pool = Transaction_pool.resource_pool transaction_pool in

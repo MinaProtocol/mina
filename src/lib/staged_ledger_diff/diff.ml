@@ -167,7 +167,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       module V2 = struct
         type t =
           ( Transaction_snark_work.Stable.V2.t
-          , User_command.Stable.V2.t With_status.Stable.V2.t )
+          , User_command.Wire.Stable.V2.t With_status.Stable.V2.t )
           Pre_diff_two.Stable.V2.t
         [@@deriving equal, compare, sexp, yojson]
 
@@ -186,7 +186,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       module V2 = struct
         type t =
           ( Transaction_snark_work.Stable.V2.t
-          , User_command.Stable.V2.t With_status.Stable.V2.t )
+          , User_command.Wire.Stable.V2.t With_status.Stable.V2.t )
           Pre_diff_one.Stable.V2.t
         [@@deriving equal, compare, sexp, yojson]
 
@@ -230,6 +230,97 @@ module Make_str (A : Wire_types.Concrete) = struct
   type t = Stable.Latest.t = { diff : Diff.t }
   [@@deriving equal, compare, sexp, yojson, fields]
 
+  let coinbase_amount
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~supercharge_coinbase =
+    if supercharge_coinbase then
+      Currency.Amount.scale constraint_constants.coinbase_amount
+        constraint_constants.supercharged_coinbase_factor
+    else Some constraint_constants.coinbase_amount
+
+  let coinbase_of_diff_pair
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~supercharge_coinbase (first_pre_diff, second_pre_diff_opt) =
+    let coinbase_amount =
+      coinbase_amount ~constraint_constants ~supercharge_coinbase
+    in
+    match
+      ( first_pre_diff.Pre_diff_two.coinbase
+      , Option.value_map second_pre_diff_opt ~default:At_most_one.Zero
+          ~f:(fun d -> d.Pre_diff_one.coinbase) )
+    with
+    | At_most_two.Zero, At_most_one.Zero ->
+        Some Currency.Amount.zero
+    | _ ->
+        coinbase_amount
+
+  module With_hashes_computed = struct
+    type t =
+      { diff :
+          ( Transaction_snark_work.t
+          , User_command.t With_status.t )
+          Pre_diff_two.t
+          * ( Transaction_snark_work.t
+            , User_command.t With_status.t )
+            Pre_diff_one.t
+            option
+      }
+    [@@deriving equal, compare, sexp, yojson, fields]
+
+    let map ~f (two, one_opt) =
+      let f2 = With_status.map ~f in
+      ( Pre_diff_two.map ~f1:ident ~f2 two
+      , Option.map ~f:(Pre_diff_one.map ~f1:ident ~f2) one_opt )
+
+    let compute { Stable.Latest.diff } =
+      { diff = map ~f:User_command.of_wire diff }
+
+    let forget { diff } =
+      { Stable.Latest.diff = map ~f:User_command.to_wire diff }
+
+    let commands (t : t) =
+      (fst t.diff).commands
+      @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d -> d.commands)
+
+    let completed_works (t : t) =
+      (fst t.diff).completed_works
+      @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d ->
+            d.completed_works )
+
+    let empty_diff : t =
+      { diff =
+          ( { completed_works = []
+            ; commands = []
+            ; coinbase = At_most_two.Zero
+            ; internal_command_statuses = []
+            }
+          , None )
+      }
+
+    let net_return
+        ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+        ~supercharge_coinbase (t : t) =
+      let open Currency in
+      let open Option.Let_syntax in
+      let%bind coinbase =
+        coinbase_of_diff_pair ~constraint_constants ~supercharge_coinbase t.diff
+      in
+      let%bind total_reward =
+        List.fold
+          ~init:(Some (Amount.to_fee coinbase))
+          (commands t)
+          ~f:(fun sum cmd ->
+            let%bind sum = sum in
+            Fee.( + ) sum (User_command.fee (With_status.data cmd)) )
+      in
+      let%bind completed_works_fees =
+        List.fold ~init:(Some Fee.zero) (completed_works t) ~f:(fun sum work ->
+            let%bind sum = sum in
+            Fee.( + ) sum work.Transaction_snark_work.fee )
+      in
+      Amount.(of_fee total_reward - of_fee completed_works_fees)
+  end
+
   module With_valid_signatures_and_proofs = struct
     type pre_diff_with_at_most_two_coinbase =
       ( Transaction_snark_work.Checked.t
@@ -267,30 +358,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let forget_cw cw_list = List.map ~f:Transaction_snark_work.forget cw_list
 
-  let coinbase_amount
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~supercharge_coinbase =
-    if supercharge_coinbase then
-      Currency.Amount.scale constraint_constants.coinbase_amount
-        constraint_constants.supercharged_coinbase_factor
-    else Some constraint_constants.coinbase_amount
-
-  let coinbase
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~supercharge_coinbase t =
-    let first_pre_diff, second_pre_diff_opt = t.diff in
-    let coinbase_amount =
-      coinbase_amount ~constraint_constants ~supercharge_coinbase
-    in
-    match
-      ( first_pre_diff.coinbase
-      , Option.value_map second_pre_diff_opt ~default:At_most_one.Zero
-          ~f:(fun d -> d.coinbase) )
-    with
-    | At_most_two.Zero, At_most_one.Zero ->
-        Some Currency.Amount.zero
-    | _ ->
-        coinbase_amount
+  let coinbase ~constraint_constants ~supercharge_coinbase (t : t) =
+    coinbase_of_diff_pair ~constraint_constants ~supercharge_coinbase t.diff
 
   module With_valid_signatures = struct
     type pre_diff_with_at_most_two_coinbase =
@@ -312,25 +381,11 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     type t = { diff : diff } [@@deriving compare, sexp, to_yojson]
 
-    let coinbase
-        ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-        ~supercharge_coinbase (t : t) =
-      let first_pre_diff, second_pre_diff_opt = t.diff in
-      let coinbase_amount =
-        coinbase_amount ~constraint_constants ~supercharge_coinbase
-      in
-      match
-        ( first_pre_diff.coinbase
-        , Option.value_map second_pre_diff_opt ~default:At_most_one.Zero
-            ~f:(fun d -> d.coinbase) )
-      with
-      | At_most_two.Zero, At_most_one.Zero ->
-          Some Currency.Amount.zero
-      | _ ->
-          coinbase_amount
+    let coinbase ~constraint_constants ~supercharge_coinbase (t : t) =
+      coinbase_of_diff_pair ~constraint_constants ~supercharge_coinbase t.diff
   end
 
-  let validate_commands (t : t)
+  let validate_commands (t : With_hashes_computed.t)
       ~(check :
             User_command.t With_status.t list
          -> (User_command.Valid.t list, 'e) Result.t Async.Deferred.Or_error.t
@@ -392,9 +447,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let forget_pre_diff_with_at_most_two
       (pre_diff :
-        With_valid_signatures_and_proofs.pre_diff_with_at_most_two_coinbase ) :
-      Pre_diff_with_at_most_two_coinbase.t =
-    { completed_works = forget_cw pre_diff.completed_works
+        With_valid_signatures_and_proofs.pre_diff_with_at_most_two_coinbase ) =
+    { Pre_diff_two.completed_works = forget_cw pre_diff.completed_works
     ; commands =
         List.map
           ~f:(With_status.map ~f:User_command.forget_check)
@@ -416,7 +470,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     }
 
   let forget (t : With_valid_signatures_and_proofs.t) =
-    { diff =
+    { With_hashes_computed.diff =
         ( forget_pre_diff_with_at_most_two (fst t.diff)
         , Option.map (snd t.diff) ~f:forget_pre_diff_with_at_most_one )
     }
@@ -428,29 +482,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   let completed_works (t : t) =
     (fst t.diff).completed_works
     @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d -> d.completed_works)
-
-  let net_return
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~supercharge_coinbase (t : t) =
-    let open Currency in
-    let open Option.Let_syntax in
-    let%bind coinbase =
-      coinbase ~constraint_constants ~supercharge_coinbase t
-    in
-    let%bind total_reward =
-      List.fold
-        ~init:(Some (Amount.to_fee coinbase))
-        (commands t)
-        ~f:(fun sum cmd ->
-          let%bind sum = sum in
-          Fee.( + ) sum (User_command.fee (With_status.data cmd)) )
-    in
-    let%bind completed_works_fees =
-      List.fold ~init:(Some Fee.zero) (completed_works t) ~f:(fun sum work ->
-          let%bind sum = sum in
-          Fee.(sum + Transaction_snark_work.fee work) )
-    in
-    Amount.(of_fee total_reward - of_fee completed_works_fees)
 
   let empty_diff : t =
     { diff =

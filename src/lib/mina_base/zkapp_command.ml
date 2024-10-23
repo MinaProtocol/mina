@@ -17,16 +17,29 @@ module Graphql_repr = struct
   end]
 end
 
+module T = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'account_updates t =
+            'account_updates Mina_wire_types.Mina_base.Zkapp_command.V1.T.t =
+        { fee_payer : Account_update.Fee_payer.Stable.V1.t
+        ; account_updates : 'account_updates
+        ; memo : Signed_command_memo.Stable.V1.t
+        }
+      [@@deriving annot, sexp, compare, equal, hash, yojson, fields]
+
+      let to_latest = Fn.id
+    end
+  end]
+end
+
 module Simple = struct
   (* For easily constructing values *)
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
-        { fee_payer : Account_update.Fee_payer.Stable.V1.t
-        ; account_updates : Account_update.Simple.Stable.V1.t list
-        ; memo : Signed_command_memo.Stable.V1.t
-        }
+      type t = Account_update.Simple.Stable.V1.t list T.Stable.V1.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
@@ -37,163 +50,126 @@ end
 module Call_forest = Zkapp_call_forest_base
 module Digest = Call_forest.Digest
 
-module T = struct
-  [%%versioned_binable
+module Wire = struct
+  (* DO NOT DELETE VERSIONS!
+     so we can always get transaction hashes from old transaction ids
+     the version linter should be checking this
+
+     IF YOU CREATE A NEW VERSION:
+     update Transaction_hash.hash_of_transaction_id to handle it
+     add hash_zkapp_command_vn for that version
+  *)
+  [%%versioned
   module Stable = struct
     [@@@with_top_version_tag]
 
-    (* DO NOT DELETE VERSIONS!
-       so we can always get transaction hashes from old transaction ids
-       the version linter should be checking this
-
-       IF YOU CREATE A NEW VERSION:
-       update Transaction_hash.hash_of_transaction_id to handle it
-       add hash_zkapp_command_vn for that version
-    *)
-
     module V1 = struct
-      type t = Mina_wire_types.Mina_base.Zkapp_command.V1.t =
-        { fee_payer : Account_update.Fee_payer.Stable.V1.t
-        ; account_updates :
-            ( Account_update.Stable.V1.t
-            , Digest.Account_update.Stable.V1.t
-            , Digest.Forest.Stable.V1.t )
-            Call_forest.Stable.V1.t
-        ; memo : Signed_command_memo.Stable.V1.t
-        }
-      [@@deriving annot, sexp, compare, equal, hash, yojson, fields]
+      type t =
+        (Account_update.Stable.V1.t, unit, unit) Call_forest.Stable.V1.t
+        T.Stable.V1.t
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
-
-      module Wire = struct
-        [%%versioned
-        module Stable = struct
-          module V1 = struct
-            type t =
-              { fee_payer : Account_update.Fee_payer.Stable.V1.t
-              ; account_updates :
-                  ( Account_update.Stable.V1.t
-                  , unit
-                  , unit )
-                  Call_forest.Stable.V1.t
-              ; memo : Signed_command_memo.Stable.V1.t
-              }
-            [@@deriving sexp, compare, equal, hash, yojson]
-
-            let to_latest = Fn.id
-          end
-        end]
-
-        let of_graphql_repr (t : Graphql_repr.t) : t =
-          { fee_payer = t.fee_payer
-          ; memo = t.memo
-          ; account_updates =
-              Call_forest.of_account_updates_map t.account_updates
-                ~f:Account_update.of_graphql_repr
-                ~account_update_depth:(fun (p : Account_update.Graphql_repr.t)
-                                      -> p.body.call_depth )
-          }
-
-        let to_graphql_repr (t : t) : Graphql_repr.t =
-          { fee_payer = t.fee_payer
-          ; memo = t.memo
-          ; account_updates =
-              t.account_updates
-              |> Call_forest.to_account_updates_map
-                   ~f:(fun ~depth account_update ->
-                     Account_update.to_graphql_repr account_update
-                       ~call_depth:depth )
-          }
-
-        let gen =
-          let open Quickcheck.Generator in
-          let open Let_syntax in
-          let gen_call_forest =
-            fixed_point (fun self ->
-                let%bind calls_length = small_non_negative_int in
-                list_with_length calls_length
-                  (let%map account_update = Account_update.gen
-                   and calls = self in
-                   { With_stack_hash.stack_hash = ()
-                   ; elt =
-                       { Call_forest.Tree.account_update
-                       ; account_update_digest = ()
-                       ; calls
-                       }
-                   } ) )
-          in
-          let open Quickcheck.Let_syntax in
-          let%map fee_payer = Account_update.Fee_payer.gen
-          and account_updates = gen_call_forest
-          and memo = Signed_command_memo.gen in
-          { fee_payer; account_updates; memo }
-
-        let shrinker : t Quickcheck.Shrinker.t =
-          Quickcheck.Shrinker.create (fun t ->
-              let shape = Call_forest.shape t.account_updates in
-              Sequence.map
-                (Quickcheck.Shrinker.shrink
-                   Call_forest.Shape.quickcheck_shrinker shape )
-                ~f:(fun shape' ->
-                  { t with
-                    account_updates = Call_forest.mask t.account_updates shape'
-                  } ) )
-      end
-
-      let of_wire (w : Wire.t) : t =
-        { fee_payer = w.fee_payer
-        ; memo = w.memo
-        ; account_updates =
-            w.account_updates
-            |> Call_forest.accumulate_hashes
-                 ~hash_account_update:(fun (p : Account_update.t) ->
-                   Digest.Account_update.create p )
-        }
-
-      let to_wire (t : t) : Wire.t =
-        let rec forget_hashes = List.map ~f:forget_hash
-        and forget_hash = function
-          | { With_stack_hash.stack_hash = _
-            ; elt =
-                { Call_forest.Tree.account_update
-                ; account_update_digest = _
-                ; calls
-                }
-            } ->
-              { With_stack_hash.stack_hash = ()
-              ; elt =
-                  { Call_forest.Tree.account_update
-                  ; account_update_digest = ()
-                  ; calls = forget_hashes calls
-                  }
-              }
-        in
-        { fee_payer = t.fee_payer
-        ; memo = t.memo
-        ; account_updates = forget_hashes t.account_updates
-        }
-
-      include
-        Binable.Of_binable_without_uuid
-          (Wire.Stable.V1)
-          (struct
-            type nonrec t = t
-
-            let of_binable t = of_wire t
-
-            let to_binable = to_wire
-          end)
     end
   end]
+
+  let of_graphql_repr (t : Graphql_repr.t) : t =
+    { fee_payer = t.fee_payer
+    ; memo = t.memo
+    ; account_updates =
+        Call_forest.of_account_updates_map t.account_updates
+          ~f:Account_update.of_graphql_repr
+          ~account_update_depth:(fun (p : Account_update.Graphql_repr.t) ->
+            p.body.call_depth )
+    }
+
+  let to_graphql_repr (t : t) : Graphql_repr.t =
+    { fee_payer = t.fee_payer
+    ; memo = t.memo
+    ; account_updates =
+        t.account_updates
+        |> Call_forest.to_account_updates_map ~f:(fun ~depth account_update ->
+               Account_update.to_graphql_repr account_update ~call_depth:depth )
+    }
+
+  let gen =
+    let open Quickcheck.Generator in
+    let open Let_syntax in
+    let gen_call_forest =
+      fixed_point (fun self ->
+          let%bind calls_length = small_non_negative_int in
+          list_with_length calls_length
+            (let%map account_update = Account_update.gen and calls = self in
+             { With_stack_hash.stack_hash = ()
+             ; elt =
+                 { Call_forest.Tree.account_update
+                 ; account_update_digest = ()
+                 ; calls
+                 }
+             } ) )
+    in
+    let open Quickcheck.Let_syntax in
+    let%map fee_payer = Account_update.Fee_payer.gen
+    and account_updates = gen_call_forest
+    and memo = Signed_command_memo.gen in
+    { T.fee_payer; account_updates; memo }
+
+  let shrinker : t Quickcheck.Shrinker.t =
+    Quickcheck.Shrinker.create (fun t ->
+        let shape = Call_forest.shape t.T.account_updates in
+        Sequence.map
+          (Quickcheck.Shrinker.shrink Call_forest.Shape.quickcheck_shrinker
+             shape ) ~f:(fun shape' ->
+            { t with
+              account_updates = Call_forest.mask t.account_updates shape'
+            } ) )
+
+  include Codable.Make_base64 (Stable.Latest.With_top_version_tag)
 end
 
-include T
+module Hashed = struct
+  type t =
+    (Account_update.t, Digest.Account_update.t, Digest.Forest.t) Call_forest.t
+    T.t
+  [@@deriving sexp, compare, equal, hash, yojson]
 
-[%%define_locally Stable.Latest.(of_wire, to_wire)]
+  let of_wire (w : Wire.t) : t =
+    { fee_payer = w.fee_payer
+    ; memo = w.memo
+    ; account_updates =
+        w.account_updates
+        |> Call_forest.accumulate_hashes
+             ~hash_account_update:(fun (p : Account_update.t) ->
+               Digest.Account_update.create p )
+    }
 
-[%%define_locally Stable.Latest.Wire.(gen)]
+  let to_wire (t : t) : Wire.t =
+    let rec forget_hashes = List.map ~f:forget_hash
+    and forget_hash = function
+      | { With_stack_hash.stack_hash = _
+        ; elt =
+            { Call_forest.Tree.account_update
+            ; account_update_digest = _
+            ; calls
+            }
+        } ->
+          { With_stack_hash.stack_hash = ()
+          ; elt =
+              { Call_forest.Tree.account_update
+              ; account_update_digest = ()
+              ; calls = forget_hashes calls
+              }
+          }
+    in
+    { fee_payer = t.fee_payer
+    ; memo = t.memo
+    ; account_updates = forget_hashes t.account_updates
+    }
+end
 
-let of_simple (w : Simple.t) : t =
+include Hashed
+
+let of_simple (w : Simple.t) : Wire.t =
   { fee_payer = w.fee_payer
   ; memo = w.memo
   ; account_updates =
@@ -201,13 +177,10 @@ let of_simple (w : Simple.t) : t =
         ~account_update_depth:(fun (p : Account_update.Simple.t) ->
           p.body.call_depth )
       |> Call_forest.map ~f:Account_update.of_simple
-      |> Call_forest.accumulate_hashes
-           ~hash_account_update:(fun (p : Account_update.t) ->
-             Digest.Account_update.create p )
   }
 
-let to_simple (t : t) : Simple.t =
-  { fee_payer = t.fee_payer
+let to_simple t : Simple.t =
+  { fee_payer = t.T.fee_payer
   ; memo = t.memo
   ; account_updates =
       t.account_updates
@@ -243,9 +216,12 @@ let all_account_updates (t : t) : _ Call_forest.t =
   in
   Call_forest.cons fee_payer t.account_updates
 
-let fee (t : t) : Currency.Fee.t = t.fee_payer.body.fee
+let fee (t : (Account_update.t, _, _) Call_forest.t T.t) : Currency.Fee.t =
+  t.fee_payer.body.fee
 
-let fee_payer_account_update ({ fee_payer; _ } : t) = fee_payer
+let fee_payer_account_update
+    ({ fee_payer; _ } : (Account_update.t, _, _) Call_forest.t T.t) =
+  fee_payer
 
 let applicable_at_nonce (t : t) : Account.Nonce.t =
   (fee_payer_account_update t).body.nonce
@@ -272,13 +248,14 @@ let nonce_increments (t : t) : int Public_key.Compressed.Map.t =
           ~f:(Option.value_map ~default:1 ~f:(( + ) 1))
       else incr_map )
 
-let fee_token (_t : t) = Token_id.default
+let fee_token (_t : (Account_update.t, _, _) Call_forest.t T.t) =
+  Token_id.default
 
-let fee_payer (t : t) =
+let fee_payer (t : (Account_update.t, _, _) Call_forest.t T.t) =
   Account_id.create t.fee_payer.body.public_key (fee_token t)
 
 let extract_vks (t : t) : (Account_id.t * Verification_key_wire.t) List.t =
-  account_updates t
+  T.account_updates t
   |> Call_forest.fold ~init:[] ~f:(fun acc (p : Account_update.t) ->
          match Account_update.verification_key_update_to_option p with
          | Zkapp_basic.Set_or_keep.Set (Some vk) ->
@@ -286,11 +263,12 @@ let extract_vks (t : t) : (Account_id.t * Verification_key_wire.t) List.t =
          | _ ->
              acc )
 
-let account_updates_list (t : t) : Account_update.t list =
-  Call_forest.fold t.account_updates ~init:[] ~f:(Fn.flip List.cons) |> List.rev
+let account_updates_list t : Account_update.t list =
+  Call_forest.fold t.T.account_updates ~init:[] ~f:(Fn.flip List.cons)
+  |> List.rev
 
-let all_account_updates_list (t : t) : Account_update.t list =
-  Call_forest.fold t.account_updates
+let all_account_updates_list t : Account_update.t list =
+  Call_forest.fold t.T.account_updates
     ~init:[ Account_update.of_fee_payer (fee_payer_account_update t) ]
     ~f:(Fn.flip List.cons)
   |> List.rev
@@ -299,7 +277,8 @@ let fee_excess (t : t) =
   Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
 
 (* always `Accessed` for fee payer *)
-let account_access_statuses (t : t) (status : Transaction_status.t) =
+let account_access_statuses (t : (Account_update.t, _, _) Call_forest.t T.t)
+    (status : Transaction_status.t) =
   let init = [ (fee_payer t, `Accessed) ] in
   let status_sym =
     match status with Applied -> `Accessed | Failed _ -> `Not_accessed
@@ -308,7 +287,7 @@ let account_access_statuses (t : t) (status : Transaction_status.t) =
       (Account_update.account_id p, status_sym) :: acc )
   |> List.rev |> List.stable_dedup
 
-let accounts_referenced (t : t) =
+let accounts_referenced (t : (Account_update.t, _, _) Call_forest.t T.t) =
   List.map (account_access_statuses t Applied) ~f:(fun (acct_id, _status) ->
       acct_id )
 
@@ -436,7 +415,7 @@ module Verifiable : sig
     -> Verification_key_wire.t Account_id.Map.t
 
   val create :
-       T.t
+       Hashed.t
     -> failed:bool
     -> find_vk:
          (Zkapp_basic.F.t -> Account_id.t -> Verification_key_wire.t Or_error.t)
@@ -458,7 +437,9 @@ module Verifiable : sig
     module Command_wrapper : Command_wrapper_intf
 
     val create_all :
-      T.t Command_wrapper.t list -> cache -> t Command_wrapper.t list Or_error.t
+         Hashed.t Command_wrapper.t list
+      -> cache
+      -> t Command_wrapper.t list Or_error.t
   end
 
   module From_unapplied_sequence :
@@ -540,8 +521,8 @@ end = struct
    * subsequent account_updates use the replaced key instead of looking in the
    * ledger for the key (ie set by a previous transaction).
    *)
-  let create ({ fee_payer; account_updates; memo } : T.t) ~failed ~find_vk :
-      t Or_error.t =
+  let create ({ fee_payer; account_updates; memo } : Hashed.t) ~failed ~find_vk
+      : t Or_error.t =
     With_return.with_return (fun { return } ->
         let tbl = Account_id.Table.create () in
         let vks_overridden =
@@ -646,7 +627,9 @@ end = struct
     module Command_wrapper : Command_wrapper_intf
 
     val create_all :
-      T.t Command_wrapper.t list -> cache -> t Command_wrapper.t list Or_error.t
+         Hashed.t Command_wrapper.t list
+      -> cache
+      -> t Command_wrapper.t list Or_error.t
   end
 
   module Make_create_all
@@ -657,7 +640,7 @@ end = struct
        and type cache = Cache.t = struct
     type cache = Cache.t
 
-    let create_all (wrapped_cmds : T.t Command_wrapper.t list)
+    let create_all (wrapped_cmds : Hashed.t Command_wrapper.t list)
         (init_cache : Cache.t) : t Command_wrapper.t list Or_error.t =
       Or_error.try_with (fun () ->
           snd (* remove the helper cache we folded with *)
@@ -794,7 +777,7 @@ module Transaction_commitment = struct
   end
 end
 
-let account_updates_hash (t : t) = Call_forest.hash t.account_updates
+let account_updates_hash t = Call_forest.hash t.T.account_updates
 
 let commitment (t : t) : Transaction_commitment.t =
   Transaction_commitment.create ~account_updates_hash:(account_updates_hash t)
@@ -812,7 +795,7 @@ module Weight = struct
 end
 
 let weight (zkapp_command : t) : int =
-  let { fee_payer; account_updates; memo } = zkapp_command in
+  let T.{ fee_payer; account_updates; memo } = zkapp_command in
   List.sum
     (module Int)
     ~f:Fn.id
@@ -822,19 +805,14 @@ let weight (zkapp_command : t) : int =
     ]
 
 module type Valid_intf = sig
-  [%%versioned:
-  module Stable : sig
-    module V1 : sig
-      type t = private { zkapp_command : T.Stable.V1.t }
-      [@@deriving sexp, compare, equal, hash, yojson]
-    end
-  end]
+  type t = private { zkapp_command : Hashed.t }
+  [@@deriving sexp, compare, equal, hash, yojson]
 
   val to_valid_unsafe :
-    T.t -> [> `If_this_is_used_it_should_have_a_comment_justifying_it of t ]
+    Hashed.t -> [> `If_this_is_used_it_should_have_a_comment_justifying_it of t ]
 
   val to_valid :
-       T.t
+       Hashed.t
     -> failed:bool
     -> find_vk:
          (   Zkapp_basic.F.t
@@ -844,69 +822,40 @@ module type Valid_intf = sig
 
   val of_verifiable : Verifiable.t -> t
 
-  val forget : t -> T.t
+  val forget : t -> Hashed.t
 end
 
-module Valid :
-  Valid_intf
-    with type Stable.V1.t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V1.t =
-struct
-  module S = Stable
-
-  module Verification_key_hash = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t = Zkapp_basic.F.Stable.V1.t
-        [@@deriving sexp, compare, equal, hash, yojson]
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
-
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V1.t =
-        { zkapp_command : S.V1.t }
-      [@@deriving sexp, compare, equal, hash, yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
+module Valid : Valid_intf = struct
+  type t = { zkapp_command : Hashed.t }
+  [@@deriving sexp, compare, equal, hash, yojson]
 
   let create zkapp_command : t = { zkapp_command }
 
   let of_verifiable (t : Verifiable.t) : t = { zkapp_command = of_verifiable t }
 
-  let to_valid_unsafe (t : T.t) :
+  let to_valid_unsafe (t : Hashed.t) :
       [> `If_this_is_used_it_should_have_a_comment_justifying_it of t ] =
     `If_this_is_used_it_should_have_a_comment_justifying_it (create t)
 
-  let forget (t : t) : T.t = t.zkapp_command
+  let forget (t : t) : Hashed.t = t.zkapp_command
 
-  let to_valid (t : T.t) ~failed ~find_vk : t Or_error.t =
+  let to_valid (t : Hashed.t) ~failed ~find_vk : t Or_error.t =
     Verifiable.create t ~failed ~find_vk |> Or_error.map ~f:of_verifiable
 end
 
-[%%define_locally Stable.Latest.(of_yojson, to_yojson)]
-
 (* so transaction ids have a version tag *)
-include Codable.Make_base64 (Stable.Latest.With_top_version_tag)
-
 type account_updates =
   (Account_update.t, Digest.Account_update.t, Digest.Forest.t) Call_forest.t
 
 let account_updates_deriver obj =
   let of_zkapp_command_with_depth (ps : Account_update.Graphql_repr.t list) :
-      account_updates =
+      (Account_update.t, unit, unit) Call_forest.t =
     Call_forest.of_account_updates ps
       ~account_update_depth:(fun (p : Account_update.Graphql_repr.t) ->
         p.body.call_depth )
     |> Call_forest.map ~f:Account_update.of_graphql_repr
-    |> Call_forest.accumulate_hashes'
-  and to_zkapp_command_with_depth (ps : account_updates) :
+  and to_zkapp_command_with_depth
+      (ps : (Account_update.t, unit, unit) Call_forest.t) :
       Account_update.Graphql_repr.t list =
     ps
     |> Call_forest.to_account_updates_map ~f:(fun ~depth p ->
@@ -919,16 +868,17 @@ let account_updates_deriver obj =
 
 let deriver obj =
   let open Fields_derivers_zkapps.Derivers in
-  let ( !. ) = ( !. ) ~t_fields_annots in
-  Fields.make_creator obj
+  let ( !. ) = ( !. ) ~t_fields_annots:T.t_fields_annots in
+  T.Fields.make_creator obj
     ~fee_payer:!.Account_update.Fee_payer.deriver
     ~account_updates:!.account_updates_deriver
     ~memo:!.Signed_command_memo.deriver
-  |> finish "ZkappCommand" ~t_toplevel_annots
+  |> finish "ZkappCommand" ~t_toplevel_annots:T.t_toplevel_annots
 
 let arg_typ () = Fields_derivers_zkapps.(arg_typ (deriver @@ Derivers.o ()))
 
-let typ () = Fields_derivers_zkapps.(typ (deriver @@ Derivers.o ()))
+let typ () : (_, Wire.t) Fields_derivers_graphql.Schema.typ =
+  Fields_derivers_zkapps.(typ (deriver @@ Derivers.o ()))
 
 let to_json x = Fields_derivers_zkapps.(to_json (deriver @@ Derivers.o ())) x
 
@@ -958,8 +908,8 @@ let dummy =
        ; authorization = Signature.dummy
        }
      in
-     { fee_payer
-     ; account_updates = Call_forest.cons account_update []
+     { T.fee_payer
+     ; account_updates = Call_forest.Unit.cons account_update []
      ; memo = Signed_command_memo.empty
      } )
 
@@ -987,7 +937,7 @@ end) : sig
   end
 
   val group_by_zkapp_command_rev :
-       t list
+       (Account_update.t, _, _) Call_forest.t T.t list
     -> (Input.global_state * Input.local_state * Input.connecting_ledger_hash)
        list
        list
@@ -1028,7 +978,7 @@ end = struct
       will need to be passed as part of the snark witness while applying that
       pair.
   *)
-  let group_by_zkapp_command_rev (zkapp_commands : t list)
+  let group_by_zkapp_command_rev zkapp_commands
       (stmtss : (global_state * local_state * connecting_ledger_hash) list list)
       : Zkapp_command_intermediate_state.t list =
     let intermediate_state ~kind ~spec ~before ~after =
@@ -1043,7 +993,7 @@ end = struct
     in
     let zkapp_account_updatess =
       []
-      :: List.map zkapp_commands ~f:(fun (zkapp_command : t) ->
+      :: List.map zkapp_commands ~f:(fun zkapp_command ->
              all_account_updates_list zkapp_command )
     in
     let rec group_by_zkapp_command_rev
@@ -1329,8 +1279,8 @@ let zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments
    - when adding to the transaction pool
    - in incoming blocks
 *)
-let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
-    unit Or_error.t =
+let valid_size ~(genesis_constants : Genesis_constants.t)
+    (t : (Account_update.t, _, _) Call_forest.t T.t) : unit Or_error.t =
   let events_elements events =
     List.fold events ~init:0 ~f:(fun acc event -> acc + Array.length event)
   in
@@ -1407,7 +1357,7 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
     in
     Error (Error.of_string err_msg)
 
-let has_zero_vesting_period t =
+let has_zero_vesting_period (t : (Account_update.t, _, _) Call_forest.t T.t) =
   Call_forest.exists t.account_updates ~f:(fun p ->
       match p.body.update.timing with
       | Keep ->
@@ -1415,7 +1365,7 @@ let has_zero_vesting_period t =
       | Set { vesting_period; _ } ->
           Mina_numbers.Global_slot_span.(equal zero) vesting_period )
 
-let is_incompatible_version t =
+let is_incompatible_version (t : (Account_update.t, _, _) Call_forest.t T.t) =
   Call_forest.exists t.account_updates ~f:(fun p ->
       match p.body.update.permissions with
       | Keep ->
@@ -1423,8 +1373,8 @@ let is_incompatible_version t =
       | Set { set_verification_key = _auth, txn_version; _ } ->
           not Mina_numbers.Txn_version.(equal_to_current txn_version) )
 
-let get_transaction_commitments (zkapp_command : t) =
-  let memo_hash = Signed_command_memo.hash zkapp_command.memo in
+let get_transaction_commitments zkapp_command =
+  let memo_hash = Signed_command_memo.hash zkapp_command.T.memo in
   let fee_payer_hash =
     Account_update.of_fee_payer zkapp_command.fee_payer
     |> Digest.Account_update.create
@@ -1467,9 +1417,9 @@ module For_tests = struct
         }
     }
 
-  let replace_vks (t : t) vk =
+  let replace_vks t vk =
     { t with
-      account_updates = Call_forest.map t.account_updates ~f:(replace_vk vk)
+      T.account_updates = Call_forest.map t.T.account_updates ~f:(replace_vk vk)
     }
 end
 
@@ -1477,4 +1427,4 @@ let%test "latest zkApp version" =
   (* if this test fails, update `Transaction_hash.hash_of_transaction_id`
      for latest version, then update this test
   *)
-  Stable.Latest.version = 1
+  Wire.Stable.Latest.version = 1

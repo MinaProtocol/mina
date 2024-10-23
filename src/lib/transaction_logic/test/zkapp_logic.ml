@@ -66,7 +66,7 @@ let%test_module "Test transaction logic." =
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
             (Predicates.pure ~f:(fun (txn, ledger) ->
-                 Transaction_status.equal txn.command.status Applied
+                 Transaction_status.equal txn.T.command.status Applied
                  && Predicates.verify_balance_changes ~txn ~ledger accounts ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
@@ -100,7 +100,7 @@ let%test_module "Test transaction logic." =
                  String.is_substring (Error.to_string_hum e)
                    ~substring:"Overflow" )
                ~f:(fun (txn, _) ->
-                 Transaction_status.equal txn.command.status
+                 Transaction_status.equal txn.T.command.status
                    (Failed [ []; [ Overflow ]; [ Cancelled ] ]) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
@@ -128,7 +128,7 @@ let%test_module "Test transaction logic." =
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
             (Predicates.pure ~f:(fun (txn, _) ->
-                 Transaction_status.equal txn.command.status
+                 Transaction_status.equal txn.T.command.status
                    (Failed [ []; [ Invalid_fee_excess ] ]) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
@@ -154,7 +154,7 @@ let%test_module "Test transaction logic." =
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
             (Predicates.pure ~f:(fun (txn, _) ->
-                 Transaction_status.equal txn.command.status
+                 Transaction_status.equal txn.T.command.status
                    (Failed [ []; [ Invalid_fee_excess ] ]) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
@@ -176,7 +176,7 @@ let%test_module "Test transaction logic." =
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
             (Predicates.pure ~f:(fun (txn, ledger) ->
-                 Transaction_status.equal txn.command.status Applied
+                 Transaction_status.equal txn.T.command.status Applied
                  && Predicates.verify_account_updates (List.hd_exn accounts)
                       ~txn ~ledger ~f:(fun balance_change -> function
                       | Some orig, Some updt ->
@@ -208,7 +208,7 @@ let%test_module "Test transaction logic." =
                  let delegate_pk =
                    (Option.value_exn @@ List.nth accounts 1).pk
                  in
-                 Transaction_status.equal txn.command.status Applied
+                 Transaction_status.equal txn.T.command.status Applied
                  && Predicates.verify_account_updates delegator ~txn ~ledger
                       ~f:(fun _ -> function
                       | Some _, Some updt ->
@@ -249,7 +249,7 @@ let%test_module "Test transaction logic." =
           [%test_pred: Zk_cmd_result.t Or_error.t]
             (Predicates.pure ~f:(fun (txn, ledger) ->
                  let delegator = List.hd_exn accounts in
-                 Transaction_status.equal txn.command.status
+                 Transaction_status.equal txn.T.command.status
                    (Failed
                       [ []
                       ; [ Cancelled ]
@@ -292,7 +292,7 @@ let%test_module "Test transaction logic." =
           [%test_pred: Zk_cmd_result.t Or_error.t]
             (Predicates.pure ~f:(fun (txn, ledger) ->
                  let account = List.hd_exn accounts in
-                 Transaction_status.equal txn.command.status Applied
+                 Transaction_status.equal txn.T.command.status Applied
                  && Predicates.verify_account_updates ~txn ~ledger account
                       ~f:(fun _ -> function
                       | Some _, Some updt ->
@@ -352,7 +352,7 @@ let%test_module "Test transaction logic." =
           [%test_pred: Zk_cmd_result.t Or_error.t]
             (Predicates.pure ~f:(fun (txn, ledger) ->
                  let account = List.hd_exn accounts in
-                 Transaction_status.equal txn.command.status Applied
+                 Transaction_status.equal txn.T.command.status Applied
                  && Predicates.verify_account_updates account ~txn ~ledger
                       ~f:(fun _ -> function
                       | Some orig, Some updt ->
@@ -405,7 +405,7 @@ let%test_module "Test transaction logic." =
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
             (Predicates.pure ~f:(fun (txn, _ledger) ->
-                 Transaction_status.equal txn.command.status
+                 Transaction_status.equal txn.T.command.status
                    (Failed [ []; [ Source_minimum_balance_violation ] ]) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
@@ -424,7 +424,7 @@ let%test_module "Test transaction logic." =
           [%test_pred: Zk_cmd_result.t Or_error.t]
             (Predicates.pure ~f:(fun (txn, ledger) ->
                  let account = List.hd_exn accounts in
-                 Transaction_status.equal txn.command.status Applied
+                 Transaction_status.equal txn.T.command.status Applied
                  && Predicates.verify_account_updates account ~ledger ~txn
                       ~f:(fun _ -> function
                       | Some orig, Some updt ->
@@ -450,7 +450,7 @@ let%test_module "Test transaction logic." =
           [%test_pred: Zk_cmd_result.t Or_error.t]
             (Predicates.pure ~f:(fun (txn, ledger) ->
                  let account = List.hd_exn accounts in
-                 Transaction_status.equal txn.command.status Applied
+                 Transaction_status.equal txn.T.command.status Applied
                  && Predicates.verify_account_updates account ~txn ~ledger
                       ~f:(fun _ -> function
                       | Some _, Some updt ->
@@ -486,7 +486,7 @@ let%test_module "Test transaction logic." =
         ~f:(fun (fee_payer, fee, accounts, txns, zkapp_state) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
             (Predicates.pure ~f:(fun (txn, ledger) ->
-                 Transaction_status.equal txn.command.status Applied
+                 Transaction_status.equal txn.T.command.status Applied
                  && List.for_all accounts
                       ~f:
                         (Predicates.verify_account_updates ~ledger ~txn
@@ -546,7 +546,7 @@ let%test_module "Test transaction logic." =
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
             (Predicates.pure ~f:(fun (txn, _ledger) ->
-                 Transaction_status.equal txn.command.status
+                 Transaction_status.equal txn.T.command.status
                    (Failed
                       [ []
                       ; [ Cancelled ]
@@ -581,7 +581,7 @@ let%test_module "Test transaction logic." =
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
             (Predicates.pure ~f:(fun (txn, ledger) ->
-                 Transaction_status.equal txn.command.status
+                 Transaction_status.equal txn.T.command.status
                    (Failed
                       [ []
                       ; [ Cancelled ]
@@ -685,7 +685,7 @@ let%test_module "Test transaction logic." =
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
             (Predicates.pure ~f:(fun (txn, ledger) ->
-                 Transaction_status.equal txn.command.status Applied
+                 Transaction_status.equal txn.T.command.status Applied
                  && Predicates.verify_balance_changes ~txn ~ledger accounts ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
@@ -722,7 +722,7 @@ let%test_module "Test transaction logic." =
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
             (Predicates.pure ~f:(fun (txn, _ledger) ->
-                 Transaction_status.equal txn.command.status
+                 Transaction_status.equal txn.T.command.status
                    (Failed
                       [ []
                       ; [ Overflow ]
@@ -783,7 +783,7 @@ let%test_module "Test transaction logic." =
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
             (Predicates.pure ~f:(fun (txn, ledger) ->
-                 Transaction_status.equal txn.command.status Applied
+                 Transaction_status.equal txn.T.command.status Applied
                  && Predicates.verify_balance_changes ~ledger ~txn accounts ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
@@ -851,7 +851,7 @@ let%test_module "Test transaction logic." =
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
             (Predicates.pure ~f:(fun (txn, ledger) ->
-                 Transaction_status.equal txn.command.status
+                 Transaction_status.equal txn.T.command.status
                    (Failed
                       [ []
                       ; [ Cancelled ]

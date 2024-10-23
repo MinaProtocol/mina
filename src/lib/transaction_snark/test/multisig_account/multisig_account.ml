@@ -468,6 +468,7 @@ let%test_module "multisig_account" =
                       ]
                   ; memo
                   }
+                |> Zkapp_command.of_wire
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
               Async.Thread_safe.block_on_async_exn (fun () ->

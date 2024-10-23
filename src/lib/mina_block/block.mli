@@ -12,7 +12,10 @@ end]
 
 type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
-type with_hash = t State_hash.With_state_hashes.t [@@deriving sexp]
+type with_hash =
+  (Header.t * Staged_ledger_diff.With_hashes_computed.t)
+  State_hash.With_state_hashes.t
+[@@deriving sexp, to_yojson]
 
 (* TODO: interface for both unchecked and checked construction of blocks *)
 (* check version needs to run following checks:
@@ -33,9 +36,11 @@ val timestamp : t -> Block_time.t
 val transactions :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> t
-  -> Transaction.t With_status.t list
+  -> Transaction.Wire.t With_status.t list
 
-val account_ids_accessed :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> t
-  -> (Account_id.t * [ `Accessed | `Not_accessed ]) list
+val block_of_header_and_body_with_hashes :
+  Header.t * Staged_ledger_diff.With_hashes_computed.t -> t
+
+val forget_computed_hashes : with_hash -> t State_hash.With_state_hashes.t
+
+val staged_ledger_diff_hashed : t -> Staged_ledger_diff.With_hashes_computed.t

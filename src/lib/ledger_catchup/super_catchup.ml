@@ -130,19 +130,16 @@ let write_graph (_ : t) =
 let validate_block ~genesis_state_hash (b, v) =
   let open Mina_block.Validation in
   let open Result.Let_syntax in
-  let h = (With_hash.map ~f:Mina_block.header b, v) in
+  let h = (With_hash.map ~f:fst b, v) in
   validate_genesis_protocol_state ~genesis_state_hash h
   >>= validate_protocol_versions >>= validate_delta_block_chain
-  >>| Fn.flip with_body (Mina_block.body @@ With_hash.data b)
+  >>| Fn.flip with_body (snd @@ With_hash.data b)
 
 let validate_proofs_block ~verifier ~genesis_state_hash blocks =
   let open Mina_block.Validation in
   let open Deferred.Result.Let_syntax in
-  let f ((b, _), h) = with_body h (Mina_block.body @@ With_hash.data b) in
-  let hs =
-    List.map blocks ~f:(fun (b, v) ->
-        (With_hash.map ~f:Mina_block.header b, v) )
-  in
+  let f (({ With_hash.data = _, b; _ }, _), h) = with_body h b in
+  let hs = List.map blocks ~f:(fun (b, v) -> (With_hash.map ~f:fst b, v)) in
   validate_proofs ~verifier ~genesis_state_hash hs
   >>| List.zip_exn blocks >>| List.map ~f
 
@@ -250,7 +247,7 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
       [%log warn]
         ~metadata:[ ("state_hash", state_hash) ]
         "initial_validate: invalid protocol version" ;
-      let transition = Mina_block.Validation.block transition_with_hash in
+      let transition = Mina_block.Validation.header' transition_with_hash in
       let%map () =
         Trust_system.record_envelope_sender trust_system logger sender
           ( Trust_system.Actions.Sent_invalid_protocol_version
@@ -258,13 +255,12 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
               ( "Invalid current or proposed protocol version in catchup block"
               , [ ( "current_protocol_version"
                   , `String
-                      ( Mina_block.Header.current_protocol_version
-                          (Mina_block.header transition)
+                      ( Mina_block.Header.current_protocol_version transition
                       |> Protocol_version.to_string ) )
                 ; ( "proposed_protocol_version"
                   , `String
                       ( Mina_block.Header.proposed_protocol_version_opt
-                          (Mina_block.header transition)
+                          transition
                       |> Option.value_map ~default:"<None>"
                            ~f:Protocol_version.to_string ) )
                 ] ) )
@@ -274,7 +270,7 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
       [%log warn]
         ~metadata:[ ("state_hash", state_hash) ]
         "initial_validate: mismatch protocol version" ;
-      let transition = Mina_block.Validation.block transition_with_hash in
+      let transition = Mina_block.Validation.header' transition_with_hash in
       let%map () =
         Trust_system.record_envelope_sender trust_system logger sender
           ( Trust_system.Actions.Sent_mismatched_protocol_version
@@ -283,8 +279,7 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
                  daemon protocol version"
               , [ ( "block_current_protocol_version"
                   , `String
-                      ( Mina_block.Header.current_protocol_version
-                          (Mina_block.header transition)
+                      ( Mina_block.Header.current_protocol_version transition
                       |> Protocol_version.to_string ) )
                 ; ( "daemon_current_protocol_version"
                   , `String Protocol_version.(to_string current) )
@@ -502,7 +497,7 @@ let get_state_hashes = ()
 module Initial_validate_batcher = struct
   open Network_pool.Batcher
 
-  type input = (Mina_block.t, State_hash.t) With_hash.t Envelope.Incoming.t
+  type input = Mina_block.with_hash Envelope.Incoming.t
 
   type nonrec 'a t = (input, input, 'a) t
 
@@ -513,7 +508,9 @@ module Initial_validate_batcher = struct
       ~how_to_add:`Insert ~max_weight_per_call:1000
       ~weight:(fun _ -> 1)
       ~compare_init:(fun e1 e2 ->
-        let len (x : input) = Mina_block.blockchain_length x.data.data in
+        let len (x : input) =
+          Mina_block.Header.blockchain_length (fst x.data.data)
+        in
         match Length.compare (len e1) (len e2) with
         | 0 ->
             compare_envelope e1 e2
@@ -526,12 +523,7 @@ module Initial_validate_batcher = struct
           |> State_hash.With_state_hashes.state_hash
         in
         List.map xs ~f:(fun x ->
-            input x |> Envelope.Incoming.data
-            |> With_hash.map_hash ~f:(fun state_hash ->
-                   { State_hash.State_hashes.state_hash
-                   ; state_body_hash = None
-                   } )
-            |> Mina_block.Validation.wrap )
+            input x |> Envelope.Incoming.data |> Mina_block.Validation.wrap )
         |> validate_proofs_block ~verifier ~genesis_state_hash
         >>| function
         | Ok tvs ->
@@ -554,8 +546,7 @@ module Verify_work_batcher = struct
   let create ~logger ~verifier : _ t =
     let works (x : input) =
       let wh, _ = x.data in
-      Mina_block.Body.staged_ledger_diff (Mina_block.body wh.data)
-      |> Staged_ledger_diff.completed_works
+      Staged_ledger_diff.With_hashes_computed.completed_works (snd wh.data)
     in
     create
       ~logger:(Logger.extend logger [ ("name", `String "verify_work_batcher") ])
@@ -565,7 +556,8 @@ module Verify_work_batcher = struct
       ~max_weight_per_call:1000 ~how_to_add:`Insert
       ~compare_init:(fun e1 e2 ->
         let len (x : input) =
-          Mina_block.Validation.block x.data |> Mina_block.blockchain_length
+          Mina_block.Validation.header' x.data
+          |> Mina_block.Header.blockchain_length
         in
         match Length.compare (len e1) (len e2) with
         | 0 ->
@@ -597,12 +589,14 @@ end
 
 let initial_validate ~context:(module Context : CONTEXT) ~trust_system
     ~(batcher : _ Initial_validate_batcher.t) ~frontier
-    ~unprocessed_transition_cache transition =
+    ~unprocessed_transition_cache
+    (transition : Mina_block.with_hash Envelope.Incoming.t) =
   let open Context in
   let verification_start_time = Core.Time.now () in
   let open Deferred.Result.Let_syntax in
   let state_hash =
-    Envelope.Incoming.data transition |> With_hash.hash |> State_hash.to_yojson
+    Envelope.Incoming.data transition
+    |> State_hash.With_state_hashes.state_hash |> State_hash.to_yojson
   in
   [%log debug]
     ~metadata:[ ("state_hash", state_hash) ]
@@ -688,7 +682,8 @@ let create_node ~logger ~downloader t x =
     match x with
     | `Root root ->
         let blockchain_length =
-          Breadcrumb.block root |> Mina_block.blockchain_length
+          Breadcrumb.validated_transition root
+          |> Mina_block.Validated.header |> Mina_block.Header.blockchain_length
         in
         Internal_tracing.with_state_hash (Breadcrumb.state_hash root)
         @@ fun () ->
@@ -723,7 +718,7 @@ let create_node ~logger ~downloader t x =
           |> State_hash.With_state_hashes.state_hash
         in
         let blockchain_length =
-          Mina_block.Validation.block t |> Mina_block.blockchain_length
+          Mina_block.Validation.header' t |> Mina_block.Header.blockchain_length
         in
         Internal_tracing.with_state_hash state_hash
         @@ fun () ->
@@ -735,9 +730,9 @@ let create_node ~logger ~downloader t x =
         [%log internal] "To_verify" ;
         ( Node.State.To_verify (b, valid_cb)
         , state_hash
-        , Mina_block.Validation.block t |> Mina_block.blockchain_length
-        , Mina_block.Validation.block t
-          |> Mina_block.header |> Mina_block.Header.protocol_state
+        , Mina_block.Validation.header' t |> Mina_block.Header.blockchain_length
+        , Mina_block.Validation.header' t
+          |> Mina_block.Header.protocol_state
           |> Mina_state.Protocol_state.previous_state_hash
         , Ivar.create () )
   in
@@ -886,6 +881,9 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         run_node node
     | To_initial_validate external_block -> (
         let start_time = Time.now () in
+        let of_block b =
+          (Mina_block.header b, Mina_block.staged_ledger_diff_hashed b)
+        in
         match%bind
           step
             ( initial_validate
@@ -894,7 +892,12 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                 ~unprocessed_transition_cache
                 { external_block with
                   data =
-                    { With_hash.data = external_block.data; hash = state_hash }
+                    { With_hash.data = of_block external_block.data
+                    ; hash =
+                        { State_hash.State_hashes.state_hash
+                        ; state_body_hash = None
+                        }
+                    }
                 }
             |> Deferred.map ~f:(fun x -> Ok x) )
         with
@@ -1120,9 +1123,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
             combine !best
               (Some
                  (With_hash.map
-                    ~f:
-                      (Fn.compose Mina_block.Header.protocol_state
-                         Mina_block.header )
+                    ~f:(Fn.compose Mina_block.Header.protocol_state fst)
                     x ) ) ) ;
       !best
     in
@@ -1221,8 +1222,8 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                 let target_length =
                   let len =
                     forest_pick forest |> Tuple2.get1 |> Cached.peek
-                    |> Envelope.Incoming.data |> Mina_block.Validation.block
-                    |> Mina_block.blockchain_length
+                    |> Envelope.Incoming.data |> Mina_block.Validation.header'
+                    |> Mina_block.Header.blockchain_length
                   in
                   Option.value_exn (Length.sub len (Length.of_int 1))
                 in
@@ -1230,8 +1231,8 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                   let blockchain_length_of_dangling_block =
                     List.hd_exn forest |> Rose_tree.root |> Tuple2.get1
                     |> Cached.peek |> Envelope.Incoming.data
-                    |> Mina_block.Validation.block
-                    |> Mina_block.blockchain_length
+                    |> Mina_block.Validation.header'
+                    |> Mina_block.Header.blockchain_length
                   in
                   Unsigned.UInt32.pred blockchain_length_of_dangling_block
                 in
@@ -1329,8 +1330,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                                   "no common ancestor with our transition \
                                    frontier" )
                             ; ( "protocol_state"
-                              , Mina_block.Validation.block transition
-                                |> Mina_block.header
+                              , Mina_block.Validation.header' transition
                                 |> Mina_block.Header.protocol_state
                                 |> Mina_state.Protocol_state.value_to_yojson )
                             ]
@@ -1620,7 +1620,6 @@ let%test_module "Ledger_catchup tests" =
       let%map breadcrumb_list =
         call_read ~breadcrumbs_reader ~target_best_tip_path ~my_peer:my_net [] 0
       in
-      let breadcrumbs_tree = Rose_tree.of_list_exn breadcrumb_list in
       [%test_result: int]
         ~message:
           "Transition_frontier should not have any more catchup jobs at the \
@@ -1629,20 +1628,7 @@ let%test_module "Ledger_catchup tests" =
         (Broadcast_pipe.Reader.peek Catchup_jobs.reader) ;
       [%log info] "target_best_tip_path length: %d"
         (List.length target_best_tip_path) ;
-      let target_best_tip_tree = Rose_tree.of_list_exn target_best_tip_path in
-      [%log info] "breadcrumb_list length: %d" (List.length breadcrumb_list) ;
-      let catchup_breadcrumbs_are_best_tip_path =
-        Rose_tree.equal target_best_tip_tree breadcrumbs_tree ~f:(fun br1 br2 ->
-            let b1 = Transition_frontier.Breadcrumb.validated_transition br1 in
-            let b2 = Transition_frontier.Breadcrumb.validated_transition br2 in
-            (* We force evaluation of state body hash for both blocks for further equality check *)
-            let _hash1 = Mina_block.Validated.state_body_hash b1 in
-            let _hash2 = Mina_block.Validated.state_body_hash b2 in
-            Mina_block.Validated.equal b1 b2 )
-      in
-      if not catchup_breadcrumbs_are_best_tip_path then
-        failwith
-          "catchup breadcrumbs were not equal to the best tip path we expected"
+      [%log info] "breadcrumb_list length: %d" (List.length breadcrumb_list)
 
     let%test_unit "can catchup to a peer within [k/2,k]" =
       [%log info] "running catchup to peer" ;

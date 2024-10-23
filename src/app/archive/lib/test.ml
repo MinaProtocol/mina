@@ -62,7 +62,7 @@ let%test_module "Archive node unit tests" =
       Mina_state.Protocol_state.Body.view genesis_state_body
 
     let user_command_zkapp_gen :
-        ('a, Zkapp_command.t) User_command.t_ Base_quickcheck.Generator.t =
+        ('a, Zkapp_command.Wire.t) User_command.t_ Base_quickcheck.Generator.t =
       let open Base_quickcheck.Generator.Let_syntax in
       let%bind initial_balance =
         Base_quickcheck.Generator.int64_uniform_inclusive 200_000_000_000_000L
@@ -115,7 +115,7 @@ let%test_module "Archive node unit tests" =
           ~protocol_state_view:genesis_state_view ~constraint_constants
           ~genesis_constants ()
       in
-      User_command.Zkapp_command zkapp_command
+      User_command.Zkapp_command (Zkapp_command.to_wire zkapp_command)
 
     let fee_transfer_gen =
       Fee_transfer.Single.Gen.with_random_receivers ~min_fee:0 ~max_fee:10
@@ -132,7 +132,7 @@ let%test_module "Archive node unit tests" =
       let conn = Lazy.force conn_lazy in
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      Async.Quickcheck.async_test ~sexp_of:[%sexp_of: User_command.t]
+      Async.Quickcheck.async_test ~sexp_of:[%sexp_of: User_command.Wire.t]
         user_command_signed_gen ~f:(fun user_command ->
           let transaction_hash = Transaction_hash.hash_command user_command in
           match%map
@@ -162,19 +162,17 @@ let%test_module "Archive node unit tests" =
       let conn = Lazy.force conn_lazy in
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      Async.Quickcheck.async_test ~trials:20 ~sexp_of:[%sexp_of: User_command.t]
-        user_command_zkapp_gen ~f:(fun user_command ->
+      Async.Quickcheck.async_test ~trials:20
+        ~sexp_of:[%sexp_of: User_command.Wire.t] user_command_zkapp_gen
+        ~f:(fun user_command ->
           let transaction_hash = Transaction_hash.hash_command user_command in
           match user_command with
           | Signed_command _ ->
               failwith "zkapp_gen failed"
           | Zkapp_command p -> (
               let rec add_token_owners
-                  (forest :
-                    ( Account_update.t
-                    , Zkapp_command.Digest.Account_update.t
-                    , Zkapp_command.Digest.Forest.t )
-                    Zkapp_command.Call_forest.t ) =
+                  (forest : (Account_update.t, _, _) Zkapp_command.Call_forest.t)
+                  =
                 List.iter forest ~f:(fun { With_stack_hash.elt = tree; _ } ->
                     if List.is_empty tree.calls then ()
                     else

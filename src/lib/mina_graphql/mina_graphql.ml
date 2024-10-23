@@ -391,8 +391,8 @@ module Mutations = struct
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
 
-  let mock_zkapp_command mina zkapp_command :
-      ( (Zkapp_command.t, Transaction_hash.t) With_hash.t
+  let mock_zkapp_command mina (zkapp_command_wire : Zkapp_command.Wire.t) :
+      ( (Zkapp_command.Wire.t, Transaction_hash.t) With_hash.t
         Types.Zkapp_command.With_status.t
       , string )
       result
@@ -400,6 +400,7 @@ module Mutations = struct
     (* instead of adding the zkapp_command to the transaction pool, as we would for an actual zkapp,
        apply the zkapp using an ephemeral ledger
     *)
+    let zkapp_command = Zkapp_command.of_wire zkapp_command_wire in
     match Mina_lib.best_tip mina with
     | `Active breadcrumb -> (
         let best_tip_ledger =
@@ -471,16 +472,16 @@ module Mutations = struct
                 let applied_ok =
                   Result.map applied
                     ~f:(fun (zkapp_command_applied, _local_state_and_amount) ->
-                      let ({ data = zkapp_command; status }
-                            : Zkapp_command.t With_status.t ) =
+                      let ({ data = _; status } : Zkapp_command.t With_status.t)
+                          =
                         zkapp_command_applied.command
                       in
                       let hash =
                         Transaction_hash.hash_command
-                          (Zkapp_command zkapp_command)
+                          (Zkapp_command zkapp_command_wire)
                       in
                       let (with_hash : _ With_hash.t) =
-                        { data = zkapp_command; hash }
+                        { data = zkapp_command_wire; hash }
                       in
                       let (status : Types.Command_status.t) =
                         match status with
@@ -1705,10 +1706,11 @@ module Queries = struct
                         (Transaction_hash.User_command_with_valid_signature
                          .create valid_cmd )
                   | Error _ -> (
-                      match Zkapp_command.of_base64 serialized_txn with
+                      match Zkapp_command.Wire.of_base64 serialized_txn with
                       | Ok zkapp_command ->
                           let user_cmd =
-                            User_command.Zkapp_command zkapp_command
+                            User_command.Zkapp_command
+                              (Zkapp_command.of_wire zkapp_command)
                           in
                           (* The command gets piped through [forget_check]
                              below; this is just to make the types work
@@ -1808,7 +1810,10 @@ module Queries = struct
             | Zkapp_command zkapp_cmd ->
                 Some
                   { Types.Zkapp_command.With_status.status = Enqueued
-                  ; data = { cmd_with_hash with data = zkapp_cmd }
+                  ; data =
+                      { cmd_with_hash with
+                        data = Zkapp_command.to_wire zkapp_cmd
+                      }
                   } ) )
 
   let sync_status =
@@ -2032,7 +2037,7 @@ module Queries = struct
                   >>| fun c -> User_command.Signed_command c)
             | `Zkapp_command cmd ->
                 Or_error.(
-                  Zkapp_command.of_base64 cmd
+                  Zkapp_command.Wire.of_base64 cmd
                   >>| fun c -> User_command.Zkapp_command c)
           in
           result_of_or_error res ~error:"Invalid transaction provided"
@@ -2055,7 +2060,8 @@ module Queries = struct
         let frontier_broadcast_pipe = Mina_lib.transition_frontier mina in
         let transaction_pool = Mina_lib.transaction_pool mina in
         Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
-          ~transaction_pool txn.data )
+          ~transaction_pool
+          (User_command.of_wire txn.data) )
 
   let current_snark_worker =
     field "currentSnarkWorker" ~typ:Types.snark_worker
@@ -2125,14 +2131,23 @@ module Queries = struct
   (* used by best_chain, block below *)
   let block_of_breadcrumb mina breadcrumb =
     let hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
-    let block = Transition_frontier.Breadcrumb.block breadcrumb in
+    let block =
+      Transition_frontier.Breadcrumb.validated_transition breadcrumb
+    in
     let transactions =
-      Mina_block.transactions
+      Mina_block.Validated.transactions
         ~constraint_constants:
           (Mina_lib.config mina).precomputed_values.constraint_constants block
     in
+    let completed_works =
+      Mina_block.Validated.forget block
+      |> With_hash.data |> snd
+      |> Staged_ledger_diff.With_hashes_computed.completed_works
+    in
     { With_hash.Stable.Latest.data =
-        Filtered_external_transition.of_transition block `All transactions
+        Filtered_external_transition.of_transition
+          (Mina_block.Validated.header block)
+          completed_works `All transactions
     ; hash
     }
 
@@ -2619,23 +2634,22 @@ module Queries = struct
           | Some _, Some _ ->
               Deferred.Result.fail "Cannot specify both state hash and height"
         in
-        let block = Transition_frontier.Breadcrumb.block breadcrumb in
-        let blockchain_length = Mina_block.blockchain_length block in
-        let global_slot_since_genesis =
-          Mina_block.consensus_state block
-          |> Consensus.Data.Consensus_state.global_slot_since_genesis
-        in
-        let staged_ledger =
-          Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-          |> Staged_ledger.ledger
-        in
-        let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
+        let header = Transition_frontier.Breadcrumb.header breadcrumb in
+        let blockchain_length = Mina_block.Header.blockchain_length header in
         let protocol_state =
           Transition_frontier.Breadcrumb.protocol_state breadcrumb
         in
         let consensus =
           Mina_state.Protocol_state.consensus_state protocol_state
         in
+        let global_slot_since_genesis =
+          Consensus.Data.Consensus_state.global_slot_since_genesis consensus
+        in
+        let staged_ledger =
+          Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+          |> Staged_ledger.ledger
+        in
+        let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
         let staking_epoch =
           Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
             consensus

@@ -30,7 +30,7 @@ val header_with_hash : _ with_header -> Header.with_hash
 
 val block_with_hash : _ with_block -> Block.with_hash
 
-val block : _ with_block -> Block.t
+val header' : _ with_block -> Header.t
 
 val header : _ with_header -> Header.t
 
@@ -75,6 +75,25 @@ val skip_time_received_validation :
      , 'f )
      with_block
   -> ([ `Time_received ] * unit Truth.true_t, 'a, 'b, 'c, 'd, 'e, 'f) with_block
+
+val skip_time_received_validation_header :
+     [ `This_block_was_not_received_via_gossip ]
+  -> ( [ `Time_received ] * unit Truth.false_t
+     , 'a
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_header
+  -> ( [ `Time_received ] * unit Truth.true_t
+     , 'a
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_header
 
 val validate_genesis_protocol_state :
      genesis_state_hash:State_hash.t
@@ -196,29 +215,72 @@ val skip_delta_block_chain_validation :
      , 'f )
      with_block
 
+val skip_delta_block_chain_validation_header :
+     [ `This_block_was_not_received_via_gossip ]
+  -> ( 'a
+     , 'b
+     , 'c
+     , [ `Delta_block_chain ]
+       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.false_t
+     , 'd
+     , 'e
+     , 'f )
+     with_header
+  -> ( 'a
+     , 'b
+     , 'c
+     , [ `Delta_block_chain ]
+       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
+     , 'd
+     , 'e
+     , 'f )
+     with_header
+
 val validate_frontier_dependencies :
-     to_header:('a -> Header.t)
-  -> context:(module CONTEXT)
+     context:(module CONTEXT)
   -> root_block:Block.with_hash
   -> is_block_in_frontier:(Frozen_ledger_hash.t -> bool)
-  -> ('a, State_hash.State_hashes.t) With_hash.t
-     * ( 'b
+  -> ( 'b
+     , 'c
+     , 'd
+     , 'e
+     , [ `Frontier_dependencies ] * unit Truth.false_t
+     , 'f
+     , 'g )
+     with_block
+  -> ( ( 'b
        , 'c
        , 'd
        , 'e
-       , [ `Frontier_dependencies ] * unit Truth.false_t
+       , [ `Frontier_dependencies ] * unit Truth.true_t
        , 'f
        , 'g )
-       t
-  -> ( ('a, State_hash.State_hashes.t) With_hash.t
-       * ( 'b
-         , 'c
-         , 'd
-         , 'e
-         , [ `Frontier_dependencies ] * unit Truth.true_t
-         , 'f
-         , 'g )
-         t
+       with_block
+     , [> `Already_in_frontier
+       | `Not_selected_over_frontier_root
+       | `Parent_missing_from_frontier ] )
+     Result.t
+
+val validate_frontier_dependencies_header :
+     context:(module CONTEXT)
+  -> root_block:Block.with_hash
+  -> is_block_in_frontier:(Frozen_ledger_hash.t -> bool)
+  -> ( 'b
+     , 'c
+     , 'd
+     , 'e
+     , [ `Frontier_dependencies ] * unit Truth.false_t
+     , 'f
+     , 'g )
+     with_header
+  -> ( ( 'b
+       , 'c
+       , 'd
+       , 'e
+       , [ `Frontier_dependencies ] * unit Truth.true_t
+       , 'f
+       , 'g )
+       with_header
      , [> `Already_in_frontier
        | `Not_selected_over_frontier_root
        | `Parent_missing_from_frontier ] )
@@ -395,7 +457,7 @@ val with_body :
      , [ `Staged_ledger_diff ] * unit Truth.false_t
      , 'f )
      with_header
-  -> Staged_ledger_diff.Body.t
+  -> Staged_ledger_diff.With_hashes_computed.t
   -> ( 'a
      , 'b
      , 'c

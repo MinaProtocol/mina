@@ -1533,14 +1533,14 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
         Signed_command_memo.gen
   in
   let zkapp_command_dummy_authorizations : Zkapp_command.t =
-    { fee_payer
-    ; account_updates =
-        Zkapp_command.Call_forest.map
-          ~f:(Fn.compose map_account_update Account_update.of_simple)
-          account_updates
-        |> Zkapp_command.Call_forest.accumulate_hashes_predicated
-    ; memo
-    }
+    Zkapp_command.of_wire
+      { fee_payer
+      ; account_updates =
+          Zkapp_command.Call_forest.map
+            ~f:(Fn.compose map_account_update Account_update.of_simple)
+            account_updates
+      ; memo
+      }
   in
   (* update receipt chain hashes in accounts table *)
   let receipt_elt =

@@ -119,8 +119,10 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
     match block_or_header with
     | `Block cached_env ->
         let env = Cached.peek cached_env in
-        let block, v = Envelope.Incoming.data env in
-        ( Mina_block.header @@ With_hash.data block
+        let (block, v) : Mina_block.initial_valid_block =
+          Envelope.Incoming.data env
+        in
+        ( fst @@ With_hash.data block
         , State_hash.With_state_hashes.state_hash block
         , Some (Envelope.Incoming.received_at env)
         , Envelope.Incoming.sender env
@@ -164,9 +166,9 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       let header_with_hash, _ = Envelope.Incoming.data env in
       [%log internal] "Validate_frontier_dependencies" ;
       match
-        Mina_block.Validation.validate_frontier_dependencies
+        Mina_block.Validation.validate_frontier_dependencies_header
           ~context:(module Consensus_context)
-          ~root_block ~is_block_in_frontier ~to_header:ident
+          ~root_block ~is_block_in_frontier
           (Envelope.Incoming.data env)
       with
       | Ok _ | Error `Parent_missing_from_frontier ->
@@ -197,8 +199,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
         match
           Mina_block.Validation.validate_frontier_dependencies
             ~context:(module Consensus_context)
-            ~root_block ~is_block_in_frontier ~to_header:Mina_block.header
-            initially_validated_transition
+            ~root_block ~is_block_in_frontier initially_validated_transition
         with
         | Ok t ->
             return (Ok t)
@@ -600,7 +601,7 @@ let%test_module "Transition_handler.Processor tests" =
                                      , `Int
                                          ( newly_added_transition
                                          |> Mina_block.Validated.forget
-                                         |> With_hash.data |> Mina_block.header
+                                         |> With_hash.data |> fst
                                          |> Mina_block.Header.protocol_state
                                          |> Protocol_state.consensus_state
                                          |> Consensus.Data.Consensus_state

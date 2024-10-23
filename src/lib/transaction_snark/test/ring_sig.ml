@@ -310,6 +310,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                   ]
               ; memo
               }
+            |> Zkapp_command.of_wire
           in
           ( if debug_mode then
             (* print fee payer *)

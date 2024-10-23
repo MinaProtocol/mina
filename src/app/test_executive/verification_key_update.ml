@@ -213,7 +213,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Malleable_error.lift
       @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
     in
-    let call_forest_to_zkapp ~call_forest ~nonce : Zkapp_command.t =
+    let call_forest_to_zkapp ~call_forest ~nonce : Zkapp_command.Wire.t =
       let memo = Signed_command_memo.empty in
       let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         let account_updates_hash = Zkapp_command.Call_forest.hash call_forest in
@@ -274,6 +274,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { fee_payer; account_updates; memo }
       in
       sign_all { fee_payer; account_updates = call_forest; memo }
+      |> Zkapp_command.to_wire
     in
     let call_forest1 =
       []
@@ -380,22 +381,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
       let%bind invalid_update_vk_perm_proof =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+        @@ Transaction_snark.For_tests.update_states_wire ~constraint_constants
              spec_invalid_proof
       in
       let%bind invalid_update_vk_perm_impossible =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+        @@ Transaction_snark.For_tests.update_states_wire ~constraint_constants
              spec_invalid_impossible
       in
       let%bind update_vk_perm_proof =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+        @@ Transaction_snark.For_tests.update_states_wire ~constraint_constants
              spec_proof
       in
       let%map update_vk_perm_impossible =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+        @@ Transaction_snark.For_tests.update_states_wire ~constraint_constants
              spec_impossible
       in
       ( invalid_update_vk_perm_proof
@@ -448,17 +449,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let%bind failed_update_vk_signature_1 =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+        @@ Transaction_snark.For_tests.update_states_wire ~constraint_constants
              spec_failed_signature_1
       in
       let%bind failed_update_vk_signature_2 =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+        @@ Transaction_snark.For_tests.update_states_wire ~constraint_constants
              spec_failed_signature_2
       in
       let%map update_vk_proof =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+        @@ Transaction_snark.For_tests.update_states_wire ~constraint_constants
              spec_proof
       in
       ( failed_update_vk_signature_1

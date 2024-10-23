@@ -9,7 +9,7 @@ module Historical : sig
 
   val transition : t -> Mina_block.Validated.t
 
-  val scan_state : t -> Staged_ledger.Scan_state.t
+  val scan_state : t -> Transaction_snark_scan_state.t
 
   val pending_coinbase : t -> Pending_coinbase.t
 
@@ -32,11 +32,11 @@ module Limited : sig
 
   type t = Stable.Latest.t [@@deriving to_yojson]
 
-  val transition : t -> Mina_block.Validated.t
+  val transition : t -> Mina_block.t State_hash.With_state_hashes.t
 
   val hashes : t -> State_hash.State_hashes.t
 
-  val scan_state : t -> Staged_ledger.Scan_state.t
+  val scan_state : t -> Transaction_snark_scan_state.Wire.t
 
   val pending_coinbase : t -> Pending_coinbase.t
 
@@ -44,8 +44,8 @@ module Limited : sig
     t -> Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
 
   val create :
-       transition:Mina_block.Validated.t
-    -> scan_state:Staged_ledger.Scan_state.t
+       transition:Mina_block.t State_hash.With_state_hashes.t
+    -> scan_state:Transaction_snark_scan_state.Wire.t
     -> pending_coinbase:Pending_coinbase.t
     -> protocol_states:
          Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
@@ -67,7 +67,7 @@ module Minimal : sig
 
   val hash : t -> State_hash.t
 
-  val scan_state : t -> Staged_ledger.Scan_state.t
+  val scan_state : t -> Transaction_snark_scan_state.Wire.t
 
   val pending_coinbase : t -> Pending_coinbase.t
 
@@ -82,7 +82,7 @@ module Minimal : sig
 
   val create :
        hash:State_hash.t
-    -> scan_state:Staged_ledger.Scan_state.t
+    -> scan_state:Transaction_snark_scan_state.Wire.t
     -> pending_coinbase:Pending_coinbase.t
     -> t
 end

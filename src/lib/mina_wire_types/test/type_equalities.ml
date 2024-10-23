@@ -248,10 +248,8 @@ module Mina_base = struct
       (W.Zkapp_command.Call_forest)
   include Assert_equal0V2 (O.Control.Stable) (W.Control)
   include Assert_equal0V1 (O.Account_update.Stable) (W.Account_update)
-  include Assert_equal0V1 (O.Zkapp_command.Stable) (W.Zkapp_command)
-  include Assert_equal0V1 (O.Zkapp_command.Valid.Stable) (W.Zkapp_command.Valid)
-  include Assert_equal0V2 (O.User_command.Stable) (W.User_command)
-  include Assert_equal0V2 (O.User_command.Valid.Stable) (W.User_command.Valid)
+  include Assert_equal0V1 (O.Zkapp_command.Wire.Stable) (W.Zkapp_command)
+  include Assert_equal0V2 (O.User_command.Wire.Stable) (W.User_command)
   include
     Assert_equal0V1
       (O.Pending_coinbase.State_stack.Stable)
@@ -317,8 +315,7 @@ module Mina_transaction = struct
   module O = Mina_transaction.Transaction
   module W = WT.Mina_transaction
   include Assert_equal1V2 (O.Poly.Stable) (W.Poly)
-  include Assert_equal0V2 (O.Stable) (W)
-  include Assert_equal0V2 (O.Valid.Stable) (W.Valid)
+  include Assert_equal0V2 (O.Wire.Stable) (W)
 end
 
 module Mina_state = struct

@@ -8,14 +8,7 @@ module Ledger = Mina_ledger.Ledger
 type t
 
 module Scan_state : sig
-  [%%versioned:
-  module Stable : sig
-    module V2 : sig
-      type t
-
-      val hash : t -> Staged_ledger_hash.Aux_hash.t
-    end
-  end]
+  type t = Transaction_snark_scan_state.t [@@deriving sexp]
 
   module Job_view : sig
     type t [@@deriving sexp, to_yojson]
@@ -68,14 +61,6 @@ module Scan_state : sig
 
   (** Hashes of the protocol states required for proving pending transactions*)
   val required_state_hashes : t -> State_hash.Set.t
-
-  (** Validate protocol states required for proving the transactions. Returns an association list of state_hash and the corresponding state*)
-  val check_required_protocol_states :
-       t
-    -> protocol_states:
-         Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
-    -> Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
-       Or_error.t
 
   (** Apply transactions corresponding to the last emitted proof based on the
     two-pass system to get snarked ledger- first pass includes legacy transactions and zkapp payments and the second pass includes account updates. This ignores any account updates if a blocks transactions were split among two trees.
@@ -194,7 +179,7 @@ val apply :
   -> get_completed_work:
        (   Transaction_snark_work.Statement.t
         -> Transaction_snark_work.Checked.t option )
-  -> Staged_ledger_diff.t
+  -> Staged_ledger_diff.With_hashes_computed.t
   -> logger:Logger.t
   -> verifier:Verifier.t
   -> current_state_view:Zkapp_precondition.Protocol_state.View.t

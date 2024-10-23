@@ -106,7 +106,7 @@ module T = struct
     ; proofs : Ledger_proof.t One_or_two.t
     ; prover : Public_key.Compressed.t
     }
-  [@@deriving compare, fields, yojson, sexp]
+  [@@deriving equal, compare, fields, yojson, sexp]
 
   let statement t = One_or_two.map t.proofs ~f:Ledger_proof.statement
 

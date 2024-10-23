@@ -79,7 +79,9 @@ let worth_getting_root ({ context = (module Context); _ } as t) candidate =
        ~context:(module Consensus_context)
        ~existing:
          ( t.best_seen_transition |> Mina_block.Validation.block_with_hash
-         |> With_hash.map ~f:Mina_block.consensus_state )
+         |> With_hash.map ~f:(fun (h, _) ->
+                Protocol_state.consensus_state
+                @@ Mina_block.Header.protocol_state h ) )
        ~candidate
 
 let received_bad_proof ({ context = (module Context); _ } as t) host e =
@@ -113,7 +115,7 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger
   t.best_seen_transition <- peer_best_tip ;
   t.current_root <- peer_root ;
   let blockchain_state =
-    t.current_root |> Mina_block.Validation.block |> Mina_block.header
+    t.current_root |> Mina_block.Validation.header'
     |> Mina_block.Header.protocol_state |> Protocol_state.blockchain_state
   in
   let expected_staged_ledger_hash =
@@ -171,16 +173,33 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
           !"Could not get the proof of the root transition from the network: \
             $error" ;
         Deferred.return `Ignored
-    | Ok peer_root_with_proof -> (
+    | Ok
+        { Envelope.Incoming.data =
+            { Proof_carrying_data.data = best_tip_block; proof = p, root_block }
+        ; _
+        } -> (
+        let header_proof =
+          { Proof_carrying_data.data = Mina_block.header best_tip_block
+          ; proof = (p, Mina_block.header root_block)
+          }
+        in
         match%bind
           Sync_handler.Root.verify
             ~context:(module Context)
-            ~verifier:t.verifier candidate_consensus_state
-            peer_root_with_proof.data
+            ~verifier:t.verifier  candidate_consensus_state
+            header_proof
         with
-        | Ok (`Root root, `Best_tip best_tip) ->
+        | Ok (`Root root_header, `Best_tip best_tip_header) ->
             if done_syncing_root root_sync_ledger then return `Ignored
             else
+              let best_tip =
+                Mina_block.Validation.with_body best_tip_header
+                @@ Mina_block.staged_ledger_diff_hashed best_tip_block
+              in
+              let root =
+                Mina_block.Validation.with_body root_header
+                @@ Mina_block.staged_ledger_diff_hashed root_block
+              in
               start_sync_job_with_peer ~sender ~root_sync_ledger t best_tip root
         | Error e ->
             return (received_bad_proof t sender e |> Fn.const `Ignored) )
@@ -200,8 +219,7 @@ let sync_ledger ({ context = (module Context); _ } as t) ~preferred
         match b_or_h with
         | `Block b_env ->
             ( Envelope.Incoming.data b_env
-              |> Mina_block.Validation.block_with_hash
-              |> With_hash.map ~f:Mina_block.header
+              |> Mina_block.Validation.block_with_hash |> With_hash.map ~f:fst
             , Envelope.Incoming.remote_sender_exn b_env
             , Envelope.Incoming.map ~f:(fun x -> `Block x) b_env )
         | `Header h_env ->
@@ -376,13 +394,16 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
           | Error err ->
               Deferred.return (staged_ledger_data_download_time, None, Error err)
           | Ok
-              ( scan_state
+              ( scan_state_wire
               , expected_merkle_root
               , pending_coinbases
               , protocol_states ) -> (
               let%map staged_ledger_construction_result =
                 O1trace.thread "construct_root_staged_ledger" (fun () ->
                     let open Deferred.Or_error.Let_syntax in
+                    let scan_state =
+                      Transaction_snark_scan_state.of_wire scan_state_wire
+                    in
                     let received_staged_ledger_hash =
                       Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
                         (Staged_ledger.Scan_state.hash scan_state)
@@ -417,8 +438,13 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                         ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
                     in
                     let%bind protocol_states =
-                      Staged_ledger.Scan_state.check_required_protocol_states
-                        scan_state ~protocol_states
+                      Transaction_snark_scan_state
+                      .check_required_protocol_states
+                        ~is_zkapp_transaction:
+                          Mina_transaction_logic.Transaction_applied.Wire
+                          .is_zkapp_transaction scan_state_wire.scan_state
+                        scan_state_wire.previous_incomplete_zkapp_updates
+                        ~protocol_states
                       |> Deferred.return
                     in
                     let protocol_states_map =
@@ -470,7 +496,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                             ~logger
                             ~snarked_local_state:
                               Mina_block.(
-                                t.current_root |> Validation.block |> header
+                                t.current_root |> Validation.header'
                                 |> Header.protocol_state
                                 |> Protocol_state.blockchain_state
                                 |> Blockchain_state.snarked_local_state)
@@ -485,7 +511,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                         Result.map result
                           ~f:
                             (const
-                               ( scan_state
+                               ( scan_state_wire
                                , pending_coinbases
                                , new_root
                                , protocol_states ) ))
@@ -546,7 +572,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
             let best_seen_block_with_hash, _ = t.best_seen_transition in
             let consensus_state =
               With_hash.data best_seen_block_with_hash
-              |> Mina_block.header |> Mina_block.Header.protocol_state
+              |> fst |> Mina_block.Header.protocol_state
               |> Protocol_state.consensus_state
             in
             (* step 4. Synchronize consensus local state if necessary *)
@@ -602,7 +628,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                 (* step 5. Close the old frontier and reload a new one from disk. *)
                 let new_root_data : Transition_frontier.Root_data.Limited.t =
                   Transition_frontier.Root_data.Limited.create
-                    ~transition:(Mina_block.Validated.lift new_root)
+                    ~transition:
+                      ( Mina_block.Validation.block_with_hash new_root
+                      |> Mina_block.forget_computed_hashes )
                     ~scan_state ~pending_coinbase ~protocol_states
                 in
                 let%bind () =
@@ -859,13 +887,9 @@ let%test_module "Bootstrap_controller tests" =
               Strict_pipe.Writer.close sync_ledger_writer ;
               sync_deferred ) ;
           let expected_transitions =
-            List.map branch
-              ~f:
-                (Fn.compose
-                   (With_hash.map ~f:Mina_block.header)
-                   (Fn.compose Mina_block.Validation.block_with_hash
-                      (Fn.compose Mina_block.Validated.remember
-                         Transition_frontier.Breadcrumb.validated_transition ) ) )
+            List.map branch ~f:(fun b ->
+                Transition_frontier.Breadcrumb.validated_transition b
+                |> Mina_block.Validated.forget |> With_hash.map ~f:fst )
           in
           let saved_transitions =
             Transition_cache.data transition_graph
@@ -913,9 +937,7 @@ let%test_module "Bootstrap_controller tests" =
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions : Transition_cache.element list) =
-      let root =
-        Transition_frontier.Breadcrumb.block root |> Mina_block.header
-      in
+      let root = Transition_frontier.Breadcrumb.header root in
       ignore
         ( List.fold_result ~init:root incoming_transitions
             ~f:(fun max_acc incoming_transition ->

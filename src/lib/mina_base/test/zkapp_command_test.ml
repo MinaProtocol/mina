@@ -98,12 +98,10 @@ let account_update_or_stack_of_zkapp_command_list () =
     zkapp_command_list_4
 
 let wire_embedded_in_t () =
-  let module Wire = Stable.Latest.Wire in
   Quickcheck.test ~trials:10 ~shrinker:Wire.shrinker Wire.gen ~f:(fun w ->
       [%test_eq: Wire.t] (to_wire (of_wire w)) w )
 
 let wire_embedded_in_graphql () =
-  let module Wire = Stable.Latest.Wire in
   Quickcheck.test ~shrinker:Wire.shrinker Wire.gen ~f:(fun w ->
       [%test_eq: Wire.t] (Wire.of_graphql_repr (Wire.to_graphql_repr w)) w )
 
@@ -120,7 +118,7 @@ end = struct
 
   let json_roundtrip_dummy () =
     let dummy = Lazy.force dummy in
-    [%test_eq: t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
+    [%test_eq: Wire.t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
 
   let full_circuit () =
     Run_in_thread.block_on_async_exn

@@ -49,12 +49,8 @@ module Protocol_states_for_root_scan_state = struct
   type t = Protocol_state.value State_hash.With_state_hashes.t State_hash.Map.t
 
   let protocol_states_for_next_root_scan_state protocol_states_for_old_root
-      ~new_scan_state
+      ~required_state_hashes
       ~(old_root_state : Protocol_state.value State_hash.With_state_hashes.t) =
-    let required_state_hashes =
-      Staged_ledger.Scan_state.required_state_hashes new_scan_state
-      |> State_hash.Set.to_list
-    in
     let protocol_state_map =
       (*Note: Protocol states for the next root should all be in this map
         assuming roots transition to their successors and do not skip any node in
@@ -63,8 +59,8 @@ module Protocol_states_for_root_scan_state = struct
         ~key:(State_hash.With_state_hashes.state_hash old_root_state)
         ~data:old_root_state
     in
-    List.map required_state_hashes
-      ~f:(State_hash.Map.find_exn protocol_state_map)
+    State_hash.Set.to_list required_state_hashes
+    |> List.map ~f:(State_hash.Map.find_exn protocol_state_map)
 end
 
 (* Invariant: The path from the root to the tip inclusively, will be max_length *)
@@ -109,8 +105,8 @@ let find_protocol_state (t : t) hash =
       With_hash.data s
   | Some breadcrumb ->
       Some
-        ( breadcrumb |> Breadcrumb.block |> Mina_block.header
-        |> Mina_block.Header.protocol_state )
+        ( breadcrumb |> Breadcrumb.validated_transition
+        |> Mina_block.Validated.header |> Mina_block.Header.protocol_state )
 
 let root t = find_exn t t.root
 
@@ -140,8 +136,8 @@ let create ~context:(module Context : CONTEXT) ~root_data ~root_ledger
     |> State_hash.Map.of_alist_exn
   in
   let root_protocol_state =
-    validated_transition |> Mina_block.Validated.forget |> With_hash.data
-    |> Mina_block.header |> Mina_block.Header.protocol_state
+    validated_transition |> Mina_block.Validated.header
+    |> Mina_block.Header.protocol_state
   in
   let root_blockchain_state =
     Protocol_state.blockchain_state root_protocol_state
@@ -326,15 +322,25 @@ let calculate_root_transition_diff t heir =
         in
         { transition; scan_state } )
   in
+  let required_state_hashes =
+    Transaction_snark_scan_state.required_state_hashes
+      (Staged_ledger.scan_state heir_staged_ledger)
+  in
   let protocol_states =
     Protocol_states_for_root_scan_state.protocol_states_for_next_root_scan_state
-      t.protocol_states_for_root_scan_state
-      ~new_scan_state:(Staged_ledger.scan_state heir_staged_ledger)
+      t.protocol_states_for_root_scan_state ~required_state_hashes
       ~old_root_state:(Breadcrumb.protocol_state_with_hashes root)
   in
   let new_root_data =
-    Root_data.Limited.create ~transition:heir_transition
-      ~scan_state:(Staged_ledger.scan_state heir_staged_ledger)
+    let transition =
+      Mina_block.forget_computed_hashes
+      @@ Mina_block.Validated.forget heir_transition
+    in
+    let scan_state =
+      Transaction_snark_scan_state.to_wire
+        (Staged_ledger.scan_state heir_staged_ledger)
+    in
+    Root_data.Limited.create ~transition ~scan_state
       ~pending_coinbase:
         (Staged_ledger.pending_coinbase_collection heir_staged_ledger)
       ~protocol_states
@@ -700,10 +706,11 @@ module Metrics = struct
     r -. Mina_metrics.time_offset_sec
 
   let has_coinbase b =
-    let d1, d2 =
-      ( Breadcrumb.block b |> Mina_block.body
-      |> Mina_block.Body.staged_ledger_diff )
-        .diff
+    let { With_hash.data =
+            _, { Staged_ledger_diff.With_hashes_computed.diff = d1, d2 }
+        ; _
+        } =
+      Breadcrumb.validated_transition b |> Mina_block.Validated.forget
     in
     match (d1.coinbase, d2) with
     | Zero, None | Zero, Some { coinbase = Zero; _ } ->

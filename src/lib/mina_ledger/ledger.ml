@@ -462,6 +462,7 @@ let%test_unit "tokens test" =
       let zkapp_command =
         mk_zkapp_command ~fee:7 ~fee_payer_pk:pk ~fee_payer_nonce:nonce
           account_updates
+        |> Zkapp_command.of_wire
       in
       match
         apply_zkapp_command_unchecked ~constraint_constants

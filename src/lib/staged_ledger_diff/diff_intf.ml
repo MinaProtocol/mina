@@ -66,7 +66,9 @@ module type Full = sig
 
   module Pre_diff_with_at_most_two_coinbase : sig
     type t =
-      (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_two.t
+      ( Transaction_snark_work.t
+      , User_command.Wire.t With_status.t )
+      Pre_diff_two.t
     [@@deriving equal, compare, sexp, yojson]
 
     module Stable : sig
@@ -79,7 +81,9 @@ module type Full = sig
 
   module Pre_diff_with_at_most_one_coinbase : sig
     type t =
-      (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_one.t
+      ( Transaction_snark_work.t
+      , User_command.Wire.t With_status.t )
+      Pre_diff_one.t
     [@@deriving equal, compare, sexp, yojson]
 
     module Stable : sig
@@ -118,6 +122,36 @@ module type Full = sig
     module Latest = V2
   end
   with type V2.t = t
+
+  module With_hashes_computed : sig
+    type t =
+      { diff :
+          ( Transaction_snark_work.t
+          , User_command.t With_status.t )
+          Pre_diff_two.t
+          * ( Transaction_snark_work.t
+            , User_command.t With_status.t )
+            Pre_diff_one.t
+            option
+      }
+    [@@deriving equal, compare, sexp, yojson, fields]
+
+    val compute : Stable.Latest.t -> t
+
+    val forget : t -> Stable.Latest.t
+
+    val commands : t -> User_command.t With_status.t list
+
+    val completed_works : t -> Transaction_snark_work.t list
+
+    val empty_diff : t
+
+    val net_return :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> supercharge_coinbase:bool
+      -> t
+      -> Currency.Amount.t option
+  end
 
   module With_valid_signatures_and_proofs : sig
     type pre_diff_with_at_most_two_coinbase =
@@ -175,16 +209,16 @@ module type Full = sig
     With_valid_signatures_and_proofs.t -> With_valid_signatures.t
 
   val validate_commands :
-       t
+       With_hashes_computed.t
     -> check:
          (   User_command.t With_status.t list
           -> (User_command.Valid.t list, 'e) Result.t Async.Deferred.Or_error.t
          )
     -> (With_valid_signatures.t, 'e) Result.t Async.Deferred.Or_error.t
 
-  val forget : With_valid_signatures_and_proofs.t -> t
+  val forget : With_valid_signatures_and_proofs.t -> With_hashes_computed.t
 
-  val commands : t -> User_command.t With_status.t list
+  val commands : t -> User_command.Wire.t With_status.t list
 
   val completed_works : t -> Transaction_snark_work.t list
 
@@ -194,10 +228,10 @@ module type Full = sig
     -> t
     -> Currency.Amount.t option
 
-  val net_return :
+  val coinbase_of_diff_pair :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> supercharge_coinbase:bool
-    -> t
+    -> ('w, 't) Pre_diff_two.t * ('w, 'a) Pre_diff_one.t option
     -> Currency.Amount.t option
 
   val empty_diff : t

@@ -222,15 +222,15 @@ module Make (Inputs : Inputs_intf) :
           (Consensus.Hooks.select
              ~context:(module Context)
              ~existing:
-               (With_hash.map ~f:Mina_block.consensus_state
-                  best_tip_with_witness.data )
+               ( Mina_block.Validated.forget best_tip_with_witness.data
+               |> With_hash.map ~f:(fun (h, _) ->
+                      Mina_state.Protocol_state.consensus_state
+                      @@ Mina_block.Header.protocol_state h ) )
              ~candidate:seen_consensus_state )
           `Keep
       in
       let%map () = Option.some_if is_tip_better () in
-      { best_tip_with_witness with
-        data = With_hash.data best_tip_with_witness.data
-      }
+      best_tip_with_witness
 
     let verify ~context:(module Context : CONTEXT) ~verifier observed_state
         peer_root =
@@ -256,7 +256,11 @@ module Make (Inputs : Inputs_intf) :
           (Consensus.Hooks.select
              ~context:(module Context)
              ~existing:
-               (With_hash.map ~f:Mina_block.consensus_state best_tip_transition)
+               (With_hash.map
+                  ~f:(fun h ->
+                    Mina_state.Protocol_state.consensus_state
+                    @@ Mina_block.Header.protocol_state h )
+                  best_tip_transition )
              ~candidate )
           `Keep
       in

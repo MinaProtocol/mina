@@ -2,6 +2,6 @@
 
 module User_command = Mina_base.User_command
 
-type t = User_command.t
+type t = User_command.Wire.t
 
-[%%define_locally User_command.(to_base64, of_base64)]
+[%%define_locally User_command.Wire.(to_base64, of_base64)]

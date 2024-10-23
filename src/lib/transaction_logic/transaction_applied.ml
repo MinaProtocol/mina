@@ -53,33 +53,79 @@ module Signed_command_applied = struct
 end
 
 module Zkapp_command_applied = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        { accounts : (Account_id.Stable.V2.t * Account.Stable.V2.t option) list
-        ; command : Zkapp_command.Stable.V1.t With_status.Stable.V2.t
-        ; new_accounts : Account_id.Stable.V2.t list
-        }
-      [@@deriving sexp, to_yojson]
+  module T = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type 'command t =
+          { accounts :
+              (Account_id.Stable.V2.t * Account.Stable.V2.t option) list
+          ; command : 'command With_status.Stable.V2.t
+          ; new_accounts : Account_id.Stable.V2.t list
+          }
+        [@@deriving sexp, to_yojson]
 
-      let to_latest = Fn.id
-    end
-  end]
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
+  module Wire = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Zkapp_command.Wire.Stable.V1.t T.Stable.V1.t
+        [@@deriving sexp, to_yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
+  type t = Zkapp_command.t T.t [@@deriving sexp, to_yojson]
+
+  let of_wire : Wire.t -> t =
+   fun { accounts; command; new_accounts } ->
+    let command = With_status.map command ~f:Zkapp_command.of_wire in
+    { accounts; command; new_accounts }
+
+  let to_wire : t -> Wire.t =
+   fun { accounts; command; new_accounts } ->
+    let command = With_status.map command ~f:Zkapp_command.to_wire in
+    { accounts; command; new_accounts }
 end
 
 module Command_applied = struct
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t =
-        | Signed_command of Signed_command_applied.Stable.V2.t
-        | Zkapp_command of Zkapp_command_applied.Stable.V1.t
-      [@@deriving sexp, to_yojson]
+  module Wire = struct
+    [%%versioned
+    module Stable = struct
+      module V2 = struct
+        type t =
+          | Signed_command of Signed_command_applied.Stable.V2.t
+          | Zkapp_command of Zkapp_command_applied.Wire.Stable.V1.t
+        [@@deriving sexp, to_yojson]
 
-      let to_latest = Fn.id
-    end
-  end]
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
+  type t =
+    | Signed_command of Signed_command_applied.t
+    | Zkapp_command of Zkapp_command_applied.t
+  [@@deriving sexp, to_yojson]
+
+  let of_wire : Wire.t -> t = function
+    | Signed_command sc ->
+        Signed_command sc
+    | Zkapp_command zc ->
+        Zkapp_command (Zkapp_command_applied.of_wire zc)
+
+  let to_wire : t -> Wire.t = function
+    | Signed_command sc ->
+        Signed_command sc
+    | Zkapp_command zc ->
+        Zkapp_command (Zkapp_command_applied.to_wire zc)
 end
 
 module Fee_transfer_applied = struct
@@ -115,30 +161,83 @@ module Coinbase_applied = struct
 end
 
 module Varying = struct
+  module Wire = struct
+    [%%versioned
+    module Stable = struct
+      module V2 = struct
+        type t =
+          | Command of Command_applied.Wire.Stable.V2.t
+          | Fee_transfer of Fee_transfer_applied.Stable.V2.t
+          | Coinbase of Coinbase_applied.Stable.V2.t
+        [@@deriving sexp, to_yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
+  type t =
+    | Command of Command_applied.t
+    | Fee_transfer of Fee_transfer_applied.t
+    | Coinbase of Coinbase_applied.t
+  [@@deriving sexp, to_yojson]
+
+  let of_wire : Wire.t -> t = function
+    | Fee_transfer c ->
+        Fee_transfer c
+    | Coinbase c ->
+        Coinbase c
+    | Command c ->
+        Command (Command_applied.of_wire c)
+
+  let to_wire : t -> Wire.t = function
+    | Fee_transfer c ->
+        Fee_transfer c
+    | Coinbase c ->
+        Coinbase c
+    | Command c ->
+        Command (Command_applied.to_wire c)
+end
+
+module Wire = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
       type t =
-        | Command of Command_applied.Stable.V2.t
-        | Fee_transfer of Fee_transfer_applied.Stable.V2.t
-        | Coinbase of Coinbase_applied.Stable.V2.t
+        { previous_hash : Ledger_hash.Stable.V1.t
+        ; varying : Varying.Wire.Stable.V2.t
+        }
       [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
     end
   end]
+
+  let is_zkapp_transaction = function
+    | { varying = Command (Zkapp_command _); _ } ->
+        true
+    | _ ->
+        false
 end
 
-[%%versioned
-module Stable = struct
-  module V2 = struct
-    type t =
-      { previous_hash : Ledger_hash.Stable.V1.t; varying : Varying.Stable.V2.t }
-    [@@deriving sexp, to_yojson]
+type t = { previous_hash : Ledger_hash.t; varying : Varying.t }
+[@@deriving sexp, to_yojson]
 
-    let to_latest = Fn.id
-  end
-end]
+let is_zkapp_transaction = function
+  | { varying = Command (Zkapp_command _); _ } ->
+      true
+  | _ ->
+      false
+
+let of_wire : Wire.t -> t =
+ fun { previous_hash; varying } ->
+  let varying = Varying.of_wire varying in
+  { previous_hash; varying }
+
+let to_wire : t -> Wire.t =
+ fun { previous_hash; varying } ->
+  let varying = Varying.to_wire varying in
+  { previous_hash; varying }
 
 let burned_tokens : t -> Currency.Amount.t =
  fun { varying; _ } ->

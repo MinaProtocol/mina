@@ -23,12 +23,11 @@ let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
   let open Deferred.Or_error.Let_syntax in
   let open Root_data.Minimal in
   let blockchain_state =
-    root_transition |> Mina_block.Validated.forget |> With_hash.data
-    |> Mina_block.header |> Mina_block.Header.protocol_state
-    |> Protocol_state.blockchain_state
+    root_transition |> Mina_block.Validated.forget |> With_hash.data |> fst
+    |> Mina_block.Header.protocol_state |> Protocol_state.blockchain_state
   in
   let pending_coinbases = pending_coinbase root in
-  let scan_state = scan_state root in
+  let scan_state = scan_state root |> Transaction_snark_scan_state.of_wire in
   let protocol_states_map =
     List.fold protocol_states ~init:State_hash.Map.empty
       ~f:(fun acc protocol_state ->
@@ -194,11 +193,8 @@ module Instance = struct
     let open Deferred.Result.Let_syntax in
     let validate genesis_state_hash (b, v) =
       Validation.validate_genesis_protocol_state ~genesis_state_hash
-        (With_hash.map ~f:Mina_block.header b, v)
-      |> Result.map
-           ~f:
-             (Fn.flip Validation.with_body
-                (Mina_block.body @@ With_hash.data b) )
+        (With_hash.map ~f:fst b, v)
+      |> Result.map ~f:(Fn.flip Validation.with_body (snd @@ With_hash.data b))
     in
     let downgrade_transition transition genesis_state_hash :
         ( Mina_block.almost_valid_block
@@ -227,9 +223,8 @@ module Instance = struct
       |> Deferred.return
     in
     let root_genesis_state_hash =
-      root_transition |> Mina_block.Validated.forget |> With_hash.data
-      |> Mina_block.header |> Mina_block.Header.protocol_state
-      |> Protocol_state.genesis_state_hash
+      root_transition |> Mina_block.Validated.forget |> With_hash.data |> fst
+      |> Mina_block.Header.protocol_state |> Protocol_state.genesis_state_hash
     in
     (* construct the root staged ledger in memory *)
     let%bind root_staged_ledger =
@@ -309,7 +304,8 @@ module Instance = struct
                  [ ( "blockchain_length"
                    , Mina_numbers.Length.to_yojson
                      @@ Mina_block.(
-                          blockchain_length (Validation.block transition)) )
+                          Header.blockchain_length
+                            (Validation.header' transition)) )
                  ] ;
              [%log internal] "Loaded_transition_from_storage" ;
              (* we're loading transitions from persistent storage,
@@ -378,7 +374,7 @@ let reset_database_exn t ~root_data ~genesis_state_hash =
     ~metadata:
       [ ( "state_hash"
         , State_hash.to_yojson
-          @@ Mina_block.Validated.state_hash root_transition )
+          @@ State_hash.With_state_hashes.state_hash root_transition )
       ]
     "Resetting transition frontier database to new root" ;
   let%bind () = destroy_database_exn t in

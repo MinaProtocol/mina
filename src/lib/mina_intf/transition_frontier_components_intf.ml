@@ -170,8 +170,8 @@ module type Best_tip_prover_intf = sig
   val prove :
        context:(module CONTEXT)
     -> transition_frontier
-    -> ( Mina_block.t State_hash.With_state_hashes.t
-       , State_body_hash.t list * Mina_block.t )
+    -> ( Mina_block.Validated.t
+       , State_body_hash.t list * Mina_block.Validated.t )
        Proof_carrying_data.t
        option
 
@@ -179,11 +179,11 @@ module type Best_tip_prover_intf = sig
        verifier:Verifier.t
     -> genesis_constants:Genesis_constants.t
     -> precomputed_values:Precomputed_values.t
-    -> ( Mina_block.t
-       , State_body_hash.t list * Mina_block.t )
+    -> ( Mina_block.Header.t
+       , State_body_hash.t list * Mina_block.Header.t )
        Proof_carrying_data.t
-    -> ( [ `Root of Mina_block.initial_valid_block ]
-       * [ `Best_tip of Mina_block.initial_valid_block ] )
+    -> ( [ `Root of Mina_block.initial_valid_header ]
+       * [ `Best_tip of Mina_block.initial_valid_header ] )
        Deferred.Or_error.t
 end
 
@@ -197,8 +197,8 @@ module type Consensus_best_tip_prover_intf = sig
        context:(module CONTEXT)
     -> frontier:transition_frontier
     -> Consensus.Data.Consensus_state.Value.t State_hash.With_state_hashes.t
-    -> ( Mina_block.t
-       , State_body_hash.t list * Mina_block.t )
+    -> ( Mina_block.Validated.t
+       , State_body_hash.t list * Mina_block.Validated.t )
        Proof_carrying_data.t
        option
 
@@ -206,11 +206,11 @@ module type Consensus_best_tip_prover_intf = sig
        context:(module CONTEXT)
     -> verifier:Verifier.t
     -> Consensus.Data.Consensus_state.Value.t State_hash.With_state_hashes.t
-    -> ( Mina_block.t
-       , State_body_hash.t list * Mina_block.t )
+    -> ( Mina_block.Header.t
+       , State_body_hash.t list * Mina_block.Header.t )
        Proof_carrying_data.t
-    -> ( [ `Root of Mina_block.initial_valid_block ]
-       * [ `Best_tip of Mina_block.initial_valid_block ] )
+    -> ( [ `Root of Mina_block.initial_valid_header ]
+       * [ `Best_tip of Mina_block.initial_valid_header ] )
        Deferred.Or_error.t
 end
 
@@ -237,7 +237,8 @@ module type Sync_handler_intf = sig
   val get_transition_chain :
        frontier:transition_frontier
     -> State_hash.t list
-    -> Mina_block.t list option
+    -> (Mina_block.Header.t * Staged_ledger_diff.With_hashes_computed.t) list
+       option
 
   val best_tip_path : frontier:transition_frontier -> State_hash.t list
 

@@ -5,7 +5,7 @@ module Ledger = Mina_ledger.Ledger
 
 let underToCamel s = String.lowercase s |> Mina_graphql.Reflection.underToCamel
 
-let graphql_zkapp_command (zkapp_command : Zkapp_command.t) =
+let graphql_zkapp_command (zkapp_command : Zkapp_command.Wire.t) =
   sprintf
     {|
 mutation MyMutation {
@@ -42,14 +42,14 @@ let get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
   in
   second_pass_ledger
 
-let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t)
+let gen_proof ?(zkapp_account = None) zkapp_command
     ~(genesis_constants : Genesis_constants.t)
     ~(proof_level : Genesis_constants.Proof_level.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
   let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
   let _v =
     let id =
-      zkapp_command.fee_payer.body.public_key
+      zkapp_command.Zkapp_command.T.fee_payer.body.public_key
       |> fun pk -> Account_id.create pk Token_id.default
     in
     Ledger.get_or_create_account ledger id
@@ -131,8 +131,8 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t)
       ~f:(fun _ ((witness, spec, statement) as w) ->
         printf "%s"
           (sprintf
-             !"current witness \
-               %{sexp:(Transaction_witness.Zkapp_command_segment_witness.t * \
+             !"current witness %{sexp:(Zkapp_command.t \
+               Transaction_witness.Zkapp_command_segment_witness.t * \
                Transaction_snark.Zkapp_command_segment.Basic.t * \
                Transaction_snark.Statement.With_sok.t) }%!"
              w ) ;
@@ -182,7 +182,7 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
       ~protocol_state_predicate spec ledger ~snapp_kp:zkapp_kp
   in
   printf "ZkApp transaction yojson: %s\n\n%!"
-    (Zkapp_command.to_yojson zkapp_command |> Yojson.Safe.to_string) ;
+    (Zkapp_command.Wire.to_yojson zkapp_command |> Yojson.Safe.to_string) ;
   printf "(ZkApp transaction graphQL input %s\n\n%!"
     (graphql_zkapp_command zkapp_command) ;
   printf "Updated accounts\n" ;
@@ -209,6 +209,7 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
           pending_coinbase_init_stack
     }
   in
+  let zkapp_command = Zkapp_command.of_wire zkapp_command in
   let witnesses =
     let second_pass_ledger =
       get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
@@ -235,8 +236,8 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
       ~f:(fun _ ((witness, spec, statement) as w) ->
         printf "%s"
           (sprintf
-             !"current witness \
-               %{sexp:(Transaction_witness.Zkapp_command_segment_witness.t * \
+             !"current witness %{sexp:(Zkapp_command.t \
+               Transaction_witness.Zkapp_command_segment_witness.t * \
                Transaction_snark.Zkapp_command_segment.Basic.t * \
                Transaction_snark.Statement.With_sok.t) }%!"
              w ) ;
@@ -279,15 +280,15 @@ module Util = struct
   let snapp_keypair_of_file = keypair_of_file ~which:"Zkapp Account"
 
   let print_snapp_transaction ~debug zkapp_command =
+    let gql = graphql_zkapp_command (Zkapp_command.to_wire zkapp_command) in
     if debug then (
       printf
         !"Zkapp_command sexp:\n %{sexp: Zkapp_command.t}\n\n%!"
         zkapp_command ;
       printf "Zkapp transaction yojson:\n %s\n\n%!"
         (Zkapp_command.to_yojson zkapp_command |> Yojson.Safe.to_string) ;
-      printf "Zkapp transaction graphQL input %s\n\n%!"
-        (graphql_zkapp_command zkapp_command) )
-    else printf "%s\n%!" (graphql_zkapp_command zkapp_command)
+      printf "Zkapp transaction graphQL input %s\n\n%!" gql )
+    else printf "%s\n%!" gql
 
   let memo =
     Option.value_map ~default:Signed_command_memo.empty ~f:(fun m ->
@@ -374,6 +375,7 @@ let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
   let%bind zkapp_command =
     Transaction_snark.For_tests.deploy_snapp
       ~permissions:Permissions.user_default ~constraint_constants spec
+    >>| Zkapp_command.of_wire
   in
   let%map () =
     if debug then
@@ -466,6 +468,7 @@ let transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer ~fee_payer_nonce
     Transaction_snark.For_tests.multiple_transfers
       ~constraint_constants:
         Genesis_constants.For_unit_tests.Constraint_constants.t spec
+    |> Zkapp_command.of_wire
   in
   let%map () =
     if debug then
@@ -761,7 +764,7 @@ let%test_module "ZkApps test transaction" =
           io_field "sendZkapp" ~typ:(non_null string)
             ~args:Arg.[ arg "input" ~typ:(non_null typ) ]
             ~doc:"sample query"
-            ~resolve:(fun _ () (zkapp_command' : Zkapp_command.t) ->
+            ~resolve:(fun _ () zkapp_command' ->
               let ok_fee_payer =
                 print_diff_yojson ~path:[ "fee_payer" ]
                   (Account_update.Fee_payer.to_yojson zkapp_command.fee_payer)
@@ -808,7 +811,7 @@ let%test_module "ZkApps test transaction" =
           match user_cmd with
           | Zkapp_command p ->
               let p = Zkapp_command.Valid.forget p in
-              let q = graphql_zkapp_command p in
+              let q = graphql_zkapp_command (Zkapp_command.to_wire p) in
               Async.Thread_safe.block_on_async_exn (fun () ->
                   match%map hit_server p q with
                   | Ok _res ->

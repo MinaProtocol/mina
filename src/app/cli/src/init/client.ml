@@ -356,13 +356,14 @@ let verify_receipt =
              |> Deferred.return
            in
            let%bind payment =
-             User_command.of_yojson payment_json
+             User_command.Wire.of_yojson payment_json
              |> to_deferred_or_error
                   ~error:
                     (sprintf "Payment file %s has invalid json format"
                        payment_path )
            and proof =
-             [%of_yojson: Receipt.Chain_hash.t * User_command.t list] proof_json
+             [%of_yojson: Receipt.Chain_hash.t * User_command.Wire.t list]
+               proof_json
              |> to_deferred_or_error
                   ~error:
                     (sprintf "Proof file %s has invalid json format" proof_path)
@@ -2199,7 +2200,8 @@ let receipt_chain_hash =
                (Signed_command_payload signed_cmd.payload) previous_hash
          | Some n ->
              let zkapp_cmd =
-               Zkapp_command.of_base64 transaction_id |> Or_error.ok_exn
+               Zkapp_command.Wire.of_base64 transaction_id
+               |> Or_error.ok_exn |> Zkapp_command.of_wire
              in
              let receipt_elt =
                let _txn_commitment, full_txn_commitment =

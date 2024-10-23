@@ -57,7 +57,7 @@ module Inputs = struct
   [@@deriving bin_io_unversioned, sexp]
 
   type zkapp_command_inputs =
-    ( Transaction_witness.Zkapp_command_segment_witness.t
+    ( Zkapp_command.t Transaction_witness.Zkapp_command_segment_witness.t
     * Transaction_snark.Zkapp_command_segment.Basic.t
     * Transaction_snark.Statement.With_sok.t )
     list
@@ -124,14 +124,14 @@ module Inputs = struct
                                     , `Sparse_ledger w.second_pass_ledger
                                     , `Connecting_ledger_hash
                                         input.connecting_ledger_left
-                                    , zkapp_command )
+                                    , Zkapp_command.of_wire zkapp_command )
                                   ]
                                 |> List.rev )
                             |> Result.map_error ~f:(fun e ->
                                    Error.createf
                                      !"Failed to generate inputs for \
                                        zkapp_command : %s: %s"
-                                     ( Zkapp_command.to_yojson zkapp_command
+                                     ( Zkapp_command.Wire.to_yojson zkapp_command
                                      |> Yojson.Safe.to_string )
                                      (Error.to_string_hum e) )
                             |> Deferred.return

@@ -30,7 +30,7 @@ let header (b, _) = With_hash.data b
 
 let block_with_hash (b, _) = b
 
-let block (b, _) = With_hash.data b
+let header' (b, _) = fst @@ With_hash.data b
 
 let wrap t : fully_invalid_with_block = (t, fully_invalid)
 
@@ -288,6 +288,10 @@ let skip_time_received_validation `This_block_was_not_received_via_gossip
     (t, validation) =
   (t, Unsafe.set_valid_time_received validation)
 
+let skip_time_received_validation_header `This_block_was_not_received_via_gossip
+    (t, validation) =
+  (t, Unsafe.set_valid_time_received validation)
+
 let validate_genesis_protocol_state ~genesis_state_hash (t, validation) =
   let state = t |> With_hash.data |> Header.protocol_state in
   if
@@ -388,14 +392,24 @@ let validate_delta_block_chain (t, validation) =
 let skip_delta_block_chain_validation `This_block_was_not_received_via_gossip
     (t, validation) =
   let previous_protocol_state_hash =
-    t |> With_hash.data |> Block.header |> Header.protocol_state
+    t |> With_hash.data |> fst |> Header.protocol_state
     |> Protocol_state.previous_state_hash
   in
   ( t
   , Unsafe.set_valid_delta_block_chain validation
       (Mina_stdlib.Nonempty_list.singleton previous_protocol_state_hash) )
 
-let validate_frontier_dependencies ~to_header
+let skip_delta_block_chain_validation_header
+    `This_block_was_not_received_via_gossip (t, validation) =
+  let previous_protocol_state_hash =
+    t |> With_hash.data |> Header.protocol_state
+    |> Protocol_state.previous_state_hash
+  in
+  ( t
+  , Unsafe.set_valid_delta_block_chain validation
+      (Mina_stdlib.Nonempty_list.singleton previous_protocol_state_hash) )
+
+let validate_frontier_dependencies_impl ~to_header
     ~context:(module Context : CONTEXT) ~root_block ~is_block_in_frontier
     (t, validation) =
   let module Context = struct
@@ -414,7 +428,7 @@ let validate_frontier_dependencies ~to_header
     With_hash.map
       ~f:
         (Fn.compose Protocol_state.consensus_state
-           (Fn.compose Header.protocol_state Block.header) )
+           (Fn.compose Header.protocol_state fst) )
       root_block
   in
   let parent_hash =
@@ -446,6 +460,12 @@ let validate_frontier_dependencies ~to_header
   in
   (t, Unsafe.set_valid_frontier_dependencies validation)
 
+let validate_frontier_dependencies ~context =
+  validate_frontier_dependencies_impl ~to_header:fst ~context
+
+let validate_frontier_dependencies_header ~context =
+  validate_frontier_dependencies_impl ~to_header:ident ~context
+
 let skip_frontier_dependencies_validation
     (_ :
       [ `This_block_belongs_to_a_detached_subtree
@@ -476,19 +496,18 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
     ~get_completed_work ~precomputed_values ~verifier ~parent_staged_ledger
     ~parent_protocol_state (t, validation) =
   [%log internal] "Validate_staged_ledger_diff" ;
-  let block = With_hash.data t in
-  let header = Block.header block in
+  let header, body = With_hash.data t in
   let protocol_state = Header.protocol_state header in
   let blockchain_state = Protocol_state.blockchain_state protocol_state in
   let consensus_state = Protocol_state.consensus_state protocol_state in
   let global_slot = Consensus_state.global_slot_since_genesis consensus_state in
-  let body = Block.body block in
   let apply_start_time = Core.Time.now () in
   let body_ref_from_header = Blockchain_state.body_reference blockchain_state in
   let body_ref_computed =
     Staged_ledger_diff.Body.compute_reference
       ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
-      body
+      ( Staged_ledger_diff.With_hashes_computed.forget body
+      |> Staged_ledger_diff.Body.create )
   in
   let%bind.Deferred.Result () =
     if Blake2.equal body_ref_computed body_ref_from_header then
@@ -503,8 +522,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
       ~get_completed_work
       ~constraint_constants:
         precomputed_values.Precomputed_values.constraint_constants ~global_slot
-      ~logger ~verifier parent_staged_ledger
-      (Staged_ledger_diff.Body.staged_ledger_diff body)
+      ~logger ~verifier parent_staged_ledger body
       ~current_state_view:
         Mina_state.Protocol_state.(Body.view @@ body parent_protocol_state)
       ~state_and_body_hash:
@@ -566,7 +584,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
 let validate_staged_ledger_hash
     (`Staged_ledger_already_materialized staged_ledger_hash) (t, validation) =
   let state =
-    t |> With_hash.data |> Block.header |> Header.protocol_state
+    t |> With_hash.data |> fst |> Header.protocol_state
     |> Protocol_state.blockchain_state
   in
   if
@@ -612,9 +630,8 @@ let skip_protocol_versions_validation `This_block_has_valid_protocol_versions
   (t, Unsafe.set_valid_protocol_versions validation)
 
 let with_body (header_with_hash, validation) body =
-  ( With_hash.map ~f:(fun header -> Block.create ~header ~body) header_with_hash
-  , validation )
+  (With_hash.map ~f:(fun header -> (header, body)) header_with_hash, validation)
 
 let wrap_header t : fully_invalid_with_header = (t, fully_invalid)
 
-let to_header (b, v) = (With_hash.map ~f:Block.header b, v)
+let to_header (b, v) = (With_hash.map ~f:fst b, v)

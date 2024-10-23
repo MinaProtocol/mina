@@ -611,7 +611,7 @@ module T = struct
       ; sok_digest = ()
       }
     in
-    { Scan_state.Transaction_with_witness.transaction_with_info = applied_txn
+    { Scan_state.Transaction_with_witness.T.transaction_with_info = applied_txn
     ; state_hash = state_and_body_hash
     ; first_pass_ledger_witness = pre_stmt.first_pass_ledger_witness
     ; second_pass_ledger_witness = ledger_witness
@@ -1106,7 +1106,7 @@ module T = struct
                 `List
                   (List.map data
                      ~f:(fun
-                          { Scan_state.Transaction_with_witness.statement; _ }
+                          { Scan_state.Transaction_with_witness.T.statement; _ }
                         -> Transaction_snark.Statement.to_yojson statement ) )
               in
               [%log error]
@@ -1189,10 +1189,13 @@ module T = struct
           ; coinbase_amount
           } ) )
 
-  let update_metrics (t : t) (witness : Staged_ledger_diff.t) =
+  let update_metrics (t : t)
+      (witness : Staged_ledger_diff.With_hashes_computed.t) =
     let open Or_error.Let_syntax in
-    let commands = Staged_ledger_diff.commands witness in
-    let work = Staged_ledger_diff.completed_works witness in
+    let commands = Staged_ledger_diff.With_hashes_computed.commands witness in
+    let work =
+      Staged_ledger_diff.With_hashes_computed.completed_works witness
+    in
     let%bind total_txn_fee =
       sum_fees commands ~f:(fun { data = cmd; _ } -> User_command.fee cmd)
     in
@@ -1246,11 +1249,13 @@ module T = struct
                  (Error.of_string "batch verification failed") ) ) )
 
   let apply ?skip_verification ~constraint_constants ~global_slot t
-      ~get_completed_work (witness : Staged_ledger_diff.t) ~logger ~verifier
-      ~current_state_view ~state_and_body_hash ~coinbase_receiver
-      ~supercharge_coinbase ~zkapp_cmd_limit_hardcap =
+      ~get_completed_work (witness : Staged_ledger_diff.With_hashes_computed.t)
+      ~logger ~verifier ~current_state_view ~state_and_body_hash
+      ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap =
     let open Deferred.Result.Let_syntax in
-    let work = Staged_ledger_diff.completed_works witness in
+    let work =
+      Staged_ledger_diff.With_hashes_computed.completed_works witness
+    in
     let%bind () =
       O1trace.thread "check_completed_works" (fun () ->
           match skip_verification with
@@ -2662,12 +2667,12 @@ let%test_module "staged ledger tests" =
       | One (Some ft) ->
           (1, [ ft ])
 
-    let coinbase_count (sl_diff : Staged_ledger_diff.t) =
+    let coinbase_count (sl_diff : Staged_ledger_diff.With_hashes_computed.t) =
       (coinbase_first_prediff (fst sl_diff.diff).coinbase |> fst)
       + Option.value_map ~default:0 (snd sl_diff.diff) ~f:(fun d ->
             coinbase_second_prediff d.coinbase |> fst )
 
-    let coinbase_cost (sl_diff : Staged_ledger_diff.t) =
+    let coinbase_cost (sl_diff : Staged_ledger_diff.With_hashes_computed.t) =
       let coinbase_fts =
         (coinbase_first_prediff (fst sl_diff.diff).coinbase |> snd)
         @ Option.value_map ~default:[] (snd sl_diff.diff) ~f:(fun d ->
@@ -2725,7 +2730,7 @@ let%test_module "staged ledger tests" =
             -> User_command.Valid.t Sequence.t
                (* Sequence of commands to apply. *)
             -> 'acc
-            -> (Staged_ledger_diff.t * 'acc) Deferred.t )
+            -> (Staged_ledger_diff.With_hashes_computed.t * 'acc) Deferred.t )
         -> 'acc Deferred.t =
      fun cmds cmd_iters acc f ->
       match cmd_iters with
@@ -2744,7 +2749,7 @@ let%test_module "staged ledger tests" =
             f cmds count_opt (Sequence.of_list cmds_this_iter_max) acc
           in
           let cmds_applied_count =
-            List.length @@ Staged_ledger_diff.commands diff
+            List.length @@ Staged_ledger_diff.With_hashes_computed.commands diff
           in
           iter_cmds_acc (List.drop cmds cmds_applied_count) counts_rest acc' f
 
@@ -2797,7 +2802,8 @@ let%test_module "staged ledger tests" =
                       .state_body_hash |> Option.value_exn )
                 sl cmds_this_iter stmt_to_work
             in
-            List.iter (Staged_ledger_diff.commands diff) ~f:(fun c ->
+            List.iter (Staged_ledger_diff.With_hashes_computed.commands diff)
+              ~f:(fun c ->
                 match With_status.status c with
                 | Applied ->
                     ()
@@ -2889,7 +2895,8 @@ let%test_module "staged ledger tests" =
             in
             assert_fee_excess ledger_proof ;
             let cmds_applied_this_iter =
-              List.length @@ Staged_ledger_diff.commands diff
+              List.length
+              @@ Staged_ledger_diff.With_hashes_computed.commands diff
             in
             let cb = coinbase_count diff in
             ( match provers with
@@ -2903,7 +2910,8 @@ let%test_module "staged ledger tests" =
                    there is only enough space for coinbase transactions. *)
                 assert (cmds_applied_this_iter <= Sequence.length cmds_this_iter) ;
                 [%test_eq: User_command.t list]
-                  (List.map (Staged_ledger_diff.commands diff)
+                  (List.map
+                     (Staged_ledger_diff.With_hashes_computed.commands diff)
                      ~f:(fun { With_status.data; _ } -> data) )
                   ( Sequence.take cmds_this_iter cmds_applied_this_iter
                   |> Sequence.map ~f:User_command.forget_check
@@ -3310,7 +3318,8 @@ let%test_module "staged ledger tests" =
     let%test_unit "Invalid diff test: check zero fee excess for partitions" =
       let create_diff_with_non_zero_fee_excess ~ledger ~coinbase_amount
           ~global_slot txns completed_works
-          (partition : Sl.Scan_state.Space_partition.t) : Staged_ledger_diff.t =
+          (partition : Sl.Scan_state.Space_partition.t) :
+          Staged_ledger_diff.With_hashes_computed.t =
         (*With exact number of user commands in partition.first, the fee transfers that settle the fee_excess would be added to the next tree causing a non-zero fee excess*)
         let slots, job_count1 = partition.first in
         match partition.second with
@@ -3339,7 +3348,7 @@ let%test_module "staged ledger tests" =
                   ; internal_command_statuses = []
                   } )
       in
-      let empty_diff = Staged_ledger_diff.empty_diff in
+      let empty_diff = Staged_ledger_diff.With_hashes_computed.empty_diff in
       Quickcheck.test
         Quickcheck.Generator.(tuple2 gen_at_capacity small_positive_int)
         ~sexp_of:
@@ -3420,8 +3429,9 @@ let%test_module "staged ledger tests" =
               assert checked ) )
 
     let%test_unit "Provers can't pay the account creation fee" =
-      let no_work_included (diff : Staged_ledger_diff.t) =
-        List.is_empty (Staged_ledger_diff.completed_works diff)
+      let no_work_included diff =
+        List.is_empty
+          (Staged_ledger_diff.With_hashes_computed.completed_works diff)
       in
       let stmt_to_work stmts =
         let prover = stmt_to_prover stmts in
@@ -3545,7 +3555,8 @@ let%test_module "staged ledger tests" =
             in
             assert_fee_excess proof ;
             let cmds_applied_this_iter =
-              List.length @@ Staged_ledger_diff.commands diff
+              List.length
+              @@ Staged_ledger_diff.With_hashes_computed.commands diff
             in
             let cb = coinbase_count diff in
             assert (proofs_available_this_iter = 0 || cb > 0) ;
@@ -3730,19 +3741,16 @@ let%test_module "staged ledger tests" =
                 cmds_this_iter
                 (stmt_to_work_random_fee work_to_be_done provers)
             in
-            let sorted_work_from_diff1
-                (pre_diff :
-                  Staged_ledger_diff.Pre_diff_with_at_most_two_coinbase.t ) =
-              List.sort pre_diff.completed_works ~compare:(fun w w' ->
-                  Fee.compare w.fee w'.fee )
+            let sorted_work_from_diff1 pre_diff =
+              List.sort pre_diff.Staged_ledger_diff.Pre_diff_two.completed_works
+                ~compare:(fun w w' ->
+                  Fee.compare w.Transaction_snark_work.fee w'.fee )
             in
-            let sorted_work_from_diff2
-                (pre_diff :
-                  Staged_ledger_diff.Pre_diff_with_at_most_one_coinbase.t option
-                  ) =
+            let sorted_work_from_diff2 pre_diff =
               Option.value_map pre_diff ~default:[] ~f:(fun p ->
-                  List.sort p.completed_works ~compare:(fun w w' ->
-                      Fee.compare w.fee w'.fee ) )
+                  List.sort p.Staged_ledger_diff.Pre_diff_one.completed_works
+                    ~compare:(fun w w' ->
+                      Fee.compare w.Transaction_snark_work.fee w'.fee ) )
             in
             let () =
               let assert_same_fee { Coinbase.Fee_transfer.fee; _ } fee' =
@@ -3782,7 +3790,7 @@ let%test_module "staged ledger tests" =
                   failwith
                     (sprintf
                        !"Incorrect coinbase in the diff %{sexp: \
-                         Staged_ledger_diff.t}"
+                         Staged_ledger_diff.With_hashes_computed.t}"
                        diff )
             in
             (diff, List.tl_exn proofs_available_left) )
@@ -3955,7 +3963,8 @@ let%test_module "staged ledger tests" =
               ~is_new_stack ;
             assert_fee_excess proof ;
             let cmds_applied_this_iter =
-              List.length @@ Staged_ledger_diff.commands diff
+              List.length
+              @@ Staged_ledger_diff.With_hashes_computed.commands diff
             in
             let cb = coinbase_count diff in
             assert (proofs_available_this_iter = 0 || cb > 0) ;
@@ -4736,12 +4745,9 @@ let%test_module "staged ledger tests" =
               cmd)
             in
             *)
-              let diff : Staged_ledger_diff.t =
-                let pre_diff :
-                    Staged_ledger_diff.Pre_diff_with_at_most_two_coinbase.Stable
-                    .V2
-                    .t =
-                  { completed_works = []
+              let diff : Staged_ledger_diff.With_hashes_computed.t =
+                let pre_diff =
+                  { Staged_ledger_diff.Pre_diff_two.completed_works = []
                   ; commands = cmds
                   ; coinbase = Zero
                   ; internal_command_statuses = [ Applied ]
@@ -4807,6 +4813,7 @@ let%test_module "staged ledger tests" =
       let open Zkapp_command_builder in
       mk_forest nodes
       |> mk_zkapp_command ~fee ~fee_payer_pk ~fee_payer_nonce
+      |> Zkapp_command.of_wire
       |> replace_authorizations ?prover ~keymap
 
     let%test_unit "Setting verification keys across differing accounts" =
@@ -5062,7 +5069,8 @@ let%test_module "staged ledger tests" =
                       stmt_to_work_one_prover
                   in
                   let command =
-                    Staged_ledger_diff.commands diff |> List.hd_exn
+                    Staged_ledger_diff.With_hashes_computed.commands diff
+                    |> List.hd_exn
                   in
                   (*Zkapp_command with incompatible vk is added with failed status*)
                   ( match command.status with
@@ -5101,7 +5109,9 @@ let%test_module "staged ledger tests" =
                          (User_command.Zkapp_command valid_zkapp_command) )
                       stmt_to_work_one_prover
                   in
-                  let commands = Staged_ledger_diff.commands diff in
+                  let commands =
+                    Staged_ledger_diff.With_hashes_computed.commands diff
+                  in
                   assert (List.length commands = 1) ;
                   match List.hd_exn commands with
                   | { With_status.data = Zkapp_command _ps; status = Applied }

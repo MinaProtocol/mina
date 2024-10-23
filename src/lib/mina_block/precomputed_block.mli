@@ -51,10 +51,10 @@ type t = Stable.Latest.t =
   }
 [@@deriving sexp, yojson]
 
-val of_block :
+val of_validated_block :
      logger:Logger.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> scheduled_time:Block_time.Time.t
   -> staged_ledger:Staged_ledger.t
-  -> (Block.t, Mina_base.State_hash.State_hashes.t) With_hash.t
+  -> Validated_block.t
   -> t

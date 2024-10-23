@@ -69,10 +69,7 @@ let compute_block_trace_metadata transition_with_validation =
   (* No need to compute anything if internal tracing is disabled, will be dropped anyway *)
   if not @@ Internal_tracing.is_enabled () then []
   else
-    let header =
-      Mina_block.header
-      @@ Mina_block.Validation.block transition_with_validation
-    in
+    let header = Mina_block.Validation.header' transition_with_validation in
     let ps = Mina_block.Header.protocol_state header in
     let cs = Mina_state.Protocol_state.consensus_state ps in
     let open Consensus.Data.Consensus_state in
@@ -203,23 +200,22 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
 let block_with_hash =
   Fn.compose Mina_block.Validated.forget validated_transition
 
-let block = Fn.compose With_hash.data block_with_hash
+let header = Fn.compose (fun { With_hash.data = h, _; _ } -> h) block_with_hash
 
 let state_hash = Fn.compose Mina_block.Validated.state_hash validated_transition
 
-let protocol_state b =
-  b |> block |> Mina_block.header |> Mina_block.Header.protocol_state
+let protocol_state = Fn.compose Mina_block.Header.protocol_state header
 
 let protocol_state_with_hashes breadcrumb =
   breadcrumb |> validated_transition |> Mina_block.Validated.forget
-  |> With_hash.map ~f:(Fn.compose Header.protocol_state Mina_block.header)
+  |> With_hash.map ~f:(Fn.compose Header.protocol_state fst)
 
 let consensus_state = Fn.compose Protocol_state.consensus_state protocol_state
 
 let consensus_state_with_hashes breadcrumb =
   breadcrumb |> block_with_hash
-  |> With_hash.map ~f:(fun block ->
-         block |> Mina_block.header |> Mina_block.Header.protocol_state
+  |> With_hash.map ~f:(fun (header, _) ->
+         Mina_block.Header.protocol_state header
          |> Protocol_state.consensus_state )
 
 let parent_hash b = b |> protocol_state |> Protocol_state.previous_state_hash
@@ -247,9 +243,7 @@ type display =
 [@@deriving yojson]
 
 let display t =
-  let protocol_state =
-    t |> block |> Mina_block.header |> Mina_block.Header.protocol_state
-  in
+  let protocol_state = t |> header |> Mina_block.Header.protocol_state in
   let blockchain_state =
     Blockchain_state.display (Protocol_state.blockchain_state protocol_state)
   in
@@ -369,8 +363,7 @@ module For_tests = struct
       in
       let current_state_view, state_and_body_hash =
         let prev_state =
-          parent_breadcrumb |> block |> Mina_block.header
-          |> Mina_block.Header.protocol_state
+          parent_breadcrumb |> header |> Mina_block.Header.protocol_state
         in
         let prev_state_hashes = Protocol_state.hashes prev_state in
         let current_state_view =
@@ -395,8 +388,13 @@ module For_tests = struct
         |> Result.map_error ~f:Staged_ledger.Pre_diff_info.Error.to_error
         |> Or_error.ok_exn
       in
+      let staged_ledger_diff_hashed =
+        Staged_ledger_diff.forget staged_ledger_diff
+      in
       let body =
-        Mina_block.Body.create @@ Staged_ledger_diff.forget staged_ledger_diff
+        Mina_block.Body.create
+        @@ Staged_ledger_diff.With_hashes_computed.forget
+             staged_ledger_diff_hashed
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
@@ -417,8 +415,7 @@ module For_tests = struct
             failwith (Staged_ledger.Staged_ledger_error.to_string e)
       in
       let previous_protocol_state =
-        parent_breadcrumb |> block |> Mina_block.header
-        |> Mina_block.Header.protocol_state
+        parent_breadcrumb |> header |> Mina_block.Header.protocol_state
       in
       let previous_ledger_proof_stmt =
         previous_protocol_state |> Protocol_state.blockchain_state
@@ -476,7 +473,7 @@ module For_tests = struct
         (* We manually created a validated an block *)
         let block =
           { With_hash.hash = Protocol_state.hashes protocol_state
-          ; data = Mina_block.create ~header ~body
+          ; data = (header, staged_ledger_diff_hashed)
           }
         in
         Mina_block.Validated.unsafe_of_trusted_block

@@ -84,11 +84,11 @@ let validate_transition_is_relevant ~context:(module Context : CONTEXT)
     Envelope.Incoming.data enveloped_transition
     |> Mina_block.Validation.block_with_hash
   in
-  let transition_data = With_hash.data transition in
+  let header, body_hashed = With_hash.data transition in
   let block_slot =
     Consensus.Data.Consensus_state.curr_global_slot
-    @@ Protocol_state.consensus_state @@ Header.protocol_state
-    @@ Mina_block.header transition_data
+    @@ Protocol_state.consensus_state
+    @@ Header.protocol_state header
   in
   let%bind () =
     match slot_tx_end with
@@ -97,12 +97,9 @@ let validate_transition_is_relevant ~context:(module Context : CONTEXT)
       ->
         [%log' internal Context.logger]
           "Block after slot_tx_end, validating it is empty" ;
-        let staged_ledger_diff =
-          Body.staged_ledger_diff @@ body transition_data
-        in
         Result.ok_if_true
-          ( Staged_ledger_diff.compare Staged_ledger_diff.empty_diff
-              staged_ledger_diff
+          ( Staged_ledger_diff.With_hashes_computed.compare
+              Staged_ledger_diff.With_hashes_computed.empty_diff body_hashed
           = 0 )
           ~error:`Non_empty_staged_ledger_diff_after_stop_slot
     | None | Some _ ->
@@ -116,7 +113,7 @@ let validate_transition_is_relevant ~context:(module Context : CONTEXT)
       ~init:Result.(Ok ())
       ~f:(fun _ final_state -> Result.Error (`In_process final_state))
   in
-  let header_with_hash = With_hash.map ~f:Mina_block.header transition in
+  let header_with_hash = With_hash.map ~f:fst transition in
   let%map () =
     validate_header_is_relevant
       ~context:(module Context)
@@ -156,7 +153,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
             match b_or_h with
             | `Block b ->
                 let block_with_hash, _ = Envelope.Incoming.data b in
-                ( With_hash.map ~f:Mina_block.header block_with_hash
+                ( With_hash.map ~f:fst block_with_hash
                 , Envelope.Incoming.sender b )
             | `Header h ->
                 let header_with_hash, _ = Envelope.Incoming.data h in

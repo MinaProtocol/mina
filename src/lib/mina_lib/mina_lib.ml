@@ -71,7 +71,7 @@ type components =
 (* tag commands so they can share a common pipe, to ensure sequentiality of nonces *)
 type command_inputs =
   | Signed_command_inputs of User_command_input.t list
-  | Zkapp_command_command_inputs of Zkapp_command.t list
+  | Zkapp_command_command_inputs of Zkapp_command.Wire.t list
 
 type pipes =
   { validated_transitions_reader : Mina_block.Validated.t Strict_pipe.Reader.t
@@ -735,8 +735,8 @@ let get_snarked_ledger_full t state_hash_opt =
             else return () )
       in
       let snarked_ledger_hash =
-        Transition_frontier.Breadcrumb.block b
-        |> Mina_block.header |> Header.protocol_state
+        Transition_frontier.Breadcrumb.validated_transition b
+        |> Mina_block.Validated.header |> Header.protocol_state
         |> Mina_state.Protocol_state.blockchain_state
         |> Mina_state.Blockchain_state.snarked_ledger_hash
       in
@@ -969,7 +969,7 @@ let add_full_transactions t user_commands =
       in
       Deferred.Result.fail error
 
-let add_zkapp_transactions t (zkapp_commands : Zkapp_command.t list) =
+let add_zkapp_transactions t (zkapp_commands : Zkapp_command.Wire.t list) =
   let add_all_txns () =
     let result_ivar = Ivar.create () in
     let cmd_inputs = Zkapp_command_command_inputs zkapp_commands in
@@ -2513,9 +2513,8 @@ let best_chain_block_by_height (t : t) height =
            Transition_frontier.Breadcrumb.validated_transition bc
          in
          let block_height =
-           Mina_block.(
-             blockchain_length @@ With_hash.data
-             @@ Validated.forget validated_transition)
+           Mina_block.Header.blockchain_length @@ fst @@ With_hash.data
+           @@ Validated.forget validated_transition
          in
          Unsigned.UInt32.equal block_height height )
   |> Result.of_option

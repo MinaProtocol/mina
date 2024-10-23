@@ -210,7 +210,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     List.iter zkapp_commands ~f:(fun zkapp_command ->
         [%log info] "Sending $zkapp_command"
           ~metadata:
-            [ ("zkapp_command", Mina_base.Zkapp_command.to_yojson zkapp_command)
+            [ ( "zkapp_command"
+              , Mina_base.Zkapp_command.Wire.to_yojson zkapp_command )
             ; ( "memo"
               , `String
                   (Mina_base.Signed_command_memo.to_string_hum

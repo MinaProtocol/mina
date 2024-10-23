@@ -78,10 +78,14 @@ type Structured_log_events.t += Persisted_frontier_dropped
 
 let genesis_root_data ~precomputed_values =
   let transition =
-    Mina_block.Validated.lift @@ Mina_block.genesis ~precomputed_values
+    Mina_block.genesis ~precomputed_values
+    |> fst |> Mina_block.forget_computed_hashes
   in
   let constraint_constants = precomputed_values.constraint_constants in
-  let scan_state = Staged_ledger.Scan_state.empty ~constraint_constants () in
+  let scan_state =
+    Staged_ledger.Scan_state.empty ~constraint_constants ()
+    |> Transaction_snark_scan_state.to_wire
+  in
   (*if scan state is empty the protocol states required is also empty*)
   let protocol_states = [] in
   let pending_coinbase =
@@ -469,7 +473,7 @@ let add_breadcrumb_exn t breadcrumb =
   let tx_hash_json =
     Fn.compose
       Mina_transaction.Transaction_hash.(Fn.compose to_yojson hash_command)
-      User_command.forget_check
+      (Fn.compose User_command.to_wire User_command.forget_check)
   in
   [%str_log' trace t.logger] Added_breadcrumb_user_commands
     ~metadata:
@@ -761,8 +765,12 @@ module For_tests = struct
     in
     let root_data =
       Root_data.Limited.create
-        ~transition:(Breadcrumb.validated_transition root)
-        ~scan_state:(Breadcrumb.staged_ledger root |> Staged_ledger.scan_state)
+        ~transition:
+          ( Breadcrumb.validated_transition root
+          |> Mina_block.Validated.forget |> Mina_block.forget_computed_hashes )
+        ~scan_state:
+          ( Breadcrumb.staged_ledger root
+          |> Staged_ledger.scan_state |> Transaction_snark_scan_state.to_wire )
         ~pending_coinbase:
           ( Breadcrumb.staged_ledger root
           |> Staged_ledger.pending_coinbase_collection )
@@ -779,7 +787,7 @@ module For_tests = struct
     Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
         let transition = Root_data.Limited.transition root_data in
         Persistent_root.Instance.set_root_state_hash instance
-          (Mina_block.Validated.state_hash transition) ;
+          (State_hash.With_state_hashes.state_hash transition) ;
         ignore
         @@ Ledger_transfer.transfer_accounts ~src:root_snarked_ledger
              ~dest:(Persistent_root.Instance.snarked_ledger instance) ) ;

@@ -27,7 +27,7 @@ let create_buffered_pipe ?name ~f () =
 let block_or_header_to_header_hashed b_or_h =
   match b_or_h with
   | `Block b ->
-      With_hash.map ~f:Mina_block.header @@ fst @@ Envelope.Incoming.data b
+      With_hash.map ~f:fst @@ fst @@ Envelope.Incoming.data b
   | `Header h ->
       fst @@ Envelope.Incoming.data h
 
@@ -35,7 +35,7 @@ let block_or_header_to_header_hashed_with_validation b_or_h =
   match b_or_h with
   | `Block b ->
       let b', v = Envelope.Incoming.data b in
-      (With_hash.map ~f:Mina_block.header b', v)
+      (With_hash.map ~f:fst b', v)
   | `Header h ->
       Envelope.Incoming.data h
 
@@ -239,18 +239,26 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
                 ]
               "Couldn't get best tip from peer: $error" ;
             return None
-        | Ok peer_best_tip -> (
+        | Ok
+            ( { Proof_carrying_data.data = best_tip_block
+              ; proof = p, root_block
+              } as pcd ) -> (
+            let header_proof =
+              { Proof_carrying_data.data = Mina_block.header best_tip_block
+              ; proof = (p, Mina_block.header root_block)
+              }
+            in
             [%log debug]
               ~metadata:
                 [ ("peer", Network_peer.Peer.to_yojson peer)
                 ; ( "length"
                   , Length.to_yojson
-                      (Mina_block.blockchain_length peer_best_tip.data) )
+                      (Mina_block.blockchain_length best_tip_block) )
                 ]
               "Successfully downloaded best tip with $length from $peer" ;
             (* TODO: Use batch verification instead *)
             match%bind
-              Best_tip_prover.verify ~verifier peer_best_tip ~genesis_constants
+              Best_tip_prover.verify ~verifier header_proof ~genesis_constants
                 ~precomputed_values
             with
             | Error e ->
@@ -269,14 +277,18 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
                         ))
                 in
                 None
-            | Ok (`Root _, `Best_tip candidate_best_tip) ->
+            | Ok (`Root _, `Best_tip candidate_best_tip_header) ->
+                let candidate_best_tip =
+                  Mina_block.Validation.with_body candidate_best_tip_header
+                  @@ Mina_block.staged_ledger_diff_hashed best_tip_block
+                in
                 [%log debug]
                   ~metadata:[ ("peer", Network_peer.Peer.to_yojson peer) ]
                   "Successfully verified best tip from $peer" ;
                 return
                   (Some
                      (Envelope.Incoming.wrap_peer
-                        ~data:{ peer_best_tip with data = candidate_best_tip }
+                        ~data:{ pcd with data = candidate_best_tip }
                         ~sender:peer ) ) ) )
   in
   [%log debug]
@@ -295,7 +307,9 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
           ~f:(fun enveloped_existing_best_tip enveloped_candidate_best_tip ->
             let f x =
               Mina_block.Validation.block_with_hash x
-              |> With_hash.map ~f:Mina_block.consensus_state
+              |> With_hash.map ~f:(fun (h, _) ->
+                     Mina_block.Header.protocol_state h
+                     |> Mina_state.Protocol_state.consensus_state )
             in
             match
               Consensus.Hooks.select
@@ -311,8 +325,8 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
   Option.iter res ~f:(fun best ->
       let best_tip = best.data.data in
       let best_tip_length =
-        Mina_block.Validation.block best_tip
-        |> Mina_block.blockchain_length |> Length.to_int
+        Mina_block.Validation.header' best_tip
+        |> Mina_block.Header.blockchain_length |> Length.to_int
       in
       Mina_metrics.Transition_frontier.update_max_blocklength_observed
         best_tip_length ;
@@ -451,8 +465,8 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
           [ ( "length"
             , `Int
                 (Unsigned.UInt32.to_int
-                   ( Mina_block.blockchain_length
-                   @@ Mina_block.Validation.block best_tip.data ) ) )
+                   ( Mina_block.Header.blockchain_length
+                   @@ Mina_block.Validation.header' best_tip.data ) ) )
           ]
         "Network best tip is too new to catchup to (best_tip with $length); \
          starting bootstrap" ;
@@ -477,8 +491,8 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
                 [ ( "length"
                   , `Int
                       (Unsigned.UInt32.to_int
-                         ( Mina_block.blockchain_length
-                         @@ Mina_block.Validation.block best_tip.data ) ) )
+                         ( Mina_block.Header.blockchain_length
+                         @@ Mina_block.Validation.header' best_tip.data ) ) )
                 ]
               "Network best tip is recent enough to catchup to (best_tip with \
                $length); syncing local state and starting participation" ;

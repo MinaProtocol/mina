@@ -441,7 +441,9 @@ module Update = struct
               Mina_metrics.Transaction_pool.zkapp_transactions_added_to_pool ;
             Mina_metrics.Counter.inc
               Mina_metrics.Transaction_pool.zkapp_transaction_size
-              (Zkapp_command.Stable.Latest.bin_size_t p |> Float.of_int) ;
+              ( Zkapp_command.Wire.Stable.Latest.bin_size_t
+                  (Zkapp_command.to_wire p)
+              |> Float.of_int ) ;
             Mina_metrics.Counter.inc Mina_metrics.Transaction_pool.zkapp_updates
               (Float.of_int updates) ;
             Mina_metrics.Counter.inc

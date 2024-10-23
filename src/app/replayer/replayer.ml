@@ -552,6 +552,7 @@ let zkapp_command_to_transaction ~logger ~pool (cmd : Sql.Zkapp_command.t) :
   let memo = Signed_command_memo.of_base58_check_exn cmd.memo in
   let zkapp_command =
     Zkapp_command.of_simple { fee_payer; account_updates; memo }
+    |> Zkapp_command.of_wire
   in
   return
   @@ Mina_transaction.Transaction.Command

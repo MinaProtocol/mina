@@ -4,31 +4,60 @@ open Mina_base
 open Mina_transaction
 module Ledger = Mina_ledger.Ledger
 
-[%%versioned:
-module Stable : sig
-  module V2 : sig
-    type t
-
-    val hash : t -> Staged_ledger_hash.Aux_hash.t
-  end
-end]
+type t 
 
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
-  type t =
-    { transaction_with_info : Mina_transaction_logic.Transaction_applied.t
-    ; state_hash : State_hash.t * State_body_hash.t
-    ; statement : Transaction_snark.Statement.t
-    ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
-    ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
-    ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
-    ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
-    }
-  [@@deriving sexp]
+  module T : sig
+    [%%versioned:
+    module Stable : sig
+      module V2 : sig
+        (* TODO: The statement is redundant here - it can be computed from the
+           witness and the transaction
+        *)
+        type 'tx t =
+          { transaction_with_info : 'tx
+          ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
+          ; statement : Transaction_snark.Statement.Stable.V2.t
+          ; init_stack :
+              Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable
+              .V1
+              .t
+          ; first_pass_ledger_witness :
+              (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
+          ; second_pass_ledger_witness :
+              (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
+          ; block_global_slot :
+              Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+          }
+        [@@deriving sexp, to_yojson]
+      end
+    end]
+  end
+
+  module Wire : sig
+    [%%versioned:
+    module Stable : sig
+      module V2 : sig
+        type t =
+          Mina_transaction_logic.Transaction_applied.Wire.Stable.V2.t
+          T.Stable.V2.t
+        [@@deriving sexp, to_yojson]
+      end
+    end]
+  end
+
+  type t = Mina_transaction_logic.Transaction_applied.t T.t [@@deriving sexp]
 end
 
 module Ledger_proof_with_sok_message : sig
-  type t = Ledger_proof.t * Sok_message.t
+  [%%versioned:
+  module Stable : sig
+    module V2 : sig
+      type t = Ledger_proof.Stable.V2.t * Sok_message.Stable.V1.t
+      [@@deriving sexp]
+    end
+  end]
 end
 
 module Available_job : sig
@@ -258,9 +287,12 @@ val required_state_hashes : t -> State_hash.Set.t
 
 (** Validate protocol states required for proving the transactions. Returns an association list of state_hash and the corresponding state*)
 val check_required_protocol_states :
-     t
+     is_zkapp_transaction:('a -> bool)
   -> protocol_states:
        Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
+  -> ('b, 'a Transaction_with_witness.T.t) Parallel_scan.State.t
+  -> 'a Transaction_with_witness.T.t list
+     * [ `Border_block_continued_in_the_next_tree of bool ]
   -> Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
      Or_error.t
 
@@ -272,3 +304,25 @@ val all_work_pairs :
      One_or_two.t
      list
      Or_error.t
+
+module Wire : sig
+  [%%versioned:
+  module Stable : sig
+    module V2 : sig
+      type t =
+        { scan_state :
+            ( Ledger_proof_with_sok_message.Stable.V2.t
+            , Transaction_with_witness.Wire.Stable.V2.t )
+            Parallel_scan.State.Stable.V1.t
+        ; previous_incomplete_zkapp_updates :
+            Transaction_with_witness.Wire.Stable.V2.t list
+            * [ `Border_block_continued_in_the_next_tree of bool ]
+        }
+      [@@deriving sexp]
+    end
+  end]
+end
+
+val to_wire : t -> Wire.t
+
+val of_wire : Wire.t -> t

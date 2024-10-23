@@ -201,7 +201,7 @@ let log_block_metadata ~logger state_hash ~parent_hash =
 
 let get_parent_hash transition_with_hash =
   With_hash.data transition_with_hash
-  |> Mina_block.header |> Header.protocol_state
+  |> fst |> Header.protocol_state
   |> Mina_state.Protocol_state.previous_state_hash
 
 let make_timeout t transition_with_hash duration =
@@ -219,7 +219,8 @@ let make_timeout t transition_with_hash duration =
           ; ( "duration"
             , `Int (Block_time.Span.to_ms duration |> Int64.to_int_trunc) )
           ; ( "cached_transition"
-            , With_hash.data transition_with_hash |> Mina_block.to_yojson )
+            , With_hash.data transition_with_hash
+              |> fst |> Mina_block.Header.to_yojson )
           ]
         "Timed out waiting for the parent of $cached_transition after \
          $duration ms, signalling a catchup job" ;

@@ -10,7 +10,10 @@ let append_newline s = s ^ "\n"
 
 let block_of_breadcrumb ?with_parent_statehash breadcrumb =
   let open Mina_block in
-  let block = Frontier_base.Breadcrumb.block breadcrumb in
+  let block =
+    Frontier_base.Breadcrumb.validated_transition breadcrumb
+    |> Mina_block.Validated.block
+  in
   match with_parent_statehash with
   | None ->
       block

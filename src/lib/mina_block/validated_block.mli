@@ -1,13 +1,6 @@
 open Mina_base
 
-[%%versioned:
-module Stable : sig
-  module V2 : sig
-    type t [@@deriving sexp, equal]
-  end
-end]
-
-type t = Stable.Latest.t [@@deriving sexp, to_yojson, equal]
+type t [@@deriving sexp, to_yojson]
 
 val lift : Validation.fully_valid_with_block -> t
 
@@ -30,4 +23,14 @@ val state_body_hash : t -> State_body_hash.t
 
 val header : t -> Header.t
 
-val body : t -> Staged_ledger_diff.Body.t
+val account_ids_accessed :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> t
+  -> (Account_id.t * [ `Accessed | `Not_accessed ]) list
+
+val transactions :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> t
+  -> Mina_transaction.Transaction.t With_status.t list
+
+val block : t -> Block.t

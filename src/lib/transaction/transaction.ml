@@ -26,32 +26,52 @@ module Poly = struct
 end
 
 module Valid = struct
+  module T = struct
+    type t = User_command.Valid.t Poly.t
+    [@@deriving sexp, compare, equal, hash, yojson]
+  end
+
+  include T
+  include Hashable.Make (T)
+  include Comparable.Make (T)
+end
+
+module Wire = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type t = User_command.Valid.Stable.V2.t Poly.Stable.V2.t
+      type t = User_command.Wire.Stable.V2.t Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  include Hashable.Make (Stable.Latest)
-  include Comparable.Make (Stable.Latest)
+  let check_well_formedness ~genesis_constants ~compile_config (t : t) =
+    match t with
+    | Command cmd ->
+        User_command.check_well_formedness ~genesis_constants ~compile_config
+          cmd
+    | Fee_transfer _ | Coinbase _ ->
+        Ok ()
 end
 
-[%%versioned
-module Stable = struct
-  module V2 = struct
-    type t = User_command.Stable.V2.t Poly.Stable.V2.t
-    [@@deriving sexp, compare, equal, hash, yojson]
+module T = struct
+  type t = User_command.t Poly.t [@@deriving sexp, compare, equal, hash, yojson]
+end
 
-    let to_latest = Fn.id
-  end
-end]
+include T
+include Hashable.Make (T)
+include Comparable.Make (T)
 
-include Hashable.Make (Stable.Latest)
-include Comparable.Make (Stable.Latest)
+let to_wire (t : t) : Wire.t =
+  match t with
+  | Fee_transfer c ->
+      Fee_transfer c
+  | Coinbase c ->
+      Coinbase c
+  | Command c ->
+      Command (User_command.to_wire c)
 
 type 'command t_ = 'command Poly.t =
   | Command of 'command
@@ -109,7 +129,8 @@ let public_keys (t : t) =
   in
   List.map account_ids ~f:Account_id.public_key
 
-let account_access_statuses (t : t) (status : Transaction_status.t) =
+let account_access_statuses (t : (_, _) User_command.unwired_t t_)
+    (status : Transaction_status.t) =
   match t with
   | Command (Signed_command cmd) ->
       Signed_command.account_access_statuses cmd status
@@ -169,7 +190,7 @@ let yojson_summary_of_command =
   in
   function
   | User_command.Zkapp_command cmd ->
-      mk_record (zkapp_type cmd) (Zkapp_command.memo cmd)
+      mk_record (zkapp_type cmd) (Zkapp_command.T.memo cmd)
         ( Zkapp_command.fee_payer_account_update cmd
         |> Account_update.Fee_payer.authorization )
   | Signed_command cmd ->
