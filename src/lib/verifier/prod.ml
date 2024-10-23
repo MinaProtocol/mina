@@ -77,6 +77,7 @@ module Worker_state = struct
 
   let create { logger; proof_level; constraint_constants; commit_id; _ } :
       t Deferred.t =
+    printf !"verifier/prod.ml#WorkerState#create DEBUG very first line\n%!" ;
     match proof_level with
     | Full ->
         Pickles.Side_loaded.srs_precomputation () ;
@@ -393,6 +394,7 @@ module Worker = struct
             ; constraint_constants
             ; commit_id
             } =
+        printf !"verifier/prod.ml#worker DEBUG init_worker_state starting\n%!" ;
         if Option.is_some conf_dir then (
           let max_size = 256 * 1024 * 512 in
           let num_rotate = 1 in
@@ -418,7 +420,8 @@ module Worker = struct
         if enable_internal_tracing then
           don't_wait_for @@ Internal_tracing.toggle ~commit_id ~logger `Enabled ;
         [%log info] "Verifier started" ;
-        Worker_state.create
+        [%log error] "DEBUG Verifier thread started" ;
+        let res = Worker_state.create
           { conf_dir
           ; enable_internal_tracing
           ; internal_trace_filename
@@ -426,7 +429,9 @@ module Worker = struct
           ; proof_level
           ; constraint_constants
           ; commit_id
-          }
+          } in
+        printf !"verifier/prod.ml#worker DEBUG init_worker_state successful\n%!" ;
+        res
 
       let init_connection_state ~connection:_ ~worker_state:_ () = Deferred.unit
     end
@@ -447,13 +452,16 @@ type t = { worker : worker Ivar.t ref; logger : Logger.t }
 let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
     ~proof_level ~constraint_constants ~pids ~conf_dir ~commit_id () :
     t Deferred.t =
+  printf !"verifier/prod.ml#create DEBUG very first line\n%!" ;
   let on_failure err =
+    printf !"verifier/prod.ml#create DEBUG VERIFIER FAILURE\n%!" ;
     [%log error] "Verifier process failed with error $err"
       ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
     Error.raise err
   in
   let create_worker () =
     [%log info] "Starting a new verifier process" ;
+    printf !"verifier/prod.ml#create DEBUG create_worker 1\n%!" ;
     let%map.Deferred.Or_error connection, process =
       (* This [try_with] isn't really here to catch an error that throws while
          the process is being spawned. Indeed, the immediate [ok_exn] will
@@ -467,33 +475,45 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
          [rest] handler for the 'rest' of the errors after the value is
          determined, which logs the errors and then swallows them.
       *)
-      Monitor.try_with ~here:[%here] ~name:"Verifier RPC worker" ~run:`Now
-        ~rest:
-          (`Call
-            (fun exn ->
-              let err = Error.of_exn ~backtrace:`Get exn in
-              [%log error] "Error from verifier worker $err"
-                ~metadata:[ ("err", Error_json.error_to_yojson err) ] ) )
-        (fun () ->
-          Worker.spawn_in_foreground_exn
-            ~connection_timeout:(Time.Span.of_min 1.) ~on_failure
-            ~shutdown_on:Connection_closed ~connection_state_init_arg:()
-            { conf_dir
-            ; enable_internal_tracing
-            ; internal_trace_filename
-            ; logger
-            ; proof_level
-            ; constraint_constants
-            ; commit_id
-            } )
-      |> Deferred.Result.map_error ~f:Error.of_exn
+      printf !"verifier/prod.ml#create DEBUG create_worker 2\n%!" ;
+      let res =
+        Monitor.try_with ~here:[%here] ~name:"Verifier RPC worker" ~run:`Now
+          ~rest:
+            (`Call
+              (fun exn ->
+                let err = Error.of_exn ~backtrace:`Get exn in
+                printf !"verifier/prod.ml#DEBUG ERROR FROM VERIFIER WORKER!\n%!";
+                [%log error] "Error from verifier worker $err"
+                  ~metadata:[ ("err", Error_json.error_to_yojson err) ] ) )
+          (fun () ->
+            printf !"verifier/prod.ml#create DEBUG create_worker 3\n%!" ;
+            let res = Worker.spawn_in_foreground_exn
+              ~connection_timeout:(Time.Span.of_min 1.) ~on_failure
+              ~shutdown_on:Connection_closed ~connection_state_init_arg:()
+              { conf_dir
+              ; enable_internal_tracing
+              ; internal_trace_filename
+              ; logger
+              ; proof_level
+              ; constraint_constants
+              ; commit_id
+              } in
+            printf !"verifier/prod.ml#create DEBUG create_worker 4 (spawned)\n%!" ;
+            res
+          )
+          |> Deferred.Result.map_error ~f:Error.of_exn
+      in
+      printf !"verifier/prod.ml#create DEBUG create_worker returning res\n%!" ;
+      res
     in
+    printf !"verifier/prod.ml#create cerate_worker DEBUG 5\n%!" ;
     Child_processes.Termination.wait_for_process_log_errors ~logger process
       ~module_:__MODULE__ ~location:__LOC__ ~here:[%here] ;
     let exit_or_signal =
       Child_processes.Termination.wait_safe ~logger process ~module_:__MODULE__
         ~location:__LOC__ ~here:[%here]
     in
+    printf !"verifier/prod.ml#create cerate_worker DEBUG 6\n%!" ;
     [%log info]
       "Daemon started process of kind $process_kind with pid $verifier_pid"
       ~metadata:
@@ -506,25 +526,33 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
     (* Always report termination as expected, and use the restart logic here
        instead.
     *)
+    printf !"verifier/prod.ml#create cerate_worker DEBUG 7\n%!" ;
     don't_wait_for
     @@ Pipe.iter
          (Process.stdout process |> Reader.pipe)
          ~f:(fun stdout ->
            return
-           @@ [%log debug] "Verifier stdout: $stdout"
-                ~metadata:[ ("stdout", `String stdout) ] ) ;
+             ( printf !"DEBUG VERIFIER PRODUCED STDOUT: %s\n%!" stdout ;
+               [%log debug] "Verifier stdout: $stdout"
+                 ~metadata:[ ("stdout", `String stdout) ] ) ) ;
     don't_wait_for
     @@ Pipe.iter
          (Process.stderr process |> Reader.pipe)
          ~f:(fun stderr ->
            return
-           @@ [%log error] "Verifier stderr: $stderr"
-                ~metadata:[ ("stderr", `String stderr) ] ) ;
+             ( printf !"DEBUG VERIFIER PRODUCED STDERR: %s\n%!" stderr ;
+               [%log error] "Verifier stderr: $stderr"
+                 ~metadata:[ ("stderr", `String stderr) ] ) ) ; 
+    printf !"verifier/prod.ml#create cerate_worker DEBUG 8\n%!" ;
     { connection; process; exit_or_signal }
   in
+  printf !"verifier/prod.ml#create DEBUG 6\n%!" ;
   let%map worker = create_worker () |> Deferred.Or_error.ok_exn in
+  printf !"verifier/prod.ml#create DEBUG 6.1\n%!" ;
   let worker_ref = ref (Ivar.create_full worker) in
+  printf !"verifier/prod.ml#create DEBUG 6.2\n%!" ;
   let rec on_worker { connection = _; process; exit_or_signal } =
+    printf !"verifier/prod.ml#create DEBUG 7\n%!" ;
     let finished =
       Deferred.any
         [ ( exit_or_signal
@@ -535,7 +563,9 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
               `Wait_threw_an_exception err )
         ]
     in
+    printf !"verifier/prod.ml#create DEBUG before 'upon finished'\n%!" ;
     upon finished (fun e ->
+        printf !"verifier/prod.ml#create DEBUG inside 'upon finished'\n%!" ;
         don't_wait_for (Process.stdin process |> Writer.close) ;
         let pid = Process.pid process in
         Child_processes.Termination.remove pids pid ;
@@ -590,6 +620,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
                :: exit_metadata ) ;
            Child_processes.Termination.remove pids pid ;
            Ivar.fill_if_empty create_worker_trigger () ) ;
+        printf !"verifier/prod.ml#create DEBUG dont_wait_for\n%!" ;
         don't_wait_for
           (let%bind () = Ivar.read create_worker_trigger in
            let rec try_create_worker () =
@@ -606,9 +637,14 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
                  let%bind () = after Time.Span.(of_sec 5.) in
                  try_create_worker ()
            in
+           printf
+             !"verifier/prod.ml#create DEBUG last line before try_create_worker\n\
+               %!" ;
            try_create_worker () ) )
   in
+  printf !"verifier/prod.ml#create DEBUG 6.3\n%!" ;
   on_worker worker ;
+  printf !"verifier/prod.ml#create DEBUG LAST line\n%!" ;
   { worker = worker_ref; logger }
 
 let with_retry ~logger f =
