@@ -419,7 +419,10 @@ module type Full = sig
       [@@deriving sexp]
     end
 
-    val multiple_transfers : Multiple_transfers_spec.t -> Zkapp_command.t
+    val multiple_transfers :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> Multiple_transfers_spec.t
+      -> Zkapp_command.t
 
     val set_proof_cache : Pickles.Proof_cache.t -> unit
   end

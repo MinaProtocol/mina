@@ -35,8 +35,8 @@ in  Pipeline.build
       Pipeline.Config::{
       , spec =
           let unitDirtyWhen =
-                [ S.strictlyStart (S.contains "src/automation/terraform")
-                , S.strictlyStart (S.contains "src/helm")
+                [ S.strictlyStart (S.contains "automation/terraform")
+                , S.strictlyStart (S.contains "helm")
                 , S.strictlyStart
                     (S.contains "buildkite/src/Jobs/Test/TerraformNetworkTest")
                 , S.strictlyStart
@@ -47,7 +47,11 @@ in  Pipeline.build
               , dirtyWhen = unitDirtyWhen
               , path = "Test"
               , name = "TerraformNetworkTest"
-              , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Test ]
+              , tags =
+                [ PipelineTag.Type.Fast
+                , PipelineTag.Type.Test
+                , PipelineTag.Type.Stable
+                ]
               }
       , steps = [ buildTestCmd Size.Large ]
       }

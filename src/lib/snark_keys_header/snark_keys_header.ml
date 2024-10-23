@@ -130,7 +130,6 @@ type t =
   { header_version : int
   ; kind : Kind.t
   ; constraint_constants : Constraint_constants.t
-  ; commit : string
   ; length : int
   ; constraint_system_hash : string
   ; identifying_hash : string
@@ -226,7 +225,6 @@ let%test_module "Check parsing of header" =
           ; account_creation_fee = Unsigned.UInt64.of_int 1
           ; fork = None
           }
-      ; commit = "7e1fb2cd9138af1d0f24e78477efd40a2a0fcd07"
       ; length = 4096
       ; constraint_system_hash = "ABCDEF1234567890"
       ; identifying_hash = "ABCDEF1234567890"

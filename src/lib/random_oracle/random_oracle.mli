@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Pickles.Impls.Step.Internal_Basic
 module Input = Random_oracle_input
 

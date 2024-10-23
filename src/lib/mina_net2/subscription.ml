@@ -50,7 +50,7 @@ let unsubscribe ~helper sub =
   else Deferred.Or_error.error_string "already unsubscribed"
 
 let handle_and_validate sub ~validation_expiration ~(sender : Peer.t)
-    ~data:raw_data =
+    ~data:raw_data ~block_window_duration =
   let open Libp2p_ipc.Reader.ValidationResult in
   let wrap_message data =
     if
@@ -65,7 +65,9 @@ let handle_and_validate sub ~validation_expiration ~(sender : Peer.t)
         Validation_callback.create validation_expiration
       in
       let%bind () = sub.validator (wrap_message data) validation_callback in
-      match%map Validation_callback.await validation_callback with
+      match%map
+        Validation_callback.await ~block_window_duration validation_callback
+      with
       | Some `Accept ->
           `Validation_result Accept
       | Some `Reject ->

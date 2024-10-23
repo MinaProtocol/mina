@@ -16,6 +16,8 @@ declare CLI_VERSION='1.0.0';
 declare CLI_NAME='aptly.sh';
 declare PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
 
+PORT=8080
+
 # functions
 
 function check_required() {
@@ -33,6 +35,7 @@ function start_aptly() {
     local __clean=$4
     local __component=$5
     local __repo="$__distribution-$__component"
+    local __port=$6
 
     if [ $__clean = 1 ]; then
         rm -rf ~/.aptly
@@ -47,9 +50,9 @@ function start_aptly() {
     aptly publish snapshot -distribution=$__distribution -skip-signing $__component
 
     if [ $__background = 1 ]; then
-        aptly serve -listen localhost:8080 &
+        aptly serve -listen localhost:$__port &
     else 
-        aptly serve -listen localhost:8080
+        aptly serve -listen localhost:$__port
     fi
 
     
@@ -70,6 +73,7 @@ function start_help(){
     echo "  -d, --debians     The Debian(s) to be available in aptly. Supports regular expression"
     echo "  -m, --component   The Component for debian repository. For example: unstable"
     echo "  -l, --clean       Removes existing aptly installation"
+    echo "  -p, --port        Server port. default=8080"
     echo ""
     echo "Example: $0  start --background --codename focal --debs *.deb --component unstable "
     echo ""
@@ -86,6 +90,7 @@ function start(){
     local __background=0
     local __clean=0
     local __component="unstable"
+    local __port=$PORT
     
 
     while [ ${#} -gt 0 ]; do
@@ -100,6 +105,10 @@ function start(){
             ;;
             -c | --codename )
                 __distribution=${2:?$error_message}
+                shift 2;
+            ;;
+            -p | --port )
+                __port=${2:?$error_message}
                 shift 2;
             ;;
             -d | --debians )
@@ -126,7 +135,9 @@ function start(){
         $__debs \
         $__background \
         $__clean \
-        $__component
+        $__component \
+        $__port
+
 
 }
 

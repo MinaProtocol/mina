@@ -89,12 +89,12 @@ check: ocaml_checks libp2p_helper
 
 build: ocaml_checks reformat-diff libp2p_helper
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe --profile=$(DUNE_PROFILE)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe src/app/generate_keypair/generate_keypair.exe src/app/validate_keypair/validate_keypair.exe src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
-build_all_sigs: ocaml_checks reformat-diff libp2p_helper
+build_all_sigs: ocaml_checks reformat-diff libp2p_helper build
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe src/app/cli/src/mina_testnet_signatures.exe src/app/cli/src/mina_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/cli/src/mina_testnet_signatures.exe src/app/cli/src/mina_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 build_archive: ocaml_checks reformat-diff
@@ -102,9 +102,9 @@ build_archive: ocaml_checks reformat-diff
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
-build_archive_all_sigs: ocaml_checks reformat-diff
+build_archive_utils: ocaml_checks reformat-diff
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/archive/archive_testnet_signatures.exe src/app/archive/archive_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/replayer/replayer.exe src/app/archive_blocks/archive_blocks.exe src/app/extract_blocks/extract_blocks.exe src/app/missing_blocks_auditor/missing_blocks_auditor.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 build_rosetta: ocaml_checks
@@ -132,11 +132,6 @@ replayer: ocaml_checks
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/replayer/replayer.exe --profile=devnet
 	$(info Build complete)
 
-delegation_compliance: ocaml_checks
-	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/delegation_compliance/delegation_compliance.exe --profile=testnet_postake_medium_curves
-	$(info Build complete)
-
 missing_blocks_auditor: ocaml_checks
 	$(info Starting Build)
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/missing_blocks_auditor/missing_blocks_auditor.exe --profile=testnet_postake_medium_curves
@@ -154,12 +149,7 @@ archive_blocks: ocaml_checks
 
 patch_archive_test: ocaml_checks
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/patch_archive_test/patch_archive_test.exe --profile=testnet_postake_medium_curves
-	$(info Build complete)
-
-swap_bad_balances: ocaml_checks
-	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/swap_bad_balances/swap_bad_balances.exe --profile=testnet_postake_medium_curves
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/patch_archive_test/patch_archive_test.exe --profile=testnet_postake_medium_curves
 	$(info Build complete)
 
 heap_usage: ocaml_checks
@@ -200,9 +190,6 @@ check-format: ocaml_checks
 check-snarky-submodule:
 	./scripts/check-snarky-submodule.sh
 
-check-proof-systems-submodule:
-	./scripts/check-proof-systems-submodule.sh
-
 #######################################
 ## Environment setup
 
@@ -216,14 +203,7 @@ publish-macos:
 	@./scripts/publish-macos.sh
 
 deb:
-	./scripts/rebuild-deb.sh
-	./scripts/archive/build-release-archives.sh
-	@mkdir -p /tmp/artifacts
-	@cp _build/mina*.deb /tmp/artifacts/.
-
-deb_optimized:
-	./scripts/rebuild-deb.sh "optimized"
-	./scripts/archive/build-release-archives.sh
+	./scripts/debian/builder.sh
 	@mkdir -p /tmp/artifacts
 	@cp _build/mina*.deb /tmp/artifacts/.
 
@@ -237,13 +217,11 @@ build_or_download_pv_keys: ocaml_checks
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
 	$(info Keys built)
 
-publish_debs:
-	@./buildkite/scripts/publish-deb.sh
-
 genesiskeys:
 	@mkdir -p /tmp/artifacts
 	@cp _build/default/src/lib/key_gen/sample_keypairs.ml /tmp/artifacts/.
 	@cp _build/default/src/lib/key_gen/sample_keypairs.json /tmp/artifacts/.
+
 
 ##############################################
 ## Genesis ledger in OCaml from running daemon
@@ -319,4 +297,4 @@ ml-docs: ocaml_checks
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
 
-.PHONY: all build check-format clean deb dev mina-docker reformat doc_diagrams ml-docs macos-setup macos-setup-download setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor extract_blocks archive_blocks genesis_ledger_from_tsv ocaml_version ocaml_word_size ocaml_checks switch
+.PHONY: all build check-format clean deb dev mina-docker reformat doc_diagrams ml-docs macos-setup macos-setup-download setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor extract_blocks archive_blocks ocaml_version ocaml_word_size ocaml_checks switch
