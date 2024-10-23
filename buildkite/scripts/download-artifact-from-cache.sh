@@ -9,7 +9,7 @@ if [[ $# -lt 2 ]]; then
 fi
 
 DOWNLOAD_BIN=gsutil
-PREFIX=gs://buildkite_k8s/coda/shared/0192b1f4-720f-48d9-b8a4-5044a7409187
+PREFIX=gs://buildkite_k8s/coda/shared/${BUILDKITE_BUILD_ID}
 FILE="$1"
 REMOTE_LOCATION="$2"
 OPTS=${3:-""}
