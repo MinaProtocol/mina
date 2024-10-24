@@ -11,87 +11,10 @@ module type S = sig
 
   type location
 
-  module Transaction_applied : sig
-    module Signed_command_applied : sig
-      module Common : sig
-        type t = Transaction_applied.Signed_command_applied.Common.t =
-          { user_command : Signed_command.t With_status.t }
-        [@@deriving sexp]
-      end
+  val transaction_of_applied :
+    Transaction_applied.t -> Transaction.t With_status.t
 
-      module Body : sig
-        type t = Transaction_applied.Signed_command_applied.Body.t =
-          | Payment of { new_accounts : Account_id.t list }
-          | Stake_delegation of
-              { previous_delegate : Public_key.Compressed.t option }
-          | Failed
-        [@@deriving sexp]
-      end
-
-      type t = Transaction_applied.Signed_command_applied.t =
-        { common : Common.t; body : Body.t }
-      [@@deriving sexp]
-    end
-
-    module Zkapp_command_applied : sig
-      type t = Transaction_applied.Zkapp_command_applied.t =
-        { accounts : (Account_id.t * Account.t option) list
-        ; command : Zkapp_command.t With_status.t
-        ; new_accounts : Account_id.t list
-        }
-      [@@deriving sexp]
-    end
-
-    module Command_applied : sig
-      type t = Transaction_applied.Command_applied.t =
-        | Signed_command of Signed_command_applied.t
-        | Zkapp_command of Zkapp_command_applied.t
-      [@@deriving sexp]
-    end
-
-    module Fee_transfer_applied : sig
-      type t = Transaction_applied.Fee_transfer_applied.t =
-        { fee_transfer : Fee_transfer.t With_status.t
-        ; new_accounts : Account_id.t list
-        ; burned_tokens : Currency.Amount.t
-        }
-      [@@deriving sexp]
-    end
-
-    module Coinbase_applied : sig
-      type t = Transaction_applied.Coinbase_applied.t =
-        { coinbase : Coinbase.t With_status.t
-        ; new_accounts : Account_id.t list
-        ; burned_tokens : Currency.Amount.t
-        }
-      [@@deriving sexp]
-    end
-
-    module Varying : sig
-      type t = Transaction_applied.Varying.t =
-        | Command of Command_applied.t
-        | Fee_transfer of Fee_transfer_applied.t
-        | Coinbase of Coinbase_applied.t
-      [@@deriving sexp]
-    end
-
-    type t = Transaction_applied.t =
-      { previous_hash : Ledger_hash.t; varying : Varying.t }
-    [@@deriving sexp]
-
-    val burned_tokens : t -> Currency.Amount.t
-
-    val supply_increase :
-         constraint_constants:Genesis_constants.Constraint_constants.t
-      -> t
-      -> Currency.Amount.Signed.t Or_error.t
-
-    val transaction : t -> Transaction.t With_status.t
-
-    val transaction_status : t -> Transaction_status.t
-
-    val new_accounts : t -> Account_id.t list
-  end
+  val status_of_applied : Transaction_applied.t -> Transaction_status.t
 
   module Global_state : sig
     type t =
@@ -515,38 +438,33 @@ module Make (L : Ledger_intf.S) :
         transaction expiry slot %{sexp: Global_slot_since_genesis.t}"
       current_global_slot valid_until
 
-  module Transaction_applied = struct
-    include Transaction_applied
+  let transaction_of_applied :
+      Transaction_applied.t -> Transaction.t With_status.t =
+   fun { varying; _ } ->
+    match varying with
+    | Command (Signed_command uc) ->
+        With_status.map uc.common.user_command ~f:(fun cmd ->
+            Transaction.Command (User_command.Signed_command cmd) )
+    | Command (Zkapp_command s) ->
+        With_status.map s.command ~f:(fun c ->
+            Transaction.Command (User_command.Zkapp_command c) )
+    | Fee_transfer f ->
+        With_status.map f.fee_transfer ~f:(fun f -> Transaction.Fee_transfer f)
+    | Coinbase c ->
+        With_status.map c.coinbase ~f:(fun c -> Transaction.Coinbase c)
 
-    let transaction : t -> Transaction.t With_status.t =
-     fun { varying; _ } ->
-      match varying with
-      | Command (Signed_command uc) ->
-          With_status.map uc.common.user_command ~f:(fun cmd ->
-              Transaction.Command (User_command.Signed_command cmd) )
-      | Command (Zkapp_command s) ->
-          With_status.map s.command ~f:(fun c ->
-              Transaction.Command (User_command.Zkapp_command c) )
-      | Fee_transfer f ->
-          With_status.map f.fee_transfer ~f:(fun f ->
-              Transaction.Fee_transfer f )
-      | Coinbase c ->
-          With_status.map c.coinbase ~f:(fun c -> Transaction.Coinbase c)
-
-    let transaction_status : t -> Transaction_status.t =
-     fun { varying; _ } ->
-      match varying with
-      | Command
-          (Signed_command { common = { user_command = { status; _ }; _ }; _ })
-        ->
-          status
-      | Command (Zkapp_command c) ->
-          c.command.status
-      | Fee_transfer f ->
-          f.fee_transfer.status
-      | Coinbase c ->
-          c.coinbase.status
-  end
+  let status_of_applied : Transaction_applied.t -> Transaction_status.t =
+   fun { varying; _ } ->
+    match varying with
+    | Command
+        (Signed_command { common = { user_command = { status; _ }; _ }; _ }) ->
+        status
+    | Command (Zkapp_command c) ->
+        c.command.status
+    | Fee_transfer f ->
+        f.fee_transfer.status
+    | Coinbase c ->
+        c.coinbase.status
 
   let get_new_accounts action pk =
     if Ledger_intf.equal_account_state action `Added then [ pk ] else []
