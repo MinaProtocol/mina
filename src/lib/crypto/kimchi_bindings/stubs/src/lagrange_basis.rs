@@ -6,11 +6,11 @@ use poly_commitment::{commitment::CommitmentCurve, srs::SRS};
 use std::env;
 
 pub trait WithLagrangeBasis<G: AffineRepr> {
-    fn with_lagrange_basis(&mut self, domain: D<G::ScalarField>);
+    fn with_lagrange_basis(&self, domain: D<G::ScalarField>);
 }
 
 impl WithLagrangeBasis<Vesta> for SRS<Vesta> {
-    fn with_lagrange_basis(&mut self, domain: D<<Vesta as AffineRepr>::ScalarField>) {
+    fn with_lagrange_basis(&self, domain: D<<Vesta as AffineRepr>::ScalarField>) {
         match env::var("LAGRANGE_CACHE_DIR") {
             Ok(_) => add_lagrange_basis_with_cache(self, domain, cache::get_vesta_file_cache()),
             Err(_) => {
@@ -21,7 +21,7 @@ impl WithLagrangeBasis<Vesta> for SRS<Vesta> {
 }
 
 impl WithLagrangeBasis<Pallas> for SRS<Pallas> {
-    fn with_lagrange_basis(&mut self, domain: D<<Pallas as AffineRepr>::ScalarField>) {
+    fn with_lagrange_basis(&self, domain: D<<Pallas as AffineRepr>::ScalarField>) {
         match env::var("LAGRANGE_CACHE_DIR") {
             Ok(_) => add_lagrange_basis_with_cache(self, domain, cache::get_pallas_file_cache()),
             Err(_) => {
@@ -32,7 +32,7 @@ impl WithLagrangeBasis<Pallas> for SRS<Pallas> {
 }
 
 fn add_lagrange_basis_with_cache<G: CommitmentCurve, C: LagrangeCache<G>>(
-    srs: &mut SRS<G>,
+    srs: &SRS<G>,
     domain: D<G::ScalarField>,
     cache: &C,
 ) {
@@ -41,7 +41,7 @@ fn add_lagrange_basis_with_cache<G: CommitmentCurve, C: LagrangeCache<G>>(
         return;
     }
     if let Some(basis) = cache.load_lagrange_basis_from_cache(srs.g.len(), &domain) {
-        srs.lagrange_bases.get_or_generate(n, || { basis });
+        srs.lagrange_bases.get_or_generate(n, || basis);
         return;
     } else {
         let basis = srs.get_lagrange_basis(domain);
