@@ -166,8 +166,8 @@ let pipeline
                     , deb_repo = DebianRepo.Type.Local
                     , step_key =
                         "daemon-devnet-${DebianVersions.lowerName
-                                             debVersion}${Profiles.toLabelSegment
-                                                            profile}-docker-image"
+                                           debVersion}${Profiles.toLabelSegment
+                                                          profile}-docker-image"
                     }
                 , Command.build
                     Command.Config::{
@@ -184,8 +184,8 @@ let pipeline
                       [ { name = pipelineName
                         , key =
                             "daemon-devnet-${DebianVersions.lowerName
-                                                 debVersion}${Profiles.toLabelSegment
-                                                                profile}-docker-image"
+                                               debVersion}${Profiles.toLabelSegment
+                                                              profile}-docker-image"
                         }
                       ]
                     , if = None B/If
@@ -204,8 +204,8 @@ let pipeline
                       [ { name = pipelineName
                         , key =
                             "daemon-devnet-${DebianVersions.lowerName
-                                                 debVersion}${Profiles.toLabelSegment
-                                                                profile}-docker-image"
+                                               debVersion}${Profiles.toLabelSegment
+                                                              profile}-docker-image"
                         }
                       ]
                     , if = None B/If
