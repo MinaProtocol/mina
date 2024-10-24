@@ -362,7 +362,7 @@ let%test_module "account timing check" =
             stack_with_state
       in
       let supply_increase =
-        Mina_ledger.Ledger.Transaction_applied.supply_increase
+        Mina_transaction_logic.Transaction_applied.supply_increase
           ~constraint_constants txn_applied
         |> Or_error.ok_exn
       in

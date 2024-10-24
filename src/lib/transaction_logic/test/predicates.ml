@@ -13,7 +13,7 @@ let result ?(with_error = Fn.const false) ~f result =
 
 let verify_account_updates ~(ledger : Helpers.Ledger.t)
     ~(txn :
-       Helpers.Transaction_logic.Transaction_applied.Zkapp_command_applied.t )
+       Mina_transaction_logic.Transaction_applied.Zkapp_command_applied.t )
     ~(f : Amount.Signed.t -> Account.t option * Account.t option -> bool)
     (account : Test_account.t) =
   let open Helpers in
@@ -81,7 +81,7 @@ let verify_balance_changes ~txn ~ledger accounts =
 
 let verify_balances_unchanged ~(ledger : Helpers.Ledger.t)
     ~(txn :
-       Helpers.Transaction_logic.Transaction_applied.Zkapp_command_applied.t )
+       Mina_transaction_logic.Transaction_applied.Zkapp_command_applied.t )
     (accounts : Test_account.t list) =
   let is_fee_payer account =
     Public_key.Compressed.equal account.Test_account.pk

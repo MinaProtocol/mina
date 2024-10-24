@@ -563,7 +563,7 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
                  (target_ledger, applied) ->
            let txn =
              With_status.data
-             @@ Mina_ledger.Ledger.Transaction_applied.transaction applied
+             @@ Mina_ledger.Ledger.transaction_of_applied applied
            in
            (* the txn was already valid before apply, we are just recasting it here after application *)
            let (`If_this_is_used_it_should_have_a_comment_justifying_it
@@ -782,7 +782,7 @@ let check_base_snarks ~genesis_constants ~constraint_constants sparse_ledger0
            ~f:(fun source_ledger (target_ledger, applied_txn) ->
              let txn =
                With_status.data
-               @@ Mina_ledger.Ledger.Transaction_applied.transaction applied_txn
+               @@ Mina_ledger.Ledger.transaction_of_applied applied_txn
              in
              (* the txn was already valid before apply, we are just recasting it here after application *)
              let (`If_this_is_used_it_should_have_a_comment_justifying_it
@@ -793,7 +793,7 @@ let check_base_snarks ~genesis_constants ~constraint_constants sparse_ledger0
                pending_coinbase_stack_target txn Pending_coinbase.Stack.empty
              in
              let supply_increase =
-               Mina_ledger.Ledger.Transaction_applied.supply_increase
+               Mina_transaction_logic.Transaction_applied.supply_increase
                  ~constraint_constants applied_txn
                |> Or_error.ok_exn
              in
@@ -844,7 +844,7 @@ let generate_base_snarks_witness ~genesis_constants ~constraint_constants
            ~f:(fun source_ledger (target_ledger, applied_txn) ->
              let txn =
                With_status.data
-               @@ Mina_ledger.Ledger.Transaction_applied.transaction applied_txn
+               @@ Mina_ledger.Ledger.transaction_of_applied applied_txn
              in
              (* the txn was already valid before apply, we are just recasting it here after application *)
              let (`If_this_is_used_it_should_have_a_comment_justifying_it
@@ -855,7 +855,7 @@ let generate_base_snarks_witness ~genesis_constants ~constraint_constants
                pending_coinbase_stack_target txn Pending_coinbase.Stack.empty
              in
              let supply_increase =
-               Mina_ledger.Ledger.Transaction_applied.supply_increase
+               Mina_transaction_logic.Transaction_applied.supply_increase
                  ~constraint_constants applied_txn
                |> Or_error.ok_exn
              in

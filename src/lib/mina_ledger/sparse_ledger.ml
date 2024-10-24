@@ -179,7 +179,9 @@ let apply_zkapp_second_pass_unchecked_with_states ~init ledger c =
   |> Result.map ~f:(fun (account_update_applied, rev_states) ->
          let module LS = Mina_transaction_logic.Zkapp_command_logic.Local_state
          in
-         let module Applied = T.Transaction_applied.Zkapp_command_applied in
+         let module Applied =
+           Mina_transaction_logic.Transaction_applied.Zkapp_command_applied
+         in
          let states =
            match rev_states with
            | [] ->
