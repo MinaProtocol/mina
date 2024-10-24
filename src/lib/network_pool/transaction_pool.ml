@@ -2343,6 +2343,23 @@ let%test_module _ =
         ; nonce = Account.Nonce.of_int nonce
         }
 
+    let test_to_wire (valid : User_command.Valid.t) =
+      let cmd = User_command.forget_check valid in
+      let pass = User_command.(Fn.compose of_wire to_wire) in
+      let cmd' = pass cmd in
+      let cmd'' = pass cmd' in
+      [%test_eq: User_command.t] cmd' cmd'' ;
+      [%test_eq: User_command.t] cmd cmd'
+
+    (* This test is added due to an issue that was originally found in
+       the generator used by other tests of this module. It also checks
+       an invariant of to_wire/of_wire. *)
+    let%test_unit "zkapps: Fn.compose of_wire to_wire = ident" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind test = setup_test () in
+          mk_zkapp_commands_single_block 7 test.txn_pool
+          >>| List.iter ~f:test_to_wire )
+
     let mk_linear_case_test t cmds =
       assert_pool_txs t [] ;
       let%bind () = add_commands' t cmds in
