@@ -50,3 +50,39 @@ function caml_do_cool_thingies() {
 ```
 
 So now instead of using the implementation in JavaScript, we directly call into the Rust implementation that has been compiled to WASM! This means, whenever something in OCaml invokes `FunnyLittleModule.do_cool_thingies` it automatically resolves to `caml_do_cool_thingies` in Rust compiled to WASM.
+
+Previously, these bindings were in one single file `bindings.js` which made it hard to understand. Now, bindings are split into separate files, each with their own responsibilities.
+
+Sometimes, these "proxy" functions actually don't call into WASM directly, but do some pre-computation, like this example:
+
+```js
+// Provides: caml_pasta_fp_plonk_proof_create
+// Requires: plonk_wasm, tsRustConversion
+var caml_pasta_fp_plonk_proof_create = function (
+  index,
+  witness_cols,
+  caml_runtime_tables,
+  prev_challenges,
+  prev_sgs
+) {
+  var w = new plonk_wasm.WasmVecVecFp(witness_cols.length - 1);
+  for (var i = 1; i < witness_cols.length; i++) {
+    w.push(tsRustConversion.fp.vectorToRust(witness_cols[i]));
+  }
+  witness_cols = w;
+  prev_challenges = tsRustConversion.fp.vectorToRust(prev_challenges);
+  var wasm_runtime_tables =
+    tsRustConversion.fp.runtimeTablesToRust(caml_runtime_tables);
+  prev_sgs = tsRustConversion.fp.pointsToRust(prev_sgs);
+  var proof = plonk_wasm.caml_pasta_fp_plonk_proof_create(
+    index,
+    witness_cols,
+    wasm_runtime_tables,
+    prev_challenges,
+    prev_sgs
+  );
+  return tsRustConversion.fp.proofFromRust(proof);
+};
+```
+
+So just keep in mind that sometimes it's not as easy to just forward the implementation to WASM and occasionally some more work needs to be done :)
