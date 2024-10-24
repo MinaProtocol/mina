@@ -29,7 +29,7 @@ function usage() {
   echo "  -t, --to-component     The target channel for package (unstable, alpha, beta etc.)"
   echo "  -c, --codename         The Debian codename (bullseye, focal etc.)"
   echo ""
-  echo "Example: $0 --package mina-archive --version 2.0.0berkeley-rc1-berkeley-48efea4 --architecture amd64 --codename bullseye --from-component unstable --to-component nightly"
+  echo "Example: $0 --package mina-archive --version 2.0.0-rc1-48efea4 --architecture amd64 --codename bullseye --from-component unstable --to-component nightly"
   exit 1
 }
 

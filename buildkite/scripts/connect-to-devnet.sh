@@ -3,10 +3,10 @@
 set -eo pipefail
 
 case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
-  rampup|berkeley|release/2.0.0|develop)
+  compatible|release/*|develop|master)
   ;;
   *)
-    echo "Not pulling against rampup, not running the connect test"
+    echo "Not pulling against mainline branch, not running the connect test"
     exit 0 ;;
 esac
 
@@ -16,7 +16,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y git apt-transport-https ca-certificates tzdata curl
 
-TESTNET_VERSION_NAME="berkeley"
+TESTNET_VERSION_NAME="devnet"
 TESTNET_NAME="testworld-2-0"
 
 git config --global --add safe.directory /workdir
