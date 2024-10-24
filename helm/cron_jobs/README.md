@@ -1,7 +1,7 @@
 Replayer cron jobs
 ==================
 
-There are replayer cron jobs for Mainnet, Devnet, and Berkeley. These
+There are replayer cron jobs for Mainnet and Devnet. These
 jobs are run daily, to replay a day's worth of transactions.
 
 Each cron job downloads the most recent archive dump corresponding to

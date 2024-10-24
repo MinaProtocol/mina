@@ -7,16 +7,16 @@ if [[ $# -ne 3 ]]; then
     exit 1
 fi
 
-TESTNET_VERSION_NAME="berkeley"
+TESTNET_VERSION_NAME="devnet"
 TESTNET_NAME=$1
 WAIT_BETWEEN_POLLING_GRAPHQL=$2
 WAIT_AFTER_FINAL_CHECK=$3
 
 case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
-  rampup|berkeley|release/2.0.0|develop)
+  compatible|release/*|develop|master)
   ;;
   *)
-    echo "Not pulling against rampup, not running the connect test"
+    echo "Not pulling against mainline branch, not running the connect test"
     exit 0 ;;
 esac
 

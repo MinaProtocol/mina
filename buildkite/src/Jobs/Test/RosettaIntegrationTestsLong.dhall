@@ -55,7 +55,7 @@ in  Pipeline.build
               , Cmd.runInDocker
                   Cmd.Docker::{
                   , image =
-                      "gcr.io/o1labs-192920/mina-rosetta:\\\${MINA_DOCKER_TAG}-berkeley"
+                      "gcr.io/o1labs-192920/mina-rosetta:\\\${MINA_DOCKER_TAG}-devnet"
                   }
                   "buildkite/scripts/rosetta-integration-tests-full.sh"
               ]
@@ -66,7 +66,7 @@ in  Pipeline.build
             , depends_on =
                 Dockers.dependsOn
                   Dockers.Type.Bullseye
-                  (Some Network.Type.Berkeley)
+                  (Some Network.Type.Devnet)
                   Profiles.Type.Standard
                   Artifacts.Type.Rosetta
             }

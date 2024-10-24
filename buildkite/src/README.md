@@ -160,7 +160,7 @@ All list of available parameters:
 
 - PROFILE                     The Docker and Debian profile (Standard, Lightnet)". All available profiles are located in `buildkite/src/Constants/Profiles.dhall` file. Only CamelCase format is supported
 
-- NETWORK                     The Docker and Debian network (Devnet, Mainnet, Berkeley). All available profiles are located in `buildkite/src/Constants/Network.dhall` file. Only CamelCase format is supported
+- NETWORK                     The Docker and Debian network (Devnet, Mainnet). All available profiles are located in `buildkite/src/Constants/Network.dhall` file. Only CamelCase format is supported
 
 - FROM_CHANNEL                Source debian channel. By default: Unstable. All available channels  are located in `buildkite/src/Constants/DebianChannel.dhall` file. Only CamelCase format is supported
 

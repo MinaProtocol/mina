@@ -45,7 +45,7 @@ function usage() {
   echo "  NEW_VERSION                 The new Debian version or new Docker tag"
   echo "  REMOVE_PROFILE_FROM_NAME    Should we remove profile suffix from debian name"
   echo "  PROFILE                     The Docker and Debian profile (Standard, Lightnet)"
-  echo "  NETWORK                     The Docker and Debian network (Devnet, Mainnet, Berkeley)"
+  echo "  NETWORK                     The Docker and Debian network (Devnet, Mainnet)"
   echo "  TO_CHANNEL                  Target debian channel"
   echo "  PUBLISH                     The Publish to docker.io flag. If defined, script will publish docker do docker.io. Otherwise it will still resides in gcr.io"
   echo ""
@@ -59,7 +59,7 @@ DHALL_DEBIANS="([] : List $DEBIAN_DHALL_DEF.Type)"
 if [[ -n "$DEBIANS" ]]; then 
     if [[ -z "$CODENAMES" ]]; then usage "Codenames is not set!"; exit 1; fi;
     if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
-    if [[ -z "$NETWORK" ]]; then NETWORK="Berkeley"; fi;
+    if [[ -z "$NETWORK" ]]; then NETWORK="Devnet"; fi;
     if [[ -z "$REMOVE_PROFILE_FROM_NAME" ]]; then REMOVE_PROFILE_FROM_NAME=0; fi;
     if [[ -z "$PUBLISH" ]]; then PUBLISH=0; fi;
     if [[ -z "$TO_CHANNEL" ]]; then TO_CHANNEL="Unstable"; fi;

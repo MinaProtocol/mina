@@ -24,7 +24,7 @@ function usage() {
   echo "  -v, --version       The Debian version"
   echo "  -c, --codename      The Debian codename"
   echo ""
-  echo "Example: $0 --name mina-archive --release unstable --version 2.0.0berkeley-rc1-berkeley-48efea4 --codename bullseye "
+  echo "Example: $0 --name mina-archive --release unstable --version 2.0.0-rc1-48efea4 --codename bullseye "
   exit 1
 }
 
