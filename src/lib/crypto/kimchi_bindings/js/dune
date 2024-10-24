@@ -3,8 +3,8 @@
  (public_name bindings_js)
  (js_of_ocaml
   (javascript_files
-   bindings/bindings.js
-   bindings/bigint256.js
+     bindings/bigint256.js
+   bindings/pickles-test.js
    bindings/field.js
    bindings/curve.js
    bindings/vector.js
