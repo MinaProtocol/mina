@@ -24,7 +24,7 @@ let dependsOn =
       DebianVersions.dependsOn
         DebianVersions.DebVersion.Bullseye
         Network.Type.Devnet
-        Profiles.Type.Lightnet
+        Profiles.Type.Standard
 
 in  Pipeline.build
       Pipeline.Config::{
