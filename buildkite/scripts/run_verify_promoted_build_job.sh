@@ -45,7 +45,7 @@ function usage() {
   echo "  NEW_VERSION                 The new Debian version or new Docker tag"
   echo "  REMOVE_PROFILE_FROM_NAME    Should we remove profile suffix from debian name"
   echo "  PROFILE                     The Docker and Debian profile (Standard, Lightnet)"
-  echo "  NETWORK                     The Docker and Debian network (Devnet, Mainnet, Berkeley)"
+  echo "  NETWORK                     The Docker and Debian network (Devnet, Mainnet)"
   echo "  TO_CHANNEL                  Target debian channel"
   echo "  PUBLISH                     The Publish to docker.io flag. If defined, script will publish docker do docker.io. Otherwise it will still resides in gcr.io"
   echo ""
@@ -107,4 +107,4 @@ if [[ "${REMOVE_PROFILE_FROM_NAME}" -eq 0 ]]; then
 else 
   REMOVE_PROFILE_FROM_NAME="True"
 fi 
-echo $PROMOTE_PACKAGE_DHALL_DEF'.verify_artifacts '"$DHALL_DEBIANS"' '"$DHALL_DOCKERS"' "'"${NEW_VERSION}"'" '$PROFILES_DHALL_DEF'.Type.'"${PROFILE}"' '$NETWORK_DHALL_DEF'.Type.'"${NETWORK}"' '"${DHALL_CODENAMES}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${TO_CHANNEL}"' "'"${TAG}"'" '${REMOVE_PROFILE_FROM_NAME}' '${DHALL_PUBLISH}' ' | dhall-to-yaml --quoted 
+echo $PROMOTE_PACKAGE_DHALL_DEF'.verify_artifacts '"$DHALL_DEBIANS"' '"$DHALL_DOCKERS"' "'"${NEW_VERSION}"'" '$PROFILES_DHALL_DEF'.Type.'"${PROFILE}"' '$NETWORK_DHALL_DEF'.Type.'"${NETWORK}"' '"${DHALL_CODENAMES}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${TO_CHANNEL}"' "'"${NEW_VERSION}"'" '${REMOVE_PROFILE_FROM_NAME}' '${DHALL_PUBLISH}' ' | dhall-to-yaml --quoted 

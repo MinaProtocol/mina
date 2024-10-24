@@ -31,7 +31,7 @@ function usage() {
   echo "  --suite           The Current Debian suite"
   echo "  --new-suite       The New Debian suite"
   echo ""
-  echo "Example: $0 --deb mina-archive --version 2.0.0berkeley-rc1-berkeley-48efea4 --new-version 2.0.0berkeley-rc1 --codename bullseye --release unstable --new-release umt"
+  echo "Example: $0 --deb mina-archive --version 2.0.0-rc1-48efea4 --new-version 2.0.0-rc1 --codename bullseye --release unstable --new-release umt"
   exit 1
 }
 

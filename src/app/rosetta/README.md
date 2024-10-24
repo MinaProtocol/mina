@@ -134,7 +134,7 @@ command:
 $ MINA_ROSETTA_MAX_DB_POOL_SIZE=64 _build/default/src/app/rosetta/rosetta.exe \
     --port 3087 \
     --graphql-uri http://localhost:3085/graphql \
-    --archive-uri postgres://pguser:pguser@localhost:5432/archive_berkeley
+    --archive-uri postgres://pguser:pguser@localhost:5432/archive
 ```
 
 The `--graphql-uri` parameter gives the address at which Rosetta can connect to
