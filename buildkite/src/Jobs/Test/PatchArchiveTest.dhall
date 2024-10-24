@@ -28,7 +28,7 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
-          , S.exactly "scripts/path-archive-test" "sh"
+          , S.exactly "scripts/patch-archive-test" "sh"
           , S.exactly "buildkite/src/Jobs/Test/PatchArchiveTest" "dhall"
           , S.exactly "buildkite/src/Command/PatchArchiveTest" "dhall"
           ]
