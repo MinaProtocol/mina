@@ -3,25 +3,6 @@
     caml_create_bytes, caml_bytes_unsafe_set, caml_bytes_unsafe_get, caml_ml_bytes_length,
     UInt64, caml_int64_of_int32, tsRustConversion,tsSrs
 */
-// Provides: caml_opt_of_rust
-var caml_opt_of_rust = function (value, value_of_rust) {
-  if (value === undefined) {
-    return 0;
-  } else {
-    return [0, value_of_rust(value)];
-  }
-};
-
-// Provides: caml_opt_to_rust
-var caml_opt_to_rust = function (caml_optional_value, to_rust) {
-  // to_rust expects the parameters of the variant. A `Some vx` is represented
-  // as [0, vx]
-  if (caml_optional_value === 0) {
-    return undefined;
-  } else {
-    return to_rust(caml_optional_value[1]);
-  }
-};
 
 // Provides: caml_pasta_fp_plonk_verifier_index_create
 // Requires: plonk_wasm, tsRustConversion

@@ -39,3 +39,10 @@ function caml_pasta_fp_plonk_proof_example_with_rot() {
 function caml_pasta_fp_plonk_proof_example_with_xor() {
   throw new Error('Unimplemented caml_pasta_fp_plonk_proof_example_with_xor');
 }
+
+// Provides: caml_pasta_fp_plonk_proof_example_with_lookup
+function caml_pasta_fp_plonk_proof_example_with_lookup() {
+  throw new Error(
+    'Unimplemented caml_pasta_fp_plonk_proof_example_with_lookup'
+  );
+}

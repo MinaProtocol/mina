@@ -16,37 +16,6 @@ var caml_bytes_of_uint8array = function (uint8array) {
   return ocaml_bytes;
 };
 
-// Provides: caml_bytes_to_uint8array
-// Requires: caml_ml_bytes_length, caml_bytes_unsafe_get
-var caml_bytes_to_uint8array = function (ocaml_bytes) {
-  var length = caml_ml_bytes_length(ocaml_bytes);
-  var bytes = new globalThis.Uint8Array(length);
-  for (var i = 0; i < length; i++) {
-    // No need to convert here: OCaml Char.t is just an int under the hood.
-    bytes[i] = caml_bytes_unsafe_get(ocaml_bytes, i);
-  }
-  return bytes;
-};
-
-// Provides: caml_option_of_maybe_undefined
-var caml_option_of_maybe_undefined = function (x) {
-  if (x === undefined) {
-    return 0; // None
-  } else {
-    return [0, x]; // Some(x)
-  }
-};
-
-// Provides: caml_option_to_maybe_undefined
-var caml_option_to_maybe_undefined = function (x) {
-  if (x === 0) {
-    // None
-    return undefined;
-  } else {
-    return x[1];
-  }
-};
-
 // Provides: free_finalization_registry
 var free_finalization_registry = new globalThis.FinalizationRegistry(function (
   instance_representative
