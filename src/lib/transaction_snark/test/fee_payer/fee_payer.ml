@@ -167,6 +167,7 @@ let%test_module "Fee payer tests" =
                 Async.Thread_safe.block_on_async_exn (fun () ->
                     Transaction_snark.For_tests.deploy_snapp test_spec
                       ~constraint_constants )
+                |> Zkapp_command.of_wire
               in
               let txn_state_view =
                 Mina_state.Protocol_state.Body.view U.genesis_state_body

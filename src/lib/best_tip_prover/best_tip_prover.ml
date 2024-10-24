@@ -2,7 +2,6 @@ open Core_kernel
 open Mina_base
 open Mina_state
 open Async_kernel
-open Mina_block
 
 module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier
@@ -28,7 +27,8 @@ module Make (Inputs : Inputs_intf) :
 
     let get_previous ~context transition =
       let parent_hash =
-        transition |> Mina_block.Validated.header |> Header.protocol_state
+        transition |> Mina_block.Validated.header
+        |> Mina_block.Header.protocol_state
         |> Protocol_state.previous_state_hash
       in
       let open Option.Let_syntax in
@@ -68,7 +68,6 @@ module Make (Inputs : Inputs_intf) :
     let best_verified_tip =
       Transition_frontier.Breadcrumb.validated_transition best_tip_breadcrumb
     in
-    let best_tip = Mina_block.Validated.forget best_verified_tip in
     let root =
       Transition_frontier.root frontier
       |> Transition_frontier.Breadcrumb.validated_transition
@@ -83,33 +82,30 @@ module Make (Inputs : Inputs_intf) :
         ]
       "Best tip prover produced a merkle list of $merkle_list" ;
     Proof_carrying_data.
-      { data = best_tip
-      ; proof = (merkle_list, With_hash.data @@ Mina_block.Validated.forget root)
-      }
+      { data = best_verified_tip; proof = (merkle_list, root) }
 
   let validate_proof ~verifier ~genesis_state_hash
-      (transition_with_hash : Mina_block.with_hash) :
-      Mina_block.initial_valid_block Deferred.Or_error.t =
-    let validate (b, v) =
+      (header_hashed : Mina_block.Header.with_hash) :
+      Mina_block.initial_valid_header Deferred.Or_error.t =
+    let open Mina_block.Validation in
+    let validate h =
       let open Deferred.Result.Let_syntax in
-      let h = (With_hash.map ~f:Mina_block.header b, v) in
-      Deferred.return (Validation.validate_protocol_versions h)
+      Deferred.return (validate_protocol_versions h)
       >>= Fn.compose Deferred.return
-            (Validation.validate_genesis_protocol_state ~genesis_state_hash)
-      >>= Validation.validate_single_proof ~verifier ~genesis_state_hash
-      >>| Fn.flip Validation.with_body (Mina_block.body @@ With_hash.data b)
+            (validate_genesis_protocol_state ~genesis_state_hash)
+      >>= validate_single_proof ~verifier ~genesis_state_hash
     in
     let%map validation =
-      Validation.wrap transition_with_hash
-      |> Validation.skip_time_received_validation
+      wrap_header header_hashed
+      |> skip_time_received_validation_header
            `This_block_was_not_received_via_gossip
-      |> Validation.skip_delta_block_chain_validation
+      |> skip_delta_block_chain_validation_header
            `This_block_was_not_received_via_gossip
       |> validate
     in
     match validation with
-    | Ok block ->
-        Ok block
+    | Ok h ->
+        Ok h
     | Error err -> (
         match err with
         | `Invalid_genesis_protocol_state ->
@@ -132,8 +128,8 @@ module Make (Inputs : Inputs_intf) :
     let genesis_state_hash =
       State_hash.With_state_hashes.state_hash genesis_protocol_state
     in
-    let state_hashes block =
-      Mina_block.header block |> Header.protocol_state |> Protocol_state.hashes
+    let state_hashes header =
+      Mina_block.Header.protocol_state header |> Protocol_state.hashes
     in
     let root_state_hash = (state_hashes root).state_hash in
     let root_is_genesis = State_hash.(root_state_hash = genesis_state_hash) in
@@ -167,10 +163,10 @@ module Make (Inputs : Inputs_intf) :
                 "Peer should have given a valid merkle list proof for their \
                  best tip" ) )
     in
-    let%map root, best_tip =
-      Deferred.Or_error.both
-        (validate_proof ~genesis_state_hash ~verifier root_transition_with_hash)
-        (validate_proof ~genesis_state_hash ~verifier best_tip_with_hash)
+    let%map root =
+      validate_proof ~genesis_state_hash ~verifier root_transition_with_hash
+    and best_tip =
+      validate_proof ~genesis_state_hash ~verifier best_tip_with_hash
     in
     (`Root root, `Best_tip best_tip)
 end

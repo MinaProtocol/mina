@@ -32,10 +32,10 @@ module Send_user_commands = struct
 end
 
 module Send_zkapp_commands = struct
-  type query = Zkapp_command.Stable.Latest.t list
+  type query = Zkapp_command.Wire.Stable.Latest.t list
   [@@deriving bin_io_unversioned]
 
-  type response = Zkapp_command.Stable.Latest.t list Or_error.t
+  type response = Zkapp_command.Wire.Stable.Latest.t list Or_error.t
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -140,8 +140,9 @@ end
 module Verify_proof = struct
   type query =
     Account_id.Stable.Latest.t
-    * User_command.Stable.Latest.t
-    * (Receipt.Chain_hash.Stable.Latest.t * User_command.Stable.Latest.t list)
+    * User_command.Wire.Stable.Latest.t
+    * ( Receipt.Chain_hash.Stable.Latest.t
+      * User_command.Wire.Stable.Latest.t list )
   [@@deriving bin_io_unversioned]
 
   type response = unit Or_error.t [@@deriving bin_io_unversioned]

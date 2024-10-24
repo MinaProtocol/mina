@@ -31,8 +31,8 @@ module Make (Inputs : Inputs_intf) :
 
     let get_previous ~context transition =
       let parent_hash =
-        transition |> Mina_block.Validated.forget |> With_hash.data
-        |> Mina_block.header |> Mina_block.Header.protocol_state
+        transition |> Mina_block.Validated.header
+        |> Mina_block.Header.protocol_state
         |> Protocol_state.previous_state_hash
       in
       let open Option.Let_syntax in

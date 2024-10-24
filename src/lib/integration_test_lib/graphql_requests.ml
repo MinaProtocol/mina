@@ -742,7 +742,7 @@ let must_send_online_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount
   |> Deferred.bind ~f:Malleable_error.or_hard_error
 
 let send_zkapp_batch ~logger node_uri
-    ~(zkapp_commands : Mina_base.Zkapp_command.t list) =
+    ~(zkapp_commands : Mina_base.Zkapp_command.Wire.t list) =
   [%log info] "Sending zkapp transactions"
     ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
   let open Deferred.Or_error.Let_syntax in

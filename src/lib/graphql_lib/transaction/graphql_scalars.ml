@@ -49,7 +49,13 @@ let%test_module "Roundtrip tests" =
     let%test_module "TransactionId" =
       ( module struct
         module TransactionId_gen = struct
-          include Mina_transaction.Transaction_id.User_command
+          open Mina_transaction.Transaction_id.User_command
+
+          type t = Wire.t
+
+          [%%define_locally Wire.(sexp_of_t, compare)]
+
+          let gen = Base_quickcheck.Generator.map ~f:to_wire gen
         end
 
         include Make_test (TransactionId) (TransactionId_gen)

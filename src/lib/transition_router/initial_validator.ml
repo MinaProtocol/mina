@@ -296,7 +296,11 @@ let validate ~logger ~trust_system ~verifier ~initialization_finish_signal
                            ~f:
                              (Fn.compose
                                 (Mina_block.Validation.with_body verified_header)
-                                Mina_block.body )
+                                (fun b ->
+                                  Staged_ledger_diff.With_hashes_computed
+                                  .compute
+                                  @@ Staged_ledger_diff.Body.staged_ledger_diff
+                                  @@ Mina_block.body b ) )
                            b_env )
                   | `Header h_env ->
                       `Header

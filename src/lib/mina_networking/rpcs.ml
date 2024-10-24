@@ -39,24 +39,23 @@ end
 
 type ctx = (module CONTEXT)
 
-let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender blocks =
+let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender headers =
   let version_errors =
     let invalid_current_versions =
-      List.filter blocks ~f:(fun block ->
-          Mina_block.header block |> Mina_block.Header.current_protocol_version
+      List.filter headers ~f:(fun header ->
+          Mina_block.Header.current_protocol_version header
           |> Protocol_version.is_valid |> not )
     in
 
     let invalid_next_versions =
-      List.filter blocks ~f:(fun block ->
-          Mina_block.header block
-          |> Mina_block.Header.proposed_protocol_version_opt
+      List.filter headers ~f:(fun header ->
+          Mina_block.Header.proposed_protocol_version_opt header
           |> Option.for_all ~f:Protocol_version.is_valid
           |> not )
     in
     let current_version_mismatches =
-      List.filter blocks ~f:(fun block ->
-          Mina_block.header block |> Mina_block.Header.current_protocol_version
+      List.filter headers ~f:(fun header ->
+          Mina_block.Header.current_protocol_version header
           |> Protocol_version.compatible_with_daemon |> not )
     in
     List.map invalid_current_versions ~f:(fun x ->
@@ -69,8 +68,7 @@ let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender blocks =
     (* NB: these errors aren't always accurate... sometimes we are calling this when we were
            requested to serve an outdated block (requested vs sent) *)
     Deferred.List.iter version_errors ~how:`Parallel
-      ~f:(fun (version_error, block) ->
-        let header = Mina_block.header block in
+      ~f:(fun (version_error, header) ->
         let block_protocol_version =
           Mina_block.Header.current_protocol_version header
         in
@@ -188,7 +186,8 @@ module Get_some_initial_peers = struct
 
   let response_is_successful peer_list = not (List.is_empty peer_list)
 
-  let handle_request (module Context : CONTEXT) ~version:_ _request =
+  let handle_request (module Context : CONTEXT) ~version:_
+      (_request : query Envelope.Incoming.t) : response Deferred.t =
     Context.list_peers ()
 
   let rate_limit_budget = (1, `Per Time.Span.minute)
@@ -207,7 +206,7 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       type query = State_hash.t
 
       type response =
-        ( Staged_ledger.Scan_state.t
+        ( Transaction_snark_scan_state.Wire.t
         * Ledger_hash.t
         * Pending_coinbase.t
         * Mina_state.Protocol_state.value list )
@@ -249,7 +248,7 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       type query = State_hash.Stable.V1.t
 
       type response =
-        ( Staged_ledger.Scan_state.Stable.V2.t
+        ( Transaction_snark_scan_state.Wire.Stable.V2.t
         * Ledger_hash.Stable.V1.t
         * Pending_coinbase.Stable.V2.t
         * Mina_state.Protocol_state.Value.Stable.V2.t list )
@@ -284,7 +283,8 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
 
   let response_is_successful = Option.is_some
 
-  let handle_request (module Context : CONTEXT) ~version:_ request =
+  let handle_request (module Context : CONTEXT) ~version:_
+      (request : query Envelope.Incoming.t) : response Deferred.t =
     let open Context in
     let hash = Envelope.Incoming.data request in
     let result =
@@ -292,32 +292,34 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier
         hash
     in
-    let%map () =
-      match result with
-      | Some
-          (scan_state, expected_merkle_root, pending_coinbases, _protocol_states)
-        ->
-          let staged_ledger_hash =
-            Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-              (Staged_ledger.Scan_state.hash scan_state)
-              expected_merkle_root pending_coinbases
-          in
-          [%log debug]
-            ~metadata:
-              [ ( "staged_ledger_hash"
-                , Staged_ledger_hash.to_yojson staged_ledger_hash )
-              ]
-            "sending scan state and pending coinbase" ;
-          Deferred.unit
-      | None ->
-          Trust_system.(
-            record_envelope_sender trust_system logger
-              (Envelope.Incoming.sender request)
-              Actions.
-                ( Requested_unknown_item
-                , Some (receipt_trust_action_message hash) ))
-    in
-    result
+    match result with
+    | Some
+        (scan_state, expected_merkle_root, pending_coinbases, _protocol_states)
+      ->
+        let staged_ledger_hash =
+          Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
+            (Staged_ledger.Scan_state.hash scan_state)
+            expected_merkle_root pending_coinbases
+        in
+        [%log debug]
+          ~metadata:
+            [ ( "staged_ledger_hash"
+              , Staged_ledger_hash.to_yojson staged_ledger_hash )
+            ]
+          "sending scan state and pending coinbase" ;
+        Deferred.return
+        @@ Some
+             ( Transaction_snark_scan_state.to_wire scan_state
+             , expected_merkle_root
+             , pending_coinbases
+             , _protocol_states )
+    | None ->
+        Trust_system.(
+          record_envelope_sender trust_system logger
+            (Envelope.Incoming.sender request)
+            Actions.
+              (Requested_unknown_item, Some (receipt_trust_action_message hash)))
+        >>| const None
 
   let rate_limit_budget = (4, `Per Time.Span.minute)
 
@@ -407,7 +409,8 @@ module Answer_sync_ledger_query = struct
 
   let response_is_successful = Result.is_ok
 
-  let handle_request (module Context : CONTEXT) ~version:_ request =
+  let handle_request (module Context : CONTEXT) ~version:_
+      (request : query Envelope.Incoming.t) : response Deferred.t =
     let open Context in
     let ledger_hash, _ = Envelope.Incoming.data request in
     let query = Envelope.Incoming.map request ~f:Tuple2.get2 in
@@ -525,7 +528,8 @@ module Get_transition_chain = struct
 
   let response_is_successful = Option.is_some
 
-  let handle_request (module Context : CONTEXT) ~version:_ request =
+  let handle_request (module Context : CONTEXT) ~version:_
+      (request : query Envelope.Incoming.t) : response Deferred.t =
     let open Context in
     let hashes = Envelope.Incoming.data request in
     let result =
@@ -538,9 +542,10 @@ module Get_transition_chain = struct
           validate_protocol_versions ~logger ~trust_system
             ~rpc_name:"Get_transition_chain"
             ~sender:(Envelope.Incoming.sender request)
-            blocks
+            (List.map blocks ~f:fst)
         in
-        Option.some_if valid_versions blocks
+        Option.some_if valid_versions
+        @@ List.map ~f:Mina_block.block_of_header_and_body_with_hashes blocks
     | None ->
         let%map () =
           Trust_system.(
@@ -632,7 +637,8 @@ module Get_transition_knowledge = struct
 
   let response_is_successful hashes = not (List.is_empty hashes)
 
-  let handle_request (module Context : CONTEXT) ~version:_ _request =
+  let handle_request (module Context : CONTEXT) ~version:_
+      (_request : query Envelope.Incoming.t) : response Deferred.t =
     let open Context in
     let result =
       let%map.Option frontier = get_transition_frontier () in
@@ -721,7 +727,8 @@ module Get_transition_chain_proof = struct
 
   let response_is_successful = Option.is_some
 
-  let handle_request (module Context : CONTEXT) ~version:_ request =
+  let handle_request (module Context : CONTEXT) ~version:_
+      (request : query Envelope.Incoming.t) : response Deferred.t =
     let open Context in
     let hash = Envelope.Incoming.data request in
     let result =
@@ -832,7 +839,8 @@ module Get_ancestry = struct
 
   let response_is_successful = Option.is_some
 
-  let handle_request (module Context : CONTEXT) ~version:_ request =
+  let handle_request (module Context : CONTEXT) ~version:_
+      (request : query Envelope.Incoming.t) : response Deferred.t =
     let open Context in
     let consensus_state_with_hash = Envelope.Incoming.data request in
     let result =
@@ -854,14 +862,19 @@ module Get_ancestry = struct
                 ))
         in
         None
-    | Some { proof = _, block; _ } ->
+    | Some { proof = p, pblock; data } ->
         let%map valid_versions =
           validate_protocol_versions ~logger ~trust_system
             ~rpc_name:"Get_ancestry"
             ~sender:(Envelope.Incoming.sender request)
-            [ block ]
+            [ Mina_block.Validated.header pblock ]
         in
-        if valid_versions then result else None
+        if valid_versions then
+          Some
+            { Proof_carrying_data.proof = (p, Mina_block.Validated.block pblock)
+            ; data = Mina_block.Validated.block data
+            }
+        else None
 
   let rate_limit_budget = (5, `Per Time.Span.minute)
 
@@ -945,7 +958,9 @@ module Ban_notify = struct
 
   let response_is_successful = Fn.const true
 
-  let handle_request _ctx ~version:_ _request = Deferred.unit
+  let handle_request _ctx ~version:_ (_request : query Envelope.Incoming.t) :
+      response Deferred.t =
+    Deferred.unit
 
   let rate_limit_budget = (1, `Per Time.Span.minute)
 
@@ -1032,16 +1047,13 @@ module Get_best_tip = struct
 
   let response_is_successful = Option.is_some
 
-  let handle_request (module Context : CONTEXT) ~version:_ request =
+  let handle_request (module Context : CONTEXT) ~version:_
+      (request : query Envelope.Incoming.t) : response Deferred.t =
     let open Context in
     let result =
       let open Option.Let_syntax in
       let%bind frontier = get_transition_frontier () in
-      let%map proof_with_data =
-        Best_tip_prover.prove ~context:(module Context) frontier
-      in
-      (* strip hash from proof data *)
-      Proof_carrying_data.map proof_with_data ~f:With_hash.data
+      Best_tip_prover.prove ~context:(module Context) frontier
     in
     match result with
     | None ->
@@ -1053,19 +1065,25 @@ module Get_best_tip = struct
                 (Requested_unknown_item, Some (receipt_trust_action_message ())))
         in
         None
-    | Some { data = data_block; proof = _, proof_block } ->
+    | Some { data = data_block; proof = p, proof_block } ->
         let%map data_valid_versions =
           validate_protocol_versions ~logger ~trust_system
             ~rpc_name:"Get_best_tip (data)"
             ~sender:(Envelope.Incoming.sender request)
-            [ data_block ]
+            [ Mina_block.Validated.header data_block ]
         and proof_valid_versions =
           validate_protocol_versions ~logger ~trust_system
             ~rpc_name:"Get_best_tip (proof)"
             ~sender:(Envelope.Incoming.sender request)
-            [ proof_block ]
+            [ Mina_block.Validated.header proof_block ]
         in
-        if data_valid_versions && proof_valid_versions then result else None
+        if data_valid_versions && proof_valid_versions then
+          Some
+            { Proof_carrying_data.proof =
+                (p, Mina_block.Validated.block proof_block)
+            ; data = Mina_block.Validated.block data_block
+            }
+        else None
 
   let rate_limit_budget = (3, `Per Time.Span.minute)
 

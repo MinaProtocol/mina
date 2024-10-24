@@ -2,6 +2,16 @@ open Core
 open Mina_base
 open Mina_transaction
 open Signature_lib
+open Staged_ledger_diff
+
+type ('a, 'b) diff_pair_t =
+  ( Transaction_snark_work.t
+  , ('a, 'b) User_command.unwired_t With_status.t )
+  Pre_diff_two.t
+  * ( Transaction_snark_work.t
+    , ('a, 'b) User_command.unwired_t With_status.t )
+    Pre_diff_one.t
+    option
 
 module type S = sig
   module Error : sig
@@ -34,8 +44,16 @@ module type S = sig
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> coinbase_receiver:Public_key.Compressed.t
     -> supercharge_coinbase:bool
-    -> Staged_ledger_diff.t
-    -> (Transaction.t With_status.t list, Error.t) result
+    -> ('a, 'b) diff_pair_t
+    -> ( ('a, 'b) User_command.unwired_t Transaction.t_ With_status.t list
+       , Error.t )
+       result
+
+  val get_transactions_exn :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> consensus_state:Consensus.Data.Consensus_state.Value.t
+    -> ('a, 'b) diff_pair_t
+    -> ('a, 'b) User_command.unwired_t Transaction.t_ With_status.t list
 end
 
 module Error = struct
@@ -176,7 +194,8 @@ let sum_fees xs ~f =
 let to_staged_ledger_or_error =
   Result.map_error ~f:(fun error -> Error.Unexpected error)
 
-let fee_remainder (type c) ~(to_user_command : c -> User_command.t)
+let fee_remainder (type d1 d2 c)
+    ~(to_user_command : c -> (d1, d2) User_command.unwired_t)
     (commands : c list) completed_works coinbase_fee =
   let open Result.Let_syntax in
   let%bind budget =
@@ -242,8 +261,9 @@ module Transaction_data = struct
     }
 end
 
-let get_transaction_data (type c) ~constraint_constants coinbase_parts ~receiver
-    ~coinbase_amount ~(to_user_command : c -> User_command.t)
+let get_transaction_data (type d1 d2 c) ~constraint_constants coinbase_parts
+    ~receiver ~coinbase_amount
+    ~(to_user_command : c -> (d1, d2) User_command.unwired_t)
     (commands : c list) completed_works :
     (c Transaction_data.t, Error.t) Result.t =
   let open Result.Let_syntax in
@@ -307,8 +327,6 @@ let get_individual_info (type c) ~constraint_constants coinbase_parts ~receiver
   ; coinbases =
       List.map coinbase_parts ~f:(fun Coinbase.{ amount; _ } -> amount)
   }
-
-open Staged_ledger_diff
 
 let check_coinbase (diff : _ Pre_diff_two.t * _ Pre_diff_one.t option) =
   match
@@ -404,10 +422,10 @@ let compute_statuses
   in
   (p1', p2')
 
-let get' (type c)
+let get' (type d1 d2 c)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~(to_user_command : c With_status.t -> User_command.t) ~diff
-    ~coinbase_receiver ~coinbase_amount =
+    ~(to_user_command : c With_status.t -> (d1, d2) User_command.unwired_t)
+    ~diff ~coinbase_receiver ~coinbase_amount =
   let open Result.Let_syntax in
   let%bind coinbase_amount =
     Option.value_map coinbase_amount
@@ -481,13 +499,25 @@ let get_unchecked ~constraint_constants ~coinbase_receiver ~supercharge_coinbase
          ~supercharge_coinbase t )
 
 let get_transactions ~constraint_constants ~coinbase_receiver
-    ~supercharge_coinbase (sl_diff : t) =
+    ~supercharge_coinbase sl_diff =
   let open Result.Let_syntax in
   let%map transactions, _, _, _ =
-    get' ~constraint_constants ~to_user_command:With_status.data
-      ~diff:sl_diff.diff ~coinbase_receiver
+    get' ~constraint_constants ~to_user_command:With_status.data ~diff:sl_diff
+      ~coinbase_receiver
       ~coinbase_amount:
-        (Staged_ledger_diff.coinbase ~constraint_constants ~supercharge_coinbase
-           sl_diff )
+        (Staged_ledger_diff.coinbase_of_diff_pair ~constraint_constants
+           ~supercharge_coinbase sl_diff )
   in
   transactions
+
+let get_transactions_exn ~constraint_constants ~consensus_state diff =
+  let coinbase_receiver =
+    Consensus.Data.Consensus_state.coinbase_receiver consensus_state
+  in
+  let supercharge_coinbase =
+    Consensus.Data.Consensus_state.supercharge_coinbase consensus_state
+  in
+  get_transactions ~constraint_constants ~coinbase_receiver
+    ~supercharge_coinbase diff
+  |> Result.map_error ~f:Error.to_error
+  |> Or_error.ok_exn

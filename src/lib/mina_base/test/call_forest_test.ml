@@ -7,12 +7,11 @@
 
 open Core_kernel
 open Mina_base
-open Zkapp_command.Call_forest
 
 (* TODO: move generators to the library once the code isn't actively being
      worked on *)
 module Tree = struct
-  include Tree
+  include Zkapp_command.Call_forest.Tree
 
   let gen account_update_gen account_update_digest_gen digest_gen =
     let open Quickcheck.Generator.Let_syntax in
@@ -139,7 +138,7 @@ module Tree_test = struct
         Tree.fold_forest2_exn forest forest' ~init:() ~f:(fun _ _ _ -> ()) )
 
   let mapi_forest_with_trees_unit_test () =
-    [%test_result: (int, unit, unit) t]
+    [%test_result: (int, unit, unit) Zkapp_command.Call_forest.t]
       ~expect:[ node 2 [ node 0 []; node 4 [ node 6 [] ] ]; node 4 [] ]
       (Tree.mapi_forest_with_trees
          [ node 1 [ node 0 []; node 2 [ node 3 [] ] ]; node 2 [] ]
@@ -158,7 +157,8 @@ module Tree_test = struct
         let forest_2 =
           Tree.mapi_forest_with_trees forest ~f:(fun _ x _ -> f_1 @@ f_2 x)
         in
-        [%test_eq: (int, int, int) t] forest_1 forest_2 )
+        [%test_eq: (int, int, int) Zkapp_command.Call_forest.t] forest_1
+          forest_2 )
 
   let mapi_prime_preserves_shape () =
     Quickcheck.test
@@ -170,7 +170,7 @@ module Tree_test = struct
         Tree.fold2_exn tree tree' ~init:() ~f:(fun _ _ _ -> ()) )
 
   let mapi_prime () =
-    [%test_result: int * (int, unit, unit) Tree.t]
+    [%test_result: int * (int, unit, unit) Zkapp_command.Call_forest.Tree.t]
       ~expect:(7, tree 4 [ node 4 []; node 7 [ node 9 [] ] ])
       (Tree.mapi' ~i:3
          (tree 1 [ node 0 []; node 2 [ node 3 [] ] ])
@@ -178,7 +178,11 @@ module Tree_test = struct
 
   let mapi_forest_prime () =
     [%test_result:
-      int * ((int, unit, unit) Tree.t, unit) With_stack_hash.t list]
+      int
+      * ( (int, unit, unit) Zkapp_command.Call_forest.Tree.t
+        , unit )
+        With_stack_hash.t
+        list]
       ~expect:(7, [ node 4 [ node 4 []; node 7 [ node 9 [] ] ] ])
       (Tree.mapi_forest' ~i:3
          [ node 1 [ node 0 []; node 2 [ node 3 [] ] ] ]
@@ -195,7 +199,8 @@ module Tree_test = struct
           Tree.map_forest ~f:f_1 @@ Tree.map_forest forest ~f:f_2
         in
         let forest_2 = Tree.mapi_forest forest ~f:(fun _ x -> f_1 @@ f_2 x) in
-        [%test_eq: (int, int, int) t] forest_1 forest_2 )
+        [%test_eq: (int, int, int) Zkapp_command.Call_forest.t] forest_1
+          forest_2 )
 
   let deferred_map_forest_equivalent_to_map_forest () =
     Quickcheck.test
@@ -208,7 +213,8 @@ module Tree_test = struct
                 ~f:(fun x _ -> Async_kernel.return (x + 1))
                 x )
         in
-        [%test_eq: (int, int, int) t] tree_sync tree_async )
+        [%test_eq: (int, int, int) Zkapp_command.Call_forest.t] tree_sync
+          tree_async )
 end
 
 let test_shape () =
@@ -219,7 +225,7 @@ let test_shape () =
     }
   in
   [%test_eq: Shape.t]
-    (shape
+    (Zkapp_command.Call_forest.shape
        [ node 0
            [ node 1 [ node 2 [ node 3 [ node 4 [] ] ]; node 2 [] ]; node 1 [] ]
        ; node 0 []
@@ -244,29 +250,31 @@ let shape_indices_always_start_with_0_and_increse_by_1 () =
             [%test_eq: int] i j ;
             check_shape xs' )
       in
-      check_shape (shape tree) )
+      check_shape (Zkapp_command.Call_forest.shape tree) )
 
 let match_up_ok () =
   let l_1 = [ 1; 2; 3; 4; 5; 6 ] in
   let l_2 = [ (0, 'a'); (1, 'b'); (2, 'c'); (3, 'd') ] in
   let expect = [ (1, 'a'); (2, 'b'); (3, 'c'); (4, 'd') ] in
-  [%test_result: (int * char) list] ~expect (match_up l_1 l_2)
+  [%test_result: (int * char) list] ~expect
+    (Zkapp_command.Call_forest.match_up l_1 l_2)
 
 let match_up_error () =
   let l_1 = [ 1; 2; 3 ] in
   let l_2 = [ (0, 'a'); (1, 'b'); (2, 'c'); (3, 'd') ] in
-  assert_error (Tuple.T2.uncurry match_up) (l_1, l_2)
+  assert_error (Tuple.T2.uncurry Zkapp_command.Call_forest.match_up) (l_1, l_2)
 
 let match_up_error_2 () =
   let l_1 = [ 1; 2; 3 ] in
   let l_2 = [ (2, 'a'); (3, 'b'); (4, 'c'); (5, 'd') ] in
-  assert_error (Tuple.T2.uncurry match_up) (l_1, l_2)
+  assert_error (Tuple.T2.uncurry Zkapp_command.Call_forest.match_up) (l_1, l_2)
 
 let match_up_empty () =
   let l_1 = [ 1; 2; 3; 4; 5; 6 ] in
   let l_2 = [ (1, 'a'); (2, 'b'); (3, 'c'); (4, 'd') ] in
   let expect = [] in
-  [%test_result: (int * char) list] ~expect (match_up l_1 l_2)
+  [%test_result: (int * char) list] ~expect
+    (Zkapp_command.Call_forest.match_up l_1 l_2)
 
 let gen_forest_shape =
   let open Quickcheck.Generator.Let_syntax in
@@ -285,29 +293,33 @@ let gen_forest_shape =
     in
     Shape.Node (List.rev l)
   in
-  let shape = shape forest in
+  let shape = Zkapp_command.Call_forest.shape forest in
   let%map shape = gen_shape shape in
   (forest, shape)
 
 let mask () =
   Quickcheck.test gen_forest_shape ~f:(fun (f, s) ->
-      [%test_result: Shape.t] ~expect:s (shape @@ mask f s) )
+      [%test_result: Shape.t] ~expect:s
+        Zkapp_command.Call_forest.(shape @@ mask f s) )
 
 let to_account_updates_is_the_inverse_of_of_account_updates () =
-  Quickcheck.test (Quickcheck.Generator.list Int.quickcheck_generator)
-    ~f:(fun forest ->
-      let forest' =
-        to_account_updates
-          (of_account_updates ~account_update_depth:Fn.id forest)
-      in
-      [%test_result: int list] ~expect:forest forest' )
+  Quickcheck.test
+    (Quickcheck.Generator.list Int.quickcheck_generator)
+    ~f:
+      Zkapp_command.Call_forest.(
+        fun forest ->
+          let forest' =
+            to_account_updates
+              (of_account_updates ~account_update_depth:Fn.id forest)
+          in
+          [%test_result: int list] ~expect:forest forest')
 
 let to_zkapp_command_with_hashes_list () =
   let node i hash calls =
     { With_stack_hash.elt = Tree_test.tree i calls; stack_hash = hash }
   in
   let computed =
-    to_zkapp_command_with_hashes_list
+    Zkapp_command.Call_forest.to_zkapp_command_with_hashes_list
       [ node 0 'a' [ node 1 'b' []; node 2 'c' [ node 3 'd' [] ] ]
       ; node 4 'e' [ node 5 'f' [] ]
       ]

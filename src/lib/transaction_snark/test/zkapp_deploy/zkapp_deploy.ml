@@ -42,6 +42,7 @@ let%test_module "zkApp deploy tests" =
                     Async.Thread_safe.block_on_async_exn (fun () ->
                         Transaction_snark.For_tests.deploy_snapp test_spec
                           ~constraint_constants )
+                    |> Zkapp_command.of_wire
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -81,6 +82,7 @@ let%test_module "zkApp deploy tests" =
                     Async.Thread_safe.block_on_async_exn (fun () ->
                         Transaction_snark.For_tests.deploy_snapp test_spec
                           ~constraint_constants )
+                    |> Zkapp_command.of_wire
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -114,6 +116,7 @@ let%test_module "zkApp deploy tests" =
                     Async.Thread_safe.block_on_async_exn (fun () ->
                         Transaction_snark.For_tests.deploy_snapp test_spec
                           ~constraint_constants )
+                    |> Zkapp_command.of_wire
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -148,6 +151,7 @@ let%test_module "zkApp deploy tests" =
                     Async.Thread_safe.block_on_async_exn (fun () ->
                         Transaction_snark.For_tests.deploy_snapp test_spec
                           ~constraint_constants )
+                    |> Zkapp_command.of_wire
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -182,6 +186,7 @@ let%test_module "zkApp deploy tests" =
                     Async.Thread_safe.block_on_async_exn (fun () ->
                         Transaction_snark.For_tests.deploy_snapp test_spec
                           ~constraint_constants )
+                    |> Zkapp_command.of_wire
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)

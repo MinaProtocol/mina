@@ -349,7 +349,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; preconditions = None
         }
       in
-      Transaction_snark.For_tests.update_states ~constraint_constants
+      Transaction_snark.For_tests.update_states_wire ~constraint_constants
         zkapp_command_spec
     in
     let with_timeout =

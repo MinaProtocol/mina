@@ -98,16 +98,17 @@ end]
 (* functions for the versioned json, not the unversioned ones provided by `T` *)
 [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
 
-let of_block ~logger
+let of_validated_block ~logger
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~scheduled_time ~staged_ledger block_with_hash =
+    ~scheduled_time ~staged_ledger (validated_block : Validated_block.t) =
   let ledger = Staged_ledger.ledger staged_ledger in
-  let block = With_hash.data block_with_hash in
-  let state_hash =
-    (With_hash.hash block_with_hash).State_hash.State_hashes.state_hash
+  let { With_hash.data = header, body
+      ; hash = { State_hash.State_hashes.state_hash; _ }
+      } =
+    Validated_block.forget validated_block
   in
   let account_ids_accessed =
-    Block.account_ids_accessed ~constraint_constants block
+    Validated_block.account_ids_accessed ~constraint_constants validated_block
   in
   let start = Time.now () in
   let accounts_accessed =
@@ -132,7 +133,6 @@ let of_block ~logger
                   ] ;
               None ) )
   in
-  let header = Block.header block in
   let protocol_version = Header.current_protocol_version header in
   let proposed_protocol_version = Header.proposed_protocol_version_opt header in
   let accounts_accessed_time = Time.now () in
@@ -179,8 +179,7 @@ let of_block ~logger
   { scheduled_time
   ; protocol_state = Header.protocol_state header
   ; protocol_state_proof = Header.protocol_state_proof header
-  ; staged_ledger_diff =
-      Staged_ledger_diff.Body.staged_ledger_diff (Block.body block)
+  ; staged_ledger_diff = Staged_ledger_diff.With_hashes_computed.forget body
   ; delta_transition_chain_proof = Header.delta_block_chain_proof header
   ; protocol_version
   ; proposed_protocol_version

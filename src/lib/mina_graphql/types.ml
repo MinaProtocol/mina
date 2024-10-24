@@ -1931,8 +1931,9 @@ module Zkapp_command = struct
 
   let zkapp_command =
     let conv
-        (x : (Mina_lib.t, Zkapp_command.t) Fields_derivers_graphql.Schema.typ) :
-        (Mina_lib.t, Zkapp_command.t) typ =
+        (x :
+          (Mina_lib.t, Zkapp_command.Wire.t) Fields_derivers_graphql.Schema.typ
+          ) : (Mina_lib.t, Zkapp_command.Wire.t) typ =
       Obj.magic x
     in
     obj "ZkappCommandResult" ~fields:(fun _ ->
@@ -2569,7 +2570,7 @@ module Input = struct
   end
 
   module SendTestZkappInput = struct
-    type input = Mina_base.Zkapp_command.t
+    type input = Mina_base.Zkapp_command.Wire.t
 
     let arg_typ =
       scalar "SendTestZkappInput" ~doc:"zkApp command for a test zkApp"
@@ -2915,8 +2916,9 @@ module Input = struct
     let arg_typ =
       let conv
           (x :
-            Mina_base.Zkapp_command.t Fields_derivers_graphql.Schema.Arg.arg_typ
-            ) : Mina_base.Zkapp_command.t Graphql_async.Schema.Arg.arg_typ =
+            Mina_base.Zkapp_command.Wire.t
+            Fields_derivers_graphql.Schema.Arg.arg_typ ) :
+          Mina_base.Zkapp_command.Wire.t Graphql_async.Schema.Arg.arg_typ =
         Obj.magic x
       in
       let arg_typ =

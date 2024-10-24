@@ -237,11 +237,10 @@ let build_zkapp_cmd ?valid_until ~fee transactions :
   let open State.Let_syntax in
   let%bind body = fee_payer_body ?valid_until fee in
   let%map updates = State.concat_map_m ~f:mk_updates transactions in
-  Zkapp_command.
-    { fee_payer = { body; authorization = Signature.dummy }
-    ; account_updates = updates
-    ; memo = Signed_command_memo.dummy
-    }
+  { Zkapp_command.T.fee_payer = { body; authorization = Signature.dummy }
+  ; account_updates = updates
+  ; memo = Signed_command_memo.dummy
+  }
 
 let zkapp_cmd ?valid_until ~noncemap ~fee transactions =
   Monad_lib.State.eval_state

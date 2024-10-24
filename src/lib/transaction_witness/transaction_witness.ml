@@ -9,7 +9,7 @@ module Zkapp_command_segment_witness = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
+      type 'zkapp_command t =
         { global_first_pass_ledger : Sparse_ledger.Stable.V2.t
         ; global_second_pass_ledger : Sparse_ledger.Stable.V2.t
         ; local_state_init :
@@ -32,7 +32,7 @@ module Zkapp_command_segment_witness = struct
             , Transaction_status.Failure.Collection.Stable.V1.t )
             Mina_transaction_logic.Zkapp_command_logic.Local_state.Stable.V1.t
         ; start_zkapp_command :
-            ( Zkapp_command.Stable.V1.t
+            ( 'zkapp_command
             , Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
             , bool )
             Mina_transaction_logic.Zkapp_command_logic.Start_data.Stable.V1.t
@@ -52,7 +52,7 @@ end
 module Stable = struct
   module V2 = struct
     type t =
-      { transaction : Mina_transaction.Transaction.Stable.V2.t
+      { transaction : Mina_transaction.Transaction.Wire.Stable.V2.t
       ; first_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
       ; second_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
       ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t

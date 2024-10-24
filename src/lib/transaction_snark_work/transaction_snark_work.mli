@@ -56,7 +56,7 @@ type t = Mina_wire_types.Transaction_snark_work.V2.t =
   ; proofs : Ledger_proof.t One_or_two.t
   ; prover : Public_key.Compressed.t
   }
-[@@deriving compare, sexp, yojson]
+[@@deriving equal, compare, sexp, yojson]
 
 val fee : t -> Fee.t
 

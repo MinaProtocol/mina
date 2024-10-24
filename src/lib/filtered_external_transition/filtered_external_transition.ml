@@ -21,7 +21,7 @@ module Transactions = struct
     module V2 = struct
       type t =
         { commands :
-            ( User_command.Stable.V2.t
+            ( User_command.Wire.Stable.V2.t
             , Transaction_hash.Stable.V1.t )
             With_hash.Stable.V1.t
             With_status.Stable.V2.t
@@ -104,22 +104,6 @@ let participant_pks
 
 let commands { transactions = { Transactions.commands; _ }; _ } = commands
 
-let validate_transactions block =
-  let consensus_state =
-    block |> Mina_block.header |> Mina_block.Header.protocol_state
-    |> Mina_state.Protocol_state.consensus_state
-  in
-  let open Consensus.Data in
-  let coinbase_receiver = Consensus_state.coinbase_receiver consensus_state in
-  let supercharge_coinbase =
-    Consensus_state.supercharge_coinbase consensus_state
-  in
-  let staged_ledger_diff =
-    block |> Mina_block.body |> Mina_block.Body.staged_ledger_diff
-  in
-  Staged_ledger.Pre_diff_info.get_transactions ~coinbase_receiver
-    ~supercharge_coinbase staged_ledger_diff
-
 let filter_protocol_state protocol_state : Protocol_state.t =
   Mina_state.Protocol_state.
     { previous_state_hash = previous_state_hash protocol_state
@@ -127,12 +111,8 @@ let filter_protocol_state protocol_state : Protocol_state.t =
     ; consensus_state = consensus_state protocol_state
     }
 
-let of_transition block tracked_participants
+let of_transition header completed_works tracked_participants
     (calculated_transactions : Transaction.t With_status.t list) =
-  let header = Mina_block.header block in
-  let staged_ledger_diff =
-    block |> Mina_block.body |> Mina_block.Body.staged_ledger_diff
-  in
   let consensus_state =
     header |> Mina_block.Header.protocol_state
     |> Mina_state.Protocol_state.consensus_state
@@ -166,13 +146,14 @@ let of_transition block tracked_participants
               (* Should include this command. *)
               { acc_transactions with
                 commands =
-                  { With_status.data =
-                      { With_hash.data = command
-                      ; hash = Transaction_hash.hash_command command
-                      }
-                  ; status
-                  }
-                  :: acc_transactions.commands
+                  (let wired = User_command.to_wire command in
+                   { With_status.data =
+                       { With_hash.data = wired
+                       ; hash = Transaction_hash.hash_command wired
+                       }
+                   ; status
+                   }
+                   :: acc_transactions.commands )
               } )
       | { data = Fee_transfer fee_transfer; _ } ->
           let fee_transfer_list =
@@ -213,12 +194,10 @@ let of_transition block tracked_participants
                 Option.value_exn (add amount acc_transactions.coinbase))
           } )
   in
-  let snark_jobs =
-    staged_ledger_diff |> Staged_ledger_diff.completed_works
-    |> List.map ~f:Transaction_snark_work.info
+  let snark_jobs = List.map ~f:Transaction_snark_work.info completed_works in
+  let creator = Consensus.Data.Consensus_state.block_creator consensus_state in
+  let winner =
+    Consensus.Data.Consensus_state.block_stake_winner consensus_state
   in
-  let open Consensus.Data in
-  let creator = Consensus_state.block_creator consensus_state in
-  let winner = Consensus_state.block_stake_winner consensus_state in
   let proof = Mina_block.Header.protocol_state_proof header in
   { creator; winner; protocol_state; transactions; snark_jobs; proof }

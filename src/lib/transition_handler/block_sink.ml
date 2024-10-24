@@ -172,7 +172,7 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
             in
             List.exists transactions ~f:(fun txn ->
                 match
-                  Mina_transaction.Transaction.check_well_formedness
+                  Mina_transaction.Transaction.Wire.check_well_formedness
                     ~genesis_constants ~compile_config txn.data
                 with
                 | Ok () ->

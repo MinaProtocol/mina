@@ -80,12 +80,13 @@ let deploy_zkapps ~scheduler_tbl ~mina ~ledger ~deployment_fee ~max_cost
                 "Successfully submitted zkApp command that creates a zkApp \
                  account"
                 ~metadata:
-                  [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command) ] ;
+                  [ ("zkapp_command", Zkapp_command.Wire.to_yojson zkapp_command)
+                  ] ;
               Deferred.return (`Finished ())
           | Error err ->
               [%log info] "Failed to setup a zkApp account, try again"
                 ~metadata:
-                  [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command)
+                  [ ("zkapp_command", Zkapp_command.Wire.to_yojson zkapp_command)
                   ; ("error", `String err)
                   ] ;
               let%bind () = after wait_span in
@@ -238,6 +239,7 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
                    ~genesis_constants:
                      (Mina_lib.config mina).precomputed_values.genesis_constants
                    ()
+                 |> Base_quickcheck.Generator.map ~f:Zkapp_command.of_wire
                else
                  Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
                    ~memo
@@ -283,7 +285,9 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
         let%bind () =
           O1trace.thread "itn_send_zkapp"
           @@ fun () ->
-          match%map Zkapps.send_zkapp_command mina zkapp_command with
+          match%map
+            Zkapps.send_zkapp_command mina (Zkapp_command.to_wire zkapp_command)
+          with
           | Ok _ ->
               [%log info] "Sent out zkApp with fee payer's summary $summary"
                 ~metadata:

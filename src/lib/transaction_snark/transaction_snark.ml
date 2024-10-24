@@ -1853,7 +1853,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 Boolean.Assert.all
                   [ correct_coinbase_target_stack; valid_init_state ] ) )
 
-      let main ?(witness : Witness.t option) (spec : Spec.t)
+      let main ?(witness : Zkapp_command.t Witness.t option) (spec : Spec.t)
           ~constraint_constants (statement : Statement.With_sok.var) =
         let open Impl in
         run_checked (dummy_constraints ()) ;
@@ -2079,7 +2079,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         (Stdlib.( ! ) zkapp_input, `Must_verify (Stdlib.( ! ) must_verify))
 
       (* Horrible hack :( *)
-      let witness : Witness.t option ref = ref None
+      (* TODO remove it, very sad to see it *)
+      let witness : Zkapp_command.t Witness.t option ref = ref None
 
       let rule (type a b c d) ~constraint_constants ~proof_level
           (t : (a, b, c, d) Basic.t_typed) :
@@ -3375,7 +3376,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     val of_zkapp_command_segment_exn :
          statement:Statement.With_sok.t
-      -> witness:Zkapp_command_segment.Witness.t
+      -> witness:Zkapp_command.t Zkapp_command_segment.Witness.t
       -> spec:Zkapp_command_segment.Basic.t
       -> t Async.Deferred.t
 
@@ -3838,7 +3839,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; full_transaction_commitment = next_full_commitment
           }
         in
-        let w : Zkapp_command_segment.Witness.t =
+        let w : Zkapp_command.t Zkapp_command_segment.Witness.t =
           { global_first_pass_ledger = source_global.first_pass_ledger
           ; global_second_pass_ledger = source_global.second_pass_ledger
           ; local_state_init = source_local
@@ -3964,7 +3965,9 @@ module Make_str (A : Wire_types.Concrete) = struct
     let verify = verify_impl ~f:Proof.verify
 
     let first_account_update
-        (witness : Transaction_witness.Zkapp_command_segment_witness.t) =
+        (witness :
+          (Account_update.t, _, _) Zkapp_command.Call_forest.t Zkapp_command.T.t
+          Transaction_witness.Zkapp_command_segment_witness.t ) =
       match witness.local_state_init.stack_frame.calls with
       | [] ->
           with_return (fun { return } ->
@@ -3984,7 +3987,10 @@ module Make_str (A : Wire_types.Concrete) = struct
           None
 
     let snapp_proof_data
-        ~(witness : Transaction_witness.Zkapp_command_segment_witness.t) =
+        ~(witness :
+           (Account_update.t, _, _) Zkapp_command.Call_forest.t
+           Zkapp_command.T.t
+           Transaction_witness.Zkapp_command_segment_witness.t ) =
       let open Option.Let_syntax in
       let%bind p = first_account_update witness in
       let%map pi = account_update_proof p in
@@ -4598,7 +4604,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                      } )
           }
       in
-      let ( `Zkapp_command { Zkapp_command.fee_payer; account_updates; memo }
+      let ( `Zkapp_command { Zkapp_command.T.fee_payer; account_updates; memo }
           , `Sender_account_update sender_account_update
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment commitment
@@ -4637,20 +4643,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       let account_updates =
         Option.to_list sender_account_update @ snapp_zkapp_command
       in
-      let zkapp_command : Zkapp_command.t =
-        { fee_payer
-        ; memo
-        ; account_updates =
-            Zkapp_command.Call_forest.of_account_updates account_updates
-              ~account_update_depth:(fun (p : Account_update.Simple.t) ->
-                p.body.call_depth )
-            |> Zkapp_command.Call_forest.map ~f:Account_update.of_simple
-            |> Zkapp_command.Call_forest.accumulate_hashes
-                 ~hash_account_update:(fun (p : Account_update.t) ->
-                   Zkapp_command.Digest.Account_update.create p )
-        }
-      in
-      zkapp_command
+      { Zkapp_command.T.fee_payer
+      ; memo
+      ; account_updates =
+          Zkapp_command.Call_forest.of_account_updates account_updates
+            ~account_update_depth:(fun (p : Account_update.Simple.t) ->
+              p.body.call_depth )
+          |> Zkapp_command.Call_forest.map ~f:Account_update.of_simple
+      }
 
     (* This spec is intended to build a zkapp command with only one account update
        with proof authorization. This is mainly for cross-network replay tests. We
@@ -4706,7 +4706,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             create_trivial_snapp ~constraint_constants ()
       in
       let%bind.Async.Deferred vk = vk in
-      let ( `Zkapp_command { Zkapp_command.fee_payer; memo; _ }
+      let ( `Zkapp_command { Zkapp_command.T.fee_payer; memo; _ }
           , `Sender_account_update _
           , `Proof_zkapp_command _
           , `Txn_commitment _
@@ -4846,7 +4846,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
     end
 
-    let update_states ?receiver_auth ?zkapp_prover_and_vk ?empty_sender
+    let update_states_wire ?receiver_auth ?zkapp_prover_and_vk ?empty_sender
         ~constraint_constants (spec : Update_states_spec.t) =
       let prover, vk =
         match zkapp_prover_and_vk with
@@ -4860,7 +4860,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             (prover, vk)
       in
       let%bind.Async.Deferred vk = vk in
-      let ( `Zkapp_command ({ Zkapp_command.fee_payer; memo; _ } as p)
+      let ( `Zkapp_command ({ Zkapp_command.T.fee_payer; memo; _ } as p)
           , `Sender_account_update sender_account_update
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment commitment
@@ -4933,10 +4933,13 @@ module Make_str (A : Wire_types.Concrete) = struct
         Option.value_map ~default:[] ~f:(fun p -> [ p ]) sender_account_update
         @ snapp_zkapp_command @ receivers
       in
-      let zkapp_command : Zkapp_command.t =
-        Zkapp_command.of_simple { fee_payer; account_updates; memo }
-      in
-      zkapp_command
+      Zkapp_command.of_simple { fee_payer; account_updates; memo }
+
+    let update_states ?receiver_auth ?zkapp_prover_and_vk ?empty_sender
+        ~constraint_constants spec =
+      Async.Deferred.map ~f:Zkapp_command.of_wire
+      @@ update_states_wire ?receiver_auth ?zkapp_prover_and_vk ?empty_sender
+           ~constraint_constants spec
 
     module Multiple_transfers_spec = struct
       type t =
@@ -5005,7 +5008,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       assert (List.is_empty snapp_zkapp_command) ;
       let account_updates =
         let sender_account_update = Option.value_exn sender_account_update in
-        Zkapp_command.Call_forest.cons
+        Zkapp_command.Call_forest.Unit.cons
           (Account_update.of_simple sender_account_update)
           zkapp_command.account_updates
       in
@@ -5192,10 +5195,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; { body = snapp_account_update_data.body; authorization = Proof pi }
         ]
       in
-      let zkapp_command : Zkapp_command.t =
-        Zkapp_command.of_simple { fee_payer; account_updates; memo }
-      in
-      zkapp_command
+      Zkapp_command.of_simple { fee_payer; account_updates; memo }
   end
 end
 

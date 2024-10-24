@@ -26,7 +26,7 @@ let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
   in
   let protocol_state = With_hash.data genesis_state in
   let block_with_hash =
-    let body = Staged_ledger_diff.Body.create Staged_ledger_diff.empty_diff in
+    let body = Staged_ledger_diff.With_hashes_computed.empty_diff in
     let header =
       Header.create ~protocol_state
         ~protocol_state_proof:(Lazy.force Proof.blockchain_dummy)
@@ -34,8 +34,7 @@ let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
           (Protocol_state.previous_state_hash protocol_state, [])
         ()
     in
-    let block = Block.create ~header ~body in
-    With_hash.map genesis_state ~f:(Fn.const block)
+    With_hash.map genesis_state ~f:(Fn.const (header, body))
   in
   let validation =
     ( (`Time_received, Truth.True ())
@@ -53,7 +52,7 @@ let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
 
 let genesis_header ~precomputed_values =
   let b, v = genesis ~precomputed_values in
-  (With_hash.map ~f:Block.header b, v)
+  (With_hash.map ~f:fst b, v)
 
 let handle_dropped_transition ?pipe_name ?valid_cb ~logger block =
   [%log warn] "Dropping state_hash $state_hash from $pipe transition pipe"

@@ -35,8 +35,8 @@ end
 
 module Transaction_pool = struct
   type t =
-    { added : User_command.Stable.Latest.t list
-    ; removed : User_command.Stable.Latest.t list
+    { added : User_command.Wire.Stable.Latest.t list
+    ; removed : User_command.Wire.Stable.Latest.t list
     }
   [@@deriving bin_io_unversioned]
 end
@@ -71,12 +71,12 @@ module Builder = struct
                (sender, receipt_chain_hash)) )
     in
     let block_with_hash = Mina_block.Validated.forget validated_block in
-    let block = With_hash.data block_with_hash in
     let state_hash = (With_hash.hash block_with_hash).state_hash in
     let start = Time.now () in
     let account_ids_accessed =
-      Mina_block.account_ids_accessed
-        ~constraint_constants:precomputed_values.constraint_constants block
+      Mina_block.Validated.account_ids_accessed
+        ~constraint_constants:precomputed_values.constraint_constants
+        validated_block
     in
     let accounts_accessed =
       List.filter_map account_ids_accessed ~f:(fun (acct_id, status) ->
@@ -105,7 +105,8 @@ module Builder = struct
         precomputed_values.constraint_constants.account_creation_fee
       in
       let previous_block_state_hash =
-        Mina_block.header block |> Header.protocol_state
+        Mina_block.Validated.header validated_block
+        |> Header.protocol_state
         |> Mina_state.Protocol_state.previous_state_hash
       in
       List.map
@@ -134,8 +135,9 @@ module Builder = struct
               (Time.Span.to_ms
                  (Time.diff account_created_time accounts_accessed_time) ) )
         ] ;
+    let block = Mina_block.forget_computed_hashes block_with_hash in
     Transition_frontier.Breadcrumb_added
-      { block = block_with_hash
+      { block
       ; accounts_accessed
       ; accounts_created
       ; tokens_used

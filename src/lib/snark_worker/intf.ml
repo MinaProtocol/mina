@@ -78,7 +78,7 @@ module type Work_S = sig
     type t = (Spec.t, ledger_proof) Work.Result.t
 
     val transactions :
-      t -> Mina_transaction.Transaction.t option One_or_two.Stable.V1.t
+      t -> Mina_transaction.Transaction.Wire.t option One_or_two.Stable.V1.t
   end
 end
 

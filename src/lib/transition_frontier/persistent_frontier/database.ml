@@ -303,7 +303,7 @@ let check t ~genesis_state_hash =
 let initialize t ~root_data =
   let open Root_data.Limited in
   let root_state_hash, root_transition =
-    let t = Mina_block.Validated.forget (transition root_data) in
+    let t = transition root_data in
     ( State_hash.With_state_hashes.state_hash t
     , State_hash.With_state_hashes.data t )
   in
@@ -345,17 +345,19 @@ let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
       Error (`Not_found `Old_root_transition)
 
 let add ~arcs_cache ~transition =
-  let transition = Mina_block.Validated.forget transition in
-  let hash = State_hash.With_state_hashes.state_hash transition in
+  let hash = Mina_block.Validated.state_hash transition in
   let parent_hash =
-    With_hash.data transition |> Mina_block.header |> Header.protocol_state
-    |> Mina_state.Protocol_state.previous_state_hash
+    Mina_block.Validated.header transition
+    |> Header.protocol_state |> Mina_state.Protocol_state.previous_state_hash
   in
   let parent_arcs = State_hash.Table.find_exn arcs_cache parent_hash in
   State_hash.Table.set arcs_cache ~key:parent_hash ~data:(hash :: parent_arcs) ;
   State_hash.Table.set arcs_cache ~key:hash ~data:[] ;
   fun batch ->
-    Batch.set batch ~key:(Transition hash) ~data:(With_hash.data transition) ;
+    Batch.set batch ~key:(Transition hash)
+      ~data:
+        ( With_hash.data @@ Mina_block.forget_computed_hashes
+        @@ Mina_block.Validated.forget transition ) ;
     Batch.set batch ~key:(Arcs hash) ~data:[] ;
     Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs)
 
@@ -389,6 +391,10 @@ let get_transition t hash =
     block |> With_hash.data |> Mina_block.header
     |> Mina_block.Header.protocol_state
     |> Mina_state.Protocol_state.previous_state_hash
+  in
+  let block =
+    With_hash.map block ~f:(fun b ->
+        (Mina_block.header b, Mina_block.staged_ledger_diff_hashed b) )
   in
   (* TODO: the delta transition chain proof is incorrect (same behavior the daemon used to have, but we should probably fix this?) *)
   Mina_block.Validated.unsafe_of_trusted_block

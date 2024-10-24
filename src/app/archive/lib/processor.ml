@@ -2060,7 +2060,8 @@ module User_command = struct
         @@ Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names )
         id
 
-    let add_if_doesn't_exist (module Conn : CONNECTION) (ps : Zkapp_command.t) =
+    let add_if_doesn't_exist (module Conn : CONNECTION)
+        (ps : Zkapp_command.Wire.t) =
       let open Deferred.Result.Let_syntax in
       let zkapp_command = Zkapp_command.to_simple ps in
       let%bind zkapp_fee_payer_body_id =
@@ -2090,14 +2091,14 @@ module User_command = struct
         { zkapp_fee_payer_body_id; zkapp_account_updates_ids; memo; hash }
   end
 
-  let via (t : User_command.t) : [ `Zkapp_command | `Ident ] =
+  let via (t : User_command.Wire.t) : [ `Zkapp_command | `Ident ] =
     match t with
     | Signed_command _ ->
         `Ident
     | Zkapp_command _ ->
         `Zkapp_command
 
-  let add_if_doesn't_exist conn (t : User_command.t) ~v1_transaction_hash =
+  let add_if_doesn't_exist conn (t : User_command.Wire.t) ~v1_transaction_hash =
     match t with
     | Signed_command sc ->
         Signed_command.add_if_doesn't_exist conn ~via:(via t)
@@ -2951,7 +2952,8 @@ module Block = struct
           in
           match
             Staged_ledger.Pre_diff_info.get_transactions ~constraint_constants
-              ~coinbase_receiver ~supercharge_coinbase staged_ledger_diff
+              ~coinbase_receiver ~supercharge_coinbase
+              staged_ledger_diff.Staged_ledger_diff.diff
           with
           | Ok transactions ->
               transactions
@@ -3294,14 +3296,18 @@ module Block = struct
         return block_id
 
   let add_if_doesn't_exist conn ~constraint_constants
-      ({ data = t; hash = { state_hash = hash; _ } } :
-        Mina_block.t State_hash.With_state_hashes.t ) =
+      { With_hash.data = block
+      ; hash = { State_hash.State_hashes.state_hash = hash; _ }
+      } =
+    let header = Mina_block.header block in
+    let staged_ledger_diff =
+      Mina_block.body block |> Staged_ledger_diff.Body.staged_ledger_diff
+    in
     add_parts_if_doesn't_exist conn ~constraint_constants
-      ~protocol_state:(Header.protocol_state @@ Mina_block.header t)
-      ~staged_ledger_diff:(Body.staged_ledger_diff @@ Mina_block.body t)
-      ~protocol_version:(Header.current_protocol_version @@ Mina_block.header t)
-      ~proposed_protocol_version:
-        (Header.proposed_protocol_version_opt @@ Mina_block.header t)
+      ~protocol_state:(Header.protocol_state header)
+      ~staged_ledger_diff
+      ~protocol_version:(Header.current_protocol_version header)
+      ~proposed_protocol_version:(Header.proposed_protocol_version_opt header)
       ~hash ~v1_transaction_hash:false
 
   let add_from_precomputed conn ~constraint_constants (t : Precomputed.t) =
@@ -4741,12 +4747,8 @@ let add_genesis_accounts ~logger
         let%map account_id_set = Mina_ledger.Ledger.accounts ledger in
         Account_id.Set.to_list account_id_set
       in
-      let genesis_block =
-        let With_hash.{ data = block; hash = the_hash }, _ =
-          Mina_block.genesis ~precomputed_values
-        in
-        With_hash.{ data = block; hash = the_hash }
-      in
+      let genesis_block, _ = Mina_block.genesis ~precomputed_values in
+      let genesis_block = Mina_block.forget_computed_hashes genesis_block in
       let add_accounts () =
         Caqti_async.Pool.use
           (fun (module Conn : CONNECTION) ->

@@ -152,7 +152,8 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
 
 let block_base64_of_breadcrumb breadcrumb =
   let external_transition =
-    breadcrumb |> Transition_frontier.Breadcrumb.block
+    breadcrumb |> Transition_frontier.Breadcrumb.validated_transition
+    |> Mina_block.Validated.block
   in
   let block_string =
     Binable.to_string (module Mina_block.Stable.Latest) external_transition
@@ -214,7 +215,10 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
           ~prover:(Public_key.compress submitter_keypair.public_key)
       in
       let best_tip = Transition_frontier.best_tip tf in
-      let best_tip_block = Transition_frontier.Breadcrumb.block best_tip in
+      let best_tip_block =
+        Transition_frontier.Breadcrumb.validated_transition best_tip
+        |> Mina_block.Validated.block
+      in
       if
         List.is_empty
           (Mina_block.transactions ~constraint_constants best_tip_block)
