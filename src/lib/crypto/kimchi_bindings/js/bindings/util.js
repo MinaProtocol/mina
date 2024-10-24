@@ -4,6 +4,13 @@
     UInt64, caml_int64_of_int32, tsRustConversion,tsSrs
 */
 
+// Provides: integers_uint64_of_uint32
+// Requires: UInt64, caml_int64_of_int32
+function integers_uint64_of_uint32(i) {
+  // Same as integers_uint64_of_int
+  return new UInt64(caml_int64_of_int32(i));
+}
+
 // Provides: caml_bytes_of_uint8array
 // Requires: caml_create_bytes, caml_bytes_unsafe_set
 var caml_bytes_of_uint8array = function (uint8array) {
