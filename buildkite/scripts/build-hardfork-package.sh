@@ -9,7 +9,7 @@ case "${NETWORK_NAME}" in
   mainnet)
     DUNE_PROFILE=mainnet
     ;;
-  devnet|berkeley)
+  devnet)
     DUNE_PROFILE=devnet
     ;;
   *)
