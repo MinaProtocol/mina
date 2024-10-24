@@ -233,7 +233,7 @@ val start_filtered_log : t -> string list -> unit Or_error.t
 
 val get_filtered_log_entries : t -> int -> string list * bool
 
-val verifier : t -> Verifier.t
+val prover : t -> Prover.t
 
 val vrf_evaluator : t -> Vrf_evaluator.t
 

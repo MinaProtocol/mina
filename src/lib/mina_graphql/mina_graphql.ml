@@ -2663,7 +2663,7 @@ module Queries = struct
       ~args:Arg.[]
       ~resolve:(fun { ctx = mina; _ } () ->
         let open Deferred.Result.Let_syntax in
-        Mina_lib.verifier mina |> Verifier.get_blockchain_verification_key
+        Mina_lib.prover mina |> Prover.get_blockchain_verification_key
         |> Deferred.Result.map_error ~f:Error.to_string_hum
         >>| Pickles.Verification_key.to_yojson >>| Yojson.Safe.to_basic )
 
