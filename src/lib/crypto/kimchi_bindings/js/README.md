@@ -1,3 +1,5 @@
+Despite popular belief, the bindings files are not auto-generated, they just look funny.
+
 This library provides a wrapper around the WebAssembly prover code, which
 allows `js_of_ocaml` to compile the mina project against the WebAssembly
 backend.
