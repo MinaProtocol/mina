@@ -44,6 +44,7 @@ module Failure = struct
         | Account_app_state_precondition_unsatisfied of int
         | Account_proved_state_precondition_unsatisfied
         | Account_is_new_precondition_unsatisfied
+        | Permissions_precondition_unsatisfied
         | Protocol_state_precondition_unsatisfied
         | Unexpected_verification_key_hash
         | Valid_while_precondition_unsatisfied
@@ -128,6 +129,7 @@ module Failure = struct
         List.init 8 ~f:var.constructor @ acc )
       ~account_proved_state_precondition_unsatisfied:add
       ~account_is_new_precondition_unsatisfied:add
+      ~permissions_precondition_unsatisfied:add
       ~protocol_state_precondition_unsatisfied:add
       ~valid_while_precondition_unsatisfied:add
       ~unexpected_verification_key_hash:add ~incorrect_nonce:add
@@ -214,6 +216,8 @@ module Failure = struct
         "Account_proved_state_precondition_unsatisfied"
     | Account_is_new_precondition_unsatisfied ->
         "Account_is_new_precondition_unsatisfied"
+    | Permissions_precondition_unsatisfied ->
+        "Permissions_precondition_unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
         "Protocol_state_precondition_unsatisfied"
     | Valid_while_precondition_unsatisfied ->
@@ -304,6 +308,8 @@ module Failure = struct
         Ok Account_proved_state_precondition_unsatisfied
     | "Account_is_new_precondition_unsatisfied" ->
         Ok Account_is_new_precondition_unsatisfied
+    | "Permissions_precondition_unsatisfied" ->
+        Ok Permissions_precondition_unsatisfied
     | "Protocol_state_precondition_unsatisfied" ->
         Ok Protocol_state_precondition_unsatisfied
     | "Valid_while_precondition_unsatisfied" ->
@@ -451,6 +457,9 @@ module Failure = struct
         "The account update's account proved state precondition was unsatisfied"
     | Account_is_new_precondition_unsatisfied ->
         "The account update's account is-new state precondition was unsatisfied"
+    | Permissions_precondition_unsatisfied ->
+        "A permission precondition was unsatisfied"
+        (* TODO should probably turn this into a bunch of errors for each field*)
     | Protocol_state_precondition_unsatisfied ->
         "The account update's protocol state precondition unsatisfied"
     | Valid_while_precondition_unsatisfied ->
