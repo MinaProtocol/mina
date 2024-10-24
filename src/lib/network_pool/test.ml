@@ -3,9 +3,6 @@ open Core_kernel
 open Pipe_lib
 open Network_peer
 
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
-
 let%test_module "network pool test" =
   ( module struct
     let trust_system = Mocks.trust_system

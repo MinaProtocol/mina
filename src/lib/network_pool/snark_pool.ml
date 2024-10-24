@@ -256,7 +256,7 @@ struct
                 }
           ; frontier =
               (fun () -> Broadcast_pipe.Reader.peek frontier_broadcast_pipe)
-          ; batcher = Batcher.Snark_pool.create config.verifier
+          ; batcher = Batcher.Snark_pool.create ~logger config.verifier
           ; logger
           ; config
           ; account_creation_fee =
@@ -558,9 +558,6 @@ module Diff_versioned = struct
     | Empty
   [@@deriving compare, sexp, to_yojson, hash]
 end
-
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 
 let%test_module "random set test" =
   ( module struct
