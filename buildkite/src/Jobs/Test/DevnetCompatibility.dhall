@@ -32,19 +32,19 @@ in  Pipeline.build
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
           , S.exactly "buildkite/scripts/check-compatibility" "sh"
-          , S.exactly "buildkite/src/Jobs/Test/DevelopCompatibility" "dhall"
+          , S.exactly "buildkite/src/Jobs/Test/DevnetCompatibility" "dhall"
           ]
         , path = "Test"
         , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
-        , name = "DevelopCompatibility"
+        , name = "DevnetCompatibility"
         }
       , steps =
         [ Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run "buildkite/scripts/check-compatibility.sh develop" ]
-            , label = "Test: develop compatibilty test"
-            , key = "develop-compatibilty-test"
+              [ Cmd.run "buildkite/scripts/check-compatibility.sh devnet" ]
+            , label = "Test: devnet compatibilty test"
+            , key = "devnet-compatibilty-test"
             , target = Size.XLarge
             , docker = None Docker.Type
             , depends_on = dependsOn

@@ -45,15 +45,23 @@ esac
 
 # Add suffix to debian to distinguish different profiles (mainnet/devnet/lightnet)
 case "${DUNE_PROFILE}" in
-  devnet|mainnet)
+  devnet)
     MINA_DEB_NAME="mina-devnet"
     DEB_SUFFIX=""
    ;;
-  *)
+  mainnet)
+    MINA_DEB_NAME="mina-mainnet"
+    DEB_SUFFIX=""
+   ;;
+  lightnet)
     # use dune profile as suffix but replace underscore to dashes so deb builder won't complain
     _SUFFIX=${DUNE_PROFILE//_/-}
     MINA_DEB_NAME="mina-devnet-${_SUFFIX}"
     DEB_SUFFIX="-${_SUFFIX}"
+    ;;
+  *)
+    echo "Unsupported dune profile"
+    exit 1
     ;;
 esac
 
@@ -282,7 +290,7 @@ build_rosetta_mainnet_deb() {
   build_deb mina-rosetta-mainnet
 }
 
-##################################### ROSETTA MAINNET PACKAGE #######################################
+##################################### ROSETTA DEVNET PACKAGE #######################################
 build_rosetta_devnet_deb() {
 
   echo "------------------------------------------------------------"
@@ -315,7 +323,7 @@ build_daemon_devnet_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building testnet signatures deb without keys:"
 
-  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network'
+  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
 
   copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
 
@@ -354,7 +362,7 @@ build_archive_deb () {
 ##################################### ZKAPP TEST TXN #######################################
 build_zkapp_test_transaction_deb () {
   echo "------------------------------------------------------------"
-  echo "--- Building Mina Berkeley ZkApp test transaction tool:"
+  echo "--- Building Mina Devnet ZkApp test transaction tool:"
 
   create_control_file mina-zkapp-test-transaction "${SHARED_DEPS}${DAEMON_DEPS}" 'Utility to generate ZkApp transactions in Mina GraphQL format'
 

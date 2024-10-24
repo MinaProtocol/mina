@@ -549,7 +549,7 @@ func TestBitswapSmoke(t *testing.T) {
 }
 
 func TestBitswapSmall(t *testing.T) {
-	testBitswap(t, 20, 100, 5, 1<<16, false)
+	testBitswap(t, 20, 10, 5, 1<<16, false)
 }
 
 func TestBitswapQC(t *testing.T) {

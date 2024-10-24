@@ -27,7 +27,6 @@ if [ $# -eq 0 ]
     build_batch_txn_deb
     build_daemon_mainnet_deb
     build_daemon_devnet_deb
-    build_rosetta_berkeley_deb
     build_rosetta_mainnet_deb
     build_rosetta_devnet_deb
     build_test_executive_deb

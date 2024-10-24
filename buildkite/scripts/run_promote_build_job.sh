@@ -46,7 +46,7 @@ function usage() {
   echo "  NEW_VERSION                 The new Debian version or new Docker tag"
   echo "  REMOVE_PROFILE_FROM_NAME    Should we remove profile suffix from debian name"
   echo "  PROFILE                     The Docker and Debian profile (Standard, Lightnet)"
-  echo "  NETWORK                     The Docker and Debian network (Devnet, Mainnet, Berkeley)"
+  echo "  NETWORK                     The Docker and Debian network (Devnet, Mainnet)"
   echo "  FROM_CHANNEL                Source debian channel"
   echo "  TO_CHANNEL                  Target debian channel"
   echo "  PUBLISH                     The Publish to docker.io flag. If defined, script will publish docker do docker.io. Otherwise it will still resides in gcr.io"

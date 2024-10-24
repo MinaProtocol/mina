@@ -253,6 +253,9 @@ pub mod fp {
         domain_size: i32,
         i: i32,
     ) -> Option<WasmPolyComm> {
+        if !(srs.0.lagrange_bases.contains_key(&(domain_size as usize))) {
+            return None;
+        }
         let basis = srs.get_lagrange_basis_from_domain_size(domain_size as usize);
         Some(basis[i as usize].clone().into())
     }
@@ -330,7 +333,10 @@ pub mod fq {
         domain_size: i32,
         i: i32,
     ) -> Option<WasmPolyComm> {
-        let basis = srs.0.get_lagrange_basis_from_domain_size(domain_size as usize);
+        if !(srs.0.lagrange_bases.contains_key(&(domain_size as usize))) {
+            return None;
+        }
+        let basis = srs.get_lagrange_basis_from_domain_size(domain_size as usize);
         Some(basis[i as usize].clone().into())
     }
 
