@@ -12,6 +12,8 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
+let DebianRepo = ../../Constants/DebianRepo.dhall
+
 let Toolchain = ../../Constants/Toolchain.dhall
 
 let Command = ../Base.dhall
@@ -29,6 +31,8 @@ let PromoteDebianSpec =
           , codename : DebianVersions.DebVersion
           , from_channel : DebianChannel.Type
           , to_channel : DebianChannel.Type
+          , source_repo : DebianRepo.Type
+          , target_repo : DebianRepo.Type
           , profile : Profiles.Type
           , remove_profile_from_name : Bool
           , step_key : Text
@@ -43,7 +47,9 @@ let PromoteDebianSpec =
           , network = Network.Type.Berkeley
           , codename = DebianVersions.DebVersion.Bullseye
           , from_channel = DebianChannel.Type.Unstable
-          , to_channel = DebianChannel.Type.NightlyCompatible
+          , to_channel = DebianChannel.Type.Compatible
+          , source_repo = DebianRepo.Type.Unstable
+          , target_repo = DebianRepo.Type.Nightly
           , profile = Profiles.Type.Standard
           , remove_profile_from_name = False
           , step_key = "promote-debian-package"

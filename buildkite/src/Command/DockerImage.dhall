@@ -90,18 +90,22 @@ let generateStep =
                 ++  " --deb-build-flags ${BuildFlags.lowerName
                                             spec.build_flags}"
 
+          let remoteRepoCmds =
+                [ Cmd.run
+                    (     exportMinaDebCmd
+                      ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
+                      ++  " && "
+                      ++  buildDockerCmd
+                      ++  " && "
+                      ++  releaseDockerCmd
+                    )
+                ]
+
           let commands =
                 merge
-                  { PackagesO1Test =
-                    [ Cmd.run
-                        (     exportMinaDebCmd
-                          ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
-                          ++  " && "
-                          ++  buildDockerCmd
-                          ++  " && "
-                          ++  releaseDockerCmd
-                        )
-                    ]
+                  { PackagesO1Test = remoteRepoCmds
+                  , Unstable = remoteRepoCmds
+                  , Nightly = remoteRepoCmds
                   , Local =
                     [ Cmd.run
                         (     exportMinaDebCmd
