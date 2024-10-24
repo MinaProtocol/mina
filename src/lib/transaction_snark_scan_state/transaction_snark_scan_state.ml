@@ -770,18 +770,17 @@ module Transactions_ordered = struct
                   let target_first_pass_ledger =
                     txn_with_witness.statement.target.first_pass_ledger
                   in
-                  if
-                    is_zkapp_transaction
-                      txn_with_witness
-                        .Transaction_with_witness.T.transaction_with_info
-                  then
-                    ( txn_with_witness :: first_pass_txns
-                    , second_pass_txns
-                    , target_first_pass_ledger )
-                  else
-                    ( txn_with_witness :: first_pass_txns
-                    , txn_with_witness :: second_pass_txns
-                    , target_first_pass_ledger ) )
+                  let second_pass_txns' =
+                    if
+                      is_zkapp_transaction
+                        txn_with_witness
+                          .Transaction_with_witness.T.transaction_with_info
+                    then txn_with_witness :: second_pass_txns
+                    else second_pass_txns
+                  in
+                  ( txn_with_witness :: first_pass_txns
+                  , second_pass_txns'
+                  , target_first_pass_ledger ) )
             in
             ( List.rev first_pass_txns
             , List.rev second_pass_txns
