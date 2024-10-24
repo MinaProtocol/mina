@@ -15,7 +15,7 @@ let lowerName =
       ->  merge { Devnet = "devnet", Mainnet = "mainnet" } network
 
 let requiresMainnetBuild =
-      \(network : Network) -> merge { Devnet = True, Mainnet = True } network
+      \(network : Network) -> merge { Devnet = False, Mainnet = True } network
 
 let foldMinaBuildMainnetEnv =
           \(networks : List Network)
