@@ -2114,33 +2114,26 @@ let%test_module _ =
               Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
                 ~max_token_updates:1 ~keymap ~account_state_tbl
                 ~fee_payer_keypair ~ledger:best_tip_ledger ~constraint_constants
-                ~genesis_constants ()
-            in
-            let zkapp_command =
-              { zkapp_command with
-                account_updates =
-                  Zkapp_command.Call_forest.map zkapp_command.account_updates
-                    ~f:(fun (p : Account_update.t) ->
-                      { p with
-                        body =
-                          { p.body with
-                            preconditions =
-                              { p.body.preconditions with
-                                account =
-                                  ( match p.body.preconditions.account.nonce with
-                                  | Zkapp_basic.Or_ignore.Check n as c
-                                    when Zkapp_precondition.Numeric.(
-                                           is_constant Tc.nonce c) ->
-                                      Zkapp_precondition.Account.nonce n.lower
-                                  | _ ->
-                                      Zkapp_precondition.Account.accept )
-                              }
-                          }
-                      } )
-              }
-            in
-            let zkapp_command_valid_vk_hashes =
-              Zkapp_command.For_tests.replace_vks zkapp_command vk
+                ~genesis_constants
+                ~map_account_update:(fun (p : Account_update.t) ->
+                  Zkapp_command.For_tests.replace_vk vk
+                    { p with
+                      body =
+                        { p.body with
+                          preconditions =
+                            { p.body.preconditions with
+                              account =
+                                ( match p.body.preconditions.account.nonce with
+                                | Zkapp_basic.Or_ignore.Check n as c
+                                  when Zkapp_precondition.Numeric.(
+                                         is_constant Tc.nonce c) ->
+                                    Zkapp_precondition.Account.nonce n.lower
+                                | _ ->
+                                    Zkapp_precondition.Account.accept )
+                            }
+                        }
+                    } )
+                ()
             in
             let valid_zkapp_command =
               Or_error.ok_exn
@@ -2151,7 +2144,7 @@ let%test_module _ =
                         ~location_of_account:
                           (Mina_ledger.Ledger.location_of_account
                              best_tip_ledger ) )
-                   zkapp_command_valid_vk_hashes )
+                   zkapp_command )
             in
             User_command.Zkapp_command valid_zkapp_command
           in
