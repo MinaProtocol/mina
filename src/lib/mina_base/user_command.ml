@@ -155,11 +155,11 @@ let to_wire : t -> Wire.t = function
   | Zkapp_command cmd ->
       Zkapp_command (Zkapp_command.to_wire cmd)
 
-let of_wire : Wire.t -> t = function
+let of_wire ~chain = function
   | Signed_command cmd ->
       Signed_command cmd
   | Zkapp_command cmd ->
-      Zkapp_command (Zkapp_command.of_wire cmd)
+      Zkapp_command (Zkapp_command.of_wire ~chain cmd)
 
 module Zero_one_or_two = struct
   [%%versioned

@@ -180,8 +180,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   module For_tests = struct
     (* Pretend to sign a command. Much faster than actually signing. *)
-    let fake_sign ~signature_kind:_ (kp : Signature_keypair.t)
-        (payload : Payload.t) : t =
+    let fake_sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
       { payload; signer = kp.public_key; signature = Signature.dummy }
   end
 
@@ -226,24 +225,23 @@ module Make_str (_ : Wire_types.Concrete) = struct
         Signed_command_payload.Body.Payment
           { receiver_pk = Public_key.compress receiver; amount }
 
-      let gen ?(sign_type = `Fake) ~signature_kind =
+      let gen ?(sign_type = `Fake) =
         match sign_type with
         | `Fake ->
-            gen_inner (For_tests.fake_sign ~signature_kind)
+            gen_inner For_tests.fake_sign
         | `Real ->
-            gen_inner (sign ~signature_kind)
+            gen_inner (sign ~signature_kind:Testnet)
 
-      let gen_with_random_participants ?sign_type ~signature_kind ~keys ?nonce
-          ?min_amount ~max_amount ?min_fee ~fee_range =
+      let gen_with_random_participants ?sign_type ~keys ?nonce ?min_amount
+          ~max_amount ?min_fee ~fee_range =
         with_random_participants ~keys ~gen:(fun ~key_gen ->
-            gen ?sign_type ~signature_kind ~key_gen ?nonce ?min_amount
-              ~max_amount ?min_fee ~fee_range )
+            gen ?sign_type ~key_gen ?nonce ?min_amount ~max_amount ?min_fee
+              ~fee_range )
     end
 
     module Stake_delegation = struct
-      let gen ~key_gen ?nonce ?min_fee ~fee_range ~signature_kind () =
-        gen_inner (For_tests.fake_sign ~signature_kind)
-          ~key_gen ?nonce ?min_fee ~fee_range
+      let gen ~key_gen ?nonce ?min_fee ~fee_range () =
+        gen_inner For_tests.fake_sign ~key_gen ?nonce ?min_fee ~fee_range
           (fun { public_key = new_delegate; _ } ->
             Quickcheck.Generator.return
             @@ Signed_command_payload.Body.Stake_delegation
@@ -266,14 +264,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let sequence :
            ?length:int
         -> ?sign_type:[ `Fake | `Real ]
-        -> signature_kind:Mina_signature_kind.t
         -> ( Signature_lib.Keypair.t
            * Currency.Amount.t
            * Mina_numbers.Account_nonce.t
            * Account_timing.t )
            array
         -> t list Quickcheck.Generator.t =
-     fun ?length ?(sign_type = `Fake) ~signature_kind account_info ->
+     fun ?length ?(sign_type = `Fake) account_info ->
       let open Quickcheck.Generator in
       let open Quickcheck.Generator.Let_syntax in
       let%bind n_commands =
@@ -366,9 +363,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
             let sign' =
               match sign_type with
               | `Fake ->
-                  For_tests.fake_sign ~signature_kind
+                  For_tests.fake_sign
               | `Real ->
-                  sign ~signature_kind
+                  sign ~signature_kind:Testnet
             in
             return @@ sign' sender_pk payload )
   end
@@ -434,18 +431,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let gen_test =
     let open Quickcheck.Let_syntax in
-    let signature_kind = Mina_signature_kind.Testnet in
     let%bind keys =
       Quickcheck.Generator.list_with_length 2 Signature_keypair.gen
     in
     Gen.payment_with_random_participants ~sign_type:`Real
-      ~keys:(Array.of_list keys) ~max_amount:10000 ~fee_range:1000
-      ~signature_kind ()
+      ~keys:(Array.of_list keys) ~max_amount:10000 ~fee_range:1000 ()
 
   let%test_unit "completeness" =
-    let signature_kind = Mina_signature_kind.Testnet in
     Quickcheck.test ~trials:20 gen_test ~f:(fun t ->
-        assert (check_signature ~signature_kind t) )
+        assert (check_signature ~signature_kind:Testnet t) )
 
   let%test_unit "json" =
     Quickcheck.test ~trials:20 ~sexp_of:sexp_of_t gen_test ~f:(fun t ->
@@ -453,13 +447,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   (* return type is `t option` here, interface coerces that to `With_valid_signature.t option` *)
   let check t =
-    let signature_kind = Mina_signature_kind.Testnet in
-    Option.some_if (check_signature ~signature_kind t && check_valid_keys t) t
+    Option.some_if
+      (check_signature ~signature_kind:Testnet t && check_valid_keys t)
+      t
 
   (* return type is `t option` here, interface coerces that to `With_valid_signature.t option` *)
   let check_only_for_signature t =
-    let signature_kind = Mina_signature_kind.Testnet in
-    Option.some_if (check_signature ~signature_kind t) t
+    Option.some_if (check_signature ~signature_kind:Testnet t) t
 
   let forget_check t = t
 

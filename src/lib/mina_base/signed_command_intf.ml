@@ -17,7 +17,6 @@ module type Gen_intf = sig
     *)
     val payment :
          ?sign_type:[ `Fake | `Real ]
-      -> signature_kind:Mina_signature_kind.t
       -> key_gen:
            (Signature_keypair.t * Signature_keypair.t) Quickcheck.Generator.t
       -> ?nonce:Account_nonce.t
@@ -36,7 +35,6 @@ module type Gen_intf = sig
     *)
     val payment_with_random_participants :
          ?sign_type:[ `Fake | `Real ]
-      -> signature_kind:Mina_signature_kind.t
       -> keys:Signature_keypair.t array
       -> ?nonce:Account_nonce.t
       -> ?min_amount:int
@@ -52,7 +50,6 @@ module type Gen_intf = sig
       -> ?nonce:Account_nonce.t
       -> ?min_fee:Currency.Fee.t
       -> fee_range:int
-      -> signature_kind:Mina_signature_kind.t
       -> unit
       -> t Quickcheck.Generator.t
 
@@ -61,7 +58,6 @@ module type Gen_intf = sig
       -> ?nonce:Account_nonce.t
       -> ?min_fee:Currency.Fee.t
       -> fee_range:int
-      -> signature_kind:Mina_signature_kind.t
       -> unit
       -> t Quickcheck.Generator.t
 
@@ -71,7 +67,6 @@ module type Gen_intf = sig
     val sequence :
          ?length:int
       -> ?sign_type:[ `Fake | `Real ]
-      -> signature_kind:Mina_signature_kind.t
       -> ( Signature_lib.Keypair.t
          * Currency.Amount.t
          * Mina_numbers.Account_nonce.t
@@ -177,10 +172,7 @@ module type S = sig
   module For_tests : sig
     (** the signature kind is an argument, to match `sign`, but ignored *)
     val fake_sign :
-         signature_kind:Mina_signature_kind.t
-      -> Signature_keypair.t
-      -> Signed_command_payload.t
-      -> With_valid_signature.t
+      Signature_keypair.t -> Signed_command_payload.t -> With_valid_signature.t
   end
 
   (** checks signature and keys *)
