@@ -4,6 +4,8 @@ let Network = ../../Constants/Network.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
 
+let Profiles = ../../Constants/Profiles.dhall
+
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineMode = ../../Pipeline/Mode.dhall
@@ -21,7 +23,8 @@ in  Pipeline.build
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
             ]
-          , networks = [ Network.Type.Devnet, Network.Type.Mainnet ]
+          , network = Network.Type.Mainnet
+          , profile = Profiles.Type.Mainnet
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release

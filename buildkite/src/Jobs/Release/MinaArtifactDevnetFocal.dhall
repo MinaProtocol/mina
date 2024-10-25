@@ -4,8 +4,6 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
-
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -26,8 +24,7 @@ in  Pipeline.build
             , Artifacts.Type.ZkappTestTransaction
             ]
           , debVersion = DebianVersions.DebVersion.Focal
-          , network = Network.Type.Mainnet
-          , profile = Profiles.Type.Mainnet
+          , network = Network.Type.Devnet
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release

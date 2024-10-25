@@ -94,45 +94,13 @@ let toDebianName =
 
 let toDebianNames =
           \(artifacts : List Artifact)
-      ->  \(networks : List Network.Type)
-      ->  let list_of_list_of_debians =
+      ->  \(network : Network.Type)
+      ->  let items =
                 Prelude.List.map
                   Artifact
-                  (List Text)
-                  (     \(a : Artifact)
-                    ->  merge
-                          { Daemon =
-                              Prelude.List.map
-                                Network.Type
-                                Text
-                                (\(n : Network.Type) -> toDebianName a n)
-                                networks
-                          , Archive = [ "archive" ]
-                          , LogProc = [ "logproc" ]
-                          , TestExecutive = [ "test_executive" ]
-                          , BatchTxn = [ "batch_txn" ]
-                          , Rosetta =
-                              Prelude.List.map
-                                Network.Type
-                                Text
-                                (     \(n : Network.Type)
-                                  ->  "rosetta_${Network.lowerName n}"
-                                )
-                                networks
-                          , ZkappTestTransaction = [ "zkapp_test_transaction" ]
-                          , FunctionalTestSuite = [ "functional_test_suite" ]
-                          }
-                          a
-                  )
+                  Text
+                  (\(a : Artifact) -> toDebianName a network)
                   artifacts
-
-          let items =
-                Prelude.List.fold
-                  (List Text)
-                  list_of_list_of_debians
-                  (List Text)
-                  (\(x : List Text) -> \(y : List Text) -> x # y)
-                  ([] : List Text)
 
           in  Text/concatSep " " items
 

@@ -1,7 +1,3 @@
-let Prelude = ../External/Prelude.dhall
-
-let List/any = Prelude.List.any
-
 let Network
     : Type
     = < Devnet | Mainnet | Berkeley >
@@ -20,11 +16,11 @@ let lowerName =
 
 let requiresMainnetBuild =
           \(network : Network)
-      ->  merge { Devnet = True, Mainnet = True, Berkeley = False } network
+      ->  merge { Devnet = False, Mainnet = True, Berkeley = False } network
 
-let foldMinaBuildMainnetEnv =
-          \(networks : List Network)
-      ->        if List/any Network requiresMainnetBuild networks
+let buildMainnetEnv =
+          \(network : Network)
+      ->        if requiresMainnetBuild network
 
           then  "MINA_BUILD_MAINNET=true"
 
@@ -34,5 +30,5 @@ in  { Type = Network
     , capitalName = capitalName
     , lowerName = lowerName
     , requiresMainnetBuild = requiresMainnetBuild
-    , foldMinaBuildMainnetEnv = foldMinaBuildMainnetEnv
+    , buildMainnetEnv = buildMainnetEnv
     }

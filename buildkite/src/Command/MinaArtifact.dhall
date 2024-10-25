@@ -41,8 +41,8 @@ let MinaBuildSpec =
           { prefix : Text
           , artifacts : List Artifacts.Type
           , debVersion : DebianVersions.DebVersion
+          , network : Network.Type
           , profile : Profiles.Type
-          , networks : List Network.Type
           , buildFlags : BuildFlags.Type
           , toolchainSelectMode : Toolchain.SelectionMode
           , mode : PipelineMode.Type
@@ -53,9 +53,9 @@ let MinaBuildSpec =
           { prefix = "MinaArtifact"
           , artifacts = Artifacts.AllButTests
           , debVersion = DebianVersions.DebVersion.Bullseye
-          , profile = Profiles.Type.Standard
           , buildFlags = BuildFlags.Type.None
-          , networks = [ Network.Type.Berkeley ]
+          , profile = Profiles.Type.Standard
+          , network = Network.Type.Berkeley
           , toolchainSelectMode = Toolchain.SelectionMode.ByDebian
           , mode = PipelineMode.Type.PullRequest
           , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
@@ -79,13 +79,13 @@ let build_artifacts
                         , "MINA_COMMIT_SHA1=\$BUILDKITE_COMMIT"
                         , "MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                  spec.debVersion}"
-                        , Network.foldMinaBuildMainnetEnv spec.networks
+                        , Network.buildMainnetEnv spec.network
                         ]
                       # BuildFlags.buildEnvs spec.buildFlags
                     )
                     "./buildkite/scripts/build-release.sh ${Artifacts.toDebianNames
                                                               spec.artifacts
-                                                              spec.networks}"
+                                                              spec.network}"
                 # [ Cmd.run
                       "./buildkite/scripts/debian/upload-to-gs.sh ${DebianVersions.lowerName
                                                                       spec.debVersion}"
@@ -151,29 +151,23 @@ let docker_step
 
           in  merge
                 { Daemon =
-                    Prelude.List.map
-                      Network.Type
-                      DockerImage.ReleaseSpec.Type
-                      (     \(n : Network.Type)
-                        ->  DockerImage.ReleaseSpec::{
-                            , deps = deps
-                            , service =
-                                Artifacts.dockerName Artifacts.Type.Daemon
-                            , network = Network.lowerName n
-                            , deb_codename =
-                                "${DebianVersions.lowerName spec.debVersion}"
-                            , deb_profile = spec.profile
-                            , build_flags = spec.buildFlags
-                            , deb_repo = DebianRepo.Type.Local
-                            , step_key =
-                                "daemon-${Network.lowerName
-                                            n}-${DebianVersions.lowerName
-                                                   spec.debVersion}${Profiles.toLabelSegment
-                                                                       spec.profile}${BuildFlags.toLabelSegment
-                                                                                        spec.buildFlags}-docker-image"
-                            }
-                      )
-                      spec.networks
+                  [ DockerImage.ReleaseSpec::{
+                    , deps = deps
+                    , service = Artifacts.dockerName Artifacts.Type.Daemon
+                    , network = Network.lowerName spec.network
+                    , deb_codename =
+                        "${DebianVersions.lowerName spec.debVersion}"
+                    , deb_profile = spec.profile
+                    , build_flags = spec.buildFlags
+                    , deb_repo = DebianRepo.Type.Local
+                    , step_key =
+                        "daemon-${Network.lowerName
+                                    spec.network}-${DebianVersions.lowerName
+                                                      spec.debVersion}${Profiles.toLabelSegment
+                                                                          spec.profile}${BuildFlags.toLabelSegment
+                                                                                           spec.buildFlags}-docker-image"
+                    }
+                  ]
                 , TestExecutive = [] : List DockerImage.ReleaseSpec.Type
                 , LogProc = [] : List DockerImage.ReleaseSpec.Type
                 , BatchTxn =
@@ -209,28 +203,22 @@ let docker_step
                     }
                   ]
                 , Rosetta =
-                    Prelude.List.map
-                      Network.Type
-                      DockerImage.ReleaseSpec.Type
-                      (     \(n : Network.Type)
-                        ->  DockerImage.ReleaseSpec::{
-                            , deps = deps
-                            , service =
-                                Artifacts.dockerName Artifacts.Type.Rosetta
-                            , network = Network.lowerName n
-                            , deb_codename =
-                                "${DebianVersions.lowerName spec.debVersion}"
-                            , deb_profile = spec.profile
-                            , build_flags = spec.buildFlags
-                            , deb_repo = DebianRepo.Type.Local
-                            , step_key =
-                                "rosetta-${Network.lowerName
-                                             n}-${DebianVersions.lowerName
-                                                    spec.debVersion}${BuildFlags.toLabelSegment
-                                                                        spec.buildFlags}-docker-image"
-                            }
-                      )
-                      spec.networks
+                  [ DockerImage.ReleaseSpec::{
+                    , deps = deps
+                    , service = Artifacts.dockerName Artifacts.Type.Rosetta
+                    , network = Network.lowerName spec.network
+                    , deb_codename =
+                        "${DebianVersions.lowerName spec.debVersion}"
+                    , deb_profile = spec.profile
+                    , build_flags = spec.buildFlags
+                    , deb_repo = DebianRepo.Type.Local
+                    , step_key =
+                        "rosetta-${Network.lowerName
+                                     spec.network}-${DebianVersions.lowerName
+                                                       spec.debVersion}${BuildFlags.toLabelSegment
+                                                                           spec.buildFlags}-docker-image"
+                    }
+                  ]
                 , ZkappTestTransaction =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
