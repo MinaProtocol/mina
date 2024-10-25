@@ -10,6 +10,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineMode = ../../Pipeline/Mode.dhall
 
+let Profiles = ../../Constants/Profiles.dhall
+
 let PipelineTag = ../../Pipeline/Tag.dhall
 
 in  Pipeline.build
@@ -31,5 +33,6 @@ in  Pipeline.build
             , PipelineTag.Type.Stable
             ]
           , mode = PipelineMode.Type.Stable
+          , profile = Profiles.Type.Mainnet
           }
       )
