@@ -84,10 +84,9 @@ module Zkapp_command_applied = struct
 
   type t = Zkapp_command.t T.t [@@deriving sexp, to_yojson]
 
-  let of_wire : Wire.t -> t =
-   fun { accounts; command; new_accounts } ->
-    let command = With_status.map command ~f:Zkapp_command.of_wire in
-    { accounts; command; new_accounts }
+  let of_wire ~chain { T.accounts; command; new_accounts } =
+    let command = With_status.map command ~f:(Zkapp_command.of_wire ~chain) in
+    { T.accounts; command; new_accounts }
 
   let to_wire : t -> Wire.t =
    fun { accounts; command; new_accounts } ->
@@ -115,11 +114,11 @@ module Command_applied = struct
     | Zkapp_command of Zkapp_command_applied.t
   [@@deriving sexp, to_yojson]
 
-  let of_wire : Wire.t -> t = function
-    | Signed_command sc ->
+  let of_wire ~chain = function
+    | Wire.Signed_command sc ->
         Signed_command sc
     | Zkapp_command zc ->
-        Zkapp_command (Zkapp_command_applied.of_wire zc)
+        Zkapp_command (Zkapp_command_applied.of_wire ~chain zc)
 
   let to_wire : t -> Wire.t = function
     | Signed_command sc ->
@@ -182,13 +181,13 @@ module Varying = struct
     | Coinbase of Coinbase_applied.t
   [@@deriving sexp, to_yojson]
 
-  let of_wire : Wire.t -> t = function
-    | Fee_transfer c ->
+  let of_wire ~chain = function
+    | Wire.Fee_transfer c ->
         Fee_transfer c
     | Coinbase c ->
         Coinbase c
     | Command c ->
-        Command (Command_applied.of_wire c)
+        Command (Command_applied.of_wire ~chain c)
 
   let to_wire : t -> Wire.t = function
     | Fee_transfer c ->
@@ -229,9 +228,8 @@ let is_zkapp_transaction = function
   | _ ->
       false
 
-let of_wire : Wire.t -> t =
- fun { previous_hash; varying } ->
-  let varying = Varying.of_wire varying in
+let of_wire ~chain { Wire.previous_hash; varying } =
+  let varying = Varying.of_wire ~chain varying in
   { previous_hash; varying }
 
 let to_wire : t -> Wire.t =

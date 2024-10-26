@@ -865,7 +865,7 @@ module type Inputs_intf = sig
     val commitment : account_updates:Call_forest.t -> t
 
     val full_commitment :
-      account_update:Account_update.t -> memo_hash:Field.t -> commitment:t -> t
+      chain:Mina_signature_kind.t -> account_update:Account_update.t -> memo_hash:Field.t -> commitment:t -> t
   end
 
   and Index : sig
@@ -1198,7 +1198,7 @@ module Make (Inputs : Inputs_intf) = struct
                 ~account_updates:(Stack_frame.calls remaining)
             in
             let full_tx_commitment_on_start =
-              Transaction_commitment.full_commitment ~account_update
+              Transaction_commitment.full_commitment ~chain ~account_update
                 ~memo_hash:start_data.memo_hash
                 ~commitment:tx_commitment_on_start
             in

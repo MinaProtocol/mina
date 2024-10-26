@@ -80,17 +80,17 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
 (* replace dummy signatures, proofs with valid ones for fee payer, other zkapp_command
    [keymap] maps compressed public keys to private keys
 *)
-let replace_authorizations ?prover ~keymap
+let replace_authorizations ?prover ~chain ~keymap
     (({ account_updates; memo; fee_payer }, aux) as zkapp_command :
       Zkapp_command.t ) =
   let txn_commitment, full_txn_commitment =
-    Zkapp_command.get_transaction_commitments zkapp_command
+    Zkapp_command.get_transaction_commitments  zkapp_command
   in
   let sign_for_account_update ~use_full_commitment sk =
     let commitment =
       if use_full_commitment then full_txn_commitment else txn_commitment
     in
-    Signature_lib.Schnorr.Chunked.sign sk
+    Signature_lib.Schnorr.Chunked.sign ~signature_kind:chain sk
       (Random_oracle.Input.Chunked.field commitment)
   in
   let fee_payer_sk =

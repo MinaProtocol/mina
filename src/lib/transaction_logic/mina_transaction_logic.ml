@@ -969,10 +969,10 @@ module Make (L : Ledger_intf.S) :
         in
         Zkapp_command.Transaction_commitment.create ~account_updates_hash
 
-      let full_commitment ~account_update ~memo_hash ~commitment =
+      let full_commitment ~chain ~account_update ~memo_hash ~commitment =
         (* when called from Zkapp_command_logic.apply, the account_update is the fee payer *)
         let fee_payer_hash =
-          Zkapp_command.Digest.Account_update.create account_update
+          Zkapp_command.Digest.Account_update.create ~chain account_update
         in
         Zkapp_command.Transaction_commitment.create_complete commitment
           ~memo_hash ~fee_payer_hash
