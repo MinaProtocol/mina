@@ -10,7 +10,8 @@
    bindings/vector.js
    bindings/gate-vector.js
    bindings/oracles.js
-   bindings/pickles-test.js))
+   bindings/pickles-test.js
+   bindings/proof.js))
  (instrumentation
   (backend bisect_ppx))
  (preprocess
