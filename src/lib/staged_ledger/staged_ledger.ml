@@ -580,20 +580,17 @@ module T = struct
     let second_pass_ledger_target_hash = Ledger.merkle_root ledger in
     let%bind supply_increase =
       to_staged_ledger_or_error
-        (Ledger.Transaction_applied.supply_increase ~constraint_constants
-           applied_txn )
+        (Mina_transaction_logic.Transaction_applied.supply_increase
+           ~constraint_constants applied_txn )
     in
     let%map () =
-      let actual_status =
-        Ledger.Transaction_applied.transaction_status applied_txn
-      in
+      let actual_status = Ledger.status_of_applied applied_txn in
       if Transaction_status.equal pre_stmt.expected_status actual_status then
         return ()
       else
         let txn_with_expected_status =
           { With_status.data =
-              With_status.data
-                (Ledger.Transaction_applied.transaction applied_txn)
+              With_status.data (Ledger.transaction_of_applied applied_txn)
           ; status = pre_stmt.expected_status
           }
         in
@@ -789,9 +786,7 @@ module T = struct
       List.fold_right ~init:(Ok []) data
         ~f:(fun (d : Scan_state.Transaction_with_witness.t) acc ->
           let%map.Or_error acc = acc in
-          let t =
-            d.transaction_with_info |> Ledger.Transaction_applied.transaction
-          in
+          let t = d.transaction_with_info |> Ledger.transaction_of_applied in
           t :: acc )
     in
     let total_fee_excess txns =
