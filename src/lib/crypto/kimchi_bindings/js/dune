@@ -9,7 +9,8 @@
    bindings/curve.js
    bindings/vector.js
    bindings/gate-vector.js
-   bindings/oracles.js))
+   bindings/oracles.js
+   bindings/pickles-test.js))
  (instrumentation
   (backend bisect_ppx))
  (preprocess
