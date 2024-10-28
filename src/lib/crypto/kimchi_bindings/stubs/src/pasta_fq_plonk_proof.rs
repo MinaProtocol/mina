@@ -41,9 +41,11 @@ pub fn caml_pasta_fq_plonk_proof_create(
     prev_sgs: Vec<CamlGPallas>,
 ) -> Result<CamlProofWithPublic<CamlGPallas, CamlFq>, ocaml::Error> {
     {
-        let ptr: &mut poly_commitment::srs::SRS<Pallas> =
-            unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
-        ptr.with_lagrange_basis(index.as_ref().0.cs.domain.d1);
+        index
+            .as_ref()
+            .0
+            .srs
+            .with_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
     let prev = if prev_challenges.is_empty() {
         Vec::new()

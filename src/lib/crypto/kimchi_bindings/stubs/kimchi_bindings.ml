@@ -107,6 +107,12 @@ module Protocol = struct
         -> Pasta_bindings.Fq.t Kimchi_types.or_infinity Kimchi_types.poly_comm
         = "caml_fp_srs_lagrange_commitment"
 
+      external lagrange_commitments_whole_domain :
+           t
+        -> int
+        -> Pasta_bindings.Fq.t Kimchi_types.or_infinity Kimchi_types.poly_comm
+           array = "caml_fp_srs_lagrange_commitments_whole_domain"
+
       external add_lagrange_basis : t -> int -> unit
         = "caml_fp_srs_add_lagrange_basis"
 
@@ -155,6 +161,12 @@ module Protocol = struct
         -> int
         -> Pasta_bindings.Fp.t Kimchi_types.or_infinity Kimchi_types.poly_comm
         = "caml_fq_srs_lagrange_commitment"
+
+      external lagrange_commitments_whole_domain :
+           t
+        -> int
+        -> Pasta_bindings.Fp.t Kimchi_types.or_infinity Kimchi_types.poly_comm
+           array = "caml_fq_srs_lagrange_commitments_whole_domain"
 
       external add_lagrange_basis : t -> int -> unit
         = "caml_fq_srs_add_lagrange_basis"

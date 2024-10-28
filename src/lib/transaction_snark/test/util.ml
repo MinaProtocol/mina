@@ -173,7 +173,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
               let open Async.Deferred.Let_syntax in
               let applied, statement_opt =
                 if ignore_outside_snark then
-                  ( Ledger.Transaction_applied.Varying.Command
+                  ( Mina_transaction_logic.Transaction_applied.Varying.Command
                       (Zkapp_command
                          { command =
                              { With_status.status = Applied
@@ -213,8 +213,8 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                     ; connecting_ledger_right = connecting_ledger
                     ; fee_excess = Zkapp_command.fee_excess zkapp_command
                     ; supply_increase =
-                        Ledger.Transaction_applied.supply_increase
-                          ~constraint_constants applied_txn
+                        Mina_transaction_logic.Transaction_applied
+                        .supply_increase ~constraint_constants applied_txn
                         |> Or_error.ok_exn
                     ; sok_digest = ()
                     }
@@ -620,7 +620,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
     with
     | Ok res ->
         ( if Option.is_some expected_failure then
-          match Ledger.Transaction_applied.transaction_status res with
+          match Ledger.status_of_applied res with
           | Applied ->
               failwith
                 (sprintf "Expected Ledger.apply_transaction to fail with %s"
@@ -665,7 +665,8 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   let supply_increase =
     Option.value_map applied_transaction ~default:Amount.Signed.zero
       ~f:(fun txn ->
-        Ledger.Transaction_applied.supply_increase ~constraint_constants txn
+        Mina_transaction_logic.Transaction_applied.supply_increase
+          ~constraint_constants txn
         |> Or_error.ok_exn )
   in
   match
