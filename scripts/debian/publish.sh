@@ -59,8 +59,6 @@ for _ in {1..10}; do (
     "${DEB_NAMES}"
 ) && break || scripts/debian/clear-s3-lockfile.sh; done
 
-DEBS3_EXIST="deb-s3 exist $BUCKET_ARG $S3_REGION_ARG"
-
 debs=()
 
 for deb in $DEB_NAMES
@@ -81,7 +79,7 @@ do
   join=$(join_by " " "${debs[@]}")
 
   IFS=$'\n'
-  output=$($DEBS3_EXIST "$join" "$DEB_VERSION" "$ARCH" -c "$DEB_CODENAME" -m "$DEB_RELEASE")
+  output=$(deb-s3 exist "$BUCKET_ARG" "$S3_REGION_ARG" "$join" "$DEB_VERSION" "$ARCH" -c "$DEB_CODENAME" -m "$DEB_RELEASE")
 
   for item in $output; do
      if [[ $item == *"Found" ]]; then
