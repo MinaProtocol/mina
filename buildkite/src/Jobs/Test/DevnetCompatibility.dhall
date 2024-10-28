@@ -16,7 +16,7 @@ let Size = ../../Command/Size.dhall
 
 let dependsOn =
       [ { name = "MinaArtifactBullseye"
-        , key = "daemon-berkeley-bullseye-docker-image"
+        , key = "daemon-devnet-bullseye-docker-image"
         }
       ]
 
@@ -26,19 +26,19 @@ in  Pipeline.build
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
           , S.exactly "buildkite/scripts/check-compatibility" "sh"
-          , S.exactly "buildkite/src/Jobs/Test/BerkeleyCompatibility" "dhall"
+          , S.exactly "buildkite/src/Jobs/Test/DevnetCompatibility" "dhall"
           ]
         , path = "Test"
         , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
-        , name = "BerkeleyCompatibility"
+        , name = "DevnetCompatibility"
         }
       , steps =
         [ Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run "buildkite/scripts/check-compatibility.sh berkeley" ]
-            , label = "Test: berkeley compatibilty test"
-            , key = "berkeley-compatibilty-test"
+              [ Cmd.run "buildkite/scripts/check-compatibility.sh devnet" ]
+            , label = "Test: devnet compatibilty test"
+            , key = "devnet-compatibilty-test"
             , target = Size.XLarge
             , docker = None Docker.Type
             , depends_on = dependsOn
