@@ -52,7 +52,7 @@ DEBS3_UPLOAD="deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
 echo "Publishing debs: ${DEB_NAMES} to Release: ${DEB_RELEASE} and Codename: ${DEB_CODENAME}"
 # Upload the deb files to s3.
 # If this fails, attempt to remove the lockfile and retry.
-for i in {1..10}; do (
+for _i in {1..10}; do (
   ${DEBS3_UPLOAD} \
     --component "${DEB_RELEASE}" \
     --codename "${DEB_CODENAME}" \
@@ -90,6 +90,5 @@ do
     echo "You may still try to rerun job as debian repository is known from imperfect performance"
     exit 1
   fi
+
 done
-
-

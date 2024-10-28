@@ -10,16 +10,16 @@ let PatchArchiveTest = ../../Command/PatchArchiveTest.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
+let Dockers = ../../Constants/DockerVersions.dhall
+
 let Network = ../../Constants/Network.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
-
 let dependsOn =
       Dockers.dependsOn
         Dockers.Type.Bullseye
-        (None Network.Type)
+        Network.Type.Devnet
         Profiles.Type.Standard
         Artifacts.Type.FunctionalTestSuite
 
