@@ -13,7 +13,8 @@
    bindings/pickles-test.js
    bindings/proof.js
    bindings/prover-index.js
-   bindings/util.js))
+   bindings/util.js
+   bindings/srs.js))
  (instrumentation
   (backend bisect_ppx))
  (preprocess
