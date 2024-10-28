@@ -334,7 +334,8 @@ module Values (S : Sample) = struct
     }
 
   let zkapp_command' () : Mina_base.Zkapp_command.t =
-    { fee_payer =
+    let cmd =
+    { Mina_base.Zkapp_command.T.fee_payer =
         { body =
             { public_key = public_key ()
             ; fee = fee ()
@@ -349,7 +350,7 @@ module Values (S : Sample) = struct
                Mina_base.Zkapp_command.Call_forest.cons
                  (zkapp_account_update ()) acc )
     ; memo = signed_command_memo ()
-    }
+    } in cmd, Mina_base.Zkapp_command.compute_aux cmd
 
   let zkapp_command () : Mina_base.User_command.t =
     Mina_base.User_command.Zkapp_command (zkapp_command' ())

@@ -94,8 +94,7 @@ let full_commitment =
       (Zkapp_command.Digest.Account_update.create
          (Account_update.of_fee_payer fee_payer) )
 
-let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
-    Zkapp_command.t =
+let sign_all { Zkapp_command.T.fee_payer; account_updates; memo } =
   let fee_payer =
     match fee_payer with
     | { body = { public_key; _ }; _ }
@@ -128,7 +127,9 @@ let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
       | account_update ->
           account_update )
   in
-  { fee_payer; account_updates; memo }
+  let cmd =
+  { Zkapp_command.T.fee_payer; account_updates; memo } in
+  cmd, Zkapp_command.compute_aux cmd
 
 let zkapp_command : Zkapp_command.t =
   sign_all

@@ -683,7 +683,7 @@ let profile_zkapps
         in
         let proof_count, signature_count =
           List.fold ~init:(0, 0)
-            ( Account_update.of_fee_payer zkapp_command.fee_payer
+            ( Account_update.of_fee_payer (fst zkapp_command).fee_payer
             :: account_updates ) ~f:(fun (pc, sc) (p : Account_update.t) ->
               match p.authorization with
               | Proof _ ->

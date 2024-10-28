@@ -25,10 +25,11 @@ let update_vk_perm_to_be ~auth : Zkapp_command.t =
     ; authorization = Signature.dummy
     }
   in
-  { fee_payer
+  let cmd =
+  { Zkapp_command.T.fee_payer
   ; account_updates = Zkapp_command.Call_forest.cons account_update []
   ; memo = Signed_command_memo.empty
-  }
+  } in cmd, Zkapp_command.compute_aux cmd
 
 let auth_gen =
   Quickcheck.Generator.of_list

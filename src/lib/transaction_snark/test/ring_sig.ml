@@ -302,7 +302,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
             ; authorization = Signature sender_signature
             }
           in
-          let zkapp_command : Zkapp_command.t =
+          let (cmd, aux) : Zkapp_command.t =
             Zkapp_command.of_simple
               { fee_payer
               ; account_updates =
@@ -322,7 +322,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
             |> printf "fee_payer:\n%s\n\n"
             |> fun () ->
             (* print other_account_update data *)
-            Zkapp_command.Call_forest.iteri zkapp_command.account_updates
+            Zkapp_command.Call_forest.iteri cmd.account_updates
               ~f:(fun idx (p : Account_update.t) ->
                 Account_update.Body.to_yojson p.body
                 |> Yojson.Safe.pretty_to_string
@@ -339,7 +339,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
             |> printf "protocol_state:\n%s\n\n" )
           |> fun () ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) ) ;
+              check_zkapp_command_with_merges_exn ledger [ (cmd, aux) ] ) ) ) ;
   match Sys.getenv "PROOF_CACHE_OUT" with
   | Some path ->
       Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache

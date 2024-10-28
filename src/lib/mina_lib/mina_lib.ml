@@ -944,7 +944,8 @@ let add_full_transactions t user_commands =
         match
           User_command.check_well_formedness
             ~genesis_constants:t.config.precomputed_values.genesis_constants
-            ~compile_config:t.config.precomputed_values.compile_config cmd
+            ~compile_config:t.config.precomputed_values.compile_config
+            (User_command.Wire.with_aux cmd)
         with
         | Ok () ->
             None
@@ -977,7 +978,7 @@ let add_zkapp_transactions t (zkapp_commands : Zkapp_command.Wire.t list) =
           User_command.check_well_formedness
             ~genesis_constants:t.config.precomputed_values.genesis_constants
             ~compile_config:t.config.precomputed_values.compile_config
-            (Zkapp_command cmd)
+            (Zkapp_command (cmd, ()))
         with
         | Ok () ->
             None

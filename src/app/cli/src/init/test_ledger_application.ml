@@ -145,7 +145,7 @@ let apply_txs ~action_elements ~event_elements ~constraint_constants
   let accounts_accessed =
     List.fold_left ~init:Account_id.Set.empty zkapps ~f:(fun set txn ->
         Account_id.Set.(
-          union set (of_list (Zkapp_command.accounts_referenced txn))) )
+          union set (of_list (Zkapp_command.accounts_referenced (txn, ())))) )
     |> Set.to_list
   in
   Ledger.unsafe_preload_accounts_from_parent ledger accounts_accessed ;

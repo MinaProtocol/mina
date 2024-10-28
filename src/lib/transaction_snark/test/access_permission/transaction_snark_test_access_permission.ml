@@ -136,8 +136,7 @@ let%test_module "Access permission tests" =
                (Account_update.of_fee_payer fee_payer) )
       in
       (* TODO: Make this better. *)
-      let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
-          Zkapp_command.t =
+let sign_all { Zkapp_command.T.fee_payer; account_updates; memo } =
         let fee_payer =
           match fee_payer with
           | { body = { public_key; _ }; _ }
@@ -170,7 +169,9 @@ let%test_module "Access permission tests" =
             | account_update ->
                 account_update )
         in
-        { fee_payer; account_updates; memo }
+  let cmd =
+  { Zkapp_command.T.fee_payer; account_updates; memo } in
+  cmd, Zkapp_command.compute_aux cmd
       in
       let zkapp_command : Zkapp_command.t =
         sign_all

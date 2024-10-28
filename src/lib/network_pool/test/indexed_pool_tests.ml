@@ -402,7 +402,7 @@ let command_nonce (txn : Transaction_hash.User_command_with_valid_signature.t) =
   match (forget_check txn).data with
   | Signed_command sc ->
       Signed_command.nonce sc
-  | Zkapp_command zk ->
+  | Zkapp_command (zk, _) ->
       zk.fee_payer.body.nonce
 
 let dummy_state_view =

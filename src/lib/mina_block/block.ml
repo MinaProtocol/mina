@@ -108,8 +108,9 @@ let transactions ~constraint_constants block =
   let staged_ledger_diff =
     block |> body |> Staged_ledger_diff.Body.staged_ledger_diff
   in
-  Staged_ledger.Pre_diff_info.get_transactions_exn ~constraint_constants
-    ~consensus_state staged_ledger_diff.diff
+  Staged_ledger.Pre_diff_info.(
+    get_transactions_exn ~constraint_constants ~consensus_state
+    @@ with_aux staged_ledger_diff.diff)
 
 let block_of_header_and_body_with_hashes (header, body_hashed) =
   create ~header

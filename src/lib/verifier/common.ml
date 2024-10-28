@@ -50,7 +50,7 @@ let check :
             `Invalid_signature (Signed_command.public_keys c) )
   | { With_status.data =
         Zkapp_command
-          ({ fee_payer; account_updates; memo } as zkapp_command_with_vk)
+          ({ fee_payer; account_updates; memo; _ } as zkapp_command_with_vk)
     ; status
     } ->
       with_return (fun { return } ->

@@ -27,7 +27,7 @@ let txn_nonce txn =
   match unchecked.data with
   | Signed_command cmd ->
       cmd.payload.common.nonce
-  | Zkapp_command cmd ->
+  | Zkapp_command (cmd, _) ->
       cmd.fee_payer.body.nonce
 
 let sender_pk txn =
@@ -37,7 +37,7 @@ let sender_pk txn =
   match unchecked.data with
   | Signed_command cmd ->
       cmd.payload.common.fee_payer_pk
-  | Zkapp_command cmd ->
+  | Zkapp_command (cmd, _) ->
       cmd.fee_payer.body.public_key
 
 let rec rem_lowest_fee count pool =

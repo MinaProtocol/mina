@@ -491,7 +491,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             let fee =
               Currency.Amount.of_fee
                 (Mina_base.Zkapp_command.fee
-                   zkapp_command_transfer_from_timed_account )
+                   (zkapp_command_transfer_from_timed_account,()) )
             in
             let total_debited =
               Option.value_exn (Currency.Amount.( + ) amount_to_send fee)
@@ -604,7 +604,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let fee =
            Currency.Amount.of_fee
              (Mina_base.Zkapp_command.fee
-                zkapp_command_invalid_transfer_from_timed_account )
+                (zkapp_command_invalid_transfer_from_timed_account,()) )
          in
          let total_to_debit =
            Option.value_exn (Currency.Amount.( + ) amount_to_send fee)
@@ -665,7 +665,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Currency.Balance.to_amount after_balance)
              (Currency.Amount.of_fee
                 (Mina_base.Zkapp_command.fee
-                   zkapp_command_invalid_transfer_from_timed_account ) )
+                   (zkapp_command_invalid_transfer_from_timed_account,()) ) )
            |> Option.value_exn
          in
          (* the invalid transfer should result in a fee deduction only *)

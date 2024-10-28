@@ -4,14 +4,20 @@ open Mina_transaction
 open Signature_lib
 open Staged_ledger_diff
 
-type ('a, 'b) diff_pair_t =
+type ('a, 'b, 'aux) diff_pair_t =
   ( Transaction_snark_work.t
-  , ('a, 'b) User_command.unwired_t With_status.t )
+  , ('a, 'b, 'aux) User_command.unwired_t With_status.t )
   Pre_diff_two.t
   * ( Transaction_snark_work.t
-    , ('a, 'b) User_command.unwired_t With_status.t )
+    , ('a, 'b, 'aux) User_command.unwired_t With_status.t )
     Pre_diff_one.t
     option
+
+let with_aux : Diff.t -> (unit, unit, unit) diff_pair_t =
+  let f2 = With_status.map ~f:User_command.Wire.with_aux in
+  fun (two, one_opt) ->
+    ( Pre_diff_two.map ~f1:ident ~f2 two
+    , Option.map ~f:(Pre_diff_one.map ~f1:ident ~f2) one_opt )
 
 module type S = sig
   module Error : sig
@@ -27,6 +33,8 @@ module type S = sig
 
     val to_error : t -> Error.t
   end
+
+  val with_aux : Diff.t -> (unit, unit, unit) diff_pair_t
 
   val get_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -44,16 +52,16 @@ module type S = sig
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> coinbase_receiver:Public_key.Compressed.t
     -> supercharge_coinbase:bool
-    -> ('a, 'b) diff_pair_t
-    -> ( ('a, 'b) User_command.unwired_t Transaction.t_ With_status.t list
+    -> ('a, 'b, 'aux) diff_pair_t
+    -> ( ('a, 'b, 'aux) User_command.unwired_t Transaction.t_ With_status.t list
        , Error.t )
        result
 
   val get_transactions_exn :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_state:Consensus.Data.Consensus_state.Value.t
-    -> ('a, 'b) diff_pair_t
-    -> ('a, 'b) User_command.unwired_t Transaction.t_ With_status.t list
+    -> ('a, 'b, 'aux) diff_pair_t
+    -> ('a, 'b, 'aux) User_command.unwired_t Transaction.t_ With_status.t list
 end
 
 module Error = struct
@@ -194,8 +202,8 @@ let sum_fees xs ~f =
 let to_staged_ledger_or_error =
   Result.map_error ~f:(fun error -> Error.Unexpected error)
 
-let fee_remainder (type d1 d2 c)
-    ~(to_user_command : c -> (d1, d2) User_command.unwired_t)
+let fee_remainder (type d1 d2 aux c)
+    ~(to_user_command : c -> (d1, d2, aux) User_command.unwired_t)
     (commands : c list) completed_works coinbase_fee =
   let open Result.Let_syntax in
   let%bind budget =
@@ -261,9 +269,9 @@ module Transaction_data = struct
     }
 end
 
-let get_transaction_data (type d1 d2 c) ~constraint_constants coinbase_parts
+let get_transaction_data (type d1 d2 aux c) ~constraint_constants coinbase_parts
     ~receiver ~coinbase_amount
-    ~(to_user_command : c -> (d1, d2) User_command.unwired_t)
+    ~(to_user_command : c -> (d1, d2, aux) User_command.unwired_t)
     (commands : c list) completed_works :
     (c Transaction_data.t, Error.t) Result.t =
   let open Result.Let_syntax in
@@ -422,9 +430,9 @@ let compute_statuses
   in
   (p1', p2')
 
-let get' (type d1 d2 c)
+let get' (type d1 d2 aux c)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~(to_user_command : c With_status.t -> (d1, d2) User_command.unwired_t)
+    ~(to_user_command : c With_status.t -> (d1, d2, aux) User_command.unwired_t)
     ~diff ~coinbase_receiver ~coinbase_amount =
   let open Result.Let_syntax in
   let%bind coinbase_amount =

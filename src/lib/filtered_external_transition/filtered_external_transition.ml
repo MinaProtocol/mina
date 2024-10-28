@@ -75,7 +75,8 @@ let participants
   let user_command_set =
     List.fold commands ~init:empty ~f:(fun set user_command ->
         union set
-          (of_list @@ User_command.accounts_referenced user_command.data.data) )
+          ( of_list @@ User_command.accounts_referenced
+          @@ User_command.Wire.with_aux user_command.data.data ) )
   in
   let fee_transfer_participants =
     List.fold fee_transfers ~init:empty ~f:(fun set (ft, _) ->
@@ -94,7 +95,8 @@ let participant_pks
     List.fold commands ~init:empty ~f:(fun set user_command ->
         union set @@ of_list
         @@ List.map ~f:Account_id.public_key
-        @@ User_command.accounts_referenced user_command.data.data )
+        @@ User_command.accounts_referenced
+        @@ User_command.Wire.with_aux user_command.data.data )
   in
   let fee_transfer_participants =
     List.fold fee_transfers ~init:empty ~f:(fun set (ft, _) ->

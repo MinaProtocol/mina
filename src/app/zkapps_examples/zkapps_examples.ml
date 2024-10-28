@@ -785,7 +785,8 @@ module Deploy_account_update = struct
 end
 
 let insert_signatures pk_compressed sk
-    ({ fee_payer; account_updates; memo } : Zkapp_command.t) : Zkapp_command.t =
+    (({ fee_payer; account_updates; memo }, aux) : Zkapp_command.t) :
+    Zkapp_command.t =
   let transaction_commitment : Zkapp_command.Transaction_commitment.t =
     (* TODO: This is a pain. *)
     let account_updates_hash = Zkapp_command.Call_forest.hash account_updates in
@@ -831,4 +832,4 @@ let insert_signatures pk_compressed sk
       | account_update ->
           account_update )
   in
-  { fee_payer; account_updates; memo }
+  ({ fee_payer; account_updates; memo }, aux)

@@ -243,8 +243,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             (Zkapp_command.Call_forest.Digest.Account_update.create
                (Account_update.of_fee_payer fee_payer) )
       in
-      let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
-          Zkapp_command.t =
+      let sign_all { Zkapp_command.T.fee_payer; account_updates; memo } =
         let fee_payer =
           match fee_payer with
           | { body = { public_key; _ }; _ }
@@ -277,10 +276,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             | account_update ->
                 account_update )
         in
-        { fee_payer; account_updates; memo }
+        {Zkapp_command.T. fee_payer; account_updates; memo }
       in
       sign_all { fee_payer; account_updates = call_forest; memo }
-      |> Zkapp_command.to_wire
+      |> Zkapp_command.to_wire_
     in
     let call_forest1 =
       []

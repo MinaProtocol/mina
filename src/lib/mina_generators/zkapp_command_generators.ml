@@ -1563,7 +1563,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
         ({ account with receipt_chain_hash }, `Fee_payer) ) ;
   let account_updates =
     Zkapp_command.Call_forest.to_account_updates
-      zkapp_command_dummy_authorizations.account_updates
+      (fst zkapp_command_dummy_authorizations).account_updates
   in
   List.iteri account_updates ~f:(fun ndx account_update ->
       (* update receipt chain hash only for signature, proof authorizations *)

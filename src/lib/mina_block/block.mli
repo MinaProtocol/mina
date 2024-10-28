@@ -36,7 +36,7 @@ val timestamp : t -> Block_time.t
 val transactions :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> t
-  -> Transaction.Wire.t With_status.t list
+  -> Transaction.Wire.t_ With_status.t list
 
 val block_of_header_and_body_with_hashes :
   Header.t * Staged_ledger_diff.With_hashes_computed.t -> t

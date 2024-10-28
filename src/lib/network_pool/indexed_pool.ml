@@ -423,18 +423,12 @@ module Update = struct
         in
         ( match Transaction_hash.User_command_with_valid_signature.data cmd with
         | Zkapp_command p ->
-            let p = Zkapp_command.Valid.forget p in
+            let (({ Zkapp_command.T.account_updates; _ }, _) as p) =
+              Zkapp_command.Valid.forget p
+            in
             let updates, proof_updates =
-              let init =
-                match
-                  (Account_update.of_fee_payer p.fee_payer).authorization
-                with
-                | Proof _ ->
-                    (1, 1)
-                | _ ->
-                    (1, 0)
-              in
-              Zkapp_command.Call_forest.fold p.account_updates ~init
+              let init = (1, 0) in
+              Zkapp_command.Call_forest.fold account_updates ~init
                 ~f:(fun (count, proof_updates_count) account_update ->
                   ( count + 1
                   , if

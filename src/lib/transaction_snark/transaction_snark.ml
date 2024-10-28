@@ -3685,7 +3685,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             , pending_coinbase_stack_state
             , { Mina_transaction_logic.Zkapp_command_logic.Start_data
                 .account_updates
-              ; memo_hash = Signed_command_memo.hash account_updates.memo
+              ; memo_hash = Signed_command_memo.hash (fst account_updates).memo
               ; will_succeed
               } ) )
       in
@@ -3729,14 +3729,12 @@ module Make_str (A : Wire_types.Concrete) = struct
             | _ ->
                 mk ()
           in
-          let mk_next_commitments (zkapp_command : Zkapp_command.t) =
+          let mk_next_commitments
+              (({ memo; _ }, { fee_payer_hash; _ }) as zkapp_command :
+                Zkapp_command.t ) =
             empty_if_last (fun () ->
                 let next_commitment = Zkapp_command.commitment zkapp_command in
-                let memo_hash = Signed_command_memo.hash zkapp_command.memo in
-                let fee_payer_hash =
-                  Zkapp_command.Digest.Account_update.create
-                    (Account_update.of_fee_payer zkapp_command.fee_payer)
-                in
+                let memo_hash = Signed_command_memo.hash memo in
                 let next_full_commitment =
                   Zkapp_command.Transaction_commitment.create_complete
                     next_commitment ~memo_hash ~fee_payer_hash
@@ -3966,15 +3964,16 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let first_account_update
         (witness :
-          (Account_update.t, _, _) Zkapp_command.Call_forest.t Zkapp_command.T.t
+          (_, _, _) Zkapp_command.unwired_t
           Transaction_witness.Zkapp_command_segment_witness.t ) =
       match witness.local_state_init.stack_frame.calls with
       | [] ->
           with_return (fun { return } ->
-              List.iter witness.start_zkapp_command ~f:(fun s ->
+              List.iter witness.start_zkapp_command
+                ~f:(fun { account_updates = { account_updates; _ }, _; _ } ->
                   Zkapp_command.Call_forest.iteri
                     ~f:(fun _i x -> return (Some x))
-                    s.account_updates.account_updates ) ;
+                    account_updates ) ;
               None )
       | xs ->
           Zkapp_command.Call_forest.hd_account_update xs
@@ -3988,8 +3987,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let snapp_proof_data
         ~(witness :
-           (Account_update.t, _, _) Zkapp_command.Call_forest.t
-           Zkapp_command.T.t
+           (_, _, _) Zkapp_command.unwired_t
            Transaction_witness.Zkapp_command_segment_witness.t ) =
       let open Option.Let_syntax in
       let%bind p = first_account_update witness in
@@ -4782,7 +4780,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             }
         ]
       in
-      ({ fee_payer; memo; account_updates = forest } : Zkapp_command.t)
+      let cmd = { Zkapp_command.T.fee_payer; memo; account_updates = forest } in
+      let aux = Zkapp_command.compute_aux cmd in
+      ((cmd, aux) : Zkapp_command.t)
 
     module Update_states_spec = struct
       type t =
@@ -4871,7 +4871,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~receiver_update:Mina_base.Account_update.Update.noop ?receiver_auth
           ?empty_sender
       in
-      let receivers = (Zkapp_command.to_simple p).account_updates in
+      let receivers = (Zkapp_command.to_simple (p, ())).account_updates in
       let snapp_zkapp_command =
         snapp_zkapp_command
         |> List.map ~f:(fun p -> (p, p))

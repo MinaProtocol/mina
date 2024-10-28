@@ -125,11 +125,12 @@ let setup_and_submit_zkapp_commands t
   let%map result = Mina_lib.add_zkapp_transactions t zkapp_commands in
   let num_zkapps = List.length zkapp_commands in
   txn_count := !txn_count + num_zkapps ;
+  let fee_payer_summary =
+    User_command.(Fn.compose fee_payer_summary_json Wire.with_aux)
+  in
   match result with
   | Ok (`Broadcasted, commands, []) ->
-      let zkapp_jsons =
-        List.map commands ~f:User_command.fee_payer_summary_json
-      in
+      let zkapp_jsons = List.map commands ~f:fee_payer_summary in
       [%log' info (Mina_lib.top_level_logger t)]
         ~metadata:[ ("summaries", `List zkapp_jsons) ]
         "Scheduled %d zkApps" num_zkapps ;
@@ -145,9 +146,7 @@ let setup_and_submit_zkapp_commands t
                 | `Not_broadcasted ->
                     "not_broadcasted" ) )
           ; ( "valid_zkapp_commands"
-            , `List
-                (List.map ~f:User_command.fee_payer_summary_json valid_commands)
-            )
+            , `List (List.map ~f:fee_payer_summary valid_commands) )
           ; ( "invalid_zkapp_commands"
             , `List
                 (List.map invalid_commands ~f:(fun (_cmd, diff_err) ->

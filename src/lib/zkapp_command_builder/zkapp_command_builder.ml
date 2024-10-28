@@ -80,7 +80,9 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
 (* replace dummy signatures, proofs with valid ones for fee payer, other zkapp_command
    [keymap] maps compressed public keys to private keys
 *)
-let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) =
+let replace_authorizations ?prover ~keymap
+    (({ account_updates; memo; fee_payer }, aux) as zkapp_command :
+      Zkapp_command.t ) =
   let txn_commitment, full_txn_commitment =
     Zkapp_command.get_transaction_commitments zkapp_command
   in
@@ -93,17 +95,17 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) =
   in
   let fee_payer_sk =
     Signature_lib.Public_key.Compressed.Map.find_exn keymap
-      zkapp_command.fee_payer.body.public_key
+      fee_payer.body.public_key
   in
   let fee_payer_signature =
     sign_for_account_update ~use_full_commitment:true fee_payer_sk
   in
   let fee_payer_with_valid_signature =
-    { zkapp_command.fee_payer with authorization = fee_payer_signature }
+    { fee_payer with authorization = fee_payer_signature }
   in
   let open Async_kernel.Deferred.Let_syntax in
   let%map account_updates_with_valid_authorizations =
-    Zkapp_command.Call_forest.deferred_mapi zkapp_command.account_updates
+    Zkapp_command.Call_forest.deferred_mapi account_updates
       ~f:(fun _ndx ({ body; authorization } : Account_update.t) tree ->
         let%map valid_authorization =
           match authorization with
@@ -143,7 +145,10 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) =
         in
         { Account_update.body; authorization = valid_authorization } )
   in
-  { zkapp_command with
-    fee_payer = fee_payer_with_valid_signature
-  ; account_updates = account_updates_with_valid_authorizations
-  }
+  let cmd' =
+    { Zkapp_command.T.memo
+    ; fee_payer = fee_payer_with_valid_signature
+    ; account_updates = account_updates_with_valid_authorizations
+    }
+  in
+  (cmd', aux)

@@ -26,10 +26,11 @@ module Poly = struct
   end]
 end
 
-(* Type that unifies both `t` and `Wire.t` *)
-type ('a, 'b) unwired_t =
+(* Type that unifies both `t` and `Wire.t_` *)
+type ('a, 'b, 'aux) unwired_t =
   ( Signed_command.t
-  , (Account_update.t, 'a, 'b) Zkapp_command.Call_forest.t Zkapp_command.T.t )
+  , (Account_update.t, 'a, 'b) Zkapp_command.Call_forest.t Zkapp_command.T.t
+    * 'aux )
   Poly.t
 
 type ('u, 's) t_ = ('u, 's) Poly.Stable.Latest.t =
@@ -79,6 +80,9 @@ let gen_signed =
 
 let gen = Gen.to_signed_command gen_signed
 
+type fee_payer_summary_t = Signature.t * Account.key * int
+[@@deriving yojson, hash]
+
 module Wire = struct
   [%%versioned
   module Stable = struct
@@ -92,6 +96,20 @@ module Wire = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t_ = (Signed_command.t, Zkapp_command.Wire.t_) Poly.t
+
+  let strip_aux : t_ -> t = function
+    | Signed_command cmd ->
+        Signed_command cmd
+    | Zkapp_command (cmd, ()) ->
+        Zkapp_command cmd
+
+  let with_aux : t -> t_ = function
+    | Signed_command cmd ->
+        Signed_command cmd
+    | Zkapp_command cmd ->
+        Zkapp_command (Zkapp_command.Wire.with_aux cmd)
 
   let to_base64 : t -> string = function
     | Signed_command sc ->
@@ -114,6 +132,18 @@ module Wire = struct
                     "Could decode Base64 neither to signed command (%s), nor \
                      to zkApp (%s)"
                     (Error.to_string_hum err1) (Error.to_string_hum err2) ) ) )
+
+  let fee_payer_summary = function
+    | Zkapp_command { Zkapp_command.T.fee_payer; _ } ->
+        let open Account_update in
+        let body = Fee_payer.body fee_payer in
+        ( ( Fee_payer.authorization fee_payer
+          , Body.Fee_payer.public_key body
+          , Body.Fee_payer.nonce body |> Unsigned.UInt32.to_int )
+          : fee_payer_summary_t )
+    | Signed_command cmd ->
+        Signed_command.
+          (signature cmd, fee_payer_pk cmd, nonce cmd |> Unsigned.UInt32.to_int)
 end
 
 type t = (Signed_command.t, Zkapp_command.t) Poly.t
@@ -288,7 +318,7 @@ let valid_until (t : t) =
   match t with
   | Signed_command x ->
       Signed_command.valid_until x
-  | Zkapp_command { fee_payer; _ } -> (
+  | Zkapp_command ({ fee_payer; _ }, _) -> (
       match fee_payer.Account_update.Fee_payer.body.valid_until with
       | Some valid_until ->
           valid_until
@@ -369,19 +399,19 @@ let valid_size ~genesis_constants = function
 let has_zero_vesting_period = function
   | Signed_command _ ->
       false
-  | Zkapp_command p ->
+  | Zkapp_command (p, _) ->
       Zkapp_command.has_zero_vesting_period p
 
 let is_incompatible_version = function
   | Signed_command _ ->
       false
-  | Zkapp_command p ->
+  | Zkapp_command (p, _) ->
       Zkapp_command.is_incompatible_version p
 
 let has_invalid_call_forest = function
   | Signed_command _ ->
       false
-  | Zkapp_command cmd ->
+  | Zkapp_command (cmd, _) ->
       List.exists cmd.Zkapp_command.T.account_updates ~f:(fun call_forest ->
           let root_may_use_token =
             call_forest.With_stack_hash.elt
@@ -444,9 +474,6 @@ let check_well_formedness ~(genesis_constants : Genesis_constants.t)
         Zkapp_too_big err :: errs0
   in
   if List.is_empty errs then Ok () else Error errs
-
-type fee_payer_summary_t = Signature.t * Account.key * int
-[@@deriving yojson, hash]
 
 let fee_payer_summary = function
   | Zkapp_command cmd ->

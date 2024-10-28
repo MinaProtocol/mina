@@ -1680,7 +1680,7 @@ module Make (L : Ledger_intf.S) :
       Or_error.try_with (fun () ->
           M.start ~constraint_constants
             { account_updates
-            ; memo_hash = Signed_command_memo.hash command.memo
+            ; memo_hash = Signed_command_memo.hash (fst command).memo
             ; will_succeed =
                 (* It's always valid to set this value to true, and it will
                    have no effect outside of the snark.
@@ -2523,14 +2523,14 @@ module For_tests = struct
       ; memo = Signed_command_memo.empty
       }
     in
-    let zkapp_command = Zkapp_command.(of_simple zkapp_command |> of_wire) in
-    let commitment = Zkapp_command.commitment zkapp_command in
+    let zkapp_command, aux =
+      Zkapp_command.(of_simple zkapp_command |> of_wire)
+    in
+    let commitment = Zkapp_command.commitment (zkapp_command, aux) in
     let full_commitment =
       Zkapp_command.Transaction_commitment.create_complete commitment
         ~memo_hash:(Signed_command_memo.hash zkapp_command.memo)
-        ~fee_payer_hash:
-          (Zkapp_command.Digest.Account_update.create
-             (Account_update.of_fee_payer zkapp_command.fee_payer) )
+        ~fee_payer_hash:aux.fee_payer_hash
     in
     let account_updates_signature =
       let c = if use_full_commitment then full_commitment else commitment in
@@ -2552,10 +2552,11 @@ module For_tests = struct
       Schnorr.Chunked.sign sender.private_key
         (Random_oracle.Input.Chunked.field full_commitment)
     in
-    { zkapp_command with
-      fee_payer = { zkapp_command.fee_payer with authorization = signature }
-    ; account_updates
-    }
+    let fee_payer =
+      { zkapp_command.fee_payer with authorization = signature }
+    in
+    let cmd = { zkapp_command with fee_payer; account_updates } in
+    (cmd, aux)
 
   let test_eq (type l) (module L : Ledger_intf.S with type t = l) accounts
       (l1 : L.t) (l2 : L.t) =

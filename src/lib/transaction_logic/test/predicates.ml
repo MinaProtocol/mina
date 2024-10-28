@@ -26,21 +26,22 @@ let verify_account_updates ~(ledger : Helpers.Ledger.t)
     let%bind loc = Ledger.location_of_account ledger account_id in
     Ledger.get ledger loc
   in
+  let command = (fst txn.command.data) in
   let fee =
     if
       Public_key.Compressed.equal account.pk
-        txn.command.data.fee_payer.body.public_key
+        command.fee_payer.body.public_key
     then
       Signed_poly.
         { magnitude =
             Amount.of_uint64
-            @@ Fee.to_uint64 txn.command.data.fee_payer.body.fee
+            @@ Fee.to_uint64 command.fee_payer.body.fee
         ; sgn = Sgn.Neg
         }
     else Amount.Signed.zero
   in
   let balance_updates =
-    Call_forest.fold txn.command.data.account_updates ~init:Amount.Signed.zero
+    Call_forest.fold command.account_updates ~init:Amount.Signed.zero
       ~f:(fun acc upd ->
         if Public_key.Compressed.equal account.pk upd.body.public_key then
           let open Amount.Signed in
@@ -81,13 +82,14 @@ let verify_balance_changes ~txn ~ledger accounts =
 let verify_balances_unchanged ~(ledger : Helpers.Ledger.t)
     ~(txn : Mina_transaction_logic.Transaction_applied.Zkapp_command_applied.t)
     (accounts : Test_account.t list) =
+  let command = (fst txn.command.data) in
   let is_fee_payer account =
     Public_key.Compressed.equal account.Test_account.pk
-      txn.command.data.fee_payer.body.public_key
+      command.fee_payer.body.public_key
   in
   let fee =
     let open Amount in
-    of_fee txn.command.data.fee_payer.body.fee
+    of_fee command.fee_payer.body.fee
     |> Signed.of_unsigned |> Signed.negate
   in
   List.for_all accounts ~f:(fun account ->

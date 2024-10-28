@@ -681,7 +681,7 @@ let%test_module "Account precondition tests" =
                     ; preconditions = None
                     }
                   in
-                  let%bind zkapp_command0 =
+                  let%bind zkapp_command0, aux =
                     Transaction_snark.For_tests.update_states
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
@@ -706,7 +706,7 @@ let%test_module "Account precondition tests" =
                         ; (zkapp_pk, new_kp.private_key)
                         ]
                     in
-                    Zkapp_command_builder.replace_authorizations ~keymap zkapp
+                    Zkapp_command_builder.replace_authorizations ~keymap (zkapp, aux)
                   in
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
                     [ zkapp_command ] ) ) )
@@ -779,7 +779,7 @@ let%test_module "Account precondition tests" =
                              .accumulate_hashes_predicated
                       }
                     in
-                    replace_authorizations ~keymap zkapp_dummy_signatures
+                    replace_authorizations ~keymap (zkapp_dummy_signatures, Zkapp_command.compute_aux zkapp_dummy_signatures)
                   in
                   U.check_zkapp_command_with_merges_exn
                     ~expected_failure:

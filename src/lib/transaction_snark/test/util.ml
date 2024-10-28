@@ -701,9 +701,11 @@ let test_zkapp_command ?expected_failure ?(memo = Signed_command_memo.empty)
     }
   in
   let zkapp_command : Zkapp_command.t =
+    let init_cmd =
+      { Zkapp_command.T.fee_payer; account_updates = zkapp_command; memo }
+    in
     Array.fold signers
-      ~init:
-        ({ fee_payer; account_updates = zkapp_command; memo } : Zkapp_command.t)
+      ~init:(init_cmd, Zkapp_command.compute_aux init_cmd)
       ~f:(fun zkapp_command (pk_compressed, sk) ->
         Zkapps_examples.insert_signatures pk_compressed sk zkapp_command )
   in

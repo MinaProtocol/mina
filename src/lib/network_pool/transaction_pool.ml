@@ -184,11 +184,11 @@ module Diff_versioned = struct
   [@@deriving sexp, to_yojson]
 
   let summary t =
+    let f = User_command.(Fn.compose fee_payer_summary_string Wire.with_aux) in
     Printf.sprintf
       !"Transaction_pool_diff of length %d with fee payer summary %s"
       (List.length t)
-      ( String.concat ~sep:","
-      @@ List.map ~f:User_command.fee_payer_summary_string t )
+      (String.concat ~sep:"," @@ List.map ~f t)
 
   let is_empty t = List.is_empty t
 end
@@ -1019,11 +1019,13 @@ struct
       let max_per_15_seconds = max_per_15_seconds
 
       let summary t =
+        let f =
+          User_command.(Fn.compose fee_payer_summary_string Wire.with_aux)
+        in
         Printf.sprintf
           !"Transaction_pool_diff of length %d with fee payer summary %s"
           (List.length t)
-          ( String.concat ~sep:","
-          @@ List.map ~f:User_command.fee_payer_summary_string t )
+          (String.concat ~sep:"," @@ List.map ~f t)
 
       let is_empty t = List.is_empty t
 
@@ -1497,9 +1499,8 @@ struct
         Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_received) ;
         let diff = Envelope.Incoming.data envelope in
         if log_gossip_heard then (
-          let fee_payer_summaries =
-            List.map ~f:User_command.fee_payer_summary diff
-          in
+          let f = User_command.(Fn.compose fee_payer_summary Wire.with_aux) in
+          let fee_payer_summaries = List.map ~f diff in
           [%str_log debug]
             (Transactions_received
                { fee_payer_summaries
@@ -1510,14 +1511,11 @@ struct
 
       let log_internal ?reason ~logger msg
           { Envelope.Incoming.data = diff; sender; _ } =
-        let metadata =
-          [ ( "diff"
-            , `List
-                (List.map diff
-                   ~f:Mina_transaction.Transaction.yojson_summary_of_command )
-            )
-          ]
+        let f =
+          Fn.compose Mina_transaction.Transaction.yojson_summary_of_command
+            User_command.Wire.with_aux
         in
+        let metadata = [ ("diff", `List (List.map diff ~f)) ] in
         let metadata =
           match sender with
           | Remote addr ->

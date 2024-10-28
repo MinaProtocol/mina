@@ -125,8 +125,7 @@ let%test_module "Add events test" =
             (Zkapp_command.Call_forest.Digest.Account_update.create
                (Account_update.of_fee_payer fee_payer) )
       in
-      let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
-          Zkapp_command.t =
+      let sign_all { Zkapp_command.T.fee_payer; account_updates; memo } =
         let fee_payer =
           match fee_payer with
           | { body = { public_key; _ }; _ }
@@ -159,10 +158,13 @@ let%test_module "Add events test" =
             | account_update ->
                 account_update )
         in
-        { fee_payer; account_updates; memo }
+        { Zkapp_command.T.fee_payer; account_updates; memo }
+      in
+      let cmd = 
+         sign_all{ Zkapp_command.T.fee_payer; account_updates = zkapp_command; memo }
       in
       let zkapp_command : Zkapp_command.t =
-        sign_all { fee_payer; account_updates = zkapp_command; memo }
+         cmd, Zkapp_command.compute_aux cmd
       in
       Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
           let account =
@@ -175,7 +177,7 @@ let%test_module "Add events test" =
           Async.Thread_safe.block_on_async_exn (fun () ->
               check_zkapp_command_with_merges_exn ?expected_failure ledger
                 [ zkapp_command ] ) ;
-          (zkapp_command, Ledger.get ledger loc) )
+          (cmd, Ledger.get ledger loc) )
 
     module Events_verifier = Merkle_list_verifier.Make (struct
       type proof_elem = Mina_base.Zkapp_account.Event.t
@@ -188,7 +190,7 @@ let%test_module "Add events test" =
     end)
 
     let%test_unit "Initialize" =
-      let zkapp_command, account =
+      let (zkapp_command), account =
         []
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update

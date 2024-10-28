@@ -51,7 +51,7 @@ let gen_proof ?(zkapp_account = None) zkapp_command
   let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
   let _v =
     let id =
-      zkapp_command.Zkapp_command.T.fee_payer.body.public_key
+      (fst zkapp_command).Zkapp_command.T.fee_payer.body.public_key
       |> fun pk -> Account_id.create pk Token_id.default
     in
     Ledger.get_or_create_account ledger id
@@ -775,7 +775,7 @@ let%test_module "ZkApps test transaction" =
       in
       go path expected got ; !success
 
-    let hit_server (zkapp_command : Zkapp_command.t) query =
+    let hit_server ((({fee_payer;account_updates;_}, _) ) : Zkapp_command.t) query =
       let typ = Mina_graphql.Types.Input.SendZkappInput.arg_typ.arg_typ in
       let query_top_level =
         Graphql_async.Schema.(
@@ -785,12 +785,12 @@ let%test_module "ZkApps test transaction" =
             ~resolve:(fun _ () zkapp_command' ->
               let ok_fee_payer =
                 print_diff_yojson ~path:[ "fee_payer" ]
-                  (Account_update.Fee_payer.to_yojson zkapp_command.fee_payer)
+                  (Account_update.Fee_payer.to_yojson fee_payer)
                   (Account_update.Fee_payer.to_yojson zkapp_command'.fee_payer)
               in
               let _, ok_account_updates =
                 Zkapp_command.Call_forest.Tree.fold_forest2_exn ~init:(0, true)
-                  zkapp_command.account_updates zkapp_command.account_updates
+                  account_updates zkapp_command'.account_updates
                   ~f:(fun (i, ok) expected got ->
                     ( i + 1
                     , print_diff_yojson

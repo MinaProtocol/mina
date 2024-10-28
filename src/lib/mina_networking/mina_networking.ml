@@ -202,8 +202,9 @@ let broadcast_state t state =
 let broadcast_transaction_pool_diff ?nonce t diff =
   [%str_log' trace t.logger]
     (Gossip_transaction_pool_diff
-       { fee_payer_summaries = List.map ~f:User_command.fee_payer_summary diff }
-    ) ;
+       { fee_payer_summaries =
+           List.map ~f:User_command.Wire.fee_payer_summary diff
+       } ) ;
   Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_broadcasted) ;
   Gossip_net.Any.broadcast_transaction_pool_diff ?nonce t.gossip_net diff
 

@@ -127,8 +127,7 @@ let%test_module "Actions test" =
             (Zkapp_command.Call_forest.Digest.Account_update.create
                (Account_update.of_fee_payer fee_payer) )
       in
-      let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
-          Zkapp_command.t =
+      let sign_all {Zkapp_command.T. fee_payer; account_updates; memo } =
         let fee_payer =
           match fee_payer with
           | { body = { public_key; _ }; _ }
@@ -161,7 +160,9 @@ let%test_module "Actions test" =
             | account_update ->
                 account_update )
         in
-        { fee_payer; account_updates; memo }
+  let cmd =
+  { Zkapp_command.T.fee_payer; account_updates; memo } in
+  cmd, Zkapp_command.compute_aux cmd
       in
       let zkapp_command : Zkapp_command.t =
         sign_all { fee_payer; account_updates = zkapp_command; memo }
@@ -187,7 +188,7 @@ let%test_module "Actions test" =
       (Pickles_types.Vector.Vector_5.to_list action_state, last_action_slot)
 
     let%test_unit "Initialize" =
-      let zkapp_command, account =
+      let (zkapp_command, _), account =
         let ledger = create_ledger () in
         []
         |> Zkapp_command.Call_forest.cons_tree
@@ -204,7 +205,7 @@ let%test_module "Actions test" =
           assert (List.is_empty account_update.body.actions) )
 
     let%test_unit "Initialize and add sequence events" =
-      let zkapp_command0, account0 =
+      let (zkapp_command0, _), account0 =
         let ledger = create_ledger () in
         []
         |> Zkapp_command.Call_forest.cons_tree
@@ -230,7 +231,7 @@ let%test_module "Actions test" =
       (* last action slot is 0 *)
       assert (
         Mina_numbers.Global_slot_since_genesis.(equal zero) last_action_slot0 ) ;
-      let zkapp_command1, account1 =
+      let (zkapp_command1, _), account1 =
         let ledger = create_ledger () in
         []
         |> Zkapp_command.Call_forest.cons_tree Add_actions.account_update

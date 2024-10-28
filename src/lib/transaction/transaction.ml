@@ -47,7 +47,17 @@ module Wire = struct
     end
   end]
 
-  let check_well_formedness ~genesis_constants ~compile_config (t : t) =
+  type t_ = User_command.Wire.t_ Poly.t
+
+  let with_aux : t -> t_ = function
+    | Command x ->
+        Command (User_command.Wire.with_aux x)
+    | Fee_transfer x ->
+        Fee_transfer x
+    | Coinbase x ->
+        Coinbase x
+
+  let check_well_formedness ~genesis_constants ~compile_config (t : t_) =
     match t with
     | Command cmd ->
         User_command.check_well_formedness ~genesis_constants ~compile_config
@@ -129,7 +139,7 @@ let public_keys (t : t) =
   in
   List.map account_ids ~f:Account_id.public_key
 
-let account_access_statuses (t : (_, _) User_command.unwired_t t_)
+let account_access_statuses (t : (_, _, _) User_command.unwired_t t_)
     (status : Transaction_status.t) =
   match t with
   | Command (Signed_command cmd) ->
@@ -189,8 +199,8 @@ let yojson_summary_of_command =
       ]
   in
   function
-  | User_command.Zkapp_command cmd ->
-      mk_record (zkapp_type cmd) (Zkapp_command.T.memo cmd)
+  | User_command.Zkapp_command (({ Zkapp_command.T.memo; _ }, _) as cmd) ->
+      mk_record (zkapp_type cmd) memo
         ( Zkapp_command.fee_payer_account_update cmd
         |> Account_update.Fee_payer.authorization )
   | Signed_command cmd ->

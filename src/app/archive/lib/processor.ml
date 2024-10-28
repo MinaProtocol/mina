@@ -2063,7 +2063,7 @@ module User_command = struct
     let add_if_doesn't_exist (module Conn : CONNECTION)
         (ps : Zkapp_command.Wire.t) =
       let open Deferred.Result.Let_syntax in
-      let zkapp_command = Zkapp_command.to_simple ps in
+      let zkapp_command = Zkapp_command.to_simple (ps, ()) in
       let%bind zkapp_fee_payer_body_id =
         Metrics.time ~label:"Zkapp_fee_payer_body.add"
         @@ fun () ->
@@ -2951,9 +2951,10 @@ module Block = struct
             Consensus.Data.Consensus_state.supercharge_coinbase consensus_state
           in
           match
-            Staged_ledger.Pre_diff_info.get_transactions ~constraint_constants
-              ~coinbase_receiver ~supercharge_coinbase
-              staged_ledger_diff.Staged_ledger_diff.diff
+            Staged_ledger.Pre_diff_info.(
+              get_transactions ~constraint_constants ~coinbase_receiver
+                ~supercharge_coinbase
+                (with_aux staged_ledger_diff.Staged_ledger_diff.diff))
           with
           | Ok transactions ->
               transactions
@@ -3074,7 +3075,8 @@ module Block = struct
                 let%bind id =
                   User_command.add_if_doesn't_exist
                     (module Conn)
-                    ~v1_transaction_hash user_command.data
+                    ~v1_transaction_hash
+                    (Mina_base.User_command.Wire.strip_aux user_command.data)
                 in
                 let%map () =
                   match command with
