@@ -3,8 +3,6 @@
     transactions (user commands) and providing them to the block producer code.
 *)
 
-(* Only show stdout for failed inline tests.*)
-open Inline_test_quiet_logs
 open Core
 open Async
 open Mina_base
@@ -289,18 +287,20 @@ struct
         ; verifier : (Verifier.t[@sexp.opaque])
         ; genesis_constants : Genesis_constants.t
         ; slot_tx_end : Mina_numbers.Global_slot_since_hard_fork.t option
+        ; compile_config : Mina_compile_config.t
         }
       [@@deriving sexp_of]
 
       (* remove next line if there's a way to force [@@deriving make] write a
          named parameter instead of an optional parameter *)
       let make ~trust_system ~pool_max_size ~verifier ~genesis_constants
-          ~slot_tx_end =
+          ~slot_tx_end ~compile_config =
         { trust_system
         ; pool_max_size
         ; verifier
         ; genesis_constants
         ; slot_tx_end
+        ; compile_config
         }
     end
 
@@ -831,7 +831,7 @@ struct
         ; remaining_in_batch = max_per_15_seconds
         ; config
         ; logger
-        ; batcher = Batcher.create config.verifier
+        ; batcher = Batcher.create ~logger config.verifier
         ; best_tip_diff_relay = None
         ; best_tip_ledger = None
         ; verification_key_table = Vk_refcount_table.create ()
@@ -1090,7 +1090,8 @@ struct
               ~f:(fun acc user_cmd ->
                 match
                   User_command.check_well_formedness
-                    ~genesis_constants:t.config.genesis_constants user_cmd
+                    ~genesis_constants:t.config.genesis_constants
+                    ~compile_config:t.config.compile_config user_cmd
                 with
                 | Ok () ->
                     acc
@@ -1658,10 +1659,12 @@ let%test_module _ =
 
     let genesis_constants = precomputed_values.genesis_constants
 
+    let compile_config = precomputed_values.compile_config
+
     let minimum_fee =
       Currency.Fee.to_nanomina_int genesis_constants.minimum_user_command_fee
 
-    let logger = Logger.create ()
+    let logger = Logger.null ()
 
     let time_controller = Block_time.Controller.basic ~logger
 
@@ -1919,7 +1922,7 @@ let%test_module _ =
       let trust_system = Trust_system.null () in
       let config =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
-          ~genesis_constants ~slot_tx_end
+          ~genesis_constants ~slot_tx_end ~compile_config
       in
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
@@ -2203,19 +2206,22 @@ let%test_module _ =
       let tm1 = Time.now () in
       [%log' info test.txn_pool.logger] "Time for add_commands: %0.04f sec"
         (Time.diff tm1 tm0 |> Time.Span.to_sec) ;
+      let debug = false in
       ( match result with
       | Ok (`Accept, _, rejects) ->
-          List.iter rejects ~f:(fun (cmd, err) ->
-              Core.Printf.printf
-                !"command was rejected because %s: %{Yojson.Safe}\n%!"
-                (Diff_versioned.Diff_error.to_string_name err)
-                (User_command.to_yojson cmd) )
+          if debug then
+            List.iter rejects ~f:(fun (cmd, err) ->
+                Core.Printf.printf
+                  !"command was rejected because %s: %{Yojson.Safe}\n%!"
+                  (Diff_versioned.Diff_error.to_string_name err)
+                  (User_command.to_yojson cmd) )
       | Ok (`Reject, _, _) ->
           failwith "diff was rejected during application"
       | Error (`Other err) ->
-          Core.Printf.printf
-            !"failed to apply diff to pool: %s\n%!"
-            (Error.to_string_hum err) ) ;
+          if debug then
+            Core.Printf.printf
+              !"failed to apply diff to pool: %s\n%!"
+              (Error.to_string_hum err) ) ;
       result
 
     let add_commands' ?local test cs =

@@ -16,8 +16,6 @@ let JobSpec = ../Pipeline/JobSpec.dhall
 
 let Size = ./Size.dhall
 
-let Libp2p = ./Libp2pHelperBuild.dhall
-
 let DockerImage = ./DockerImage.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
@@ -257,10 +255,10 @@ let docker_step
                     , deb_repo = DebianRepo.Type.Local
                     , deb_profile = spec.profile
                     , step_key =
-                        "test-suite-${DebianVersions.lowerName
-                                        spec.debVersion}${Profiles.toLabelSegment
-                                                            spec.profile}${BuildFlags.toLabelSegment
-                                                                             spec.buildFlags}--docker-image"
+                        "functional_test_suite-${DebianVersions.lowerName
+                                                   spec.debVersion}${Profiles.toLabelSegment
+                                                                       spec.profile}${BuildFlags.toLabelSegment
+                                                                                        spec.buildFlags}-docker-image"
                     , network = "berkeley"
                     }
                   ]
@@ -320,20 +318,14 @@ let onlyDebianPipeline
     =     \(spec : MinaBuildSpec.Type)
       ->  pipelineBuilder
             spec
-            [ Libp2p.step spec.debVersion spec.buildFlags
-            , build_artifacts spec
-            , publish_to_debian_repo spec
-            ]
+            [ build_artifacts spec, publish_to_debian_repo spec ]
 
 let pipeline
     : MinaBuildSpec.Type -> Pipeline.Config.Type
     =     \(spec : MinaBuildSpec.Type)
       ->  pipelineBuilder
             spec
-            (   [ Libp2p.step spec.debVersion spec.buildFlags
-                , build_artifacts spec
-                , publish_to_debian_repo spec
-                ]
+            (   [ build_artifacts spec, publish_to_debian_repo spec ]
               # docker_commands spec
             )
 
