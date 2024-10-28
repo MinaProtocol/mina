@@ -52,44 +52,52 @@ DEBS3_UPLOAD="deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
 echo "Publishing debs: ${DEB_NAMES} to Release: ${DEB_RELEASE} and Codename: ${DEB_CODENAME}"
 # Upload the deb files to s3.
 # If this fails, attempt to remove the lockfile and retry.
-for i in {1..10}; do (
+for _ in {1..10}; do (
   ${DEBS3_UPLOAD} \
     --component "${DEB_RELEASE}" \
     --codename "${DEB_CODENAME}" \
     "${DEB_NAMES}"
 ) && break || scripts/debian/clear-s3-lockfile.sh; done
 
+DEBS3_EXIST="deb-s3 exist $BUCKET_ARG $S3_REGION_ARG"
+
+debs=()
+
 for deb in $DEB_NAMES
 do
-
-  DEBS3_SHOW="deb-s3 show $BUCKET_ARG $S3_REGION_ARG"
-
   # extracting name from debian package path. E.g:
   # _build/mina-archive_3.0.1-develop-a2a872a.deb -> mina-archive
   deb=$(basename "$deb")
   deb="${deb%_*}"
-
-  for i in {1..10}; do 
-
-    set +e
-    ${DEBS3_SHOW} "$deb" "${DEB_VERSION}" "${ARCH}" -c "${DEB_CODENAME}" -m "${DEB_RELEASE}"
-    LAST_VERIFY_STATUS=$?
-    set -eo pipefail
-
-    if [[ $LAST_VERIFY_STATUS == 0 ]]; then
-        echo "succesfully validated that package is uploaded to deb-s3"
-        break
-    fi
-    
-    sleep 60
-    i=$((i+1)) 
-  done
-
-  if [[ $LAST_VERIFY_STATUS != 0 ]]; then
-    echo "Cannot locate '$deb' in debian repo. failing job..."
-    echo "You may still try to rerun job as debian repository is known from imperfect performance"
-    exit 1
-  fi
+  debs+=("$deb")
 done
 
+function join_by { local IFS="$1"; shift; echo "$*"; }
 
+tries=10
+
+while (( ${#debs[@]} ))
+do
+  join=$(join_by " " "${debs[@]}")
+
+  IFS=$'\n'
+  output=$($DEBS3_EXIST "$join" "$DEB_VERSION" "$ARCH" -c "$DEB_CODENAME" -m "$DEB_RELEASE")
+
+  for item in $output; do
+     if [[ $item == *"Found" ]]; then
+      key=$(echo "$item" | awk '{print $1}')
+      debs=( "${debs[@]/$key}" )
+     fi
+  done
+
+  ((c++)) && ((c==$($tries))) && break
+  sleep 60
+done
+
+if [ ${#debs[@]} -eq 0 ]; then
+    echo "All debians are correctly published to our debian repository"
+else
+    echo "Error: Some Debians are still not correctly published : "$(join_by " " "${debs[@]}")
+    echo "You may still try to rerun job as debian repository is known from imperfect performance"
+    exit 1
+fi
