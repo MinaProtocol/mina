@@ -8,7 +8,8 @@
    bindings/field.js
    bindings/curve.js
    bindings/vector.js
-   bindings/gate-vector.js))
+   bindings/gate-vector.js
+   bindings/oracles.js))
  (instrumentation
   (backend bisect_ppx))
  (preprocess
