@@ -146,9 +146,9 @@ module Hashed = struct
     * Aux_data.t
   [@@deriving sexp, compare, equal, hash, yojson]
 
-  let compute_aux { T.fee_payer; memo = _; account_updates } =
+  let compute_aux ~chain { T.fee_payer; memo = _; account_updates } =
     let fee_payer_update = Account_update.of_fee_payer fee_payer in
-    let fee_payer_hash = Digest.Account_update.create fee_payer_update in
+    let fee_payer_hash = Digest.Account_update.create ~chain fee_payer_update in
     let fee_payer_stack_hash =
       let tree =
         { Call_forest.Tree.account_update = fee_payer_update
@@ -161,14 +161,14 @@ module Hashed = struct
     in
     { Aux_data.fee_payer_hash; fee_payer_stack_hash }
 
-  let of_wire { T.fee_payer; memo; account_updates } : t =
+  let of_wire ~chain { T.fee_payer; memo; account_updates } : t =
     let account_updates =
       Call_forest.accumulate_hashes account_updates
         ~hash_account_update:(fun (p : Account_update.t) ->
-          Digest.Account_update.create p )
+          Digest.Account_update.create ~chain p )
     in
     let cmd = { T.fee_payer; memo; account_updates } in
-    (cmd, compute_aux cmd)
+    (cmd, compute_aux ~chain cmd)
 
   let to_wire_ t : Wire.t =
     let rec forget_hashes = List.map ~f:forget_hash
@@ -193,7 +193,7 @@ module Hashed = struct
     ; account_updates = forget_hashes t.account_updates
     }
 
-  let to_wire ((t, _):t) = to_wire_ t 
+  let to_wire ((t, _) : t) = to_wire_ t
 end
 
 include Hashed
@@ -320,7 +320,7 @@ let fee_excess (t : (_, _, _) unwired_t) =
 let account_access_statuses
     (({ account_updates; _ }, _) as t : (_, _, _) unwired_t)
     (status : Transaction_status.t) =
-    let init = [ (fee_payer t, `Accessed) ] in
+  let init = [ (fee_payer t, `Accessed) ] in
   let status_sym =
     match status with Applied -> `Accessed | Failed _ -> `Not_accessed
   in

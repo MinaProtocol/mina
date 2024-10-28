@@ -301,7 +301,7 @@ module Account_update_under_construction = struct
         | Rev_calls rev_calls ->
             List.fold_left ~init:(Zkapp_call_forest.Checked.empty ()) rev_calls
               ~f:(fun acc (account_update, calls) ->
-                Zkapp_call_forest.Checked.push ~account_update ~calls acc )
+                Zkapp_call_forest.Checked.push ~chain:Testnet ~account_update ~calls acc )
         | Calls calls ->
             calls
       in
@@ -491,7 +491,7 @@ let to_account_update (account_update : account_update) :
   in
   let account_update_digest =
     Zkapp_command.Call_forest.Digest.Account_update.Checked.create
-      account_update
+      account_update ~chain:Testnet
   in
   let public_output : Zkapp_statement.Checked.t =
     { account_update = (account_update_digest :> Field.t)
@@ -797,7 +797,7 @@ let insert_signatures pk_compressed sk
     Zkapp_command.Transaction_commitment.create_complete transaction_commitment
       ~memo_hash
       ~fee_payer_hash:
-        (Zkapp_command.Call_forest.Digest.Account_update.create
+        (Zkapp_command.Call_forest.Digest.Account_update.create ~chain:Testnet
            (Account_update.of_fee_payer fee_payer) )
   in
   let fee_payer =
@@ -806,7 +806,7 @@ let insert_signatures pk_compressed sk
       when Public_key.Compressed.equal public_key pk_compressed ->
         { fee_payer with
           authorization =
-            Schnorr.Chunked.sign sk
+            Schnorr.Chunked.sign sk ~signature_kind:Testnet
               (Random_oracle.Input.Chunked.field full_commitment)
         }
     | fee_payer ->
@@ -826,7 +826,7 @@ let insert_signatures pk_compressed sk
           { account_update with
             authorization =
               Signature
-                (Schnorr.Chunked.sign sk
+                (Schnorr.Chunked.sign sk ~signature_kind:Testnet
                    (Random_oracle.Input.Chunked.field commitment) )
           }
       | account_update ->

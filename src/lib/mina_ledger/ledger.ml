@@ -489,7 +489,7 @@ let%test_unit "tokens test" =
       let zkapp_command =
         mk_zkapp_command ~fee:7 ~fee_payer_pk:pk ~fee_payer_nonce:nonce
           account_updates
-        |> Zkapp_command.of_wire
+        |> Zkapp_command.of_wire ~chain:Testnet
       in
       match
         apply_zkapp_command_unchecked ~constraint_constants
@@ -650,7 +650,7 @@ let%test_unit "zkapp_command payment test" =
     }
   in
   Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
-      let ts1 : Signed_command.t list = List.map specs ~f:command_send in
+      let ts1 : Signed_command.t list = List.map specs ~f:(command_send ~signature_kind:Testnet) in
       let ts2 : Zkapp_command.t list =
         List.map specs ~f:(fun s ->
             let use_full_commitment =
@@ -710,7 +710,7 @@ let%test_unit "user_command application on masked ledger" =
     }
   in
   Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
-      let cmds = List.map specs ~f:command_send in
+      let cmds = List.map specs ~f:(command_send ~signature_kind:Testnet) in
       L.with_ledger ~depth ~f:(fun l ->
           Init_ledger.init (module L) init_ledger l ;
           let init_merkle_root = L.merkle_root l in

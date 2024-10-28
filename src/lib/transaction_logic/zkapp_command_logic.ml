@@ -865,7 +865,10 @@ module type Inputs_intf = sig
     val commitment : account_updates:Call_forest.t -> t
 
     val full_commitment :
-      chain:Mina_signature_kind.t -> account_update:Account_update.t -> memo_hash:Field.t -> commitment:t -> t
+         fee_payer_hash:Zkapp_command.Digest.Account_update.t
+      -> memo_hash:Field.t
+      -> commitment:t
+      -> t
   end
 
   and Index : sig
@@ -1084,7 +1087,10 @@ module Make (Inputs : Inputs_intf) = struct
     (([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t), last_action_slot)
 
   let apply ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~(is_start : [ `Yes of _ Start_data.t | `No | `Compute of _ Start_data.t ])
+      ~(is_start :
+         [ `Yes of _ Start_data.t * Zkapp_command.Aux_data.t
+         | `No
+         | `Compute of _ Start_data.t * Zkapp_command.Aux_data.t ] )
       (h :
         (< global_state : Global_state.t
          ; transaction_commitment : Transaction_commitment.t
@@ -1119,10 +1125,10 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let will_succeed =
       match is_start with
-      | `Compute start_data ->
+      | `Compute (start_data, _) ->
           Bool.if_ is_start' ~then_:start_data.will_succeed
             ~else_:local_state.will_succeed
-      | `Yes start_data ->
+      | `Yes (start_data, _) ->
           start_data.will_succeed
       | `No ->
           local_state.will_succeed
@@ -1142,7 +1148,7 @@ module Make (Inputs : Inputs_intf) = struct
         , (a, inclusion_proof) ) =
       let to_pop, call_stack =
         match is_start with
-        | `Compute start_data ->
+        | `Compute (start_data, _) ->
             ( Stack_frame.if_ is_start'
                 ~then_:
                   (Stack_frame.make ~calls:start_data.account_updates
@@ -1150,7 +1156,7 @@ module Make (Inputs : Inputs_intf) = struct
                 ~else_:local_state.stack_frame
             , Call_stack.if_ is_start' ~then_:(Call_stack.empty ())
                 ~else_:local_state.call_stack )
-        | `Yes start_data ->
+        | `Yes (start_data, _) ->
             ( Stack_frame.make ~calls:start_data.account_updates
                 ~caller:default_caller ~caller_caller:default_caller
             , Call_stack.empty () )
@@ -1192,15 +1198,16 @@ module Make (Inputs : Inputs_intf) = struct
         | `No ->
             ( local_state.transaction_commitment
             , local_state.full_transaction_commitment )
-        | `Yes start_data | `Compute start_data ->
+        | `Yes (start_data, aux) | `Compute (start_data, aux) ->
             let tx_commitment_on_start =
               Transaction_commitment.commitment
                 ~account_updates:(Stack_frame.calls remaining)
             in
             let full_tx_commitment_on_start =
-              Transaction_commitment.full_commitment ~chain ~account_update
+              Transaction_commitment.full_commitment
                 ~memo_hash:start_data.memo_hash
                 ~commitment:tx_commitment_on_start
+                ~fee_payer_hash:aux.fee_payer_hash
             in
             let tx_commitment =
               Transaction_commitment.if_ is_start' ~then_:tx_commitment_on_start

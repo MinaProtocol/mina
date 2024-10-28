@@ -969,11 +969,8 @@ module Make (L : Ledger_intf.S) :
         in
         Zkapp_command.Transaction_commitment.create ~account_updates_hash
 
-      let full_commitment ~chain ~account_update ~memo_hash ~commitment =
+      let full_commitment ~fee_payer_hash ~memo_hash ~commitment =
         (* when called from Zkapp_command_logic.apply, the account_update is the fee payer *)
-        let fee_payer_hash =
-          Zkapp_command.Digest.Account_update.create ~chain account_update
-        in
         Zkapp_command.Transaction_commitment.create_complete commitment
           ~memo_hash ~fee_payer_hash
 
@@ -1679,14 +1676,15 @@ module Make (L : Ledger_intf.S) :
     let%map global_state, local_state =
       Or_error.try_with (fun () ->
           M.start ~constraint_constants
-            { account_updates
-            ; memo_hash = Signed_command_memo.hash (fst command).memo
-            ; will_succeed =
-                (* It's always valid to set this value to true, and it will
-                   have no effect outside of the snark.
-                *)
-                true
-            }
+            ( { account_updates
+              ; memo_hash = Signed_command_memo.hash (fst command).memo
+              ; will_succeed =
+                  (* It's always valid to set this value to true, and it will
+                     have no effect outside of the snark.
+                  *)
+                  true
+              }
+            , snd command )
             { perform } initial_state )
     in
     ( { Transaction_partially_applied.Zkapp_command_partially_applied.command
@@ -2420,11 +2418,11 @@ module For_tests = struct
     let gen = mk_gen ~num_transactions ()
   end
 
-  let command_send
+  let command_send ~signature_kind
       { Transaction_spec.fee; sender = sender, sender_nonce; receiver; amount }
       : Signed_command.t =
     let sender_pk = Public_key.compress sender.public_key in
-    Signed_command.sign sender
+    Signed_command.sign ~signature_kind sender
       { common =
           { fee
           ; fee_payer_pk = sender_pk
@@ -2524,7 +2522,7 @@ module For_tests = struct
       }
     in
     let zkapp_command, aux =
-      Zkapp_command.(of_simple zkapp_command |> of_wire)
+      Zkapp_command.(of_simple zkapp_command |> of_wire ~chain:Testnet)
     in
     let commitment = Zkapp_command.commitment (zkapp_command, aux) in
     let full_commitment =
@@ -2534,7 +2532,7 @@ module For_tests = struct
     in
     let account_updates_signature =
       let c = if use_full_commitment then full_commitment else commitment in
-      Schnorr.Chunked.sign sender.private_key
+      Schnorr.Chunked.sign ~signature_kind:Testnet sender.private_key
         (Random_oracle.Input.Chunked.field c)
     in
     let account_updates =
@@ -2549,7 +2547,7 @@ module For_tests = struct
               account_update )
     in
     let signature =
-      Schnorr.Chunked.sign sender.private_key
+      Schnorr.Chunked.sign ~signature_kind:Testnet sender.private_key
         (Random_oracle.Input.Chunked.field full_commitment)
     in
     let fee_payer =
