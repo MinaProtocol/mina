@@ -154,7 +154,7 @@ let tests =
 
       let cacheExample =
               assert
-            :     "./buildkite/scripts/cache-through.sh data.tar \"docker run -it --rm --entrypoint /bin/bash --init --volume /var/secrets:/var/secrets --volume /var/buildkite/shared:/shared --volume \\\$BUILDKITE_BUILD_CHECKOUT_PATH:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag -c 'echo hello > /tmp/data/foo.txt && tar cvf data.tar /tmp/data'\""
+            :     "./buildkite/scripts/cache-through.sh data.tar \"docker run -it --rm --entrypoint /bin/bash --init --volume /var/dune-cache:/var/dune-cache --volume /var/secrets:/var/secrets --volume /var/buildkite/shared:/shared --volume \\\$BUILDKITE_BUILD_CHECKOUT_PATH:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag -c 'echo hello > /tmp/data/foo.txt && tar cvf data.tar /tmp/data'\""
               ===  M.format
                      ( M.cacheThrough
                          M.Docker::{
