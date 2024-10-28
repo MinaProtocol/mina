@@ -14,6 +14,15 @@ let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
 
+let RunInToolchain = ../../Command/RunInToolchain.dhall
+
+let dump_pipelines_cmd =
+      Cmd.runInDocker
+        Cmd.Docker::{
+        , image = (../../Constants/ContainerImages.dhall).toolchainBase
+        }
+        "buildkite/scripts/dhall/dump_dhall_to_pipelines.sh buildkite/src/Jobs _pipelines"
+
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -57,6 +66,30 @@ in  Pipeline.build
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
+            }
+        , Command.build
+            Command.Config::{
+            , commands =
+                  [ dump_pipelines_cmd ]
+                # RunInToolchain.runInToolchainBullseye
+                    ([] : List Text)
+                    "python3 ./buildkite/scripts/dhall/checker.py --root _pipelines deps"
+            , label = "Dhall: deps"
+            , key = "check-dhall-deps"
+            , target = Size.Multi
+            , docker = None Docker.Type
+            }
+        , Command.build
+            Command.Config::{
+            , commands =
+                  [ dump_pipelines_cmd ]
+                # RunInToolchain.runInToolchainBullseye
+                    ([] : List Text)
+                    "python3 ./buildkite/scripts/dhall/checker.py --root _pipelines dirty-when  --repo ."
+            , label = "Dhall: dirtyWhen"
+            , key = "check-dhall-dirty"
+            , target = Size.Multi
+            , docker = None Docker.Type
             }
         ]
       }

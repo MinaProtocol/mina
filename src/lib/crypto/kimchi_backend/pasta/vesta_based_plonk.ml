@@ -35,8 +35,8 @@ module R1CS_constraint_system =
 
 let lagrange srs domain_log2 : _ Kimchi_types.poly_comm array =
   let domain_size = Int.pow 2 domain_log2 in
-  Array.init domain_size ~f:(fun i ->
-      Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs domain_size i )
+  Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitments_whole_domain srs
+    domain_size
 
 let with_lagrange f (vk : Verification_key.t) =
   f (lagrange vk.srs vk.domain.log_size_of_group) vk

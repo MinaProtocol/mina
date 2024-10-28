@@ -384,17 +384,20 @@ let%snarkydef_ step ~(logger : Logger.t)
 module Statement = struct
   type t = Protocol_state.Value.t
 
-  let to_field_elements (t : t) : Tick.Field.t array =
-    [| (Protocol_state.hashes t).state_hash |]
+  let typ =
+    Data_as_hash.typ ~hash:(fun t -> (Protocol_state.hashes t).state_hash)
+
+  let to_field_elements =
+    let (Typ { value_to_fields; _ }) = typ in
+    Fn.compose fst value_to_fields
 end
 
-module Statement_var = struct
-  type t = Protocol_state.Value.t Data_as_hash.t
-end
-
-type tag = (Statement_var.t, Statement.t, Nat.N2.n, Nat.N1.n) Pickles.Tag.t
-
-let typ = Data_as_hash.typ ~hash:(fun t -> (Protocol_state.hashes t).state_hash)
+type tag =
+  ( Protocol_state.Value.t Data_as_hash.t
+  , Statement.t
+  , Nat.N2.n
+  , Nat.N1.n )
+  Pickles.Tag.t
 
 let check w ?handler ~proof_level ~constraint_constants new_state_hash :
     unit Or_error.t =
@@ -402,7 +405,7 @@ let check w ?handler ~proof_level ~constraint_constants new_state_hash :
   check
     (Fn.flip handle (wrap_handler handler w) (fun () ->
          let%bind curr =
-           exists typ ~compute:(As_prover.return new_state_hash)
+           exists Statement.typ ~compute:(As_prover.return new_state_hash)
          in
          step ~proof_level ~constraint_constants ~logger:(Logger.create ()) curr )
     )
@@ -463,7 +466,7 @@ let constraint_system_digests ~proof_level ~constraint_constants () =
            in
            ()
          in
-         Tick.constraint_system ~input_typ:typ
+         Tick.constraint_system ~input_typ:Statement.typ
            ~return_typ:(Snarky_backendless.Typ.unit ())
            main ) )
   ]
@@ -478,7 +481,8 @@ end) : S = struct
   open T
 
   let tag, cache_handle, p, Pickles.Provers.[ step ] =
-    Pickles.compile () ~cache:Cache_dir.cache ~public_input:(Input typ)
+    Pickles.compile () ~cache:Cache_dir.cache
+      ~public_input:(Input Statement.typ)
       ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)
