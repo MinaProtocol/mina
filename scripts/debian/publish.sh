@@ -34,7 +34,7 @@ if [[ -z "$DEB_CODENAME" ]]; then usage "Codename is not set!"; fi;
 if [[ -z "$DEB_RELEASE" ]]; then usage "Release is not set!"; fi;
 
 
-BUCKET_ARG="--bucket packages.o1test.net"
+BUCKET_ARG="--bucket=packages.o1test.net"
 S3_REGION_ARG="--s3-region=us-west-2"
 # utility for publishing deb repo with commons options
 # deb-s3 https://github.com/krobertson/deb-s3
@@ -73,13 +73,14 @@ done
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
 tries=10
+c=0
 
 while (( ${#debs[@]} ))
 do
   join=$(join_by " " "${debs[@]}")
 
   IFS=$'\n'
-  output=$(deb-s3 exist "$BUCKET_ARG" "$S3_REGION_ARG" "$join" "$DEB_VERSION" "$ARCH" -c "$DEB_CODENAME" -m "$DEB_RELEASE")
+  output=$(deb-s3 exist $BUCKET_ARG $S3_REGION_ARG "$join" $DEB_VERSION $ARCH -c $DEB_CODENAME -m $DEB_RELEASE)
 
   for item in $output; do
      if [[ $item == *"Found" ]]; then
