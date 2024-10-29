@@ -76,14 +76,6 @@ in  Pipeline.build
         , Command.build
             Command.Config::{
             , commands =
-            , target = Size.Multi
-            , docker = Some Docker::{
-              , image = (../../Constants/ContainerImages.dhall).toolchainBase
-              }
-            }
-        , Command.build
-            Command.Config::{
-            , commands =
               [ Cmd.run "scripts/merged-to-proof-systems.sh develop" ]
             , label =
                 "[proof-systems] Check merges cleanly into proof-systems develop branch"
