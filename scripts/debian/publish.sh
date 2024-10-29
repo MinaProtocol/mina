@@ -81,11 +81,11 @@ do
 
   IFS=$'\n'
   output=$(deb-s3 exist $BUCKET_ARG $S3_REGION_ARG "$join" $DEB_VERSION $ARCH -c $DEB_CODENAME -m $DEB_RELEASE)
-
+  debs=()
   for item in $output; do
-     if [[ $item == *"Found" ]]; then
+     if [[ $item == *"Missing" ]]; then
       key=$(echo "$item" | awk '{print $1}')
-      debs=( "${debs[@]/$key}" )
+      debs+=("$key")
      fi
   done
 
