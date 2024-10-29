@@ -73,7 +73,7 @@ done
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
 tries=10
-c=0
+counter=0
 
 while (( ${#debs[@]} ))
 do
@@ -89,14 +89,17 @@ do
      fi
   done
 
-  ((c++)) && ((c==$($tries))) && break
-  sleep 60
-done
-
-if [ ${#debs[@]} -eq 0 ]; then
+  if [ ${#debs[@]} -eq 0 ]; then
     echo "All debians are correctly published to our debian repository"
-else
+    exit 0
+  fi
+
+  counter=$((counter+1))
+  if [[ $((counter)) == $((tries)) ]]; then
     echo "Error: Some Debians are still not correctly published : "$(join_by " " "${debs[@]}")
     echo "You may still try to rerun job as debian repository is known from imperfect performance"
     exit 1
-fi
+  fi 
+
+  sleep 60
+done
