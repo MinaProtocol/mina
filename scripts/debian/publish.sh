@@ -34,8 +34,8 @@ if [[ -z "$DEB_CODENAME" ]]; then usage "Codename is not set!"; fi;
 if [[ -z "$DEB_RELEASE" ]]; then usage "Release is not set!"; fi;
 
 
-BUCKET_ARG='--bucket packages.o1test.net'
-S3_REGION_ARG='--s3-region=us-west-2'
+BUCKET_ARG="--bucket packages.o1test.net"
+S3_REGION_ARG="--s3-region=us-west-2"
 # utility for publishing deb repo with commons options
 # deb-s3 https://github.com/krobertson/deb-s3
 #NOTE: Do not remove --lock flag otherwise racing deb uploads may overwrite the registry and some files will be lost. If a build fails with the following error, delete the lock file https://packages.o1test.net/dists/unstable/main/binary-/lockfile and rebuild
