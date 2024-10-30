@@ -91,5 +91,29 @@ in  Pipeline.build
             , target = Size.Multi
             , docker = None Docker.Type
             }
+        , Command.build
+            Command.Config::{
+            , commands =
+                  [ dump_pipelines_cmd ]
+                # RunInToolchain.runInToolchainBullseye
+                    ([] : List Text)
+                    "python3 ./buildkite/scripts/dhall/checker.py --root _pipelines dups"
+            , label = "Dhall: duplicates"
+            , key = "check-dhall-dups"
+            , target = Size.Multi
+            , docker = None Docker.Type
+            }
+        , Command.build
+            Command.Config::{
+            , commands =
+                  [ dump_pipelines_cmd ]
+                # RunInToolchain.runInToolchainBullseye
+                    ([] : List Text)
+                    "python3 ./buildkite/scripts/dhall/checker.py --root _pipelines names"
+            , label = "Dhall: job names"
+            , key = "check-dhall-jobs"
+            , target = Size.Multi
+            , docker = None Docker.Type
+            }
         ]
       }
