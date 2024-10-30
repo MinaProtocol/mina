@@ -4,6 +4,7 @@ set -eo pipefail
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
+PUBLISH=0
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -n|--name) NAME="$2"; shift;;
@@ -45,7 +46,7 @@ docker pull ${GCR_REPO}/${NAME}:${VERSION}
 
 source buildkite/scripts/export-git-env-vars.sh
 
-if [[ -v PUBLISH ]]; then
+if [[ $PUBLISH == 1 ]]; then
   TARGET_REPO=docker.io/minaprotocol
   docker tag ${GCR_REPO}/${NAME}:${VERSION} ${TARGET_REPO}/${NAME}:${TAG}
   docker push "${TARGET_REPO}/${NAME}:${TAG}"
