@@ -74,6 +74,11 @@ class Influx:
 
     @staticmethod
     def check_envs():
+        """
+         In order to talk with influx db we need to have some env vars defined.
+         This method verifies correct setup
+        """
+
         if Influx.host not in os.environ:
             raise RuntimeError(f"{Influx.host} env var not defined")
         if Influx.token not in os.environ:
@@ -97,11 +102,13 @@ class Influx:
     def __get_moving_average_query(self, name, branch, field, branch_header):
         """
             Constructs moving average query from influx for comparison purposes
+
+            Moving average size is configured in class constructor
         """
 
         bucket = os.environ[Influx.bucket]
         return f"from(bucket: \"{bucket}\") \
-                |>  range(start: -10d)   \
+                |>  range(start: -{self.moving_average_size})   \
                 |> filter (fn: (r) => (r[\"{branch_header.name}\"] == \"{branch}\" ) \
                                        and r._measurement == \"{name}\"   \
                                        and r._field == \"{field}\" ) \
