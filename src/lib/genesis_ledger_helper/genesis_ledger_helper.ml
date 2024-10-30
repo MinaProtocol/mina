@@ -767,6 +767,7 @@ module type Config_loader_intf = sig
     -> ?genesis_dir:string
     -> ?itn_features:bool
     -> ?cli_proof_level:Genesis_constants.Proof_level.t
+    -> ?network:[< `Dev | `Devnet | `Lightnet | `Mainnet ]
     -> ?conf_dir:string
     -> logger:Logger.t
     -> string list
@@ -842,7 +843,7 @@ module Config_loader : Config_loader_intf = struct
     (values, config)
 
   let load_config_files ?overwrite_version ?genesis_dir ?(itn_features = false)
-      ?cli_proof_level ?conf_dir ~logger (config_files : string list) =
+      ?cli_proof_level ?network ?conf_dir ~logger (config_files : string list) =
     let open Deferred.Or_error.Let_syntax in
     let genesis_dir =
       let%map.Option conf_dir = conf_dir in
@@ -850,7 +851,7 @@ module Config_loader : Config_loader_intf = struct
     in
     let%bind.Deferred constants =
       Runtime_config.Constants.load_constants ?conf_dir ?cli_proof_level
-        ~itn_features ~logger config_files
+        ?network ~itn_features ~logger config_files
     in
     let%bind config =
       Runtime_config.Json_loader.load_config_files ?conf_dir ~logger
