@@ -107,6 +107,16 @@ module Constraint_constants = struct
     }
 
   let make (inputs : Inputs.t) : t =
+    (* All the proofs before the last [work_delay] blocks must be
+       completed to add transactions. [work_delay] is the minimum number
+       of blocks and will increase if the throughput is less.
+       - If [work_delay = 0], all the work that was added to the scan
+         state in the previous block is expected to be completed and
+         included in the current block if any transactions/coinbase are to
+         be included.
+       - [work_delay >= 1] means that there's at least two block times for
+         completing the proofs.
+    *)
     let transaction_capacity_log_2 =
       match
         (inputs.scan_state_with_tps_goal, inputs.scan_state_tps_goal_x10)
