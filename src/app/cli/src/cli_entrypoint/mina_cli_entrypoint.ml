@@ -380,6 +380,7 @@ let setup_daemon logger ~itn_features =
          default: <config_dir>/daemon.json). Pass multiple times to override \
          fields from earlier config files"
       (listed string)
+  and network_base_config = Cli_lib.Flag.network_base_config
   and _may_generate =
     flag "--generate-genesis-proof"
       ~aliases:[ "generate-genesis-proof" ]
@@ -655,7 +656,8 @@ let setup_daemon logger ~itn_features =
         let mina_initialization_deferred () =
           let%bind precomputed_values, config =
             Genesis_ledger_helper.Config_loader.load_config_files ~logger
-              ~conf_dir ?genesis_dir ?cli_proof_level ~itn_features config_files
+              ~conf_dir ?genesis_dir ?cli_proof_level ~itn_features
+              ?network:network_base_config config_files
             |> Deferred.Or_error.ok_exn
           in
           let constraint_constants = precomputed_values.consensus_constants in

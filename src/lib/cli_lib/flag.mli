@@ -14,6 +14,9 @@ val conf_dir : string option Command.Param.t
 
 val config_files : string list Command.Param.t
 
+val network_base_config :
+  [> `Dev | `Devnet | `Lightnet | `Mainnet ] option Command.Param.t
+
 module Types : sig
   type 'a with_name = { name : string; value : 'a }
 
