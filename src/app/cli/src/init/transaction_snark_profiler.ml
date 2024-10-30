@@ -17,16 +17,8 @@ let run ~genesis_constants ~constraint_constants ~proof_level
     Parallel.init_master () ;
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let open Async.Deferred.Let_syntax in
-          let%bind ( `Blockchain blockchain_verification_key
-                   , `Transaction transaction_verification_key ) =
-            Verifier.For_test.get_verification_keys_eagerly
-              ~constraint_constants ~proof_level
-          in
-          Verifier.create ~commit_id:Mina_version.commit_id ~logger ~proof_level
-            ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            ~blockchain_verification_key ~transaction_verification_key () )
+          Verifier.For_tests.default ~commit_id:Mina_version.commit_id ~logger
+            ~proof_level ~constraint_constants () )
     in
     let rec go n =
       if n <= 0 then ()

@@ -1672,15 +1672,8 @@ let%test_module _ =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let%bind ( `Blockchain blockchain_verification_key
-                   , `Transaction transaction_verification_key ) =
-            Verifier.For_test.get_verification_keys_eagerly
-              ~constraint_constants ~proof_level
-          in
-          Verifier.create ~logger ~proof_level ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            ~commit_id:"not specified for unit tests" ()
-            ~blockchain_verification_key ~transaction_verification_key )
+          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
+            () )
 
     let `VK vk, `Prover prover =
       Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
@@ -3094,16 +3087,9 @@ let%test_module _ =
     let%test "account update with a different network id that uses proof \
               authorization would be rejected" =
       Thread_safe.block_on_async_exn (fun () ->
-          let%bind ( `Blockchain blockchain_verification_key
-                   , `Transaction transaction_verification_key ) =
-            Verifier.For_test.get_verification_keys_eagerly
-              ~constraint_constants ~proof_level
-          in
           let%bind verifier_full =
-            Verifier.create ~logger ~proof_level:Full ~conf_dir:None
-              ~pids:(Child_processes.Termination.create_pid_table ())
-              ~commit_id:"not specified for unit tests" ()
-              ~blockchain_verification_key ~transaction_verification_key
+            Verifier.For_tests.default ~constraint_constants ~logger
+              ~proof_level:Full ()
           in
           let%bind test =
             setup_test ~verifier:verifier_full

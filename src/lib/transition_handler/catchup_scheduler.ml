@@ -366,14 +366,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let%bind ( `Blockchain blockchain_verification_key
-                   , `Transaction transaction_verification_key ) =
-            Verifier.For_test.get_verification_keys_eagerly
-              ~constraint_constants ~proof_level
-          in
-          Verifier.create ~logger ~proof_level ~conf_dir:None ~pids
-            ~commit_id:"not specified for unit tests"
-            ~blockchain_verification_key ~transaction_verification_key () )
+          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
+            ~pids () )
 
     (* cast a breadcrumb into a cached, enveloped, partially validated transition *)
     let downcast_breadcrumb breadcrumb =
