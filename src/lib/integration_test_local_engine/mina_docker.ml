@@ -47,8 +47,8 @@ module Network_config = struct
   [@@deriving to_yojson]
 
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
-      ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
-      =
+      ~(images : Test_config.Container_images.t) ~(test_config : Test_config.t)
+      ~(constants : Test_config.constants) =
     let _ = cli_inputs in
     let ({ genesis_ledger
          ; epoch_data
@@ -144,7 +144,7 @@ module Network_config = struct
     let genesis_ledger_accounts = add_accounts genesis_accounts_and_keys in
     let constraint_constants =
       Genesis_ledger_helper.make_constraint_constants
-        ~default:Genesis_constants.Constraint_constants.compiled proof_config
+        ~default:constants.constraint_constants proof_config
     in
     let ledger_is_prefix ledger1 ledger2 =
       List.is_prefix ledger2 ~prefix:ledger1
@@ -156,17 +156,19 @@ module Network_config = struct
     let runtime_config =
       { Runtime_config.daemon =
           Some
-            { txpool_max_size = Some txpool_max_size
+            { Runtime_config.Daemon.default with
+              txpool_max_size = Some txpool_max_size
             ; peer_list_url = None
-            ; zkapp_proof_update_cost = None
-            ; zkapp_signed_single_update_cost = None
-            ; zkapp_signed_pair_update_cost = None
-            ; zkapp_transaction_cost_limit = None
-            ; max_event_elements = None
-            ; max_action_elements = None
-            ; zkapp_cmd_limit_hardcap = None
+            ; zkapp_proof_update_cost = Some 10.26
+            ; zkapp_signed_single_update_cost = Some 9.140000000000001
+            ; zkapp_signed_pair_update_cost = Some 10.08
+            ; zkapp_transaction_cost_limit = Some 69.45
+            ; max_event_elements = Some 100
+            ; max_action_elements = Some 100
+            ; zkapp_cmd_limit_hardcap = Some 128
             ; slot_tx_end
             ; slot_chain_end
+            ; minimum_user_command_fee = Some (Currency.Fee.of_string "1000000")
             ; network_id
             }
       ; genesis =
@@ -280,10 +282,10 @@ module Network_config = struct
     let genesis_constants =
       Or_error.ok_exn
         (Genesis_ledger_helper.make_genesis_constants ~logger
-           ~default:Genesis_constants.compiled runtime_config )
+           ~default:constants.genesis_constants runtime_config )
     in
     let constants : Test_config.constants =
-      { constraints = constraint_constants; genesis = genesis_constants }
+      { constants with genesis_constants; constraint_constants }
     in
     let mk_net_keypair keypair_name (pk, sk) =
       let keypair =
@@ -302,9 +304,7 @@ module Network_config = struct
       ^ "/src/app/archive/"
     in
     let mina_archive_schema_aux_files =
-      [ sprintf "%screate_schema.sql" mina_archive_base_url
-      ; sprintf "%szkapp_tables.sql" mina_archive_base_url
-      ]
+      [ sprintf "%screate_schema.sql" mina_archive_base_url ]
     in
     let genesis_keypairs =
       List.fold genesis_accounts_and_keys ~init:String.Map.empty
@@ -371,7 +371,6 @@ module Network_config = struct
               ~image:Postgres_config.postgres_image ~ports:[ postgres_port ]
               ~volumes:
                 [ Postgres_config.postgres_create_schema_volume
-                ; Postgres_config.postgres_zkapp_schema_volume
                 ; Postgres_config.postgres_entrypoint_volume
                 ]
               ~config

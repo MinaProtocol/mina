@@ -1,7 +1,5 @@
 (* user_command_intf.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Mina_base_import
 open Core_kernel
 open Snark_params.Tick
@@ -24,6 +22,7 @@ module type Gen_intf = sig
       -> ?nonce:Account_nonce.t
       -> ?min_amount:int
       -> max_amount:int
+      -> ?min_fee:Currency.Fee.t
       -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -40,6 +39,7 @@ module type Gen_intf = sig
       -> ?nonce:Account_nonce.t
       -> ?min_amount:int
       -> max_amount:int
+      -> ?min_fee:Currency.Fee.t
       -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -48,6 +48,7 @@ module type Gen_intf = sig
          key_gen:
            (Signature_keypair.t * Signature_keypair.t) Quickcheck.Generator.t
       -> ?nonce:Account_nonce.t
+      -> ?min_fee:Currency.Fee.t
       -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -55,6 +56,7 @@ module type Gen_intf = sig
     val stake_delegation_with_random_participants :
          keys:Signature_keypair.t array
       -> ?nonce:Account_nonce.t
+      -> ?min_fee:Currency.Fee.t
       -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -115,11 +117,6 @@ module type S = sig
   val memo : t -> Signed_command_memo.t
 
   val valid_until : t -> Global_slot_since_genesis.t
-
-  (* for filtering *)
-  val minimum_fee : Currency.Fee.t
-
-  val has_insufficient_fee : t -> bool
 
   val tag : t -> Transaction_union_tag.t
 

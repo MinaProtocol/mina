@@ -1,11 +1,24 @@
--- Tag defines pipeline 
+-- Tag defines pipeline
 -- Using tags one can tailor pipeline for any need. Each job should be tagged with one or several tags
--- then on pipeline settings we can define which tagged jobs to include or exclue in pipeline 
+-- then on pipeline settings we can define which tagged jobs to include or exclue in pipeline
 
-let Prelude = ../External/Prelude.dhall
 let Tag = ./Tag.dhall
 
-let Filter : Type = < FastOnly | Long | LongAndVeryLong | TearDownOnly | ToolchainsOnly | AllTests | Release | HardforkPackageGeneration >
+let Filter
+    : Type
+    = < FastOnly
+      | Long
+      | LongAndVeryLong
+      | TearDownOnly
+      | ToolchainsOnly
+      | AllTests
+      | Release
+      | HardforkPackageGeneration
+      | Promote
+      | DebianBuild
+      | DockerBuild
+      | Maintenance
+      >
 
 let tags: Filter -> List Tag.Type = \(filter: Filter) -> 
   merge {
@@ -15,8 +28,16 @@ let tags: Filter -> List Tag.Type = \(filter: Filter) ->
     , Maintenance = [ Tag.Type.Maintenance ]
     , TearDownOnly = [ Tag.Type.TearDown ]
     , ToolchainsOnly = [ Tag.Type.Toolchain ]
-    , AllTests = [ Tag.Type.Lint, Tag.Type.Release, Tag.Type.Test, Tag.Type.Hardfork ]
+    , DebianBuild = [ Tag.Type.Debian ]
+    , DockerBuild = [ Tag.Type.Docker ]
+    , AllTests =
+              [ Tag.Type.Lint
+              , Tag.Type.Release
+              , Tag.Type.Test
+              , Tag.Type.Hardfork
+              ]
     , Release = [ Tag.Type.Release ]
+    , Promote = [ Tag.Type.Promote ]
     , HardforkPackageGeneration = [ Tag.Type.Hardfork ]
   } filter
 
@@ -30,12 +51,10 @@ let show: Filter -> Text = \(filter: Filter) ->
     , TearDownOnly = "TearDownOnly"
     , AllTests = "AllTests"
     , Release = "Release"
+    , Promote = "Promote"
+    , DebianBuild = "DebianBuild"
+    , DockerBuild = "DockerBuild"
     , HardforkPackageGeneration = "HardforkPackageGeneration"
   } filter
 
-in
-{ 
-  Type = Filter,
-  tags = tags,
-  show = show
-}
+in  { Type = Filter, tags = tags, show = show }

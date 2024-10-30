@@ -102,22 +102,8 @@ let transactions ~constraint_constants block =
   |> Result.map_error ~f:Staged_ledger.Pre_diff_info.Error.to_error
   |> Or_error.ok_exn
 
-let payments block =
-  block |> body |> Staged_ledger_diff.Body.staged_ledger_diff
-  |> Staged_ledger_diff.commands
-  |> List.filter_map ~f:(function
-       | { data = Signed_command ({ payload = { body = Payment _; _ }; _ } as c)
-         ; status
-         } ->
-           Some { With_status.data = c; status }
-       | _ ->
-           None )
-
-let account_ids_accessed t =
-  let transactions =
-    transactions
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled t
-  in
+let account_ids_accessed ~constraint_constants t =
+  let transactions = transactions ~constraint_constants t in
   List.map transactions ~f:(fun { data = txn; status } ->
       Mina_transaction.Transaction.account_access_statuses txn status )
   |> List.concat

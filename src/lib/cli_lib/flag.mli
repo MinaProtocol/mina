@@ -12,6 +12,8 @@ val privkey_read_path : string Command.Param.t
 
 val conf_dir : string option Command.Param.t
 
+val config_files : string list Command.Param.t
+
 module Types : sig
   type 'a with_name = { name : string; value : 'a }
 
@@ -74,15 +76,19 @@ module Log : sig
 
   val file_log_level : Logger.Level.t Command.Param.t
 
+  val file : string option Command.Param.t
+
   val file_log_rotations : int Command.Param.t
 end
 
 type signed_command_common =
   { sender : Signature_lib.Public_key.Compressed.t
-  ; fee : Currency.Fee.t
+  ; fee : Currency.Fee.t option
   ; nonce : Mina_base.Account.Nonce.t option
   ; memo : string option
   }
+
+val fee_common : Currency.Fee.t option Command.Param.t
 
 val signed_command_common : signed_command_common Command.Param.t
 

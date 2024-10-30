@@ -7,9 +7,9 @@ module Impl = Pickles.Impls.Step
 module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 module Statement = Transaction_snark.Statement
 
-let constraint_constants = Genesis_constants.Constraint_constants.compiled
+let constraint_constants = Genesis_constants.Compiled.constraint_constants
 
-let genesis_constants = Genesis_constants.compiled
+let genesis_constants = Genesis_constants.Compiled.genesis_constants
 
 (* Always run tests with proof-level Full *)
 let proof_level = Genesis_constants.Proof_level.Full
@@ -173,7 +173,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
               let open Async.Deferred.Let_syntax in
               let applied, statement_opt =
                 if ignore_outside_snark then
-                  ( Ledger.Transaction_applied.Varying.Command
+                  ( Mina_transaction_logic.Transaction_applied.Varying.Command
                       (Zkapp_command
                          { command =
                              { With_status.status = Applied
@@ -213,7 +213,8 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                     ; connecting_ledger_right = connecting_ledger
                     ; fee_excess = Zkapp_command.fee_excess zkapp_command
                     ; supply_increase =
-                        Ledger.Transaction_applied.supply_increase applied_txn
+                        Mina_transaction_logic.Transaction_applied
+                        .supply_increase ~constraint_constants applied_txn
                         |> Or_error.ok_exn
                     ; sok_digest = ()
                     }
@@ -570,7 +571,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
               ~consensus_state:consensus_state_at_slot
               ~constants:
                 (Protocol_constants_checked.value_of_t
-                   Genesis_constants.compiled.protocol ))
+                   genesis_constants.protocol ))
             .body
         in
         let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
@@ -619,7 +620,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
     with
     | Ok res ->
         ( if Option.is_some expected_failure then
-          match Ledger.Transaction_applied.transaction_status res with
+          match Ledger.status_of_applied res with
           | Applied ->
               failwith
                 (sprintf "Expected Ledger.apply_transaction to fail with %s"
@@ -664,7 +665,9 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   let supply_increase =
     Option.value_map applied_transaction ~default:Amount.Signed.zero
       ~f:(fun txn ->
-        Ledger.Transaction_applied.supply_increase txn |> Or_error.ok_exn )
+        Mina_transaction_logic.Transaction_applied.supply_increase
+          ~constraint_constants txn
+        |> Or_error.ok_exn )
   in
   match
     Or_error.try_with (fun () ->

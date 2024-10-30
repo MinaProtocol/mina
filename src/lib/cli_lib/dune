@@ -37,15 +37,15 @@
   rosetta_coding
   logger
   interpolator_lib
-  mina_compile_config
   snark_params
   pickles.backend
   consensus.vrf
   error_json
-  kimchi_backend.pasta
-  kimchi_backend.pasta.basic
+  kimchi_pasta
+  kimchi_pasta.basic
   ppx_version.runtime
-  gossip_net)
+  gossip_net
+  runtime_config)
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make))
  (instrumentation (backend bisect_ppx))

@@ -34,15 +34,15 @@ module type Full = sig
   open Pickles_types
 
   type tag =
-    ( Statement.With_sok.Checked.t
+    ( Statement.With_sok.var
     , Statement.With_sok.t
     , Nat.N2.n
     , Nat.N5.n )
     Pickles.Tag.t
 
   val verify :
-       (t * Sok_message.t) list
-    -> key:Pickles.Verification_key.t
+       key:Pickles.Verification_key.t
+    -> (t * Sok_message.t) list
     -> unit Or_error.t Async.Deferred.t
 
   module Verification : sig
@@ -419,7 +419,10 @@ module type Full = sig
       [@@deriving sexp]
     end
 
-    val multiple_transfers : Multiple_transfers_spec.t -> Zkapp_command.t
+    val multiple_transfers :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> Multiple_transfers_spec.t
+      -> Zkapp_command.t
 
     val set_proof_cache : Pickles.Proof_cache.t -> unit
   end

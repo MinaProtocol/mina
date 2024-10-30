@@ -256,7 +256,7 @@ struct
                 }
           ; frontier =
               (fun () -> Broadcast_pipe.Reader.peek frontier_broadcast_pipe)
-          ; batcher = Batcher.Snark_pool.create config.verifier
+          ; batcher = Batcher.Snark_pool.create ~logger config.verifier
           ; logger
           ; config
           ; account_creation_fee =
@@ -559,9 +559,6 @@ module Diff_versioned = struct
   [@@deriving compare, sexp, to_yojson, hash]
 end
 
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
-
 let%test_module "random set test" =
   ( module struct
     open Mina_base
@@ -569,6 +566,9 @@ let%test_module "random set test" =
     let trust_system = Mocks.trust_system
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let block_window_duration =
+      Mina_compile_config.For_unit_tests.t.block_window_duration
 
     (* SNARK work is rejected if the prover doesn't have an account and the fee
        is below the account creation fee. So, just to make generating valid SNARK
@@ -591,7 +591,7 @@ let%test_module "random set test" =
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            () )
+            ~commit_id:"not specified for unit tests" () )
 
     module Mock_snark_pool =
       Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
@@ -639,6 +639,7 @@ let%test_module "random set test" =
           ~consensus_constants ~time_controller
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
+          ~block_window_duration
         (* |>  *)
       in
       let pool = Mock_snark_pool.resource_pool mock_pool in
@@ -805,6 +806,7 @@ let%test_module "random set test" =
               ~consensus_constants ~time_controller ~logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
+              ~block_window_duration
           in
           let priced_proof =
             { Priced_proof.proof =
@@ -877,6 +879,7 @@ let%test_module "random set test" =
                 ~consensus_constants ~time_controller
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
                 ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
+                ~block_window_duration
             in
             List.map (List.take works per_reader) ~f:create_work
             |> List.map ~f:(fun work ->
@@ -961,6 +964,7 @@ let%test_module "random set test" =
               ~constraint_constants ~consensus_constants ~time_controller
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
+              ~block_window_duration
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in
           let%bind () =

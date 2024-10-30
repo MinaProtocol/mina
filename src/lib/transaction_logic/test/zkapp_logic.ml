@@ -27,7 +27,7 @@ let balance_to_fee = Fn.compose Amount.to_fee Balance.to_amount
    validate them. *)
 let%test_module "Test transaction logic." =
   ( module struct
-    open Transaction_logic.Transaction_applied.Zkapp_command_applied
+    open Mina_transaction_logic.Transaction_applied.Zkapp_command_applied
 
     let run_zkapp_cmd ~fee_payer ~fee ~accounts txns =
       let open Result.Let_syntax in
@@ -183,9 +183,8 @@ let%test_module "Test transaction logic." =
                           Predicates.verify_balance_change ~balance_change orig
                             updt
                           && not
-                               Account.Poly.(
-                                 Account.Token_symbol.equal orig.token_symbol
-                                   updt.token_symbol)
+                               (Account.Token_symbol.equal orig.token_symbol
+                                  updt.token_symbol )
                       | _ ->
                           false ) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )

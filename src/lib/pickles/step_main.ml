@@ -278,7 +278,7 @@ let step_main :
   in
   let main () : _ Types.Step.Statement.t Promise.t =
     let open Impls.Step in
-    let logger = Internal_tracing_context_logger.get () in
+    let logger = Context_logger.get () in
     let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
                                          with type n = max_proofs_verified )
     in
@@ -351,7 +351,7 @@ let step_main :
               Req.Compute_prev_proof_parts previous_proof_statements )
         in
         let dlog_plonk_index =
-          let num_chunks = (* TODO *) 1 in
+          let num_chunks = (* TODO *) Plonk_checks.num_chunks_by_default in
           exists
             ~request:(fun () -> Req.Wrap_index)
             (Plonk_verification_key_evals.typ

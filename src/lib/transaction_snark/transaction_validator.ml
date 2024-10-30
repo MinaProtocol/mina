@@ -16,7 +16,9 @@ let apply_user_command ~constraint_constants ~txn_global_slot l uc =
   within_mask l ~f:(fun l' ->
       Result.map
         ~f:(fun applied_txn ->
-          applied_txn.Ledger.Transaction_applied.Signed_command_applied.common
+          applied_txn
+            .Mina_transaction_logic.Transaction_applied.Signed_command_applied
+             .common
             .user_command
             .status )
         (Ledger.apply_user_command l' ~constraint_constants ~txn_global_slot uc) )
@@ -43,7 +45,9 @@ let%test_unit "invalid transactions do not dirty the ledger" =
   let open Mina_numbers in
   let open Currency in
   let open Signature_lib in
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let constraint_constants =
+    Genesis_constants.For_unit_tests.Constraint_constants.t
+  in
   let ledger = Ledger.create_ephemeral ~depth:4 () in
   let sender_sk, receiver_sk =
     Quickcheck.Generator.generate ~size:0

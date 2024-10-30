@@ -14,7 +14,7 @@ libp2p_helper: ../../libp2p_ipc/libp2p_ipc.capnp.go
 test: ../../libp2p_ipc/libp2p_ipc.capnp.go
 	cd src/libp2p_helper \
 		&& (ulimit -n 65536 || true) \
-		&& $(GO) test -short -timeout 40m
+		&& $(GO) test -short -timeout 60m
 
 test-bs-qc: ../../libp2p_ipc/libp2p_ipc.capnp.go
 	cd src/libp2p_helper \

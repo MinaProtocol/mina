@@ -8,6 +8,7 @@ module Inputs = struct
     ; constraint_constants : Genesis_constants.Constraint_constants.t
     ; proof_level : Genesis_constants.Proof_level.t
     ; genesis_constants : Genesis_constants.t
+    ; compile_config : Mina_compile_config.t
     ; genesis_ledger : Genesis_ledger.Packed.t
     ; genesis_epoch_data : Consensus.Genesis_epoch_data.t
     ; genesis_body_reference : Consensus.Body_reference.t
@@ -85,6 +86,7 @@ module T = struct
     ; constraint_constants : Genesis_constants.Constraint_constants.t
     ; genesis_constants : Genesis_constants.t
     ; proof_level : Genesis_constants.Proof_level.t
+    ; compile_config : Mina_compile_config.t
     ; genesis_ledger : Genesis_ledger.Packed.t
     ; genesis_epoch_data : Consensus.Genesis_epoch_data.t
     ; genesis_body_reference : Consensus.Body_reference.t
@@ -218,30 +220,12 @@ let blockchain_snark_state (inputs : Inputs.t) :
   end) in
   ((module T), (module B))
 
-let create_values txn b (t : Inputs.t) =
-  let%bind.Async.Deferred (), (), genesis_proof = base_proof b t in
-  let%map.Async.Deferred blockchain_proof_system_id =
-    let (module B) = b in
-    Lazy.force B.Proof.id
-  in
-  { runtime_config = t.runtime_config
-  ; constraint_constants = t.constraint_constants
-  ; proof_level = t.proof_level
-  ; genesis_constants = t.genesis_constants
-  ; genesis_ledger = t.genesis_ledger
-  ; genesis_epoch_data = t.genesis_epoch_data
-  ; genesis_body_reference = t.genesis_body_reference
-  ; consensus_constants = t.consensus_constants
-  ; protocol_state_with_hashes = t.protocol_state_with_hashes
-  ; constraint_system_digests = digests txn b
-  ; proof_data = Some { blockchain_proof_system_id; genesis_proof }
-  }
-
 let create_values_no_proof (t : Inputs.t) =
   { runtime_config = t.runtime_config
   ; constraint_constants = t.constraint_constants
   ; proof_level = t.proof_level
   ; genesis_constants = t.genesis_constants
+  ; compile_config = t.compile_config
   ; genesis_ledger = t.genesis_ledger
   ; genesis_epoch_data = t.genesis_epoch_data
   ; genesis_body_reference = t.genesis_body_reference
@@ -259,6 +243,7 @@ let to_inputs (t : t) : Inputs.t =
   ; constraint_constants = t.constraint_constants
   ; proof_level = t.proof_level
   ; genesis_constants = t.genesis_constants
+  ; compile_config = t.compile_config
   ; genesis_ledger = t.genesis_ledger
   ; genesis_epoch_data = t.genesis_epoch_data
   ; genesis_body_reference = t.genesis_body_reference

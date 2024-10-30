@@ -1,7 +1,7 @@
 (library
  (inline_tests (flags -verbose -show-counts))
  (name kimchi_pasta_basic)
- (public_name kimchi_backend.pasta.basic)
+ (public_name kimchi_pasta.basic)
  (flags -warn-error -27)
  (instrumentation
   (backend bisect_ppx))
@@ -17,7 +17,7 @@
   ;; local libraries
   sponge
   pickles_types
-  kimchi_backend.common
+  kimchi_backend_common
   promise
   kimchi_bindings
   kimchi_types

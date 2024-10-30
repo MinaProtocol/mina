@@ -29,11 +29,11 @@ module Account = struct
 
   let create = Mina_base.Account.create
 
-  let balance Mina_base.Account.Poly.{ balance; _ } = balance
+  let balance Mina_base.Account.{ balance; _ } = balance
 
-  let update_balance t bal = { t with Mina_base.Account.Poly.balance = bal }
+  let update_balance t bal = { t with Mina_base.Account.balance = bal }
 
-  let token Mina_base.Account.Poly.{ token_id; _ } = token_id
+  let token Mina_base.Account.{ token_id; _ } = token_id
 end
 
 module Receipt = Mina_base.Receipt
@@ -59,12 +59,12 @@ module Hash = struct
    * important impossible to create an account such that (merge a b = hash_account account) *)
 
   let hash_account account =
-    Md5.digest_string ("0" ^ Format.sprintf !"%{sexp: Account.t}" account)
+    Md5.digest_string (Format.sprintf !"0%{sexp: Account.t}" account)
 
   let merge ~height a b =
     let res =
       Md5.digest_string
-        (sprintf "test_ledger_%d:" height ^ Md5.to_hex a ^ Md5.to_hex b)
+        (sprintf "test_ledger_%d:%s%s" height (Md5.to_hex a) (Md5.to_hex b))
     in
     res
 

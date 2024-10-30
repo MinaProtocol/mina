@@ -1,4 +1,5 @@
 use crate::arkworks::CamlFp;
+use crate::WithLagrangeBasis;
 use crate::{gate_vector::fp::CamlPastaFpPlonkGateVectorPtr, srs::fp::CamlFpSrs};
 use ark_poly::EvaluationDomain;
 use kimchi::circuits::lookup::runtime_tables::caml::CamlRuntimeTableCfg;
@@ -79,21 +80,14 @@ pub fn caml_pasta_fp_plonk_index_create(
         })
         .build()
     {
-        Err(e) => {
-            return Err(e.into())
-        }
+        Err(e) => return Err(e.into()),
         Ok(cs) => cs,
     };
 
     // endo
     let (endo_q, _endo_r) = poly_commitment::srs::endos::<Pallas>();
 
-    // Unsafe if we are in a multi-core ocaml
-    {
-        let ptr: &mut poly_commitment::srs::SRS<Vesta> =
-            unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-        ptr.add_lagrange_basis(cs.domain.d1);
-    }
+    srs.0.with_lagrange_basis(cs.domain.d1);
 
     // create index
     let mut index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.clone());

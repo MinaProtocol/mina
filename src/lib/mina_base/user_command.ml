@@ -228,14 +228,11 @@ let fee : t -> Currency.Fee.t = function
   | Zkapp_command p ->
       Zkapp_command.fee p
 
-(* for filtering *)
-let minimum_fee = Currency.Fee.minimum_user_command_fee
+let has_insufficient_fee ~minimum_fee t = Currency.Fee.(fee t < minimum_fee)
 
-let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
-
-let is_disabled = function
+let is_disabled ~(compile_config : Mina_compile_config.t) = function
   | Zkapp_command _ ->
-      Mina_compile_config.zkapps_disabled
+      compile_config.zkapps_disabled
   | _ ->
       false
 
@@ -396,12 +393,23 @@ let is_incompatible_version = function
   | Zkapp_command p ->
       Zkapp_command.is_incompatible_version p
 
+let has_invalid_call_forest : t -> bool = function
+  | Signed_command _ ->
+      false
+  | Zkapp_command cmd ->
+      List.exists cmd.account_updates ~f:(fun call_forest ->
+          let root_may_use_token =
+            call_forest.elt.account_update.body.may_use_token
+          in
+          not (Account_update.May_use_token.equal root_may_use_token No) )
+
 module Well_formedness_error = struct
   (* syntactically-evident errors such that a user command can never succeed *)
   type t =
     | Insufficient_fee
     | Zero_vesting_period
     | Zkapp_too_big of (Error.t[@to_yojson Error_json.error_to_yojson])
+    | Zkapp_invalid_call_forest
     | Transaction_type_disabled
     | Incompatible_version
   [@@deriving compare, to_yojson, sexp]
@@ -413,20 +421,27 @@ module Well_formedness_error = struct
         "Zero vesting period"
     | Zkapp_too_big err ->
         sprintf "Zkapp too big (%s)" (Error.to_string_hum err)
+    | Zkapp_invalid_call_forest ->
+        "Zkapp has an invalid call forest (root account updates may not use \
+         tokens)"
     | Incompatible_version ->
         "Set verification-key permission is updated to an incompatible version"
     | Transaction_type_disabled ->
         "Transaction type disabled"
 end
 
-let check_well_formedness ~genesis_constants t :
+let check_well_formedness ~(genesis_constants : Genesis_constants.t)
+    ~(compile_config : Mina_compile_config.t) t :
     (unit, Well_formedness_error.t list) result =
   let preds =
     let open Well_formedness_error in
-    [ (has_insufficient_fee, Insufficient_fee)
+    [ ( has_insufficient_fee
+          ~minimum_fee:genesis_constants.minimum_user_command_fee
+      , Insufficient_fee )
     ; (has_zero_vesting_period, Zero_vesting_period)
     ; (is_incompatible_version, Incompatible_version)
-    ; (is_disabled, Transaction_type_disabled)
+    ; (is_disabled ~compile_config, Transaction_type_disabled)
+    ; (has_invalid_call_forest, Zkapp_invalid_call_forest)
     ]
   in
   let errs0 =

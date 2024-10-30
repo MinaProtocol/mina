@@ -2,19 +2,13 @@
 --
 -- Goal of the pipeline can be either quick feedback for CI changes
 -- or Nightly run which supposed to be run only on stable changes.
+-- PullRequest - filter elligible jobs based on tags and then apply triage based on changed made in PR
+-- Stable - filter only ellligigble jobs and do not perform triage
 
-let Prelude = ../External/Prelude.dhall
+let Mode = < PullRequest | Stable >
 
-let Mode = < PullRequest | Stable  >
+let capitalName =
+          \(pipelineMode : Mode)
+      ->  merge { PullRequest = "PullRequest", Stable = "Stable" } pipelineMode
 
-let capitalName = \(pipelineMode : Mode) ->
-  merge {
-    PullRequest = "PullRequest"
-    , Stable = "Stable"
-  } pipelineMode
-
-in
-{ 
-    Type = Mode,
-    capitalName = capitalName
-}
+in  { Type = Mode, capitalName = capitalName }

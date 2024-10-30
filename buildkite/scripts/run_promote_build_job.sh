@@ -18,7 +18,7 @@
 #          - "NETWORK=Devnet"
 #          - "FROM_VERSION=3.0.0devnet-tooling-dkijania-hardfork-package-gen-in-nightly-b37f50e"
 #          - "NEW_VERSION=3.0.0fake-ddb6fc4"
-#          - "CODENAMES=Focal,Buster,Bullseye"
+#          - "CODENAMES=Focal,Bullseye"
 #          - "FROM_CHANNEL=Unstable"
 #          - "TO_CHANNEL=Experimental"
 #        image: codaprotocol/ci-toolchain-base:v3
@@ -41,7 +41,7 @@ function usage() {
   fi
   echo "  DEBIANS                     The comma delimitered debian names. For example: 'Daemon,Archive' "
   echo "  DOCKERS                     The comma delimitered docker names. For example: 'Daemon,Archive' "
-  echo "  CODENAMES                   The Debian codenames (Bullseye, Buster etc.)"
+  echo "  CODENAMES                   The Debian codenames (Bullseye, Focal etc.)"
   echo "  FROM_VERSION                The Source Docker or Debian version "
   echo "  NEW_VERSION                 The new Debian version or new Docker tag"
   echo "  REMOVE_PROFILE_FROM_NAME    Should we remove profile suffix from debian name"
@@ -61,7 +61,7 @@ DHALL_DEBIANS="([] : List $DEBIAN_DHALL_DEF.Type)"
 if [[ -n "$DEBIANS" ]]; then 
     if [[ -z "$CODENAMES" ]]; then usage "Codenames is not set!"; exit 1; fi;
     if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
-    if [[ -z "$NETWORK" ]]; then NETWORK="Berkeley"; fi;
+    if [[ -z "$NETWORK" ]]; then NETWORK="Devnet"; fi;
     if [[ -z "$REMOVE_PROFILE_FROM_NAME" ]]; then REMOVE_PROFILE_FROM_NAME=0; fi;
     if [[ -z "$PUBLISH" ]]; then PUBLISH=0; fi;
     if [[ -z "$FROM_CHANNEL" ]]; then FROM_CHANNEL="Unstable"; fi;
@@ -112,4 +112,4 @@ if [[ "${REMOVE_PROFILE_FROM_NAME}" -eq 0 ]]; then
 else 
   REMOVE_PROFILE_FROM_NAME="True"
 fi 
-echo $PROMOTE_PACKAGE_DHALL_DEF'.promote_artifacts '"$DHALL_DEBIANS"' '"$DHALL_DOCKERS"' "'"${FROM_VERSION}"'" "'"${NEW_VERSION}"'" "amd64" '$PROFILES_DHALL_DEF'.Type.'"${PROFILE}"' '$NETWORK_DHALL_DEF'.Type.'"${NETWORK}"' '"${DHALL_CODENAMES}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${FROM_CHANNEL}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${TO_CHANNEL}"' "'"${TAG}"'" '${REMOVE_PROFILE_FROM_NAME}' '${DHALL_PUBLISH}' ' | dhall-to-yaml --quoted 
+echo $PROMOTE_PACKAGE_DHALL_DEF'.promote_artifacts '"$DHALL_DEBIANS"' '"$DHALL_DOCKERS"' "'"${FROM_VERSION}"'" "'"${NEW_VERSION}"'" "amd64" '$PROFILES_DHALL_DEF'.Type.'"${PROFILE}"' '$NETWORK_DHALL_DEF'.Type.'"${NETWORK}"' '"${DHALL_CODENAMES}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${FROM_CHANNEL}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${TO_CHANNEL}"' "'"${NEW_VERSION}"'" '${REMOVE_PROFILE_FROM_NAME}' '${DHALL_PUBLISH}' ' | dhall-to-yaml --quoted 

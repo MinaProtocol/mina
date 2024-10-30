@@ -34,7 +34,7 @@ else
   debs=(${DEBS//,/ })
   for i in "${debs[@]}"; do
     case $i in
-      mina-berkeley|mina-devnet|mina-mainnet|mina-berkeley-lightnet)
+      mina-devnet|mina-mainnet|mina-devnet-lightnet)
         # Downaload mina-logproc too
         source ./buildkite/scripts/download-artifact-from-cache.sh "mina-logproc*" $MINA_DEB_CODENAME/_build "" $LOCAL_DEB_FOLDER
       ;;
@@ -46,6 +46,11 @@ else
     source ./buildkite/scripts/download-artifact-from-cache.sh "${i}_*" $MINA_DEB_CODENAME/_build "" $LOCAL_DEB_FOLDER
   done
 fi
+
+debs_with_version=()
+for i in "${debs[@]}"; do
+   debs_with_version+=("${i}=${MINA_DEB_VERSION}")
+done
 
 # Install aptly
 $SUDO apt-get update 
@@ -59,7 +64,8 @@ echo "Installing mina packages: $DEBS"
 echo "deb [trusted=yes] http://localhost:8080 $MINA_DEB_CODENAME unstable" | $SUDO tee /etc/apt/sources.list.d/mina.list
 
 $SUDO apt-get update --yes
-$SUDO apt-get install --yes --allow-downgrades "${debs[@]}"
+$SUDO apt-get remove --yes "${debs[@]}"
+$SUDO apt-get install --yes --allow-downgrades "${debs_with_version[@]}"
 
 
 

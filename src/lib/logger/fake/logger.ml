@@ -127,32 +127,28 @@ end
 module Consumer_registry = struct
   type id = string
 
-  let register ~id:_ ~processor:_ ~transport:_ = not_implemented ()
+  let register ?commit_id:_ ~id:_ ~processor:_ ~transport:_ = not_implemented
 end
 
-[%%versioned
-module Stable = struct
-  module V1 = struct
-    type t =
-      { null : bool
-      ; metadata : Metadata.Stable.V1.t
-      ; id : Bounded_types.String.Stable.V1.t
-      }
+type t = Metadata.Stable.Latest.t [@@deriving bin_io_unversioned]
 
-    let to_latest = Fn.id
-  end
-end]
+let metadata = Fn.id
 
-let metadata t = t.metadata
+type itn_logger_config = unit
 
-let create ?metadata:_ ?(id = "default") () =
-  { null = false; metadata = Metadata.empty; id }
+let make_itn_logger_config ~rpc_handshake_timeout:_ ~rpc_heartbeat_timeout:_
+    ~rpc_heartbeat_send_every:_ =
+  ()
 
-let null () = { null = true; metadata = Metadata.empty; id = "default" }
+let create ?metadata:_ ?id:_ ?itn_config:_ () = Metadata.empty
+
+let with_itn _ = Fn.id
+
+let null () = Metadata.empty
 
 let extend t _ = t
 
-let change_id { null; metadata; id = _ } ~id = { null; metadata; id }
+let change_id t ~id:_ = t
 
 let raw _ _ = not_implemented ()
 

@@ -21,6 +21,17 @@
   inputs.opam-nix.inputs.nixpkgs.follows = "nixpkgs";
   inputs.opam-nix.inputs.opam-repository.follows = "opam-repository";
 
+  inputs.dune-nix.url = "github:o1-labs/dune-nix";
+  inputs.dune-nix.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.dune-nix.inputs.flake-utils.follows = "utils";
+
+  inputs.describe-dune.url = "github:o1-labs/describe-dune";
+  inputs.describe-dune.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.describe-dune.inputs.flake-utils.follows = "utils";
+
+  inputs.o1-opam-repository.url = "github:o1-labs/opam-repository";
+  inputs.o1-opam-repository.flake = false;
+
   inputs.opam-repository.url = "github:ocaml/opam-repository";
   inputs.opam-repository.flake = false;
 
@@ -57,22 +68,22 @@
         ref = r: "[34;1m${r}[31;1m";
         command = c: "[37;1m${c}[31;1m";
       in lib.warnIf (!builtins.all (x: x)
-        (map (x: builtins.pathExists ./${x} && builtins.readDir ./${x} != { }) submodules)) ''
-          Some submodules are missing, you may get errors. Consider one of the following:
-          - run ${command "nix/pin.sh"} and use "${ref "mina"}" flake ref, e.g. ${command "nix develop mina"} or ${command "nix build mina"};
-          - use "${ref "git+file://$PWD?submodules=1"}";
-          - use "${ref "git+https://github.com/minaprotocol/mina?submodules=1"}";
-          - use non-flake commands like ${command "nix-build"} and ${command "nix-shell"}.
-        '';
-      # Only get the ocaml stuff, to reduce the amount of unnecessary rebuilds
-      ocaml-src =
-        with inputs.nix-filter.lib;
-          filter {
-            root = ./.;
-            include =
-              [ (inDirectory "src") "dune" "dune-project"
-                "./graphql_schema.json" "opam.export" ];
-          };
+        (map (x: builtins.pathExists ./${x} && builtins.readDir ./${x} != { })
+          submodules)) ''
+            Some submodules are missing, you may get errors. Consider one of the following:
+            - run ${command "nix/pin.sh"} and use "${
+              ref "mina"
+            }" flake ref, e.g. ${command "nix develop mina"} or ${
+              command "nix build mina"
+            };
+            - use "${ref "git+file://$PWD?submodules=1"}";
+            - use "${
+              ref "git+https://github.com/minaprotocol/mina?submodules=1"
+            }";
+            - use non-flake commands like ${command "nix-build"} and ${
+              command "nix-shell"
+            }.
+          '';
     in {
       overlays = {
         misc = import ./nix/misc.nix;
@@ -80,10 +91,8 @@
         go = import ./nix/go.nix;
         javascript = import ./nix/javascript.nix;
         ocaml = pkgs: prev: {
-          ocamlPackages_mina = requireSubmodules (import ./nix/ocaml.nix {
-            inherit inputs pkgs;
-            src = ocaml-src;
-          });
+          ocamlPackages_mina =
+            requireSubmodules (import ./nix/ocaml.nix { inherit inputs pkgs; });
         };
       };
 
@@ -223,14 +232,13 @@
               label = "Run ${test} integration test";
               depends_on = [ "push_mina-image-full" ]
                 ++ lib.optional with-archive "push_mina-archive-image-full";
-              "if" = ''build.pull_request.labels includes "nix-integration-tests"'';
+              "if" =
+                ''build.pull_request.labels includes "nix-integration-tests"'';
               retry = {
-                automatic = [
-                  {
-                    exit_status = "*";
-                    limit = 3;
-                  }
-                ];
+                automatic = [{
+                  exit_status = "*";
+                  limit = 3;
+                }];
               };
             };
         in {
@@ -261,10 +269,12 @@
         };
     } // utils.lib.eachDefaultSystem (system:
       let
-	rocksdbOverlay = pkgs: prev:
-          if prev.stdenv.isDarwin then
-            { rocksdb-mina = pkgs.rocksdb; }
-          else { rocksdb-mina = pkgs.rocksdb511; };
+        rocksdbOverlay = pkgs: prev:
+          if prev.stdenv.isDarwin then {
+            rocksdb-mina = pkgs.rocksdb;
+          } else {
+            rocksdb-mina = pkgs.rocksdb511;
+          };
 
         # nixpkgs with all relevant overlays applied
         pkgs = nixpkgs.legacyPackages.${system}.extend
@@ -279,7 +289,7 @@
                   nodejs = pkgs.nodejs-16_x;
                 };
             })
-          ] ++ builtins.attrValues self.overlays ++ [ rocksdbOverlay ] ));
+          ] ++ builtins.attrValues self.overlays ++ [ rocksdbOverlay ]));
 
         checks = import ./nix/checks.nix inputs pkgs;
 
@@ -302,14 +312,23 @@
         # Main user-facing binaries.
         packages = rec {
           inherit (ocamlPackages)
-            mina devnet mainnet mina_tests mina-ocaml-format mina_client_sdk test_executive with-instrumentation;
+            mina devnet mainnet mina_tests mina-ocaml-format mina_client_sdk
+            test_executive with-instrumentation;
+          # Granular nix
+          inherit (ocamlPackages)
+            src exes all all-tested pkgs all-exes files tested info
+            dune-description base-libs external-libs;
+          # ^ TODO move elsewhere, external-libs isn't a package
+          # TODO consider the following: inherit (ocamlPackages) default;
+          granular = ocamlPackages.default;
+          default = ocamlPackages.mina;
           inherit (pkgs)
-            libp2p_helper kimchi_bindings_stubs snarky_js leaderboard
-            validation trace-tool zkapp-cli;
+            libp2p_helper kimchi_bindings_stubs snarky_js validation
+            trace-tool zkapp-cli;
           inherit (dockerImages)
-            mina-image-slim mina-image-full mina-archive-image-full mina-image-instr-full; 
+            mina-image-slim mina-image-full mina-archive-image-full
+            mina-image-instr-full;
           mina-deb = debianPackages.mina;
-          default = mina;
         };
 
         # Pure dev shell, from which you can build Mina yourself manually, or hack on it.
@@ -387,5 +406,7 @@
         });
 
         inherit checks;
+
+        formatter = pkgs.nixfmt;
       });
 }

@@ -1,28 +1,40 @@
 let S = ../../Lib/SelectFiles.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
+
 let Pipeline = ../../Pipeline/Dsl.dhall
+
 let PipelineTag = ../../Pipeline/Tag.dhall
 
 let CheckGraphQLSchema = ../../Command/CheckGraphQLSchema.dhall
+
 let DebianVersions = ../../Constants/DebianVersions.dhall
+
 let Profiles = ../../Constants/Profiles.dhall
 
-let dependsOn = DebianVersions.dependsOn DebianVersions.DebVersion.Bullseye Profiles.Type.Standard
+let Network = ../../Constants/Network.dhall
 
-in Pipeline.build Pipeline.Config::{
-  spec =
-    JobSpec::{
-    dirtyWhen = [
-      S.strictlyStart (S.contains "src"),
-      S.exactly "buildkite/scripts/check-graphql-schema" "sh",
-      S.strictly (S.contains "Makefile")
-    ],
-    path = "Test",
-    name = "CheckGraphQLSchema", 
-    tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
-  },
-  steps = [
-    CheckGraphQLSchema.step dependsOn
-  ]
-}
+let dependsOn =
+      DebianVersions.dependsOn
+        DebianVersions.DebVersion.Bullseye
+        Network.Type.Devnet
+        Profiles.Type.Standard
+
+in  Pipeline.build
+      Pipeline.Config::{
+      , spec = JobSpec::{
+        , dirtyWhen =
+          [ S.strictlyStart (S.contains "src")
+          , S.exactly "buildkite/scripts/check-graphql-schema" "sh"
+          , S.strictly (S.contains "Makefile")
+          ]
+        , path = "Test"
+        , name = "CheckGraphQLSchema"
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
+        }
+      , steps = [ CheckGraphQLSchema.step dependsOn ]
+      }

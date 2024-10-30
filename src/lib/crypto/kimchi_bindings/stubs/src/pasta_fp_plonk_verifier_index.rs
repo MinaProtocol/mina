@@ -4,7 +4,8 @@ use crate::plonk_verifier_index::{
     CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
 };
 use crate::srs::fp::CamlFpSrs;
-use ark_ec::AffineCurve;
+use crate::WithLagrangeBasis;
+use ark_ec::AffineRepr;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use kimchi::circuits::constraints::FeatureFlags;
@@ -220,11 +221,11 @@ pub fn caml_pasta_fp_plonk_verifier_index_write(
 pub fn caml_pasta_fp_plonk_verifier_index_create(
     index: CamlPastaFpPlonkIndexPtr,
 ) -> CamlPastaFpPlonkVerifierIndex {
-    {
-        let ptr: &mut poly_commitment::srs::SRS<Vesta> =
-            unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
-        ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
-    }
+    index
+        .as_ref()
+        .0
+        .srs
+        .with_lagrange_basis(index.as_ref().0.cs.domain.d1);
     let verifier_index = index.as_ref().0.verifier_index();
     verifier_index.into()
 }
@@ -241,7 +242,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_shifts(log2_size: ocaml::Int) -> Vec<C
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierIndex {
     fn comm() -> CamlPolyComm<CamlGVesta> {
-        let g: CamlGVesta = Vesta::prime_subgroup_generator().into();
+        let g: CamlGVesta = Vesta::generator().into();
         CamlPolyComm {
             shifted: None,
             unshifted: vec![g, g, g],

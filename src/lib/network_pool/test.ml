@@ -3,9 +3,6 @@ open Core_kernel
 open Pipe_lib
 open Network_peer
 
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
-
 let%test_module "network pool test" =
   ( module struct
     let trust_system = Mocks.trust_system
@@ -22,12 +19,15 @@ let%test_module "network pool test" =
 
     let time_controller = Block_time.Controller.basic ~logger
 
+    let block_window_duration =
+      Mina_compile_config.For_unit_tests.t.block_window_duration
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            () )
+            ~commit_id:"not specified for unit tests" () )
 
     module Mock_snark_pool =
       Snark_pool.Make (Mocks.Base_ledger) (Mocks.Staged_ledger)
@@ -61,6 +61,7 @@ let%test_module "network pool test" =
               ~consensus_constants ~time_controller
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
+              ~block_window_duration
           in
           let%bind () =
             Mocks.Transition_frontier.refer_statements tf [ work ]
@@ -115,6 +116,7 @@ let%test_module "network pool test" =
             ~consensus_constants ~time_controller
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
+            ~block_window_duration
         in
         List.map (List.take works per_reader) ~f:create_work
         |> List.map ~f:(fun work ->

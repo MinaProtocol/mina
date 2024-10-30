@@ -224,6 +224,7 @@ module type Network_pool_base_intf = sig
     -> logger:Logger.t
     -> log_gossip_heard:bool
     -> on_remote_push:(unit -> unit Deferred.t)
+    -> block_window_duration:Time.Span.t
     -> t * Remote_sink.t * Local_sink.t
 
   val of_resource_pool_and_diffs :
@@ -233,6 +234,7 @@ module type Network_pool_base_intf = sig
     -> tf_diffs:transition_frontier_diff Strict_pipe.Reader.t
     -> log_gossip_heard:bool
     -> on_remote_push:(unit -> unit Deferred.t)
+    -> block_window_duration:Time.Span.t
     -> t * Remote_sink.t * Local_sink.t
 
   val resource_pool : t -> resource_pool
@@ -382,6 +384,7 @@ module type Transaction_resource_pool_intf = sig
     -> verifier:Verifier.t
     -> genesis_constants:Genesis_constants.t
     -> slot_tx_end:Mina_numbers.Global_slot_since_hard_fork.t option
+    -> compile_config:Mina_compile_config.t
     -> Config.t
 
   val member : t -> Transaction_hash.User_command_with_valid_signature.t -> bool

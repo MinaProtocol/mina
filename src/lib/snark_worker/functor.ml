@@ -118,22 +118,17 @@ module Make (Inputs : Intf.Inputs_intf) :
              ; prover = public_key
              } )
 
-  let dispatch rpc shutdown_on_disconnect query address =
+  let dispatch ~(compile_config : Mina_compile_config.t) rpc
+      shutdown_on_disconnect query address =
     let%map res =
       Rpc.Connection.with_client
-        ~handshake_timeout:
-          (Time.Span.of_sec Mina_compile_config.rpc_handshake_timeout_sec)
+        ~handshake_timeout:compile_config.rpc_handshake_timeout
         ~heartbeat_config:
           (Rpc.Connection.Heartbeat_config.create
-             ~timeout:
-               (Time_ns.Span.of_sec
-                  Mina_compile_config.rpc_heartbeat_timeout_sec )
-             ~send_every:
-               (Time_ns.Span.of_sec
-                  Mina_compile_config.rpc_heartbeat_send_every_sec )
-             () )
-        (Tcp.Where_to_connect.of_host_and_port address)
-        (fun conn -> Rpc.Rpc.dispatch rpc conn query)
+             ~timeout:compile_config.rpc_heartbeat_timeout
+             ~send_every:compile_config.rpc_heartbeat_send_every () )
+        (Tcp.Where_to_connect.of_host_and_port address) (fun conn ->
+          Rpc.Rpc.dispatch rpc conn query )
     in
     match res with
     | Error exn ->
@@ -226,11 +221,8 @@ module Make (Inputs : Intf.Inputs_intf) :
   let main
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
         with type Work.ledger_proof = Inputs.Ledger_proof.t ) ~logger
-      ~proof_level daemon_address shutdown_on_disconnect =
-    let constraint_constants =
-      (* TODO: Make this configurable. *)
-      Genesis_constants.Constraint_constants.compiled
-    in
+      ~proof_level ~constraint_constants ~compile_config daemon_address
+      shutdown_on_disconnect =
     let%bind state =
       Worker_state.create ~constraint_constants ~proof_level ()
     in
@@ -272,8 +264,8 @@ module Make (Inputs : Intf.Inputs_intf) :
         !"Snark worker using daemon $addr"
         ~metadata:[ ("addr", `String (Host_and_port.to_string daemon_address)) ] ;
       match%bind
-        dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect ()
-          daemon_address
+        dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect
+          ~compile_config () daemon_address
       with
       | Error e ->
           log_and_retry "getting work" e (retry_pause 10.) go
@@ -305,7 +297,8 @@ module Make (Inputs : Intf.Inputs_intf) :
               let%bind () =
                 match%map
                   dispatch Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
-                    shutdown_on_disconnect (e, work, public_key) daemon_address
+                    ~compile_config shutdown_on_disconnect (e, work, public_key)
+                    daemon_address
                 with
                 | Error e ->
                     [%log error]
@@ -329,7 +322,7 @@ module Make (Inputs : Intf.Inputs_intf) :
                   ] ;
               let rec submit_work () =
                 match%bind
-                  dispatch Rpcs_versioned.Submit_work.Latest.rpc
+                  dispatch ~compile_config Rpcs_versioned.Submit_work.Latest.rpc
                     shutdown_on_disconnect result daemon_address
                 with
                 | Error e ->
@@ -342,7 +335,7 @@ module Make (Inputs : Intf.Inputs_intf) :
     in
     go ()
 
-  let command_from_rpcs
+  let command_from_rpcs ~commit_id
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
         with type Work.ledger_proof = Inputs.Ledger_proof.t ) =
     Command.async ~summary:"Snark worker"
@@ -351,7 +344,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         flag "--daemon-address" ~aliases:[ "daemon-address" ]
           (required (Arg_type.create Host_and_port.of_string))
           ~doc:"HOST-AND-PORT address daemon is listening on"
-      and proof_level =
+      and cli_proof_level =
         flag "--proof-level" ~aliases:[ "proof-level" ]
           (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
           ~doc:"full|check|none"
@@ -361,31 +354,40 @@ module Make (Inputs : Intf.Inputs_intf) :
           (optional bool)
           ~doc:
             "true|false Shutdown when disconnected from daemon (default:true)"
+      and config_file = Cli_lib.Flag.config_files
       and conf_dir = Cli_lib.Flag.conf_dir in
       fun () ->
         let logger =
           Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
         in
+        let%bind.Deferred constraint_constants, proof_level, compile_config =
+          let%map.Deferred config =
+            Runtime_config.Constants.load_constants ?conf_dir ?cli_proof_level
+              ~logger config_file
+          in
+          Runtime_config.Constants.
+            ( constraint_constants config
+            , proof_level config
+            , compile_config config )
+        in
         Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
             let logrotate_max_size = 1024 * 10 in
             let logrotate_num_rotate = 1 in
-            Logger.Consumer_registry.register ~id:Logger.Logger_id.snark_worker
+            Logger.Consumer_registry.register ~commit_id
+              ~id:Logger.Logger_id.snark_worker
               ~processor:(Logger.Processor.raw ())
               ~transport:
                 (Logger_file_system.dumb_logrotate ~directory:conf_dir
                    ~log_filename:"mina-snark-worker.log"
-                   ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate ) ) ;
+                   ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate )
+              () ) ;
         Signal.handle [ Signal.term ] ~f:(fun _signal ->
             [%log info]
               !"Received signal to terminate. Aborting snark worker process" ;
             Core.exit 0 ) ;
-        let proof_level =
-          Option.value ~default:Genesis_constants.Proof_level.compiled
-            proof_level
-        in
         main
           (module Rpcs_versioned)
-          ~logger ~proof_level daemon_port
+          ~logger ~proof_level ~constraint_constants ~compile_config daemon_port
           (Option.value ~default:true shutdown_on_disconnect))
 
   let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect =

@@ -15,6 +15,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val compile_config : Mina_compile_config.t
 end
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -55,6 +57,25 @@ end
     After building the breadcrumb path, [Ledger_catchup] will then send it to
     the [Processor] via writing them to catchup_breadcrumbs_writer. *)
 
+let validate_block ~genesis_state_hash (b, v) =
+  let open Mina_block.Validation in
+  let open Result.Let_syntax in
+  let h = (With_hash.map ~f:Mina_block.header b, v) in
+  validate_genesis_protocol_state ~genesis_state_hash h
+  >>= validate_protocol_versions >>= validate_delta_block_chain
+  >>| Fn.flip with_body (Mina_block.body @@ With_hash.data b)
+
+let validate_proofs_block ~verifier ~genesis_state_hash blocks =
+  let open Mina_block.Validation in
+  let open Deferred.Result.Let_syntax in
+  let f ((b, _), h) = with_body h (Mina_block.body @@ With_hash.data b) in
+  let hs =
+    List.map blocks ~f:(fun (b, v) ->
+        (With_hash.map ~f:Mina_block.header b, v) )
+  in
+  validate_proofs ~verifier ~genesis_state_hash hs
+  >>| List.zip_exn blocks >>| List.map ~f
+
 let verify_transition ~context:(module Context : CONTEXT) ~trust_system
     ~frontier ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
     enveloped_transition =
@@ -68,16 +89,13 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
       transition_with_hash
       |> Mina_block.Validation.skip_time_received_validation
            `This_block_was_not_received_via_gossip
-      |> Mina_block.Validation.validate_genesis_protocol_state
-           ~genesis_state_hash
-      >>= Mina_block.Validation.validate_protocol_versions
-      >>= Mina_block.Validation.validate_delta_block_chain
+      |> validate_block ~genesis_state_hash
     in
     let enveloped_initially_validated_transition =
       Envelope.Incoming.map enveloped_transition
         ~f:(Fn.const initially_validated_transition)
     in
-    Transition_handler.Validator.validate_transition
+    Transition_handler.Validator.validate_transition_is_relevant
       ~context:(module Context)
       ~frontier ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
       enveloped_initially_validated_transition
@@ -493,7 +511,7 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
         |> State_hash.With_state_hashes.state_hash
       in
       match%bind
-        Mina_block.Validation.validate_proofs ~verifier ~genesis_state_hash
+        validate_proofs_block ~verifier ~genesis_state_hash
           (List.map transitions ~f:(fun t ->
                Mina_block.Validation.wrap (Envelope.Incoming.data t) ) )
       with
@@ -529,10 +547,10 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
         ]
       "verification of proofs complete" ;
     let slot_tx_end =
-      Runtime_config.slot_tx_end_or_default precomputed_values.runtime_config
+      Runtime_config.slot_tx_end precomputed_values.runtime_config
     in
     let slot_chain_end =
-      Runtime_config.slot_chain_end_or_default precomputed_values.runtime_config
+      Runtime_config.slot_chain_end precomputed_values.runtime_config
     in
     fold_until (List.rev tvs) ~init:[]
       ~f:(fun acc transition ->
@@ -647,7 +665,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~unprocessed_transition_cache : unit =
   let open Context in
   let hash_tree =
-    match Transition_frontier.catchup_tree frontier with
+    match Transition_frontier.catchup_state frontier with
     | Hash t ->
         t
     | Full _ ->
@@ -880,6 +898,8 @@ let%test_module "Ledger_catchup tests" =
 
     let constraint_constants = precomputed_values.constraint_constants
 
+    let compile_config = Mina_compile_config.For_unit_tests.t
+
     let trust_system = Trust_system.null ()
 
     let time_controller = Block_time.Controller.basic ~logger
@@ -891,7 +911,7 @@ let%test_module "Ledger_catchup tests" =
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            () )
+            ~commit_id:"not specified for unit tests" () )
 
     module Context = struct
       let logger = logger
@@ -901,6 +921,8 @@ let%test_module "Ledger_catchup tests" =
       let constraint_constants = constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let compile_config = compile_config
     end
 
     let downcast_transition transition =
@@ -949,6 +971,7 @@ let%test_module "Ledger_catchup tests" =
       in
       let unprocessed_transition_cache =
         Transition_handler.Unprocessed_transition_cache.create ~logger
+          ~cache_exceptions:true
       in
       run
         ~context:(module Context)
@@ -1024,6 +1047,7 @@ let%test_module "Ledger_catchup tests" =
           in
           gen ~precomputed_values ~verifier ~max_frontier_length
             ~use_super_catchup
+            ~compile_config:Mina_compile_config.For_unit_tests.t
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size
             ])
@@ -1045,6 +1069,7 @@ let%test_module "Ledger_catchup tests" =
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
             ~use_super_catchup
+            ~compile_config:Mina_compile_config.For_unit_tests.t
             [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
         ~f:(fun network ->
           let open Fake_network in
@@ -1060,6 +1085,7 @@ let%test_module "Ledger_catchup tests" =
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
             ~use_super_catchup
+            ~compile_config:Mina_compile_config.For_unit_tests.t
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:(max_frontier_length * 2)
             ])

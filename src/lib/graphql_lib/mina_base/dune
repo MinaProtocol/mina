@@ -18,8 +18,8 @@
    mina_base
    pickles
    pickles.backend
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
  )
  (preprocess (pps ppx_jane ppx_version))
  (instrumentation (backend bisect_ppx))

@@ -1,4 +1,5 @@
 use crate::arkworks::CamlFq;
+use crate::WithLagrangeBasis;
 use crate::{gate_vector::fq::CamlPastaFqPlonkGateVectorPtr, srs::fq::CamlFqSrs};
 use ark_poly::EvaluationDomain;
 use kimchi::circuits::lookup::runtime_tables::caml::CamlRuntimeTableCfg;
@@ -9,7 +10,7 @@ use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::{linearization::expr_linearization, prover_index::ProverIndex};
 use mina_curves::pasta::{Fq, Pallas, PallasParameters, Vesta};
 use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
-use poly_commitment::{evaluation_proof::OpeningProof};
+use poly_commitment::evaluation_proof::OpeningProof;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -78,21 +79,14 @@ pub fn caml_pasta_fq_plonk_index_create(
         })
         .build()
     {
-        Err(e) => {
-            return Err(e.into())
-        }
+        Err(e) => return Err(e.into()),
         Ok(cs) => cs,
     };
 
     // endo
     let (endo_q, _endo_r) = poly_commitment::srs::endos::<Vesta>();
 
-    // Unsafe if we are in a multi-core ocaml
-    {
-        let ptr: &mut poly_commitment::srs::SRS<Pallas> =
-            unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-        ptr.add_lagrange_basis(cs.domain.d1);
-    }
+    srs.0.with_lagrange_basis(cs.domain.d1);
 
     // create index
     let mut index = ProverIndex::<Pallas, OpeningProof<Pallas>>::create(cs, endo_q, srs.clone());

@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 (* Only show stdout for failed inline tests. *)
 open Inline_test_quiet_logs
 open Core_kernel
@@ -434,14 +432,6 @@ module T = struct
       (Ledger.merkle_root ledger)
       pending_coinbase_collection
 
-  [%%if call_logger]
-
-  let hash t =
-    Mina_debug.Call_logger.record_call "Staged_ledger.hash" ;
-    hash t
-
-  [%%endif]
-
   let ledger { ledger; _ } = ledger
 
   let create_exn ~constraint_constants ~ledger : t =
@@ -571,8 +561,9 @@ module T = struct
       ; init_stack = new_init_stack
       } )
 
-  let apply_single_transaction_second_pass ~connecting_ledger ledger
-      state_and_body_hash ~global_slot (pre_stmt : Pre_statement.t) =
+  let apply_single_transaction_second_pass ~constraint_constants
+      ~connecting_ledger ledger state_and_body_hash ~global_slot
+      (pre_stmt : Pre_statement.t) =
     let open Result.Let_syntax in
     let empty_local_state = Mina_state.Local_state.empty () in
     let second_pass_ledger_source_hash = Ledger.merkle_root ledger in
@@ -589,19 +580,17 @@ module T = struct
     let second_pass_ledger_target_hash = Ledger.merkle_root ledger in
     let%bind supply_increase =
       to_staged_ledger_or_error
-        (Ledger.Transaction_applied.supply_increase applied_txn)
+        (Mina_transaction_logic.Transaction_applied.supply_increase
+           ~constraint_constants applied_txn )
     in
     let%map () =
-      let actual_status =
-        Ledger.Transaction_applied.transaction_status applied_txn
-      in
+      let actual_status = Ledger.status_of_applied applied_txn in
       if Transaction_status.equal pre_stmt.expected_status actual_status then
         return ()
       else
         let txn_with_expected_status =
           { With_status.data =
-              With_status.data
-                (Ledger.Transaction_applied.transaction applied_txn)
+              With_status.data (Ledger.transaction_of_applied applied_txn)
           ; status = pre_stmt.expected_status
           }
         in
@@ -664,14 +653,14 @@ module T = struct
     in
     (List.rev res_rev, pending_coinbase_stack_state.pc.target)
 
-  let apply_transactions_second_pass ~yield ~global_slot ledger
-      state_and_body_hash pre_stmts =
+  let apply_transactions_second_pass ~constraint_constants ~yield ~global_slot
+      ledger state_and_body_hash pre_stmts =
     let open Deferred.Result.Let_syntax in
     let connecting_ledger = Ledger.merkle_root ledger in
     Mina_stdlib.Deferred.Result.List.map pre_stmts ~f:(fun pre_stmt ->
         let%bind result =
-          apply_single_transaction_second_pass ~connecting_ledger ~global_slot
-            ledger state_and_body_hash pre_stmt
+          apply_single_transaction_second_pass ~constraint_constants
+            ~connecting_ledger ~global_slot ledger state_and_body_hash pre_stmt
           |> Deferred.return
         in
         let%map () = yield () in
@@ -712,8 +701,8 @@ module T = struct
     in
     let first_pass_ledger_end = Ledger.merkle_root ledger in
     let%map txns_with_witnesses =
-      apply_transactions_second_pass ~yield ~global_slot ledger
-        state_and_body_hash (pre_stmts1 @ pre_stmts2)
+      apply_transactions_second_pass ~constraint_constants ~yield ~global_slot
+        ledger state_and_body_hash (pre_stmts1 @ pre_stmts2)
     in
     (txns_with_witnesses, updated_stack1, updated_stack2, first_pass_ledger_end)
 
@@ -797,9 +786,7 @@ module T = struct
       List.fold_right ~init:(Ok []) data
         ~f:(fun (d : Scan_state.Transaction_with_witness.t) acc ->
           let%map.Or_error acc = acc in
-          let t =
-            d.transaction_with_info |> Ledger.Transaction_applied.transaction
-          in
+          let t = d.transaction_with_info |> Ledger.transaction_of_applied in
           t :: acc )
     in
     let total_fee_excess txns =
@@ -828,8 +815,9 @@ module T = struct
       ~f:(fun _ -> check (List.drop data (fst partitions.first)) partitions)
       partitions.second
 
-  let update_coinbase_stack_and_get_data ~logger ~constraint_constants
-      ~global_slot scan_state ledger pending_coinbase_collection transactions
+  let update_coinbase_stack_and_get_data_impl ~logger ~constraint_constants
+      ~global_slot ~first_partition_slots:slots ~no_second_partition
+      ~is_new_stack ledger pending_coinbase_collection transactions
       current_state_view state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let coinbase_exists txns =
@@ -842,101 +830,104 @@ module T = struct
               Continue acc )
         ~finish:Fn.id
     in
+    if no_second_partition then (
+      (*Single partition:
+        1.Check if a new stack is required and get a working stack [working_stack]
+        2.create data for enqueuing onto the scan state *)
+      let%bind working_stack =
+        working_stack pending_coinbase_collection ~is_new_stack
+        |> Deferred.return
+      in
+      [%log internal] "Update_ledger_and_get_statements"
+        ~metadata:[ ("partition", `String "single") ] ;
+      let%map data, updated_stack, _, first_pass_ledger_end =
+        update_ledger_and_get_statements ~constraint_constants ~global_slot
+          ledger working_stack (transactions, None) current_state_view
+          state_and_body_hash
+      in
+      [%log internal] "Update_ledger_and_get_statements_done" ;
+      [%log internal] "Update_coinbase_stack_done"
+        ~metadata:
+          [ ("is_new_stack", `Bool is_new_stack)
+          ; ("transactions_len", `Int (List.length transactions))
+          ; ("data_len", `Int (List.length data))
+          ] ;
+      ( is_new_stack
+      , data
+      , Pending_coinbase.Update.Action.Update_one
+      , `Update_one updated_stack
+      , `First_pass_ledger_end first_pass_ledger_end ) )
+    else
+      (*Two partition:
+        Assumption: Only one of the partition will have coinbase transaction(s)in it.
+        1. Get the latest stack for coinbase in the first set of transactions
+        2. get the first set of scan_state data[data1]
+        3. get a new stack for the second partion because the second set of transactions would start from the begining of the next tree in the scan_state
+        4. Initialize the new stack with the state from the first stack
+        5. get the second set of scan_state data[data2]*)
+      let txns_for_partition1 = List.take transactions slots in
+      let coinbase_in_first_partition = coinbase_exists txns_for_partition1 in
+      let%bind working_stack1 =
+        working_stack pending_coinbase_collection ~is_new_stack:false
+        |> Deferred.return
+      in
+      let txns_for_partition2 = List.drop transactions slots in
+      [%log internal] "Update_ledger_and_get_statements"
+        ~metadata:[ ("partition", `String "both") ] ;
+      let%map data, updated_stack1, updated_stack2, first_pass_ledger_end =
+        update_ledger_and_get_statements ~constraint_constants ~global_slot
+          ledger working_stack1
+          (txns_for_partition1, Some txns_for_partition2)
+          current_state_view state_and_body_hash
+      in
+      [%log internal] "Update_ledger_and_get_statements_done" ;
+      let second_has_data = List.length txns_for_partition2 > 0 in
+      let pending_coinbase_action, stack_update =
+        match (coinbase_in_first_partition, second_has_data) with
+        | true, true ->
+            ( Pending_coinbase.Update.Action.Update_two_coinbase_in_first
+            , `Update_two (updated_stack1, updated_stack2) )
+        (*updated_stack2 does not have coinbase and but has the state from the previous stack*)
+        | true, false ->
+            (*updated_stack1 has some new coinbase but parition 2 has no
+              data and so we have only one stack to update*)
+            (Update_one, `Update_one updated_stack1)
+        | false, true ->
+            (*updated_stack1 just has the new state. [updated stack2] might have coinbase, definitely has some
+              data and therefore will have a non-dummy state.*)
+            ( Update_two_coinbase_in_second
+            , `Update_two (updated_stack1, updated_stack2) )
+        | false, false ->
+            (* a diff consists of only non-coinbase transactions. This is currently not possible because a diff will have a coinbase at the very least, so don't update anything?*)
+            (Update_none, `Update_none)
+      in
+      [%log internal] "Update_coinbase_stack_done"
+        ~metadata:
+          [ ("is_new_stack", `Bool false)
+          ; ("coinbase_in_first_partition", `Bool coinbase_in_first_partition)
+          ; ("second_has_data", `Bool second_has_data)
+          ; ("txns_for_partition1_len", `Int (List.length txns_for_partition1))
+          ; ("txns_for_partition2_len", `Int (List.length txns_for_partition2))
+          ] ;
+      ( false
+      , data
+      , pending_coinbase_action
+      , stack_update
+      , `First_pass_ledger_end first_pass_ledger_end )
+
+  let update_coinbase_stack_and_get_data ~logger ~constraint_constants
+      ~global_slot scan_state ledger pending_coinbase_collection transactions
+      current_state_view state_and_body_hash =
     let { Scan_state.Space_partition.first = slots, _; second } =
       Scan_state.partition_if_overflowing scan_state
     in
-    if not @@ List.is_empty transactions then (
-      match second with
-      | None ->
-          (*Single partition:
-            1.Check if a new stack is required and get a working stack [working_stack]
-            2.create data for enqueuing onto the scan state *)
-          let is_new_stack = Scan_state.next_on_new_tree scan_state in
-          let%bind working_stack =
-            working_stack pending_coinbase_collection ~is_new_stack
-            |> Deferred.return
-          in
-          [%log internal] "Update_ledger_and_get_statements"
-            ~metadata:[ ("partition", `String "single") ] ;
-          let%map data, updated_stack, _, first_pass_ledger_end =
-            update_ledger_and_get_statements ~constraint_constants ~global_slot
-              ledger working_stack (transactions, None) current_state_view
-              state_and_body_hash
-          in
-          [%log internal] "Update_ledger_and_get_statements_done" ;
-          [%log internal] "Update_coinbase_stack_done"
-            ~metadata:
-              [ ("is_new_stack", `Bool is_new_stack)
-              ; ("transactions_len", `Int (List.length transactions))
-              ; ("data_len", `Int (List.length data))
-              ] ;
-          ( is_new_stack
-          , data
-          , Pending_coinbase.Update.Action.Update_one
-          , `Update_one updated_stack
-          , `First_pass_ledger_end first_pass_ledger_end )
-      | Some _ ->
-          (*Two partition:
-            Assumption: Only one of the partition will have coinbase transaction(s)in it.
-            1. Get the latest stack for coinbase in the first set of transactions
-            2. get the first set of scan_state data[data1]
-            3. get a new stack for the second partion because the second set of transactions would start from the begining of the next tree in the scan_state
-            4. Initialize the new stack with the state from the first stack
-            5. get the second set of scan_state data[data2]*)
-          let txns_for_partition1 = List.take transactions slots in
-          let coinbase_in_first_partition =
-            coinbase_exists txns_for_partition1
-          in
-          let%bind working_stack1 =
-            working_stack pending_coinbase_collection ~is_new_stack:false
-            |> Deferred.return
-          in
-          let txns_for_partition2 = List.drop transactions slots in
-          [%log internal] "Update_ledger_and_get_statements"
-            ~metadata:[ ("partition", `String "both") ] ;
-          let%map data, updated_stack1, updated_stack2, first_pass_ledger_end =
-            update_ledger_and_get_statements ~constraint_constants ~global_slot
-              ledger working_stack1
-              (txns_for_partition1, Some txns_for_partition2)
-              current_state_view state_and_body_hash
-          in
-          [%log internal] "Update_ledger_and_get_statements_done" ;
-          let second_has_data = List.length txns_for_partition2 > 0 in
-          let pending_coinbase_action, stack_update =
-            match (coinbase_in_first_partition, second_has_data) with
-            | true, true ->
-                ( Pending_coinbase.Update.Action.Update_two_coinbase_in_first
-                , `Update_two (updated_stack1, updated_stack2) )
-            (*updated_stack2 does not have coinbase and but has the state from the previous stack*)
-            | true, false ->
-                (*updated_stack1 has some new coinbase but parition 2 has no
-                  data and so we have only one stack to update*)
-                (Update_one, `Update_one updated_stack1)
-            | false, true ->
-                (*updated_stack1 just has the new state. [updated stack2] might have coinbase, definitely has some
-                  data and therefore will have a non-dummy state.*)
-                ( Update_two_coinbase_in_second
-                , `Update_two (updated_stack1, updated_stack2) )
-            | false, false ->
-                (* a diff consists of only non-coinbase transactions. This is currently not possible because a diff will have a coinbase at the very least, so don't update anything?*)
-                (Update_none, `Update_none)
-          in
-          [%log internal] "Update_coinbase_stack_done"
-            ~metadata:
-              [ ("is_new_stack", `Bool false)
-              ; ( "coinbase_in_first_partition"
-                , `Bool coinbase_in_first_partition )
-              ; ("second_has_data", `Bool second_has_data)
-              ; ( "txns_for_partition1_len"
-                , `Int (List.length txns_for_partition1) )
-              ; ( "txns_for_partition2_len"
-                , `Int (List.length txns_for_partition2) )
-              ] ;
-          ( false
-          , data
-          , pending_coinbase_action
-          , stack_update
-          , `First_pass_ledger_end first_pass_ledger_end ) )
+    let is_new_stack = Scan_state.next_on_new_tree scan_state in
+    if not @@ List.is_empty transactions then
+      update_coinbase_stack_and_get_data_impl ~logger ~constraint_constants
+        ~global_slot ~first_partition_slots:slots
+        ~no_second_partition:(Option.is_none second) ~is_new_stack ledger
+        pending_coinbase_collection transactions current_state_view
+        state_and_body_hash
     else (
       [%log internal] "Update_coinbase_stack_done" ;
       Deferred.return
@@ -2298,12 +2289,12 @@ include T
 
 module Test_helpers = struct
   let constraint_constants =
-    Genesis_constants.Constraint_constants.for_unit_tests
+    Genesis_constants.For_unit_tests.Constraint_constants.t
 
   let dummy_state_and_view ?global_slot () =
     let state =
       let consensus_constants =
-        let genesis_constants = Genesis_constants.for_unit_tests in
+        let genesis_constants = Genesis_constants.For_unit_tests.t in
         Consensus.Constants.create ~constraint_constants
           ~protocol_constants:genesis_constants.protocol
       in
@@ -2351,6 +2342,9 @@ module Test_helpers = struct
 
   let dummy_state_view ?global_slot () =
     dummy_state_and_view ?global_slot () |> snd
+
+  let update_coinbase_stack_and_get_data_impl =
+    update_coinbase_stack_and_get_data_impl
 end
 
 let%test_module "staged ledger tests" =
@@ -2372,10 +2366,12 @@ let%test_module "staged ledger tests" =
     let coinbase_receiver =
       Public_key.compress coinbase_receiver_keypair.public_key
 
-    let proof_level = Genesis_constants.Proof_level.for_unit_tests
+    let proof_level = Genesis_constants.For_unit_tests.Proof_level.t
+
+    let genesis_constants = Genesis_constants.For_unit_tests.t
 
     let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+      Genesis_constants.For_unit_tests.Constraint_constants.t
 
     let zkapp_cmd_limit_hardcap = 200
 
@@ -2391,7 +2387,7 @@ let%test_module "staged ledger tests" =
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            () )
+            ~commit_id:"not specified for unit tests" () )
 
     let find_vk ledger =
       Zkapp_command.Verifiable.load_vk_from_ledger ~get:(Ledger.get ledger)
@@ -2942,7 +2938,8 @@ let%test_module "staged ledger tests" =
       let%bind zkapp_command_and_fee_payer_keypairs, ledger =
         Mina_generators.User_command_generators
         .sequence_zkapp_command_with_ledger ?ledger_init_state
-          ~max_token_updates:1 ~length:num_zkapps ~vk ?failure ()
+          ~max_token_updates:1 ~length:num_zkapps ~vk ?failure
+          ~constraint_constants ~genesis_constants ()
       in
       let zkapps =
         List.map zkapp_command_and_fee_payer_keypairs ~f:(function
@@ -4817,7 +4814,10 @@ let%test_module "staged ledger tests" =
               { status = Applied
               ; data =
                   mk_basic_zkapp_command ~keymap
-                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                    ~fee:
+                      (Fee.to_nanomina_int
+                         Genesis_constants.For_unit_tests.t
+                           .minimum_user_command_fee )
                     ~fee_payer_pk:a.public_key
                     ~fee_payer_nonce:(Unsigned.UInt32.of_int 0)
                     [ mk_basic_node ~account:a ~authorization:Signature
@@ -4832,7 +4832,10 @@ let%test_module "staged ledger tests" =
               { status = Applied
               ; data =
                   mk_basic_zkapp_command ~keymap
-                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                    ~fee:
+                      (Fee.to_nanomina_int
+                         Genesis_constants.For_unit_tests.t
+                           .minimum_user_command_fee )
                     ~fee_payer_pk:a.public_key
                     ~fee_payer_nonce:(Unsigned.UInt32.of_int 1)
                     [ mk_basic_node ~account:b ~authorization:Signature
@@ -4847,7 +4850,10 @@ let%test_module "staged ledger tests" =
               { status = Applied
               ; data =
                   mk_basic_zkapp_command ~prover:prover_a ~keymap
-                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                    ~fee:
+                      (Fee.to_nanomina_int
+                         Genesis_constants.For_unit_tests.t
+                           .minimum_user_command_fee )
                     ~fee_payer_pk:a.public_key
                     ~fee_payer_nonce:(Unsigned.UInt32.of_int 2)
                     [ mk_basic_node ~account:a ~authorization:(Proof vk_a.hash)
@@ -4879,7 +4885,10 @@ let%test_module "staged ledger tests" =
               { status = Applied
               ; data =
                   mk_basic_zkapp_command ~keymap
-                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                    ~fee:
+                      (Fee.to_nanomina_int
+                         Genesis_constants.For_unit_tests.t
+                           .minimum_user_command_fee )
                     ~fee_payer_pk:a.public_key
                     ~fee_payer_nonce:(Unsigned.UInt32.of_int 0)
                     [ mk_basic_node ~account:a ~authorization:Signature
@@ -4895,7 +4904,10 @@ let%test_module "staged ledger tests" =
                   Failed [ []; [ Account_nonce_precondition_unsatisfied ] ]
               ; data =
                   mk_basic_zkapp_command ~keymap
-                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                    ~fee:
+                      (Fee.to_nanomina_int
+                         Genesis_constants.For_unit_tests.t
+                           .minimum_user_command_fee )
                     ~fee_payer_pk:a.public_key
                     ~fee_payer_nonce:(Unsigned.UInt32.of_int 1)
                     [ mk_basic_node ~account:a ~authorization:Signature
@@ -4916,7 +4928,10 @@ let%test_module "staged ledger tests" =
               { status = Applied
               ; data =
                   mk_basic_zkapp_command ~prover:prover_a ~keymap
-                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                    ~fee:
+                      (Fee.to_nanomina_int
+                         Genesis_constants.For_unit_tests.t
+                           .minimum_user_command_fee )
                     ~fee_payer_pk:a.public_key
                     ~fee_payer_nonce:(Unsigned.UInt32.of_int 2)
                     [ mk_basic_node ~account:a ~authorization:(Proof vk_a.hash)
@@ -5172,7 +5187,7 @@ let%test_module "staged ledger tests" =
                           ~constraint_constants ~conf_dir:None
                           ~pids:
                             (Child_processes.Termination.create_pid_table ())
-                          ()
+                          ~commit_id:"not specified for unit tests" ()
                       in
                       match%map
                         Sl.apply ~constraint_constants ~global_slot !sl

@@ -188,7 +188,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
               ; account_creation_fee = Unsigned.UInt64.of_int 0
               ; fork = None
               }
-          ; commit = ""
           ; length = 0
           ; constraint_system_hash = ""
           ; identifying_hash = ""
@@ -255,8 +254,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ; branches = Verification_key.Max_branches.n
         ; feature_flags =
             Plonk_types.(Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags)
-        ; num_chunks = 1
-        ; zk_rows = 3
+        ; num_chunks = Plonk_checks.num_chunks_by_default
+        ; zk_rows = Plonk_checks.zk_rows_by_default
         }
 
     module Proof = struct
@@ -317,15 +316,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-      ~max_proofs_verified ~name ?constraint_constants ?commit ~choices () =
+      ~max_proofs_verified ~name ?constraint_constants ~choices () =
     compile_with_wrap_main_override_promise ?self ?cache ?storables ?proof_cache
       ?disk_keys ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
-      ~branches ~max_proofs_verified ~name ?constraint_constants ?commit
-      ~choices ()
+      ~branches ~max_proofs_verified ~name ?constraint_constants ~choices ()
 
   let compile ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-      ~max_proofs_verified ~name ?constraint_constants ?commit ~choices () =
+      ~max_proofs_verified ~name ?constraint_constants ~choices () =
     let choices ~self =
       let choices = choices ~self in
       let rec go :
@@ -348,7 +346,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
         ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-        ~max_proofs_verified ~name ?constraint_constants ?commit ~choices ()
+        ~max_proofs_verified ~name ?constraint_constants ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
@@ -365,7 +363,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let compile_async ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-      ~max_proofs_verified ~name ?constraint_constants ?commit ~choices () =
+      ~max_proofs_verified ~name ?constraint_constants ~choices () =
     let choices ~self =
       let choices = choices ~self in
       let rec go :
@@ -393,7 +391,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
         ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-        ~max_proofs_verified ~name ?constraint_constants ?commit ~choices ()
+        ~max_proofs_verified ~name ?constraint_constants ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
@@ -1085,7 +1083,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 Snark_keys_header.header_version
             ; kind
             ; constraint_constants
-            ; commit = "[NOT SPECIFIED]"
             ; length = (* This is a dummy, it gets filled in on read/write. *) 0
             ; constraint_system_hash
             ; identifying_hash =
@@ -1157,7 +1154,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let step_keypair =
             let etyp =
               Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-                ~wrap_rounds:Tock.Rounds.n
             in
             let open Impls.Step in
             let k_p =
@@ -1370,7 +1366,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       in
                       M.f prev_statement.messages_for_next_wrap_proof
                     in
-                    let prev_statement_with_hashes : _ Types.Step.Statement.t =
+                    let prev_statement_with_hashes : _ Impls.Step.statement =
                       { proof_state =
                           { prev_statement.proof_state with
                             messages_for_next_step_proof =
@@ -1838,8 +1834,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 Lazy.map wrap_vk ~f:(Promise.map ~f:Verification_key.index)
             ; wrap_domains
             ; step_domains
-            ; num_chunks = 1
-            ; zk_rows = 3
+            ; num_chunks = Plonk_checks.num_chunks_by_default
+            ; zk_rows = Plonk_checks.zk_rows_by_default
             }
           in
           Types_map.add_exn self data ;

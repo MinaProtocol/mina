@@ -93,7 +93,7 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
       |> Signature_lib.Public_key.compress )
   in
   Ledger.with_ledger
-    ~depth:Genesis_constants.Constraint_constants.for_unit_tests.ledger_depth
+    ~depth:Genesis_constants.For_unit_tests.Constraint_constants.t.ledger_depth
     ~f:(fun ledger ->
       let _, pub1 = keygen () in
       let _, pub2 = keygen () in
@@ -179,7 +179,9 @@ let apply_zkapp_second_pass_unchecked_with_states ~init ledger c =
   |> Result.map ~f:(fun (account_update_applied, rev_states) ->
          let module LS = Mina_transaction_logic.Zkapp_command_logic.Local_state
          in
-         let module Applied = T.Transaction_applied.Zkapp_command_applied in
+         let module Applied =
+           Mina_transaction_logic.Transaction_applied.Zkapp_command_applied
+         in
          let states =
            match rev_states with
            | [] ->
