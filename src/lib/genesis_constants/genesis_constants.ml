@@ -23,6 +23,14 @@ module Proof_level = struct
 end
 
 module Fork_constants = struct
+  module Inputs = struct
+    type t =
+      { state_hash : string
+      ; blockchain_length : int
+      ; global_slot_since_genesis : int
+      }
+  end
+
   type t =
     { state_hash : Pickles.Backend.Tick.Field.Stable.Latest.t
     ; blockchain_length : Mina_numbers.Length.Stable.Latest.t
@@ -30,9 +38,35 @@ module Fork_constants = struct
         Mina_numbers.Global_slot_since_genesis.Stable.Latest.t
     }
   [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
+
+  let make (inputs : Inputs.t) =
+    { state_hash =
+        Data_hash_lib.State_hash.of_base58_check_exn inputs.state_hash
+    ; blockchain_length = Mina_numbers.Length.of_int inputs.blockchain_length
+    ; global_slot_since_genesis =
+        Mina_numbers.Global_slot_since_genesis.of_int
+          inputs.global_slot_since_genesis
+    }
 end
 
 module Constraint_constants = struct
+  module Inputs = struct
+    type t =
+      { sub_windows_per_window : int
+      ; ledger_depth : int
+      ; work_delay : int
+      ; block_window_duration_ms : int
+      ; scan_state_work_delay : int
+      ; scan_state_with_tps_goal : bool
+      ; scan_state_tps_goal_x10 : int option
+      ; scan_state_transaction_capacity_log_2 : int option
+      ; coinbase : string
+      ; supercharged_coinbase_factor : int
+      ; account_creation_fee_int : string
+      ; fork : Fork_constants.Inputs.t option
+      }
+  end
+
   type t =
     { sub_windows_per_window : int
     ; ledger_depth : int
@@ -70,6 +104,60 @@ module Constraint_constants = struct
               }
         | None ->
             None )
+    }
+
+  let make (inputs : Inputs.t) : t =
+    let transaction_capacity_log_2 =
+      match
+        (inputs.scan_state_with_tps_goal, inputs.scan_state_tps_goal_x10)
+      with
+      | true, Some tps_goal_x10 ->
+          let max_coinbases = 2 in
+
+          (* block_window_duration is in milliseconds, so divide by 1000 divide
+             by 10 again because we have tps * 10
+          *)
+          let max_user_commands_per_block =
+            tps_goal_x10 * inputs.block_window_duration_ms / (1000 * 10)
+          in
+
+          (* Log of the capacity of transactions per transition.
+                - 1 will only work if we don't have prover fees.
+                - 2 will work with prover fees, but not if we want a transaction
+                  included in every block.
+                - At least 3 ensures a transaction per block and the staged-ledger
+                  unit tests pass.
+          *)
+          1
+          + Core_kernel.Int.ceil_log2
+              (max_user_commands_per_block + max_coinbases)
+      | _ -> (
+          match inputs.scan_state_transaction_capacity_log_2 with
+          | Some a ->
+              a
+          | None ->
+              failwith
+                "scan_state_transaction_capacity_log_2 must be set if \
+                 scan_state_with_tps_goal is false" )
+    in
+    let supercharged_coinbase_factor = inputs.supercharged_coinbase_factor in
+
+    let pending_coinbase_depth =
+      Core_kernel.Int.ceil_log2
+        ( ((transaction_capacity_log_2 + 1) * (inputs.scan_state_work_delay + 1))
+        + 1 )
+    in
+    { sub_windows_per_window = inputs.sub_windows_per_window
+    ; ledger_depth = inputs.ledger_depth
+    ; work_delay = inputs.scan_state_work_delay
+    ; block_window_duration_ms = inputs.block_window_duration_ms
+    ; transaction_capacity_log_2
+    ; pending_coinbase_depth
+    ; coinbase_amount = Currency.Amount.of_mina_string_exn inputs.coinbase
+    ; supercharged_coinbase_factor
+    ; account_creation_fee =
+        Currency.Fee.of_mina_string_exn inputs.account_creation_fee_int
+    ; fork = Option.map inputs.fork ~f:Fork_constants.make
     }
 end
 
@@ -210,6 +298,27 @@ module Protocol = struct
 end
 
 module T = struct
+  module Inputs = struct
+    type t =
+      { k : int
+      ; slots_per_epoch : int
+      ; slots_per_sub_window : int
+      ; grace_period_slots : int
+      ; delta : int
+      ; genesis_state_timestamp : string
+      ; txpool_max_size : int
+      ; num_accounts : int option
+      ; zkapp_proof_update_cost : float
+      ; zkapp_signed_single_update_cost : float
+      ; zkapp_signed_pair_update_cost : float
+      ; zkapp_transaction_cost_limit : float
+      ; max_event_elements : int
+      ; max_action_elements : int
+      ; zkapp_cmd_limit_hardcap : int
+      ; minimum_user_command_fee : string
+      }
+  end
+
   (* bin_io is for printing chain id inputs *)
   type t =
     { protocol : Protocol.Stable.Latest.t
@@ -225,6 +334,30 @@ module T = struct
     ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t
     }
   [@@deriving to_yojson, sexp_of, bin_io_unversioned]
+
+  let make (inputs : Inputs.t) : t =
+    { protocol =
+        { k = inputs.k
+        ; slots_per_epoch = inputs.slots_per_epoch
+        ; slots_per_sub_window = inputs.slots_per_sub_window
+        ; grace_period_slots = inputs.grace_period_slots
+        ; delta = inputs.delta
+        ; genesis_state_timestamp =
+            genesis_timestamp_of_string inputs.genesis_state_timestamp
+            |> of_time
+        }
+    ; txpool_max_size = inputs.txpool_max_size
+    ; num_accounts = inputs.num_accounts
+    ; zkapp_proof_update_cost = inputs.zkapp_proof_update_cost
+    ; zkapp_signed_single_update_cost = inputs.zkapp_signed_single_update_cost
+    ; zkapp_signed_pair_update_cost = inputs.zkapp_signed_pair_update_cost
+    ; zkapp_transaction_cost_limit = inputs.zkapp_transaction_cost_limit
+    ; max_event_elements = inputs.max_event_elements
+    ; max_action_elements = inputs.max_action_elements
+    ; zkapp_cmd_limit_hardcap = inputs.zkapp_cmd_limit_hardcap
+    ; minimum_user_command_fee =
+        Currency.Fee.of_mina_string_exn inputs.minimum_user_command_fee
+    }
 
   let hash (t : t) =
     let str =
@@ -247,6 +380,80 @@ module T = struct
 end
 
 include T
+
+module type Inputs_intf = sig
+  val proof_level : string
+
+  val genesis_constants : T.Inputs.t
+
+  val constraint_constants : Constraint_constants.Inputs.t
+end
+
+module Make_Inputs (Node_config : Node_config_intf.S) : Inputs_intf = struct
+  include Node_config
+
+  let proof_level = proof_level
+
+  (** limits on Zkapp_command.t size
+      10.26*np + 10.08*n2 + 9.14*n1 < 69.45
+      where np: number of single proof updates
+      n2: number of pairs of signed/no-auth update
+      n1: number of single signed/no-auth update
+      and their coefficients representing the cost
+    The formula was generated based on benchmarking data conducted on bare
+    metal i9 processor with room to include lower spec.
+    69.45 was the total time for a combination of updates that was considered
+    acceptable.
+    The method used to estimate the cost was linear least squares.
+  *)
+  let genesis_constants : T.Inputs.t =
+    let zkapp_proof_update_cost = 10.26 in
+
+    let zkapp_signed_pair_update_cost = 10.08 in
+
+    let zkapp_signed_single_update_cost = 9.14 in
+
+    let zkapp_transaction_cost_limit = 69.45 in
+
+    let max_event_elements = 100 in
+
+    let max_action_elements = 100 in
+
+    let zkapp_cmd_limit_hardcap = 128 in
+
+    { k
+    ; slots_per_epoch
+    ; slots_per_sub_window
+    ; grace_period_slots
+    ; delta
+    ; genesis_state_timestamp
+    ; txpool_max_size = pool_max_size
+    ; num_accounts = None
+    ; zkapp_proof_update_cost
+    ; zkapp_signed_pair_update_cost
+    ; zkapp_signed_single_update_cost
+    ; zkapp_transaction_cost_limit
+    ; max_event_elements
+    ; max_action_elements
+    ; zkapp_cmd_limit_hardcap
+    ; minimum_user_command_fee
+    }
+
+  let constraint_constants : Constraint_constants.Inputs.t =
+    { sub_windows_per_window
+    ; ledger_depth
+    ; work_delay = scan_state_work_delay
+    ; block_window_duration_ms = block_window_duration
+    ; scan_state_work_delay
+    ; scan_state_with_tps_goal
+    ; scan_state_tps_goal_x10
+    ; scan_state_transaction_capacity_log_2
+    ; coinbase
+    ; supercharged_coinbase_factor
+    ; account_creation_fee_int
+    ; fork = None
+    }
+end
 
 module type S = sig
   module Proof_level : sig
@@ -295,11 +502,13 @@ module type S = sig
   val t : t
 end
 
-module Make (Node_config : Node_config_intf.S) : S = struct
+module Make (Config : Node_config_intf.S) : S = struct
+  module I = Make_Inputs (Config)
+
   module Proof_level = struct
     include Proof_level
 
-    let t = of_string Node_config.proof_level
+    let t = of_string I.proof_level
   end
 
   module Fork_constants = Fork_constants
@@ -314,143 +523,80 @@ module Make (Node_config : Node_config_intf.S) : S = struct
   module Constraint_constants = struct
     include Constraint_constants
 
-    (* Generate the compile-time constraint constants, using a signature to hide
-       the optcomp constants that we import.
-    *)
-    include (
-      struct
-        (** All the proofs before the last [work_delay] blocks must be
-            completed to add transactions. [work_delay] is the minimum number
-            of blocks and will increase if the throughput is less.
-            - If [work_delay = 0], all the work that was added to the scan
-              state in the previous block is expected to be completed and
-              included in the current block if any transactions/coinbase are to
-              be included.
-            - [work_delay >= 1] means that there's at least two block times for
-              completing the proofs.
-        *)
-
-        let transaction_capacity_log_2 =
-          match
-            ( Node_config.scan_state_with_tps_goal
-            , Node_config.scan_state_tps_goal_x10 )
-          with
-          | true, Some tps_goal_x10 ->
-              let max_coinbases = 2 in
-
-              (* block_window_duration is in milliseconds, so divide by 1000 divide
-                 by 10 again because we have tps * 10
-              *)
-              let max_user_commands_per_block =
-                tps_goal_x10 * Node_config.block_window_duration / (1000 * 10)
-              in
-
-              (* Log of the capacity of transactions per transition.
-                    - 1 will only work if we don't have prover fees.
-                    - 2 will work with prover fees, but not if we want a transaction
-                      included in every block.
-                    - At least 3 ensures a transaction per block and the staged-ledger
-                      unit tests pass.
-              *)
-              1
-              + Core_kernel.Int.ceil_log2
-                  (max_user_commands_per_block + max_coinbases)
-          | _ -> (
-              match Node_config.scan_state_transaction_capacity_log_2 with
-              | Some a ->
-                  a
-              | None ->
-                  failwith
-                    "scan_state_transaction_capacity_log_2 must be set if \
-                     scan_state_with_tps_goal is false" )
-
-        let supercharged_coinbase_factor =
-          Node_config.supercharged_coinbase_factor
-
-        let pending_coinbase_depth =
-          Core_kernel.Int.ceil_log2
-            ( (transaction_capacity_log_2 + 1)
-              * (Node_config.scan_state_work_delay + 1)
-            + 1 )
-
-        let t =
-          { sub_windows_per_window = Node_config.sub_windows_per_window
-          ; ledger_depth = Node_config.ledger_depth
-          ; work_delay = Node_config.scan_state_work_delay
-          ; block_window_duration_ms = Node_config.block_window_duration
-          ; transaction_capacity_log_2
-          ; pending_coinbase_depth
-          ; coinbase_amount =
-              Currency.Amount.of_mina_string_exn Node_config.coinbase
-          ; supercharged_coinbase_factor
-          ; account_creation_fee =
-              Currency.Fee.of_mina_string_exn
-                Node_config.account_creation_fee_int
-          ; fork = None
-          }
-      end :
-        sig
-          val t : t
-        end )
+    let t = make I.constraint_constants
   end
 
   include Helpers
   module Protocol = Protocol
   include T
 
-  let genesis_state_timestamp_string = Node_config.genesis_state_timestamp
+  let genesis_state_timestamp_string =
+    I.genesis_constants.genesis_state_timestamp
 
-  let k = Node_config.k
+  let k = I.genesis_constants.k
 
-  let slots_per_epoch = Node_config.slots_per_epoch
+  let slots_per_epoch = I.genesis_constants.slots_per_epoch
 
-  let slots_per_sub_window = Node_config.slots_per_sub_window
+  let slots_per_sub_window = I.genesis_constants.slots_per_sub_window
 
-  let grace_period_slots = Node_config.grace_period_slots
+  let grace_period_slots = I.genesis_constants.grace_period_slots
 
-  let delta = Node_config.delta
+  let delta = I.genesis_constants.delta
 
-  let pool_max_size = Node_config.pool_max_size
+  let pool_max_size = I.genesis_constants.txpool_max_size
 
-  let t : t =
-    { protocol =
-        { k
-        ; slots_per_epoch
-        ; slots_per_sub_window
-        ; grace_period_slots
-        ; delta
-        ; genesis_state_timestamp =
-            genesis_timestamp_of_string genesis_state_timestamp_string
-            |> of_time
-        }
-    ; txpool_max_size = pool_max_size
-    ; num_accounts = None
-    ; zkapp_proof_update_cost = 10.26
-    ; zkapp_signed_pair_update_cost = 10.08
-    ; zkapp_signed_single_update_cost = 9.14
-    ; zkapp_transaction_cost_limit = 69.45
-    ; max_event_elements = 100
-    ; max_action_elements = 100
-    ; zkapp_cmd_limit_hardcap = 128
-    ; minimum_user_command_fee =
-        Currency.Fee.of_mina_string_exn Node_config.minimum_user_command_fee
+  let t = T.make I.genesis_constants
+end
+
+module For_unit_tests : S = Make (Node_config_for_unit_tests)
+
+module Network_constants = struct
+  type t =
+    { genesis_constants : T.t
+    ; constraint_constants : Constraint_constants.t
+    ; proof_level : Proof_level.t
+    }
+
+  let compiled =
+    let module M = Make (Node_config) in
+    { genesis_constants = M.t
+    ; constraint_constants = M.Constraint_constants.t
+    ; proof_level = M.Proof_level.t
+    }
+
+  let dev =
+    let module M = Make (Node_config.Dev) in
+    { genesis_constants = M.t
+    ; constraint_constants = M.Constraint_constants.t
+    ; proof_level = M.Proof_level.t
+    }
+
+  let lightnet =
+    let module M = Make (Node_config.Lightnet) in
+    { genesis_constants = M.t
+    ; constraint_constants = M.Constraint_constants.t
+    ; proof_level = M.Proof_level.t
+    }
+
+  let devnet =
+    let module M = Make (Node_config.Devnet) in
+    { genesis_constants = M.t
+    ; constraint_constants = M.Constraint_constants.t
+    ; proof_level = M.Proof_level.t
+    }
+
+  let mainnet =
+    let module M = Make (Node_config.Mainnet) in
+    { genesis_constants = M.t
+    ; constraint_constants = M.Constraint_constants.t
+    ; proof_level = M.Proof_level.t
     }
 end
 
-module For_unit_tests = Make (Node_config_for_unit_tests)
+module Compiled = struct
+  let genesis_constants = Network_constants.compiled.genesis_constants
 
-module Compiled : sig
-  val genesis_constants : t
+  let constraint_constants = Network_constants.compiled.constraint_constants
 
-  val constraint_constants : Constraint_constants.t
-
-  val proof_level : Proof_level.t
-end = struct
-  include Make (Node_config)
-
-  let genesis_constants = t
-
-  let constraint_constants = Constraint_constants.t
-
-  let proof_level = Proof_level.t
+  let proof_level = Network_constants.compiled.proof_level
 end

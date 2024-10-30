@@ -93,19 +93,18 @@ let to_yojson t =
     ; ("zkapps_disabled", `Bool t.zkapps_disabled)
     ]
 
-(*TODO: Delete this module and read in a value from the environment*)
-module Compiled = struct
+module Make (Config : Node_config_intf.S) = struct
   let t : t =
     let (inputs : Inputs.t) =
-      { curve_size = Node_config.curve_size
-      ; default_snark_worker_fee_string = Node_config.default_snark_worker_fee
-      ; minimum_user_command_fee_string = Node_config.minimum_user_command_fee
-      ; itn_features = Node_config.itn_features
-      ; compaction_interval_ms = Node_config.compaction_interval
-      ; block_window_duration_ms = Node_config.block_window_duration
-      ; vrf_poll_interval_ms = Node_config.vrf_poll_interval
-      ; network_id = Node_config.network
-      ; zkapp_cmd_limit = Node_config.zkapp_cmd_limit
+      { curve_size = Config.curve_size
+      ; default_snark_worker_fee_string = Config.default_snark_worker_fee
+      ; minimum_user_command_fee_string = Config.minimum_user_command_fee
+      ; itn_features = Config.itn_features
+      ; compaction_interval_ms = Config.compaction_interval
+      ; block_window_duration_ms = Config.block_window_duration
+      ; vrf_poll_interval_ms = Config.vrf_poll_interval
+      ; network_id = Config.network
+      ; zkapp_cmd_limit = Config.zkapp_cmd_limit
       ; rpc_handshake_timeout_sec = 60.0
       ; rpc_heartbeat_timeout_sec = 60.0
       ; rpc_heartbeat_send_every_sec = 10.0
@@ -113,6 +112,33 @@ module Compiled = struct
       }
     in
     make inputs
+end
+
+module Network_constants = struct
+  let compiled =
+    let module M = Make (Node_config) in
+    M.t
+
+  let dev =
+    let module M = Make (Node_config.Dev) in
+    M.t
+
+  let lightnet =
+    let module M = Make (Node_config.Lightnet) in
+    M.t
+
+  let devnet =
+    let module M = Make (Node_config.Devnet) in
+    M.t
+
+  let mainnet =
+    let module M = Make (Node_config.Mainnet) in
+    M.t
+end
+
+(*TODO: Delete this module and read in a value from the environment*)
+module Compiled = struct
+  let t = Network_constants.compiled
 end
 
 module For_unit_tests = struct
