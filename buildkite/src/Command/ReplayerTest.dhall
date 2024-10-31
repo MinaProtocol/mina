@@ -18,9 +18,9 @@ in  { step =
                 [ RunWithPostgres.runInDockerWithPostgresConn
                     ([] : List Text)
                     "./src/test/archive/sample_db/archive_db.sql"
-                    Artifacts.Type.Archive
+                    Artifacts.Type.FunctionalTestSuite
                     (None Network.Type)
-                    "./buildkite/scripts/replayer-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key} dev"
+                    "./buildkite/scripts/replayer-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
                 ]
               , label = "Archive: Replayer test"
               , key = key
