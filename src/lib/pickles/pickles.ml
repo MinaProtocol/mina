@@ -14,6 +14,7 @@ end
 module Make_str (_ : Wire_types.Concrete) = struct
   module Endo = Endo
   module P = Proof
+  module Debug = Debug
 
   module type Statement_intf = Intf.Statement
 

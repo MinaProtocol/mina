@@ -11,5 +11,3 @@ module Bulletproof_challenge = Types.Bulletproof_challenge
 module Domain = Pickles_base.Domain
 module Domains = Pickles_base.Domains
 module Scalar_challenge = Kimchi_backend_common.Scalar_challenge
-
-let debug = false

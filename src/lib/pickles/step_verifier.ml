@@ -34,11 +34,6 @@ struct
           fun () ->
             printf !"%s: %{sexp:Backend.Tick.Field.t}\n%!" lab (read_var x))
 
-  let print_bool lab x =
-    if debug then
-      as_prover (fun () ->
-          printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x) )
-
   let equal_g g1 g2 =
     List.map2_exn ~f:Field.equal
       (Inner_curve.to_field_elements g1)
@@ -302,7 +297,7 @@ struct
         let q = p_prime + lr_prod in
         absorb sponge PC delta ;
         let c = squeeze_scalar sponge in
-        print_fp "c" c.inner ;
+        Debug.print_fp "c" c.inner ;
         (* c Q + delta = z1 (G + b U) + z2 H *)
         let lhs =
           let cq = Scalar_challenge.endo q c in
@@ -1003,8 +998,8 @@ struct
               (module Field)
               ~env ~domain plonk_minimal combined_evals evals1.public_input )
       in
-      print_fp "ft_eval0" ft_eval0 ;
-      print_fp "ft_eval1" ft_eval1 ;
+      Debug.print_fp "ft_eval0" ft_eval0 ;
+      Debug.print_fp "ft_eval1" ft_eval1 ;
       (* sum_i r^i sum_j xi^j f_j(beta_i) *)
       let actual_combined_inner_product =
         let combine ~ft ~sg_evals x_hat
@@ -1041,8 +1036,8 @@ struct
           (module Field)
           ~shift:shift1 combined_inner_product
       in
-      print_fp "step_main cip expected" expected ;
-      print_fp "step_main cip actual" actual_combined_inner_product ;
+      Debug.print_fp "step_main cip expected" expected ;
+      Debug.print_fp "step_main cip actual" actual_combined_inner_product ;
       equal expected actual_combined_inner_product
     in
     let bulletproof_challenges =
@@ -1068,10 +1063,11 @@ struct
             (module Impl)
             ~env ~shift:shift1 plonk combined_evals )
     in
-    print_bool "xi_correct" xi_correct ;
-    print_bool "combined_inner_product_correct" combined_inner_product_correct ;
-    print_bool "plonk_checks_passed" plonk_checks_passed ;
-    print_bool "b_correct" b_correct ;
+    Debug.print_bool "xi_correct" xi_correct ;
+    Debug.print_bool "combined_inner_product_correct"
+      combined_inner_product_correct ;
+    Debug.print_bool "plonk_checks_passed" plonk_checks_passed ;
+    Debug.print_bool "b_correct" b_correct ;
     ( Boolean.all
         [ xi_correct
         ; b_correct

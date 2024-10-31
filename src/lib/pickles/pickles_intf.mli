@@ -19,6 +19,12 @@ module type S = sig
   module Cache = Cache
   module Ro = Ro
 
+  module Debug : sig
+    val print_fp : string -> 'f -> unit
+
+    val print_bool : string -> 'b -> unit
+  end
+
   module type Statement_intf = sig
     type field
 
