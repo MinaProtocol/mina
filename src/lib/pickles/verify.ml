@@ -23,6 +23,8 @@ let verify_heterogenous (ts : Instance.t list) =
   [%log internal] "Verify_heterogenous"
     ~metadata:[ ("count", `Int (List.length ts)) ] ;
   let tick_field : _ Plonk_checks.field = (module Tick_field) in
+
+  (* Helper used by the different conditions to verify *)
   let check, result =
     let r = ref [] in
     let result () =
@@ -37,31 +39,35 @@ let verify_heterogenous (ts : Instance.t list) =
     in
     ((fun (lab, b) -> if not b then r := lab :: !r), result)
   in
+
+  (* ---- *)
   [%log internal] "Compute_plonks_and_chals" ;
   let _computed_bp_chals, deferred_values =
     List.map ts
       ~f:(fun
-           (T
-             ( _max_proofs_verified
-             , _statement
-             , chunking_data
-             , key
-             , _app_state
-             , T
-                 { statement =
-                     { proof_state
-                     ; messages_for_next_step_proof =
-                         { old_bulletproof_challenges; _ }
-                     }
-                 ; prev_evals = evals
-                 ; proof = _
-                 } ) )
-         ->
+          (T
+            ( _max_proofs_verified
+            , _statement
+            , chunking_data
+            , key
+            , _app_state
+            , T
+                { statement =
+                    { proof_state
+                    ; messages_for_next_step_proof =
+                        { old_bulletproof_challenges; _ }
+                    }
+                ; prev_evals = evals
+                ; proof = _
+                } ) )
+        ->
         Timer.start __LOC__ ;
+        (* We first start by verifying the chunks condition (i.e.
+           [RFC0002](https://github.com/o1-labs/rfcs/blob/main/0002-chunking.md) *)
         let non_chunking, expected_num_chunks =
           let expected_num_chunks =
             Option.value_map ~default:Plonk_checks.num_chunks_by_default
-              chunking_data ~f:(fun x -> x.Instance.num_chunks)
+              chunking_data ~f:(fun x -> x.Instance.num_chunks )
           in
           let exception Is_chunked in
           match
@@ -82,11 +88,15 @@ let verify_heterogenous (ts : Instance.t list) =
         check
           ( lazy (sprintf "only uses %i chunks" expected_num_chunks)
           , non_chunking ) ;
+        (* ---- *)
+        (* Checking feature flags activation *)
         check
           ( lazy "feature flags are consistent with evaluations"
           , Pickles_types.Plonk_types.Evals.validate_feature_flags
               ~feature_flags:proof_state.deferred_values.plonk.feature_flags
               evals.evals.evals ) ;
+        (* ---- *)
+        (* Start checking domain size *)
         Timer.start __LOC__ ;
         let open Types.Wrap.Proof_state in
         let step_domain =
