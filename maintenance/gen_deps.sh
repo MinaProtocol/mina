@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e -o pipefail
 maintenance_dir="$(realpath $(dirname $0))"
 [ "$(which dune-deps)" != '' ] || (echo 'missing required executable "dune-deps"; try `opam install dune-deps`' && exit 1)
