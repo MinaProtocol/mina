@@ -5,6 +5,7 @@
 // Provides: fp_oracles_create
 // Requires: plonk_wasm, tsRustConversion
 var fp_oracles_create = function (lgr_comm, verifier_index, proof) {
+  console.log('lgr comm', lgr_comm);
   return tsRustConversion.fp.oraclesFromRust(
     plonk_wasm.fp_oracles_create(
       tsRustConversion.fp.polyCommsToRust(lgr_comm),

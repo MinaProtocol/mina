@@ -6,11 +6,33 @@
 // Requires: tsBindings, plonk_wasm
 var tsSrs = tsBindings.srs(plonk_wasm);
 
-// srs
-
 // Provides: caml_fp_srs_create
 // Requires: tsSrs
 var caml_fp_srs_create = tsSrs.fp.create;
+
+// Provides: caml_fq_srs_lagrange_commitments_whole_domain
+// Requires: plonk_wasm
+var caml_fq_srs_lagrange_commitments_whole_domain = function (
+  srs,
+  domain_size
+) {
+  return plonk_wasm.caml_fq_srs_lagrange_commitments_whole_domain(
+    srs,
+    domain_size
+  );
+};
+
+// Provides: caml_fp_srs_lagrange_commitments_whole_domain
+// Requires: plonk_wasm
+var caml_fp_srs_lagrange_commitments_whole_domain = function (
+  srs,
+  domain_size
+) {
+  return plonk_wasm.caml_fp_srs_lagrange_commitments_whole_domain(
+    srs,
+    domain_size
+  );
+};
 
 // Provides: caml_fp_srs_write
 // Requires: plonk_wasm, caml_jsstring_of_string
