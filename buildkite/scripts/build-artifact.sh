@@ -17,8 +17,7 @@ else
 fi
 
 
-# TODO: Stop building lib_p2p multiple times by pulling from buildkite-agent artifacts or docker or somewhere
-echo "--- Build libp2p_helper TODO: use the previously uploaded build artifact"
+echo "--- Build libp2p_helper"
 make -C src/app/libp2p_helper
 
 MAINNET_TARGETS=""
