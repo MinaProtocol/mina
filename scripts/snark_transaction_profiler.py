@@ -62,7 +62,9 @@ if __name__ == "__main__":
     stats = parse_stats (output)
     #TODO: add code to check against some threshold
     print(stats)
-    
+
+    print(f"exit code: {process_exit_code}")
+
     if not process_exit_code == 0:
         print('non-zero exit code from program, failing build')
         sys.exit(1)
