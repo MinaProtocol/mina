@@ -38,7 +38,7 @@ in  Pipeline.build
                   "cd src/app/trace-tool ; PATH=/home/opam/.cargo/bin:\$PATH cargo check"
             , label = "Rust lint steps; trace-tool"
             , key = "lint-trace-tool"
-            , target = Size.Small
+            , target = Size.Multi
             , docker = None Docker.Type
             }
         ]
