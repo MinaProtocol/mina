@@ -15,7 +15,6 @@ import abc
 
 logger = logging.getLogger(__name__)
 
-
 class Benchmark(abc.ABC):
     """
         Abstract class which aggregate all necessary operations
@@ -29,41 +28,81 @@ class Benchmark(abc.ABC):
         self.influx_client = Influx()
 
     def headers_to_influx(self, headers):
+        """
+         Converts headers to influx db headers. Details:
+         https://docs.influxdata.com/influxdb/cloud/reference/syntax/annotated-csv/extended/
+        """
         return "#datatype " + ",".join(
             [header.influx_kind for header in headers])
 
     @abc.abstractmethod
     def default_path(self):
+        """
+         Abstract method to get default path to app
+        """
         pass
 
     @abc.abstractmethod
     def name_header(self):
+        """
+         Abstract method for getting header object for measurement name
+        """
         pass
 
     @abc.abstractmethod
     def branch_header(self):
+        """
+         Abstract method for getting header object for branch name
+        """
         pass
 
     def headers_to_name(self, headers):
+        """
+         Gets names of headers
+        """
         return list(map(lambda x: x.name, headers))
 
     @abc.abstractmethod
     def headers(self):
+        """
+         Returns all csv headers
+        """
         pass
 
     @abc.abstractmethod
     def fields(self):
+        """
+         Returns subset of headers for influx field:
+         https://docs.influxdata.com/influxdb/cloud/reference/syntax/annotated-csv/extended/#field
+        """
         pass
 
     @abc.abstractmethod
     def run(self, path):
+        """
+         Runs benchmark
+        """
         pass
 
     @abc.abstractmethod
     def parse(self, content, output_filename, influxdb, branch):
+        """
+         Parses benchmark output to csv
+        """
         pass
 
     def compare(self, result_file, yellow_threshold, red_threshold):
+        """
+         Compares actual measurements against thresholds (yellow,red)
+
+         Constraints on result file:
+         - comma as delimiter
+         - implements influx csv format:
+           https://docs.influxdata.com/influxdb/cloud/reference/syntax/annotated-csv/extended/
+
+         It gets moving average from influx db and adds grace values (yellow,red) to handle measurements skew.
+
+        """
         with open(result_file, newline='') as csvfile:
             reader = csv.reader(csvfile, delimiter=',')
             for i in range(2):
@@ -109,6 +148,7 @@ class Benchmark(abc.ABC):
 
 
 class BenchmarkType(Enum):
+
     mina_base = 'mina-base'
     snark = 'snark'
     heap_usage = 'heap-usage'
@@ -159,6 +199,20 @@ class JaneStreetBenchmark(Benchmark, ABC):
         return self.branch
 
     def export_to_csv(self, lines, filename, influxdb, branch):
+        """
+         Exports Native Ocaml benchmarks to influxdb annotated csv
+         JaneStreet benchmarks has a common tabular layout. Similar to:
+
+         | No.| Proof updates| Non-proof pairs| Non-proof singles| Mempool verification time (sec)| Transaction proving time (sec)|Permutation|
+         |--|--|--|--|--|--|--|
+         | 1| 0| 1| 1| 0.002070| 12.125372| SSS|
+         | 2| 1| 0| 2| 0.102019| 0.263364| SPS|
+         | 3| 1| 1| 0| 0.110309| 0.427459| SSP|
+         | 4| 2| 0| 1| 0.129152| 0.277442| SPP|
+         | 5| 0| 2| 0| 0.002546| 0.508766| SSSS|
+         | 6| 1| 1| 1| 0.135265| 0.384839| SPSS|
+         | 7| 2| 0| 2| 0.172069| 0.346551| SPPS|
+        """
         with open(filename, 'w') as csvfile:
 
             csvwriter = csv.writer(csvfile)
@@ -218,6 +272,15 @@ class JaneStreetBenchmark(Benchmark, ABC):
                     csvwriter.writerow(rows[:])
 
     def parse(self, content, output_filename, influxdb, branch):
+        """
+         Parses output of standard jane street benchmark to csv. Format is well known and similar to below:
+         | No.| Proof updates| Non-proof pairs| Non-proof singles| Mempool verification time (sec)| Transaction proving time (sec)|Permutation|
+         |--|--|--|--|--|--|--|
+         | 1| 0| 1| 1| 0.002070| 12.125372| SSS|
+         ....
+
+         It can produce standard csv of annotated influx db csv
+        """
         buf = io.StringIO(content)
         lines = buf.readlines()
 
@@ -249,6 +312,9 @@ class JaneStreetBenchmark(Benchmark, ABC):
 
 
 class MinaBaseBenchmark(JaneStreetBenchmark):
+    """
+     Concrete implementation of JaneStreetBenchmark for mina-base benchmarks
+    """
 
     def __init__(self):
         JaneStreetBenchmark.__init__(self, BenchmarkType.mina_base)
@@ -271,6 +337,10 @@ class MinaBaseBenchmark(JaneStreetBenchmark):
 
 
 class LedgerExportBenchmark(JaneStreetBenchmark):
+    """
+     Concrete implementation of JaneStreetBenchmark for ledger export benchmark.
+     Ledger export requires also genesis ledger config
+    """
 
     def __init__(self, genesis_ledger_path):
         JaneStreetBenchmark.__init__(self, BenchmarkType.ledger_export)
@@ -292,6 +362,19 @@ class LedgerExportBenchmark(JaneStreetBenchmark):
 
 
 class ZkappLimitsBenchmark(Benchmark):
+    """
+     ZkappLimit benchmark has it's own output which we need to handle separately. It is similar to:
+
+        Proofs updates=0  Signed/None updates=0  Pairs of Signed/None updates=1: Total account updates: 2 Cost: 10.080000
+        Proofs updates=0  Signed/None updates=0  Pairs of Signed/None updates=2: Total account updates: 4 Cost: 20.160000
+        Proofs updates=0  Signed/None updates=0  Pairs of Signed/None updates=3: Total account updates: 6 Cost: 30.240000
+        Proofs updates=0  Signed/None updates=0  Pairs of Signed/None updates=4: Total account updates: 8 Cost: 40.320000
+        Proofs updates=0  Signed/None updates=0  Pairs of Signed/None updates=5: Total account updates: 10 Cost: 50.400000
+        Proofs updates=0  Signed/None updates=0  Pairs of Signed/None updates=6: Total account updates: 12 Cost: 60.480000
+        Proofs updates=0  Signed/None updates=1  Pairs of Signed/None updates=0: Total account updates: 1 Cost: 9.140000
+        Proofs updates=0  Signed/None updates=1  Pairs of Signed/None updates=1: Total account updates: 3 Cost: 19.220000
+
+    """
 
     name = MeasurementColumn("Name", 0)
     proofs_updates = FieldColumn("proofs updates",  1, "")
@@ -462,6 +545,17 @@ class SnarkBenchmark(Benchmark):
 
 
 class HeapUsageBenchmark(Benchmark):
+    """
+     Heap Usage benchmark is another example of non standard benchmark.
+     Output is similar like:
+
+        Data of type Zkapp_command.t                                uses  52268 heap words =   418144 bytes
+        Data of type Pickles.Side_loaded.Proof.t                    uses   3467 heap words =    27736 bytes
+        Data of type Mina_base.Side_loaded_verification_key.t       uses    897 heap words =     7176 bytes
+        Data of type Dummy Pickles.Side_loaded.Proof.t              uses   2672 heap words =    21376 bytes
+        Data of type Dummy Mina_base.Side_loaded_verification_key.t uses     99 heap words =      792 bytes
+        ...
+    """
 
     name = MeasurementColumn("Name", 0)
     heap_words = FieldColumn("heap words", 1, "")
