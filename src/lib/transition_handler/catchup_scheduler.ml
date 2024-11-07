@@ -366,8 +366,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None ~pids ~commit_id:"not specified for unit tests" () )
+          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
+            ~pids () )
 
     (* cast a breadcrumb into a cached, enveloped, partially validated transition *)
     let downcast_breadcrumb breadcrumb =
