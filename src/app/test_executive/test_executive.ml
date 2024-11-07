@@ -47,9 +47,7 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
   else Deferred.return ()
 
 let engines : engine list =
-  [ 
-   ("local", (module Integration_test_local_engine : Intf.Engine.S))
-  ]
+  [ ("local", (module Integration_test_local_engine : Intf.Engine.S)) ]
 
 let tests : test list =
   [ ( "peers-reliability"
