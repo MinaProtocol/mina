@@ -318,18 +318,14 @@ let onlyDebianPipeline
     =     \(spec : MinaBuildSpec.Type)
       ->  pipelineBuilder
             spec
-            [ build_artifacts spec
-            , publish_to_debian_repo spec
-            ]
+            [ build_artifacts spec, publish_to_debian_repo spec ]
 
 let pipeline
     : MinaBuildSpec.Type -> Pipeline.Config.Type
     =     \(spec : MinaBuildSpec.Type)
       ->  pipelineBuilder
             spec
-            (   [ build_artifacts spec
-                , publish_to_debian_repo spec
-                ]
+            (   [ build_artifacts spec, publish_to_debian_repo spec ]
               # docker_commands spec
             )
 
