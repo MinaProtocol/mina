@@ -41,7 +41,7 @@ in  Pipeline.build
                   , image = (../../Constants/ContainerImages.dhall).xrefcheck
                   , useBash = False
                   }
-                  (     "awesome_bot -allow-dupe "
+                  (     "awesome_bot --allow-dupe "
                     ++  "--allow-redirect "
                     ++  "--allow 403,401 "
                     ++  "--skip-save-results "
