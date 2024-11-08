@@ -40,13 +40,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Core.String.Map.data (Network.all_mina_nodes network)) )
     in
     [%log info] "gossip_consistency test: done waiting for initializations" ;
-    let receiver_bp =
-      Core.String.Map.find_exn (Network.block_producers network) "node-a"
-    in
+    let receiver_bp = Network.block_producer network "node-a" in
     let%bind receiver_pub_key = pub_key_of_node receiver_bp in
-    let sender_bp =
-      Core.String.Map.find_exn (Network.block_producers network) "node-b"
-    in
+    let sender_bp = Network.block_producer network "node-b" in
     let%bind sender_pub_key = pub_key_of_node sender_bp in
     let num_payments = 3 in
     let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in

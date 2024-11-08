@@ -35,13 +35,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (Wait_condition.nodes_to_initialize
            (Core.String.Map.data all_mina_nodes) )
     in
-    let node =
-      Core.String.Map.find_exn (Network.block_producers network) "node"
-    in
-    let bp_keypair =
-      (Core.String.Map.find_exn (Network.genesis_keypairs network) "node-key")
-        .keypair
-    in
+    let node = Network.block_producer network "node" in
+    let bp_keypair = (Network.genesis_keypair network "node-key").keypair in
     let bp_pk = bp_keypair.public_key |> Signature_lib.Public_key.compress in
     let bp_pk_account_id = Account_id.create bp_pk Token_id.default in
     let bp_original_balance = Currency.Amount.of_mina_string_exn "1000" in
