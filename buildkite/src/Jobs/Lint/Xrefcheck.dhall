@@ -1,5 +1,3 @@
-let B = ../../External/Buildkite.dhall
-
 let SelectFiles = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -13,8 +11,6 @@ let Cmd = ../../Lib/Cmds.dhall
 let Command = ../../Command/Base.dhall
 
 let Size = ../../Command/Size.dhall
-
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -56,7 +52,6 @@ in  Pipeline.build
             , label = "Verifies references in markdown"
             , key = "xrefcheck"
             , target = Size.Multi
-            , soft_fail = Some (B/SoftFail.Boolean True)
             }
         ]
       }
