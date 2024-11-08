@@ -39,6 +39,7 @@ in  Pipeline.build
               [ Cmd.runInDocker
                   Cmd.Docker::{
                   , image = (../../Constants/ContainerImages.dhall).xrefcheck
+                  , useBash = False
                   }
                   (     "awesome_bot -allow-dupe "
                     ++  "--allow-redirect "
