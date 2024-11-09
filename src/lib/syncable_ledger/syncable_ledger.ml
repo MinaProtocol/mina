@@ -550,18 +550,20 @@ end = struct
          'a t
       -> Addr.t
       -> Hash.t array
+      -> int
       -> [ `Good of (Addr.t * Hash.t) array
          | `Hash_mismatch of Hash.t * Hash.t
          | `Invalid_length ] =
-   fun t addr nodes ->
+   fun t addr nodes requested_depth ->
     let len = Array.length nodes in
     let is_power = Int.is_pow2 len in
     let is_more_than_two = len >= 2 in
     let subtree_depth = Int.ceil_log2 len in
     let less_than_max = len <= Int.pow 2 max_subtree_depth in
-
-    let valid_length = is_power && is_more_than_two && less_than_max in
-
+    let less_than_requested = subtree_depth <= requested_depth in
+    let valid_length =
+      is_power && is_more_than_two && less_than_requested && less_than_max
+    in
     if valid_length then
       let ledger_depth = MT.depth t.tree in
       let expected =
@@ -738,11 +740,9 @@ end = struct
                             ] ) )
                   in
                   requeue_query () )
-          (* query depth is not checked as the response is allowed to use any
-             depth within the valid range *)
-          | Query.What_child_hashes (address, _), Answer.Child_hashes_are hashes
-            -> (
-              match add_subtree t address hashes with
+          | ( Query.What_child_hashes (address, requested_depth)
+            , Answer.Child_hashes_are hashes ) -> (
+              match add_subtree t address hashes requested_depth with
               | `Hash_mismatch (expected, actual) ->
                   let%map () =
                     record_envelope_sender t.trust_system t.logger sender
