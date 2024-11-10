@@ -1,11 +1,11 @@
-module Vesta_based_plonk = struct
-  module Bigint256 =
-    Kimchi_backend_common.Bigint.Make
-      (Pasta_bindings.BigInt256)
-      (struct
-        let length_in_bytes = 32
-      end)
+module Bigint256 =
+  Kimchi_backend_common.Bigint.Make
+    (Pasta_bindings.BigInt256)
+    (struct
+      let length_in_bytes = 32
+    end)
 
+module Vesta_based_plonk = struct
   module Field = Kimchi_backend_common.Field.Make (struct
     module Bigint = Bigint256
     include Pasta_bindings.Fp
@@ -34,13 +34,6 @@ module Vesta_based_plonk = struct
 end
 
 module Pallas_based_plonk = struct
-  module Bigint256 =
-    Kimchi_backend_common.Bigint.Make
-      (Pasta_bindings.BigInt256)
-      (struct
-        let length_in_bytes = 32
-      end)
-
   module Field = Kimchi_backend_common.Field.Make (struct
     module Bigint = Bigint256
     include Pasta_bindings.Fq
