@@ -3,8 +3,9 @@
  (name kimchi_pasta_snarky_backend)
  (instrumentation
   (backend bisect_ppx))
+ (flags -warn-error -22)
  (preprocess
-  (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
+  (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std h_list.ppx))
  (libraries
   ;; opam libraries
   integers
@@ -20,10 +21,6 @@
   snarkette
   key_cache
   hex
-  kimchi_backend
-  kimchi_pasta
-  kimchi_pasta.basic
-  kimchi_pasta.constraint_system
   pickles_types
   sponge
   snarky.intf))
