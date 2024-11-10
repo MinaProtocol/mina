@@ -34,8 +34,8 @@ if [[ -z "$DEB_CODENAME" ]]; then usage "Codename is not set!"; fi;
 if [[ -z "$DEB_RELEASE" ]]; then usage "Release is not set!"; fi;
 
 
-BUCKET_ARG='--bucket packages.o1test.net'
-S3_REGION_ARG='--s3-region=us-west-2'
+BUCKET_ARG="--bucket=packages.o1test.net"
+S3_REGION_ARG="--s3-region=us-west-2"
 # utility for publishing deb repo with commons options
 # deb-s3 https://github.com/krobertson/deb-s3
 #NOTE: Do not remove --lock flag otherwise racing deb uploads may overwrite the registry and some files will be lost. If a build fails with the following error, delete the lock file https://packages.o1test.net/dists/unstable/main/binary-/lockfile and rebuild
@@ -52,43 +52,54 @@ DEBS3_UPLOAD="deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
 echo "Publishing debs: ${DEB_NAMES} to Release: ${DEB_RELEASE} and Codename: ${DEB_CODENAME}"
 # Upload the deb files to s3.
 # If this fails, attempt to remove the lockfile and retry.
-for _i in {1..10}; do (
+for _ in {1..10}; do (
   ${DEBS3_UPLOAD} \
     --component "${DEB_RELEASE}" \
     --codename "${DEB_CODENAME}" \
     "${DEB_NAMES}"
 ) && break || scripts/debian/clear-s3-lockfile.sh; done
 
+debs=()
+
 for deb in $DEB_NAMES
 do
-
-  DEBS3_SHOW="deb-s3 show $BUCKET_ARG $S3_REGION_ARG"
-
   # extracting name from debian package path. E.g:
   # _build/mina-archive_3.0.1-develop-a2a872a.deb -> mina-archive
   deb=$(basename "$deb")
   deb="${deb%_*}"
+  debs+=("$deb")
+done
 
-  for i in {1..10}; do 
+function join_by { local IFS="$1"; shift; echo "$*"; }
 
-    set +e
-    ${DEBS3_SHOW} "$deb" "${DEB_VERSION}" "${ARCH}" -c "${DEB_CODENAME}" -m "${DEB_RELEASE}"
-    LAST_VERIFY_STATUS=$?
-    set -eo pipefail
+tries=10
+counter=0
 
-    if [[ $LAST_VERIFY_STATUS == 0 ]]; then
-        echo "succesfully validated that package is uploaded to deb-s3"
-        break
-    fi
-    
-    sleep 60
-    i=$((i+1)) 
+while (( ${#debs[@]} ))
+do
+  join=$(join_by " " "${debs[@]}")
+
+  IFS=$'\n'
+  output=$(deb-s3 exist $BUCKET_ARG $S3_REGION_ARG "$join" $DEB_VERSION $ARCH -c $DEB_CODENAME -m $DEB_RELEASE)
+  debs=()
+  for item in $output; do
+     if [[ $item == *"Missing" ]]; then
+      key=$(echo "$item" | awk '{print $1}')
+      debs+=("$key")
+     fi
   done
 
-  if [[ $LAST_VERIFY_STATUS != 0 ]]; then
-    echo "Cannot locate '$deb' in debian repo. failing job..."
-    echo "You may still try to rerun job as debian repository is known from imperfect performance"
-    exit 1
+  if [ ${#debs[@]} -eq 0 ]; then
+    echo "All debians are correctly published to our debian repository"
+    exit 0
   fi
 
+  counter=$((counter+1))
+  if [[ $((counter)) == $((tries)) ]]; then
+    echo "Error: Some Debians are still not correctly published : "$(join_by " " "${debs[@]}")
+    echo "You may still try to rerun job as debian repository is known from imperfect performance"
+    exit 1
+  fi 
+
+  sleep 60
 done
