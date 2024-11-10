@@ -2,13 +2,14 @@ open Pickles_types
 
 module Wrap_impl :
     module type of
-      Snarky_backendless.Snark.Run.Make (Kimchi_backend.Pasta.Pallas_based_plonk)
+      Snarky_backendless.Snark.Run.Make
+        (Kimchi_pasta_snarky_backend.Pallas_based_plonk)
 
 module Step : sig
   module Impl :
       module type of
         Snarky_backendless.Snark.Run.Make
-          (Kimchi_backend.Pasta.Vesta_based_plonk)
+          (Kimchi_pasta_snarky_backend.Vesta_based_plonk)
 
   include module type of Impl
 
@@ -91,7 +92,7 @@ module Wrap : sig
   module Impl :
       module type of
         Snarky_backendless.Snark.Run.Make
-          (Kimchi_backend.Pasta.Pallas_based_plonk)
+          (Kimchi_pasta_snarky_backend.Pallas_based_plonk)
 
   include module type of Impl
 
