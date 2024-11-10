@@ -20,7 +20,7 @@
   snarkette
   key_cache
   hex
-  kimchi_backend_common
+  kimchi_backend
   kimchi_pasta
   kimchi_pasta.basic
   kimchi_pasta.constraint_system
