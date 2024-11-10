@@ -14,7 +14,8 @@ cat dockerfiles/Dockerfile-mina-rosetta \
         --build-arg "network=devnet" \
         --build-arg "image=debian:bullseye" \
         --build-arg "deb_codename=bullseye" \
-        --build-arg "deb_version=2.0.0berkeley-rc1-1551e2f" -
+        --build-arg "deb_release=devnet" \
+        --build-arg "deb_version=2.0.0devnet-rc1-1551e2f" -
 ```
 
 This creates an image (`mina-rosetta:v2.0.0`) based on Debian Bullseye that
@@ -134,7 +135,7 @@ command:
 $ MINA_ROSETTA_MAX_DB_POOL_SIZE=64 _build/default/src/app/rosetta/rosetta.exe \
     --port 3087 \
     --graphql-uri http://localhost:3085/graphql \
-    --archive-uri postgres://pguser:pguser@localhost:5432/archive_berkeley
+    --archive-uri postgres://pguser:pguser@localhost:5432/archive
 ```
 
 The `--graphql-uri` parameter gives the address at which Rosetta can connect to
