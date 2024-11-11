@@ -335,7 +335,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         let%bind sync_ledger_time, (hash, sender, expected_staged_ledger_hash) =
           time_deferred
             (let root_sync_ledger =
-               Sync_ledger.Db.create temp_snarked_ledger ~logger ~trust_system
+               Sync_ledger.Db.create temp_snarked_ledger
+                 ~context:(module Context)
+                 ~trust_system
              in
              don't_wait_for
                (sync_ledger t ~preferred:preferred_peers ~root_sync_ledger
@@ -821,7 +823,8 @@ let%test_module "Bootstrap_controller tests" =
           let root_sync_ledger =
             Sync_ledger.Db.create
               (Transition_frontier.root_snarked_ledger me.state.frontier)
-              ~logger ~trust_system
+              ~context:(module Context)
+              ~trust_system
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
               let sync_deferred =

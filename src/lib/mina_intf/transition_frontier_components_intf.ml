@@ -224,7 +224,7 @@ module type Sync_handler_intf = sig
        frontier:transition_frontier
     -> Ledger_hash.t
     -> Mina_ledger.Sync_ledger.Query.t Envelope.Incoming.t
-    -> logger:Logger.t
+    -> context:(module CONTEXT)
     -> trust_system:Trust_system.t
     -> Mina_ledger.Sync_ledger.Answer.t option Deferred.t
 

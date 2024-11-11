@@ -14,6 +14,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val compile_config : Mina_compile_config.t
 end
 
 exception Invalid_genesis_state_hash of Mina_block.Validated.t

@@ -12,6 +12,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val compile_config : Mina_compile_config.t
 end
 
 module Node = struct
@@ -958,6 +960,8 @@ module For_tests = struct
     let precomputed_values = precomputed_values
 
     let consensus_constants = precomputed_values.consensus_constants
+
+    let compile_config = Mina_compile_config.For_unit_tests.t
   end
 
   let verifier () =

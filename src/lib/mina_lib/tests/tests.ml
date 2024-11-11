@@ -425,7 +425,8 @@ let%test_module "Epoch ledger sync tests" =
             | Error _ ->
                 failwith "Could not add starting account" ) ;
         let sync_ledger =
-          Mina_ledger.Sync_ledger.Db.create ~logger
+          Mina_ledger.Sync_ledger.Db.create
+            ~context:(module Context)
             ~trust_system:Context.trust_system db_ledger
         in
         let query_reader =

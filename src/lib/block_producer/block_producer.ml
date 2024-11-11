@@ -20,6 +20,8 @@ module type CONTEXT = sig
   val zkapp_cmd_limit : int option ref
 
   val vrf_poll_interval : Time.Span.t
+
+  val compile_config : Mina_compile_config.t
 end
 
 type Structured_log_events.t += Block_produced

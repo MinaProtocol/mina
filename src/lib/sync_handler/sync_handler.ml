@@ -90,16 +90,25 @@ module Make (Inputs : Inputs_intf) :
          frontier:Inputs.Transition_frontier.t
       -> Ledger_hash.t
       -> Sync_ledger.Query.t Envelope.Incoming.t
-      -> logger:Logger.t
+      -> context:(module CONTEXT)
       -> trust_system:Trust_system.t
       -> Sync_ledger.Answer.t Option.t Deferred.t =
-   fun ~frontier hash query ~logger ~trust_system ->
+   fun ~frontier hash query ~context ~trust_system ->
+    let (module Context) = context in
+    let (module C : Syncable_ledger.CONTEXT) =
+      ( module struct
+        let logger = Context.logger
+
+        let compile_config = Context.compile_config
+      end )
+    in
     match get_ledger_by_hash ~frontier hash with
     | None ->
         return None
     | Some ledger ->
         let responder =
-          Sync_ledger.Any_ledger.Responder.create ledger ignore ~logger
+          Sync_ledger.Any_ledger.Responder.create ledger ignore
+            ~context:(module C)
             ~trust_system
         in
         Sync_ledger.Any_ledger.Responder.answer_query responder query

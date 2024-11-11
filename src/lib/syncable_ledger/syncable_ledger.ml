@@ -105,6 +105,12 @@ module Answer = struct
   end]
 end
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val compile_config : Mina_compile_config.t
+end
+
 module type Inputs_intf = sig
   module Addr : module type of Merkle_address
 
@@ -159,7 +165,7 @@ module type S = sig
     val create :
          merkle_tree
       -> (query -> unit)
-      -> logger:Logger.t
+      -> context:(module CONTEXT)
       -> trust_system:Trust_system.t
       -> t
 
@@ -168,7 +174,10 @@ module type S = sig
   end
 
   val create :
-    merkle_tree -> logger:Logger.t -> trust_system:Trust_system.t -> 'a t
+       merkle_tree
+    -> context:(module CONTEXT)
+    -> trust_system:Trust_system.t
+    -> 'a t
 
   val answer_writer :
        'a t
@@ -273,10 +282,6 @@ end = struct
 
   type query = Addr.t Query.t
 
-  let max_subtree_depth : int = 8
-
-  let default_subtree_depth : int = 4
-
   (* Provides addresses at an specific depth from this address *)
   let rec intermediate_range : index -> Addr.t -> index -> Addr.t list =
    fun ledger_depth addr i ->
@@ -300,21 +305,23 @@ end = struct
     type t =
       { mt : MT.t
       ; f : query -> unit
-      ; logger : Logger.t
+      ; context : (module CONTEXT)
       ; trust_system : Trust_system.t
       }
 
     let create :
            MT.t
         -> (query -> unit)
-        -> logger:Logger.t
+        -> context:(module CONTEXT)
         -> trust_system:Trust_system.t
         -> t =
-     fun mt f ~logger ~trust_system -> { mt; f; logger; trust_system }
+     fun mt f ~context ~trust_system -> { mt; f; context; trust_system }
 
     let answer_query :
         t -> query Envelope.Incoming.t -> answer option Deferred.t =
-     fun { mt; f; logger; trust_system } query_envelope ->
+     fun { mt; f; context; trust_system } query_envelope ->
+      let (module Context) = context in
+      let open Context in
       let open Trust_system in
       let ledger_depth = MT.depth mt in
       let sender = Envelope.Incoming.sender query_envelope in
@@ -394,7 +401,10 @@ end = struct
                  (len, MT.get_inner_hash_at_addr_exn mt content_root_addr) )
         | What_child_hashes (a, subtree_depth) -> (
             match subtree_depth with
-            | n when n >= 1 && n <= max_subtree_depth -> (
+            | n
+              when n >= 1
+                   && n <= Context.compile_config.sync_ledger_max_subtree_depth
+              -> (
                 let ledger_depth = MT.depth mt in
                 let addresses =
                   intermediate_range ledger_depth a subtree_depth
@@ -409,7 +419,6 @@ end = struct
                 | Ok answer ->
                     Either.First answer
                 | Error e ->
-                    let logger = Logger.create () in
                     [%log error]
                       ~metadata:[ ("error", Error_json.error_to_yojson e) ]
                       "When handling What_child_hashes request, the following \
@@ -420,7 +429,6 @@ end = struct
                           ( "invalid address $addr in What_child_hashes request"
                           , [ ("addr", Addr.to_yojson a) ] ) ) )
             | _ ->
-                let logger = Logger.create () in
                 [%log error]
                   "When handling What_child_hashes request, the depth was \
                    outside the valid range" ;
@@ -446,7 +454,6 @@ end = struct
     { mutable desired_root : Root_hash.t option
     ; mutable auxiliary_data : 'a option
     ; tree : MT.t
-    ; logger : Logger.t
     ; trust_system : Trust_system.t
     ; answers :
         (Root_hash.t * query * answer Envelope.Incoming.t) Linear_pipe.Reader.t
@@ -460,6 +467,7 @@ end = struct
     ; waiting_content : Hash.t Addr.Table.t
     ; mutable validity_listener :
         [ `Ok | `Target_changed of Root_hash.t option * Root_hash.t ] Ivar.t
+    ; context : (module CONTEXT)
     }
 
   let t_of_sexp _ = failwith "t_of_sexp: not implemented"
@@ -478,7 +486,9 @@ end = struct
 
   let expect_children : 'a t -> Addr.t -> Hash.t -> unit =
    fun t parent_addr expected ->
-    [%log' trace t.logger]
+    let (module Context) = t.context in
+    let open Context in
+    [%log trace]
       ~metadata:
         [ ("parent_address", Addr.to_yojson parent_addr)
         ; ("hash", Hash.to_yojson expected)
@@ -488,7 +498,9 @@ end = struct
 
   let expect_content : 'a t -> Addr.t -> Hash.t -> unit =
    fun t addr expected ->
-    [%log' trace t.logger]
+    let (module Context) = t.context in
+    let open Context in
+    [%log trace]
       ~metadata:
         [ ("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected) ]
       "Expecting content addr $address, expected: $hash" ;
@@ -503,13 +515,15 @@ end = struct
       -> [ `Success
          | `Hash_mismatch of Hash.t * Hash.t  (** expected hash, actual *) ] =
    fun t addr content ->
+    let (module Context) = t.context in
+    let open Context in
     let expected = Addr.Table.find_exn t.waiting_content addr in
     (* TODO #444 should we batch all the updates and do them at the end? *)
     (* We might write the wrong data to the underlying ledger here, but if so
        we'll requeue the address and it'll be overwritten. *)
     MT.set_all_accounts_rooted_at_exn t.tree addr content ;
     Addr.Table.remove t.waiting_content addr ;
-    [%log' trace t.logger]
+    [%log trace]
       ~metadata:
         [ ("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected) ]
       "Found content addr $address, with hash $hash, removing from waiting \
@@ -555,11 +569,14 @@ end = struct
          | `Hash_mismatch of Hash.t * Hash.t
          | `Invalid_length ] =
    fun t addr nodes requested_depth ->
+    let (module Context) = t.context in
     let len = Array.length nodes in
     let is_power = Int.is_pow2 len in
     let is_more_than_two = len >= 2 in
     let subtree_depth = Int.ceil_log2 len in
-    let less_than_max = len <= Int.pow 2 max_subtree_depth in
+    let less_than_max =
+      len <= Int.pow 2 Context.compile_config.sync_ledger_max_subtree_depth
+    in
     let less_than_requested = subtree_depth <= requested_depth in
     let valid_length =
       is_power && is_more_than_two && less_than_requested && less_than_max
@@ -592,11 +609,13 @@ end = struct
     else `Invalid_length
 
   let all_done t =
+    let (module Context) = t.context in
+    let open Context in
     if not (Root_hash.equal (MT.merkle_root t.tree) (desired_root_exn t)) then
       failwith "We finished syncing, but made a mistake somewhere :("
     else (
       if Ivar.is_full t.validity_listener then
-        [%log' error t.logger] "Ivar.fill bug is here!" ;
+        [%log error] "Ivar.fill bug is here!" ;
       Ivar.fill t.validity_listener `Ok )
 
   (** Compute the hash of an empty tree of the specified height. *)
@@ -623,6 +642,7 @@ end = struct
       the children.
   *)
   let handle_node t addr exp_hash =
+    let (module Context) = t.context in
     if Addr.depth addr >= MT.depth t.tree - account_subtree_height then (
       expect_content t addr exp_hash ;
       Linear_pipe.write_without_pushback_if_open t.queries
@@ -630,7 +650,9 @@ end = struct
     else (
       expect_children t addr exp_hash ;
       Linear_pipe.write_without_pushback_if_open t.queries
-        (desired_root_exn t, What_child_hashes (addr, default_subtree_depth)) )
+        ( desired_root_exn t
+        , What_child_hashes
+            (addr, Context.compile_config.sync_ledger_default_subtree_depth) ) )
 
   (** Handle the initial Num_accounts message, starting the main syncing
       process. *)
@@ -652,6 +674,8 @@ end = struct
     else `Hash_mismatch (rh, actual)
 
   let main_loop t =
+    let (module Context) = t.context in
+    let open Context in
     let handle_answer :
            Root_hash.t
            * Addr.t Query.t
@@ -666,14 +690,14 @@ end = struct
       in
       let sender = Envelope.Incoming.sender env in
       let answer = Envelope.Incoming.data env in
-      [%log' trace t.logger]
+      [%log trace]
         ~metadata:
           [ ("root_hash", Root_hash.to_yojson root_hash)
           ; ("query", Query.to_yojson Addr.to_yojson query)
           ]
         "Handle answer for $root_hash" ;
       if not (Root_hash.equal root_hash (desired_root_exn t)) then (
-        [%log' trace t.logger]
+        [%log trace]
           ~metadata:
             [ ("desired_hash", Root_hash.to_yojson (desired_root_exn t))
             ; ("ignored_hash", Root_hash.to_yojson root_hash)
@@ -683,8 +707,7 @@ end = struct
       else if already_done then (
         (* This can happen if we asked for hashes that turn out to be equal in
            underlying ledger and the target. *)
-        [%log' debug t.logger]
-          "Got sync response when we're already finished syncing" ;
+        [%log debug] "Got sync response when we're already finished syncing" ;
         Deferred.unit )
       else
         let open Trust_system in
@@ -694,7 +717,7 @@ end = struct
           Linear_pipe.write_without_pushback_if_open t.queries (root_hash, query)
         in
         let credit_fulfilled_request () =
-          record_envelope_sender t.trust_system t.logger sender
+          record_envelope_sender t.trust_system logger sender
             ( Actions.Fulfilled_request
             , Some
                 ( "sync ledger query $query"
@@ -708,7 +731,7 @@ end = struct
                   credit_fulfilled_request ()
               | `Hash_mismatch (expected, actual) ->
                   let%map () =
-                    record_envelope_sender t.trust_system t.logger sender
+                    record_envelope_sender t.trust_system logger sender
                       ( Actions.Sent_bad_hash
                       , Some
                           ( "sent accounts $accounts for address $addr, they \
@@ -727,7 +750,7 @@ end = struct
                   credit_fulfilled_request ()
               | `Hash_mismatch (expected, actual) ->
                   let%map () =
-                    record_envelope_sender t.trust_system t.logger sender
+                    record_envelope_sender t.trust_system logger sender
                       ( Actions.Sent_bad_hash
                       , Some
                           ( "Claimed num_accounts $count, content root hash \
@@ -745,7 +768,7 @@ end = struct
               match add_subtree t address hashes requested_depth with
               | `Hash_mismatch (expected, actual) ->
                   let%map () =
-                    record_envelope_sender t.trust_system t.logger sender
+                    record_envelope_sender t.trust_system logger sender
                       ( Actions.Sent_bad_hash
                       , Some
                           ( "hashes sent for subtree on address $address merge \
@@ -757,12 +780,16 @@ end = struct
                   requeue_query ()
               | `Invalid_length ->
                   let%map () =
-                    record_envelope_sender t.trust_system t.logger sender
+                    record_envelope_sender t.trust_system logger sender
                       ( Actions.Sent_bad_hash
                       , Some
                           ( "hashes sent for subtree on address $address must \
                              be a power of 2 in the range 2-2^$depth"
-                          , [ ("depth", `Int max_subtree_depth) ] ) )
+                          , [ ( "depth"
+                              , `Int
+                                  Context.compile_config
+                                    .sync_ledger_max_subtree_depth )
+                            ] ) )
                   in
                   requeue_query ()
               | `Good children_to_verify ->
@@ -771,7 +798,7 @@ end = struct
                   credit_fulfilled_request () )
           | query, answer ->
               let%map () =
-                record_envelope_sender t.trust_system t.logger sender
+                record_envelope_sender t.trust_system logger sender
                   ( Actions.Violated_protocol
                   , Some
                       ( "Answered question we didn't ask! Query was $query \
@@ -789,13 +816,15 @@ end = struct
             (Option.value_exn t.desired_root)
             (MT.merkle_root t.tree)
         then (
-          [%str_log' trace t.logger] Snarked_ledger_synced ;
+          [%str_log trace] Snarked_ledger_synced ;
           all_done t ) ;
         Deferred.unit
     in
     Linear_pipe.iter t.answers ~f:handle_answer
 
   let new_goal t h ~data ~equal =
+    let (module Context) = t.context in
+    let open Context in
     let should_skip =
       match t.desired_root with
       | None ->
@@ -805,7 +834,7 @@ end = struct
     in
     if not should_skip then (
       Option.iter t.desired_root ~f:(fun root_hash ->
-          [%log' debug t.logger]
+          [%log debug]
             ~metadata:
               [ ("old_root_hash", Root_hash.to_yojson root_hash)
               ; ("new_root_hash", Root_hash.to_yojson h)
@@ -822,7 +851,7 @@ end = struct
       Option.fold t.auxiliary_data ~init:false ~f:(fun _ saved_data ->
           equal data saved_data )
     then (
-      [%log' debug t.logger] "New_goal to same hash, not doing anything" ;
+      [%log debug] "New_goal to same hash, not doing anything" ;
       `Repeat )
     else (
       t.auxiliary_data <- Some data ;
@@ -856,14 +885,13 @@ end = struct
     ignore (new_goal t rh ~data ~equal : [ `New | `Repeat | `Update_data ]) ;
     wait_until_valid t rh
 
-  let create mt ~logger ~trust_system =
+  let create mt ~context ~trust_system =
     let qr, qw = Linear_pipe.create () in
     let ar, aw = Linear_pipe.create () in
     let t =
       { desired_root = None
       ; auxiliary_data = None
       ; tree = mt
-      ; logger
       ; trust_system
       ; answers = ar
       ; answer_writer = aw
@@ -872,6 +900,7 @@ end = struct
       ; waiting_parents = Addr.Table.create ()
       ; waiting_content = Addr.Table.create ()
       ; validity_listener = Ivar.create ()
+      ; context
       }
     in
     don't_wait_for (main_loop t) ;

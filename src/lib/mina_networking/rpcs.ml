@@ -456,7 +456,8 @@ module Answer_sync_ledger_query = struct
     let query = Envelope.Incoming.map request ~f:Tuple2.get2 in
     let%bind answer =
       let%bind.Deferred.Option frontier = return (get_transition_frontier ()) in
-      Sync_handler.answer_query ~frontier ledger_hash query ~logger
+      Sync_handler.answer_query ~frontier ledger_hash query
+        ~context:(module Context)
         ~trust_system
     in
     let result =
