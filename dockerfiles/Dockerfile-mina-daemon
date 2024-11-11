@@ -13,8 +13,8 @@ ARG deb_suffix
 ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
 # construct mina debian package name based on network and suffix.
 # possible values:
-# - mina-berkeley
-# - mina-berkeley-lightnet etc.
+# - mina-devnet
+# - mina-devnet-lightnet etc.
 ENV MINA_DEB=mina-${network}${SUFFIX}
 
 ENV DEBIAN_FRONTEND noninteractive
