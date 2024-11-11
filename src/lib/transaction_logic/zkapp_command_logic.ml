@@ -176,7 +176,9 @@ module type Actions_intf = sig
 
   val is_empty : t -> bool
 
-  val push_events : field -> t -> field
+  val push_events_hash : acc:field -> field -> field
+
+  val hash : t -> field
 end
 
 module type Protocol_state_precondition_intf = sig
@@ -966,7 +968,8 @@ module Make (Inputs : Inputs_intf) = struct
     ; new_frame : Stack_frame.t
     }
 
-  let get_next_account_update (current_forest : Stack_frame.t)
+  let get_next_account_update ~lookup_precomputed_token_id
+      (current_forest : Stack_frame.t)
       (* The stack for the most recent zkApp *)
         (call_stack : Call_stack.t) (* The partially-completed parent stacks *)
       : get_next_account_update_result =
@@ -1047,12 +1050,16 @@ module Make (Inputs : Inputs_intf) = struct
           (Stack_frame.if_ remainder_of_current_forest_empty
              ~then_:newly_popped_frame ~else_:remainder_of_current_forest_frame )
         ~else_:
-          (let caller =
-             Account_id.derive_token_id
-               ~owner:(Account_update.account_id account_update)
-           and caller_caller = caller_id in
-           Stack_frame.make ~calls:account_update_forest ~caller ~caller_caller
-          )
+          (let owner = Account_update.account_id account_update in
+           let caller =
+             match lookup_precomputed_token_id owner with
+             | Some tid ->
+                 tid
+             | None ->
+                 Account_id.derive_token_id ~owner
+           in
+           Stack_frame.make ~calls:account_update_forest ~caller
+             ~caller_caller:caller_id )
     in
     { account_update
     ; caller_id
@@ -1061,12 +1068,15 @@ module Make (Inputs : Inputs_intf) = struct
     ; new_call_stack
     }
 
-  let update_action_state (action_state : _ Pickles_types.Vector.t) actions
-      ~txn_global_slot ~last_action_slot =
+  let update_action_state (action_state : _ Pickles_types.Vector.t)
+      ?actions_hash actions ~txn_global_slot ~last_action_slot =
     (* Push events to s1. *)
     let [ s1'; s2'; s3'; s4'; s5' ] = action_state in
     let is_empty = Actions.is_empty actions in
-    let s1_updated = Actions.push_events s1' actions in
+    let actions_hash =
+      match actions_hash with None -> Actions.hash actions | Some h -> h
+    in
+    let s1_updated = Actions.push_events_hash ~acc:s1' actions_hash in
     let s1 = Field.if_ is_empty ~then_:s1' ~else_:s1_updated in
     (* Shift along if not empty and last update wasn't this slot *)
     let is_this_slot =
@@ -1083,8 +1093,32 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t), last_action_slot)
 
+  (** Type holding zkapp transaction-related data that is dependent only on a transaction
+      (and not ledger)
+  *)
+  type zkapp_precomputed_t =
+    { all_account_updates :
+        ( Account_update.t
+        , Zkapp_command.Digest.Account_update.t
+        , Zkapp_command.Digest.Forest.t )
+        Zkapp_command.Call_forest.t
+    ; init_account_update_result : get_next_account_update_result
+    ; tx_commitment_on_start : Inputs.Transaction_commitment.t
+    ; full_commitment_on_start : Inputs.Transaction_commitment.t
+    ; lookup_actions_hash : Actions.t -> Field.t option
+    }
+
+  (** Type holding transaction-related data that is dependent only on a transaction
+      (and not ledger)
+  *)
+  type precomputed_t =
+    { lookup_derived_token_id : Account_id.t -> Token_id.t option
+    ; zkapp_precomputed : zkapp_precomputed_t
+    }
+
   let apply ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(is_start : [ `Yes of _ Start_data.t | `No | `Compute of _ Start_data.t ])
+      ?(precomputed : precomputed_t option)
       (h :
         (< global_state : Global_state.t
          ; transaction_commitment : Transaction_commitment.t
@@ -1163,9 +1197,23 @@ module Make (Inputs : Inputs_intf) = struct
           ; new_frame = remaining
           ; new_call_stack = call_stack
           } =
-        with_label ~label:"get next account update" (fun () ->
-            (* TODO: Make the stack frame hashed inside of the local state *)
-            get_next_account_update to_pop call_stack )
+        match (precomputed, is_start) with
+        | ( Some { zkapp_precomputed = { init_account_update_result; _ }; _ }
+          , `Yes _ )
+        | ( Some { zkapp_precomputed = { init_account_update_result; _ }; _ }
+          , `Compute _ ) ->
+            init_account_update_result
+        | _ ->
+            let lookup_precomputed_token_id =
+              Option.value_map ~default:(Fn.const None)
+                ~f:(fun { lookup_derived_token_id; _ } ->
+                  lookup_derived_token_id )
+                precomputed
+            in
+            with_label ~label:"get next account update" (fun () ->
+                (* TODO: Make the stack frame hashed inside of the local state *)
+                get_next_account_update ~lookup_precomputed_token_id to_pop
+                  call_stack )
       in
       let local_state =
         with_label ~label:"token owner not caller" (fun () ->
@@ -1193,14 +1241,18 @@ module Make (Inputs : Inputs_intf) = struct
             ( local_state.transaction_commitment
             , local_state.full_transaction_commitment )
         | `Yes start_data | `Compute start_data ->
-            let tx_commitment_on_start =
-              Transaction_commitment.commitment
-                ~account_updates:(Stack_frame.calls remaining)
-            in
-            let full_tx_commitment_on_start =
-              Transaction_commitment.full_commitment ~account_update
-                ~memo_hash:start_data.memo_hash
-                ~commitment:tx_commitment_on_start
+            let tx_commitment_on_start, full_commitment_on_start =
+              match precomputed with
+              | Some { zkapp_precomputed = p; _ } ->
+                  (p.tx_commitment_on_start, p.full_commitment_on_start)
+              | None ->
+                  let commitment =
+                    Transaction_commitment.commitment
+                      ~account_updates:(Stack_frame.calls remaining)
+                  in
+                  ( commitment
+                  , Transaction_commitment.full_commitment ~account_update
+                      ~memo_hash:start_data.memo_hash ~commitment )
             in
             let tx_commitment =
               Transaction_commitment.if_ is_start' ~then_:tx_commitment_on_start
@@ -1208,7 +1260,7 @@ module Make (Inputs : Inputs_intf) = struct
             in
             let full_tx_commitment =
               Transaction_commitment.if_ is_start'
-                ~then_:full_tx_commitment_on_start
+                ~then_:full_commitment_on_start
                 ~else_:local_state.full_transaction_commitment
             in
             (tx_commitment, full_tx_commitment)
@@ -1596,9 +1648,14 @@ module Make (Inputs : Inputs_intf) = struct
     let a, local_state =
       let actions = Account_update.Update.actions account_update in
       let last_action_slot = Account.last_action_slot a in
+      let actions_hash =
+        Option.bind precomputed
+          ~f:(fun { zkapp_precomputed = { lookup_actions_hash; _ }; _ } ->
+            lookup_actions_hash actions )
+      in
       let action_state, last_action_slot =
-        update_action_state (Account.action_state a) actions ~txn_global_slot
-          ~last_action_slot
+        update_action_state (Account.action_state a) ?actions_hash actions
+          ~txn_global_slot ~last_action_slot
       in
       let is_empty =
         (* also computed in update_action_state, but messy to return it *)
@@ -1968,7 +2025,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (global_state, local_state)
 
-  let step h state = apply ~is_start:`No h state
+  let step = apply ~is_start:`No
 
-  let start start_data h state = apply ~is_start:(`Yes start_data) h state
+  let start start_data = apply ~is_start:(`Yes start_data)
 end
