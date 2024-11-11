@@ -166,9 +166,9 @@ let%test_module "Block storage tests" =
         Result.t] (Ok body) (read_body db body_ref)
 
     let%test_unit "Write many blocks" =
-      let n = 300 in
-      Quickcheck.test (gen_breadcrumb ~verifier ()) ~trials:1
-        ~f:(fun make_breadcrumb ->
+      let n = 5 in
+      Quickcheck.test (gen_breadcrumb_seq ~verifier n) ~trials:1
+        ~f:(fun make_breadcrumb_seq ->
           let frontier = create_frontier () in
           let root = Full_frontier.root frontier in
           let reader, writer = Pipe.create () in
@@ -176,21 +176,9 @@ let%test_module "Block storage tests" =
               let db =
                 create (String.concat ~sep:"/" [ conf_dir; "block-db" ])
               in
-              let%bind breadcrumb = make_breadcrumb root in
-              let%bind () = send_and_receive ~db ~helper ~reader breadcrumb in
-              Quickcheck.test
-                (String.gen_with_length 1000
-                   (* increase to 1000000 to reach past mmap size of 256 MiB*)
-                   Base_quickcheck.quickcheck_generator_char ) ~trials:n
-                ~f:(fun _ ->
-                  let body = Breadcrumb.block breadcrumb |> Mina_block.body in
-                  Mina_net2.For_tests.Helper.send_add_resource
-                    ~tag:Staged_ledger_diff.Body.Tag.Body ~body helper ) ;
-              match%bind Pipe.read_exactly reader ~num_values:n with
-              | `Exactly _ ->
-                  make_breadcrumb root >>= send_and_receive ~db ~helper ~reader
-              | _ ->
-                  failwith "unexpected" ) ;
+              let%bind breadcrumbs = make_breadcrumb_seq root in
+              Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
+                  send_and_receive ~db ~helper ~reader breadcrumb ) ) ;
           clean_up_persistent_root ~frontier )
 
     let%test_unit "Write a block body to db and read it" =
