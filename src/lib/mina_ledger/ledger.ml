@@ -341,33 +341,6 @@ module Ledger_inner = struct
         Debug_assert.debug_assert (fun () ->
             [%test_eq: Ledger_hash.t] start_hash (merkle_root ledger) ) ;
         (merkle_path ledger new_loc, Account.empty)
-
-  let _handler t =
-    let open Snark_params.Tick in
-    let path_exn idx =
-      List.map (merkle_path_at_index_exn t idx) ~f:(function
-        | `Left h ->
-            h
-        | `Right h ->
-            h )
-    in
-    stage (fun (With { request; respond }) ->
-        match request with
-        | Ledger_hash.Get_element idx ->
-            let elt = get_at_index_exn t idx in
-            let path = (path_exn idx :> Random_oracle.Digest.t list) in
-            respond (Provide (elt, path))
-        | Ledger_hash.Get_path idx ->
-            let path = (path_exn idx :> Random_oracle.Digest.t list) in
-            respond (Provide path)
-        | Ledger_hash.Set (idx, account) ->
-            set_at_index_exn t idx account ;
-            respond (Provide ())
-        | Ledger_hash.Find_index pk ->
-            let index = index_of_account_exn t pk in
-            respond (Provide index)
-        | _ ->
-            unhandled )
 end
 
 include Ledger_inner
