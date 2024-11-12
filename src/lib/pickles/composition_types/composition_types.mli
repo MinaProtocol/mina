@@ -504,18 +504,20 @@ module Wrap : sig
         -> 'f Core_kernel.Array.t
 
       val typ :
-           ( 'a
-           , 'b
-           , 'c
-           , (unit, 'c) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
-           )
-           snarky_typ
-        -> ('d, 'e, 'c) Snarky_backendless.Typ.t
+           ('a, 'b) Step_impl.Typ.t
+        -> ('d, 'e) Step_impl.Typ.t
         -> length:'f Nat.nat
         -> ( ('a, ('d, 'f) Vector.vec) t
-           , ('b, ('e, 'f) Vector.vec) t
-           , 'c )
-           Snarky_backendless.Typ.t
+           , ('b, ('e, 'f) Vector.vec) t )
+           Step_impl.Typ.t
+
+      val wrap_typ :
+           ('a, 'b) Wrap_impl.Typ.t
+        -> ('d, 'e) Wrap_impl.Typ.t
+        -> length:'f Nat.nat
+        -> ( ('a, ('d, 'f) Vector.vec) t
+           , ('b, ('e, 'f) Vector.vec) t )
+           Wrap_impl.Typ.t
     end
 
     module Minimal : sig

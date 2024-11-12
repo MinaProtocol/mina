@@ -392,7 +392,13 @@ module Wrap = struct
           ]
 
       let typ g1 chal ~length =
-        Snarky_backendless.Typ.of_hlistable
+        Step_impl.Typ.of_hlistable
+          [ g1; Vector.typ chal length ]
+          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+          ~value_of_hlist:of_hlist
+
+      let wrap_typ g1 chal ~length =
+        Wrap_impl.Typ.of_hlistable
           [ g1; Vector.typ chal length ]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
