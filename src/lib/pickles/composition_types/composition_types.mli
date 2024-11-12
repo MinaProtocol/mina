@@ -3,9 +3,6 @@ module Opt = Opt
 
 type ('a, 'b) opt := ('a, 'b) Opt.t
 
-type ('var, 'value, 'field, 'checked) snarky_typ :=
-  ('var, 'value, 'field, 'checked) Snarky_backendless.Types.Typ.t
-
 (** {2 Module aliases} *)
 
 module Digest = Digest
@@ -339,39 +336,18 @@ module Wrap : sig
         [@@deriving sexp, compare, yojson, hash, equal]
 
         val typ :
-             (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-          -> dummy_scalar_challenge:'b Scalar_challenge.t
-          -> challenge:
-               ( 'c
-               , 'd
-               , 'f
-               , ( unit
-                 , 'f )
-                 Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
-               snarky_typ
-          -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
+             dummy_scalar_challenge:'b Scalar_challenge.t
+          -> challenge:('c, 'd) Step_impl.Typ.t
+          -> scalar_challenge:('e, 'b) Step_impl.Typ.t
           -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
-          -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
-          -> ( 'g
-             , 'h
-             , 'f
-             , ( unit
-               , 'f )
-               Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
-             snarky_typ
+          -> ('fp, 'a) Step_impl.Typ.t
+          -> ('g, 'h) Step_impl.Typ.t
           -> ( ( ( 'c
                  , 'e Scalar_challenge.t
                  , 'fp
-                 , ( 'fp
-                   , 'f Snarky_backendless.Cvar.t
-                     Snarky_backendless__Snark_intf.Boolean0.t )
-                   Opt.t
-                 , ( 'e Scalar_challenge.t
-                   , 'f Snarky_backendless.Cvar.t
-                     Snarky_backendless__Snark_intf.Boolean0.t )
-                   Opt.t
-                 , 'f Snarky_backendless.Cvar.t
-                   Snarky_backendless__Snark_intf.Boolean0.t )
+                 , ('fp, Step_impl.Boolean.var) Opt.t
+                 , ('e Scalar_challenge.t, Step_impl.Boolean.var) Opt.t
+                 , Step_impl.Boolean.var )
                  Plonk.In_circuit.t
                , 'e Scalar_challenge.t
                , 'fp
@@ -393,9 +369,8 @@ module Wrap : sig
                  , Backend.Tick.Rounds.n )
                  Vector.vec
                , 'h )
-               Stable.Latest.t
-             , 'f )
-             Snarky_backendless.Typ.t
+               Stable.Latest.t )
+             Step_impl.Typ.t
       end
 
       val to_minimal :
