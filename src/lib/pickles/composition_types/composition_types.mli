@@ -1357,33 +1357,6 @@ module Step : sig
              , bool )
              In_circuit.t )
            Step_impl.Typ.t
-
-      val wrap_typ :
-           ('b, 'c) Wrap_impl.Typ.t
-        -> assert_16_bits:(Wrap_impl.Field.t -> unit)
-        -> ( ( Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
-             , Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
-               Scalar_challenge.t
-             , 'b
-             , ( Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
-                 Scalar_challenge.t
-                 Bulletproof_challenge.t
-               , Backend.Tock.Rounds.n )
-               Vector.t
-             , Wrap_impl.Field.t
-             , Wrap_impl.Boolean.var )
-             In_circuit.t
-           , ( Limb_vector.Challenge.Constant.t
-             , Limb_vector.Challenge.Constant.t Scalar_challenge.t
-             , 'c
-             , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
-                 Bulletproof_challenge.t
-               , Backend.Tock.Rounds.n )
-               Vector.t
-             , Digest.Constant.t
-             , bool )
-             In_circuit.t )
-           Wrap_impl.Typ.t
     end
 
     type ('unfinalized_proofs, 'messages_for_next_step_proof) t =
