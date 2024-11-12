@@ -590,46 +590,20 @@ module Wrap : sig
       [@@deriving sexp, compare, yojson, hash, equal]
 
       val typ :
-           (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-        -> dummy_scalar_challenge:'b Scalar_challenge.t
-        -> challenge:
-             ( 'c
-             , 'd
-             , 'f
-             , ( unit
-               , 'f )
-               Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
-             snarky_typ
-        -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
+           dummy_scalar_challenge:'b Scalar_challenge.t
+        -> challenge:('c, 'd) Step_impl.Typ.t
+        -> scalar_challenge:('e, 'b) Step_impl.Typ.t
         -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
-        -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
-        -> ( 'g
-           , 'h
-           , 'f
-           , (unit, 'f) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
-           )
-           snarky_typ
-        -> ( 'i
-           , 'j
-           , 'f
-           , (unit, 'f) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
-           )
-           snarky_typ
-        -> ( 'k
-           , 'l
-           , 'f
-           , (unit, 'f) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
-           )
-           snarky_typ
+        -> ('fp, 'a) Step_impl.Typ.t
+        -> ('g, 'h) Step_impl.Typ.t
+        -> ('i, 'j) Step_impl.Typ.t
+        -> ('k, 'l) Step_impl.Typ.t
         -> ( ( ( 'c
                , 'e Scalar_challenge.t
                , 'fp
                , ('fp, 'boolean) Opt.t
                , ('e Scalar_challenge.t, 'boolean) Opt.t
-               , ('f Snarky_backendless.Cvar.t
-                  Snarky_backendless__Snark_intf.Boolean0.t
-                  as
-                  'boolean ) )
+               , (Step_impl.Boolean.var as 'boolean) )
                Deferred_values.Plonk.In_circuit.t
              , 'e Scalar_challenge.t
              , 'fp
@@ -655,9 +629,51 @@ module Wrap : sig
                , Backend.Tick.Rounds.n )
                Vector.vec
              , 'l )
+             Stable.Latest.t )
+           Step_impl.Typ.t
+
+      val wrap_typ :
+           dummy_scalar_challenge:'b Scalar_challenge.t
+        -> challenge:('c, 'd) Wrap_impl.Typ.t
+        -> scalar_challenge:('e, 'b) Wrap_impl.Typ.t
+        -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
+        -> ('fp, 'a) Wrap_impl.Typ.t
+        -> ('g, 'h) Wrap_impl.Typ.t
+        -> ('i, 'j) Wrap_impl.Typ.t
+        -> ('k, 'l) Wrap_impl.Typ.t
+        -> ( ( ( 'c
+               , 'e Scalar_challenge.t
+               , 'fp
+               , ('fp, 'boolean) Opt.t
+               , ('e Scalar_challenge.t, 'boolean) Opt.t
+               , (Wrap_impl.Boolean.var as 'boolean) )
+               Deferred_values.Plonk.In_circuit.t
+             , 'e Scalar_challenge.t
+             , 'fp
+             , 'g
+             , 'i
+             , ( 'e Scalar_challenge.t Bulletproof_challenge.t
+               , Backend.Tick.Rounds.n )
+               Vector.vec
+             , 'k )
              Stable.Latest.t
-           , 'f )
-           Snarky_backendless.Typ.t
+           , ( ( 'd
+               , 'b Scalar_challenge.t
+               , 'a
+               , 'a option
+               , 'b Scalar_challenge.t option
+               , bool )
+               Deferred_values.Plonk.In_circuit.t
+             , 'b Scalar_challenge.t
+             , 'a
+             , 'h
+             , 'j
+             , ( 'b Scalar_challenge.t Bulletproof_challenge.t
+               , Backend.Tick.Rounds.n )
+               Vector.vec
+             , 'l )
+             Stable.Latest.t )
+           Wrap_impl.Typ.t
     end
 
     val to_minimal :
