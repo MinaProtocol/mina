@@ -134,14 +134,12 @@ module Wrap = struct
             ; perm = f t.perm
             }
 
-          let typ (type f fp)
-              (module Impl : Snarky_backendless.Snark_intf.Run
-                with type field = f ) ~dummy_scalar_challenge ~challenge
-              ~scalar_challenge ~bool
+          let typ (type fp) ~dummy_scalar_challenge ~challenge ~scalar_challenge
+              ~bool
               ~feature_flags:
                 ({ Plonk_types.Features.Full.uses_lookups; _ } as feature_flags)
-              (fp : (fp, _, f) Snarky_backendless.Typ.t) =
-            Snarky_backendless.Typ.of_hlistable
+              (fp : (fp, _) Step_impl.Typ.t) =
+            Step_impl.Typ.of_hlistable
               [ Scalar_challenge.typ scalar_challenge
               ; challenge
               ; challenge
@@ -152,7 +150,7 @@ module Wrap = struct
               ; Plonk_types.Features.typ
                   ~feature_flags:(Plonk_types.Features.of_full feature_flags)
                   bool
-              ; Opt.typ Impl.Boolean.typ uses_lookups
+              ; Opt.typ Step_impl.Boolean.typ uses_lookups
                   ~dummy:dummy_scalar_challenge
                   (Scalar_challenge.typ scalar_challenge)
               ]
@@ -330,10 +328,8 @@ module Wrap = struct
         let typ (type fp) ~dummy_scalar_challenge ~challenge ~scalar_challenge
             ~feature_flags (fp : (fp, _) Step_impl.Typ.t) index =
           Step_impl.Typ.of_hlistable
-            [ Plonk.In_circuit.typ
-                (module Step_impl)
-                ~dummy_scalar_challenge ~challenge ~scalar_challenge
-                ~bool:Step_impl.Boolean.typ ~feature_flags fp
+            [ Plonk.In_circuit.typ ~dummy_scalar_challenge ~challenge
+                ~scalar_challenge ~bool:Step_impl.Boolean.typ ~feature_flags fp
             ; fp
             ; fp
             ; Scalar_challenge.typ scalar_challenge

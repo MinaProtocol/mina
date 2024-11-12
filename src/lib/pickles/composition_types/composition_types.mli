@@ -133,44 +133,6 @@ module Wrap : sig
                ('a, 'b, 'c, ('c, 'e) Opt.t, ('d, 'e) Opt.t, 'bool) t
             -> f:('c -> 'f)
             -> ('a, 'b, 'f, ('f, 'e) Opt.t, ('d, 'e) Opt.t, 'bool) t
-
-          val typ :
-               'f Spec.impl
-            -> dummy_scalar_challenge:'b Scalar_challenge.t
-            -> challenge:
-                 ( 'c
-                 , 'd
-                 , 'f
-                 , ( unit
-                   , 'f )
-                   Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
-                 Snarky_backendless.Types.Typ.t
-            -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
-            -> bool:
-                 ( ('f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
-                    as
-                    'boolean )
-                 , bool
-                 , 'f )
-                 Snarky_backendless.Typ.t
-            -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
-            -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
-            -> ( ( 'c
-                 , 'e Scalar_challenge.t
-                 , 'fp
-                 , ('fp, 'boolean) Opt.t
-                 , ('e Scalar_challenge.t, 'boolean) Opt.t
-                 , 'boolean )
-                 t
-               , ( 'd
-                 , 'b Scalar_challenge.t
-                 , 'a
-                 , 'a option
-                 , 'b Scalar_challenge.t option
-                 , bool )
-                 t
-               , 'f )
-               Snarky_backendless.Typ.t
         end
 
         val to_minimal :
