@@ -16,6 +16,7 @@ module Nvector = Vector.With_length
 module Wrap_bp_vec = Backend.Tock.Rounds_vector
 module Step_bp_vec = Backend.Tick.Rounds_vector
 module Scalar_challenge = Kimchi_backend_common.Scalar_challenge
+module Step_impl := Kimchi_pasta_snarky_backend.Step_impl
 module Wrap_impl := Kimchi_pasta_snarky_backend.Wrap_impl
 
 (** {2 Modules} *)
@@ -1331,24 +1332,19 @@ module Step : sig
       end
 
       val typ :
-           'a Spec.impl
-        -> ( 'b
-           , 'c
-           , 'a
-           , (unit, 'a) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
-           )
-           snarky_typ
-        -> assert_16_bits:('a Snarky_backendless.Cvar.t -> unit)
-        -> ( ( 'a Limb_vector.Challenge.t
-             , 'a Limb_vector.Challenge.t Scalar_challenge.t
+           ('b, 'c) Step_impl.Typ.t
+        -> assert_16_bits:(Step_impl.Field.t -> unit)
+        -> ( ( Step_impl.Field.Constant.t Limb_vector.Challenge.t
+             , Step_impl.Field.Constant.t Limb_vector.Challenge.t
+               Scalar_challenge.t
              , 'b
-             , ( 'a Limb_vector.Challenge.t Scalar_challenge.t
+             , ( Step_impl.Field.Constant.t Limb_vector.Challenge.t
+                 Scalar_challenge.t
                  Bulletproof_challenge.t
                , Backend.Tock.Rounds.n )
                Vector.t
-             , 'a Snarky_backendless.Cvar.t
-             , 'a Snarky_backendless.Cvar.t
-               Snarky_backendless__Snark_intf.Boolean0.t )
+             , Step_impl.Field.t
+             , Step_impl.Boolean.var )
              In_circuit.t
            , ( Limb_vector.Challenge.Constant.t
              , Limb_vector.Challenge.Constant.t Scalar_challenge.t
@@ -1359,9 +1355,35 @@ module Step : sig
                Vector.t
              , Digest.Constant.t
              , bool )
+             In_circuit.t )
+           Step_impl.Typ.t
+
+      val wrap_typ :
+           ('b, 'c) Wrap_impl.Typ.t
+        -> assert_16_bits:(Wrap_impl.Field.t -> unit)
+        -> ( ( Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
+             , Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
+               Scalar_challenge.t
+             , 'b
+             , ( Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
+                 Scalar_challenge.t
+                 Bulletproof_challenge.t
+               , Backend.Tock.Rounds.n )
+               Vector.t
+             , Wrap_impl.Field.t
+             , Wrap_impl.Boolean.var )
              In_circuit.t
-           , 'a )
-           Snarky_backendless.Typ.t
+           , ( Limb_vector.Challenge.Constant.t
+             , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+             , 'c
+             , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                 Bulletproof_challenge.t
+               , Backend.Tock.Rounds.n )
+               Vector.t
+             , Digest.Constant.t
+             , bool )
+             In_circuit.t )
+           Wrap_impl.Typ.t
     end
 
     type ('unfinalized_proofs, 'messages_for_next_step_proof) t =
