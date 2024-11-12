@@ -24,8 +24,6 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
-
-  val compile_config : Mina_compile_config.t
 end
 
 let max_catchup_chunk_length = 20
@@ -722,7 +720,7 @@ module For_tests = struct
 
       let consensus_constants = precomputed_values.consensus_constants
 
-      let compile_config = Mina_compile_config.For_unit_tests.t
+      let genesis_constants = precomputed_values.genesis_constants
     end in
     let open Context in
     let open Quickcheck.Generator.Let_syntax in

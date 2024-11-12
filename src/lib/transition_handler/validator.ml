@@ -14,8 +14,6 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
-
-  val compile_config : Mina_compile_config.t
 end
 
 let validate_header_is_relevant ~context:(module Context : CONTEXT) ~frontier
@@ -23,6 +21,8 @@ let validate_header_is_relevant ~context:(module Context : CONTEXT) ~frontier
   let open Result.Let_syntax in
   let module Context = struct
     include Context
+
+    let genesis_constants = precomputed_values.genesis_constants
 
     let logger =
       Logger.extend logger

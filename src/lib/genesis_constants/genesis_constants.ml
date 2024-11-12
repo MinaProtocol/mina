@@ -223,6 +223,8 @@ module T = struct
     ; max_action_elements : int
     ; zkapp_cmd_limit_hardcap : int
     ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t
+    ; sync_ledger_default_subtree_depth : int
+    ; sync_ledger_max_subtree_depth : int
     }
   [@@deriving to_yojson, sexp_of, bin_io_unversioned]
 
@@ -435,6 +437,9 @@ module Make (Node_config : Node_config_intf.S) : S = struct
     ; zkapp_cmd_limit_hardcap = Node_config.zkapp_cmd_limit_hardcap
     ; minimum_user_command_fee =
         Currency.Fee.of_mina_string_exn Node_config.minimum_user_command_fee
+    ; sync_ledger_max_subtree_depth = Node_config.sync_ledger_max_subtree_depth
+    ; sync_ledger_default_subtree_depth =
+        Node_config.sync_ledger_default_subtree_depth
     }
 end
 

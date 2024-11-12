@@ -11,7 +11,7 @@ module type CONTEXT = sig
 
   val consensus_constants : Consensus.Constants.t
 
-  val compile_config : Mina_compile_config.t
+  val genesis_constants : Genesis_constants.t
 end
 
 (*Slot number within an epoch*)
@@ -77,7 +77,7 @@ module Worker_state = struct
   type init_arg =
     { constraint_constants : Genesis_constants.Constraint_constants.t
     ; consensus_constants : Consensus.Constants.Stable.Latest.t
-    ; compile_config : Mina_compile_config.t
+    ; genesis_constants : Genesis_constants.t
     ; conf_dir : string
     ; logger : Logger.t
     ; commit_id : string
@@ -87,7 +87,7 @@ module Worker_state = struct
   let context_of_config
       ({ constraint_constants
        ; consensus_constants
-       ; compile_config
+       ; genesis_constants
        ; logger
        ; conf_dir = _
        ; commit_id = _
@@ -100,7 +100,7 @@ module Worker_state = struct
 
       let logger = logger
 
-      let compile_config = compile_config
+      let genesis_constants = genesis_constants
     end )
 
   type t =
@@ -420,7 +420,7 @@ let update_block_producer_keys { connection; process = _ } ~keypairs =
     ~arg:(Keypair.And_compressed_pk.Set.to_list keypairs)
 
 let create ~constraint_constants ~pids ~consensus_constants ~conf_dir ~logger
-    ~keypairs ~commit_id ~compile_config =
+    ~keypairs ~commit_id ~genesis_constants =
   let on_failure err =
     [%log error] "VRF evaluator process failed with error $err"
       ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
@@ -432,7 +432,7 @@ let create ~constraint_constants ~pids ~consensus_constants ~conf_dir ~logger
       ~on_failure ~shutdown_on:Connection_closed ~connection_state_init_arg:()
       { constraint_constants
       ; consensus_constants
-      ; compile_config
+      ; genesis_constants
       ; conf_dir
       ; logger
       ; commit_id

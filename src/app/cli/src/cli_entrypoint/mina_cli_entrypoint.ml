@@ -1045,13 +1045,11 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let module Context = struct
             let logger = logger
 
-            let precomputed_values = precomputed_values
+            let genesis_constants = precomputed_values.genesis_constants
 
             let constraint_constants = precomputed_values.constraint_constants
 
             let consensus_constants = precomputed_values.consensus_constants
-
-            let compile_config = compile_config
           end in
           let consensus_local_state =
             Consensus.Data.Local_state.create

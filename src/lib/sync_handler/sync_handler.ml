@@ -14,8 +14,6 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
-
-  val compile_config : Mina_compile_config.t
 end
 
 module type Inputs_intf = sig
@@ -99,7 +97,7 @@ module Make (Inputs : Inputs_intf) :
       ( module struct
         let logger = Context.logger
 
-        let compile_config = Context.compile_config
+        let genesis_constants = Context.precomputed_values.genesis_constants
       end )
     in
     match get_ledger_by_hash ~frontier hash with
@@ -207,6 +205,8 @@ module Make (Inputs : Inputs_intf) :
       let module Context = struct
         include Context
 
+        let genesis_constants = precomputed_values.genesis_constants
+
         let logger =
           Logger.extend logger [ ("selection_context", `String "Root.prove") ]
       end in
@@ -229,20 +229,24 @@ module Make (Inputs : Inputs_intf) :
         data = With_hash.data best_tip_with_witness.data
       }
 
-    let verify ~context:(module Context : CONTEXT) ~verifier ~genesis_constants
-        observed_state peer_root =
+    let verify ~context:(module Context : CONTEXT) ~verifier observed_state
+        peer_root =
       let module Context = struct
         include Context
+
+        let genesis_constants = precomputed_values.genesis_constants
 
         let logger =
           Logger.extend logger [ ("selection_context", `String "Root.verify") ]
       end in
       let open Context in
       let open Deferred.Result.Let_syntax in
+      (*TODO: use precomputed_values.genesis_constants that's already passed*)
       let%bind ( (`Root _, `Best_tip (best_tip_transition, _)) as
                verified_witness ) =
-        Best_tip_prover.verify ~verifier ~genesis_constants ~precomputed_values
-          peer_root
+        Best_tip_prover.verify ~verifier
+          ~genesis_constants:precomputed_values.genesis_constants
+          ~precomputed_values peer_root
       in
       let is_before_best_tip candidate =
         Consensus.Hooks.equal_select_status

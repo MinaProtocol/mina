@@ -25,8 +25,6 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
-
-  val compile_config : Mina_compile_config.t
 end
 
 (* TODO: calculate a sensible value from postake consensus arguments *)
@@ -114,7 +112,16 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
   let is_block_in_frontier =
     Fn.compose Option.is_some @@ Transition_frontier.find frontier
   in
-  let open Context in
+  let module Consensus_context = struct
+    include Context
+
+    let genesis_constants = precomputed_values.genesis_constants
+  end in
+  let open Consensus_context in
+  let block_window_duration =
+    Float.of_int constraint_constants.block_window_duration_ms
+    |> Time.Span.of_ms
+  in
   let header, transition_hash, transition_receipt_time, sender, validation =
     match block_or_header with
     | `Block cached_env ->
@@ -165,15 +172,14 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       [%log internal] "Validate_frontier_dependencies" ;
       match
         Mina_block.Validation.validate_frontier_dependencies
-          ~context:(module Context)
+          ~context:(module Consensus_context)
           ~root_block ~is_block_in_frontier ~to_header:ident
           (Envelope.Incoming.data env)
       with
       | Ok _ | Error `Parent_missing_from_frontier ->
           [%log internal] "Schedule_catchup" ;
           Catchup_scheduler.watch_header catchup_scheduler ~valid_cb
-            ~block_window_duration:compile_config.block_window_duration
-            ~header_with_hash ;
+            ~block_window_duration ~header_with_hash ;
           return ()
       | Error `Not_selected_over_frontier_root ->
           handle_not_selected ()
@@ -197,7 +203,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
         [%log internal] "Validate_frontier_dependencies" ;
         match
           Mina_block.Validation.validate_frontier_dependencies
-            ~context:(module Context)
+            ~context:(module Consensus_context)
             ~root_block ~is_block_in_frontier ~to_header:Mina_block.header
             initially_validated_transition
         with
@@ -240,8 +246,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
                 in
                 Catchup_scheduler.watch catchup_scheduler ~timeout_duration
                   ~cached_transition:cached_initially_validated_transition
-                  ~valid_cb
-                  ~block_window_duration:compile_config.block_window_duration ;
+                  ~valid_cb ~block_window_duration ;
                 return (Error ()) )
       in
       (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
@@ -286,7 +291,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
         add_and_finalize ~logger ~frontier ~catchup_scheduler
           ~processed_transition_writer ~only_if_present:false ~time_controller
           ~source:`Gossip breadcrumb ~precomputed_values ~valid_cb
-          ~block_window_duration:compile_config.block_window_duration
+          ~block_window_duration
       in
       ( match result with
       | Ok () ->
@@ -325,6 +330,10 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
        , unit )
        Writer.t ) ~processed_transition_writer =
   let open Context in
+  let block_window_duration =
+    Float.of_int constraint_constants.block_window_duration_ms
+    |> Time.Span.of_ms
+  in
   let catchup_scheduler =
     Catchup_scheduler.create ~logger ~precomputed_values ~verifier ~trust_system
       ~frontier ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
@@ -380,8 +389,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                               let%map result =
                                 add_and_finalize ~logger ~only_if_present:true
                                   ~source:`Catchup ~valid_cb b
-                                  ~block_window_duration:
-                                    compile_config.block_window_duration
+                                  ~block_window_duration
                               in
                               Internal_tracing.with_state_hash state_hash
                               @@ fun () ->
@@ -445,8 +453,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                     match%map
                       add_and_finalize ~logger ~only_if_present:false
                         ~source:`Internal breadcrumb ~valid_cb:None
-                        ~block_window_duration:
-                          compile_config.block_window_duration
+                        ~block_window_duration
                     with
                     | Ok () ->
                         [%log internal] "Breadcrumb_integrated" ;
@@ -494,8 +501,6 @@ let%test_module "Transition_handler.Processor tests" =
 
     let trust_system = Trust_system.null ()
 
-    let compile_config = Mina_compile_config.For_unit_tests.t
-
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
@@ -511,8 +516,6 @@ let%test_module "Transition_handler.Processor tests" =
       let constraint_constants = constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
-
-      let compile_config = compile_config
     end
 
     let downcast_breadcrumb breadcrumb =

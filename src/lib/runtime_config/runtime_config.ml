@@ -514,6 +514,8 @@ module Json_layout = struct
             [@default None] [@key "validation-queue-size"]
       ; stop_time : int option [@default None] [@key "stop-time"]
       ; peers : string list option [@default None] [@key "peers"]
+      ; sync_ledger_max_subtree_depth : int option [@default None]
+      ; sync_ledger_default_subtree_depth : int option [@default None]
       }
     [@@deriving yojson, fields]
 
@@ -1223,6 +1225,8 @@ module Daemon = struct
     ; validation_queue_size : int option [@default None]
     ; stop_time : int option [@default None]
     ; peers : string list option [@default None]
+    ; sync_ledger_max_subtree_depth : int option [@default None]
+    ; sync_ledger_default_subtree_depth : int option [@default None]
     }
   [@@deriving bin_io_unversioned, fields]
 
@@ -1264,6 +1268,8 @@ module Daemon = struct
     ; validation_queue_size = None
     ; stop_time = None
     ; peers = None
+    ; sync_ledger_max_subtree_depth = None
+    ; sync_ledger_default_subtree_depth = None
     }
 
   let to_json_layout : t -> Json_layout.Daemon.t = Fn.id
@@ -1354,6 +1360,12 @@ module Daemon = struct
           t2.validation_queue_size
     ; stop_time = opt_fallthrough ~default:t1.stop_time t2.stop_time
     ; peers = opt_fallthrough ~default:t1.peers t2.peers
+    ; sync_ledger_max_subtree_depth =
+        opt_fallthrough ~default:t1.sync_ledger_max_subtree_depth
+          t2.sync_ledger_max_subtree_depth
+    ; sync_ledger_default_subtree_depth =
+        opt_fallthrough ~default:t1.sync_ledger_default_subtree_depth
+          t2.sync_ledger_default_subtree_depth
     }
 end
 

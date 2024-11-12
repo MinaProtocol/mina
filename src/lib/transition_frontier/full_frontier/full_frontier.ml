@@ -12,8 +12,6 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
-
-  val compile_config : Mina_compile_config.t
 end
 
 module Node = struct
@@ -565,6 +563,11 @@ let calculate_diffs ({ context = (module Context); _ } as t) breadcrumb =
         ]
   end in
   let open Diff in
+  let module Consensus_context = struct
+    include Context
+
+    let genesis_constants = precomputed_values.genesis_constants
+  end in
   O1trace.sync_thread "calculate_diff_frontier_diffs" (fun () ->
       let breadcrumb_hash = Breadcrumb.state_hash breadcrumb in
       let parent_node =
@@ -585,7 +588,7 @@ let calculate_diffs ({ context = (module Context); _ } as t) breadcrumb =
         if
           Consensus.Hooks.equal_select_status
             (Consensus.Hooks.select
-               ~context:(module Context)
+               ~context:(module Consensus_context)
                ~existing:
                  (Breadcrumb.consensus_state_with_hashes current_best_tip)
                ~candidate:(Breadcrumb.consensus_state_with_hashes breadcrumb) )
@@ -961,7 +964,7 @@ module For_tests = struct
 
     let consensus_constants = precomputed_values.consensus_constants
 
-    let compile_config = Mina_compile_config.For_unit_tests.t
+    let genesis_constants = Genesis_constants.For_unit_tests.t
   end
 
   let verifier () =
