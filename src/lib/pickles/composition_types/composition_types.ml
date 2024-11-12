@@ -519,20 +519,6 @@ module Wrap = struct
           ]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
-
-      let wrap_typ (type fp) ~dummy_scalar_challenge ~challenge
-          ~scalar_challenge ~feature_flags (fp : (fp, _) Wrap_impl.Typ.t)
-          messages_for_next_wrap_proof digest index =
-        Wrap_impl.Typ.of_hlistable
-          [ Deferred_values.In_circuit.typ
-              (module Wrap_impl)
-              ~dummy_scalar_challenge ~challenge ~scalar_challenge
-              ~feature_flags fp index
-          ; digest
-          ; messages_for_next_wrap_proof
-          ]
-          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-          ~value_of_hlist:of_hlist
     end
 
     let to_minimal

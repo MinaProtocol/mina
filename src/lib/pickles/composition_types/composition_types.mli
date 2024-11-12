@@ -631,49 +631,6 @@ module Wrap : sig
              , 'l )
              Stable.Latest.t )
            Step_impl.Typ.t
-
-      val wrap_typ :
-           dummy_scalar_challenge:'b Scalar_challenge.t
-        -> challenge:('c, 'd) Wrap_impl.Typ.t
-        -> scalar_challenge:('e, 'b) Wrap_impl.Typ.t
-        -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
-        -> ('fp, 'a) Wrap_impl.Typ.t
-        -> ('g, 'h) Wrap_impl.Typ.t
-        -> ('i, 'j) Wrap_impl.Typ.t
-        -> ('k, 'l) Wrap_impl.Typ.t
-        -> ( ( ( 'c
-               , 'e Scalar_challenge.t
-               , 'fp
-               , ('fp, 'boolean) Opt.t
-               , ('e Scalar_challenge.t, 'boolean) Opt.t
-               , (Wrap_impl.Boolean.var as 'boolean) )
-               Deferred_values.Plonk.In_circuit.t
-             , 'e Scalar_challenge.t
-             , 'fp
-             , 'g
-             , 'i
-             , ( 'e Scalar_challenge.t Bulletproof_challenge.t
-               , Backend.Tick.Rounds.n )
-               Vector.vec
-             , 'k )
-             Stable.Latest.t
-           , ( ( 'd
-               , 'b Scalar_challenge.t
-               , 'a
-               , 'a option
-               , 'b Scalar_challenge.t option
-               , bool )
-               Deferred_values.Plonk.In_circuit.t
-             , 'b Scalar_challenge.t
-             , 'a
-             , 'h
-             , 'j
-             , ( 'b Scalar_challenge.t Bulletproof_challenge.t
-               , Backend.Tick.Rounds.n )
-               Vector.vec
-             , 'l )
-             Stable.Latest.t )
-           Wrap_impl.Typ.t
     end
 
     val to_minimal :
