@@ -18,6 +18,8 @@ module type Input_intf = sig
     val equal : t -> t -> bool
   end
 
+  module Context : Syncable_ledger.CONTEXT
+
   module Ledger :
     Ledger_intf
       with type root_hash := Root_hash.t
@@ -35,6 +37,52 @@ module type Input_intf = sig
        and type answer := (Root_hash.t, Ledger.account) Syncable_ledger.Answer.t
 end
 
+module Make_context (Subtree_depth : sig
+  val sync_ledger_max_subtree_depth : int
+
+  val sync_ledger_default_subtree_depth : int
+end) : Syncable_ledger.CONTEXT = struct
+  let logger = Logger.null ()
+
+  let compile_config =
+    { Mina_compile_config.For_unit_tests.t with
+      sync_ledger_max_subtree_depth =
+        Subtree_depth.sync_ledger_max_subtree_depth
+    ; sync_ledger_default_subtree_depth =
+        Subtree_depth.sync_ledger_default_subtree_depth
+    }
+end
+
+module Context_subtree_depth32 = Make_context (struct
+  let sync_ledger_max_subtree_depth = 3
+
+  let sync_ledger_default_subtree_depth = 2
+end)
+
+module Context_subtree_depth81 = Make_context (struct
+  let sync_ledger_max_subtree_depth = 8
+
+  let sync_ledger_default_subtree_depth = 1
+end)
+
+module Context_subtree_depth82 = Make_context (struct
+  let sync_ledger_max_subtree_depth = 8
+
+  let sync_ledger_default_subtree_depth = 2
+end)
+
+module Context_subtree_depth86 = Make_context (struct
+  let sync_ledger_max_subtree_depth = 8
+
+  let sync_ledger_default_subtree_depth = 6
+end)
+
+module Context_subtree_depth88 = Make_context (struct
+  let sync_ledger_max_subtree_depth = 8
+
+  let sync_ledger_default_subtree_depth = 8
+end)
+
 module Make_test
     (Input : Input_intf) (Input' : sig
       val num_accts : int
@@ -48,19 +96,11 @@ struct
    * in before we need it. *)
   let total_queries = ref None
 
-  let logger = Logger.null ()
-
   let trust_system = Trust_system.null ()
 
   let () =
     Async.Scheduler.set_record_backtraces true ;
     Core.Backtrace.elide := false
-
-  module Context : Syncable_ledger.CONTEXT = struct
-    let logger = logger
-
-    let compile_config = Mina_compile_config.For_unit_tests.t
-  end
 
   let%test "full_sync_entirely_different" =
     let l1, _k1 = Ledger.load_ledger 1 1 in
@@ -185,9 +225,10 @@ end
 (* Testing different ledger instantiations on Syncable_ledger *)
 
 module Db = struct
-  module Make (Depth : sig
-    val depth : int
-  end) =
+  module Make
+      (Context : Syncable_ledger.CONTEXT) (Depth : sig
+        val depth : int
+      end) =
   struct
     open Merkle_ledger_tests.Test_stubs
 
@@ -251,19 +292,47 @@ module Db = struct
       module MT = Ledger
       include Base_ledger_inputs
 
-      let account_subtree_height = 3
+      let account_subtree_height = 6
     end
 
     module Sync_ledger = Syncable_ledger.Make (Syncable_ledger_inputs)
+    module Context = Context
   end
 
-  module DB3 = Make (struct
-    let depth = 3
-  end)
+  module DB3 =
+    Make
+      (Context_subtree_depth32)
+      (struct
+        let depth = 3
+      end)
 
-  module DB16 = Make (struct
-    let depth = 16
-  end)
+  module DB16_subtree_depths81 =
+    Make
+      (Context_subtree_depth81)
+      (struct
+        let depth = 16
+      end)
+
+  module DB16_subtree_depths82 =
+    Make
+      (Context_subtree_depth82)
+      (struct
+        let depth = 16
+      end)
+
+  module DB16_subtree_depths86 =
+    Make
+      (Context_subtree_depth86)
+      (struct
+        let depth = 16
+      end)
+
+  module DB16_subtree_depths88 =
+    Make
+      (Context_subtree_depth88)
+      (struct
+        let depth = 16
+      end)
 
   module TestDB3_3 =
     Make_test
@@ -281,32 +350,55 @@ module Db = struct
 
   module TestDB16_20 =
     Make_test
-      (DB16)
+      (DB16_subtree_depths86)
       (struct
         let num_accts = 20
       end)
 
   module TestDB16_1024 =
     Make_test
-      (DB16)
+      (DB16_subtree_depths86)
       (struct
         let num_accts = 1024
       end)
 
-  module TestDB16_1026 =
+  module TestDB16_1026_subtree_depth81 =
     Make_test
-      (DB16)
+      (DB16_subtree_depths81)
+      (struct
+        let num_accts = 1026
+      end)
+
+  module TestDB16_1026_subtree_depth82 =
+    Make_test
+      (DB16_subtree_depths82)
+      (struct
+        let num_accts = 1026
+      end)
+
+  module TestDB16_1026_subtree_depth86 =
+    Make_test
+      (DB16_subtree_depths86)
+      (struct
+        let num_accts = 1026
+      end)
+
+  (*Test till sync_ledger_max_subtree_depth*)
+  module TestDB16_1026_subtree_depth88 =
+    Make_test
+      (DB16_subtree_depths88)
       (struct
         let num_accts = 1026
       end)
 end
 
 module Mask = struct
-  module Make (Input : sig
-    val depth : int
+  module Make
+      (Context : Syncable_ledger.CONTEXT) (Input : sig
+        val depth : int
 
-    val mask_layers : int
-  end) =
+        val mask_layers : int
+      end) =
   struct
     open Merkle_ledger_tests.Test_stubs
 
@@ -396,29 +488,66 @@ module Mask = struct
       module MT = Ledger
       include Base_ledger_inputs
 
-      let account_subtree_height = 3
+      let account_subtree_height = 6
     end
 
     module Sync_ledger = Syncable_ledger.Make (Syncable_ledger_inputs)
+    module Context = Context
   end
 
-  module Mask3_Layer1 = Make (struct
-    let depth = 3
+  module Mask3_Layer1 =
+    Make
+      (Context_subtree_depth32)
+      (struct
+        let depth = 3
 
-    let mask_layers = 1
-  end)
+        let mask_layers = 1
+      end)
 
-  module Mask16_Layer1 = Make (struct
-    let depth = 16
+  module Mask16_Layer1 =
+    Make
+      (Context_subtree_depth32)
+      (struct
+        let depth = 16
 
-    let mask_layers = 1
-  end)
+        let mask_layers = 1
+      end)
 
-  module Mask16_Layer2 = Make (struct
-    let depth = 16
+  module Mask16_Layer2 =
+    Make
+      (Context_subtree_depth32)
+      (struct
+        let depth = 16
 
-    let mask_layers = 2
-  end)
+        let mask_layers = 2
+      end)
+
+  module Mask16_Layer2_Depth81 =
+    Make
+      (Context_subtree_depth81)
+      (struct
+        let depth = 16
+
+        let mask_layers = 2
+      end)
+
+  module Mask16_Layer2_Depth86 =
+    Make
+      (Context_subtree_depth86)
+      (struct
+        let depth = 16
+
+        let mask_layers = 2
+      end)
+
+  module Mask16_Layer2_Depth88 =
+    Make
+      (Context_subtree_depth88)
+      (struct
+        let depth = 16
+
+        let mask_layers = 2
+      end)
 
   module TestMask3_Layer1_3 =
     Make_test
@@ -458,6 +587,27 @@ module Mask = struct
   module TestMask16_Layer2_1024 =
     Make_test
       (Mask16_Layer2)
+      (struct
+        let num_accts = 1024
+      end)
+
+  module TestMask16_Layer2_1024_Depth81 =
+    Make_test
+      (Mask16_Layer2_Depth81)
+      (struct
+        let num_accts = 1024
+      end)
+
+  module TestMask16_Layer2_1024_Depth86 =
+    Make_test
+      (Mask16_Layer2_Depth86)
+      (struct
+        let num_accts = 1024
+      end)
+
+  module TestMask16_Layer2_1024_Depth88 =
+    Make_test
+      (Mask16_Layer2_Depth88)
       (struct
         let num_accts = 1024
       end)
