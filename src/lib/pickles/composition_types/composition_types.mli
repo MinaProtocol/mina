@@ -1110,22 +1110,6 @@ module Step : sig
             -> ('f, 'g, 'c) t
 
           val map_fields : ('a, 'b, 'c) t -> f:('c -> 'f) -> ('a, 'b, 'f) t
-
-          val typ :
-               challenge:('c, 'd) Step_impl.Typ.t
-            -> scalar_challenge:('e, 'b) Step_impl.Typ.t
-            -> ('fp, 'a) Step_impl.Typ.t
-            -> ( ('c, 'e Scalar_challenge.t, 'fp) t
-               , ('d, 'b Scalar_challenge.t, 'a) t )
-               Step_impl.Typ.t
-
-          val wrap_typ :
-               challenge:('c, 'd) Wrap_impl.Typ.t
-            -> scalar_challenge:('e, 'b) Wrap_impl.Typ.t
-            -> ('fp, 'a) Wrap_impl.Typ.t
-            -> ( ('c, 'e Scalar_challenge.t, 'fp) t
-               , ('d, 'b Scalar_challenge.t, 'a) t )
-               Wrap_impl.Typ.t
         end
 
         val to_minimal :

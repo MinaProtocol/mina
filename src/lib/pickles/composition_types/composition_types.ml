@@ -1091,34 +1091,6 @@ module Step = struct
             ; zeta_to_domain_size = f t.zeta_to_domain_size
             ; perm = f t.perm
             }
-
-          let typ (type fp) ~challenge ~scalar_challenge
-              (fp : (fp, _) Step_impl.Typ.t) =
-            Step_impl.Typ.of_hlistable
-              [ Scalar_challenge.typ scalar_challenge
-              ; challenge
-              ; challenge
-              ; Scalar_challenge.typ scalar_challenge
-              ; fp
-              ; fp
-              ; fp
-              ]
-              ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-              ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-
-          let wrap_typ (type fp) ~challenge ~scalar_challenge
-              (fp : (fp, _) Wrap_impl.Typ.t) =
-            Wrap_impl.Typ.of_hlistable
-              [ Scalar_challenge.typ scalar_challenge
-              ; challenge
-              ; challenge
-              ; Scalar_challenge.typ scalar_challenge
-              ; fp
-              ; fp
-              ; fp
-              ]
-              ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-              ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         end
 
         let to_minimal (type challenge scalar_challenge fp)
