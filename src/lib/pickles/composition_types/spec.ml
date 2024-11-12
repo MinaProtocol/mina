@@ -429,59 +429,62 @@ let typ (type field other_field other_field_var) ~assert_16_bits
   in
   typ typ_basic t
 
-let packed_typ_basic (type field other_field other_field_var)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
-    (field : (other_field_var, other_field, field) ETyp.t) =
-  let open Impl in
-  let module Digest = D.Make (Impl) in
-  let module Challenge = Limb_vector.Challenge.Make (Impl) in
-  let module Env = struct
-    type ('other_field, 'other_field_var, 'a) t =
-      < field1 : 'other_field
-      ; field2 : 'other_field_var
-      ; bool1 : bool
-      ; bool2 : Boolean.var
-      ; digest1 : Digest.Constant.t
-      ; digest2 : Field.t
-      ; challenge1 : Challenge.Constant.t
-      ; challenge2 : (* Challenge.t *) Field.t
-      ; bulletproof_challenge1 :
-          Challenge.Constant.t Sc.t Bulletproof_challenge.t
-      ; bulletproof_challenge2 : Field.t Sc.t Bulletproof_challenge.t
-      ; branch_data1 : Branch_data.t
-      ; branch_data2 : Field.t
-      ; .. >
-      as
-      'a
-  end in
-  let etyp :
-      type a b.
-         (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
-      -> (b, a, field) ETyp.t = function
-    | Unit ->
-        T (Typ.unit, Fn.id, Fn.id)
-    | Field ->
-        field
-    | Bool ->
-        T (Boolean.typ, Fn.id, Fn.id)
-    | Digest ->
-        T (Digest.typ, Fn.id, Fn.id)
-    | Challenge ->
-        T (Challenge.typ, Fn.id, Fn.id)
-    | Branch_data ->
-        T (Branch_data.packed_typ (module Impl), Fn.id, Fn.id)
-    | Bulletproof_challenge ->
-        let typ =
-          let there bp_challenge =
-            let { Sc.inner = pre } = Bulletproof_challenge.pack bp_challenge in
-            pre
+let packed_typ impl field t =
+  let packed_typ_basic (type field other_field other_field_var)
+      (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
+      (field : (other_field_var, other_field, field) ETyp.t) =
+    let open Impl in
+    let module Digest = D.Make (Impl) in
+    let module Challenge = Limb_vector.Challenge.Make (Impl) in
+    let module Env = struct
+      type ('other_field, 'other_field_var, 'a) t =
+        < field1 : 'other_field
+        ; field2 : 'other_field_var
+        ; bool1 : bool
+        ; bool2 : Boolean.var
+        ; digest1 : Digest.Constant.t
+        ; digest2 : Field.t
+        ; challenge1 : Challenge.Constant.t
+        ; challenge2 : (* Challenge.t *) Field.t
+        ; bulletproof_challenge1 :
+            Challenge.Constant.t Sc.t Bulletproof_challenge.t
+        ; bulletproof_challenge2 : Field.t Sc.t Bulletproof_challenge.t
+        ; branch_data1 : Branch_data.t
+        ; branch_data2 : Field.t
+        ; .. >
+        as
+        'a
+    end in
+    let etyp :
+        type a b.
+           (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
+        -> (b, a, field) ETyp.t = function
+      | Unit ->
+          T (Typ.unit, Fn.id, Fn.id)
+      | Field ->
+          field
+      | Bool ->
+          T (Boolean.typ, Fn.id, Fn.id)
+      | Digest ->
+          T (Digest.typ, Fn.id, Fn.id)
+      | Challenge ->
+          T (Challenge.typ, Fn.id, Fn.id)
+      | Branch_data ->
+          T (Branch_data.packed_typ (module Impl), Fn.id, Fn.id)
+      | Bulletproof_challenge ->
+          let typ =
+            let there bp_challenge =
+              let { Sc.inner = pre } =
+                Bulletproof_challenge.pack bp_challenge
+              in
+              pre
+            in
+            let back pre = Bulletproof_challenge.unpack { Sc.inner = pre } in
+            Typ.transport Challenge.typ ~there ~back
+            |> Typ.transport_var ~there ~back
           in
-          let back pre = Bulletproof_challenge.unpack { Sc.inner = pre } in
-          Typ.transport Challenge.typ ~there ~back
-          |> Typ.transport_var ~there ~back
-        in
-        T (typ, Fn.id, Fn.id)
+          T (typ, Fn.id, Fn.id)
+    in
+    { etyp }
   in
-  { etyp }
-
-let packed_typ impl field t = etyp (packed_typ_basic impl field) t
+  etyp (packed_typ_basic impl field) t
