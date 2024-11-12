@@ -327,36 +327,36 @@ let pack (type f) ((module Impl) as impl : f impl) t =
     ~one:(`Packed_bits (Field.one, 1))
     None
 
-let typ_basic (type field other_field other_field_var)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
-    ~assert_16_bits (field : (other_field_var, other_field) Impl.Typ.t) =
-  let open Impl in
-  let module C = Common (Impl) in
-  let open C in
-  let typ :
-      type a b.
-         (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
-      -> (b, a) Impl.Typ.t =
-   fun basic ->
-    match basic with
-    | Unit ->
-        Typ.unit
-    | Field ->
-        field
-    | Bool ->
-        Boolean.typ
-    | Branch_data ->
-        Branch_data.typ (module Impl) ~assert_16_bits
-    | Digest ->
-        Digest.typ
-    | Challenge ->
-        Challenge.typ
-    | Bulletproof_challenge ->
-        Bulletproof_challenge.typ Challenge.typ
-  in
-  { typ }
-
 let typ ~assert_16_bits impl field t =
+  let typ_basic (type field other_field other_field_var)
+      (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
+      ~assert_16_bits (field : (other_field_var, other_field) Impl.Typ.t) =
+    let open Impl in
+    let module C = Common (Impl) in
+    let open C in
+    let typ :
+        type a b.
+           (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
+        -> (b, a) Impl.Typ.t =
+     fun basic ->
+      match basic with
+      | Unit ->
+          Typ.unit
+      | Field ->
+          field
+      | Bool ->
+          Boolean.typ
+      | Branch_data ->
+          Branch_data.typ (module Impl) ~assert_16_bits
+      | Digest ->
+          Digest.typ
+      | Challenge ->
+          Challenge.typ
+      | Bulletproof_challenge ->
+          Bulletproof_challenge.typ Challenge.typ
+    in
+    { typ }
+  in
   let rec typ :
       type f var value env.
          (f, env) typ
