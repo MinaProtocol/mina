@@ -161,97 +161,6 @@ module ETyp = struct
         -> ('var, 'value, 'f) t
 end
 
-type ('f, 'env) etyp =
-  { etyp : 'var 'value. ('value, 'var, 'env) basic -> ('var, 'value, 'f) ETyp.t
-  }
-
-let rec etyp :
-    type f var value env.
-    (f, env) etyp -> (value, var, env) T.t -> (var, value, f) ETyp.t =
-  let open Snarky_backendless.Typ in
-  fun e spec ->
-    match[@warning "-45"] spec with
-    | B spec ->
-        e.etyp spec
-    | Scalar chal ->
-        let (T (typ, f, f_inv)) = e.etyp chal in
-        T (Sc.typ typ, Sc.map ~f, Sc.map ~f:f_inv)
-    | Vector (spec, n) ->
-        let (T (typ, f, f_inv)) = etyp e spec in
-        T (Vector.typ typ n, Vector.map ~f, Vector.map ~f:f_inv)
-    | Array (spec, n) ->
-        let (T (typ, f, f_inv)) = etyp e spec in
-        T (array ~length:n typ, Array.map ~f, Array.map ~f:f_inv)
-    | Struct [] ->
-        let open Hlist.HlistId in
-        let there [] = () in
-        let back () = [] in
-        T
-          ( transport (unit ()) ~there ~back |> transport_var ~there ~back
-          , Fn.id
-          , Fn.id )
-    | Struct (spec :: specs) ->
-        let open Hlist.HlistId in
-        let (T (t1, f1, f1_inv)) = etyp e spec in
-        let (T (t2, f2, f2_inv)) = etyp e (Struct specs) in
-        T
-          ( tuple2 t1 t2
-            |> transport
-                 ~there:(fun (x :: xs) -> (x, xs))
-                 ~back:(fun (x, xs) -> x :: xs)
-          , (fun (x, xs) -> f1 x :: f2 xs)
-          , fun (x :: xs) -> (f1_inv x, f2_inv xs) )
-    | Opt { inner; flag; dummy1; dummy2; bool = (module B) } ->
-        let (T (bool, f_bool, f_bool')) = etyp e (B Bool) in
-        let (T (a, f_a, f_a')) = etyp e inner in
-        let opt_map ~f1 ~f2 (x : _ Opt.t) : _ Opt.t =
-          match x with
-          | Nothing ->
-              Opt.nothing
-          | Just x ->
-              Opt.just (f1 x)
-          | Maybe (b, x) ->
-              Maybe (f2 b, f1 x)
-        in
-        let f = opt_map ~f1:f_a ~f2:f_bool in
-        let f' = opt_map ~f1:f_a' ~f2:f_bool' in
-        T
-          ( Opt.constant_layout_typ ~dummy:dummy1 ~dummy_var:(f_a' dummy2)
-              ~true_:(f_bool' B.true_) ~false_:(f_bool' B.false_) bool flag a
-          , f
-          , f' )
-    | Opt_unflagged { inner; dummy1; dummy2; flag = _ } ->
-        let (T (typ, f, f_inv)) = etyp e inner in
-        let f x = Some (f x) in
-        let f_inv = function None -> f_inv dummy2 | Some x -> f_inv x in
-        let typ =
-          typ
-          |> Snarky_backendless.Typ.transport
-               ~there:(Option.value ~default:dummy1) ~back:(fun x -> Some x)
-        in
-        T (typ, f, f_inv)
-    | Constant (x, _assert_eq, spec) ->
-        let (T (Typ typ, f, f')) = etyp e spec in
-        let constant_var =
-          let fields, aux = typ.value_to_fields x in
-          let fields =
-            Array.map fields ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
-          in
-          typ.var_of_fields (fields, aux)
-        in
-        (* We skip any constraints that would be added here, but we *do* use
-           the underlying [Typ.t] to make sure that we allocate public inputs
-           correctly.
-        *)
-        T
-          ( Typ
-              { typ with
-                check =
-                  (fun _ -> Snarky_backendless.Checked_runner.Simple.return ())
-              }
-          , (fun _ -> f constant_var)
-          , f' )
-
 module Common (Impl : Snarky_backendless.Snark_intf.Run) = struct
   module Digest = D.Make (Impl)
   module Challenge = Limb_vector.Challenge.Make (Impl)
@@ -430,6 +339,12 @@ let typ (type field other_field other_field_var) ~assert_16_bits
   typ typ_basic t
 
 let packed_typ impl field t =
+  let module ETyp_record = struct
+    type ('f, 'env) etyp =
+      { etyp :
+          'var 'value. ('value, 'var, 'env) basic -> ('var, 'value, 'f) ETyp.t
+      }
+  end in
   let packed_typ_basic (type field other_field other_field_var)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
       (field : (other_field_var, other_field, field) ETyp.t) =
@@ -485,6 +400,95 @@ let packed_typ impl field t =
           in
           T (typ, Fn.id, Fn.id)
     in
-    { etyp }
+    { ETyp_record.etyp }
+  in
+  let rec etyp :
+      type f var value env.
+         (f, env) ETyp_record.etyp
+      -> (value, var, env) T.t
+      -> (var, value, f) ETyp.t =
+    let open Snarky_backendless.Typ in
+    fun e spec ->
+      match[@warning "-45"] spec with
+      | B spec ->
+          e.etyp spec
+      | Scalar chal ->
+          let (T (typ, f, f_inv)) = e.etyp chal in
+          T (Sc.typ typ, Sc.map ~f, Sc.map ~f:f_inv)
+      | Vector (spec, n) ->
+          let (T (typ, f, f_inv)) = etyp e spec in
+          T (Vector.typ typ n, Vector.map ~f, Vector.map ~f:f_inv)
+      | Array (spec, n) ->
+          let (T (typ, f, f_inv)) = etyp e spec in
+          T (array ~length:n typ, Array.map ~f, Array.map ~f:f_inv)
+      | Struct [] ->
+          let open Hlist.HlistId in
+          let there [] = () in
+          let back () = [] in
+          T
+            ( transport (unit ()) ~there ~back |> transport_var ~there ~back
+            , Fn.id
+            , Fn.id )
+      | Struct (spec :: specs) ->
+          let open Hlist.HlistId in
+          let (T (t1, f1, f1_inv)) = etyp e spec in
+          let (T (t2, f2, f2_inv)) = etyp e (Struct specs) in
+          T
+            ( tuple2 t1 t2
+              |> transport
+                   ~there:(fun (x :: xs) -> (x, xs))
+                   ~back:(fun (x, xs) -> x :: xs)
+            , (fun (x, xs) -> f1 x :: f2 xs)
+            , fun (x :: xs) -> (f1_inv x, f2_inv xs) )
+      | Opt { inner; flag; dummy1; dummy2; bool = (module B) } ->
+          let (T (bool, f_bool, f_bool')) = etyp e (B Bool) in
+          let (T (a, f_a, f_a')) = etyp e inner in
+          let opt_map ~f1 ~f2 (x : _ Opt.t) : _ Opt.t =
+            match x with
+            | Nothing ->
+                Opt.nothing
+            | Just x ->
+                Opt.just (f1 x)
+            | Maybe (b, x) ->
+                Maybe (f2 b, f1 x)
+          in
+          let f = opt_map ~f1:f_a ~f2:f_bool in
+          let f' = opt_map ~f1:f_a' ~f2:f_bool' in
+          T
+            ( Opt.constant_layout_typ ~dummy:dummy1 ~dummy_var:(f_a' dummy2)
+                ~true_:(f_bool' B.true_) ~false_:(f_bool' B.false_) bool flag a
+            , f
+            , f' )
+      | Opt_unflagged { inner; dummy1; dummy2; flag = _ } ->
+          let (T (typ, f, f_inv)) = etyp e inner in
+          let f x = Some (f x) in
+          let f_inv = function None -> f_inv dummy2 | Some x -> f_inv x in
+          let typ =
+            typ
+            |> Snarky_backendless.Typ.transport
+                 ~there:(Option.value ~default:dummy1) ~back:(fun x -> Some x)
+          in
+          T (typ, f, f_inv)
+      | Constant (x, _assert_eq, spec) ->
+          let (T (Typ typ, f, f')) = etyp e spec in
+          let constant_var =
+            let fields, aux = typ.value_to_fields x in
+            let fields =
+              Array.map fields ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
+            in
+            typ.var_of_fields (fields, aux)
+          in
+          (* We skip any constraints that would be added here, but we *do* use
+             the underlying [Typ.t] to make sure that we allocate public inputs
+             correctly.
+          *)
+          T
+            ( Typ
+                { typ with
+                  check =
+                    (fun _ -> Snarky_backendless.Checked_runner.Simple.return ())
+                }
+            , (fun _ -> f constant_var)
+            , f' )
   in
   etyp (packed_typ_basic impl field) t
