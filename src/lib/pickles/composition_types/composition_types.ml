@@ -607,7 +607,18 @@ module Wrap = struct
       }
 
     let typ comm g s chal proofs_verified =
-      Snarky_backendless.Typ.of_hlistable
+      Step_impl.Typ.of_hlistable
+        [ s
+        ; Plonk_verification_key_evals.typ comm
+        ; Vector.typ g proofs_verified
+        ; chal
+        ]
+        (* TODO: Should this really just be a vector typ of length Rounds.n ?*)
+        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
+
+    let wrap_typ comm g s chal proofs_verified =
+      Wrap_impl.Typ.of_hlistable
         [ s
         ; Plonk_verification_key_evals.typ comm
         ; Vector.typ g proofs_verified
