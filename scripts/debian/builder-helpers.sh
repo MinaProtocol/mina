@@ -241,6 +241,9 @@ build_functional_test_suite_deb() {
 
   # Binaries
   cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
+  cp ./default/src/app/benchmarks/benchmarks.exe "${BUILDDIR}/usr/local/bin/mina-benchmarks"
+  cp ./default/src/app/ledger_export_bench/ledger_export_benchmark.exe "${BUILDDIR}/usr/local/bin/mina-ledger-export-benchmark"
+  cp ./default/src/app/disk_caching_stats/disk_caching_stats.exe "${BUILDDIR}/usr/local/bin/mina-disk-caching-stats"
   cp ./default/src/app/heap_usage/heap_usage.exe "${BUILDDIR}/usr/local/bin/mina-heap-usage"
   cp ./default/src/app/zkapp_limits/zkapp_limits.exe "${BUILDDIR}/usr/local/bin/mina-zkapp-limits"
   cp ./default/src/test/archive/patch_archive_test/patch_archive_test.exe "${BUILDDIR}/usr/local/bin/mina-patch-archive-test"

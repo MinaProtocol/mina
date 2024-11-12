@@ -11,7 +11,7 @@ let main () =
     max_event_elements ;
   printf "max field elements for actions per transaction: %d\n"
     max_action_elements ;
-  printf "All possible zkApp account update combinations" ;
+  printf "All possible zkApp account update combinations: \n" ;
   List.iter values ~f:(fun proofs ->
       List.iter values ~f:(fun signed_single_segments ->
           List.iter values ~f:(fun signed_pair_segments ->

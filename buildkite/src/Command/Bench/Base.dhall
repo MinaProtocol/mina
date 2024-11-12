@@ -57,7 +57,7 @@ let command
             , commands =
                 RunInToolchain.runInToolchain
                   (Benchmarks.toEnvList Benchmarks.Type::{=})
-                  "./buildkite/scripts/benchmarks.sh  ${spec.bench} --red-threshold ${Double/show
+                  "./buildkite/scripts/bench/run.sh  ${spec.bench} --red-threshold ${Double/show
                                                                                         spec.redThreshold} --yellow-threshold ${Double/show
                                                                                                                                   spec.yellowThreshold}"
             , label = "Perf: ${spec.label}"
@@ -79,6 +79,9 @@ let pipeline
                       "dhall"
                   , SelectFiles.contains "scripts/benchmark"
                   , SelectFiles.contains "buildkite/scripts/benchmark"
+                  , SelectFiles.exactly 
+                      "buildkite/src/Jobs/Bench/${spec.name}" 
+                      "dhall"
                   ]
                 # spec.additionalDirtyWhen
             , path = spec.path
