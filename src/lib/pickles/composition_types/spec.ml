@@ -327,10 +327,10 @@ let pack (type f) ((module Impl) as impl : f impl) t =
     ~one:(`Packed_bits (Field.one, 1))
     None
 
-let typ ~assert_16_bits impl field t =
-  let typ_basic (type field other_field other_field_var)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
-      ~assert_16_bits (field : (other_field_var, other_field) Impl.Typ.t) =
+let typ (type field other_field other_field_var) ~assert_16_bits
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
+    (field : (other_field_var, other_field) Impl.Typ.t) t =
+  let typ_basic =
     let open Impl in
     let module C = Common (Impl) in
     let open C in
@@ -425,7 +425,7 @@ let typ ~assert_16_bits impl field t =
           |> transport ~there:(fun y -> assert_eq x y) ~back:(fun () -> x)
           |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant_var)
   in
-  typ (typ_basic ~assert_16_bits impl field) t
+  typ typ_basic t
 
 let packed_typ_basic (type field other_field other_field_var)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
