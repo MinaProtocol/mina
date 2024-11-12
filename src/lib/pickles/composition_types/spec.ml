@@ -152,12 +152,6 @@ let rec pack :
   | Constant (x, _, inner) ->
       pack ~zero ~one p inner (Some x) t
 
-type ('f, 'env) typ =
-  { typ :
-      'var 'value.
-      ('value, 'var, 'env) basic -> ('var, 'value, 'f) Snarky_backendless.Typ.t
-  }
-
 module ETyp = struct
   type ('var, 'value, 'f) t =
     | T :
@@ -330,9 +324,17 @@ let pack (type f) ((module Impl) as impl : f impl) t =
 let typ (type field other_field other_field_var) ~assert_16_bits
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
     (field : (other_field_var, other_field) Impl.Typ.t) t =
+  let module C = Common (Impl) in
+  let module Typ_record = struct
+    type ('f, 'env) typ =
+      { typ :
+          'var 'value.
+             ('value, 'var, 'env) basic
+          -> ('var, 'value, 'f) Snarky_backendless.Typ.t
+      }
+  end in
   let typ_basic =
     let open Impl in
-    let module C = Common (Impl) in
     let open C in
     let typ :
         type a b.
@@ -355,11 +357,11 @@ let typ (type field other_field other_field_var) ~assert_16_bits
       | Bulletproof_challenge ->
           Bulletproof_challenge.typ Challenge.typ
     in
-    { typ }
+    { Typ_record.typ }
   in
   let rec typ :
       type f var value env.
-         (f, env) typ
+         (f, env) Typ_record.typ
       -> (value, var, env) T.t
       -> (var, value, f) Snarky_backendless.Typ.t =
     let open Snarky_backendless.Typ in
