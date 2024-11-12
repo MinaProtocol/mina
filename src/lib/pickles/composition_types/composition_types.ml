@@ -1092,9 +1092,23 @@ module Step = struct
             ; perm = f t.perm
             }
 
-          let typ (type f fp) _ ~challenge ~scalar_challenge
-              (fp : (fp, _, f) Snarky_backendless.Typ.t) =
-            Snarky_backendless.Typ.of_hlistable
+          let typ (type fp) ~challenge ~scalar_challenge
+              (fp : (fp, _) Step_impl.Typ.t) =
+            Step_impl.Typ.of_hlistable
+              [ Scalar_challenge.typ scalar_challenge
+              ; challenge
+              ; challenge
+              ; Scalar_challenge.typ scalar_challenge
+              ; fp
+              ; fp
+              ; fp
+              ]
+              ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+              ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+          let wrap_typ (type fp) ~challenge ~scalar_challenge
+              (fp : (fp, _) Wrap_impl.Typ.t) =
+            Wrap_impl.Typ.of_hlistable
               [ Scalar_challenge.typ scalar_challenge
               ; challenge
               ; challenge

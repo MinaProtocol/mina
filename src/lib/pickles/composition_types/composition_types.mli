@@ -1112,21 +1112,20 @@ module Step : sig
           val map_fields : ('a, 'b, 'c) t -> f:('c -> 'f) -> ('a, 'b, 'f) t
 
           val typ :
-               'f Spec.impl
-            -> challenge:
-                 ( 'c
-                 , 'd
-                 , 'f
-                 , ( unit
-                   , 'f )
-                   Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
-                 Snarky_backendless.Types.Typ.t
-            -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
-            -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
+               challenge:('c, 'd) Step_impl.Typ.t
+            -> scalar_challenge:('e, 'b) Step_impl.Typ.t
+            -> ('fp, 'a) Step_impl.Typ.t
             -> ( ('c, 'e Scalar_challenge.t, 'fp) t
-               , ('d, 'b Scalar_challenge.t, 'a) t
-               , 'f )
-               Snarky_backendless.Typ.t
+               , ('d, 'b Scalar_challenge.t, 'a) t )
+               Step_impl.Typ.t
+
+          val wrap_typ :
+               challenge:('c, 'd) Wrap_impl.Typ.t
+            -> scalar_challenge:('e, 'b) Wrap_impl.Typ.t
+            -> ('fp, 'a) Wrap_impl.Typ.t
+            -> ( ('c, 'e Scalar_challenge.t, 'fp) t
+               , ('d, 'b Scalar_challenge.t, 'a) t )
+               Wrap_impl.Typ.t
         end
 
         val to_minimal :
