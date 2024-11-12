@@ -697,26 +697,6 @@ module Wrap : sig
       -> app_state:('b -> 'f Core_kernel.Array.t)
       -> g:('g -> 'f list)
       -> 'f Core_kernel.Array.t
-
-    val typ :
-         ('a, 'b) Step_impl.Typ.t
-      -> ('d, 'e) Step_impl.Typ.t
-      -> ('f, 'g) Step_impl.Typ.t
-      -> ('h, 'i) Step_impl.Typ.t
-      -> 'j Nat.nat
-      -> ( ('a, 'f, ('d, 'j) Vector.vec, 'h) t
-         , ('b, 'g, ('e, 'j) Vector.vec, 'i) t )
-         Step_impl.Typ.t
-
-    val wrap_typ :
-         ('a, 'b) Wrap_impl.Typ.t
-      -> ('d, 'e) Wrap_impl.Typ.t
-      -> ('f, 'g) Wrap_impl.Typ.t
-      -> ('h, 'i) Wrap_impl.Typ.t
-      -> 'j Nat.nat
-      -> ( ('a, 'f, ('d, 'j) Vector.vec, 'h) t
-         , ('b, 'g, ('e, 'j) Vector.vec, 'i) t )
-         Wrap_impl.Typ.t
   end
 
   module Lookup_parameters : sig
