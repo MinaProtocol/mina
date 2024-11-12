@@ -235,11 +235,9 @@ let typ (type field other_field other_field_var) ~assert_16_bits
     (field : (other_field_var, other_field) Impl.Typ.t) t =
   let module C = Common (Impl) in
   let module Typ_record = struct
-    type ('f, 'env) typ =
+    type 'env typ =
       { typ :
-          'var 'value.
-             ('value, 'var, 'env) basic
-          -> ('var, 'value, 'f) Snarky_backendless.Typ.t
+          'var 'value. ('value, 'var, 'env) basic -> ('var, 'value) Impl.Typ.t
       }
   end in
   let typ_basic =
@@ -269,10 +267,8 @@ let typ (type field other_field other_field_var) ~assert_16_bits
     { Typ_record.typ }
   in
   let rec typ :
-      type f var value env.
-         (f, env) Typ_record.typ
-      -> (value, var, env) T.t
-      -> (var, value, f) Snarky_backendless.Typ.t =
+      type var value env.
+      env Typ_record.typ -> (value, var, env) T.t -> (var, value) Impl.Typ.t =
     let open Snarky_backendless.Typ in
     fun t spec ->
       match[@warning "-45"] spec with
