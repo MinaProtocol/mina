@@ -206,8 +206,7 @@ let wrap_main
             with_label __LOC__ (fun () ->
                 let open Types.Step.Proof_state in
                 let typ =
-                  typ
-                    (module Impl)
+                  wrap_typ
                     ~assert_16_bits:(Wrap_verifier.assert_n_bits ~n:16)
                     (Vector.init Max_proofs_verified.n ~f:(fun _ ->
                          Plonk_types.Features.none ) )

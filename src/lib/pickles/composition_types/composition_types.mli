@@ -16,6 +16,8 @@ module Nvector = Vector.With_length
 module Wrap_bp_vec = Backend.Tock.Rounds_vector
 module Step_bp_vec = Backend.Tick.Rounds_vector
 module Scalar_challenge = Kimchi_backend_common.Scalar_challenge
+module Step_impl := Kimchi_pasta_snarky_backend.Step_impl
+module Wrap_impl := Kimchi_pasta_snarky_backend.Wrap_impl
 
 (** {2 Modules} *)
 
@@ -1382,29 +1384,24 @@ module Step : sig
          Spec.T.t
 
     val typ :
-         'f Spec.impl
-      -> assert_16_bits:('f Snarky_backendless.Cvar.t -> unit)
+         assert_16_bits:(Step_impl.Field.t -> unit)
       -> (Opt.Flag.t Plonk_types.Features.t, 'n) Vector.t
-      -> ( 'b
-         , 'a
-         , 'f
-         , (unit, 'f) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
-         )
-         snarky_typ
-      -> ( ( ( ( 'f Limb_vector.Challenge.t
-               , 'f Limb_vector.Challenge.t Scalar_challenge.t
+      -> ('b, 'a) Step_impl.Typ.t
+      -> ( ( ( ( Step_impl.Field.Constant.t Limb_vector.Challenge.t
+               , Step_impl.Field.Constant.t Limb_vector.Challenge.t
+                 Scalar_challenge.t
                , 'b
-               , ( 'f Limb_vector.Challenge.t Scalar_challenge.t
+               , ( Step_impl.Field.Constant.t Limb_vector.Challenge.t
+                   Scalar_challenge.t
                    Bulletproof_challenge.t
                  , Backend.Tock.Rounds.n )
                  Vector.t
-               , 'f Snarky_backendless.Cvar.t
-               , 'f Snarky_backendless.Cvar.t
-                 Snarky_backendless__Snark_intf.Boolean0.t )
+               , Step_impl.Field.t
+               , Step_impl.Boolean.var )
                Per_proof.In_circuit.t
              , 'n )
              Vector.t
-           , 'f Snarky_backendless.Cvar.t )
+           , Step_impl.Field.t )
            t
          , ( ( ( Limb_vector.Challenge.Constant.t
                , Limb_vector.Challenge.Constant.t Scalar_challenge.t
@@ -1419,9 +1416,44 @@ module Step : sig
              , 'n )
              Vector.t
            , Digest.Constant.t )
+           t )
+         Step_impl.Typ.t
+
+    val wrap_typ :
+         assert_16_bits:(Wrap_impl.Field.t -> unit)
+      -> (Opt.Flag.t Plonk_types.Features.t, 'n) Vector.t
+      -> ('b, 'a) Wrap_impl.Typ.t
+      -> ( ( ( ( Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
+               , Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
+                 Scalar_challenge.t
+               , 'b
+               , ( Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
+                   Scalar_challenge.t
+                   Bulletproof_challenge.t
+                 , Backend.Tock.Rounds.n )
+                 Vector.t
+               , Wrap_impl.Field.t
+               , Wrap_impl.Boolean.var )
+               Per_proof.In_circuit.t
+             , 'n )
+             Vector.t
+           , Wrap_impl.Field.t )
            t
-         , 'f )
-         Snarky_backendless.Typ.t
+         , ( ( ( Limb_vector.Challenge.Constant.t
+               , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+               , 'a
+               , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                   Bulletproof_challenge.t
+                 , Backend.Tock.Rounds.n )
+                 Vector.t
+               , Digest.Constant.t
+               , bool )
+               Per_proof.In_circuit.t
+             , 'n )
+             Vector.t
+           , Digest.Constant.t )
+           t )
+         Wrap_impl.Typ.t
   end
 
   module Statement : sig

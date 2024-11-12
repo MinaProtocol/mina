@@ -6,6 +6,8 @@ module Digest = Digest
 module Spec = Spec
 module Opt = Opt
 open Core_kernel
+module Step_impl = Kimchi_pasta_snarky_backend.Step_impl
+module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl
 
 type 'f impl = 'f Spec.impl
 
@@ -1356,20 +1358,30 @@ module Step = struct
         }
     end [@@warning "-45"]
 
-    let[@warning "-60"] typ (type n f)
-        ( (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-        as impl ) ~assert_16_bits
+    let[@warning "-60"] typ (type n) ~assert_16_bits
         (proofs_verified : (Opt.Flag.t Plonk_types.Features.t, n) Vector.t) fq :
-        ( ((_, _) Vector.t, _) t
-        , ((_, _) Vector.t, _) t
-        , _ )
-        Snarky_backendless.Typ.t =
-      let per_proof _ = Per_proof.typ impl fq ~assert_16_bits in
+        (((_, _) Vector.t, _) t, ((_, _) Vector.t, _) t) Step_impl.Typ.t =
+      let per_proof _ = Per_proof.typ (module Step_impl) fq ~assert_16_bits in
       let unfinalized_proofs =
         Vector.typ' (Vector.map proofs_verified ~f:per_proof)
       in
       let messages_for_next_step_proof =
-        Spec.typ impl fq ~assert_16_bits (B Spec.Digest)
+        Spec.typ (module Step_impl) fq ~assert_16_bits (B Spec.Digest)
+      in
+      Snarky_backendless.Typ.of_hlistable
+        [ unfinalized_proofs; messages_for_next_step_proof ]
+        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
+
+    let[@warning "-60"] wrap_typ (type n) ~assert_16_bits
+        (proofs_verified : (Opt.Flag.t Plonk_types.Features.t, n) Vector.t) fq :
+        (((_, _) Vector.t, _) t, ((_, _) Vector.t, _) t) Wrap_impl.Typ.t =
+      let per_proof _ = Per_proof.typ (module Wrap_impl) fq ~assert_16_bits in
+      let unfinalized_proofs =
+        Vector.typ' (Vector.map proofs_verified ~f:per_proof)
+      in
+      let messages_for_next_step_proof =
+        Spec.typ (module Wrap_impl) fq ~assert_16_bits (B Spec.Digest)
       in
       Snarky_backendless.Typ.of_hlistable
         [ unfinalized_proofs; messages_for_next_step_proof ]
