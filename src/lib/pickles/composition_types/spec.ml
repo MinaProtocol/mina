@@ -231,9 +231,10 @@ let pack (type f) ((module Impl) as impl : f impl) t =
     None
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
+  module C = Common (Impl)
+
   let typ (type other_field other_field_var) ~assert_16_bits
       (field : (other_field_var, other_field) Impl.Typ.t) t =
-    let module C = Common (Impl) in
     let module Typ_record = struct
       type 'env typ =
         { typ :
@@ -345,8 +346,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
     end in
     let packed_typ_basic =
       let open Impl in
-      let module Digest = D.Make (Impl) in
-      let module Challenge = Limb_vector.Challenge.Make (Impl) in
+      let open C in
       let module Env = struct
         type ('other_field, 'other_field_var, 'a) t =
           < field1 : 'other_field
