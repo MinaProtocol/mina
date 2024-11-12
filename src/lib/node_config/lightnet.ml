@@ -1,4 +1,4 @@
-[%%import "/src/config.mlh"]
+[%%import "/src/config/lightnet.mlh"]
 
 (** This file consists of compile-time constants that are not in
     Genesis_constants.
@@ -103,11 +103,3 @@ let scan_state_tps_goal_x10 : int option = None
 let scan_state_tps_goal_x10 = Some scan_state_tps_goal_x10
 
 [%%endif]
-
-module Dev : Node_config_intf.S = Dev
-
-module Lightnet : Node_config_intf.S = Lightnet
-
-module Devnet : Node_config_intf.S = Devnet
-
-module Mainnet : Node_config_intf.S = Mainnet

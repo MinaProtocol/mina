@@ -1779,6 +1779,7 @@ module type Constants_intf = sig
     -> ?commit_id_short:string
     -> ?itn_features:bool
     -> ?cli_proof_level:Genesis_constants.Proof_level.t
+    -> ?network:[< `Dev | `Devnet | `Lightnet | `Mainnet ]
     -> logger:Logger.t
     -> string list
     -> constants Deferred.t
@@ -1786,6 +1787,7 @@ module type Constants_intf = sig
   val load_constants' :
        ?itn_features:bool
     -> ?cli_proof_level:Genesis_constants.Proof_level.t
+    -> ?network:[< `Dev | `Devnet | `Lightnet | `Mainnet ]
     -> t
     -> constants
 
@@ -1959,12 +1961,30 @@ module Constants : Constants_intf = struct
     in
     { genesis_constants; constraint_constants; proof_level; compile_config }
 
-  let load_constants' ?itn_features ?cli_proof_level runtime_config =
+  let load_constants' ?itn_features ?cli_proof_level ?network runtime_config =
     let compile_constants =
-      { genesis_constants = Genesis_constants.Compiled.genesis_constants
-      ; constraint_constants = Genesis_constants.Compiled.constraint_constants
-      ; proof_level = Genesis_constants.Compiled.proof_level
-      ; compile_config = Mina_compile_config.Compiled.t
+      let constants, compile_config =
+        match network with
+        | None ->
+            ( Genesis_constants.Network_constants.compiled
+            , Mina_compile_config.Network_constants.compiled )
+        | Some `Dev ->
+            ( Genesis_constants.Network_constants.dev
+            , Mina_compile_config.Network_constants.dev )
+        | Some `Lightnet ->
+            ( Genesis_constants.Network_constants.lightnet
+            , Mina_compile_config.Network_constants.lightnet )
+        | Some `Devnet ->
+            ( Genesis_constants.Network_constants.devnet
+            , Mina_compile_config.Network_constants.devnet )
+        | Some `Mainnet ->
+            ( Genesis_constants.Network_constants.mainnet
+            , Mina_compile_config.Network_constants.mainnet )
+      in
+      { genesis_constants = constants.genesis_constants
+      ; constraint_constants = constants.constraint_constants
+      ; proof_level = constants.proof_level
+      ; compile_config
       }
     in
     let cs = combine compile_constants runtime_config in
@@ -1979,7 +1999,7 @@ module Constants : Constants_intf = struct
 
   (* Use this function if you don't need/want the ledger configuration *)
   let load_constants ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
-      ~logger config_files =
+      ?network ~logger config_files =
     Deferred.Or_error.ok_exn
     @@
     let open Deferred.Or_error.Let_syntax in
@@ -1987,7 +2007,7 @@ module Constants : Constants_intf = struct
       Json_loader.load_config_files ?conf_dir ?commit_id_short ~logger
         config_files
     in
-    load_constants' ?itn_features ?cli_proof_level runtime_config
+    load_constants' ?itn_features ?cli_proof_level ?network runtime_config
 
   let magic_for_unit_tests t =
     let compile_constants =

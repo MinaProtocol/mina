@@ -42,6 +42,22 @@ let config_files =
        earlier config files"
     (listed string)
 
+let network_base_config =
+  let open Command.Param in
+  let make_network_flag a name =
+    flag ("--" ^ name) ~aliases:[ name ]
+      ~doc:(sprintf "Use the %s network base configuration" name)
+      no_arg
+    |> map ~f:(fun b -> if b then Some a else None)
+  in
+  let dev = make_network_flag `Dev "dev" in
+  let lightnet = make_network_flag `Lightnet "lightnet" in
+  let devnet = make_network_flag `Devnet "devnet" in
+  let mainnet = make_network_flag `Mainnet "mainnet" in
+  Command.Param.choose_one
+    [ dev; lightnet; devnet; mainnet ]
+    ~if_nothing_chosen:Return_none
+
 module Doc_builder = struct
   type 'value t =
     { type_name : string
