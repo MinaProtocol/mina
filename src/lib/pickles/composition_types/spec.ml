@@ -158,74 +158,6 @@ type ('f, 'env) typ =
       ('value, 'var, 'env) basic -> ('var, 'value, 'f) Snarky_backendless.Typ.t
   }
 
-let rec typ :
-    type f var value env.
-       (f, env) typ
-    -> (value, var, env) T.t
-    -> (var, value, f) Snarky_backendless.Typ.t =
-  let open Snarky_backendless.Typ in
-  fun t spec ->
-    match[@warning "-45"] spec with
-    | B spec ->
-        t.typ spec
-    | Scalar chal ->
-        Sc.typ (t.typ chal)
-    | Vector (spec, n) ->
-        Vector.typ (typ t spec) n
-    | Array (spec, n) ->
-        array ~length:n (typ t spec)
-    | Struct [] ->
-        let open Hlist.HlistId in
-        transport (unit ()) ~there:(fun [] -> ()) ~back:(fun () -> [])
-        |> transport_var ~there:(fun [] -> ()) ~back:(fun () -> [])
-    | Struct (spec :: specs) ->
-        let open Hlist.HlistId in
-        tuple2 (typ t spec) (typ t (Struct specs))
-        |> transport
-             ~there:(fun (x :: xs) -> (x, xs))
-             ~back:(fun (x, xs) -> x :: xs)
-        |> transport_var
-             ~there:(fun (x :: xs) -> (x, xs))
-             ~back:(fun (x, xs) -> x :: xs)
-    | Opt { inner; flag; dummy1; dummy2; bool = (module B) } ->
-        let bool = typ t (B Bool) in
-        let open B in
-        (* Always use the same "maybe" layout which is a boolean and then the value *)
-        Opt.constant_layout_typ bool flag ~dummy:dummy1 ~dummy_var:dummy2 ~true_
-          ~false_ (typ t inner)
-    | Opt_unflagged { inner; flag; dummy1; dummy2 } -> (
-        match flag with
-        | Opt.Flag.No ->
-            let open Snarky_backendless.Typ in
-            unit ()
-            |> Snarky_backendless.Typ.transport
-                 ~there:(function Some _ -> assert false | None -> ())
-                 ~back:(fun () -> None)
-            |> Snarky_backendless.Typ.transport_var
-                 ~there:(function Some _ -> assert false | None -> ())
-                 ~back:(fun _ -> None)
-        | Opt.Flag.(Yes | Maybe) ->
-            typ t inner
-            |> Snarky_backendless.Typ.transport
-                 ~there:(function Some x -> x | None -> dummy1)
-                 ~back:(fun x -> Some x)
-            |> Snarky_backendless.Typ.transport_var
-                 ~there:(function Some x -> x | None -> dummy2)
-                 ~back:(fun x -> Some x) )
-    | Constant (x, assert_eq, spec) ->
-        let (Typ typ) = typ t spec in
-        let constant_var =
-          let fields, aux = typ.value_to_fields x in
-          let fields =
-            Array.map fields ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
-          in
-          typ.var_of_fields (fields, aux)
-        in
-        let open Snarky_backendless.Typ in
-        unit ()
-        |> transport ~there:(fun y -> assert_eq x y) ~back:(fun () -> x)
-        |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant_var)
-
 module ETyp = struct
   type ('var, 'value, 'f) t =
     | T :
@@ -425,6 +357,74 @@ let typ_basic (type field other_field other_field_var)
   { typ }
 
 let typ ~assert_16_bits impl field t =
+  let rec typ :
+      type f var value env.
+         (f, env) typ
+      -> (value, var, env) T.t
+      -> (var, value, f) Snarky_backendless.Typ.t =
+    let open Snarky_backendless.Typ in
+    fun t spec ->
+      match[@warning "-45"] spec with
+      | B spec ->
+          t.typ spec
+      | Scalar chal ->
+          Sc.typ (t.typ chal)
+      | Vector (spec, n) ->
+          Vector.typ (typ t spec) n
+      | Array (spec, n) ->
+          array ~length:n (typ t spec)
+      | Struct [] ->
+          let open Hlist.HlistId in
+          transport (unit ()) ~there:(fun [] -> ()) ~back:(fun () -> [])
+          |> transport_var ~there:(fun [] -> ()) ~back:(fun () -> [])
+      | Struct (spec :: specs) ->
+          let open Hlist.HlistId in
+          tuple2 (typ t spec) (typ t (Struct specs))
+          |> transport
+               ~there:(fun (x :: xs) -> (x, xs))
+               ~back:(fun (x, xs) -> x :: xs)
+          |> transport_var
+               ~there:(fun (x :: xs) -> (x, xs))
+               ~back:(fun (x, xs) -> x :: xs)
+      | Opt { inner; flag; dummy1; dummy2; bool = (module B) } ->
+          let bool = typ t (B Bool) in
+          let open B in
+          (* Always use the same "maybe" layout which is a boolean and then the value *)
+          Opt.constant_layout_typ bool flag ~dummy:dummy1 ~dummy_var:dummy2
+            ~true_ ~false_ (typ t inner)
+      | Opt_unflagged { inner; flag; dummy1; dummy2 } -> (
+          match flag with
+          | Opt.Flag.No ->
+              let open Snarky_backendless.Typ in
+              unit ()
+              |> Snarky_backendless.Typ.transport
+                   ~there:(function Some _ -> assert false | None -> ())
+                   ~back:(fun () -> None)
+              |> Snarky_backendless.Typ.transport_var
+                   ~there:(function Some _ -> assert false | None -> ())
+                   ~back:(fun _ -> None)
+          | Opt.Flag.(Yes | Maybe) ->
+              typ t inner
+              |> Snarky_backendless.Typ.transport
+                   ~there:(function Some x -> x | None -> dummy1)
+                   ~back:(fun x -> Some x)
+              |> Snarky_backendless.Typ.transport_var
+                   ~there:(function Some x -> x | None -> dummy2)
+                   ~back:(fun x -> Some x) )
+      | Constant (x, assert_eq, spec) ->
+          let (Typ typ) = typ t spec in
+          let constant_var =
+            let fields, aux = typ.value_to_fields x in
+            let fields =
+              Array.map fields ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
+            in
+            typ.var_of_fields (fields, aux)
+          in
+          let open Snarky_backendless.Typ in
+          unit ()
+          |> transport ~there:(fun y -> assert_eq x y) ~back:(fun () -> x)
+          |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant_var)
+  in
   typ (typ_basic ~assert_16_bits impl field) t
 
 let packed_typ_basic (type field other_field other_field_var)
