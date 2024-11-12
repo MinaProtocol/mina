@@ -338,16 +338,16 @@ let typ (type field other_field other_field_var) ~assert_16_bits
   in
   typ typ_basic t
 
-let packed_typ impl field t =
+let packed_typ (type field other_field other_field_var)
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
+    (field : (other_field_var, other_field, field) ETyp.t) t =
   let module ETyp_record = struct
     type ('f, 'env) etyp =
       { etyp :
           'var 'value. ('value, 'var, 'env) basic -> ('var, 'value, 'f) ETyp.t
       }
   end in
-  let packed_typ_basic (type field other_field other_field_var)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
-      (field : (other_field_var, other_field, field) ETyp.t) =
+  let packed_typ_basic =
     let open Impl in
     let module Digest = D.Make (Impl) in
     let module Challenge = Limb_vector.Challenge.Make (Impl) in
@@ -491,4 +491,4 @@ let packed_typ impl field t =
             , (fun _ -> f constant_var)
             , f' )
   in
-  etyp (packed_typ_basic impl field) t
+  etyp packed_typ_basic t
