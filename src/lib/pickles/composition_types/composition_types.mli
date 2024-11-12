@@ -503,14 +503,6 @@ module Wrap : sig
         -> g1:('g -> 'f list)
         -> 'f Core_kernel.Array.t
 
-      val typ :
-           ('a, 'b) Step_impl.Typ.t
-        -> ('d, 'e) Step_impl.Typ.t
-        -> length:'f Nat.nat
-        -> ( ('a, ('d, 'f) Vector.vec) t
-           , ('b, ('e, 'f) Vector.vec) t )
-           Step_impl.Typ.t
-
       val wrap_typ :
            ('a, 'b) Wrap_impl.Typ.t
         -> ('d, 'e) Wrap_impl.Typ.t

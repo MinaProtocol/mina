@@ -391,12 +391,6 @@ module Wrap = struct
           ; Array.of_list (g1_to_field_elements challenge_polynomial_commitment)
           ]
 
-      let typ g1 chal ~length =
-        Step_impl.Typ.of_hlistable
-          [ g1; Vector.typ chal length ]
-          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-          ~value_of_hlist:of_hlist
-
       let wrap_typ g1 chal ~length =
         Wrap_impl.Typ.of_hlistable
           [ g1; Vector.typ chal length ]
