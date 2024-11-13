@@ -1,8 +1,17 @@
 open Core_kernel
 
 let padded_array_typ ~length ~dummy elt =
-  Snarky_backendless.Typ.array ~length elt
-  |> Snarky_backendless.Typ.transport
+  Kimchi_pasta_snarky_backend.Step_impl.Typ.array ~length elt
+  |> Kimchi_pasta_snarky_backend.Step_impl.Typ.transport
+       ~there:(fun a ->
+         let n = Array.length a in
+         if n > length then failwithf "Expected %d <= %d" n length () ;
+         Array.append a (Array.create ~len:(length - n) dummy) )
+       ~back:Fn.id
+
+let wrap_padded_array_typ ~length ~dummy elt =
+  Kimchi_pasta_snarky_backend.Wrap_impl.Typ.array ~length elt
+  |> Kimchi_pasta_snarky_backend.Wrap_impl.Typ.transport
        ~there:(fun a ->
          let n = Array.length a in
          if n > length then failwithf "Expected %d <= %d" n length () ;
@@ -1461,14 +1470,16 @@ module Poly_comm = struct
 
     let padded_array_typ0 = padded_array_typ
 
-    let typ (type f g g_var bool_var)
-        (g : (g_var, g, f) Snarky_backendless.Typ.t) ~length
-        ~dummy_group_element
-        ~(bool : (bool_var, bool, f) Snarky_backendless.Typ.t) :
-        ((bool_var * g_var) t, g Or_infinity.t t, f) Snarky_backendless.Typ.t =
-      let open Snarky_backendless.Typ in
+    let typ (type g g_var)
+        (g : (g_var, g) Kimchi_pasta_snarky_backend.Step_impl.Typ.t) ~length
+        ~dummy_group_element :
+        ( (Kimchi_pasta_snarky_backend.Step_impl.Boolean.var * g_var) t
+        , g Or_infinity.t t )
+        Kimchi_pasta_snarky_backend.Step_impl.Typ.t =
+      let open Kimchi_pasta_snarky_backend.Step_impl.Typ in
       let g_inf =
-        transport (tuple2 bool g)
+        transport
+          (tuple2 Kimchi_pasta_snarky_backend.Step_impl.Boolean.typ g)
           ~there:(function
             | Or_infinity.Infinity ->
                 (false, dummy_group_element)
@@ -1477,6 +1488,29 @@ module Poly_comm = struct
           ~back:(fun (b, x) -> if b then Infinity else Finite x)
       in
       let arr = padded_array_typ0 ~length ~dummy:Or_infinity.Infinity g_inf in
+      of_hlistable [ arr; g_inf ] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+    let wrap_typ (type g g_var)
+        (g : (g_var, g) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t) ~length
+        ~dummy_group_element :
+        ( (Kimchi_pasta_snarky_backend.Wrap_impl.Boolean.var * g_var) t
+        , g Or_infinity.t t )
+        Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t =
+      let open Kimchi_pasta_snarky_backend.Wrap_impl.Typ in
+      let g_inf =
+        transport
+          (tuple2 Kimchi_pasta_snarky_backend.Wrap_impl.Boolean.typ g)
+          ~there:(function
+            | Or_infinity.Infinity ->
+                (false, dummy_group_element)
+            | Finite x ->
+                (true, x) )
+          ~back:(fun (b, x) -> if b then Infinity else Finite x)
+      in
+      let arr =
+        wrap_padded_array_typ ~length ~dummy:Or_infinity.Infinity g_inf
+      in
       of_hlistable [ arr; g_inf ] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
   end
@@ -1604,7 +1638,7 @@ module Messages = struct
     let _w n =
       With_degree_bound.typ g
         ~length:(Vector.reduce_exn n ~f:Int.max)
-        ~dummy_group_element:dummy ~bool:Impl.Boolean.typ
+        ~dummy_group_element:dummy
     in
     let lookup =
       Lookup.opt_typ Impl.Boolean.typ ~uses_lookup:uses_lookups
@@ -1623,12 +1657,12 @@ module Messages = struct
     let module Impl = Kimchi_pasta_snarky_backend.Wrap_impl in
     let open Impl.Typ in
     let { Poly.w = w_lens; z; t } = commitment_lengths in
-    let array ~length elt = padded_array_typ ~dummy ~length elt in
+    let array ~length elt = wrap_padded_array_typ ~dummy ~length elt in
     let wo n = array ~length:(Vector.reduce_exn n ~f:Int.max) g in
     let _w n =
-      With_degree_bound.typ g
+      With_degree_bound.wrap_typ g
         ~length:(Vector.reduce_exn n ~f:Int.max)
-        ~dummy_group_element:dummy ~bool:Impl.Boolean.typ
+        ~dummy_group_element:dummy
     in
     let lookup =
       Lookup.opt_typ Impl.Boolean.typ ~uses_lookup:uses_lookups
