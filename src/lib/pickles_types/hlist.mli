@@ -400,24 +400,6 @@ module H2 : sig
     -> sig
     val f : ('a, 'b) T(A).t -> ('a, 'b) T(B).t
   end
-
-  (** See {!H1.Typ}. *)
-  module Typ : functor
-    (Impl : sig
-       type field
-
-       module Typ : sig
-         type ('var, 'value) t = ('var, 'value, field) Snarky_backendless.Typ.t
-       end
-     end)
-    -> sig
-    val f :
-         ('vars, 'values) T(Impl.Typ).t
-      -> ( 'vars H1.T(Id).t
-         , 'values H1.T(Id).t
-         , Impl.field )
-         Snarky_backendless.Typ.t
-  end
 end
 
 (** Data type of heterogeneous lists whose content type varies over two type
@@ -926,50 +908,6 @@ module H6 : sig
          ('a1, 'a2, 'a3, 'a4, 'a5, 'a6) T(A).t
       -> ('a1, 'n) Length.t
       -> ('a2, 'n) Length.t
-  end
-
-  (** See {!H1.Typ}. *)
-  module Typ : functor
-    (Impl : sig
-       type field
-     end)
-    (A : T6)
-    (Var : T4)
-    (Val : T4)
-    (_ : sig
-       val f :
-            ('var, 'value, 'ret_var, 'ret_value, 'n1, 'n2) A.t
-         -> ( ('var, 'ret_var, 'n1, 'n2) Var.t
-            , ('value, 'ret_value, 'n1, 'n2) Val.t
-            , Impl.field )
-            Snarky_backendless.Typ.t
-     end)
-    -> sig
-    val transport :
-         ('a, 'b, 'c) Snarky_backendless.Typ.t
-      -> there:('d -> 'b)
-      -> back:('b -> 'd)
-      -> ('a, 'd, 'c) Snarky_backendless.Typ.t
-
-    val transport_var :
-         ('a, 'b, 'c) Snarky_backendless.Typ.t
-      -> there:('d -> 'a)
-      -> back:('a -> 'd)
-      -> ('d, 'b, 'c) Snarky_backendless.Typ.t
-
-    val tuple2 :
-         ('a, 'b, 'c) Snarky_backendless.Typ.t
-      -> ('d, 'e, 'c) Snarky_backendless.Typ.t
-      -> ('a * 'd, 'b * 'e, 'c) Snarky_backendless.Typ.t
-
-    val unit : unit -> (unit, unit, 'a) Snarky_backendless.Typ.t
-
-    val f :
-         ('vars, 'values, 'ret_vars, 'ret_values, 'ns1, 'ns2) T(A).t
-      -> ( ('vars, 'ret_vars, 'ns1, 'ns2) H4.T(Var).t
-         , ('values, 'ret_values, 'ns1, 'ns2) H4.T(Val).t
-         , Impl.field )
-         Snarky_backendless.Typ.t
   end
 end
 
