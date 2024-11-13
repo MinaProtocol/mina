@@ -35,14 +35,6 @@ type ('a, 'b, 'c) basic =
         )
         basic
 
-module type Bool_intf = sig
-  type var
-
-  val true_ : var
-
-  val false_ : var
-end
-
 module rec T : sig
   type (_, _, _) t =
     | B : ('a, 'b, 'env) basic -> ('a, 'b, 'env) t
@@ -61,7 +53,6 @@ module rec T : sig
         ; flag : Opt.Flag.t
         ; dummy1 : 'a1
         ; dummy2 : 'a2
-        ; bool : (module Bool_intf with type var = 'bool)
         }
         -> ('a1 option, ('a2, 'bool) Opt.t, 'env) t
     | Opt_unflagged :
@@ -120,7 +111,7 @@ let rec pack :
             Option.map t_constant_opt ~f:(fun t_const -> t_const.(i))
           in
           pack ~zero ~one p spec t_constant_opt t )
-  | Opt { inner; dummy1; dummy2; flag = _; bool = _ } -> (
+  | Opt { inner; dummy1; dummy2; flag = _ } -> (
       match t with
       | Nothing ->
           let t_constant_opt = Option.map t_constant_opt ~f:(fun _ -> dummy1) in
@@ -278,8 +269,18 @@ module Make
         -> ('b, 'a, Impl.Field.Constant.t) ETyp.t
 
       val scalar_typ : ('a, 'b) Impl.Typ.t -> ('a Sc.t, 'b Sc.t) Impl.Typ.t
+
+      val opt_constant_layout_typ :
+           Opt.Flag.t
+        -> ('a_var, 'a) Impl.Typ.t
+        -> dummy:'a
+        -> dummy_var:'a_var
+        -> (('a_var, Impl.Boolean.var) Opt.t, 'a option) Impl.Typ.t
     end) =
 struct
+  type 'env is_boolean =
+    | Is_boolean : < bool2 : Impl.Boolean.var ; .. > is_boolean
+
   let typ (type other_field other_field_var) ~assert_16_bits
       (field : (other_field_var, other_field) Impl.Typ.t) t =
     let module Typ_record = struct
@@ -290,37 +291,39 @@ struct
     end in
     let rec typ :
         type var value env.
-        env Typ_record.typ -> (value, var, env) T.t -> (var, value) Impl.Typ.t =
+           env Typ_record.typ
+        -> env is_boolean
+        -> (value, var, env) T.t
+        -> (var, value) Impl.Typ.t =
       let open Impl.Typ in
-      fun t spec ->
+      fun t is_boolean spec ->
         match[@warning "-45"] spec with
         | B spec ->
             t.typ spec
         | Scalar chal ->
             Basic.scalar_typ (t.typ chal)
         | Vector (spec, n) ->
-            Vector.typ (typ t spec) n
+            Vector.typ (typ t is_boolean spec) n
         | Array (spec, n) ->
-            array ~length:n (typ t spec)
+            array ~length:n (typ t is_boolean spec)
         | Struct [] ->
             let open Hlist.HlistId in
             transport unit ~there:(fun [] -> ()) ~back:(fun () -> [])
             |> transport_var ~there:(fun [] -> ()) ~back:(fun () -> [])
         | Struct (spec :: specs) ->
             let open Hlist.HlistId in
-            tuple2 (typ t spec) (typ t (Struct specs))
+            tuple2 (typ t is_boolean spec) (typ t is_boolean (Struct specs))
             |> transport
                  ~there:(fun (x :: xs) -> (x, xs))
                  ~back:(fun (x, xs) -> x :: xs)
             |> transport_var
                  ~there:(fun (x :: xs) -> (x, xs))
                  ~back:(fun (x, xs) -> x :: xs)
-        | Opt { inner; flag; dummy1; dummy2; bool = (module B) } ->
-            let bool = typ t (B Bool) in
-            let open B in
+        | Opt { inner; flag; dummy1; dummy2 } ->
             (* Always use the same "maybe" layout which is a boolean and then the value *)
-            Opt.constant_layout_typ bool flag ~dummy:dummy1 ~dummy_var:dummy2
-              ~true_ ~false_ (typ t inner)
+            let Is_boolean = is_boolean in
+            Basic.opt_constant_layout_typ flag ~dummy:dummy1 ~dummy_var:dummy2
+              (typ t is_boolean inner)
         | Opt_unflagged { inner; flag; dummy1; dummy2 } -> (
             match flag with
             | Opt.Flag.No ->
@@ -333,7 +336,7 @@ struct
                      ~there:(function Some _ -> assert false | None -> ())
                      ~back:(fun _ -> None)
             | Opt.Flag.(Yes | Maybe) ->
-                typ t inner
+                typ t is_boolean inner
                 |> Impl.Typ.transport
                      ~there:(function Some x -> x | None -> dummy1)
                      ~back:(fun x -> Some x)
@@ -341,7 +344,7 @@ struct
                      ~there:(function Some x -> x | None -> dummy2)
                      ~back:(fun x -> Some x) )
         | Constant (x, assert_eq, spec) ->
-            let (Typ typ) = typ t spec in
+            let (Typ typ) = typ t is_boolean spec in
             let constant_var =
               let fields, aux = typ.value_to_fields x in
               let fields =
@@ -355,7 +358,9 @@ struct
             |> transport ~there:(fun y -> assert_eq x y) ~back:(fun () -> x)
             |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant_var)
     in
-    typ { typ = (fun basic -> Basic.typ_basic ~assert_16_bits field basic) } t
+    typ
+      { typ = (fun basic -> Basic.typ_basic ~assert_16_bits field basic) }
+      Is_boolean t
 
   let packed_typ (type other_field other_field_var)
       (field : (other_field_var, other_field, Impl.Field.Constant.t) ETyp.t) t =
@@ -368,10 +373,11 @@ struct
     let rec etyp :
         type var value env.
            (Impl.Field.Constant.t, env) ETyp_record.etyp
+        -> env is_boolean
         -> (value, var, env) T.t
         -> (var, value, Impl.Field.Constant.t) ETyp.t =
       let open Impl.Typ in
-      fun e spec ->
+      fun e is_boolean spec ->
         match[@warning "-45"] spec with
         | B spec ->
             e.etyp spec
@@ -379,10 +385,10 @@ struct
             let (T (typ, f, f_inv)) = e.etyp chal in
             T (Basic.scalar_typ typ, Sc.map ~f, Sc.map ~f:f_inv)
         | Vector (spec, n) ->
-            let (T (typ, f, f_inv)) = etyp e spec in
+            let (T (typ, f, f_inv)) = etyp e is_boolean spec in
             T (Vector.typ typ n, Vector.map ~f, Vector.map ~f:f_inv)
         | Array (spec, n) ->
-            let (T (typ, f, f_inv)) = etyp e spec in
+            let (T (typ, f, f_inv)) = etyp e is_boolean spec in
             T (array ~length:n typ, Array.map ~f, Array.map ~f:f_inv)
         | Struct [] ->
             let open Hlist.HlistId in
@@ -394,8 +400,8 @@ struct
               , Fn.id )
         | Struct (spec :: specs) ->
             let open Hlist.HlistId in
-            let (T (t1, f1, f1_inv)) = etyp e spec in
-            let (T (t2, f2, f2_inv)) = etyp e (Struct specs) in
+            let (T (t1, f1, f1_inv)) = etyp e is_boolean spec in
+            let (T (t2, f2, f2_inv)) = etyp e is_boolean (Struct specs) in
             T
               ( tuple2 t1 t2
                 |> transport
@@ -403,9 +409,9 @@ struct
                      ~back:(fun (x, xs) -> x :: xs)
               , (fun (x, xs) -> f1 x :: f2 xs)
               , fun (x :: xs) -> (f1_inv x, f2_inv xs) )
-        | Opt { inner; flag; dummy1; dummy2; bool = (module B) } ->
-            let (T (bool, f_bool, f_bool')) = etyp e (B Bool) in
-            let (T (a, f_a, f_a')) = etyp e inner in
+        | Opt { inner; flag; dummy1; dummy2 } ->
+            let Is_boolean = is_boolean in
+            let (T (a, f_a, f_a')) = etyp e is_boolean inner in
             let opt_map ~f1 ~f2 (x : _ Opt.t) : _ Opt.t =
               match x with
               | Nothing ->
@@ -415,16 +421,15 @@ struct
               | Maybe (b, x) ->
                   Maybe (f2 b, f1 x)
             in
-            let f = opt_map ~f1:f_a ~f2:f_bool in
-            let f' = opt_map ~f1:f_a' ~f2:f_bool' in
+            let f = opt_map ~f1:f_a ~f2:Fn.id in
+            let f' = opt_map ~f1:f_a' ~f2:Fn.id in
             T
-              ( Opt.constant_layout_typ ~dummy:dummy1 ~dummy_var:(f_a' dummy2)
-                  ~true_:(f_bool' B.true_) ~false_:(f_bool' B.false_) bool flag
-                  a
+              ( Basic.opt_constant_layout_typ ~dummy:dummy1
+                  ~dummy_var:(f_a' dummy2) flag a
               , f
               , f' )
         | Opt_unflagged { inner; dummy1; dummy2; flag = _ } ->
-            let (T (typ, f, f_inv)) = etyp e inner in
+            let (T (typ, f, f_inv)) = etyp e is_boolean inner in
             let f x = Some (f x) in
             let f_inv = function None -> f_inv dummy2 | Some x -> f_inv x in
             let typ =
@@ -434,7 +439,7 @@ struct
             in
             T (typ, f, f_inv)
         | Constant (x, _assert_eq, spec) ->
-            let (T (Typ typ, f, f')) = etyp e spec in
+            let (T (Typ typ, f, f')) = etyp e is_boolean spec in
             let constant_var =
               let fields, aux = typ.value_to_fields x in
               let fields =
@@ -459,7 +464,7 @@ struct
     in
     etyp
       { ETyp_record.etyp = (fun basic -> Basic.packed_typ_basic field basic) }
-      t
+      Is_boolean t
 end
 
 module Step =
@@ -555,6 +560,8 @@ module Step =
         etyp
 
       let scalar_typ = Sc.typ
+
+      let opt_constant_layout_typ = Opt.constant_layout_typ
     end)
 
 module Wrap =
@@ -650,6 +657,8 @@ module Wrap =
         etyp
 
       let scalar_typ = Sc.wrap_typ
+
+      let opt_constant_layout_typ = Opt.wrap_constant_layout_typ
     end)
 
 let typ = Step.typ

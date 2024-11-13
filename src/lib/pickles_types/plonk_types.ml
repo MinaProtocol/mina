@@ -1190,7 +1190,7 @@ module Evals = struct
         _ Features.Full.t ) :
       ((a_var, Step_impl.Boolean.var) In_circuit.t, a t) Step_impl.Typ.t =
     let open Step_impl in
-    let opt flag = Opt.typ Boolean.typ flag e ~dummy in
+    let opt flag = Opt.typ flag e ~dummy in
     let lookup_sorted =
       let lookups_per_row_3 = opt lookups_per_row_3 in
       let lookups_per_row_4 = opt lookups_per_row_4 in
@@ -1238,7 +1238,7 @@ module Evals = struct
         _ Features.Full.t ) :
       ((a_var, Wrap_impl.Boolean.var) In_circuit.t, a t) Wrap_impl.Typ.t =
     let open Wrap_impl in
-    let opt flag = Opt.typ Boolean.typ flag e ~dummy in
+    let opt flag = Opt.wrap_typ flag e ~dummy in
     let lookup_sorted =
       let lookups_per_row_3 = opt lookups_per_row_3 in
       let lookups_per_row_4 = opt lookups_per_row_4 in
@@ -1567,21 +1567,36 @@ module Messages = struct
       ; runtime = None
       }
 
-    let typ bool_typ e ~lookups_per_row_4 ~runtime_tables ~dummy =
-      Snarky_backendless.Typ.of_hlistable
+    let typ e ~lookups_per_row_4 ~runtime_tables ~dummy =
+      Step_impl.Typ.of_hlistable
         [ Vector.typ e Lookup_sorted_minus_1.n
-        ; Opt.typ bool_typ lookups_per_row_4 e ~dummy
+        ; Opt.typ lookups_per_row_4 e ~dummy
         ; e
-        ; Opt.typ bool_typ runtime_tables e ~dummy
+        ; Opt.typ runtime_tables e ~dummy
         ]
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
 
-    let opt_typ bool_typ ~(uses_lookup : Opt.Flag.t)
+    let opt_typ ~(uses_lookup : Opt.Flag.t) ~(lookups_per_row_4 : Opt.Flag.t)
+        ~(runtime_tables : Opt.Flag.t) ~dummy:z elt =
+      Opt.typ uses_lookup ~dummy:(dummy z)
+        (typ ~lookups_per_row_4 ~runtime_tables ~dummy:z elt)
+
+    let wrap_typ e ~lookups_per_row_4 ~runtime_tables ~dummy =
+      Wrap_impl.Typ.of_hlistable
+        [ Vector.typ e Lookup_sorted_minus_1.n
+        ; Opt.wrap_typ lookups_per_row_4 e ~dummy
+        ; e
+        ; Opt.wrap_typ runtime_tables e ~dummy
+        ]
+        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+        ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
+
+    let wrap_opt_typ ~(uses_lookup : Opt.Flag.t)
         ~(lookups_per_row_4 : Opt.Flag.t) ~(runtime_tables : Opt.Flag.t)
         ~dummy:z elt =
-      Opt.typ bool_typ uses_lookup ~dummy:(dummy z)
-        (typ bool_typ ~lookups_per_row_4 ~runtime_tables ~dummy:z elt)
+      Opt.wrap_typ uses_lookup ~dummy:(dummy z)
+        (wrap_typ ~lookups_per_row_4 ~runtime_tables ~dummy:z elt)
   end
 
   [%%versioned
@@ -1633,8 +1648,8 @@ module Messages = struct
         ~dummy_group_element:dummy
     in
     let lookup =
-      Lookup.opt_typ Impl.Boolean.typ ~uses_lookup:uses_lookups
-        ~lookups_per_row_4 ~runtime_tables ~dummy:[| dummy |]
+      Lookup.opt_typ ~uses_lookup:uses_lookups ~lookups_per_row_4
+        ~runtime_tables ~dummy:[| dummy |]
         (wo [ 1 ])
     in
     of_hlistable
@@ -1657,8 +1672,8 @@ module Messages = struct
         ~dummy_group_element:dummy
     in
     let lookup =
-      Lookup.opt_typ Impl.Boolean.typ ~uses_lookup:uses_lookups
-        ~lookups_per_row_4 ~runtime_tables ~dummy:[| dummy |]
+      Lookup.wrap_opt_typ ~uses_lookup:uses_lookups ~lookups_per_row_4
+        ~runtime_tables ~dummy:[| dummy |]
         (wo [ 1 ])
     in
     of_hlistable

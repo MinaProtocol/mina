@@ -610,8 +610,7 @@ module Wrap : sig
       }
 
     val opt_spec :
-         'f Spec.impl
-      -> ('a, 'b, 'c, 'd) t
+         ('a, 'b, 'c, 'd) t
       -> ( ('a Scalar_challenge.t * unit) Hlist.HlistId.t option
          , ( ('b Scalar_challenge.t * unit) Hlist.HlistId.t
            , 'f Snarky_backendless.Cvar.t
