@@ -51,7 +51,7 @@ struct
       Fix_domains.domains
         (module Impls.Wrap)
         (Impls.Wrap.input ~feature_flags ())
-        (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
+        (T (Impls.Wrap.Typ.unit, Fn.id, Fn.id))
         (fun input -> Promise.return (main input))
     in
     Timer.clock __LOC__ ; t
