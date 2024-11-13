@@ -233,22 +233,15 @@ let pack (type f) ((module Impl) as impl : f impl) t =
 module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
   module C = Common (Impl)
 
-  let typ (type other_field other_field_var) ~assert_16_bits
-      (field : (other_field_var, other_field) Impl.Typ.t) t =
-    let module Typ_record = struct
-      type 'env typ =
-        { typ :
-            'var 'value. ('value, 'var, 'env) basic -> ('var, 'value) Impl.Typ.t
-        }
-    end in
-    let typ_basic =
+  let typ_basic (type other_field other_field_var) ~assert_16_bits
+      (field : (other_field_var, other_field) Impl.Typ.t) =
+    let typ_basic :
+        type a b.
+           (a, b, ((other_field, other_field_var, 'e) C.Env.t as 'e)) basic
+        -> (b, a) Impl.Typ.t =
       let open Impl in
       let open C in
-      let typ :
-          type a b.
-             (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
-          -> (b, a) Impl.Typ.t =
-       fun basic ->
+      fun basic ->
         match basic with
         | Unit ->
             Typ.unit
@@ -264,9 +257,72 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
             Challenge.typ
         | Bulletproof_challenge ->
             Bulletproof_challenge.typ Challenge.typ
-      in
-      { Typ_record.typ }
     in
+    typ_basic
+
+  let packed_typ_basic (type other_field other_field_var)
+      (field : (other_field_var, other_field, Impl.Field.Constant.t) ETyp.t) =
+    let open Impl in
+    let open C in
+    let module Env = struct
+      type ('other_field, 'other_field_var, 'a) t =
+        < field1 : 'other_field
+        ; field2 : 'other_field_var
+        ; bool1 : bool
+        ; bool2 : Boolean.var
+        ; digest1 : Digest.Constant.t
+        ; digest2 : Field.t
+        ; challenge1 : Challenge.Constant.t
+        ; challenge2 : (* Challenge.t *) Field.t
+        ; bulletproof_challenge1 :
+            Challenge.Constant.t Sc.t Bulletproof_challenge.t
+        ; bulletproof_challenge2 : Field.t Sc.t Bulletproof_challenge.t
+        ; branch_data1 : Branch_data.t
+        ; branch_data2 : Field.t
+        ; .. >
+        as
+        'a
+    end in
+    let etyp :
+        type a b.
+           (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
+        -> (b, a, field) ETyp.t = function
+      | Unit ->
+          T (Typ.unit, Fn.id, Fn.id)
+      | Field ->
+          field
+      | Bool ->
+          T (Boolean.typ, Fn.id, Fn.id)
+      | Digest ->
+          T (Digest.typ, Fn.id, Fn.id)
+      | Challenge ->
+          T (Challenge.typ, Fn.id, Fn.id)
+      | Branch_data ->
+          T (Branch_data.packed_typ (module Impl), Fn.id, Fn.id)
+      | Bulletproof_challenge ->
+          let typ =
+            let there bp_challenge =
+              let { Sc.inner = pre } =
+                Bulletproof_challenge.pack bp_challenge
+              in
+              pre
+            in
+            let back pre = Bulletproof_challenge.unpack { Sc.inner = pre } in
+            Typ.transport Challenge.typ ~there ~back
+            |> Typ.transport_var ~there ~back
+          in
+          T (typ, Fn.id, Fn.id)
+    in
+    etyp
+
+  let typ (type other_field other_field_var) ~assert_16_bits
+      (field : (other_field_var, other_field) Impl.Typ.t) t =
+    let module Typ_record = struct
+      type 'env typ =
+        { typ :
+            'var 'value. ('value, 'var, 'env) basic -> ('var, 'value) Impl.Typ.t
+        }
+    end in
     let rec typ :
         type var value env.
         env Typ_record.typ -> (value, var, env) T.t -> (var, value) Impl.Typ.t =
@@ -334,7 +390,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
             |> transport ~there:(fun y -> assert_eq x y) ~back:(fun () -> x)
             |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant_var)
     in
-    typ typ_basic t
+    typ { typ = (fun basic -> typ_basic ~assert_16_bits field basic) } t
 
   let packed_typ (type other_field other_field_var)
       (field : (other_field_var, other_field, Impl.Field.Constant.t) ETyp.t) t =
@@ -344,60 +400,6 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
             'var 'value. ('value, 'var, 'env) basic -> ('var, 'value, 'f) ETyp.t
         }
     end in
-    let packed_typ_basic =
-      let open Impl in
-      let open C in
-      let module Env = struct
-        type ('other_field, 'other_field_var, 'a) t =
-          < field1 : 'other_field
-          ; field2 : 'other_field_var
-          ; bool1 : bool
-          ; bool2 : Boolean.var
-          ; digest1 : Digest.Constant.t
-          ; digest2 : Field.t
-          ; challenge1 : Challenge.Constant.t
-          ; challenge2 : (* Challenge.t *) Field.t
-          ; bulletproof_challenge1 :
-              Challenge.Constant.t Sc.t Bulletproof_challenge.t
-          ; bulletproof_challenge2 : Field.t Sc.t Bulletproof_challenge.t
-          ; branch_data1 : Branch_data.t
-          ; branch_data2 : Field.t
-          ; .. >
-          as
-          'a
-      end in
-      let etyp :
-          type a b.
-             (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
-          -> (b, a, field) ETyp.t = function
-        | Unit ->
-            T (Typ.unit, Fn.id, Fn.id)
-        | Field ->
-            field
-        | Bool ->
-            T (Boolean.typ, Fn.id, Fn.id)
-        | Digest ->
-            T (Digest.typ, Fn.id, Fn.id)
-        | Challenge ->
-            T (Challenge.typ, Fn.id, Fn.id)
-        | Branch_data ->
-            T (Branch_data.packed_typ (module Impl), Fn.id, Fn.id)
-        | Bulletproof_challenge ->
-            let typ =
-              let there bp_challenge =
-                let { Sc.inner = pre } =
-                  Bulletproof_challenge.pack bp_challenge
-                in
-                pre
-              in
-              let back pre = Bulletproof_challenge.unpack { Sc.inner = pre } in
-              Typ.transport Challenge.typ ~there ~back
-              |> Typ.transport_var ~there ~back
-            in
-            T (typ, Fn.id, Fn.id)
-      in
-      { ETyp_record.etyp }
-    in
     let rec etyp :
         type f var value env.
            (f, env) ETyp_record.etyp
@@ -490,7 +492,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
               , (fun _ -> f constant_var)
               , f' )
     in
-    etyp packed_typ_basic t
+    etyp { ETyp_record.etyp = (fun basic -> packed_typ_basic field basic) } t
 end
 
 module Step = Make (Kimchi_pasta_snarky_backend.Step_impl)
