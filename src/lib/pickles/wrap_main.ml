@@ -455,7 +455,7 @@ let wrap_main
           let openings_proof =
             let shift = Shifts.tick1 in
             exists
-              (Plonk_types.Openings.Bulletproof.typ
+              (Plonk_types.Openings.Bulletproof.wrap_typ
                  ( Typ.transport Wrap_verifier.Other_field.Packed.typ
                      ~there:(fun x ->
                        (* When storing, make it a shifted value *)

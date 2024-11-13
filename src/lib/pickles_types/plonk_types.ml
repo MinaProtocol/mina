@@ -1349,7 +1349,14 @@ module Openings = struct
     end]
 
     let typ fq g ~length =
-      let open Snarky_backendless.Typ in
+      let open Kimchi_pasta_snarky_backend.Step_impl.Typ in
+      of_hlistable
+        [ array ~length (g * g); fq; fq; g; g ]
+        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
+
+    let wrap_typ fq g ~length =
+      let open Kimchi_pasta_snarky_backend.Wrap_impl.Typ in
       of_hlistable
         [ array ~length (g * g); fq; fq; g; g ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist

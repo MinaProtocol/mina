@@ -337,18 +337,16 @@ module Openings : sig
     end]
 
     val typ :
-         ( 'a
-         , 'b
-         , 'c
-         , (unit, 'c) Snarky_backendless.Checked_runner.Simple.t )
-         Snarky_backendless.Types.Typ.typ
-      -> ( 'd
-         , 'e
-         , 'c
-         , (unit, 'c) Snarky_backendless.Checked_runner.Simple.t )
-         Snarky_backendless.Types.Typ.typ
+         ('a, 'b) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+      -> ('d, 'e) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
       -> length:int
-      -> (('d, 'a) t, ('e, 'b) t, 'c) Snarky_backendless.Typ.t
+      -> (('d, 'a) t, ('e, 'b) t) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+
+    val wrap_typ :
+         ('a, 'b) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
+      -> ('d, 'e) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
+      -> length:int
+      -> (('d, 'a) t, ('e, 'b) t) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
   end
 
   module Stable : sig
