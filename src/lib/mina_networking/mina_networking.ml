@@ -95,6 +95,7 @@ let create (module Context : CONTEXT) (config : Config.t) ~sinks
     O1trace.thread "gossip_net" (fun () ->
         Gossip_net.Any.create config.creatable_gossip_net
           (module Rpc_context)
+          ~on_bitswap_update:(fun ~tag:_ _ _ -> ())
           (Gossip_net.Message.Any_sinks ((module Sinks), sinks)) )
   in
   gossip_net_ref := Some gossip_net ;
