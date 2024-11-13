@@ -1643,7 +1643,10 @@ let%test_module _ =
     let num_extra_keys = 30
 
     let block_window_duration =
-      Mina_compile_config.For_unit_tests.t.block_window_duration
+      Float.of_int
+        Genesis_constants.For_unit_tests.Constraint_constants.t
+          .block_window_duration_ms
+      |> Time.Span.of_ms
 
     (* keys that can be used when generating new accounts *)
     let extra_keys =
