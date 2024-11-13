@@ -291,7 +291,7 @@ struct
     let rec typ :
         type var value env.
         env Typ_record.typ -> (value, var, env) T.t -> (var, value) Impl.Typ.t =
-      let open Snarky_backendless.Typ in
+      let open Impl.Typ in
       fun t spec ->
         match[@warning "-45"] spec with
         | B spec ->
@@ -304,7 +304,7 @@ struct
             array ~length:n (typ t spec)
         | Struct [] ->
             let open Hlist.HlistId in
-            transport (unit ()) ~there:(fun [] -> ()) ~back:(fun () -> [])
+            transport unit ~there:(fun [] -> ()) ~back:(fun () -> [])
             |> transport_var ~there:(fun [] -> ()) ~back:(fun () -> [])
         | Struct (spec :: specs) ->
             let open Hlist.HlistId in
@@ -324,20 +324,20 @@ struct
         | Opt_unflagged { inner; flag; dummy1; dummy2 } -> (
             match flag with
             | Opt.Flag.No ->
-                let open Snarky_backendless.Typ in
-                unit ()
-                |> Snarky_backendless.Typ.transport
+                let open Impl.Typ in
+                unit
+                |> Impl.Typ.transport
                      ~there:(function Some _ -> assert false | None -> ())
                      ~back:(fun () -> None)
-                |> Snarky_backendless.Typ.transport_var
+                |> Impl.Typ.transport_var
                      ~there:(function Some _ -> assert false | None -> ())
                      ~back:(fun _ -> None)
             | Opt.Flag.(Yes | Maybe) ->
                 typ t inner
-                |> Snarky_backendless.Typ.transport
+                |> Impl.Typ.transport
                      ~there:(function Some x -> x | None -> dummy1)
                      ~back:(fun x -> Some x)
-                |> Snarky_backendless.Typ.transport_var
+                |> Impl.Typ.transport_var
                      ~there:(function Some x -> x | None -> dummy2)
                      ~back:(fun x -> Some x) )
         | Constant (x, assert_eq, spec) ->
@@ -350,8 +350,8 @@ struct
               in
               typ.var_of_fields (fields, aux)
             in
-            let open Snarky_backendless.Typ in
-            unit ()
+            let open Impl.Typ in
+            unit
             |> transport ~there:(fun y -> assert_eq x y) ~back:(fun () -> x)
             |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant_var)
     in
@@ -370,7 +370,7 @@ struct
            (Impl.Field.Constant.t, env) ETyp_record.etyp
         -> (value, var, env) T.t
         -> (var, value, Impl.Field.Constant.t) ETyp.t =
-      let open Snarky_backendless.Typ in
+      let open Impl.Typ in
       fun e spec ->
         match[@warning "-45"] spec with
         | B spec ->
@@ -389,7 +389,7 @@ struct
             let there [] = () in
             let back () = [] in
             T
-              ( transport (unit ()) ~there ~back |> transport_var ~there ~back
+              ( transport unit ~there ~back |> transport_var ~there ~back
               , Fn.id
               , Fn.id )
         | Struct (spec :: specs) ->
@@ -429,8 +429,8 @@ struct
             let f_inv = function None -> f_inv dummy2 | Some x -> f_inv x in
             let typ =
               typ
-              |> Snarky_backendless.Typ.transport
-                   ~there:(Option.value ~default:dummy1) ~back:(fun x -> Some x)
+              |> Impl.Typ.transport ~there:(Option.value ~default:dummy1)
+                   ~back:(fun x -> Some x)
             in
             T (typ, f, f_inv)
         | Constant (x, _assert_eq, spec) ->
