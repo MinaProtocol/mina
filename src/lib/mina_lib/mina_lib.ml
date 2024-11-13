@@ -64,7 +64,7 @@ type components =
   ; snark_pool : Network_pool.Snark_pool.t
   ; transition_frontier : Transition_frontier.t option Broadcast_pipe.Reader.t
   ; most_recent_valid_block :
-      Mina_block.initial_valid_block Broadcast_pipe.Reader.t
+      Mina_block.initial_valid_header Broadcast_pipe.Reader.t
   ; block_produced_bvar : (Transition_frontier.Breadcrumb.t, read_write) Bvar.t
   }
 
@@ -943,7 +943,8 @@ let add_full_transactions t user_commands =
     List.find_map user_commands ~f:(fun cmd ->
         match
           User_command.check_well_formedness
-            ~genesis_constants:t.config.precomputed_values.genesis_constants cmd
+            ~genesis_constants:t.config.precomputed_values.genesis_constants
+            ~compile_config:t.config.precomputed_values.compile_config cmd
         with
         | Ok () ->
             None
@@ -975,6 +976,7 @@ let add_zkapp_transactions t (zkapp_commands : Zkapp_command.t list) =
         match
           User_command.check_well_formedness
             ~genesis_constants:t.config.precomputed_values.genesis_constants
+            ~compile_config:t.config.precomputed_values.compile_config
             (Zkapp_command cmd)
         with
         | Ok () ->
@@ -1497,7 +1499,12 @@ let create ~commit_id ?wallets (config : Config.t) =
   let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
-  let block_window_duration = config.compile_config.block_window_duration in
+  let compile_config = config.precomputed_values.compile_config in
+  let block_window_duration =
+    Float.of_int
+      config.precomputed_values.constraint_constants.block_window_duration_ms
+    |> Time.Span.of_ms
+  in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
@@ -1561,15 +1568,23 @@ let create ~commit_id ?wallets (config : Config.t) =
                       ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
               (fun () ->
                 O1trace.thread "manage_verifier_subprocess" (fun () ->
+                    let%bind blockchain_verification_key =
+                      Prover.get_blockchain_verification_key prover
+                      >>| Or_error.ok_exn
+                    in
+                    let%bind transaction_verification_key =
+                      Prover.get_transaction_verification_key prover
+                      >>| Or_error.ok_exn
+                    in
                     let%bind verifier =
                       Verifier.create ~commit_id ~logger:config.logger
                         ~enable_internal_tracing:
                           (Internal_tracing.is_enabled ())
                         ~internal_trace_filename:"verifier-internal-trace.jsonl"
                         ~proof_level:config.precomputed_values.proof_level
-                        ~constraint_constants:
-                          config.precomputed_values.constraint_constants
-                        ~pids:config.pids ~conf_dir:(Some config.conf_dir) ()
+                        ~pids:config.pids ~conf_dir:(Some config.conf_dir)
+                        ~blockchain_verification_key
+                        ~transaction_verification_key ()
                     in
                     let%map () = set_itn_data (module Verifier) verifier in
                     verifier ) )
@@ -1810,7 +1825,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
               ~genesis_constants:config.precomputed_values.genesis_constants
-              ~slot_tx_end
+              ~slot_tx_end ~compile_config
           in
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =
@@ -1866,7 +1881,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ; consensus_constants
               ; genesis_constants = config.precomputed_values.genesis_constants
               ; constraint_constants
-              ; block_window_duration
+              ; compile_config
               }
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
@@ -1926,7 +1941,8 @@ let create ~commit_id ?wallets (config : Config.t) =
           |> Deferred.don't_wait_for ;
           let most_recent_valid_block_reader, most_recent_valid_block_writer =
             Broadcast_pipe.create
-              ( Mina_block.genesis ~precomputed_values:config.precomputed_values
+              ( Mina_block.genesis_header
+                  ~precomputed_values:config.precomputed_values
               |> Validation.reset_frontier_dependencies_validation
               |> Validation.reset_staged_ledger_diff_validation )
           in
@@ -2246,7 +2262,7 @@ let get_filtered_log_entries
   in
   (get_from_idx curr_idx messages [], is_started)
 
-let verifier { processes = { verifier; _ }; _ } = verifier
+let prover { processes = { prover; _ }; _ } = prover
 
 let vrf_evaluator { processes = { vrf_evaluator; _ }; _ } = vrf_evaluator
 

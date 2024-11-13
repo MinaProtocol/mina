@@ -14,7 +14,7 @@ module type Stable_v1 = sig
 end
 
 module type Inputs_intf = sig
-  open Intf
+  open Kimchi_pasta_snarky_backend.Intf
 
   val name : string
 

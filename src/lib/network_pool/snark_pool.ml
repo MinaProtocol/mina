@@ -256,7 +256,7 @@ struct
                 }
           ; frontier =
               (fun () -> Broadcast_pipe.Reader.peek frontier_broadcast_pipe)
-          ; batcher = Batcher.Snark_pool.create config.verifier
+          ; batcher = Batcher.Snark_pool.create ~logger config.verifier
           ; logger
           ; config
           ; account_creation_fee =
@@ -559,9 +559,6 @@ module Diff_versioned = struct
   [@@deriving compare, sexp, to_yojson, hash]
 end
 
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
-
 let%test_module "random set test" =
   ( module struct
     open Mina_base
@@ -571,7 +568,10 @@ let%test_module "random set test" =
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     let block_window_duration =
-      Mina_compile_config.For_unit_tests.t.block_window_duration
+      Float.of_int
+        Genesis_constants.For_unit_tests.Constraint_constants.t
+          .block_window_duration_ms
+      |> Time.Span.of_ms
 
     (* SNARK work is rejected if the prover doesn't have an account and the fee
        is below the account creation fee. So, just to make generating valid SNARK
@@ -591,10 +591,8 @@ let%test_module "random set test" =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            ~commit_id:"not specified for unit tests" () )
+          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
+            () )
 
     module Mock_snark_pool =
       Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)

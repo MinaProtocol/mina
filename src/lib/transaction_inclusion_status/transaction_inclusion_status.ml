@@ -88,14 +88,15 @@ let%test_module "transaction_status" =
     let pool_max_size = precomputed_values.genesis_constants.txpool_max_size
 
     let block_window_duration =
-      Mina_compile_config.For_unit_tests.t.block_window_duration
+      Float.of_int
+        Genesis_constants.For_unit_tests.Constraint_constants.t
+          .block_window_duration_ms
+      |> Time.Span.of_ms
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            ~commit_id:"not specified for unit tests" () )
+          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
+            () )
 
     let key_gen =
       let open Quickcheck.Generator in
@@ -119,7 +120,7 @@ let%test_module "transaction_status" =
       let config =
         Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size
           ~verifier ~genesis_constants:precomputed_values.genesis_constants
-          ~slot_tx_end:None
+          ~slot_tx_end:None ~compile_config:precomputed_values.compile_config
       in
       let transaction_pool, _, local_sink =
         Transaction_pool.create ~config

@@ -1,14 +1,18 @@
-### Build status
+<img src="https://github.com/MinaProtocol/mina-resources/blob/main/mina.png?raw=true" >
 
-| Develop | Berkeley | Compatible | 
-| ------- | -------- | ---------- |
-| [![Build status - develop](https://badge.buildkite.com/0c47452f3ea619d3217d388e0de522b218db28c3e161887a9a.svg?branch=develop)](https://buildkite.com/o-1-labs-2/mina-end-to-end-nightlies) | [![Build status - berkeley](https://badge.buildkite.com/0c47452f3ea619d3217d388e0de522b218db28c3e161887a9a.svg?branch=berkeley)](https://buildkite.com/o-1-labs-2/mina-end-to-end-nightlies) | [![Build status - compatible](https://badge.buildkite.com/0c47452f3ea619d3217d388e0de522b218db28c3e161887a9a.svg?branch=compatible)](https://buildkite.com/o-1-labs-2/mina-end-to-end-nightlies)
+<h1 align="center" > Mina </h1>
 
-<a href="https://minaprotocol.com">
-  <img src="https://github.com/MinaProtocol/docs/blob/main/public/static/img/svg/mina-wordmark-redviolet.svg?raw=true&sanitize=true" width="350" alt="Mina logo">
-</a>
+<div align="center">
 
-# Mina
+  ![GitHub stars](https://img.shields.io/github/stars/minaprotocol/mina)&nbsp;&nbsp;![GitHub forks](https://img.shields.io/github/forks/minaprotocol/mina)
+
+![GitHub contributors](https://img.shields.io/github/contributors/minaprotocol/mina)&nbsp;&nbsp;![GitHub commit activity](https://img.shields.io/github/commit-activity/m/minaprotocol/mina)&nbsp;&nbsp;![GitHub last commit](https://img.shields.io/github/last-commit/minaprotocol/mina)
+
+| Develop[^1] | Compatible[^2] | Master[^3] | 
+| ------- | ---------- | ---------- |
+| [![Build status - develop](https://badge.buildkite.com/0c47452f3ea619d3217d388e0de522b218db28c3e161887a9a.svg?branch=develop)](https://buildkite.com/o-1-labs-2/mina-end-to-end-nightlies) | [![Build status - compatible](https://badge.buildkite.com/0c47452f3ea619d3217d388e0de522b218db28c3e161887a9a.svg?branch=compatible)](https://buildkite.com/o-1-labs-2/mina-end-to-end-nightlies) | [![Build status - master](https://badge.buildkite.com/0c47452f3ea619d3217d388e0de522b218db28c3e161887a9a.svg?branch=master)](https://buildkite.com/o-1-labs-2/mina-end-to-end-nightlies)
+
+</div>
 
 Mina is the first cryptocurrency with a lightweight, constant-sized blockchain. This is the main source code repository for the Mina project and contains code for the OCaml protocol implementation, the [Mina Protocol website](https://minaprotocol.com), and wallet. Enjoy!
 
@@ -60,3 +64,7 @@ The [Node Developers](https://docs.minaprotocol.com/node-developers) docs contai
 [Apache 2.0](LICENSE)
 
 Commits older than 2018-10-03 do not have a [LICENSE](LICENSE) file or this notice, but are distributed under the same terms.
+
+[^1]: Develop is a mainline branch containing code that may be not compatible with current mainnet and may require major upgrade (hardfork).
+[^2]: Compatible is a mainline branch containing code which does not need hardfork in order to apply it to mainnet.
+[^3]: Branch which contains current mainnet code.
