@@ -39,7 +39,7 @@ in  Pipeline.build
               [ Cmd.run "HELM_LINT=true buildkite/scripts/helm-ci.sh" ]
             , label = "Helm chart lint steps"
             , key = "lint-helm-chart"
-            , target = Size.Small
+            , target = Size.Multi
             , docker = None Docker.Type
             }
         ]

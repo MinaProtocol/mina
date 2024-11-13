@@ -214,7 +214,7 @@ val wallets : t -> Secrets.Wallets.t
 val subscriptions : t -> Mina_subscriptions.t
 
 val most_recent_valid_transition :
-  t -> Mina_block.initial_valid_block Broadcast_pipe.Reader.t
+  t -> Mina_block.initial_valid_header Broadcast_pipe.Reader.t
 
 val block_produced_bvar :
   t -> (Transition_frontier.Breadcrumb.t, read_write) Bvar.t
@@ -233,7 +233,7 @@ val start_filtered_log : t -> string list -> unit Or_error.t
 
 val get_filtered_log_entries : t -> int -> string list * bool
 
-val verifier : t -> Verifier.t
+val prover : t -> Prover.t
 
 val vrf_evaluator : t -> Vrf_evaluator.t
 

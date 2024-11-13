@@ -75,10 +75,7 @@ in  Pipeline.build
                   (S.contains "buildkite/src/Jobs/Lint/ValidationService")
 
           in  JobSpec::{
-              , dirtyWhen =
-                [ dirtyDhallDir
-                , S.strictlyStart (S.contains ValidationService.rootPath)
-                ]
+              , dirtyWhen = [ dirtyDhallDir ]
               , path = "Lint"
               , name = "ValidationService"
               , tags =

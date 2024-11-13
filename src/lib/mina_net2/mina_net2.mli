@@ -139,7 +139,6 @@ val create :
   -> conf_dir:string
   -> on_peer_connected:(Peer.Id.t -> unit)
   -> on_peer_disconnected:(Peer.Id.t -> unit)
-  -> block_window_duration:Time.Span.t
   -> unit
   -> t Deferred.Or_error.t
 
