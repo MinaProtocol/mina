@@ -199,11 +199,16 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
     match sender with Remote r -> [ r ] | Local -> []
   in
   let preferred_peers = Option.value_map ~f ~default:[] best_seen_transition in
+  let all_peers = Mina_networking.peers network in
   (* TODO find a better place for this *)
   let fetch_completed_snarks () =
+    let%bind all_peers = all_peers in
+    [%log info] "FETCHING COMPLETED SNARKS" ;
     Deferred.List.iter
       ~f:(fun peer ->
         print_endline @@ "PEER IS " ^ Network_peer.Peer.to_string peer ;
+        [%log info] "PEER IS: Fetching completed snarks from peer: $peer"
+          ~metadata:[ ("peer", Network_peer.Peer.to_yojson peer) ] ;
         let completed_works =
           Mina_networking.get_completed_checked_snarks network peer
         in
@@ -244,12 +249,12 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
                 in
                 Envelope.Incoming.wrap_peer ~data:diff ~sender:peer
               in
-              print_endline "fetch and broadcasting completed snarks";
+              print_endline "fetch and broadcasting completed snarks" ;
               Network_pool.Snark_pool.apply_and_broadcast snark_pool msg
                 callback )
         in
         Deferred.unit )
-      preferred_peers
+      all_peers
   in
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
   don't_wait_for (fetch_completed_snarks ()) ;
@@ -760,7 +765,8 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                              ~clear_reader ~transition_writer_ref
                              ~consensus_local_state ~frontier_w ~persistent_root
                              ~persistent_frontier ~initial_root_transition
-                             ~best_seen_transition:(Some b_or_h) ~catchup_mode ~snark_pool )
+                             ~best_seen_transition:(Some b_or_h) ~catchup_mode
+                             ~snark_pool )
                       else Deferred.unit
                   | None ->
                       Deferred.unit
