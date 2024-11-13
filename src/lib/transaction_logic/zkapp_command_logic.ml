@@ -475,6 +475,10 @@ module type Call_stack_intf = sig
   include Stack_intf with type elt := stack_frame
 end
 
+module type Aux_data_intf = sig
+  type t
+end
+
 module type Ledger_intf = sig
   include Iffable
 
@@ -854,6 +858,8 @@ module type Inputs_intf = sig
        and type bool := Bool.t
        and module Opt := Opt)
 
+  and Aux_data : Aux_data_intf
+
   and Transaction_commitment : sig
     include
       Iffable
@@ -865,10 +871,7 @@ module type Inputs_intf = sig
     val commitment : account_updates:Call_forest.t -> t
 
     val full_commitment :
-         fee_payer_hash:Zkapp_command.Digest.Account_update.t
-      -> memo_hash:Field.t
-      -> commitment:t
-      -> t
+      aux:Aux_data.t -> memo_hash:Field.t -> commitment:t -> t
   end
 
   and Index : sig
@@ -1088,9 +1091,9 @@ module Make (Inputs : Inputs_intf) = struct
 
   let apply ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(is_start :
-         [ `Yes of _ Start_data.t * Zkapp_command.Aux_data.t
+         [ `Yes of _ Start_data.t * Aux_data.t
          | `No
-         | `Compute of _ Start_data.t * Zkapp_command.Aux_data.t ] )
+         | `Compute of _ Start_data.t * Aux_data.t ] )
       (h :
         (< global_state : Global_state.t
          ; transaction_commitment : Transaction_commitment.t
@@ -1206,8 +1209,7 @@ module Make (Inputs : Inputs_intf) = struct
             let full_tx_commitment_on_start =
               Transaction_commitment.full_commitment
                 ~memo_hash:start_data.memo_hash
-                ~commitment:tx_commitment_on_start
-                ~fee_payer_hash:aux.fee_payer_hash
+                ~commitment:tx_commitment_on_start ~aux
             in
             let tx_commitment =
               Transaction_commitment.if_ is_start' ~then_:tx_commitment_on_start

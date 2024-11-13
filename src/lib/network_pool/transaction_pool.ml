@@ -435,6 +435,7 @@ struct
       ; mutable best_tip_diff_relay : (unit Deferred.t[@sexp.opaque]) Option.t
       ; mutable best_tip_ledger : (Base_ledger.t[@sexp.opaque]) Option.t
       ; verification_key_table : (Vk_refcount_table.t[@sexp.opaque])
+      ; chain : (Mina_signature_kind.t[@sexp.opaque])
       }
     [@@deriving sexp_of]
 
@@ -817,7 +818,7 @@ struct
       t.pool <- pool
 
     let create ~constraint_constants ~consensus_constants ~time_controller
-        ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
+        ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer ~chain =
       let t =
         { pool =
             Indexed_pool.empty ~constraint_constants ~consensus_constants
@@ -836,6 +837,7 @@ struct
         ; best_tip_diff_relay = None
         ; best_tip_ledger = None
         ; verification_key_table = Vk_refcount_table.create ()
+        ; chain
         }
       in
       don't_wait_for
@@ -1231,7 +1233,7 @@ struct
       let verify t diff_wire =
         verify_impl t
           (Envelope.Incoming.map diff_wire
-             ~f:(List.map ~f:User_command.of_wire) )
+             ~f:(List.map ~f:(User_command.of_wire ~chain:t.chain)) )
 
       let register_locally_generated t txn =
         Hashtbl.update t.locally_generated_uncommitted txn ~f:(function

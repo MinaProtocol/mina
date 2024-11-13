@@ -88,8 +88,8 @@ let%test_unit "invalid transactions do not dirty the ledger" =
         ~body:(Signed_command_payload.Body.Payment payment)
     in
     Option.value_exn
-      (Signed_command.create_with_signature_checked
-         (Signed_command.sign_payload sender_sk payload)
+      (Signed_command.create_with_signature_checked ~signature_kind:Testnet
+         (Signed_command.sign_payload ~signature_kind:Testnet sender_sk payload)
          sender_pk payload )
   in
   Ledger.create_new_account_exn ledger sender_id sender_account ;

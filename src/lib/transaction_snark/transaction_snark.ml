@@ -541,13 +541,14 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ~fee_payer_account ~source_account ~receiver_account txn)
     end
 
-    let%snarkydef_ check_signature shifted ~payload ~is_user_command ~signer
-        ~signature =
+    let%snarkydef_ check_signature ~signature_kind shifted ~payload
+        ~is_user_command ~signer ~signature =
       let%bind input =
         Transaction_union_payload.Checked.to_input_legacy payload
       in
       let%bind verifies =
-        Schnorr.Legacy.Checked.verifies shifted signature signer input
+        Schnorr.Legacy.Checked.verifies ~signature_kind shifted signature signer
+          input
       in
       [%with_label_ "check signature"] (fun () ->
           Boolean.Assert.any [ Boolean.not is_user_command; verifies ] )
@@ -628,12 +629,13 @@ module Make_str (A : Wire_types.Concrete) = struct
             ~max_proofs_verified:
               (module Pickles.Side_loaded.Verification_key.Max_width) )
 
-    let signature_verifies ~shifted ~payload_digest signature pk =
+    let signature_verifies ~signature_kind ~shifted ~payload_digest signature pk
+        =
       let%bind pk =
         Public_key.decompress_var pk
         (*           (Account_id.Checked.public_key fee_payer_id) *)
       in
-      Schnorr.Chunked.Checked.verifies shifted signature pk
+      Schnorr.Chunked.Checked.verifies ~signature_kind shifted signature pk
         (Random_oracle.Input.Chunked.field payload_digest)
 
     module Zkapp_command_snark = struct
@@ -663,7 +665,13 @@ module Make_str (A : Wire_types.Concrete) = struct
             let acc' = Ledger_hash.merge_var ~height l r in
             acc' )
 
+      module type Signature_kind_input = sig
+        val signature_kind : Mina_signature_kind.t
+      end
+
       module type Single_inputs = sig
+        include Signature_kind_input
+
         val constraint_constants : Genesis_constants.Constraint_constants.t
 
         val spec : single
@@ -681,9 +689,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; control : Control.t Prover_value.t
         }
 
-      module Inputs = struct
+      module Inputs (I : Signature_kind_input) = struct
         module V = Prover_value
         open Impl
+        module Aux_data = Zkapp_command.Aux_data
 
         module Transaction_commitment = struct
           type t = Field.t
@@ -697,10 +706,12 @@ module Make_str (A : Wire_types.Concrete) = struct
             Zkapp_command.Transaction_commitment.Checked.create
               ~account_updates_hash
 
-          let full_commitment ~account_update:{ account_update; _ } ~memo_hash
-              ~commitment =
+          let full_commitment ~aux ~memo_hash ~commitment =
             Zkapp_command.Transaction_commitment.Checked.create_complete
-              commitment ~memo_hash ~fee_payer_hash:account_update.hash
+              commitment ~memo_hash
+              ~fee_payer_hash:
+                (Zkapp_command.Digest.Account_update.constant
+                   aux.Aux_data.fee_payer_hash )
         end
 
         module Bool = struct
@@ -1081,7 +1092,11 @@ module Make_str (A : Wire_types.Concrete) = struct
             Flagged_option.data x
         end
 
-        module Call_forest = Zkapp_call_forest.Checked
+        module Call_forest = struct
+          include Zkapp_call_forest.Checked
+
+          let pop_exn = pop_exn ~chain:I.signature_kind
+        end
 
         module Stack_frame = struct
           type frame = (Token_id.Checked.t, Call_forest.t) Stack_frame.t
@@ -1419,7 +1434,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         open Impl
 
         module Inputs = struct
-          include Inputs
+          include Inputs (I)
 
           module Account = struct
             include Account
@@ -1643,7 +1658,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                       (let%bind (module S) =
                          Tick.Inner_curve.Checked.Shifted.create ()
                        in
-                       signature_verifies
+                       signature_verifies ~signature_kind
                          ~shifted:(module S)
                          ~payload_digest:commitment signature
                          account_update.data.public_key )
@@ -1854,7 +1869,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                   [ correct_coinbase_target_stack; valid_init_state ] ) )
 
       let main ?(witness : Zkapp_command.t Witness.t option) (spec : Spec.t)
-          ~constraint_constants (statement : Statement.With_sok.var) =
+          ~constraint_constants ~signature_kind
+          (statement : Statement.With_sok.var) =
         let open Impl in
         run_checked (dummy_constraints ()) ;
         let ( ! ) x = Option.value_exn x in
@@ -1939,6 +1955,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let set_zkapp_input x = zkapp_input := Some x
 
                 let set_must_verify x = must_verify := x
+
+                let signature_kind = signature_kind
               end) in
               let finish v =
                 let open Mina_transaction_logic.Zkapp_command_logic.Start_data in
@@ -2082,7 +2100,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       (* TODO remove it, very sad to see it *)
       let witness : Zkapp_command.t Witness.t option ref = ref None
 
-      let rule (type a b c d) ~constraint_constants ~proof_level
+      let rule (type a b c d) ~constraint_constants ~proof_level ~signature_kind
           (t : (a, b, c, d) Basic.t_typed) :
           ( a
           , b
@@ -2114,7 +2132,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; main =
                 (fun { public_input = stmt } ->
                   let zkapp_input, `Must_verify must_verify =
-                    main ?witness:!witness s ~constraint_constants stmt
+                    main ~signature_kind ?witness:!witness s
+                      ~constraint_constants stmt
                   in
                   let proof =
                     Run.exists (Typ.Internal.ref ()) ~request:(fun () ->
@@ -2137,7 +2156,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; main =
                 (fun { public_input = stmt } ->
                   let zkapp_input_opt, _ =
-                    main ?witness:!witness s ~constraint_constants stmt
+                    main ~signature_kind ?witness:!witness s
+                      ~constraint_constants stmt
                   in
                   assert (Option.is_none zkapp_input_opt) ;
                   { previous_proof_statements = []
@@ -2152,7 +2172,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; main =
                 (fun { public_input = stmt } ->
                   let zkapp_input_opt, _ =
-                    main ?witness:!witness s ~constraint_constants stmt
+                    main ~signature_kind ?witness:!witness s
+                      ~constraint_constants stmt
                   in
                   assert (Option.is_none zkapp_input_opt) ;
                   { previous_proof_statements = []
@@ -2187,7 +2208,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let%snarkydef_ apply_tagged_transaction
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-        (type shifted)
+        ~signature_kind (type shifted)
         (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
         fee_payment_root global_slot pending_coinbase_stack_init
         pending_coinbase_stack_before pending_coinbase_after state_body
@@ -2198,7 +2219,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let%bind () =
         [%with_label_ "Check transaction signature"] (fun () ->
-            check_signature shifted ~payload ~is_user_command ~signer ~signature )
+            check_signature ~signature_kind shifted ~payload ~is_user_command
+              ~signer ~signature )
       in
       let%bind signer_pk = Public_key.compress_var signer in
       let%bind () =
@@ -3053,7 +3075,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           supply_increase : Amount.Signed.t
           pc: Pending_coinbase_stack_state.t
     *)
-    let%snarkydef_ main ~constraint_constants
+    let%snarkydef_ main ~constraint_constants ~signature_kind
         (statement : Statement.With_sok.var) =
       let%bind () = dummy_constraints () in
       let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
@@ -3074,7 +3096,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~request:(As_prover.return Global_slot)
       in
       let%bind fee_payment_root_after, fee_excess, supply_increase =
-        apply_tagged_transaction ~constraint_constants
+        apply_tagged_transaction ~constraint_constants ~signature_kind
           (module Shifted)
           statement.source.first_pass_ledger global_slot pending_coinbase_init
           statement.source.pending_coinbase_stack
@@ -3126,12 +3148,13 @@ module Make_str (A : Wire_types.Concrete) = struct
               Fee_excess.assert_equal_checked fee_excess statement.fee_excess )
         ]
 
-    let rule ~constraint_constants : _ Pickles.Inductive_rule.t =
+    let rule ~constraint_constants ~signature_kind : _ Pickles.Inductive_rule.t
+        =
       { identifier = "transaction"
       ; prevs = []
       ; main =
           (fun { public_input = x } ->
-            Run.run_checked (main ~constraint_constants x) ;
+            Run.run_checked (main ~constraint_constants ~signature_kind x) ;
             { previous_proof_statements = []
             ; public_output = ()
             ; auxiliary_output = ()
@@ -3309,7 +3332,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     , Nat.N5.n )
     Pickles.Tag.t
 
-  let system ~proof_level ~constraint_constants =
+  let system ~proof_level ~constraint_constants ~signature_kind =
     Pickles.compile () ~cache:Cache_dir.cache ?proof_cache:!proof_cache
       ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~public_input:(Input Statement.With_sok.typ) ~auxiliary_typ:Typ.unit
@@ -3323,11 +3346,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         let zkapp_command x =
           Base.Zkapp_command_snark.rule ~constraint_constants ~proof_level x
         in
-        [ Base.rule ~constraint_constants
+        [ Base.rule ~signature_kind ~constraint_constants
         ; Merge.rule ~proof_level self
-        ; zkapp_command Opt_signed_opt_signed
-        ; zkapp_command Opt_signed
-        ; zkapp_command Proved
+        ; zkapp_command ~signature_kind Opt_signed_opt_signed
+        ; zkapp_command ~signature_kind Opt_signed
+        ; zkapp_command ~signature_kind Proved
         ] )
 
   module Verification = struct
@@ -4465,7 +4488,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         Zkapp_command.Transaction_commitment.create_complete commitment
           ~memo_hash:(Signed_command_memo.hash memo)
           ~fee_payer_hash:
-            (Zkapp_command.Digest.Account_update.create
+            (Zkapp_command.Digest.Account_update.create ~chain:Testnet
                (Account_update.of_fee_payer fee_payer) )
       in
       let fee_payer =

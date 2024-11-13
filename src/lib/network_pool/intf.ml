@@ -38,6 +38,7 @@ module type Resource_pool_base_intf = sig
          , Strict_pipe.synchronous
          , unit Deferred.t )
          Strict_pipe.Writer.t
+    -> chain:Mina_signature_kind.t
     -> t
 end
 
@@ -225,6 +226,7 @@ module type Network_pool_base_intf = sig
     -> log_gossip_heard:bool
     -> on_remote_push:(unit -> unit Deferred.t)
     -> block_window_duration:Time.Span.t
+    -> chain:Mina_signature_kind.t
     -> t * Remote_sink.t * Local_sink.t
 
   val of_resource_pool_and_diffs :

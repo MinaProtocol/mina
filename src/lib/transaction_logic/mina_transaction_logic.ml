@@ -958,6 +958,8 @@ module Make (L : Ledger_intf.S) :
         match loc with `Existing _ -> `Is_new false | `New -> `Is_new true
     end
 
+    module Aux_data = Zkapp_command.Aux_data
+
     module Transaction_commitment = struct
       type t = Field.t
 
@@ -969,10 +971,10 @@ module Make (L : Ledger_intf.S) :
         in
         Zkapp_command.Transaction_commitment.create ~account_updates_hash
 
-      let full_commitment ~fee_payer_hash ~memo_hash ~commitment =
+      let full_commitment ~aux ~memo_hash ~commitment =
         (* when called from Zkapp_command_logic.apply, the account_update is the fee payer *)
         Zkapp_command.Transaction_commitment.create_complete commitment
-          ~memo_hash ~fee_payer_hash
+          ~memo_hash ~fee_payer_hash:aux.Aux_data.fee_payer_hash
 
       let if_ = value_if
     end
