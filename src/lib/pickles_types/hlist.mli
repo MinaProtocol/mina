@@ -327,21 +327,21 @@ module H1 : sig
       element. See {!Snarky_backendless.Typ} and its documentation for more
       information.
   *)
-  module Typ : functor
-    (Impl : sig
-       type field
-     end)
+  module Wrap_typ : functor
     (A : T1)
     (Var : T1)
     (Val : T1)
     (_ : sig
        val f :
-         'a A.t -> ('a Var.t, 'a Val.t, Impl.field) Snarky_backendless.Typ.t
+            'a A.t
+         -> ('a Var.t, 'a Val.t) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
      end)
     -> sig
     val f :
          'xs T(A).t
-      -> ('xs T(Var).t, 'xs T(Val).t, Impl.field) Snarky_backendless.Typ.t
+      -> ( 'xs T(Var).t
+         , 'xs T(Val).t )
+         Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
   end
 end
 

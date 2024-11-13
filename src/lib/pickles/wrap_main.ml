@@ -321,7 +321,7 @@ let wrap_main
             with_label __LOC__ (fun () ->
                 let typ =
                   let module T =
-                    H1.Typ (Impls.Wrap) (Nat) (Challenges_vector)
+                    H1.Wrap_typ (Nat) (Challenges_vector)
                       (Challenges_vector.Constant)
                       (struct
                         let f (type n) (n : n Nat.t) =

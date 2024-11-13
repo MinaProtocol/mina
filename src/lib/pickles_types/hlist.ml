@@ -158,21 +158,24 @@ module H1 = struct
       match (xs, ys) with [], [] -> [] | x :: xs, y :: ys -> (x, y) :: f xs ys
   end
 
-  module Typ (Impl : sig
-    type field
-  end)
-  (F : T1)
-  (Var : T1)
-  (Val : T1) (C : sig
-    val f : 'a F.t -> ('a Var.t, 'a Val.t, Impl.field) Snarky_backendless.Typ.t
-  end) =
+  module Wrap_typ
+      (F : T1)
+      (Var : T1)
+      (Val : T1) (C : sig
+        val f :
+             'a F.t
+          -> ('a Var.t, 'a Val.t) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
+      end) =
   struct
     let rec f :
         type xs.
            xs T(F).t
-        -> (xs T(Var).t, xs T(Val).t, Impl.field) Snarky_backendless.Typ.t =
+        -> ( xs T(Var).t
+           , xs T(Val).t )
+           Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t =
       let transport, transport_var, tuple2, unit =
-        Snarky_backendless.Typ.(transport, transport_var, tuple2, unit)
+        Kimchi_pasta_snarky_backend.Wrap_impl.Typ.
+          (transport, transport_var, tuple2, unit)
       in
       fun ts ->
         match ts with
@@ -187,7 +190,7 @@ module H1 = struct
                  ~back:(fun (x, xs) -> x :: xs)
         | [] ->
             let there _ = () in
-            transport (unit ()) ~there ~back:(fun () : _ T(Val).t -> [])
+            transport unit ~there ~back:(fun () : _ T(Val).t -> [])
             |> transport_var ~there ~back:(fun () : _ T(Var).t -> [])
   end
 end
