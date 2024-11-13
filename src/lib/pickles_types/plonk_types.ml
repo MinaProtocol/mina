@@ -1173,16 +1173,65 @@ module Evals = struct
         ; foreign_field_mul_lookup_selector
         ]
 
-  let typ (type f a_var a)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-      ~dummy e
+  let typ (type a_var a) ~dummy e
       ({ uses_lookups; lookups_per_row_3; lookups_per_row_4; _ } as
        feature_flags :
         _ Features.Full.t ) :
-      ((a_var, Impl.Boolean.var) In_circuit.t, a t, f) Snarky_backendless.Typ.t
-      =
-    let open Impl in
-    let opt flag = Opt.typ Impl.Boolean.typ flag e ~dummy in
+      ( (a_var, Kimchi_pasta_snarky_backend.Step_impl.Boolean.var) In_circuit.t
+      , a t )
+      Kimchi_pasta_snarky_backend.Step_impl.Typ.t =
+    let open Kimchi_pasta_snarky_backend.Step_impl in
+    let opt flag = Opt.typ Boolean.typ flag e ~dummy in
+    let lookup_sorted =
+      let lookups_per_row_3 = opt lookups_per_row_3 in
+      let lookups_per_row_4 = opt lookups_per_row_4 in
+      Vector.typ'
+        [ lookups_per_row_3
+        ; lookups_per_row_3
+        ; lookups_per_row_3
+        ; lookups_per_row_3
+        ; lookups_per_row_4
+        ]
+    in
+    Typ.of_hlistable
+      [ Vector.typ e Columns.n
+      ; Vector.typ e Columns.n
+      ; e
+      ; Vector.typ e Permuts_minus_1.n
+      ; e
+      ; e
+      ; e
+      ; e
+      ; e
+      ; e
+      ; opt feature_flags.range_check0
+      ; opt feature_flags.range_check1
+      ; opt feature_flags.foreign_field_add
+      ; opt feature_flags.foreign_field_mul
+      ; opt feature_flags.xor
+      ; opt feature_flags.rot
+      ; opt uses_lookups
+      ; opt uses_lookups
+      ; lookup_sorted
+      ; opt feature_flags.runtime_tables
+      ; opt feature_flags.runtime_tables
+      ; opt feature_flags.lookup_pattern_xor
+      ; opt feature_flags.lookup
+      ; opt feature_flags.lookup_pattern_range_check
+      ; opt feature_flags.foreign_field_mul
+      ]
+      ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+  let wrap_typ (type a_var a) ~dummy e
+      ({ uses_lookups; lookups_per_row_3; lookups_per_row_4; _ } as
+       feature_flags :
+        _ Features.Full.t ) :
+      ( (a_var, Kimchi_pasta_snarky_backend.Wrap_impl.Boolean.var) In_circuit.t
+      , a t )
+      Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t =
+    let open Kimchi_pasta_snarky_backend.Wrap_impl in
+    let opt flag = Opt.typ Boolean.typ flag e ~dummy in
     let lookup_sorted =
       let lookups_per_row_3 = opt lookups_per_row_3 in
       let lookups_per_row_4 = opt lookups_per_row_4 in
@@ -1258,9 +1307,16 @@ module All_evals = struct
         : (b1, b2) t =
       { public_input = f1 t.public_input; evals = Evals.map ~f:f2 t.evals }
 
-    let typ impl feature_flags f f_multi ~dummy =
-      let evals = Evals.typ impl f_multi feature_flags ~dummy in
-      let open Snarky_backendless.Typ in
+    let typ feature_flags f f_multi ~dummy =
+      let evals = Evals.typ f_multi feature_flags ~dummy in
+      let open Kimchi_pasta_snarky_backend.Step_impl.Typ in
+      of_hlistable [ f; evals ] ~var_to_hlist:In_circuit.to_hlist
+        ~var_of_hlist:In_circuit.of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
+
+    let wrap_typ feature_flags f f_multi ~dummy =
+      let evals = Evals.wrap_typ f_multi feature_flags ~dummy in
+      let open Kimchi_pasta_snarky_backend.Wrap_impl.Typ in
       of_hlistable [ f; evals ] ~var_to_hlist:In_circuit.to_hlist
         ~var_of_hlist:In_circuit.of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
@@ -1309,17 +1365,27 @@ module All_evals = struct
     ; ft_eval1 = f1 t.ft_eval1
     }
 
-  let typ (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-      ~num_chunks feature_flags =
+  let typ ~num_chunks feature_flags =
+    let module Impl = Kimchi_pasta_snarky_backend.Step_impl in
     let open Impl.Typ in
     let single = array ~length:num_chunks field in
     let dummy = Array.init num_chunks ~f:(fun _ -> Impl.Field.Constant.zero) in
     let evals =
-      With_public_input.typ
-        (module Impl)
-        feature_flags (tuple2 single single) (tuple2 single single)
-        ~dummy:(dummy, dummy)
+      With_public_input.typ feature_flags (tuple2 single single)
+        (tuple2 single single) ~dummy:(dummy, dummy)
+    in
+    of_hlistable [ evals; Impl.Field.typ ] ~var_to_hlist:In_circuit.to_hlist
+      ~var_of_hlist:In_circuit.of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
+
+  let wrap_typ ~num_chunks feature_flags =
+    let module Impl = Kimchi_pasta_snarky_backend.Wrap_impl in
+    let open Impl.Typ in
+    let single = array ~length:num_chunks field in
+    let dummy = Array.init num_chunks ~f:(fun _ -> Impl.Field.Constant.zero) in
+    let evals =
+      With_public_input.wrap_typ feature_flags (tuple2 single single)
+        (tuple2 single single) ~dummy:(dummy, dummy)
     in
     of_hlistable [ evals; Impl.Field.typ ] ~var_to_hlist:In_circuit.to_hlist
       ~var_of_hlist:In_circuit.of_hlist ~value_to_hlist:to_hlist
@@ -1526,20 +1592,43 @@ module Messages = struct
     [@@deriving hlist, fields]
   end
 
-  let typ (type n f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) g
+  let typ (type n) g
       ({ runtime_tables; uses_lookups; lookups_per_row_4; _ } :
         Opt.Flag.t Features.Full.t ) ~dummy
-      ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) ~bool
-      =
-    let open Snarky_backendless.Typ in
+      ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) =
+    let module Impl = Kimchi_pasta_snarky_backend.Step_impl in
+    let open Impl.Typ in
     let { Poly.w = w_lens; z; t } = commitment_lengths in
     let array ~length elt = padded_array_typ ~dummy ~length elt in
     let wo n = array ~length:(Vector.reduce_exn n ~f:Int.max) g in
     let _w n =
       With_degree_bound.typ g
         ~length:(Vector.reduce_exn n ~f:Int.max)
-        ~dummy_group_element:dummy ~bool
+        ~dummy_group_element:dummy ~bool:Impl.Boolean.typ
+    in
+    let lookup =
+      Lookup.opt_typ Impl.Boolean.typ ~uses_lookup:uses_lookups
+        ~lookups_per_row_4 ~runtime_tables ~dummy:[| dummy |]
+        (wo [ 1 ])
+    in
+    of_hlistable
+      [ Vector.typ (wo w_lens) Columns.n; wo [ z ]; wo [ t ]; lookup ]
+      ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+  let wrap_typ (type n) g
+      ({ runtime_tables; uses_lookups; lookups_per_row_4; _ } :
+        Opt.Flag.t Features.Full.t ) ~dummy
+      ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) =
+    let module Impl = Kimchi_pasta_snarky_backend.Wrap_impl in
+    let open Impl.Typ in
+    let { Poly.w = w_lens; z; t } = commitment_lengths in
+    let array ~length elt = padded_array_typ ~dummy ~length elt in
+    let wo n = array ~length:(Vector.reduce_exn n ~f:Int.max) g in
+    let _w n =
+      With_degree_bound.typ g
+        ~length:(Vector.reduce_exn n ~f:Int.max)
+        ~dummy_group_element:dummy ~bool:Impl.Boolean.typ
     in
     let lookup =
       Lookup.opt_typ Impl.Boolean.typ ~uses_lookup:uses_lookups

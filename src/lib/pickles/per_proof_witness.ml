@@ -154,7 +154,6 @@ let typ (type n avar aval) ~feature_flags ~num_chunks
            (module Impl)
            ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
     ; Plonk_types.All_evals.typ ~num_chunks
-        (module Impl)
         (* Assume we have lookup iff we have runtime tables *)
         feature_flags
     ; Vector.typ (Vector.typ Field.typ Tick.Rounds.n) max_proofs_verified

@@ -355,9 +355,8 @@ let wrap_main
                 let evals =
                   let ty =
                     let ty =
-                      Plonk_types.All_evals.typ
-                        (module Impl)
-                        ~num_chunks:1 Plonk_types.Features.Full.none
+                      Plonk_types.All_evals.wrap_typ ~num_chunks:1
+                        Plonk_types.Features.Full.none
                     in
                     Vector.typ ty Max_proofs_verified.n
                   in
@@ -485,9 +484,7 @@ let wrap_main
             let messages =
               with_label __LOC__ (fun () ->
                   exists
-                    (Plonk_types.Messages.typ
-                       (module Impl)
-                       Inner_curve.typ ~bool:Boolean.typ feature_flags
+                    (Plonk_types.Messages.wrap_typ Inner_curve.typ feature_flags
                        ~dummy:Inner_curve.Params.one
                        ~commitment_lengths:
                          (Commitment_lengths.default ~num_chunks) )

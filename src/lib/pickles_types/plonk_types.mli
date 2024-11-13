@@ -203,18 +203,22 @@ module Messages : sig
   end
 
   val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> ('a, 'b, 'f) Snarky_backendless.Typ.t
+       ('a, 'b) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
     -> Opt.Flag.t Features.Full.t
     -> dummy:'b
     -> commitment_lengths:((int, 'n) Vector.vec, int, int) Poly.t
-    -> bool:('c, bool, 'f) Snarky_backendless.Typ.t
-    -> ( ( 'a
-         , 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
-         In_circuit.t
-       , 'b t
-       , 'f )
-       Snarky_backendless.Typ.t
+    -> ( ('a, Kimchi_pasta_snarky_backend.Step_impl.Boolean.var) In_circuit.t
+       , 'b t )
+       Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+
+  val wrap_typ :
+       ('a, 'b) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
+    -> Opt.Flag.t Features.Full.t
+    -> dummy:'b
+    -> commitment_lengths:((int, 'n) Vector.vec, int, int) Poly.t
+    -> ( ('a, Kimchi_pasta_snarky_backend.Wrap_impl.Boolean.var) In_circuit.t
+       , 'b t )
+       Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
 end
 
 module Evals : sig
@@ -442,17 +446,28 @@ module All_evals : sig
   val map : ('a, 'b) t -> f1:('a -> 'c) -> f2:('b -> 'd) -> ('c, 'd) t
 
   val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> num_chunks:int
+       num_chunks:int
     -> Opt.Flag.t Features.Full.t
-    -> ( ( 'f Snarky_backendless.Cvar.t
-         , 'f Snarky_backendless.Cvar.t array
-         , 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
+    -> ( ( Kimchi_pasta_snarky_backend.Step_impl.Field.t
+         , Kimchi_pasta_snarky_backend.Step_impl.Field.t array
+         , Kimchi_pasta_snarky_backend.Step_impl.Boolean.var )
          In_circuit.t
-       , ('f, 'f array) t
-       , 'f
-       , (unit, 'f) Snarky_backendless.Checked_runner.Simple.t )
-       Snarky_backendless.Types.Typ.typ
+       , ( Kimchi_pasta_snarky_backend.Step_impl.Field.Constant.t
+         , Kimchi_pasta_snarky_backend.Step_impl.Field.Constant.t array )
+         t )
+       Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+
+  val wrap_typ :
+       num_chunks:int
+    -> Opt.Flag.t Features.Full.t
+    -> ( ( Kimchi_pasta_snarky_backend.Wrap_impl.Field.t
+         , Kimchi_pasta_snarky_backend.Wrap_impl.Field.t array
+         , Kimchi_pasta_snarky_backend.Wrap_impl.Boolean.var )
+         In_circuit.t
+       , ( Kimchi_pasta_snarky_backend.Wrap_impl.Field.Constant.t
+         , Kimchi_pasta_snarky_backend.Wrap_impl.Field.Constant.t array )
+         t )
+       Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
 end
 
 (** Shifts, related to the permutation argument in Plonk *)

@@ -153,9 +153,7 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
      for use in the circuit *)
   and evals =
     constant
-      (Plonk_types.All_evals.typ ~num_chunks:1
-         (module Impls.Step)
-         full_features )
+      (Plonk_types.All_evals.typ ~num_chunks:1 full_features)
       { evals =
           { public_input = x_hat_evals; evals = proof.proof.openings.evals }
       ; ft_eval1 = proof.proof.openings.ft_eval1
