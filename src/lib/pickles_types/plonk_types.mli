@@ -84,9 +84,9 @@ module Features : sig
     -> 'a t
 
   val typ :
-       ('var, bool, 'f) Snarky_backendless.Typ.t
+       ('var, bool) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
     -> feature_flags:options
-    -> ('var t, bool t, 'f) Snarky_backendless.Typ.t
+    -> ('var t, bool t) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
 
   val none : options
 

@@ -367,18 +367,17 @@ module Features = struct
         ; runtime_tables
         } =
     (* TODO: This should come from snarky. *)
-    let constant (type var value)
-        (typ : (var, value, _) Snarky_backendless.Typ.t) (x : value) : var =
+    let module Impl = Kimchi_pasta_snarky_backend.Step_impl in
+    let constant (type var value) (typ : (var, value) Impl.Typ.t) (x : value) :
+        var =
       let (Typ typ) = typ in
       let fields, aux = typ.value_to_fields x in
-      let fields =
-        Array.map ~f:(fun x -> Snarky_backendless.Cvar.Constant x) fields
-      in
+      let fields = Array.map ~f:(fun x -> Impl.Field.constant x) fields in
       typ.var_of_fields (fields, aux)
     in
     let constant_typ ~there value =
-      let open Snarky_backendless.Typ in
-      unit ()
+      let open Impl.Typ in
+      unit
       |> transport ~there ~back:(fun () -> value)
       |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant bool value)
     in
@@ -394,7 +393,7 @@ module Features = struct
       | Opt.Flag.Maybe ->
           bool
     in
-    Snarky_backendless.Typ.of_hlistable
+    Impl.Typ.of_hlistable
       [ bool_typ_of_flag range_check0
       ; bool_typ_of_flag range_check1
       ; bool_typ_of_flag foreign_field_add
