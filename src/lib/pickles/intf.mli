@@ -49,7 +49,7 @@ module Group (Impl : Snarky_backendless.Snark_intf.Run) : sig
     val typ_unchecked : (t, Constant.t, Impl.field) Snarky_backendless.Typ.t
 
     (** Represent a point on the curve and in the prime subgroup *)
-    val typ : (t, Constant.t, Impl.field) Snarky_backendless.Typ.t
+    val typ : (t, Constant.t) Impl.Typ.t
 
     (** Add two points on the curve.
         TODO: is the addition complete?
