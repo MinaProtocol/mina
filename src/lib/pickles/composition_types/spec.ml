@@ -231,8 +231,6 @@ let pack (type f) ((module Impl) as impl : f impl) t =
     None
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
-  module C = Common (Impl)
-
   module Basic : sig
     val typ_basic :
          assert_16_bits:(Impl.Field.t -> unit)
@@ -244,12 +242,13 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
            ; branch_data1 : Branch_data.t
            ; branch_data2 : Impl.field Branch_data.Checked.t
            ; bulletproof_challenge1 :
-               C.Challenge.Constant.t Sc.t Bulletproof_challenge.t
-           ; bulletproof_challenge2 : C.Challenge.t Sc.t Bulletproof_challenge.t
-           ; challenge1 : C.Challenge.Constant.t
-           ; challenge2 : C.Challenge.t
-           ; digest1 : C.Digest.Constant.t
-           ; digest2 : C.Digest.t
+               Common(Impl).Challenge.Constant.t Sc.t Bulletproof_challenge.t
+           ; bulletproof_challenge2 :
+               Common(Impl).Challenge.t Sc.t Bulletproof_challenge.t
+           ; challenge1 : Common(Impl).Challenge.Constant.t
+           ; challenge2 : Common(Impl).Challenge.t
+           ; digest1 : Common(Impl).Digest.Constant.t
+           ; digest2 : Common(Impl).Digest.t
            ; field1 : 'other_field
            ; field2 : 'other_field_var
            ; .. > )
@@ -263,20 +262,23 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
          , < bool1 : bool
            ; bool2 : Impl.Boolean.var
            ; branch_data1 : Branch_data.t
-           ; branch_data2 : C.Digest.t
+           ; branch_data2 : Common(Impl).Digest.t
            ; bulletproof_challenge1 :
-               C.Challenge.Constant.t Sc.t Bulletproof_challenge.t
-           ; bulletproof_challenge2 : C.Digest.t Sc.t Bulletproof_challenge.t
-           ; challenge1 : C.Challenge.Constant.t
-           ; challenge2 : C.Digest.t
-           ; digest1 : C.Digest.Constant.t
-           ; digest2 : C.Digest.t
+               Common(Impl).Challenge.Constant.t Sc.t Bulletproof_challenge.t
+           ; bulletproof_challenge2 :
+               Common(Impl).Digest.t Sc.t Bulletproof_challenge.t
+           ; challenge1 : Common(Impl).Challenge.Constant.t
+           ; challenge2 : Common(Impl).Digest.t
+           ; digest1 : Common(Impl).Digest.Constant.t
+           ; digest2 : Common(Impl).Digest.t
            ; field1 : 'other_field
            ; field2 : 'other_field_var
            ; .. > )
          basic
       -> ('b, 'a, Impl.Field.Constant.t) ETyp.t
   end = struct
+    module C = Common (Impl)
+
     let typ_basic (type other_field other_field_var) ~assert_16_bits
         (field : (other_field_var, other_field) Impl.Typ.t) =
       let typ_basic :
