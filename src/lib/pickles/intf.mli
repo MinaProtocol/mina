@@ -2,28 +2,6 @@ open Core_kernel
 open Pickles_types
 module Sponge_lib = Sponge
 
-module Snarkable : sig
-  module type S1 = sig
-    type _ t
-
-    val typ :
-         ('var, 'value, 'f) Snarky_backendless.Typ.t
-      -> ('var t, 'value t, 'f) Snarky_backendless.Typ.t
-  end
-end
-
-module Evals : sig
-  module type S = sig
-    type n
-
-    val n : n Nat.t
-
-    include Binable.S1 with type 'a t = ('a, n) Vector.t
-
-    include Snarkable.S1 with type 'a t := 'a t
-  end
-end
-
 (** Generic interface over a concrete implementation [Impl] of an elliptic
     curve in Weierstrass form with [a] and [b]. In affine, the curve has the
     equation form [y² = x³ + ax + b]. *)
