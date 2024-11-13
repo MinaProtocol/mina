@@ -52,7 +52,7 @@ in  Pipeline.build
                   [ "POSTGRES_PASSWORD=${password}"
                   , "POSTGRES_USER=${user}"
                   , "POSTGRES_DB=${db}"
-                  , "MINA_TEST_POSTGRES=postgres://${user}:${password}@localhost:5434/${db}"
+                  , "MINA_TEST_POSTGRES=postgres://${user}:${password}@localhost:${port}/${db}"
                   , "GO=/usr/lib/go/bin/go"
                   , "DUNE_INSTRUMENT_WITH=bisect_ppx"
                   , "COVERALLS_TOKEN"
