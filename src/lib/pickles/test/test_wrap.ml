@@ -69,7 +69,7 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
   (* Constants helper - takes an OCaml value and converts it to a snarky value, where
                         all values here are constant literals.  N.b. this should be
                         encapsulated as Snarky internals, but it never got merged. *)
-  let constant (Typ typ : _ Snarky_backendless.Typ.t) x =
+  let constant (Typ typ : _ Impls.Step.Typ.t) x =
     let xs, aux = typ.value_to_fields x in
     typ.var_of_fields (Array.map xs ~f:Impls.Step.Field.constant, aux)
   in

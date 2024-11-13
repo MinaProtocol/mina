@@ -40,7 +40,7 @@ module Step : sig
 
     val typ_unchecked : (t, Constant.t) Typ.t
 
-    val typ : (t, Constant.t, Internal_Basic.field) Snarky_backendless.Typ.t
+    val typ : (t, Constant.t) Impl.Typ.t
   end
 
   type unfinalized_proof =
@@ -125,11 +125,7 @@ module Wrap : sig
 
     val typ_unchecked : (Impl.Field.t, Backend.Tick.Field.t) Impl.Typ.t
 
-    val typ :
-      ( Impl.Field.t
-      , Backend.Tick.Field.t
-      , Wrap_impl.Internal_Basic.Field.t )
-      Snarky_backendless.Typ.t
+    val typ : (Impl.Field.t, Backend.Tick.Field.t) Impl.Typ.t
   end
 
   val input :
