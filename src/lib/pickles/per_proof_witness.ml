@@ -141,9 +141,8 @@ let typ (type n avar aval) ~feature_flags ~num_chunks
   let open Impls.Step in
   let open Step_main_inputs in
   let open Step_verifier in
-  Snarky_backendless.Typ.of_hlistable ~var_to_hlist:to_hlist
-    ~var_of_hlist:of_hlist ~value_to_hlist:Constant.to_hlist
-    ~value_of_hlist:Constant.of_hlist
+  Impls.Step.Typ.of_hlistable ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+    ~value_to_hlist:Constant.to_hlist ~value_of_hlist:Constant.of_hlist
     [ statement
     ; Wrap_proof.typ
     ; Types.Wrap.Proof_state.In_circuit.typ
@@ -151,8 +150,7 @@ let typ (type n avar aval) ~feature_flags ~num_chunks
         ~challenge:Challenge.typ ~scalar_challenge:Challenge.typ ~feature_flags
         ~dummy_scalar_challenge:(Sc.create Limb_vector.Challenge.Constant.zero)
         (Shifted_value.Type1.typ Field.typ)
-        (Snarky_backendless.Typ.unit ())
-        Digest.typ
+        Impls.Step.Typ.unit Digest.typ
         (Branch_data.typ
            (module Impl)
            ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
