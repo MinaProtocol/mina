@@ -772,9 +772,6 @@ module H4 : sig
 
   (** See {!H1.Typ}. *)
   module Typ : functor
-    (Impl : sig
-       type field
-     end)
     (A : T4)
     (Var : T3)
     (Val : T3)
@@ -782,36 +779,15 @@ module H4 : sig
        val f :
             ('var, 'value, 'n1, 'n2) A.t
          -> ( ('var, 'n1, 'n2) Var.t
-            , ('value, 'n1, 'n2) Val.t
-            , Impl.field )
-            Snarky_backendless.Typ.t
+            , ('value, 'n1, 'n2) Val.t )
+            Kimchi_pasta_snarky_backend.Step_impl.Typ.t
      end)
     -> sig
-    val transport :
-         ('a, 'b, 'c) Snarky_backendless.Typ.t
-      -> there:('d -> 'b)
-      -> back:('b -> 'd)
-      -> ('a, 'd, 'c) Snarky_backendless.Typ.t
-
-    val transport_var :
-         ('a, 'b, 'c) Snarky_backendless.Typ.t
-      -> there:('d -> 'a)
-      -> back:('a -> 'd)
-      -> ('d, 'b, 'c) Snarky_backendless.Typ.t
-
-    val tuple2 :
-         ('a, 'b, 'c) Snarky_backendless.Typ.t
-      -> ('d, 'e, 'c) Snarky_backendless.Typ.t
-      -> ('a * 'd, 'b * 'e, 'c) Snarky_backendless.Typ.t
-
-    val unit : unit -> (unit, unit, 'a) Snarky_backendless.Typ.t
-
     val f :
          ('vars, 'values, 'ns1, 'ns2) T(A).t
       -> ( ('vars, 'ns1, 'ns2) H3.T(Var).t
-         , ('values, 'ns1, 'ns2) H3.T(Val).t
-         , Impl.field )
-         Snarky_backendless.Typ.t
+         , ('values, 'ns1, 'ns2) H3.T(Val).t )
+         Kimchi_pasta_snarky_backend.Step_impl.Typ.t
   end
 end
 
