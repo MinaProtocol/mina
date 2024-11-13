@@ -425,25 +425,10 @@ let make_constraint_constants
   in
   let transaction_capacity_log_2 =
     match config.transaction_capacity with
-    | Some (Log_2 i) ->
-        i
-    | Some (Txns_per_second_x10 tps_goal_x10) ->
-        let max_coinbases = 2 in
-        let max_user_commands_per_block =
-          (* block_window_duration is in milliseconds, so divide by 1000 divide
-             by 10 again because we have tps * 10
-          *)
-          tps_goal_x10 * block_window_duration_ms / (1000 * 10)
-        in
-        (* Log of the capacity of transactions per transition.
-            - 1 will only work if we don't have prover fees.
-            - 2 will work with prover fees, but not if we want a transaction
-              included in every block.
-            - At least 3 ensures a transaction per block and the staged-ledger
-              unit tests pass.
-        *)
-        1
-        + Core_kernel.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
+    | Some transaction_capacity ->
+        Runtime_config.Proof_keys.Transaction_capacity
+        .to_transaction_capacity_log_2 ~block_window_duration_ms
+          ~transaction_capacity
     | None ->
         default.transaction_capacity_log_2
   in

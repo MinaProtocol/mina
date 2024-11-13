@@ -936,8 +936,10 @@ module Mutations = struct
                 "Could not find an archive process to connect to"
         in
         let%map () =
-          Mina_lib.Archive_client.dispatch_precomputed_block archive_location
-            block
+          Mina_lib.Archive_client.dispatch_precomputed_block
+            ~compile_config:
+              (Mina_lib.config mina).precomputed_values.compile_config
+            archive_location block
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
         () )
@@ -967,8 +969,10 @@ module Mutations = struct
                 "Could not find an archive process to connect to"
         in
         let%map () =
-          Mina_lib.Archive_client.dispatch_extensional_block archive_location
-            block
+          Mina_lib.Archive_client.dispatch_extensional_block
+            ~compile_config:
+              (Mina_lib.config mina).precomputed_values.compile_config
+            archive_location block
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
         () )
@@ -2209,8 +2213,8 @@ module Queries = struct
           Mina_lib.(
             Option.map (snark_worker_key mina) ~f:(fun _ -> snark_work_fee mina))
         in
-        let (module S) = Mina_lib.work_selection_method mina in
-        S.pending_work_statements ~snark_pool ~fee_opt snark_job_state )
+        Work_selector.pending_work_statements ~snark_pool ~fee_opt
+          snark_job_state )
 
   module SnarkedLedgerMembership = struct
     let resolve_membership :
@@ -2659,7 +2663,7 @@ module Queries = struct
       ~args:Arg.[]
       ~resolve:(fun { ctx = mina; _ } () ->
         let open Deferred.Result.Let_syntax in
-        Mina_lib.verifier mina |> Verifier.get_blockchain_verification_key
+        Mina_lib.prover mina |> Prover.get_blockchain_verification_key
         |> Deferred.Result.map_error ~f:Error.to_string_hum
         >>| Pickles.Verification_key.to_yojson >>| Yojson.Safe.to_basic )
 
@@ -2672,7 +2676,13 @@ module Queries = struct
       ~args:Arg.[]
       ~resolve:(fun { ctx = mina; _ } () ->
         let cfg = Mina_lib.config mina in
-        "mina:" ^ cfg.compile_config.network_id )
+        let runtime_cfg = Mina_lib.runtime_config mina in
+        let network_id =
+          Option.value ~default:cfg.compile_config.network_id
+          @@ let%bind.Option daemon = runtime_cfg.daemon in
+             daemon.network_id
+        in
+        "mina:" ^ network_id )
 
   let signature_kind =
     field "signatureKind"

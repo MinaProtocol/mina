@@ -51,7 +51,6 @@
 
 
 (*BEGIN src/config/amount_defaults/standard.mlh*)
-[%%define default_transaction_fee "5"]
 [%%define default_snark_worker_fee "1"]
 [%%define minimum_user_command_fee "2"]
 (*END src/config/amount_defaults/standard.mlh*)
