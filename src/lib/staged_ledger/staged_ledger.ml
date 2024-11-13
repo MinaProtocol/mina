@@ -580,20 +580,17 @@ module T = struct
     let second_pass_ledger_target_hash = Ledger.merkle_root ledger in
     let%bind supply_increase =
       to_staged_ledger_or_error
-        (Ledger.Transaction_applied.supply_increase ~constraint_constants
-           applied_txn )
+        (Mina_transaction_logic.Transaction_applied.supply_increase
+           ~constraint_constants applied_txn )
     in
     let%map () =
-      let actual_status =
-        Ledger.Transaction_applied.transaction_status applied_txn
-      in
+      let actual_status = Ledger.status_of_applied applied_txn in
       if Transaction_status.equal pre_stmt.expected_status actual_status then
         return ()
       else
         let txn_with_expected_status =
           { With_status.data =
-              With_status.data
-                (Ledger.Transaction_applied.transaction applied_txn)
+              With_status.data (Ledger.transaction_of_applied applied_txn)
           ; status = pre_stmt.expected_status
           }
         in
@@ -789,9 +786,7 @@ module T = struct
       List.fold_right ~init:(Ok []) data
         ~f:(fun (d : Scan_state.Transaction_with_witness.t) acc ->
           let%map.Or_error acc = acc in
-          let t =
-            d.transaction_with_info |> Ledger.Transaction_applied.transaction
-          in
+          let t = d.transaction_with_info |> Ledger.transaction_of_applied in
           t :: acc )
     in
     let total_fee_excess txns =
@@ -2389,10 +2384,8 @@ let%test_module "staged ledger tests" =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            ~commit_id:"not specified for unit tests" () )
+          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
+            () )
 
     let find_vk ledger =
       Zkapp_command.Verifiable.load_vk_from_ledger ~get:(Ledger.get ledger)
@@ -5187,12 +5180,10 @@ let%test_module "staged ledger tests" =
                           (Staged_ledger_diff.With_valid_signatures_and_proofs
                            .commands diff )
                         = 1 ) ;
+
                       let%bind verifier_full =
-                        Verifier.create ~logger ~proof_level:Full
-                          ~constraint_constants ~conf_dir:None
-                          ~pids:
-                            (Child_processes.Termination.create_pid_table ())
-                          ~commit_id:"not specified for unit tests" ()
+                        Verifier.For_tests.default ~constraint_constants ~logger
+                          ~proof_level:Full ()
                       in
                       match%map
                         Sl.apply ~constraint_constants ~global_slot !sl

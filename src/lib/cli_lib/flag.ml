@@ -33,6 +33,15 @@ let conf_dir =
   flag "--config-directory" ~aliases:[ "config-directory" ]
     ~doc:"DIR Configuration directory" (optional string)
 
+let config_files =
+  let open Command.Param in
+  flag "--config-file" ~aliases:[ "config-file" ]
+    ~doc:
+      "PATH path to a configuration file (overrides MINA_CONFIG_FILE, default: \
+       <config_dir>/daemon.json). Pass multiple times to override fields from \
+       earlier config files"
+    (listed string)
+
 module Doc_builder = struct
   type 'value t =
     { type_name : string
@@ -343,32 +352,24 @@ end
 
 type signed_command_common =
   { sender : Signature_lib.Public_key.Compressed.t
-  ; fee : Currency.Fee.t
+  ; fee : Currency.Fee.t option
   ; nonce : Mina_base.Account.Nonce.t option
   ; memo : string option
   }
 
-let fee_common ~default_transaction_fee ~minimum_user_command_fee :
-    Currency.Fee.t Command.Param.t =
+let fee_common : Currency.Fee.t option Command.Param.t =
   Command.Param.flag "--fee" ~aliases:[ "fee" ]
-    ~doc:
-      (Printf.sprintf
-         "FEE Amount you are willing to pay to process the transaction \
-          (default: %s) (minimum: %s)"
-         (Currency.Fee.to_mina_string default_transaction_fee)
-         (Currency.Fee.to_mina_string minimum_user_command_fee) )
-    (Command.Param.optional_with_default default_transaction_fee
-       Arg_type.txn_fee )
+    ~doc:"FEE Amount you are willing to pay to process the transaction"
+    (Command.Param.optional Arg_type.txn_fee)
 
-let signed_command_common ~default_transaction_fee ~minimum_user_command_fee :
-    signed_command_common Command.Param.t =
+let signed_command_common : signed_command_common Command.Param.t =
   let open Command.Let_syntax in
   let open Arg_type in
   let%map_open sender =
     flag "--sender" ~aliases:[ "sender" ]
       (required public_key_compressed)
       ~doc:"PUBLICKEY Public key from which you want to send the transaction"
-  and fee = fee_common ~default_transaction_fee ~minimum_user_command_fee
+  and fee = fee_common
   and nonce =
     flag "--nonce" ~aliases:[ "nonce" ]
       ~doc:
@@ -401,15 +402,10 @@ module Signed_command = struct
     flag "--amount" ~aliases:[ "amount" ]
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
 
-  let fee ~default_transaction_fee ~minimum_user_command_fee =
+  let fee =
     let open Command.Param in
     flag "--fee" ~aliases:[ "fee" ]
-      ~doc:
-        (Printf.sprintf
-           "FEE Amount you are willing to pay to process the transaction \
-            (default: %s) (minimum: %s)"
-           (Currency.Fee.to_mina_string default_transaction_fee)
-           (Currency.Fee.to_mina_string minimum_user_command_fee) )
+      ~doc:"FEE Amount you are willing to pay to process the transaction"
       (optional txn_fee)
 
   let valid_until =
