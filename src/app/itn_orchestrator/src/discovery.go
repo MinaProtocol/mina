@@ -93,6 +93,17 @@ func (config *Config) iterateSubmissions(handler func(MiniMetaToBeSaved)) error 
 	}
 }
 
+func (config *Config) nodeAddress(remoteAddr string, controlPort uint16) NodeAddress {
+	if controlPort >= 10000 {
+		ix := int(controlPort)/10000 - 1
+		if len(config.UrlOverrides) > ix {
+			url := strings.ReplaceAll(config.UrlOverrides[ix], "{}", strconv.Itoa(int(controlPort)%10000))
+			return NodeAddress(url + ":80")
+		}
+	}
+	return NodeAddress(remoteAddr + ":" + strconv.Itoa(int(controlPort)))
+}
+
 func discoverParticipantsDo(config Config, params DiscoveryParams, output func(NodeAddress)) error {
 	log := config.Log
 	// This function has the following concurrency architecture:
@@ -141,7 +152,7 @@ func discoverParticipantsDo(config Config, params DiscoveryParams, output func(N
 	connecting := make(map[NodeAddress]struct{})
 
 	config.iterateSubmissions(func(meta MiniMetaToBeSaved) {
-		addr := NodeAddress(meta.RemoteAddr + ":" + strconv.Itoa(int(meta.GraphqlControlPort)))
+		addr := config.nodeAddress(meta.RemoteAddr, meta.GraphqlControlPort)
 		if _, has := connecting[addr]; !has {
 			connecting[addr] = struct{}{}
 			if entry, has := config.NodeData[addr]; has {

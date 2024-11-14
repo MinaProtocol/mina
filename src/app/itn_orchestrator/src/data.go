@@ -54,6 +54,7 @@ type Config struct {
 	ControlExec        string
 	StopDaemonDelaySec int
 	FundDaemonPorts    []string
+	UrlOverrides       []string
 }
 
 type OutputF = func(name string, value any, multiple bool, sensitive bool)
