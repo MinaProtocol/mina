@@ -2239,28 +2239,30 @@ module Queries = struct
                  startingIndex >= endingIndex."
               ~typ:Types.Input.UInt32.arg_typ
           ]
-      ~typ:(non_null @@ list @@ non_null Types.pending_work)
+      ~typ:(non_null @@ list @@ non_null Types.pending_work_spec)
       ~resolve:(fun { ctx = mina; _ } () start_idx end_idx ->
-        let pending_work = get_pending_work mina in
-        let pending_work_size =
-          pending_work |> List.length |> Unsigned.UInt32.of_int
-        in
+        let snark_job_state = Mina_lib.snark_job_state mina in
+        let snark_pool = Mina_lib.snark_pool mina in
+        let all_work = Work_selector.all_work ~snark_pool snark_job_state in
+        let work_size = all_work |> List.length |> Unsigned.UInt32.of_int in
         let less_than uint1 uint2 = Unsigned.UInt32.compare uint1 uint2 < 0 in
+        let to_bundle_specs =
+          List.map ~f:(fun (spec, fee_prover) ->
+              { Types.Snark_work_bundle.spec; fee_prover } )
+        in
         match end_idx with
-        | None when less_than start_idx pending_work_size ->
+        | None when less_than start_idx work_size ->
             (* drop handles case when start_idx is greater than pending work and is O(start_idx)*)
             let start = Unsigned.UInt32.to_int start_idx in
-            List.drop pending_work start
+            List.drop all_work start |> to_bundle_specs
         | Some end_idx
-          when less_than start_idx end_idx
-               && less_than start_idx pending_work_size ->
+          when less_than start_idx end_idx && less_than start_idx work_size ->
             let pos = Unsigned.UInt32.to_int start_idx in
             let len =
               Unsigned.UInt32.(
-                min (sub end_idx start_idx) (sub pending_work_size start_idx)
-                |> to_int)
+                min (sub end_idx start_idx) (sub work_size start_idx) |> to_int)
             in
-            List.sub ~pos ~len pending_work
+            List.sub ~pos ~len all_work |> to_bundle_specs
         | _ ->
             [] )
 
