@@ -2581,6 +2581,21 @@ module Input = struct
           Yojson.Safe.to_basic @@ Mina_base.Zkapp_command.to_json x )
   end
 
+  module ProofBundleInput = struct
+    type input = Ledger_proof.t Snark_work_lib.Work.Result_without_metrics.t
+
+    let arg_typ =
+      scalar "ProofBundle" ~doc:"Proof bundle for a given spec in json format"
+        ~coerce:(fun json ->
+          let json = Utils.to_yojson json in
+          Snark_work_lib.Work.Result_without_metrics.of_yojson
+            Ledger_proof.of_yojson json )
+        ~to_json:(fun (res : input) ->
+          Snark_work_lib.Work.Result_without_metrics.to_yojson
+            Ledger_proof.to_yojson res
+          |> Yojson.Safe.to_basic )
+  end
+
   module PrecomputedBlock = struct
     type input = Mina_block.Precomputed.t
 
