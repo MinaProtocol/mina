@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/Khan/genqlient/graphql"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	logging "github.com/ipfs/go-log/v2"
 )
 
 func prefixByTime(t time.Time) string {
@@ -26,26 +27,10 @@ type Node struct {
 }
 
 type DiscoveryParams struct {
-	OffsetMin          int  `json:"offsetMin"`
 	Limit              int  `json:"limit,omitempty"`
 	OnlyBlockProducers bool `json:"onlyBPs,omitempty"`
 	NoBlockProducers   bool `json:"noBPs,omitempty"`
 	Exactly            bool `json:"exactly,omitempty"`
-}
-
-func (awsctx AwsContext) ListObjects(ctx context.Context, startAfter string, continuationToken *string) (*s3.ListObjectsV2Output, error) {
-	return awsctx.Client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
-		Bucket:            awsctx.BucketName,
-		Prefix:            aws.String(awsctx.Prefix),
-		StartAfter:        aws.String(awsctx.Prefix + "/" + startAfter),
-		ContinuationToken: continuationToken,
-	})
-}
-func (awsctx AwsContext) ReadObject(ctx context.Context, key *string) (*s3.GetObjectOutput, error) {
-	return awsctx.Client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: awsctx.BucketName,
-		Key:    key,
-	})
 }
 
 type nodeAddrEntry struct {
@@ -59,50 +44,56 @@ type nodeAddrEntriesAndCount struct {
 	count   int
 }
 
-func iterateSubmissions(config Config, startAfter string, handleAddress func(string, NodeAddress)) error {
-	log := config.Log
-	ctx := config.Ctx
-	resp, err := config.AwsContext.ListObjects(ctx, startAfter, nil)
-	if err != nil {
-		return err
+// retryGetURL attempts to retrieve the content of a URL up to maxAttempts times
+// with a delay between each retry, then decode received JSON into an array of MiniMetaToBeSaved
+func retryGetURL(ctx context.Context, log logging.StandardLogger, url string, maxAttempts int, delay time.Duration) (contents []MiniMetaToBeSaved, err error) {
+	// Attempt to get the URL content up to maxAttempts times
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		resp, err := http.Get(url)
+		if err == nil {
+			var body []byte
+			// Read the response body
+			body, err = io.ReadAll(resp.Body)
+			_ = resp.Body.Close() // Close the response body
+			if err == nil {
+				err = json.Unmarshal(body, &contents)
+			}
+			if err == nil {
+				break // Exit the loop if successful
+			}
+		}
+
+		log.Warnf("Attempt %d failed: %v\n", attempt, err)
+		if attempt < maxAttempts {
+			log.Warnf("Retrying in %v...\n", delay)
+			select {
+			case <-ctx.Done(): // If the context is cancelled,
+				return nil, ctx.Err()
+			case <-time.After(delay):
+			}
+		}
 	}
-	for {
-		for _, obj := range resp.Contents {
-			name := *obj.Key
-			r, err := config.AwsContext.ReadObject(ctx, obj.Key)
-			if err != nil {
-				log.Warnf("Error reading submission %s: %v", name, err)
-				continue
-			}
-			var meta MetaToBeSaved
-			d := json.NewDecoder(r.Body)
-			err = d.Decode(&meta)
-			if err != nil {
-				log.Warnf("Error decoding submission %s: %v", name, err)
-				continue
-			}
-			colonIx := strings.IndexRune(meta.RemoteAddr, ':')
-			if colonIx < 0 {
-				// No port is specified in the address, hence we just take the whole remote address field
-				colonIx = len(meta.RemoteAddr)
-			}
-			addr := NodeAddress(meta.RemoteAddr[:colonIx] + ":" + strconv.Itoa(int(meta.GraphqlControlPort)))
-			handleAddress(meta.Submitter, addr)
+	return
+}
+
+func (config *Config) iterateSubmissions(handler func(MiniMetaToBeSaved)) error {
+	if config.AwsContext != nil {
+		before := time.Now().Add(-15 * time.Minute)
+		startAfter := prefixByTime(before)
+		return config.AwsContext.iterateSubmissions(config.Ctx, config.Log, startAfter, handler)
+	} else {
+		submissions, err := retryGetURL(config.Ctx, config.Log, config.OnlineURL, 5, time.Minute)
+		if err != nil {
+			return err
 		}
-		if resp.IsTruncated {
-			resp, err = config.AwsContext.ListObjects(ctx, startAfter, resp.NextContinuationToken)
-			if err != nil {
-				return err
-			}
-		} else {
-			return nil
+		for _, meta := range submissions {
+			handler(meta)
 		}
+		return nil
 	}
 }
 
 func discoverParticipantsDo(config Config, params DiscoveryParams, output func(NodeAddress)) error {
-	before := time.Now().Add(-time.Duration(params.OffsetMin) * time.Minute)
-	startAfter := prefixByTime(before)
 	log := config.Log
 	// This function has the following concurrency architecture:
 	// 1. There is a goroutine that reads discovered nodes and outputs them, at the end
@@ -148,14 +139,16 @@ func discoverParticipantsDo(config Config, params DiscoveryParams, output func(N
 		}
 	}
 	connecting := make(map[NodeAddress]struct{})
-	iterateSubmissions(config, startAfter, func(pk string, addr NodeAddress) {
+
+	config.iterateSubmissions(func(meta MiniMetaToBeSaved) {
+		addr := NodeAddress(meta.RemoteAddr + ":" + strconv.Itoa(int(meta.GraphqlControlPort)))
 		if _, has := connecting[addr]; !has {
 			connecting[addr] = struct{}{}
 			if entry, has := config.NodeData[addr]; has {
 				connected <- nodeAddrEntry{addr: addr, entry: entry, isNew: false}
 			} else {
 				wg.Add(1)
-				go tryToConnect(pk, addr)
+				go tryToConnect(meta.Submitter, addr)
 			}
 		}
 	})
