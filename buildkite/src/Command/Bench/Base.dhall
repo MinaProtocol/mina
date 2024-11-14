@@ -58,9 +58,9 @@ let command
                 RunInToolchain.runInToolchain
                   (Benchmarks.toEnvList Benchmarks.Type::{=})
                   "./buildkite/scripts/bench/run.sh  ${spec.bench} --red-threshold ${Double/show
-                                                                                        spec.redThreshold} --yellow-threshold ${Double/show
-                                                                                                                                  spec.yellowThreshold}"
-            , label = "Perf: ${spec.label}"
+                                                                                       spec.redThreshold} --yellow-threshold ${Double/show
+                                                                                                                                 spec.yellowThreshold}"
+            , label = "Perf: ${spec.name} ${PipelineMode.capitalName spec.mode}"
             , key = spec.key
             , target = spec.size
             , docker = None Docker.Type
@@ -77,10 +77,11 @@ let pipeline
                   , SelectFiles.exactly
                       "buildkite/src/Command/Bench/Base"
                       "dhall"
+                  , SelectFiles.exactly "buildkite/scripts/bench/install" "sh"
+                  , SelectFiles.exactly "buildkite/scripts/bench/run" "sh"
                   , SelectFiles.contains "scripts/benchmark"
-                  , SelectFiles.contains "buildkite/scripts/benchmark"
-                  , SelectFiles.exactly 
-                      "buildkite/src/Jobs/Bench/${spec.name}" 
+                  , SelectFiles.exactly
+                      "buildkite/src/Jobs/Bench/${spec.name}"
                       "dhall"
                   ]
                 # spec.additionalDirtyWhen

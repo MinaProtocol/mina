@@ -2,8 +2,6 @@ let BenchBase = ../../Command/Bench/Base.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-let S = ../../Lib/SelectFiles.dhall
-
 let PipelineMode = ../../Pipeline/Mode.dhall
 
 let name = "LedgerExportStable"
@@ -16,7 +14,7 @@ in  Pipeline.build
           , mode = PipelineMode.Type.Stable
           , path = "Bench"
           , name = name
-          , label = "Ledger Export Stable"
+          , label = "Ledger Export"
           , key = bench
           , bench = bench
           }

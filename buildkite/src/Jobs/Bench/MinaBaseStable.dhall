@@ -4,8 +4,6 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineMode = ../../Pipeline/Mode.dhall
 
-let S = ../../Lib/SelectFiles.dhall
-
 let name = "MinaBaseStable"
 
 let bench = "mina-base"
@@ -16,7 +14,7 @@ in  Pipeline.build
           , mode = PipelineMode.Type.Stable
           , path = "Bench"
           , name = name
-          , label = "Mina Base Stable"
+          , label = "Mina Base"
           , key = bench
           , bench = bench
           }

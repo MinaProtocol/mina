@@ -2,8 +2,6 @@ let BenchBase = ../../Command/Bench/Base.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-let S = ../../Lib/SelectFiles.dhall
-
 let PipelineMode = ../../Pipeline/Mode.dhall
 
 let name = "SnarkProfilerStable"
@@ -16,7 +14,7 @@ in  Pipeline.build
           , mode = PipelineMode.Type.Stable
           , path = "Bench"
           , name = name
-          , label = "Snark Profiler Stable"
+          , label = "Snark Profiler"
           , key = bench
           , bench = bench
           }

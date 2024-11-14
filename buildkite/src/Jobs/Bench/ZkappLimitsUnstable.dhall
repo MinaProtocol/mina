@@ -4,8 +4,6 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let Size = ../../Command/Size.dhall
 
-let S = ../../Lib/SelectFiles.dhall
-
 let name = "ZkappLimitsUnstable"
 
 let bench = "zkapp"
@@ -15,7 +13,7 @@ in  Pipeline.build
           BenchBase.Spec::{
           , path = "Bench"
           , name = name
-          , label = "Zkapp Limits Pr"
+          , label = "Zkapp Limits"
           , size = Size.Small
           , key = bench
           , bench = bench
