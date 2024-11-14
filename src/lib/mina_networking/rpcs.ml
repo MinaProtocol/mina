@@ -822,7 +822,7 @@ module Get_completed_snarks = struct
   let handle_request (module Context : CONTEXT) ~version:_ _request =
     let open Context in
     (* the maximum number of completed snarks to return over rpc *)
-    let limit = 10 in
+    let limit = 16 in
 
     match get_snark_pool () with
     | None ->
