@@ -3,7 +3,7 @@ set -euox pipefail
 
 
 
-BUILD_URL=${BUILD_URL:-"local build from '$(hostname)' host"}
+BUILD_URL=${BUILD_URL:-${BUILDKITE_BUILD_URL:-"local build from '$(hostname)' host"}}
 MINA_DEB_CODENAME=${MINA_DEB_CODENAME:-"bullseye"}
 MINA_DEB_VERSION=${MINA_DEB_VERSION:-"0.0.0-experimental"}
 MINA_DEB_RELEASE=${MINA_DEB_RELEASE:-"unstable"}
