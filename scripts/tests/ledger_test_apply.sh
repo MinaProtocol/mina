@@ -1,7 +1,11 @@
 #!/bin/bash
 
-# test mina ledger test-apply
-set -x
+# executes mina ledger test-apply command which is a
+# Benchmark-like tool that:
+# 1. Creates a set number of 9-account-updates transactions 
+# 2. Applies these transactions to the ledger by calling update_coinbase_stack_and_get_data (which from runs on whale-1-1 seemed to be the major cost center), 
+#    using empty scan state and pending coinbase collections
+# Tool might be useful for detecting regression related to mentioned areas
 
 export MINA_PRIVKEY_PASS='naughty blue worm'
 
