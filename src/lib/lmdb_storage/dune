@@ -3,41 +3,10 @@
  (public_name lmdb_storage)
  (libraries
    ;; opam libraries
-   async
-   base58
-   base64
-   capnp
-   digestif
-   stdio
-   core
-   libp2p_ipc
-   yojson
-   async_kernel
-   core_kernel
-   bin_prot.shape
-   ppx_inline_test.config
-   async_unix
-   sexplib0
-   base.caml
-   base.base_internalhash_types
-   splittable_random
    lmdb
-   integers
-   ppx_version.runtime
    ;; local libraries
-   blake2
-   error_json
-   child_processes
    file_system
-   logger
-   network_peer
-   pipe_lib
-   timeout_lib
-   mina_metrics
-   o1trace
-   consensus
-   mina_numbers
-   data_hash_lib
+   blake2
    ;; test deps
    inline_test_quiet_logs
    )
