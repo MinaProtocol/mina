@@ -21,7 +21,6 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
-          , S.exactly "buildkite/src/Jobs/Lint/Changelog" "dhall"
           ]
         , path = "Lint"
         , name = "Changelog"
