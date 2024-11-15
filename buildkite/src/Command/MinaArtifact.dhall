@@ -73,6 +73,9 @@ let build_artifacts
                     spec.toolchainSelectMode
                     spec.debVersion
                     (   [ "DUNE_PROFILE=${Profiles.duneProfile spec.profile}"
+                        , "DUNE_CACHE"
+                        , "DUNE_CACHE_STORAGE_MODE"
+                        , "XDG_CACHE_HOME"
                         , "AWS_ACCESS_KEY_ID"
                         , "AWS_SECRET_ACCESS_KEY"
                         , "MINA_BRANCH=\$BUILDKITE_BRANCH"
