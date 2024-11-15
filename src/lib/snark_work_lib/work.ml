@@ -107,5 +107,5 @@ module Result_without_metrics = struct
     ; prover : Signature_lib.Public_key.Compressed.t
     ; fee : Currency.Fee.t
     }
-  [@@deriving yojson]
+  [@@deriving yojson, sexp]
 end

@@ -2,12 +2,55 @@ open Core_kernel
 open Async
 module Prod = Snark_worker__Prod.Inputs
 
+let perform (s : Prod.Worker_state.t) ~fee ~public_key
+    (spec :
+      (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
+      One_or_two.t ) =
+  One_or_two.Deferred_result.map spec ~f:(fun w ->
+      let open Deferred.Or_error.Let_syntax in
+      let%map proof, time =
+        Prod.perform_single s
+          ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
+          w
+      in
+      ( proof
+      , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge) ) )
+  |> Deferred.Or_error.map ~f:(function
+       | `One (proof1, _) ->
+           { Snark_work_lib.Work.Result_without_metrics.proofs = `One proof1
+           ; statements =
+               One_or_two.map spec ~f:Snark_work_lib.Work.Single.Spec.statement
+           ; prover = public_key
+           ; fee
+           }
+       | `Two ((proof1, _), (proof2, _)) ->
+           { Snark_work_lib.Work.Result_without_metrics.proofs =
+               `Two (proof1, proof2)
+           ; statements =
+               One_or_two.map spec ~f:Snark_work_lib.Work.Single.Spec.statement
+           ; prover = public_key
+           ; fee
+           } )
+
 let command =
   let open Command.Let_syntax in
   Command.async ~summary:"Run snark worker directly"
-    (let%map_open spec =
-       flag "--spec-sexp" ~doc:""
-         (required (sexp_conv Prod.single_spec_of_sexp))
+    (let%map_open spec_json =
+       flag "--spec-json"
+         ~doc:
+           "Snark work spec in json format (preferred over sexp format if both \
+            are passed)"
+         (optional string)
+     and spec_sexp =
+       flag "--spec-sexp"
+         ~doc:
+           "Snark work spec in sexp format(json format is preferred over sexp \
+            if both are passed)"
+         (optional
+            (sexp_conv
+               (One_or_two.t_of_sexp
+                  (Snark_work_lib.Work.Single.Spec.t_of_sexp
+                     Transaction_witness.t_of_sexp Ledger_proof.t_of_sexp ) ) ) )
      and config_file = Cli_lib.Flag.config_files
      and cli_proof_level =
        flag "--proof-level" ~doc:""
@@ -17,6 +60,20 @@ let command =
                ; ("Check", Check)
                ; ("None", No_check)
                ] ) )
+     and snark_work_fee =
+       flag "--snark-worker-fee" ~aliases:[ "snark-worker-fee" ]
+         ~doc:
+           (sprintf
+              "FEE Amount a worker wants to get compensated for generating a \
+               snark proof" )
+         (optional Cli_lib.Arg_type.txn_fee)
+     and snark_worker_key =
+       flag "--snark-worker-public-key"
+         ~aliases:[ "snark-worker-public-key" ]
+         ~doc:
+           (sprintf "PUBLICKEY Run the SNARK worker with this public key. %s"
+              Cli_lib.Default.receiver_key_warning )
+         (optional Cli_lib.Arg_type.public_key_compressed)
      in
      fun () ->
        let open Async in
@@ -32,16 +89,39 @@ let command =
        let%bind worker_state =
          Prod.Worker_state.create ~constraint_constants ~proof_level ()
        in
-       let public_key = fst Key_gen.Sample_keypairs.genesis_winner in
-       let fee = Currency.Fee.of_nanomina_int_exn 10 in
-       let message = Mina_base.Sok_message.create ~fee ~prover:public_key in
-       match%bind Prod.perform_single worker_state ~message spec with
-       | Ok (proof, time) ->
+       let spec =
+         match spec_json with
+         | Some json -> (
+             match
+               Yojson.Safe.from_string json
+               |> One_or_two.of_yojson
+                    (Snark_work_lib.Work.Single.Spec.of_yojson
+                       Transaction_witness.of_yojson Ledger_proof.of_yojson )
+             with
+             | Ok spec ->
+                 spec
+             | Error e ->
+                 failwith (sprintf "Failed to read json spec. Error: %s" e) )
+         | None ->
+             Option.value_exn spec_sexp
+       in
+       let public_key =
+         Option.value
+           ~default:(fst Key_gen.Sample_keypairs.genesis_winner)
+           snark_worker_key
+       in
+       let fee =
+         Option.value
+           ~default:(Currency.Fee.of_nanomina_int_exn 10)
+           snark_work_fee
+       in
+       match%bind perform worker_state ~fee ~public_key spec with
+       | Ok result ->
            Caml.Format.printf
-             !"@[<v>Successfully proved in %{sexp: Time.Span.t}.@,\
-               Proof was:@,\
-               %{sexp: Transaction_snark.t}@]@."
-             time proof ;
+             !"@[<v>Successfully proved. Result: \n\
+              \               %{sexp: Ledger_proof.t \
+               Snark_work_lib.Work.Result_without_metrics.t}@]@."
+             result ;
            exit 0
        | Error err ->
            Caml.Format.printf
