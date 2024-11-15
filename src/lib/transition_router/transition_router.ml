@@ -98,99 +98,6 @@ let is_transition_for_bootstrap ~context:(module Context : CONTEXT) frontier
           ~context:(module Context)
           ~existing:root_consensus_state ~candidate:new_consensus_state
 
-let fetch_completed_snarks ~context:(module Context : CONTEXT) all_peers network
-    snark_pool =
-  let open Context in
-  [%str_log info] Starting_bootstrap_controller ;
-  let%bind all_peers = all_peers in
-  [%log info] "FETCHING COMPLETED SNARKS" ;
-  Deferred.List.iter
-    ~f:(fun peer ->
-      print_endline @@ "PEER IS " ^ Network_peer.Peer.to_string peer ;
-      [%log info] "PEER IS: Fetching completed snarks from peer: $peer"
-        ~metadata:[ ("peer", Network_peer.Peer.to_yojson peer) ] ;
-      let completed_works =
-        Mina_networking.get_completed_checked_snarks network peer
-      in
-      let%bind completed_works = completed_works in
-      let completed_works =
-        match completed_works with
-        | Error e ->
-            [%log error]
-              ~metadata:
-                [ ("peer", Network_peer.Peer.to_yojson peer)
-                ; ("error", Error_json.error_to_yojson e)
-                ]
-              "Failed to fetch completed snarks from peer: $error" ;
-            []
-        | Ok completed_works ->
-            completed_works
-      in
-      let%bind () =
-        Deferred.List.iter completed_works ~f:(fun work ->
-            let callback =
-              let cb =
-                Mina_net2.Validation_callback.create_without_expiration ()
-              in
-              Network_pool.Snark_pool.Broadcast_callback.External cb
-            in
-
-            (* proofs should be verified in apply and broadcast *)
-            let statement = Transaction_snark_work.Checked.statement work in
-            let snark =
-              Network_pool.Priced_proof.
-                { proof = work.proofs
-                ; fee = { fee = work.fee; prover = work.prover }
-                }
-            in
-            let msg =
-              let diff =
-                Network_pool.Snark_pool.Diff_versioned.Add_solved_work
-                  (statement, snark)
-              in
-              Envelope.Incoming.wrap_peer ~data:diff ~sender:peer
-            in
-
-            (* verify the snarks to be added *)
-            let resource_pool =
-              Network_pool.Snark_pool.resource_pool snark_pool
-            in
-            let%bind err =
-              Network_pool.Snark_pool.Resource_pool.verify_and_act resource_pool
-                ~work:(statement, snark) ~sender:msg.sender
-            in
-            match err with
-            | Ok () ->
-                [%log info]
-                  ~metadata:
-                    [ ("peer", Network_peer.Peer.to_yojson peer)
-                    ; ( "work_ids"
-                      , Transaction_snark_work.Statement.compact_json statement
-                      )
-                    ]
-                  "Successfully verified snark work from peer: $peer" ;
-
-                (* does an empty check for the snark, then an unsafe apply, and finally adds it to the pool *)
-                Network_pool.Snark_pool.apply_and_broadcast snark_pool msg
-                  callback
-                |> Deferred.return
-            | Error e ->
-                [%log error]
-                  ~metadata:
-                    [ ("peer", Network_peer.Peer.to_yojson peer)
-                    ; ( "work_ids"
-                      , Transaction_snark_work.Statement.compact_json statement
-                      )
-                    ; ( "error"
-                      , Network_pool.Intf.Verification_error.to_error e
-                        |> Error_json.error_to_yojson )
-                    ]
-                  "Failed to verify snark work from peer: $peer" ;
-                Deferred.unit )
-      in
-      Deferred.unit )
-    all_peers
-
 let start_transition_frontier_controller ~context:(module Context : CONTEXT)
     ~trust_system ~verifier ~network ~time_controller ~get_completed_work
     ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
@@ -293,6 +200,7 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
   in
   let preferred_peers = Option.value_map ~f ~default:[] best_seen_transition in
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
+
   upon
     (Bootstrap_controller.run
        ~context:(module Context)
@@ -660,7 +568,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
     ~get_current_frontier ~frontier_broadcast_writer:frontier_w
     ~network_transition_reader ~producer_transition_reader
     ~get_most_recent_valid_block ~most_recent_valid_block_writer
-    ~get_completed_work ~catchup_mode ~notify_online ~snark_pool () =
+    ~get_completed_work ~catchup_mode ~notify_online () =
   let open Context in
   [%log info] "Starting transition router" ;
   let initialization_finish_signal = Ivar.create () in
@@ -743,14 +651,6 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~consensus_local_state ~notify_online
       in
       Ivar.fill_if_empty initialization_finish_signal () ;
-      (* fill the snark pool after bootstrap from peers, without waiting for the transition router to finish initializing *)
-      let all_peers = Mina_networking.peers network in
-      let snark_pulling =
-        fetch_completed_snarks
-          ~context:(module Context)
-          all_peers network snark_pool
-      in
-      don't_wait_for snark_pulling ;
 
       let valid_transition_reader1, valid_transition_reader2 =
         Strict_pipe.Reader.Fork.two valid_transition_reader

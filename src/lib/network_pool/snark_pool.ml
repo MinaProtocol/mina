@@ -379,14 +379,19 @@ struct
           let account_opt =
             let open Mina_base in
             let open Option.Let_syntax in
-            let%bind ledger = best_tip_ledger t in
+            let btl = best_tip_ledger t in
+            [%log' debug t.logger] "Best tip ledger: should be TRUE: $ledger"
+              ~metadata:[ ("ledger", `Bool (Option.is_some btl)) ] ;
+            let%bind ledger = btl in
             if Deferred.is_determined (Base_ledger.detached_signal ledger) then
               None
             else
               let%bind loc =
+                (* how can you be sure the token id will be MINA ? This seems like a pre-berk assumption *)
                 Account_id.create prover Token_id.default
                 |> Base_ledger.location_of_account ledger
               in
+
               Base_ledger.get ledger loc
           in
           let prover_account_exists = Option.is_some account_opt in
@@ -521,9 +526,9 @@ struct
 
   let get_all_completed_checked_work ?limit t =
     let work = Resource_pool.all_completed_checked_work (resource_pool t) in
-    print_endline
-    @@ Fmt.strf ">>>>>>>>>>>>>get_all_completed_checked_work of size %d"
-         (List.length work) ;
+    [%log' debug (Logger.create ())]
+      "Number of work items available: $work"
+      ~metadata:[ ("work", `Int (List.length work)) ] ;
     match limit with
     | None ->
         work

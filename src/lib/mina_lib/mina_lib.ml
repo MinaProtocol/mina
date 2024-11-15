@@ -1493,6 +1493,95 @@ let start_filtered_log ~commit_id
       () ;
     Ok () )
 
+let fetch_completed_snarks (module Context : CONTEXT) snark_pool network =
+  let open Context in
+  let open Network_peer in
+  let%bind all_peers = Mina_networking.peers network in
+  Deferred.List.iter
+    ~f:(fun peer ->
+      [%log debug] "PEER IS: Fetching completed snarks from peer: $peer"
+        ~metadata:[ ("peer", Network_peer.Peer.to_yojson peer) ] ;
+      let completed_works =
+        Mina_networking.get_completed_checked_snarks network peer
+      in
+      let%bind completed_works = completed_works in
+      let completed_works =
+        match completed_works with
+        | Error e ->
+            [%log debug]
+              ~metadata:
+                [ ("peer", Network_peer.Peer.to_yojson peer)
+                ; ("error", Error_json.error_to_yojson e)
+                ]
+              "Failed to fetch completed snarks from peer: $error" ;
+            []
+        | Ok completed_works ->
+            completed_works
+      in
+      let%bind () =
+        Deferred.List.iter completed_works ~f:(fun work ->
+            let callback =
+              let cb =
+                Mina_net2.Validation_callback.create_without_expiration ()
+              in
+              Network_pool.Snark_pool.Broadcast_callback.External cb
+            in
+
+            (* proofs should be verified in apply and broadcast *)
+            let statement = Transaction_snark_work.Checked.statement work in
+            let snark =
+              Network_pool.Priced_proof.
+                { proof = work.proofs
+                ; fee = { fee = work.fee; prover = work.prover }
+                }
+            in
+            let msg =
+              let diff =
+                Network_pool.Snark_pool.Diff_versioned.Add_solved_work
+                  (statement, snark)
+              in
+              Envelope.Incoming.wrap_peer ~data:diff ~sender:peer
+            in
+            (* verify the snarks to be added *)
+            let resource_pool =
+              Network_pool.Snark_pool.resource_pool snark_pool
+            in
+            let%bind err =
+              Network_pool.Snark_pool.Resource_pool.verify_and_act resource_pool
+                ~work:(statement, snark) ~sender:msg.sender
+            in
+            match err with
+            | Ok () ->
+                [%log debug]
+                  ~metadata:
+                    [ ("peer", Network_peer.Peer.to_yojson peer)
+                    ; ( "work_ids"
+                      , Transaction_snark_work.Statement.compact_json statement
+                      )
+                    ]
+                  "Successfully verified snark work from peer: $peer" ;
+
+                (* does an empty check for the snark, then an unsafe apply, and finally adds it to the pool *)
+                Network_pool.Snark_pool.apply_and_broadcast snark_pool msg
+                  callback
+                |> Deferred.return
+            | Error e ->
+                [%log debug]
+                  ~metadata:
+                    [ ("peer", Network_peer.Peer.to_yojson peer)
+                    ; ( "work_ids"
+                      , Transaction_snark_work.Statement.compact_json statement
+                      )
+                    ; ( "error"
+                      , Network_pool.Intf.Verification_error.to_error e
+                        |> Error_json.error_to_yojson )
+                    ]
+                  "Failed to verify snark work from peer: $peer" ;
+                Deferred.unit )
+      in
+      Deferred.unit )
+    all_peers
+
 let create ~commit_id ?wallets (config : Config.t) =
   let module Context = (val context ~commit_id config) in
   let commit_id_short = String.sub ~pos:0 ~len:8 commit_id in
@@ -1959,7 +2048,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~frontier_broadcast_writer:frontier_broadcast_pipe_w ~catchup_mode
               ~network_transition_reader:block_reader
               ~producer_transition_reader ~get_most_recent_valid_block
-              ~most_recent_valid_block_writer ~snark_pool
+              ~most_recent_valid_block_writer
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
               ~notify_online ()
@@ -2116,6 +2205,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                 Secrets.Wallets.load ~logger:config.logger
                   ~disk_location:config.wallets_disk_location
           in
+
           O1trace.background_thread "broadcast_snark_pool_diffs" (fun () ->
               let rl = Network_pool.Snark_pool.create_rate_limiter () in
               log_rate_limiter_occasionally rl ~label:"broadcast_snark_work" ;
@@ -2189,6 +2279,28 @@ let create ~commit_id ?wallets (config : Config.t) =
           in
           (* tie other knot *)
           sync_status_ref := Some sync_status ;
+          O1trace.background_thread "fetch_completed_snarks" (fun () ->
+              let open Deferred.Let_syntax in
+              let rec loop () =
+                let status = !sync_status_ref in
+                if Option.is_none status then loop ()
+                else
+                  match
+                    Mina_incremental.Status.Observer.value
+                      (Option.value_exn status)
+                  with
+                  | Ok `Offline | Ok `Bootstrap ->
+                      let%bind () = after (Time.Span.of_sec 1.) in
+                      loop ()
+                  | Ok `Synced ->
+                      fetch_completed_snarks (module Context) snark_pool net
+                  | Ok `Catchup | Ok `Listening | Ok `Connecting ->
+                      let%bind () = after (Time.Span.of_sec 1.) in
+                      loop ()
+                  | Error _e ->
+                      loop ()
+              in
+              loop () ) ;
           Deferred.return
             { config
             ; next_producer_timing = None
