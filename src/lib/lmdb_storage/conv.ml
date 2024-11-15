@@ -4,7 +4,7 @@ let uint32_be =
   Lmdb.Conv.make
     ~flags:
       Lmdb.Conv.Flags.(
-        if Sys.big_endian && is_int_size 4 then
+        if Sys.big_endian && Int.equal Sys.int_size 4 then
           integer_key + integer_dup + dup_fixed
         else dup_fixed)
     ~serialise:(fun alloc x ->
