@@ -34,7 +34,7 @@ let blake2 =
 
 let bin_prot_conv (t : 'a Bin_prot.Type_class.t) =
   Lmdb.Conv.(
-    make
+    make ~flags:Lmdb.Conv.Flags.dup_fixed
       ~serialise:(fun alloc x ->
         let sz = t.writer.size x in
         let res = alloc sz in
