@@ -6,6 +6,7 @@ set -eox pipefail
 
 YELLOW_THRESHOLD="0.1"
 RED_THRESHOLD="0.3"
+EXTRA_ARGS=""
 
 source buildkite/scripts/bench/install.sh
 
