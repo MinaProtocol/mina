@@ -15,7 +15,7 @@ let uint32_be =
 
 let uint8 =
   Lmdb.Conv.make
-    ~flags:Lmdb.Conv.Flags.(integer_key + integer_dup + dup_fixed)
+ ~flags:Lmdb.Conv.Flags.dup_fixed
     ~serialise:(fun alloc x ->
       let a = alloc 1 in
       Bigstring.set_uint8_exn a ~pos:0 x ;
