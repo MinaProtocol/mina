@@ -1,5 +1,7 @@
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let PipelineMode = ../../Pipeline/Mode.dhall
+
 let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -72,6 +74,7 @@ in  Pipeline.build
                 , PipelineTag.Type.Test
                 , PipelineTag.Type.Stable
                 ]
+              , mode = PipelineMode.Type.Stable
               }
       , steps = [ buildTestCmd Size.XLarge ]
       }
