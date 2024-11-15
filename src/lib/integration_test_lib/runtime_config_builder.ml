@@ -2,6 +2,13 @@ open Core
 open Currency
 open Genesis_ledger
 
+let ledger_is_prefix ledger1 ledger2 =
+  List.is_prefix ledger2 ~prefix:ledger1
+    ~equal:(fun
+             ({ account_name = name1; _ } : Test_config.Test_account.t)
+             ({ account_name = name2; _ } : Test_config.Test_account.t)
+           -> String.equal name1 name2 )
+
 let create ~(test_config : Test_config.t) ~(genesis_ledger : Genesis_ledger.t) =
   { Runtime_config.daemon =
       Some
@@ -49,13 +56,6 @@ let create ~(test_config : Test_config.t) ~(genesis_ledger : Genesis_ledger.t) =
       *)
       Option.map test_config.epoch_data
         ~f:(fun { staking = staking_ledger; next } ->
-          let ledger_is_prefix ledger1 ledger2 =
-            List.is_prefix ledger2 ~prefix:ledger1
-              ~equal:(fun
-                       ({ account_name = name1; _ } : Test_config.Test_account.t)
-                       ({ account_name = name2; _ } : Test_config.Test_account.t)
-                     -> String.equal name1 name2 )
-          in
           let genesis_winner_account : Runtime_config.Accounts.single =
             Runtime_config.Accounts.Single.of_account
               Mina_state.Consensus_state_hooks.genesis_winner_account
@@ -94,6 +94,13 @@ let create ~(test_config : Test_config.t) ~(genesis_ledger : Genesis_ledger.t) =
                         zkapp
                   } )
             in
+            (* because we run integration tests with Proof_level = Full, the winner account
+                  gets added to the genesis ledger
+                  there isn't a corresponding mechanism to add the winner account to epoch
+                  ledgers, so we add it explicitly here
+                  `add_genesis_winner` in the record below has no effect, it's ignored in
+                  Runtime_config.Epoch_data.to_yojson, which is used to create the config file
+            *)
             ( { base = Accounts (genesis_winner_account :: epoch_ledger_accounts)
               ; add_genesis_winner = None (* no effect *)
               ; num_accounts = None
