@@ -1,0 +1,15 @@
+(library
+ (name o1vm_bindings)
+ (foreign_stubs
+  (language c)
+  (names o1vm_bindings))
+ (libraries ocaml-rs))
+
+(rule
+ (targets libo1vm_bindings.a)
+ (deps
+  (glob_files *.rs))
+ (action
+  (progn
+   (run cargo build --release)
+   (run mv target/release/libo1vm_bindings.a libo1vm_bindings.a))))

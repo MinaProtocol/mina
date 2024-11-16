@@ -1,0 +1,16 @@
+[package]
+name = "o1vm_bindings"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "o1vm_bindings"
+crate-type = ["lib", "staticlib", "cdylib"]
+
+[dependencies]
+o1vm = { path = "../proof-systems/o1vm", features = ["ocaml_types"] }
+kimchi = { path = "../proof-systems/kimchi", features = ["ocaml_types"] }
+
+# ocaml-specific
+ocaml = { version = "0.22.2", features = ["no-caml-startup"] }
+ocaml-gen = "0.1.5"
