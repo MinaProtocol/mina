@@ -50,4 +50,5 @@ dune build "--profile=${DUNE_PROFILE}" $INSTRUMENTED_PARAM \
   src/app/heap_usage/heap_usage.exe \
   src/app/zkapp_limits/zkapp_limits.exe \
   src/test/command_line_tests/command_line_tests.exe \
-  src/test/archive/patch_archive_test/patch_archive_test.exe
+  src/test/archive/patch_archive_test/patch_archive_test.exe \
+  src/test/archive/archive_node_tests/archive_node_tests.exe
