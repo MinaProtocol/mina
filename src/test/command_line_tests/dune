@@ -13,6 +13,7 @@
    cmdliner
    ;; mina libraries
    init
+   mina_automation
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_compare))
