@@ -97,7 +97,7 @@ let load_config_exn ~logger config_file =
   in
   if
     Option.(
-      is_some config.daemon
+      is_some config.daemon || is_some config.genesis
       || Option.value_map ~default:false ~f:is_dirty_proof config.proof)
   then failwith "Runtime config has unexpected fields" ;
   let ledger = Option.value_exn ~message:"No ledger provided" config.ledger in
