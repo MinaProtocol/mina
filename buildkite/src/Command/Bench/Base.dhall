@@ -60,7 +60,8 @@ let command
                   "./buildkite/scripts/bench/run.sh  ${spec.bench} --red-threshold ${Double/show
                                                                                        spec.redThreshold} --yellow-threshold ${Double/show
                                                                                                                                  spec.yellowThreshold}"
-            , label = "Perf: ${spec.label} ${PipelineMode.capitalName spec.mode}"
+            , label =
+                "Perf: ${spec.label} ${PipelineMode.capitalName spec.mode}"
             , key = spec.key
             , target = spec.size
             , docker = None Docker.Type
