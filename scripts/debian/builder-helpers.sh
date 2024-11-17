@@ -10,7 +10,7 @@ MINA_DEB_RELEASE=${MINA_DEB_RELEASE:-"unstable"}
 
 # Helper script to include when building deb archives.
 
-echo "--- Setting up the envrionment to build debian packages..."
+echo "--- Setting up the environment to build debian packages..."
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd "${SCRIPTPATH}/../../_build"
@@ -244,6 +244,10 @@ build_functional_test_suite_deb() {
   cp ./default/src/app/heap_usage/heap_usage.exe "${BUILDDIR}/usr/local/bin/mina-heap-usage"
   cp ./default/src/app/zkapp_limits/zkapp_limits.exe "${BUILDDIR}/usr/local/bin/mina-zkapp-limits"
   cp ./default/src/test/archive/patch_archive_test/patch_archive_test.exe "${BUILDDIR}/usr/local/bin/mina-patch-archive-test"
+  cp ./default/src/test/archive/archive_node_tests/archive_node_tests.exe "${BUILDDIR}/usr/local/bin/mina-archive-node-test"
+
+  mkdir -p ${BUILDDIR}/etc/mina/test/archive/sample_db
+  rsync -Huav ../src/test/archive/sample_db* "${BUILDDIR}/etc/mina/test/archive/sample_db"
 
   build_deb mina-test-suite
 
