@@ -883,7 +883,6 @@ module Make
   val to_json : t -> string
 end = struct
   open Core_kernel
-  open Pickles_types
 
   (* Used by compute_witness to build the runtime tables from the Lookup
      constraint *)
