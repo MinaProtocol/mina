@@ -3,7 +3,7 @@ set -euox pipefail
 
 
 
-BUILD_URL=${BUILD_URL:-"local build from '$(hostname)' host"}
+BUILD_URL=${BUILD_URL:-${BUILDKITE_BUILD_URL:-"local build from '$(hostname)' host"}}
 MINA_DEB_CODENAME=${MINA_DEB_CODENAME:-"bullseye"}
 MINA_DEB_VERSION=${MINA_DEB_VERSION:-"0.0.0-experimental"}
 MINA_DEB_RELEASE=${MINA_DEB_RELEASE:-"unstable"}
@@ -241,6 +241,8 @@ build_functional_test_suite_deb() {
 
   # Binaries
   cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
+  cp ./default/src/app/heap_usage/heap_usage.exe "${BUILDDIR}/usr/local/bin/mina-heap-usage"
+  cp ./default/src/app/zkapp_limits/zkapp_limits.exe "${BUILDDIR}/usr/local/bin/mina-zkapp-limits"
   cp ./default/src/test/archive/patch_archive_test/patch_archive_test.exe "${BUILDDIR}/usr/local/bin/mina-patch-archive-test"
 
   build_deb mina-test-suite

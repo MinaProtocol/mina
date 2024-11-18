@@ -66,26 +66,12 @@ end = struct
 end
 
 (* why use a functor here? *)
-module Bigint256 =
-  Kimchi_backend_common.Bigint.Make
-    (Pasta_bindings.BigInt256)
-    (struct
-      let length_in_bytes = 32
-    end)
+module Bigint256 = Kimchi_pasta_snarky_backend.Bigint256
 
 (* the two pasta fields and curves *)
 
-module Fp = Field.Make (struct
-  module Bigint = Bigint256
-  include Pasta_bindings.Fp
-  module Vector = Kimchi_bindings.FieldVectors.Fp
-end)
-
-module Fq = Field.Make (struct
-  module Bigint = Bigint256
-  include Pasta_bindings.Fq
-  module Vector = Kimchi_bindings.FieldVectors.Fq
-end)
+module Fp = Kimchi_pasta_snarky_backend.Vesta_based_plonk.Field
+module Fq = Kimchi_pasta_snarky_backend.Pallas_based_plonk.Field
 
 module Vesta = struct
   module Params = struct
@@ -149,6 +135,8 @@ end)
 
 (* poseidon params *)
 
-let poseidon_params_fp = Sponge.Params.(map pasta_p_kimchi ~f:Fp.of_string)
+let poseidon_params_fp =
+  Kimchi_pasta_snarky_backend.Vesta_based_plonk.poseidon_params
 
-let poseidon_params_fq = Sponge.Params.(map pasta_q_kimchi ~f:Fq.of_string)
+let poseidon_params_fq =
+  Kimchi_pasta_snarky_backend.Pallas_based_plonk.poseidon_params

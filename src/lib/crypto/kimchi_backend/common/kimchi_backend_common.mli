@@ -1,13 +1,14 @@
-module Bigint = Bigint
-module Field = Field
 module Curve = Curve
 module Poly_comm = Poly_comm
 
 module Plonk_constraint_system : sig
-  module Make = Plonk_constraint_system.Make
-  module Plonk_constraint = Plonk_constraint_system.Plonk_constraint
+  module Make = Kimchi_pasta_snarky_backend.Plonk_constraint_system.Make
 
-  type ('f, 'rust_gates) t = ('f, 'rust_gates) Plonk_constraint_system.t
+  module Plonk_constraint =
+    Kimchi_pasta_snarky_backend.Plonk_constraint_system.Plonk_constraint
+
+  type ('f, 'rust_gates) t =
+    ('f, 'rust_gates) Kimchi_pasta_snarky_backend.Plonk_constraint_system.t
 
   val get_public_input_size : ('a, 'b) t -> int Core_kernel.Set_once.t
 
@@ -29,7 +30,7 @@ module Plonk_constraint_system : sig
 end
 
 module Dlog_plonk_based_keypair = Dlog_plonk_based_keypair
-module Constants = Constants
+module Constants = Kimchi_pasta_snarky_backend.Constants
 module Plonk_dlog_proof = Plonk_dlog_proof
 module Plonk_dlog_oracles = Plonk_dlog_oracles
 
@@ -70,7 +71,8 @@ module Scalar_challenge : sig
   val map : 'a t -> f:('a -> 'b) -> 'b t
 end
 
-module Endoscale_round = Endoscale_round
-module Scale_round = Scale_round
-module Endoscale_scalar_round = Endoscale_scalar_round
-module Intf = Intf
+module Endoscale_round = Kimchi_pasta_snarky_backend.Endoscale_round
+module Scale_round = Kimchi_pasta_snarky_backend.Scale_round
+module Endoscale_scalar_round =
+  Kimchi_pasta_snarky_backend.Endoscale_scalar_round
+module Intf = Kimchi_pasta_snarky_backend.Intf

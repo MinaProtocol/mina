@@ -74,6 +74,7 @@
 (package (name key_value_database))
 (package (name kimchi_backend))
 (package (name kimchi_backend_common))
+(package (name kimchi_pasta_snarky_backend))
 (package (name kimchi_bindings))
 (package (name kimchi_pasta))
 (package (name kimchi_types))
