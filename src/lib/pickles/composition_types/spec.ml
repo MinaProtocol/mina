@@ -493,7 +493,7 @@ module Step =
             | Bool ->
                 Boolean.typ
             | Branch_data ->
-                Branch_data.typ (module Impl) ~assert_16_bits
+                Branch_data.typ ~assert_16_bits
             | Digest ->
                 Digest.typ
             | Challenge ->
@@ -590,7 +590,7 @@ module Wrap =
             | Bool ->
                 Boolean.typ
             | Branch_data ->
-                Branch_data.typ (module Impl) ~assert_16_bits
+                Branch_data.wrap_typ ~assert_16_bits
             | Digest ->
                 Digest.typ
             | Challenge ->

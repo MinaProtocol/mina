@@ -36,10 +36,15 @@ module type S = sig
       -> 'f Snarky_backendless.Cvar.t
   end
 
+  module Impls := Kimchi_pasta_snarky_backend
+
   val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> assert_16_bits:('f Snarky_backendless.Cvar.t -> unit)
-    -> ('f Checked.t, t, 'f) Snarky_backendless.Typ.t
+       assert_16_bits:(Impls.Step_impl.Field.t -> unit)
+    -> (Impls.Step_impl.Field.Constant.t Checked.t, t) Impls.Step_impl.Typ.t
+
+  val wrap_typ :
+       assert_16_bits:(Impls.Wrap_impl.Field.t -> unit)
+    -> (Impls.Wrap_impl.Field.Constant.t Checked.t, t) Impls.Wrap_impl.Typ.t
 
   val packed_typ :
        (module Snarky_backendless.Snark_intf.Run with type field = 'f)
