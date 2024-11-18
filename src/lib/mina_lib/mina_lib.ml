@@ -1520,13 +1520,6 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network =
       in
       let%bind () =
         Deferred.List.iter completed_works ~f:(fun work ->
-            let callback =
-              let cb =
-                Mina_net2.Validation_callback.create_without_expiration ()
-              in
-              Network_pool.Snark_pool.Broadcast_callback.External cb
-            in
-
             (* proofs should be verified in apply and broadcast *)
             let statement = Transaction_snark_work.Checked.statement work in
             let snark =
@@ -1562,8 +1555,7 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network =
                   "Successfully verified snark work from peer: $peer" ;
 
                 (* does an empty check for the snark, then an unsafe apply, and finally adds it to the pool *)
-                Network_pool.Snark_pool.apply_and_broadcast snark_pool msg
-                  callback
+                Network_pool.Snark_pool.apply_no_broadcast snark_pool msg
                 |> Deferred.return
             | Error e ->
                 [%log debug]
