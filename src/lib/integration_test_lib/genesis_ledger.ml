@@ -100,39 +100,3 @@ let create (config : Test_config.Test_account.t list) =
   in
   let genesis_ledger_accounts = add_accounts genesis_accounts_and_keys in
   { accounts = genesis_ledger_accounts; keypairs = genesis_keypairs }
-
-let to_runtime_config t ?(no_num_accounts = false) ?(add_genesis_winner = None)
-    =
-  let ledger =
-    { Runtime_config.Ledger.base =
-        Accounts (List.map t.accounts ~f:(fun (_name, acct) -> acct))
-    ; num_accounts =
-        (if no_num_accounts then None else Some (List.length t.accounts))
-    ; balances = []
-    ; hash = None
-    ; s3_data_hash = None
-    ; name = None
-    ; add_genesis_winner
-    }
-  in
-  Runtime_config.make ?ledger:(Some ledger) ()
-
-let write_keys_to t base_path =
-  Core.String.Map.iter t.keypairs ~f:(fun kp ->
-      let keypath = String.concat [ base_path; "/"; kp.keypair_name ] in
-      Out_channel.with_file ~fail_if_exists:true keypath ~f:(fun ch ->
-          kp.private_key |> Out_channel.output_string ch ) ;
-      Out_channel.with_file ~fail_if_exists:true (keypath ^ ".pub")
-        ~f:(fun ch -> kp.public_key |> Out_channel.output_string ch) ) ;
-
-  Deferred.Map.iter t.keypairs ~f:(fun kp ->
-      Util.run_cmd_exn base_path "chmod" [ "600"; kp.keypair_name ]
-      |> Deferred.ignore_m )
-
-let write_ledger t base_path ?no_num_accounts ?add_genesis_winner =
-  Out_channel.with_file ~fail_if_exists:true
-    (base_path ^ "/" ^ "genesis_ledger.config")
-    ~f:(fun ch ->
-      to_runtime_config t ?no_num_accounts ?add_genesis_winner
-      |> Runtime_config.to_yojson |> Yojson.Safe.to_string
-      |> Out_channel.output_string ch )
