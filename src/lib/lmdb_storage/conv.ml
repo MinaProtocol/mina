@@ -1,12 +1,7 @@
 open Core_kernel
 
 let uint32_be =
-  Lmdb.Conv.make
-    ~flags:
-      Lmdb.Conv.Flags.(
-        if Sys.big_endian && Int.equal Sys.int_size 4 then
-          integer_key + integer_dup + dup_fixed
-        else dup_fixed)
+  Lmdb.Conv.make ~flags:Lmdb.Conv.Flags.dup_fixed
     ~serialise:(fun alloc x ->
       let a = alloc 4 in
       Bigstring.set_uint32_be_exn a ~pos:0 x ;
