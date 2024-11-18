@@ -2585,7 +2585,8 @@ module Input = struct
     type input = Ledger_proof.t Snark_work_lib.Work.Result_without_metrics.t
 
     let arg_typ =
-      scalar "ProofBundle" ~doc:"Proof bundle for a given spec in json format"
+      scalar "ProofBundleInput"
+        ~doc:"Proof bundle for a given spec in json format"
         ~coerce:(fun json ->
           let json = Utils.to_yojson json in
           Snark_work_lib.Work.Result_without_metrics.of_yojson
