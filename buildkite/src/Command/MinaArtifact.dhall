@@ -105,6 +105,7 @@ let build_artifacts
 
 let publish_to_debian_repo =
           \(spec : MinaBuildSpec.Type)
+      ->  \(dependsOn : List Command.TaggedKey.Type)
       ->  Command.build
             Command.Config::{
             , commands =
@@ -122,14 +123,9 @@ let publish_to_debian_repo =
                 "Publish Mina for ${DebianVersions.capitalName
                                       spec.debVersion} ${Profiles.toSuffixUppercase
                                                            spec.profile}"
-            , key = "publish-deb-pkg"
-            , depends_on =
-                DebianVersions.dependsOnStep
-                  (Some spec.prefix)
-                  spec.debVersion
-                  spec.profile
-                  spec.buildFlags
-                  "build"
+            , key =
+                "publish-${DebianVersions.lowerName spec.debVersion}-deb-pkg"
+            , depends_on = dependsOn
             , target = Size.Small
             }
 
@@ -318,18 +314,25 @@ let onlyDebianPipeline
     =     \(spec : MinaBuildSpec.Type)
       ->  pipelineBuilder
             spec
-            [ build_artifacts spec, publish_to_debian_repo spec ]
+            [ build_artifacts spec
+            , publish_to_debian_repo
+                spec
+                ( DebianVersions.dependsOnStep
+                    (Some spec.prefix)
+                    spec.debVersion
+                    spec.profile
+                    spec.buildFlags
+                    "build"
+                )
+            ]
 
 let pipeline
     : MinaBuildSpec.Type -> Pipeline.Config.Type
     =     \(spec : MinaBuildSpec.Type)
-      ->  pipelineBuilder
-            spec
-            (   [ build_artifacts spec, publish_to_debian_repo spec ]
-              # docker_commands spec
-            )
+      ->  pipelineBuilder spec ([ build_artifacts spec ] # docker_commands spec)
 
 in  { pipeline = pipeline
     , onlyDebianPipeline = onlyDebianPipeline
+    , publishToDebian = publish_to_debian_repo
     , MinaBuildSpec = MinaBuildSpec
     }
