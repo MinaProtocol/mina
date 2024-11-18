@@ -97,7 +97,7 @@
         },
         {
           "kind": "SCALAR",
-          "name": "ProofBundle",
+          "name": "ProofBundleInput",
           "description": "Proof bundle for a given spec in json format",
           "fields": null,
           "inputFields": null,
@@ -5514,7 +5514,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "SCALAR",
-                      "name": "ProofBundle",
+                      "name": "ProofBundleInput",
                       "ofType": null
                     }
                   },

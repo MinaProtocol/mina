@@ -2,6 +2,37 @@ open Core_kernel
 open Async
 module Prod = Snark_worker__Prod.Inputs
 
+module Graphql_client = Graphql_lib.Client.Make (struct
+  let preprocess_variables_string = Fn.id
+
+  let headers = String.Map.empty
+end)
+
+module Encoders = Mina_graphql.Types.Input
+module Scalars = Graphql_lib.Scalars
+
+module Send_proof_mutation =
+[%graphql
+({|
+  mutation ($input: ProofBundleInput!) @encoders(module: "Encoders"){
+    sendProofBundle(input: $input)
+    }
+  |}
+[@encoders Encoders] )]
+
+let submit_graphql input graphql_endpoint =
+  let obj = Send_proof_mutation.(make @@ makeVariables ~input ()) in
+  match%bind Graphql_client.query obj graphql_endpoint with
+  | Ok _s ->
+      Caml.Format.printf "Successfully generated proof bundle mutation" ;
+      exit 0
+  | Error (`Failed_request s) ->
+      Caml.Format.printf !"Request failed:  %s" s ;
+      exit 1
+  | Error (`Graphql_error s) ->
+      Caml.Format.printf "Graphql error: %s" s ;
+      exit 1
+
 let perform (s : Prod.Worker_state.t) ~fee ~public_key
     (spec :
       (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
@@ -46,11 +77,7 @@ let command =
          ~doc:
            "Snark work spec in sexp format(json format is preferred over sexp \
             if both are passed)"
-         (optional
-            (sexp_conv
-               (One_or_two.t_of_sexp
-                  (Snark_work_lib.Work.Single.Spec.t_of_sexp
-                     Transaction_witness.t_of_sexp Ledger_proof.t_of_sexp ) ) ) )
+         (optional string)
      and config_file = Cli_lib.Flag.config_files
      and cli_proof_level =
        flag "--proof-level" ~doc:""
@@ -74,6 +101,9 @@ let command =
            (sprintf "PUBLICKEY Run the SNARK worker with this public key. %s"
               Cli_lib.Default.receiver_key_warning )
          (optional Cli_lib.Arg_type.public_key_compressed)
+     and proof_submission_graphql_endpoint =
+       flag "--graphql-uri" ~doc:"Graphql endpoint to submit proofs"
+         (optional Cli_lib.Arg_type.uri)
      in
      fun () ->
        let open Async in
@@ -102,8 +132,15 @@ let command =
                  spec
              | Error e ->
                  failwith (sprintf "Failed to read json spec. Error: %s" e) )
-         | None ->
-             Option.value_exn spec_sexp
+         | None -> (
+             match spec_sexp with
+             | Some spec ->
+                 One_or_two.t_of_sexp
+                   (Snark_work_lib.Work.Single.Spec.t_of_sexp
+                      Transaction_witness.t_of_sexp Ledger_proof.t_of_sexp )
+                   (Sexp.of_string spec)
+             | None ->
+                 failwith "Provide a spec either in json or sexp format" )
        in
        let public_key =
          Option.value
@@ -116,13 +153,17 @@ let command =
            snark_work_fee
        in
        match%bind perform worker_state ~fee ~public_key spec with
-       | Ok result ->
+       | Ok result -> (
            Caml.Format.printf
              !"@[<v>Successfully proved. Result: \n\
               \               %{sexp: Ledger_proof.t \
                Snark_work_lib.Work.Result_without_metrics.t}@]@."
              result ;
-           exit 0
+           match proof_submission_graphql_endpoint with
+           | Some endpoint ->
+               submit_graphql result endpoint
+           | _ ->
+               Deferred.unit )
        | Error err ->
            Caml.Format.printf
              !"Proving failed with error: %s@."
