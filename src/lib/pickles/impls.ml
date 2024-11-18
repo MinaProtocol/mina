@@ -2,7 +2,7 @@ open Pickles_types
 open Core_kernel
 open Import
 open Backend
-module Wrap_impl = Snarky_backendless.Snark.Run.Make (Tock)
+module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl
 
 (** returns [true] if the [i]th bit of [x] is set to 1 *)
 let test_bit x i = B.(shift_right x i land one = one)
@@ -31,7 +31,7 @@ let forbidden_shifted_values ~modulus:r ~size_in_bits =
   |> List.dedup_and_sort ~compare:B.compare
 
 module Step = struct
-  module Impl = Snarky_backendless.Snark.Run.Make (Tick)
+  module Impl = Kimchi_pasta_snarky_backend.Step_impl
   include Impl
   module Verification_key = Tick.Verification_key
   module Proving_key = Tick.Proving_key
@@ -170,7 +170,7 @@ module Step = struct
 end
 
 module Wrap = struct
-  module Impl = Wrap_impl
+  module Impl = Kimchi_pasta_snarky_backend.Wrap_impl
   include Impl
   module Challenge = Challenge.Make (Impl)
   module Digest = Digest.Make (Impl)
