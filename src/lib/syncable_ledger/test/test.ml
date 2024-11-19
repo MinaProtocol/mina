@@ -44,8 +44,8 @@ module Make_context (Subtree_depth : sig
 end) : Syncable_ledger.CONTEXT = struct
   let logger = Logger.null ()
 
-  let genesis_constants =
-    { Genesis_constants.For_unit_tests.t with
+  let compile_config =
+    { Mina_compile_config.For_unit_tests.t with
       sync_ledger_max_subtree_depth =
         Subtree_depth.sync_ledger_max_subtree_depth
     ; sync_ledger_default_subtree_depth =

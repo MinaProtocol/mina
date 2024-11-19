@@ -112,7 +112,7 @@ module Query = struct
 
       (* Not a standard versioning function *)
 
-(* Attempts to downgrade v2 -> v1 *)
+      (* Attempts to downgrade v2 -> v1 *)
       let from_v2 : V2.t -> t = function
         | What_child_hashes (a, _) ->
             What_child_hashes a
