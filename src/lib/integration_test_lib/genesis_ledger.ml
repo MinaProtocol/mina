@@ -1,5 +1,4 @@
 open Core
-open Async
 open Currency
 open Signature_lib
 
