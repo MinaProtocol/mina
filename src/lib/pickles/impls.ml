@@ -101,7 +101,7 @@ module Step = struct
       Checked.List.map (Lazy.force forbidden_shifted_values) ~f:(equal t)
       >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
 
-    let typ : _ Snarky_backendless.Typ.t =
+    let typ : _ Impl.Typ.t =
       let (Typ typ_unchecked) = typ_unchecked in
       Typ { typ_unchecked with check }
 
@@ -227,7 +227,7 @@ module Wrap = struct
       in
       (typ_unchecked, check)
 
-    let typ : _ Snarky_backendless.Typ.t =
+    let typ : _ Impl.Typ.t =
       let (Typ typ_unchecked) = typ_unchecked in
       Typ { typ_unchecked with check }
 

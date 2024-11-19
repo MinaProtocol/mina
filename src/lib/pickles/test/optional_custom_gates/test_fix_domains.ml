@@ -16,7 +16,7 @@ let add_plonk_constraint c = assert_ { basic = T c; annotation = None }
 
 let etyp_unit =
   Composition_types.Spec.ETyp.T
-    (Snarky_backendless.Typ.unit (), Core_kernel.Fn.id, Core_kernel.Fn.id)
+    (Pickles.Impls.Step.Typ.unit, Core_kernel.Fn.id, Core_kernel.Fn.id)
 
 let log2_size ~feature_flags main =
   let main' () = main () ; Promise.return () in
