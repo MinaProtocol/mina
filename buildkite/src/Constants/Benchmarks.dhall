@@ -10,10 +10,10 @@ let Spec =
 
 let toEnvList =
           \(spec : Spec.Type)
-      ->  [ "INFLUXDB_HOST=${spec.host}"
-          , "INFLUXDB_TOKEN=${spec.tokenEnvName}"
-          , "INFLUXDB_ORG=${spec.org}"
-          , "INFLUXDB_BUCKET_NAME=${spec.bucket}"
+      ->  [ "INFLUX_HOST=${spec.host}"
+          , "INFLUX_TOKEN=${spec.tokenEnvName}"
+          , "INFLUX_ORG=${spec.org}"
+          , "INFLUX_BUCKET_NAME=${spec.bucket}"
           ]
 
 let mainlineBranches = "[develop,compatible,master]"
