@@ -44,4 +44,14 @@ module type S = sig
   val underlying_proof : t -> Proof.t
 
   val snarked_ledger_hash : t -> Frozen_ledger_hash.t
+
+  module Cache_tag : sig
+    type value := t
+
+    type t [@@deriving compare, equal, sexp, yojson, hash]
+
+    val unwrap : t -> value
+
+    val generate : value -> t
+  end
 end

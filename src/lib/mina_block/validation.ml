@@ -535,7 +535,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
         (*There was no proof emitted, snarked ledger hash shouldn't change*)
         Protocol_state.snarked_ledger_hash parent_protocol_state
     | Some (proof, _) ->
-        Ledger_proof.snarked_ledger_hash proof
+        Ledger_proof.snarked_ledger_hash (Ledger_proof.Cache_tag.unwrap proof)
   in
   let hash_errors =
     Result.combine_errors_unit
