@@ -125,6 +125,14 @@ macro_rules! impl_srs {
             }
 
             #[wasm_bindgen]
+            pub fn [<$name:snake _lagrange_commitments_whole_domain>](
+                srs: &[<Wasm $field_name:camel Srs>],
+                domain_size: i32,
+            ) -> WasmVector<$WasmPolyComm> {
+                srs.get_lagrange_basis_from_domain_size(domain_size as usize).clone().into_iter().map(|x| x.into()).collect()
+            }
+
+            #[wasm_bindgen]
             pub fn [<$name:snake _lagrange_commitment>](
                 srs: &[<Wasm $field_name:camel Srs>],
                 domain_size: i32,
