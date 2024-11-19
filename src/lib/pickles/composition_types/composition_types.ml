@@ -9,8 +9,6 @@ open Core_kernel
 module Step_impl = Kimchi_pasta_snarky_backend.Step_impl
 module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl
 
-type 'f impl = 'f Spec.impl
-
 let index_to_field_elements =
   Pickles_base.Side_loaded_verification_key.index_to_field_elements
 
@@ -150,8 +148,7 @@ module Wrap = struct
               ; Plonk_types.Features.typ
                   ~feature_flags:(Plonk_types.Features.of_full feature_flags)
                   bool
-              ; Opt.typ Step_impl.Boolean.typ uses_lookups
-                  ~dummy:dummy_scalar_challenge
+              ; Opt.typ uses_lookups ~dummy:dummy_scalar_challenge
                   (Scalar_challenge.typ scalar_challenge)
               ]
               ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
@@ -607,8 +604,7 @@ module Wrap = struct
       ; use : Opt.Flag.t
       }
 
-    let opt_spec (type f) ((module Impl) : f impl)
-        { zero = { value; var }; use } =
+    let opt_spec { zero = { value; var }; use } =
       Spec.T.Opt
         { inner = Struct [ Scalar Challenge ]
         ; flag = use
@@ -616,7 +612,6 @@ module Wrap = struct
             [ Kimchi_backend_common.Scalar_challenge.create value.challenge ]
         ; dummy2 =
             [ Kimchi_backend_common.Scalar_challenge.create var.challenge ]
-        ; bool = (module Impl.Boolean)
         }
   end
 
@@ -774,7 +769,7 @@ module Wrap = struct
           ; Vector (B Bulletproof_challenge, Backend.Tick.Rounds.n)
           ; Vector (B Branch_data, Nat.N1.n)
           ; feature_flags_spec
-          ; Lookup_parameters.opt_spec impl lookup
+          ; Lookup_parameters.opt_spec lookup
           ]
 
       (** Convert a statement (as structured data) into the flat data-based representation. *)

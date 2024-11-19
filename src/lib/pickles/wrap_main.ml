@@ -321,7 +321,7 @@ let wrap_main
             with_label __LOC__ (fun () ->
                 let typ =
                   let module T =
-                    H1.Typ (Impls.Wrap) (Nat) (Challenges_vector)
+                    H1.Wrap_typ (Nat) (Challenges_vector)
                       (Challenges_vector.Constant)
                       (struct
                         let f (type n) (n : n Nat.t) =
@@ -355,9 +355,8 @@ let wrap_main
                 let evals =
                   let ty =
                     let ty =
-                      Plonk_types.All_evals.typ
-                        (module Impl)
-                        ~num_chunks:1 Plonk_types.Features.Full.none
+                      Plonk_types.All_evals.wrap_typ ~num_chunks:1
+                        Plonk_types.Features.Full.none
                     in
                     Vector.typ ty Max_proofs_verified.n
                   in
@@ -455,7 +454,7 @@ let wrap_main
           let openings_proof =
             let shift = Shifts.tick1 in
             exists
-              (Plonk_types.Openings.Bulletproof.typ
+              (Plonk_types.Openings.Bulletproof.wrap_typ
                  ( Typ.transport Wrap_verifier.Other_field.Packed.typ
                      ~there:(fun x ->
                        (* When storing, make it a shifted value *)
@@ -485,9 +484,7 @@ let wrap_main
             let messages =
               with_label __LOC__ (fun () ->
                   exists
-                    (Plonk_types.Messages.typ
-                       (module Impl)
-                       Inner_curve.typ ~bool:Boolean.typ feature_flags
+                    (Plonk_types.Messages.wrap_typ Inner_curve.typ feature_flags
                        ~dummy:Inner_curve.Params.one
                        ~commitment_lengths:
                          (Commitment_lengths.default ~num_chunks) )

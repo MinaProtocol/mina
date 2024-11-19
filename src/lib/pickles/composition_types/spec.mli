@@ -30,14 +30,6 @@ type (_, _, _) basic =
         )
         basic
 
-module type Bool_intf = sig
-  type var
-
-  val true_ : var
-
-  val false_ : var
-end
-
 (** Compound types. These are built from Basic types described above *)
 module rec T : sig
   type (_, _, _) t =
@@ -66,7 +58,6 @@ module rec T : sig
         ; flag : Pickles_types.Opt.Flag.t
         ; dummy1 : 'a1
         ; dummy2 : 'a2
-        ; bool : (module Bool_intf with type var = 'bool)
         }
         -> ( 'a1 option
            , ('a2, 'bool) Pickles_types.Opt.t

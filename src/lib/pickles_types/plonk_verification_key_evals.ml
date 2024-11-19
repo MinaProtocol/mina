@@ -54,7 +54,7 @@ let map2 t1 t2 ~f =
   }
 
 let typ g =
-  Snarky_backendless.Typ.of_hlistable
+  Kimchi_pasta_snarky_backend.Step_impl.Typ.of_hlistable
     [ Vector.typ g Plonk_types.Permuts.n
     ; Vector.typ g Plonk_types.Columns.n
     ; g
@@ -170,33 +170,6 @@ module Step = struct
     ; lookup_selector_ffmul =
         f_opt t1.lookup_selector_ffmul t2.lookup_selector_ffmul
     }
-
-  let typ g g_opt =
-    Snarky_backendless.Typ.of_hlistable
-      [ Vector.typ g Plonk_types.Permuts.n
-      ; Vector.typ g Plonk_types.Columns.n
-      ; g
-      ; g
-      ; g
-      ; g
-      ; g
-      ; g
-      ; g_opt
-      ; g_opt
-      ; g_opt
-      ; g_opt
-      ; g_opt
-      ; g_opt
-      ; Vector.typ g_opt Plonk_types.Lookup_sorted_minus_1.n
-      ; g_opt
-      ; g_opt
-      ; g_opt
-      ; g_opt
-      ; g_opt
-      ; g_opt
-      ]
-      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-      ~value_of_hlist:of_hlist
 
   let forget_optional_commitments
       { sigma_comm
