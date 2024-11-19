@@ -19,7 +19,11 @@ let level = "warning"
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
-        , dirtyWhen = [ S.contains "buildkite/scripts", S.contains "scripts" ]
+        , dirtyWhen =
+          [ S.contains "buildkite/scripts"
+          , S.contains "scripts"
+          , S.exactly "buildkite/src/Jobs/Lint/Bash" "dhall"
+          ]
         , path = "Lint"
         , name = "Bash"
         , tags =
