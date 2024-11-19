@@ -1270,7 +1270,7 @@ let context ~commit_id (config : Config.t) : (module CONTEXT) =
     let compaction_interval = config.compile_config.compaction_interval
 
     (*Same as config.precomputed_values.compile_config.
-    TODO: Remove redundant fields *)
+      TODO: Remove redundant fields *)
     let compile_config = config.compile_config
   end )
 
@@ -1502,7 +1502,11 @@ let create ~commit_id ?wallets (config : Config.t) =
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let compile_config = config.precomputed_values.compile_config in
-  let block_window_duration = config.compile_config.block_window_duration in
+  let block_window_duration =
+    Float.of_int
+      config.precomputed_values.constraint_constants.block_window_duration_ms
+    |> Time.Span.of_ms
+  in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)

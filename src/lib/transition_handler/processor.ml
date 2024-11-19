@@ -44,8 +44,7 @@ let cached_transform_deferred_result ~transform_cached ~transform_result cached
 (* add a breadcrumb and perform post processing *)
 let add_and_finalize ~logger ~frontier ~catchup_scheduler
     ~processed_transition_writer ~only_if_present ~time_controller ~source
-    ~valid_cb cached_breadcrumb ~(precomputed_values : Precomputed_values.t)
-    ~block_window_duration:_ (*TODO remove unused var*) =
+    ~valid_cb cached_breadcrumb ~(precomputed_values : Precomputed_values.t) =
   let module Inclusion_time = Mina_metrics.Block_latency.Inclusion_time in
   let breadcrumb =
     if Cached.is_pure cached_breadcrumb then Cached.peek cached_breadcrumb
@@ -118,10 +117,6 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
     let compile_config = precomputed_values.compile_config
   end in
   let open Consensus_context in
-  let block_window_duration =
-    Float.of_int constraint_constants.block_window_duration_ms
-    |> Time.Span.of_ms
-  in
   let header, transition_hash, transition_receipt_time, sender, validation =
     match block_or_header with
     | `Block cached_env ->
@@ -291,7 +286,6 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
         add_and_finalize ~logger ~frontier ~catchup_scheduler
           ~processed_transition_writer ~only_if_present:false ~time_controller
           ~source:`Gossip breadcrumb ~precomputed_values ~valid_cb
-          ~block_window_duration
       in
       ( match result with
       | Ok () ->
@@ -330,10 +324,6 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
        , unit )
        Writer.t ) ~processed_transition_writer =
   let open Context in
-  let block_window_duration =
-    Float.of_int constraint_constants.block_window_duration_ms
-    |> Time.Span.of_ms
-  in
   let catchup_scheduler =
     Catchup_scheduler.create ~logger ~precomputed_values ~verifier ~trust_system
       ~frontier ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
@@ -389,7 +379,6 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                               let%map result =
                                 add_and_finalize ~logger ~only_if_present:true
                                   ~source:`Catchup ~valid_cb b
-                                  ~block_window_duration
                               in
                               Internal_tracing.with_state_hash state_hash
                               @@ fun () ->
@@ -453,7 +442,6 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                     match%map
                       add_and_finalize ~logger ~only_if_present:false
                         ~source:`Internal breadcrumb ~valid_cb:None
-                        ~block_window_duration
                     with
                     | Ok () ->
                         [%log internal] "Breadcrumb_integrated" ;

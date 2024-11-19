@@ -675,8 +675,7 @@ struct
            let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
            let main x () = wrap_main (conv x) in
            let cs =
-             constraint_system ~input_typ:typ
-               ~return_typ:(Snarky_backendless.Typ.unit ())
+             constraint_system ~input_typ:typ ~return_typ:Impls.Wrap.Typ.unit
                main
            in
            let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in

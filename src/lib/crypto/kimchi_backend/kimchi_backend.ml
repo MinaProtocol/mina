@@ -1,5 +1,5 @@
 module Kimchi_backend_common = struct
-  module Field = Kimchi_backend_common.Field
+  module Field = Kimchi_pasta_snarky_backend__.Field
   module Scalar_challenge = Kimchi_backend_common.Scalar_challenge
 end
 

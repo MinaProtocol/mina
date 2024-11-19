@@ -8,12 +8,10 @@ open Core_kernel
 
 module Inputs = struct
   type t =
-    { curve_size : int
-    ; default_snark_worker_fee_string : string
+    { default_snark_worker_fee_string : string
     ; minimum_user_command_fee_string : string
     ; itn_features : bool
     ; compaction_interval_ms : int option
-    ; block_window_duration_ms : int
     ; vrf_poll_interval_ms : int
     ; network_id : string
     ; zkapp_cmd_limit : int option
@@ -28,12 +26,10 @@ module Inputs = struct
 end
 
 type t =
-  { curve_size : int
-  ; default_snark_worker_fee : Currency.Fee.Stable.Latest.t
+  { default_snark_worker_fee : Currency.Fee.Stable.Latest.t
   ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t
   ; itn_features : bool
   ; compaction_interval : Time.Span.t option
-  ; block_window_duration : Time.Span.t
   ; vrf_poll_interval : Time.Span.t
   ; network_id : string
   ; zkapp_cmd_limit : int option
@@ -47,8 +43,7 @@ type t =
 [@@deriving sexp_of, bin_io_unversioned]
 
 let make (inputs : Inputs.t) =
-  { curve_size = inputs.curve_size
-  ; default_snark_worker_fee =
+  { default_snark_worker_fee =
       Currency.Fee.of_mina_string_exn inputs.default_snark_worker_fee_string
   ; minimum_user_command_fee =
       Currency.Fee.of_mina_string_exn inputs.minimum_user_command_fee_string
@@ -57,8 +52,6 @@ let make (inputs : Inputs.t) =
       Option.map
         ~f:(fun x -> Float.of_int x |> Time.Span.of_ms)
         inputs.compaction_interval_ms
-  ; block_window_duration =
-      Float.of_int inputs.block_window_duration_ms |> Time.Span.of_ms
   ; vrf_poll_interval =
       Float.of_int inputs.vrf_poll_interval_ms |> Time.Span.of_ms
   ; rpc_handshake_timeout = Time.Span.of_sec inputs.rpc_handshake_timeout_sec
@@ -74,8 +67,7 @@ let make (inputs : Inputs.t) =
 
 let to_yojson t =
   `Assoc
-    [ ("curve_size", `Int t.curve_size)
-    ; ( "default_snark_worker_fee"
+    [ ( "default_snark_worker_fee"
       , Currency.Fee.to_yojson t.default_snark_worker_fee )
     ; ( "minimum_user_command_fee"
       , Currency.Fee.to_yojson t.minimum_user_command_fee )
@@ -84,7 +76,6 @@ let to_yojson t =
       , Option.value_map ~default:`Null
           ~f:(fun x -> `Float (Time.Span.to_ms x))
           t.compaction_interval )
-    ; ("block_window_duration", `Float (Time.Span.to_ms t.block_window_duration))
     ; ("vrf_poll_interval", `Float (Time.Span.to_ms t.vrf_poll_interval))
     ; ( "rpc_handshake_timeout"
       , `Float (Time.Span.to_sec t.rpc_handshake_timeout) )
@@ -106,12 +97,10 @@ let to_yojson t =
 module Compiled = struct
   let t : t =
     let (inputs : Inputs.t) =
-      { curve_size = Node_config.curve_size
-      ; default_snark_worker_fee_string = Node_config.default_snark_worker_fee
+      { default_snark_worker_fee_string = Node_config.default_snark_worker_fee
       ; minimum_user_command_fee_string = Node_config.minimum_user_command_fee
       ; itn_features = Node_config.itn_features
       ; compaction_interval_ms = Node_config.compaction_interval
-      ; block_window_duration_ms = Node_config.block_window_duration
       ; vrf_poll_interval_ms = Node_config.vrf_poll_interval
       ; network_id = Node_config.network
       ; zkapp_cmd_limit = Node_config.zkapp_cmd_limit
@@ -131,15 +120,12 @@ end
 module For_unit_tests = struct
   let t : t =
     let inputs : Inputs.t =
-      { curve_size = Node_config_for_unit_tests.curve_size
-      ; default_snark_worker_fee_string =
+      { default_snark_worker_fee_string =
           Node_config_for_unit_tests.default_snark_worker_fee
       ; minimum_user_command_fee_string =
           Node_config_for_unit_tests.minimum_user_command_fee
       ; itn_features = Node_config_for_unit_tests.itn_features
       ; compaction_interval_ms = Node_config_for_unit_tests.compaction_interval
-      ; block_window_duration_ms =
-          Node_config_for_unit_tests.block_window_duration
       ; vrf_poll_interval_ms = Node_config_for_unit_tests.vrf_poll_interval
       ; rpc_handshake_timeout_sec =
           Node_config_for_unit_tests.rpc_handshake_timeout_sec

@@ -10,8 +10,6 @@ include Node_config_version
 
 [%%inject "ledger_depth", ledger_depth]
 
-[%%inject "curve_size", curve_size]
-
 [%%inject "coinbase", coinbase]
 
 [%%inject "k", k]

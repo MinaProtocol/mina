@@ -33,6 +33,7 @@
   pickles_types
   hex
   kimchi_bindings
+  kimchi_pasta_snarky_backend
   kimchi_types
   pasta_bindings
   sponge

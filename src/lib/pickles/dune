@@ -44,6 +44,7 @@
    kimchi_pasta
    kimchi_pasta.basic
    kimchi_pasta.constraint_system
+   kimchi_pasta_snarky_backend
    bitstring_lib
    snarky.intf
    pickles.backend

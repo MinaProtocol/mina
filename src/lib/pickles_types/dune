@@ -33,6 +33,7 @@
   bin_prot.shape
   ;; local libraries
   kimchi_types
+  kimchi_pasta_snarky_backend
   snarky.backendless
   tuple_lib
   ppx_version.runtime

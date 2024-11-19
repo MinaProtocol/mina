@@ -11,8 +11,6 @@ module type S = sig
 
   val ledger_depth : int
 
-  val curve_size : int
-
   val coinbase : string
 
   val k : int
