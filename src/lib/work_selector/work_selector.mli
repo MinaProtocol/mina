@@ -10,7 +10,10 @@ module type Selection_method_intf =
   Intf.Selection_method_intf
     with type snark_pool := snark_pool
      and type staged_ledger := Staged_ledger.t
-     and type work := work
+     and type work :=
+      ( Transaction_witness.t
+      , Ledger_proof.Cache_tag.t )
+      Snark_work_lib.Work.Single.Spec.t
      and type transition_frontier := Transition_frontier.t
      and module State := State
 

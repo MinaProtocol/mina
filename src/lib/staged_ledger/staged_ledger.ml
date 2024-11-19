@@ -226,7 +226,9 @@ module T = struct
 
     let verify ~verifier:{ logger; verifier } ts =
       verify_proofs ~logger ~verifier
-        (List.map ts ~f:(fun (p, m) -> (p, Ledger_proof.statement p, m)))
+        (List.map ts ~f:(fun (p, m) ->
+             let p = Ledger_proof.Cache_tag.unwrap p in
+             (p, Ledger_proof.statement p, m) ) )
   end
 
   module Statement_scanner_with_proofs =
@@ -283,7 +285,8 @@ module T = struct
     let statement_check = `Partial in
     let last_proof_statement =
       Option.map
-        ~f:(fun ((p, _), _) -> Ledger_proof.statement p)
+        ~f:(fun ((p, _), _) ->
+          Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p )
         (Scan_state.latest_ledger_proof scan_state)
     in
     Statement_scanner.check_invariants ~constraint_constants scan_state
@@ -388,7 +391,8 @@ module T = struct
     in
     let last_proof_statement =
       Scan_state.latest_ledger_proof scan_state
-      |> Option.map ~f:(fun ((p, _), _) -> Ledger_proof.statement p)
+      |> Option.map ~f:(fun ((p, _), _) ->
+             Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p )
     in
     f ~constraint_constants ~last_proof_statement ~ledger:snarked_ledger
       ~scan_state ~pending_coinbase_collection:pending_coinbases
@@ -444,9 +448,8 @@ module T = struct
     }
 
   let current_ledger_proof t =
-    Option.map
-      (Scan_state.latest_ledger_proof t.scan_state)
-      ~f:(Fn.compose fst fst)
+    Option.map (Scan_state.latest_ledger_proof t.scan_state)
+      ~f:(fun ((x, _), _) -> Ledger_proof.Cache_tag.unwrap x)
 
   let replace_ledger_exn t ledger =
     [%test_result: Ledger_hash.t]
@@ -1124,7 +1127,10 @@ module T = struct
           update_pending_coinbase_collection
             ~depth:t.constraint_constants.pending_coinbase_depth
             t.pending_coinbase_collection stack_update ~is_new_stack
-            ~ledger_proof:res_opt
+            ~ledger_proof:
+              (Option.map
+                 ~f:(fun (p, x) -> (Ledger_proof.Cache_tag.unwrap p, x))
+                 res_opt )
           |> Deferred.return )
     in
     let%bind () = yield_result () in
@@ -2850,6 +2856,10 @@ let%test_module "staged ledger tests" =
               ignore
                 (Ledger.unregister_mask_exn sl_of_snarked_ledger ~loc:__LOC__)
             in
+            let ledger_proof =
+              Option.map ledger_proof ~f:(fun (p, x) ->
+                  (Ledger_proof.Cache_tag.unwrap p, x) )
+            in
             let%bind () =
               if check_snarked_ledger_transition then
                 do_snarked_ledger_transition ledger_proof
@@ -3515,7 +3525,10 @@ let%test_module "staged ledger tests" =
                    (List.take work_list proofs_available_this_iter)
                    provers )
             in
-            assert_fee_excess proof ;
+            assert_fee_excess
+              (Option.map
+                 ~f:(fun (p, x) -> (Ledger_proof.Cache_tag.unwrap p, x))
+                 proof ) ;
             let cmds_applied_this_iter =
               List.length @@ Staged_ledger_diff.commands diff
             in
@@ -3932,7 +3945,10 @@ let%test_module "staged ledger tests" =
             check_pending_coinbase proof ~supercharge_coinbase ~sl_before
               ~sl_after:!sl state_and_body_hash global_slot pc_update
               ~is_new_stack ;
-            assert_fee_excess proof ;
+            assert_fee_excess
+              (Option.map
+                 ~f:(fun (p, x) -> (Ledger_proof.Cache_tag.unwrap p, x))
+                 proof ) ;
             let cmds_applied_this_iter =
               List.length @@ Staged_ledger_diff.commands diff
             in
