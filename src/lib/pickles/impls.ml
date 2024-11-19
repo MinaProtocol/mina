@@ -259,7 +259,7 @@ module Wrap = struct
     let (T (typ, f, f_inv)) =
       Spec.wrap_packed_typ
         (T
-           ( Shifted_value.Type1.typ fp
+           ( Shifted_value.Type1.wrap_typ fp
            , (fun (Shifted_value x as t) ->
                Impl.run_checked (Other_field.check x) ;
                t )
