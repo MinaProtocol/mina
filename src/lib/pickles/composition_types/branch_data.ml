@@ -98,13 +98,17 @@ module Make_str (A : Wire_types.Concrete) = struct
       + pack (Pickles_types.Vector.to_list proofs_verified_mask)
   end
 
-  let packed_typ (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) =
-    Impl.Typ.transport Impl.Typ.field
-      ~there:(pack (module Impl))
-      ~back:(unpack (module Impl))
-
   open Kimchi_pasta_snarky_backend
+
+  let packed_typ =
+    Step_impl.Typ.transport Step_impl.Typ.field
+      ~there:(pack (module Step_impl))
+      ~back:(unpack (module Step_impl))
+
+  let wrap_packed_typ =
+    Wrap_impl.Typ.transport Wrap_impl.Typ.field
+      ~there:(pack (module Wrap_impl))
+      ~back:(unpack (module Wrap_impl))
 
   let typ
       ~(* We actually only need it to be less than 252 bits in order to pack
