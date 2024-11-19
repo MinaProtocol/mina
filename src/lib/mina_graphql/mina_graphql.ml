@@ -811,7 +811,7 @@ module Mutations = struct
         | Ok
             ( `Broadcasted
             , Network_pool.Snark_pool.Resource_pool.Diff.Add_solved_work _
-            , _ ) ->
+            , () ) ->
             Ok "Accepted"
         | Error err ->
             Error (Error.to_string_hum err)
