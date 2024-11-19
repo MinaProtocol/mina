@@ -175,7 +175,7 @@ exec-daemon() {
     -file-log-level ${FILE_LOG_LEVEL} \
     -precomputed-blocks-file ${FOLDER}/precomputed_blocks.log \
     -log-precomputed-blocks ${LOG_PRECOMPUTED_BLOCKS} \
-    $@
+    "$@"
 }
 
 # Executes the Mina Snark Worker
@@ -189,7 +189,7 @@ exec-worker-daemon() {
     -proof-level ${PROOF_LEVEL} \
     -shutdown-on-disconnect ${SHUTDOWN_ON_DISCONNECT} \
     -daemon-address ${COORDINATOR_HOST_AND_PORT} \
-    $@
+    "$@"
 }
 
 # Executes the Archive node
@@ -199,28 +199,28 @@ exec-archive-node() {
     --log-level ${LOG_LEVEL} \
     --postgres-uri postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT}/${PG_DB} \
     --server-port ${ARCHIVE_SERVER_PORT} \
-    $@
+    "$@"
 }
 
 # Spawns the Node in background
 spawn-node() {
   FOLDER=${1}
   shift
-  exec-daemon $@ -config-directory ${FOLDER} &>${FOLDER}/log.txt &
+  exec-daemon "$@" -config-directory ${FOLDER} &>${FOLDER}/log.txt &
 }
 
 # Spawns worker in background
 spawn-worker() {
   FOLDER=${1}
   shift
-  exec-worker-daemon $@ -config-directory ${FOLDER} &>${FOLDER}/log.txt &
+  exec-worker-daemon "$@" -config-directory ${FOLDER} &>${FOLDER}/log.txt &
 }
 
 # Spawns the Archive Node in background
 spawn-archive-node() {
   FOLDER=${1}
   shift
-  exec-archive-node $@ &>${FOLDER}/log.txt &
+  exec-archive-node "$@" &>${FOLDER}/log.txt &
 }
 
 # Resets genesis ledger
@@ -494,7 +494,7 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
     FILE=$(ls ${LEDGER_FOLDER}/offline_fish_keys/ | head -n 1)
     OWNER=$(stat -c "%U" ${LEDGER_FOLDER}/offline_fish_keys/${FILE})
 
-    if [ "${FILE}" != "${USER}" ]; then
+    if [ "${OWNER}" != "${USER}" ]; then
       sudo chown -R ${USER} ${LEDGER_FOLDER}/zkapp_keys
       sudo chown -R ${USER} ${LEDGER_FOLDER}/offline_fish_keys
       sudo chown -R ${USER} ${LEDGER_FOLDER}/online_fish_keys
@@ -759,7 +759,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
     python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
   fi
 
-  if ${VALUE_TRANSFER}; then
+  if ${VALUE_TRANSFERS}; then
     ${MINA_EXE} account import -rest-server ${REST_SERVER} -privkey-path ${KEY_FILE}
     ${MINA_EXE} account unlock -rest-server ${REST_SERVER} -public-key ${PUB_KEY}
 
@@ -774,7 +774,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   while true; do
     sleep ${TRANSACTION_FREQUENCY}
 
-    if ${VALUE_TRANSFER}; then
+    if ${VALUE_TRANSFERS}; then
       ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -receiver ${PUB_KEY} -sender ${PUB_KEY}
     fi
 

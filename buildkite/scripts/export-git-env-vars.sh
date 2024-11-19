@@ -14,9 +14,9 @@ function find_most_recent_numeric_tag() {
     echo $TAG
 }
 
-export GITHASH=$(git rev-parse --short=7 HEAD)
+GITHASH=$(git rev-parse --short=7 HEAD)
 
-export THIS_COMMIT_TAG=$(git tag --points-at HEAD)
+THIS_COMMIT_TAG=$(git tag --points-at HEAD)
 export PROJECT="mina"
 
 set +u
@@ -26,9 +26,9 @@ set -u
 
 export MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=bullseye}
 if [[ -n "$BUILDKITE_BRANCH" ]]; then
-   export GITBRANCH=$(echo "$BUILDKITE_BRANCH" | sed 's!/!-!g; s!_!-!g; s!#!-!g')
+   GITBRANCH=$(echo "$BUILDKITE_BRANCH" | sed 's!/!-!g; s!_!-!g; s!#!-!g')
 else
-   export GITBRANCH=$(git name-rev --name-only $GITHASH | sed "s/remotes\/origin\///g" | sed 's!/!-!g; s!_!-!g; s!#!-!g' )
+   GITBRANCH=$(git name-rev --name-only $GITHASH | sed "s/remotes\/origin\///g" | sed 's!/!-!g; s!_!-!g; s!#!-!g' )
 fi
 
 
@@ -46,20 +46,25 @@ if [ "${BUILDKITE_REPO}" != "${MINA_REPO}" ]; then
 
   # We don't want to use tags (as this can replace our dockers/debian packages). Instead we are using repo name
   # For example: for given repo 'https://github.com/dkijania/mina.git' we convert it to 'dkijania_mina' 
-  export GITTAG=1.0.0$(echo ${BUILDKITE_REPO} | sed -e 's/^.*github.com[:\/]\(.*\)\.git$/\1/' -e 's/\//-/')
+  GITTAG=1.0.0$(echo ${BUILDKITE_REPO} | sed -e 's/^.*github.com[:\/]\(.*\)\.git$/\1/' -e 's/\//-/')
   export THIS_COMMIT_TAG=""
 
 else
   # GITTAG is the closest tagged commit to this commit, while THIS_COMMIT_TAG only has a value when the current commit is tagged
-  export GITTAG=$(find_most_recent_numeric_tag HEAD)
+  GITTAG=$(find_most_recent_numeric_tag HEAD)
 fi
 
 
 export MINA_DEB_VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
-export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g')"
+MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g')"
 export RELEASE=unstable
 
 echo "Publishing on release channel \"${RELEASE}\""
 [[ -n ${THIS_COMMIT_TAG} ]] && export MINA_COMMIT_TAG="${THIS_COMMIT_TAG}"
 
 export MINA_DEB_RELEASE="${RELEASE}"
+export THIS_COMMIT_TAG
+export MINA_DOCKER_TAG
+export GITBRANCH
+export GITTAG
+export GITHASH

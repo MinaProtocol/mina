@@ -9,8 +9,10 @@ set -x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 
-SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-source ${SCRIPTPATH}/helper.sh
+SCRIPTPATH="$( cd "$(dirname "$0")" || exit ; pwd -P )"
+
+# shellcheck disable=SC1090
+source "${SCRIPTPATH}"/helper.sh
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -110,7 +112,7 @@ if [[ -z "$INPUT_REPO" ]]; then
   DEB_REPO="--build-arg deb_repo=http://localhost:8080"
 fi
 
-if [[ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then usage "Invalid service!"; fi
+if [[ $(echo "${VALID_SERVICES[@]}" | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then usage "Invalid service!"; fi
 
 case "${SERVICE}" in
     mina-archive)

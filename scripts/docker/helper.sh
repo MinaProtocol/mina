@@ -76,7 +76,8 @@ function export_docker_tag() {
     export DOCKER_REGISTRY="gcr.io/o1labs-192920"
     export TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}${BUILD_FLAG_SUFFIX}"
     # friendly, predictable tag
-    export GITHASH=$(git rev-parse --short=7 HEAD)
+    GITHASH=$(git rev-parse --short=7 HEAD)
+    export GITHASH
     export HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}${BUILD_FLAG_SUFFIX}"
 
 }

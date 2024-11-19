@@ -65,7 +65,7 @@ while [[ $# -gt 0 ]]; do
       SLOT_TX_END="$2"; shift; shift ;;
     --genesis-ledger-dir)
       GENESIS_LEDGER_DIR="$2"; shift; shift ;;
-    -*|--*)
+    -*)
       echo "Unknown option $1"; exit 1 ;;
     *)
       KEYS+=("$1") ; shift ;;
@@ -114,7 +114,7 @@ if [[ "${NODE_ARGS_2[0]}" == "--discovery-keypair" ]]; then
 fi
 
 if [[ "$CUSTOM_CONF" == "" ]] && [[ ! -f $CONF_DIR/ledger.json ]]; then
-  ( cd $CONF_DIR && "$SCRIPT_DIR/../prepare-test-ledger.sh" -c 100000 -b 1000000 $(cat bp.pub) >ledger.json )
+  ( cd $CONF_DIR && "$SCRIPT_DIR/../prepare-test-ledger.sh" -c 100000 -b 1000000 "$(cat bp.pub)" >ledger.json )
 fi
 
 if [[ "$SLOT_TX_END" != "" ]]; then

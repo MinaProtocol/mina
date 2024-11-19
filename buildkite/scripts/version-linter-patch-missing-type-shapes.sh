@@ -27,20 +27,20 @@ function checkout_and_dump() {
     git checkout $__commit
     git submodule sync
     git submodule update --init --recursive
-    eval $(opam config env)
+    eval "$(opam config env)"
     TYPE_SHAPE_FILE=${__commit:0:7}-type_shape.txt
     dune exec src/app/cli/src/mina.exe internal dump-type-shapes > /tmp/${TYPE_SHAPE_FILE}
     revert_checkout
     source buildkite/scripts/gsutil-upload.sh /tmp/${TYPE_SHAPE_FILE} gs://mina-type-shapes
 }
 
-if ! $(gsutil ls gs://mina-type-shapes/$RELEASE_BRANCH_COMMIT 2>/dev/null); then
+if ! gsutil ls gs://mina-type-shapes/$RELEASE_BRANCH_COMMIT 2>/dev/null; then
     checkout_and_dump $RELEASE_BRANCH_COMMIT
 fi
 
 if [[ -n "${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-}" ]]; then 
     BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 ${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH} )
-    if ! $(gsutil ls gs://mina-type-shapes/$BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT 2>/dev/null); then
+    if ! gsutil ls gs://mina-type-shapes/$BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT 2>/dev/null; then
         checkout_and_dump $BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT
     fi
 fi
