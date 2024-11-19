@@ -493,7 +493,7 @@ module Step =
             | Bool ->
                 Boolean.typ
             | Branch_data ->
-                Branch_data.typ (module Impl) ~assert_16_bits
+                Branch_data.typ ~assert_16_bits
             | Digest ->
                 Digest.typ
             | Challenge ->
@@ -542,7 +542,7 @@ module Step =
           | Challenge ->
               T (Challenge.typ, Fn.id, Fn.id)
           | Branch_data ->
-              T (Branch_data.packed_typ (module Impl), Fn.id, Fn.id)
+              T (Branch_data.packed_typ, Fn.id, Fn.id)
           | Bulletproof_challenge ->
               let typ =
                 let there bp_challenge =
@@ -590,7 +590,7 @@ module Wrap =
             | Bool ->
                 Boolean.typ
             | Branch_data ->
-                Branch_data.typ (module Impl) ~assert_16_bits
+                Branch_data.wrap_typ ~assert_16_bits
             | Digest ->
                 Digest.typ
             | Challenge ->
@@ -639,7 +639,7 @@ module Wrap =
           | Challenge ->
               T (Challenge.typ, Fn.id, Fn.id)
           | Branch_data ->
-              T (Branch_data.packed_typ (module Impl), Fn.id, Fn.id)
+              T (Branch_data.wrap_packed_typ, Fn.id, Fn.id)
           | Bulletproof_challenge ->
               let typ =
                 let there bp_challenge =
