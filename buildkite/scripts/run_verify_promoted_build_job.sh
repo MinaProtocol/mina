@@ -66,7 +66,7 @@ if [[ -n "$DEBIANS" ]]; then
     if [[ -z "$NEW_VERSION" ]]; then NEW_VERSION=$FROM_VERSION; fi;
     
 
-  arr_of_debians=(${DEBIANS//,/ })
+  arr_of_debians=("${DEBIANS//,/ }")
   DHALL_DEBIANS=""
   for i in "${arr_of_debians[@]}"; do
     DHALL_DEBIANS="${DHALL_DEBIANS}, $DEBIAN_DHALL_DEF.Type.${i}"
@@ -87,7 +87,7 @@ if [[ -n "$DOCKERS" ]]; then
     if [[ -z "$NEW_VERSION" ]]; then usage "New Tag is not set!"; fi;
     if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
 
-  arr_of_dockers=(${DOCKERS//,/ })
+  arr_of_dockers=("${DOCKERS//,/ }")
   DHALL_DOCKERS=""
   for i in "${arr_of_dockers[@]}"; do
     DHALL_DOCKERS="${DHALL_DOCKERS}, $DOCKER_DHALL_DEF.Type.${i}"
@@ -95,7 +95,7 @@ if [[ -n "$DOCKERS" ]]; then
   DHALL_DOCKERS="[${DHALL_DOCKERS:1}]"
 fi
 
-CODENAMES=(${CODENAMES//,/ })
+CODENAMES=("${CODENAMES//,/ }")
 DHALL_CODENAMES=""
   for i in "${CODENAMES[@]}"; do
     DHALL_CODENAMES="${DHALL_CODENAMES}, $DEBIAN_VERSION_DHALL_DEF.DebVersion.${i}"

@@ -66,7 +66,7 @@ done
 # Check that the daemon has connected to peers and is still up after 2 mins
 sleep $WAIT_AFTER_FINAL_CHECK
 mina client status
-if [ $(mina advanced get-peers | wc -l) -gt 0 ]; then
+if [ "$(mina advanced get-peers | wc -l)" -gt 0 ]; then
     echo "Found some peers"
 else
     echo "No peers found"

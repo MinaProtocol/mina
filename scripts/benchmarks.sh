@@ -7,7 +7,7 @@
 export BENCHMARKS_RUNNER=TRUE
 export X_LIBRARY_INLINING=true
 
-GIT_ROOT="`git rev-parse --show-toplevel`"
+GIT_ROOT="$(git rev-parse --show-toplevel)"
 
 BENCHMARK_EXE=$GIT_ROOT/_build/default/src/app/benchmarks/benchmarks.exe
 
@@ -16,4 +16,4 @@ if [ ! -f "$BENCHMARK_EXE" ]; then
     exit 1
 fi
 
-exec $BENCHMARK_EXE "$@" -run-without-cross-library-inlining -suppress-warnings
+exec "$BENCHMARK_EXE" "$@" -run-without-cross-library-inlining -suppress-warnings
