@@ -154,7 +154,6 @@ module Step = struct
     let spec = spec proofs_verified Tock.Rounds.n in
     let (T (typ, f, f_inv)) =
       Spec.packed_typ
-        (module Impl)
         (T
            ( Shifted_value.Type2.typ Other_field.typ_unchecked
            , (fun (Shifted_value.Type2.Shifted_value x as t) ->
@@ -258,8 +257,7 @@ module Wrap = struct
     in
     let open Types.Wrap.Statement in
     let (T (typ, f, f_inv)) =
-      Spec.packed_typ
-        (module Impl)
+      Spec.wrap_packed_typ
         (T
            ( Shifted_value.Type1.typ fp
            , (fun (Shifted_value x as t) ->
