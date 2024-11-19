@@ -97,8 +97,9 @@ module Prefix_mask = struct
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) :
       (f Checked.t, proofs_verified) Impl.Typ.t =
     let open Impl in
+    let module Vector_typ = Pickles_types.Vector.Make_typ (Impl) in
     Typ.transport
-      (Pickles_types.Vector.typ Boolean.typ Pickles_types.Nat.N2.n)
+      (Vector_typ.typ Boolean.typ Pickles_types.Nat.N2.n)
       ~there ~back
 end
 

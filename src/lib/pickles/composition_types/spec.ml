@@ -281,6 +281,8 @@ struct
   type 'env is_boolean =
     | Is_boolean : < bool2 : Impl.Boolean.var ; .. > is_boolean
 
+  module Vector_typ = Vector.Make_typ (Impl)
+
   let typ (type other_field other_field_var) ~assert_16_bits
       (field : (other_field_var, other_field) Impl.Typ.t) t =
     let module Typ_record = struct
@@ -303,7 +305,7 @@ struct
         | Scalar chal ->
             Basic.scalar_typ (t.typ chal)
         | Vector (spec, n) ->
-            Vector.typ (typ t is_boolean spec) n
+            Vector_typ.typ (typ t is_boolean spec) n
         | Array (spec, n) ->
             array ~length:n (typ t is_boolean spec)
         | Struct [] ->
@@ -386,7 +388,7 @@ struct
             T (Basic.scalar_typ typ, Sc.map ~f, Sc.map ~f:f_inv)
         | Vector (spec, n) ->
             let (T (typ, f, f_inv)) = etyp e is_boolean spec in
-            T (Vector.typ typ n, Vector.map ~f, Vector.map ~f:f_inv)
+            T (Vector_typ.typ typ n, Vector.map ~f, Vector.map ~f:f_inv)
         | Array (spec, n) ->
             let (T (typ, f, f_inv)) = etyp e is_boolean spec in
             T (array ~length:n typ, Array.map ~f, Array.map ~f:f_inv)

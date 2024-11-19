@@ -1242,7 +1242,7 @@ module Evals = struct
     let lookup_sorted =
       let lookups_per_row_3 = opt lookups_per_row_3 in
       let lookups_per_row_4 = opt lookups_per_row_4 in
-      Vector.typ'
+      Vector.wrap_typ'
         [ lookups_per_row_3
         ; lookups_per_row_3
         ; lookups_per_row_3
@@ -1251,10 +1251,10 @@ module Evals = struct
         ]
     in
     Typ.of_hlistable
-      [ Vector.typ e Columns.n
-      ; Vector.typ e Columns.n
+      [ Vector.wrap_typ e Columns.n
+      ; Vector.wrap_typ e Columns.n
       ; e
-      ; Vector.typ e Permuts_minus_1.n
+      ; Vector.wrap_typ e Permuts_minus_1.n
       ; e
       ; e
       ; e
@@ -1584,7 +1584,7 @@ module Messages = struct
 
     let wrap_typ e ~lookups_per_row_4 ~runtime_tables ~dummy =
       Wrap_impl.Typ.of_hlistable
-        [ Vector.typ e Lookup_sorted_minus_1.n
+        [ Vector.wrap_typ e Lookup_sorted_minus_1.n
         ; Opt.wrap_typ lookups_per_row_4 e ~dummy
         ; e
         ; Opt.wrap_typ runtime_tables e ~dummy
@@ -1677,7 +1677,7 @@ module Messages = struct
         (wo [ 1 ])
     in
     of_hlistable
-      [ Vector.typ (wo w_lens) Columns.n; wo [ z ]; wo [ t ]; lookup ]
+      [ Vector.wrap_typ (wo w_lens) Columns.n; wo [ z ]; wo [ t ]; lookup ]
       ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 end

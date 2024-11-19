@@ -385,7 +385,7 @@ module Wrap = struct
 
       let wrap_typ g1 chal ~length =
         Wrap_impl.Typ.of_hlistable
-          [ g1; Vector.typ chal length ]
+          [ g1; Vector.wrap_typ chal length ]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
     end
@@ -1332,7 +1332,7 @@ module Step = struct
         (((_, _) Vector.t, _) t, ((_, _) Vector.t, _) t) Wrap_impl.Typ.t =
       let per_proof _ = Per_proof.wrap_typ fq ~assert_16_bits in
       let unfinalized_proofs =
-        Vector.typ' (Vector.map proofs_verified ~f:per_proof)
+        Vector.wrap_typ' (Vector.map proofs_verified ~f:per_proof)
       in
       let messages_for_next_step_proof =
         Spec.wrap_typ fq ~assert_16_bits (B Spec.Digest)

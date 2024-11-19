@@ -314,7 +314,7 @@ let wrap_main
           in
           let prev_step_accs =
             with_label __LOC__ (fun () ->
-                exists (Vector.typ Inner_curve.typ Max_proofs_verified.n)
+                exists (Vector.wrap_typ Inner_curve.typ Max_proofs_verified.n)
                   ~request:(fun () -> Req.Step_accs) )
           in
           let old_bp_chals =
@@ -325,8 +325,8 @@ let wrap_main
                       (Challenges_vector.Constant)
                       (struct
                         let f (type n) (n : n Nat.t) =
-                          Vector.typ
-                            (Vector.typ Field.typ Backend.Tock.Rounds.n)
+                          Vector.wrap_typ
+                            (Vector.wrap_typ Field.typ Backend.Tock.Rounds.n)
                             n
                       end)
                   in
@@ -358,7 +358,7 @@ let wrap_main
                       Plonk_types.All_evals.wrap_typ ~num_chunks:1
                         Plonk_types.Features.Full.none
                     in
-                    Vector.typ ty Max_proofs_verified.n
+                    Vector.wrap_typ ty Max_proofs_verified.n
                   in
                   exists ty ~request:(fun () -> Req.Evals)
                 in
@@ -368,7 +368,7 @@ let wrap_main
                       Wrap_verifier.all_possible_domains ()
                     in
                     let wrap_domain_indices =
-                      exists (Vector.typ Field.typ Max_proofs_verified.n)
+                      exists (Vector.wrap_typ Field.typ Max_proofs_verified.n)
                         ~request:(fun () -> Req.Wrap_domain_indices)
                     in
                     Vector.map wrap_domain_indices ~f:(fun index ->
