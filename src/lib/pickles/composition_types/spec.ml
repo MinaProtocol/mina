@@ -276,6 +276,8 @@ module Make
              ; .. > )
            basic
         -> ('b, 'a, Impl.Field.Constant.t) ETyp.t
+
+      val scalar_typ : ('a, 'b) Impl.Typ.t -> ('a Sc.t, 'b Sc.t) Impl.Typ.t
     end) =
 struct
   let typ (type other_field other_field_var) ~assert_16_bits
@@ -295,7 +297,7 @@ struct
         | B spec ->
             t.typ spec
         | Scalar chal ->
-            Sc.typ (t.typ chal)
+            Basic.scalar_typ (t.typ chal)
         | Vector (spec, n) ->
             Vector.typ (typ t spec) n
         | Array (spec, n) ->
@@ -364,10 +366,10 @@ struct
         }
     end in
     let rec etyp :
-        type f var value env.
-           (f, env) ETyp_record.etyp
+        type var value env.
+           (Impl.Field.Constant.t, env) ETyp_record.etyp
         -> (value, var, env) T.t
-        -> (var, value, f) ETyp.t =
+        -> (var, value, Impl.Field.Constant.t) ETyp.t =
       let open Snarky_backendless.Typ in
       fun e spec ->
         match[@warning "-45"] spec with
@@ -375,7 +377,7 @@ struct
             e.etyp spec
         | Scalar chal ->
             let (T (typ, f, f_inv)) = e.etyp chal in
-            T (Sc.typ typ, Sc.map ~f, Sc.map ~f:f_inv)
+            T (Basic.scalar_typ typ, Sc.map ~f, Sc.map ~f:f_inv)
         | Vector (spec, n) ->
             let (T (typ, f, f_inv)) = etyp e spec in
             T (Vector.typ typ n, Vector.map ~f, Vector.map ~f:f_inv)
@@ -551,6 +553,8 @@ module Step =
               T (typ, Fn.id, Fn.id)
         in
         etyp
+
+      let scalar_typ = Sc.typ
     end)
 
 module Wrap =
@@ -583,7 +587,7 @@ module Wrap =
             | Challenge ->
                 Challenge.typ
             | Bulletproof_challenge ->
-                Bulletproof_challenge.typ Challenge.typ
+                Bulletproof_challenge.wrap_typ Challenge.typ
         in
         typ_basic
 
@@ -644,6 +648,8 @@ module Wrap =
               T (typ, Fn.id, Fn.id)
         in
         etyp
+
+      let scalar_typ = Sc.wrap_typ
     end)
 
 let typ = Step.typ
