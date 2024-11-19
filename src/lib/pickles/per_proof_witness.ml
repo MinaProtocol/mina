@@ -145,9 +145,8 @@ let typ (type n avar aval) ~feature_flags ~num_chunks
     ~value_to_hlist:Constant.to_hlist ~value_of_hlist:Constant.of_hlist
     [ statement
     ; Wrap_proof.typ
-    ; Types.Wrap.Proof_state.In_circuit.typ
-        (module Impl)
-        ~challenge:Challenge.typ ~scalar_challenge:Challenge.typ ~feature_flags
+    ; Types.Wrap.Proof_state.In_circuit.typ ~challenge:Challenge.typ
+        ~scalar_challenge:Challenge.typ ~feature_flags
         ~dummy_scalar_challenge:(Sc.create Limb_vector.Challenge.Constant.zero)
         (Shifted_value.Type1.typ Field.typ)
         Impls.Step.Typ.unit Digest.typ
