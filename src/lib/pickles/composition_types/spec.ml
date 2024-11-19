@@ -143,14 +143,20 @@ let rec pack :
   | Constant (x, _, inner) ->
       pack ~zero ~one p inner (Some x) t
 
-module ETyp = struct
-  type ('var, 'value, 'f) t =
+module Make_ETyp (Impl : sig
+  module Typ : sig
+    type ('var, 'value) t
+  end
+end) =
+struct
+  type ('var, 'value) t =
     | T :
-        ('inner, 'value, 'f) Snarky_backendless.Typ.t
-        * ('inner -> 'var)
-        * ('var -> 'inner)
-        -> ('var, 'value, 'f) t
+        ('inner, 'value) Impl.Typ.t * ('inner -> 'var) * ('var -> 'inner)
+        -> ('var, 'value) t
 end
+
+module Step_etyp = Make_ETyp (Kimchi_pasta_snarky_backend.Step_impl)
+module Wrap_etyp = Make_ETyp (Kimchi_pasta_snarky_backend.Wrap_impl)
 
 module Common (Impl : Snarky_backendless.Snark_intf.Run) = struct
   module Digest = D.Make (Impl)
@@ -247,7 +253,7 @@ module Make
         -> ('b, 'a) Impl.Typ.t
 
       val packed_typ_basic :
-           ('other_field_var, 'other_field, Impl.Field.Constant.t) ETyp.t
+           ('other_field_var, 'other_field) Make_ETyp(Impl).t
         -> ( 'a
            , 'b
            , < bool1 : bool
@@ -266,7 +272,7 @@ module Make
              ; field2 : 'other_field_var
              ; .. > )
            basic
-        -> ('b, 'a, Impl.Field.Constant.t) ETyp.t
+        -> ('b, 'a) Make_ETyp(Impl).t
 
       val scalar_typ : ('a, 'b) Impl.Typ.t -> ('a Sc.t, 'b Sc.t) Impl.Typ.t
 
@@ -365,11 +371,12 @@ struct
       Is_boolean t
 
   let packed_typ (type other_field other_field_var)
-      (field : (other_field_var, other_field, Impl.Field.Constant.t) ETyp.t) t =
+      (field : (other_field_var, other_field) Make_ETyp(Impl).t) t =
     let module ETyp_record = struct
       type ('f, 'env) etyp =
         { etyp :
-            'var 'value. ('value, 'var, 'env) basic -> ('var, 'value, 'f) ETyp.t
+            'var 'value.
+            ('value, 'var, 'env) basic -> ('var, 'value) Make_ETyp(Impl).t
         }
     end in
     let rec etyp :
@@ -377,7 +384,7 @@ struct
            (Impl.Field.Constant.t, env) ETyp_record.etyp
         -> env is_boolean
         -> (value, var, env) T.t
-        -> (var, value, Impl.Field.Constant.t) ETyp.t =
+        -> (var, value) Make_ETyp(Impl).t =
       let open Impl.Typ in
       fun e is_boolean spec ->
         match[@warning "-45"] spec with
@@ -504,8 +511,7 @@ module Step =
         typ_basic
 
       let packed_typ_basic (type other_field other_field_var)
-          (field : (other_field_var, other_field, Impl.Field.Constant.t) ETyp.t)
-          =
+          (field : (other_field_var, other_field) Make_ETyp(Impl).t) =
         let open Impl in
         let open C in
         let module Env = struct
@@ -530,7 +536,7 @@ module Step =
         let etyp :
             type a b.
                (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
-            -> (b, a, field) ETyp.t = function
+            -> (b, a) Make_ETyp(Impl).t = function
           | Unit ->
               T (Typ.unit, Fn.id, Fn.id)
           | Field ->
@@ -601,8 +607,7 @@ module Wrap =
         typ_basic
 
       let packed_typ_basic (type other_field other_field_var)
-          (field : (other_field_var, other_field, Impl.Field.Constant.t) ETyp.t)
-          =
+          (field : (other_field_var, other_field) Make_ETyp(Impl).t) =
         let open Impl in
         let open C in
         let module Env = struct
@@ -627,7 +632,7 @@ module Wrap =
         let etyp :
             type a b.
                (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
-            -> (b, a, field) ETyp.t = function
+            -> (b, a) Make_ETyp(Impl).t = function
           | Unit ->
               T (Typ.unit, Fn.id, Fn.id)
           | Field ->

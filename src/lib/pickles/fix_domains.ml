@@ -7,16 +7,15 @@ let rough_domains =
   let d = Domain.Pow_2_roots_of_unity 20 in
   { Domains.h = d }
 
-let domains (type field gates) ?feature_flags
+let domains_impl (type field gates) ?feature_flags
     (module Impl : Snarky_backendless.Snark_intf.Run
       with type field = field
        and type R1CS_constraint_system.t = ( field
                                            , gates )
                                            Kimchi_backend_common
                                            .Plonk_constraint_system
-                                           .t )
-    (Spec.ETyp.T (typ, conv, _conv_inv))
-    (Spec.ETyp.T (return_typ, _ret_conv, ret_conv_inv)) main =
+                                           .t ) (typ, conv, _conv_inv)
+    (return_typ, _ret_conv, ret_conv_inv) main =
   let main x () = Promise.map ~f:ret_conv_inv (main (conv x)) in
 
   let domains2 sys =
@@ -83,3 +82,19 @@ let domains (type field gates) ?feature_flags
   let%map.Promise res = constraint_builder.run_circuit main in
   let constraint_system = constraint_builder.finish_computation res in
   domains2 constraint_system
+
+let domains ?feature_flags (Spec.Step_etyp.T (typ, conv, conv_inv))
+    (Spec.Step_etyp.T (return_typ, ret_conv, ret_conv_inv)) main =
+  domains_impl ?feature_flags
+    (module Impls.Step)
+    (typ, conv, conv_inv)
+    (return_typ, ret_conv, ret_conv_inv)
+    main
+
+let wrap_domains ?feature_flags (Spec.Wrap_etyp.T (typ, conv, conv_inv))
+    (Spec.Wrap_etyp.T (return_typ, ret_conv, ret_conv_inv)) main =
+  domains_impl ?feature_flags
+    (module Impls.Wrap)
+    (typ, conv, conv_inv)
+    (return_typ, ret_conv, ret_conv_inv)
+    main
