@@ -115,7 +115,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
   let module Consensus_context = struct
     include Context
 
-    let genesis_constants = precomputed_values.genesis_constants
+    let compile_config = precomputed_values.compile_config
   end in
   let open Consensus_context in
   let block_window_duration =

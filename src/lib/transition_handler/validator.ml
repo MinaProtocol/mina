@@ -22,7 +22,7 @@ let validate_header_is_relevant ~context:(module Context : CONTEXT) ~frontier
   let module Context = struct
     include Context
 
-    let genesis_constants = precomputed_values.genesis_constants
+    let compile_config = precomputed_values.compile_config
 
     let logger =
       Logger.extend logger

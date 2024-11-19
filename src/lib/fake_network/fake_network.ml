@@ -216,7 +216,7 @@ module Generator = struct
     let module Consensus_context = struct
       include Context
 
-      let genesis_constants = precomputed_values.genesis_constants
+      let compile_config = precomputed_values.compile_config
     end in
     let open Context in
     let epoch_ledger_location =
@@ -263,7 +263,7 @@ module Generator = struct
     let module Consensus_context = struct
       include Context
 
-      let genesis_constants = precomputed_values.genesis_constants
+      let compile_config = precomputed_values.compile_config
     end in
     let open Context in
     let epoch_ledger_location =

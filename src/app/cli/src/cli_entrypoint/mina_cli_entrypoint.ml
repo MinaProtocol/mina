@@ -1006,7 +1006,7 @@ let setup_daemon logger ~itn_features =
           let module Context = struct
             let logger = logger
 
-            let genesis_constants = precomputed_values.genesis_constants
+            let compile_config = precomputed_values.compile_config
 
             let constraint_constants = precomputed_values.constraint_constants
 

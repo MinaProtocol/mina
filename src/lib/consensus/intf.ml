@@ -12,7 +12,7 @@ module type CONTEXT = sig
 
   val consensus_constants : Constants.t
 
-  val genesis_constants : Genesis_constants.t
+  val compile_config : Mina_compile_config.t
 end
 
 module type Constants = sig

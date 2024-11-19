@@ -31,7 +31,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     val consensus_constants : Constants.t
 
-    val genesis_constants : Genesis_constants.t
+    val compile_config : Mina_compile_config.t
   end
 
   let make_checked t = Snark_params.Tick.Run.make_checked t
@@ -3111,7 +3111,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
         let consensus_constants = Lazy.force Constants.for_unit_tests
 
-        let genesis_constants = Genesis_constants.For_unit_tests.t
+        let compile_config = Mina_compile_config.For_unit_tests.t
       end in
       (* Even when consensus constants are of prod sizes, candidate should still trigger a bootstrap *)
       should_bootstrap_len
@@ -3439,7 +3439,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
         let consensus_constants = constants
 
-        let genesis_constants = Genesis_constants.For_unit_tests.t
+        let compile_config = Mina_compile_config.For_unit_tests.t
       end
 
       let test_update constraint_constants =

@@ -97,7 +97,7 @@ module Make (Inputs : Inputs_intf) :
       ( module struct
         let logger = Context.logger
 
-        let genesis_constants = Context.precomputed_values.genesis_constants
+        let compile_config = Context.precomputed_values.compile_config
       end )
     in
     match get_ledger_by_hash ~frontier hash with
@@ -205,7 +205,7 @@ module Make (Inputs : Inputs_intf) :
       let module Context = struct
         include Context
 
-        let genesis_constants = precomputed_values.genesis_constants
+        let compile_config = precomputed_values.compile_config
 
         let logger =
           Logger.extend logger [ ("selection_context", `String "Root.prove") ]
@@ -234,7 +234,7 @@ module Make (Inputs : Inputs_intf) :
       let module Context = struct
         include Context
 
-        let genesis_constants = precomputed_values.genesis_constants
+        let compile_config = precomputed_values.compile_config
 
         let logger =
           Logger.extend logger [ ("selection_context", `String "Root.verify") ]

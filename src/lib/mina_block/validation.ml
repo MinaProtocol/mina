@@ -19,7 +19,7 @@ module type CONTEXT = sig
 
   val consensus_constants : Consensus.Constants.t
 
-  val genesis_constants : Genesis_constants.t
+  val compile_config : Mina_compile_config.t
 end
 
 let validation (_, v) = v

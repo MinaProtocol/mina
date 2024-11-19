@@ -1892,14 +1892,6 @@ module Constants : Constants_intf = struct
       ; minimum_user_command_fee =
           Option.value ~default:a.genesis_constants.minimum_user_command_fee
             Option.(b.daemon >>= fun d -> d.minimum_user_command_fee)
-      ; sync_ledger_default_subtree_depth =
-          Option.value
-            ~default:a.genesis_constants.sync_ledger_default_subtree_depth
-            Option.(b.daemon >>= fun d -> d.sync_ledger_default_subtree_depth)
-      ; sync_ledger_max_subtree_depth =
-          Option.value
-            ~default:a.genesis_constants.sync_ledger_max_subtree_depth
-            Option.(b.daemon >>= fun d -> d.sync_ledger_max_subtree_depth)
       }
     in
     let constraint_constants =
@@ -1975,6 +1967,13 @@ module Constants : Constants_intf = struct
       ; network_id =
           Option.value ~default:a.compile_config.network_id
             Option.(b.daemon >>= fun d -> d.network_id)
+      ; sync_ledger_max_subtree_depth =
+          Option.value ~default:a.compile_config.sync_ledger_max_subtree_depth
+            Option.(b.daemon >>= fun d -> d.sync_ledger_max_subtree_depth)
+      ; sync_ledger_default_subtree_depth =
+          Option.value
+            ~default:a.compile_config.sync_ledger_default_subtree_depth
+            Option.(b.daemon >>= fun d -> d.sync_ledger_default_subtree_depth)
       }
     in
     { genesis_constants; constraint_constants; proof_level; compile_config }

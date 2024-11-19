@@ -108,7 +108,7 @@ end
 module type CONTEXT = sig
   val logger : Logger.t
 
-  val genesis_constants : Genesis_constants.t
+  val compile_config : Mina_compile_config.t
 end
 
 module type Inputs_intf = sig
@@ -403,8 +403,7 @@ end = struct
             match subtree_depth with
             | n
               when n >= 1
-                   && n
-                      <= Context.genesis_constants.sync_ledger_max_subtree_depth
+                   && n <= Context.compile_config.sync_ledger_max_subtree_depth
               -> (
                 let ledger_depth = MT.depth mt in
                 let addresses =
@@ -576,7 +575,7 @@ end = struct
     let is_more_than_two = len >= 2 in
     let subtree_depth = Int.ceil_log2 len in
     let less_than_max =
-      len <= Int.pow 2 Context.genesis_constants.sync_ledger_max_subtree_depth
+      len <= Int.pow 2 Context.compile_config.sync_ledger_max_subtree_depth
     in
     let less_than_requested = subtree_depth <= requested_depth in
     let valid_length =
@@ -653,8 +652,7 @@ end = struct
       Linear_pipe.write_without_pushback_if_open t.queries
         ( desired_root_exn t
         , What_child_hashes
-            (addr, Context.genesis_constants.sync_ledger_default_subtree_depth)
-        ) )
+            (addr, Context.compile_config.sync_ledger_default_subtree_depth) ) )
 
   (** Handle the initial Num_accounts message, starting the main syncing
       process. *)
@@ -789,7 +787,7 @@ end = struct
                              be a power of 2 in the range 2-2^$depth"
                           , [ ( "depth"
                               , `Int
-                                  Context.genesis_constants
+                                  Context.compile_config
                                     .sync_ledger_max_subtree_depth )
                             ] ) )
                   in

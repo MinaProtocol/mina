@@ -769,7 +769,7 @@ let pick ~context:(module Context : CONTEXT)
   let module Context = struct
     include Context
 
-    let genesis_constants = precomputed_values.genesis_constants
+    let compile_config = precomputed_values.compile_config
   end in
   match
     Consensus.Hooks.select

@@ -821,7 +821,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
           let module Consensus_context = struct
             include Context
 
-            let genesis_constants = precomputed_values.genesis_constants
+            let compile_config = precomputed_values.compile_config
           end in
           Internal_tracing.with_state_hash protocol_state_hashes.state_hash
           @@ fun () ->
@@ -1419,7 +1419,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
         let module Consensus_context = struct
           include Context
 
-          let genesis_constants = precomputed_values.genesis_constants
+          let compile_config = precomputed_values.compile_config
         end in
         Debug_assert.debug_assert (fun () ->
             [%test_result: [ `Take | `Keep ]]

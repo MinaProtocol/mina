@@ -64,10 +64,10 @@ let time_deferred deferred =
   (Time.diff end_time start_time, result)
 
 let worth_getting_root ({ context = (module Context); _ } as t) candidate =
-  let module Context = struct
+  let module Consensus_context = struct
     include Context
 
-    let genesis_constants = precomputed_values.genesis_constants
+    let compile_config = precomputed_values.compile_config
 
     let logger =
       Logger.extend logger
@@ -77,7 +77,7 @@ let worth_getting_root ({ context = (module Context); _ } as t) candidate =
   end in
   Consensus.Hooks.equal_select_status `Take
   @@ Consensus.Hooks.select
-       ~context:(module Context)
+       ~context:(module Consensus_context)
        ~existing:
          ( t.best_seen_transition |> Mina_block.Validation.block_with_hash
          |> With_hash.map ~f:Mina_block.consensus_state )
@@ -240,7 +240,7 @@ let external_transition_compare ~context:(module Context : CONTEXT) =
   let module Consensus_context = struct
     include Context
 
-    let genesis_constants = precomputed_values.genesis_constants
+    let compile_config = precomputed_values.compile_config
   end in
   let get_consensus_state =
     Fn.compose Protocol_state.consensus_state Mina_block.Header.protocol_state
@@ -337,7 +337,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         let module Consensus_context = struct
           include Context
 
-          let genesis_constants = precomputed_values.genesis_constants
+          let compile_config = precomputed_values.compile_config
         end in
         let%bind sync_ledger_time, (hash, sender, expected_staged_ledger_hash) =
           time_deferred
@@ -823,7 +823,7 @@ let%test_module "Bootstrap_controller tests" =
           let module Consensus_context = struct
             include Context
 
-            let genesis_constants = precomputed_values.genesis_constants
+            let compile_config = precomputed_values.compile_config
           end in
           let root_sync_ledger =
             Sync_ledger.Db.create

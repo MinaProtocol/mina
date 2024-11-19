@@ -566,7 +566,7 @@ let calculate_diffs ({ context = (module Context); _ } as t) breadcrumb =
   let module Consensus_context = struct
     include Context
 
-    let genesis_constants = precomputed_values.genesis_constants
+    let compile_config = precomputed_values.compile_config
   end in
   O1trace.sync_thread "calculate_diff_frontier_diffs" (fun () ->
       let breadcrumb_hash = Breadcrumb.state_hash breadcrumb in
@@ -964,7 +964,7 @@ module For_tests = struct
 
     let consensus_constants = precomputed_values.consensus_constants
 
-    let genesis_constants = Genesis_constants.For_unit_tests.t
+    let compile_config = precomputed_values.compile_config
   end
 
   let verifier () =

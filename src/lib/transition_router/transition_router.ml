@@ -286,7 +286,7 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
   let module Consensus_context = struct
     include Context
 
-    let genesis_constants = precomputed_values.genesis_constants
+    let compile_config = precomputed_values.compile_config
   end in
   let res =
     List.fold tips ~init:None ~f:(fun acc enveloped_candidate_best_tip ->
@@ -410,7 +410,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
   let module Consensus_context = struct
     include Context
 
-    let genesis_constants = precomputed_values.genesis_constants
+    let compile_config = precomputed_values.compile_config
   end in
   match%bind
     Deferred.both
@@ -580,7 +580,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
   let module Consensus_context = struct
     include Context
 
-    let genesis_constants = precomputed_values.genesis_constants
+    let compile_config = precomputed_values.compile_config
   end in
   [%log info] "Starting transition router" ;
   let initialization_finish_signal = Ivar.create () in
