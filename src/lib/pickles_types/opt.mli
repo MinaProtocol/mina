@@ -75,22 +75,34 @@ module Flag : sig
   val ( ||| ) : t -> t -> t
 end
 
+module Step_impl := Kimchi_pasta_snarky_backend.Step_impl
+module Wrap_impl := Kimchi_pasta_snarky_backend.Wrap_impl
+
 val constant_layout_typ :
-     ('b, bool, 'f) Snarky_backendless.Typ.t
-  -> true_:'b
-  -> false_:'b
-  -> Flag.t
-  -> ('a_var, 'a, 'f) Snarky_backendless.Typ.t
+     Flag.t
+  -> ('a_var, 'a) Step_impl.Typ.t
   -> dummy:'a
   -> dummy_var:'a_var
-  -> (('a_var, 'b) t, 'a option, 'f) Snarky_backendless.Typ.t
+  -> (('a_var, Step_impl.Boolean.var) t, 'a option) Step_impl.Typ.t
 
 val typ :
-     ('b, bool, 'f) Snarky_backendless.Typ.t
-  -> Flag.t
-  -> ('a_var, 'a, 'f) Snarky_backendless.Typ.t
+     Flag.t
+  -> ('a_var, 'a) Step_impl.Typ.t
   -> dummy:'a
-  -> (('a_var, 'b) t, 'a option, 'f) Snarky_backendless.Typ.t
+  -> (('a_var, Step_impl.Boolean.var) t, 'a option) Step_impl.Typ.t
+
+val wrap_constant_layout_typ :
+     Flag.t
+  -> ('a_var, 'a) Wrap_impl.Typ.t
+  -> dummy:'a
+  -> dummy_var:'a_var
+  -> (('a_var, Wrap_impl.Boolean.var) t, 'a option) Wrap_impl.Typ.t
+
+val wrap_typ :
+     Flag.t
+  -> ('a_var, 'a) Wrap_impl.Typ.t
+  -> dummy:'a
+  -> (('a_var, Wrap_impl.Boolean.var) t, 'a option) Wrap_impl.Typ.t
 
 (** A sequence that should be considered to have stopped at
        the first occurence of {!Flag.No} *)

@@ -158,21 +158,24 @@ module H1 = struct
       match (xs, ys) with [], [] -> [] | x :: xs, y :: ys -> (x, y) :: f xs ys
   end
 
-  module Typ (Impl : sig
-    type field
-  end)
-  (F : T1)
-  (Var : T1)
-  (Val : T1) (C : sig
-    val f : 'a F.t -> ('a Var.t, 'a Val.t, Impl.field) Snarky_backendless.Typ.t
-  end) =
+  module Wrap_typ
+      (F : T1)
+      (Var : T1)
+      (Val : T1) (C : sig
+        val f :
+             'a F.t
+          -> ('a Var.t, 'a Val.t) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
+      end) =
   struct
     let rec f :
         type xs.
            xs T(F).t
-        -> (xs T(Var).t, xs T(Val).t, Impl.field) Snarky_backendless.Typ.t =
+        -> ( xs T(Var).t
+           , xs T(Val).t )
+           Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t =
       let transport, transport_var, tuple2, unit =
-        Snarky_backendless.Typ.(transport, transport_var, tuple2, unit)
+        Kimchi_pasta_snarky_backend.Wrap_impl.Typ.
+          (transport, transport_var, tuple2, unit)
       in
       fun ts ->
         match ts with
@@ -187,7 +190,7 @@ module H1 = struct
                  ~back:(fun (x, xs) -> x :: xs)
         | [] ->
             let there _ = () in
-            transport (unit ()) ~there ~back:(fun () : _ T(Val).t -> [])
+            transport unit ~there ~back:(fun () : _ T(Val).t -> [])
             |> transport_var ~there ~back:(fun () : _ T(Var).t -> [])
   end
 end
@@ -238,40 +241,6 @@ module H2 = struct
       | x :: xs ->
           let y = C.f x in
           y :: f xs
-  end
-
-  module Typ (Impl : sig
-    type field
-
-    module Typ : sig
-      type ('var, 'value) t = ('var, 'value, field) Snarky_backendless.Typ.t
-    end
-  end) =
-  struct
-    let transport, transport_var, tuple2, unit =
-      Snarky_backendless.Typ.(transport, transport_var, tuple2, unit)
-
-    let rec f :
-        type vars values.
-           (vars, values) T(Impl.Typ).t
-        -> ( vars H1.T(Id).t
-           , values H1.T(Id).t
-           , Impl.field )
-           Snarky_backendless.Typ.t =
-     fun ts ->
-      match ts with
-      | [] ->
-          let there _ = () in
-          transport (unit ()) ~there ~back:(fun () : _ H1.T(Id).t -> [])
-          |> transport_var ~there ~back:(fun () : _ H1.T(Id).t -> [])
-      | t :: ts ->
-          transport
-            (tuple2 t (f ts))
-            ~there:(fun (x :: xs : _ H1.T(Id).t) -> (x, xs))
-            ~back:(fun (x, xs) -> x :: xs)
-          |> transport_var
-               ~there:(fun (x :: xs : _ H1.T(Id).t) -> (x, xs))
-               ~back:(fun (x, xs) -> x :: xs)
   end
 end
 
@@ -678,35 +647,32 @@ module H4 = struct
      fun xs n -> match (xs, n) with [], Z -> Z | _ :: xs, S n -> S (f xs n)
   end
 
-  module Typ (Impl : sig
-    type field
-  end)
-  (F : T4)
-  (Var : T3)
-  (Val : T3) (C : sig
-    val f :
-         ('var, 'value, 'n1, 'n2) F.t
-      -> ( ('var, 'n1, 'n2) Var.t
-         , ('value, 'n1, 'n2) Val.t
-         , Impl.field )
-         Snarky_backendless.Typ.t
-  end) =
+  module Typ
+      (F : T4)
+      (Var : T3)
+      (Val : T3) (C : sig
+        val f :
+             ('var, 'value, 'n1, 'n2) F.t
+          -> ( ('var, 'n1, 'n2) Var.t
+             , ('value, 'n1, 'n2) Val.t )
+             Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+      end) =
   struct
     let transport, transport_var, tuple2, unit =
-      Snarky_backendless.Typ.(transport, transport_var, tuple2, unit)
+      Kimchi_pasta_snarky_backend.Step_impl.Typ.
+        (transport, transport_var, tuple2, unit)
 
     let rec f :
         type vars values ns1 ns2.
            (vars, values, ns1, ns2) T(F).t
         -> ( (vars, ns1, ns2) H3.T(Var).t
-           , (values, ns1, ns2) H3.T(Val).t
-           , Impl.field )
-           Snarky_backendless.Typ.t =
+           , (values, ns1, ns2) H3.T(Val).t )
+           Kimchi_pasta_snarky_backend.Step_impl.Typ.t =
      fun ts ->
       match ts with
       | [] ->
           let there _ = () in
-          transport (unit ()) ~there ~back:(fun () : _ H3.T(Val).t -> [])
+          transport unit ~there ~back:(fun () : _ H3.T(Val).t -> [])
           |> transport_var ~there ~back:(fun () : _ H3.T(Var).t -> [])
       | t :: ts ->
           transport
@@ -820,46 +786,6 @@ module H6 = struct
         (a1, a2, a3, a4, a5, a6) T(F).t -> (a1, n) Length.t -> (a2, n) Length.t
         =
      fun xs n -> match (xs, n) with [], Z -> Z | _ :: xs, S n -> S (f xs n)
-  end
-
-  module Typ (Impl : sig
-    type field
-  end)
-  (F : T6)
-  (Var : T4)
-  (Val : T4) (C : sig
-    val f :
-         ('var, 'value, 'ret_var, 'ret_value, 'n1, 'n2) F.t
-      -> ( ('var, 'ret_var, 'n1, 'n2) Var.t
-         , ('value, 'ret_value, 'n1, 'n2) Val.t
-         , Impl.field )
-         Snarky_backendless.Typ.t
-  end) =
-  struct
-    let transport, transport_var, tuple2, unit =
-      Snarky_backendless.Typ.(transport, transport_var, tuple2, unit)
-
-    let rec f :
-        type vars values ret_vars ret_values ns1 ns2.
-           (vars, values, ret_vars, ret_values, ns1, ns2) T(F).t
-        -> ( (vars, ret_vars, ns1, ns2) H4.T(Var).t
-           , (values, ret_values, ns1, ns2) H4.T(Val).t
-           , Impl.field )
-           Snarky_backendless.Typ.t =
-     fun ts ->
-      match ts with
-      | [] ->
-          let there _ = () in
-          transport (unit ()) ~there ~back:(fun () : _ H4.T(Val).t -> [])
-          |> transport_var ~there ~back:(fun () : _ H4.T(Var).t -> [])
-      | t :: ts ->
-          transport
-            (tuple2 (C.f t) (f ts))
-            ~there:(fun (x :: xs : _ H4.T(Val).t) -> (x, xs))
-            ~back:(fun (x, xs) -> x :: xs)
-          |> transport_var
-               ~there:(fun (x :: xs : _ H4.T(Var).t) -> (x, xs))
-               ~back:(fun (x, xs) -> x :: xs)
   end
 end
 

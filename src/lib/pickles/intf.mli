@@ -2,138 +2,6 @@ open Core_kernel
 open Pickles_types
 module Sponge_lib = Sponge
 
-module Snarkable : sig
-  module type S1 = sig
-    type _ t
-
-    val typ :
-         ('var, 'value, 'f) Snarky_backendless.Typ.t
-      -> ('var t, 'value t, 'f) Snarky_backendless.Typ.t
-  end
-
-  module type S2 = sig
-    type (_, _) t
-
-    val typ :
-         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
-      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
-      -> (('var1, 'var2) t, ('value1, 'value2) t, 'f) Snarky_backendless.Typ.t
-  end
-
-  module type S3 = sig
-    type (_, _, _) t
-
-    val typ :
-         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
-      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
-      -> ('var3, 'value3, 'f) Snarky_backendless.Typ.t
-      -> ( ('var1, 'var2, 'var3) t
-         , ('value1, 'value2, 'value3) t
-         , 'f )
-         Snarky_backendless.Typ.t
-  end
-
-  module type S4 = sig
-    type (_, _, _, _) t
-
-    val typ :
-         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
-      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
-      -> ('var3, 'value3, 'f) Snarky_backendless.Typ.t
-      -> ('var4, 'value4, 'f) Snarky_backendless.Typ.t
-      -> ( ('var1, 'var2, 'var3, 'var4) t
-         , ('value1, 'value2, 'value3, 'value4) t
-         , 'f )
-         Snarky_backendless.Typ.t
-  end
-
-  module type S5 = sig
-    type (_, _, _, _, _) t
-
-    val typ :
-         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
-      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
-      -> ('var3, 'value3, 'f) Snarky_backendless.Typ.t
-      -> ('var4, 'value4, 'f) Snarky_backendless.Typ.t
-      -> ('var5, 'value5, 'f) Snarky_backendless.Typ.t
-      -> ( ('var1, 'var2, 'var3, 'var4, 'var5) t
-         , ('value1, 'value2, 'value3, 'value4, 'value5) t
-         , 'f )
-         Snarky_backendless.Typ.t
-  end
-
-  module type S6 = sig
-    type (_, _, _, _, _, _) t
-
-    val typ :
-         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
-      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
-      -> ('var3, 'value3, 'f) Snarky_backendless.Typ.t
-      -> ('var4, 'value4, 'f) Snarky_backendless.Typ.t
-      -> ('var5, 'value5, 'f) Snarky_backendless.Typ.t
-      -> ('var6, 'value6, 'f) Snarky_backendless.Typ.t
-      -> ( ('var1, 'var2, 'var3, 'var4, 'var5, 'var6) t
-         , ('value1, 'value2, 'value3, 'value4, 'value5, 'value6) t
-         , 'f )
-         Snarky_backendless.Typ.t
-  end
-
-  module type S7 = sig
-    type (_, _, _, _, _, _, _) t
-
-    val typ :
-         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
-      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
-      -> ('var3, 'value3, 'f) Snarky_backendless.Typ.t
-      -> ('var4, 'value4, 'f) Snarky_backendless.Typ.t
-      -> ('var5, 'value5, 'f) Snarky_backendless.Typ.t
-      -> ('var6, 'value6, 'f) Snarky_backendless.Typ.t
-      -> ('var7, 'value7, 'f) Snarky_backendless.Typ.t
-      -> ( ('var1, 'var2, 'var3, 'var4, 'var5, 'var6, 'var7) t
-         , ('value1, 'value2, 'value3, 'value4, 'value5, 'value6, 'value7) t
-         , 'f )
-         Snarky_backendless.Typ.t
-  end
-
-  module type S8 = sig
-    type (_, _, _, _, _, _, _, _) t
-
-    val typ :
-         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
-      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
-      -> ('var3, 'value3, 'f) Snarky_backendless.Typ.t
-      -> ('var4, 'value4, 'f) Snarky_backendless.Typ.t
-      -> ('var5, 'value5, 'f) Snarky_backendless.Typ.t
-      -> ('var6, 'value6, 'f) Snarky_backendless.Typ.t
-      -> ('var7, 'value7, 'f) Snarky_backendless.Typ.t
-      -> ('var8, 'value8, 'f) Snarky_backendless.Typ.t
-      -> ( ('var1, 'var2, 'var3, 'var4, 'var5, 'var6, 'var7, 'var8) t
-         , ( 'value1
-           , 'value2
-           , 'value3
-           , 'value4
-           , 'value5
-           , 'value6
-           , 'value7
-           , 'value8 )
-           t
-         , 'f )
-         Snarky_backendless.Typ.t
-  end
-end
-
-module Evals : sig
-  module type S = sig
-    type n
-
-    val n : n Nat.t
-
-    include Binable.S1 with type 'a t = ('a, n) Vector.t
-
-    include Snarkable.S1 with type 'a t := 'a t
-  end
-end
-
 (** Generic interface over a concrete implementation [Impl] of an elliptic
     curve in Weierstrass form with [a] and [b]. In affine, the curve has the
     equation form [y² = x³ + ax + b]. *)
@@ -178,10 +46,10 @@ module Group (Impl : Snarky_backendless.Snark_intf.Run) : sig
 
     (** Represent a point, but not necessarily on the curve and in the prime
         subgroup *)
-    val typ_unchecked : (t, Constant.t, Impl.field) Snarky_backendless.Typ.t
+    val typ_unchecked : (t, Constant.t) Impl.Typ.t
 
     (** Represent a point on the curve and in the prime subgroup *)
-    val typ : (t, Constant.t, Impl.field) Snarky_backendless.Typ.t
+    val typ : (t, Constant.t) Impl.Typ.t
 
     (** Add two points on the curve.
         TODO: is the addition complete?
