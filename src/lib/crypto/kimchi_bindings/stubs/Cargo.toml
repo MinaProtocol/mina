@@ -12,6 +12,7 @@ name = "wires_15_stubs"
 crate-type = ["lib", "staticlib"]
 
 [dependencies]
+bumpalo = "=3.14"
 array-init = "2.0.0"
 rmp-serde = "1.1.2"
 libc = "0.2.62"
