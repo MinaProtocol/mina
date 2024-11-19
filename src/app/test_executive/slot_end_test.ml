@@ -70,7 +70,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let tx_delay_ms = 5000
 
-  let run network t =
+  type network_config = Engine.Network_config.t
+
+  type setup = unit
+
+  let setup (_network_config : network_config) = Async.Deferred.return ()
+
+  let run network t () =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let num_slots = slot_chain_end + 2 in

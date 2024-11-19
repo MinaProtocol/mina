@@ -40,6 +40,10 @@ module Engine = struct
       -> test_config:Test_config.t
       -> images:Test_config.Container_images.t
       -> t
+
+    val network_keypair : string -> t -> Network_keypair.t option
+
+    val constraint_constants : t -> Genesis_constants.Constraint_constants.t
   end
 
   module type Network_intf = sig
@@ -342,7 +346,13 @@ module Test = struct
 
     val config : Test_config.t
 
-    val run : network -> dsl -> unit Malleable_error.t
+    type network_config
+
+    type setup
+
+    val setup : network_config -> setup Deferred.t
+
+    val run : network -> dsl -> setup -> unit Malleable_error.t
   end
 
   (* NB: until the DSL is actually implemented, a test just takes in the engine
@@ -352,4 +362,5 @@ module Test = struct
       with type network = Inputs.Engine.Network.t
        and type node = Inputs.Engine.Network.Node.t
        and type dsl = Inputs.Dsl.t
+       and type network_config = Inputs.Engine.Network_config.t
 end

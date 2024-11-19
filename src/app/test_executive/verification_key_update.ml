@@ -71,9 +71,128 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let `VK vk, `Prover prover =
-    Transaction_snark.For_tests.create_trivial_snapp
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled ()
+  let update_vk (vk : Side_loaded_verification_key.t) : Account_update.t =
+    let body (vk : Side_loaded_verification_key.t) : Account_update.Body.t =
+      { Account_update.Body.dummy with
+        public_key = account_a_pk
+      ; update =
+          { Account_update.Update.dummy with
+            verification_key =
+              Set
+                { data = vk
+                ; hash =
+                    (* TODO: This function should live in
+                       [Side_loaded_verification_key].
+                    *)
+                    Zkapp_account.digest_vk vk
+                }
+          ; permissions =
+              Set
+                { edit_state = Proof
+                ; send = Signature
+                ; receive = Proof
+                ; set_delegate = Proof
+                ; set_permissions = Signature
+                ; set_verification_key =
+                    (Signature, Mina_numbers.Txn_version.current)
+                ; set_zkapp_uri = Proof
+                ; edit_action_state = Proof
+                ; set_token_symbol = Proof
+                ; increment_nonce = Signature
+                ; set_voting_for = Proof
+                ; access = None
+                ; set_timing = Signature
+                }
+          }
+      ; use_full_commitment = true
+      ; preconditions =
+          { Account_update.Preconditions.network =
+              Zkapp_precondition.Protocol_state.accept
+          ; account = Zkapp_precondition.Account.accept
+          ; valid_while = Ignore
+          }
+      ; authorization_kind = Signature
+      }
+    in
+    (* TODO: This is a pain. *)
+    { body = body vk; authorization = Signature Signature.dummy }
+
+  let call_forest_to_zkapp ~call_forest ~nonce : Zkapp_command.t =
+    let memo = Signed_command_memo.empty in
+    let transaction_commitment : Zkapp_command.Transaction_commitment.t =
+      let account_updates_hash = Zkapp_command.Call_forest.hash call_forest in
+      Zkapp_command.Transaction_commitment.create ~account_updates_hash
+    in
+    let fee_payer : Account_update.Fee_payer.t =
+      { body =
+          { Account_update.Body.Fee_payer.dummy with
+            public_key = account_a_pk
+          ; nonce
+          ; fee = Currency.Fee.(of_nanomina_int_exn 20_000_000)
+          }
+      ; authorization = Signature.dummy
+      }
+    in
+    let memo_hash = Signed_command_memo.hash memo in
+    let full_commitment =
+      Zkapp_command.Transaction_commitment.create_complete
+        transaction_commitment ~memo_hash
+        ~fee_payer_hash:
+          (Zkapp_command.Call_forest.Digest.Account_update.create
+             (Account_update.of_fee_payer fee_payer) )
+    in
+    let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
+        Zkapp_command.t =
+      let fee_payer =
+        match fee_payer with
+        | { body = { public_key; _ }; _ }
+          when Public_key.Compressed.equal public_key account_a_pk ->
+            { fee_payer with
+              authorization =
+                Schnorr.Chunked.sign account_a_kp.private_key
+                  (Random_oracle.Input.Chunked.field full_commitment)
+            }
+        | fee_payer ->
+            fee_payer
+      in
+      let account_updates =
+        Zkapp_command.Call_forest.map account_updates ~f:(function
+          | ({ body = { public_key; use_full_commitment; _ }
+             ; authorization = Signature _
+             } as account_update :
+              Account_update.t )
+            when Public_key.Compressed.equal public_key account_a_pk ->
+              let commitment =
+                if use_full_commitment then full_commitment
+                else transaction_commitment
+              in
+              { account_update with
+                authorization =
+                  Signature
+                    (Schnorr.Chunked.sign account_a_kp.private_key
+                       (Random_oracle.Input.Chunked.field commitment) )
+              }
+          | account_update ->
+              account_update )
+      in
+      { fee_payer; account_updates; memo }
+    in
+    sign_all { fee_payer; account_updates = call_forest; memo }
+
+  let wait_for_zkapp t ~logger ~has_failures zkapp_command =
+    let open Malleable_error.Let_syntax in
+    let with_timeout =
+      let soft_slots = 3 in
+      let soft_timeout = Network_time_span.Slots soft_slots in
+      let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
+      Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
+    in
+    let%map () =
+      wait_for t @@ with_timeout
+      @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures
+           ~zkapp_command
+    in
+    [%log info] "zkApp transaction included in transition frontier"
 
   let config =
     let open Test_config in
@@ -101,24 +220,29 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let logger = Logger.create ()
 
-  let run network t =
-    let open Malleable_error.Let_syntax in
-    let%bind () =
-      section_hard "Wait for nodes to initialize"
-        (wait_for t
-           (Wait_condition.nodes_to_initialize
-              (Core.String.Map.data (Network.all_mina_nodes network)) ) )
+  type network_config = Engine.Network_config.t
+
+  type setup =
+    { zkapp_command_create_accounts : Zkapp_command.t
+    ; zkapp_command_update_vk1 : Zkapp_command.t
+    ; zkapp_command_update_vk2_refers_vk1 : Zkapp_command.t
+    ; zkapp_command_update_vk2 : Zkapp_command.t
+    ; invalid_zkapp_command_set_vk_perm_proof : Zkapp_command.t
+    ; invalid_zkapp_command_set_vk_perm_impossible : Zkapp_command.t
+    ; zkapp_command_set_vk_perm_proof : Zkapp_command.t
+    ; zkapp_command_set_vk_perm_impossible : Zkapp_command.t
+    ; failed_zkapp_command_set_vk_signature_1 : Zkapp_command.t
+    ; failed_zkapp_command_set_vk_signature_2 : Zkapp_command.t
+    ; zkapp_command_set_vk_proof : Zkapp_command.t
+    }
+
+  let setup (network_config : network_config) =
+    let open Async.Deferred.Let_syntax in
+    let constraint_constants =
+      Network_config.constraint_constants network_config
     in
     let whale1 =
-      Core.String.Map.find_exn (Network.block_producers network) "whale1"
-    in
-    let%bind whale1_pk = pub_key_of_node whale1 in
-    let%bind whale1_sk = priv_key_of_node whale1 in
-    let constraint_constants = Network.constraint_constants network in
-    let (whale1_kp : Keypair.t) =
-      { public_key = whale1_pk |> Public_key.decompress_exn
-      ; private_key = whale1_sk
-      }
+      Option.value_exn @@ Network_config.network_keypair "whale1" network_config
     in
     (* Build the provers for the various rules. *)
     let tag1, _, _, Pickles.Provers.[ trivial_prover1 ] =
@@ -151,60 +275,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind.Async.Deferred account_update2, _ =
       trivial_prover2 ~handler:Trivial_rule2.handler ()
     in
-
-    let update_vk (vk : Side_loaded_verification_key.t) : Account_update.t =
-      let body (vk : Side_loaded_verification_key.t) : Account_update.Body.t =
-        { Account_update.Body.dummy with
-          public_key = account_a_pk
-        ; update =
-            { Account_update.Update.dummy with
-              verification_key =
-                Set
-                  { data = vk
-                  ; hash =
-                      (* TODO: This function should live in
-                         [Side_loaded_verification_key].
-                      *)
-                      Zkapp_account.digest_vk vk
-                  }
-            ; permissions =
-                Set
-                  { edit_state = Proof
-                  ; send = Signature
-                  ; receive = Proof
-                  ; set_delegate = Proof
-                  ; set_permissions = Signature
-                  ; set_verification_key =
-                      (Signature, Mina_numbers.Txn_version.current)
-                  ; set_zkapp_uri = Proof
-                  ; edit_action_state = Proof
-                  ; set_token_symbol = Proof
-                  ; increment_nonce = Signature
-                  ; set_voting_for = Proof
-                  ; access = None
-                  ; set_timing = Signature
-                  }
-            }
-        ; use_full_commitment = true
-        ; preconditions =
-            { Account_update.Preconditions.network =
-                Zkapp_precondition.Protocol_state.accept
-            ; account = Zkapp_precondition.Account.accept
-            ; valid_while = Ignore
-            }
-        ; authorization_kind = Signature
-        }
-      in
-
-      (* TODO: This is a pain. *)
-      { body = body vk; authorization = Signature Signature.dummy }
-    in
     let zkapp_command_create_accounts =
       let memo =
         Signed_command_memo.create_from_string_exn "Zkapp create account"
       in
       let (spec : Transaction_snark.For_tests.Deploy_snapp_spec.t) =
-        { sender = (whale1_kp, Account.Nonce.zero)
+        { sender = (whale1.keypair, Account.Nonce.zero)
         ; fee = Currency.Fee.of_nanomina_int_exn 20_000_000
         ; fee_payer = None
         ; amount = Currency.Amount.of_mina_int_exn 100
@@ -217,68 +293,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
-    in
-    let call_forest_to_zkapp ~call_forest ~nonce : Zkapp_command.t =
-      let memo = Signed_command_memo.empty in
-      let transaction_commitment : Zkapp_command.Transaction_commitment.t =
-        let account_updates_hash = Zkapp_command.Call_forest.hash call_forest in
-        Zkapp_command.Transaction_commitment.create ~account_updates_hash
-      in
-      let fee_payer : Account_update.Fee_payer.t =
-        { body =
-            { Account_update.Body.Fee_payer.dummy with
-              public_key = account_a_pk
-            ; nonce
-            ; fee = Currency.Fee.(of_nanomina_int_exn 20_000_000)
-            }
-        ; authorization = Signature.dummy
-        }
-      in
-      let memo_hash = Signed_command_memo.hash memo in
-      let full_commitment =
-        Zkapp_command.Transaction_commitment.create_complete
-          transaction_commitment ~memo_hash
-          ~fee_payer_hash:
-            (Zkapp_command.Call_forest.Digest.Account_update.create
-               (Account_update.of_fee_payer fee_payer) )
-      in
-      let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
-          Zkapp_command.t =
-        let fee_payer =
-          match fee_payer with
-          | { body = { public_key; _ }; _ }
-            when Public_key.Compressed.equal public_key account_a_pk ->
-              { fee_payer with
-                authorization =
-                  Schnorr.Chunked.sign account_a_kp.private_key
-                    (Random_oracle.Input.Chunked.field full_commitment)
-              }
-          | fee_payer ->
-              fee_payer
-        in
-        let account_updates =
-          Zkapp_command.Call_forest.map account_updates ~f:(function
-            | ({ body = { public_key; use_full_commitment; _ }
-               ; authorization = Signature _
-               } as account_update :
-                Account_update.t )
-              when Public_key.Compressed.equal public_key account_a_pk ->
-                let commitment =
-                  if use_full_commitment then full_commitment
-                  else transaction_commitment
-                in
-                { account_update with
-                  authorization =
-                    Signature
-                      (Schnorr.Chunked.sign account_a_kp.private_key
-                         (Random_oracle.Input.Chunked.field commitment) )
-                }
-            | account_update ->
-                account_update )
-        in
-        { fee_payer; account_updates; memo }
-      in
-      sign_all { fee_payer; account_updates = call_forest; memo }
     in
     let call_forest1 =
       []
@@ -353,7 +367,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let memo = Signed_command_memo.dummy in
       let (spec_invalid_proof : Transaction_snark.For_tests.Update_states_spec.t)
           =
-        { sender = (whale1_kp, Account.Nonce.one)
+        { sender = (whale1.keypair, Account.Nonce.one)
         ; fee
         ; fee_payer = None
         ; receivers = []
@@ -377,27 +391,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { spec_invalid_proof with snapp_update = snapp_update_proof }
       and spec_impossible =
         { spec_invalid_proof with
-          sender = (whale1_kp, Account.Nonce.of_int 2)
+          sender = (whale1.keypair, Account.Nonce.of_int 2)
         ; zkapp_account_keypairs = [ account_c_kp ]
         ; snapp_update = snapp_update_impossible
         }
       in
       let%map invalid_update_vk_perm_proof =
-        Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_invalid_proof
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          spec_invalid_proof
       and invalid_update_vk_perm_impossible =
-        Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_invalid_impossible
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          spec_invalid_impossible
       and update_vk_perm_proof =
-        Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_proof
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          spec_proof
       and update_vk_perm_impossible =
-        Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_impossible
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          spec_impossible
       in
       ( invalid_update_vk_perm_proof
       , invalid_update_vk_perm_impossible
@@ -412,7 +422,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let memo = Signed_command_memo.dummy in
       let (spec_failed_signature_1
             : Transaction_snark.For_tests.Update_states_spec.t ) =
-        { sender = (whale1_kp, Account.Nonce.of_int 3)
+        { sender = (whale1.keypair, Account.Nonce.of_int 3)
         ; fee
         ; fee_payer = None
         ; receivers = []
@@ -437,47 +447,68 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let spec_failed_signature_2 =
         { spec_failed_signature_1 with
-          sender = (whale1_kp, Account.Nonce.of_int 4)
+          sender = (whale1.keypair, Account.Nonce.of_int 4)
         ; zkapp_account_keypairs = [ account_c_kp ]
         }
       in
       let spec_proof =
         { spec_failed_signature_1 with
-          sender = (whale1_kp, Account.Nonce.of_int 5)
+          sender = (whale1.keypair, Account.Nonce.of_int 5)
         ; current_auth = Proof
         }
       in
       let%map failed_update_vk_signature_1 =
-        Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_failed_signature_1
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          spec_failed_signature_1
       and failed_update_vk_signature_2 =
-        Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_failed_signature_2
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          spec_failed_signature_2
       and update_vk_proof =
-        Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_proof
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          spec_proof
       in
       ( failed_update_vk_signature_1
       , failed_update_vk_signature_2
       , update_vk_proof )
     in
-    let with_timeout =
-      let soft_slots = 3 in
-      let soft_timeout = Network_time_span.Slots soft_slots in
-      let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
-      Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
+    Async.Deferred.return
+      { zkapp_command_create_accounts
+      ; zkapp_command_update_vk1
+      ; zkapp_command_update_vk2_refers_vk1
+      ; zkapp_command_update_vk2
+      ; invalid_zkapp_command_set_vk_perm_proof
+      ; invalid_zkapp_command_set_vk_perm_impossible
+      ; zkapp_command_set_vk_perm_proof
+      ; zkapp_command_set_vk_perm_impossible
+      ; failed_zkapp_command_set_vk_signature_1
+      ; failed_zkapp_command_set_vk_signature_2
+      ; zkapp_command_set_vk_proof
+      }
+
+  let run network t
+      { zkapp_command_create_accounts
+      ; zkapp_command_update_vk1
+      ; zkapp_command_update_vk2_refers_vk1
+      ; zkapp_command_update_vk2
+      ; invalid_zkapp_command_set_vk_perm_proof
+      ; invalid_zkapp_command_set_vk_perm_impossible
+      ; zkapp_command_set_vk_perm_proof
+      ; zkapp_command_set_vk_perm_impossible
+      ; failed_zkapp_command_set_vk_signature_1
+      ; failed_zkapp_command_set_vk_signature_2
+      ; zkapp_command_set_vk_proof
+      } =
+    let open Malleable_error.Let_syntax in
+    let%bind () =
+      section_hard "Wait for nodes to initialize"
+        (wait_for t
+           (Wait_condition.nodes_to_initialize
+              (Core.String.Map.data (Network.all_mina_nodes network)) ) )
     in
-    let wait_for_zkapp ~has_failures zkapp_command =
-      let%map () =
-        wait_for t @@ with_timeout
-        @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures
-             ~zkapp_command
-      in
-      [%log info] "zkApp transaction included in transition frontier"
+    let whale1 =
+      Core.String.Map.find_exn (Network.block_producers network) "whale1"
     in
+    let wait_for_zkapp = wait_for_zkapp ~logger t in
 
     let%bind () =
       section "Send a zkApp to create a zkApp account"
