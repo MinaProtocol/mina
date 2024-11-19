@@ -642,6 +642,10 @@ version = "0.1.0"
 dependencies = [
  "ark-ec",
  "ark-ff",
+ "ark-serialize",
+ "derivative",
+ "num-bigint",
+ "wasm-bindgen",
 ]
 
 [[package]]
