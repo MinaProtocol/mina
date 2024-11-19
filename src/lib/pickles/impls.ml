@@ -163,7 +163,7 @@ module Step = struct
         spec
     in
     let typ = Typ.transport typ ~there:to_data ~back:of_data in
-    Spec.ETyp.T (typ, (fun x -> of_data (f x)), fun x -> f_inv (to_data x))
+    Spec.Step_etyp.T (typ, (fun x -> of_data (f x)), fun x -> f_inv (to_data x))
 
   module Async_promise = Async_generic (Promise)
 end
@@ -271,7 +271,7 @@ module Wrap = struct
         ~there:(In_circuit.to_data ~option_map:Option.map)
         ~back:(In_circuit.of_data ~option_map:Option.map)
     in
-    Spec.ETyp.T
+    Spec.Wrap_etyp.T
       ( typ
       , (fun x -> In_circuit.of_data ~option_map:Opt.map (f x))
       , fun x -> f_inv (In_circuit.to_data ~option_map:Opt.map x) )

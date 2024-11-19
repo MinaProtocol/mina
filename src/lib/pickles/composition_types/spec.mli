@@ -130,17 +130,25 @@ val wrap_typ :
      T.t
   -> ('e, 'd) Wrap_impl.Typ.t
 
-module ETyp : sig
-  type ('var, 'value, 'f) t =
+module Make_ETyp (Impl : sig
+  module Typ : sig
+    type ('var, 'value) t
+  end
+end) : sig
+  type ('var, 'value) t =
     | T :
-        ('inner, 'value, 'f) Snarky_backendless.Typ.t
-        * ('inner -> 'var)
-        * ('var -> 'inner)
-        -> ('var, 'value, 'f) t
+        ('inner, 'value) Impl.Typ.t * ('inner -> 'var) * ('var -> 'inner)
+        -> ('var, 'value) t
 end
 
+module Step_etyp :
+    module type of Make_ETyp (Kimchi_pasta_snarky_backend.Step_impl)
+
+module Wrap_etyp :
+    module type of Make_ETyp (Kimchi_pasta_snarky_backend.Wrap_impl)
+
 val packed_typ :
-     ('b, 'c, Step_impl.Field.Constant.t) ETyp.t
+     ('b, 'c) Step_etyp.t
   -> ( 'd
      , 'e
      , < bool1 : bool
@@ -162,10 +170,10 @@ val packed_typ :
        ; field2 : 'b
        ; .. > )
      T.t
-  -> ('e, 'd, Step_impl.Field.Constant.t) ETyp.t
+  -> ('e, 'd) Step_etyp.t
 
 val wrap_packed_typ :
-     ('b, 'c, Wrap_impl.Field.Constant.t) ETyp.t
+     ('b, 'c) Wrap_etyp.t
   -> ( 'd
      , 'e
      , < bool1 : bool
@@ -187,7 +195,7 @@ val wrap_packed_typ :
        ; field2 : 'b
        ; .. > )
      T.t
-  -> ('e, 'd, Wrap_impl.Field.Constant.t) ETyp.t
+  -> ('e, 'd) Wrap_etyp.t
 
 val pack :
      'f impl

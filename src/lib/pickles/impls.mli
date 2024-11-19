@@ -81,9 +81,8 @@ module Step : sig
   val input :
        proofs_verified:'proofs_verified Nat.t
     -> ( 'proofs_verified statement_var
-       , 'proofs_verified statement
-       , Impl.field )
-       Import.Spec.ETyp.t
+       , 'proofs_verified statement )
+       Import.Spec.Step_etyp.t
 
   module Async_promise : module type of Async_generic (Promise)
 end
@@ -169,7 +168,6 @@ module Wrap : sig
            , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
            Pickles_types.Vector.t
          , Composition_types.Branch_data.t )
-         Import.Types.Wrap.Statement.In_circuit.t
-       , Wrap_impl.field )
-       Import.Spec.ETyp.t
+         Import.Types.Wrap.Statement.In_circuit.t )
+       Import.Spec.Wrap_etyp.t
 end
