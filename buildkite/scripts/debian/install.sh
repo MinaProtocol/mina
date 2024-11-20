@@ -31,7 +31,7 @@ if [ -z "$DEBS" ]; then
     echo "DEBS env var is empty. It should contains comma delimitered names of debians to install"
     exit 1
 else
-  debs=("${DEBS//,/ }")
+  mapfile -t debs <<< "${DEBS//,/ }"
   for i in "${debs[@]}"; do
     case $i in
       mina-berkeley|mina-devnet|mina-mainnet|mina-berkeley-lightnet)
