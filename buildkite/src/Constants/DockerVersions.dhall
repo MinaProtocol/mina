@@ -28,16 +28,15 @@ let lowerName =
             }
             docker
 
-let dependsOn =
+let dependsOnStep =
           \(docker : Docker)
+      ->  \(prefix : Text)
       ->  \(network : Network.Type)
       ->  \(profile : Profiles.Type)
       ->  \(binary : Artifacts.Type)
       ->  let network = "${Network.capitalName network}"
 
           let profileSuffix = "${Profiles.toSuffixUppercase profile}"
-
-          let prefix = "MinaArtifact"
 
           let suffix = "docker-image"
 
@@ -77,8 +76,16 @@ let dependsOn =
                 }
                 docker
 
+let dependsOn =
+          \(docker : Docker)
+      ->  \(network : Network.Type)
+      ->  \(profile : Profiles.Type)
+      ->  \(binary : Artifacts.Type)
+      ->  dependsOnStep docker "MinaArtifact" network profile binary
+
 in  { Type = Docker
     , capitalName = capitalName
     , lowerName = lowerName
     , dependsOn = dependsOn
+    , dependsOnStep = dependsOnStep
     }
