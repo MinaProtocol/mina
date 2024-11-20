@@ -1,7 +1,6 @@
 #!/bin/bash
 
 CODENAME=$1
-GS_DO_NOT_OVERRIDE=1
 
 echo "--- Copy debians to gs"
 for entry in _build/*.deb; do
