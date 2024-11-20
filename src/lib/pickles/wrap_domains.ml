@@ -48,8 +48,7 @@ struct
     Timer.clock __LOC__ ;
     let%bind.Promise main = Lazy.force main in
     let t =
-      Fix_domains.domains
-        (module Impls.Wrap)
+      Fix_domains.wrap_domains
         (Impls.Wrap.input ~feature_flags ())
         (T (Impls.Wrap.Typ.unit, Fn.id, Fn.id))
         (fun input -> Promise.return (main input))

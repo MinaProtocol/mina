@@ -9,8 +9,6 @@ open Core_kernel
 module Step_impl = Kimchi_pasta_snarky_backend.Step_impl
 module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl
 
-type 'f impl = 'f Spec.impl
-
 let index_to_field_elements =
   Pickles_base.Side_loaded_verification_key.index_to_field_elements
 
@@ -150,8 +148,7 @@ module Wrap = struct
               ; Plonk_types.Features.typ
                   ~feature_flags:(Plonk_types.Features.of_full feature_flags)
                   bool
-              ; Opt.typ Step_impl.Boolean.typ uses_lookups
-                  ~dummy:dummy_scalar_challenge
+              ; Opt.typ uses_lookups ~dummy:dummy_scalar_challenge
                   (Scalar_challenge.typ scalar_challenge)
               ]
               ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
@@ -388,7 +385,7 @@ module Wrap = struct
 
       let wrap_typ g1 chal ~length =
         Wrap_impl.Typ.of_hlistable
-          [ g1; Vector.typ chal length ]
+          [ g1; Vector.wrap_typ chal length ]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
     end
@@ -607,8 +604,7 @@ module Wrap = struct
       ; use : Opt.Flag.t
       }
 
-    let opt_spec (type f) ((module Impl) : f impl)
-        { zero = { value; var }; use } =
+    let opt_spec { zero = { value; var }; use } =
       Spec.T.Opt
         { inner = Struct [ Scalar Challenge ]
         ; flag = use
@@ -616,7 +612,6 @@ module Wrap = struct
             [ Kimchi_backend_common.Scalar_challenge.create value.challenge ]
         ; dummy2 =
             [ Kimchi_backend_common.Scalar_challenge.create var.challenge ]
-        ; bool = (module Impl.Boolean)
         }
   end
 
@@ -774,7 +769,7 @@ module Wrap = struct
           ; Vector (B Bulletproof_challenge, Backend.Tick.Rounds.n)
           ; Vector (B Branch_data, Nat.N1.n)
           ; feature_flags_spec
-          ; Lookup_parameters.opt_spec impl lookup
+          ; Lookup_parameters.opt_spec lookup
           ]
 
       (** Convert a statement (as structured data) into the flat data-based representation. *)
@@ -1293,19 +1288,13 @@ module Step = struct
 
       let typ fq ~assert_16_bits =
         let open In_circuit in
-        Spec.typ
-          (module Step_impl)
-          fq ~assert_16_bits
-          (spec Backend.Tock.Rounds.n)
+        Spec.typ fq ~assert_16_bits (spec Backend.Tock.Rounds.n)
         |> Step_impl.Typ.transport ~there:to_data ~back:of_data
         |> Step_impl.Typ.transport_var ~there:to_data ~back:of_data
 
       let wrap_typ fq ~assert_16_bits =
         let open In_circuit in
-        Spec.typ
-          (module Wrap_impl)
-          fq ~assert_16_bits
-          (spec Backend.Tock.Rounds.n)
+        Spec.wrap_typ fq ~assert_16_bits (spec Backend.Tock.Rounds.n)
         |> Wrap_impl.Typ.transport ~there:to_data ~back:of_data
         |> Wrap_impl.Typ.transport_var ~there:to_data ~back:of_data
     end
@@ -1343,10 +1332,10 @@ module Step = struct
         (((_, _) Vector.t, _) t, ((_, _) Vector.t, _) t) Wrap_impl.Typ.t =
       let per_proof _ = Per_proof.wrap_typ fq ~assert_16_bits in
       let unfinalized_proofs =
-        Vector.typ' (Vector.map proofs_verified ~f:per_proof)
+        Vector.wrap_typ' (Vector.map proofs_verified ~f:per_proof)
       in
       let messages_for_next_step_proof =
-        Spec.typ (module Wrap_impl) fq ~assert_16_bits (B Spec.Digest)
+        Spec.wrap_typ fq ~assert_16_bits (B Spec.Digest)
       in
       Wrap_impl.Typ.of_hlistable
         [ unfinalized_proofs; messages_for_next_step_proof ]

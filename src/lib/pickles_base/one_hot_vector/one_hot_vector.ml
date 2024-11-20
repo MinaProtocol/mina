@@ -26,8 +26,10 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
 
   let of_vector_unsafe = Fn.id
 
+  module Vector_typ = Vector.Make_typ (Impl)
+
   let typ (n : 'n Nat.t) : ('n t, Constant.t) Typ.t =
-    let (Typ typ) = Vector.typ Boolean.typ n in
+    let (Typ typ) = Vector_typ.typ Boolean.typ n in
     let typ : _ Typ.t =
       Typ
         { typ with

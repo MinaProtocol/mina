@@ -24,10 +24,7 @@ module Other_field : sig
     type t = Impls.Wrap.Other_field.t
 
     val typ :
-      ( Impls.Wrap.Impl.Field.t
-      , Backend.Tick.Field.t
-      , Impls.Wrap_impl.Internal_Basic.Field.t )
-      Snarky_backendless.Typ.t
+      (Impls.Wrap.Impl.Field.t, Backend.Tick.Field.t) Impls.Wrap_impl.Typ.t
   end
 end
 

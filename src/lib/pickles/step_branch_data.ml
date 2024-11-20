@@ -219,7 +219,6 @@ let create
     in
     let%bind.Promise () = chain_to in
     Fix_domains.domains ~feature_flags:actual_feature_flags
-      (module Impls.Step)
       (T (Impls.Step.Typ.unit, Fn.id, Fn.id))
       etyp main
   in

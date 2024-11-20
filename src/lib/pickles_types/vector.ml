@@ -369,24 +369,33 @@ module With_length (N : Nat.Intf) = struct
   let to_list : 'a t -> 'a list = to_list
 end
 
-let rec typ' :
-    type f var value n.
-       ((var, value, f) Snarky_backendless.Typ.t, n) t
-    -> ((var, n) t, (value, n) t, f) Snarky_backendless.Typ.t =
-  let open Snarky_backendless.Typ in
-  fun elts ->
-    match elts with
-    | elt :: elts ->
-        let tl = typ' elts in
-        let there = function x :: xs -> (x, xs) in
-        let back (x, xs) = x :: xs in
-        transport (elt * tl) ~there ~back |> transport_var ~there ~back
-    | [] ->
-        let there [] = () in
-        let back () = [] in
-        transport (unit ()) ~there ~back |> transport_var ~there ~back
+module Make_typ (Impl : Snarky_backendless.Snark_intf.Run) = struct
+  let rec typ' :
+      type var value n.
+      ((var, value) Impl.Typ.t, n) t -> ((var, n) t, (value, n) t) Impl.Typ.t =
+    let open Impl.Typ in
+    fun elts ->
+      match elts with
+      | elt :: elts ->
+          let tl = typ' elts in
+          let there = function x :: xs -> (x, xs) in
+          let back (x, xs) = x :: xs in
+          transport (elt * tl) ~there ~back |> transport_var ~there ~back
+      | [] ->
+          let there [] = () in
+          let back () = [] in
+          transport unit ~there ~back |> transport_var ~there ~back
 
-let typ elt n = typ' (init n ~f:(fun _ -> elt))
+  let typ elt n = typ' (init n ~f:(fun _ -> elt))
+end
+
+module Step_typ = Make_typ (Kimchi_pasta_snarky_backend.Step_impl)
+module Wrap_typ = Make_typ (Kimchi_pasta_snarky_backend.Wrap_impl)
+include Step_typ
+
+let wrap_typ' = Wrap_typ.typ'
+
+let wrap_typ = Wrap_typ.typ
 
 let rec append :
     type n m n_m a. (a, n) t -> (a, m) t -> (n, m, n_m) Nat.Adds.t -> (a, n_m) t
