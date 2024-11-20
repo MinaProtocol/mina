@@ -7,6 +7,8 @@
 #    using empty scan state and pending coinbase collections
 # Tool might be useful for detecting regression related to mentioned areas
 
+set -exo pipefail
+
 export MINA_PRIVKEY_PASS='naughty blue worm'
 
 MINA_APP=_build/default/src/app/cli/src/mina.exe
@@ -29,7 +31,9 @@ $MINA_APP ledger test generate-accounts -n 200000 --min-balance 10000 --max-bala
 
 jq  '{ ledger: { accounts:( $inputs | .[] ) , "add_genesis_winner": false } }' $ACCOUNTS_FILE --slurpfile inputs $ACCOUNTS_FILE > $GENESIS_LEDGER
 
+
 echo "creating runtime ledger in $TEMP_FOLDER"
+
 $RUNTIME_LEDGER_APP --config-file $GENESIS_LEDGER --genesis-dir $TEMP_FOLDER/genesis --hash-output-file $TEMP_FOLDER/genesis/hash.out --ignore-missing
 
 
