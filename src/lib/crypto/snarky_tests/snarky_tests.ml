@@ -5,10 +5,7 @@ open Core_kernel
 
 (* instantiate snarky for Vesta *)
 
-module Impl = Snarky_backendless.Snark.Run.Make (struct
-  include Kimchi_backend.Pasta.Vesta_based_plonk
-  module Inner_curve = Kimchi_backend.Pasta.Pasta.Pallas
-end)
+module Impl = Kimchi_pasta_snarky_backend.Step_impl
 
 (* helpers *)
 
