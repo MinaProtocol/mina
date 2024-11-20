@@ -2,7 +2,7 @@ let Spec =
       { Type = { tokenEnvName : Text, bucket : Text, org : Text, host : Text }
       , default =
           { tokenEnvName = "\\\${INFLUXDB_TOKEN}"
-          , bucket = "\\\${INFLUXDB_BUCKET_NAME}"
+          , bucket = "\\\${INFLUXDB_BUCKET}"
           , org = "\\\${INFLUXDB_ORG}"
           , host = "\\\${INFLUXDB_HOST}"
           }
