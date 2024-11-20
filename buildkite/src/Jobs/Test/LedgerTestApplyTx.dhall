@@ -74,7 +74,7 @@ in  Pipeline.build
                 , PipelineTag.Type.Test
                 , PipelineTag.Type.Stable
                 ]
-              , mode = PipelineMode.Type.Stable
+              , mode = PipelineMode.Type.PullRequest
               }
       , steps = [ buildTestCmd Size.XLarge ]
       }
