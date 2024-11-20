@@ -39,10 +39,6 @@ in  Pipeline.build
           , S.strictlyStart
               (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest")
           , S.strictlyStart (S.contains "buildkite/src/Command/TestExecutive")
-          , S.strictlyStart
-              (S.contains "automation/terraform/modules/o1-integration")
-          , S.strictlyStart
-              (S.contains "automation/terraform/modules/kubernetes/testnet")
           ]
         , path = "Test"
         , name = "TestnetIntegrationTestsLong"
