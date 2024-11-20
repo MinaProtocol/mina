@@ -9,7 +9,6 @@ open Core_kernel
 module Inputs = struct
   type t =
     { default_snark_worker_fee_string : string
-    ; minimum_user_command_fee_string : string
     ; itn_features : bool
     ; compaction_interval_ms : int option
     ; vrf_poll_interval_ms : int
@@ -27,7 +26,6 @@ end
 
 type t =
   { default_snark_worker_fee : Currency.Fee.Stable.Latest.t
-  ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t
   ; itn_features : bool
   ; compaction_interval : Time.Span.t option
   ; vrf_poll_interval : Time.Span.t
@@ -45,8 +43,6 @@ type t =
 let make (inputs : Inputs.t) =
   { default_snark_worker_fee =
       Currency.Fee.of_mina_string_exn inputs.default_snark_worker_fee_string
-  ; minimum_user_command_fee =
-      Currency.Fee.of_mina_string_exn inputs.minimum_user_command_fee_string
   ; itn_features = inputs.itn_features
   ; compaction_interval =
       Option.map
@@ -69,8 +65,6 @@ let to_yojson t =
   `Assoc
     [ ( "default_snark_worker_fee"
       , Currency.Fee.to_yojson t.default_snark_worker_fee )
-    ; ( "minimum_user_command_fee"
-      , Currency.Fee.to_yojson t.minimum_user_command_fee )
     ; ("itn_features", `Bool t.itn_features)
     ; ( "compaction_interval"
       , Option.value_map ~default:`Null
@@ -98,7 +92,6 @@ module Compiled = struct
   let t : t =
     let (inputs : Inputs.t) =
       { default_snark_worker_fee_string = Node_config.default_snark_worker_fee
-      ; minimum_user_command_fee_string = Node_config.minimum_user_command_fee
       ; itn_features = Node_config.itn_features
       ; compaction_interval_ms = Node_config.compaction_interval
       ; vrf_poll_interval_ms = Node_config.vrf_poll_interval
@@ -122,8 +115,6 @@ module For_unit_tests = struct
     let inputs : Inputs.t =
       { default_snark_worker_fee_string =
           Node_config_for_unit_tests.default_snark_worker_fee
-      ; minimum_user_command_fee_string =
-          Node_config_for_unit_tests.minimum_user_command_fee
       ; itn_features = Node_config_for_unit_tests.itn_features
       ; compaction_interval_ms = Node_config_for_unit_tests.compaction_interval
       ; vrf_poll_interval_ms = Node_config_for_unit_tests.vrf_poll_interval
