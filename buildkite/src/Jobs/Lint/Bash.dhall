@@ -38,7 +38,7 @@ in  Pipeline.build
             , commands =
                 RunInToolchain.runInToolchainBullseye
                   ([] : List Text)
-                  (     "apt-get install shellcheck"
+                  (     "sudo apt-get install shellcheck"
                     ++  " && shellcheck scripts/**/*.sh -S ${level} "
                     ++  " && shellcheck buildkite/scripts/**/*.sh -S ${level} "
                   )
