@@ -283,23 +283,9 @@ end = struct
   type query = Addr.t Query.t
 
   (* Provides addresses at an specific depth from this address *)
-  let rec intermediate_range : index -> Addr.t -> index -> Addr.t list =
-   fun ledger_depth addr i ->
-    match i with
-    | 0 ->
-        [ addr ]
-    | i ->
-        let left, right =
-          (* TODO: may be better to propagate the error *)
-          Option.value_exn
-            ( Or_error.ok
-            @@ Or_error.both
-                 (Addr.child ~ledger_depth addr Direction.Left)
-                 (Addr.child ~ledger_depth addr Direction.Right) )
-        in
-        let left = intermediate_range ledger_depth left (i - 1) in
-        let right = intermediate_range ledger_depth right (i - 1) in
-        left @ right
+  let intermediate_range ledger_depth addr i =
+    Array.init (1 lsl i) ~f:(fun idx ->
+        Addr.extend_exn ~ledger_depth addr ~num_bits:i (Int64.of_int idx) )
 
   module Responder = struct
     type t =
@@ -408,7 +394,6 @@ end = struct
                 let addresses =
                   intermediate_range ledger_depth a subtree_depth
                 in
-                let addresses = List.to_array addresses in
                 match
                   Or_error.try_with (fun () ->
                       let get_hash a = MT.get_inner_hash_at_addr_exn mt a in
@@ -586,7 +571,6 @@ end = struct
       if Hash.equal expected merged then (
         Addr.Table.remove t.waiting_parents addr ;
         let addresses = intermediate_range ledger_depth addr subtree_depth in
-        let addresses = List.to_array addresses in
         let addresses_and_hashes = Array.zip_exn addresses nodes in
 
         (* Filter to fetch only those that differ *)
