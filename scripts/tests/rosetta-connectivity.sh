@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # end to end test for rosetta connectivity with given network 
-set -exo pipefail
+set -euo pipefail
 CLEAR='\033[0m'
 RED='\033[0;31m'
 
@@ -40,17 +40,10 @@ cleanup_on_error() {
     exit 1
 }
 
-cleanup_on_exit() {
-    stop_docker
-    exit 0
-}
-
-
 container_id=$(docker run -d --env MINA_NETWORK=$NETWORK gcr.io/o1labs-192920/mina-rosetta:$TAG-$NETWORK )
 
 # Trap errors and call the cleanup function
 trap cleanup_on_error ERR
-trap cleanup_on_exit EXIT
 
 # Command to run the process
 process_command="docker logs $container_id -f"
@@ -85,7 +78,7 @@ $process_command | while read -r line; do
     # If the pattern is found, increment the match count
     if [[ "$line" =~ $pattern ]]; then
         ((match_count++))
-        echo "Pattern found ($match_count/$required_matches): $line"
+        echo "Pattern found ($match_count of $required_matches): $line"
     fi
 
     # If the required number of matches is reached, exit the loop
@@ -103,3 +96,4 @@ else
     exit 1
 fi
 
+stop_docker
