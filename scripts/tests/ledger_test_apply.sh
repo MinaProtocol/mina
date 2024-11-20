@@ -27,10 +27,14 @@ esac; shift; done
 
 
 echo "Exporting ledger to $TEMP_FOLDER"
-$MINA_APP ledger test generate-accounts -n 200000 --min-balance 10000 --max-balance 1000000 > $ACCOUNTS_FILE
+$MINA_APP ledger test generate-accounts -n 20000 --min-balance 1000 --max-balance 10000 > $ACCOUNTS_FILE
 
+echo "Adapt ledger for tests"
+
+# give more MINA to first account which will be sending founds
+jq '(.[0] | .balance ) |= "20000000"' $ACCOUNTS_FILE
+# construct correct ledger file
 jq  '{ ledger: { accounts:( $inputs | .[] ) , "add_genesis_winner": false } }' $ACCOUNTS_FILE --slurpfile inputs $ACCOUNTS_FILE > $GENESIS_LEDGER
-
 
 echo "creating runtime ledger in $TEMP_FOLDER"
 
