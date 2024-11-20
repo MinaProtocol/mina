@@ -25,7 +25,12 @@ let buildTestCmd
                 Command.Config::{
                 , commands =
                     RunInToolchain.runInToolchain
-                      [ "DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN" ]
+                      [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
+                      , "COVERALLS_TOKEN"
+                      , "DUNE_CACHE"
+                      , "DUNE_CACHE_STORAGE_MODE"
+                      , "XDG_CACHE_HOME"
+                      ]
                       "buildkite/scripts/unit-test.sh ${profile} ${path} && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
                 , label = "${profile} unit-tests"
                 , key = command_key
@@ -56,5 +61,5 @@ in  Pipeline.build
                 , PipelineTag.Type.Stable
                 ]
               }
-      , steps = [ buildTestCmd "dev" "src/lib" Size.XLarge ]
+      , steps = [ buildTestCmd "dev" "src/lib" Size.QA ]
       }

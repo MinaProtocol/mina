@@ -843,6 +843,7 @@ module T = struct
         working_stack pending_coinbase_collection ~is_new_stack
         |> Deferred.return
       in
+      [%log trace] "Spurious change to re-run some unit tests" ;
       [%log internal] "Update_ledger_and_get_statements"
         ~metadata:[ ("partition", `String "single") ] ;
       let%map data, updated_stack, _, first_pass_ledger_end =
