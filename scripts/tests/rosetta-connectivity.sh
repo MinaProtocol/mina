@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # end to end test for rosetta connectivity with given network 
-set -euo pipefail
+set -euox pipefail
 CLEAR='\033[0m'
 RED='\033[0;31m'
 
@@ -77,7 +77,7 @@ $process_command | while read -r line; do
 
     # If the pattern is found, increment the match count
     if [[ "$line" =~ $pattern ]]; then
-        ((match_count++))
+        match_count=$((match_count+1))
         echo "Pattern found ($match_count of $required_matches): $line"
     fi
 
