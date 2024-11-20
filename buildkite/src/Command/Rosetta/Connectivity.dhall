@@ -89,7 +89,7 @@ let pipeline
                   , S.exactly
                       "buildkite/src/Command/Rosetta/Connectivity"
                       "dhall"
-                  , S.exactly "scripts/tests/rosetta-connectivity-test" "sh"
+                  , S.exactly "scripts/tests/rosetta-connectivity" "sh"
                   , S.exactly "buildkite/scripts/rosetta-integration-tests" "sh"
                   , S.exactly
                       "buildkite/scripts/rosetta-integration-tests-full"
