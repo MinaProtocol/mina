@@ -89,7 +89,7 @@ module State = struct
   type 'a matrix = 'a array array
 
   (* Creates a state formed by a matrix of 5x5 Cvar zeros *)
-  let zeros : Circuit.Field.t matrix =
+  let zeros () : Circuit.Field.t matrix =
     let open Circuit in
     let state =
       Array.make_matrix ~dimx:keccak_dim ~dimy:keccak_dim Field.zero
@@ -294,7 +294,7 @@ let theta (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix
 let pi_rho (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix
     =
   let state_e = state in
-  let state_b = State.zeros in
+  let state_b = State.zeros () in
   (* for all x in {0..4} and y in {0..4}: B[y,2x+3y] = ROT(E[x,y], r[x,y]) *)
   for x = 0 to keccak_dim - 1 do
     for y = 0 to keccak_dim - 1 do
@@ -317,7 +317,7 @@ let pi_rho (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix
  *)
 let chi (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix =
   let state_b = state in
-  let state_f = State.zeros in
+  let state_f = State.zeros () in
   (* for all x in {0..4} and y in {0..4}: F[x,y] = B[x,y] xor ((not B[x+1,y]) and B[x+2,y]) *)
   for x = 0 to keccak_dim - 1 do
     for y = 0 to keccak_dim - 1 do
@@ -375,7 +375,7 @@ let permutation (state : Circuit.Field.t State.matrix)
 let absorb (padded_message : Circuit.Field.t list) ~(capacity : int)
     ~(rate : int) ~(rc : Circuit.Field.t array) : Circuit.Field.t State.matrix =
   let open Circuit in
-  let root_state = State.zeros in
+  let root_state = State.zeros () in
   let state = root_state in
 
   (* split into blocks of rate bits *)
