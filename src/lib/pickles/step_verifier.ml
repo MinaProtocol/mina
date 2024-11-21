@@ -228,7 +228,7 @@ struct
 
   let check_bulletproof ~pcs_batch ~(sponge : Sponge.t) ~polyscale
       ~(* Corresponds to y in figure 7 of WTS *)
-       (* sum_i r^i sum_j polyscale^j f_j(beta_i) *)
+       (* sum_i evalscale^i sum_j polyscale^j f_j(beta_i) *)
       (advice : _ Bulletproof.Advice.t)
       ~polynomials:(without_degree_bound, with_degree_bound)
       ~opening:
@@ -240,8 +240,8 @@ struct
           | Shifted_value.Type2.Shifted_value x ->
               x ) ;
         (* a_hat should be equal to
-           sum_i < t, r^i pows(beta_i) >
-           = sum_i r^i < t, pows(beta_i) > *)
+           sum_i < t, evalscale^i pows(beta_i) >
+           = sum_i evalscale^i < t, pows(beta_i) > *)
         let u =
           let t = Sponge.squeeze_field sponge in
           group_map t
@@ -564,7 +564,7 @@ struct
         let sponge_before_evaluations = Sponge.copy sponge in
         let sponge_digest_before_evaluations = Sponge.squeeze_field sponge in
 
-        (* polyscale, r are sampled here using the other sponge. *)
+        (* polyscale, evalscale are sampled here using the other sponge. *)
         (* No need to expose the polynomial evaluations as deferred values as they're
            not needed here for the incremental verification. All we need is a_hat and
            "combined_inner_product".
@@ -823,7 +823,7 @@ struct
 
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
      It
-     1. Checks that [polyscale] and [r] where sampled correctly. I.e., by absorbing all the
+     1. Checks that [polyscale] and [evalscale] where sampled correctly. I.e., by absorbing all the
      evaluation openings and then squeezing.
      2. Checks that the "combined inner product" value used in the elliptic curve part of
      the opening proof was computed correctly, in terms of the evaluation openings and the
@@ -957,7 +957,7 @@ struct
     sponge.state <- sponge_state ;
     let squeeze () = squeeze_challenge sponge in
     let polyscale_actual = squeeze () in
-    let r_actual = squeeze () in
+    let evalscale_actual = squeeze () in
     let polyscale_correct =
       Field.equal polyscale_actual
         ( match polyscale with
@@ -965,7 +965,7 @@ struct
             polyscale )
     in
     let polyscale = scalar polyscale in
-    let r = scalar (Import.Scalar_challenge.create r_actual) in
+    let evalscale = scalar (Import.Scalar_challenge.create evalscale_actual) in
     let plonk_minimal =
       Plonk.to_minimal plonk ~to_option:Opt.to_option_unsafe
     in
@@ -1024,7 +1024,7 @@ struct
       in
       print_fp "ft_eval0" ft_eval0 ;
       print_fp "ft_eval1" ft_eval1 ;
-      (* sum_i r^i sum_j polyscale^j f_j(beta_i) *)
+      (* sum_i evalscale^i sum_j polyscale^j f_j(beta_i) *)
       let actual_combined_inner_product =
         let combine ~ft ~sg_evals x_hat
             (e : (Field.t array, _) Evals.In_circuit.t) =
@@ -1051,7 +1051,7 @@ struct
         with_label "combine" (fun () ->
             combine ~ft:ft_eval0 ~sg_evals:sg_evals1 evals1.public_input
               evals1.evals
-            + r
+            + evalscale
               * combine ~ft:ft_eval1 ~sg_evals:sg_evals2 evals2.public_input
                   evals2.evals )
       in
@@ -1074,7 +1074,7 @@ struct
               (challenge_polynomial (Vector.to_array bulletproof_challenges))
           in
           let b_actual =
-            challenge_poly plonk.zeta + (r * challenge_poly zetaw)
+            challenge_poly plonk.zeta + (evalscale * challenge_poly zetaw)
           in
           let b_used =
             Shifted_value.Type1.to_field (module Field) ~shift:shift1 b

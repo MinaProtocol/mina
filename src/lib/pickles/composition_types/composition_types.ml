@@ -199,9 +199,9 @@ module Wrap = struct
                 .t =
             { plonk : 'plonk
             ; combined_inner_product : 'fp
-                  (** combined_inner_product = sum_{i < num_evaluation_points} sum_{j < num_polys} r^i polyscale^j f_j(pt_i) *)
+                  (** combined_inner_product = sum_{i < num_evaluation_points} sum_{j < num_polys} evalscale^i polyscale^j f_j(pt_i) *)
             ; b : 'fp
-                  (** b = challenge_poly plonk.zeta + r * challenge_poly (domain_generrator * plonk.zeta)
+                  (** b = challenge_poly plonk.zeta + evalscale * challenge_poly (domain_generrator * plonk.zeta)
                 where challenge_poly(x) = \prod_i (1 + bulletproof_challenges.(i) * x^{2^{k - 1 - i}})
             *)
             ; polyscale : 'scalar_challenge
@@ -912,7 +912,7 @@ module Step = struct
       type 'fq t =
         { b : 'fq
         ; combined_inner_product : 'fq
-              (* sum_i r^i sum_j polyscale^j f_j(pt_i) *)
+              (* sum_i evalscale^i sum_j polyscale^j f_j(pt_i) *)
         }
       [@@deriving hlist]
     end
@@ -1087,13 +1087,13 @@ module Step = struct
       type ('plonk, 'scalar_challenge, 'fq, 'bulletproof_challenges) t_ =
         { plonk : 'plonk
         ; combined_inner_product : 'fq
-              (** combined_inner_product = sum_{i < num_evaluation_points} sum_{j < num_polys} r^i polyscale^j f_j(pt_i) *)
+              (** combined_inner_product = sum_{i < num_evaluation_points} sum_{j < num_polys} evalscale^i polyscale^j f_j(pt_i) *)
         ; polyscale : 'scalar_challenge
               (** The challenge used for combining polynomials *)
         ; bulletproof_challenges : 'bulletproof_challenges
               (** The challenges from the inner-product argument that was partially verified. *)
         ; b : 'fq
-              (** b = challenge_poly plonk.zeta + r * challenge_poly (domain_generrator * plonk.zeta)
+              (** b = challenge_poly plonk.zeta + evalscale * challenge_poly (domain_generrator * plonk.zeta)
                 where challenge_poly(x) = \prod_i (1 + bulletproof_challenges.(i) * x^{2^{k - 1 - i}})
             *)
         }

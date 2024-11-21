@@ -1259,7 +1259,7 @@ struct
         let sponge_before_evaluations = Sponge.copy sponge in
         let sponge_digest_before_evaluations = Sponge.squeeze_field sponge in
 
-        (* polyscale, r are sampled here using the other sponge. *)
+        (* polyscale, evalscale are sampled here using the other sponge. *)
         (* No need to expose the polynomial evaluations as deferred values as they're
            not needed here for the incremental verification. All we need is a_hat and
            "combined_inner_product".
@@ -1460,7 +1460,7 @@ struct
 
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
      It
-     1. Checks that [polyscale] and [r] where sampled correctly. I.e., by absorbing all the
+     1. Checks that [polyscale] and [evalscale] where sampled correctly. I.e., by absorbing all the
      evaluation openings and then squeezing.
      2. Checks that the "combined inner product" value used in the elliptic curve part of
      the opening proof was computed correctly, in terms of the evaluation openings and the
@@ -1543,7 +1543,7 @@ struct
     in
     sponge.state <- sponge_state ;
     let polyscale_actual = squeeze_scalar sponge in
-    let r_actual = squeeze_challenge sponge in
+    let evalscale_actual = squeeze_challenge sponge in
     let polyscale_correct =
       with_label __LOC__ (fun () ->
           let { Import.Scalar_challenge.inner = polyscale_actual } =
@@ -1554,8 +1554,10 @@ struct
           Field.equal polyscale_actual polyscale )
     in
     let polyscale = scalar_to_field polyscale in
-    (* TODO: r actually does not need to be a scalar challenge. *)
-    let r = scalar_to_field (Import.Scalar_challenge.create r_actual) in
+    (* TODO: evalscale actually does not need to be a scalar challenge. *)
+    let evalscale =
+      scalar_to_field (Import.Scalar_challenge.create evalscale_actual)
+    in
     let plonk_minimal =
       plonk |> Plonk.to_minimal
       |> Plonk.Minimal.to_wrap
@@ -1612,7 +1614,7 @@ struct
                   (module Field)
                   ~env ~domain plonk_minimal combined_evals evals1.public_input )
           in
-          (* sum_i r^i sum_j polyscale^j f_j(beta_i) *)
+          (* sum_i evalscale^i sum_j polyscale^j f_j(beta_i) *)
           let actual_combined_inner_product =
             let combine ~ft ~sg_evals x_hat
                 (e : (Field.t array, _) Evals.In_circuit.t) =
@@ -1653,7 +1655,7 @@ struct
             in
             combine ~ft:ft_eval0 ~sg_evals:sg_evals1 evals1.public_input
               evals1.evals
-            + r
+            + evalscale
               * combine ~ft:ft_eval1 ~sg_evals:sg_evals2 evals2.public_input
                   evals2.evals
           in
@@ -1675,7 +1677,7 @@ struct
               (challenge_polynomial (Vector.to_array bulletproof_challenges))
           in
           let b_actual =
-            challenge_poly plonk.zeta + (r * challenge_poly zetaw)
+            challenge_poly plonk.zeta + (evalscale * challenge_poly zetaw)
           in
           equal
             (Shifted_value.Type2.to_field (module Field) ~shift:shift2 b)
@@ -1717,8 +1719,8 @@ struct
     ; combined_inner_product
     ; bulletproof_challenges =
         Vector.map bulletproof_challenges
-          ~f:(fun (r : _ Bulletproof_challenge.t) ->
-            Bulletproof_challenge.map ~f:scalar r )
+          ~f:(fun (ch : _ Bulletproof_challenge.t) ->
+            Bulletproof_challenge.map ~f:scalar ch )
     ; polyscale = scalar polyscale
     ; b
     }

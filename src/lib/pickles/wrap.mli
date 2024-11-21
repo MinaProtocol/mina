@@ -153,7 +153,7 @@ val combined_inner_product :
        ( (Backend.Tick.Field.t, 'a) Pickles_types.Vector.t
        , 'actual_proofs_verified )
        Pickles_types.Vector.t
-  -> r:Backend.Tick.Field.t
+  -> evalscale:Backend.Tick.Field.t
   -> plonk:
        ( Backend.Tick.Field.t
        , Backend.Tick.Field.t

@@ -334,7 +334,7 @@ struct
         }
       in
       let polyscale = scalar_chal O.v in
-      let r = scalar_chal O.u in
+      let evalscale = scalar_chal O.u in
       let sponge_digest_before_evaluations = O.digest_before_evaluations o in
       let to_field =
         SC.to_field_constant
@@ -342,7 +342,7 @@ struct
           ~endo:Endo.Step_inner_curve.scalar
       in
       let module As_field = struct
-        let r = to_field r
+        let evalscale = to_field evalscale
 
         let polyscale = to_field polyscale
 
@@ -368,7 +368,7 @@ struct
         let open As_field in
         let b =
           let open Tock.Field in
-          challenge_polynomial zeta + (r * challenge_polynomial zetaw)
+          challenge_polynomial zeta + (evalscale * challenge_polynomial zetaw)
         in
         let prechals =
           Vector.of_list_and_length_exn
@@ -492,7 +492,8 @@ struct
         in
         let open Tock.Field in
         combine ~which_eval:`Fst ~ft_eval:ft_eval0 As_field.zeta
-        + (r * combine ~which_eval:`Snd ~ft_eval:proof.openings.ft_eval1 zetaw)
+        + evalscale
+          * combine ~which_eval:`Snd ~ft_eval:proof.openings.ft_eval1 zetaw
       in
       let chal = Challenge.Constant.of_tock_field in
       let plonk =
