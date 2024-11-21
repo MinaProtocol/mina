@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # end to end test for rosetta connectivity with given network 
-set -euox pipefail
+set -x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 
@@ -30,20 +30,13 @@ function usage() {
 
 if [[ -z "$TAG" ]]; then usage "Docker tag is not set!"; usage; exit 1; fi;
 
-stop_docker() {
-    docker stop "$container_id" && docker rm "$container_id"
-}
-
-cleanup_on_error() {
-    echo "Error occurred. Stopping and removing Docker container..."
-    stop_docker
-    exit 1
-}
-
 container_id=$(docker run -d --env MINA_NETWORK=$NETWORK gcr.io/o1labs-192920/mina-rosetta:$TAG-$NETWORK )
 
-# Trap errors and call the cleanup function
-trap cleanup_on_error ERR
+stop_docker() {
+    { docker stop "$container_id" ; docker rm "$container_id" ; } || true
+}
+
+trap stop_docker ERR
 
 # Command to run the process
 process_command="docker logs $container_id -f"
@@ -64,7 +57,7 @@ match_count=0
 start_time=$(date +%s)
 
 # Run the rosetta docker and check its output
-$process_command | while read -r line; do
+while  IFS= read -t 10 -r line; do
     # Get the current time
     current_time=$(date +%s)
     
@@ -86,14 +79,15 @@ $process_command | while read -r line; do
         echo "Pattern found $required_matches times. Exiting..."
         break
     fi
-done
+done < <($process_command)
+
+stop_docker
 
 # Check if we met the required match count
 if [ "$match_count" -ge "$required_matches" ]; then
     echo "Successfully found the pattern ('$pattern') $required_matches times."
+    exit 0
 else
     echo "Failed to find the pattern ('$pattern') $required_matches times within the timeout."
     exit 1
 fi
-
-stop_docker
