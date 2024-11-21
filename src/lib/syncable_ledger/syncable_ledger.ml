@@ -84,7 +84,7 @@ module Answer = struct
 
       let to_latest acct_to_latest = function
         | Child_hashes_are (h1, h2) ->
-            V2.Child_hashes_are (List.to_array [ h1; h2 ])
+            V2.Child_hashes_are [| h1; h2 |]
         | Contents_are accts ->
             V2.Contents_are (List.map ~f:acct_to_latest accts)
         | Num_accounts (i, h) ->
@@ -93,14 +93,14 @@ module Answer = struct
       (* Not a standard versioning function *)
 
       (** Attempts to downgrade v2 -> v1 *)
-      let from_v2 : ('a, 'b) V2.t -> ('a, 'b) t = function
+      let from_v2 : ('a, 'b) V2.t -> ('a, 'b) t Or_error.t = function
         | Child_hashes_are h ->
-            if Array.length h = 2 then Child_hashes_are (h.(0), h.(1))
-            else failwith "can't downgrade wide query"
+            if Array.length h = 2 then Ok (Child_hashes_are (h.(0), h.(1)))
+            else Or_error.error_string "can't downgrade wide query"
         | Contents_are accs ->
-            Contents_are accs
+            Ok (Contents_are accs)
         | Num_accounts (n, h) ->
-            Num_accounts (n, h)
+            Ok (Num_accounts (n, h))
     end
   end]
 end
@@ -320,8 +320,7 @@ end = struct
     let answer_query :
         t -> query Envelope.Incoming.t -> answer Or_error.t Deferred.t =
      fun { mt; f; context; trust_system } query_envelope ->
-      let (module Context) = context in
-      let open Context in
+      let open (val context) in
       let open Trust_system in
       let ledger_depth = MT.depth mt in
       let sender = Envelope.Incoming.sender query_envelope in
@@ -401,9 +400,7 @@ end = struct
                  (len, MT.get_inner_hash_at_addr_exn mt content_root_addr) )
         | What_child_hashes (a, subtree_depth) -> (
             match subtree_depth with
-            | n
-              when n >= 1
-                   && n <= Context.compile_config.sync_ledger_max_subtree_depth
+            | n when n >= 1 && n <= compile_config.sync_ledger_max_subtree_depth
               -> (
                 let ledger_depth = MT.depth mt in
                 let addresses =
@@ -488,8 +485,7 @@ end = struct
 
   let expect_children : 'a t -> Addr.t -> Hash.t -> unit =
    fun t parent_addr expected ->
-    let (module Context) = t.context in
-    let open Context in
+    let open (val t.context) in
     [%log trace]
       ~metadata:
         [ ("parent_address", Addr.to_yojson parent_addr)
@@ -500,8 +496,7 @@ end = struct
 
   let expect_content : 'a t -> Addr.t -> Hash.t -> unit =
    fun t addr expected ->
-    let (module Context) = t.context in
-    let open Context in
+    let open (val t.context) in
     [%log trace]
       ~metadata:
         [ ("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected) ]
@@ -517,8 +512,7 @@ end = struct
       -> [ `Success
          | `Hash_mismatch of Hash.t * Hash.t  (** expected hash, actual *) ] =
    fun t addr content ->
-    let (module Context) = t.context in
-    let open Context in
+    let open (val t.context) in
     let expected = Addr.Table.find_exn t.waiting_content addr in
     (* TODO #444 should we batch all the updates and do them at the end? *)
     (* We might write the wrong data to the underlying ledger here, but if so
@@ -571,13 +565,13 @@ end = struct
          | `Hash_mismatch of Hash.t * Hash.t
          | `Invalid_length ] =
    fun t addr nodes requested_depth ->
-    let (module Context) = t.context in
+    let open (val t.context) in
     let len = Array.length nodes in
     let is_power = Int.is_pow2 len in
     let is_more_than_two = len >= 2 in
     let subtree_depth = Int.ceil_log2 len in
     let less_than_max =
-      len <= Int.pow 2 Context.compile_config.sync_ledger_max_subtree_depth
+      len <= Int.pow 2 compile_config.sync_ledger_max_subtree_depth
     in
     let less_than_requested = subtree_depth <= requested_depth in
     let valid_length =
@@ -611,8 +605,7 @@ end = struct
     else `Invalid_length
 
   let all_done t =
-    let (module Context) = t.context in
-    let open Context in
+    let open (val t.context) in
     if not (Root_hash.equal (MT.merkle_root t.tree) (desired_root_exn t)) then
       failwith "We finished syncing, but made a mistake somewhere :("
     else (
@@ -644,7 +637,7 @@ end = struct
       the children.
   *)
   let handle_node t addr exp_hash =
-    let (module Context) = t.context in
+    let open (val t.context) in
     if Addr.depth addr >= MT.depth t.tree - account_subtree_height then (
       expect_content t addr exp_hash ;
       Linear_pipe.write_without_pushback_if_open t.queries
@@ -654,7 +647,7 @@ end = struct
       Linear_pipe.write_without_pushback_if_open t.queries
         ( desired_root_exn t
         , What_child_hashes
-            (addr, Context.compile_config.sync_ledger_default_subtree_depth) ) )
+            (addr, compile_config.sync_ledger_default_subtree_depth) ) )
 
   (** Handle the initial Num_accounts message, starting the main syncing
       process. *)
@@ -676,8 +669,7 @@ end = struct
     else `Hash_mismatch (rh, actual)
 
   let main_loop t =
-    let (module Context) = t.context in
-    let open Context in
+    let open (val t.context) in
     let handle_answer :
            Root_hash.t
            * Addr.t Query.t
@@ -789,8 +781,8 @@ end = struct
                              be a power of 2 in the range 2-2^$depth"
                           , [ ( "depth"
                               , `Int
-                                  Context.compile_config
-                                    .sync_ledger_max_subtree_depth )
+                                  compile_config.sync_ledger_max_subtree_depth
+                              )
                             ] ) )
                   in
                   requeue_query ()
@@ -825,8 +817,7 @@ end = struct
     Linear_pipe.iter t.answers ~f:handle_answer
 
   let new_goal t h ~data ~equal =
-    let (module Context) = t.context in
-    let open Context in
+    let open (val t.context) in
     let should_skip =
       match t.desired_root with
       | None ->

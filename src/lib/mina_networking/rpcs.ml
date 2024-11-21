@@ -417,7 +417,7 @@ module Answer_sync_ledger_query = struct
 
       let response_of_callee_model : Master.T.response -> response = function
         | Ok a ->
-            Ok (Sync_ledger.Answer.Stable.V2.from_v3 a)
+            Sync_ledger.Answer.Stable.V2.from_v3 a
         | Error e ->
             Error e
 

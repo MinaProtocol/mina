@@ -76,7 +76,7 @@ module Answer = struct
       (* Not a standard versioning function *)
 
       (** Attempts to downgrade v3 -> v2 *)
-      let from_v3 : V3.t -> t =
+      let from_v3 : V3.t -> t Or_error.t =
        fun x -> Syncable_ledger.Answer.Stable.V1.from_v2 x
     end
   end]
