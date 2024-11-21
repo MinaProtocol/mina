@@ -712,7 +712,7 @@ let%test_module "Bootstrap_controller tests" =
     let max_frontier_length =
       Transition_frontier.global_max_length Genesis_constants.For_unit_tests.t
 
-    let logger = Logger.create ()
+    let logger = Logger.null ()
 
     let trust_system =
       let s = Trust_system.null () in
@@ -731,7 +731,7 @@ let%test_module "Bootstrap_controller tests" =
     let compile_config = Mina_compile_config.For_unit_tests.t
 
     module Context = struct
-      let logger = Logger.create ()
+      let logger = logger
 
       let precomputed_values = precomputed_values
 
