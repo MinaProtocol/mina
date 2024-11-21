@@ -56,8 +56,11 @@ match_count=0
 # Start time
 start_time=$(date +%s)
 
+# Wait timeout for next line in output
+next_line_timeout=60
+
 # Run the rosetta docker and check its output
-while  IFS= read -t 10 -r line; do
+while  IFS= read -t $next_line_timeout -r line; do
     # Get the current time
     current_time=$(date +%s)
     
