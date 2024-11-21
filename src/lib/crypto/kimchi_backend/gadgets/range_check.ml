@@ -2,21 +2,19 @@ open Core_kernel
 
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
+module Circuit = Kimchi_pasta_snarky_backend.Step_impl
+
 let tests_enabled = true
 
 (* Helper to create RangeCheck0 gate, configured in various ways
  *     - is_64bit   : create 64-bit range check
  *     - is_compact : compact limbs mode (only used by compact multi-range-check)
  *)
-let range_check0 (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ~(label : string) ?(is_compact : bool = false) (v0 : Circuit.Field.t)
-    (v0p0 : Circuit.Field.t) (v0p1 : Circuit.Field.t) =
+let range_check0 ~(label : string) ?(is_compact : bool = false)
+    (v0 : Circuit.Field.t) (v0p0 : Circuit.Field.t) (v0p1 : Circuit.Field.t) =
   let open Circuit in
   (* Define shorthand helper *)
-  let of_bits =
-    Common.as_prover_cvar_field_bits_le_to_cvar_field (module Circuit)
-  in
+  let of_bits = Common.as_prover_cvar_field_bits_le_to_cvar_field in
 
   (* Sanity check v0p0 and v1p1 correspond to the correct bits of v0 *)
   as_prover (fun () ->
@@ -74,16 +72,12 @@ let range_check0 (type f)
         } )
 
 (* Helper to create RangeCheck1 gate *)
-let range_check1 (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ~(label : string) (v0p0 : Circuit.Field.t) (v0p1 : Circuit.Field.t)
-    (v1p0 : Circuit.Field.t) (v1p1 : Circuit.Field.t) (v2 : Circuit.Field.t)
-    (v12 : Circuit.Field.t) =
+let range_check1 ~(label : string) (v0p0 : Circuit.Field.t)
+    (v0p1 : Circuit.Field.t) (v1p0 : Circuit.Field.t) (v1p1 : Circuit.Field.t)
+    (v2 : Circuit.Field.t) (v12 : Circuit.Field.t) =
   let open Circuit in
   (* Define shorthand helper *)
-  let of_bits =
-    Common.as_prover_cvar_field_bits_le_to_cvar_field (module Circuit)
-  in
+  let of_bits = Common.as_prover_cvar_field_bits_le_to_cvar_field in
 
   (* Create sublimbs - current row *)
   let v2c0 = of_bits v2 86 88 in
@@ -154,47 +148,31 @@ let range_check1 (type f)
         } )
 
 (* 64-bit range-check gadget - checks v0 \in [0, 2^64) *)
-let bits64 (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (v0 : Circuit.Field.t) =
-  range_check0
-    (module Circuit)
-    ~label:"range_check64" ~is_compact:false v0 Circuit.Field.zero
+let bits64 (v0 : Circuit.Field.t) =
+  range_check0 ~label:"range_check64" ~is_compact:false v0 Circuit.Field.zero
     Circuit.Field.zero
 
 (* multi-range-check gadget - checks v0,v1,v2 \in [0, 2^88) *)
-let multi (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (v0 : Circuit.Field.t) (v1 : Circuit.Field.t) (v2 : Circuit.Field.t) =
+let multi (v0 : Circuit.Field.t) (v1 : Circuit.Field.t) (v2 : Circuit.Field.t) =
   let open Circuit in
-  let of_bits =
-    Common.as_prover_cvar_field_bits_le_to_cvar_field (module Circuit)
-  in
+  let of_bits = Common.as_prover_cvar_field_bits_le_to_cvar_field in
   let v0p0 = of_bits v0 76 88 in
   let v0p1 = of_bits v0 64 76 in
-  range_check0
-    (module Circuit)
-    ~label:"multi_range_check" ~is_compact:false v0 v0p0 v0p1 ;
+  range_check0 ~label:"multi_range_check" ~is_compact:false v0 v0p0 v0p1 ;
   let v1p0 = of_bits v1 76 88 in
   let v1p1 = of_bits v1 64 76 in
-  range_check0
-    (module Circuit)
-    ~label:"multi_range_check" ~is_compact:false v1 v1p0 v1p1 ;
+  range_check0 ~label:"multi_range_check" ~is_compact:false v1 v1p0 v1p1 ;
   let zero = exists Field.typ ~compute:(fun () -> Field.Constant.zero) in
-  range_check1
-    (module Circuit)
-    ~label:"multi_range_check" v0p0 v0p1 v1p0 v1p1 v2 zero
+  range_check1 ~label:"multi_range_check" v0p0 v0p1 v1p0 v1p1 v2 zero
 
 (* compact multi-range-check gadget - checks
  *     - v0,v1,v2 \in [0, 2^88)
  *     - v01 = v0 + 2^88 * v1
  *)
-let compact_multi (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (v01 : Circuit.Field.t) (v2 : Circuit.Field.t) =
+let compact_multi (v01 : Circuit.Field.t) (v2 : Circuit.Field.t) =
   let open Circuit in
   (* Set up helper *)
-  let bignum_bigint_to_field = Common.bignum_bigint_to_field (module Circuit) in
+  let bignum_bigint_to_field = Common.bignum_bigint_to_field in
   (* Prepare range-check values *)
   let v1, v0 =
     exists
@@ -202,29 +180,19 @@ let compact_multi (type f)
       ~compute:(fun () ->
         (* Decompose v0 and v1 from v01 = 2^L * v1 + v0 *)
         let v01 =
-          Common.field_to_bignum_bigint
-            (module Circuit)
-            (As_prover.read Field.typ v01)
+          Common.field_to_bignum_bigint (As_prover.read Field.typ v01)
         in
         let v1, v0 = Common.(bignum_bigint_div_rem v01 two_to_limb) in
         (bignum_bigint_to_field v1, bignum_bigint_to_field v0) )
   in
-  let of_bits =
-    Common.as_prover_cvar_field_bits_le_to_cvar_field (module Circuit)
-  in
+  let of_bits = Common.as_prover_cvar_field_bits_le_to_cvar_field in
   let v2p0 = of_bits v2 76 88 in
   let v2p1 = of_bits v2 64 76 in
-  range_check0
-    (module Circuit)
-    ~label:"compact_multi_range_check" ~is_compact:false v2 v2p0 v2p1 ;
+  range_check0 ~label:"compact_multi_range_check" ~is_compact:false v2 v2p0 v2p1 ;
   let v0p0 = of_bits v0 76 88 in
   let v0p1 = of_bits v0 64 76 in
-  range_check0
-    (module Circuit)
-    ~label:"compact_multi_range_check" ~is_compact:true v0 v0p0 v0p1 ;
-  range_check1
-    (module Circuit)
-    ~label:"compact_multi_range_check" v2p0 v2p1 v0p0 v0p1 v1 v01
+  range_check0 ~label:"compact_multi_range_check" ~is_compact:true v0 v0p0 v0p1 ;
+  range_check1 ~label:"compact_multi_range_check" v2p0 v2p1 v0p0 v0p1 v1 v01
 
 (*********)
 (* Tests *)
@@ -244,12 +212,12 @@ let%test_unit "range_check64 gadget" =
      *)
     let test_range_check64 ?cs base10 =
       let open Runner.Impl in
-      let value = Common.field_of_base10 (module Runner.Impl) base10 in
+      let value = Common.field_of_base10 base10 in
 
       let make_circuit value =
         (* Circuit definition *)
         let value = exists Field.typ ~compute:(fun () -> value) in
-        bits64 (module Runner.Impl) value ;
+        bits64 value ;
         (* Padding *)
         Boolean.Assert.is_true (Field.equal value value)
       in
@@ -288,9 +256,9 @@ let%test_unit "multi_range_check gadget" =
     (* Helper to test multi_range_check gadget *)
     let test_multi_range_check ?cs v0 v1 v2 =
       let open Runner.Impl in
-      let v0 = Common.field_of_base10 (module Runner.Impl) v0 in
-      let v1 = Common.field_of_base10 (module Runner.Impl) v1 in
-      let v2 = Common.field_of_base10 (module Runner.Impl) v2 in
+      let v0 = Common.field_of_base10 v0 in
+      let v1 = Common.field_of_base10 v1 in
+      let v2 = Common.field_of_base10 v2 in
 
       let make_circuit v0 v1 v2 =
         (* Circuit definition *)
@@ -298,7 +266,7 @@ let%test_unit "multi_range_check gadget" =
           exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
               [| v0; v1; v2 |] )
         in
-        multi (module Runner.Impl) values.(0) values.(1) values.(2)
+        multi values.(0) values.(1) values.(2)
       in
 
       (* Generate and verify proof *)
@@ -364,15 +332,15 @@ let%test_unit "compact_multi_range_check gadget" =
     (* Helper to test compact_multi_range_check gadget *)
     let test_compact_multi_range_check v01 v2 : unit =
       let open Runner.Impl in
-      let v01 = Common.field_of_base10 (module Runner.Impl) v01 in
-      let v2 = Common.field_of_base10 (module Runner.Impl) v2 in
+      let v01 = Common.field_of_base10 v01 in
+      let v2 = Common.field_of_base10 v2 in
 
       let make_circuit v01 v2 =
         (* Circuit definition *)
         let v01, v2 =
           exists Typ.(Field.typ * Field.typ) ~compute:(fun () -> (v01, v2))
         in
-        compact_multi (module Runner.Impl) v01 v2
+        compact_multi v01 v2
       in
 
       (* Generate and verify first proof *)
