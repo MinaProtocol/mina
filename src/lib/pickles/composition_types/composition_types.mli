@@ -170,12 +170,12 @@ module Wrap : sig
                 .t =
             { plonk : 'plonk
             ; combined_inner_product : 'fp
-                  (** combined_inner_product = sum_{i < num_evaluation_points} sum_{j < num_polys} r^i xi^j f_j(pt_i) *)
+                  (** combined_inner_product = sum_{i < num_evaluation_points} sum_{j < num_polys} r^i polyscale^j f_j(pt_i) *)
             ; b : 'fp
                   (** b = challenge_poly plonk.zeta + r * challenge_poly (domain_generrator * plonk.zeta)
                 where challenge_poly(x) = \prod_i (1 + bulletproof_challenges.(i) * x^{2^{k - 1 - i}})
             *)
-            ; xi : 'scalar_challenge
+            ; polyscale : 'scalar_challenge
                   (** The challenge used for combining polynomials *)
             ; bulletproof_challenges : 'bulletproof_challenges
                   (** The challenges from the inner-product argument that was partially verified. *)
@@ -208,7 +208,7 @@ module Wrap : sig
         { plonk : 'plonk
         ; combined_inner_product : 'fp
         ; b : 'fp
-        ; xi : 'scalar_challenge
+        ; polyscale : 'scalar_challenge
         ; bulletproof_challenges : 'bulletproof_challenges
         ; branch_data : 'branch_data
         }
@@ -1001,8 +1001,8 @@ module Step : sig
       type ('plonk, 'scalar_challenge, 'fq, 'bulletproof_challenges) t_ =
         { plonk : 'plonk
         ; combined_inner_product : 'fq
-              (** combined_inner_product = sum_{i < num_evaluation_points} sum_{j < num_polys} r^i xi^j f_j(pt_i) *)
-        ; xi : 'scalar_challenge
+              (** combined_inner_product = sum_{i < num_evaluation_points} sum_{j < num_polys} r^i polyscale^j f_j(pt_i) *)
+        ; polyscale : 'scalar_challenge
               (** The challenge used for combining polynomials *)
         ; bulletproof_challenges : 'bulletproof_challenges
               (** The challenges from the inner-product argument that was partially verified. *)

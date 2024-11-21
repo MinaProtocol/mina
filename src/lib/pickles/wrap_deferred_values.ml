@@ -160,8 +160,8 @@ let expand_deferred (type n most_recent_width) ~zk_rows
    Array.iter ~f:absorb x2 ;
    List.iter xs ~f:(fun (x1, x2) ->
        Array.iter ~f:absorb x1 ; Array.iter ~f:absorb x2 ) ) ;
-  let xi_chal = squeeze () in
-  let xi = sc xi_chal in
+  let polyscale_chal = squeeze () in
+  let polyscale = sc polyscale_chal in
   let r_chal = squeeze () in
   let r = sc r_chal in
   Timer.clock __LOC__ ;
@@ -173,7 +173,7 @@ let expand_deferred (type n most_recent_width) ~zk_rows
     Wrap.combined_inner_product ~env:tick_env ~plonk:tick_plonk_minimal
       ~domain:tick_domain ~ft_eval1:evals.ft_eval1
       ~actual_proofs_verified:(Nat.Add.create actual_proofs_verified)
-      evals.evals ~old_bulletproof_challenges ~r ~xi ~zeta ~zetaw
+      evals.evals ~old_bulletproof_challenges ~r ~polyscale ~zeta ~zetaw
   in
   Timer.clock __LOC__ ;
   let bulletproof_challenges =
@@ -190,7 +190,7 @@ let expand_deferred (type n most_recent_width) ~zk_rows
   let to_shifted =
     Shifted_value.Type1.of_field (module Tick.Field) ~shift:Shifts.tick1
   in
-  { xi = xi_chal
+  { polyscale = polyscale_chal
   ; plonk
   ; combined_inner_product = to_shifted combined_inner_product_actual
   ; branch_data

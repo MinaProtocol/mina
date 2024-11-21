@@ -1519,7 +1519,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         }
                       in
                       let r = scalar_chal O.u in
-                      let xi = scalar_chal O.v in
+                      let polyscale = scalar_chal O.v in
                       let to_field =
                         SC.to_field_constant
                           (module Tick.Field)
@@ -1528,7 +1528,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       let module As_field = struct
                         let r = to_field r
 
-                        let xi = to_field xi
+                        let polyscale = to_field polyscale
 
                         let zeta = to_field plonk0.zeta
 
@@ -1616,7 +1616,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               (let x1, x2 = x_hat in
                                ([| x1 |], [| x2 |]) )
                           }
-                          ~r ~xi ~zeta ~zetaw
+                          ~r ~polyscale ~zeta ~zetaw
                           ~old_bulletproof_challenges:prev_challenges
                           ~env:tick_env ~domain:tick_domain
                           ~ft_eval1:proof.proof.openings.ft_eval1
@@ -1719,7 +1719,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       in
                       { proof_state =
                           { deferred_values =
-                              { xi
+                              { polyscale
                               ; b = shift_value b
                               ; bulletproof_challenges =
                                   Vector.of_array_and_length_exn

@@ -229,9 +229,9 @@ struct
     with_label __LOC__ (fun () ->
         Ops.scale_fast2 p s ~num_bits:Field.size_in_bits )
 
-  let check_bulletproof ~pcs_batch ~(sponge : Sponge.t) ~xi
+  let check_bulletproof ~pcs_batch ~(sponge : Sponge.t) ~polyscale
       ~(* Corresponds to y in figure 7 of WTS *)
-       (* sum_i r^i sum_j xi^j f_j(beta_i) *)
+       (* sum_i r^i sum_j polyscale^j f_j(beta_i) *)
       (advice : _ Bulletproof.Advice.t)
       ~polynomials:(without_degree_bound, with_degree_bound)
       ~opening:
@@ -250,7 +250,8 @@ struct
           group_map t
         in
         let open Inner_curve in
-        let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
+        let combined_polynomial
+            (* Corresponds to polyscale in figure 7 of WTS *) =
           with_label "combined_polynomial" (fun () ->
               Pcs_batch.combine_split_commitments pcs_batch
                 ~reduce_without_degree_bound:Array.to_list
@@ -263,7 +264,8 @@ struct
                 ~scale_and_add:(fun ~(acc :
                                        [ `Maybe_finite of
                                          Boolean.var * Inner_curve.t
-                                       | `Finite of Inner_curve.t ] ) ~xi p ->
+                                       | `Finite of Inner_curve.t ] ) ~polyscale
+                                    p ->
                   match acc with
                   | `Maybe_finite (acc_is_finite, (acc : Inner_curve.t)) -> (
                       match p with
@@ -271,24 +273,30 @@ struct
                           let is_finite =
                             Boolean.(p_is_finite ||| acc_is_finite)
                           in
-                          let xi_acc = Scalar_challenge.endo acc xi in
+                          let polyscale_acc =
+                            Scalar_challenge.endo acc polyscale
+                          in
                           `Maybe_finite
                             ( is_finite
-                            , if_ acc_is_finite ~then_:(p + xi_acc) ~else_:p )
+                            , if_ acc_is_finite ~then_:(p + polyscale_acc)
+                                ~else_:p )
                       | `Finite p ->
-                          let xi_acc = Scalar_challenge.endo acc xi in
+                          let polyscale_acc =
+                            Scalar_challenge.endo acc polyscale
+                          in
                           `Finite
-                            (if_ acc_is_finite ~then_:(p + xi_acc) ~else_:p) )
+                            (if_ acc_is_finite ~then_:(p + polyscale_acc)
+                               ~else_:p ) )
                   | `Finite acc ->
-                      let xi_acc = Scalar_challenge.endo acc xi in
+                      let polyscale_acc = Scalar_challenge.endo acc polyscale in
                       `Finite
                         ( match p with
                         | `Finite p ->
-                            p + xi_acc
+                            p + polyscale_acc
                         | `Maybe_finite (p_is_finite, p) ->
-                            if_ p_is_finite ~then_:(p + xi_acc) ~else_:xi_acc )
-                  )
-                ~xi
+                            if_ p_is_finite ~then_:(p + polyscale_acc)
+                              ~else_:polyscale_acc ) )
+                ~polyscale
                 ~init:(function
                   | `Finite x ->
                       Some (`Finite x)
@@ -487,7 +495,7 @@ struct
          [ `Known of Domain.t
          | `Side_loaded of
            Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ] )
-      ~srs ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
+      ~srs ~verification_key:(m : _ Plonk_verification_key_evals.t) ~polyscale ~sponge
       ~sponge_after_index
       ~(public_input :
          [ `Field of Field.t | `Packed_bits of Field.t * int ] array )
@@ -559,7 +567,7 @@ struct
         let sponge_before_evaluations = Sponge.copy sponge in
         let sponge_digest_before_evaluations = Sponge.squeeze_field sponge in
 
-        (* xi, r are sampled here using the other sponge. *)
+        (* polyscale, r are sampled here using the other sponge. *)
         (* No need to expose the polynomial evaluations as deferred values as they're
            not needed here for the incremental verification. All we need is a_hat and
            "combined_inner_product".
@@ -609,7 +617,7 @@ struct
                   (Common.dlog_pcs_batch
                      (Wrap_hack.Padded_length.add
                         num_commitments_without_degree_bound ) )
-                ~sponge:sponge_before_evaluations ~xi ~advice ~opening
+                ~sponge:sponge_before_evaluations ~polyscale ~advice ~opening
                 ~polynomials:(without_degree_bound, []) )
         in
         let joint_combiner = None in
@@ -818,7 +826,7 @@ struct
 
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
      It
-     1. Checks that [xi] and [r] where sampled correctly. I.e., by absorbing all the
+     1. Checks that [polyscale] and [r] where sampled correctly. I.e., by absorbing all the
      evaluation openings and then squeezing.
      2. Checks that the "combined inner product" value used in the elliptic curve part of
      the opening proof was computed correctly, in terms of the evaluation openings and the
@@ -834,7 +842,7 @@ struct
       ~(* TODO: Add "actual proofs verified" so that proofs don't
           carry around dummy "old bulletproof challenges" *)
        sponge ~(prev_challenges : (_, b) Vector.t)
-      ({ xi
+      ({ polyscale
        ; combined_inner_product
        ; bulletproof_challenges
        ; branch_data
@@ -951,13 +959,15 @@ struct
     in
     sponge.state <- sponge_state ;
     let squeeze () = squeeze_challenge sponge in
-    let xi_actual = squeeze () in
+    let polyscale_actual = squeeze () in
     let r_actual = squeeze () in
-    let xi_correct =
-      Field.equal xi_actual
-        (match xi with { Import.Scalar_challenge.inner = xi } -> xi)
+    let polyscale_correct =
+      Field.equal polyscale_actual
+        ( match polyscale with
+        | { Import.Scalar_challenge.inner = polyscale } ->
+            polyscale )
     in
-    let xi = scalar xi in
+    let polyscale = scalar polyscale in
     let r = scalar (Import.Scalar_challenge.create r_actual) in
     let plonk_minimal =
       Plonk.to_minimal plonk ~to_option:Opt.to_option_unsafe
@@ -1017,7 +1027,7 @@ struct
       in
       print_fp "ft_eval0" ft_eval0 ;
       print_fp "ft_eval1" ft_eval1 ;
-      (* sum_i r^i sum_j xi^j f_j(beta_i) *)
+      (* sum_i r^i sum_j polyscale^j f_j(beta_i) *)
       let actual_combined_inner_product =
         let combine ~ft ~sg_evals x_hat
             (e : (Field.t array, _) Evals.In_circuit.t) =
@@ -1039,7 +1049,7 @@ struct
             List.append sg_evals
               (Array.map ~f:Opt.just x_hat :: [| Opt.just ft |] :: a)
           in
-          Common.combined_evaluation (module Impl) ~xi v
+          Common.combined_evaluation (module Impl) ~polyscale v
         in
         with_label "combine" (fun () ->
             combine ~ft:ft_eval0 ~sg_evals:sg_evals1 evals1.public_input
@@ -1080,12 +1090,12 @@ struct
             (module Impl)
             ~env ~shift:shift1 plonk combined_evals )
     in
-    print_bool "xi_correct" xi_correct ;
+    print_bool "polyscale_correct" polyscale_correct ;
     print_bool "combined_inner_product_correct" combined_inner_product_correct ;
     print_bool "plonk_checks_passed" plonk_checks_passed ;
     print_bool "b_correct" b_correct ;
     ( Boolean.all
-        [ xi_correct
+        [ polyscale_correct
         ; b_correct
         ; combined_inner_product_correct
         ; plonk_checks_passed
@@ -1190,7 +1200,7 @@ struct
                `Packed_bits (x, n) )
     in
     let sponge = Sponge.create sponge_params in
-    let { Types.Step.Proof_state.Deferred_values.xi
+    let { Types.Step.Proof_state.Deferred_values.polyscale
         ; combined_inner_product
         ; b
         ; _
@@ -1200,8 +1210,8 @@ struct
     let ( sponge_digest_before_evaluations_actual
         , (`Success bulletproof_success, bulletproof_challenges_actual) ) =
       incrementally_verify_proof ~srs proofs_verified ~srs ~domain:wrap_domain
-        ~xi ~verification_key:wrap_verification_key ~sponge ~sponge_after_index
-        ~public_input ~sg_old
+        ~polyscale ~verification_key:wrap_verification_key ~sponge
+        ~sponge_after_index ~public_input ~sg_old
         ~advice:{ b; combined_inner_product }
         ~proof
         ~plonk:
