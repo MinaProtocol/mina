@@ -16,6 +16,7 @@ RUNTIME_LEDGER_APP=_build/default/src/app/runtime_genesis_ledger/runtime_genesis
 
 TEMP_FOLDER=$(mktemp -d)
 ACCOUNTS_FILE=$TEMP_FOLDER/accounts.json
+TEMP_ACCOUNTS_FILE=$TEMP_FOLDER/accounts_tmp.json
 GENESIS_LEDGER=$TEMP_FOLDER/genesis_ledger.config
 SENDER=$TEMP_FOLDER/sender
 
@@ -32,7 +33,9 @@ $MINA_APP ledger test generate-accounts -n 20000 --min-balance 1000 --max-balanc
 echo "Adapt ledger for tests"
 
 # give more MINA to first account which will be sending founds
-jq '(.[0] | .balance ) |= "20000000"' $ACCOUNTS_FILE > $ACCOUNTS_FILE
+jq '(.[0] | .balance ) |= "20000000"' $ACCOUNTS_FILE > $TEMP_ACCOUNTS_FILE
+mv $TEMP_ACCOUNTS_FILE $ACCOUNTS_FILE
+
 # construct correct ledger file
 jq  '{ ledger: { accounts:( $inputs | .[] ) , "add_genesis_winner": false } }' $ACCOUNTS_FILE --slurpfile inputs $ACCOUNTS_FILE > $GENESIS_LEDGER
 
