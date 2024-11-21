@@ -308,7 +308,7 @@ class JaneStreetBenchmark(Benchmark, ABC):
 
             for start, end in zip(starts, ends):
                 name = parse.parse('Running inline tests in library "{}"',
-                                   lines[start].strip())[0]
+                                   lines[start-1].strip())[0]
                 file = f'{name}_{output_filename}'
                 logger.info(f"exporting {file}..")
                 self.export_to_csv(lines[start:end], f'{file}', influxdb,
