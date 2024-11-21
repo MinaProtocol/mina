@@ -67,8 +67,12 @@ module type S = sig
   end]
 
   val typ :
-       ('a, 'b, 'f) Snarky_backendless.Typ.t
-    -> ('a t, 'b t, 'f) Snarky_backendless.Typ.t
+       ('a, 'b) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+    -> ('a t, 'b t) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+
+  val wrap_typ :
+       ('a, 'b) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
+    -> ('a t, 'b t) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
 
@@ -104,7 +108,13 @@ module Type1 = struct
   let typ f =
     let there (Shifted_value x) = x in
     let back x = Shifted_value x in
-    Snarky_backendless.Typ.(
+    Kimchi_pasta_snarky_backend.Step_impl.Typ.(
+      transport_var (transport f ~there ~back) ~there ~back)
+
+  let wrap_typ f =
+    let there (Shifted_value x) = x in
+    let back x = Shifted_value x in
+    Kimchi_pasta_snarky_backend.Wrap_impl.Typ.(
       transport_var (transport f ~there ~back) ~there ~back)
 
   let map (Shifted_value x) ~f = Shifted_value (f x)
@@ -162,7 +172,13 @@ module Type2 = struct
   let typ f =
     let there (Shifted_value x) = x in
     let back x = Shifted_value x in
-    Snarky_backendless.Typ.(
+    Kimchi_pasta_snarky_backend.Step_impl.Typ.(
+      transport_var (transport f ~there ~back) ~there ~back)
+
+  let wrap_typ f =
+    let there (Shifted_value x) = x in
+    let back x = Shifted_value x in
+    Kimchi_pasta_snarky_backend.Wrap_impl.Typ.(
       transport_var (transport f ~there ~back) ~there ~back)
 
   let map (Shifted_value x) ~f = Shifted_value (f x)
