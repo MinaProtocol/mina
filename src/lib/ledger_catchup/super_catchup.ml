@@ -683,8 +683,7 @@ let check_invariant ~downloader t =
          Node.State.Enum.equal (Node.State.enum node.state) To_download ) )
 
 let download s d ~key ~attempts =
-  let logger = Logger.create () in
-  [%log debug]
+  [%log' debug (Downloader.logger d)]
     ~metadata:[ ("key", Downloader.Key.to_yojson key); ("caller", `String s) ]
     "Download download $key" ;
   Downloader.download d ~key ~attempts
