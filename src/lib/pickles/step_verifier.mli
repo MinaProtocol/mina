@@ -26,11 +26,7 @@ module Other_field : sig
 
   val size_in_bits : int
 
-  val typ :
-    ( t
-    , Impls.Step.Other_field.Constant.t
-    , Impls.Step.Internal_Basic.field )
-    Snarky_backendless.Typ.t
+  val typ : (t, Impls.Step.Other_field.Constant.t) Impls.Step.Typ.t
 end
 
 val assert_n_bits :

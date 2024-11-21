@@ -423,7 +423,7 @@ let glue_sync_ledger :
     Sl_downloader.create ~preferred ~max_batch_size:100
       ~peers:(fun () -> peers t)
       ~knowledge_context:root_hash_r ~knowledge ~stop:global_stop
-      ~trust_system:t.trust_system
+      ~logger:t.logger ~trust_system:t.trust_system
       ~get:(fun (peer : Peer.t) qs ->
         List.iter qs ~f:(fun (h, _) ->
             if

@@ -467,8 +467,7 @@ let constraint_system_digests ~proof_level ~constraint_constants () =
            ()
          in
          Tick.constraint_system ~input_typ:Statement.typ
-           ~return_typ:(Snarky_backendless.Typ.unit ())
-           main ) )
+           ~return_typ:Tick.Typ.unit main ) )
   ]
 
 module Make (T : sig

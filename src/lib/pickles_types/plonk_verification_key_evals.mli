@@ -33,8 +33,8 @@ type 'comm t = 'comm Stable.Latest.t =
 [@@deriving sexp, equal, compare, hash, yojson, hlist]
 
 val typ :
-     ('a, 'b, 'c) Snarky_backendless.Typ.t
-  -> ('a t, 'b t, 'c) Snarky_backendless.Typ.t
+     ('a, 'b) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+  -> ('a t, 'b t) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
 
 (** [map t ~f] applies [f] to all elements of type ['a] within record [t] and
     returns the result. In particular, [f] is applied to the elements of
@@ -69,14 +69,6 @@ module Step : sig
     ; lookup_selector_ffmul : 'opt_comm
     }
   [@@deriving sexp, equal, compare, hash, yojson, hlist]
-
-  val typ :
-       ('comm_var, 'comm_value, 'c) Snarky_backendless.Typ.t
-    -> ('opt_comm_var, 'opt_comm_value, 'c) Snarky_backendless.Typ.t
-    -> ( ('comm_var, 'opt_comm_var) t
-       , ('comm_value, 'opt_comm_value) t
-       , 'c )
-       Snarky_backendless.Typ.t
 
   val map :
        ('comm1, 'opt_comm1) t

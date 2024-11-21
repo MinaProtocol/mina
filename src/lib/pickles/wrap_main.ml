@@ -206,12 +206,11 @@ let wrap_main
             with_label __LOC__ (fun () ->
                 let open Types.Step.Proof_state in
                 let typ =
-                  typ
-                    (module Impl)
+                  wrap_typ
                     ~assert_16_bits:(Wrap_verifier.assert_n_bits ~n:16)
                     (Vector.init Max_proofs_verified.n ~f:(fun _ ->
                          Plonk_types.Features.none ) )
-                    (Shifted_value.Type2.typ Field.typ)
+                    (Shifted_value.Type2.wrap_typ Field.typ)
                 in
                 exists typ ~request:(fun () -> Req.Proof_state) )
           in
@@ -315,19 +314,19 @@ let wrap_main
           in
           let prev_step_accs =
             with_label __LOC__ (fun () ->
-                exists (Vector.typ Inner_curve.typ Max_proofs_verified.n)
+                exists (Vector.wrap_typ Inner_curve.typ Max_proofs_verified.n)
                   ~request:(fun () -> Req.Step_accs) )
           in
           let old_bp_chals =
             with_label __LOC__ (fun () ->
                 let typ =
                   let module T =
-                    H1.Typ (Impls.Wrap) (Nat) (Challenges_vector)
+                    H1.Wrap_typ (Nat) (Challenges_vector)
                       (Challenges_vector.Constant)
                       (struct
                         let f (type n) (n : n Nat.t) =
-                          Vector.typ
-                            (Vector.typ Field.typ Backend.Tock.Rounds.n)
+                          Vector.wrap_typ
+                            (Vector.wrap_typ Field.typ Backend.Tock.Rounds.n)
                             n
                       end)
                   in
@@ -356,11 +355,10 @@ let wrap_main
                 let evals =
                   let ty =
                     let ty =
-                      Plonk_types.All_evals.typ
-                        (module Impl)
-                        ~num_chunks:1 Plonk_types.Features.Full.none
+                      Plonk_types.All_evals.wrap_typ ~num_chunks:1
+                        Plonk_types.Features.Full.none
                     in
-                    Vector.typ ty Max_proofs_verified.n
+                    Vector.wrap_typ ty Max_proofs_verified.n
                   in
                   exists ty ~request:(fun () -> Req.Evals)
                 in
@@ -370,7 +368,7 @@ let wrap_main
                       Wrap_verifier.all_possible_domains ()
                     in
                     let wrap_domain_indices =
-                      exists (Vector.typ Field.typ Max_proofs_verified.n)
+                      exists (Vector.wrap_typ Field.typ Max_proofs_verified.n)
                         ~request:(fun () -> Req.Wrap_domain_indices)
                     in
                     Vector.map wrap_domain_indices ~f:(fun index ->
@@ -456,7 +454,7 @@ let wrap_main
           let openings_proof =
             let shift = Shifts.tick1 in
             exists
-              (Plonk_types.Openings.Bulletproof.typ
+              (Plonk_types.Openings.Bulletproof.wrap_typ
                  ( Typ.transport Wrap_verifier.Other_field.Packed.typ
                      ~there:(fun x ->
                        (* When storing, make it a shifted value *)
@@ -486,9 +484,7 @@ let wrap_main
             let messages =
               with_label __LOC__ (fun () ->
                   exists
-                    (Plonk_types.Messages.typ
-                       (module Impl)
-                       Inner_curve.typ ~bool:Boolean.typ feature_flags
+                    (Plonk_types.Messages.wrap_typ Inner_curve.typ feature_flags
                        ~dummy:Inner_curve.Params.one
                        ~commitment_lengths:
                          (Commitment_lengths.default ~num_chunks) )

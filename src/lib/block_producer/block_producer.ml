@@ -364,6 +364,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 in
                 let body_reference =
                   Staged_ledger_diff.Body.compute_reference
+                    ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
                     (Body.create @@ Staged_ledger_diff.forget diff)
                 in
                 let blockchain_state =

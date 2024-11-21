@@ -1,8 +1,19 @@
 open Core_kernel
+module Step_impl = Kimchi_pasta_snarky_backend.Step_impl
+module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl
 
 let padded_array_typ ~length ~dummy elt =
-  Snarky_backendless.Typ.array ~length elt
-  |> Snarky_backendless.Typ.transport
+  Step_impl.Typ.array ~length elt
+  |> Step_impl.Typ.transport
+       ~there:(fun a ->
+         let n = Array.length a in
+         if n > length then failwithf "Expected %d <= %d" n length () ;
+         Array.append a (Array.create ~len:(length - n) dummy) )
+       ~back:Fn.id
+
+let wrap_padded_array_typ ~length ~dummy elt =
+  Wrap_impl.Typ.array ~length elt
+  |> Wrap_impl.Typ.transport
        ~there:(fun a ->
          let n = Array.length a in
          if n > length then failwithf "Expected %d <= %d" n length () ;
@@ -367,18 +378,17 @@ module Features = struct
         ; runtime_tables
         } =
     (* TODO: This should come from snarky. *)
-    let constant (type var value)
-        (typ : (var, value, _) Snarky_backendless.Typ.t) (x : value) : var =
+    let module Impl = Step_impl in
+    let constant (type var value) (typ : (var, value) Impl.Typ.t) (x : value) :
+        var =
       let (Typ typ) = typ in
       let fields, aux = typ.value_to_fields x in
-      let fields =
-        Array.map ~f:(fun x -> Snarky_backendless.Cvar.Constant x) fields
-      in
+      let fields = Array.map ~f:(fun x -> Impl.Field.constant x) fields in
       typ.var_of_fields (fields, aux)
     in
     let constant_typ ~there value =
-      let open Snarky_backendless.Typ in
-      unit ()
+      let open Impl.Typ in
+      unit
       |> transport ~there ~back:(fun () -> value)
       |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant bool value)
     in
@@ -394,7 +404,7 @@ module Features = struct
       | Opt.Flag.Maybe ->
           bool
     in
-    Snarky_backendless.Typ.of_hlistable
+    Impl.Typ.of_hlistable
       [ bool_typ_of_flag range_check0
       ; bool_typ_of_flag range_check1
       ; bool_typ_of_flag foreign_field_add
@@ -1174,16 +1184,13 @@ module Evals = struct
         ; foreign_field_mul_lookup_selector
         ]
 
-  let typ (type f a_var a)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-      ~dummy e
+  let typ (type a_var a) ~dummy e
       ({ uses_lookups; lookups_per_row_3; lookups_per_row_4; _ } as
        feature_flags :
         _ Features.Full.t ) :
-      ((a_var, Impl.Boolean.var) In_circuit.t, a t, f) Snarky_backendless.Typ.t
-      =
-    let open Impl in
-    let opt flag = Opt.typ Impl.Boolean.typ flag e ~dummy in
+      ((a_var, Step_impl.Boolean.var) In_circuit.t, a t) Step_impl.Typ.t =
+    let open Step_impl in
+    let opt flag = Opt.typ flag e ~dummy in
     let lookup_sorted =
       let lookups_per_row_3 = opt lookups_per_row_3 in
       let lookups_per_row_4 = opt lookups_per_row_4 in
@@ -1200,6 +1207,54 @@ module Evals = struct
       ; Vector.typ e Columns.n
       ; e
       ; Vector.typ e Permuts_minus_1.n
+      ; e
+      ; e
+      ; e
+      ; e
+      ; e
+      ; e
+      ; opt feature_flags.range_check0
+      ; opt feature_flags.range_check1
+      ; opt feature_flags.foreign_field_add
+      ; opt feature_flags.foreign_field_mul
+      ; opt feature_flags.xor
+      ; opt feature_flags.rot
+      ; opt uses_lookups
+      ; opt uses_lookups
+      ; lookup_sorted
+      ; opt feature_flags.runtime_tables
+      ; opt feature_flags.runtime_tables
+      ; opt feature_flags.lookup_pattern_xor
+      ; opt feature_flags.lookup
+      ; opt feature_flags.lookup_pattern_range_check
+      ; opt feature_flags.foreign_field_mul
+      ]
+      ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+  let wrap_typ (type a_var a) ~dummy e
+      ({ uses_lookups; lookups_per_row_3; lookups_per_row_4; _ } as
+       feature_flags :
+        _ Features.Full.t ) :
+      ((a_var, Wrap_impl.Boolean.var) In_circuit.t, a t) Wrap_impl.Typ.t =
+    let open Wrap_impl in
+    let opt flag = Opt.wrap_typ flag e ~dummy in
+    let lookup_sorted =
+      let lookups_per_row_3 = opt lookups_per_row_3 in
+      let lookups_per_row_4 = opt lookups_per_row_4 in
+      Vector.wrap_typ'
+        [ lookups_per_row_3
+        ; lookups_per_row_3
+        ; lookups_per_row_3
+        ; lookups_per_row_3
+        ; lookups_per_row_4
+        ]
+    in
+    Typ.of_hlistable
+      [ Vector.wrap_typ e Columns.n
+      ; Vector.wrap_typ e Columns.n
+      ; e
+      ; Vector.wrap_typ e Permuts_minus_1.n
       ; e
       ; e
       ; e
@@ -1259,9 +1314,16 @@ module All_evals = struct
         : (b1, b2) t =
       { public_input = f1 t.public_input; evals = Evals.map ~f:f2 t.evals }
 
-    let typ impl feature_flags f f_multi ~dummy =
-      let evals = Evals.typ impl f_multi feature_flags ~dummy in
-      let open Snarky_backendless.Typ in
+    let typ feature_flags f f_multi ~dummy =
+      let evals = Evals.typ f_multi feature_flags ~dummy in
+      let open Step_impl.Typ in
+      of_hlistable [ f; evals ] ~var_to_hlist:In_circuit.to_hlist
+        ~var_of_hlist:In_circuit.of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
+
+    let wrap_typ feature_flags f f_multi ~dummy =
+      let evals = Evals.wrap_typ f_multi feature_flags ~dummy in
+      let open Wrap_impl.Typ in
       of_hlistable [ f; evals ] ~var_to_hlist:In_circuit.to_hlist
         ~var_of_hlist:In_circuit.of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
@@ -1310,17 +1372,27 @@ module All_evals = struct
     ; ft_eval1 = f1 t.ft_eval1
     }
 
-  let typ (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-      ~num_chunks feature_flags =
+  let typ ~num_chunks feature_flags =
+    let module Impl = Step_impl in
     let open Impl.Typ in
     let single = array ~length:num_chunks field in
     let dummy = Array.init num_chunks ~f:(fun _ -> Impl.Field.Constant.zero) in
     let evals =
-      With_public_input.typ
-        (module Impl)
-        feature_flags (tuple2 single single) (tuple2 single single)
-        ~dummy:(dummy, dummy)
+      With_public_input.typ feature_flags (tuple2 single single)
+        (tuple2 single single) ~dummy:(dummy, dummy)
+    in
+    of_hlistable [ evals; Impl.Field.typ ] ~var_to_hlist:In_circuit.to_hlist
+      ~var_of_hlist:In_circuit.of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
+
+  let wrap_typ ~num_chunks feature_flags =
+    let module Impl = Wrap_impl in
+    let open Impl.Typ in
+    let single = array ~length:num_chunks field in
+    let dummy = Array.init num_chunks ~f:(fun _ -> Impl.Field.Constant.zero) in
+    let evals =
+      With_public_input.wrap_typ feature_flags (tuple2 single single)
+        (tuple2 single single) ~dummy:(dummy, dummy)
     in
     of_hlistable [ evals; Impl.Field.typ ] ~var_to_hlist:In_circuit.to_hlist
       ~var_of_hlist:In_circuit.of_hlist ~value_to_hlist:to_hlist
@@ -1350,7 +1422,14 @@ module Openings = struct
     end]
 
     let typ fq g ~length =
-      let open Snarky_backendless.Typ in
+      let open Step_impl.Typ in
+      of_hlistable
+        [ array ~length (g * g); fq; fq; g; g ]
+        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
+
+    let wrap_typ fq g ~length =
+      let open Wrap_impl.Typ in
       of_hlistable
         [ array ~length (g * g); fq; fq; g; g ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
@@ -1389,14 +1468,13 @@ module Poly_comm = struct
 
     let padded_array_typ0 = padded_array_typ
 
-    let typ (type f g g_var bool_var)
-        (g : (g_var, g, f) Snarky_backendless.Typ.t) ~length
-        ~dummy_group_element
-        ~(bool : (bool_var, bool, f) Snarky_backendless.Typ.t) :
-        ((bool_var * g_var) t, g Or_infinity.t t, f) Snarky_backendless.Typ.t =
-      let open Snarky_backendless.Typ in
+    let typ (type g g_var) (g : (g_var, g) Step_impl.Typ.t) ~length
+        ~dummy_group_element :
+        ((Step_impl.Boolean.var * g_var) t, g Or_infinity.t t) Step_impl.Typ.t =
+      let open Step_impl.Typ in
       let g_inf =
-        transport (tuple2 bool g)
+        transport
+          (tuple2 Step_impl.Boolean.typ g)
           ~there:(function
             | Or_infinity.Infinity ->
                 (false, dummy_group_element)
@@ -1405,6 +1483,26 @@ module Poly_comm = struct
           ~back:(fun (b, x) -> if b then Infinity else Finite x)
       in
       let arr = padded_array_typ0 ~length ~dummy:Or_infinity.Infinity g_inf in
+      of_hlistable [ arr; g_inf ] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+    let wrap_typ (type g g_var) (g : (g_var, g) Wrap_impl.Typ.t) ~length
+        ~dummy_group_element :
+        ((Wrap_impl.Boolean.var * g_var) t, g Or_infinity.t t) Wrap_impl.Typ.t =
+      let open Wrap_impl.Typ in
+      let g_inf =
+        transport
+          (tuple2 Wrap_impl.Boolean.typ g)
+          ~there:(function
+            | Or_infinity.Infinity ->
+                (false, dummy_group_element)
+            | Finite x ->
+                (true, x) )
+          ~back:(fun (b, x) -> if b then Infinity else Finite x)
+      in
+      let arr =
+        wrap_padded_array_typ ~length ~dummy:Or_infinity.Infinity g_inf
+      in
       of_hlistable [ arr; g_inf ] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
   end
@@ -1469,21 +1567,36 @@ module Messages = struct
       ; runtime = None
       }
 
-    let typ bool_typ e ~lookups_per_row_4 ~runtime_tables ~dummy =
-      Snarky_backendless.Typ.of_hlistable
+    let typ e ~lookups_per_row_4 ~runtime_tables ~dummy =
+      Step_impl.Typ.of_hlistable
         [ Vector.typ e Lookup_sorted_minus_1.n
-        ; Opt.typ bool_typ lookups_per_row_4 e ~dummy
+        ; Opt.typ lookups_per_row_4 e ~dummy
         ; e
-        ; Opt.typ bool_typ runtime_tables e ~dummy
+        ; Opt.typ runtime_tables e ~dummy
         ]
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
 
-    let opt_typ bool_typ ~(uses_lookup : Opt.Flag.t)
+    let opt_typ ~(uses_lookup : Opt.Flag.t) ~(lookups_per_row_4 : Opt.Flag.t)
+        ~(runtime_tables : Opt.Flag.t) ~dummy:z elt =
+      Opt.typ uses_lookup ~dummy:(dummy z)
+        (typ ~lookups_per_row_4 ~runtime_tables ~dummy:z elt)
+
+    let wrap_typ e ~lookups_per_row_4 ~runtime_tables ~dummy =
+      Wrap_impl.Typ.of_hlistable
+        [ Vector.wrap_typ e Lookup_sorted_minus_1.n
+        ; Opt.wrap_typ lookups_per_row_4 e ~dummy
+        ; e
+        ; Opt.wrap_typ runtime_tables e ~dummy
+        ]
+        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+        ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
+
+    let wrap_opt_typ ~(uses_lookup : Opt.Flag.t)
         ~(lookups_per_row_4 : Opt.Flag.t) ~(runtime_tables : Opt.Flag.t)
         ~dummy:z elt =
-      Opt.typ bool_typ uses_lookup ~dummy:(dummy z)
-        (typ bool_typ ~lookups_per_row_4 ~runtime_tables ~dummy:z elt)
+      Opt.wrap_typ uses_lookup ~dummy:(dummy z)
+        (wrap_typ ~lookups_per_row_4 ~runtime_tables ~dummy:z elt)
   end
 
   [%%versioned
@@ -1520,28 +1633,51 @@ module Messages = struct
     [@@deriving hlist, fields]
   end
 
-  let typ (type n f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) g
+  let typ (type n) g
       ({ runtime_tables; uses_lookups; lookups_per_row_4; _ } :
         Opt.Flag.t Features.Full.t ) ~dummy
-      ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) ~bool
-      =
-    let open Snarky_backendless.Typ in
+      ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) =
+    let module Impl = Step_impl in
+    let open Impl.Typ in
     let { Poly.w = w_lens; z; t } = commitment_lengths in
     let array ~length elt = padded_array_typ ~dummy ~length elt in
     let wo n = array ~length:(Vector.reduce_exn n ~f:Int.max) g in
     let _w n =
       With_degree_bound.typ g
         ~length:(Vector.reduce_exn n ~f:Int.max)
-        ~dummy_group_element:dummy ~bool
+        ~dummy_group_element:dummy
     in
     let lookup =
-      Lookup.opt_typ Impl.Boolean.typ ~uses_lookup:uses_lookups
-        ~lookups_per_row_4 ~runtime_tables ~dummy:[| dummy |]
+      Lookup.opt_typ ~uses_lookup:uses_lookups ~lookups_per_row_4
+        ~runtime_tables ~dummy:[| dummy |]
         (wo [ 1 ])
     in
     of_hlistable
       [ Vector.typ (wo w_lens) Columns.n; wo [ z ]; wo [ t ]; lookup ]
+      ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+  let wrap_typ (type n) g
+      ({ runtime_tables; uses_lookups; lookups_per_row_4; _ } :
+        Opt.Flag.t Features.Full.t ) ~dummy
+      ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) =
+    let module Impl = Wrap_impl in
+    let open Impl.Typ in
+    let { Poly.w = w_lens; z; t } = commitment_lengths in
+    let array ~length elt = wrap_padded_array_typ ~dummy ~length elt in
+    let wo n = array ~length:(Vector.reduce_exn n ~f:Int.max) g in
+    let _w n =
+      With_degree_bound.wrap_typ g
+        ~length:(Vector.reduce_exn n ~f:Int.max)
+        ~dummy_group_element:dummy
+    in
+    let lookup =
+      Lookup.wrap_opt_typ ~uses_lookup:uses_lookups ~lookups_per_row_4
+        ~runtime_tables ~dummy:[| dummy |]
+        (wo [ 1 ])
+    in
+    of_hlistable
+      [ Vector.wrap_typ (wo w_lens) Columns.n; wo [ z ]; wo [ t ]; lookup ]
       ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 end

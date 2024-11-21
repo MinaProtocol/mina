@@ -1747,8 +1747,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                         ; challenges = Vector.to_array chals
                                         } )
                                   |> Wrap_hack.pad_accumulator ) )
-                            ~input_typ:input
-                            ~return_typ:(Snarky_backendless.Typ.unit ())
+                            ~input_typ:input ~return_typ:Impls.Wrap.Typ.unit
                             (fun x () : unit -> wrap_main (conv x))
                             { messages_for_next_step_proof =
                                 prev_statement_with_hashes.proof_state
