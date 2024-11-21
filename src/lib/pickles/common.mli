@@ -58,7 +58,7 @@ val dlog_pcs_batch :
 
 val combined_evaluation :
      (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> xi:'f Snarky_backendless.Cvar.t
+  -> polyscale:'f Snarky_backendless.Cvar.t
   -> ( 'f Snarky_backendless.Cvar.t
      , 'f Snarky_backendless.Cvar.t Snarky_backendless.Snark_intf.Boolean0.t )
      Pickles_types.Opt.t

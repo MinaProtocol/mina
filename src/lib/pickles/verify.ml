@@ -192,7 +192,7 @@ let verify_heterogenous (ts : Instance.t list) =
                   ; combined_inner_product =
                       deferred_values.combined_inner_product
                   ; b = deferred_values.b
-                  ; xi = deferred_values.xi
+                  ; polyscale = deferred_values.polyscale
                   ; bulletproof_challenges =
                       deferred_values.bulletproof_challenges
                   ; branch_data = deferred_values.branch_data

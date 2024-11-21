@@ -23,7 +23,7 @@ let pow ~one ~mul x n =
 let create ~without_degree_bound ~with_degree_bound =
   { without_degree_bound; with_degree_bound }
 
-let combine_commitments _t ~scale ~add ~xi (type n)
+let combine_commitments _t ~scale ~add ~polyscale (type n)
     (without_degree_bound : (_, n) Vector.t) with_degree_bound =
   match without_degree_bound with
   | [] ->
@@ -34,11 +34,11 @@ let combine_commitments _t ~scale ~add ~xi (type n)
         @ List.concat_map (Vector.to_list with_degree_bound)
             ~f:(fun (unshifted, shifted) -> [ unshifted; shifted ])
       in
-      List.fold_left polys ~init ~f:(fun acc p -> add p (scale acc xi))
+      List.fold_left polys ~init ~f:(fun acc p -> add p (scale acc polyscale))
 
 let combine_evaluations' (type a n m)
     ({ without_degree_bound = _; with_degree_bound } : (a, n Nat.s, m) t)
-    ~shifted_pow ~mul ~add ~one:_ ~evaluation_point ~xi
+    ~shifted_pow ~mul ~add ~one:_ ~evaluation_point ~polyscale
     (init :: evals0 : (_, n Nat.s) Vector.t) (evals1 : (_, m) Vector.t) =
   let evals =
     Vector.to_list evals0
@@ -47,25 +47,26 @@ let combine_evaluations' (type a n m)
            (Vector.map2 with_degree_bound evals1 ~f:(fun deg fx ->
                 [ fx; mul (shifted_pow deg evaluation_point) fx ] ) ) )
   in
-  List.fold_left evals ~init ~f:(fun acc fx -> add fx (mul acc xi))
+  List.fold_left evals ~init ~f:(fun acc fx -> add fx (mul acc polyscale))
 
 let[@warning "-45"] combine_evaluations' (type n) (t : (_, n, _) t) ~shifted_pow
-    ~mul ~add ~one ~evaluation_point ~xi (evals0 : (_, n) Vector.t) evals1 =
+    ~mul ~add ~one ~evaluation_point ~polyscale (evals0 : (_, n) Vector.t)
+    evals1 =
   match evals0 with
   | Vector.[] ->
       failwith "Empty evals0"
   | _ :: _ ->
-      combine_evaluations' t ~shifted_pow ~mul ~add ~one ~evaluation_point ~xi
-        evals0 evals1
+      combine_evaluations' t ~shifted_pow ~mul ~add ~one ~evaluation_point
+        ~polyscale evals0 evals1
 
 let combine_evaluations (type f) t ~crs_max_degree ~(mul : f -> f -> f) ~add
-    ~one ~evaluation_point ~xi evals0 evals1 =
+    ~one ~evaluation_point ~polyscale evals0 evals1 =
   let pow = pow ~one ~mul in
   combine_evaluations' t evals0 evals1
     ~shifted_pow:(fun deg x -> pow x (crs_max_degree - deg))
-    ~mul ~add ~one ~evaluation_point ~xi
+    ~mul ~add ~one ~evaluation_point ~polyscale
 
-let combine_split_commitments _t ~scale_and_add ~init:i ~xi
+let combine_split_commitments _t ~scale_and_add ~init:i ~polyscale
     ~reduce_without_degree_bound ~reduce_with_degree_bound (type n)
     (without_degree_bound : (_, n) Vector.t) with_degree_bound =
   let flat =
@@ -85,17 +86,17 @@ let combine_split_commitments _t ~scale_and_add ~init:i ~xi
             go comms
         | Some init ->
             List.fold_left comms ~init ~f:(fun acc p ->
-                scale_and_add ~acc ~xi p ) )
+                scale_and_add ~acc ~polyscale p ) )
   in
   go (List.rev flat)
 
 let combine_split_evaluations (type f f')
-    ~(mul_and_add : acc:f' -> xi:f' -> f -> f') ~init:(i : f -> f') ~(xi : f')
-    (evals0 : f array list) : f' =
+    ~(mul_and_add : acc:f' -> polyscale:f' -> f -> f') ~init:(i : f -> f')
+    ~(polyscale : f') (evals0 : f array list) : f' =
   let flat = List.concat_map evals0 ~f:Array.to_list in
   match List.rev flat with
   | [] ->
       failwith "combine_split_evaluations: empty"
   | init :: es ->
       List.fold_left es ~init:(i init) ~f:(fun acc fx ->
-          mul_and_add ~acc ~xi fx )
+          mul_and_add ~acc ~polyscale fx )

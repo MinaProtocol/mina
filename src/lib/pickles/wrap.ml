@@ -35,7 +35,7 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
       (module AB : Nat.Add.Intf with type n = actual_proofs_verified)
     (e : (_ array * _ array, _) Plonk_types.All_evals.With_public_input.t)
     ~(old_bulletproof_challenges : (_, actual_proofs_verified) Vector.t) ~r
-    ~plonk ~xi ~zeta ~zetaw =
+    ~plonk ~polyscale ~zeta ~zetaw =
   let combined_evals =
     Plonk_checks.evals_of_split_evals ~zeta ~zetaw
       (module Tick.Field)
@@ -64,8 +64,8 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
         (f e.public_input :: [| ft |] :: a)
     in
     let open Tick.Field in
-    Pcs_batch.combine_split_evaluations ~xi ~init:Fn.id
-      ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
+    Pcs_batch.combine_split_evaluations ~polyscale ~init:Fn.id
+      ~mul_and_add:(fun ~acc ~polyscale fx -> fx + (polyscale * acc))
       v
   in
   let open Tick.Field in
@@ -140,7 +140,7 @@ module For_tests_only = struct
       }
     in
     let r = scalar_chal O.u in
-    let xi = scalar_chal O.v in
+    let polyscale = scalar_chal O.v in
     let module As_field = struct
       let to_field =
         SC.to_field_constant
@@ -149,7 +149,7 @@ module For_tests_only = struct
 
       let r = to_field r
 
-      let xi = to_field xi
+      let polyscale = to_field polyscale
 
       let zeta = to_field plonk0.zeta
 
@@ -238,7 +238,7 @@ module For_tests_only = struct
       Shifted_value.Type1.of_field (module Tick.Field) ~shift:Shifts.tick1
     and chal = Challenge.Constant.of_tick_field in
     { deferred_values =
-        { Types.Wrap.Proof_state.Deferred_values.xi
+        { Types.Wrap.Proof_state.Deferred_values.polyscale
         ; b = shift_value b
         ; bulletproof_challenges =
             Vector.of_array_and_length_exn new_bulletproof_challenges
@@ -250,7 +250,7 @@ module For_tests_only = struct
                   ~actual_proofs_verified:
                     (Nat.Add.create actual_proofs_verified)
                   { evals = proof.proof.openings.evals; public_input = x_hat }
-                  ~r ~xi ~zeta ~zetaw
+                  ~r ~polyscale ~zeta ~zetaw
                   ~old_bulletproof_challenges:prev_challenges ~env:tick_env
                   ~domain:tick_domain ~ft_eval1:proof.proof.openings.ft_eval1
                   ~plonk:tick_plonk_minimal)
