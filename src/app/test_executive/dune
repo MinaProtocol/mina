@@ -38,7 +38,6 @@
   currency
   mina_runtime_config
   secrets
-  integration_test_cloud_engine
   integration_test_local_engine
   mina_generators
   logger

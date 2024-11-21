@@ -89,7 +89,7 @@ module State = struct
   type 'a matrix = 'a array array
 
   (* Creates a state formed by a matrix of 5x5 Cvar zeros *)
-  let zeros : Circuit.Field.t matrix =
+  let zeros () : Circuit.Field.t matrix =
     let open Circuit in
     let state =
       Array.make_matrix ~dimx:keccak_dim ~dimy:keccak_dim Field.zero
@@ -294,7 +294,7 @@ let theta (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix
 let pi_rho (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix
     =
   let state_e = state in
-  let state_b = State.zeros in
+  let state_b = State.zeros () in
   (* for all x in {0..4} and y in {0..4}: B[y,2x+3y] = ROT(E[x,y], r[x,y]) *)
   for x = 0 to keccak_dim - 1 do
     for y = 0 to keccak_dim - 1 do
@@ -317,7 +317,7 @@ let pi_rho (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix
  *)
 let chi (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix =
   let state_b = state in
-  let state_f = State.zeros in
+  let state_f = State.zeros () in
   (* for all x in {0..4} and y in {0..4}: F[x,y] = B[x,y] xor ((not B[x+1,y]) and B[x+2,y]) *)
   for x = 0 to keccak_dim - 1 do
     for y = 0 to keccak_dim - 1 do
@@ -375,7 +375,7 @@ let permutation (state : Circuit.Field.t State.matrix)
 let absorb (padded_message : Circuit.Field.t list) ~(capacity : int)
     ~(rate : int) ~(rc : Circuit.Field.t array) : Circuit.Field.t State.matrix =
   let open Circuit in
-  let root_state = State.zeros in
+  let root_state = State.zeros () in
   let state = root_state in
 
   (* split into blocks of rate bits *)
@@ -580,177 +580,198 @@ let pre_nist ?(inp_endian = Big) ?(out_endian = Big) ?(byte_checks = false)
 
 (* KECCAK GADGET TESTS *)
 
-let%test_unit "keccak gadget" =
-  if tests_enabled then (
-    let (* Import the gadget test runner *)
-    open Kimchi_gadgets_test_runner in
+let%test_module "keccak gadget" =
+  ( module struct
+    (* Import the gadget test runner *)
+    open Kimchi_gadgets_test_runner
+
+    let () = Backtrace.elide := false
+
     (* Initialize the SRS cache. *)
     let () =
       try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
-    in
 
     let test_keccak ?cs ?inp_endian ?out_endian ~nist ~len message expected =
-      let cs, _proof_keypair, _proof =
-        Runner.generate_and_verify_proof ?cs (fun () ->
-            let open Runner.Impl in
-            assert (String.length message % 2 = 0) ;
-            let message =
-              Array.to_list
-              @@ exists
-                   (Typ.array ~length:(String.length message / 2) Field.typ)
-                   ~compute:(fun () ->
-                     Array.of_list @@ Common.field_bytes_of_hex message )
-            in
-            let hashed =
-              Array.of_list
-              @@
-              match nist with
-              | true ->
-                  nist_sha3 len message ?inp_endian ?out_endian
-                    ~byte_checks:true
-              | false ->
-                  pre_nist len message ?inp_endian ?out_endian ~byte_checks:true
-            in
+      if tests_enabled then
+        let cs, _proof_keypair, _proof =
+          Runner.generate_and_verify_proof ?cs (fun () ->
+              let open Runner.Impl in
+              assert (String.length message % 2 = 0) ;
+              let message =
+                Array.to_list
+                @@ exists
+                     (Typ.array ~length:(String.length message / 2) Field.typ)
+                     ~compute:(fun () ->
+                       Array.of_list @@ Common.field_bytes_of_hex message )
+              in
+              let hashed =
+                Array.of_list
+                @@
+                match nist with
+                | true ->
+                    nist_sha3 len message ?inp_endian ?out_endian
+                      ~byte_checks:true
+                | false ->
+                    pre_nist len message ?inp_endian ?out_endian
+                      ~byte_checks:true
+              in
 
-            let expected =
-              Array.of_list @@ Common.field_bytes_of_hex expected
-            in
-            (* Check expected hash output *)
-            as_prover (fun () ->
-                for i = 0 to Array.length hashed - 1 do
-                  let byte_hash =
-                    Common.cvar_field_to_bignum_bigint_as_prover hashed.(i)
-                  in
-                  let byte_exp = Common.field_to_bignum_bigint expected.(i) in
-                  assert (Bignum_bigint.(byte_hash = byte_exp))
-                done ;
-                () ) ;
-            () )
-      in
-      cs
-    in
+              let expected =
+                Array.of_list @@ Common.field_bytes_of_hex expected
+              in
+              (* Check expected hash output *)
+              as_prover (fun () ->
+                  for i = 0 to Array.length hashed - 1 do
+                    let byte_hash =
+                      Common.cvar_field_to_bignum_bigint_as_prover hashed.(i)
+                    in
+                    let byte_exp = Common.field_to_bignum_bigint expected.(i) in
+                    assert (Bignum_bigint.(byte_hash = byte_exp))
+                  done ;
+                  () ) ;
+              () )
+        in
+        Some cs
+      else None
 
     (* Positive tests *)
     let cs_eth256_1byte =
-      test_keccak ~nist:false ~len:256 "30"
-        "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116d"
-    in
+      lazy
+        (test_keccak ~nist:false ~len:256 "30"
+           "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116d" )
+
+    let%test_unit "eth256_1byte" = Lazy.force cs_eth256_1byte |> fun _ -> ()
 
     let cs_nist512_1byte =
-      test_keccak ~nist:true ~len:512 "30"
-        "2d44da53f305ab94b6365837b9803627ab098c41a6013694f9b468bccb9c13e95b3900365eb58924de7158a54467e984efcfdabdbcc9af9a940d49c51455b04c"
-    in
+      lazy
+        (test_keccak ~nist:true ~len:512 "30"
+           "2d44da53f305ab94b6365837b9803627ab098c41a6013694f9b468bccb9c13e95b3900365eb58924de7158a54467e984efcfdabdbcc9af9a940d49c51455b04c" )
 
-    (* I am the owner of the NFT with id X on the Ethereum chain *)
-    let _cs =
-      test_keccak ~nist:false ~len:256
-        "4920616d20746865206f776e6572206f6620746865204e465420776974682069642058206f6e2074686520457468657265756d20636861696e"
-        "63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36"
-    in
-    let _cs =
-      test_keccak ~nist:false ~len:512
-        "4920616d20746865206f776e6572206f6620746865204e465420776974682069642058206f6e2074686520457468657265756d20636861696e"
-        "848cf716c2d64444d2049f215326b44c25a007127d2871c1b6004a9c3d102f637f31acb4501e59f3a0160066c8814816f4dc58a869f37f740e09b9a8757fa259"
-    in
+    let%test_unit "nist512_1byte" = Lazy.force cs_nist512_1byte |> fun _ -> ()
 
-    (* The following two tests use 2 blocks instead *)
-    (* For Keccak *)
-    let _cs =
-      test_keccak ~nist:false ~len:256
-        "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116df9e2eaaa42d9fe9e558a9b8ef1bf366f190aacaa83bad2641ee106e9041096e42d44da53f305ab94b6365837b9803627ab098c41a6013694f9b468bccb9c13e95b3900365eb58924de7158a54467e984efcfdabdbcc9af9a940d49c51455b04c63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36"
-        "560deb1d387f72dba729f0bd0231ad45998dda4b53951645322cf95c7b6261d9"
-    in
-    (* For NIST *)
-    let _cs =
-      test_keccak ~nist:true ~len:256
-        "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116df9e2eaaa42d9fe9e558a9b8ef1bf366f190aacaa83bad2641ee106e9041096e42d44da53f305ab94b6365837b9803627ab098c41a6013694f9b468bccb9c13e95b3900365eb58924de7158a54467e984efcfdabdbcc9af9a940d49c51455b04c63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36"
-        "1784354c4bbfa5f54e5db23041089e65a807a7b970e3cfdba95e2fbe63b1c0e4"
-    in
+    let%test_unit "I own an NFT with id X on Ethereum" =
+      let _cs =
+        test_keccak ~nist:false ~len:256
+          "4920616d20746865206f776e6572206f6620746865204e465420776974682069642058206f6e2074686520457468657265756d20636861696e"
+          "63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36"
+      in
+      let _cs =
+        test_keccak ~nist:false ~len:512
+          "4920616d20746865206f776e6572206f6620746865204e465420776974682069642058206f6e2074686520457468657265756d20636861696e"
+          "848cf716c2d64444d2049f215326b44c25a007127d2871c1b6004a9c3d102f637f31acb4501e59f3a0160066c8814816f4dc58a869f37f740e09b9a8757fa259"
+      in
+      ()
+
+    let%test_unit "Two blocks" =
+      (* The following two tests use 2 blocks instead *)
+      (* For Keccak *)
+      let _cs =
+        test_keccak ~nist:false ~len:256
+          "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116df9e2eaaa42d9fe9e558a9b8ef1bf366f190aacaa83bad2641ee106e9041096e42d44da53f305ab94b6365837b9803627ab098c41a6013694f9b468bccb9c13e95b3900365eb58924de7158a54467e984efcfdabdbcc9af9a940d49c51455b04c63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36"
+          "560deb1d387f72dba729f0bd0231ad45998dda4b53951645322cf95c7b6261d9"
+      in
+      (* For NIST *)
+      let _cs =
+        test_keccak ~nist:true ~len:256
+          "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116df9e2eaaa42d9fe9e558a9b8ef1bf366f190aacaa83bad2641ee106e9041096e42d44da53f305ab94b6365837b9803627ab098c41a6013694f9b468bccb9c13e95b3900365eb58924de7158a54467e984efcfdabdbcc9af9a940d49c51455b04c63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36"
+          "1784354c4bbfa5f54e5db23041089e65a807a7b970e3cfdba95e2fbe63b1c0e4"
+      in
+      ()
 
     (* Padding of input 1080 bits and 1088 bits *)
-    (* 135 bits, uses the following single padding byte as 0x81 *)
     let cs135 =
-      test_keccak ~nist:false ~len:256
-        "391ccf9b5de23bb86ec6b2b142adb6e9ba6bee8519e7502fb8be8959fbd2672934cc3e13b7b45bf2b8a5cb48881790a7438b4a326a0c762e31280711e6b64fcc2e3e4e631e501d398861172ea98603618b8f23b91d0208b0b992dfe7fdb298b6465adafbd45e4f88ee9dc94e06bc4232be91587f78572c169d4de4d8b95b714ea62f1fbf3c67a4"
-        "7d5655391ede9ca2945f32ad9696f464be8004389151ce444c89f688278f2e1d"
-    in
+      lazy
+        (test_keccak ~nist:false ~len:256
+           "391ccf9b5de23bb86ec6b2b142adb6e9ba6bee8519e7502fb8be8959fbd2672934cc3e13b7b45bf2b8a5cb48881790a7438b4a326a0c762e31280711e6b64fcc2e3e4e631e501d398861172ea98603618b8f23b91d0208b0b992dfe7fdb298b6465adafbd45e4f88ee9dc94e06bc4232be91587f78572c169d4de4d8b95b714ea62f1fbf3c67a4"
+           "7d5655391ede9ca2945f32ad9696f464be8004389151ce444c89f688278f2e1d" )
+
+    let%test_unit "135 bits, uses the following single padded byte as 0x81" =
+      Lazy.force cs135 |> fun _ -> ()
 
     (* 136 bits, 2 blocks and second is just padding *)
     let cs136 =
-      test_keccak ~nist:false ~len:256
-        "ff391ccf9b5de23bb86ec6b2b142adb6e9ba6bee8519e7502fb8be8959fbd2672934cc3e13b7b45bf2b8a5cb48881790a7438b4a326a0c762e31280711e6b64fcc2e3e4e631e501d398861172ea98603618b8f23b91d0208b0b992dfe7fdb298b6465adafbd45e4f88ee9dc94e06bc4232be91587f78572c169d4de4d8b95b714ea62f1fbf3c67a4"
-        "37694fd4ba137be747eb25a85b259af5563e0a7a3010d42bd15963ac631b9d3f"
-    in
+      lazy
+        (test_keccak ~nist:false ~len:256
+           "ff391ccf9b5de23bb86ec6b2b142adb6e9ba6bee8519e7502fb8be8959fbd2672934cc3e13b7b45bf2b8a5cb48881790a7438b4a326a0c762e31280711e6b64fcc2e3e4e631e501d398861172ea98603618b8f23b91d0208b0b992dfe7fdb298b6465adafbd45e4f88ee9dc94e06bc4232be91587f78572c169d4de4d8b95b714ea62f1fbf3c67a4"
+           "37694fd4ba137be747eb25a85b259af5563e0a7a3010d42bd15963ac631b9d3f" )
 
-    (* Input already looks like padded *)
-    let _cs =
-      test_keccak ~cs:cs135 ~nist:false ~len:256
+    let%test_unit "136 bits, 2 blocks and second is just padding" =
+      Lazy.force cs136 |> fun _ -> ()
+
+    let%test_unit "135 bits, input already looks padded" =
+      test_keccak ?cs:(Lazy.force cs135) ~nist:false ~len:256
         "800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001"
         "0edbbae289596c7da9fafe65931c5dce3439fb487b8286d6c1970e44eea39feb"
-    in
+      |> fun _ -> ()
 
-    let _cs =
-      test_keccak ~cs:cs136 ~nist:false ~len:256
+    let%test_unit "136 bits, input already looks padded" =
+      test_keccak ?cs:(Lazy.force cs136) ~nist:false ~len:256
         "80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001"
         "bbf1f49a2cc5678aa62196d0c3108d89425b81780e1e90bcec03b4fb5f834714"
-    in
+      |> fun _ -> ()
 
-    (* Reusing *)
-    let _cs =
-      test_keccak ~cs:cs_eth256_1byte ~nist:false ~len:256 "00"
+    let%test_unit "reuse eth256_1byte" =
+      test_keccak
+        ?cs:(Lazy.force cs_eth256_1byte)
+        ~nist:false ~len:256 "00"
         "bc36789e7a1e281436464229828f817d6612f7b477d66591ff96a9e064bcc98a"
-    in
+      |> fun _ -> ()
 
     let cs2 =
-      test_keccak ~nist:false ~len:256 "a2c0"
-        "9856642c690c036527b8274db1b6f58c0429a88d9f3b9298597645991f4f58f0"
-    in
+      lazy
+        (test_keccak ~nist:false ~len:256 "a2c0"
+           "9856642c690c036527b8274db1b6f58c0429a88d9f3b9298597645991f4f58f0" )
 
-    let _cs =
-      test_keccak ~cs:cs2 ~nist:false ~len:256 "0a2c"
-        "295b48ad49eff61c3abfd399c672232434d89a4ef3ca763b9dbebb60dbb32a8b"
-    in
+    let%test_unit "reuse" =
+      let _cs =
+        test_keccak ?cs:(Lazy.force cs2) ~nist:false ~len:256 "0a2c"
+          "295b48ad49eff61c3abfd399c672232434d89a4ef3ca763b9dbebb60dbb32a8b"
+      in
+      ()
 
     (* Endianness *)
-    let _cs =
+    let%test_unit "endianness" =
       test_keccak ~nist:false ~len:256 ~inp_endian:Little ~out_endian:Little
         "2c0a"
         "8b2ab3db60bbbe9d3b76caf34e9ad834242372c699d3bf3a1cf6ef49ad485b29"
-    in
+      |> fun _ -> ()
 
     (* Negative tests *)
-    (* Check cannot use bad hex inputs *)
-    assert (
-      Common.is_error (fun () ->
-          test_keccak ~nist:false ~len:256 "a2c"
-            "07f02d241eeba9c909a1be75e08d9e8ac3e61d9e24fa452a6785083e1527c467" ) ) ;
+
+    let%test_unit "bad hex input" =
+      assert (
+        Common.is_error (fun () ->
+            test_keccak ~nist:false ~len:256 "a2c"
+              "07f02d241eeba9c909a1be75e08d9e8ac3e61d9e24fa452a6785083e1527c467" ) )
 
     (* Check cannot use bad hex inputs *)
-    assert (
-      Common.is_error (fun () ->
-          test_keccak ~nist:true ~len:256 "0"
-            "f39f4526920bb4c096e5722d64161ea0eb6dbd0b4ff0d812f31d56fb96142084" ) ) ;
+    let%test_unit "bad hex input 2" =
+      assert (
+        Common.is_error (fun () ->
+            test_keccak ~nist:true ~len:256 "0"
+              "f39f4526920bb4c096e5722d64161ea0eb6dbd0b4ff0d812f31d56fb96142084" ) )
 
-    (* Cannot reuse CS for different output length *)
-    assert (
-      Common.is_error (fun () ->
-          test_keccak ~cs:cs_nist512_1byte ~nist:true ~len:256 "30"
-            "f9e2eaaa42d9fe9e558a9b8ef1bf366f190aacaa83bad2641ee106e9041096e4" ) ) ;
+    let%test_unit "inconsistent output length reuse" =
+      assert (
+        Common.is_error (fun () ->
+            test_keccak
+              ?cs:(Lazy.force cs_nist512_1byte)
+              ~nist:true ~len:256 "30"
+              "f9e2eaaa42d9fe9e558a9b8ef1bf366f190aacaa83bad2641ee106e9041096e4" ) )
 
-    (* Checking cannot reuse CS for same length but different padding *)
-    assert (
-      Common.is_error (fun () ->
-          test_keccak ~cs:cs_eth256_1byte ~nist:true ~len:256
-            "4920616d20746865206f776e6572206f6620746865204e465420776974682069642058206f6e2074686520457468657265756d20636861696e"
-            "63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36" ) ) ;
+    let%test_unit "inconsistent padding reuse" =
+      assert (
+        Common.is_error (fun () ->
+            test_keccak
+              ?cs:(Lazy.force cs_eth256_1byte)
+              ~nist:true ~len:256
+              "4920616d20746865206f776e6572206f6620746865204e465420776974682069642058206f6e2074686520457468657265756d20636861696e"
+              "63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36" ) )
 
-    (* Cannot reuse cs with different endianness *)
-    assert (
-      Common.is_error (fun () ->
-          test_keccak ~cs:cs2 ~nist:false ~len:256 ~inp_endian:Little
-            ~out_endian:Little "2c0a"
-            "8b2ab3db60bbbe9d3b76caf34e9ad834242372c699d3bf3a1cf6ef49ad485b29" ) ) ;
-
-    () ) ;
-
-  ()
+    let%test_unit "inconsistent endianess reuse" =
+      assert (
+        Common.is_error (fun () ->
+            test_keccak ?cs:(Lazy.force cs2) ~nist:false ~len:256
+              ~inp_endian:Little ~out_endian:Little "2c0a"
+              "8b2ab3db60bbbe9d3b76caf34e9ad834242372c699d3bf3a1cf6ef49ad485b29" ) )
+  end )

@@ -98,7 +98,7 @@ let setup (type n) ~context:(module Context : CONTEXT)
         }
     }
   in
-  let get_node_status _ = failwith "unimplemented" in
+  let get_node_status _ = Deferred.Or_error.error_string "unimplemented" in
   let peer_networks =
     Vect.map2 peers states ~f:(fun peer state ->
         let trust_system = Trust_system.null () in
