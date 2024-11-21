@@ -801,7 +801,7 @@ module Get_completed_snarks = struct
         return None
     | Some snark_pool ->
         snark_pool
-        |> Network_pool.Snark_pool.get_all_completed_checked_work ~limit
+        |> Network_pool.Snark_pool.get_all_completed_unchecked_work ~limit
         |> Option.some |> return
 
   let rate_limit_budget = (1, `Per Time.Span.minute)
