@@ -28,6 +28,7 @@ esac; shift; done
 
 
 echo "Exporting ledger to $TEMP_FOLDER"
+echo "20k accounts is way less than the size of a mainnet ledger (200k), but good enough for testing"
 $MINA_APP ledger test generate-accounts -n 20000 --min-balance 1000 --max-balance 10000 > $ACCOUNTS_FILE
 
 echo "Adapt ledger for tests"
@@ -37,7 +38,7 @@ jq '(.[0] | .balance ) |= "20000000"' $ACCOUNTS_FILE > $TEMP_ACCOUNTS_FILE
 mv $TEMP_ACCOUNTS_FILE $ACCOUNTS_FILE
 
 # construct correct ledger file
-jq  '{ ledger: { accounts:( $inputs | .[] ) , "add_genesis_winner": false } }' $ACCOUNTS_FILE --slurpfile inputs $ACCOUNTS_FILE > $GENESIS_LEDGER
+jq  '{ ledger: { accounts: . , "add_genesis_winner": false } }' < $ACCOUNTS_FILE > $GENESIS_LEDGER
 
 echo "creating runtime ledger in $TEMP_FOLDER"
 
