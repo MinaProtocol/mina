@@ -15,14 +15,17 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     exit 0
 fi
 
-
-sudo chown -R opam ~/.gnupg/
-
-gpg --batch --yes --import /var/secrets/debian/key.gpg
+if [ -z "$SIGN" ]; then
+  sudo chown -R opam ~/.gnupg/
+  gpg --batch --yes --import /var/secrets/debian/key.gpg
+  SIGN_ARG="--sign $SIGN"
+else
+  SIGN_ARG=""
+fi
 
 source scripts/debian/publish.sh \
   --names "${DOWNLOAD_FOLDER}/mina-*.deb" \
   --release $MINA_DEB_RELEASE \
   --version $MINA_DEB_VERSION \
   --codename $MINA_DEB_CODENAME \
-  --sign $SIGN
+  $SIGN_ARG
