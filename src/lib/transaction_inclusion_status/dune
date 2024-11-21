@@ -31,7 +31,6 @@
    trust_system
    genesis_constants
    mina_stdlib
-   inline_test_quiet_logs
    mina_base.import
    mina_block
    ppx_version.runtime
