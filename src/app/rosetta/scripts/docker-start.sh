@@ -52,6 +52,13 @@ POSTGRES_DATA_DIR=${POSTGRES_DATA_DIR:=/data/postgresql}
 PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432/${POSTGRES_DBNAME}
 DUMP_TIME=${DUMP_TIME:=0000}
 ARCHIVE_GENESIS_INIT=${ARCHIVE_GENESIS_INIT:=0}
+# Missing block guardian env vars
+export DB_USERNAME="$POSTGRES_USERNAME"
+export DB_HOST=127.0.0.1
+export DB_PORT=5432
+export DB_NAME="$POSTGRES_DBNAME"
+export PGPASSWORD="$POSTGRES_USERNAME"
+export PRECOMPUTED_BLOCKS_URL="https://storage.googleapis.com/mina_network_block_data"
 
 # Genesis Ledger
 if [ -n "$MINA_GENESIS_LEDGER_URL" ]; then
@@ -109,7 +116,7 @@ MINA_DAEMON_PID=$!
 sleep 30
 
 echo "========================= POPULATING MISSING BLOCKS ==========================="
-./download-missing-blocks.sh --network ${MINA_NETWORK} --archive-uri ${PG_CONN} &
+TIMEOUT=3600 mina-missing-blocks-guardian daemon &
 
 if ! kill -0 "${MINA_DAEMON_PID}"; then
   echo "[FATAL] Mina daemon failed to start, exiting docker-start.sh"

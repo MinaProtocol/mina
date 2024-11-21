@@ -1,13 +1,14 @@
-module Bigint = Bigint
-module Field = Field
 module Curve = Curve
 module Poly_comm = Poly_comm
 
 module Plonk_constraint_system : sig
-  module Make = Plonk_constraint_system.Make
-  module Plonk_constraint = Plonk_constraint_system.Plonk_constraint
+  module Make = Kimchi_pasta_snarky_backend.Plonk_constraint_system.Make
 
-  type ('f, 'rust_gates) t = ('f, 'rust_gates) Plonk_constraint_system.t
+  module Plonk_constraint =
+    Kimchi_pasta_snarky_backend.Plonk_constraint_system.Plonk_constraint
+
+  type ('f, 'rust_gates) t =
+    ('f, 'rust_gates) Kimchi_pasta_snarky_backend.Plonk_constraint_system.t
 
   val get_public_input_size : ('a, 'b) t -> int Core_kernel.Set_once.t
 
@@ -29,7 +30,7 @@ module Plonk_constraint_system : sig
 end
 
 module Dlog_plonk_based_keypair = Dlog_plonk_based_keypair
-module Constants = Constants
+module Constants = Kimchi_pasta_snarky_backend.Constants
 module Plonk_dlog_proof = Plonk_dlog_proof
 module Plonk_dlog_oracles = Plonk_dlog_oracles
 
@@ -37,40 +38,27 @@ module Scalar_challenge : sig
   module Stable = Scalar_challenge.Stable
 
   type 'f t = 'f Kimchi_types.scalar_challenge = { inner : 'f }
-
-  val to_yojson : ('f -> Yojson.Safe.t) -> 'f t -> Yojson.Safe.t
-
-  val of_yojson :
-       (Yojson.Safe.t -> 'f Ppx_deriving_yojson_runtime.error_or)
-    -> Yojson.Safe.t
-    -> 'f t Ppx_deriving_yojson_runtime.error_or
-
-  val t_of_sexp :
-    (Ppx_sexp_conv_lib.Sexp.t -> 'f) -> Ppx_sexp_conv_lib.Sexp.t -> 'f t
-
-  val sexp_of_t :
-    ('f -> Ppx_sexp_conv_lib.Sexp.t) -> 'f t -> Ppx_sexp_conv_lib.Sexp.t
-
-  val compare : ('f -> 'f -> int) -> 'f t -> 'f t -> int
-
-  val equal : ('f -> 'f -> bool) -> 'f t -> 'f t -> bool
-
-  val hash_fold_t :
-       (Base_internalhash_types.state -> 'f -> Base_internalhash_types.state)
-    -> Base_internalhash_types.state
-    -> 'f t
-    -> Base_internalhash_types.state
+  [@@deriving yojson, sexp, compare, equal, hash]
 
   val create : 'a -> 'a t
 
+  module Make_typ (Impl : Snarky_backendless.Snark_intf.Run) : sig
+    val typ : ('a, 'b) Impl.Typ.t -> ('a t, 'b t) Impl.Typ.t
+  end
+
   val typ :
-       ('a, 'b, 'c) Snarky_backendless.Typ.t
-    -> ('a t, 'b t, 'c) Snarky_backendless.Typ.t
+       ('a, 'b) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+    -> ('a t, 'b t) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+
+  val wrap_typ :
+       ('a, 'b) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
+    -> ('a t, 'b t) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
 end
 
-module Endoscale_round = Endoscale_round
-module Scale_round = Scale_round
-module Endoscale_scalar_round = Endoscale_scalar_round
-module Intf = Intf
+module Endoscale_round = Kimchi_pasta_snarky_backend.Endoscale_round
+module Scale_round = Kimchi_pasta_snarky_backend.Scale_round
+module Endoscale_scalar_round =
+  Kimchi_pasta_snarky_backend.Endoscale_scalar_round
+module Intf = Kimchi_pasta_snarky_backend.Intf

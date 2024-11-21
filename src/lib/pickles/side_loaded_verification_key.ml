@@ -347,8 +347,8 @@ let typ : (Checked.t, t) Impls.Step.Typ.t =
   let open Step_main_inputs in
   let open Impl in
   Typ.of_hlistable
-    [ Pickles_base.Proofs_verified.One_hot.typ (module Impls.Step)
-    ; Pickles_base.Proofs_verified.One_hot.typ (module Impls.Step)
+    [ Pickles_base.Proofs_verified.One_hot.typ
+    ; Pickles_base.Proofs_verified.One_hot.typ
     ; Plonk_verification_key_evals.typ Inner_curve.typ
     ]
     ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
