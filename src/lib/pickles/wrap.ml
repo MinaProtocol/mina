@@ -24,9 +24,9 @@ module Type1 =
 let _vector_of_list (type a t)
     (module V : Snarky_intf.Vector.S with type elt = a and type t = t)
     (xs : a list) : t =
-  let r = V.create () in
-  List.iter xs ~f:(V.emplace_back r) ;
-  r
+  let res = V.create () in
+  List.iter xs ~f:(V.emplace_back res) ;
+  res
 
 let tick_rounds = Nat.to_int Tick.Rounds.n
 
@@ -34,8 +34,8 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
     ~actual_proofs_verified:
       (module AB : Nat.Add.Intf with type n = actual_proofs_verified)
     (e : (_ array * _ array, _) Plonk_types.All_evals.With_public_input.t)
-    ~(old_bulletproof_challenges : (_, actual_proofs_verified) Vector.t) ~r
-    ~plonk ~polyscale ~zeta ~zetaw =
+    ~(old_bulletproof_challenges : (_, actual_proofs_verified) Vector.t)
+    ~evalscale ~plonk ~polyscale ~zeta ~zetaw =
   let combined_evals =
     Plonk_checks.evals_of_split_evals ~zeta ~zetaw
       (module Tick.Field)
@@ -70,7 +70,7 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
   in
   let open Tick.Field in
   combine ~which_eval:`Fst ~ft:ft_eval0 zeta
-  + (r * combine ~which_eval:`Snd ~ft:ft_eval1 zetaw)
+  + (evalscale * combine ~which_eval:`Snd ~ft:ft_eval1 zetaw)
 
 module For_tests_only = struct
   type shifted_tick_field =
@@ -139,7 +139,7 @@ module For_tests_only = struct
       ; feature_flags = actual_feature_flags
       }
     in
-    let r = scalar_chal O.u in
+    let evalscale = scalar_chal O.u in
     let polyscale = scalar_chal O.v in
     let module As_field = struct
       let to_field =
@@ -147,7 +147,7 @@ module For_tests_only = struct
           (module Tick.Field)
           ~endo:Endo.Wrap_inner_curve.scalar
 
-      let r = to_field r
+      let evalscale = to_field evalscale
 
       let polyscale = to_field polyscale
 
@@ -229,7 +229,7 @@ module For_tests_only = struct
       let open As_field in
       let b =
         let open Tick.Field in
-        challenge_poly zeta + (r * challenge_poly zetaw)
+        challenge_poly zeta + (evalscale * challenge_poly zetaw)
       in
       let prechals = Array.map prechals ~f:Bulletproof_challenge.unpack in
       (prechals, b)
@@ -250,7 +250,7 @@ module For_tests_only = struct
                   ~actual_proofs_verified:
                     (Nat.Add.create actual_proofs_verified)
                   { evals = proof.proof.openings.evals; public_input = x_hat }
-                  ~r ~polyscale ~zeta ~zetaw
+                  ~evalscale ~polyscale ~zeta ~zetaw
                   ~old_bulletproof_challenges:prev_challenges ~env:tick_env
                   ~domain:tick_domain ~ft_eval1:proof.proof.openings.ft_eval1
                   ~plonk:tick_plonk_minimal)

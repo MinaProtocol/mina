@@ -162,8 +162,8 @@ let expand_deferred (type n most_recent_width) ~zk_rows
        Array.iter ~f:absorb x1 ; Array.iter ~f:absorb x2 ) ) ;
   let polyscale_chal = squeeze () in
   let polyscale = sc polyscale_chal in
-  let r_chal = squeeze () in
-  let r = sc r_chal in
+  let evalscale_chal = squeeze () in
+  let evalscale = sc evalscale_chal in
   Timer.clock __LOC__ ;
   (* TODO: The deferred values "bulletproof_challenges" should get routed
      into a "batch dlog Tick acc verifier" *)
@@ -173,7 +173,7 @@ let expand_deferred (type n most_recent_width) ~zk_rows
     Wrap.combined_inner_product ~env:tick_env ~plonk:tick_plonk_minimal
       ~domain:tick_domain ~ft_eval1:evals.ft_eval1
       ~actual_proofs_verified:(Nat.Add.create actual_proofs_verified)
-      evals.evals ~old_bulletproof_challenges ~r ~polyscale ~zeta ~zetaw
+      evals.evals ~old_bulletproof_challenges ~evalscale ~polyscale ~zeta ~zetaw
   in
   Timer.clock __LOC__ ;
   let bulletproof_challenges =
@@ -185,7 +185,7 @@ let expand_deferred (type n most_recent_width) ~zk_rows
       unstage
         (Wrap.challenge_polynomial (Vector.to_array bulletproof_challenges))
     in
-    Tick.Field.(challenge_poly zeta + (r * challenge_poly zetaw))
+    Tick.Field.(challenge_poly zeta + (evalscale * challenge_poly zetaw))
   in
   let to_shifted =
     Shifted_value.Type1.of_field (module Tick.Field) ~shift:Shifts.tick1

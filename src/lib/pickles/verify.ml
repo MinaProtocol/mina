@@ -24,18 +24,19 @@ let verify_heterogenous (ts : Instance.t list) =
     ~metadata:[ ("count", `Int (List.length ts)) ] ;
   let tick_field : _ Plonk_checks.field = (module Tick_field) in
   let check, result =
-    let r = ref [] in
+    let list_ref = ref [] in
     let result () =
-      match !r with
+      match !list_ref with
       | [] ->
           Ok ()
       | _ ->
           Error
             ( Error.tag ~tag:"Pickles.verify"
             @@ Error.of_list
-            @@ List.map !r ~f:(fun lab -> Error.of_string (Lazy.force lab)) )
+            @@ List.map !list_ref ~f:(fun lab ->
+                   Error.of_string (Lazy.force lab) ) )
     in
-    ((fun (lab, b) -> if not b then r := lab :: !r), result)
+    ((fun (lab, b) -> if not b then list_ref := lab :: !list_ref), result)
   in
   [%log internal] "Compute_plonks_and_chals" ;
   let _computed_bp_chals, deferred_values =
