@@ -116,7 +116,7 @@ MINA_DAEMON_PID=$!
 sleep 30
 
 echo "========================= POPULATING MISSING BLOCKS ==========================="
-/etc/mina/archive/missing-blocks-guardian.sh single-run
+/etc/mina/archive/missing-blocks-guardian.sh single-run &
 
 if ! kill -0 "${MINA_DAEMON_PID}"; then
   echo "[FATAL] Mina daemon failed to start, exiting docker-start.sh"
