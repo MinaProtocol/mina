@@ -555,8 +555,7 @@ let wrap
             in
             [%log internal] "Backend_tock_proof_create_async_done" ;
             proof )
-          ~input_typ:input
-          ~return_typ:(Snarky_backendless.Typ.unit ())
+          ~input_typ:input ~return_typ:Impls.Wrap.Typ.unit
           (fun x () : unit ->
             Impls.Wrap.handle (fun () : unit -> wrap_main (conv x)) handler )
           { messages_for_next_step_proof =

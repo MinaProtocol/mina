@@ -259,8 +259,7 @@ let step_main :
       local_signature_length local_branches_length feature_flags_and_num_chunks
   in
   let module Prev_typ =
-    H4.Typ (Impls.Step) (Typ_with_max_proofs_verified)
-      (Per_proof_witness.No_app_state)
+    H4.Typ (Typ_with_max_proofs_verified) (Per_proof_witness.No_app_state)
       (Per_proof_witness.Constant.No_app_state)
       (struct
         let f = Fn.id

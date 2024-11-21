@@ -40,7 +40,7 @@ module Step : sig
 
     val typ_unchecked : (t, Constant.t) Typ.t
 
-    val typ : (t, Constant.t, Internal_Basic.field) Snarky_backendless.Typ.t
+    val typ : (t, Constant.t) Impl.Typ.t
   end
 
   type unfinalized_proof =
@@ -81,9 +81,8 @@ module Step : sig
   val input :
        proofs_verified:'proofs_verified Nat.t
     -> ( 'proofs_verified statement_var
-       , 'proofs_verified statement
-       , Impl.field )
-       Import.Spec.ETyp.t
+       , 'proofs_verified statement )
+       Import.Spec.Step_etyp.t
 
   module Async_promise : module type of Async_generic (Promise)
 end
@@ -125,11 +124,7 @@ module Wrap : sig
 
     val typ_unchecked : (Impl.Field.t, Backend.Tick.Field.t) Impl.Typ.t
 
-    val typ :
-      ( Impl.Field.t
-      , Backend.Tick.Field.t
-      , Wrap_impl.Internal_Basic.Field.t )
-      Snarky_backendless.Typ.t
+    val typ : (Impl.Field.t, Backend.Tick.Field.t) Impl.Typ.t
   end
 
   val input :
@@ -173,7 +168,6 @@ module Wrap : sig
            , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
            Pickles_types.Vector.t
          , Composition_types.Branch_data.t )
-         Import.Types.Wrap.Statement.In_circuit.t
-       , Wrap_impl.field )
-       Import.Spec.ETyp.t
+         Import.Types.Wrap.Statement.In_circuit.t )
+       Import.Spec.Wrap_etyp.t
 end

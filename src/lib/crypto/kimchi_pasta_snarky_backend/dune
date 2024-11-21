@@ -21,6 +21,5 @@
   snarkette
   key_cache
   hex
-  pickles_types
   sponge
   snarky.intf))

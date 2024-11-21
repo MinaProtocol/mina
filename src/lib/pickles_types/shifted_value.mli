@@ -52,8 +52,12 @@ module type S = sig
   type 'f t = 'f Stable.V1.t
 
   val typ :
-       ('a, 'b, 'f) Snarky_backendless.Typ.t
-    -> ('a t, 'b t, 'f) Snarky_backendless.Typ.t
+       ('a, 'b) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+    -> ('a t, 'b t) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+
+  val wrap_typ :
+       ('a, 'b) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
+    -> ('a t, 'b t) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
 
@@ -91,8 +95,12 @@ module Type1 : sig
   val equal : ('a, 'res) Sigs.rel2 -> ('a t, 'res) Sigs.rel2
 
   val typ :
-       ('a, 'b, 'f) Snarky_backendless.Typ.t
-    -> ('a t, 'b t, 'f) Snarky_backendless.Typ.t
+       ('a, 'b) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+    -> ('a t, 'b t) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+
+  val wrap_typ :
+       ('a, 'b) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
+    -> ('a t, 'b t) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
 
@@ -126,8 +134,12 @@ module Type2 : sig
   val equal : ('a, 'res) Sigs.rel2 -> ('a t, 'res) Sigs.rel2
 
   val typ :
-       ('a, 'b, 'f) Snarky_backendless.Typ.t
-    -> ('a t, 'b t, 'f) Snarky_backendless.Typ.t
+       ('a, 'b) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+    -> ('a t, 'b t) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+
+  val wrap_typ :
+       ('a, 'b) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
+    -> ('a t, 'b t) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
 
