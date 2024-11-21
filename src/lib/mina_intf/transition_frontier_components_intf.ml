@@ -223,7 +223,7 @@ module type Sync_handler_intf = sig
     -> Mina_ledger.Sync_ledger.Query.t Envelope.Incoming.t
     -> context:(module CONTEXT)
     -> trust_system:Trust_system.t
-    -> Mina_ledger.Sync_ledger.Answer.t option Deferred.t
+    -> Mina_ledger.Sync_ledger.Answer.t Or_error.t Deferred.t
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        frontier:transition_frontier

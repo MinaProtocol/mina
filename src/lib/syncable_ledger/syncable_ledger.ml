@@ -170,7 +170,7 @@ module type S = sig
       -> t
 
     val answer_query :
-      t -> query Envelope.Incoming.t -> answer option Deferred.t
+      t -> query Envelope.Incoming.t -> answer Or_error.t Deferred.t
   end
 
   val create :
@@ -318,7 +318,7 @@ end = struct
      fun mt f ~context ~trust_system -> { mt; f; context; trust_system }
 
     let answer_query :
-        t -> query Envelope.Incoming.t -> answer option Deferred.t =
+        t -> query Envelope.Incoming.t -> answer Or_error.t Deferred.t =
      fun { mt; f; context; trust_system } query_envelope ->
       let (module Context) = context in
       let open Context in
@@ -334,7 +334,7 @@ end = struct
               Either.Second
                 ( Actions.Violated_protocol
                 , Some
-                    ( "requested too big of a subtree at once: $addr"
+                    ( "Requested too big of a subtree at once"
                     , [ ("addr", Addr.to_yojson a) ] ) )
             else
               let addresses_and_accounts =
@@ -350,8 +350,8 @@ end = struct
                 Either.Second
                   ( Actions.Violated_protocol
                   , Some
-                      ( "Requested empty subtree: $addr"
-                      , [ ("addr", Addr.to_yojson a) ] ) )
+                      ("Requested empty subtree", [ ("addr", Addr.to_yojson a) ])
+                  )
               else
                 let first_address, rest_address =
                   (List.hd_exn addresses, List.tl_exn addresses)
@@ -426,7 +426,7 @@ end = struct
                     Either.Second
                       ( Actions.Violated_protocol
                       , Some
-                          ( "invalid address $addr in What_child_hashes request"
+                          ( "Invalid address in What_child_hashes request"
                           , [ ("addr", Addr.to_yojson a) ] ) ) )
             | _ ->
                 [%log error]
@@ -435,19 +435,21 @@ end = struct
                 Either.Second
                   ( Actions.Violated_protocol
                   , Some
-                      ( "invalid depth requested at $addr in What_child_hashes \
-                         request"
+                      ( "Invalid depth requested in What_child_hashes request"
                       , [ ("addr", Addr.to_yojson a) ] ) ) )
       in
 
       match response_or_punish with
       | Either.First answer ->
-          Deferred.return @@ Some answer
+          Deferred.return @@ Ok answer
       | Either.Second action ->
           let%map _ =
             record_envelope_sender trust_system logger sender action
           in
-          None
+          let err =
+            Option.value_map ~default:"Violated protocol" (snd action) ~f:fst
+          in
+          Or_error.error_string err
   end
 
   type 'a t =

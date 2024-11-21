@@ -453,18 +453,20 @@ module Answer_sync_ledger_query = struct
     let ledger_hash, _ = Envelope.Incoming.data request in
     let query = Envelope.Incoming.map request ~f:Tuple2.get2 in
     let%bind answer =
-      let%bind.Deferred.Option frontier = return (get_transition_frontier ()) in
-      Sync_handler.answer_query ~frontier ledger_hash query
-        ~context:(module Context)
-        ~trust_system
+      match get_transition_frontier () with
+      | Some frontier ->
+          Sync_handler.answer_query ~frontier ledger_hash query
+            ~context:(module Context)
+            ~trust_system
+      | None ->
+          return (Or_error.error_string "No Frontier")
     in
     let result =
-      Result.of_option answer
-        ~error:
-          (Error.createf
-             !"Refusing to answer sync ledger query for ledger_hash: \
-               %{sexp:Ledger_hash.t}"
-             ledger_hash )
+      Result.map_error answer ~f:(fun e ->
+          Error.createf
+            !"Refusing to answer sync ledger query for ledger_hash: \
+              %{sexp:Ledger_hash.t}. Error: %s"
+            ledger_hash (Error.to_string_hum e) )
     in
     let%map () =
       match result with

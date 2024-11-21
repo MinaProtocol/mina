@@ -90,9 +90,8 @@ module Make (Inputs : Inputs_intf) :
       -> Sync_ledger.Query.t Envelope.Incoming.t
       -> context:(module CONTEXT)
       -> trust_system:Trust_system.t
-      -> Sync_ledger.Answer.t Option.t Deferred.t =
-   fun ~frontier hash query ~context ~trust_system ->
-    let (module Context) = context in
+      -> Sync_ledger.Answer.t Or_error.t Deferred.t =
+   fun ~frontier hash query ~context:(module Context) ~trust_system ->
     let (module C : Syncable_ledger.CONTEXT) =
       ( module struct
         let logger = Context.logger
@@ -102,7 +101,11 @@ module Make (Inputs : Inputs_intf) :
     in
     match get_ledger_by_hash ~frontier hash with
     | None ->
-        return None
+        return
+          (Or_error.error_string
+             (sprintf
+                !"Failed to find ledger for hash %{sexp:Ledger_hash.t}"
+                hash ) )
     | Some ledger ->
         let responder =
           Sync_ledger.Any_ledger.Responder.create ledger ignore
