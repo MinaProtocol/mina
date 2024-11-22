@@ -400,8 +400,10 @@ end = struct
                  (len, MT.get_inner_hash_at_addr_exn mt content_root_addr) )
         | What_child_hashes (a, subtree_depth) -> (
             match subtree_depth with
-            | n when n >= 1 && n <= compile_config.sync_ledger_max_subtree_depth
-              -> (
+            | n when n >= 1 -> (
+                let subtree_depth =
+                  min n compile_config.sync_ledger_max_subtree_depth
+                in
                 let ledger_depth = MT.depth mt in
                 let addresses =
                   intermediate_range ledger_depth a subtree_depth
@@ -570,13 +572,8 @@ end = struct
     let is_power = Int.is_pow2 len in
     let is_more_than_two = len >= 2 in
     let subtree_depth = Int.ceil_log2 len in
-    let less_than_max =
-      len <= Int.pow 2 compile_config.sync_ledger_max_subtree_depth
-    in
     let less_than_requested = subtree_depth <= requested_depth in
-    let valid_length =
-      is_power && is_more_than_two && less_than_requested && less_than_max
-    in
+    let valid_length = is_power && is_more_than_two && less_than_requested in
     if valid_length then
       let ledger_depth = MT.depth t.tree in
       let expected =

@@ -89,6 +89,12 @@ module Context_subtree_depth68 = Make_context (struct
   let sync_ledger_default_subtree_depth = 8
 end)
 
+module Context_subtree_depth80 = Make_context (struct
+  let sync_ledger_max_subtree_depth = 8
+
+  let sync_ledger_default_subtree_depth = 0
+end)
+
 module Make_test
     (Input : Input_intf) (Input' : sig
       val num_accts : int
@@ -213,7 +219,7 @@ struct
             failwith "the target changed again" )
 end
 
-module Make_test_failure_cases (Input : Input_intf) = struct
+module Make_test_edge_cases (Input : Input_intf) = struct
   open Input
   module Sync_responder = Sync_ledger.Responder
 
@@ -228,12 +234,9 @@ module Make_test_failure_cases (Input : Input_intf) = struct
   let check_answer (query : Ledger.addr Syncable_ledger.Query.t) answer =
     match query with
     | What_child_hashes (_, depth) -> (
-        let invalid_depth =
-          depth > Context.compile_config.sync_ledger_max_subtree_depth
-        in
+        let invalid_depth = depth < 1 in
         match answer with
         | Error s ->
-            (*fail if requested depth is > max depth configured*)
             if
               invalid_depth
               && String.is_substring (Error.to_string_hum s)
@@ -429,6 +432,13 @@ module Db = struct
         let depth = 16
       end)
 
+  module DB16_subtree_depths80 =
+    Make
+      (Context_subtree_depth80)
+      (struct
+        let depth = 16
+      end)
+
   module TestDB3_3 =
     Make_test
       (DB3)
@@ -486,10 +496,12 @@ module Db = struct
         let num_accts = 1026
       end)
 
-  module TestDB16_1026_subtree_depth68_Failure =
-    Make_test_failure_cases (DB16_subtree_depths68)
-  module TestDB16_1026_subtree_depth86_Success =
-    Make_test_failure_cases (DB16_subtree_depths86)
+  module TestDB16_Edge_Cases_subtree_depth68 =
+    Make_test_edge_cases (DB16_subtree_depths68)
+  module TestDB16_Edge_Cases_subtree_depth86 =
+    Make_test_edge_cases (DB16_subtree_depths81)
+  module TestDB16_Edge_Cases_subtree_depth80 =
+    Make_test_edge_cases (DB16_subtree_depths80)
 end
 
 module Mask = struct
@@ -658,6 +670,15 @@ module Mask = struct
         let mask_layers = 2
       end)
 
+  module Mask16_Layer2_Depth80 =
+    Make
+      (Context_subtree_depth80)
+      (struct
+        let depth = 16
+
+        let mask_layers = 2
+      end)
+
   module TestMask3_Layer1_3 =
     Make_test
       (Mask3_Layer1)
@@ -721,8 +742,10 @@ module Mask = struct
         let num_accts = 1024
       end)
 
-  module TestMask16_Layer2_1024_Depth68_Failure =
-    Make_test_failure_cases (Mask16_Layer2_Depth68)
-  module TestMask16_Layer2_1024_Depth86_Success =
-    Make_test_failure_cases (Mask16_Layer2_Depth86)
+  module TestMask16_Edge_Cases_Depth68 =
+    Make_test_edge_cases (Mask16_Layer2_Depth68)
+  module TestMask16_Edge_Cases_Depth81 =
+    Make_test_edge_cases (Mask16_Layer2_Depth81)
+  module TestMask16_Edge_Cases_Depth80 =
+    Make_test_edge_cases (Mask16_Layer2_Depth80)
 end
