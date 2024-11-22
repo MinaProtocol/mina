@@ -1158,7 +1158,8 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
               | None ->
                   `Some [] ) )
     in
-    Downloader.create ~stop ~trust_system ~preferred:[] ~max_batch_size:5
+    Downloader.create ~stop ~trust_system ~logger ~preferred:[]
+      ~max_batch_size:5
       ~get:(fun peer hs ->
         let sec =
           let sec_per_block =

@@ -1,5 +1,4 @@
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Core
 open Async
 open Mina_base
@@ -721,7 +720,21 @@ let%test_module "Bootstrap_controller tests" =
     let max_frontier_length =
       Transition_frontier.global_max_length Genesis_constants.For_unit_tests.t
 
-    let logger = Logger.create ()
+    let logger = Logger.null ()
+
+    let () =
+      (* Disable log messages from best_tip_diff logger. *)
+      Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+        ~id:Logger.Logger_id.best_tip_diff ~processor:(Logger.Processor.raw ())
+        ~transport:
+          (Logger.Transport.create
+             ( module struct
+               type t = unit
+
+               let transport () _ = ()
+             end )
+             () )
+        ()
 
     let trust_system =
       let s = Trust_system.null () in
@@ -738,7 +751,7 @@ let%test_module "Bootstrap_controller tests" =
     let constraint_constants = precomputed_values.constraint_constants
 
     module Context = struct
-      let logger = Logger.create ()
+      let logger = logger
 
       let precomputed_values = precomputed_values
 
