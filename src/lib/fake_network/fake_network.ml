@@ -117,7 +117,8 @@ let setup (type n) ~context:(module Context : CONTEXT)
                   , Network_pool.Transaction_pool.Remote_sink.void
                   , Network_pool.Snark_pool.Remote_sink.void )
                 ~get_transition_frontier:(Fn.const (Some state.frontier))
-                ~get_snark_pool:(Fn.const None) ~get_node_status )
+                ~get_snark_pool:(Fn.const None) ~get_node_status
+                ~snark_job_state:(Fn.const None) )
         in
         { peer; state; network } )
   in

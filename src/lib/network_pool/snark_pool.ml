@@ -50,9 +50,6 @@ module type S = sig
        t
     -> Transaction_snark_work.Statement.t
     -> Transaction_snark_work.Checked.t option
-
-  val get_all_completed_unchecked_work :
-    ?limit:int -> t -> Transaction_snark_work.unchecked list
 end
 
 module type Transition_frontier_intf = sig
@@ -150,14 +147,6 @@ struct
                        prover )
                  ]
                :: acc ) )
-
-      let all_completed_unchecked_work t =
-        Map.fold ~init:[] !(t.snark_tables).all
-          ~f:(fun ~key:_ ~data:{ proof; fee = { fee; prover } } acc ->
-            let unchecked =
-              { Transaction_snark_work.fee; proofs = proof; prover }
-            in
-            unchecked :: acc )
 
       let all_completed_work (t : t) : Transaction_snark_work.Info.t list =
         Map.fold ~init:[] !(t.snark_tables).all
@@ -517,15 +506,6 @@ struct
       ~f:(fun Priced_proof.{ proof; fee = { fee; prover } } ->
         Transaction_snark_work.Checked.create_unsafe
           { Transaction_snark_work.fee; proofs = proof; prover } )
-
-  let get_all_completed_unchecked_work ?limit t =
-    let work = Resource_pool.all_completed_unchecked_work (resource_pool t) in
-    match limit with
-    | None ->
-        work
-    | Some limit ->
-        (* gets the limit number of completed work at a random order *)
-        List.take work limit
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)

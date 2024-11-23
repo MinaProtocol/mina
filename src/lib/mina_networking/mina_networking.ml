@@ -75,7 +75,8 @@ type t =
 let create (module Context : CONTEXT) (config : Config.t) ~sinks
     ~(get_transition_frontier : unit -> Transition_frontier.t option)
     ~(get_snark_pool : unit -> Snark_pool.t option)
-    ~(get_node_status : unit -> Node_status.t Deferred.Or_error.t) =
+    ~(get_node_status : unit -> Node_status.t Deferred.Or_error.t)
+    ~(snark_job_state : unit -> Work_selector.State.t option) =
   let open Context in
   let gossip_net_ref = ref None in
   let module Rpc_context = struct
@@ -93,6 +94,8 @@ let create (module Context : CONTEXT) (config : Config.t) ~sinks
     let get_transition_frontier = get_transition_frontier
 
     let get_snark_pool = get_snark_pool
+
+    let snark_job_state = snark_job_state
   end in
   let%map gossip_net =
     O1trace.thread "gossip_net" (fun () ->

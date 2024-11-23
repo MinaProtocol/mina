@@ -36,9 +36,6 @@ module type S = sig
        t
     -> Transaction_snark_work.Statement.t
     -> Transaction_snark_work.Checked.t option
-
-  val get_all_completed_unchecked_work :
-    ?limit:int -> t -> Transaction_snark_work.unchecked list
 end
 
 module type Transition_frontier_intf = sig

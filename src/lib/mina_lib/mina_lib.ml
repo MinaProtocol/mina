@@ -1884,6 +1884,12 @@ let create ~commit_id ?wallets (config : Config.t) =
               ; compile_config
               }
           in
+          let snark_jobs_state =
+            Work_selector.State.init
+              ~reassignment_wait:config.work_reassignment_wait
+              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+              ~logger:config.logger
+          in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
           let%bind net =
             O1trace.thread "mina_networking" (fun () ->
@@ -1893,6 +1899,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                   ~get_transition_frontier:(fun () ->
                     Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r )
                   ~get_snark_pool:(fun () -> Some snark_pool)
+                  ~snark_job_state:(fun () -> Some snark_jobs_state)
                   ~get_node_status )
           in
           (* tie the first knot *)
@@ -2106,12 +2113,7 @@ let create ~commit_id ?wallets (config : Config.t) =
             (Linear_pipe.iter
                (Mina_networking.ban_notification_reader net)
                ~f:(Fn.const Deferred.unit) ) ;
-          let snark_jobs_state =
-            Work_selector.State.init
-              ~reassignment_wait:config.work_reassignment_wait
-              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-              ~logger:config.logger
-          in
+
           let%bind wallets =
             match wallets with
             | Some wallets ->
