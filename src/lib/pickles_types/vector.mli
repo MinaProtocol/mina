@@ -113,17 +113,41 @@ module With_length (N : Nat.Intf) : S with type 'a t = ('a, N.n) vec
 
 (** {1 Snarky related functions } *)
 
+module Make_typ (Impl : Snarky_backendless.Snark_intf.Run) : sig
+  (** [typ v t_n] creates a snarky [Typ.t] for a vector of the length [t_n] and
+    sets the contents of each cell to [v] *)
+  val typ :
+    ('a, 'b) Impl.Typ.t -> 'd Nat.nat -> (('a, 'd) vec, ('b, 'd) vec) Impl.Typ.t
+
+  (** Builds a Snarky type from a type [('a, 'n) t]*)
+  val typ' :
+       (('var, 'value) Impl.Typ.t, 'n) t
+    -> (('var, 'n) t, ('value, 'n) t) Impl.Typ.t
+end
+
 (** [typ v t_n] creates a snarky [Typ.t] for a vector of the length [t_n] and
     sets the contents of each cell to [v] *)
 val typ :
-     ('a, 'b, 'c) Snarky_backendless.Typ.t
+     ('a, 'b) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
   -> 'd Nat.nat
-  -> (('a, 'd) vec, ('b, 'd) vec, 'c) Snarky_backendless.Typ.t
+  -> (('a, 'd) vec, ('b, 'd) vec) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
 
 (** Builds a Snarky type from a type [('a, 'n) t]*)
 val typ' :
-     (('var, 'value, 'f) Snarky_backendless.Typ.t, 'n) t
-  -> (('var, 'n) t, ('value, 'n) t, 'f) Snarky_backendless.Typ.t
+     (('var, 'value) Kimchi_pasta_snarky_backend.Step_impl.Typ.t, 'n) t
+  -> (('var, 'n) t, ('value, 'n) t) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+
+(** [wrap_typ v t_n] creates a snarky [Typ.t] for a vector of the length [t_n] and
+    sets the contents of each cell to [v] *)
+val wrap_typ :
+     ('a, 'b) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
+  -> 'd Nat.nat
+  -> (('a, 'd) vec, ('b, 'd) vec) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
+
+(** Builds a Snarky type from a type [('a, 'n) t]*)
+val wrap_typ' :
+     (('var, 'value) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t, 'n) t
+  -> (('var, 'n) t, ('value, 'n) t) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
 
 (** {1 Common interface of vectors } *)
 

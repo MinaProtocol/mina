@@ -36,6 +36,8 @@ module type CONTEXT = sig
 
   val get_snark_pool : unit -> Network_pool.Snark_pool.t option
 
+  val snark_job_state : unit -> Work_selector.State.t option
+
   val compile_config : Mina_compile_config.t
 end
 
@@ -822,16 +824,13 @@ module Get_completed_snarks = struct
   let handle_request (module Context : CONTEXT) ~version:_ _request =
     let open Context in
     (* the maximum number of completed snarks to return over rpc *)
-    let limit = 16 in
-
-    match get_snark_pool () with
-    | None ->
+    let limit = 32 in
+    match (get_snark_pool (), snark_job_state ()) with
+    | Some snark_pool, Some snark_state ->
+        Work_selector.completed_work_statements ~snark_pool snark_state
+        |> Fn.flip List.take limit |> Option.some |> return
+    | _, _ ->
         return None
-    | Some snark_pool ->
-        print_endline "get_snark_pool ()" ;
-        snark_pool
-        |> Network_pool.Snark_pool.get_all_completed_checked_work ~limit
-        |> Option.some |> return
 
   let rate_limit_budget = (1, `Per Time.Span.minute)
 
