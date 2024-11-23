@@ -1493,7 +1493,8 @@ let start_filtered_log ~commit_id
       () ;
     Ok () )
 
-let fetch_completed_snarks (module Context : CONTEXT) snark_pool network =
+let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
+    top_block get_most_recent_valid_block =
   let open Context in
   let open Network_peer in
   let%bind all_peers = Mina_networking.peers network in
@@ -1518,6 +1519,44 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network =
         | Ok completed_works ->
             completed_works
       in
+
+      [%log debug]
+        ~metadata:
+          [ ("peer", Network_peer.Peer.to_yojson peer)
+          ; ("completed_works", `Int (List.length completed_works))
+          ]
+        "Fetched $completed_works completed snarks from peer: $peer" ;
+
+      (* keep reading from the frontier pipe until the new top block is greater than 2 more than the old top block.public_key
+         we do this to account for the block lag placed after the bootstrap process. The number 2 was chosen after manual testing.
+         1 did not yield successful verifcation of the polled snarks work.
+      *)
+      let rec wait_for_new_top_block old_top_block =
+        let new_block_length_received =
+          let open Mina_block in
+          Mina_numbers.Length.to_int @@ Mina_block.Header.blockchain_length
+          @@ Validation.header
+          @@ get_most_recent_valid_block ()
+        in
+
+        [%log debug]
+          ~metadata:
+            [ ("old_top_block", `Int old_top_block)
+            ; ("new_top_block", `Int new_block_length_received)
+            ]
+          "WAITING  old top block: $old_top_block, new top block: \
+           $new_top_block" ;
+
+        if abs (new_block_length_received - old_top_block) >= 2 then
+          Deferred.unit
+        else
+          let%bind () = after (Time.Span.of_ms 20.) in
+          wait_for_new_top_block old_top_block
+      in
+
+      let%bind () = wait_for_new_top_block top_block in
+
+      (* verify the snarks and add them to the pool *)
       let%bind () =
         Deferred.List.iter completed_works ~f:(fun work ->
             (* proofs should be verified in apply and broadcast *)
@@ -1545,7 +1584,7 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network =
             in
             match err with
             | Ok () ->
-                [%log debug]
+                [%log info]
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson peer)
                     ; ( "work_ids"
@@ -1558,7 +1597,7 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network =
                 Network_pool.Snark_pool.apply_no_broadcast snark_pool msg
                 |> Deferred.return
             | Error e ->
-                [%log debug]
+                [%log info]
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson peer)
                     ; ( "work_ids"
@@ -2282,11 +2321,19 @@ let create ~commit_id ?wallets (config : Config.t) =
               let last_sync_status = ref `Offline in
               let equal_status
                   (s1 :
-                    [> `Catchup | `Connecting | `Listening | `Offline | `Synced ]
-                    )
+                    [> `Catchup
+                    | `Connecting
+                    | `Listening
+                    | `Offline
+                    | `Synced
+                    | `Bootstrap ] )
                   (s2 :
-                    [> `Catchup | `Connecting | `Listening | `Offline | `Synced ]
-                    ) =
+                    [> `Catchup
+                    | `Connecting
+                    | `Listening
+                    | `Offline
+                    | `Synced
+                    | `Bootstrap ] ) =
                 match (s1, s2) with
                 | `Catchup, `Catchup ->
                     true
@@ -2298,23 +2345,56 @@ let create ~commit_id ?wallets (config : Config.t) =
                     true
                 | `Synced, `Synced ->
                     true
+                | `Bootstrap, `Bootstrap ->
+                    true
                 | _ ->
                     false
               in
+              let to_yojson_status = function
+                | `Catchup ->
+                    `String "Catchup"
+                | `Connecting ->
+                    `String "Connecting"
+                | `Listening ->
+                    `String "Listening"
+                | `Offline ->
+                    `String "Offline"
+                | `Synced ->
+                    `String "Synced"
+                | `Bootstrap ->
+                    `String "Bootstrap"
+              in
               let rec loop () =
-                let status = !sync_status_ref in
-                if Option.is_none status then loop ()
+                let status = !last_sync_status in
+                (* log the status with info *)
+                [%log' info config.logger] ">>>>>> Current sync status: $status"
+                  ~metadata:[ ("status", to_yojson_status status) ] ;
+                if Option.is_none !sync_status_ref then loop ()
                 else
                   match
                     Mina_incremental.Status.Observer.value
-                      (Option.value_exn status)
+                      (Option.value_exn !sync_status_ref)
                   with
                   | Ok (`Offline as s) | Ok (`Bootstrap as s) ->
                       let%bind () = after (Time.Span.of_sec 1.) in
                       last_sync_status := s ;
                       loop ()
-                  | Ok `Synced when equal_status !last_sync_status `Catchup ->
-                      fetch_completed_snarks (module Context) snark_pool net
+                  | Ok `Synced
+                    when equal_status !last_sync_status `Catchup
+                         || equal_status !last_sync_status `Bootstrap ->
+                      [%log' info config.logger]
+                        ">>>>>> Synced, fetching completed snarks" ;
+                      let top_block =
+                        let open Mina_block in
+                        Mina_numbers.Length.to_int
+                        @@ Mina_block.Header.blockchain_length
+                        @@ Validation.header
+                        @@ get_most_recent_valid_block ()
+                      in
+
+                      fetch_completed_snarks
+                        (module Context)
+                        snark_pool net top_block get_most_recent_valid_block
                   | Ok (`Catchup as s)
                   | Ok (`Listening as s)
                   | Ok (`Connecting as s)
