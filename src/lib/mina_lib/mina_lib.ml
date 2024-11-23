@@ -2279,6 +2279,28 @@ let create ~commit_id ?wallets (config : Config.t) =
           sync_status_ref := Some sync_status ;
           O1trace.background_thread "fetch_completed_snarks" (fun () ->
               let open Deferred.Let_syntax in
+              let last_sync_status = ref `Offline in
+              let equal_status
+                  (s1 :
+                    [> `Catchup | `Connecting | `Listening | `Offline | `Synced ]
+                    )
+                  (s2 :
+                    [> `Catchup | `Connecting | `Listening | `Offline | `Synced ]
+                    ) =
+                match (s1, s2) with
+                | `Catchup, `Catchup ->
+                    true
+                | `Connecting, `Connecting ->
+                    true
+                | `Listening, `Listening ->
+                    true
+                | `Offline, `Offline ->
+                    true
+                | `Synced, `Synced ->
+                    true
+                | _ ->
+                    false
+              in
               let rec loop () =
                 let status = !sync_status_ref in
                 if Option.is_none status then loop ()
@@ -2287,13 +2309,18 @@ let create ~commit_id ?wallets (config : Config.t) =
                     Mina_incremental.Status.Observer.value
                       (Option.value_exn status)
                   with
-                  | Ok `Offline | Ok `Bootstrap ->
+                  | Ok (`Offline as s) | Ok (`Bootstrap as s) ->
                       let%bind () = after (Time.Span.of_sec 1.) in
+                      last_sync_status := s ;
                       loop ()
-                  | Ok `Synced ->
+                  | Ok `Synced when equal_status !last_sync_status `Catchup ->
                       fetch_completed_snarks (module Context) snark_pool net
-                  | Ok `Catchup | Ok `Listening | Ok `Connecting ->
+                  | Ok (`Catchup as s)
+                  | Ok (`Listening as s)
+                  | Ok (`Connecting as s)
+                  | Ok (`Synced as s) ->
                       let%bind () = after (Time.Span.of_sec 1.) in
+                      last_sync_status := s ;
                       loop ()
                   | Error _e ->
                       loop ()
