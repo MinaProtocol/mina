@@ -19,6 +19,9 @@ end)
   let apply_and_broadcast_thread_label =
     "apply_and_broadcast_" ^ Resource_pool.label ^ "_diffs"
 
+  let apply_no_broadcast_thread_label =
+    "apply_no_broadcast_" ^ Resource_pool.label ^ "_diffs"
+
   let processing_diffs_thread_label =
     "processing_" ^ Resource_pool.label ^ "_diffs"
 
@@ -158,7 +161,7 @@ end)
   let apply_no_broadcast ({ logger; _ } as t)
       (diff : Resource_pool.Diff.verified Envelope.Incoming.t) =
     let env = Envelope.Incoming.map ~f:Resource_pool.Diff.t_of_verified diff in
-    O1trace.sync_thread apply_and_broadcast_thread_label (fun () ->
+    O1trace.sync_thread apply_no_broadcast_thread_label (fun () ->
         match Resource_pool.Diff.unsafe_apply t.resource_pool diff with
         | Ok (`Accept, _accepted, _rejected) ->
             Resource_pool.Diff.log_internal ~logger "accepted" env
