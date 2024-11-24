@@ -201,7 +201,7 @@ module Wrap = struct
             ; combined_inner_product : 'fp
                   (** combined_inner_product = sum_{i < num_evaluation_points} sum_{j < num_polys} evalscale^i polyscale^j f_j(pt_i) *)
             ; b : 'fp
-                  (** b = challenge_poly plonk.zeta + evalscale * challenge_poly (domain_generrator * plonk.zeta)
+                  (** b = challenge_poly plonk.zeta + evalscale * challenge_poly (domain_generator * plonk.zeta)
                 where challenge_poly(x) = \prod_i (1 + bulletproof_challenges.(i) * x^{2^{k - 1 - i}})
             *)
             ; polyscale : 'scalar_challenge
@@ -1093,7 +1093,7 @@ module Step = struct
         ; bulletproof_challenges : 'bulletproof_challenges
               (** The challenges from the inner-product argument that was partially verified. *)
         ; b : 'fq
-              (** b = challenge_poly plonk.zeta + evalscale * challenge_poly (domain_generrator * plonk.zeta)
+              (** b = challenge_poly plonk.zeta + evalscale * challenge_poly (domain_generator * plonk.zeta)
                 where challenge_poly(x) = \prod_i (1 + bulletproof_challenges.(i) * x^{2^{k - 1 - i}})
             *)
         }
