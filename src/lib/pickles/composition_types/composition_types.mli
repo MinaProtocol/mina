@@ -1016,7 +1016,7 @@ module Step : sig
         ; bulletproof_challenges : 'bulletproof_challenges
               (** The challenges from the inner-product argument that was partially verified. *)
         ; b : 'fq
-              (** b = challenge_poly plonk.zeta + evalscale * challenge_poly (domain_generrator * plonk.zeta)
+              (** b = challenge_poly plonk.zeta + evalscale * challenge_poly (domain_generator * plonk.zeta)
                 where challenge_poly(x) = \prod_i (1 + bulletproof_challenges.(i) * x^{2^{k - 1 - i}})
             *)
         }
