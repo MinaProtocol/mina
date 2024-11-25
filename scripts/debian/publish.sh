@@ -70,11 +70,7 @@ echo "Publishing debs: ${DEB_NAMES} to Release: ${DEB_RELEASE} and Codename: ${D
 # Upload the deb files to s3.
 # If this fails, attempt to remove the lockfile and retry.
 for _ in {1..10}; do (
-  "${DEBS3_UPLOAD}" \
-     --component "${DEB_RELEASE}" \
-     --codename "${DEB_CODENAME}" \
-     "${GPG_OPTS}" \
-     "${DEB_NAMES}"
+  ${DEBS3_UPLOAD} "--component ${DEB_RELEASE} --codename ${DEB_CODENAME} ${GPG_OPTS} ${DEB_NAMES}"
 ) && break || scripts/debian/clear-s3-lockfile.sh; done
 
 for deb in $DEB_NAMES
