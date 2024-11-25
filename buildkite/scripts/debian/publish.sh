@@ -16,11 +16,11 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
 fi
 
 if [ -z "$SIGN" ]; then
+  SIGN_ARG=""
+else
   sudo chown -R opam ~/.gnupg/
   gpg --batch --yes --import /var/secrets/debian/key.gpg
   SIGN_ARG="--sign $SIGN"
-else
-  SIGN_ARG=""
 fi
 
 source scripts/debian/publish.sh \
