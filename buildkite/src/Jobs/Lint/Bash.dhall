@@ -14,8 +14,6 @@ let Size = ../../Command/Size.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
-let level = "warning"
-
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
