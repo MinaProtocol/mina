@@ -1,4 +1,4 @@
-(** Cache handle. It is currently used to cache proving and verifying keys for pickles *)
+(** Cache handle. It is currently used to cache proving and verifying keys for vinegar *)
 
 type t = Dirty.t Promise.t Lazy.t
 

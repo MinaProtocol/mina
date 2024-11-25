@@ -31,7 +31,7 @@ struct
         | None ->
             0
         | Some feature_flags ->
-            let { Pickles_types.Plonk_types.Features.range_check0
+            let { Vinegar_types.Plonk_types.Features.range_check0
                 ; range_check1
                 ; foreign_field_add =
                     _

@@ -1,9 +1,9 @@
 open Core_kernel
-open Pickles_types
+open Vinegar_types
 open Import
 open Backend
 
-let hash_fold_array = Pickles_types.Plonk_types.hash_fold_array
+let hash_fold_array = Vinegar_types.Plonk_types.hash_fold_array
 
 module Base = struct
   module Messages_for_next_proof_over_same_field =
@@ -70,7 +70,7 @@ module Base = struct
           *)
       ( 'messages_for_next_wrap_proof
       , 'messages_for_next_step_proof )
-      Mina_wire_types.Pickles.Concrete_.Proof.Base.Wrap.V2.t =
+      Mina_wire_types.Vinegar.Concrete_.Proof.Base.Wrap.V2.t =
       { statement :
           ( Challenge.Constant.t
           , Challenge.Constant.t Scalar_challenge.t
@@ -91,7 +91,7 @@ module Base = struct
 end
 
 type ('s, 'mlmb, 'c) with_data =
-      ('s, 'mlmb, 'c) Mina_wire_types.Pickles.Concrete_.Proof.with_data =
+      ('s, 'mlmb, 'c) Mina_wire_types.Vinegar.Concrete_.Proof.with_data =
   | T :
       ( 'mlmb Base.Messages_for_next_proof_over_same_field.Wrap.t
       , ( 's

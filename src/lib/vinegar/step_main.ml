@@ -1,4 +1,4 @@
-open Pickles_types
+open Vinegar_types
 open Hlist
 open Import
 open Impls.Step
@@ -403,7 +403,7 @@ let step_main :
                   -> (vars, ns1) H2.T(Inductive_rule.Previous_proof_statement).t
                   -> (vars, n) Length.t
                   -> actual_wrap_domains:
-                       ( Pickles_base.Proofs_verified.t As_prover.Ref.t
+                       ( Vinegar_base.Proofs_verified.t As_prover.Ref.t
                        , n )
                        Vector.t
                   -> (_, n) Vector.t * B.t list =
@@ -437,7 +437,7 @@ let step_main :
                           as_prover (fun () ->
                               let actual_wrap_domain =
                                 As_prover.Ref.get actual_wrap_domain
-                                |> Pickles_base.Proofs_verified.to_int
+                                |> Vinegar_base.Proofs_verified.to_int
                               in
                               let actual_wrap_domain =
                                 Common.wrap_domains

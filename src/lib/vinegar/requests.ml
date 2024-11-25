@@ -1,6 +1,6 @@
 open Import
 open Types
-open Pickles_types
+open Vinegar_types
 open Hlist
 open Snarky_backendless.Request
 open Backend
@@ -138,7 +138,7 @@ module Step = struct
       | Messages_for_next_wrap_proof :
           (Digest.Constant.t, max_proofs_verified) Vector.t t
       | Wrap_domain_indices :
-          (Pickles_base.Proofs_verified.t, proofs_verified) Vector.t t
+          (Vinegar_base.Proofs_verified.t, proofs_verified) Vector.t t
   end
 
   let create :
@@ -193,7 +193,7 @@ module Step = struct
         | Messages_for_next_wrap_proof :
             (Digest.Constant.t, max_proofs_verified) Vector.t t
         | Wrap_domain_indices :
-            (Pickles_base.Proofs_verified.t, proofs_verified) Vector.t t
+            (Vinegar_base.Proofs_verified.t, proofs_verified) Vector.t t
     end in
     (module R)
 end

@@ -1,4 +1,4 @@
-open Pickles_types
+open Vinegar_types
 
 (* Module names below kept to document functor parameters, even though they are
    unused in the signature, hence the [@@warning "-67"] *)

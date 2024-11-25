@@ -4,14 +4,14 @@
 *)
 
 val domains :
-     ?feature_flags:bool Pickles_types.Plonk_types.Features.t
+     ?feature_flags:bool Vinegar_types.Plonk_types.Features.t
   -> ('a, 'b) Import.Spec.Step_etyp.t
   -> ('c, 'd) Import.Spec.Step_etyp.t
   -> ('a -> 'c Promise.t)
   -> Import.Domains.t Promise.t
 
 val wrap_domains :
-     ?feature_flags:bool Pickles_types.Plonk_types.Features.t
+     ?feature_flags:bool Vinegar_types.Plonk_types.Features.t
   -> ('a, 'b) Import.Spec.Wrap_etyp.t
   -> ('c, 'd) Import.Spec.Wrap_etyp.t
   -> ('a -> 'c Promise.t)

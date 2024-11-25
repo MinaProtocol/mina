@@ -1,8 +1,8 @@
 (** A homogenized verification key type, used to 'side load' and verify any
-    pickles proof regardless of its original structure.
+    vinegar proof regardless of its original structure.
 *)
 
-module V = Pickles_base.Side_loaded_verification_key
+module V = Vinegar_base.Side_loaded_verification_key
 
 include
   module type of V with module Width := V.Width and module Domains := V.Domains
@@ -26,15 +26,15 @@ module Width : sig
 
   val typ : (Checked.t, t) Impls.Step.Typ.t
 
-  module Max = Pickles_types.Nat.N2
+  module Max = Vinegar_types.Nat.N2
 
-  module Max_vector : Pickles_types.Vector.With_version(Max).S
+  module Max_vector : Vinegar_types.Vector.With_version(Max).S
 
   module Max_at_most : sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type 'a t = ('a, Max.n) Pickles_types.At_most.t
+        type 'a t = ('a, Max.n) Vinegar_types.At_most.t
         [@@deriving compare, sexp, yojson, hash, equal]
       end
     end]
@@ -45,15 +45,15 @@ module Checked : sig
   type t =
     { max_proofs_verified :
         Step_main_inputs.Impl.field
-        Pickles_base.Proofs_verified.One_hot.Checked.t
+        Vinegar_base.Proofs_verified.One_hot.Checked.t
           (** The maximum of all of the [step_widths]. *)
     ; actual_wrap_domain_size :
         Step_main_inputs.Impl.field
-        Pickles_base.Proofs_verified.One_hot.Checked.t
+        Vinegar_base.Proofs_verified.One_hot.Checked.t
           (** The actual domain size used by the wrap circuit. *)
     ; wrap_index :
         Step_main_inputs.Inner_curve.t
-        Pickles_types.Plonk_verification_key_evals.t
+        Vinegar_types.Plonk_verification_key_evals.t
           (** The plonk verification key for the 'wrapping' proof that this key
               is used to verify.
           *)
@@ -77,7 +77,7 @@ module Stable : sig
   module V2 : sig
     type t =
       ( Backend.Tock.Curve.Affine.t
-      , Pickles_base.Proofs_verified.Stable.V1.t
+      , Vinegar_base.Proofs_verified.Stable.V1.t
       , Vk.t )
       Poly.Stable.V2.t
     [@@deriving hash, sexp, compare, equal, yojson]

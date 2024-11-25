@@ -1,5 +1,5 @@
 open Core_kernel
-open Pickles_types
+open Vinegar_types
 
 let rec absorb :
     type a g1 g1_opt f scalar.
@@ -25,7 +25,7 @@ let rec absorb :
         ~f:(Fn.compose (List.iter ~f:absorb_field) g1_to_field_elements)
         t
   | Type.With_degree_bound ->
-      let Pickles_types.Plonk_types.Poly_comm.With_degree_bound.
+      let Vinegar_types.Plonk_types.Poly_comm.With_degree_bound.
             { unshifted; shifted } =
         t
       in
@@ -57,13 +57,13 @@ let ones_vector :
       type m. Boolean.var -> int -> m Nat.t -> (Boolean.var, m) Vector.t =
    fun value i m ->
     match[@warning "-45"] m with
-    | Pickles_types.Nat.Z ->
-        Pickles_types.Vector.[]
-    | Pickles_types.Nat.S m ->
+    | Vinegar_types.Nat.Z ->
+        Vinegar_types.Vector.[]
+    | Vinegar_types.Nat.S m ->
         let value =
           Boolean.(value && not (Field.equal first_zero (Field.of_int i)))
         in
-        Pickles_types.Vector.(value :: go value (i + 1) m)
+        Vinegar_types.Vector.(value :: go value (i + 1) m)
   in
   go Boolean.true_ 0 n
 

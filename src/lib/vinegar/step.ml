@@ -1,5 +1,5 @@
 module SC = Scalar_challenge
-open Pickles_types
+open Vinegar_types
 open Poly_types
 open Hlist
 open Backend
@@ -32,7 +32,7 @@ struct
   let f
       (type (* The maximum number of proofs verified by one of the proof systems verified by this rule :)
 
-               In other words: each of the proofs verified by this rule comes from some pickles proof system.
+               In other words: each of the proofs verified by this rule comes from some vinegar proof system.
 
                The ith one of those proof systems has a maximum number of proofs N_i that is verified by
                a rule in proof system i. max_local_max_proof_verifieds is the max of the N_i.
@@ -55,7 +55,7 @@ struct
         , local_heights )
         Step_branch_data.t ) (next_state : A_value.t)
       ~maxes:
-        (module Maxes : Pickles_types.Hlist.Maxes.S
+        (module Maxes : Vinegar_types.Hlist.Maxes.S
           with type length = Max_proofs_verified.n
            and type ns = max_local_max_proof_verifieds )
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
@@ -82,7 +82,7 @@ struct
       * (int, prevs_length) Vector.t )
       Promise.t =
     let logger = Context_logger.get () in
-    [%log internal] "Pickles_step_proof" ;
+    [%log internal] "Vinegar_step_proof" ;
     let _ = auxiliary_typ in
     (* unused *)
     let _, prev_vars_length = branch_data.proofs_verified in
@@ -767,7 +767,7 @@ struct
                     ~f:(fun j acc (Pow_2_roots_of_unity domain) ->
                       if Int.equal domain domain_size then j else acc )
                 in
-                Pickles_base.Proofs_verified.of_int_exn domain_index )
+                Vinegar_base.Proofs_verified.of_int_exn domain_index )
           in
           k wrap_domain_indices
       | _ -> (
@@ -885,7 +885,7 @@ struct
       ; messages_for_next_wrap_proof
       }
     in
-    [%log internal] "Pickles_step_proof_done" ;
+    [%log internal] "Vinegar_step_proof_done" ;
     ( { Proof.Base.Step.proof = next_proof
       ; statement = next_statement
       ; index = branch_data.index

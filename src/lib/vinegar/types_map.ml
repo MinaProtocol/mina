@@ -1,5 +1,5 @@
 open Core_kernel
-open Pickles_types
+open Vinegar_types
 open Import
 open Backend
 
@@ -165,7 +165,7 @@ module For_step = struct
     ; wrap_domain :
         [ `Known of Domain.t
         | `Side_loaded of
-          Impls.Step.field Pickles_base.Proofs_verified.One_hot.Checked.t ]
+          Impls.Step.field Vinegar_base.Proofs_verified.One_hot.Checked.t ]
     ; step_domains : [ `Known of (Domains.t, 'branches) Vector.t | `Side_loaded ]
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int

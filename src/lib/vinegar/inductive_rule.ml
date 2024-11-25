@@ -1,5 +1,5 @@
-open Pickles_types.Poly_types
-open Pickles_types.Hlist
+open Vinegar_types.Poly_types
+open Vinegar_types.Hlist
 
 module B = struct
   type t = Impls.Step.Boolean.var
@@ -119,7 +119,7 @@ struct
     ; main :
            'a_var main_input
         -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return M.t
-    ; feature_flags : bool Pickles_types.Plonk_types.Features.t
+    ; feature_flags : bool Vinegar_types.Plonk_types.Features.t
     }
 
   module T

@@ -1,5 +1,5 @@
 open Core_kernel
-open Pickles_types
+open Vinegar_types
 open Hlist
 open Import
 
@@ -135,8 +135,8 @@ let create
   in
   (* Here, we prefetch the known wrap keys for all compiled rules.
      These keys may resolve asynchronously due to key generation for other
-     pickles rules, but we want to preserve the single-threaded behavior of
-     pickles to maximize our chances of successful debugging.
+     vinegar rules, but we want to preserve the single-threaded behavior of
+     vinegar to maximize our chances of successful debugging.
      Hence, we preload here, and pass the values in as needed when we create
      [datas] below.
   *)

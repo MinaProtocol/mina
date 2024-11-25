@@ -1,4 +1,4 @@
-open Pickles_types
+open Vinegar_types
 
 module Wrap_impl :
     module type of
@@ -132,15 +132,15 @@ module Wrap : sig
     -> unit
     -> ( ( Impl.Field.t
          , Impl.Field.t Composition_types.Scalar_challenge.t
-         , Impl.Field.t Pickles_types.Shifted_value.Type1.t
-         , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
+         , Impl.Field.t Vinegar_types.Shifted_value.Type1.t
+         , ( Impl.Field.t Vinegar_types.Shifted_value.Type1.t
            , Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
-           Pickles_types.Opt.t
+           Vinegar_types.Opt.t
          , ( Impl.Field.t Composition_types.Scalar_challenge.t
            , Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
-           Pickles_types.Opt.t
+           Vinegar_types.Opt.t
          , Impl.Boolean.var
          , Impl.field Snarky_backendless.Cvar.t
          , Impl.field Snarky_backendless.Cvar.t
@@ -148,14 +148,14 @@ module Wrap : sig
          , ( Impl.field Snarky_backendless.Cvar.t
              Kimchi_backend_common.Scalar_challenge.t
              Composition_types.Bulletproof_challenge.t
-           , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
-           Pickles_types.Vector.t
+           , Vinegar_types.Nat.z Backend.Tick.Rounds.plus_n )
+           Vinegar_types.Vector.t
          , Impl.field Snarky_backendless.Cvar.t )
          Import.Types.Wrap.Statement.In_circuit.t
        , ( Limb_vector.Challenge.Constant.t
          , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
-         , Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
-         , Other_field.Constant.t Pickles_types.Shifted_value.Type1.t option
+         , Other_field.Constant.t Vinegar_types.Shifted_value.Type1.t
+         , Other_field.Constant.t Vinegar_types.Shifted_value.Type1.t option
          , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
            option
          , bool
@@ -165,8 +165,8 @@ module Wrap : sig
          , ( Limb_vector.Challenge.Constant.t
              Kimchi_backend_common.Scalar_challenge.t
              Composition_types.Bulletproof_challenge.t
-           , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
-           Pickles_types.Vector.t
+           , Vinegar_types.Nat.z Backend.Tick.Rounds.plus_n )
+           Vinegar_types.Vector.t
          , Composition_types.Branch_data.t )
          Import.Types.Wrap.Statement.In_circuit.t )
        Import.Spec.Wrap_etyp.t

@@ -9,17 +9,17 @@
     evaluations happen in.
 
     For the different versions, refer to the module
-    {!module:Pickles_types.Plonk_types.Evals}. When a new custom gate is added, the
+    {!module:Vinegar_types.Plonk_types.Evals}. When a new custom gate is added, the
     corresponding selectors must be added.
 
     As for the return type of {!Commitment_lengths.create}, an encoding of the
     vector size is provided at the type level.
  *)
-type 'a t := 'a Pickles_types.Plonk_types.Evals.t
+type 'a t := 'a Vinegar_types.Plonk_types.Evals.t
 
 (** [default] is a value of type [int t].
 
     Its field values are set to [1] when they are non-optional, contains only
-    [1]-values when they are containers (like {!type:Pickles_types.Vector.t})
+    [1]-values when they are containers (like {!type:Vinegar_types.Vector.t})
     and are set to {!Option.None} when optional. *)
 val default : int t

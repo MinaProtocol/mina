@@ -14,10 +14,10 @@ val ones_vector :
   'f 'n.
      first_zero:'f Snarky_backendless.Cvar.t
   -> (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'n Pickles_types.Nat.t
+  -> 'n Vinegar_types.Nat.t
   -> ( 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
      , 'n )
-     Pickles_types.Vector.t
+     Vinegar_types.Vector.t
 
 val seal :
      (module Snarky_backendless.Snark_intf.Run with type field = 'f)

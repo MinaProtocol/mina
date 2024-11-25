@@ -1,6 +1,6 @@
 open Core_kernel
 open Import
-open Pickles_types
+open Vinegar_types
 open Common
 open Backend
 
@@ -17,7 +17,7 @@ module Step = struct
             , 'challenge_polynomial_commitments
             , 'bpcs )
             Mina_wire_types
-            .Pickles_reduced_messages_for_next_proof_over_same_field
+            .Vinegar_reduced_messages_for_next_proof_over_same_field
             .Step
             .V1
             .t =
@@ -44,7 +44,7 @@ end
 
 module Wrap = struct
   module Challenges_vector = struct
-    module Vector = Pickles_types.Vector
+    module Vector = Vinegar_types.Vector
     module Wrap_bp_vec = Import.Types.Wrap_bp_vec
     open Import
 

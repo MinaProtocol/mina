@@ -1,7 +1,7 @@
 open Core_kernel
 open Backend
 open Impls.Step
-open Pickles_types
+open Vinegar_types
 open Common
 open Import
 module Shifted_value = Shifted_value.Type2

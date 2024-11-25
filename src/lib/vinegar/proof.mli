@@ -1,4 +1,4 @@
-(** The type of intermediate (step) and emitted (wrap) proofs that pickles
+(** The type of intermediate (step) and emitted (wrap) proofs that vinegar
     generates
 *)
 
@@ -34,18 +34,18 @@ module Base : sig
         type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
           { statement :
               ( Limb_vector.Constant.Hex64.Stable.V1.t
-                Pickles_types.Vector.Vector_2.Stable.V1.t
+                Vinegar_types.Vector.Vector_2.Stable.V1.t
               , Limb_vector.Constant.Hex64.Stable.V1.t
-                Pickles_types.Vector.Vector_2.Stable.V1.t
+                Vinegar_types.Vector.Vector_2.Stable.V1.t
                 Import.Scalar_challenge.Stable.V2.t
               , Backend.Tick.Field.Stable.V1.t
-                Pickles_types.Shifted_value.Type1.Stable.V1.t
+                Vinegar_types.Shifted_value.Type1.Stable.V1.t
               , bool
               , 'messages_for_next_wrap_proof
               , Import.Digest.Constant.Stable.V1.t
               , 'messages_for_next_step_proof
               , Limb_vector.Constant.Hex64.Stable.V1.t
-                Pickles_types.Vector.Vector_2.Stable.V1.t
+                Vinegar_types.Vector.Vector_2.Stable.V1.t
                 Import.Scalar_challenge.Stable.V2.t
                 Import.Bulletproof_challenge.Stable.V1.t
                 Import.Step_bp_vec.Stable.V1.t
@@ -54,7 +54,7 @@ module Base : sig
           ; prev_evals :
               ( Backend.Tick.Field.Stable.V1.t
               , Backend.Tick.Field.Stable.V1.t array )
-              Pickles_types.Plonk_types.All_evals.Stable.V1.t
+              Vinegar_types.Plonk_types.All_evals.Stable.V1.t
           ; proof : Wrap_wire_proof.Stable.V1.t
           }
         [@@deriving compare, sexp, hash, equal]
@@ -68,11 +68,11 @@ module Base : sig
           *)
       ( 'messages_for_next_wrap_proof
       , 'messages_for_next_step_proof )
-      Mina_wire_types.Pickles.Concrete_.Proof.Base.Wrap.V2.t =
+      Mina_wire_types.Vinegar.Concrete_.Proof.Base.Wrap.V2.t =
       { statement :
           ( Import.Challenge.Constant.t
           , Import.Challenge.Constant.t Import.Scalar_challenge.t
-          , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+          , Backend.Tick.Field.t Vinegar_types.Shifted_value.Type1.t
           , bool
           , 'messages_for_next_wrap_proof
           , Import.Digest.Constant.t
@@ -85,7 +85,7 @@ module Base : sig
       ; prev_evals :
           ( Backend.Tick.Field.t
           , Backend.Tick.Field.t array )
-          Pickles_types.Plonk_types.All_evals.t
+          Vinegar_types.Plonk_types.All_evals.t
       ; proof : Wrap_wire_proof.Stable.V1.t
       }
     [@@deriving compare, sexp, yojson, hash, equal]
@@ -93,18 +93,18 @@ module Base : sig
 end
 
 type ('s, 'mlmb, 'c) with_data =
-      ('s, 'mlmb, 'c) Mina_wire_types.Pickles.Concrete_.Proof.with_data =
+      ('s, 'mlmb, 'c) Mina_wire_types.Vinegar.Concrete_.Proof.with_data =
   | T :
       ( 'mlmb Base.Messages_for_next_proof_over_same_field.Wrap.t
       , ( 's
         , ( Backend.Tock.Curve.Affine.t
           , 'most_recent_width )
-          Pickles_types.Vector.t
+          Vinegar_types.Vector.t
         , ( Import.Challenge.Constant.t Import.Scalar_challenge.Stable.Latest.t
             Import.Bulletproof_challenge.t
             Import.Step_bp_vec.t
           , 'most_recent_width )
-          Pickles_types.Vector.t )
+          Vinegar_types.Vector.t )
         Base.Messages_for_next_proof_over_same_field.Step.t )
       Base.Wrap.t
       -> ('s, 'mlmb, _) with_data
@@ -112,15 +112,15 @@ type ('s, 'mlmb, 'c) with_data =
 type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) with_data
 
 val dummy :
-     'w Pickles_types.Nat.t
-  -> 'h Pickles_types.Nat.t
-  -> 'r Pickles_types.Nat.t
+     'w Vinegar_types.Nat.t
+  -> 'h Vinegar_types.Nat.t
+  -> 'r Vinegar_types.Nat.t
   -> domain_log2:int
   -> ('w, 'h) t
 
-module Make (W : Pickles_types.Nat.Intf) (MLMB : Pickles_types.Nat.Intf) : sig
+module Make (W : Vinegar_types.Nat.Intf) (MLMB : Vinegar_types.Nat.Intf) : sig
   module Max_proofs_verified_at_most :
-      module type of Pickles_types.At_most.With_length (W)
+      module type of Vinegar_types.At_most.With_length (W)
 
   module MLMB_vec : module type of Import.Nvector (MLMB)
 
@@ -150,22 +150,22 @@ module Make (W : Pickles_types.Nat.Intf) (MLMB : Pickles_types.Nat.Intf) : sig
 
   val to_yojson : t -> [> `String of string ]
 
-  val to_yojson_full : t Pickles_types.Sigs.jsonable
+  val to_yojson_full : t Vinegar_types.Sigs.jsonable
 
   val of_yojson : [> `String of string ] -> (t, string) result
 end
 
 module Proofs_verified_2 : sig
-  module T : module type of Make (Pickles_types.Nat.N2) (Pickles_types.Nat.N2)
+  module T : module type of Make (Vinegar_types.Nat.N2) (Vinegar_types.Nat.N2)
 
   [%%versioned:
   module Stable : sig
     module V2 : sig
       include module type of T with module Repr := T.Repr
 
-      include Pickles_types.Sigs.VERSIONED
+      include Vinegar_types.Sigs.VERSIONED
 
-      include Pickles_types.Sigs.Binable.S with type t := t
+      include Vinegar_types.Sigs.Binable.S with type t := t
     end
   end]
 
@@ -184,9 +184,9 @@ module Proofs_verified_max : sig
     module V2 : sig
       include module type of T with module Repr := T.Repr
 
-      include Pickles_types.Sigs.VERSIONED
+      include Vinegar_types.Sigs.VERSIONED
 
-      include Pickles_types.Sigs.Binable.S with type t := t
+      include Vinegar_types.Sigs.Binable.S with type t := t
     end
   end]
 

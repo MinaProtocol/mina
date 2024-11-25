@@ -5,7 +5,7 @@
     Pallas and Vesta used by Halo2 and used by kimchi.
 
     This module provides a generic interface and abstract it with the Tick and
-    Tock curves used in Pickles.
+    Tock curves used in Vinegar.
     For a more detailed description, the reader is invited to have a look at the
     {{ https://eprint.iacr.org/2019/1021.pdf } Halo paper }.
 *)

@@ -1,4 +1,4 @@
-(** A verification key for a pickles proof, whose contents are not fixed within
+(** A verification key for a vinegar proof, whose contents are not fixed within
     the verifier circuit.
     This is used to verify a proof where the verification key is determined by
     some other constraint, for example to use a verification key provided as
@@ -11,7 +11,7 @@
       - (equivalently) the maximum number of proofs that a proof depends upon
         directly.
       - NB: This does not include recursively-verified proofs, this only refers
-        to proofs that were provided directly to pickles when the proof was
+        to proofs that were provided directly to vinegar when the proof was
         being generated.
     * **branch**:
       - a single 'rule' or 'circuit' for which a proof can be generated, where
@@ -24,9 +24,9 @@
 *)
 
 open Core_kernel
-open Pickles_types
+open Vinegar_types
 open Import
-module V = Pickles_base.Side_loaded_verification_key
+module V = Vinegar_base.Side_loaded_verification_key
 
 include (
   V :
@@ -149,7 +149,7 @@ module Stable = struct
     module T = struct
       type t =
         ( Backend.Tock.Curve.Affine.t
-        , Pickles_base.Proofs_verified.Stable.V1.t
+        , Vinegar_base.Proofs_verified.Stable.V1.t
         , Vk.t )
         Poly.Stable.V2.t
       [@@deriving hash]
@@ -180,7 +180,7 @@ module Stable = struct
         let d =
           (Common.wrap_domains
              ~proofs_verified:
-               (Pickles_base.Proofs_verified.to_int actual_wrap_domain_size) )
+               (Vinegar_base.Proofs_verified.to_int actual_wrap_domain_size) )
             .h
         in
         let log2_size = Import.Domain.log2_size d in
@@ -307,10 +307,10 @@ module Checked = struct
 
   type t =
     { max_proofs_verified :
-        Impl.field Pickles_base.Proofs_verified.One_hot.Checked.t
+        Impl.field Vinegar_base.Proofs_verified.One_hot.Checked.t
           (** The maximum of all of the [step_widths]. *)
     ; actual_wrap_domain_size :
-        Impl.field Pickles_base.Proofs_verified.One_hot.Checked.t
+        Impl.field Vinegar_base.Proofs_verified.One_hot.Checked.t
           (** The actual domain size used by the wrap circuit. *)
     ; wrap_index : Inner_curve.t Plonk_verification_key_evals.t
           (** The plonk verification key for the 'wrapping' proof that this key
@@ -327,11 +327,11 @@ module Checked = struct
     fun { max_proofs_verified; actual_wrap_domain_size; wrap_index } :
         _ Random_oracle_input.Chunked.t ->
       let max_proofs_verified =
-        Pickles_base.Proofs_verified.One_hot.Checked.to_input
+        Vinegar_base.Proofs_verified.One_hot.Checked.to_input
           max_proofs_verified
       in
       let actual_wrap_domain_size =
-        Pickles_base.Proofs_verified.One_hot.Checked.to_input
+        Vinegar_base.Proofs_verified.One_hot.Checked.to_input
           actual_wrap_domain_size
       in
       List.reduce_exn ~f:append
@@ -347,8 +347,8 @@ let typ : (Checked.t, t) Impls.Step.Typ.t =
   let open Step_main_inputs in
   let open Impl in
   Typ.of_hlistable
-    [ Pickles_base.Proofs_verified.One_hot.typ
-    ; Pickles_base.Proofs_verified.One_hot.typ
+    [ Vinegar_base.Proofs_verified.One_hot.typ
+    ; Vinegar_base.Proofs_verified.One_hot.typ
     ; Plonk_verification_key_evals.typ Inner_curve.typ
     ]
     ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist

@@ -1,6 +1,6 @@
 module SC = Scalar_challenge
 module P = Proof
-open Pickles_types
+open Vinegar_types
 open Hlist
 open Common
 open Import
@@ -74,7 +74,7 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
 
 module For_tests_only = struct
   type shifted_tick_field =
-    Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+    Backend.Tick.Field.t Vinegar_types.Shifted_value.Type1.t
 
   type scalar_challenge_constant =
     Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -312,7 +312,7 @@ let wrap
         Vector.t )
       P.Base.Step.t ) =
   let logger = Context_logger.get () in
-  [%log internal] "Pickles_wrap_proof" ;
+  [%log internal] "Vinegar_wrap_proof" ;
   let messages_for_next_wrap_proof =
     let module M =
       H1.Map
@@ -494,7 +494,7 @@ let wrap
         next_statement
     | Some f ->
         (* For adversarial tests, we want to simulate an adversary creating a
-           proof that doesn't match the pickles protocol.
+           proof that doesn't match the vinegar protocol.
            In order to do this, we pass a function [tweak_statement] that takes
            the valid statement that we computed above and 'tweaks' it so that
            the statement is no longer valid. This modified statement is then
@@ -579,7 +579,7 @@ let wrap
               }
           } )
   in
-  [%log internal] "Pickles_wrap_proof_done" ;
+  [%log internal] "Vinegar_wrap_proof_done" ;
   ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof.proof
     ; statement =
         Types.Wrap.Statement.to_minimal next_statement

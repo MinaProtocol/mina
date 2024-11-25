@@ -2,7 +2,7 @@
     non-deterministic witness data from the prover.
 *)
 
-open Pickles_types
+open Vinegar_types
 
 module Step : sig
   module type S = sig
@@ -47,7 +47,7 @@ module Step : sig
           (Import.Types.Digest.Constant.t, max_proofs_verified) Vector.t
           Snarky_backendless.Request.t
       | Wrap_domain_indices :
-          (Pickles_base.Proofs_verified.t, proofs_verified) Vector.t
+          (Vinegar_base.Proofs_verified.t, proofs_verified) Vector.t
           Snarky_backendless.Request.t
   end
 

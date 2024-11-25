@@ -4,16 +4,16 @@
 module Ipa : sig
   module Wrap : sig
     val challenges :
-      ( (int64, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
+      ( (int64, Vinegar_types.Nat.N2.n) Vinegar_types.Vector.t
         Import.Scalar_challenge.t
         Composition_types.Bulletproof_challenge.t
-      , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
-      Pickles_types.Vector.t
+      , Vinegar_types.Nat.z Backend.Tock.Rounds.plus_n )
+      Vinegar_types.Vector.t
 
     val challenges_computed :
       ( Backend.Tock.Field.t
-      , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
-      Pickles_types.Vector.t
+      , Vinegar_types.Nat.z Backend.Tock.Rounds.plus_n )
+      Vinegar_types.Vector.t
       lazy_t
 
     val sg : (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t) lazy_t
@@ -21,16 +21,16 @@ module Ipa : sig
 
   module Step : sig
     val challenges :
-      ( (int64, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
+      ( (int64, Vinegar_types.Nat.N2.n) Vinegar_types.Vector.t
         Import.Scalar_challenge.t
         Composition_types.Bulletproof_challenge.t
-      , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
-      Pickles_types.Vector.t
+      , Vinegar_types.Nat.z Backend.Tick.Rounds.plus_n )
+      Vinegar_types.Vector.t
 
     val challenges_computed :
       ( Backend.Tick.Field.t
-      , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
-      Pickles_types.Vector.t
+      , Vinegar_types.Nat.z Backend.Tick.Rounds.plus_n )
+      Vinegar_types.Vector.t
       lazy_t
 
     val sg : (Pasta_bindings.Fq.t * Pasta_bindings.Fq.t) lazy_t
@@ -46,12 +46,12 @@ end
 val evals :
   ( Backend.Tock.Field.t
   , Backend.Tock.Field.t array )
-  Pickles_types.Plonk_types.All_evals.t
+  Vinegar_types.Plonk_types.All_evals.t
   lazy_t
 
 (** [evals_combined] is a constant *)
 val evals_combined :
   ( Backend.Tock.Field.t
   , Backend.Tock.Field.t )
-  Pickles_types.Plonk_types.All_evals.t
+  Vinegar_types.Plonk_types.All_evals.t
   lazy_t

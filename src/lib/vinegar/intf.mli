@@ -1,5 +1,5 @@
 open Core_kernel
-open Pickles_types
+open Vinegar_types
 module Sponge_lib = Sponge
 
 (** Generic interface over a concrete implementation [Impl] of an elliptic

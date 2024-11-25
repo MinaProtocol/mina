@@ -1,5 +1,5 @@
 module SC = Scalar_challenge
-open Pickles_types
+open Vinegar_types
 open Common
 open Import
 
@@ -31,7 +31,7 @@ let verify_heterogenous (ts : Instance.t list) =
           Ok ()
       | _ ->
           Error
-            ( Error.tag ~tag:"Pickles.verify"
+            ( Error.tag ~tag:"Vinegar.verify"
             @@ Error.of_list
             @@ List.map !r ~f:(fun lab -> Error.of_string (Lazy.force lab)) )
     in
@@ -65,7 +65,7 @@ let verify_heterogenous (ts : Instance.t list) =
           in
           let exception Is_chunked in
           match
-            Pickles_types.Plonk_types.Evals.map evals.evals.evals
+            Vinegar_types.Plonk_types.Evals.map evals.evals.evals
               ~f:(fun (x, y) ->
                 if
                   Array.length x > expected_num_chunks
@@ -84,7 +84,7 @@ let verify_heterogenous (ts : Instance.t list) =
           , non_chunking ) ;
         check
           ( lazy "feature flags are consistent with evaluations"
-          , Pickles_types.Plonk_types.Evals.validate_feature_flags
+          , Vinegar_types.Plonk_types.Evals.validate_feature_flags
               ~feature_flags:proof_state.deferred_values.plonk.feature_flags
               evals.evals.evals ) ;
         Timer.start __LOC__ ;

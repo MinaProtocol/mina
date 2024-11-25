@@ -1,5 +1,5 @@
 open Core_kernel
-open Pickles_types
+open Vinegar_types
 open Import
 open Backend
 
@@ -42,7 +42,7 @@ let actual_wrap_domain_size ~log_2_domain_size =
     | _ ->
         assert false
   in
-  Pickles_base.Proofs_verified.of_int_exn d
+  Vinegar_base.Proofs_verified.of_int_exn d
 
 let hash_messages_for_next_step_proof ~app_state
     (t : _ Types.Step.Proof_state.Messages_for_next_step_proof.t) =
@@ -165,7 +165,7 @@ module Ipa = struct
       let comm =
         Kimchi_bindings.Protocol.SRS.Fq.b_poly_commitment
           (Backend.Tock.Keypair.load_urs ())
-          (Pickles_types.Vector.to_array (compute_challenges chals))
+          (Vinegar_types.Vector.to_array (compute_challenges chals))
       in
       comm.unshifted.(0) |> finite_exn
   end
@@ -184,7 +184,7 @@ module Ipa = struct
       let comm =
         Kimchi_bindings.Protocol.SRS.Fp.b_poly_commitment
           (Backend.Tick.Keypair.load_urs ())
-          (Pickles_types.Vector.to_array (compute_challenges chals))
+          (Vinegar_types.Vector.to_array (compute_challenges chals))
       in
       comm.unshifted.(0) |> finite_exn
 

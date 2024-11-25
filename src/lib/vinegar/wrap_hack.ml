@@ -1,6 +1,6 @@
 open Core_kernel
 open Backend
-open Pickles_types
+open Vinegar_types
 
 (* The actual "accumulator" for the wrap proof contains a vector of elements,
    each of which is a vector of bulletproof challenges.

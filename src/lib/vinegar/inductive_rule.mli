@@ -44,7 +44,7 @@ type 'public_input main_input =
 (** The return type of an inductive rule's main function. *)
 type ('prev_vars, 'widths, 'public_output, 'auxiliary_output) main_return =
   { previous_proof_statements :
-      ('prev_vars, 'widths) Pickles_types.Hlist.H2.T(Previous_proof_statement).t
+      ('prev_vars, 'widths) Vinegar_types.Hlist.H2.T(Previous_proof_statement).t
         (** A list of booleans, determining whether each previous proof must
             verify.
         *)
@@ -112,20 +112,20 @@ end) : sig
         , 'prev_values
         , 'widths
         , 'heights )
-        Pickles_types.Hlist.H4.T(Tag).t
+        Vinegar_types.Hlist.H4.T(Tag).t
     ; main :
            'a_var main_input
         -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return M.t
-    ; feature_flags : bool Pickles_types.Plonk_types.Features.t
+    ; feature_flags : bool Vinegar_types.Plonk_types.Features.t
     }
 
   module T
-      (Statement : Pickles_types.Poly_types.T0)
-      (Statement_value : Pickles_types.Poly_types.T0)
-      (Return_var : Pickles_types.Poly_types.T0)
-      (Return_value : Pickles_types.Poly_types.T0)
-      (Auxiliary_var : Pickles_types.Poly_types.T0)
-      (Auxiliary_value : Pickles_types.Poly_types.T0) : sig
+      (Statement : Vinegar_types.Poly_types.T0)
+      (Statement_value : Vinegar_types.Poly_types.T0)
+      (Return_var : Vinegar_types.Poly_types.T0)
+      (Return_value : Vinegar_types.Poly_types.T0)
+      (Auxiliary_var : Vinegar_types.Poly_types.T0)
+      (Auxiliary_value : Vinegar_types.Poly_types.T0) : sig
     type nonrec ('prev_vars, 'prev_values, 'widths, 'heights) t =
       ( 'prev_vars
       , 'prev_values
@@ -149,4 +149,4 @@ module Deferred : sig
   include module type of Make (Async_kernel.Deferred)
 end
 
-include module type of Make (Pickles_types.Hlist.Id)
+include module type of Make (Vinegar_types.Hlist.Id)

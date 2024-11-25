@@ -10,7 +10,7 @@ module Step : sig
             , 'challenge_polynomial_commitments
             , 'bpcs )
             Mina_wire_types
-            .Pickles_reduced_messages_for_next_proof_over_same_field
+            .Vinegar_reduced_messages_for_next_proof_over_same_field
             .Step
             .V1
             .t =
@@ -20,7 +20,7 @@ module Step : sig
         }
       [@@deriving sexp, yojson, sexp, compare, hash, equal, bin_shape, bin_io]
 
-      include Pickles_types.Sigs.VERSIONED
+      include Vinegar_types.Sigs.VERSIONED
     end
   end
 
@@ -28,7 +28,7 @@ module Step : sig
         ( 's
         , 'challenge_polynomial_commitments
         , 'bpcs )
-        Mina_wire_types.Pickles_reduced_messages_for_next_proof_over_same_field
+        Mina_wire_types.Vinegar_reduced_messages_for_next_proof_over_same_field
         .Step
         .V1
         .t =
@@ -39,22 +39,22 @@ module Step : sig
   [@@deriving sexp, yojson, sexp, compare, hash, equal]
 
   val prepare :
-       dlog_plonk_index:'a Pickles_types.Plonk_verification_key_evals.t
+       dlog_plonk_index:'a Vinegar_types.Plonk_verification_key_evals.t
     -> ( 'b
        , 'c
        , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
              Import.Bulletproof_challenge.t
            , 'd )
-           Pickles_types.Vector.t
+           Vinegar_types.Vector.t
          , 'e )
-         Pickles_types.Vector.t )
+         Vinegar_types.Vector.t )
        t
     -> ( 'a
        , 'b
        , 'c
-       , ( (Backend.Tick.Field.t, 'd) Pickles_types.Vector.t
+       , ( (Backend.Tick.Field.t, 'd) Vinegar_types.Vector.t
          , 'e )
-         Pickles_types.Vector.t )
+         Vinegar_types.Vector.t )
        Import.Types.Step.Proof_state.Messages_for_next_step_proof.t
 end
 
@@ -64,13 +64,13 @@ module Wrap : sig
       module V2 : sig
         type t =
           Limb_vector.Constant.Hex64.Stable.V1.t
-          Pickles_types.Vector.Vector_2.Stable.V1.t
+          Vinegar_types.Vector.Vector_2.Stable.V1.t
           Import.Scalar_challenge.Stable.V2.t
           Import.Bulletproof_challenge.Stable.V1.t
           Import.Types.Wrap_bp_vec.Stable.V1.t
         [@@deriving sexp, compare, yojson, hash, equal, bin_shape, bin_io]
 
-        include Pickles_types.Sigs.VERSIONED
+        include Vinegar_types.Sigs.VERSIONED
       end
     end
 
@@ -82,7 +82,7 @@ module Wrap : sig
 
     module Prepared : sig
       type t =
-        (Backend.Tock.Field.t, Backend.Tock.Rounds.n) Pickles_types.Vector.t
+        (Backend.Tock.Field.t, Backend.Tock.Rounds.n) Vinegar_types.Vector.t
     end
   end
 
@@ -90,7 +90,7 @@ module Wrap : sig
     ( Backend.Tock.Inner_curve.Affine.t
     , ( Challenges_vector.t
       , 'max_local_max_proofs_verified )
-      Pickles_types.Vector.t )
+      Vinegar_types.Vector.t )
     Import.Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
 
   val prepare :
@@ -98,9 +98,9 @@ module Wrap : sig
     -> ( Backend.Tock.Inner_curve.Affine.t
        , ( ( Backend.Tock.Field.t
            , Kimchi_pasta.Basic.Rounds.Wrap.n )
-           Pickles_types.Vector.t
+           Vinegar_types.Vector.t
          , 'a )
-         Pickles_types.Vector.t )
+         Vinegar_types.Vector.t )
        Import.Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
 
   module Prepared : sig
@@ -108,7 +108,7 @@ module Wrap : sig
       ( Backend.Tock.Inner_curve.Affine.t
       , ( Challenges_vector.Prepared.t
         , 'max_local_max_proofs_verified )
-        Pickles_types.Vector.t )
+        Vinegar_types.Vector.t )
       Import.Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
   end
 end

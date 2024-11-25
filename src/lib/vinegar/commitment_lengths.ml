@@ -1,4 +1,4 @@
-open Pickles_types
+open Vinegar_types
 
 let default ~num_chunks =
   { Plonk_types.Messages.Poly.w =

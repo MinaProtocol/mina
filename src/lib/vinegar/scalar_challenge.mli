@@ -39,7 +39,7 @@ module Make : functor
     type t = Challenge.Constant.t Import.Scalar_challenge.t
 
     val to_field :
-         (Core_kernel.Int64.t, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
+         (Core_kernel.Int64.t, Vinegar_types.Nat.N2.n) Vinegar_types.Vector.t
          Import.Scalar_challenge.t
       -> G.Constant.Scalar.t
   end

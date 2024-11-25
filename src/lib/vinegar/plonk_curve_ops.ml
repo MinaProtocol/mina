@@ -70,7 +70,7 @@ struct
     (num_bits + (bits_per_chunk - 1)) / bits_per_chunk
 
   let scale_fast_msb_bits base
-      (Pickles_types.Shifted_value.Type1.Shifted_value
+      (Vinegar_types.Shifted_value.Type1.Shifted_value
         (bits_msb : Boolean.var array) ) : Field.t * Field.t =
     let ((x_base, y_base) as base) = seal base in
     let ( !! ) = As_prover.read_var in
@@ -138,7 +138,7 @@ struct
 
      fun (g, t) -> (2 * t + 1 + 2^len(t)) g *)
   let scale_fast_unpack base
-      (Pickles_types.Shifted_value.Type1.Shifted_value (scalar : Field.t))
+      (Vinegar_types.Shifted_value.Type1.Shifted_value (scalar : Field.t))
       ~num_bits : (Field.t * Field.t) * Boolean.var array =
     let ((x_base, y_base) as base) = seal base in
     let ( !! ) = As_prover.read_var in
@@ -249,7 +249,7 @@ struct
      s = 2 * (s >> 1) + 1 - 1.
   *)
   let scale_fast2 (g : G.t)
-      (Pickles_types.Shifted_value.Type2.Shifted_value
+      (Vinegar_types.Shifted_value.Type2.Shifted_value
         ((s_div_2 : Field.t), (s_odd : Boolean.var)) ) ~(num_bits : int) : G.t =
     let s_div_2_bits = num_bits - 1 in
     (* The number of chunks need for scaling by s_div_2. *)
@@ -289,7 +289,7 @@ struct
        in the other field. *)
     with_label __LOC__ (fun () ->
         Field.Assert.equal Field.((of_int 2 * s_div_2) + (s_odd :> Field.t)) s ) ;
-    scale_fast2 g (Pickles_types.Shifted_value.Type2.Shifted_value s_parts)
+    scale_fast2 g (Vinegar_types.Shifted_value.Type2.Shifted_value s_parts)
       ~num_bits
 
   let scale_fast a b = with_label __LOC__ (fun () -> scale_fast a b)

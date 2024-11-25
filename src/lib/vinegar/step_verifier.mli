@@ -33,21 +33,21 @@ val assert_n_bits :
   n:int -> Pasta_bindings.Fp.t Snarky_backendless.Cvar.t -> unit
 
 val finalize_other_proof :
-     (module Pickles_types.Nat.Add.Intf with type n = 'b)
+     (module Vinegar_types.Nat.Add.Intf with type n = 'b)
   -> step_domains:
-       [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
+       [ `Known of (Import.Domains.t, 'branches) Vinegar_types.Vector.t
        | `Side_loaded ]
   -> zk_rows:int
   -> sponge:Step_main_inputs.Sponge.t
   -> prev_challenges:
-       ( (Step_main_inputs.Impl.Field.t, 'a) Pickles_types.Vector.t
+       ( (Step_main_inputs.Impl.Field.t, 'a) Vinegar_types.Vector.t
        , 'b )
-       Pickles_types.Vector.t
+       Vinegar_types.Vector.t
   -> ( Step_main_inputs.Impl.Field.t
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
        Import.Scalar_challenge.t
-     , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-     , ( Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
+     , Step_main_inputs.Impl.Field.t Vinegar_types.Shifted_value.Type1.t
+     , ( Step_main_inputs.Impl.Field.t Vinegar_types.Shifted_value.Type1.t
        , Step_main_inputs.Impl.Boolean.var )
        Composition_types.Opt.t
      , ( Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
@@ -58,30 +58,30 @@ val finalize_other_proof :
          Import.Scalar_challenge.t
          Import.Bulletproof_challenge.t
        , 'c )
-       Pickles_types.Vector.t
+       Vinegar_types.Vector.t
      , Step_main_inputs.Impl.Field.Constant.t Import.Branch_data.Checked.t
      , Step_main_inputs.Impl.Boolean.var )
      Import.Types.Wrap.Proof_state.Deferred_values.In_circuit.t
   -> ( Step_main_inputs.Impl.Field.t
      , Step_main_inputs.Impl.Field.t Core_kernel.Array.t
      , Step_main_inputs.Impl.Boolean.var )
-     Pickles_types.Plonk_types.All_evals.In_circuit.t
+     Vinegar_types.Plonk_types.All_evals.In_circuit.t
   -> Step_main_inputs.Impl.Boolean.var
      * ( Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
        , 'c )
-       Pickles_types.Vector.t
+       Vinegar_types.Vector.t
 
 val hash_messages_for_next_step_proof :
      index:
        Step_main_inputs.Inner_curve.t array
-       Pickles_types.Plonk_verification_key_evals.t
+       Vinegar_types.Plonk_verification_key_evals.t
   -> ('s -> Step_main_inputs.Impl.Field.t array)
   -> (   ( 'a
          , 's
-         , (Inner_curve.t, 'b) Pickles_types.Vector.t
-         , ( (Step_main_inputs.Impl.Field.t, 'c) Pickles_types.Vector.t
+         , (Inner_curve.t, 'b) Vinegar_types.Vector.t
+         , ( (Step_main_inputs.Impl.Field.t, 'c) Vinegar_types.Vector.t
            , 'b )
-           Pickles_types.Vector.t )
+           Vinegar_types.Vector.t )
          Import.Types.Step.Proof_state.Messages_for_next_step_proof.t
       -> Step_main_inputs.Impl.Field.t )
      Core_kernel.Staged.t
@@ -89,40 +89,40 @@ val hash_messages_for_next_step_proof :
 val hash_messages_for_next_step_proof_opt :
      index:
        Step_main_inputs.Inner_curve.t array
-       Pickles_types.Plonk_verification_key_evals.t
+       Vinegar_types.Plonk_verification_key_evals.t
   -> ('s -> Step_main_inputs.Impl.Field.t array)
   -> Step_main_inputs.Sponge.t
      * (   ( 'a
            , 's
-           , (Inner_curve.t, 'b) Pickles_types.Vector.t
-           , ( (Step_main_inputs.Impl.Field.t, 'c) Pickles_types.Vector.t
+           , (Inner_curve.t, 'b) Vinegar_types.Vector.t
+           , ( (Step_main_inputs.Impl.Field.t, 'c) Vinegar_types.Vector.t
              , 'b )
-             Pickles_types.Vector.t )
+             Vinegar_types.Vector.t )
            Import.Types.Step.Proof_state.Messages_for_next_step_proof.t
         -> widths:'d
         -> max_width:'e
         -> proofs_verified_mask:
              ( Step_main_inputs.Impl.Field.t Snarky_backendless.Boolean.t
              , 'b )
-             Pickles_types.Vector.t
+             Vinegar_types.Vector.t
         -> Step_main_inputs.Impl.Field.t )
        Core_kernel.Staged.t
 
 (** Actual verification using cryptographic tools. Returns [true] (encoded as a
     in-circuit Boolean variable) if the verification is successful *)
 val verify :
-     proofs_verified:(module Pickles_types.Nat.Add.Intf with type n = 'a)
+     proofs_verified:(module Vinegar_types.Nat.Add.Intf with type n = 'a)
   -> is_base_case:Step_main_inputs.Impl.Boolean.var
-  -> sg_old:(Impls.Step.Field.t Tuple_lib.Double.t, 'a) Pickles_types.Vector.t
+  -> sg_old:(Impls.Step.Field.t Tuple_lib.Double.t, 'a) Vinegar_types.Vector.t
   -> sponge_after_index:Step_main_inputs.Sponge.t
   -> lookup_parameters:
        ( Limb_vector.Challenge.Constant.t
        , Step_main_inputs.Impl.field Limb_vector.Challenge.t
        , 'b
-       , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t )
+       , Step_main_inputs.Impl.Field.t Vinegar_types.Shifted_value.Type1.t )
        Composition_types.Wrap.Lookup_parameters.t
        (* lookup arguments parameters *)
-  -> feature_flags:Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.t
+  -> feature_flags:Vinegar_types.Opt.Flag.t Vinegar_types.Plonk_types.Features.t
   -> proof:Wrap_proof.Checked.t
   -> srs:Kimchi_bindings.Protocol.SRS.Fq.t
   -> wrap_domain:
@@ -132,19 +132,19 @@ val verify :
          Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ]
   -> wrap_verification_key:
        Step_main_inputs.Inner_curve.t array
-       Pickles_types.Plonk_verification_key_evals.t
+       Vinegar_types.Plonk_verification_key_evals.t
   -> ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
      , Step_main_inputs.Impl.field Limb_vector.Challenge.t
        Composition_types.Scalar_challenge.t
-     , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-     , ( Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
+     , Step_main_inputs.Impl.Field.t Vinegar_types.Shifted_value.Type1.t
+     , ( Step_main_inputs.Impl.Field.t Vinegar_types.Shifted_value.Type1.t
        , Step_main_inputs.Impl.Boolean.var )
-       Pickles_types.Opt.t
+       Vinegar_types.Opt.t
      , ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
          Composition_types.Scalar_challenge.t
        , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
          Snarky_backendless.Snark_intf.Boolean0.t )
-       Pickles_types.Opt.t
+       Vinegar_types.Opt.t
      , Step_main_inputs.Impl.Boolean.var
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
@@ -152,8 +152,8 @@ val verify :
      , ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
          Kimchi_backend_common.Scalar_challenge.t
          Composition_types.Bulletproof_challenge.t
-       , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
-       Pickles_types.Vector.t
+       , Vinegar_types.Nat.z Backend.Tick.Rounds.plus_n )
+       Vinegar_types.Vector.t
      , Step_main_inputs.Impl.field Composition_types.Branch_data.Checked.t )
      Import.Types.Wrap.Statement.In_circuit.t
      (* statement *)
@@ -167,6 +167,6 @@ module For_tests_only : sig
        log2_size:field
     -> < generator : field
        ; log2_size : field
-       ; shifts : field Pickles_types.Plonk_types.Shifts.t
+       ; shifts : field Vinegar_types.Plonk_types.Shifts.t
        ; vanishing_polynomial : field -> field >
 end

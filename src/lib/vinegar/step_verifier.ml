@@ -5,7 +5,7 @@ open Import
 open Common
 open Util
 open Types.Step
-open Pickles_types
+open Vinegar_types
 
 module Make
     (Inputs : Intf.Step_main_inputs.S
@@ -729,7 +729,7 @@ struct
            let d =
              Number.of_bits
                (Field.unpack
-                  ~length:Pickles_base.Side_loaded_verification_key.max_log2_degree
+                  ~length:Vinegar_base.Side_loaded_verification_key.max_log2_degree
                   d )
            in
            Number.mod_pow_2 d (`Two_to_the k)

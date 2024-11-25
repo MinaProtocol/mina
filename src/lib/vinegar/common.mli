@@ -1,7 +1,7 @@
 val wrap_domains : proofs_verified:int -> Import.Domains.Stable.V2.t
 
 val actual_wrap_domain_size :
-  log_2_domain_size:int -> Pickles_base.Proofs_verified.t
+  log_2_domain_size:int -> Vinegar_base.Proofs_verified.t
 
 (** [when_profiling profiling default] returns [profiling] when environment
     variable [PICKLES_PROFILING] is set to anything else than [0] or [false],
@@ -39,7 +39,7 @@ val ft_comm :
      add:('comm -> 'comm -> 'comm)
   -> scale:('comm -> 'scalar -> 'comm)
   -> negate:('comm -> 'comm)
-  -> verification_key:'comm array Pickles_types.Plonk_verification_key_evals.t
+  -> verification_key:'comm array Vinegar_types.Plonk_verification_key_evals.t
   -> plonk:
        ( 'd
        , 'e
@@ -52,16 +52,16 @@ val ft_comm :
   -> 'comm
 
 val dlog_pcs_batch :
-     'total Pickles_types.Nat.t
-     * ('proofs_verified, 'n, 'total) Pickles_types.Nat.Adds.t
-  -> ('a, 'total, Pickles_types.Nat.z) Pickles_types.Pcs_batch.t
+     'total Vinegar_types.Nat.t
+     * ('proofs_verified, 'n, 'total) Vinegar_types.Nat.Adds.t
+  -> ('a, 'total, Vinegar_types.Nat.z) Vinegar_types.Pcs_batch.t
 
 val combined_evaluation :
      (module Snarky_backendless.Snark_intf.Run with type field = 'f)
   -> xi:'f Snarky_backendless.Cvar.t
   -> ( 'f Snarky_backendless.Cvar.t
      , 'f Snarky_backendless.Cvar.t Snarky_backendless.Snark_intf.Boolean0.t )
-     Pickles_types.Opt.t
+     Vinegar_types.Opt.t
      array
      list
   -> 'f Snarky_backendless.Cvar.t
@@ -75,17 +75,17 @@ module Max_degree : sig
 end
 
 module Shifts : sig
-  val tick1 : Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.Shift.t
+  val tick1 : Backend.Tick.Field.t Vinegar_types.Shifted_value.Type1.Shift.t
 
-  val tock2 : Backend.Tock.Field.t Pickles_types.Shifted_value.Type2.Shift.t
+  val tock2 : Backend.Tock.Field.t Vinegar_types.Shifted_value.Type2.Shift.t
 end
 
 module Lookup_parameters : sig
   type ('a, 'b) zero_value :=
     ( Import.Challenge.Constant.t
     , 'a
-    , Impls.Wrap.Field.Constant.t Pickles_types.Shifted_value.Type2.t
-    , 'b Pickles_types.Shifted_value.Type2.t )
+    , Impls.Wrap.Field.Constant.t Vinegar_types.Shifted_value.Type2.t
+    , 'b Vinegar_types.Shifted_value.Type2.t )
     Composition_types.Zero_values.t
 
   val tick_zero :
@@ -100,7 +100,7 @@ module Ipa : sig
     ( Import.Challenge.Constant.t Import.Scalar_challenge.t
       Import.Bulletproof_challenge.t
     , 'a )
-    Pickles_types.Vector.t
+    Vinegar_types.Vector.t
 
   type ('a, 'b) compute_sg := 'a challenge -> 'b * 'b
 
@@ -114,7 +114,7 @@ module Ipa : sig
       -> Backend.Tock.Field.t
 
     val compute_challenges :
-      'a challenge -> (Backend.Tock.Field.t, 'a) Pickles_types.Vector.t
+      'a challenge -> (Backend.Tock.Field.t, 'a) Vinegar_types.Vector.t
 
     val compute_sg : ('a, Pasta_bindings.Fp.t) compute_sg
   end
@@ -129,13 +129,13 @@ module Ipa : sig
       -> Backend.Tick.Field.t
 
     val compute_challenges :
-      'a challenge -> (Backend.Tick.Field.t, 'a) Pickles_types.Vector.t
+      'a challenge -> (Backend.Tick.Field.t, 'a) Vinegar_types.Vector.t
 
     val compute_sg : ('a, Pasta_bindings.Fq.t) compute_sg
 
     val accumulator_check :
          ( (Pasta_bindings.Fq.t * Pasta_bindings.Fq.t)
-         * (Pasta_bindings.Fp.t, 'a) Pickles_types.Vector.t )
+         * (Pasta_bindings.Fp.t, 'a) Vinegar_types.Vector.t )
          list
       -> bool Promise.t
   end
@@ -150,30 +150,30 @@ val hash_messages_for_next_step_proof :
      , ( Kimchi_pasta.Basic.Fp.Stable.Latest.t
          * Kimchi_pasta.Basic.Fp.Stable.Latest.t
        , 'n )
-       Pickles_types.Vector.t
+       Vinegar_types.Vector.t
      (* challenge polynomial commitments. We use the full parameter type to
         restrict the size of the vector to be the same than the one for the next
         parameter which are the bulletproof challenges *)
-     , ( (Kimchi_pasta.Basic.Fp.Stable.Latest.t, 'm) Pickles_types.Vector.t
+     , ( (Kimchi_pasta.Basic.Fp.Stable.Latest.t, 'm) Vinegar_types.Vector.t
        , 'n
        (* size of the vector *) )
-       Pickles_types.Vector.t
+       Vinegar_types.Vector.t
      (* bulletproof challenges *) )
      Import.Types.Step.Proof_state.Messages_for_next_step_proof.t
   -> Import.Types.Digest.Constant.t
 
 val tick_public_input_of_statement :
-     max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
+     max_proofs_verified:'max_proofs_verified Vinegar_types.Nat.t
   -> 'max_proofs_verified Impls.Step.statement
   -> Backend.Tick.Field.Vector.elt list
 
 val tock_public_input_of_statement :
      feature_flags:
-       Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.Full.t
+       Vinegar_types.Opt.Flag.t Vinegar_types.Plonk_types.Features.Full.t
   -> ( Limb_vector.Challenge.Constant.t
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
-     , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
-     , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
+     , Impls.Wrap.Other_field.Constant.t Vinegar_types.Shifted_value.Type1.t
+     , Impls.Wrap.Other_field.Constant.t Vinegar_types.Shifted_value.Type1.t
        option
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
        option
@@ -184,19 +184,19 @@ val tock_public_input_of_statement :
      , ( Limb_vector.Challenge.Constant.t
          Kimchi_backend_common.Scalar_challenge.t
          Composition_types.Bulletproof_challenge.t
-       , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
-       Pickles_types.Vector.t
+       , Vinegar_types.Nat.z Backend.Tick.Rounds.plus_n )
+       Vinegar_types.Vector.t
      , Composition_types.Branch_data.t )
      Import.Types.Wrap.Statement.In_circuit.t
   -> Backend.Tock.Field.Vector.elt list
 
 val tock_unpadded_public_input_of_statement :
      feature_flags:
-       Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.Full.t
+       Vinegar_types.Opt.Flag.t Vinegar_types.Plonk_types.Features.Full.t
   -> ( Limb_vector.Challenge.Constant.t
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
-     , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
-     , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
+     , Impls.Wrap.Other_field.Constant.t Vinegar_types.Shifted_value.Type1.t
+     , Impls.Wrap.Other_field.Constant.t Vinegar_types.Shifted_value.Type1.t
        option
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
        option
@@ -207,8 +207,8 @@ val tock_unpadded_public_input_of_statement :
      , ( Limb_vector.Challenge.Constant.t
          Kimchi_backend_common.Scalar_challenge.t
          Composition_types.Bulletproof_challenge.t
-       , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
-       Pickles_types.Vector.t
+       , Vinegar_types.Nat.z Backend.Tick.Rounds.plus_n )
+       Vinegar_types.Vector.t
      , Composition_types.Branch_data.t )
      Import.Types.Wrap.Statement.In_circuit.t
   -> Backend.Tock.Field.Vector.elt list

@@ -1,5 +1,5 @@
 open Backend
-open Pickles_types
+open Vinegar_types
 open Import
 module Impl = Impls.Step
 module One_hot_vector = One_hot_vector.Make (Impl)
@@ -60,7 +60,7 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       ( challenge
       , scalar_challenge
       , Impl.Field.t Shifted_value.Type1.t
-      , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
+      , ( Impl.Field.t Vinegar_types.Shifted_value.Type1.t
         , Impl.Boolean.var )
         Opt.t
       , (scalar_challenge, Impl.Boolean.var) Opt.t

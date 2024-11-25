@@ -1,6 +1,6 @@
 let default =
   let one = 1 in
-  let open Pickles_types in
+  let open Vinegar_types in
   let open Plonk_types in
   Evals.
     { w = Vector.init Columns.n ~f:(fun _ -> one)

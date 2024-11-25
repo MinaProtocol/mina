@@ -17,7 +17,7 @@
 *)
 val default :
      num_chunks:int
-  -> ( int Pickles_types.Plonk_types.Columns_vec.t
+  -> ( int Vinegar_types.Plonk_types.Columns_vec.t
      , int
      , int )
-     Pickles_types.Plonk_types.Messages.Poly.t
+     Vinegar_types.Plonk_types.Messages.Poly.t

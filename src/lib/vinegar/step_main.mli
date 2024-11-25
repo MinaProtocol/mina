@@ -12,18 +12,18 @@ val step_main :
          and type proofs_verified = 'proofs_verified
          and type return_value = 'ret_value
          and type statement = 'a_value )
-  -> (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
-  -> self_branches:'self_branches Pickles_types.Nat.t
+  -> (module Vinegar_types.Nat.Add.Intf with type n = 'max_proofs_verified)
+  -> self_branches:'self_branches Vinegar_types.Nat.t
   -> local_signature:
-       'local_signature Pickles_types.Hlist.H1.T(Pickles_types.Nat).t
+       'local_signature Vinegar_types.Hlist.H1.T(Vinegar_types.Nat).t
   -> local_signature_length:
-       ('local_signature, 'proofs_verified) Pickles_types.Hlist.Length.t
+       ('local_signature, 'proofs_verified) Vinegar_types.Hlist.Length.t
   -> local_branches:
-       'local_branches Pickles_types.Hlist.H1.T(Pickles_types.Nat).t
+       'local_branches Vinegar_types.Hlist.H1.T(Vinegar_types.Nat).t
   -> local_branches_length:
-       ('local_branches, 'proofs_verified) Pickles_types.Hlist.Length.t
-  -> proofs_verified:('prev_vars, 'proofs_verified) Pickles_types.Hlist.Length.t
-  -> lte:('proofs_verified, 'max_proofs_verified) Pickles_types.Nat.Lte.t
+       ('local_branches, 'proofs_verified) Vinegar_types.Hlist.Length.t
+  -> proofs_verified:('prev_vars, 'proofs_verified) Vinegar_types.Hlist.Length.t
+  -> lte:('proofs_verified, 'max_proofs_verified) Vinegar_types.Nat.Lte.t
   -> public_input:
        ( 'var
        , 'value
@@ -41,7 +41,7 @@ val step_main :
        Types_map.Compiled.basic
   -> known_wrap_keys:
        'local_branches
-       Pickles_types.Hlist.H1.T(Types_map.For_step.Optional_wrap_key).t
+       Vinegar_types.Hlist.H1.T(Types_map.For_step.Optional_wrap_key).t
   -> self:('var, 'value, 'max_proofs_verified, 'self_branches) Tag.t
   -> ( 'prev_vars
      , 'prev_values
@@ -55,9 +55,9 @@ val step_main :
      , 'auxiliary_value )
      Inductive_rule.Promise.t
   -> (   unit
-      -> ( (Unfinalized.t, 'max_proofs_verified) Pickles_types.Vector.t
+      -> ( (Unfinalized.t, 'max_proofs_verified) Vinegar_types.Vector.t
          , Impls.Step.Field.t
-         , (Impls.Step.Field.t, 'max_proofs_verified) Pickles_types.Vector.t )
+         , (Impls.Step.Field.t, 'max_proofs_verified) Vinegar_types.Vector.t )
          Import.Types.Step.Statement.t
          Promise.t )
      Core_kernel.Staged.t

@@ -10,7 +10,7 @@ module SC = Scalar_challenge
 open Core_kernel
 open Async_kernel
 open Import
-open Pickles_types
+open Vinegar_types
 open Poly_types
 open Hlist
 open Backend
@@ -127,9 +127,9 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          Vector.t
          Promise.t
          Lazy.t
-      -> (int, 'branches) Pickles_types.Vector.t
-      -> (Import.Domains.t, 'branches) Pickles_types.Vector.t Promise.t
-      -> (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
+      -> (int, 'branches) Vinegar_types.Vector.t
+      -> (Import.Domains.t, 'branches) Vinegar_types.Vector.t Promise.t
+      -> (module Vinegar_types.Nat.Add.Intf with type n = 'max_proofs_verified)
       -> ('max_proofs_verified, 'max_local_max_proofs_verifieds) Requests.Wrap.t
          * (   ( ( Impls.Wrap.Field.t
                  , Wrap_verifier.Challenge.t Kimchi_types.scalar_challenge
@@ -139,14 +139,14 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
                    Opt.t
                  , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
                    , Impls.Wrap.Boolean.var )
-                   Pickles_types__Opt.t
+                   Vinegar_types__Opt.t
                  , Impls.Wrap.Boolean.var )
                  Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                  .In_circuit
                  .t
                , Wrap_verifier.Challenge.t Kimchi_types.scalar_challenge
                , Wrap_verifier.Other_field.Packed.t
-                 Pickles_types__Shifted_value.Type1.t
+                 Vinegar_types__Shifted_value.Type1.t
                , Impls.Wrap.Field.t
                , Impls.Wrap.Field.t
                , Impls.Wrap.Field.t
@@ -160,14 +160,14 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            Promise.t
            Lazy.t
         (** An override for wrap_main, which allows for adversarial testing
-              with an 'invalid' pickles statement by passing a dummy proof.
+              with an 'invalid' vinegar statement by passing a dummy proof.
           *)
   ; tweak_statement :
       'actual_proofs_verified 'b 'e.
          ( Import.Challenge.Constant.t
          , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-         , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-         , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+         , Backend.Tick.Field.t Vinegar_types.Shifted_value.Type1.t
+         , ( Backend.Tick.Field.t Vinegar_types.Shifted_value.Type1.t
            , bool )
            Import.Types.Opt.t
          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
@@ -180,13 +180,13 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          , ( 'b
            , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
              , 'actual_proofs_verified )
-             Pickles_types.Vector.t
+             Vinegar_types.Vector.t
            , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
                  Import.Bulletproof_challenge.t
                , 'e )
-               Pickles_types.Vector.t
+               Vinegar_types.Vector.t
              , 'actual_proofs_verified )
-             Pickles_types.Vector.t )
+             Vinegar_types.Vector.t )
            Proof.Base.Messages_for_next_proof_over_same_field.Step.t
          , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
            Import.Types.Bulletproof_challenge.t
@@ -195,8 +195,8 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          Import.Types.Wrap.Statement.In_circuit.t
       -> ( Import.Challenge.Constant.t
          , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-         , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-         , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+         , Backend.Tick.Field.t Vinegar_types.Shifted_value.Type1.t
+         , ( Backend.Tick.Field.t Vinegar_types.Shifted_value.Type1.t
            , bool )
            Import.Types.Opt.t
          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
@@ -209,13 +209,13 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          , ( 'b
            , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
              , 'actual_proofs_verified )
-             Pickles_types.Vector.t
+             Vinegar_types.Vector.t
            , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
                  Import.Bulletproof_challenge.t
                , 'e )
-               Pickles_types.Vector.t
+               Vinegar_types.Vector.t
              , 'actual_proofs_verified )
-             Pickles_types.Vector.t )
+             Vinegar_types.Vector.t )
            Proof.Base.Messages_for_next_proof_over_same_field.Step.t
          , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
            Import.Types.Bulletproof_challenge.t
@@ -223,9 +223,9 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          , Import.Types.Branch_data.t )
          Import.Types.Wrap.Statement.In_circuit.t
         (** A function to modify the statement passed into the wrap proof,
-              which will be later passed to recursion pickles rules.
+              which will be later passed to recursion vinegar rules.
 
-              This function can be used to modify the pickles statement in an
+              This function can be used to modify the vinegar statement in an
               adversarial way, along with [wrap_main] above that allows that
               statement to be accepted.
           *)
@@ -342,7 +342,7 @@ struct
       -> ?disk_keys:
            (Cache.Step.Key.Verification.t, branches) Vector.t
            * Cache.Wrap.Key.Verification.t
-      -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
+      -> ?override_wrap_domain:Vinegar_base.Proofs_verified.t
       -> ?override_wrap_main:
            (max_proofs_verified, branches, prev_varss) wrap_main_generic
       -> ?num_chunks:int
@@ -470,7 +470,7 @@ struct
             ~feature_flags ~num_chunks
       | Some override ->
           Common.wrap_domains
-            ~proofs_verified:(Pickles_base.Proofs_verified.to_int override)
+            ~proofs_verified:(Vinegar_base.Proofs_verified.to_int override)
     in
     Timer.clock __LOC__ ;
     let module Branch_data = struct
@@ -654,7 +654,7 @@ struct
             prev_varss_length step_vks proofs_verifieds all_step_domains
             max_proofs_verified
       | Some { wrap_main; tweak_statement = _ } ->
-          (* Instead of creating a proof using the pickles wrap circuit, we
+          (* Instead of creating a proof using the vinegar wrap circuit, we
              have been asked to create proof in an 'adversarial' way, where
              the wrap circuit is some other circuit.
              The [wrap_main] value passed in as part of [override_wrap_main]
@@ -804,7 +804,7 @@ struct
                      test.
 
                      This function modifies the statement that will be proved
-                     over, and which gets passed to later recursive pickles
+                     over, and which gets passed to later recursive vinegar
                      rules.
                   *)
                   Some tweak_statement
@@ -910,7 +910,7 @@ module Side_loaded = struct
         ; wrap_index =
             Plonk_verification_key_evals.map wrap_key ~f:(fun x -> x.(0))
         ; max_proofs_verified =
-            Pickles_base.Proofs_verified.of_nat_exn
+            Vinegar_base.Proofs_verified.of_nat_exn
               (Nat.Add.n d.max_proofs_verified)
         ; actual_wrap_domain_size
         }
@@ -968,7 +968,7 @@ module Side_loaded = struct
                   | None ->
                       return
                         (Promise.return
-                           (Or_error.errorf "Pickles.verify: wrap_vk not found") )
+                           (Or_error.errorf "Vinegar.verify: wrap_vk not found") )
                   | Some x ->
                       x )
               ; data =
@@ -997,7 +997,7 @@ let compile_with_wrap_main_override_promise :
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, branches) Vector.t
          * Cache.Wrap.Key.Verification.t
-    -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
+    -> ?override_wrap_domain:Vinegar_base.Proofs_verified.t
     -> ?override_wrap_main:
          (max_proofs_verified, branches, prev_varss) wrap_main_generic
     -> ?num_chunks:int
@@ -1043,7 +1043,7 @@ let compile_with_wrap_main_override_promise :
            * (max_proofs_verified, max_proofs_verified) Proof.t )
            Promise.t )
          H3_2.T(Prover).t =
- (* This function is an adapter between the user-facing Pickles.compile API
+ (* This function is an adapter between the user-facing Vinegar.compile API
     and the underlying Make(_).compile function which builds the circuits.
  *)
  fun ?self ?(cache = []) ?(storables = Storables.default) ?proof_cache
@@ -1251,8 +1251,8 @@ module Make_adversarial_test (M : sig
   val tweak_statement :
        ( Import.Challenge.Constant.t
        , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-       , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-       , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+       , Backend.Tick.Field.t Vinegar_types.Shifted_value.Type1.t
+       , ( Backend.Tick.Field.t Vinegar_types.Shifted_value.Type1.t
          , bool )
          Import.Types.Opt.t
        , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
@@ -1265,13 +1265,13 @@ module Make_adversarial_test (M : sig
        , ( 'b
          , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
            , 'actual_proofs_verified )
-           Pickles_types.Vector.t
+           Vinegar_types.Vector.t
          , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
                Import.Bulletproof_challenge.t
              , 'e )
-             Pickles_types.Vector.t
+             Vinegar_types.Vector.t
            , 'actual_proofs_verified )
-           Pickles_types.Vector.t )
+           Vinegar_types.Vector.t )
          Proof.Base.Messages_for_next_proof_over_same_field.Step.t
        , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
          Import.Types.Bulletproof_challenge.t
@@ -1280,8 +1280,8 @@ module Make_adversarial_test (M : sig
        Import.Types.Wrap.Statement.In_circuit.t
     -> ( Import.Challenge.Constant.t
        , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-       , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-       , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+       , Backend.Tick.Field.t Vinegar_types.Shifted_value.Type1.t
+       , ( Backend.Tick.Field.t Vinegar_types.Shifted_value.Type1.t
          , bool )
          Import.Types.Opt.t
        , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
@@ -1294,13 +1294,13 @@ module Make_adversarial_test (M : sig
        , ( 'b
          , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
            , 'actual_proofs_verified )
-           Pickles_types.Vector.t
+           Vinegar_types.Vector.t
          , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
                Import.Bulletproof_challenge.t
              , 'e )
-             Pickles_types.Vector.t
+             Vinegar_types.Vector.t
            , 'actual_proofs_verified )
-           Pickles_types.Vector.t )
+           Vinegar_types.Vector.t )
          Proof.Base.Messages_for_next_proof_over_same_field.Step.t
        , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
          Import.Types.Bulletproof_challenge.t

@@ -3,7 +3,7 @@
 *)
 
 open Core_kernel
-open Pickles_types
+open Vinegar_types
 module Columns = Nat.N15
 module Columns_vec = Vector.Vector_15
 module Coefficients = Nat.N15
@@ -18,7 +18,7 @@ module Commitments : sig
   module Stable : sig
     module V1 : sig
       type t =
-            Mina_wire_types.Pickles.Concrete_.Wrap_wire_proof.Commitments.V1.t =
+            Mina_wire_types.Vinegar.Concrete_.Wrap_wire_proof.Commitments.V1.t =
         { w_comm :
             (Backend.Tick.Field.Stable.V1.t * Backend.Tick.Field.Stable.V1.t)
             Columns_vec.Stable.V1.t
@@ -42,7 +42,7 @@ module Evaluations : sig
   module Stable : sig
     module V1 : sig
       type t =
-            Mina_wire_types.Pickles.Concrete_.Wrap_wire_proof.Evaluations.V1.t =
+            Mina_wire_types.Vinegar.Concrete_.Wrap_wire_proof.Evaluations.V1.t =
         { w :
             (Backend.Tock.Field.Stable.V1.t * Backend.Tock.Field.Stable.V1.t)
             Columns_vec.Stable.V1.t
@@ -84,7 +84,7 @@ end
 [%%versioned:
 module Stable : sig
   module V1 : sig
-    type t = Mina_wire_types.Pickles.Concrete_.Wrap_wire_proof.V1.t =
+    type t = Mina_wire_types.Vinegar.Concrete_.Wrap_wire_proof.V1.t =
       { commitments : Commitments.Stable.V1.t
       ; evaluations : Evaluations.Stable.V1.t
       ; ft_eval1 : Backend.Tock.Field.Stable.V1.t

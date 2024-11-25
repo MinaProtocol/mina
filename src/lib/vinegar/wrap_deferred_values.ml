@@ -1,6 +1,6 @@
 module SC = Scalar_challenge
 open Core_kernel
-open Pickles_types
+open Vinegar_types
 open Common
 open Import
 open Backend
@@ -16,19 +16,19 @@ let expand_deferred (type n most_recent_width) ~zk_rows
     ~(evals :
        ( Backend.Tick.Field.t
        , Backend.Tick.Field.t array )
-       Pickles_types.Plonk_types.All_evals.t )
+       Vinegar_types.Plonk_types.All_evals.t )
     ~(old_bulletproof_challenges :
        ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
          Bulletproof_challenge.t
          Step_bp_vec.t
        , most_recent_width )
-       Pickles_types.Vector.t )
+       Vinegar_types.Vector.t )
     ~(proof_state :
        ( Challenge.Constant.t
        , Challenge.Constant.t Scalar_challenge.t
-       , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+       , Backend.Tick.Field.t Vinegar_types.Shifted_value.Type1.t
        , bool
-       , n Pickles__.Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
+       , n Vinegar__.Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
        , Digest.Constant.t
        , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
          Step_bp_vec.t

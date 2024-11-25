@@ -1,6 +1,6 @@
-(** The information required to recursively verify a Pickles proof. *)
+(** The information required to recursively verify a Vinegar proof. *)
 
-open Pickles_types
+open Vinegar_types
 module Impl = Impls.Step
 
 module One_hot_vector : module type of One_hot_vector.Make (Impls.Step)
@@ -25,11 +25,11 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
   ; proof_state :
       ( challenge
       , scalar_challenge
-      , Impl.Field.t Pickles_types.Shifted_value.Type1.t
-      , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
+      , Impl.Field.t Vinegar_types.Shifted_value.Type1.t
+      , ( Impl.Field.t Vinegar_types.Shifted_value.Type1.t
         , Impl.Boolean.var )
-        Pickles_types.Opt.t
-      , (scalar_challenge, Impl.Boolean.var) Pickles_types.Opt.t
+        Vinegar_types.Opt.t
+      , (scalar_challenge, Impl.Boolean.var) Vinegar_types.Opt.t
       , Impl.Boolean.var
       , unit
       , Import.Digest.Make(Impl).t
@@ -49,17 +49,17 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       ( Impl.Field.t
       , Impl.Field.t array
       , Impl.Boolean.var )
-      Pickles_types.Plonk_types.All_evals.In_circuit.t
+      Vinegar_types.Plonk_types.All_evals.In_circuit.t
         (** The evaluations from the step proof that this proof wraps *)
   ; prev_challenges :
-      ( (Impl.Field.t, Backend.Tick.Rounds.n) Pickles_types.Vector.t
+      ( (Impl.Field.t, Backend.Tick.Rounds.n) Vinegar_types.Vector.t
       , 'max_proofs_verified )
-      Pickles_types.Vector.t
+      Vinegar_types.Vector.t
         (** The challenges c_0, ... c_{k - 1} corresponding to each W_i. *)
   ; prev_challenge_polynomial_commitments :
       ( Step_main_inputs.Inner_curve.t
       , 'max_proofs_verified )
-      Pickles_types.Vector.t
+      Vinegar_types.Vector.t
         (** The commitments to the "challenge polynomials" \prod_{i = 0}^k (1 + c_{k - 1 - i} x^{2^i})
       corresponding to each of the "prev_challenges".
   *)
@@ -82,8 +82,8 @@ module Constant : sig
     ; proof_state :
         ( challenge
         , scalar_challenge
-        , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-        , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t option
+        , Backend.Tick.Field.t Vinegar_types.Shifted_value.Type1.t
+        , Backend.Tick.Field.t Vinegar_types.Shifted_value.Type1.t option
         , scalar_challenge option
         , bool
         , unit
@@ -95,15 +95,15 @@ module Constant : sig
     ; prev_proof_evals :
         ( Backend.Tick.Field.t
         , Backend.Tick.Field.t array )
-        Pickles_types.Plonk_types.All_evals.t
+        Vinegar_types.Plonk_types.All_evals.t
     ; prev_challenges :
-        ( (Backend.Tick.Field.t, Backend.Tick.Rounds.n) Pickles_types.Vector.t
+        ( (Backend.Tick.Field.t, Backend.Tick.Rounds.n) Vinegar_types.Vector.t
         , 'max_proofs_verified )
-        Pickles_types.Vector.t
+        Vinegar_types.Vector.t
     ; prev_challenge_polynomial_commitments :
         ( Backend.Tick.Inner_curve.Affine.t
         , 'max_proofs_verified )
-        Pickles_types.Vector.t
+        Vinegar_types.Vector.t
     }
 
   module No_app_state : sig
@@ -115,5 +115,5 @@ val typ :
      feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
   -> num_chunks:int
   -> ('avar, 'aval) Impl.Typ.t
-  -> 'n Pickles_types.Nat.t
+  -> 'n Vinegar_types.Nat.t
   -> (('avar, 'n, _) t, ('aval, 'n) Constant.t) Impl.Typ.t

@@ -1,4 +1,4 @@
-(** Provides common aliases to provide a single entrypoint to open in Pickles
+(** Provides common aliases to provide a single entrypoint to open in Vinegar
     libraries
 *)
 
@@ -15,10 +15,10 @@ module Step_bp_vec = Types.Step_bp_vec
 module Nvector = Types.Nvector
 module Bulletproof_challenge = Types.Bulletproof_challenge
 
-(** {2 Import from library [Pickles_base]} *)
+(** {2 Import from library [Vinegar_base]} *)
 
-module Domain = Pickles_base.Domain
-module Domains = Pickles_base.Domains
+module Domain = Vinegar_base.Domain
+module Domains = Vinegar_base.Domains
 
 (** {2 Misc modules}*)
 

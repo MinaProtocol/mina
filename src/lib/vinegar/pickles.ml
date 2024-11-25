@@ -1,11 +1,11 @@
-(** Pickles implementation *)
+(** Vinegar implementation *)
 
 (** See documentation of the {!Mina_wire_types} library *)
-module Wire_types = Mina_wire_types.Pickles
+module Wire_types = Mina_wire_types.Vinegar
 
 module Make_sig (A : Wire_types.Types.S) = struct
   module type S =
-    Pickles_intf.S
+    Vinegar_intf.S
       with type Side_loaded.Verification_key.Stable.V2.t =
         A.Side_loaded.Verification_key.V2.t
        and type ('a, 'b) Proof.t = ('a, 'b) A.Proof.t
@@ -27,7 +27,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   open Core_kernel
   open Async_kernel
   open Import
-  open Pickles_types
+  open Vinegar_types
   open Hlist
   open Common
   open Backend
@@ -231,7 +231,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           ; wrap_index =
               Plonk_verification_key_evals.map wrap_key ~f:(fun x -> x.(0))
           ; max_proofs_verified =
-              Pickles_base.Proofs_verified.of_nat_exn
+              Vinegar_base.Proofs_verified.of_nat_exn
                 (Nat.Add.n d.max_proofs_verified)
           ; actual_wrap_domain_size
           }
@@ -291,7 +291,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         return
                           (Promise.return
                              (Or_error.errorf
-                                "Pickles.verify: wrap_vk not found" ) )
+                                "Vinegar.verify: wrap_vk not found" ) )
                     | Some x ->
                         x )
                 ; data =
@@ -641,7 +641,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
-                ~override_wrap_domain:Pickles_base.Proofs_verified.N1
+                ~override_wrap_domain:Vinegar_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
@@ -761,7 +761,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Output Field.typ)
-                ~override_wrap_domain:Pickles_base.Proofs_verified.N1
+                ~override_wrap_domain:Vinegar_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
@@ -2097,7 +2097,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
-                ~override_wrap_domain:Pickles_base.Proofs_verified.N1
+                ~override_wrap_domain:Vinegar_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
@@ -2406,7 +2406,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
-                ~override_wrap_domain:Pickles_base.Proofs_verified.N1
+                ~override_wrap_domain:Vinegar_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)

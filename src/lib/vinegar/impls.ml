@@ -1,4 +1,4 @@
-open Pickles_types
+open Vinegar_types
 open Core_kernel
 open Import
 open Backend
@@ -124,9 +124,9 @@ module Step = struct
     Types.Step.Proof_state.Per_proof.In_circuit.t
 
   type 'proofs_verified statement =
-    ( (unfinalized_proof, 'proofs_verified) Pickles_types.Vector.t
+    ( (unfinalized_proof, 'proofs_verified) Vinegar_types.Vector.t
     , Import.Types.Digest.Constant.t
-    , (Import.Types.Digest.Constant.t, 'proofs_verified) Pickles_types.Vector.t
+    , (Import.Types.Digest.Constant.t, 'proofs_verified) Vinegar_types.Vector.t
     )
     Import.Types.Step.Statement.t
 
@@ -136,17 +136,17 @@ module Step = struct
     , Other_field.t Shifted_value.Type2.t
     , ( Field.t Scalar_challenge.t Bulletproof_challenge.t
       , Tock.Rounds.n )
-      Pickles_types.Vector.t
+      Vinegar_types.Vector.t
     , Field.t
     , Boolean.var )
     Types.Step.Proof_state.Per_proof.In_circuit.t
 
   type 'proofs_verified statement_var =
-    ( (unfinalized_proof_var, 'proofs_verified) Pickles_types.Vector.t
+    ( (unfinalized_proof_var, 'proofs_verified) Vinegar_types.Vector.t
     , Impl.field Snarky_backendless.Cvar.t
     , ( Impl.field Snarky_backendless.Cvar.t
       , 'proofs_verified )
-      Pickles_types.Vector.t )
+      Vinegar_types.Vector.t )
     Import.Types.Step.Statement.t
 
   let input ~proofs_verified =

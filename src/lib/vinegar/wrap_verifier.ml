@@ -2,7 +2,7 @@ module S = Sponge
 open Core_kernel
 open Util
 module SC = Scalar_challenge
-open Pickles_types
+open Vinegar_types
 open Plonk_types
 open Tuple_lib
 open Import
@@ -14,7 +14,7 @@ module G = struct
   (* given [chals], compute
      \prod_i (1 + chals.(i) * x^{2^{k - 1 - i}}) *)
   let challenge_polynomial (type a)
-      (module M : Pickles_types.Shifted_value.Field_intf with type t = a) chals
+      (module M : Vinegar_types.Shifted_value.Field_intf with type t = a) chals
       : (a -> a) Staged.t =
     stage (fun pt ->
         let k = Array.length chals in
@@ -86,7 +86,7 @@ struct
 
       let typ = Impls.Wrap.Other_field.typ_unchecked
 
-      let _absorb_shifted sponge (x : t Pickles_types.Shifted_value.Type1.t) =
+      let _absorb_shifted sponge (x : t Vinegar_types.Shifted_value.Type1.t) =
         match x with Shifted_value x -> Sponge.absorb sponge x
     end
   end
@@ -689,8 +689,8 @@ struct
             Array.iter2_exn ~f:Field.Assert.equal
               (fst @@ var_to_fields j0)
               (fst @@ var_to_fields j1)
-        | ( ((Pickles_types.Opt.Just _ | Maybe _ | Nothing) as j0)
-          , ((Pickles_types.Opt.Just _ | Maybe _ | Nothing) as j1) ) ->
+        | ( ((Vinegar_types.Opt.Just _ | Maybe _ | Nothing) as j0)
+          , ((Vinegar_types.Opt.Just _ | Maybe _ | Nothing) as j1) ) ->
             let sexp_of t =
               Sexp.to_string
               @@ Types.Opt.sexp_of_t
@@ -740,7 +740,7 @@ struct
         } =
       m
     in
-    let open Pickles_types in
+    let open Vinegar_types in
     let g_opt = Opt.map ~f:g in
     List.map
       ( Vector.to_list sigma_comm
@@ -777,9 +777,9 @@ struct
       final state when using the sponge.
   *)
   let simulate_optional_sponge_with_alignment (sponge : Sponge.t) ~f = function
-    | Pickles_types.Opt.Nothing ->
-        Pickles_types.Opt.Nothing
-    | Pickles_types.Opt.Maybe (b, x) ->
+    | Vinegar_types.Opt.Nothing ->
+        Vinegar_types.Opt.Nothing
+    | Vinegar_types.Opt.Maybe (b, x) ->
         (* Cache the sponge state before *)
         let sponge_state_before = sponge.sponge_state in
         let state_before = Array.copy sponge.state in
@@ -800,9 +800,9 @@ struct
               Field.if_ b ~then_ ~else_ )
         in
         sponge.state <- state ;
-        Pickles_types.Opt.Maybe (b, res)
-    | Pickles_types.Opt.Just x ->
-        Pickles_types.Opt.Just (f sponge x)
+        Vinegar_types.Opt.Maybe (b, res)
+    | Vinegar_types.Opt.Just x ->
+        Vinegar_types.Opt.Just (f sponge x)
 
   let incrementally_verify_proof (type b)
       (module Max_proofs_verified : Nat.Add.Intf with type n = b)
@@ -835,7 +835,7 @@ struct
                           List.to_array (Inner_curve.to_field_elements z) ) )
                    m )
                 ~f:(fun x ->
-                  let (_ : (unit, _) Pickles_types.Opt.t) =
+                  let (_ : (unit, _) Vinegar_types.Opt.t) =
                     simulate_optional_sponge_with_alignment index_sponge x
                       ~f:(fun sponge x ->
                         Array.iter ~f:(Sponge.absorb sponge) x )
@@ -940,15 +940,15 @@ struct
           | Nothing
           | Maybe (_, { runtime = Nothing; _ })
           | Just { runtime = Nothing; _ } ->
-              Pickles_types.Opt.Nothing
+              Vinegar_types.Opt.Nothing
           | Maybe (b_lookup, { runtime = Maybe (b_runtime, runtime); _ }) ->
               let b = Boolean.( &&& ) b_lookup b_runtime in
-              Pickles_types.Opt.Maybe (b, runtime)
+              Vinegar_types.Opt.Maybe (b, runtime)
           | Maybe (b, { runtime = Just runtime; _ })
           | Just { runtime = Maybe (b, runtime); _ } ->
-              Pickles_types.Opt.Maybe (b, runtime)
+              Vinegar_types.Opt.Maybe (b, runtime)
           | Just { runtime = Just runtime; _ } ->
-              Pickles_types.Opt.Just runtime
+              Vinegar_types.Opt.Just runtime
         in
         let absorb_runtime_tables () =
           match runtime_comm with
@@ -1233,7 +1233,7 @@ struct
         let alpha = sample_scalar () in
         let t_comm :
             (Inputs.Impl.Field.t * Inputs.Impl.Field.t)
-            Pickles_types__Plonk_types.Poly_comm.Without_degree_bound.t =
+            Vinegar_types__Plonk_types.Poly_comm.Without_degree_bound.t =
           messages.t_comm
         in
         absorb_g t_comm ;
@@ -1312,7 +1312,7 @@ struct
                all but last sigma_comm
             *)
             Vector.map sg_old ~f:(fun (keep, p) ->
-                Pickles_types.Opt.Maybe (keep, [| p |]) )
+                Vinegar_types.Opt.Maybe (keep, [| p |]) )
             |> append_chain
                  (snd (Max_proofs_verified.add len_6))
                  ( [ x_hat
@@ -1330,7 +1330,7 @@ struct
                          (Vector.append m.coefficients_comm sigma_comm_init
                             len_1_add )
                          len_2_add )
-                 |> Vector.map ~f:Pickles_types.Opt.just
+                 |> Vector.map ~f:Vinegar_types.Opt.just
                  |> append_chain len_6_add
                       ( [ m.range_check0_comm
                         ; m.range_check1_comm
@@ -1341,7 +1341,7 @@ struct
                         ]
                       |> append_chain len_4_add lookup_sorted
                       |> append_chain len_5_add
-                           [ Pickles_types.Opt.map messages.lookup ~f:(fun l ->
+                           [ Vinegar_types.Opt.map messages.lookup ~f:(fun l ->
                                  l.aggreg )
                            ; lookup_table_comm
                            ; runtime_comm
@@ -1360,7 +1360,7 @@ struct
             ~polynomials:
               ( Vector.map without_degree_bound
                   ~f:
-                    (Pickles_types.Opt.map
+                    (Vinegar_types.Opt.map
                        ~f:(Array.map ~f:(fun x -> `Finite x)) )
               , [] )
         in
@@ -1383,11 +1383,11 @@ struct
 
   let _mask_evals (type n)
       ~(lengths :
-         (int, n) Pickles_types.Vector.t Pickles_types.Plonk_types.Evals.t )
+         (int, n) Vinegar_types.Vector.t Vinegar_types.Plonk_types.Evals.t )
       (choice : n One_hot_vector.t)
-      (e : Field.t array Pickles_types.Plonk_types.Evals.t) :
-      (Boolean.var * Field.t) array Pickles_types.Plonk_types.Evals.t =
-    Pickles_types.Plonk_types.Evals.map2 lengths e ~f:(fun lengths e ->
+      (e : Field.t array Vinegar_types.Plonk_types.Evals.t) :
+      (Boolean.var * Field.t) array Vinegar_types.Plonk_types.Evals.t =
+    Vinegar_types.Plonk_types.Evals.map2 lengths e ~f:(fun lengths e ->
         Array.zip_exn (mask lengths choice) e )
 
   let compute_challenges ~scalar chals =
@@ -1436,7 +1436,7 @@ struct
             failwith "empty list" )
 
   let _shift1 =
-    Pickles_types.Shifted_value.Type1.Shift.(
+    Vinegar_types.Shifted_value.Type1.Shift.(
       map ~f:Field.constant (create (module Field.Constant)))
 
   let shift2 =
@@ -1617,12 +1617,12 @@ struct
                      | Nothing ->
                          [||]
                      | Just a ->
-                         Array.map a ~f:Pickles_types.Opt.just
+                         Array.map a ~f:Vinegar_types.Opt.just
                      | Maybe (b, a) ->
-                         Array.map a ~f:(Pickles_types.Opt.maybe b) )
+                         Array.map a ~f:(Vinegar_types.Opt.maybe b) )
               in
               let sg_evals =
-                Vector.map sg_evals ~f:(fun x -> [| Pickles_types.Opt.just x |])
+                Vector.map sg_evals ~f:(fun x -> [| Vinegar_types.Opt.just x |])
                 |> Vector.to_list
                 (* TODO: This was the code before the wrap hack was put in
                    match actual_proofs_verified with
@@ -1640,8 +1640,8 @@ struct
               in
               let v =
                 List.append sg_evals
-                  ( Array.map ~f:Pickles_types.Opt.just x_hat
-                  :: [| Pickles_types.Opt.just ft |]
+                  ( Array.map ~f:Vinegar_types.Opt.just x_hat
+                  :: [| Vinegar_types.Opt.just ft |]
                   :: a )
               in
               Common.combined_evaluation (module Impl) ~xi v
@@ -1683,7 +1683,7 @@ struct
             (module Impl)
             ~env ~shift:shift2
             (Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
-             .to_wrap ~opt_none:Pickles_types.Opt.nothing ~false_:Boolean.false_
+             .to_wrap ~opt_none:Vinegar_types.Opt.nothing ~false_:Boolean.false_
                plonk )
             combined_evals )
     in

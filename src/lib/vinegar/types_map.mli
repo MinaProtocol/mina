@@ -1,4 +1,4 @@
-open Pickles_types
+open Vinegar_types
 
 type inner_curve_var =
   Backend.Tick.Field.t Snarky_backendless.Cvar.t
@@ -6,13 +6,13 @@ type inner_curve_var =
 
 module Basic : sig
   type ('var, 'value, 'n1, 'n2) t =
-    { max_proofs_verified : (module Pickles_types.Nat.Add.Intf with type n = 'n1)
+    { max_proofs_verified : (module Vinegar_types.Nat.Add.Intf with type n = 'n1)
     ; public_input : ('var, 'value) Impls.Step.Typ.t
-    ; branches : 'n2 Pickles_types.Nat.t
+    ; branches : 'n2 Vinegar_types.Nat.t
     ; wrap_domains : Import.Domains.t
     ; wrap_key :
         Backend.Tick.Inner_curve.Affine.t array
-        Pickles_types.Plonk_verification_key_evals.t
+        Vinegar_types.Plonk_verification_key_evals.t
     ; wrap_vk : Impls.Wrap.Verification_key.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
@@ -35,10 +35,10 @@ module Side_loaded : sig
   module Permanent : sig
     type ('var, 'value, 'n1, 'n2) t =
       { max_proofs_verified :
-          (module Pickles_types.Nat.Add.Intf with type n = 'n1)
+          (module Vinegar_types.Nat.Add.Intf with type n = 'n1)
       ; public_input : ('var, 'value) Impls.Step.Typ.t
       ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
-      ; branches : 'n2 Pickles_types.Nat.t
+      ; branches : 'n2 Vinegar_types.Nat.t
       ; num_chunks : int
       ; zk_rows : int
       }
@@ -58,31 +58,31 @@ end
 module Compiled : sig
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) basic =
     { public_input : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; proofs_verifieds : (int, 'branches) Pickles_types.Vector.t
+    ; proofs_verifieds : (int, 'branches) Vinegar_types.Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; wrap_domains : Import.Domains.t
-    ; step_domains : (Import.Domains.t, 'branches) Pickles_types.Vector.t
+    ; step_domains : (Import.Domains.t, 'branches) Vinegar_types.Vector.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
     ; zk_rows : int
     }
 
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
-    { branches : 'branches Pickles_types.Nat.t
+    { branches : 'branches Vinegar_types.Nat.t
     ; max_proofs_verified :
-        (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
-    ; proofs_verifieds : (int, 'branches) Pickles_types.Vector.t
+        (module Vinegar_types.Nat.Add.Intf with type n = 'max_proofs_verified)
+    ; proofs_verifieds : (int, 'branches) Vinegar_types.Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
     ; wrap_key :
         Backend.Tick.Inner_curve.Affine.t array
-        Pickles_types.Plonk_verification_key_evals.t
+        Vinegar_types.Plonk_verification_key_evals.t
         Promise.t
         Lazy.t
     ; wrap_vk : Impls.Wrap.Verification_key.t Promise.t Lazy.t
     ; wrap_domains : Import.Domains.t
     ; step_domains :
-        (Import.Domains.t Promise.t, 'branches) Pickles_types.Vector.t
+        (Import.Domains.t Promise.t, 'branches) Vinegar_types.Vector.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
     ; zk_rows : int
@@ -91,21 +91,21 @@ end
 
 module For_step : sig
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
-    { branches : 'branches Pickles_types.Nat.t
+    { branches : 'branches Vinegar_types.Nat.t
     ; max_proofs_verified :
-        (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
+        (module Vinegar_types.Nat.Add.Intf with type n = 'max_proofs_verified)
     ; proofs_verifieds :
-        [ `Known of (Impls.Step.Field.t, 'branches) Pickles_types.Vector.t
+        [ `Known of (Impls.Step.Field.t, 'branches) Vinegar_types.Vector.t
         | `Side_loaded ]
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
     ; wrap_key :
-        inner_curve_var array Pickles_types.Plonk_verification_key_evals.t
+        inner_curve_var array Vinegar_types.Plonk_verification_key_evals.t
     ; wrap_domain :
         [ `Known of Import.Domain.t
         | `Side_loaded of
-          Impls.Step.field Pickles_base.Proofs_verified.One_hot.Checked.t ]
+          Impls.Step.field Vinegar_base.Proofs_verified.One_hot.Checked.t ]
     ; step_domains :
-        [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
+        [ `Known of (Import.Domains.t, 'branches) Vinegar_types.Vector.t
         | `Side_loaded ]
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
@@ -118,8 +118,8 @@ module For_step : sig
     type 'branches known =
       { wrap_key :
           Backend.Tick.Inner_curve.Affine.t array
-          Pickles_types.Plonk_verification_key_evals.t
-      ; step_domains : (Import.Domains.t, 'branches) Pickles_types.Vector.t
+          Vinegar_types.Plonk_verification_key_evals.t
+      ; step_domains : (Import.Domains.t, 'branches) Vinegar_types.Vector.t
       }
 
     type 'branches t = 'branches known option
@@ -153,7 +153,7 @@ val add_side_loaded :
 
 val max_proofs_verified :
      ('a, 'b, 'n1, 'c) Tag.t
-  -> (module Pickles_types.Nat.Add.Intf with type n = 'n1)
+  -> (module Vinegar_types.Nat.Add.Intf with type n = 'n1)
 
 val feature_flags : _ Tag.t -> Opt.Flag.t Plonk_types.Features.Full.t
 

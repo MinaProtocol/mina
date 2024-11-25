@@ -1,4 +1,4 @@
-open Pickles_types
+open Vinegar_types
 
 (** The data obtained from "compiling" an inductive rule into a circuit. *)
 type ( 'a_var
@@ -19,10 +19,10 @@ type ( 'a_var
      t =
   | T :
       { proofs_verified :
-          'proofs_verified Pickles_types.Nat.t
-          * ('prev_vars, 'proofs_verified) Pickles_types.Hlist.Length.t
+          'proofs_verified Vinegar_types.Nat.t
+          * ('prev_vars, 'proofs_verified) Vinegar_types.Hlist.Length.t
       ; index : int
-      ; lte : ('proofs_verified, 'max_proofs_verified) Pickles_types.Nat.Lte.t
+      ; lte : ('proofs_verified, 'max_proofs_verified) Vinegar_types.Nat.Lte.t
       ; domains : Import.Domains.t Promise.t
       ; rule :
           ( 'prev_vars
@@ -39,13 +39,13 @@ type ( 'a_var
             (* Main functions to compute *)
       ; main :
              step_domains:
-               (Import.Domains.t, 'branches) Pickles_types.Vector.t Promise.t
+               (Import.Domains.t, 'branches) Vinegar_types.Vector.t Promise.t
           -> (   unit
-              -> ( (Unfinalized.t, 'max_proofs_verified) Pickles_types.Vector.t
+              -> ( (Unfinalized.t, 'max_proofs_verified) Vinegar_types.Vector.t
                  , Impls.Step.Field.t
                  , ( Impls.Step.Field.t
                    , 'max_proofs_verified )
-                   Pickles_types.Vector.t )
+                   Vinegar_types.Vector.t )
                  Import.Types.Step.Statement.t
                  Promise.t )
              Promise.t
@@ -90,9 +90,9 @@ val create :
   -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
   -> num_chunks:int
   -> actual_feature_flags:bool Plonk_types.Features.t
-  -> max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
-  -> proofs_verifieds:(int, 'branches) Pickles_types.Vector.t
-  -> branches:'branches Pickles_types.Nat.t
+  -> max_proofs_verified:'max_proofs_verified Vinegar_types.Nat.t
+  -> proofs_verifieds:(int, 'branches) Vinegar_types.Vector.t
+  -> branches:'branches Vinegar_types.Nat.t
   -> public_input:
        ( 'var
        , 'value

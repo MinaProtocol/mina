@@ -1,4 +1,4 @@
-open Pickles_types
+open Vinegar_types
 open Import
 open Backend
 

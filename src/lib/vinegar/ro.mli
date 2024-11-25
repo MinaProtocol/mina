@@ -20,8 +20,8 @@ val tick : unit -> Backend.Tick.Field.t
 
 val scalar_chal :
      unit
-  -> (Core_kernel.Int64.t, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
+  -> (Core_kernel.Int64.t, Vinegar_types.Nat.N2.n) Vinegar_types.Vector.t
      Import.Scalar_challenge.t
 
 val chal :
-  unit -> (Core_kernel.Int64.t, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
+  unit -> (Core_kernel.Int64.t, Vinegar_types.Nat.N2.n) Vinegar_types.Vector.t

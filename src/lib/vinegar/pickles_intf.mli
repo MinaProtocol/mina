@@ -3,7 +3,7 @@ module type S = sig
   module Endo = Endo
   open Core_kernel
   open Async_kernel
-  open Pickles_types
+  open Vinegar_types
   open Hlist
   module Tick_field_sponge = Tick_field_sponge
   module Util = Util
@@ -241,7 +241,7 @@ module type S = sig
         ; main :
                'a_var main_input
             -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return M.t
-        ; feature_flags : bool Pickles_types.Plonk_types.Features.t
+        ; feature_flags : bool Vinegar_types.Plonk_types.Features.t
         }
     end
 
@@ -399,7 +399,7 @@ module type S = sig
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
          * Cache.Wrap.Key.Verification.t
-    -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
+    -> ?override_wrap_domain:Vinegar_base.Proofs_verified.t
     -> ?num_chunks:int
     -> public_input:
          ( 'var
@@ -455,7 +455,7 @@ module type S = sig
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
          * Cache.Wrap.Key.Verification.t
-    -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
+    -> ?override_wrap_domain:Vinegar_base.Proofs_verified.t
     -> ?num_chunks:int
     -> public_input:
          ( 'var
@@ -511,7 +511,7 @@ module type S = sig
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
          * Cache.Wrap.Key.Verification.t
-    -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
+    -> ?override_wrap_domain:Vinegar_base.Proofs_verified.t
     -> ?num_chunks:int
     -> public_input:
          ( 'var
