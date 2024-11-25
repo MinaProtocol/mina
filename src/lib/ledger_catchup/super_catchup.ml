@@ -1,5 +1,4 @@
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Core
 open Async
 open Cache_lib
@@ -507,12 +506,10 @@ module Initial_validate_batcher = struct
 
   type nonrec 'a t = (input, input, 'a) t
 
-  let create ~verifier ~precomputed_values : _ t =
+  let create ~logger ~verifier ~precomputed_values : _ t =
     create
       ~logger:
-        (Logger.create
-           ~metadata:[ ("name", `String "initial_validate_batcher") ]
-           () )
+        (Logger.extend logger [ ("name", `String "initial_validate_batcher") ])
       ~how_to_add:`Insert ~max_weight_per_call:1000
       ~weight:(fun _ -> 1)
       ~compare_init:(fun e1 e2 ->
@@ -554,15 +551,14 @@ module Verify_work_batcher = struct
 
   type nonrec 'a t = (input, input, 'a) t
 
-  let create ~verifier : _ t =
+  let create ~logger ~verifier : _ t =
     let works (x : input) =
       let wh, _ = x.data in
       Mina_block.Body.staged_ledger_diff (Mina_block.body wh.data)
       |> Staged_ledger_diff.completed_works
     in
     create
-      ~logger:
-        (Logger.create ~metadata:[ ("name", `String "verify_work_batcher") ] ())
+      ~logger:(Logger.extend logger [ ("name", `String "verify_work_batcher") ])
       ~weight:(fun (x : input) ->
         List.fold ~init:0 (works x) ~f:(fun acc { proofs; _ } ->
             acc + One_or_two.length proofs ) )
@@ -681,8 +677,7 @@ let check_invariant ~downloader t =
          Node.State.Enum.equal (Node.State.enum node.state) To_download ) )
 
 let download s d ~key ~attempts =
-  let logger = Logger.create () in
-  [%log debug]
+  [%log' debug (Downloader.logger d)]
     ~metadata:[ ("key", Downloader.Key.to_yojson key); ("caller", `String s) ]
     "Download download $key" ;
   Downloader.download d ~key ~attempts
@@ -809,9 +804,9 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
   let open Context in
   (* setup_state_machine_runner returns a fully configured lambda function, which is the state machine runner *)
   let initial_validation_batcher =
-    Initial_validate_batcher.create ~verifier ~precomputed_values
+    Initial_validate_batcher.create ~logger ~verifier ~precomputed_values
   in
-  let verify_work_batcher = Verify_work_batcher.create ~verifier in
+  let verify_work_batcher = Verify_work_batcher.create ~logger ~verifier in
   let set_state t node s =
     set_state t node s ;
     try check_invariant ~downloader t
@@ -1439,7 +1434,21 @@ let%test_module "Ledger_catchup tests" =
 
     let max_frontier_length = 10
 
-    let logger = Logger.create ()
+    let logger = Logger.null ()
+
+    let () =
+      (* Disable log messages from best_tip_diff logger. *)
+      Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+        ~id:Logger.Logger_id.best_tip_diff ~processor:(Logger.Processor.raw ())
+        ~transport:
+          (Logger.Transport.create
+             ( module struct
+               type t = unit
+
+               let transport () _ = ()
+             end )
+             () )
+        ()
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 

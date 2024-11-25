@@ -1,7 +1,6 @@
 open Core
 open Signature_lib
 open Mina_base
-open Inline_test_quiet_logs
 
 let () = Key_cache_native.linkme (* Ensure that we use the native key cache. *)
 
