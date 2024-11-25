@@ -1,5 +1,5 @@
 open Core_kernel
-open Pickles_types
+open Vinegar_types
 
 module Constant = struct
   type t = int

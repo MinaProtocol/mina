@@ -1,6 +1,6 @@
 (library
  (name one_hot_vector)
- (public_name pickles_base.one_hot_vector)
+ (public_name vinegar_base.one_hot_vector)
  (flags
    (:standard
     -w +a-40..42-44
@@ -13,5 +13,5 @@
    core_kernel
    ;; local libraries
    snarky.backendless
-   pickles_types
+   vinegar_types
 ))

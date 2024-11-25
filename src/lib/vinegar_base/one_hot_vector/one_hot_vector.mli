@@ -1,5 +1,5 @@
 (** Represents a typed size one-hot vector, which is list of bits where exactly
-    one of the bit is one. As usual in Pickles, we encode the length at the type
+    one of the bit is one. As usual in Vinegar, we encode the length at the type
     level and a type parameter is used to represent the finite field the vector bits
     are encoded in. Booleans are used to represent [0] and [1].
 
@@ -7,7 +7,7 @@
     https://en.wikipedia.org/wiki/One-hot } wikipedia article }.
 *)
 
-open Pickles_types
+open Vinegar_types
 
 module Constant : sig
   type t = int
