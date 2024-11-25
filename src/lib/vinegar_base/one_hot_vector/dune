@@ -1,5 +1,5 @@
 (library
- (name one_hot_vector)
+ (name vinegar_one_hot_vector)
  (public_name vinegar_base.one_hot_vector)
  (flags
    (:standard
