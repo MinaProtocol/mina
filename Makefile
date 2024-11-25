@@ -190,6 +190,10 @@ check-format: ocaml_checks
 check-snarky-submodule:
 	./scripts/check-snarky-submodule.sh
 
+check-bash:
+	shellcheck ./scripts/**/*.sh -S warning
+	shellcheck ./buildkite/scripts/**/*.sh -S warning
+
 #######################################
 ## Environment setup
 
