@@ -6,5 +6,5 @@ let Connectivity = ../../Command/Rosetta/Connectivity.dhall
 
 in  Pipeline.build
       ( Connectivity.pipeline
-          Connectivity.Spec::{ network = Network.Type.Mainnet }
+          Connectivity.Spec::{ network = Network.Type.Mainnet, timeout = 1200 }
       )

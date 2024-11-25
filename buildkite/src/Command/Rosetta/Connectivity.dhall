@@ -33,6 +33,7 @@ let Spec =
           , mode : PipelineMode.Type
           , additionalDirtyWhen : List S.Type
           , softFail : B/SoftFail
+          , timeout : Natural
           }
       , default =
           { dockerType = Dockers.Type.Bullseye
@@ -40,6 +41,7 @@ let Spec =
           , mode = PipelineMode.Type.PullRequest
           , additionalDirtyWhen = [] : List S.Type
           , softFail = B/SoftFail.Boolean False
+          , timeout = 900
           }
       }
 
@@ -54,7 +56,8 @@ let command
                                                   spec.dockerType}"
                   , "source ./buildkite/scripts/export-git-env-vars.sh"
                   , "scripts/tests/rosetta-connectivity.sh --network ${Network.lowerName
-                                                                         spec.network} --tag \\\${MINA_DOCKER_TAG}"
+                                                                         spec.network} --tag \\\${MINA_DOCKER_TAG} --timeout ${Natural/show
+                                                                                                                                 spec.timeout}"
                   ]
               ]
             , label =
