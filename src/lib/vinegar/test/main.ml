@@ -5,4 +5,4 @@ let () =
     @ Test_side_loaded_verification_key.tests @ Test_step_verifier.tests
     @ Test_wrap.tests @ Test_wrap_hack.tests @ Test_ro.tests
   in
-  Alcotest.run "Pickles" tests
+  Alcotest.run "Vinegar" tests

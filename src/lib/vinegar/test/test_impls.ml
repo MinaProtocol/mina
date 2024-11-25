@@ -1,7 +1,7 @@
 (* Testing
    -------
 
-   Component: Pickles
+   Component: Vinegar
    Subject: Test step and wrap circuits
    Invocation: dune exec src/lib/pickles/test/main.exe -- test "Impls:"
 *)

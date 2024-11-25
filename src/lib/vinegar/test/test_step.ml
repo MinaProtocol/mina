@@ -1,15 +1,15 @@
 (* Testing
    -------
 
-   Component: Pickles
+   Component: Vinegar
    Subject: Test scaling functions
    Invocation: \
     dune exec src/lib/pickles/test/main.exe -- test "Step curve operations"
 *)
 
-module Impl = Pickles__Impls.Step
-module Inner_curve = Pickles__Step_main_inputs.Inner_curve
-module Ops = Pickles__Step_main_inputs.Ops
+module Impl = Vinegar__Impls.Step
+module Inner_curve = Vinegar__Step_main_inputs.Inner_curve
+module Ops = Vinegar__Step_main_inputs.Ops
 
 let test_scale_fast_2 () =
   let open Impl in
@@ -38,7 +38,7 @@ let test_scale_fast_2 () =
           let x =
             let chunks_needed = Ops.chunks_needed ~num_bits:(n - 1) in
             let actual_bits_used = chunks_needed * Ops.bits_per_chunk in
-            Pickles_types.Pcs_batch.pow ~one:G.Constant.Scalar.one
+            Vinegar_types.Pcs_batch.pow ~one:G.Constant.Scalar.one
               ~mul:G.Constant.Scalar.( * )
               G.Constant.Scalar.(of_int 2)
               actual_bits_used
@@ -78,7 +78,7 @@ let test_scale_fast_2_small () =
           let x =
             let chunks_needed = Ops.chunks_needed ~num_bits:(n - 1) in
             let actual_bits_used = chunks_needed * Ops.bits_per_chunk in
-            Pickles_types.Pcs_batch.pow ~one:G.Constant.Scalar.one
+            Vinegar_types.Pcs_batch.pow ~one:G.Constant.Scalar.one
               ~mul:G.Constant.Scalar.( * )
               G.Constant.Scalar.(of_int 2)
               actual_bits_used

@@ -1,18 +1,18 @@
 (* Testing
    -------
 
-   Component: Pickles
+   Component: Vinegar
    Subject: Test step and wrap scalar challenges
    Invocation: dune exec src/lib/pickles/test/main.exe -- test "scalar challenge"
 *)
 
-module SC = Pickles__Import.Scalar_challenge
-module Scalar_challenge = Pickles__Scalar_challenge
+module SC = Vinegar__Import.Scalar_challenge
+module Scalar_challenge = Vinegar__Scalar_challenge
 
 module Test_make
     (Impl : Snarky_backendless.Snark_intf.Run)
-    (G : Pickles__Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t)
-    (Challenge : Pickles__Import.Challenge.S with module Impl := Impl)
+    (G : Vinegar__Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t)
+    (Challenge : Vinegar__Import.Challenge.S with module Impl := Impl)
     (Endo : sig
       val base : Impl.Field.Constant.t
 
@@ -20,7 +20,7 @@ module Test_make
     end) =
 struct
   open Impl
-  include Pickles__Scalar_challenge.Make (Impl) (G) (Challenge) (Endo)
+  include Vinegar__Scalar_challenge.Make (Impl) (G) (Challenge) (Endo)
   module T = Internal_Basic
 
   let test_endo () =
@@ -80,13 +80,13 @@ struct
           raise e )
 end
 
-module Endo = Pickles__Endo
+module Endo = Vinegar__Endo
 module Wrap =
-  Test_make (Impls.Wrap) (Pickles__Wrap_main_inputs.Inner_curve)
+  Test_make (Impls.Wrap) (Vinegar__Wrap_main_inputs.Inner_curve)
     (Impls.Wrap.Challenge)
     (Endo.Wrap_inner_curve)
 module Step =
-  Test_make (Impls.Step) (Pickles__Step_main_inputs.Inner_curve)
+  Test_make (Impls.Step) (Vinegar__Step_main_inputs.Inner_curve)
     (Impls.Step.Challenge)
     (Endo.Step_inner_curve)
 

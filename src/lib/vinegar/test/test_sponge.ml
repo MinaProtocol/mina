@@ -1,7 +1,7 @@
 (* Testing
    -------
 
-   Component: Pickles
+   Component: Vinegar
    Subject: Test sponge
    Invocation: \
     dune exec src/lib/pickles/test/main.exe -- test "Sponge"
@@ -44,20 +44,20 @@ struct
 end
 
 module Step =
-  Test (Impls.Step) (Pickles__Tick_field_sponge.Field)
-    (Pickles__Step_main_inputs.Sponge.S)
+  Test (Impls.Step) (Vinegar__Tick_field_sponge.Field)
+    (Vinegar__Step_main_inputs.Sponge.S)
 module Wrap =
-  Test (Impls.Wrap) (Pickles__Tock_field_sponge.Field)
-    (Pickles__Wrap_main_inputs.Sponge.S)
+  Test (Impls.Wrap) (Vinegar__Tock_field_sponge.Field)
+    (Vinegar__Wrap_main_inputs.Sponge.S)
 
 let tests =
   let open Alcotest in
   [ ( "Sponge:Step"
     , [ test_case "sponge" `Quick (fun () ->
-            Step.test Pickles__Tick_field_sponge.params )
+            Step.test Vinegar__Tick_field_sponge.params )
       ] )
   ; ( "Sponge:Wrap"
     , [ test_case "sponge" `Quick (fun () ->
-            Wrap.test Pickles__Tock_field_sponge.params )
+            Wrap.test Vinegar__Tock_field_sponge.params )
       ] )
   ]

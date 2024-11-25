@@ -1,7 +1,7 @@
 (* Testing
    -------
 
-   Component: Pickles
+   Component: Vinegar
    Subject: Test Plonk curve operations
    Invocation: \
     dune exec src/lib/pickles/test/main.exe -- test "Plonk curve operations"
@@ -9,11 +9,11 @@
 
 module Test_make
     (Impl : Snarky_backendless.Snark_intf.Run)
-    (G : Pickles__Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t) =
+    (G : Vinegar__Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t) =
 struct
   open Impl
   module T = Internal_Basic
-  include Pickles__Plonk_curve_ops.Make (Impl) (G)
+  include Vinegar__Plonk_curve_ops.Make (Impl) (G)
 
   let random_point =
     let rec pt x =
@@ -42,7 +42,7 @@ struct
             let x =
               let chunks_needed = chunks_needed ~num_bits:(n - 1) in
               let actual_bits_used = chunks_needed * bits_per_chunk in
-              Pickles_types.Pcs_batch.pow ~one:G.Constant.Scalar.one
+              Vinegar_types.Pcs_batch.pow ~one:G.Constant.Scalar.one
                 ~mul:G.Constant.Scalar.( * )
                 G.Constant.Scalar.(of_int 2)
                 actual_bits_used
@@ -53,7 +53,7 @@ struct
           (random_point, input) )
 
   let test_scale_fast () =
-    let open Pickles_types in
+    let open Vinegar_types in
     let shift = Shifted_value.Type1.Shift.create (module G.Constant.Scalar) in
     Quickcheck.test ~trials:10
       Quickcheck.Generator.(
@@ -91,9 +91,9 @@ struct
 end
 
 module Wrap =
-  Test_make (Pickles__Impls.Wrap) (Pickles__Wrap_main_inputs.Inner_curve)
+  Test_make (Vinegar__Impls.Wrap) (Vinegar__Wrap_main_inputs.Inner_curve)
 module Step =
-  Test_make (Pickles__Impls.Step) (Pickles__Step_main_inputs.Inner_curve)
+  Test_make (Vinegar__Impls.Step) (Vinegar__Step_main_inputs.Inner_curve)
 
 let tests =
   [ ("Plonk curve operations:Wrap", Wrap.tests)

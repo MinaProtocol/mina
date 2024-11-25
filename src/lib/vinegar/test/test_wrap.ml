@@ -1,14 +1,14 @@
 (* Testing
    -------
 
-   Component: Pickles
+   Component: Vinegar
    Subject: Test Wrap
    Invocation: \
     dune exec src/lib/pickles/test/main.exe -- test "Gate:"
 *)
-open Pickles_types
-module Wrap = Pickles__Wrap
-module Import = Pickles__Import
+open Vinegar_types
+module Wrap = Vinegar__Wrap
+module Import = Vinegar__Import
 
 (* Type to list test configurations, that is, how to interpret feature flags in
    the tests. *)
@@ -74,7 +74,7 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
     typ.var_of_fields (Array.map xs ~f:Impls.Step.Field.constant, aux)
   in
 
-  (* Compute deferred values - in the Pickles recursive proof system, deferred values
+  (* Compute deferred values - in the Vinegar recursive proof system, deferred values
      are values from 2 proofs earlier in the recursion hierarchy.  Every recursion
      goes through a two-phase process of step and wrap, like so
 

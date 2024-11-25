@@ -3,9 +3,9 @@
  (flags
   (:standard -warn-error +a)
   -open Core_kernel
-  -open Pickles)
+  -open Vinegar)
  (preprocess (pps ppx_jane))
- (package pickles)
+ (package vinegar)
  (libraries
   ; Opam libraries
   alcotest
@@ -21,14 +21,14 @@
   kimchi_bindings
   kimchi_types
   pasta_bindings
-  pickles
-  pickles.backend
-  pickles.composition_types
-  pickles.limb_vector
-  pickles_base.one_hot_vector
-  pickles.plonk_checks
-  pickles_base
-  pickles_types
+  vinegar
+  vinegar.backend
+  vinegar.composition_types
+  vinegar.limb_vector
+  vinegar_base.one_hot_vector
+  vinegar.plonk_checks
+  vinegar_base
+  vinegar_types
   promise
   snark_keys_header
   snarky.backendless
