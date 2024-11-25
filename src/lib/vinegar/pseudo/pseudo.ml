@@ -1,5 +1,5 @@
 open Core_kernel
-open Pickles_types
+open Vinegar_types
 module Domain = Plonk_checks.Domain
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
@@ -40,7 +40,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
   end
 
   module Domain = struct
-    let num_shifts = Nat.to_int Pickles_types.Plonk_types.Permuts.n
+    let num_shifts = Nat.to_int Vinegar_types.Plonk_types.Permuts.n
 
     (** Compute the 'shifts' used by the kimchi permutation argument.
 
@@ -60,7 +60,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
     *)
     let shifts (type n) ((which, log2s) : (int, n) t)
         ~(shifts : log2_size:int -> Field.Constant.t array) :
-        Field.t Pickles_types.Plonk_types.Shifts.t =
+        Field.t Vinegar_types.Plonk_types.Shifts.t =
       let all_shifts = Vector.map log2s ~f:(fun d -> shifts ~log2_size:d) in
       match all_shifts with
       | [] ->

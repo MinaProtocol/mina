@@ -1,6 +1,6 @@
 (library
  (name pseudo)
- (public_name pickles.pseudo)
+ (public_name vinegar.pseudo)
  (flags
   (:standard
     -w +a-40..42-44
@@ -12,10 +12,10 @@
    ;; opam libraries
    core_kernel
    ;; local libraries
-   pickles_types
-   pickles.plonk_checks
-   pickles_base.one_hot_vector
+   vinegar_types
+   vinegar.plonk_checks
+   vinegar_base.one_hot_vector
    snarky.backendless
-   pickles_base
+   vinegar_base
  )
 )
