@@ -1,11 +1,11 @@
 module Stable : sig
   module V1 : sig
     type 'challenge t =
-          'challenge Mina_wire_types.Pickles_bulletproof_challenge.V1.t =
+          'challenge Mina_wire_types.Vinegar_bulletproof_challenge.V1.t =
       { prechallenge : 'challenge }
     [@@deriving sexp, compare, yojson, hash, equal, bin_shape, bin_io]
 
-    include Pickles_types.Sigs.VERSIONED
+    include Vinegar_types.Sigs.VERSIONED
   end
 end
 

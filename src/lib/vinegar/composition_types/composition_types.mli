@@ -1,4 +1,4 @@
-open Pickles_types
+open Vinegar_types
 module Opt = Opt
 
 type ('a, 'b) opt := ('a, 'b) Opt.t
@@ -55,7 +55,7 @@ module Wrap : sig
                     ( 'challenge
                     , 'scalar_challenge
                     , 'bool )
-                    Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                    Mina_wire_types.Vinegar_composition_types.Wrap.Proof_state
                     .Deferred_values
                     .Plonk
                     .Minimal
@@ -164,7 +164,7 @@ module Wrap : sig
                 , 'fp
                 , 'bulletproof_challenges
                 , 'branch_data )
-                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                Mina_wire_types.Vinegar_composition_types.Wrap.Proof_state
                 .Deferred_values
                 .V1
                 .t =
@@ -201,7 +201,7 @@ module Wrap : sig
             , 'fp
             , 'bulletproof_challenges
             , 'branch_data )
-            Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+            Mina_wire_types.Vinegar_composition_types.Wrap.Proof_state
             .Deferred_values
             .V1
             .t =
@@ -237,7 +237,7 @@ module Wrap : sig
                   , 'bool
                   , 'bulletproof_challenges
                   , 'branch_data )
-                  Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                  Mina_wire_types.Vinegar_composition_types.Wrap.Proof_state
                   .Deferred_values
                   .Minimal
                   .V1
@@ -358,7 +358,7 @@ module Wrap : sig
               , 'digest
               , 'bp_chals
               , 'index )
-              Mina_wire_types.Pickles_composition_types.Wrap.Proof_state.V1.t =
+              Mina_wire_types.Vinegar_composition_types.Wrap.Proof_state.V1.t =
           { deferred_values :
               ( 'plonk
               , 'scalar_challenge
@@ -374,7 +374,7 @@ module Wrap : sig
         [@@deriving
           sexp, compare, yojson, hlist, hash, equal, bin_shape, bin_io]
 
-        include Pickles_types.Sigs.VERSIONED
+        include Vinegar_types.Sigs.VERSIONED
       end
 
       module Latest = V1
@@ -412,7 +412,7 @@ module Wrap : sig
           type ('g1, 'bulletproof_challenges) t =
                 ( 'g1
                 , 'bulletproof_challenges )
-                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                Mina_wire_types.Vinegar_composition_types.Wrap.Proof_state
                 .Messages_for_next_wrap_proof
                 .V1
                 .t =
@@ -422,7 +422,7 @@ module Wrap : sig
           [@@deriving
             sexp, compare, yojson, hlist, hash, equal, bin_shape, bin_io]
 
-          include Pickles_types.Sigs.VERSIONED
+          include Vinegar_types.Sigs.VERSIONED
         end
 
         module Latest = V1
@@ -470,7 +470,7 @@ module Wrap : sig
                 , 'digest
                 , 'bp_chals
                 , 'index )
-                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                Mina_wire_types.Vinegar_composition_types.Wrap.Proof_state
                 .Minimal
                 .V1
                 .t =
@@ -653,7 +653,7 @@ module Wrap : sig
               , 'messages_for_next_step_proof
               , 'bp_chals
               , 'index )
-              Mina_wire_types.Pickles_composition_types.Wrap.Statement.V1.t =
+              Mina_wire_types.Vinegar_composition_types.Wrap.Statement.V1.t =
           { proof_state :
               ( 'plonk
               , 'scalar_challenge
@@ -667,7 +667,7 @@ module Wrap : sig
           }
         [@@deriving compare, yojson, sexp, hash, equal, bin_shape, bin_io]
 
-        include Pickles_types.Sigs.VERSIONED
+        include Vinegar_types.Sigs.VERSIONED
       end
 
       module Latest = V1
@@ -726,7 +726,7 @@ module Wrap : sig
                 , 'messages_for_next_step_proof
                 , 'bp_chals
                 , 'index )
-                Mina_wire_types.Pickles_composition_types.Wrap.Statement.Minimal
+                Mina_wire_types.Vinegar_composition_types.Wrap.Statement.Minimal
                 .V1
                 .t =
             { proof_state :
@@ -743,7 +743,7 @@ module Wrap : sig
             }
           [@@deriving compare, yojson, sexp, hash, equal, bin_shape, bin_io]
 
-          include Pickles_types.Sigs.VERSIONED
+          include Vinegar_types.Sigs.VERSIONED
         end
 
         module Latest = V1
@@ -1382,6 +1382,6 @@ module Challenges_vector : sig
 end
 
 (** Alias for
- ** {!val:Pickles_base.Side_loaded_verification_key.index_to_field_elements} *)
+ ** {!val:Vinegar_base.Side_loaded_verification_key.index_to_field_elements} *)
 val index_to_field_elements :
   'a Plonk_verification_key_evals.t -> g:('a -> 'b array) -> 'b array

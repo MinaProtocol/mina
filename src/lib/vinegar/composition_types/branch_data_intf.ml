@@ -1,6 +1,6 @@
 module type S = sig
   open Core_kernel
-  module Proofs_verified = Pickles_base.Proofs_verified
+  module Proofs_verified = Vinegar_base.Proofs_verified
 
   module Domain_log2 : sig
     [%%versioned:
@@ -52,5 +52,5 @@ module type S = sig
 
   val length_in_bits : int
 
-  val domain : t -> Pickles_base.Domain.t
+  val domain : t -> Vinegar_base.Domain.t
 end

@@ -1,4 +1,4 @@
-open Pickles_types
+open Vinegar_types
 module Scalar_challenge = Kimchi_backend_common.Scalar_challenge
 module Bulletproof_challenge = Bulletproof_challenge
 module Branch_data = Branch_data
@@ -10,7 +10,7 @@ module Step_impl = Kimchi_pasta_snarky_backend.Step_impl
 module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl
 
 let index_to_field_elements =
-  Pickles_base.Side_loaded_verification_key.index_to_field_elements
+  Vinegar_base.Side_loaded_verification_key.index_to_field_elements
 
 module Zero_values = struct
   type ('chal, 'fp) single = { challenge : 'chal; scalar : 'fp }
@@ -46,7 +46,7 @@ module Wrap = struct
                     ( 'challenge
                     , 'scalar_challenge
                     , 'bool )
-                    Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                    Mina_wire_types.Vinegar_composition_types.Wrap.Proof_state
                     .Deferred_values
                     .Plonk
                     .Minimal
@@ -86,7 +86,7 @@ module Wrap = struct
           end
         end
 
-        open Pickles_types
+        open Vinegar_types
 
         module In_circuit = struct
           (** All scalar values deferred by a verifier circuit.
@@ -193,7 +193,7 @@ module Wrap = struct
                 , 'fp
                 , 'bulletproof_challenges
                 , 'branch_data )
-                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                Mina_wire_types.Vinegar_composition_types.Wrap.Proof_state
                 .Deferred_values
                 .V1
                 .t =
@@ -255,7 +255,7 @@ module Wrap = struct
                   , 'bool
                   , 'bulletproof_challenges
                   , 'branch_data )
-                  Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                  Mina_wire_types.Vinegar_composition_types.Wrap.Proof_state
                   .Deferred_values
                   .Minimal
                   .V1
@@ -363,7 +363,7 @@ module Wrap = struct
           type ('g1, 'bulletproof_challenges) t =
                 ( 'g1
                 , 'bulletproof_challenges )
-                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                Mina_wire_types.Vinegar_composition_types.Wrap.Proof_state
                 .Messages_for_next_wrap_proof
                 .V1
                 .t =
@@ -408,7 +408,7 @@ module Wrap = struct
               , 'digest
               , 'bp_chals
               , 'index )
-              Mina_wire_types.Pickles_composition_types.Wrap.Proof_state.V1.t =
+              Mina_wire_types.Vinegar_composition_types.Wrap.Proof_state.V1.t =
           { deferred_values :
               ( 'plonk
               , 'scalar_challenge
@@ -446,7 +446,7 @@ module Wrap = struct
                 , 'digest
                 , 'bp_chals
                 , 'index )
-                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                Mina_wire_types.Vinegar_composition_types.Wrap.Proof_state
                 .Minimal
                 .V1
                 .t =
@@ -641,7 +641,7 @@ module Wrap = struct
               , 'messages_for_next_step_proof
               , 'bp_chals
               , 'index )
-              Mina_wire_types.Pickles_composition_types.Wrap.Statement.V1.t =
+              Mina_wire_types.Vinegar_composition_types.Wrap.Statement.V1.t =
           { proof_state :
               ( 'plonk
               , 'scalar_challenge
@@ -680,7 +680,7 @@ module Wrap = struct
                 , 'messages_for_next_step_proof
                 , 'bp_chals
                 , 'index )
-                Mina_wire_types.Pickles_composition_types.Wrap.Statement.Minimal
+                Mina_wire_types.Vinegar_composition_types.Wrap.Statement.Minimal
                 .V1
                 .t =
             { proof_state :
@@ -956,7 +956,7 @@ module Step = struct
             { alpha; beta; gamma; zeta }
         end
 
-        open Pickles_types
+        open Vinegar_types
 
         module In_circuit = struct
           (** All scalar values deferred by a verifier circuit.

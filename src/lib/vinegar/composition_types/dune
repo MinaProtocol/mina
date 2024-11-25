@@ -1,6 +1,6 @@
 (library
  (name composition_types)
- (public_name pickles.composition_types)
+ (public_name vinegar.composition_types)
  ; Deactivated warnings
  ; 40: name-out-scope (activate later)
  ;
@@ -32,11 +32,11 @@
   kimchi_pasta
   kimchi_pasta.basic
   snarky.backendless
-  pickles_types
-  pickles.limb_vector
+  vinegar_types
+  vinegar.limb_vector
   kimchi_backend
-  pickles_base
-  pickles.backend
+  vinegar_base
+  vinegar.backend
   kimchi_backend_common
   ppx_version.runtime
   )

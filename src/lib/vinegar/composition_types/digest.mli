@@ -1,11 +1,11 @@
 (** Vectors of 4 limbs of int64 *)
 
-module Limbs = Pickles_types.Nat.N4
+module Limbs = Vinegar_types.Nat.N4
 
 type nat4 := Limbs.n
 
 (** Alias for fixed typed-size vector of size 4 *)
-type 'a v := ('a, nat4) Pickles_types.Vector.vec
+type 'a v := ('a, nat4) Vinegar_types.Vector.vec
 
 module Constant : sig
   module A : sig
@@ -22,12 +22,12 @@ module Constant : sig
     module V1 : sig
       type t =
         Limb_vector.Constant.Hex64.Stable.V1.t
-        Pickles_types.Vector.Vector_4.Stable.V1.t
+        Vinegar_types.Vector.Vector_4.Stable.V1.t
       [@@deriving compare, sexp, yojson, hash, equal]
 
-      include Pickles_types.Sigs.VERSIONED
+      include Vinegar_types.Sigs.VERSIONED
 
-      include Pickles_types.Sigs.Binable.S with type t := t
+      include Vinegar_types.Sigs.Binable.S with type t := t
 
       val to_latest : 'a -> 'a
     end

@@ -1,5 +1,5 @@
 (** See documentation of the {!Mina_wire_types} library *)
-module Wire_types = Mina_wire_types.Pickles_composition_types.Branch_data
+module Wire_types = Mina_wire_types.Vinegar_composition_types.Branch_data
 
 module Make_sig (A : Wire_types.Types.S) = struct
   module type S =
@@ -12,7 +12,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   (** Data specific to a branch of a proof-system that's necessary for
     finalizing the deferred-values in a wrap proof of that branch. *)
 
-  module Proofs_verified = Pickles_base.Proofs_verified
+  module Proofs_verified = Vinegar_base.Proofs_verified
 
   module Domain_log2 = struct
     [%%versioned
@@ -67,7 +67,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     (* shift domain_log2 over by 2 bits (multiply by 4) *)
     times4 domain_log2
     + project
-        (Pickles_types.Vector.to_list
+        (Vinegar_types.Vector.to_list
            (Proofs_verified.Prefix_mask.there proofs_verified) )
 
   let unpack (type f)
@@ -95,7 +95,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let open Impl.Field in
       let four = of_int 4 in
       (four * domain_log2)
-      + pack (Pickles_types.Vector.to_list proofs_verified_mask)
+      + pack (Vinegar_types.Vector.to_list proofs_verified_mask)
   end
 
   open Kimchi_pasta_snarky_backend
@@ -161,7 +161,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
 
   let domain { domain_log2; _ } =
-    Pickles_base.Domain.Pow_2_roots_of_unity (Char.to_int domain_log2)
+    Vinegar_base.Domain.Pow_2_roots_of_unity (Char.to_int domain_log2)
 end
 
 include Wire_types.Make (Make_sig) (Make_str)

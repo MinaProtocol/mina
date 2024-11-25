@@ -1,6 +1,6 @@
 module D = Digest
 open Core_kernel
-open Pickles_types
+open Vinegar_types
 open Hlist
 module Sc = Kimchi_backend_common.Scalar_challenge
 

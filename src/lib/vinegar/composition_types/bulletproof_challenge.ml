@@ -2,7 +2,7 @@
 module Stable = struct
   module V1 = struct
     type 'challenge t =
-          'challenge Mina_wire_types.Pickles_bulletproof_challenge.V1.t =
+          'challenge Mina_wire_types.Vinegar_bulletproof_challenge.V1.t =
       { prechallenge : 'challenge }
     [@@deriving sexp, compare, yojson, hash, equal]
   end
