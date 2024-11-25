@@ -241,7 +241,7 @@ module Wrap = struct
       { Types.Wrap.Lookup_parameters.use = uses_lookups
       ; zero =
           { value =
-              { challenge = Limb_vector.Challenge.Constant.zero
+              { challenge = Vinegar_limb_vector.Challenge.Constant.zero
               ; scalar =
                   Shifted_value.Type1.Shifted_value Other_field.Constant.zero
               }

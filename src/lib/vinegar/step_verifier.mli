@@ -116,8 +116,8 @@ val verify :
   -> sg_old:(Impls.Step.Field.t Tuple_lib.Double.t, 'a) Vinegar_types.Vector.t
   -> sponge_after_index:Step_main_inputs.Sponge.t
   -> lookup_parameters:
-       ( Limb_vector.Challenge.Constant.t
-       , Step_main_inputs.Impl.field Limb_vector.Challenge.t
+       ( Vinegar_limb_vector.Challenge.Constant.t
+       , Step_main_inputs.Impl.field Vinegar_limb_vector.Challenge.t
        , 'b
        , Step_main_inputs.Impl.Field.t Vinegar_types.Shifted_value.Type1.t )
        Composition_types.Wrap.Lookup_parameters.t
@@ -133,14 +133,14 @@ val verify :
   -> wrap_verification_key:
        Step_main_inputs.Inner_curve.t array
        Vinegar_types.Plonk_verification_key_evals.t
-  -> ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
-     , Step_main_inputs.Impl.field Limb_vector.Challenge.t
+  -> ( Step_main_inputs.Impl.field Vinegar_limb_vector.Challenge.t
+     , Step_main_inputs.Impl.field Vinegar_limb_vector.Challenge.t
        Composition_types.Scalar_challenge.t
      , Step_main_inputs.Impl.Field.t Vinegar_types.Shifted_value.Type1.t
      , ( Step_main_inputs.Impl.Field.t Vinegar_types.Shifted_value.Type1.t
        , Step_main_inputs.Impl.Boolean.var )
        Vinegar_types.Opt.t
-     , ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
+     , ( Step_main_inputs.Impl.field Vinegar_limb_vector.Challenge.t
          Composition_types.Scalar_challenge.t
        , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
          Snarky_backendless.Snark_intf.Boolean0.t )
@@ -149,7 +149,7 @@ val verify :
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
-     , ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
+     , ( Step_main_inputs.Impl.field Vinegar_limb_vector.Challenge.t
          Kimchi_backend_common.Scalar_challenge.t
          Composition_types.Bulletproof_challenge.t
        , Vinegar_types.Nat.z Backend.Tick.Rounds.plus_n )

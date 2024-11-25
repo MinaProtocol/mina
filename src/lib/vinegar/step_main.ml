@@ -98,7 +98,7 @@ let verify_one ~srs
                     ; scalar = Shifted_value Field.zero
                     }
                 ; value =
-                    { challenge = Limb_vector.Challenge.Constant.zero
+                    { challenge = Vinegar_limb_vector.Challenge.Constant.zero
                     ; scalar =
                         Shifted_value.Type1.Shifted_value Field.Constant.zero
                     }

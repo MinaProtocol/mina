@@ -170,18 +170,18 @@ val tick_public_input_of_statement :
 val tock_public_input_of_statement :
      feature_flags:
        Vinegar_types.Opt.Flag.t Vinegar_types.Plonk_types.Features.Full.t
-  -> ( Limb_vector.Challenge.Constant.t
-     , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
+  -> ( Vinegar_limb_vector.Challenge.Constant.t
+     , Vinegar_limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
      , Impls.Wrap.Other_field.Constant.t Vinegar_types.Shifted_value.Type1.t
      , Impls.Wrap.Other_field.Constant.t Vinegar_types.Shifted_value.Type1.t
        option
-     , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
+     , Vinegar_limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
        option
      , bool
      , Import.Types.Digest.Constant.t
      , Import.Types.Digest.Constant.t
      , Import.Types.Digest.Constant.t
-     , ( Limb_vector.Challenge.Constant.t
+     , ( Vinegar_limb_vector.Challenge.Constant.t
          Kimchi_backend_common.Scalar_challenge.t
          Composition_types.Bulletproof_challenge.t
        , Vinegar_types.Nat.z Backend.Tick.Rounds.plus_n )
@@ -193,18 +193,18 @@ val tock_public_input_of_statement :
 val tock_unpadded_public_input_of_statement :
      feature_flags:
        Vinegar_types.Opt.Flag.t Vinegar_types.Plonk_types.Features.Full.t
-  -> ( Limb_vector.Challenge.Constant.t
-     , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
+  -> ( Vinegar_limb_vector.Challenge.Constant.t
+     , Vinegar_limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
      , Impls.Wrap.Other_field.Constant.t Vinegar_types.Shifted_value.Type1.t
      , Impls.Wrap.Other_field.Constant.t Vinegar_types.Shifted_value.Type1.t
        option
-     , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
+     , Vinegar_limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
        option
      , bool
      , Import.Types.Digest.Constant.t
      , Import.Types.Digest.Constant.t
      , Import.Types.Digest.Constant.t
-     , ( Limb_vector.Challenge.Constant.t
+     , ( Vinegar_limb_vector.Challenge.Constant.t
          Kimchi_backend_common.Scalar_challenge.t
          Composition_types.Bulletproof_challenge.t
        , Vinegar_types.Nat.z Backend.Tick.Rounds.plus_n )
