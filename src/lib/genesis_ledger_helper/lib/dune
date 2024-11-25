@@ -34,7 +34,6 @@
    kimchi_pasta
    kimchi_pasta.basic
    ppx_inline_test.config
-   inline_test_quiet_logs
  )
  (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
