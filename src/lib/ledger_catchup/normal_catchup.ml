@@ -15,8 +15,6 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
-
-  val compile_config : Mina_compile_config.t
 end
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -898,8 +896,6 @@ let%test_module "Ledger_catchup tests" =
 
     let constraint_constants = precomputed_values.constraint_constants
 
-    let compile_config = Mina_compile_config.For_unit_tests.t
-
     let trust_system = Trust_system.null ()
 
     let time_controller = Block_time.Controller.basic ~logger
@@ -919,8 +915,6 @@ let%test_module "Ledger_catchup tests" =
       let constraint_constants = constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
-
-      let compile_config = compile_config
     end
 
     let downcast_transition transition =
@@ -1045,7 +1039,6 @@ let%test_module "Ledger_catchup tests" =
           in
           gen ~precomputed_values ~verifier ~max_frontier_length
             ~use_super_catchup
-            ~compile_config:Mina_compile_config.For_unit_tests.t
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size
             ])
@@ -1067,7 +1060,6 @@ let%test_module "Ledger_catchup tests" =
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
             ~use_super_catchup
-            ~compile_config:Mina_compile_config.For_unit_tests.t
             [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
         ~f:(fun network ->
           let open Fake_network in
@@ -1083,7 +1075,6 @@ let%test_module "Ledger_catchup tests" =
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
             ~use_super_catchup
-            ~compile_config:Mina_compile_config.For_unit_tests.t
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:(max_frontier_length * 2)
             ])

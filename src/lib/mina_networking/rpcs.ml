@@ -33,8 +33,6 @@ module type CONTEXT = sig
   val list_peers : unit -> Peer.t list Deferred.t
 
   val get_transition_frontier : unit -> Transition_frontier.t option
-
-  val compile_config : Mina_compile_config.t
 end
 
 type ctx = (module CONTEXT)
@@ -366,13 +364,13 @@ module Answer_sync_ledger_query = struct
     include Master
   end)
 
-  module V3 = struct
+  module V4 = struct
     module T = struct
-      type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
+      type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V2.t
       [@@deriving sexp]
 
       type response =
-        (( Sync_ledger.Answer.Stable.V2.t
+        (( Sync_ledger.Answer.Stable.V3.t
          , Bounded_types.Wrapped_error.Stable.V1.t )
          Result.t
         [@version_asserted] )
@@ -385,6 +383,49 @@ module Answer_sync_ledger_query = struct
       let response_of_callee_model = Fn.id
 
       let caller_model_of_response = Fn.id
+    end
+
+    module T' =
+      Perf_histograms.Rpc.Plain.Decorate_bin_io
+        (struct
+          include M
+          include Master
+        end)
+        (T)
+
+    include T'
+    include Register (T')
+  end
+
+  module V3 = struct
+    module T = struct
+      type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
+      [@@deriving sexp]
+
+      type response =
+        (( Sync_ledger.Answer.Stable.V2.t
+         , Bounded_types.Wrapped_error.Stable.V1.t )
+         Result.t
+        [@version_asserted] )
+      [@@deriving sexp]
+
+      let query_of_caller_model : Master.T.query -> query =
+       fun (h, q) -> (h, Sync_ledger.Query.Stable.V1.from_v2 q)
+
+      let callee_model_of_query : query -> Master.T.query =
+       fun (h, q) -> (h, Sync_ledger.Query.Stable.V1.to_latest q)
+
+      let response_of_callee_model : Master.T.response -> response = function
+        | Ok a ->
+            Sync_ledger.Answer.Stable.V2.from_v3 a
+        | Error e ->
+            Error e
+
+      let caller_model_of_response : response -> Master.T.response = function
+        | Ok a ->
+            Ok (Sync_ledger.Answer.Stable.V2.to_latest a)
+        | Error e ->
+            Error e
     end
 
     module T' =
@@ -412,17 +453,20 @@ module Answer_sync_ledger_query = struct
     let ledger_hash, _ = Envelope.Incoming.data request in
     let query = Envelope.Incoming.map request ~f:Tuple2.get2 in
     let%bind answer =
-      let%bind.Deferred.Option frontier = return (get_transition_frontier ()) in
-      Sync_handler.answer_query ~frontier ledger_hash query ~logger
-        ~trust_system
+      match get_transition_frontier () with
+      | Some frontier ->
+          Sync_handler.answer_query ~frontier ledger_hash query
+            ~context:(module Context)
+            ~trust_system
+      | None ->
+          return (Or_error.error_string "No Frontier")
     in
     let result =
-      Result.of_option answer
-        ~error:
-          (Error.createf
-             !"Refusing to answer sync ledger query for ledger_hash: \
-               %{sexp:Ledger_hash.t}"
-             ledger_hash )
+      Result.map_error answer ~f:(fun e ->
+          Error.createf
+            !"Refusing to answer sync ledger query for ledger_hash: \
+              %{sexp:Ledger_hash.t}. Error: %s"
+            ledger_hash (Error.to_string_hum e) )
     in
     let%map () =
       match result with

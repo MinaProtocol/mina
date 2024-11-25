@@ -18,12 +18,14 @@ module Inputs = struct
     ; rpc_heartbeat_timeout_sec : float
     ; rpc_heartbeat_send_every_sec : float
     ; zkapps_disabled : bool
+    ; sync_ledger_max_subtree_depth : int
+    ; sync_ledger_default_subtree_depth : int
     }
-  [@@deriving yojson]
+  [@@deriving yojson, bin_io_unversioned]
 end
 
 type t =
-  { default_snark_worker_fee : Currency.Fee.t
+  { default_snark_worker_fee : Currency.Fee.Stable.Latest.t
   ; itn_features : bool
   ; compaction_interval : Time.Span.t option
   ; vrf_poll_interval : Time.Span.t
@@ -33,8 +35,10 @@ type t =
   ; rpc_heartbeat_timeout : Time_ns.Span.t
   ; rpc_heartbeat_send_every : Time_ns.Span.t
   ; zkapps_disabled : bool
+  ; sync_ledger_max_subtree_depth : int
+  ; sync_ledger_default_subtree_depth : int
   }
-[@@deriving sexp_of]
+[@@deriving sexp_of, bin_io_unversioned]
 
 let make (inputs : Inputs.t) =
   { default_snark_worker_fee =
@@ -53,6 +57,8 @@ let make (inputs : Inputs.t) =
   ; network_id = inputs.network_id
   ; zkapp_cmd_limit = inputs.zkapp_cmd_limit
   ; zkapps_disabled = inputs.zkapps_disabled
+  ; sync_ledger_max_subtree_depth = inputs.sync_ledger_max_subtree_depth
+  ; sync_ledger_default_subtree_depth = inputs.sync_ledger_default_subtree_depth
   }
 
 let to_yojson t =
@@ -76,6 +82,9 @@ let to_yojson t =
       , Option.value_map ~default:`Null ~f:(fun x -> `Int x) t.zkapp_cmd_limit
       )
     ; ("zkapps_disabled", `Bool t.zkapps_disabled)
+    ; ("sync_ledger_max_subtree_depth", `Int t.sync_ledger_max_subtree_depth)
+    ; ( "sync_ledger_default_subtree_depth"
+      , `Int t.sync_ledger_default_subtree_depth )
     ]
 
 (*TODO: Delete this module and read in a value from the environment*)
@@ -92,6 +101,10 @@ module Compiled = struct
       ; rpc_heartbeat_timeout_sec = 60.0
       ; rpc_heartbeat_send_every_sec = 10.0
       ; zkapps_disabled = false
+      ; sync_ledger_max_subtree_depth =
+          Node_config.sync_ledger_max_subtree_depth
+      ; sync_ledger_default_subtree_depth =
+          Node_config.sync_ledger_default_subtree_depth
       }
     in
     make inputs
@@ -114,6 +127,10 @@ module For_unit_tests = struct
       ; network_id = Node_config_for_unit_tests.network
       ; zkapp_cmd_limit = Node_config_for_unit_tests.zkapp_cmd_limit
       ; zkapps_disabled = Node_config_for_unit_tests.zkapps_disabled
+      ; sync_ledger_max_subtree_depth =
+          Node_config_for_unit_tests.sync_ledger_max_subtree_depth
+      ; sync_ledger_default_subtree_depth =
+          Node_config_for_unit_tests.sync_ledger_default_subtree_depth
       }
     in
     make inputs
