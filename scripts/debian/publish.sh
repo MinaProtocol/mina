@@ -36,7 +36,7 @@ if [[ -z "$DEB_CODENAME" ]]; then usage "Codename is not set!"; fi;
 if [[ -z "$DEB_RELEASE" ]]; then usage "Release is not set!"; fi;
 
 
-if [[ -z "$SIGN" ]]; then 
+if [[ -z "${SIGN:-}" ]]; then 
   SIGN_ARG=""
 else
   SIGN_ARG="--sign=$SIGN"
