@@ -10,8 +10,6 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
-
-  val compile_config : Mina_compile_config.t
 end
 
 (* There must be at least 2 peers to create a network *)
@@ -100,6 +98,5 @@ module Generator : sig
     -> max_frontier_length:int
     -> use_super_catchup:bool
     -> (peer_config, 'n num_peers) Vect.t
-    -> compile_config:Mina_compile_config.t
     -> 'n num_peers t Generator.t
 end
