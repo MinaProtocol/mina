@@ -1,5 +1,5 @@
 (library
- (name limb_vector)
+ (name vinegar_limb_vector)
  (public_name vinegar.limb_vector)
  (flags
    (:standard
