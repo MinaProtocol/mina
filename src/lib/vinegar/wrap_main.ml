@@ -172,7 +172,7 @@ let wrap_main
               ~request:(fun () -> Req.Which_branch)
           in
           let which_branch =
-            Wrap_verifier.One_hot_vector.of_index which_branch' ~length:branches
+            Wrap_verifier.Vinegar_one_hot_vector.of_index which_branch' ~length:branches
           in
           let actual_proofs_verified_mask =
             Util.ones_vector
@@ -373,7 +373,7 @@ let wrap_main
                     in
                     Vector.map wrap_domain_indices ~f:(fun index ->
                         let which_branch =
-                          Wrap_verifier.One_hot_vector.of_index index
+                          Wrap_verifier.Vinegar_one_hot_vector.of_index index
                             ~length:Wrap_verifier.num_possible_domains
                         in
                         Wrap_verifier.Pseudo.Domain.to_domain ~shifts

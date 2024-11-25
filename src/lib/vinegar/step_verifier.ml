@@ -363,7 +363,7 @@ struct
     | _ ->
         assert false
 
-  module O = One_hot_vector.Make (Impl)
+  module O = Vinegar_one_hot_vector.Make (Impl)
   open Tuple_lib
 
   let public_input_commitment_dynamic (type n) ~srs (which : n O.t)
@@ -698,7 +698,7 @@ struct
          Vector.to_array (ones_vector (module Impl) ~first_zero:actual max)
 
        let mask (type n) ~(lengths : (int, n) Vector.t)
-           (choice : n One_hot_vector.T(Impl).t) : Boolean.var array =
+           (choice : n Vinegar_one_hot_vector.T(Impl).t) : Boolean.var array =
          let max =
            Option.value_exn
              (List.max_elt ~compare:Int.compare (Vector.to_list lengths))
@@ -735,7 +735,7 @@ struct
            Number.mod_pow_2 d (`Two_to_the k)
 
        let _mask_evals (type n) ~(lengths : (int, n) Vector.t Evals.t)
-           (choice : n One_hot_vector.T(Impl).t) (e : Field.t array Evals.t) :
+           (choice : n Vinegar_one_hot_vector.T(Impl).t) (e : Field.t array Evals.t) :
            (Boolean.var * Field.t) array Evals.t =
          Evals.map2 lengths e ~f:(fun lengths e ->
              Array.zip_exn (mask ~lengths choice) e )

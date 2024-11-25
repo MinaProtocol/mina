@@ -193,7 +193,7 @@ struct
       (Inner_curve.to_field_elements g2)
     |> Boolean.all
 
-  module One_hot_vector = One_hot_vector.Make (Impl)
+  module Vinegar_one_hot_vector = Vinegar_one_hot_vector.Make (Impl)
 
   type ('comm, 'comm_opt) index' =
     ('comm, 'comm_opt) Plonk_verification_key_evals.Step.t
@@ -201,7 +201,7 @@ struct
   (* Mask out the given vector of indices with the given one-hot vector *)
   let choose_key :
       type n.
-         n One_hot_vector.t
+         n Vinegar_one_hot_vector.t
       -> ( (Inner_curve.t array, (Inner_curve.t array, Boolean.var) Opt.t) index'
          , n )
          Vector.t
@@ -324,7 +324,7 @@ struct
   (* TODO: Unify with the code in step_verifier *)
   let lagrange (type n)
       ~domain:
-        ( (which_branch : n One_hot_vector.t)
+        ( (which_branch : n Vinegar_one_hot_vector.t)
         , (domains : (Domains.t, n) Vector.t) ) srs i =
     Vector.map domains ~f:(fun d ->
         let d = Int.pow 2 (Domain.log2_size d.h) in
@@ -348,7 +348,7 @@ struct
 
   let scaled_lagrange (type n) c
       ~domain:
-        ( (which_branch : n One_hot_vector.t)
+        ( (which_branch : n Vinegar_one_hot_vector.t)
         , (domains : (Domains.t, n) Vector.t) ) srs i =
     Vector.map domains ~f:(fun d ->
         let d = Int.pow 2 (Domain.log2_size d.h) in
@@ -372,7 +372,7 @@ struct
 
   let lagrange_with_correction (type n) ~input_length
       ~domain:
-        ( (which_branch : n One_hot_vector.t)
+        ( (which_branch : n Vinegar_one_hot_vector.t)
         , (domains : (Domains.t, n) Vector.t) ) srs i :
       Inner_curve.t Double.t array =
     with_label __LOC__ (fun () ->
@@ -646,7 +646,7 @@ struct
 
   module Pseudo = Pseudo.Make (Impl)
 
-  let mask (type n) (lengths : (int, n) Vector.t) (choice : n One_hot_vector.t)
+  let mask (type n) (lengths : (int, n) Vector.t) (choice : n Vinegar_one_hot_vector.t)
       : Boolean.var array =
     let max =
       Option.value_exn
@@ -1384,7 +1384,7 @@ struct
   let _mask_evals (type n)
       ~(lengths :
          (int, n) Vinegar_types.Vector.t Vinegar_types.Plonk_types.Evals.t )
-      (choice : n One_hot_vector.t)
+      (choice : n Vinegar_one_hot_vector.t)
       (e : Field.t array Vinegar_types.Plonk_types.Evals.t) :
       (Boolean.var * Field.t) array Vinegar_types.Plonk_types.Evals.t =
     Vinegar_types.Plonk_types.Evals.map2 lengths e ~f:(fun lengths e ->

@@ -28,7 +28,7 @@ module Other_field : sig
   end
 end
 
-module One_hot_vector : module type of One_hot_vector.Make (Impls.Wrap)
+module Vinegar_one_hot_vector : module type of Vinegar_one_hot_vector.Make (Impls.Wrap)
 
 module Pseudo : module type of Pseudo.Make (Impls.Wrap)
 
@@ -82,7 +82,7 @@ val incrementally_verify_proof :
        ( Wrap_main_inputs.Impl.Field.t * Wrap_main_inputs.Impl.Field.t
        , Wrap_main_inputs.Impl.Boolean.var )
        Vinegar_types.Plonk_types.Messages.In_circuit.t
-  -> which_branch:'a One_hot_vector.t
+  -> which_branch:'a Vinegar_one_hot_vector.t
   -> openings_proof:
        ( Wrap_main_inputs.Inner_curve.t
        , Other_field.Packed.t Vinegar_types.Shifted_value.Type1.t )
@@ -140,7 +140,7 @@ val finalize_other_proof :
 
 val choose_key :
   'n.
-     'n One_hot_vector.t
+     'n Vinegar_one_hot_vector.t
   -> ( ( Wrap_main_inputs.Inner_curve.t array
        , ( Wrap_main_inputs.Inner_curve.t array
          , Impls.Wrap.Boolean.var )

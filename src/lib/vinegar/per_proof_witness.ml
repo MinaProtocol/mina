@@ -2,7 +2,7 @@ open Backend
 open Vinegar_types
 open Import
 module Impl = Impls.Step
-module One_hot_vector = One_hot_vector.Make (Impl)
+module Vinegar_one_hot_vector = Vinegar_one_hot_vector.Make (Impl)
 
 (* Let F, K be the two fields (either (Fp, Fq) or (Fq, Fp)).
    Each proof over F has an accumulator state which contains

@@ -3,7 +3,7 @@
 open Vinegar_types
 module Impl = Impls.Step
 
-module One_hot_vector : module type of One_hot_vector.Make (Impls.Step)
+module Vinegar_one_hot_vector : module type of Vinegar_one_hot_vector.Make (Impls.Step)
 
 type challenge = Import.Challenge.Make(Impls.Step).t
 
