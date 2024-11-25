@@ -40,8 +40,7 @@ in  Pipeline.build
                   ([] : List Text)
                   (     "sudo apt-get update"
                     ++  " && sudo apt-get install shellcheck"
-                    ++  " && shellcheck scripts/**/*.sh -S ${level} "
-                    ++  " && shellcheck buildkite/scripts/**/*.sh -S ${level} "
+                    ++  " && make check-bash "
                   )
             , label = "Bash: shellcheck"
             , key = "check-bash"
