@@ -4,6 +4,8 @@ let Optional/map = Prelude.Optional.map
 
 let Optional/default = Prelude.Optional.default
 
+let Optional/toList = Prelude.Optional.toList
+
 let DebianRepo
     : Type
     = < Local | PackagesO1Test >
@@ -74,7 +76,7 @@ let keyArg =
 
           in  Optional/default Text "" maybeKey
 
-let keyIdEnv =
+let keyIdEnvList =
           \(repo : DebianRepo)
       ->  let maybeKey =
                 Optional/map
@@ -83,7 +85,7 @@ let keyIdEnv =
                   (\(repo : Text) -> "SIGN=" ++ repo)
                   (keyId repo)
 
-          in  Optional/default Text "" maybeKey
+          in  Optional/toList Text maybeKey
 
 let bucketEnv =
           \(repo : DebianRepo)
@@ -97,7 +99,7 @@ let bucketEnv =
           in  Optional/default Text "" maybeKey
 
 in  { Type = DebianRepo
-    , keyIdEnv = keyIdEnv
+    , keyIdEnvList = keyIdEnvList
     , keyAddressArg = keyAddressArg
     , address = address
     , bucket = bucket
