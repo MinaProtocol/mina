@@ -6,10 +6,12 @@ CLEAR='\033[0m'
 RED='\033[0;31m'
 
 NETWORK=devnet
+TIMEOUT=900
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -n|--network) NETWORK="$2"; shift;;
   -t|--tag) TAG="$2"; shift;;
+  --timeout) TIMEOUT="$2"; shift;;
   -h|--help) usage; exit 0;;
   *) echo "Unknown parameter passed: $1"; usage; exit 1;;
 esac; shift; done
@@ -45,7 +47,7 @@ process_command="docker logs $container_id -f"
 pattern="Added block with state hash"
 
 # Timeout duration in seconds
-timeout_duration=900
+timeout_duration=$TIMEOUT
 
 # Required number of matches
 required_matches=10
