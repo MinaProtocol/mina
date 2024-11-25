@@ -27,7 +27,7 @@ val to_int : t -> int
 
 module One_hot : sig
   module Checked : sig
-    type 'f t = ('f, Vinegar_types.Nat.N3.n) One_hot_vector.t
+    type 'f t = ('f, Vinegar_types.Nat.N3.n) Vinegar_one_hot_vector.t
 
     val to_input :
       'f t -> 'f Snarky_backendless.Cvar.t Random_oracle_input.Chunked.t

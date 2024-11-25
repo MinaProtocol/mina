@@ -110,7 +110,7 @@ end
 
 module One_hot = struct
   module Checked = struct
-    type 'f t = ('f, Vinegar_types.Nat.N3.n) One_hot_vector.t
+    type 'f t = ('f, Vinegar_types.Nat.N3.n) Vinegar_one_hot_vector.t
 
     let to_input (type f) (t : f t) =
       Random_oracle_input.Chunked.packeds
@@ -146,10 +146,10 @@ module One_hot = struct
   open Kimchi_pasta_snarky_backend
 
   let typ : (_ Checked.t, proofs_verified) Step_impl.Typ.t =
-    let module M = One_hot_vector.Make (Step_impl) in
+    let module M = Vinegar_one_hot_vector.Make (Step_impl) in
     Step_impl.Typ.transport (M.typ Vinegar_types.Nat.N3.n) ~there ~back
 
   let wrap_typ : (_ Checked.t, proofs_verified) Wrap_impl.Typ.t =
-    let module M = One_hot_vector.Make (Wrap_impl) in
+    let module M = Vinegar_one_hot_vector.Make (Wrap_impl) in
     Wrap_impl.Typ.transport (M.typ Vinegar_types.Nat.N3.n) ~there ~back
 end
