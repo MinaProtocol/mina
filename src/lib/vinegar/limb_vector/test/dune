@@ -5,7 +5,7 @@
   -open Core_kernel
   -open Limb_vector
   )
- (package pickles)
+ (package vinegar)
  (preprocess (pps ppx_jane))
- (libraries alcotest core_kernel pickles pickles.limb_vector)
+ (libraries alcotest core_kernel vinegar vinegar.limb_vector)
  (action (run %{test})))

@@ -1,6 +1,6 @@
 type 'f t = 'f Snarky_backendless.Cvar.t
 
-module Constant : module type of Constant.Make (Pickles_types.Nat.N2)
+module Constant : module type of Constant.Make (Vinegar_types.Nat.N2)
 
 module type S = sig
   module Impl : Snarky_backendless.Snark_intf.Run

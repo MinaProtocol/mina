@@ -1,7 +1,7 @@
 open Core_kernel
-open Pickles_types
+open Vinegar_types
 
-module T (Impl : Snarky_backendless.Snark_intf.Run) (N : Pickles_types.Nat.Intf) =
+module T (Impl : Snarky_backendless.Snark_intf.Run) (N : Vinegar_types.Nat.Intf) =
 struct
   open Impl
 

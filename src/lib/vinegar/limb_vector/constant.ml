@@ -1,5 +1,5 @@
 open Core_kernel
-open Pickles_types
+open Vinegar_types
 
 type 'n t = (Int64.t, 'n) Vector.t [@@deriving sexp_of]
 
@@ -61,7 +61,7 @@ module Hex64 = struct
   end]
 end
 
-module Make (N : Pickles_types.Nat.Intf) = struct
+module Make (N : Vinegar_types.Nat.Intf) = struct
   module A = Vector.With_length (N)
 
   let length = 64 * Nat.to_int N.n

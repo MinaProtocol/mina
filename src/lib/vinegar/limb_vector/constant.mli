@@ -24,17 +24,17 @@ module Hex64 : sig
       type nonrec t = t
       [@@deriving compare, sexp, yojson, hash, equal, bin_shape, bin_io]
 
-      include Pickles_types.Sigs.VERSIONED
+      include Vinegar_types.Sigs.VERSIONED
     end
   end
 end
 
-module Make (N : Pickles_types.Nat.Intf) : sig
-  module A : module type of Pickles_types.Vector.With_length (N)
+module Make (N : Vinegar_types.Nat.Intf) : sig
+  module A : module type of Vinegar_types.Vector.With_length (N)
 
   val length : int
 
-  type t = (Hex64.t, N.n) Pickles_types.Vector.vec
+  type t = (Hex64.t, N.n) Vinegar_types.Vector.vec
   [@@deriving sexp, compare, yojson, hash, equal]
 
   val to_bits : t -> bool list

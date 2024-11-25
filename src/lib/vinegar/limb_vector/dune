@@ -1,6 +1,6 @@
 (library
  (name limb_vector)
- (public_name pickles.limb_vector)
+ (public_name vinegar.limb_vector)
  (flags
    (:standard
     -w +a-40..42-44
@@ -18,8 +18,8 @@
    result
    ;; local libraries
    snarky.backendless
-   pickles.backend
-   pickles_types
+   vinegar.backend
+   vinegar_types
    kimchi_pasta
    kimchi_pasta.basic
    ppx_version.runtime

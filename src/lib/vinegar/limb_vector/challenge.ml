@@ -1,4 +1,4 @@
-open Pickles_types
+open Vinegar_types
 
 type 'f t = 'f Snarky_backendless.Cvar.t
 

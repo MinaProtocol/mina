@@ -1,9 +1,9 @@
 (* Testing
    -------
 
-   Component: Pickles / Limb_vector
+   Component: Vinegar / Limb_vector
    Subject: Test Constant (Hex64)
-   Invocation: dune exec src/lib/pickles/limb_vector/test/test_constant.exe
+   Invocation: dune exec src/lib/vinegar/limb_vector/test/test_constant.exe
 *)
 
 let test_hex_conversion () =
