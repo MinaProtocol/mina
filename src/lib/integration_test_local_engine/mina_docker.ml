@@ -54,7 +54,6 @@ module Network_config = struct
          ; num_archive_nodes
          ; log_precomputed_blocks (* ; num_plain_nodes *)
          ; start_filtered_logs
-         ; proof_config
          ; _
          }
           : Test_config.t ) =
@@ -71,8 +70,8 @@ module Network_config = struct
         "All nodes in testnet must have unique names.  Check to make sure you \
          are not using the same node_name more than once" ;
     let genesis_ledger = Genesis_ledger.create test_config.genesis_ledger in
-    let constraint_constants =
-      Genesis_ledger_helper.make_constraint_constants
+    let runtime_config =
+      Runtime_config_builder.create ~test_config ~genesis_ledger
     in
     let constraint_constants =
       Runtime_config.make_constraint_constants constants.constraint_constants

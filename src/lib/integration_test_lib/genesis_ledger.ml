@@ -36,22 +36,11 @@ let create (config : Test_config.Test_account.t list) =
        sure you are not using the same account_name more than once" ;
   let keypairs =
     List.take
+      (* the first keypair is the genesis winner and is assumed to be untimed.
+         Therefore dropping it, and not assigning it to any block producer *)
       (List.tl_exn
          (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs)) )
       (List.length config)
-  in
-  let runtime_timing_of_timing = function
-    | Mina_base.Account.Timing.Untimed ->
-        None
-    | Timed t ->
-        Some
-          { Runtime_config.Accounts.Single.Timed.initial_minimum_balance =
-              t.initial_minimum_balance
-          ; cliff_time = t.cliff_time
-          ; cliff_amount = t.cliff_amount
-          ; vesting_period = t.vesting_period
-          ; vesting_increment = t.vesting_increment
-          }
   in
   let add_accounts accounts_and_keypairs =
     List.map accounts_and_keypairs
@@ -70,7 +59,9 @@ let create (config : Test_config.Test_account.t list) =
           { default with
             pk = Public_key.Compressed.to_string pk
           ; sk = Some (Private_key.to_base58_check sk)
-          ; balance = Balance.of_mina_string_exn balance
+          ; balance =
+              Balance.of_mina_string_exn balance
+              (* delegation currently unsupported *)
           ; delegate = None
           ; timing
           ; permissions =

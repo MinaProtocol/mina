@@ -26,7 +26,7 @@ let create ~(test_config : Test_config.t) ~(genesis_ledger : Genesis_ledger.t) =
         ; slots_per_sub_window = Some test_config.slots_per_sub_window
         ; grace_period_slots = Some test_config.grace_period_slots
         ; genesis_state_timestamp =
-            Some Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
+            Some (Core.Time.(now ()) |> Genesis_constants.of_time)
         }
   ; proof =
       Some test_config.proof_config (* TODO: prebake ledger and only set hash *)
