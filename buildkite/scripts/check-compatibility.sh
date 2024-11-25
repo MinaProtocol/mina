@@ -67,7 +67,7 @@ function boot_and_sync {
 
     if [ ! -z $PEER_ID ] && [ ! -z $PEER_PORT ]; then
 	echo "Running with peer" $PEER_ID "on port" $PEER_PORT
-	PEER_FLAG="--peer /ip4/127.0.0.1/tcp/"$PEER_PORT"/p2p/"$PEER_ID
+	PEER_FLAG="--peer /ip4/127.0.0.1/tcp/$PEER_PORT/p2p/"$PEER_ID
 	SEED_FLAG=""
     else
 	echo "Running as seed"
@@ -94,7 +94,7 @@ function boot_and_sync {
         # "connection refused" until GraphQL server up
         GOT_SYNC_STATUS=$(echo ${SYNC_STATUS} | grep "syncStatus")
         if [ ! -z $GOT_SYNC_STATUS ]; then
-            echo $(date +'%Y-%m-%d %H:%M:%S') ". Sync status:" $GOT_SYNC_STATUS
+            echo "$(date +'%Y-%m-%d %H:%M:%S')" ". Sync status:" $GOT_SYNC_STATUS
         fi
 
         SYNCED=$(echo ${SYNC_STATUS} | grep -c "SYNCED")

@@ -10,6 +10,7 @@ CLEAR='\033[0m'
 RED='\033[0;31m'
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+# shellcheck disable=SC1090
 source ${SCRIPTPATH}/helper.sh
 
 function usage() {
@@ -30,19 +31,18 @@ function usage() {
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
-  exit 1
 }
 
 while [[ "$#" -gt 0 ]]; do case $1 in
-  -s|--service) SERVICE="$2"; shift;;
-  -v|--version) VERSION="$2"; shift;;
-  -n|--network) NETWORK="--build-arg network=$2"; shift;;
-  --deb-codename) DEB_CODENAME="--build-arg deb_codename=$2"; shift;;
-  --deb-version) DEB_VERSION="--build-arg deb_version=$2"; shift;;
-  --deb-profile) DEB_PROFILE="$2"; shift;;
-  --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
-  --help) usage; exit 0;;
-  *) echo "Unknown parameter passed: $1"; exit 1;;
+  -s|--service) export SERVICE="$2"; shift;;
+  -v|--version) export VERSION="$2"; shift;;
+  -n|--network) export NETWORK="--build-arg network=$2"; shift;;
+  --deb-codename) export DEB_CODENAME="--build-arg deb_codename=$2"; shift;;
+  --deb-version) export DEB_VERSION="--build-arg deb_version=$2"; shift;;
+  --deb-profile) export DEB_PROFILE="$2"; shift;;
+  --deb-build-flags) export DEB_BUILD_FLAGS="$2"; shift;;
+  --help) usage "$@"; exit 0;;
+  *) echo "Unknown parameter passed: $1"; usage "$@"; exit 1;;
 esac; shift; done
 
 export_version
