@@ -21,3 +21,7 @@ val rpc_handshake_timeout_sec : float
 val rpc_heartbeat_timeout_sec : float
 
 val rpc_heartbeat_send_every_sec : float
+
+val sync_ledger_max_subtree_depth : int
+
+val sync_ledger_default_subtree_depth : int
