@@ -5,9 +5,9 @@ module Stable : sig
     type t = Pow_2_roots_of_unity of int
     [@@unboxed] [@@deriving sexp, equal, compare, hash, yojson]
 
-    include Pickles_types.Sigs.Binable.S with type t := t
+    include Vinegar_types.Sigs.Binable.S with type t := t
 
-    include Pickles_types.Sigs.VERSIONED
+    include Vinegar_types.Sigs.VERSIONED
   end
 
   module Latest = V1

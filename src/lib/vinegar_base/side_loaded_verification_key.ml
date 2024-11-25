@@ -1,5 +1,5 @@
 open Core_kernel
-open Pickles_types
+open Vinegar_types
 
 let bits ~len n = List.init len ~f:(fun i -> (n lsr i) land 1 = 1)
 
@@ -145,7 +145,7 @@ module Poly = struct
             ( 'g
             , 'proofs_verified
             , 'vk )
-            Mina_wire_types.Pickles_base.Side_loaded_verification_key.Poly.V2.t =
+            Mina_wire_types.Vinegar_base.Side_loaded_verification_key.Poly.V2.t =
         { max_proofs_verified : 'proofs_verified
         ; actual_wrap_domain_size : 'proofs_verified
         ; wrap_index : 'g Plonk_verification_key_evals.Stable.V2.t
