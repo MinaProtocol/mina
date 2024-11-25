@@ -3,7 +3,7 @@ open Core_kernel
 module Limbs = Nat.N4
 
 module Constant = struct
-  include Limb_vector.Constant.Make (Limbs)
+  include Vinegar_limb_vector.Constant.Make (Limbs)
 
   [%%versioned
   module Stable = struct
@@ -11,7 +11,7 @@ module Constant = struct
 
     module V1 = struct
       type t =
-        Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_4.Stable.V1.t
+        Vinegar_limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_4.Stable.V1.t
       [@@deriving compare, sexp, yojson, hash, equal]
 
       let to_latest = Fn.id

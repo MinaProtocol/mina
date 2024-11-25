@@ -1199,11 +1199,11 @@ module Step : sig
       val typ :
            ('b, 'c) Step_impl.Typ.t
         -> assert_16_bits:(Step_impl.Field.t -> unit)
-        -> ( ( Step_impl.Field.Constant.t Limb_vector.Challenge.t
-             , Step_impl.Field.Constant.t Limb_vector.Challenge.t
+        -> ( ( Step_impl.Field.Constant.t Vinegar_limb_vector.Challenge.t
+             , Step_impl.Field.Constant.t Vinegar_limb_vector.Challenge.t
                Scalar_challenge.t
              , 'b
-             , ( Step_impl.Field.Constant.t Limb_vector.Challenge.t
+             , ( Step_impl.Field.Constant.t Vinegar_limb_vector.Challenge.t
                  Scalar_challenge.t
                  Bulletproof_challenge.t
                , Backend.Tock.Rounds.n )
@@ -1211,10 +1211,10 @@ module Step : sig
              , Step_impl.Field.t
              , Step_impl.Boolean.var )
              In_circuit.t
-           , ( Limb_vector.Challenge.Constant.t
-             , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+           , ( Vinegar_limb_vector.Challenge.Constant.t
+             , Vinegar_limb_vector.Challenge.Constant.t Scalar_challenge.t
              , 'c
-             , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+             , ( Vinegar_limb_vector.Challenge.Constant.t Scalar_challenge.t
                  Bulletproof_challenge.t
                , Backend.Tock.Rounds.n )
                Vector.t
@@ -1246,11 +1246,11 @@ module Step : sig
          assert_16_bits:(Wrap_impl.Field.t -> unit)
       -> (Opt.Flag.t Plonk_types.Features.t, 'n) Vector.t
       -> ('b, 'a) Wrap_impl.Typ.t
-      -> ( ( ( ( Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
-               , Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
+      -> ( ( ( ( Wrap_impl.Field.Constant.t Vinegar_limb_vector.Challenge.t
+               , Wrap_impl.Field.Constant.t Vinegar_limb_vector.Challenge.t
                  Scalar_challenge.t
                , 'b
-               , ( Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
+               , ( Wrap_impl.Field.Constant.t Vinegar_limb_vector.Challenge.t
                    Scalar_challenge.t
                    Bulletproof_challenge.t
                  , Backend.Tock.Rounds.n )
@@ -1262,10 +1262,10 @@ module Step : sig
              Vector.t
            , Wrap_impl.Field.t )
            t
-         , ( ( ( Limb_vector.Challenge.Constant.t
-               , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+         , ( ( ( Vinegar_limb_vector.Challenge.Constant.t
+               , Vinegar_limb_vector.Challenge.Constant.t Scalar_challenge.t
                , 'a
-               , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+               , ( Vinegar_limb_vector.Challenge.Constant.t Scalar_challenge.t
                    Bulletproof_challenge.t
                  , Backend.Tock.Rounds.n )
                  Vector.t

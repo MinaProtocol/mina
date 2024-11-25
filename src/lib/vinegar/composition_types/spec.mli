@@ -86,15 +86,15 @@ val typ :
        ; branch_data1 : Branch_data.t
        ; branch_data2 : Step_impl.Field.Constant.t Branch_data.Checked.t
        ; bulletproof_challenge1 :
-           Limb_vector.Challenge.Constant.t
+           Vinegar_limb_vector.Challenge.Constant.t
            Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
-           Step_impl.Field.Constant.t Limb_vector.Challenge.t
+           Step_impl.Field.Constant.t Vinegar_limb_vector.Challenge.t
            Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
-       ; challenge1 : Limb_vector.Challenge.Constant.t
-       ; challenge2 : Step_impl.Field.Constant.t Limb_vector.Challenge.t
+       ; challenge1 : Vinegar_limb_vector.Challenge.Constant.t
+       ; challenge2 : Step_impl.Field.Constant.t Vinegar_limb_vector.Challenge.t
        ; digest1 : Digest.Constant.t
        ; digest2 : Step_impl.Field.t
        ; field1 : 'c
@@ -113,15 +113,15 @@ val wrap_typ :
        ; branch_data1 : Branch_data.t
        ; branch_data2 : Wrap_impl.Field.Constant.t Branch_data.Checked.t
        ; bulletproof_challenge1 :
-           Limb_vector.Challenge.Constant.t
+           Vinegar_limb_vector.Challenge.Constant.t
            Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
-           Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
+           Wrap_impl.Field.Constant.t Vinegar_limb_vector.Challenge.t
            Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
-       ; challenge1 : Limb_vector.Challenge.Constant.t
-       ; challenge2 : Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
+       ; challenge1 : Vinegar_limb_vector.Challenge.Constant.t
+       ; challenge2 : Wrap_impl.Field.Constant.t Vinegar_limb_vector.Challenge.t
        ; digest1 : Digest.Constant.t
        ; digest2 : Wrap_impl.Field.t
        ; field1 : 'c
@@ -156,13 +156,13 @@ val packed_typ :
        ; branch_data1 : Branch_data.t
        ; branch_data2 : Step_impl.Field.t
        ; bulletproof_challenge1 :
-           Limb_vector.Challenge.Constant.t
+           Vinegar_limb_vector.Challenge.Constant.t
            Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
            Step_impl.Field.t Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
-       ; challenge1 : Limb_vector.Challenge.Constant.t
+       ; challenge1 : Vinegar_limb_vector.Challenge.Constant.t
        ; challenge2 : Step_impl.Field.t
        ; digest1 : Digest.Constant.t
        ; digest2 : Step_impl.Field.t
@@ -181,13 +181,13 @@ val wrap_packed_typ :
        ; branch_data1 : Branch_data.t
        ; branch_data2 : Wrap_impl.Field.t
        ; bulletproof_challenge1 :
-           Limb_vector.Challenge.Constant.t
+           Vinegar_limb_vector.Challenge.Constant.t
            Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
            Wrap_impl.Field.t Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
-       ; challenge1 : Limb_vector.Challenge.Constant.t
+       ; challenge1 : Vinegar_limb_vector.Challenge.Constant.t
        ; challenge2 : Wrap_impl.Field.t
        ; digest1 : Digest.Constant.t
        ; digest2 : Wrap_impl.Field.t
@@ -207,14 +207,14 @@ val pack :
        ; branch_data1 : Branch_data.t
        ; branch_data2 : 'f Branch_data.Checked.t
        ; bulletproof_challenge1 :
-           Limb_vector.Challenge.Constant.t
+           Vinegar_limb_vector.Challenge.Constant.t
            Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
-           'f Limb_vector.Challenge.t Kimchi_backend_common.Scalar_challenge.t
+           'f Vinegar_limb_vector.Challenge.t Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
-       ; challenge1 : Limb_vector.Challenge.Constant.t
-       ; challenge2 : 'f Limb_vector.Challenge.t
+       ; challenge1 : Vinegar_limb_vector.Challenge.Constant.t
+       ; challenge2 : 'f Vinegar_limb_vector.Challenge.t
        ; digest1 : Digest.Constant.t
        ; digest2 : 'f Snarky_backendless.Cvar.t
        ; field1 : 'c

@@ -160,7 +160,7 @@ module Wrap_etyp = Make_ETyp (Kimchi_pasta_snarky_backend.Wrap_impl)
 
 module Common (Impl : Snarky_backendless.Snark_intf.Run) = struct
   module Digest = D.Make (Impl)
-  module Challenge = Limb_vector.Challenge.Make (Impl)
+  module Challenge = Vinegar_limb_vector.Challenge.Make (Impl)
   open Impl
 
   module Env = struct
