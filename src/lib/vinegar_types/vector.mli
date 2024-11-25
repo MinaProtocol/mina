@@ -1,4 +1,4 @@
-(** Typed size vectors for Pickles. The size of the vector is encoded at the
+(** Typed size vectors for Vinegar. The size of the vector is encoded at the
     type level.
     The module also provides common methods available for built-in lists ['a
     list] like [map], [iter], etc.
@@ -8,7 +8,7 @@
 
 (** Encode a vector at the type level with its size *)
 module T : sig
-  type ('a, 'b) t = ('a, 'b) Mina_wire_types.Pickles_types.Vector.t =
+  type ('a, 'b) t = ('a, 'b) Mina_wire_types.Vinegar_types.Vector.t =
     | [] : ('a, Nat.z) t
     | ( :: ) : 'a * ('a, 'n) t -> ('a, 'n Nat.s) t
 end
@@ -198,21 +198,21 @@ val for_all : ('a, 'n) t -> f:('a -> bool) -> bool
     [v1] is of size [n] and [v2] is of size [m] where [length v = n + m] and [v1
     || v2 = v].
 
-    [n] must have been constructed using {Pickles_types.Nat.I.add} whose result
+    [n] must have been constructed using {Vinegar_types.Nat.I.add} whose result
     is equal the length of [v].
     More concretely:
     ```
-    let six = Pickles_types.Nat.N6.n in
-    let eleven = Pickles_types.Nat.N11.n in
-    let v = Pickles_types.Vector.init eleven ~f:(fun i -> i) in
+    let six = Vinegar_types.Nat.N6.n in
+    let eleven = Vinegar_types.Nat.N11.n in
+    let v = Vinegar_types.Vector.init eleven ~f:(fun i -> i) in
     (* will split v into two vectors, the first of size 5 and the second of size
        6
     *)
     let v_five, v_six =
-      Pickles_types.Vector.split
+      Vinegar_types.Vector.split
         (* built using Nat.I.add *)
         v
-        (snd (Pickles_types.Nat.N5.add six))
+        (snd (Vinegar_types.Nat.N5.add six))
     in
     [...]
     ```

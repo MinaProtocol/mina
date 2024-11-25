@@ -1,6 +1,6 @@
 (library
- (name pickles_types)
- (public_name pickles_types)
+ (name vinegar_types)
+ (public_name vinegar_types)
  ; Deactivated warnings
  ;
  ; 40: name-out-scope (activate later)

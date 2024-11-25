@@ -42,7 +42,7 @@ module Features : sig
   module Stable : sig
     module V1 : sig
       type 'bool t =
-            'bool Mina_wire_types.Pickles_types.Plonk_types.Features.V1.t =
+            'bool Mina_wire_types.Vinegar_types.Plonk_types.Features.V1.t =
         { range_check0 : 'bool
         ; range_check1 : 'bool
         ; foreign_field_add : 'bool
@@ -139,7 +139,7 @@ module Messages : sig
     module Stable : sig
       module V1 : sig
         type 'g t =
-              'g Mina_wire_types.Pickles_types.Plonk_types.Messages.Lookup.V1.t =
+              'g Mina_wire_types.Vinegar_types.Plonk_types.Messages.Lookup.V1.t =
           { sorted : 'g array; aggreg : 'g; runtime : 'g option }
         [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
       end
@@ -173,7 +173,7 @@ module Messages : sig
           - [lookup] contains the commitments to the polynomials involved the
             lookup arguments.
       *)
-      type 'g t = 'g Mina_wire_types.Pickles_types.Plonk_types.Messages.V2.t =
+      type 'g t = 'g Mina_wire_types.Vinegar_types.Plonk_types.Messages.V2.t =
         { w_comm : 'g Poly_comm.Without_degree_bound.t Columns_vec.t
         ; z_comm : 'g Poly_comm.Without_degree_bound.t
         ; t_comm : 'g Poly_comm.Without_degree_bound.t
@@ -273,7 +273,7 @@ module Evals : sig
       -> unit
   end
 
-  type 'a t = 'a Mina_wire_types.Pickles_types.Plonk_types.Evals.V2.t =
+  type 'a t = 'a Mina_wire_types.Vinegar_types.Plonk_types.Evals.V2.t =
     { w : 'a Columns_vec.t
     ; coefficients : 'a Columns_vec.t
     ; z : 'a
@@ -328,7 +328,7 @@ module Openings : sig
         type ('g, 'fq) t =
               ( 'g
               , 'fq )
-              Mina_wire_types.Pickles_types.Plonk_types.Openings.Bulletproof.V1
+              Mina_wire_types.Vinegar_types.Plonk_types.Openings.Bulletproof.V1
               .t =
           { lr : ('g * 'g) array
           ; z_1 : 'fq
@@ -359,7 +359,7 @@ module Openings : sig
             ( 'g
             , 'fq
             , 'fqv )
-            Mina_wire_types.Pickles_types.Plonk_types.Openings.V2.t =
+            Mina_wire_types.Vinegar_types.Plonk_types.Openings.V2.t =
         { proof : ('g, 'fq) Bulletproof.t
         ; evals : ('fqv * 'fqv) Evals.t
         ; ft_eval1 : 'fq
@@ -374,7 +374,7 @@ module Proof : sig
   module Stable : sig
     module V2 : sig
       type ('g, 'fq, 'fqv) t =
-            ('g, 'fq, 'fqv) Mina_wire_types.Pickles_types.Plonk_types.Proof.V2.t =
+            ('g, 'fq, 'fqv) Mina_wire_types.Vinegar_types.Plonk_types.Proof.V2.t =
         { messages : 'g Messages.Stable.V2.t
         ; openings : ('g, 'fq, 'fqv) Openings.t
         }
@@ -397,7 +397,7 @@ module All_evals : sig
     type ('f, 'f_multi) t =
           ( 'f
           , 'f_multi )
-          Mina_wire_types.Pickles_types.Plonk_types.All_evals.With_public_input
+          Mina_wire_types.Vinegar_types.Plonk_types.All_evals.With_public_input
           .V1
           .t =
       { public_input : 'f; evals : 'f_multi Evals.t }
@@ -437,7 +437,7 @@ module All_evals : sig
   end
 
   type ('f, 'f_multi) t =
-        ('f, 'f_multi) Mina_wire_types.Pickles_types.Plonk_types.All_evals.V1.t =
+        ('f, 'f_multi) Mina_wire_types.Vinegar_types.Plonk_types.All_evals.V1.t =
     { evals : ('f_multi * 'f_multi, 'f_multi * 'f_multi) With_public_input.t
     ; ft_eval1 : 'f
     }

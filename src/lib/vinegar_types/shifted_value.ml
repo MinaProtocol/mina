@@ -99,7 +99,7 @@ module Type1 = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'f t = 'f Mina_wire_types.Pickles_types.Shifted_value.Type1.V1.t =
+      type 'f t = 'f Mina_wire_types.Vinegar_types.Shifted_value.Type1.V1.t =
         | Shifted_value of 'f
       [@@deriving sexp, compare, equal, yojson, hash]
     end

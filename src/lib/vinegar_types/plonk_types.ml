@@ -219,7 +219,7 @@ module Features = struct
   module Stable = struct
     module V1 = struct
       type 'bool t =
-            'bool Mina_wire_types.Pickles_types.Plonk_types.Features.V1.t =
+            'bool Mina_wire_types.Vinegar_types.Plonk_types.Features.V1.t =
         { range_check0 : 'bool
         ; range_check1 : 'bool
         ; foreign_field_add : 'bool
@@ -488,7 +488,7 @@ module Evals = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type 'a t = 'a Mina_wire_types.Pickles_types.Plonk_types.Evals.V2.t =
+      type 'a t = 'a Mina_wire_types.Vinegar_types.Plonk_types.Evals.V2.t =
         { w : 'a Columns_vec.Stable.V1.t
         ; coefficients : 'a Columns_vec.Stable.V1.t
         ; z : 'a
@@ -1291,7 +1291,7 @@ module All_evals = struct
         type ('f, 'f_multi) t =
               ( 'f
               , 'f_multi )
-              Mina_wire_types.Pickles_types.Plonk_types.All_evals
+              Mina_wire_types.Vinegar_types.Plonk_types.All_evals
               .With_public_input
               .V1
               .t =
@@ -1347,7 +1347,7 @@ module All_evals = struct
   end]
 
   type ('f, 'f_multi) t =
-        ('f, 'f_multi) Mina_wire_types.Pickles_types.Plonk_types.All_evals.V1.t =
+        ('f, 'f_multi) Mina_wire_types.Vinegar_types.Plonk_types.All_evals.V1.t =
     { evals : ('f_multi * 'f_multi, 'f_multi * 'f_multi) With_public_input.t
     ; ft_eval1 : 'f
     }
@@ -1411,7 +1411,7 @@ module Openings = struct
         type ('g, 'fq) t =
               ( 'g
               , 'fq )
-              Mina_wire_types.Pickles_types.Plonk_types.Openings.Bulletproof.V1
+              Mina_wire_types.Vinegar_types.Plonk_types.Openings.Bulletproof.V1
               .t =
           { lr : ('g * 'g) Bounded_types.ArrayN16.Stable.V1.t
           ; z_1 : 'fq
@@ -1445,7 +1445,7 @@ module Openings = struct
             ( 'g
             , 'fq
             , 'fqv )
-            Mina_wire_types.Pickles_types.Plonk_types.Openings.V2.t =
+            Mina_wire_types.Vinegar_types.Plonk_types.Openings.V2.t =
         { proof : ('g, 'fq) Bulletproof.Stable.V1.t
         ; evals : ('fqv * 'fqv) Evals.Stable.V2.t
         ; ft_eval1 : 'fq
@@ -1535,7 +1535,7 @@ module Messages = struct
 
       module V1 = struct
         type 'g t =
-              'g Mina_wire_types.Pickles_types.Plonk_types.Messages.Lookup.V1.t =
+              'g Mina_wire_types.Vinegar_types.Plonk_types.Messages.Lookup.V1.t =
           { sorted : 'g Bounded_types.ArrayN16.Stable.V1.t
           ; aggreg : 'g
           ; runtime : 'g option
@@ -1606,7 +1606,7 @@ module Messages = struct
     [@@@no_toplevel_latest_type]
 
     module V2 = struct
-      type 'g t = 'g Mina_wire_types.Pickles_types.Plonk_types.Messages.V2.t =
+      type 'g t = 'g Mina_wire_types.Vinegar_types.Plonk_types.Messages.V2.t =
         { w_comm : 'g Without_degree_bound.Stable.V1.t Columns_vec.Stable.V1.t
         ; z_comm : 'g Without_degree_bound.Stable.V1.t
         ; t_comm : 'g Without_degree_bound.Stable.V1.t
@@ -1689,7 +1689,7 @@ module Proof = struct
 
     module V2 = struct
       type ('g, 'fq, 'fqv) t =
-            ('g, 'fq, 'fqv) Mina_wire_types.Pickles_types.Plonk_types.Proof.V2.t =
+            ('g, 'fq, 'fqv) Mina_wire_types.Vinegar_types.Plonk_types.Proof.V2.t =
         { messages : 'g Messages.Stable.V2.t
         ; openings : ('g, 'fq, 'fqv) Openings.Stable.V2.t
         }
