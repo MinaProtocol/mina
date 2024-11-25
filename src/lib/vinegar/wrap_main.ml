@@ -178,14 +178,14 @@ let wrap_main
             Util.ones_vector
               (module Impl)
               ~first_zero:
-                (Wrap_verifier.Pseudo.choose
+                (Wrap_verifier.Vinegar_pseudo.choose
                    (which_branch, step_widths)
                    ~f:Field.of_int )
               Max_proofs_verified.n
             |> Vector.rev
           in
           let domain_log2 =
-            Wrap_verifier.Pseudo.choose
+            Wrap_verifier.Vinegar_pseudo.choose
               ( which_branch
               , Vector.map ~f:(fun ds -> Domain.log2_size ds.h) step_domains )
               ~f:Field.of_int
@@ -376,7 +376,7 @@ let wrap_main
                           Wrap_verifier.Vinegar_one_hot_vector.of_index index
                             ~length:Wrap_verifier.num_possible_domains
                         in
-                        Wrap_verifier.Pseudo.Domain.to_domain ~shifts
+                        Wrap_verifier.Vinegar_pseudo.Domain.to_domain ~shifts
                           ~domain_generator
                           (which_branch, all_possible_domains) )
                   in

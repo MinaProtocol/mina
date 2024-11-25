@@ -644,7 +644,7 @@ struct
         (Boolean.true_, Field.((finite :> t) * x, (finite :> t) * y)) )
       ty t
 
-  module Pseudo = Pseudo.Make (Impl)
+  module Vinegar_pseudo = Vinegar_pseudo.Make (Impl)
 
   let mask (type n) (lengths : (int, n) Vector.t) (choice : n Vinegar_one_hot_vector.t)
       : Boolean.var array =
@@ -652,7 +652,7 @@ struct
       Option.value_exn
         (List.max_elt ~compare:Int.compare (Vector.to_list lengths))
     in
-    let length = Pseudo.choose (choice, lengths) ~f:Field.of_int in
+    let length = Vinegar_pseudo.choose (choice, lengths) ~f:Field.of_int in
     let (T max) = Nat.of_int max in
     Vector.to_array (ones_vector (module Impl) ~first_zero:length max)
 

@@ -30,7 +30,7 @@ end
 
 module Vinegar_one_hot_vector : module type of Vinegar_one_hot_vector.Make (Impls.Wrap)
 
-module Pseudo : module type of Pseudo.Make (Impls.Wrap)
+module Vinegar_pseudo : module type of Vinegar_pseudo.Make (Impls.Wrap)
 
 module Opt : sig
   include module type of

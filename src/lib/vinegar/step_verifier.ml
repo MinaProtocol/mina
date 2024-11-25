@@ -633,14 +633,14 @@ struct
 
   let challenge_polynomial = Wrap_verifier.challenge_polynomial (module Field)
 
-  module Pseudo = Pseudo.Make (Impl)
+  module Vinegar_pseudo = Vinegar_pseudo.Make (Impl)
 
   (* module Bounded = struct
        type t = { max : int; actual : Field.t }
 
-       let _of_pseudo ((_, ns) as p : _ Pseudo.t) =
+       let _of_pseudo ((_, ns) as p : _ Vinegar_pseudo.t) =
          { max = Vector.reduce_exn ~f:Int.max ns
-         ; actual = Pseudo.choose p ~f:Field.of_int
+         ; actual = Vinegar_pseudo.choose p ~f:Field.of_int
          }
      end *)
 
@@ -675,8 +675,8 @@ struct
           ( O.of_index log2_size ~length:(S max_n)
           , Vector.init (S max_n) ~f:Fn.id )
         in
-        let shifts = Pseudo.Domain.shifts log2_sizes ~shifts in
-        let generator = Pseudo.Domain.generator log2_sizes ~domain_generator in
+        let shifts = Vinegar_pseudo.Domain.shifts log2_sizes ~shifts in
+        let generator = Vinegar_pseudo.Domain.generator log2_sizes ~domain_generator in
         let vanishing_polynomial = vanishing_polynomial mask in
         object
           method log2_size = log2_size
@@ -703,7 +703,7 @@ struct
            Option.value_exn
              (List.max_elt ~compare:Int.compare (Vector.to_list lengths))
          in
-         let actual = Pseudo.choose (choice, lengths) ~f:Field.of_int in
+         let actual = Vinegar_pseudo.choose (choice, lengths) ~f:Field.of_int in
          mask' { max; actual }
 
        let _last =
@@ -809,7 +809,7 @@ struct
       |> O.of_vector_unsafe
       (* This should be ok... think it through a little more *)
     in
-    Pseudo.Domain.to_domain
+    Vinegar_pseudo.Domain.to_domain
       (which_log2, unique_domains)
       ~shifts ~domain_generator
 

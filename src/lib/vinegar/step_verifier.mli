@@ -10,7 +10,7 @@ module Scalar_challenge :
         (Challenge)
         (Endo.Step_inner_curve)
 
-module Pseudo : module type of Pseudo.Make (Step_main_inputs.Impl)
+module Vinegar_pseudo : module type of Vinegar_pseudo.Make (Step_main_inputs.Impl)
 
 module Inner_curve : sig
   type t = Step_main_inputs.Inner_curve.t

@@ -16,7 +16,7 @@ let _one_hot_vector_to_num (type n) (v : n Per_proof_witness.Vinegar_one_hot_vec
     Field.t =
   let n = Vector.length (v :> (Boolean.var, n) Vector.t) in
   let open Step_verifier in
-  Pseudo.choose (v, Vector.init n ~f:Field.of_int) ~f:Fn.id
+  Vinegar_pseudo.choose (v, Vector.init n ~f:Field.of_int) ~f:Fn.id
 
 let verify_one ~srs
     ({ app_state
