@@ -1,6 +1,6 @@
 (library
  (name plonk_checks)
- (public_name pickles.plonk_checks)
+ (public_name vinegar.plonk_checks)
  (instrumentation (backend bisect_ppx))
  (flags
   (:standard
@@ -16,9 +16,9 @@
    ocaml-migrate-parsetree
    base.base_internalhash_types
    ;; local libraries
-   pickles_types
-   pickles_base
-   pickles.composition_types
+   vinegar_types
+   vinegar_base
+   vinegar.composition_types
    kimchi_backend
    kimchi_types
    snarky.backendless

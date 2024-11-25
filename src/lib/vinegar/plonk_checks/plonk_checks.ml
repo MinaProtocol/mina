@@ -1,6 +1,6 @@
 open Core_kernel
-open Pickles_types
-open Pickles_base
+open Vinegar_types
+open Vinegar_base
 module Scalars = Scalars
 module Domain = Domain
 module Opt = Opt

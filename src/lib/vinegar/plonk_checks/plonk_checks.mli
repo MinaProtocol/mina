@@ -1,4 +1,4 @@
-open Pickles_types
+open Vinegar_types
 
 (** The default number of chunks in a circuit is one (< 2^16 rows) *)
 val num_chunks_by_default : int
@@ -8,7 +8,7 @@ val zk_rows_by_default : int
 
 type 'field plonk_domain =
   < vanishing_polynomial : 'field -> 'field
-  ; shifts : 'field Pickles_types.Plonk_types.Shifts.t
+  ; shifts : 'field Vinegar_types.Plonk_types.Shifts.t
   ; generator : 'field >
 
 type 'field domain = < size : 'field ; vanishing_polynomial : 'field -> 'field >
@@ -72,16 +72,16 @@ val domain :
      't field
   -> shifts:(log2_size:int -> 't array)
   -> domain_generator:(log2_size:int -> 't)
-  -> Pickles_base.Domain.t
+  -> Vinegar_base.Domain.t
   -> 't plonk_domain
 
 val evals_of_split_evals :
      'a field
   -> zeta:'a
   -> zetaw:'a
-  -> ('a array * 'a array) Pickles_types.Plonk_types.Evals.t
+  -> ('a array * 'a array) Vinegar_types.Plonk_types.Evals.t
   -> rounds:int
-  -> ('a * 'a) Pickles_types.Plonk_types.Evals.t
+  -> ('a * 'a) Vinegar_types.Plonk_types.Evals.t
 
 val scalars_env :
      (module Bool_intf with type t = 'b)
@@ -96,10 +96,10 @@ val scalars_env :
      , 't
      , 'b )
      Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
-  -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
+  -> ('t * 't, 'a) Vinegar_types.Plonk_types.Evals.In_circuit.t
   -> 't Scalars.Env.t
 
-module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : sig
+module Make (Shifted_value : Vinegar_types.Shifted_value.S) (_ : Scalars.S) : sig
   val ft_eval0 :
        't field
     -> domain:< shifts : 't array ; .. >
@@ -108,7 +108,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
        , 't
        , 'b )
        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
-    -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
+    -> ('t * 't, 'a) Vinegar_types.Plonk_types.Evals.In_circuit.t
     -> 't array
     -> 't
 
@@ -121,12 +121,12 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
        , 't
        , 'b )
        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
-    -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
+    -> ('t * 't, 'a) Vinegar_types.Plonk_types.Evals.In_circuit.t
     -> ( 't
        , 't
        , 't Shifted_value.t
-       , ('t Shifted_value.t, 'b) Pickles_types.Opt.t
-       , ('t, 'b) Pickles_types.Opt.t
+       , ('t Shifted_value.t, 'b) Vinegar_types.Opt.t
+       , ('t, 'b) Vinegar_types.Opt.t
        , 'b )
        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
 
@@ -139,19 +139,19 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
        , 't Snarky_backendless.Cvar.t Shifted_value.t
        , ( 't Snarky_backendless.Cvar.t Shifted_value.t
          , 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
-         Pickles_types.Opt.t
+         Vinegar_types.Opt.t
        , ( 't Snarky_backendless.Cvar.t
          , 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
-         Pickles_types.Opt.t
+         Vinegar_types.Opt.t
        , 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
     -> ( 't Snarky_backendless.Cvar.t * 't Snarky_backendless.Cvar.t
        , 'a )
-       Pickles_types.Plonk_types.Evals.In_circuit.t
+       Vinegar_types.Plonk_types.Evals.In_circuit.t
     -> 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
 end
 
-(** [Domain] is re-exported from library Pickles_base *)
-module Domain = Pickles_base.Domain
+(** [Domain] is re-exported from library Vinegar_base *)
+module Domain = Vinegar_base.Domain
 
 module Scalars = Scalars
