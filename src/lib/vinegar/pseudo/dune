@@ -1,5 +1,5 @@
 (library
- (name pseudo)
+ (name vinegar_pseudo)
  (public_name vinegar.pseudo)
  (flags
   (:standard
