@@ -74,11 +74,10 @@ echo "Publishing debs: ${DEB_NAMES} to Release: ${DEB_RELEASE} and Codename: ${D
 # Upload the deb files to s3.
 # If this fails, attempt to remove the lockfile and retry.
 for _ in {1..10}; do (
-  "${DEBS3_UPLOAD}" \
-     --component "${DEB_RELEASE}" \
-     --codename "${DEB_CODENAME}" \
-     "${DEB_NAMES}"
-) && break || (MINA_DEB_BUCKET=${BUCKET} scripts/debian/clear-s3-lockfile.sh); done
+  ${DEBS3_UPLOAD} --component "${DEB_RELEASE}" --codename "${DEB_CODENAME}" "${DEB_NAMES}"
+) && break || scripts/debian/clear-s3-lockfile.sh; done
+
+debs=()
 
 for deb in $DEB_NAMES
 do
