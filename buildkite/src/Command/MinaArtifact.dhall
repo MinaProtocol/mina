@@ -46,6 +46,7 @@ let MinaBuildSpec =
           , mode : PipelineMode.Type
           , tags : List PipelineTag.Type
           , channel : DebianChannel.Type
+          , debianRepo : DebianRepo.Type
           }
       , default =
           { prefix = "MinaArtifact"
@@ -58,6 +59,7 @@ let MinaBuildSpec =
           , mode = PipelineMode.Type.PullRequest
           , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
           , channel = DebianChannel.Type.Unstable
+          , debianRepo = DebianRepo.Type.Unstable
           }
       }
 
@@ -117,6 +119,8 @@ let publish_to_debian_repo =
                   , "MINA_DEB_CODENAME=${DebianVersions.lowerName
                                            spec.debVersion}"
                   , "MINA_DEB_RELEASE=${DebianChannel.lowerName spec.channel}"
+                  , "${DebianRepo.keyIdEnv spec.debianRepo}"
+                  , "${DebianRepo.bucketEnv spec.debianRepo}"
                   ]
                   "./buildkite/scripts/debian/publish.sh"
             , label =

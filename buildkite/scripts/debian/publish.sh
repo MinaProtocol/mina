@@ -19,4 +19,5 @@ source scripts/debian/publish.sh \
   --names "${DOWNLOAD_FOLDER}/mina-*.deb" \
   --release $MINA_DEB_RELEASE \
   --version $MINA_DEB_VERSION \
-  --codename $MINA_DEB_CODENAME  
+  --codename $MINA_DEB_CODENAME \
+  --bucket $BUCKET
