@@ -77,7 +77,6 @@ for _ in {1..10}; do (
   "${DEBS3_UPLOAD}" \
      --component "${DEB_RELEASE}" \
      --codename "${DEB_CODENAME}" \
-     "${GPG_OPTS}" \
      "${DEB_NAMES}"
 ) && break || (MINA_DEB_BUCKET=${BUCKET} scripts/debian/clear-s3-lockfile.sh); done
 
