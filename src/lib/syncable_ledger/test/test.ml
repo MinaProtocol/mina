@@ -288,7 +288,7 @@ module Make_test_edge_cases (Input : Input_intf) = struct
                write_response answ
            | `Answer answ, _ ->
                write_response answ
-           | `Failure_as_expected ->
+           | `Failure_as_expected, _ ->
                Ivar.fill got_failure_ivar true ;
                Deferred.unit ) ) ;
     Async.Thread_safe.block_on_async_exn (fun () ->
