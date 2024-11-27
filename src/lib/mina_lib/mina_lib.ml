@@ -1269,6 +1269,8 @@ let context ~commit_id (config : Config.t) : (module CONTEXT) =
 
     let compaction_interval = config.compile_config.compaction_interval
 
+    (*Same as config.precomputed_values.compile_config.
+      TODO: Remove redundant fields *)
     let compile_config = config.compile_config
   end )
 
@@ -1621,7 +1623,9 @@ let create ~commit_id ?wallets (config : Config.t) =
                     Vrf_evaluator.create ~commit_id ~constraint_constants
                       ~pids:config.pids ~logger:config.logger
                       ~conf_dir:config.conf_dir ~consensus_constants
-                      ~keypairs:config.block_production_keypairs ) )
+                      ~keypairs:config.block_production_keypairs
+                      ~compile_config:config.precomputed_values.compile_config )
+                )
             >>| Result.ok_exn
           in
           let snark_worker =

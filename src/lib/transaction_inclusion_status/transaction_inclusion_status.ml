@@ -1,4 +1,3 @@
-open Inline_test_quiet_logs
 open Core_kernel
 open Mina_base
 open Mina_transaction
@@ -72,6 +71,20 @@ let%test_module "transaction_status" =
     let frontier_size = 1
 
     let logger = Logger.null ()
+
+    let () =
+      (* Disable log messages from best_tip_diff logger. *)
+      Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+        ~id:Logger.Logger_id.best_tip_diff ~processor:(Logger.Processor.raw ())
+        ~transport:
+          (Logger.Transport.create
+             ( module struct
+               type t = unit
+
+               let transport () _ = ()
+             end )
+             () )
+        ()
 
     let time_controller = Block_time.Controller.basic ~logger
 

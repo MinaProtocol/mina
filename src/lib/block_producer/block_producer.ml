@@ -819,12 +819,17 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                     (Mina_base.State_hash.to_base58_check
                        protocol_state_hashes.state_hash ) )
               ] ;
+          let module Consensus_context = struct
+            include Context
+
+            let compile_config = precomputed_values.compile_config
+          end in
           Internal_tracing.with_state_hash protocol_state_hashes.state_hash
           @@ fun () ->
           Debug_assert.debug_assert (fun () ->
               [%test_result: [ `Take | `Keep ]]
                 (Consensus.Hooks.select
-                   ~context:(module Context)
+                   ~context:(module Consensus_context)
                    ~existing:
                      (With_hash.map ~f:Mina_block.consensus_state
                         previous_transition )
@@ -839,7 +844,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
               in
               [%test_result: [ `Take | `Keep ]]
                 (Consensus.Hooks.select
-                   ~context:(module Context)
+                   ~context:(module Consensus_context)
                    ~existing:root_consensus_state_with_hashes
                    ~candidate:consensus_state_with_hashes )
                 ~expect:`Take
@@ -908,7 +913,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                       `This_block_was_not_received_via_gossip
                 >>= Validation.validate_frontier_dependencies
                       ~to_header:Mina_block.header
-                      ~context:(module Context)
+                      ~context:(module Consensus_context)
                       ~root_block:
                         ( Transition_frontier.root frontier
                         |> Breadcrumb.block_with_hash )
@@ -1412,10 +1417,15 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
           Header.protocol_state
           @@ Mina_block.header (With_hash.data previous_transition)
         in
+        let module Consensus_context = struct
+          include Context
+
+          let compile_config = precomputed_values.compile_config
+        end in
         Debug_assert.debug_assert (fun () ->
             [%test_result: [ `Take | `Keep ]]
               (Consensus.Hooks.select
-                 ~context:(module Context)
+                 ~context:(module Consensus_context)
                  ~existing:
                    (With_hash.map ~f:Mina_block.consensus_state
                       previous_transition )
@@ -1430,7 +1440,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
             in
             [%test_result: [ `Take | `Keep ]]
               (Consensus.Hooks.select
-                 ~context:(module Context)
+                 ~context:(module Consensus_context)
                  ~existing:root_consensus_state_with_hashes
                  ~candidate:consensus_state_with_hashes )
               ~expect:`Take
@@ -1468,7 +1478,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                       previous_protocol_state )
             >>= Validation.validate_frontier_dependencies
                   ~to_header:Mina_block.header
-                  ~context:(module Context)
+                  ~context:(module Consensus_context)
                   ~root_block:
                     ( Transition_frontier.root frontier
                     |> Breadcrumb.block_with_hash )
