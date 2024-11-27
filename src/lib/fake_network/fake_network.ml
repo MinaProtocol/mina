@@ -77,6 +77,8 @@ let setup (type n) ~context:(module Context : CONTEXT)
       let time_controller = time_controller
 
       let consensus_local_state = consensus_local_state
+
+      let compile_config = precomputed_values.compile_config
     end )
   in
   let config rpc_mocks peer =
@@ -220,8 +222,8 @@ module Generator = struct
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
       ?answer_sync_ledger_query ?get_transition_chain ?get_transition_knowledge
       ?get_transition_chain_proof ?get_ancestry ?get_best_tip
-      ?get_completed_snarks ~context:(module Context : CONTEXT) ~verifier ~max_frontier_length
-      ~use_super_catchup =
+      ?get_completed_snarks ~context:(module Context : CONTEXT) ~verifier
+      ~max_frontier_length ~use_super_catchup =
     let module Consensus_context = struct
       include Context
 
@@ -269,9 +271,8 @@ module Generator = struct
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
       ?answer_sync_ledger_query ?get_transition_chain ?get_transition_knowledge
       ?get_transition_chain_proof ?get_ancestry ?get_best_tip
-      ?get_completed_snarks 
-      ~context:(module Context : CONTEXT) ~verifier ~max_frontier_length
-      ~use_super_catchup =
+      ?get_completed_snarks ~context:(module Context : CONTEXT) ~verifier
+      ~max_frontier_length ~use_super_catchup =
     let module Consensus_context = struct
       include Context
 
