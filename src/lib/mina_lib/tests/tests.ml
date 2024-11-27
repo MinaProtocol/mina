@@ -1,5 +1,3 @@
-open Inline_test_quiet_logs
-
 let%test_module "Epoch ledger sync tests" =
   ( module struct
     open Core_kernel
@@ -30,7 +28,21 @@ let%test_module "Epoch ledger sync tests" =
 
     exception Sync_timeout
 
-    let logger = Logger.create ()
+    let logger = Logger.null ()
+
+    let () =
+      (* Disable log messages from best_tip_diff logger. *)
+      Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+        ~id:Logger.Logger_id.best_tip_diff ~processor:(Logger.Processor.raw ())
+        ~transport:
+          (Logger.Transport.create
+             ( module struct
+               type t = unit
+
+               let transport () _ = ()
+             end )
+             () )
+        ()
 
     let default_timeout_min = 5.0
 
@@ -430,7 +442,8 @@ let%test_module "Epoch ledger sync tests" =
             | Error _ ->
                 failwith "Could not add starting account" ) ;
         let sync_ledger =
-          Mina_ledger.Sync_ledger.Db.create ~logger
+          Mina_ledger.Sync_ledger.Db.create
+            ~context:(module Context)
             ~trust_system:Context.trust_system db_ledger
         in
         let query_reader =

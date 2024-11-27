@@ -381,11 +381,11 @@ let apply_diffs (t : t) (ds : Diff.Full.E.t list) =
     | E (Best_tip_changed _) ->
         () )
 
-let create ~root =
+let create ~logger ~root =
   let t =
     { states = Node.State.Enum.Table.create ()
     ; nodes = State_hash.Table.create ()
-    ; logger = Logger.create ()
+    ; logger
     }
   in
   create_node_full t root ; t
