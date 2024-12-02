@@ -261,7 +261,7 @@ Debian package can be build locally by using below commands:
 ```
 make build
 ```
-2. Build debian for mina-devet (example for ubuntu 18.04):
+2. Build debian for mina-devnet (example for ubuntu 18.04):
 ```
 ./scripts/debian/build.sh daemon_devnet
 ```
