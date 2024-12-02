@@ -41,7 +41,7 @@ let Spec =
           , mode = PipelineMode.Type.PullRequest
           , additionalDirtyWhen = [] : List S.Type
           , softFail = B/SoftFail.Boolean False
-          , timeout = 900
+          , timeout = 1000
           }
       }
 
