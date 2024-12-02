@@ -122,3 +122,5 @@ end
 let forget = Fn.id
 
 let fee { fee; _ } = fee
+
+let prover { prover; _ } = prover
