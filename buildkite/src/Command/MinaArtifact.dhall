@@ -46,6 +46,7 @@ let MinaBuildSpec =
           , mode : PipelineMode.Type
           , tags : List PipelineTag.Type
           , channel : DebianChannel.Type
+          , debianRepo : DebianRepo.Type
           }
       , default =
           { prefix = "MinaArtifact"
@@ -58,6 +59,7 @@ let MinaBuildSpec =
           , mode = PipelineMode.Type.PullRequest
           , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
           , channel = DebianChannel.Type.Unstable
+          , debianRepo = DebianRepo.Type.PackagesO1Test
           }
       }
 
@@ -112,12 +114,15 @@ let publish_to_debian_repo =
                 Toolchain.select
                   spec.toolchainSelectMode
                   spec.debVersion
-                  [ "AWS_ACCESS_KEY_ID"
-                  , "AWS_SECRET_ACCESS_KEY"
-                  , "MINA_DEB_CODENAME=${DebianVersions.lowerName
-                                           spec.debVersion}"
-                  , "MINA_DEB_RELEASE=${DebianChannel.lowerName spec.channel}"
-                  ]
+                  (   [ "AWS_ACCESS_KEY_ID"
+                      , "AWS_SECRET_ACCESS_KEY"
+                      , "MINA_DEB_CODENAME=${DebianVersions.lowerName
+                                               spec.debVersion}"
+                      , "MINA_DEB_RELEASE=${DebianChannel.lowerName
+                                              spec.channel}"
+                      ]
+                    # DebianRepo.keyIdEnvList spec.debianRepo
+                  )
                   "./buildkite/scripts/debian/publish.sh"
             , label =
                 "Publish Mina for ${DebianVersions.capitalName
