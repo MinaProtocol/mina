@@ -835,7 +835,7 @@ module Get_completed_snarks = struct
     module T = struct
       type query = unit [@@deriving sexp]
 
-      type response = Transaction_snark_work.Checked.Stable.V2.t list option
+      type response = Transaction_snark_work.Unchecked.Stable.V2.t list option
 
       let query_of_caller_model = Fn.id
 

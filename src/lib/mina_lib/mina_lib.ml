@@ -1496,7 +1496,7 @@ let start_filtered_log ~commit_id
     Ok () )
 
 let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
-    top_block get_current_frontier =
+    received_block get_current_frontier =
   let open Context in
   let open Network_peer in
   let%bind all_peers = Mina_networking.peers network in
@@ -1535,7 +1535,7 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
          we do this to account for the block lag placed after the bootstrap process. The number 2 was chosen after manual testing.
          1 did not yield successful verifcation of the polled snarks work.
       *)
-      let rec wait_for_new_top_block old_top_block =
+      let rec wait_for_new_top_block received_block =
         let frontier = get_current_frontier () in
         match frontier with
         | None ->
@@ -1543,7 +1543,7 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
               "Transition frontier is not available after sync something has \
                gone terribly wrong" ;
             let%bind () = after (Time.Span.of_ms 20.) in
-            wait_for_new_top_block old_top_block
+            wait_for_new_top_block received_block
         | Some frontier ->
             let tip = Transition_frontier.best_tip frontier in
             let top_block =
@@ -1554,21 +1554,21 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
             [%log debug]
               ~metadata:
                 [ ( "old_top_block"
-                  , `Int (old_top_block |> Unsigned.UInt32.to_int) )
+                  , `Int (received_block |> Unsigned.UInt32.to_int) )
                 ; ("new_top_block", `Int (top_block |> Unsigned.UInt32.to_int))
                 ]
               "WAITING  old top block: $old_top_block, new top block: \
                $new_top_block" ;
             let delta =
-              Unsigned.UInt32.(Infix.(top_block - old_top_block) |> to_int)
+              Unsigned.UInt32.(Infix.(top_block - received_block) |> to_int)
             in
             if abs delta >= 2 then Deferred.unit
             else
               let%bind () = after (Time.Span.of_ms 20.) in
-              wait_for_new_top_block old_top_block
+              wait_for_new_top_block received_block
       in
 
-      let%bind () = wait_for_new_top_block top_block in
+      let%bind () = wait_for_new_top_block received_block in
 
       (* verify the snarks and add them to the pool *)
       let%bind () =
