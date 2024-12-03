@@ -292,15 +292,6 @@ let insert_into_cols ~(returning : string) ~(table_name : string)
     (String.concat ~sep:", " cols)
     values returning
 
-let insert_assuming_new ~(select : string * 'select Caqti_type.t)
-    ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t)
-    (module Conn : CONNECTION) (value : 'cols) =
-  Conn.find
-    ( find_req (snd cols) (snd select)
-    @@ insert_into_cols ~returning:(fst select) ~table_name ?tannot
-         ~cols:(fst cols) () )
-    value
-
 (* run `select_cols` and return the result, if found
    if not found, run `insert_into_cols` and return the result
 *)
