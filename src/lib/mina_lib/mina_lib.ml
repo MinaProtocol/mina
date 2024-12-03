@@ -1560,9 +1560,10 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
               "WAITING  old top block: $old_top_block, new top block: \
                $new_top_block" ;
             let delta =
-              Unsigned.UInt32.(Infix.(top_block - received_block) |> to_int)
+              Unsigned.UInt32.(Infix.(received_block - top_block) |> to_int)
             in
-            if abs delta >= 2 then Deferred.unit
+            (* if delta is less than or equal to zero the transition frontier has caught up with the network *)
+            if delta <= 0 then Deferred.unit
             else
               let%bind () = after (Time.Span.of_ms 20.) in
               wait_for_new_top_block received_block
