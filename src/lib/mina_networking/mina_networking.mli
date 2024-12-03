@@ -29,6 +29,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val compile_config : Mina_compile_config.t
 end
 
 module Node_status = Node_status
@@ -107,6 +109,12 @@ module Rpcs : sig
       option
   end
 
+  module Get_completed_snarks : sig
+    type query = unit
+
+    type response = Transaction_snark_work.unchecked list option
+  end
+
   type ('query, 'response) rpc = ('query, 'response) Rpcs.rpc =
     | Get_some_initial_peers
         : (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
@@ -131,6 +139,8 @@ module Rpcs : sig
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
+    | Get_completed_snarks
+        : (Get_completed_snarks.query, Get_completed_snarks.response) rpc
 end
 
 module Config : sig
@@ -265,5 +275,7 @@ val create :
   -> Config.t
   -> sinks:Sinks.t
   -> get_transition_frontier:(unit -> Transition_frontier.t option)
+  -> get_snark_pool:(unit -> Snark_pool.t option)
   -> get_node_status:(unit -> Node_status.t Deferred.Or_error.t)
+  -> snark_job_state:(unit -> Work_selector.State.t option)
   -> t Deferred.t
