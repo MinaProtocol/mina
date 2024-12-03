@@ -18,7 +18,7 @@ end
 
 module Rw = Read_write (F)
 
-let db_dir = "/tmp" ^ "cache.db"
+let db_dir = Filename.temp_dir "mina" "proof_cache.lmdb"
 
 type t = { idx : int } [@@deriving compare, equal, sexp, yojson, hash]
 
