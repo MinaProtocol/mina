@@ -1500,6 +1500,8 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
   let open Context in
   let open Network_peer in
   let%bind all_peers = Mina_networking.peers network in
+  let peer_limit = 5 in
+  let limited_peers = List.take all_peers peer_limit in
   Deferred.List.iter
     ~f:(fun peer ->
       [%log debug] "PEER IS: Fetching completed snarks from peer: $peer"
@@ -1623,7 +1625,7 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
                 Deferred.unit )
       in
       Deferred.unit )
-    all_peers
+    limited_peers
 
 let create ~commit_id ?wallets (config : Config.t) =
   let module Context = (val context ~commit_id config) in
