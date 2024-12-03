@@ -368,8 +368,6 @@ struct
             let open Mina_base in
             let open Option.Let_syntax in
             let btl = best_tip_ledger t in
-            [%log' debug t.logger] "Best tip ledger: should be TRUE: $ledger"
-              ~metadata:[ ("ledger", `Bool (Option.is_some btl)) ] ;
             let%bind ledger = btl in
             if Deferred.is_determined (Base_ledger.detached_signal ledger) then
               None
