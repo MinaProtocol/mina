@@ -172,8 +172,7 @@ end)
             Resource_pool.Diff.log_internal ~logger "rejected"
               ~reason:"locally_generated" env
         | Error (`Other e) ->
-            [%log' debug t.logger]
-              "Pool diff apply feedback: $error"
+            [%log' debug t.logger] "Pool diff apply feedback: $error"
               ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
             Resource_pool.Diff.log_internal ~logger "rejected" env )
 

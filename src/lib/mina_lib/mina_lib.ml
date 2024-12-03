@@ -1496,7 +1496,7 @@ let start_filtered_log ~commit_id
     Ok () )
 
 let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
-    top_block get_most_recent_valid_block =
+    top_block get_current_frontier =
   let open Context in
   let open Network_peer in
   let%bind all_peers = Mina_networking.peers network in
@@ -1529,31 +1529,41 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
           ]
         "Fetched $completed_works completed snarks from peer: $peer" ;
 
-      (* keep reading from the frontier pipe until the new top block is greater than 2 more than the old top block.public_key
+      (* keep reading from the transition frontier until the new top block is greater than 2 more than the old top block.public_key
          we do this to account for the block lag placed after the bootstrap process. The number 2 was chosen after manual testing.
          1 did not yield successful verifcation of the polled snarks work.
       *)
       let rec wait_for_new_top_block old_top_block =
-        let new_block_length_received =
-          let open Mina_block in
-          Mina_numbers.Length.to_int @@ Mina_block.Header.blockchain_length
-          @@ Validation.header
-          @@ get_most_recent_valid_block ()
-        in
-
-        [%log debug]
-          ~metadata:
-            [ ("old_top_block", `Int old_top_block)
-            ; ("new_top_block", `Int new_block_length_received)
-            ]
-          "WAITING  old top block: $old_top_block, new top block: \
-           $new_top_block" ;
-
-        if abs (new_block_length_received - old_top_block) >= 2 then
-          Deferred.unit
-        else
-          let%bind () = after (Time.Span.of_ms 20.) in
-          wait_for_new_top_block old_top_block
+        let frontier = get_current_frontier () in
+        match frontier with
+        | None ->
+            [%log error]
+              "Transition frontier is not available after sync something has \
+               gone terribly wrong" ;
+            let%bind () = after (Time.Span.of_ms 20.) in
+            wait_for_new_top_block old_top_block
+        | Some frontier ->
+            let tip = Transition_frontier.best_tip frontier in
+            let top_block =
+              Transition_frontier.Breadcrumb.validated_transition tip
+              |> Mina_block.Validated.header
+              |> Mina_block.Header.blockchain_length
+            in
+            [%log debug]
+              ~metadata:
+                [ ( "old_top_block"
+                  , `Int (old_top_block |> Unsigned.UInt32.to_int) )
+                ; ("new_top_block", `Int (top_block |> Unsigned.UInt32.to_int))
+                ]
+              "WAITING  old top block: $old_top_block, new top block: \
+               $new_top_block" ;
+            let delta =
+              Unsigned.UInt32.(Infix.(top_block - old_top_block) |> to_int)
+            in
+            if abs delta >= 2 then Deferred.unit
+            else
+              let%bind () = after (Time.Span.of_ms 20.) in
+              wait_for_new_top_block old_top_block
       in
 
       let%bind () = wait_for_new_top_block top_block in
@@ -2371,7 +2381,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               let rec loop () =
                 let status = !last_sync_status in
                 (* log the status with info *)
-                [%log' info config.logger] ">>>>>> Current sync status: $status"
+                [%log' debug config.logger] "Current sync status: $status"
                   ~metadata:[ ("status", to_yojson_status status) ] ;
                 if Option.is_none !sync_status_ref then loop ()
                 else
@@ -2385,20 +2395,30 @@ let create ~commit_id ?wallets (config : Config.t) =
                       loop ()
                   | Ok `Synced
                     when equal_status !last_sync_status `Catchup
-                         || equal_status !last_sync_status `Bootstrap ->
-                      [%log' info config.logger]
-                        ">>>>>> Synced, fetching completed snarks" ;
-                      let top_block =
-                        let open Mina_block in
-                        Mina_numbers.Length.to_int
-                        @@ Mina_block.Header.blockchain_length
-                        @@ Validation.header
-                        @@ get_most_recent_valid_block ()
-                      in
+                         || equal_status !last_sync_status `Bootstrap -> (
+                      [%log' debug config.logger]
+                        "Synced, fetching completed snarks" ;
 
-                      fetch_completed_snarks
-                        (module Context)
-                        snark_pool net top_block get_most_recent_valid_block
+                      let frontier = get_current_frontier () in
+                      let tip =
+                        Option.map frontier ~f:Transition_frontier.best_tip
+                      in
+                      match tip with
+                      | None ->
+                          [%log' debug config.logger]
+                            "No tip found, waiting for tip to be available" ;
+                          let%bind () = after (Time.Span.of_sec 1.) in
+                          loop ()
+                      | Some tip ->
+                          let top_block =
+                            Transition_frontier.Breadcrumb.validated_transition
+                              tip
+                            |> Mina_block.Validated.header
+                            |> Mina_block.Header.blockchain_length
+                          in
+                          fetch_completed_snarks
+                            (module Context)
+                            snark_pool net top_block get_current_frontier )
                   | Ok (`Catchup as s)
                   | Ok (`Listening as s)
                   | Ok (`Connecting as s)
