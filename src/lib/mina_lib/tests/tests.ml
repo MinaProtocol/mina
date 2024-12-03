@@ -353,7 +353,7 @@ let%test_module "Epoch ledger sync tests" =
           ~get_completed_work:(Fn.const None) ~catchup_mode:`Normal
           ~network_transition_reader:block_reader ~producer_transition_reader
           ~get_most_recent_valid_block ~most_recent_valid_block_writer
-          ~notify_online ~snark_pool ()
+          ~notify_online ()
       in
       let%bind () = Ivar.read initialization_finish_signal in
       let tr_tm1 = Unix.gettimeofday () in
