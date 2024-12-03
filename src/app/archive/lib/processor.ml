@@ -1638,8 +1638,7 @@ module Zkapp_account_update_body = struct
     in
     let%bind update_id =
       Metrics.time ~label:"zkapp_updates.add"
-      @@ fun () ->
-      Zkapp_updates.add_if_doesn't_exist (module Conn) body.update
+      @@ fun () -> Zkapp_updates.add_if_doesn't_exist (module Conn) body.update
     in
     let increment_nonce = body.increment_nonce in
     let%bind events_id =
@@ -2094,8 +2093,7 @@ module User_command = struct
     | Zkapp_command _ ->
         `Zkapp_command
 
-  let add_if_doesn't_exist conn (t : User_command.t)
-      ~v1_transaction_hash =
+  let add_if_doesn't_exist conn (t : User_command.t) ~v1_transaction_hash =
     match t with
     | Signed_command sc ->
         Signed_command.add_if_doesn't_exist conn ~via:(via t)
@@ -4691,9 +4689,7 @@ let run pool reader ~genesis_constants ~constraint_constants ~logger
     | Diff.Transition_frontier
         (Breadcrumb_added
           { block; accounts_accessed; accounts_created; tokens_used; _ } ) -> (
-        let add_block =
-          Block.add_if_doesn't_exist ~constraint_constants
-        in
+        let add_block = Block.add_if_doesn't_exist ~constraint_constants in
         let hash = State_hash.With_state_hashes.state_hash in
         match%bind
           add_block_aux ~logger ~genesis_constants ~pool ~delete_older_than

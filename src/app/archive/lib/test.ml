@@ -34,7 +34,12 @@ let%test_module "Archive node unit tests" =
     let conn_lazy =
       lazy
         ( Thread_safe.block_on_async_exn
-        @@ fun () -> Mina_caqti.connect archive_uri )
+        @@ fun () ->
+        match%bind Mina_caqti.connect archive_uri with
+        | Ok conn ->
+            return conn
+        | Error e ->
+            failwith @@ Caqti_error.show e )
 
     let conn_pool_lazy =
       lazy
@@ -193,7 +198,7 @@ let%test_module "Archive node unit tests" =
               match%map
                 let open Deferred.Result.Let_syntax in
                 let%bind user_command_id =
-                  Processor.User_command.add_if_doesn't_exist conn ~logger
+                  Processor.User_command.add_if_doesn't_exist conn
                     ~v1_transaction_hash:false user_command
                 in
                 let%map result =
