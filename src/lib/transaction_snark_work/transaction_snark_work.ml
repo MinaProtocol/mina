@@ -115,7 +115,6 @@ type unchecked = t
 
 module Unchecked = struct
   include T
-
 end
 
 module Checked = struct

@@ -2397,30 +2397,17 @@ let create ~commit_id ?wallets (config : Config.t) =
                       loop ()
                   | Ok `Synced
                     when equal_status !last_sync_status `Catchup
-                         || equal_status !last_sync_status `Bootstrap -> (
+                         || equal_status !last_sync_status `Bootstrap ->
                       [%log' debug config.logger]
                         "Synced, fetching completed snarks" ;
-
-                      let frontier = get_current_frontier () in
-                      let tip =
-                        Option.map frontier ~f:Transition_frontier.best_tip
+                      let received_block =
+                        get_most_recent_valid_block ()
+                        |> Validation.header
+                        |> Mina_block.Header.blockchain_length
                       in
-                      match tip with
-                      | None ->
-                          [%log' debug config.logger]
-                            "No tip found, waiting for tip to be available" ;
-                          let%bind () = after (Time.Span.of_sec 1.) in
-                          loop ()
-                      | Some tip ->
-                          let top_block =
-                            Transition_frontier.Breadcrumb.validated_transition
-                              tip
-                            |> Mina_block.Validated.header
-                            |> Mina_block.Header.blockchain_length
-                          in
-                          fetch_completed_snarks
-                            (module Context)
-                            snark_pool net top_block get_current_frontier )
+                      fetch_completed_snarks
+                        (module Context)
+                        snark_pool net received_block get_current_frontier
                   | Ok (`Catchup as s)
                   | Ok (`Listening as s)
                   | Ok (`Connecting as s)
