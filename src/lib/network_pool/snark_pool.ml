@@ -375,7 +375,6 @@ struct
               None
             else
               let%bind loc =
-                (* how can you be sure the token id will be MINA ? This seems like a pre-berk assumption *)
                 Account_id.create prover Token_id.default
                 |> Base_ledger.location_of_account ledger
               in
