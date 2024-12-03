@@ -319,6 +319,7 @@ let%test_module "Epoch ledger sync tests" =
             Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r )
           ~get_snark_pool:(fun () -> Some snark_pool)
           ~get_node_status:(rpc_error "get_node_status")
+          ~snark_job_state:(fun () -> None)
       in
       (* create transition frontier *)
       let tr_tm0 = Unix.gettimeofday () in
