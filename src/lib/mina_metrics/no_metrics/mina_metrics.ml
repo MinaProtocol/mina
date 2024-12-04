@@ -264,6 +264,14 @@ module Network = struct
 
   let get_ancestry_rpc_responses_failed : Counter.t = ()
 
+  let get_completed_snarks_rpcs_sent : Counter.t * Gauge.t = ((), ())
+
+  let get_completed_snarks_rpcs_received : Counter.t * Gauge.t = ((), ())
+
+  let get_completed_snarks_rpc_requests_failed : Counter.t = ()
+
+  let get_completed_snarks_rpc_responses_failed : Counter.t = ()
+
   let ban_notify_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
   let ban_notify_rpcs_received : Counter.t * Gauge.t = ((), ())
