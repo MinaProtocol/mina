@@ -2220,7 +2220,7 @@ module Queries = struct
     field "pendingSnarkWorkRange"
       ~doc:
         "Find any sequence of pending snark works between two indexes in the \
-         pending snark work pool"
+         pending snark work pool. Returns both completed and uncompleted work."
       ~args:
         Arg.
           [ arg "startingIndex"
