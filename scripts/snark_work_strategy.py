@@ -54,8 +54,10 @@ def set_fee(pending_work, bid):
     for work, fee in pending_work:
         if fee == None:
             pending_work_with_fee.append((work, bid))
+        elif int(fee) == 0:
+            pass  # do not do the work if it is already done for 0 fees
         else:
-            pending_work_with_fee.append((work, fee / 2))
+            pending_work_with_fee.append((work, int(fee) / 2))
     return pending_work_with_fee
 
 
@@ -96,13 +98,13 @@ def spawn_worker(work_spec, bid):
 
 
 # Runs workers in parallel to produce work in [work_list]
-def spawn_workers(work_list, bid):
+def spawn_workers(work_list):
     print("Spawning worker processes...")
     with ProcessPoolExecutor() as executor:
         # Schedules the snark worker processes
         futures = {
-            executor.submit(spawn_worker, work_spec, bid): (work_spec, id)
-            for (work_spec, id) in work_list
+            executor.submit(spawn_worker, work_spec, bid): (work_spec, bid)
+            for (work_spec, bid) in work_list
         }
         # Collect results as they complete
         for future in as_completed(futures):
@@ -126,7 +128,7 @@ def main(bid, start_index, batch_size):
         else:
             print("Pending work was retreived successfully.")
             pending_work = set_fee(pending_work, bid)
-            spawn_workers(pending_work, bid)
+            spawn_workers(pending_work)
             start_index += batch_size
             end_index += batch_size
 
@@ -134,7 +136,10 @@ def main(bid, start_index, batch_size):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fetch, perform & send snark work")
     parser.add_argument(
-        "--bid", type=int, default=0, help="The bid to ask for each work performed"
+        "--bid",
+        type=int,
+        default=0,
+        help="The bid to ask for each work performed. In case the work has already been completed, the bid is ignored and the existent fee is halved.",
     )
     parser.add_argument(
         "--start",
