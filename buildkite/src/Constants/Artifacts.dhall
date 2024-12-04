@@ -31,6 +31,8 @@ let AllButTests =
       , Artifact.TestExecutive
       , Artifact.Rosetta
       , Artifact.ZkappTestTransaction
+      , Artifact.Toolchain
+      , Artifact.ItnOrchestrator
       ]
 
 let Main =
