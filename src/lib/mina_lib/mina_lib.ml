@@ -1531,9 +1531,8 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
           ]
         "Fetched $completed_works completed snarks from peer: $peer" ;
 
-      (* keep reading from the transition frontier until the new top block is greater than 2 more than the old top block.public_key
-         we do this to account for the block lag placed after the bootstrap process. The number 2 was chosen after manual testing.
-         1 did not yield successful verifcation of the polled snarks work.
+      (* Keep reading from the transition frontier until it has caught up to the most valid block from the network.
+         * This is to ensure that the snarks are verified and added to the pool in the correct order
       *)
       let rec wait_for_new_top_block received_block =
         let frontier = get_current_frontier () in

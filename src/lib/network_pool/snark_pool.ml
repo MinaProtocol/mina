@@ -367,8 +367,7 @@ struct
           let account_opt =
             let open Mina_base in
             let open Option.Let_syntax in
-            let btl = best_tip_ledger t in
-            let%bind ledger = btl in
+            let%bind ledger = best_tip_ledger t in
             if Deferred.is_determined (Base_ledger.detached_signal ledger) then
               None
             else
