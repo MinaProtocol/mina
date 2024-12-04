@@ -31,6 +31,10 @@ include Node_config_version
 [%%inject
 "sync_ledger_default_subtree_depth", sync_ledger_default_subtree_depth]
 
+let () =
+  assert (sync_ledger_default_subtree_depth > 0) ;
+  assert (sync_ledger_max_subtree_depth > 0)
+
 [%%ifndef scan_state_transaction_capacity_log_2]
 
 let scan_state_transaction_capacity_log_2 : int option = None

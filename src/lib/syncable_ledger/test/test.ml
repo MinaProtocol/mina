@@ -274,18 +274,21 @@ module Make_test_edge_cases (Input : Input_intf) = struct
            let%bind answ_or_error =
              Sync_responder.answer_query sr (Envelope.Incoming.local query)
            in
-           match check_answer query answ_or_error with
-           | `Answer answ ->
+           let write_response answ =
+             Linear_pipe.write aw
+               (root_hash, query, Envelope.Incoming.local answ)
+           in
+           match (check_answer query answ_or_error, query) with
+           | `Answer answ, What_contents _ ->
                let%bind () =
-                 if match query with What_contents _ -> true | _ -> false then
-                   Clock_ns.after
-                     (Time_ns.Span.randomize (Time_ns.Span.of_ms 0.2)
-                        ~percent:(Percent.of_percentage 20.) )
-                 else Deferred.unit
+                 Clock_ns.after
+                   (Time_ns.Span.randomize (Time_ns.Span.of_ms 0.2)
+                      ~percent:(Percent.of_percentage 20.) )
                in
-               Linear_pipe.write aw
-                 (root_hash, query, Envelope.Incoming.local answ)
-           | `Failure_as_expected ->
+               write_response answ
+           | `Answer answ, _ ->
+               write_response answ
+           | `Failure_as_expected, _ ->
                Ivar.fill got_failure_ivar true ;
                Deferred.unit ) ) ;
     Async.Thread_safe.block_on_async_exn (fun () ->
