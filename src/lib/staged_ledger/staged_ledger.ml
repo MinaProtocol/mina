@@ -1,5 +1,3 @@
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Core_kernel
 open Async
 open Mina_base
@@ -4281,7 +4279,7 @@ let%test_module "staged ledger tests" =
 
     let%test_unit "Blocks having commands with insufficient funds are rejected"
         =
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let g =
         let open Quickcheck.Generator.Let_syntax in
         let%map ledger_init_state = Ledger.gen_initial_ledger_state
