@@ -139,7 +139,7 @@ let wrap_main
     fun ({ proof_state =
              { deferred_values =
                  { plonk
-                 ; xi
+                 ; polyscale
                  ; combined_inner_product
                  ; b
                  ; branch_data
@@ -496,7 +496,7 @@ let wrap_main
                 let res =
                   Wrap_verifier.incrementally_verify_proof max_proofs_verified
                     ~actual_proofs_verified_mask ~step_domains
-                    ~verification_key:step_plonk_index ~srs ~xi ~sponge
+                    ~verification_key:step_plonk_index ~srs ~polyscale ~sponge
                     ~public_input:
                       (Array.map
                          (pack_statement Max_proofs_verified.n prev_statement)
