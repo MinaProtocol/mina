@@ -27,7 +27,7 @@ def pending_work_query(starting_index, ending_index):
       pendingSnarkWorkRange(endingIndex: "{ending_index}", startingIndex: "{starting_index}") {{
         workBundleSpec {{
           spec
-          workIds
+          snarkFee
         }}
       }}
     }}
@@ -41,9 +41,22 @@ def format_response(response):
     for work_bundle_spec in response.json().get("data").get("pendingSnarkWorkRange"):
         work_bundle_spec = work_bundle_spec.get("workBundleSpec")
         pending_work.append(
-            (work_bundle_spec.get("spec"), work_bundle_spec.get("workIds"))
+            (work_bundle_spec.get("spec"), work_bundle_spec.get("snarkFee"))
         )
     return pending_work
+
+
+# There are two types of pending work: completed and not completed yet.
+# For the not completed work, we give the bid given by the CLI.
+# For the already completed work, we halve the corresponding fee.
+def set_fee(pending_work, bid):
+    pending_work_with_fee = []
+    for work, fee in pending_work:
+        if fee == None:
+            pending_work_with_fee.append((work, bid))
+        else:
+            pending_work_with_fee.append((work, fee / 2))
+    return pending_work_with_fee
 
 
 # This function returns a range of pending work specified by [start_index] (included) & [end_index] (excluded) obtain via the graphQL endpoint
@@ -112,6 +125,7 @@ def main(bid, start_index, batch_size):
             )
         else:
             print("Pending work was retreived successfully.")
+            pending_work = set_fee(pending_work, bid)
             spawn_workers(pending_work, bid)
             start_index += batch_size
             end_index += batch_size
