@@ -236,7 +236,7 @@ module Vrf = struct
       let env = Secrets.Keypair.env in
       let open Deferred.Let_syntax in
       let%bind constraint_constants =
-        let logger = Logger.create () in
+        let logger = Logger.null () in
         let%map conf =
           Runtime_config.Constants.load_constants ~logger config_file
         in
@@ -310,7 +310,7 @@ module Vrf = struct
         eprintf "Using password from environment variable %s\n" env ;
       let open Deferred.Let_syntax in
       let%bind constraint_constants =
-        let logger = Logger.create () in
+        let logger = Logger.null () in
         let%map conf =
           Runtime_config.Constants.load_constants ~logger config_file
         in
@@ -376,7 +376,7 @@ module Vrf = struct
       @@ fun () ->
       let open Deferred.Let_syntax in
       let%bind constraint_constants =
-        let logger = Logger.create () in
+        let logger = Logger.null () in
         let%map conf =
           Runtime_config.Constants.load_constants ~logger config_file
         in
