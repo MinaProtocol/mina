@@ -4,9 +4,9 @@ module Stable : sig
     type t = Mina_wire_types.Pickles_base.Proofs_verified.V1.t = N0 | N1 | N2
     [@@deriving sexp, compare, yojson, hash, equal]
 
-    include Pickles_types.Sigs.Binable.S with type t := t
+    include Plonkish_prelude.Sigs.Binable.S with type t := t
 
-    include Pickles_types.Sigs.VERSIONED
+    include Plonkish_prelude.Sigs.VERSIONED
   end
 end
 
