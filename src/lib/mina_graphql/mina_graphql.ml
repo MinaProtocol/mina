@@ -785,6 +785,41 @@ module Mutations = struct
             Error "Internal error: response from transaction pool was malformed"
         )
 
+  let add_snark_work =
+    io_field "sendProofBundle" ~doc:"Transaction SNARKs for a given spec"
+      ~args:
+        Arg.
+          [ arg "input"
+              ~doc:
+                "Proof bundle for a given spec in json format including fees \
+                 and prover public key"
+              ~typ:(non_null Types.Input.ProofBundleInput.arg_typ)
+          ]
+      ~typ:(non_null string)
+      ~resolve:(fun { ctx = mina; _ } ()
+                    (proof_bundle :
+                      Ledger_proof.t
+                      Snark_work_lib.Work.Result_without_metrics.t ) ->
+        let solved_work =
+          Network_pool.Snark_pool.Resource_pool.Diff.Add_solved_work
+            ( proof_bundle.statements
+            , { proof = proof_bundle.proofs
+              ; fee = { fee = proof_bundle.fee; prover = proof_bundle.prover }
+              } )
+        in
+        match%map Mina_lib.add_work_graphql mina solved_work with
+        | Ok
+            ( `Broadcasted
+            , Network_pool.Snark_pool.Resource_pool.Diff.Add_solved_work _
+            , _ ) ->
+            Ok "Accepted"
+        | Error err ->
+            Error (Error.to_string_hum err)
+        | Ok _ ->
+            Error
+              "Internal error: Transaction proofs could not be added to the \
+               pool" )
+
   let export_logs =
     io_field "exportLogs" ~doc:"Export daemon logs to tar archive"
       ~args:Arg.[ arg "basename" ~typ:string ]
@@ -1006,6 +1041,7 @@ module Mutations = struct
     ; archive_precomputed_block
     ; archive_extensional_block
     ; send_rosetta_transaction
+    ; add_snark_work
     ]
 
   module Itn = struct

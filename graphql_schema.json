@@ -97,6 +97,16 @@
         },
         {
           "kind": "SCALAR",
+          "name": "ProofBundle",
+          "description": "Proof bundle for a given spec in json format",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
           "name": "RosettaTransaction",
           "description": "A transaction encoded in the Rosetta format",
           "fields": null,
@@ -5485,6 +5495,38 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "SendRosettaTransactionPayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "sendProofBundle",
+              "description": "Transaction SNARKs for a given spec",
+              "args": [
+                {
+                  "name": "input",
+                  "description":
+                    "Proof bundle for a given spec in json format including fees and prover public key",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "ProofBundle",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
                   "ofType": null
                 }
               },
