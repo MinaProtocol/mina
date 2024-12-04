@@ -1233,7 +1233,7 @@ struct
         let alpha = sample_scalar () in
         let t_comm :
             (Inputs.Impl.Field.t * Inputs.Impl.Field.t)
-            Pickles_types__Plonk_types.Poly_comm.Without_degree_bound.t =
+            Kimchi_backend_common.Plonk_types.Poly_comm.Without_degree_bound.t =
           messages.t_comm
         in
         absorb_g t_comm ;
