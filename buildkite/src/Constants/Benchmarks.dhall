@@ -1,10 +1,10 @@
 let Spec =
       { Type = { tokenEnvName : Text, bucket : Text, org : Text, host : Text }
       , default =
-          { tokenEnvName = "\\\${INFLUX_TOKEN}"
-          , bucket = "\\\${INFLUX_BUCKET_NAME}"
-          , org = "\\\${INFLUX_ORG}"
-          , host = "\\\${INFLUX_HOST}"
+          { tokenEnvName = "\\\${INFLUXDB_TOKEN}"
+          , bucket = "\\\${INFLUXDB_BUCKET}"
+          , org = "\\\${INFLUXDB_ORG}"
+          , host = "\\\${INFLUXDB_HOST}"
           }
       }
 
