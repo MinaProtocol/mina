@@ -93,7 +93,7 @@ let extract_accounts_exn = function
 let load_config_exn ~logger config_file =
   let%map config =
     Deferred.Or_error.ok_exn
-    @@ Runtime_config.Json_loader.load_config_files ~logger [ config_file ]
+    @@ Runtime_config.Json_loader.load_config_files [ config_file ]
   in
   if
     Option.(
