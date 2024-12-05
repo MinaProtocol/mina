@@ -693,7 +693,7 @@ let revalidate :
     -> [ `Entire_pool | `Subset of Account_id.Set.t ]
     -> (Account_id.t -> Account.t)
     -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t =
- fun ({ config = { constraint_constants; _ }; _ } as t) ~logger scope f ->
+ fun ({ config = { constraint_constants; _ }; _ } as t_initial) ~logger scope f ->
   let requires_revalidation =
     match scope with
     | `Entire_pool ->
@@ -701,7 +701,7 @@ let revalidate :
     | `Subset subset ->
         Set.mem subset
   in
-  Map.fold t.all_by_sender ~init:(t, Sequence.empty)
+  Map.fold t_initial.all_by_sender ~init:(t_initial, Sequence.empty)
     ~f:(fun
          ~key:sender
          ~data:(queue, currency_reserved)
@@ -713,7 +713,7 @@ let revalidate :
         let current_balance =
           Currency.Balance.to_amount
             (Account.liquid_balance_at_slot
-               ~global_slot:(global_slot_since_genesis t.config)
+               ~global_slot:(global_slot_since_genesis t_initial.config)
                account )
         in
         [%log debug]
@@ -739,13 +739,13 @@ let revalidate :
         then (
           [%log debug]
             "Account no longer has permission to send; dropping queue" ;
-          let dropped, t'' = remove_with_dependents_exn' t first_cmd in
+          let dropped, t'' = remove_with_dependents_exn' t_initial first_cmd in
           (t'', Sequence.append dropped_acc dropped) )
         else if Account_nonce.(account.nonce < first_nonce) then (
           [%log debug]
             "Current account nonce precedes first nonce in queue; dropping \
              queue" ;
-          let dropped, t'' = remove_with_dependents_exn' t first_cmd in
+          let dropped, t'' = remove_with_dependents_exn' t_initial first_cmd in
           (t'', Sequence.append dropped_acc dropped) )
         else
           (* current_nonce >= first_nonce *)
