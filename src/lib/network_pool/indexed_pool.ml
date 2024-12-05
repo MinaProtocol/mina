@@ -739,14 +739,14 @@ let revalidate :
         then (
           [%log debug]
             "Account no longer has permission to send; dropping queue" ;
-          let dropped, t'' = remove_with_dependents_exn' t_initial first_cmd in
-          (t'', Sequence.append dropped_acc dropped) )
+          let dropped, t_updated = remove_with_dependents_exn' t first_cmd in
+          (t_updated, Sequence.append dropped_acc dropped) )
         else if Account_nonce.(account.nonce < first_nonce) then (
           [%log debug]
             "Current account nonce precedes first nonce in queue; dropping \
              queue" ;
-          let dropped, t'' = remove_with_dependents_exn' t_initial first_cmd in
-          (t'', Sequence.append dropped_acc dropped) )
+          let dropped, t_updated = remove_with_dependents_exn' t first_cmd in
+          (t_updated, Sequence.append dropped_acc dropped) )
         else
           (* current_nonce >= first_nonce *)
           let first_applicable_nonce_index =
