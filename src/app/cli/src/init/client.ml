@@ -865,7 +865,7 @@ let hash_ledger =
      fun () ->
        let open Deferred.Let_syntax in
        let%bind constraint_constants =
-         let logger = Logger.create () in
+         let logger = Logger.null () in
          let%map conf =
            Runtime_config.Constants.load_constants ~logger config_files
          in
@@ -976,7 +976,7 @@ let constraint_system_digests =
      fun () ->
        let open Deferred.Let_syntax in
        let%bind constraint_constants, proof_level =
-         let logger = Logger.create () in
+         let logger = Logger.null () in
          let%map conf =
            Runtime_config.Constants.load_constants ~logger config_files
          in
@@ -1870,7 +1870,7 @@ let compile_time_constants =
        let%map ({ consensus_constants; _ } as precomputed_values), _ =
          (* This is kind of ugly because we are allowing for supplying a runtime_config value directly, rather than force what is read from the environment *)
          (* TODO: See if we can initialize consensus_constants without also initializing the ledger *)
-         let logger = Logger.create () in
+         let logger = Logger.null () in
          let%bind m_conf =
            Runtime_config.Json_loader.load_config_files ~conf_dir ~logger
              config_files
@@ -2394,7 +2394,7 @@ let test_ledger_application =
      @@ fun () ->
      let open Deferred.Let_syntax in
      let%bind genesis_constants, constraint_constants =
-       let logger = Logger.create () in
+       let logger = Logger.null () in
        let%map conf =
          Runtime_config.Constants.load_constants ~logger config_files
        in
@@ -2442,7 +2442,7 @@ let itn_create_accounts =
          ->
         let open Deferred.Let_syntax in
         let%bind genesis_constants, constraint_constants, compile_config =
-          let logger = Logger.create () in
+          let logger = Logger.null () in
           let%map conf =
             Runtime_config.Constants.load_constants ~logger config_files
           in
