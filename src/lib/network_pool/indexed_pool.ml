@@ -696,17 +696,17 @@ let revalidate :
   let global_slot = global_slot_since_genesis t_initial.config in
   Map.fold requires_revalidation ~init:(t_initial, Sequence.empty)
     ~f:(fun ~key:sender ~data:(queue, currency_reserved) (t, dropped_acc) ->
-      let account : Account.t = get_account_by_id sender in
+      let sender_account : Account.t = get_account_by_id sender in
       let current_balance =
         Currency.Balance.to_amount
-          (Account.liquid_balance_at_slot ~global_slot account)
+          (Account.liquid_balance_at_slot ~global_slot sender_account)
       in
       [%log debug]
         "Revalidating account $account in transaction pool ($account_nonce, \
          $account_balance)"
         ~metadata:
           [ ("account", `String (Sexp.to_string @@ Account_id.sexp_of_t sender))
-          ; ("account_nonce", `Int (Account_nonce.to_int account.nonce))
+          ; ("account_nonce", `Int (Account_nonce.to_int sender_account.nonce))
           ; ( "account_balance"
             , `String (Currency.Amount.to_mina_string current_balance) )
           ] ;
@@ -717,13 +717,13 @@ let revalidate :
       in
       if
         not
-          ( Account.has_permission_to_send account
-          && Account.has_permission_to_increment_nonce account )
+          ( Account.has_permission_to_send sender_account
+          && Account.has_permission_to_increment_nonce sender_account )
       then (
         [%log debug] "Account no longer has permission to send; dropping queue" ;
         let dropped, t_updated = remove_with_dependents_exn' t first_cmd in
         (t_updated, Sequence.append dropped_acc dropped) )
-      else if Account_nonce.(account.nonce < first_nonce) then (
+      else if Account_nonce.(sender_account.nonce < first_nonce) then (
         [%log debug]
           "Current account nonce precedes first nonce in queue; dropping queue" ;
         let dropped, t_updated = remove_with_dependents_exn' t first_cmd in
@@ -736,7 +736,7 @@ let revalidate :
                 Transaction_hash.User_command_with_valid_signature.command cmd'
                 |> User_command.applicable_at_nonce
               in
-              Account_nonce.equal nonce account.nonce )
+              Account_nonce.equal nonce sender_account.nonce )
           |> Option.value ~default:(F_sequence.length queue)
         in
         [%log debug]
