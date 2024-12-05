@@ -776,7 +776,7 @@ let revalidate :
                         (currency_consumed ~constraint_constants cmd)) )
               currency_reserved dropped_for_nonce
           in
-          let keep_queue', currency_reserved'', dropped_for_balance =
+          let keep_queue, currency_reserved_updated, dropped_for_balance =
             drop_until_sufficient_balance ~constraint_constants
               (retained_for_nonce, currency_reserved_partially_updated)
               current_balance
@@ -799,7 +799,7 @@ let revalidate :
                   ~f:remove_all_by_fee_and_hash_and_expiration_exn
               in
               let t''' =
-                match F_sequence.uncons keep_queue' with
+                match F_sequence.uncons keep_queue with
                 | None ->
                     { t'' with
                       all_by_sender = Map.remove t''.all_by_sender sender
@@ -812,7 +812,7 @@ let revalidate :
                     { t'' with
                       all_by_sender =
                         Map.set t''.all_by_sender ~key:sender
-                          ~data:(keep_queue', currency_reserved'')
+                          ~data:(keep_queue, currency_reserved_updated)
                     ; applicable_by_fee =
                         Map_set.insert
                           ( module Transaction_hash
