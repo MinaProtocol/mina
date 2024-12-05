@@ -743,61 +743,56 @@ let revalidate :
           "Current account nonce succeeds first nonce in queue; splitting \
            queue at $index"
           ~metadata:[ ("index", `Int first_applicable_nonce_index) ] ;
-        let drop_queue, keep_queue =
+        let dropped_from_nonce, retained_by_nonce =
           F_sequence.split_at queue first_applicable_nonce_index
         in
-        let currency_reserved' =
+        let currency_reserved_partially_updated =
           F_sequence.foldl
             (fun c cmd ->
               Option.value_exn
                 Currency.Amount.(c - Option.value_exn (currency_consumed cmd))
               )
-            currency_reserved drop_queue
+            currency_reserved dropped_from_nonce
         in
         (* NB: dropped_for_balance is ordered by nonce *)
-        let keep_queue', currency_reserved'', dropped_for_balance =
+        let keep_queue, currency_reserved_updated, dropped_for_balance =
           drop_until_sufficient_balance
-            (keep_queue, currency_reserved')
+            (retained_by_nonce, currency_reserved_partially_updated)
             current_balance
         in
-        let to_drop =
-          Sequence.append (F_sequence.to_seq drop_queue) dropped_for_balance
-        in
+        let keeping_prefix = F_sequence.is_empty dropped_from_nonce in
+        let keeping_suffix = Sequence.is_empty dropped_for_balance in
         (* t with all_by_sender and applicable_by_fee fields updated *)
         let t_partially_updated =
-          match
-            ( F_sequence.uncons drop_queue
-            , Sequence.hd dropped_for_balance
-            , F_sequence.uncons keep_queue' )
-          with
-          | None, None, _ ->
+          match F_sequence.uncons keep_queue with
+          | _ when keeping_prefix && keeping_suffix ->
               (* Nothing dropped, nothing needs to be updated *)
               t
-          | Some (first_dropped, _), _, None | None, Some first_dropped, None ->
+          | None ->
               (* We drop the entire queue, first element needs to be removed from
                  applicable_by_fee *)
-              let t' = remove_applicable_exn t first_dropped in
+              let t' = remove_applicable_exn t first_cmd in
               { t' with all_by_sender = Map.remove t'.all_by_sender sender }
-          | None, _, Some _ ->
-              (* We drop only some transactions from the end of queue, keeping
+          | Some _ when keeping_prefix ->
+              (* We drop only transactions from the end of queue, keeping
                  the head untouched, no need to update applicable_by_fee *)
               { t with
                 all_by_sender =
                   Map.set t.all_by_sender ~key:sender
-                    ~data:(keep_queue', currency_reserved'')
+                    ~data:(keep_queue, currency_reserved_updated)
               }
-          | Some (first_dropped, _), _, Some (first_kept, _) ->
+          | Some (first_kept, _) ->
               (* We need to replace old queue head with the new queue head
                  in applicable_by_fee *)
               let first_kept_unchecked =
                 Transaction_hash.User_command_with_valid_signature.command
                   first_kept
               in
-              let t' = remove_applicable_exn t first_dropped in
+              let t' = remove_applicable_exn t first_cmd in
               { t' with
                 all_by_sender =
                   Map.set t'.all_by_sender ~key:sender
-                    ~data:(keep_queue', currency_reserved'')
+                    ~data:(keep_queue, currency_reserved_updated)
               ; applicable_by_fee =
                   Map_set.insert
                     (module Transaction_hash.User_command_with_valid_signature)
@@ -805,6 +800,11 @@ let revalidate :
                     (User_command.fee_per_wu first_kept_unchecked)
                     first_kept
               }
+        in
+        let to_drop =
+          Sequence.append
+            (F_sequence.to_seq dropped_from_nonce)
+            dropped_for_balance
         in
         let t_updated =
           Sequence.fold ~init:t_partially_updated
