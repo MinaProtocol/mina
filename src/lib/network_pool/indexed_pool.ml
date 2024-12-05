@@ -763,10 +763,10 @@ let revalidate :
             "Current account nonce succeeds first nonce in queue; splitting \
              queue at $index"
             ~metadata:[ ("index", `Int first_applicable_nonce_index) ] ;
-          let drop_queue, keep_queue =
+          let dropped_for_nonce, retained_for_nonce =
             F_sequence.split_at queue first_applicable_nonce_index
           in
-          let currency_reserved' =
+          let currency_reserved_partially_updated =
             F_sequence.foldl
               (fun c cmd ->
                 Option.value_exn
@@ -774,15 +774,17 @@ let revalidate :
                     c
                     - Option.value_exn
                         (currency_consumed ~constraint_constants cmd)) )
-              currency_reserved drop_queue
+              currency_reserved dropped_for_nonce
           in
           let keep_queue', currency_reserved'', dropped_for_balance =
             drop_until_sufficient_balance ~constraint_constants
-              (keep_queue, currency_reserved')
+              (retained_for_nonce, currency_reserved_partially_updated)
               current_balance
           in
           let to_drop =
-            Sequence.append (F_sequence.to_seq drop_queue) dropped_for_balance
+            Sequence.append
+              (F_sequence.to_seq dropped_for_nonce)
+              dropped_for_balance
           in
           match Sequence.next to_drop with
           | None ->
