@@ -49,15 +49,18 @@ def format_response(response):
 # There are two types of pending work: completed and not completed yet.
 # For the not completed work, we give the bid given by the CLI.
 # For the already completed work, we halve the corresponding fee.
-def set_fee(pending_work, bid):
+def set_fee(pending_work, bid, work_counter):
     pending_work_with_fee = []
     for work, fee in pending_work:
         if fee == None:
+            print(
+                f"{work_counter}-th work not completed yet; performing with fee = {bid}"
+            )
             pending_work_with_fee.append((work, bid))
-        elif int(fee) == 0:
-            pass  # do not do the work if it is already done for 0 fees
         else:
-            pending_work_with_fee.append((work, int(fee) / 2))
+            print(f"{work_counter}-th work already completed with fee = {fee}")
+            pass
+        work_counter += 1
     return pending_work_with_fee
 
 
@@ -108,15 +111,14 @@ def spawn_workers(work_list):
         }
         # Collect results as they complete
         for future in as_completed(futures):
-            index = futures[future]
             try:
                 result = future.result()
             except Exception as e:
-                print(f"Worker number {index} generated an exception: {e}")
+                print(f"Worker generated an exception: {e}")
 
 
 def main(bid, start_index, batch_size):
-    end_index = batch_size
+    end_index = start_index + batch_size
     while True:
         pending_work = fetch_pending_work(start_index, end_index)
         # if no pending work was received, it means that either the node has not start yet, or we went over the size of the pending snark work list. In these cases we just reset the indices to go back from the beginning
@@ -127,7 +129,7 @@ def main(bid, start_index, batch_size):
             )
         else:
             print("Pending work was retreived successfully.")
-            pending_work = set_fee(pending_work, bid)
+            pending_work = set_fee(pending_work, bid, start_index)
             spawn_workers(pending_work)
             start_index += batch_size
             end_index += batch_size
