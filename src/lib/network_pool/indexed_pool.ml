@@ -705,7 +705,7 @@ let revalidate :
     ~f:(fun
          ~key:sender
          ~data:(queue, currency_reserved)
-         ((t', dropped_acc) as acc)
+         ((t, dropped_acc) as acc)
        ->
       if not (requires_revalidation sender) then acc
       else
@@ -792,7 +792,7 @@ let revalidate :
                 Sequence.fold tail
                   ~init:
                     (remove_all_by_fee_and_hash_and_expiration_exn
-                       (remove_applicable_exn t' head)
+                       (remove_applicable_exn t head)
                        head )
                   ~f:remove_all_by_fee_and_hash_and_expiration_exn
               in
