@@ -641,7 +641,11 @@ let remove_with_dependents_exn' t cmd =
       failwith "remove_with_dependents_exn"
 
 (** Drop commands from the end of the queue until the total currency consumed is
-    <= the current balance. *)
+    <= the current balance.
+
+    Returns the prefix of a queue, updated currency reserved and sequence of
+    dropped transactions in the same order they appear in queue.
+    *)
 let drop_until_sufficient_balance :
        Transaction_hash.User_command_with_valid_signature.t F_sequence.t
        * Currency.Amount.t
@@ -654,17 +658,17 @@ let drop_until_sufficient_balance :
     if Currency.Amount.(currency_reserved' <= current_balance) then
       (queue', currency_reserved', dropped_so_far)
     else
-      let daeh, liat =
+      let init, last =
         Option.value_exn
           ~message:
             "couldn't drop any more transactions when trying to preserve \
              sufficient balance"
           (F_sequence.unsnoc queue')
       in
-      let consumed = Option.value_exn (currency_consumed liat) in
-      go daeh
+      let consumed = Option.value_exn (currency_consumed last) in
+      go init
         (Option.value_exn Currency.Amount.(currency_reserved' - consumed))
-        (Sequence.append dropped_so_far @@ Sequence.singleton liat)
+        (Sequence.shift_right dropped_so_far last)
   in
   go queue currency_reserved Sequence.empty
 
@@ -760,6 +764,7 @@ let revalidate :
             (keep_queue, currency_reserved')
             current_balance
         in
+        (* NB: to_drop is ordered by nonce *)
         let to_drop =
           Sequence.append (F_sequence.to_seq drop_queue) dropped_for_balance
         in
