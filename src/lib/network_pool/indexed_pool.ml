@@ -786,43 +786,52 @@ let revalidate :
               (F_sequence.to_seq dropped_for_nonce)
               dropped_for_balance
           in
-          match Sequence.next to_drop with
-          | None ->
-              acc
-          | Some (head, tail) ->
-              let t'' =
-                Sequence.fold tail
-                  ~init:
-                    (remove_all_by_fee_and_hash_and_expiration_exn
-                       (remove_applicable_exn t head)
-                       head )
-                  ~f:remove_all_by_fee_and_hash_and_expiration_exn
-              in
-              let t''' =
-                match F_sequence.uncons keep_queue with
-                | None ->
-                    { t'' with
-                      all_by_sender = Map.remove t''.all_by_sender sender
-                    }
-                | Some (first_kept, _) ->
-                    let first_kept_unchecked =
-                      Transaction_hash.User_command_with_valid_signature.command
-                        first_kept
-                    in
-                    { t'' with
-                      all_by_sender =
-                        Map.set t''.all_by_sender ~key:sender
-                          ~data:(keep_queue, currency_reserved_updated)
-                    ; applicable_by_fee =
-                        Map_set.insert
-                          ( module Transaction_hash
-                                   .User_command_with_valid_signature )
-                          t''.applicable_by_fee
-                          (User_command.fee_per_wu first_kept_unchecked)
-                          first_kept
-                    }
-              in
-              (t''', Sequence.append dropped_acc to_drop) )
+          let keeping_prefix = F_sequence.is_empty dropped_for_nonce in
+          let keeping_suffix = Sequence.is_empty dropped_for_balance in
+          (* t with all_by_sender and applicable_by_fee fields updated *)
+          let t_partially_updated =
+            match F_sequence.uncons keep_queue with
+            | _ when keeping_prefix && keeping_suffix ->
+                (* Nothing dropped, nothing needs to be updated *)
+                t
+            | None ->
+                (* We drop the entire queue, first element needs to be removed from
+                   applicable_by_fee *)
+                let t' = remove_applicable_exn t first_cmd in
+                { t' with all_by_sender = Map.remove t'.all_by_sender sender }
+            | Some _ when keeping_prefix ->
+                (* We drop only transactions from the end of queue, keeping
+                   the head untouched, no need to update applicable_by_fee *)
+                { t with
+                  all_by_sender =
+                    Map.set t.all_by_sender ~key:sender
+                      ~data:(keep_queue, currency_reserved_updated)
+                }
+            | Some (first_kept, _) ->
+                (* We need to replace old queue head with the new queue head
+                   in applicable_by_fee *)
+                let first_kept_unchecked =
+                  Transaction_hash.User_command_with_valid_signature.command
+                    first_kept
+                in
+                let t' = remove_applicable_exn t first_cmd in
+                { t' with
+                  all_by_sender =
+                    Map.set t'.all_by_sender ~key:sender
+                      ~data:(keep_queue, currency_reserved_updated)
+                ; applicable_by_fee =
+                    Map_set.insert
+                      (module Transaction_hash.User_command_with_valid_signature)
+                      t'.applicable_by_fee
+                      (User_command.fee_per_wu first_kept_unchecked)
+                      first_kept
+                }
+          in
+          let t_updated =
+            Sequence.fold ~init:t_partially_updated
+              ~f:remove_all_by_fee_and_hash_and_expiration_exn to_drop
+          in
+          (t_updated, Sequence.append dropped_acc to_drop) )
 
 let expired_by_global_slot (t : t) :
     Transaction_hash.User_command_with_valid_signature.t Sequence.t =
