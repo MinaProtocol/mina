@@ -1083,6 +1083,38 @@ let to_signed_fee_exn sign magnitude =
   let sgn = match sign with `PLUS -> Sgn.Pos | `MINUS -> Neg in
   Currency.Fee.Signed.create ~sgn ~magnitude
 
+let format_pending_snark_work ?(f = Fun.id) graphql_endpoint =
+  Deferred.map
+    (Graphql_client.query_exn
+       Graphql_queries.Pending_snark_work.(make @@ makeVariables ())
+       graphql_endpoint )
+    ~f:(fun response ->
+      let lst =
+        [%to_yojson: Cli_lib.Graphql_types.Pending_snark_work.t]
+          (Array.map
+             ~f:(fun bundle ->
+               Array.map bundle.workBundle ~f:(fun w ->
+                   let fee_excess_left = w.fee_excess.feeExcessLeft in
+                   { Cli_lib.Graphql_types.Pending_snark_work.Work.work_id =
+                       w.work_id
+                   ; fee_excess =
+                       Currency.Amount.Signed.of_fee
+                         (to_signed_fee_exn fee_excess_left.sign
+                            fee_excess_left.feeMagnitude )
+                   ; supply_increase = w.supply_increase
+                   ; source_first_pass_ledger_hash =
+                       w.source_first_pass_ledger_hash
+                   ; target_first_pass_ledger_hash =
+                       w.target_first_pass_ledger_hash
+                   ; source_second_pass_ledger_hash =
+                       w.source_second_pass_ledger_hash
+                   ; target_second_pass_ledger_hash =
+                       w.target_second_pass_ledger_hash
+                   } ) )
+             (f response.pendingSnarkWork) )
+      in
+      print_string (Yojson.Safe.to_string lst) )
+
 let pending_snark_work =
   let open Command.Param in
   Command.async
@@ -1091,36 +1123,40 @@ let pending_snark_work =
        yet"
     (Cli_lib.Background_daemon.graphql_init (return ())
        ~f:(fun graphql_endpoint () ->
-         Deferred.map
-           (Graphql_client.query_exn
-              Graphql_queries.Pending_snark_work.(make @@ makeVariables ())
-              graphql_endpoint )
-           ~f:(fun response ->
-             let lst =
-               [%to_yojson: Cli_lib.Graphql_types.Pending_snark_work.t]
-                 (Array.map
-                    ~f:(fun bundle ->
-                      Array.map bundle.workBundle ~f:(fun w ->
-                          let fee_excess_left = w.fee_excess.feeExcessLeft in
-                          { Cli_lib.Graphql_types.Pending_snark_work.Work
-                            .work_id = w.work_id
-                          ; fee_excess =
-                              Currency.Amount.Signed.of_fee
-                                (to_signed_fee_exn fee_excess_left.sign
-                                   fee_excess_left.feeMagnitude )
-                          ; supply_increase = w.supply_increase
-                          ; source_first_pass_ledger_hash =
-                              w.source_first_pass_ledger_hash
-                          ; target_first_pass_ledger_hash =
-                              w.target_first_pass_ledger_hash
-                          ; source_second_pass_ledger_hash =
-                              w.source_second_pass_ledger_hash
-                          ; target_second_pass_ledger_hash =
-                              w.target_second_pass_ledger_hash
-                          } ) )
-                    response.pendingSnarkWork )
-             in
-             print_string (Yojson.Safe.to_string lst) ) ) )
+         format_pending_snark_work graphql_endpoint ) )
+
+let pending_snark_work_range =
+  let open Command.Param in
+  let start_idx =
+    flag "--start-idx" ~aliases:[ "start-idx" ]
+      ~doc:"START_IDX first index of the range (included)"
+      (required Cli_lib.Arg_type.int16)
+  in
+  let end_idx =
+    flag "--end-idx" ~aliases:[ "end-idx" ]
+      ~doc:"END_IDX first index of the range (excluded)"
+      (optional Cli_lib.Arg_type.int16)
+  in
+  Command.async
+    ~summary:
+      "Range of snark works in JSON format that are not available in the pool \
+       yet. Returns empty list if one of the indexes is negative."
+    (Cli_lib.Background_daemon.graphql_init (Args.zip2 start_idx end_idx)
+       ~f:(fun graphql_endpoint (start_idx, end_idx) ->
+         let f pending_snark_work =
+           let len_response = Array.length pending_snark_work in
+           if start_idx < 0 || len_response <= start_idx then [||]
+           else
+             match end_idx with
+             | None ->
+                 Array.subo ~pos:start_idx pending_snark_work
+             | Some end_idx when 0 <= start_idx && start_idx < end_idx ->
+                 let len = min len_response end_idx - start_idx in
+                 Array.sub ~pos:start_idx ~len pending_snark_work
+             | _ ->
+                 [||]
+         in
+         format_pending_snark_work ~f graphql_endpoint ) )
 
 let start_tracing =
   Command.async
@@ -2563,6 +2599,7 @@ let advanced ~itn_features =
     ; ("pooled-zkapp-commands", pooled_zkapp_commands)
     ; ("snark-pool-list", snark_pool_list)
     ; ("pending-snark-work", pending_snark_work)
+    ; ("pending-snark-work-range", pending_snark_work_range)
     ; ("compile-time-constants", compile_time_constants)
     ; ("node-status", node_status)
     ; ("visualization", Visualization.command_group)
