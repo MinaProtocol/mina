@@ -901,6 +901,13 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
   |> Deferred.don't_wait_for
 
+let add_work_graphql t diff =
+  let results_ivar = Ivar.create () in
+  Network_pool.Snark_pool.Local_sink.push t.pipes.snark_local_sink
+    (diff, Ivar.fill results_ivar)
+  |> Deferred.don't_wait_for ;
+  Ivar.read results_ivar
+
 let get_current_nonce t aid =
   match
     Participating_state.active
