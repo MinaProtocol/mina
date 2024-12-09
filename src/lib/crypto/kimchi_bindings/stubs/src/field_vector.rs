@@ -1,4 +1,5 @@
-//! We implement a custom type for field vectors in order to quickly build field vectors from the OCaml side and avoid large vector clones.
+//! We implement a custom type for field vectors in order to quickly build field
+//! vectors from the OCaml side and avoid large vector clones.
 
 use paste::paste;
 
