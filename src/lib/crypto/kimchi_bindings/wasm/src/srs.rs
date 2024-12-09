@@ -226,8 +226,8 @@ pub mod fp {
     #[wasm_bindgen]
     pub fn caml_fp_srs_get(srs: &WasmFpSrs) -> WasmVector<WasmG> {
         // return a vector which consists of h, then all the gs
-        let mut h_and_gs: Vec<WasmG> = vec![srs.0.h.clone().into()];
-        h_and_gs.extend(srs.0.g.iter().map(|x: &G| WasmG::from(x.clone())));
+        let mut h_and_gs: Vec<WasmG> = vec![srs.0.h.into()];
+        h_and_gs.extend(srs.0.g.iter().map(|x: &G| WasmG::from(*x)));
         h_and_gs.into()
     }
 
@@ -285,7 +285,7 @@ pub mod fp {
                 EvaluationDomain::<Fp>::new(domain_size as usize).expect("invalid domain size");
             srs.get_lagrange_basis(domain)
         });
-        basis.into_iter().map(Into::into).collect()
+        basis.iter().map(Into::into).collect()
     }
 }
 
@@ -306,8 +306,8 @@ pub mod fq {
     #[wasm_bindgen]
     pub fn caml_fq_srs_get(srs: &WasmFqSrs) -> WasmVector<WasmG> {
         // return a vector which consists of h, then all the gs
-        let mut h_and_gs: Vec<WasmG> = vec![srs.0.h.clone().into()];
-        h_and_gs.extend(srs.0.g.iter().map(|x: &G| WasmG::from(x.clone())));
+        let mut h_and_gs: Vec<WasmG> = vec![srs.0.h.into()];
+        h_and_gs.extend(srs.0.g.iter().map(|x: &G| WasmG::from(*x)));
         h_and_gs.into()
     }
 
@@ -365,6 +365,6 @@ pub mod fq {
                 EvaluationDomain::<Fq>::new(domain_size as usize).expect("invalid domain size");
             srs.get_lagrange_basis(domain)
         });
-        basis.into_iter().map(Into::into).collect()
+        basis.iter().map(Into::into).collect()
     }
 }
