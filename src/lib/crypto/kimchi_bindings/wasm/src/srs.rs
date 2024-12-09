@@ -4,7 +4,7 @@ use ark_poly::DenseUVPolynomial;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
 use paste::paste;
 use poly_commitment::SRS as ISRS;
-use poly_commitment::{commitment::b_poly_coefficients, srs::SRS, hash_map_cache::HashMapCache};
+use poly_commitment::{commitment::b_poly_coefficients, hash_map_cache::HashMapCache, ipa::SRS};
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 use std::{
@@ -226,8 +226,8 @@ pub mod fp {
     #[wasm_bindgen]
     pub fn caml_fp_srs_get(srs: &WasmFpSrs) -> WasmVector<WasmG> {
         // return a vector which consists of h, then all the gs
-        let mut h_and_gs: Vec<WasmG> = vec![srs.0.h.clone().into()];
-        h_and_gs.extend(srs.0.g.iter().map(|x: &G| WasmG::from(x.clone())));
+        let mut h_and_gs: Vec<WasmG> = vec![srs.0.h.into()];
+        h_and_gs.extend(srs.0.g.iter().map(|x: &G| WasmG::from(*x)));
         h_and_gs.into()
     }
 
@@ -267,9 +267,10 @@ pub mod fp {
         domain_size: i32,
         input_bases: WasmVector<WasmPolyComm>,
     ) {
-        srs.lagrange_bases.get_or_generate(domain_size as usize, || {
-            input_bases.into_iter().map(Into::into).collect()
-        });
+        srs.lagrange_bases
+            .get_or_generate(domain_size as usize, || {
+                input_bases.into_iter().map(Into::into).collect()
+            });
     }
 
     // compute & add lagrange basis internally, return the entire basis
@@ -279,13 +280,12 @@ pub mod fp {
         domain_size: i32,
     ) -> WasmVector<WasmPolyComm> {
         // compute lagrange basis
-        let basis =
-        crate::rayon::run_in_pool(|| {
+        let basis = crate::rayon::run_in_pool(|| {
             let domain =
                 EvaluationDomain::<Fp>::new(domain_size as usize).expect("invalid domain size");
             srs.get_lagrange_basis(domain)
         });
-        basis.into_iter().map(Into::into).collect()
+        basis.iter().map(Into::into).collect()
     }
 }
 
@@ -306,8 +306,8 @@ pub mod fq {
     #[wasm_bindgen]
     pub fn caml_fq_srs_get(srs: &WasmFqSrs) -> WasmVector<WasmG> {
         // return a vector which consists of h, then all the gs
-        let mut h_and_gs: Vec<WasmG> = vec![srs.0.h.clone().into()];
-        h_and_gs.extend(srs.0.g.iter().map(|x: &G| WasmG::from(x.clone())));
+        let mut h_and_gs: Vec<WasmG> = vec![srs.0.h.into()];
+        h_and_gs.extend(srs.0.g.iter().map(|x: &G| WasmG::from(*x)));
         h_and_gs.into()
     }
 
@@ -347,9 +347,10 @@ pub mod fq {
         domain_size: i32,
         input_bases: WasmVector<WasmPolyComm>,
     ) {
-        srs.lagrange_bases.get_or_generate(domain_size as usize, || {
-            input_bases.into_iter().map(Into::into).collect()
-        });
+        srs.lagrange_bases
+            .get_or_generate(domain_size as usize, || {
+                input_bases.into_iter().map(Into::into).collect()
+            });
     }
 
     // compute & add lagrange basis internally, return the entire basis
@@ -359,12 +360,11 @@ pub mod fq {
         domain_size: i32,
     ) -> WasmVector<WasmPolyComm> {
         // compute lagrange basis
-        let basis =
-        crate::rayon::run_in_pool(|| {
+        let basis = crate::rayon::run_in_pool(|| {
             let domain =
                 EvaluationDomain::<Fq>::new(domain_size as usize).expect("invalid domain size");
             srs.get_lagrange_basis(domain)
         });
-        basis.into_iter().map(Into::into).collect()
+        basis.iter().map(Into::into).collect()
     }
 }

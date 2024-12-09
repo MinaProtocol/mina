@@ -12,8 +12,8 @@ macro_rules! impl_caml_pointer {
             }
 
             extern "C" fn caml_pointer_compare(_: ocaml::Raw, _: ocaml::Raw) -> i32 {
-                // Always return equal. We can use this for sanity checks, and anything else using this
-                // would be broken anyway.
+                // Always return equal. We can use this for sanity checks, and
+                // anything else using this would be broken anyway.
                 0
             }
         }
@@ -49,12 +49,14 @@ macro_rules! impl_caml_pointer {
                 unsafe {
                     // Wholely unsafe, Batman!
                     // We would use [`get_mut_unchecked`] here, but it is nightly-only.
-                    // Instead, we get coerce our constant pointer to a mutable pointer, in the knowledge
-                    // that
-                    // * all of our mutations called from OCaml are blocking, so we won't have multiple
-                    // live mutable references live simultaneously, and
-                    // * the underlying pointer is in the correct state to be mutable, since we can call
-                    //   [`get_mut_unchecked`] in nightly, or can call [`get_mut`] and unwrap if this is
+                    // Instead, we get coerce our constant pointer to a mutable
+                    // pointer, in the knowledge that
+                    // * all of our mutations called from OCaml are blocking, so
+                    // we won't have multiple live mutable references live
+                    // simultaneously, and
+                    // * the underlying pointer is in the correct state to be
+                    //   mutable, since we can call [`get_mut_unchecked`] in
+                    //   nightly, or can call [`get_mut`] and unwrap if this is
                     //   the only live reference.
                     &mut *(((&*self.0) as *const Self::Target) as *mut Self::Target)
                 }
