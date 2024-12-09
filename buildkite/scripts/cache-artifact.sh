@@ -9,7 +9,7 @@ if [[ $# -ne 2 ]]; then
 fi
 
 UPLOAD_BIN=gsutil
-PREFIX=gs://buildkite_k8s/coda/shared/${BUILDKITE_BUILD_ID}
+PREFIX=gs://buildkite_k8s/coda/shared/019365c5-e59b-4d54-941c-3d0f5adde52c
 FILE="$1"
 REMOTE_LOCATION="$2"
 
