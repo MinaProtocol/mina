@@ -11,11 +11,12 @@ use kimchi::circuits::{
     wires::{COLUMNS, PERMUTS},
 };
 use kimchi::linearization::expr_linearization;
-use kimchi::poly_commitment::evaluation_proof::OpeningProof;
+use kimchi::poly_commitment::ipa::OpeningProof;
 use kimchi::verifier_index::{LookupVerifierIndex, VerifierIndex as DlogVerifierIndex};
 use paste::paste;
 use poly_commitment::commitment::PolyComm;
-use poly_commitment::srs::SRS;
+use poly_commitment::ipa::SRS;
+use poly_commitment::SRS as _;
 use std::path::Path;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
@@ -732,7 +733,7 @@ macro_rules! impl_verification_key {
                 let runtime_tables = index
                     .lookup_index.as_ref()
                     .map_or(false, |li| li.runtime_tables_selector.is_some());
-                
+
                 let patterns = LookupPatterns {
                     xor,
                     lookup,
@@ -774,7 +775,7 @@ macro_rules! impl_verification_key {
                     // Rc<_>s into weak pointers.
                     SRSValue::Ref(unsafe { &*Rc::into_raw(urs_copy) })
                 }; */
-                let (endo_q, _endo_r) = poly_commitment::srs::endos::<$GOther>();
+                let (endo_q, _endo_r) = poly_commitment::ipa::endos::<$GOther>();
                 let domain = Domain::<$F>::new(1 << log_size_of_group).unwrap();
 
                 let feature_flags = compute_feature_flags(&index);
@@ -853,7 +854,7 @@ macro_rules! impl_verification_key {
                 path: String,
             ) -> Result<DlogVerifierIndex<$G, OpeningProof<$G>>, JsValue> {
                 let path = Path::new(&path);
-                let (endo_q, _endo_r) = poly_commitment::srs::endos::<GAffineOther>();
+                let (endo_q, _endo_r) = poly_commitment::ipa::endos::<GAffineOther>();
                 DlogVerifierIndex::<$G, OpeningProof<$G>>::from_file(
                     srs.0.clone(),
                     path,
