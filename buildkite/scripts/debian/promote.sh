@@ -12,6 +12,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -s|--from-component) FROM_COMPONENT="$2"; shift;;
   -t|--to-component) TO_COMPONENT="$2"; shift;;
   --new-name) NEW_NAME="$2"; shift;;
+  --repo-key) REPO_KEY="$2"; shift;;
   --new-repo) NEW_REPO="$2"; shift;;
   -r|--repo) REPO="$2"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
@@ -30,6 +31,7 @@ function usage() {
   echo "  -s, --from-component   The source channel in which package currently resides"
   echo "  -t, --to-component     The target channel for package (unstable, alpha, beta etc.)"
   echo "  -c, --codename         The Debian codename (bullseye, focal etc.)"
+  echo "  --repo-key         The Debian target repo key"
   echo "  -r, --repo             The Debian source repo"
   echo "  --new-repo             The Debian target repo. By default equal to repo"
   echo ""
@@ -44,6 +46,7 @@ if [[ -z "$CODENAME" ]]; then usage "Codename is not set!"; fi;
 if [[ -z "$NEW_NAME" ]]; then NEW_NAME=$PACKAGE; fi;
 if [[ -z "$FROM_COMPONENT" ]]; then usage "Source component is not set!"; fi;
 if [[ -z "$TO_COMPONENT" ]]; then usage "Target component is not set!"; fi;
+if [[ -z "$REPO_KEY" ]]; then usage "Target repository key is not set!"; fi;
 if [[ -z "$REPO" ]]; then usage "Repository is not set!"; fi;
 if [[ -z "$NEW_REPO" ]]; then NEW_REPO=$REPO; fi;
 
@@ -72,6 +75,7 @@ else
     --suite $FROM_COMPONENT \
     --new-suite $TO_COMPONENT \
     --new-name $NEW_NAME \
+    --sign $REPO_KEY
     --repo $REPO \
     --new-repo $NEW_REPO
 fi

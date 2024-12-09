@@ -4,6 +4,8 @@ let Optional/map = Prelude.Optional.map
 
 let Optional/default = Prelude.Optional.default
 
+let Optional/toList = Prelude.Optional.toList
+
 let DebianRepo
     : Type
     = < Local | PackagesO1Test | Unstable | Nightly | Stable >
@@ -30,6 +32,17 @@ let bucket =
             }
             repo
 
+let keyId =
+          \(repo : DebianRepo)
+      ->  merge
+            { Local = None Text
+            , PackagesO1Test = None Text
+            , Unstable = Some "B40D16B1A4773DE415DAF9DBFE236881C07523DC"
+            , Nightly = Some "B40D16B1A4773DE415DAF9DBFE236881C07523DC"
+            , Stable = Some "B40D16B1A4773DE415DAF9DBFE236881C07523DC"
+            }
+            repo
+
 let bucket_or_default =
           \(repo : DebianRepo)
       ->  let maybeBucket =
@@ -51,17 +64,6 @@ let bucketArg =
                   (bucket repo)
 
           in  Optional/default Text "" maybeBucket
-
-let keyId =
-          \(repo : DebianRepo)
-      ->  merge
-            { Local = None Text
-            , PackagesO1Test = None Text
-            , Unstable = Some "B40D16B1A4773DE415DAF9DBFE236881C07523DC"
-            , Nightly = Some "B40D16B1A4773DE415DAF9DBFE236881C07523DC"
-            , Stable = Some "B40D16B1A4773DE415DAF9DBFE236881C07523DC"
-            }
-            repo
 
 let keyAddress =
           \(repo : DebianRepo)
@@ -98,7 +100,7 @@ let keyArg =
 
           in  Optional/default Text "" maybeKey
 
-let keyIdEnv =
+let keyIdEnvList =
           \(repo : DebianRepo)
       ->  let maybeKey =
                 Optional/map
@@ -107,27 +109,27 @@ let keyIdEnv =
                   (\(repo : Text) -> "SIGN=" ++ repo)
                   (keyId repo)
 
-          in  Optional/default Text "" maybeKey
+          in  Optional/toList Text maybeKey
 
-let bucketEnv =
+let bucketEnvList =
           \(repo : DebianRepo)
-      ->  let maybeKey =
+      ->  let maybeBucket =
                 Optional/map
                   Text
                   Text
                   (\(repo : Text) -> "BUCKET=" ++ repo)
                   (bucket repo)
 
-          in  Optional/default Text "" maybeKey
+          in  Optional/toList Text maybeBucket
 
 in  { Type = DebianRepo
-    , keyIdEnv = keyIdEnv
+    , keyIdEnvList = keyIdEnvList
     , keyAddressArg = keyAddressArg
     , address = address
     , bucket = bucket
     , bucket_or_default = bucket_or_default
     , bucketArg = bucketArg
-    , bucketEnv = bucketEnv
+    , bucketEnvList = bucketEnvList
     , keyId = keyId
     , keyArg = keyArg
     }
