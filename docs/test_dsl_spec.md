@@ -192,7 +192,7 @@ DSL.List.iter (left_partition @ right_partition) ~f:destroy
 
 ALTERNATIVE TEST: keep two partitions separate with a fixed topology, with 1-2 intermediate
 nodes bridging the networks, then take the other bridge offline temporarily and then have them
-rejoin the network without topologoical restrictions and see if the chains reconverge
+rejoin the network without topological restrictions and see if the chains reconverge
 
 ##### Basic Hard Fork Test
 
