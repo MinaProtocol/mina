@@ -3,7 +3,7 @@
 This folder holds static data which is used when testing replayer component. Name 'component' is used in context of test since it is not na unit tests but also not interfere with other mina components, so it cannot be called integration test. Basically test production version of replayer against manually prepared data and input config file using command:
 
 ```
-mina-replayer --archive-uri {connection_string} --input-file input.json 
+mina-replayer --archive-uri {connection_string} --input-file input.json
 ```
 
 It expects success
@@ -31,23 +31,51 @@ After we are satisfied with data generation process. We can dump archive data an
 
 #### Full script
 
-Disclaimer: I'm a nix user and has already setup nix on my machine 
+Disclaimer: I'm a nix user and has already setup nix on my machine
 
-```
+```bash
 nix develop mina
 
-dune build src/app/cli/src/mina.exe src/app/archive/archive.exe src/app/zkapp_test_transaction/zkapp_test_transaction.exe src/app/logproc/logproc.exe
+DUNE_PROFILE=devnet dune build src/app/cli/src/mina.exe src/app/archive/archive.exe src/app/zkapp_test_transaction/zkapp_test_transaction.exe src/app/logproc/logproc.exe
 
-./scripts/mina-local-network/mina-local-network.sh -a -r -pu postgres -ppw postgres -zt -vt
+psql -c 'CREATE DATABASE archive'
+psql archive < ./src/app/archive/create_schema.sql
+# set the password to postgres or change the `-ppw` option to agree with what you chose
+echo "\\password postgres" | psql archive
+
+DUNE_PROFILE=devnet ./scripts/mina-local-network/mina-local-network.sh -a -r -pu postgres -ppw postgres -zt -vt -lp
+# This script will run forever
+# In a seperate terminal run
+watch 'psql archive -t -c  "select MAX(global_slot_since_genesis) from blocks"'
+# This will tell you the current height of the chain
+# You can stop the script when it's at least 24
+
+# at this point you probably want to run this script to make the blocks canonical
+./src/test/archive/sample_db/convert_chain_to_canonical.sh postgres://postgres:postgres@localhost:5432/archive
+
+# replace precomputed_blocks.zip with whole mess
+mkdir precomputed_blocks
+find ~/.mina-network -name 'precomputed_blocks.log' | xargs -I ! ./scripts/mina-local-network/split_precomputed_log.sh ! precomputed_blocks
+rm ./src/test/archive/sample_db/precomputed_blocks.zip
+zip -r ./src/test/archive/sample_db/precomputed_blocks.zip precomputed_blocks
+rm -rf precomputed_blocks
+
 
 # archive_db.sql
-pg_dump -U postgres -d archive > archive_db.sql
+pg_dump -U postgres -d archive > ./src/test/archive/sample_db/archive_db.sql
 
-# input file 
-cp ~/.mina-network/mina-local-network-2-1-1/genesis_ledger.json
-cat genesis_ledger.json | jq '.ledger.accounts' > _tmp.json
-echo '{ "genesis_ledger": { "accounts": '$(cat _tmp.json)' } }' | jq > input.json
-            
+# input file
+cp ~/.mina-network/mina-local-network-2-1-1/genesis_ledger.json _tmp1.json
+cat _tmp1.json | jq '.accounts' > _tmp2.json
+echo '{ "genesis_ledger": { "accounts": '$(cat _tmp2.json)' } }' | jq > _tmp3.json
+NEW_HASH=$(psql archive -t -c  'SELECT state_hash from blocks where global_slot_since_genesis = (SELECT MAX(global_slot_since_genesis) from blocks)' | head -n1 | sed 's/^ *//')
+cat _tmp3.json | jq -c '.+{"target_epoch_ledgers_state_hash": "'$NEW_HASH'"}' > ./src/test/archive/sample_db/replayer_input_file.json
+rm _tmp*.json
+
+# genesis_ledger
+cat src/test/archive/sample_db/genesis.json | jq --arg ledger "$(cat ~/.mina-network/mina-local-network-2-1-1/genesis_ledger.json | jq -c)"  > _tmp.json
+mv _tmp.json src/test/archive/sample_db/genesis.json
+
 
 ```
 
@@ -58,7 +86,7 @@ As mentioned in previous section we need to have some canonical blocks in archiv
 a) We can alter input config and use `target_epoch_ledgers_state_hash` property in replayer input file to inform replayer that we want to replay also pending blocks. Example:
 
 ```
-{ 
+{
     "target_epoch_ledgers_state_hash": "3NLbZ28M72eewCxYUCE3CwQo5c7wPzoiGcNC5Bbe8oEnrutXtZt9",
     "genesis_ledger": {
     "name": "release",
@@ -67,7 +95,7 @@ a) We can alter input config and use `target_epoch_ledgers_state_hash` property 
      {
       "pk": "B62qkamwHMkTvY3t9wu4Aw4LJTDJY4m6Sk48pJ2kSMtV1fxKP2SSzWq",
    .....
-     
+
 ```
 
 b) Convert pending chain to canonical blocks using helper script:

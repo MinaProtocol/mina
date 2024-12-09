@@ -305,7 +305,17 @@
 
         # Packages for the development environment that are not needed to build mina-dev.
         # For instance dependencies for tests.
-        devShellPackages = with pkgs; [ rosetta-cli wasm-pack nodejs binaryen ];
+        devShellPackages = with pkgs;
+          [ rosetta-cli
+            wasm-pack
+            nodejs
+            binaryen
+            (pkgs.python3.withPackages (python-pkgs: [
+                python-pkgs.click
+                python-pkgs.requests
+              ]))
+              pkgs.jq
+          ];
       in {
         inherit ocamlPackages;
 

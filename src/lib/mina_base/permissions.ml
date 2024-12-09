@@ -72,6 +72,9 @@ module Auth_required = struct
     | t ->
         t
 
+  let gen : t Quickcheck.Generator.t =
+    Quickcheck.Generator.of_list [ None; Either; Proof; Signature ]
+
   (* permissions such that [check permission (Proof _)] is true *)
   let gen_for_proof_authorization : t Quickcheck.Generator.t =
     Quickcheck.Generator.of_list [ None; Either; Proof ]
@@ -244,6 +247,21 @@ module Auth_required = struct
     type t = Boolean.var Encoding.t
 
     let if_ = Encoding.if_
+
+    let equal (a : t) (b : t) : Boolean.var Checked.t =
+      let open Checked.Let_syntax in
+      Boolean.(
+        let%bind signature_necessary_equal =
+          equal
+            (Encoding.signature_necessary a)
+            (Encoding.signature_necessary b)
+        in
+        let%bind signature_sufficient_equal =
+          equal
+            (Encoding.signature_sufficient a)
+            (Encoding.signature_sufficient b)
+        in
+        signature_necessary_equal && signature_sufficient_equal)
 
     let to_input : t -> _ =
       Encoding.to_input ~field_of_bool:(fun (b : Boolean.var) ->
@@ -591,7 +609,7 @@ let empty : t =
 
 (* deriving-fields-related stuff *)
 
-let auth_required =
+let auth_required () =
   Fields_derivers_zkapps.Derivers.iso_string ~name:"AuthRequired"
     ~js_type:(Custom "AuthRequired") ~doc:"Kind of authorization required"
     ~to_string:Auth_required.to_string ~of_string:Auth_required.of_string
@@ -606,7 +624,8 @@ module As_record = struct
     let transaction_version =
       needs_custom_js ~js_type:uint32 ~name:"TransactionVersion" uint32
     in
-    Fields.make_creator obj ~auth:!.auth_required
+    Fields.make_creator obj
+      ~auth:!.(auth_required ())
       ~txn_version:!.transaction_version
     |> finish "VerificationKeyPermission" ~t_toplevel_annots
 end
@@ -617,6 +636,7 @@ let of_record { As_record.auth; txn_version } = (auth, txn_version)
 
 let deriver obj =
   let open Fields_derivers_zkapps.Derivers in
+  let auth_required = auth_required () in
   let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
   Poly.Fields.make_creator obj ~edit_state:!.auth_required ~send:!.auth_required
     ~receive:!.auth_required ~set_delegate:!.auth_required

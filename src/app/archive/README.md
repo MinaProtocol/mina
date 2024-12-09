@@ -30,7 +30,7 @@ Note that setting the authentication method to `trust` is very unsafe,
 because it allows anyone to connect without giving a password. While
 convenient and acceptable in development settings, this option should
 never be used in production. Also note that even with authentication
-method set to `trust``, its still necessary to provide a password for
+method set to `trust`, its still necessary to provide a password for
 the database user.
 
 The Docker container creates the database with the given name automatically.
