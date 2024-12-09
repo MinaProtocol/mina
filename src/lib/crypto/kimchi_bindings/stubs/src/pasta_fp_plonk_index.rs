@@ -85,7 +85,7 @@ pub fn caml_pasta_fp_plonk_index_create(
     };
 
     // endo
-    let (endo_q, _endo_r) = poly_commitment::srs::endos::<Pallas>();
+    let (endo_q, _endo_r) = poly_commitment::ipa::endos::<Pallas>();
 
     srs.0.with_lagrange_basis(cs.domain.d1);
 
@@ -100,7 +100,7 @@ pub fn caml_pasta_fp_plonk_index_create(
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_index_max_degree(index: CamlPastaFpPlonkIndexPtr) -> ocaml::Int {
-    index.as_ref().0.srs.max_degree() as isize
+    index.as_ref().0.srs.max_poly_size() as isize
 }
 
 #[ocaml_gen::func]
