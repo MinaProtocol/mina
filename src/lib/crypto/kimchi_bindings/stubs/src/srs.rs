@@ -5,7 +5,7 @@ use paste::paste;
 use poly_commitment::SRS as _;
 use poly_commitment::{
     commitment::{b_poly_coefficients, caml::CamlPolyComm},
-    srs::SRS,
+    ipa::SRS,
 };
 use serde::{Deserialize, Serialize};
 use std::{

@@ -9,10 +9,11 @@ use crate::wasm_vector::{fq::*, WasmVector};
 use kimchi::circuits::lookup::tables::LookupTable;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::linearization::expr_linearization;
-use kimchi::poly_commitment::evaluation_proof::OpeningProof;
+use kimchi::poly_commitment::ipa::OpeningProof;
 use kimchi::prover_index::ProverIndex;
 use mina_curves::pasta::{Fq, Pallas as GAffine, PallasParameters, Vesta as GAffineOther};
 use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
+use poly_commitment::SRS;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -140,7 +141,7 @@ pub fn caml_pasta_fq_plonk_index_create(
         };
 
         // endo
-        let (endo_q, _endo_r) = poly_commitment::srs::endos::<GAffineOther>();
+        let (endo_q, _endo_r) = poly_commitment::ipa::endos::<GAffineOther>();
 
         srs.0.get_lagrange_basis(cs.domain.d1);
 
@@ -161,7 +162,7 @@ pub fn caml_pasta_fq_plonk_index_create(
 
 #[wasm_bindgen]
 pub fn caml_pasta_fq_plonk_index_max_degree(index: &WasmPastaFqPlonkIndex) -> i32 {
-    index.0.srs.max_degree() as i32
+    index.0.srs.max_poly_size() as i32
 }
 
 #[wasm_bindgen]

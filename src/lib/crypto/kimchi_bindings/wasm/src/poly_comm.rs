@@ -49,9 +49,9 @@ macro_rules! impl_poly_comm {
 
             impl From<PolyComm<$G>> for WasmPolyComm {
                 fn from(x: PolyComm<$G>) -> Self {
-                    let PolyComm { elems } = x;
+                    let PolyComm { chunks } = x;
                     let unshifted: Vec<$WasmG> =
-                        elems.into_iter().map(|x| x.into()).collect();
+                        chunks.into_iter().map(|x| x.into()).collect();
                     WasmPolyComm {
                         unshifted: unshifted.into(),
                         shifted: None
@@ -62,7 +62,7 @@ macro_rules! impl_poly_comm {
             impl From<&PolyComm<$G>> for WasmPolyComm {
                 fn from(x: &PolyComm<$G>) -> Self {
                     let unshifted: Vec<$WasmG> =
-                        x.elems.iter().map(|x| x.into()).collect();
+                        x.chunks.iter().map(|x| x.into()).collect();
                     WasmPolyComm {
                         unshifted: unshifted.into(),
                         shifted: None,
@@ -78,7 +78,7 @@ macro_rules! impl_poly_comm {
                         "mina#14628: Shifted commitments are deprecated and must not be used"
                     );
                     PolyComm {
-                        elems: (*unshifted).iter().map(|x| { (*x).into() }).collect(),
+                        chunks: (*unshifted).iter().map(|x| { (*x).into() }).collect(),
                     }
                 }
             }
@@ -90,7 +90,7 @@ macro_rules! impl_poly_comm {
                         "mina#14628: Shifted commitments are deprecated and must not be used"
                     );
                     PolyComm {
-                        elems: x.unshifted.iter().map(|x| { (*x).into() }).collect(),
+                        chunks: x.unshifted.iter().map(|x| { (*x).into() }).collect(),
                     }
                 }
             }

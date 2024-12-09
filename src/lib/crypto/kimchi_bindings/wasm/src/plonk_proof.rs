@@ -30,9 +30,10 @@ use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
+use poly_commitment::SRS as _;
 use poly_commitment::{
     commitment::{CommitmentCurve, PolyComm},
-    evaluation_proof::OpeningProof,
+    ipa::OpeningProof,
 };
 use serde::{Deserialize, Serialize};
 
@@ -681,7 +682,7 @@ macro_rules! impl_proof {
                                             .map(|a| a.clone().into())
                                             .collect();
                                     let comm = PolyComm::<$G> {
-                                        elems: vec![sg],
+                                        chunks: vec![sg],
                                     };
                                     RecursionChallenge { chals, comm }
                                 })
@@ -782,7 +783,7 @@ macro_rules! impl_proof {
                 fn comm() -> PolyComm<$G> {
                     let g = $G::generator();
                     PolyComm {
-                        elems: vec![g, g, g],
+                        chunks: vec![g, g, g],
                     }
                 }
 
