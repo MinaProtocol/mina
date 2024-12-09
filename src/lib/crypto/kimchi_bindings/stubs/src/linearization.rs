@@ -44,8 +44,8 @@ pub fn linearization_strings<F: ark_ff::PrimeField>(
         mut index_terms,
     } = linearization.linearize(evaluated_cols).unwrap();
 
-    // HashMap deliberately uses an unstable order; here we sort to ensure that the output is
-    // consistent when printing.
+    // HashMap deliberately uses an unstable order; here we sort to ensure that
+    // the output is consistent when printing.
     index_terms.sort_by(|(x, _), (y, _)| x.cmp(y));
 
     let constant = constant_term.ocaml_str();
