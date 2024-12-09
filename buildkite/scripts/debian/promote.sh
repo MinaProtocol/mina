@@ -12,6 +12,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -s|--from-component) FROM_COMPONENT="$2"; shift;;
   -t|--to-component) TO_COMPONENT="$2"; shift;;
   --new-name) NEW_NAME="$2"; shift;;
+  --repo-key) REPO_KEY="$2"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
@@ -28,8 +29,9 @@ function usage() {
   echo "  -s, --from-component   The source channel in which package currently resides"
   echo "  -t, --to-component     The target channel for package (unstable, alpha, beta etc.)"
   echo "  -c, --codename         The Debian codename (bullseye, focal etc.)"
+  echo "  --repo-key         The Debian target repo key"
   echo ""
-  echo "Example: $0 --package mina-archive --version 2.0.0berkeley-rc1-berkeley-48efea4 --architecture amd64 --codename bullseye --from-component unstable --to-component nightly"
+  echo "Example: $0 --package mina-archive --version 2.0.0-rc1-48efea4 --architecture amd64 --codename bullseye --from-component unstable --to-component nightly"
   exit 1
 }
 
@@ -40,6 +42,7 @@ if [[ -z "$CODENAME" ]]; then usage "Codename is not set!"; fi;
 if [[ -z "$NEW_NAME" ]]; then NEW_NAME=$PACKAGE; fi;
 if [[ -z "$FROM_COMPONENT" ]]; then usage "Source component is not set!"; fi;
 if [[ -z "$TO_COMPONENT" ]]; then usage "Target component is not set!"; fi;
+if [[ -z "$REPO_KEY" ]]; then usage "Target repository key is not set!"; fi;
 
 # check for AWS Creds
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
@@ -65,5 +68,6 @@ else
     --new-version $NEW_VERSION \
     --suite $FROM_COMPONENT \
     --new-suite $TO_COMPONENT \
-    --new-name $NEW_NAME
+    --new-name $NEW_NAME \
+    --sign $REPO_KEY
 fi

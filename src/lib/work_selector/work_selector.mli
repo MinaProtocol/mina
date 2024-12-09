@@ -31,3 +31,6 @@ val pending_work_statements :
   -> fee_opt:Currency.Fee.t option
   -> State.t
   -> Transaction_snark.Statement.t One_or_two.t list
+
+val completed_work_statements :
+  snark_pool:snark_pool -> State.t -> Transaction_snark_work.unchecked list

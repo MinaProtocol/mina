@@ -6,8 +6,6 @@
  *  and breadcrumb rose trees (via the catchup pipe).
  *)
 
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
@@ -25,8 +23,6 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
-
-  val compile_config : Mina_compile_config.t
 end
 
 (* TODO: calculate a sensible value from postake consensus arguments *)
@@ -113,7 +109,12 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
   let is_block_in_frontier =
     Fn.compose Option.is_some @@ Transition_frontier.find frontier
   in
-  let open Context in
+  let module Consensus_context = struct
+    include Context
+
+    let compile_config = precomputed_values.compile_config
+  end in
+  let open Consensus_context in
   let header, transition_hash, transition_receipt_time, sender, validation =
     match block_or_header with
     | `Block cached_env ->
@@ -164,7 +165,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       [%log internal] "Validate_frontier_dependencies" ;
       match
         Mina_block.Validation.validate_frontier_dependencies
-          ~context:(module Context)
+          ~context:(module Consensus_context)
           ~root_block ~is_block_in_frontier ~to_header:ident
           (Envelope.Incoming.data env)
       with
@@ -195,7 +196,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
         [%log internal] "Validate_frontier_dependencies" ;
         match
           Mina_block.Validation.validate_frontier_dependencies
-            ~context:(module Context)
+            ~context:(module Consensus_context)
             ~root_block ~is_block_in_frontier ~to_header:Mina_block.header
             initially_validated_transition
         with
@@ -474,7 +475,21 @@ let%test_module "Transition_handler.Processor tests" =
       Printexc.record_backtrace true ;
       Async.Scheduler.set_record_backtraces true
 
-    let logger = Logger.create ()
+    let logger = Logger.null ()
+
+    let () =
+      (* Disable log messages from best_tip_diff logger. *)
+      Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+        ~id:Logger.Logger_id.best_tip_diff ~processor:(Logger.Processor.raw ())
+        ~transport:
+          (Logger.Transport.create
+             ( module struct
+               type t = unit
+
+               let transport () _ = ()
+             end )
+             () )
+        ()
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
@@ -485,8 +500,6 @@ let%test_module "Transition_handler.Processor tests" =
     let time_controller = Block_time.Controller.basic ~logger
 
     let trust_system = Trust_system.null ()
-
-    let compile_config = Mina_compile_config.For_unit_tests.t
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -501,8 +514,6 @@ let%test_module "Transition_handler.Processor tests" =
       let constraint_constants = constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
-
-      let compile_config = compile_config
     end
 
     let downcast_breadcrumb breadcrumb =

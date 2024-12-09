@@ -52,7 +52,6 @@
    syncable_ledger
    sync_handler
    with_hash
-   inline_test_quiet_logs
    bounded_types
  )
  (instrumentation (backend bisect_ppx))

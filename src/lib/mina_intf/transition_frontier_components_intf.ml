@@ -13,8 +13,6 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
-
-  val compile_config : Mina_compile_config.t
 end
 
 module type Transition_handler_validator_intf = sig
@@ -207,7 +205,6 @@ module type Consensus_best_tip_prover_intf = sig
   val verify :
        context:(module CONTEXT)
     -> verifier:Verifier.t
-    -> genesis_constants:Genesis_constants.t
     -> Consensus.Data.Consensus_state.Value.t State_hash.With_state_hashes.t
     -> ( Mina_block.t
        , State_body_hash.t list * Mina_block.t )
@@ -224,9 +221,9 @@ module type Sync_handler_intf = sig
        frontier:transition_frontier
     -> Ledger_hash.t
     -> Mina_ledger.Sync_ledger.Query.t Envelope.Incoming.t
-    -> logger:Logger.t
+    -> context:(module CONTEXT)
     -> trust_system:Trust_system.t
-    -> Mina_ledger.Sync_ledger.Answer.t option Deferred.t
+    -> Mina_ledger.Sync_ledger.Answer.t Or_error.t Deferred.t
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        frontier:transition_frontier

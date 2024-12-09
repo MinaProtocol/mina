@@ -2,12 +2,12 @@ open Core_kernel
 
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
+module Circuit = Kimchi_pasta_snarky_backend.Step_impl
+
 let tests_enabled = true
 
 (* Generic addition gate gadget *)
-let add (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
+let add (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
     Circuit.Field.t =
   let open Circuit in
   (* Witness computation; sum = left_input + right_input *)
@@ -36,9 +36,7 @@ let add (type f)
       sum )
 
 (* Generic subtraction gate gadget *)
-let sub (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
+let sub (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
     Circuit.Field.t =
   let open Circuit in
   (* Witness computation; difference = left_input - right_input *)
@@ -69,9 +67,7 @@ let sub (type f)
       difference )
 
 (* Generic multiplication gate gadget *)
-let mul (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
+let mul (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
     Circuit.Field.t =
   let open Circuit in
   (* Witness computation: prod = left_input + right_input *)
@@ -134,7 +130,7 @@ let%test_unit "generic gadgets" =
               exists Field.typ ~compute:(fun () -> Field.Constant.of_int sum)
             in
             (* Use the generic add gate gadget *)
-            let result = add (module Runner.Impl) left_input right_input in
+            let result = add left_input right_input in
             Field.Assert.equal sum result ;
             (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
             Boolean.Assert.is_true (Field.equal sum sum) )
@@ -166,7 +162,7 @@ let%test_unit "generic gadgets" =
                   Field.Constant.of_int difference )
             in
             (* Use the generic sub gate gadget *)
-            let result = sub (module Runner.Impl) left_input right_input in
+            let result = sub left_input right_input in
             Field.Assert.equal difference result ;
             (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
             Boolean.Assert.is_true (Field.equal difference difference) )
@@ -197,7 +193,7 @@ let%test_unit "generic gadgets" =
               exists Field.typ ~compute:(fun () -> Field.Constant.of_int prod)
             in
             (* Use the generic mul gate gadget *)
-            let result = mul (module Runner.Impl) left_input right_input in
+            let result = mul left_input right_input in
             Field.Assert.equal prod result ;
             (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
             Boolean.Assert.is_true (Field.equal prod prod) )

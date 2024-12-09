@@ -94,3 +94,7 @@ let rpc_handshake_timeout_sec = 60.0
 let rpc_heartbeat_timeout_sec = 60.0
 
 let rpc_heartbeat_send_every_sec = 10.0 (*same as the default*)
+
+let sync_ledger_max_subtree_depth = 4
+
+let sync_ledger_default_subtree_depth = 3

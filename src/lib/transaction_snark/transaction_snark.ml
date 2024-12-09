@@ -3484,8 +3484,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let open Tick in
     let main x = handle (fun () -> Base.main ~constraint_constants x) handler in
     generate_auxiliary_input ~input_typ:Statement.With_sok.typ
-      ~return_typ:(Snarky_backendless.Typ.unit ())
-      main statement
+      ~return_typ:Typ.unit main statement
 
   let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
       ~source_first_pass_ledger ~target_first_pass_ledger ~init_stack
@@ -3529,14 +3528,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       , digest
           Merge.(
             Tick.constraint_system ~input_typ:Statement.With_sok.typ
-              ~return_typ:(Snarky_backendless.Typ.unit ()) (fun x ->
+              ~return_typ:Tick.Typ.unit (fun x ->
                 let open Tick in
                 Checked.map ~f:ignore @@ main x )) )
     ; ( "transaction-base"
       , digest
           Base.(
             Tick.constraint_system ~input_typ:Statement.With_sok.typ
-              ~return_typ:(Snarky_backendless.Typ.unit ())
+              ~return_typ:Tick.Typ.unit
               (main ~constraint_constants)) )
     ]
 

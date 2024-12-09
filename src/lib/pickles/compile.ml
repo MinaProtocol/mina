@@ -139,14 +139,14 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
                    Opt.t
                  , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
                    , Impls.Wrap.Boolean.var )
-                   Pickles_types__Opt.t
+                   Plonkish_prelude.Opt.t
                  , Impls.Wrap.Boolean.var )
                  Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                  .In_circuit
                  .t
                , Wrap_verifier.Challenge.t Kimchi_types.scalar_challenge
                , Wrap_verifier.Other_field.Packed.t
-                 Pickles_types__Shifted_value.Type1.t
+                 Plonkish_prelude.Shifted_value.Type1.t
                , Impls.Wrap.Field.t
                , Impls.Wrap.Field.t
                , Impls.Wrap.Field.t
@@ -675,8 +675,7 @@ struct
            let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
            let main x () = wrap_main (conv x) in
            let cs =
-             constraint_system ~input_typ:typ
-               ~return_typ:(Snarky_backendless.Typ.unit ())
+             constraint_system ~input_typ:typ ~return_typ:Impls.Wrap.Typ.unit
                main
            in
            let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
