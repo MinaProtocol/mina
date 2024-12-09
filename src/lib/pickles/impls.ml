@@ -101,7 +101,7 @@ module Step = struct
       Checked.List.map (Lazy.force forbidden_shifted_values) ~f:(equal t)
       >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
 
-    let typ : _ Snarky_backendless.Typ.t =
+    let typ : _ Impl.Typ.t =
       let (Typ typ_unchecked) = typ_unchecked in
       Typ { typ_unchecked with check }
 
@@ -154,7 +154,6 @@ module Step = struct
     let spec = spec proofs_verified Tock.Rounds.n in
     let (T (typ, f, f_inv)) =
       Spec.packed_typ
-        (module Impl)
         (T
            ( Shifted_value.Type2.typ Other_field.typ_unchecked
            , (fun (Shifted_value.Type2.Shifted_value x as t) ->
@@ -164,7 +163,7 @@ module Step = struct
         spec
     in
     let typ = Typ.transport typ ~there:to_data ~back:of_data in
-    Spec.ETyp.T (typ, (fun x -> of_data (f x)), fun x -> f_inv (to_data x))
+    Spec.Step_etyp.T (typ, (fun x -> of_data (f x)), fun x -> f_inv (to_data x))
 
   module Async_promise = Async_generic (Promise)
 end
@@ -227,7 +226,7 @@ module Wrap = struct
       in
       (typ_unchecked, check)
 
-    let typ : _ Snarky_backendless.Typ.t =
+    let typ : _ Impl.Typ.t =
       let (Typ typ_unchecked) = typ_unchecked in
       Typ { typ_unchecked with check }
 
@@ -258,10 +257,9 @@ module Wrap = struct
     in
     let open Types.Wrap.Statement in
     let (T (typ, f, f_inv)) =
-      Spec.packed_typ
-        (module Impl)
+      Spec.wrap_packed_typ
         (T
-           ( Shifted_value.Type1.typ fp
+           ( Shifted_value.Type1.wrap_typ fp
            , (fun (Shifted_value x as t) ->
                Impl.run_checked (Other_field.check x) ;
                t )
@@ -273,7 +271,7 @@ module Wrap = struct
         ~there:(In_circuit.to_data ~option_map:Option.map)
         ~back:(In_circuit.of_data ~option_map:Option.map)
     in
-    Spec.ETyp.T
+    Spec.Wrap_etyp.T
       ( typ
       , (fun x -> In_circuit.of_data ~option_map:Opt.map (f x))
       , fun x -> f_inv (In_circuit.to_data ~option_map:Opt.map x) )

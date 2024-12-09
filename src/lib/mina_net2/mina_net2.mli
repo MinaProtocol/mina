@@ -111,6 +111,7 @@ end
 
 module Validation_callback = Validation_callback
 module Sink = Sink
+module Bitswap_tag = Bitswap_tag
 
 module For_tests : sig
   module Helper = Libp2p_helper

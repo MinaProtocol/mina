@@ -35,7 +35,6 @@
    data_hash_lib
    precomputed_values
    mina_numbers
-   inline_test_quiet_logs
    mina_networking
    mina_metrics
    pipe_lib

@@ -172,7 +172,9 @@ struct
     let to_field = to_field_constant ~endo:Endo.scalar (module Scalar)
   end
 
-  let typ : (t, Constant.t) Typ.t = SC.typ Challenge.typ
+  let typ : (t, Constant.t) Typ.t =
+    let module Typ = SC.Make_typ (Impl) in
+    Typ.typ Challenge.typ
 
   let num_bits = 128
 
