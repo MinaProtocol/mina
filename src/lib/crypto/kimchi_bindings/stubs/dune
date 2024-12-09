@@ -61,7 +61,7 @@
     (setenv
      RUSTFLAGS
      %{read:rustflags.sexp}
-     (run cargo build --release --offline)))
+     (run cargo build --release)))
    (run
     cp
     %{read:../dune-build-root}/cargo_kimchi_stubs/release/libwires_15_stubs.a
@@ -167,7 +167,7 @@
    (setenv
     CARGO_TARGET_DIR
     "%{read:../dune-build-root}/cargo_kimchi_bindgen"
-    (run cargo run %{targets} --offline))
+    (run cargo run %{targets}))
    (run ocamlformat -i %{targets}))))
 
 ;; this is used by nix
