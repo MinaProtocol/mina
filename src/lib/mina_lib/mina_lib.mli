@@ -44,6 +44,7 @@ module type CONTEXT = sig
   val compaction_interval : Time.Span.t option
 
   val compile_config : Mina_compile_config.t
+
 end
 
 exception Snark_worker_error of int
@@ -203,7 +204,7 @@ val snark_pool : t -> Network_pool.Snark_pool.t
 val start : t -> unit Deferred.t
 
 val start_with_precomputed_blocks :
-  t -> Block_producer.Precomputed.t Sequence.t -> unit Deferred.t
+  t -> cache_proof_db:Ledger_proof.Cache_tag.Cache.t -> Block_producer.Precomputed.t Sequence.t -> unit Deferred.t
 
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 

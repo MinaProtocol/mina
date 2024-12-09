@@ -89,7 +89,7 @@ let compute_block_trace_metadata transition_with_validation =
     ]
 
 let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
-    ~trust_system ~parent
+    ~trust_system ~parent ~cache_proof_db
     ~transition:(transition_with_validation : Mina_block.almost_valid_block)
     ~get_completed_work ~sender ~transition_receipt_time () =
   let state_hash =
@@ -107,7 +107,7 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
       match%bind
         Validation.validate_staged_ledger_diff ?skip_staged_ledger_verification
           ~get_completed_work ~logger ~precomputed_values ~verifier
-          ~parent_staged_ledger:(staged_ledger parent)
+          ~parent_staged_ledger:(staged_ledger parent) ~cache_proof_db
           ~parent_protocol_state:
             ( parent.validated_transition |> Mina_block.Validated.header
             |> Mina_block.Header.protocol_state )
@@ -330,6 +330,7 @@ module For_tests = struct
       ?(trust_system = Trust_system.null ()) ~accounts_with_secret_keys () :
       (t -> t Deferred.t) Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
+    let cache_proof_db = Ledger_proof.Cache_tag.For_tests.random () in
     let%bind slot_advancement = Int.gen_incl 1 10 in
     let%bind make_next_consensus_state =
       Consensus_state_hooks.For_tests.gen_consensus_state ~slot_advancement
@@ -427,7 +428,7 @@ module For_tests = struct
       let ledger_proof_statement =
         Option.value_map ledger_proof_opt ~default:previous_ledger_proof_stmt
           ~f:(fun (proof, _) ->
-            Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap proof )
+            Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap proof cache_proof_db)
       in
       let genesis_ledger_hash =
         previous_protocol_state |> Protocol_state.blockchain_state
@@ -489,7 +490,7 @@ module For_tests = struct
       match%map
         build ~logger ~precomputed_values ~trust_system ~verifier
           ~get_completed_work:(Fn.const None) ~parent:parent_breadcrumb
-          ~transition:
+          ~cache_proof_db ~transition:
             ( next_block |> Mina_block.Validated.remember
             |> Validation.reset_staged_ledger_diff_validation )
           ~sender:None ~skip_staged_ledger_verification:`All

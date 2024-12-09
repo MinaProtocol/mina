@@ -16,7 +16,7 @@ end
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~time_controller ~collected_transitions ~frontier ~get_completed_work
     ~network_transition_reader ~producer_transition_reader ~clear_reader
-    ~cache_exceptions =
+    ~cache_exceptions ~cache_proof_db =
   let open Context in
   let valid_transition_pipe_capacity = 50 in
   let start_time = Time.now () in
@@ -134,11 +134,11 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~time_controller ~trust_system ~verifier ~frontier ~get_completed_work
     ~primary_transition_reader ~producer_transition_reader
     ~clean_up_catchup_scheduler ~catchup_job_writer ~catchup_breadcrumbs_reader
-    ~catchup_breadcrumbs_writer ~processed_transition_writer ;
+    ~catchup_breadcrumbs_writer ~processed_transition_writer ~cache_proof_db ;
   Ledger_catchup.run
     ~context:(module Context)
     ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
-    ~catchup_breadcrumbs_writer ~unprocessed_transition_cache ;
+    ~catchup_breadcrumbs_writer ~unprocessed_transition_cache ~cache_proof_db;
   upon (Strict_pipe.Reader.read clear_reader) (fun _ ->
       let open Strict_pipe.Writer in
       kill valid_transition_writer ;

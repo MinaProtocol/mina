@@ -20,6 +20,7 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val compile_config : Mina_compile_config.t
+
 end
 
 let validation (_, v) = v
@@ -474,7 +475,7 @@ let reset_frontier_dependencies_validation (transition_with_hash, validation) =
 
 let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
     ~get_completed_work ~precomputed_values ~verifier ~parent_staged_ledger
-    ~parent_protocol_state (t, validation) =
+    ~cache_proof_db ~parent_protocol_state (t, validation) =
   [%log internal] "Validate_staged_ledger_diff" ;
   let block = With_hash.data t in
   let header = Block.header block in
@@ -535,7 +536,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
         (*There was no proof emitted, snarked ledger hash shouldn't change*)
         Protocol_state.snarked_ledger_hash parent_protocol_state
     | Some (proof, _) ->
-        Ledger_proof.snarked_ledger_hash (Ledger_proof.Cache_tag.unwrap proof)
+        Ledger_proof.snarked_ledger_hash (Ledger_proof.Cache_tag.unwrap proof cache_proof_db)
   in
   let hash_errors =
     Result.combine_errors_unit

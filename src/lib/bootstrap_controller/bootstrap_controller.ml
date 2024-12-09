@@ -276,7 +276,7 @@ let external_transition_compare ~context:(module Context : CONTEXT) =
  *)
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~consensus_local_state ~transition_reader ~preferred_peers ~persistent_root
-    ~persistent_frontier ~initial_root_transition ~catchup_mode =
+    ~persistent_frontier ~initial_root_transition ~catchup_mode ~cache_proof_db =
   let open Context in
   O1trace.thread "bootstrap" (fun () ->
       let rec loop previous_cycles =
@@ -627,7 +627,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                   Transition_frontier.load
                     ~context:(module Consensus_context)
                     ~retry_with_fresh_db:false ~verifier ~consensus_local_state
-                    ~persistent_root ~persistent_frontier ~catchup_mode ()
+                    ~persistent_root ~persistent_frontier ~catchup_mode ~cache_proof_db ()
                   >>| function
                   | Ok frontier ->
                       frontier
@@ -886,7 +886,7 @@ let%test_module "Bootstrap_controller tests" =
             (E.Set.of_list saved_transitions)
             ~expect:(E.Set.of_list expected_transitions) )
 
-    let run_bootstrap ~timeout_duration ~my_net ~transition_reader =
+    let run_bootstrap ~timeout_duration ~my_net ~transition_reader ~cache_proof_db=
       let open Fake_network in
       let time_controller = Block_time.Controller.basic ~logger in
       let persistent_root =
@@ -909,7 +909,7 @@ let%test_module "Bootstrap_controller tests" =
            ~trust_system ~verifier ~network:my_net.network ~preferred_peers:[]
            ~consensus_local_state:my_net.state.consensus_local_state
            ~transition_reader ~persistent_root ~persistent_frontier
-           ~catchup_mode:`Normal ~initial_root_transition )
+           ~catchup_mode:`Normal ~initial_root_transition ~cache_proof_db)
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions : Transition_cache.element list) =
@@ -941,7 +941,9 @@ let%test_module "Bootstrap_controller tests" =
           : Mina_block.Header.t )
 
     let%test_unit "sync with one node after receiving a transition" =
+      
       Quickcheck.test ~trials:1
+      
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
             ~use_super_catchup:false
@@ -950,6 +952,7 @@ let%test_module "Bootstrap_controller tests" =
                 ~frontier_branch_size:((max_frontier_length * 2) + 2)
             ])
         ~f:(fun fake_network ->
+          let cache_proof_db = Ledger_proof.Cache_tag.For_tests.random () in
           let [ my_net; peer_net ] = fake_network.peer_networks in
           let transition_reader, transition_writer =
             Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
@@ -971,7 +974,7 @@ let%test_module "Bootstrap_controller tests" =
             Async.Thread_safe.block_on_async_exn (fun () ->
                 run_bootstrap
                   ~timeout_duration:(Block_time.Span.of_ms 30_000L)
-                  ~my_net ~transition_reader )
+                  ~my_net ~transition_reader ~cache_proof_db)
           in
           assert_transitions_increasingly_sorted
             ~root:(Transition_frontier.root new_frontier)

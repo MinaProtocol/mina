@@ -44,4 +44,5 @@ val run :
   -> persistent_frontier:Transition_frontier.Persistent_frontier.t
   -> initial_root_transition:Mina_block.Validated.t
   -> catchup_mode:[ `Normal | `Super ]
+  -> cache_proof_db:Ledger_proof.Cache_tag.Cache.t
   -> (Transition_frontier.t * Transition_cache.element list) Deferred.t

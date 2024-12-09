@@ -45,4 +45,5 @@ val run :
        Strict_pipe.Writer.t
   -> unprocessed_transition_cache:
        Transition_handler.Unprocessed_transition_cache.t
+  -> cache_proof_db:Ledger_proof.Cache_tag.Cache.t
   -> unit

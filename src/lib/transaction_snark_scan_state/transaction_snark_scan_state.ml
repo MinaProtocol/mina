@@ -30,6 +30,19 @@ module type Monad_with_Or_error_intf = sig
   end
 end
 
+
+module Proof_cache = struct
+  [%%versioned
+  module Stable = struct
+    module V2 = struct
+      type t = Ledger_proof.Cache_tag.db
+    
+      let to_latest = Fn.id
+    end
+  end]
+end
+
+
 module Transaction_with_witness = struct
   [%%versioned
   module Stable = struct
@@ -51,7 +64,7 @@ module Transaction_with_witness = struct
             (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
         ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         }
-      [@@deriving sexp, to_yojson]
+      [@@deriving to_yojson]
 
       let to_latest = Fn.id
     end
@@ -166,8 +179,8 @@ module Repr = struct
         ; previous_incomplete_zkapp_updates :
             Transaction_with_witness.Stable.V2.t list
             * [ `Border_block_continued_in_the_next_tree of bool ]
+        ; proof_cache : Ledger_proof.Cache_tag.db
         }
-      [@@deriving sexp]
 
       let to_latest = Fn.id
 
@@ -213,24 +226,26 @@ module Stable = struct
       ; previous_incomplete_zkapp_updates :
           Transaction_with_witness.t list
           * [ `Border_block_continued_in_the_next_tree of bool ]
+      ; proof_cache : Ledger_proof.Cache_tag.db
       }
 
-    let to_repr ({ scan_state; previous_incomplete_zkapp_updates } : t) : Repr.t
+    let to_repr ({ scan_state; previous_incomplete_zkapp_updates; proof_cache } : t) : Repr.t
         =
       { scan_state =
           Parallel_scan.State.map
-            ~f1:(fun (p, m) -> (Ledger_proof.Cache_tag.unwrap p, m))
+            ~f1:(fun (p, m) -> (Ledger_proof.Cache_tag.unwrap p proof_cache, m ))
             ~f2:Fn.id scan_state
       ; previous_incomplete_zkapp_updates
       }
 
-    let of_repr ({ scan_state; previous_incomplete_zkapp_updates } : Repr.t) : t
+    let of_repr ({ scan_state; previous_incomplete_zkapp_updates; proof_cache } : Repr.t)  : t 
         =
       { scan_state =
           Parallel_scan.State.map
-            ~f1:(fun (p, m) -> (Ledger_proof.Cache_tag.generate p, m))
+            ~f1:(fun (p, m) -> ((Ledger_proof.Cache_tag.generate p proof_cache), m))
             ~f2:Fn.id scan_state
       ; previous_incomplete_zkapp_updates
+      ; proof_cache
       }
 
     include
@@ -239,14 +254,14 @@ module Stable = struct
         (struct
           type nonrec t = t
 
-          let to_binable = to_repr
+          let to_binable = to_repr 
 
           let of_binable = of_repr
         end)
 
     let to_latest = Fn.id
 
-    let hash (t : t) = Repr.hash (to_repr t)
+    let hash (t : t) cache_proof_db = Repr.hash (to_repr t ~cache_proof_db)
   end
 end]
 
@@ -349,7 +364,7 @@ let create_expected_statement ~constraint_constants
   ; sok_digest = ()
   }
 
-let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
+let completed_work_to_scanable_work (job : job) (fee, current_proof, prover, cache_proof_db) :
     (Ledger_proof.Cache_tag.t * Sok_message.t) Or_error.t =
   let sok_digest = Ledger_proof.sok_digest current_proof
   and proof = Ledger_proof.underlying_proof current_proof in
@@ -357,16 +372,16 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
   | Base { statement; _ } ->
       let ledger_proof =
         Ledger_proof.Cache_tag.generate
-        @@ Ledger_proof.create ~statement ~sok_digest ~proof
+        (Ledger_proof.create ~statement ~sok_digest ~proof) cache_proof_db
       in
       Ok (ledger_proof, Sok_message.create ~fee ~prover)
   | Merge ((p, _), (p', _)) ->
       let open Or_error.Let_syntax in
-      let s = Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p
-      and s' = Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p' in
+      let s = Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p cache_proof_db
+      and s' = Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p' cache_proof_db in
       let%map statement = Transaction_snark.Statement.merge s s' in
       ( Ledger_proof.Cache_tag.generate
-        @@ Ledger_proof.create ~statement ~sok_digest ~proof
+        (Ledger_proof.create ~statement ~sok_digest ~proof) cache_proof_db
       , Sok_message.create ~fee ~prover )
 
 let total_proofs (works : Transaction_snark_work.t list) =
@@ -437,7 +452,8 @@ struct
 
   (*TODO: fold over the pending_coinbase tree and validate the statements?*)
   let scan_statement ~constraint_constants ~logger
-      ({ scan_state = tree; previous_incomplete_zkapp_updates = _ } : t)
+      ({ scan_state = tree; previous_incomplete_zkapp_updates = _ } : t) 
+      ~cache_proof_db
       ~statement_check ~verifier :
       ( Transaction_snark.Statement.t
       , [ `Error of Error.t | `Empty ] )
@@ -498,12 +514,12 @@ struct
           in
           Some s2
     in
-    let fold_step_a (acc_statement, acc_pc) job =
+    let fold_step_a (acc_statement, acc_pc) cache_proof_db job =
       match job with
       | Parallel_scan.Merge.Job.Part (proof, message) ->
           let%map acc_stmt =
             let statement =
-              Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap proof
+              Ledger_proof.statement (Ledger_proof.Cache_tag.unwrap proof cache_proof_db)
             in
             merge_acc ~proofs:[ (proof, message) ] acc_statement statement
           in
@@ -512,10 +528,10 @@ struct
           return (acc_statement, acc_pc)
       | Full { left = proof_1, message_1; right = proof_2, message_2; _ } ->
           let stmt1 =
-            Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap proof_1
+            Ledger_proof.statement (Ledger_proof.Cache_tag.unwrap proof_1 cache_proof_db)
           in
           let stmt2 =
-            Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap proof_2
+            Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap proof_2 cache_proof_db
           in
           let%bind merged_statement =
             Timer.time timer (sprintf "merge:%s" __LOC__) (fun () ->
@@ -588,7 +604,7 @@ struct
       Fold.fold_chronological_until tree ~init:(None, None)
         ~f_merge:(fun acc (_weight, job) ->
           let open Container.Continue_or_stop in
-          match%map.Deferred fold_step_a acc job with
+          match%map.Deferred fold_step_a acc cache_proof_db job  with
           | Ok next ->
               Continue next
           | e ->
@@ -618,7 +634,7 @@ struct
         Deferred.return (Error (`Error e))
 
   let check_invariants t ~constraint_constants ~logger ~statement_check
-      ~verifier ~error_prefix
+      ~verifier ~error_prefix ~cache_proof_db
       ~(last_proof_statement : Transaction_snark.Statement.t option)
       ~(registers_end :
          ( Frozen_ledger_hash.t
@@ -657,7 +673,7 @@ struct
     match%map
       O1trace.sync_thread "validate_transaction_snark_scan_state" (fun () ->
           scan_statement t ~constraint_constants ~logger ~statement_check
-            ~verifier )
+            ~verifier ~cache_proof_db)
     with
     | Error (`Error e) ->
         Error e
@@ -699,13 +715,13 @@ struct
         ()
 end
 
-let statement_of_job : job -> Transaction_snark.Statement.t option = function
+let statement_of_job ~cache_proof_db : job -> Transaction_snark.Statement.t option = function
   | Base { statement; _ } ->
       Some statement
   | Merge ((p1, _), (p2, _)) ->
       Transaction_snark.Statement.merge
-        (Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p1)
-        (Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p2)
+        (Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p1 cache_proof_db)
+        (Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p2 cache_proof_db)
       |> Result.ok
 
 let create ~work_delay ~transaction_capacity_log_2 : t =
@@ -1278,10 +1294,10 @@ let extract_from_job (job : job) =
   | Merge ((p1, _), (p2, _)) ->
       Second (p1, p2)
 
-let snark_job_list_json t =
+let snark_job_list_json ~cache_proof_db t =
   let all_jobs : Job_view.t list list =
     let fa (a : Ledger_proof.Cache_tag.t * Sok_message.t) =
-      Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap (fst a)
+      Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap (fst a) cache_proof_db
     in
     let fd (d : Transaction_with_witness.t) = d.statement in
     Parallel_scan.view_jobs_with_position t.scan_state fa fd
@@ -1292,12 +1308,12 @@ let snark_job_list_json t =
            `List (List.map tree ~f:Job_view.to_yojson) ) ) )
 
 (*Always the same pairing of jobs*)
-let all_work_statements_exn t : Transaction_snark_work.Statement.t list =
+let all_work_statements_exn ~cache_proof_db t : Transaction_snark_work.Statement.t list =
   let work_seqs = all_jobs t in
   List.concat_map work_seqs ~f:(fun work_seq ->
       One_or_two.group_list
         (List.map work_seq ~f:(fun job ->
-             match statement_of_job job with
+             match statement_of_job ~cache_proof_db job with
              | None ->
                  assert false
              | Some stmt ->
@@ -1313,18 +1329,19 @@ let k_work_pairs_for_new_diff t ~k =
     take (concat_map work_list ~f:(fun works -> One_or_two.group_list works)) k)
 
 (*Always the same pairing of jobs*)
-let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
+let work_statements_for_new_diff ~cache_proof_db t : Transaction_snark_work.Statement.t list =
   let work_list = Parallel_scan.jobs_for_next_update t.scan_state in
   List.concat_map work_list ~f:(fun work_seq ->
       One_or_two.group_list
         (List.map work_seq ~f:(fun job ->
-             match statement_of_job job with
+             match statement_of_job ~cache_proof_db job with
              | None ->
                  assert false
              | Some stmt ->
                  stmt ) ) )
 
 let all_work_pairs t
+    ~cache_proof_db
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t) :
     ( Transaction_witness.t
     , Ledger_proof.Cache_tag.t )
@@ -1374,8 +1391,8 @@ let all_work_pairs t
     | Second (p1, p2) ->
         let%map merged =
           Transaction_snark.Statement.merge
-            (Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p1)
-            (Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p2)
+            (Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p1 cache_proof_db)
+            (Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p2 cache_proof_db)
         in
         Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
   in
@@ -1397,7 +1414,7 @@ let all_work_pairs t
 
 let update_metrics t = Parallel_scan.update_metrics t.scan_state
 
-let fill_work_and_enqueue_transactions t ~logger transactions work =
+let fill_work_and_enqueue_transactions t ~logger transactions work db =
   let open Or_error.Let_syntax in
   let fill_in_transaction_snark_work tree (works : Transaction_snark_work.t list)
       : (Ledger_proof.Cache_tag.t * Sok_message.t) list Or_error.t =
@@ -1443,7 +1460,7 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
       proof_opt
       ~f:(fun ((proof, _), _txns_with_witnesses) ->
         let curr_stmt =
-          Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap proof
+          Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap proof db
         in
         let prev_stmt, incomplete_zkapp_updates_from_old_proof =
           Option.value_map
@@ -1451,7 +1468,7 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
               (curr_stmt, ([], `Border_block_continued_in_the_next_tree false))
             old_proof_and_incomplete_zkapp_updates
             ~f:(fun ((p', _), incomplete_zkapp_updates_from_old_proof) ->
-              ( Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p'
+              ( Ledger_proof.statement @@ Ledger_proof.Cache_tag.unwrap p' db
               , incomplete_zkapp_updates_from_old_proof ) )
         in
         (*prev_target is connected to curr_source- Order of the arguments is

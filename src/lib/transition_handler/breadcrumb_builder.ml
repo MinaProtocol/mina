@@ -5,7 +5,7 @@ open Cache_lib
 open Network_peer
 
 let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
-    ~trust_system ~frontier ~initial_hash subtrees_of_enveloped_transitions =
+    ~trust_system ~frontier ~initial_hash ~cache_proof_db subtrees_of_enveloped_transitions =
   let missing_parent_msg =
     Printf.sprintf
       "Transition frontier already garbage-collected the parent of %s"
@@ -100,7 +100,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                         ~precomputed_values ~verifier ~trust_system ~parent
                         ~transition:mostly_validated_transition
                         ~get_completed_work:(Fn.const None)
-                        ~sender:(Some sender) ~transition_receipt_time () )
+                        ~sender:(Some sender) ~transition_receipt_time ~cache_proof_db () )
                 with
                 | Error _ ->
                     Deferred.return @@ Or_error.error_string missing_parent_msg

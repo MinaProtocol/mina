@@ -108,6 +108,7 @@ type t =
   ; wallets : Secrets.Wallets.t
   ; coinbase_receiver : Consensus.Coinbase_receiver.t ref
   ; snark_job_state : Work_selector.State.t
+  ; cache_proof_db : Ledger_proof.Cache_tag.Cache.t
   ; mutable next_producer_timing :
       Daemon_rpcs.Types.Status.Next_producer_timing.t option
   ; subscriptions : Mina_subscriptions.t
@@ -1250,6 +1251,7 @@ module type CONTEXT = sig
   val compaction_interval : Time.Span.t option
 
   val compile_config : Mina_compile_config.t
+
 end
 
 let context ~commit_id (config : Config.t) : (module CONTEXT) =
@@ -1279,10 +1281,12 @@ let context ~commit_id (config : Config.t) : (module CONTEXT) =
     (*Same as config.precomputed_values.compile_config.
       TODO: Remove redundant fields *)
     let compile_config = config.compile_config
+
   end )
 
 let start t =
   let commit_id_short = String.sub ~pos:0 ~len:8 t.commit_id in
+  let cache_proof_db = t.cache_proof_db in
   let set_next_producer_timing timing consensus_state =
     let block_production_status, next_producer_timing =
       let generated_from_consensus_at :
@@ -1366,7 +1370,9 @@ let start t =
       ~block_produced_bvar:t.components.block_produced_bvar
       ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net
       ~zkapp_cmd_limit_hardcap:
-        t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap ) ;
+        t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap
+      ~cache_proof_db
+      ) ;
   perform_compaction t.config.compile_config.compaction_interval t ;
   let () =
     match t.config.node_status_url with
@@ -1411,6 +1417,7 @@ let start t =
     ~protocol_constants:t.config.precomputed_values.genesis_constants.protocol
     ~time_controller:t.config.time_controller
     ~block_produced_bvar:t.components.block_produced_bvar
+    ~cache_proof_db
     ~uptime_submitter_keypair:t.config.uptime_submitter_keypair
     ~graphql_control_port:t.config.graphql_control_port ~built_with_commit_sha
     ~get_next_producer_timing:(fun () -> t.next_producer_timing)
@@ -1419,7 +1426,7 @@ let start t =
   stop_long_running_daemon t ;
   Snark_worker.start t
 
-let start_with_precomputed_blocks t blocks =
+let start_with_precomputed_blocks t ~cache_proof_db blocks =
   let module Context = (val context ~commit_id:t.commit_id t.config) in
   let%bind () =
     Block_producer.run_precomputed
@@ -1428,7 +1435,7 @@ let start_with_precomputed_blocks t blocks =
       ~time_controller:t.config.time_controller
       ~frontier_reader:t.components.transition_frontier
       ~transition_writer:t.pipes.producer_transition_writer
-      ~precomputed_blocks:blocks
+      ~precomputed_blocks:blocks ~cache_proof_db
   in
   start t
 
@@ -1644,6 +1651,7 @@ let create ~commit_id ?wallets (config : Config.t) =
       config.precomputed_values.constraint_constants.block_window_duration_ms
     |> Time.Span.of_ms
   in
+  let cache_proof_db = Ledger_proof.Cache_tag.Cache.initialize config.cache_proof_db_location in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
@@ -2114,7 +2122,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~most_recent_valid_block_writer
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
-              ~notify_online ()
+              ~notify_online ~cache_proof_db ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -2453,6 +2461,7 @@ let create ~commit_id ?wallets (config : Config.t) =
             ; wallets
             ; coinbase_receiver = ref config.coinbase_receiver
             ; snark_job_state = snark_jobs_state
+            ; cache_proof_db
             ; subscriptions
             ; sync_status
             ; precomputed_block_writer

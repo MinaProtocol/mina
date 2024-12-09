@@ -273,6 +273,7 @@ val validate_staged_ledger_diff :
   -> precomputed_values:Genesis_proof.t
   -> verifier:Verifier.t
   -> parent_staged_ledger:Staged_ledger.t
+  -> cache_proof_db:Ledger_proof.Cache_tag.Cache.t
   -> parent_protocol_state:Protocol_state.Value.t
   -> ( 'a
      , 'b

@@ -15,8 +15,8 @@ module Snark_tables = struct
   [@@deriving sexp, equal]
 end
 
-let unwrap_cache_tag =
-  Priced_proof.map ~f:(One_or_two.map ~f:Ledger_proof.Cache_tag.unwrap)
+let unwrap_cache_tag proof_cache_db =
+  Priced_proof.map ~f:(One_or_two.map ~f:(fun proof ->Ledger_proof.Cache_tag.unwrap proof proof_cache_db))
 
 module type S = sig
   type transition_frontier
@@ -273,16 +273,16 @@ struct
 
       let get_logger t = t.logger
 
-      let request_proof t x =
-        Option.map ~f:unwrap_cache_tag (Map.find !(t.snark_tables).all x)
+      let request_proof t x proof_cache_db =
+        Option.map ~f:(unwrap_cache_tag proof_cache_db) (Map.find !(t.snark_tables).all x)
 
       let add_snark ?(is_local = false) t ~work
-          ~(proof : Ledger_proof.t One_or_two.t) ~fee =
+          ~(proof : Ledger_proof.t One_or_two.t) ~cache_proof_db ~fee =
         if work_is_referenced t work then (
           (*Note: fee against existing proofs and the new proofs are checked in
             Diff.unsafe_apply which calls this function*)
           let cached_proof =
-            One_or_two.map ~f:Ledger_proof.Cache_tag.generate proof
+            One_or_two.map ~f:(fun proof -> Ledger_proof.Cache_tag.generate proof cache_proof_db) proof 
           in
           t.snark_tables :=
             { all =
@@ -486,7 +486,7 @@ struct
     (** Returns locally-generated snark work for re-broadcast.
         This is limited to recent work which is yet to appear in a block.
     *)
-    let get_rebroadcastable t ~has_timed_out:_ =
+    let get_rebroadcastable t proof_cache_db ~has_timed_out:_ =
       match best_tip_table t with
       | None ->
           []
@@ -494,7 +494,7 @@ struct
           Map.to_alist !(t.snark_tables).rebroadcastable
           |> List.filter_map ~f:(fun (stmt, (snark, _time)) ->
                  if Set.mem best_tips stmt then
-                   Some (Diff.Add_solved_work (stmt, unwrap_cache_tag snark))
+                   Some (Diff.Add_solved_work (stmt, unwrap_cache_tag proof_cache_db snark))
                  else None )
 
     let remove_solved_work t work =
@@ -510,9 +510,9 @@ struct
     let get_rebroadcastable = Resource_pool.get_rebroadcastable
   end
 
-  let get_completed_work t statement =
+  let get_completed_work t proof_cache_db statement =
     Option.map
-      (Resource_pool.request_proof (resource_pool t) statement)
+      (Resource_pool.request_proof (resource_pool t) statement proof_cache_db)
       ~f:(fun Priced_proof.{ proof; fee = { fee; prover } } ->
         Transaction_snark_work.Checked.create_unsafe
           { Transaction_snark_work.fee; proofs = proof; prover } )
@@ -752,6 +752,7 @@ let%test_module "random set test" =
            Fee_with_prover.gen )
         ~f:(fun (t, work, fee_1, fee_2) ->
           Async.Thread_safe.block_on_async_exn (fun () ->
+              let proof_cache_db = Proof_cache_tag
               let%bind t, tf = t in
               (*Statements should be referenced before work for those can be included*)
               let%bind () =
@@ -762,7 +763,7 @@ let%test_module "random set test" =
               let fee_upper_bound = Currency.Fee.min fee_1.fee fee_2.fee in
               let { Priced_proof.fee = { fee; _ }; _ } =
                 Option.value_exn
-                  (Mock_snark_pool.Resource_pool.request_proof t work)
+                  (Mock_snark_pool.Resource_pool.request_proof t work proof_cache_db)
               in
               assert (Currency.Fee.(fee <= fee_upper_bound)) ) )
 

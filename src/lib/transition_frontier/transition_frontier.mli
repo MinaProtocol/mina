@@ -67,6 +67,7 @@ val load :
   -> persistent_root:Persistent_root.t
   -> persistent_frontier:Persistent_frontier.t
   -> catchup_mode:[ `Normal | `Super ]
+  -> cache_proof_db:Ledger_proof.Cache_tag.Cache.t
   -> unit
   -> ( t
      , [ `Failure of string
@@ -122,6 +123,7 @@ module For_tests : sig
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
     -> catchup_mode:[ `Normal | `Super ]
+    -> cache_proof_db:Ledger_proof.Cache_tag.Cache.t
     -> unit
     -> ( t
        , [ `Failure of string

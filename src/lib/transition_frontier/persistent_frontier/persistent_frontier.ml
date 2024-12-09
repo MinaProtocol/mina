@@ -190,7 +190,7 @@ module Instance = struct
 
   let load_full_frontier t ~context:(module Context : CONTEXT) ~root_ledger
       ~consensus_local_state ~max_length ~ignore_consensus_local_state
-      ~persistent_root_instance =
+      ~persistent_root_instance ~cache_proof_db =
     let open Context in
     let open Deferred.Result.Let_syntax in
     let validate genesis_state_hash (b, v) =
@@ -321,7 +321,8 @@ module Instance = struct
                Breadcrumb.build ~skip_staged_ledger_verification:`All
                  ~logger:t.factory.logger ~precomputed_values
                  ~verifier:t.factory.verifier
-                 ~trust_system:(Trust_system.null ()) ~parent ~transition
+                 ~trust_system:(Trust_system.null ()) ~parent 
+                 ~cache_proof_db ~transition
                  ~get_completed_work:(Fn.const None) ~sender:None
                  ~transition_receipt_time ()
              in

@@ -1406,7 +1406,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
 
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
-    ~unprocessed_transition_cache : unit =
+    ~unprocessed_transition_cache ~cache_proof_db : unit =
   O1trace.background_thread "perform_super_catchup" (fun () ->
       run_catchup
         ~context:(module Context)
@@ -1414,7 +1414,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
         ~build_func:
           (Transition_frontier.Breadcrumb.build
-             ~get_completed_work:(Fn.const None) ) )
+             ~get_completed_work:(Fn.const None) ~cache_proof_db ) )
 
 (* Unit tests *)
 
@@ -1518,7 +1518,7 @@ let%test_module "Ledger_catchup tests" =
           Strict_pipe.Reader.t
       }
 
-    let setup_catchup_pipes ~network ~frontier =
+    let setup_catchup_pipes ~network ~frontier ~cache_proof_db =
       let catchup_job_reader, catchup_job_writer =
         Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
           (Buffered (`Capacity 10, `Overflow Crash))
@@ -1534,7 +1534,7 @@ let%test_module "Ledger_catchup tests" =
       run
         ~context:(module Context)
         ~verifier ~trust_system ~network ~frontier ~catchup_breadcrumbs_writer
-        ~catchup_job_reader ~unprocessed_transition_cache ;
+        ~catchup_job_reader ~unprocessed_transition_cache ~cache_proof_db;
       { cache = unprocessed_transition_cache
       ; job_writer = catchup_job_writer
       ; breadcrumbs_reader = catchup_breadcrumbs_reader
@@ -1560,8 +1560,8 @@ let%test_module "Ledger_catchup tests" =
        ; breadcrumbs_reader = catchup_breadcrumbs_reader
        } *)
 
-    let setup_catchup_with_target ~network ~frontier ~target_breadcrumb =
-      let test = setup_catchup_pipes ~network ~frontier in
+    let setup_catchup_with_target ~network ~frontier ~target_breadcrumb ~cache_proof_db =
+      let test = setup_catchup_pipes ~network ~frontier ~cache_proof_db in
       let parent_hash =
         Transition_frontier.Breadcrumb.parent_hash target_breadcrumb
       in
@@ -1610,12 +1610,12 @@ let%test_module "Ledger_catchup tests" =
           (n + 1)
       else Deferred.return b_list
 
-    let test_successful_catchup ~my_net ~target_best_tip_path =
+    let test_successful_catchup ~my_net ~target_best_tip_path ~cache_proof_db =
       let open Fake_network in
       let target_breadcrumb = List.last_exn target_best_tip_path in
       let `Test { breadcrumbs_reader; _ }, _ =
         setup_catchup_with_target ~network:my_net.network
-          ~frontier:my_net.state.frontier ~target_breadcrumb
+          ~frontier:my_net.state.frontier ~target_breadcrumb ~cache_proof_db
       in
       let%map breadcrumb_list =
         call_read ~breadcrumbs_reader ~target_best_tip_path ~my_peer:my_net [] 0
@@ -1646,6 +1646,7 @@ let%test_module "Ledger_catchup tests" =
 
     let%test_unit "can catchup to a peer within [k/2,k]" =
       [%log info] "running catchup to peer" ;
+      let cache_proof_db = Ledger_proof.Cache_tag.For_tests.random () in
       Quickcheck.test ~trials:5
         Fake_network.Generator.(
           let open Quickcheck.Generator.Let_syntax in
@@ -1666,10 +1667,11 @@ let%test_module "Ledger_catchup tests" =
                 (best_tip peer_net.state.frontier))
           in
           Thread_safe.block_on_async_exn (fun () ->
-              test_successful_catchup ~my_net ~target_best_tip_path ) )
+              test_successful_catchup ~my_net ~target_best_tip_path ~cache_proof_db ) )
 
     let%test_unit "catchup succeeds even if the parent transition is already \
                    in the frontier" =
+      let cache_proof_db = Ledger_proof.Cache_tag.For_tests.random () in
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
@@ -1682,10 +1684,11 @@ let%test_module "Ledger_catchup tests" =
             [ Transition_frontier.best_tip peer_net.state.frontier ]
           in
           Thread_safe.block_on_async_exn (fun () ->
-              test_successful_catchup ~my_net ~target_best_tip_path ) )
+              test_successful_catchup ~my_net ~target_best_tip_path ~cache_proof_db) )
 
     let%test_unit "catchup succeeds even if the parent transition is already \
                    in the frontier" =
+                   let cache_proof_db = Ledger_proof.Cache_tag.For_tests.random () in
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
@@ -1698,11 +1701,12 @@ let%test_module "Ledger_catchup tests" =
             [ Transition_frontier.best_tip peer_net.state.frontier ]
           in
           Thread_safe.block_on_async_exn (fun () ->
-              test_successful_catchup ~my_net ~target_best_tip_path ) )
+              test_successful_catchup ~my_net ~target_best_tip_path ~cache_proof_db ) )
 
     let%test_unit "when catchup fails to download state hashes, catchup will \
                    properly clear the unprocessed_transition_cache of the \
                    blocks that triggered catchup" =
+      let cache_proof_db = Ledger_proof.Cache_tag.For_tests.random () in
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
@@ -1721,7 +1725,7 @@ let%test_module "Ledger_catchup tests" =
           let target_breadcrumb = List.last_exn target_best_tip_path in
           let test =
             setup_catchup_pipes ~network:my_net.network
-              ~frontier:my_net.state.frontier
+              ~frontier:my_net.state.frontier ~cache_proof_db
           in
           let parent_hash =
             Transition_frontier.Breadcrumb.parent_hash target_breadcrumb
@@ -1781,6 +1785,7 @@ let%test_module "Ledger_catchup tests" =
         in
         Deferred.return (Some [])
       in
+      let cache_proof_db = Ledger_proof.Cache_tag.For_tests.random () in
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
@@ -1819,7 +1824,7 @@ let%test_module "Ledger_catchup tests" =
           let target_breadcrumb = List.last_exn target_best_tip_path in
           let test =
             setup_catchup_pipes ~network:my_net.network
-              ~frontier:my_net.state.frontier
+              ~frontier:my_net.state.frontier ~cache_proof_db
           in
           let parent_hash =
             Transition_frontier.Breadcrumb.parent_hash target_breadcrumb
