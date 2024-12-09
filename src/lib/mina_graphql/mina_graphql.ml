@@ -2216,25 +2216,23 @@ module Queries = struct
         Work_selector.pending_work_statements ~snark_pool ~fee_opt
           snark_job_state )
 
-  let pending_snark_work_range =
-    field "pendingSnarkWorkRange"
+  let snark_work_range =
+    field "snarkWorkRange"
       ~doc:
-        "Find any sequence of pending snark works between two indexes in the \
-         pending snark work pool. Returns both completed and uncompleted work."
+        "Find any sequence of snark work between two indexes in all available \
+         snark work. Returns both completed and uncompleted work."
       ~args:
         Arg.
           [ arg "startingIndex"
-              ~doc:
-                "The first index to be taken from the pending snark work pool"
+              ~doc:"The first index to be taken from all available snark work"
               ~typ:(non_null Types.Input.UInt32.arg_typ)
           ; arg "endingIndex"
               ~doc:
-                "The last index to be taken from the pending snark work pool \
-                 (excluded). If not specified or greater than the pending \
-                 snark work list, all elements from index [startingIndex] will \
+                "The last index to be taken from all available snark work \
+                 (exclusive). If not specified or greater than the available \
+                 snark work list,all elements from index [startingIndex] will \
                  be returned. An empty list will be returned if startingIndex \
-                 is not a valid index of the pending snark work list or if \
-                 startingIndex >= endingIndex."
+                 is not a valid index or if startingIndex >= endingIndex."
               ~typ:Types.Input.UInt32.arg_typ
           ]
       ~typ:(non_null @@ list @@ non_null Types.pending_work_spec)
@@ -2832,7 +2830,7 @@ module Queries = struct
     ; trust_status_all
     ; snark_pool
     ; pending_snark_work
-    ; pending_snark_work_range
+    ; snark_work_range
     ; SnarkedLedgerMembership.snarked_ledger_account_membership
     ; SnarkedLedgerMembership.encoded_snarked_ledger_account_membership
     ; genesis_constants
