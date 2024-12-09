@@ -2,7 +2,9 @@ use ark_ec::AffineRepr;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as D};
 use cache::LagrangeCache;
 use mina_curves::pasta::{Pallas, Vesta};
-use poly_commitment::{commitment::CommitmentCurve, srs::SRS};
+use poly_commitment::commitment::CommitmentCurve;
+use poly_commitment::ipa::SRS;
+use poly_commitment::SRS as _;
 use std::env;
 
 pub trait WithLagrangeBasis<G: AffineRepr> {

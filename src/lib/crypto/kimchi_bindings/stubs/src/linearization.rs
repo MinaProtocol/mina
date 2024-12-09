@@ -1,3 +1,4 @@
+use kimchi::circuits::expr::FormattedOutput;
 use kimchi::{
     circuits::{
         constraints::FeatureFlags,
@@ -6,13 +7,15 @@ use kimchi::{
     },
     linearization::{constraints_expr, linearization_columns},
 };
+use std::collections::HashMap;
 
-/// Converts the linearization of the kimchi circuit polynomial into a printable string.
+/// Converts the linearization of the kimchi circuit polynomial into a printable
+/// string.
 pub fn linearization_strings<F: ark_ff::PrimeField>(
     uses_custom_gates: bool,
 ) -> (String, Vec<(String, String)>)
-    where
-        num_bigint::BigUint: From<F::BigInt>,
+where
+    num_bigint::BigUint: From<F::BigInt>,
 {
     let features = if uses_custom_gates {
         None
@@ -48,10 +51,10 @@ pub fn linearization_strings<F: ark_ff::PrimeField>(
     // the output is consistent when printing.
     index_terms.sort_by(|(x, _), (y, _)| x.cmp(y));
 
-    let constant = constant_term.ocaml_str();
+    let constant = constant_term.ocaml(&mut HashMap::new());
     let other_terms = index_terms
         .iter()
-        .map(|(col, expr)| (format!("{:?}", col), expr.ocaml_str()))
+        .map(|(col, expr)| (format!("{:?}", col), expr.ocaml(&mut HashMap::new())))
         .collect();
 
     (constant, other_terms)

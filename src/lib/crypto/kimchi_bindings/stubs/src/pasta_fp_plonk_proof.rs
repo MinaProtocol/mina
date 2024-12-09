@@ -29,7 +29,7 @@ use mina_poseidon::{
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
 use poly_commitment::commitment::{CommitmentCurve, PolyComm};
-use poly_commitment::evaluation_proof::OpeningProof;
+use poly_commitment::ipa::OpeningProof;
 use std::array;
 use std::convert::TryInto;
 
@@ -66,7 +66,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
                     .iter()
                     .map(Into::<Fp>::into)
                     .collect();
-                let comm = PolyComm::<Vesta> { elems: vec![sg] };
+                let comm = PolyComm::<Vesta> { chunks: vec![sg] };
                 RecursionChallenge { chals, comm }
             })
             .collect()
@@ -134,7 +134,7 @@ pub fn caml_pasta_fp_plonk_proof_create_and_verify(
                     .iter()
                     .map(Into::<Fp>::into)
                     .collect();
-                let comm = PolyComm::<Vesta> { elems: vec![sg] };
+                let comm = PolyComm::<Vesta> { chunks: vec![sg] };
                 RecursionChallenge { chals, comm }
             })
             .collect()
@@ -204,7 +204,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
         polynomial::COLUMNS,
         wires::Wire,
     };
-    use poly_commitment::srs::endos;
+    use poly_commitment::ipa::endos;
 
     let num_gates = 1000;
     let num_tables: usize = 5;
@@ -316,6 +316,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     CamlProofWithPublic<CamlGVesta, CamlFp>,
 ) {
     use ark_ff::Zero;
+    use kimchi::circuits::polynomials::foreign_field_common::BigUintForeignFieldHelpers;
     use kimchi::circuits::{
         constraints::ConstraintSystem,
         gate::{CircuitGate, Connect},
@@ -324,8 +325,8 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     };
     use num_bigint::BigUint;
     use num_bigint::RandBigInt;
-    use o1_utils::{foreign_field::BigUintForeignFieldHelpers, FieldHelpers};
-    use poly_commitment::srs::endos;
+    use o1_utils::FieldHelpers;
+    use poly_commitment::ipa::endos;
     use rand::{rngs::StdRng, SeedableRng};
 
     let foreign_field_modulus = Fq::modulus_biguint();
@@ -475,13 +476,14 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
     CamlProofWithPublic<CamlGVesta, CamlFp>,
 ) {
     use ark_ff::Zero;
+    use kimchi::circuits::polynomials::foreign_field_common::BigUintForeignFieldHelpers;
     use kimchi::circuits::{
         constraints::ConstraintSystem, gate::CircuitGate, polynomials::range_check, wires::Wire,
     };
     use num_bigint::BigUint;
     use num_bigint::RandBigInt;
-    use o1_utils::{foreign_field::BigUintForeignFieldHelpers, BigUintFieldHelpers};
-    use poly_commitment::srs::endos;
+    use o1_utils::BigUintFieldHelpers;
+    use poly_commitment::ipa::endos;
     use rand::{rngs::StdRng, SeedableRng};
 
     let rng = &mut StdRng::from_seed([255u8; 32]);
@@ -548,7 +550,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check0(
         polynomials::{generic::GenericGateSpec, range_check},
         wires::Wire,
     };
-    use poly_commitment::srs::endos;
+    use poly_commitment::ipa::endos;
 
     let gates = {
         // Public input row with value 0
@@ -626,7 +628,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
         wires::Wire,
     };
     use num_bigint::BigUint;
-    use poly_commitment::srs::endos;
+    use poly_commitment::ipa::endos;
 
     // Includes a row to store value 1
     let num_public_inputs = 1;
@@ -749,7 +751,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
         polynomials::{generic::GenericGateSpec, xor},
         wires::Wire,
     };
-    use poly_commitment::srs::endos;
+    use poly_commitment::ipa::endos;
 
     let num_public_inputs = 2;
 
@@ -842,7 +844,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
         },
         wires::Wire,
     };
-    use poly_commitment::srs::endos;
+    use poly_commitment::ipa::endos;
 
     // Includes the actual input of the rotation and a row with the zero value
     let num_public_inputs = 2;
@@ -982,7 +984,7 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProofWithPublic<CamlGVesta, Caml
     fn comm() -> PolyComm<Vesta> {
         let g = Vesta::generator();
         PolyComm {
-            elems: vec![g, g, g],
+            chunks: vec![g, g, g],
         }
     }
 

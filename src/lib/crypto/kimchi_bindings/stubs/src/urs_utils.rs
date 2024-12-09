@@ -1,8 +1,8 @@
-use ark_ec::{VariableBaseMSM, CurveGroup};
+use ark_ec::{CurveGroup, VariableBaseMSM};
 use ark_ff::{batch_inversion, One, PrimeField, UniformRand, Zero};
 use poly_commitment::{
     commitment::{b_poly_coefficients, CommitmentCurve},
-    srs::SRS,
+    ipa::SRS,
 };
 use rayon::prelude::*;
 

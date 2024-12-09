@@ -68,5 +68,6 @@ pub use {
         CamlLookupCommitments, CamlProofWithPublic, CamlProverCommitments, CamlProverProof,
     },
     mina_poseidon::sponge::caml::CamlScalarChallenge,
-    poly_commitment::commitment::caml::{CamlOpeningProof, CamlPolyComm},
+    poly_commitment::commitment::caml::CamlPolyComm,
+    poly_commitment::ipa::caml::CamlOpeningProof,
 };
