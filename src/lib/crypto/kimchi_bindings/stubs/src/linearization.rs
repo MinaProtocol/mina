@@ -1,4 +1,3 @@
-use kimchi::circuits::expr::FormattedOutput;
 use kimchi::{
     circuits::{
         constraints::FeatureFlags,
@@ -7,7 +6,6 @@ use kimchi::{
     },
     linearization::{constraints_expr, linearization_columns},
 };
-use std::collections::HashMap;
 
 /// Converts the linearization of the kimchi circuit polynomial into a printable
 /// string.
@@ -51,10 +49,10 @@ where
     // the output is consistent when printing.
     index_terms.sort_by(|(x, _), (y, _)| x.cmp(y));
 
-    let constant = constant_term.ocaml(&mut HashMap::new());
+    let constant = constant_term.ocaml_str();
     let other_terms = index_terms
         .iter()
-        .map(|(col, expr)| (format!("{:?}", col), expr.ocaml(&mut HashMap::new())))
+        .map(|(col, expr)| (format!("{:?}", col), expr.ocaml_str()))
         .collect();
 
     (constant, other_terms)
