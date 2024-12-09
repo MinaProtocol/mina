@@ -61,7 +61,7 @@ dependencies = [
  "ark-std",
  "derivative",
  "hashbrown 0.13.2",
- "itertools",
+ "itertools 0.10.5",
  "num-traits",
  "rayon",
  "zeroize",
@@ -79,7 +79,7 @@ dependencies = [
  "ark-std",
  "derivative",
  "digest",
- "itertools",
+ "itertools 0.10.5",
  "num-bigint",
  "num-traits",
  "paste",
@@ -421,12 +421,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "disjoint-set"
-version = "0.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d102f1a462fdcdddce88d6d46c06c074a2d2749b262230333726b06c52bb7585"
-
-[[package]]
 name = "either"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -585,6 +579,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -608,11 +611,11 @@ dependencies = [
  "ark-poly",
  "ark-serialize",
  "blake2",
- "disjoint-set",
  "groupmap",
  "hex",
  "internal-tracing",
- "itertools",
+ "itertools 0.12.1",
+ "log",
  "mina-curves",
  "mina-poseidon",
  "num-bigint",
@@ -679,6 +682,7 @@ version = "0.1.0"
 dependencies = [
  "ark-ec",
  "ark-ff",
+ "num-bigint",
 ]
 
 [[package]]
@@ -802,7 +806,6 @@ dependencies = [
  "ark-serialize",
  "bcs",
  "hex",
- "mina-curves",
  "num-bigint",
  "num-integer",
  "num-traits",
@@ -810,6 +813,7 @@ dependencies = [
  "rand_core",
  "rayon",
  "rmp-serde",
+ "secp256k1",
  "serde",
  "serde_with",
  "sha2",
@@ -915,7 +919,7 @@ dependencies = [
  "ark-serialize",
  "blake2",
  "groupmap",
- "itertools",
+ "itertools 0.12.1",
  "mina-curves",
  "mina-poseidon",
  "o1-utils",
@@ -1073,6 +1077,24 @@ name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
+
+[[package]]
+name = "secp256k1"
+version = "0.28.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d24b59d129cdadea20aea4fb2352fa053712e5d713eee47d700cd4b2bc002f10"
+dependencies = [
+ "secp256k1-sys",
+]
+
+[[package]]
+name = "secp256k1-sys"
+version = "0.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5d1746aae42c19d583c3c1a8c646bfad910498e2051c551a7f2e3c0c9fbb7eb"
+dependencies = [
+ "cc",
+]
 
 [[package]]
 name = "semver"
