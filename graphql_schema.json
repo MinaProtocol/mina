@@ -15384,14 +15384,14 @@
               "deprecationReason": null
             },
             {
-              "name": "pendingSnarkWorkRange",
+              "name": "snarkWorkRange",
               "description":
-                "Find any sequence of pending snark works between two indexes in the pending snark work pool. Returns both completed and uncompleted work.",
+                "Find any sequence of snark work between two indexes in all available snark work. Returns both completed and uncompleted work.",
               "args": [
                 {
                   "name": "endingIndex",
                   "description":
-                    "The last index to be taken from the pending snark work pool (excluded). If not specified or greater than the pending snark work list, all elements from index [startingIndex] will be returned. An empty list will be returned if startingIndex is not a valid index of the pending snark work list or if startingIndex >= endingIndex.",
+                    "The last index to be taken from all available snark work (exclusive). If not specified or greater than the available snark work list,all elements from index [startingIndex] will be returned. An empty list will be returned if startingIndex is not a valid index or if startingIndex >= endingIndex.",
                   "type": {
                     "kind": "SCALAR",
                     "name": "UInt32",
@@ -15402,7 +15402,7 @@
                 {
                   "name": "startingIndex",
                   "description":
-                    "The first index to be taken from the pending snark work pool",
+                    "The first index to be taken from all available snark work",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,
