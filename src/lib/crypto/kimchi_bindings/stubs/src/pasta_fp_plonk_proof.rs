@@ -664,7 +664,8 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
         for _ in 0..4 {
             CircuitGate::extend_multi_range_check(&mut gates, &mut curr_row);
         }
-        // Connect the witnesses of the addition to the corresponding range checks
+        // Connect the witnesses of the addition to the corresponding range
+        // checks
         gates.connect_ffadd_range_checks(1, Some(4), Some(8), 12);
         // Connect the bound check range checks
         gates.connect_ffadd_range_checks(2, None, None, 16);
@@ -703,7 +704,8 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
         witness
     };
 
-    // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
+    // not sure if theres a smarter way instead of the double unwrap, but should
+    // be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates)
         .public(num_public_inputs)
         .build()
@@ -764,7 +766,8 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
                 None,
             ));
         }
-        // 1 XOR of 128 bits. This will create 8 Xor16 gates and a Generic final gate with all zeros.
+        // 1 XOR of 128 bits. This will create 8 Xor16 gates and a Generic final
+        // gate with all zeros.
         CircuitGate::<Fp>::extend_xor_gadget(&mut gates, 128);
         // connect public inputs to the inputs of the XOR
         gates.connect_cell_pair((0, 0), (2, 0));
@@ -791,7 +794,8 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
         cols
     };
 
-    // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
+    // not sure if theres a smarter way instead of the double unwrap, but should
+    // be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates)
         .public(num_public_inputs)
         .build()
@@ -884,7 +888,8 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
         cols
     };
 
-    // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
+    // not sure if theres a smarter way instead of the double unwrap, but should
+    // be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates)
         .public(num_public_inputs)
         .build()
