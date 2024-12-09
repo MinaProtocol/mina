@@ -374,7 +374,7 @@ module Wrap : sig
         [@@deriving
           sexp, compare, yojson, hlist, hash, equal, bin_shape, bin_io]
 
-        include Pickles_types.Sigs.VERSIONED
+        include Plonkish_prelude.Sigs.VERSIONED
       end
 
       module Latest = V1
@@ -422,7 +422,7 @@ module Wrap : sig
           [@@deriving
             sexp, compare, yojson, hlist, hash, equal, bin_shape, bin_io]
 
-          include Pickles_types.Sigs.VERSIONED
+          include Plonkish_prelude.Sigs.VERSIONED
         end
 
         module Latest = V1
@@ -667,7 +667,7 @@ module Wrap : sig
           }
         [@@deriving compare, yojson, sexp, hash, equal, bin_shape, bin_io]
 
-        include Pickles_types.Sigs.VERSIONED
+        include Plonkish_prelude.Sigs.VERSIONED
       end
 
       module Latest = V1
@@ -743,7 +743,7 @@ module Wrap : sig
             }
           [@@deriving compare, yojson, sexp, hash, equal, bin_shape, bin_io]
 
-          include Pickles_types.Sigs.VERSIONED
+          include Plonkish_prelude.Sigs.VERSIONED
         end
 
         module Latest = V1

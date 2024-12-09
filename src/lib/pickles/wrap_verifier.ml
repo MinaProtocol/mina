@@ -49,6 +49,15 @@ module Make
     (Inputs : Intf.Wrap_main_inputs.S
                 with type Impl.field = Backend.Tock.Field.t
                  and type Impl.Bigint.t = Backend.Tock.Bigint.t
+                 and type ('var, 'value, 'aux, 'field, 'checked) Impl.Typ.typ' =
+                  ( 'var
+                  , 'value
+                  , 'aux
+                  , 'field
+                  , 'checked )
+                  Wrap_main_inputs.Impl.Typ.typ'
+                 and type ('var, 'value, 'field, 'checked) Impl.Typ.typ =
+                  ('var, 'value, 'field, 'checked) Wrap_main_inputs.Impl.Typ.typ
                  and type Inner_curve.Constant.Scalar.t = Backend.Tick.Field.t) =
 struct
   open Inputs
@@ -1224,7 +1233,7 @@ struct
         let alpha = sample_scalar () in
         let t_comm :
             (Inputs.Impl.Field.t * Inputs.Impl.Field.t)
-            Pickles_types__Plonk_types.Poly_comm.Without_degree_bound.t =
+            Kimchi_backend_common.Plonk_types.Poly_comm.Without_degree_bound.t =
           messages.t_comm
         in
         absorb_g t_comm ;

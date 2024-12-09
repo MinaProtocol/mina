@@ -26,3 +26,4 @@ let remove = Lib.State.remove
 let pending_work_statements = Lib.pending_work_statements
 
 let all_work = Lib.all_work
+let completed_work_statements = Lib.completed_work_statements

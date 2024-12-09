@@ -39,3 +39,6 @@ val all_work :
   -> ( work One_or_two.t
      * (Currency.Fee.t * Signature_lib.Public_key.Compressed.t) option )
      list
+
+val completed_work_statements :
+  snark_pool:snark_pool -> State.t -> Transaction_snark_work.unchecked list
