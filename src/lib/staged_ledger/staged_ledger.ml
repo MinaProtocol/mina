@@ -235,14 +235,12 @@ module T = struct
   type t =
     { scan_state : Scan_state.t
     ; ledger :
-        ((* Invariant: this is the ledger after having applied all the
-             transactions in the above state. *)
-         Ledger.attached_mask
-        [@sexp.opaque] )
+        (* Invariant: this is the ledger after having applied all the
+            transactions in the above state. *)
+        Ledger.attached_mask
     ; constraint_constants : Genesis_constants.Constraint_constants.t
     ; pending_coinbase_collection : Pending_coinbase.t
     }
-  [@@deriving sexp]
 
   let proof_txns_with_state_hashes t =
     Scan_state.latest_ledger_proof t.scan_state

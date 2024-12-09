@@ -166,7 +166,6 @@ module Stable = struct
           Transaction_with_witness.Stable.V2.t list
           * [ `Border_block_continued_in_the_next_tree of bool ]
       }
-    [@@deriving sexp]
 
     let to_latest = Fn.id
 
