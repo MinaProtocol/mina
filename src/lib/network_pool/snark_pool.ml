@@ -6,14 +6,17 @@ open Network_peer
 module Snark_tables = struct
   type t =
     { all :
-        Ledger_proof.t One_or_two.t Priced_proof.t
+        Ledger_proof.Cache_tag.t One_or_two.t Priced_proof.t
         Transaction_snark_work.Statement.Map.t
     ; rebroadcastable :
-        (Ledger_proof.t One_or_two.t Priced_proof.t * Core.Time.t)
+        (Ledger_proof.Cache_tag.t One_or_two.t Priced_proof.t * Core.Time.t)
         Transaction_snark_work.Statement.Map.t
     }
   [@@deriving sexp, equal]
 end
+
+let unwrap_cache_tag =
+  Priced_proof.map ~f:(One_or_two.map ~f:Ledger_proof.Cache_tag.unwrap)
 
 module type S = sig
   type transition_frontier
@@ -270,19 +273,25 @@ struct
 
       let get_logger t = t.logger
 
-      let request_proof t = Map.find !(t.snark_tables).all
+      let request_proof t x =
+        Option.map ~f:unwrap_cache_tag (Map.find !(t.snark_tables).all x)
 
       let add_snark ?(is_local = false) t ~work
           ~(proof : Ledger_proof.t One_or_two.t) ~fee =
         if work_is_referenced t work then (
           (*Note: fee against existing proofs and the new proofs are checked in
             Diff.unsafe_apply which calls this function*)
+          let cached_proof =
+            One_or_two.map ~f:Ledger_proof.Cache_tag.generate proof
+          in
           t.snark_tables :=
-            { all = Map.set !(t.snark_tables).all ~key:work ~data:{ proof; fee }
+            { all =
+                Map.set !(t.snark_tables).all ~key:work
+                  ~data:{ proof = cached_proof; fee }
             ; rebroadcastable =
                 ( if is_local then
                   Map.set !(t.snark_tables).rebroadcastable ~key:work
-                    ~data:({ proof; fee }, Time.now ())
+                    ~data:({ proof = cached_proof; fee }, Time.now ())
                 else
                   (* Stop rebroadcasting locally generated snarks if they are
                      overwritten. No-op if there is no rebroadcastable SNARK with that
@@ -484,7 +493,7 @@ struct
           Map.to_alist !(t.snark_tables).rebroadcastable
           |> List.filter_map ~f:(fun (stmt, (snark, _time)) ->
                  if Set.mem best_tips stmt then
-                   Some (Diff.Add_solved_work (stmt, snark))
+                   Some (Diff.Add_solved_work (stmt, unwrap_cache_tag snark))
                  else None )
 
     let remove_solved_work t work =

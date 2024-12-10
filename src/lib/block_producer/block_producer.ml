@@ -341,10 +341,15 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                   previous_protocol_state |> Protocol_state.blockchain_state
                   |> Blockchain_state.snarked_ledger_hash
                 in
+                let opt_ledger_proof_statement =
+                  Option.map ledger_proof_opt ~f:(fun (proof, _) ->
+                      Ledger_proof.statement
+                      @@ Ledger_proof.Cache_tag.unwrap proof )
+                in
                 let ledger_proof_statement =
                   match ledger_proof_opt with
-                  | Some (proof, _) ->
-                      Ledger_proof.statement proof
+                  | Some _ ->
+                      Option.value_exn opt_ledger_proof_statement
                   | None ->
                       let state =
                         previous_protocol_state
@@ -357,9 +362,8 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                   |> Blockchain_state.genesis_ledger_hash
                 in
                 let supply_increase =
-                  Option.value_map ledger_proof_opt
-                    ~f:(fun (proof, _) ->
-                      (Ledger_proof.statement proof).supply_increase )
+                  Option.value_map opt_ledger_proof_statement
+                    ~f:(fun stmt -> stmt.supply_increase)
                     ~default:Currency.Amount.Signed.zero
                 in
                 let body_reference =
@@ -410,7 +414,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                       ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
                       ~ledger_proof:
                         (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
-                             proof ) ) )
+                             Ledger_proof.Cache_tag.unwrap proof ) ) )
               in
               let witness =
                 { Pending_coinbase_witness.pending_coinbases =
