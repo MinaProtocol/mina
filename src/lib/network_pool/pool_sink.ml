@@ -46,6 +46,7 @@ module Base
   Pool_sink
     with type pool := Diff.pool
      and type unwrapped_t = Diff.verified Envelope.Incoming.t * BC.t
+     and type cache_proof_db := Ledger_proof.Cache_tag.Cache.t
      and type msg := Msg.raw_msg * Msg.raw_callback = struct
   type unwrapped_t = Diff.verified Envelope.Incoming.t * BC.t
 
@@ -86,7 +87,7 @@ module Base
         BC.drop Diff.empty (Diff.reject_overloaded_diff diff) cb ;
         Deferred.unit
 
-  let verify_impl ~logger ~trace_label resource_pool rl env cb :
+  let verify_impl ~logger ~trace_label resource_pool rl env cb cache_proof_db :
       Diff.verified Envelope.Incoming.t option Deferred.t =
     let handle_diffs_thread_label = "handle_" ^ trace_label ^ "_diffs" in
 
@@ -112,7 +113,7 @@ module Base
               Deferred.return None
           | `Within_capacity ->
               O1trace.thread verify_diffs_thread_label (fun () ->
-                  match%map Diff.verify resource_pool env with
+                  match%map Diff.verify resource_pool env cache_proof_db  with
                   | Error ver_err ->
                       Diff.log_internal ~logger "rejected"
                         ~reason:
@@ -131,7 +132,7 @@ module Base
                       [%log debug] "Verified diff: $diff" ~metadata ;
                       Some verified_diff ) )
 
-  let push t (msg, cb) =
+  let push t (msg, cb) cache_proof_db =
     match t with
     | Sink
         { writer = w
@@ -172,7 +173,7 @@ module Base
           don't_wait_for
             (Throttle.enqueue throttle (fun () ->
                  match%bind
-                   verify_impl ~logger ~trace_label pool rl env' cb'
+                   verify_impl ~logger ~trace_label pool rl env' cb' cache_proof_db
                  with
                  | None ->
                      [%log debug] "Received unverified gossip on %s" trace_label
@@ -231,6 +232,7 @@ module Local_sink
   Pool_sink
     with type pool := Diff.pool
      and type unwrapped_t = Diff.verified Envelope.Incoming.t * BC.t
+     and type cache_proof_db := Ledger_proof.Cache_tag.Cache.t
      and type msg :=
       BC.resource_pool_diff
       * (   ( [ `Broadcasted | `Not_broadcasted ]
@@ -262,6 +264,7 @@ module Remote_sink
   Pool_sink
     with type pool := Diff.pool
      and type unwrapped_t = Diff.verified Envelope.Incoming.t * BC.t
+     and type cache_proof_db := Ledger_proof.Cache_tag.Cache.t
      and type msg :=
       BC.resource_pool_diff Envelope.Incoming.t
       * Mina_net2.Validation_callback.t =

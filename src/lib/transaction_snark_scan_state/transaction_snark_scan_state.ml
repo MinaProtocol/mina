@@ -31,18 +31,6 @@ module type Monad_with_Or_error_intf = sig
 end
 
 
-module Proof_cache = struct
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t = Ledger_proof.Cache_tag.db
-    
-      let to_latest = Fn.id
-    end
-  end]
-end
-
-
 module Transaction_with_witness = struct
   [%%versioned
   module Stable = struct
@@ -179,7 +167,7 @@ module Repr = struct
         ; previous_incomplete_zkapp_updates :
             Transaction_with_witness.Stable.V2.t list
             * [ `Border_block_continued_in_the_next_tree of bool ]
-        ; proof_cache : Ledger_proof.Cache_tag.db
+        ; proof_cache : Ledger_proof.Cache_tag.Cache.t
         }
 
       let to_latest = Fn.id

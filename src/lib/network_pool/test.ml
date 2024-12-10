@@ -56,13 +56,14 @@ let%test_module "network pool test" =
             }
         }
       in
+      let cache_proof_db = Ledger_proof.Cache_tag.For_tests.random () in 
       Async.Thread_safe.block_on_async_exn (fun () ->
           let network_pool, _, _ =
             Mock_snark_pool.create ~config ~logger ~constraint_constants
               ~consensus_constants ~time_controller
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
-              ~block_window_duration
+              ~block_window_duration ~cache_proof_db
           in
           let%bind () =
             Mocks.Transition_frontier.refer_statements tf [ work ]
@@ -73,12 +74,12 @@ let%test_module "network pool test" =
           in
           Mock_snark_pool.apply_and_broadcast network_pool
             (Envelope.Incoming.local command)
-            (Mock_snark_pool.Broadcast_callback.Local (Fn.const ())) ;
+            (Mock_snark_pool.Broadcast_callback.Local (Fn.const ())) cache_proof_db;
           let%map _ =
             Linear_pipe.read (Mock_snark_pool.broadcasts network_pool)
           in
           let pool = Mock_snark_pool.resource_pool network_pool in
-          match Mock_snark_pool.Resource_pool.request_proof pool work with
+          match Mock_snark_pool.Resource_pool.request_proof pool work cache_proof_db with
           | Some { proof; fee = _ } ->
               assert (
                 [%equal: Ledger_proof.t One_or_two.t] proof priced_proof.proof )
@@ -112,23 +113,24 @@ let%test_module "network pool test" =
         let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
         let tf = Mocks.Transition_frontier.create [] in
         let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create (Some tf) in
+        let cache_proof_db = Ledger_proof.Cache_tag.For_tests.random () in
         let network_pool, remote_sink, local_sink =
           Mock_snark_pool.create ~config ~logger ~constraint_constants
             ~consensus_constants ~time_controller
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
-            ~block_window_duration
+            ~block_window_duration ~cache_proof_db
         in
         List.map (List.take works per_reader) ~f:create_work
         |> List.map ~f:(fun work ->
                ( Envelope.Incoming.local work
                , Mina_net2.Validation_callback.create_without_expiration () ) )
         |> List.iter ~f:(fun diff ->
-               Mock_snark_pool.Remote_sink.push remote_sink diff
+               Mock_snark_pool.Remote_sink.push remote_sink diff cache_proof_db
                |> Deferred.don't_wait_for ) ;
         List.map (List.drop works per_reader) ~f:create_work
         |> List.iter ~f:(fun diff ->
-               Mock_snark_pool.Local_sink.push local_sink (diff, Fn.const ())
+               Mock_snark_pool.Local_sink.push local_sink (diff, Fn.const ()) cache_proof_db
                |> Deferred.don't_wait_for ) ;
         let%bind () = Mocks.Transition_frontier.refer_statements tf works in
         don't_wait_for

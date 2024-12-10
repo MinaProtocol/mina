@@ -99,7 +99,7 @@ module Make
   (** Check whether there is a proof with lower fee in the pool.
       Returns [Ok ()] is the [~fee] would be the lowest in pool.
   *)
-  let has_no_lower_fee pool work ~fee ~sender =
+  let has_no_lower_fee pool work ~fee ~sender ~cache_proof_db =
     let reject_and_log_if_local reason =
       [%log' trace (Pool.get_logger pool)]
         "Rejecting snark work $work from $sender: $reason"
@@ -112,7 +112,7 @@ module Make
           ] ;
       Result.fail reason
     in
-    match Pool.request_proof pool work with
+    match Pool.request_proof pool work cache_proof_db with
     | None ->
         Ok ()
     | Some { fee = { fee = prev; _ }; _ } ->
@@ -122,7 +122,7 @@ module Make
           reject_and_log_if_local Intf.Verification_error.Fee_equal
         else reject_and_log_if_local Intf.Verification_error.Fee_higher
 
-  let verify pool ({ data; sender; _ } as t : t Envelope.Incoming.t) =
+  let verify pool ({ data; sender; _ } as t : t Envelope.Incoming.t) cache_proof_db=
     match data with
     | Empty ->
         Deferred.Result.fail
@@ -137,11 +137,11 @@ module Make
         (*reject higher priced gossiped proofs*)
         if is_local then verify ()
         else
-          Deferred.return (has_no_lower_fee pool work ~fee:fee.fee ~sender)
-          >>= verify
+          Deferred.return (has_no_lower_fee pool ~cache_proof_db work ~fee:fee.fee ~sender)
+          >>= verify 
 
   (* This is called after verification has occurred.*)
-  let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) =
+  let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) cache_proof_db =
     let { Envelope.Incoming.data = diff; sender; _ } = t in
     match diff with
     | Empty ->
@@ -154,10 +154,10 @@ module Make
           | `Added ->
               Ok (diff, ())
         in
-        match has_no_lower_fee pool work ~fee:fee.fee ~sender with
+        match has_no_lower_fee pool work ~fee:fee.fee ~sender ~cache_proof_db with
         | Ok () ->
             let%map.Result accepted, rejected =
-              Pool.add_snark ~is_local pool ~work ~proof ~fee |> to_or_error
+              Pool.add_snark ~is_local pool ~work ~proof ~cache_proof_db ~fee |> to_or_error
             in
             (`Accept, accepted, rejected)
         | Error e ->

@@ -35,6 +35,7 @@ module type S = sig
     val get_rebroadcastable :
          Resource_pool.t
       -> has_timed_out:(Time.t -> [ `Timed_out | `Ok ])
+      -> Ledger_proof.Cache_tag.Cache.t
       -> Resource_pool.Diff.t list
   end
 
@@ -607,7 +608,7 @@ let%test_module "random set test" =
           Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
             () )
 
-    let apply_diff resource_pool work
+    let apply_diff resource_pool work cache_proof_db
         ?(proof = One_or_two.map ~f:mk_dummy_proof)
         ?(sender = Envelope.Sender.Local) fee =
       let diff =
@@ -619,8 +620,8 @@ let%test_module "random set test" =
         Mock_snark_pool.Resource_pool.Diff.verify resource_pool enveloped_diff
       with
       | Ok _ ->
-          Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool
-            enveloped_diff
+          Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool cache_proof_db
+            enveloped_diff cache_proof_db
       | Error _ ->
           Error (`Other (Error.of_string "Invalid diff"))
 
@@ -628,7 +629,7 @@ let%test_module "random set test" =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
         ~disk_location:"/tmp/snark-pool"
 
-    let gen ?length () =
+    let gen ?length cache_proof_db () =
       let open Quickcheck.Generator.Let_syntax in
       let gen_entry =
         Quickcheck.Generator.tuple2 Mocks.Transaction_snark_work.Statement.gen
@@ -649,7 +650,7 @@ let%test_module "random set test" =
           ~consensus_constants ~time_controller
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
-          ~block_window_duration
+          ~block_window_duration ~cache_proof_db
         (* |>  *)
       in
       let pool = Mock_snark_pool.resource_pool mock_pool in
@@ -660,7 +661,7 @@ let%test_module "random set test" =
       in
       let%map () =
         Deferred.List.iter sample_solved_work ~f:(fun (work, fee) ->
-            let%map res = apply_diff pool work fee in
+            let%map res = apply_diff pool work cache_proof_db fee  in
             assert (Result.is_ok res) )
       in
       (pool, tf)
@@ -739,6 +740,7 @@ let%test_module "random set test" =
     let%test_unit "When two priced proofs of the same work are inserted into \
                    the snark pool, the fee of the work is at most the minimum \
                    of those fees" =
+      let proof_cache_db = Ledger_proof.Cache_tag.For_tests.random () in
       Quickcheck.test ~trials:5
         ~sexp_of:
           [%sexp_of:
@@ -752,14 +754,13 @@ let%test_module "random set test" =
            Fee_with_prover.gen )
         ~f:(fun (t, work, fee_1, fee_2) ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let proof_cache_db = Proof_cache_tag
               let%bind t, tf = t in
               (*Statements should be referenced before work for those can be included*)
               let%bind () =
                 Mocks.Transition_frontier.refer_statements tf [ work ]
               in
-              let%bind _ = apply_diff t work fee_1 in
-              let%map _ = apply_diff t work fee_2 in
+              let%bind _ = apply_diff t work proof_cache_db fee_1 in
+              let%map _ = apply_diff t work proof_cache_db fee_2 in
               let fee_upper_bound = Currency.Fee.min fee_1.fee fee_2.fee in
               let { Priced_proof.fee = { fee; _ }; _ } =
                 Option.value_exn
@@ -770,6 +771,7 @@ let%test_module "random set test" =
     let%test_unit "A priced proof of a work will replace an existing priced \
                    proof of the same work only if it's fee is smaller than the \
                    existing priced proof" =
+      let proof_cache_db = Ledger_proof.Cache_tag.For_tests.random () in
       Quickcheck.test ~trials:5
         ~sexp_of:
           [%sexp_of:
@@ -778,7 +780,7 @@ let%test_module "random set test" =
             * Mocks.Transaction_snark_work.Statement.t
             * Fee_with_prover.t
             * Fee_with_prover.t]
-        (Quickcheck.Generator.tuple4 (gen ())
+        (Quickcheck.Generator.tuple4 (gen proof_cache_db ())
            Mocks.Transaction_snark_work.Statement.gen Fee_with_prover.gen
            Fee_with_prover.gen )
         ~f:(fun (t, work, fee_1, fee_2) ->
@@ -791,13 +793,13 @@ let%test_module "random set test" =
               Mock_snark_pool.Resource_pool.remove_solved_work t work ;
               let expensive_fee = Fee_with_prover.max fee_1 fee_2
               and cheap_fee = Fee_with_prover.min fee_1 fee_2 in
-              let%bind _ = apply_diff t work cheap_fee in
-              let%map res = apply_diff t work expensive_fee in
+              let%bind _ = apply_diff t work proof_cache_db cheap_fee in
+              let%map res = apply_diff t work proof_cache_db expensive_fee in
               assert (Result.is_error res) ;
               assert (
                 Currency.Fee.equal cheap_fee.fee
                   (Option.value_exn
-                     (Mock_snark_pool.Resource_pool.request_proof t work) )
+                     (Mock_snark_pool.Resource_pool.request_proof t work proof_cache_db) )
                     .fee
                     .fee ) ) )
 
@@ -808,6 +810,7 @@ let%test_module "random set test" =
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
+      let proof_cache_db = Ledger_proof.Cache_tag.For_tests.random () in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let frontier_broadcast_pipe_r, _ =
             Broadcast_pipe.create (Some (Mocks.Transition_frontier.create []))
@@ -817,7 +820,7 @@ let%test_module "random set test" =
               ~consensus_constants ~time_controller ~logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
-              ~block_window_duration
+              ~block_window_duration ~cache_proof_db:proof_cache_db
           in
           let priced_proof =
             { Priced_proof.proof =
@@ -841,7 +844,7 @@ let%test_module "random set test" =
                ~f:(fun _ ->
                  let pool = Mock_snark_pool.resource_pool network_pool in
                  ( match
-                     Mock_snark_pool.Resource_pool.request_proof pool fake_work
+                     Mock_snark_pool.Resource_pool.request_proof pool fake_work proof_cache_db
                    with
                  | Some { proof; fee = _ } ->
                      assert (
@@ -852,12 +855,13 @@ let%test_module "random set test" =
                  Deferred.unit ) ;
           Mock_snark_pool.apply_and_broadcast network_pool
             (Envelope.Incoming.local command)
-            (Mock_snark_pool.Broadcast_callback.Local (Fn.const ())) ;
+            (Mock_snark_pool.Broadcast_callback.Local (Fn.const ())) proof_cache_db;
           Deferred.unit )
 
     let%test_unit "when creating a network, the incoming diffs and locally \
                    generated diffs in reader pipes will automatically get \
                    process" =
+      let proof_cache_db = Ledger_proof.Cache_tag.For_tests.random () in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let work_count = 10 in
           let works =
@@ -890,7 +894,7 @@ let%test_module "random set test" =
                 ~consensus_constants ~time_controller
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
                 ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
-                ~block_window_duration
+                ~block_window_duration ~cache_proof_db:proof_cache_db
             in
             List.map (List.take works per_reader) ~f:create_work
             |> List.map ~f:(fun work ->
@@ -928,6 +932,7 @@ let%test_module "random set test" =
     let%test_unit "rebroadcast behavior" =
       let tf = Mocks.Transition_frontier.create [] in
       let frontier_broadcast_pipe_r, _w = Broadcast_pipe.create (Some tf) in
+      let cache_proof_db = Ledger_proof.Cache_tag.For_tests.random () in
       let stmt1, stmt2, stmt3, stmt4 =
         let gen_not_any l =
           Quickcheck.Generator.filter Mocks.Transaction_snark_work.Statement.gen
@@ -968,6 +973,7 @@ let%test_module "random set test" =
         [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list] (sort got)
           (sort expected)
       in
+      let proof_cache_db = Ledger_proof.Cache_tag.For_tests.random () in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
           let network_pool, _, _ =
@@ -975,7 +981,7 @@ let%test_module "random set test" =
               ~constraint_constants ~consensus_constants ~time_controller
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
-              ~block_window_duration
+              ~block_window_duration ~cache_proof_db
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in
           let%bind () =
@@ -983,7 +989,7 @@ let%test_module "random set test" =
               [ stmt1; stmt2; stmt3; stmt4 ]
           in
           let%bind res1 =
-            apply_diff ~sender:fake_sender resource_pool stmt1 fee1
+            apply_diff ~sender:fake_sender resource_pool stmt1 cache_proof_db fee1
           in
           let ok_exn = function
             | Ok e ->
@@ -999,11 +1005,11 @@ let%test_module "random set test" =
                 * Mock_snark_pool.Resource_pool.Diff.verified
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable1 =
-            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
+            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool proof_cache_db
               ~has_timed_out:(Fn.const `Ok)
           in
           check_work ~got:rebroadcastable1 ~expected:[] ;
-          let%bind res2 = apply_diff resource_pool stmt2 fee2 in
+          let%bind res2 = apply_diff resource_pool stmt2 cache_proof_db fee2 in
           let proof2 = One_or_two.map ~f:mk_dummy_proof stmt2 in
           ignore
             ( ok_exn res2
@@ -1011,13 +1017,13 @@ let%test_module "random set test" =
                 * Mock_snark_pool.Resource_pool.Diff.verified
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable2 =
-            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
+            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool proof_cache_db
               ~has_timed_out:(Fn.const `Ok)
           in
           check_work ~got:rebroadcastable2
             ~expected:
               [ Add_solved_work (stmt2, { proof = proof2; fee = fee2 }) ] ;
-          let%bind res3 = apply_diff resource_pool stmt3 fee3 in
+          let%bind res3 = apply_diff resource_pool stmt3 cache_proof_db fee3 in
           let proof3 = One_or_two.map ~f:mk_dummy_proof stmt3 in
           ignore
             ( ok_exn res3
@@ -1025,7 +1031,7 @@ let%test_module "random set test" =
                 * Mock_snark_pool.Resource_pool.Diff.verified
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable3 =
-            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
+            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool proof_cache_db
               ~has_timed_out:(Fn.const `Ok)
           in
           check_work ~got:rebroadcastable3
@@ -1037,7 +1043,7 @@ let%test_module "random set test" =
              hasn't appeared in a block yet.
           *)
           let rebroadcastable4 =
-            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
+            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool proof_cache_db
               ~has_timed_out:(Fn.const `Timed_out)
           in
           check_work ~got:rebroadcastable4
@@ -1045,7 +1051,7 @@ let%test_module "random set test" =
               [ Add_solved_work (stmt2, { proof = proof2; fee = fee2 })
               ; Add_solved_work (stmt3, { proof = proof3; fee = fee3 })
               ] ;
-          let%bind res6 = apply_diff resource_pool stmt4 fee4 in
+          let%bind res6 = apply_diff resource_pool stmt4 cache_proof_db fee4 in
           let proof4 = One_or_two.map ~f:mk_dummy_proof stmt4 in
           ignore
             ( ok_exn res6
@@ -1057,7 +1063,7 @@ let%test_module "random set test" =
             Mocks.Transition_frontier.remove_from_best_tip tf [ stmt3 ]
           in
           let rebroadcastable5 =
-            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
+            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool proof_cache_db
               ~has_timed_out:(Fn.const `Ok)
           in
           check_work ~got:rebroadcastable5

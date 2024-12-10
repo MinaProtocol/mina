@@ -106,6 +106,7 @@ module type Resource_pool_diff_intf = sig
   val verify :
        pool
     -> t Envelope.Incoming.t
+    -> Ledger_proof.Cache_tag.Cache.t
     -> (verified Envelope.Incoming.t, Verification_error.t) Deferred.Result.t
 
   (** Warning: Using this directly could corrupt the resource pool if it
@@ -114,6 +115,7 @@ module type Resource_pool_diff_intf = sig
   val unsafe_apply :
        pool
     -> verified Envelope.Incoming.t
+    -> Ledger_proof.Cache_tag.Cache.t
     -> ( [ `Accept | `Reject ] * t * rejected
        , [ `Locally_generated of t * rejected | `Other of Error.t ] )
        Result.t
@@ -194,6 +196,8 @@ module type Network_pool_base_intf = sig
 
   type transition_frontier
 
+  type cache_proof_db
+
   module Local_sink :
     Mina_net2.Sink.S_with_void
       with type msg :=
@@ -206,8 +210,8 @@ module type Network_pool_base_intf = sig
 
   module Remote_sink :
     Mina_net2.Sink.S_with_void
-      with type msg :=
-        resource_pool_diff Envelope.Incoming.t * Mina_net2.Validation_callback.t
+      with type msg := resource_pool_diff Envelope.Incoming.t * Mina_net2.Validation_callback.t
+      and type cache_proof_db:= cache_proof_db
 
   module Broadcast_callback :
     Broadcast_callback
@@ -225,6 +229,7 @@ module type Network_pool_base_intf = sig
     -> log_gossip_heard:bool
     -> on_remote_push:(unit -> unit Deferred.t)
     -> block_window_duration:Time.Span.t
+    -> cache_proof_db:Ledger_proof.Cache_tag.Cache.t
     -> t * Remote_sink.t * Local_sink.t
 
   val of_resource_pool_and_diffs :
@@ -235,6 +240,7 @@ module type Network_pool_base_intf = sig
     -> log_gossip_heard:bool
     -> on_remote_push:(unit -> unit Deferred.t)
     -> block_window_duration:Time.Span.t
+    -> cache_proof_db:Ledger_proof.Cache_tag.Cache.t
     -> t * Remote_sink.t * Local_sink.t
 
   val resource_pool : t -> resource_pool
@@ -247,6 +253,7 @@ module type Network_pool_base_intf = sig
        t
     -> resource_pool_diff_verified Envelope.Incoming.t
     -> Broadcast_callback.t
+    -> Ledger_proof.Cache_tag.Cache.t
     -> unit
 
   val apply_no_broadcast :
@@ -269,12 +276,14 @@ module type Snark_resource_pool_intf = sig
     -> t
     -> work:Transaction_snark_work.Statement.t
     -> proof:Ledger_proof.t One_or_two.t
+    -> cache_proof_db:Ledger_proof.Cache_tag.Cache.t
     -> fee:Fee_with_prover.t
     -> [ `Added | `Statement_not_referenced ]
 
   val request_proof :
        t
     -> Transaction_snark_work.Statement.t
+    -> Ledger_proof.Cache_tag.Cache.t
     -> Ledger_proof.t One_or_two.t Priced_proof.t option
 
   val verify_and_act :
