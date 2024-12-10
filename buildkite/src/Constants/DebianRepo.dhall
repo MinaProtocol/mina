@@ -124,12 +124,12 @@ let bucketEnvList =
 
 in  { Type = DebianRepo
     , keyIdEnvList = keyIdEnvList
+    , bucketEnvList = bucketEnvList
     , keyAddressArg = keyAddressArg
     , address = address
     , bucket = bucket
     , bucket_or_default = bucket_or_default
     , bucketArg = bucketArg
-    , bucketEnvList = bucketEnvList
     , keyId = keyId
     , keyArg = keyArg
     }

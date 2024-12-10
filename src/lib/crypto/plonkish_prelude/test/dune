@@ -9,6 +9,6 @@
   core_kernel
   alcotest
   ; Mina
-  pickles_types
+  plonkish_prelude
   )
  (action (run %{test})))
