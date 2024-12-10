@@ -19,6 +19,9 @@ import tempfile
 # Managing subprocesses
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
+# The executable that is called by this script to perform and submit work. run_snark_worker.ml needs to be built before running this script
+executable = "_build/default/src/lib/snark_worker/standalone/run_snark_worker.exe"
+
 # TODO: we will probably want to generalize this with giving a public key / endpoint to some node that does not necessarily run locally
 url = "http://localhost:3085/graphql"
 
@@ -102,15 +105,15 @@ def spawn_worker(work_spec, bid, public_key):
             temp_file.flush()  # Ensure the content is written to disk
             temp_file.seek(0)
             cmd = [
-                    "_build/default/src/lib/snark_worker/standalone/run_snark_worker.exe",
-                    "--spec-json-file",
-                    temp_file.name,
-                    "--graphql-uri",
-                    url,
-                    "--snark-worker-fee",
-                    f"{bid}",
-                    "--snark-worker-public-key",
-                    public_key,
+                executable,
+                "--spec-json-file",
+                temp_file.name,
+                "--graphql-uri",
+                url,
+                "--snark-worker-fee",
+                f"{bid}",
+                "--snark-worker-public-key",
+                public_key,
             ]
             print("Running", cmd)
             result = subprocess.run(
