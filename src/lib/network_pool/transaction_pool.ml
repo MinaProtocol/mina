@@ -534,10 +534,8 @@ struct
           (diff_error_of_indexed_pool_error e)
       , indexed_pool_error_metadata e )
 
-    let handle_transition_frontier_diff
-        ( ({ new_commands; removed_commands; reorg_best_tip = _ } :
-            Transition_frontier.best_tip_diff )
-        , best_tip_ledger ) t =
+    let handle_transition_frontier_diff_inner ~new_commands ~removed_commands
+        ~best_tip_ledger t =
       (* This runs whenever the best tip changes. The simple case is when the
          new best tip is an extension of the old one. There, we just remove any
          user commands that were included in it from the transaction pool.
@@ -812,6 +810,13 @@ struct
         Gauge.set Transaction_pool.pool_size
           (Float.of_int (Indexed_pool.size pool))) ;
       t.pool <- pool
+
+    let handle_transition_frontier_diff
+        ( ({ new_commands; removed_commands; reorg_best_tip = _ } :
+            Transition_frontier.best_tip_diff )
+        , best_tip_ledger ) t =
+      handle_transition_frontier_diff_inner ~new_commands ~removed_commands
+        ~best_tip_ledger t
 
     let create ~constraint_constants ~consensus_constants ~time_controller
         ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
@@ -1779,6 +1784,36 @@ let%test_module _ =
 
     let pool_max_size = 25
 
+    let apply_initial_ledger_state t init_ledger_state =
+      let new_ledger =
+        Mina_ledger.Ledger.create_ephemeral
+          ~depth:(Mina_ledger.Ledger.depth !(t.best_tip_ref))
+          ()
+      in
+      Mina_ledger.Ledger.apply_initial_ledger_state new_ledger init_ledger_state ;
+      t.best_tip_ref := new_ledger
+
+    let initial_state_of_ledger t =
+      Array.map test_keys ~f:(fun kp ->
+          let ledger = Option.value_exn t.txn_pool.best_tip_ledger in
+          let account_id =
+            Account_id.create
+              (Public_key.compress kp.public_key)
+              Token_id.default
+          in
+          let loc =
+            Option.value_exn
+            @@ Mina_ledger.Ledger.Ledger_inner.location_of_account ledger
+                 account_id
+          in
+          let account =
+            Option.value_exn @@ Mina_ledger.Ledger.Ledger_inner.get ledger loc
+          in
+          ( kp
+          , Account.balance account |> Currency.Balance.to_amount
+          , Account.nonce account
+          , Account.timing account ) )
+
     let assert_user_command_sets_equal cs1 cs2 =
       let index cs =
         let decompose c =
@@ -1926,10 +1961,10 @@ let%test_module _ =
           ~genesis_constants ~slot_tx_end ~compile_config
       in
       let pool_, _, _ =
-        Test.create ~config ~logger ~constraint_constants ~consensus_constants
-          ~time_controller ~frontier_broadcast_pipe:frontier_pipe_r
-          ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
-          ~block_window_duration
+        Test.create ~config ~logger:(Logger.create ()) ~constraint_constants
+          ~consensus_constants ~time_controller
+          ~frontier_broadcast_pipe:frontier_pipe_r ~log_gossip_heard:false
+          ~on_remote_push:(Fn.const Deferred.unit) ~block_window_duration
       in
       let txn_pool = Test.resource_pool pool_ in
       let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
@@ -2749,14 +2784,7 @@ let%test_module _ =
         ~f:(fun (init_ledger_state, cmds) ->
           Thread_safe.block_on_async_exn (fun () ->
               let%bind t = setup_test () in
-              let new_ledger =
-                Mina_ledger.Ledger.create_ephemeral
-                  ~depth:(Mina_ledger.Ledger.depth !(t.best_tip_ref))
-                  ()
-              in
-              Mina_ledger.Ledger.apply_initial_ledger_state new_ledger
-                init_ledger_state ;
-              t.best_tip_ref := new_ledger ;
+              apply_initial_ledger_state t init_ledger_state ;
               let%bind () = reorg ~reorg_best_tip:true t [] [] in
               let cmds1, cmds2 = List.split_n cmds pool_max_size in
               let%bind apply_res1 = add_commands t cmds1 in
@@ -3139,6 +3167,29 @@ let%test_module _ =
           let%bind t = setup_test ~slot_tx_end:curr_slot () in
           assert_pool_txs t [] ;
           add_commands t independent_cmds >>| assert_pool_apply [] )
+
+    let%test_unit "Handle transition frontier diff (same transaction)" =
+      Quickcheck.test ~trials:1
+        (let open Quickcheck.Generator.Let_syntax in
+        let test = Thread_safe.block_on_async_exn (fun () -> setup_test ()) in
+        let init_ledger_state = initial_state_of_ledger test in
+        let%bind prefix =
+          User_command.Valid.Gen.sequence ~sign_type:`Real ~length:1
+            init_ledger_state
+        in
+
+        return (test, prefix))
+        ~f:(fun (test, prefix) ->
+          Thread_safe.block_on_async_exn (fun () ->
+              let open Deferred.Let_syntax in
+              (* applying transaction to pool*)
+              let%bind () = add_commands' test prefix in
+
+              Test.Resource_pool.handle_transition_frontier_diff_inner
+                ~new_commands:(List.map ~f:mk_with_status prefix)
+                ~removed_commands:(List.map ~f:mk_with_status prefix)
+                ~best_tip_ledger:!(test.best_tip_ref) test.txn_pool ;
+              return () ) )
 
     let%test_unit "transactions added after slot_tx_end are rejected" =
       Thread_safe.block_on_async_exn (fun () ->
