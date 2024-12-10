@@ -73,12 +73,6 @@ with type V2.t = t
 
 type unchecked = t
 
-module Unchecked : sig
-  type nonrec t = t [@@deriving sexp, compare, to_yojson]
-
-  module Stable : module type of Stable
-end
-
 module Checked : sig
   type nonrec t = t =
     { fee : Fee.t
