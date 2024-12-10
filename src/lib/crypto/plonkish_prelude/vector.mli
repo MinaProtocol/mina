@@ -198,21 +198,21 @@ val for_all : ('a, 'n) t -> f:('a -> bool) -> bool
     [v1] is of size [n] and [v2] is of size [m] where [length v = n + m] and [v1
     || v2 = v].
 
-    [n] must have been constructed using {Pickles_types.Nat.I.add} whose result
+    [n] must have been constructed using {Kimchi_backend_types.Nat.I.add} whose result
     is equal the length of [v].
     More concretely:
     ```
-    let six = Pickles_types.Nat.N6.n in
-    let eleven = Pickles_types.Nat.N11.n in
-    let v = Pickles_types.Vector.init eleven ~f:(fun i -> i) in
+    let six = Kimchi_backend_types.Nat.N6.n in
+    let eleven = Kimchi_backend_types.Nat.N11.n in
+    let v = Kimchi_backend_types.Vector.init eleven ~f:(fun i -> i) in
     (* will split v into two vectors, the first of size 5 and the second of size
        6
     *)
     let v_five, v_six =
-      Pickles_types.Vector.split
+      Kimchi_backend_types.Vector.split
         (* built using Nat.I.add *)
         v
-        (snd (Pickles_types.Nat.N5.add six))
+        (snd (Kimchi_backend_types.Nat.N5.add six))
     in
     [...]
     ```

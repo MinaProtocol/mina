@@ -11,5 +11,5 @@ $ ALCOTEST_COLOR=always dune test .
 To run a single test:
 
 ```
-$ dune exec -- src/lib/crypto/snarky_tests/test.exe 'boolean circuit'
+$ dune exec -- src/lib/pickles/snarky_tests/test.exe 'boolean circuit'
 ```

@@ -16,7 +16,6 @@
   base.caml
   ;; local libraries
   sponge
-  pickles_types
   kimchi_backend_common
   promise
   kimchi_bindings

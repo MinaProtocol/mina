@@ -62,3 +62,5 @@ module Scale_round = Kimchi_pasta_snarky_backend.Scale_round
 module Endoscale_scalar_round =
   Kimchi_pasta_snarky_backend.Endoscale_scalar_round
 module Intf = Kimchi_pasta_snarky_backend.Intf
+module Plonk_types = Plonk_types
+module Plonk_verification_key_evals = Plonk_verification_key_evals

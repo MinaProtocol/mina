@@ -5,7 +5,7 @@ module Stable : sig
       { prechallenge : 'challenge }
     [@@deriving sexp, compare, yojson, hash, equal, bin_shape, bin_io]
 
-    include Pickles_types.Sigs.VERSIONED
+    include Plonkish_prelude.Sigs.VERSIONED
   end
 end
 

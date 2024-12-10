@@ -1,6 +1,6 @@
 (library
- (name pickles_types)
- (public_name pickles_types)
+ (name plonkish_prelude)
+ (public_name plonkish_prelude)
  ; Deactivated warnings
  ;
  ; 40: name-out-scope (activate later)
@@ -21,6 +21,7 @@
    ppx_jane
    ppx_deriving.std
    h_list.ppx))
+ (modules_without_implementation sigs poly_types)
  (instrumentation
   (backend bisect_ppx))
  (libraries
@@ -31,10 +32,7 @@
   base.caml
   bin_prot.shape
   ;; local libraries
-  kimchi_types
-  kimchi_backend_common
   kimchi_pasta_snarky_backend
-  plonkish_prelude
   snarky.backendless
   tuple_lib
   ppx_version.runtime

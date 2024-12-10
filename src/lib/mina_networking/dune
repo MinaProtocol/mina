@@ -51,6 +51,7 @@
    bounded_types
    sync_handler
    transition_chain_prover
+   work_selector
  )
  (inline_tests (flags -verbose -show-counts))
  (preprocess

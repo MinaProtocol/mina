@@ -60,6 +60,8 @@ type t = Mina_wire_types.Transaction_snark_work.V2.t =
 
 val fee : t -> Fee.t
 
+val prover : t -> Public_key.Compressed.t
+
 val info : t -> Info.t
 
 val statement : t -> Statement.t
