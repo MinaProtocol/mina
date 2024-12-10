@@ -24,13 +24,13 @@ let submit_graphql input graphql_endpoint =
   let obj = Send_proof_mutation.(make @@ makeVariables ~input ()) in
   match%bind Graphql_client.query obj graphql_endpoint with
   | Ok _s ->
-      Caml.Format.printf "Successfully generated proof bundle mutation" ;
+      Caml.Format.printf "Successfully generated proof bundle mutation.\n" ;
       exit 0
   | Error (`Failed_request s) ->
-      Caml.Format.printf !"Request failed:  %s" s ;
+      Caml.Format.printf !"Request failed:  %s\n" s ;
       exit 1
   | Error (`Graphql_error s) ->
-      Caml.Format.printf "Graphql error: %s" s ;
+      Caml.Format.printf "Graphql error: %s\n" s ;
       exit 1
 
 let perform (s : Prod.Worker_state.t) ~fee ~public_key
@@ -46,14 +46,22 @@ let perform (s : Prod.Worker_state.t) ~fee ~public_key
       in
       ( proof
       , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge) ) )
-  |> Deferred.Or_error.map ~f:(fun proofs_and_time ->
-         { Snark_work_lib.Work.Result_without_metrics.proofs =
-             One_or_two.map proofs_and_time ~f:fst
-         ; statements =
-             One_or_two.map spec ~f:Snark_work_lib.Work.Single.Spec.statement
-         ; prover = public_key
-         ; fee
-         } )
+  |> Deferred.Or_error.map ~f:(function
+       | `One (proof1, _) ->
+           { Snark_work_lib.Work.Result_without_metrics.proofs = `One proof1
+           ; statements =
+               One_or_two.map spec ~f:Snark_work_lib.Work.Single.Spec.statement
+           ; prover = public_key
+           ; fee
+           }
+       | `Two ((proof1, _), (proof2, _)) ->
+           { Snark_work_lib.Work.Result_without_metrics.proofs =
+               `Two (proof1, proof2)
+           ; statements =
+               One_or_two.map spec ~f:Snark_work_lib.Work.Single.Spec.statement
+           ; prover = public_key
+           ; fee
+           } )
 
 let command =
   let open Command.Let_syntax in
@@ -61,14 +69,20 @@ let command =
     (let%map_open spec_json =
        flag "--spec-json"
          ~doc:
-           "Snark work spec in json format (preferred over sexp format if both \
+           "Snark work spec in json format (preferred over all other formats \
+            if several are passed)"
+         (optional string)
+     and spec_json_file =
+       flag "--spec-json-file"
+         ~doc:
+           "Snark work spec in json file (preferred over sexp format if both \
             are passed)"
          (optional string)
      and spec_sexp =
        flag "--spec-sexp"
          ~doc:
-           "Snark work spec in sexp format(json format is preferred over sexp \
-            if both are passed)"
+           "Snark work spec in sexp format (json formats are preferred over \
+            sexp if both are passed)"
          (optional string)
      and config_file = Cli_lib.Flag.config_files
      and cli_proof_level =
@@ -111,28 +125,38 @@ let command =
        let%bind worker_state =
          Prod.Worker_state.create ~constraint_constants ~proof_level ()
        in
-       let spec =
+       let%bind spec =
+         let spec_of_json json =
+           match
+             Yojson.Safe.from_string json
+             |> One_or_two.of_yojson
+                  (Snark_work_lib.Work.Single.Spec.of_yojson
+                     Transaction_witness.of_yojson Ledger_proof.of_yojson )
+           with
+           | Ok spec ->
+               spec
+           | Error e ->
+               failwith (sprintf "Failed to read json spec. Error: %s" e)
+         in
          match spec_json with
-         | Some json -> (
-             match
-               Yojson.Safe.from_string json
-               |> One_or_two.of_yojson
-                    (Snark_work_lib.Work.Single.Spec.of_yojson
-                       Transaction_witness.of_yojson Ledger_proof.of_yojson )
-             with
-             | Ok spec ->
-                 spec
-             | Error e ->
-                 failwith (sprintf "Failed to read json spec. Error: %s" e) )
+         | Some json ->
+             return @@ spec_of_json json
          | None -> (
-             match spec_sexp with
-             | Some spec ->
-                 One_or_two.t_of_sexp
-                   (Snark_work_lib.Work.Single.Spec.t_of_sexp
-                      Transaction_witness.t_of_sexp Ledger_proof.t_of_sexp )
-                   (Sexp.of_string spec)
-             | None ->
-                 failwith "Provide a spec either in json or sexp format" )
+             match spec_json_file with
+             | Some spec_json_file ->
+                 let%bind json = Reader.file_contents spec_json_file in
+                 return @@ spec_of_json json
+             | None -> (
+                 return
+                 @@
+                 match spec_sexp with
+                 | Some spec ->
+                     One_or_two.t_of_sexp
+                       (Snark_work_lib.Work.Single.Spec.t_of_sexp
+                          Transaction_witness.t_of_sexp Ledger_proof.t_of_sexp )
+                       (Sexp.of_string spec)
+                 | None ->
+                     failwith "Provide a spec either in json or sexp format" ) )
        in
        let public_key =
          Option.value
