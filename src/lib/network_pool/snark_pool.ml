@@ -375,6 +375,7 @@ struct
                 Account_id.create prover Token_id.default
                 |> Base_ledger.location_of_account ledger
               in
+
               Base_ledger.get ledger loc
           in
           let prover_account_exists = Option.is_some account_opt in

@@ -198,6 +198,7 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
   in
   let preferred_peers = Option.value_map ~f ~default:[] best_seen_transition in
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
+
   upon
     (Bootstrap_controller.run
        ~context:(module Context)
@@ -663,6 +664,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~consensus_local_state ~notify_online
       in
       Ivar.fill_if_empty initialization_finish_signal () ;
+
       let valid_transition_reader1, valid_transition_reader2 =
         Strict_pipe.Reader.Fork.two valid_transition_reader
       in
