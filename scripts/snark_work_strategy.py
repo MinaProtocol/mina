@@ -96,7 +96,7 @@ def spawn_worker(work_spec, bid, public_key):
     try:
         # Create a temporary file to store the work_spec content which may be too large for the command line
         with tempfile.NamedTemporaryFile(
-            delete=False, mode="w+", encoding="utf-8"
+            delete=True, mode="w+", encoding="utf-8"
         ) as temp_file:
             temp_file.write(f"{work_spec}")
             temp_file.flush()  # Ensure the content is written to disk
