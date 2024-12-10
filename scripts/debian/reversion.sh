@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eo pipefail
+set -eox pipefail
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
@@ -10,11 +10,13 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -c|--codename) CODENAME="$2"; shift;;
   --new-name) NEW_NAME="$2"; shift;;
   --new-release) NEW_RELEASE="$2"; shift;;
+  --new-version) NEW_VERSION="$2"; shift;;
+  --new-suite) NEW_SUITE="$2"; shift;;
+  --new-repo) NEW_REPO="$2"; shift;;
+  --suite) SUITE="$2"; shift;;
   --release) RELEASE="$2"; shift;;
   --version) VERSION="$2"; shift;;
-  --new-version) NEW_VERSION="$2"; shift;;
-  --suite) SUITE="$2"; shift;;
-  --new-suite) NEW_SUITE="$2"; shift;;
+  --repo) REPO="$2"; shift;;
   --sign) SIGN="$2"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
@@ -31,6 +33,8 @@ function usage() {
   echo "  --version         The Current Debian version"
   echo "  --new-version     The New Debian version"
   echo "  --suite           The Current Debian suite"
+  echo "  --repo            The Source Debian repo"
+  echo "  --new-repo        The Target Debian repo. By default equal to '--repo'"
   echo "  --new-suite       The New Debian suite"
   echo "  --sign            The Public Key id, which is used to sign package. Key must be stored locally"
   echo ""
@@ -42,10 +46,12 @@ if [[ -z "$NEW_NAME" ]]; then NEW_NAME=$DEB; fi;
 if [[ -z "$NEW_RELEASE" ]]; then NEW_RELEASE=$RELEASE; fi;
 if [[ -z "$NEW_VERSION" ]]; then NEW_VERSION=$VERSION; fi;
 if [[ -z "$NEW_SUITE" ]]; then NEW_SUITE=$SUITE; fi;
+if [[ -z "$NEW_REPO" ]]; then NEW_REPO=$SUITE; fi;
 if [[ -z "$DEB" ]]; then NEW_NAME=$DEB; fi;
 if [[ -z "$RELEASE" ]]; then NEW_RELEASE=$RELEASE; fi;
 if [[ -z "$VERSION" ]]; then NEW_VERSION=$VERSION; fi;
 if [[ -z "$SUITE" ]]; then NEW_SUITE=$SUITE; fi;
+if [[ -z "$REPO" ]]; then echo "No repository specified"; echo ""; usage "$0" "$1" ; fi
 if [[ -z "$SIGN" ]]; then 
   SIGN_ARG=""
 else 
@@ -65,4 +71,4 @@ function rebuild_deb() {
 }
 
 rebuild_deb
-source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}.deb" --version ${NEW_VERSION} --codename ${CODENAME} --release ${NEW_RELEASE} --bucket ${BUCKET} ${SIGN_ARG}
+source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}.deb" --version ${NEW_VERSION} --codename ${CODENAME} --release ${NEW_RELEASE} --bucket ${NEW_REPO}
