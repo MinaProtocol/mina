@@ -46,15 +46,22 @@ let perform (s : Prod.Worker_state.t) ~fee ~public_key
       in
       ( proof
       , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge) ) )
-  |> Deferred.Or_error.map ~f:(fun proofs_and_time ->
-         { Snark_work_lib.Work.Result_without_metrics.proofs =
-             One_or_two.map proofs_and_time ~f:fst
-         ; statements =
-             One_or_two.map spec ~f:Snark_work_lib.Work.Single.Spec.statement
-         ; prover = public_key
-         ; fee
-         } )
-
+      |> Deferred.Or_error.map ~f:(function
+      | `One (proof1, _) ->
+          { Snark_work_lib.Work.Result_without_metrics.proofs = `One proof1
+          ; statements =
+              One_or_two.map spec ~f:Snark_work_lib.Work.Single.Spec.statement
+          ; prover = public_key
+          ; fee
+          }
+      | `Two ((proof1, _), (proof2, _)) ->
+          { Snark_work_lib.Work.Result_without_metrics.proofs =
+              `Two (proof1, proof2)
+          ; statements =
+              One_or_two.map spec ~f:Snark_work_lib.Work.Single.Spec.statement
+          ; prover = public_key
+          ; fee
+          } )
 let command =
   let open Command.Let_syntax in
   Command.async ~summary:"Run snark worker directly"

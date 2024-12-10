@@ -27,7 +27,7 @@ url = "http://localhost:3085/graphql"
 def pending_work_query(starting_index, ending_index):
     query = f"""
     {{
-      pendingSnarkWorkRange(endingIndex: "{ending_index}", startingIndex: "{starting_index}") {{
+      snarkWorkRange(endingIndex: "{ending_index}", startingIndex: "{starting_index}") {{
         workBundleSpec {{
           spec
           snarkFee
@@ -41,7 +41,7 @@ def pending_work_query(starting_index, ending_index):
 # This function parses the response as a list of (spec, id)
 def format_response(response):
     pending_work = []
-    for work_bundle_spec in response.json().get("data").get("pendingSnarkWorkRange"):
+    for work_bundle_spec in response.json().get("data").get("snarkWorkRange"):
         work_bundle_spec = work_bundle_spec.get("workBundleSpec")
         pending_work.append(
             (work_bundle_spec.get("spec"), work_bundle_spec.get("snarkFee"))
@@ -96,13 +96,12 @@ def spawn_worker(work_spec, bid, public_key):
     try:
         # Create a temporary file to store the work_spec content which may be too large for the command line
         with tempfile.NamedTemporaryFile(
-            delete=True, mode="w+", encoding="utf-8"
+            delete=False, mode="w+", encoding="utf-8"
         ) as temp_file:
             temp_file.write(f"{work_spec}")
             temp_file.flush()  # Ensure the content is written to disk
             temp_file.seek(0)
-            result = subprocess.run(
-                [
+            cmd = [
                     "_build/default/src/lib/snark_worker/standalone/run_snark_worker.exe",
                     "--spec-json-file",
                     temp_file.name,
@@ -112,14 +111,17 @@ def spawn_worker(work_spec, bid, public_key):
                     f"{bid}",
                     "--snark-worker-public-key",
                     public_key,
-                ],
+            ]
+            print("Running", cmd)
+            result = subprocess.run(
+                cmd,
                 check=True,
                 capture_output=True,
                 text=True,
             )
             print("Done", result.stdout)
     except subprocess.CalledProcessError as e:
-        raise ValueError("Error:", e.stderr)
+        raise ValueError("Error:", e.stderr, e.stdout)
     return result.stdout
 
 
