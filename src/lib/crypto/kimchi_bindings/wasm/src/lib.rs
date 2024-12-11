@@ -1,4 +1,3 @@
-#![feature(get_mut_unchecked)]
 //! The Marlin_plonk_stubs crate exports some functionalities
 //! and structures from the following the Rust crates to OCaml:
 //!
