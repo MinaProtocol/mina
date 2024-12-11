@@ -482,7 +482,7 @@ module Rules = struct
         *)
         Boolean.Assert.any [ proof_must_verify; zero_total ] ;
         let proof =
-          exists (Typ.Internal.ref ()) ~request:(fun () ->
+          exists (Typ.prover_value ()) ~request:(fun () ->
               let proof_must_verify =
                 As_prover.read Boolean.typ proof_must_verify
               in
@@ -494,7 +494,7 @@ module Rules = struct
             ; (* dummy to avoid pickles bug *)
               { public_input = recursive_input
               ; proof =
-                  exists (Typ.Internal.ref ()) ~compute:(fun () ->
+                  exists (Typ.prover_value ()) ~compute:(fun () ->
                       Lazy.force dummy_proof )
               ; proof_must_verify = Boolean.false_
               }
@@ -567,7 +567,7 @@ module Rules = struct
       *)
       Boolean.Assert.any [ proof_must_verify; zero_total ] ;
       let proof =
-        exists (Typ.Internal.ref ()) ~request:(fun () ->
+        exists (Typ.prover_value ()) ~request:(fun () ->
             let proof_must_verify =
               As_prover.read Boolean.typ proof_must_verify
             in
@@ -581,7 +581,7 @@ module Rules = struct
           ; (* dummy to avoid pickles bug *)
             { public_input = recursive_input
             ; proof =
-                exists (Typ.Internal.ref ()) ~compute:(fun () ->
+                exists (Typ.prover_value ()) ~compute:(fun () ->
                     Lazy.force dummy_proof )
             ; proof_must_verify = Boolean.false_
             }
