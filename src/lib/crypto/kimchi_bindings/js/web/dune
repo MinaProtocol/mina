@@ -19,16 +19,16 @@
   flags.sexp)
  (deps
   build.sh
-  ../../wasm/Cargo.toml
-  ../../wasm/Cargo.lock
+  ../../../proof-systems/plonk-wasm/Cargo.toml
+  ../../../proof-systems/Cargo.lock
   ../../dune-build-root
-  (source_tree ../../wasm/src)
-  (source_tree ../../wasm/.cargo/config)
+  (source_tree ../../../proof-systems/plonk-wasm/src)
+  (source_tree ../../../proof-systems/plonk-wasm/.cargo/config)
   (source_tree ../../../proof-systems))
  (locks /cargo-lock) ; lock for rustup
  (action
   (progn
-   (run chmod -R +w ../../wasm .)
+   (run chmod -R +w ../../../proof-systems/plonk-wasm .)
    (setenv
     CARGO_TARGET_DIR
     "%{read:../../dune-build-root}/cargo_kimchi_wasm"
