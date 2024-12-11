@@ -804,7 +804,7 @@ module Get_completed_snarks = struct
     module T = struct
       type query = unit [@@deriving sexp, to_yojson]
 
-      type response = Transaction_snark_work.Checked.Stable.V2.t list option
+      type response = Transaction_snark_work.Stable.V2.t list option
     end
 
     module Caller = T
