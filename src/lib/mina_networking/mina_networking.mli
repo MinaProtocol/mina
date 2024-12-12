@@ -225,6 +225,11 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      * Mina_state.Protocol_state.value list )
      Deferred.Or_error.t
 
+val get_completed_checked_snarks :
+     t
+  -> Peer.t
+  -> (Transaction_snark_work.Stable.V2.t list, Error.t) result Deferred.t
+
 val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
 
 val broadcast_state :

@@ -804,7 +804,7 @@ module Get_completed_snarks = struct
     module T = struct
       type query = unit [@@deriving sexp, to_yojson]
 
-      type response = Transaction_snark_work.Checked.Stable.V2.t list option
+      type response = Transaction_snark_work.Stable.V2.t list option
     end
 
     module Caller = T
@@ -830,6 +830,33 @@ module Get_completed_snarks = struct
     include M
     include Master
   end)
+
+  module V1 = struct
+    module T = struct
+      type query = unit [@@deriving sexp]
+
+      type response = Transaction_snark_work.Stable.V2.t list option
+
+      let query_of_caller_model = Fn.id
+
+      let callee_model_of_query = Fn.id
+
+      let response_of_callee_model = ident
+
+      let caller_model_of_response = ident
+    end
+
+    module T' =
+      Perf_histograms.Rpc.Plain.Decorate_bin_io
+        (struct
+          include M
+          include Master
+        end)
+        (T)
+
+    include T'
+    include Register (T')
+  end
 
   let receipt_trust_action_message query =
     ("Get_completed_snarks query", [ ("query", query_to_yojson query) ])
