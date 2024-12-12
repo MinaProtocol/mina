@@ -72,7 +72,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
             .collect()
     };
 
-    let witness: Vec<Vec<_>> = witness.iter().map(|x| (*x.0).clone()).collect();
+    let witness: Vec<Vec<_>> = witness.iter().map(|x| (**x).clone()).collect();
     let witness: [Vec<_>; COLUMNS] = witness
         .try_into()
         .map_err(|_| ocaml::Error::Message("the witness should be a column of 15 vectors"))?;
@@ -140,7 +140,7 @@ pub fn caml_pasta_fp_plonk_proof_create_and_verify(
             .collect()
     };
 
-    let witness: Vec<Vec<_>> = witness.iter().map(|x| (*x.0).clone()).collect();
+    let witness: Vec<Vec<_>> = witness.iter().map(|x| (**x).clone()).collect();
     let witness: [Vec<_>; COLUMNS] = witness
         .try_into()
         .map_err(|_| ocaml::Error::Message("the witness should be a column of 15 vectors"))?;
