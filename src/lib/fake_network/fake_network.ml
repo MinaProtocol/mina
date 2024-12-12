@@ -22,6 +22,7 @@ type 'n num_peers = 'n Peano.gt_1
 (* TODO: make transition frontier a mutable option *)
 type peer_state =
   { frontier : Transition_frontier.t
+  ; snark : Network_pool.Snark_pool.t option
   ; consensus_local_state : Consensus.Data.Local_state.t
   ; rpc_mocks : Gossip_net.Fake.rpc_mocks
   }
@@ -76,6 +77,8 @@ let setup (type n) ~context:(module Context : CONTEXT)
       let time_controller = time_controller
 
       let consensus_local_state = consensus_local_state
+
+      let compile_config = precomputed_values.compile_config
     end )
   in
   let config rpc_mocks peer =
@@ -114,7 +117,8 @@ let setup (type n) ~context:(module Context : CONTEXT)
                   , Network_pool.Transaction_pool.Remote_sink.void
                   , Network_pool.Snark_pool.Remote_sink.void )
                 ~get_transition_frontier:(Fn.const (Some state.frontier))
-                ~get_node_status )
+                ~get_snark_pool:(Fn.const None) ~get_node_status
+                ~snark_job_state:(Fn.const None) )
         in
         { peer; state; network } )
   in
@@ -156,18 +160,23 @@ include struct
          ( Rpcs.Get_best_tip.query
          , Rpcs.Get_best_tip.response )
          Gossip_net.Fake.rpc_mock
+    -> ?get_completed_snarks:
+         ( Rpcs.Get_completed_snarks.query
+         , Rpcs.Get_completed_snarks.response )
+         Gossip_net.Fake.rpc_mock
     -> 'a
 
   let make_peer_state :
       (   frontier:Transition_frontier.t
+       -> snark:Network_pool.Snark_pool.t option
        -> consensus_local_state:Consensus.Data.Local_state.t
        -> peer_state )
       fn_with_mocks =
    fun ?get_some_initial_peers
        ?get_staged_ledger_aux_and_pending_coinbases_at_hash
        ?answer_sync_ledger_query ?get_transition_chain ?get_transition_knowledge
-       ?get_transition_chain_proof ?get_ancestry ?get_best_tip ~frontier
-       ~consensus_local_state ->
+       ?get_transition_chain_proof ?get_ancestry ?get_best_tip
+       ?get_completed_snarks ~frontier ~snark ~consensus_local_state ->
     let rpc_mocks : Gossip_net.Fake.rpc_mocks =
       let get_mock (type q r) (rpc : (q, r) Rpcs.rpc) :
           (q, r) Gossip_net.Fake.rpc_mock option =
@@ -190,10 +199,12 @@ include struct
             None
         | Get_best_tip ->
             get_best_tip
+        | Get_completed_snarks ->
+            get_completed_snarks
       in
       { get_mock }
     in
-    { frontier; consensus_local_state; rpc_mocks }
+    { frontier; snark; consensus_local_state; rpc_mocks }
 end
 
 module Generator = struct
@@ -211,8 +222,8 @@ module Generator = struct
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
       ?answer_sync_ledger_query ?get_transition_chain ?get_transition_knowledge
       ?get_transition_chain_proof ?get_ancestry ?get_best_tip
-      ~context:(module Context : CONTEXT) ~verifier ~max_frontier_length
-      ~use_super_catchup =
+      ?get_completed_snarks ~context:(module Context : CONTEXT) ~verifier
+      ~max_frontier_length ~use_super_catchup =
     let module Consensus_context = struct
       include Context
 
@@ -238,11 +249,12 @@ module Generator = struct
         ~consensus_local_state ~max_length:max_frontier_length ~size:0
         ~use_super_catchup ()
     in
-    make_peer_state ~frontier ~consensus_local_state
+    let snark = None in
+    make_peer_state ~frontier ~snark ~consensus_local_state
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
       ?get_some_initial_peers ?answer_sync_ledger_query ?get_ancestry
-      ?get_best_tip ?get_transition_knowledge ?get_transition_chain_proof
-      ?get_transition_chain
+      ?get_best_tip ?get_completed_snarks ?get_transition_knowledge
+      ?get_transition_chain_proof ?get_transition_chain
 
   let fresh_peer ~context:(module Context : CONTEXT) ~verifier
       ~max_frontier_length ~use_super_catchup =
@@ -251,6 +263,7 @@ module Generator = struct
       ?get_some_initial_peers:None ?answer_sync_ledger_query:None
       ?get_ancestry:None ?get_best_tip:None ?get_transition_knowledge:None
       ?get_transition_chain_proof:None ?get_transition_chain:None
+      ?get_completed_snarks:None
       ~context:(module Context)
       ~verifier ~max_frontier_length ~use_super_catchup
 
@@ -258,8 +271,8 @@ module Generator = struct
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
       ?answer_sync_ledger_query ?get_transition_chain ?get_transition_knowledge
       ?get_transition_chain_proof ?get_ancestry ?get_best_tip
-      ~context:(module Context : CONTEXT) ~verifier ~max_frontier_length
-      ~use_super_catchup =
+      ?get_completed_snarks ~context:(module Context : CONTEXT) ~verifier
+      ~max_frontier_length ~use_super_catchup =
     let module Consensus_context = struct
       include Context
 
@@ -290,19 +303,20 @@ module Generator = struct
         Deferred.List.iter branch
           ~f:(Transition_frontier.add_breadcrumb_exn frontier) ) ;
 
-    make_peer_state ~frontier ~consensus_local_state
+    make_peer_state ~frontier ~snark:None ~consensus_local_state
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
       ?get_some_initial_peers ?answer_sync_ledger_query ?get_ancestry
-      ?get_best_tip ?get_transition_knowledge ?get_transition_chain_proof
-      ?get_transition_chain
+      ?get_best_tip ?get_completed_snarks ?get_transition_knowledge
+      ?get_transition_chain_proof ?get_transition_chain
 
   let peer_with_branch ~frontier_branch_size ~context:(module Context : CONTEXT)
       ~verifier ~max_frontier_length ~use_super_catchup =
     peer_with_branch_custom_rpc ~frontier_branch_size
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
       ?get_some_initial_peers:None ?answer_sync_ledger_query:None
-      ?get_ancestry:None ?get_best_tip:None ?get_transition_knowledge:None
-      ?get_transition_chain_proof:None ?get_transition_chain:None
+      ?get_ancestry:None ?get_best_tip:None ?get_completed_snarks:None
+      ?get_transition_knowledge:None ?get_transition_chain_proof:None
+      ?get_transition_chain:None
       ~context:(module Context)
       ~verifier ~max_frontier_length ~use_super_catchup
 

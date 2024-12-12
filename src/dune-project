@@ -142,6 +142,7 @@
 (package (name pickles))
 (package (name pickles_types))
 (package (name pipe_lib))
+(package (name plonkish_prelude))
 (package (name ppx_annot))
 (package (name ppx_mina))
 (package (name ppx_register_event))
