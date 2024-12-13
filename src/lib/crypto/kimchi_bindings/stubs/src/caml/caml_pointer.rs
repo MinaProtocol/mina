@@ -40,9 +40,7 @@ macro_rules! impl_caml_pointer {
             type Target = $typ;
 
             fn deref(&self) -> &Self::Target {
-                unsafe {
-                  &*self.0.get()
-                }
+                unsafe { &*self.0.get() }
             }
         }
 
@@ -59,7 +57,7 @@ macro_rules! impl_caml_pointer {
                     //   mutable, since we can call [`get_mut_unchecked`] in
                     //   nightly, or can call [`get_mut`] and unwrap if this is
                     //   the only live reference.
-                      &mut *self.0.get()
+                    &mut *self.0.get()
                 }
             }
         }
