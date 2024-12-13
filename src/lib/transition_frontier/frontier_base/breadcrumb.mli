@@ -34,6 +34,7 @@ val build :
   -> verifier:Verifier.t
   -> trust_system:Trust_system.t
   -> parent:t
+  -> cache_proof_db:Ledger_proof.Cache_tag.Cache.t
   -> transition:Mina_block.almost_valid_block
   -> get_completed_work:
        (   Transaction_snark_work.Statement.t

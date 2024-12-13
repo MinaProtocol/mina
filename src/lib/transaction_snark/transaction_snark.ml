@@ -72,7 +72,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
-
+    
     module Cache_tag = Proof_cache_tag
   end
 
@@ -90,6 +90,9 @@ module Make_str (A : Wire_types.Concrete) = struct
   end]
 
   module Cache_tag = struct
+
+    module Cache = Proof.Cache_tag.Cache
+
     type value = t [@@deriving compare, equal, sexp, yojson, hash]
 
     type t =
@@ -98,11 +101,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       }
     [@@deriving compare, equal, sexp, yojson, hash]
 
-    let unwrap ({ statement; proof } : t) : value =
-      { statement; proof = Proof.Cache_tag.unwrap proof }
+    let unwrap ({ statement; proof } : t) db : value =
+      { statement; proof = Proof.Cache_tag.unwrap proof db }
 
-    let generate ({ statement; proof } : value) : t =
-      { statement; proof = Proof.Cache_tag.generate proof }
+    let generate ({ statement; proof } : value) db : t =
+      { statement; proof = Proof.Cache_tag.generate proof db }
+
+    module For_tests = Proof.Cache_tag.For_tests
+    
   end
 
   let proof t = t.proof
@@ -4123,6 +4129,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let constraint_system_digests =
       lazy (constraint_system_digests ~constraint_constants ())
   end
+
 
   module For_tests = struct
     module Spec = struct

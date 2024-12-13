@@ -1449,7 +1449,7 @@ struct
         in
         (decision, accepted, rejected)
 
-      let unsafe_apply (t : pool) (diff : verified Envelope.Incoming.t) :
+      let unsafe_apply (t : pool) (diff : verified Envelope.Incoming.t) (_cache_proof_db : Ledger_proof.Cache_tag.Cache.t) :
           ([ `Accept | `Reject ] * t * rejected, _) Result.t =
         match apply t diff with
         | Ok (decision, accepted, rejected) ->
@@ -1670,6 +1670,8 @@ let%test_module _ =
     let logger = Logger.null ()
 
     let time_controller = Block_time.Controller.basic ~logger
+
+    let cache_proof_db = Ledger_proof.Cache_tag.For_tests.random ()
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -1929,7 +1931,7 @@ let%test_module _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
           ~time_controller ~frontier_broadcast_pipe:frontier_pipe_r
           ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
-          ~block_window_duration
+          ~block_window_duration ~cache_proof_db
       in
       let txn_pool = Test.resource_pool pool_ in
       let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
@@ -2174,7 +2176,7 @@ let%test_module _ =
     let mk_with_status (cmd : User_command.Valid.t) =
       { With_status.data = cmd; status = Applied }
 
-    let add_commands ?(local = true) test cs =
+    let add_commands ?(local = true) ?(cache_proof_db=cache_proof_db) test cs =
       let sender =
         if local then Envelope.Sender.Local
         else
@@ -2195,7 +2197,7 @@ let%test_module _ =
               (Result.map_error ~f:Intf.Verification_error.to_error)
       in
       let result =
-        Test.Resource_pool.Diff.unsafe_apply test.txn_pool verified
+        Test.Resource_pool.Diff.unsafe_apply test.txn_pool verified cache_proof_db
       in
       let tm1 = Time.now () in
       [%log' info test.txn_pool.logger] "Time for add_commands: %0.04f sec"
@@ -2218,8 +2220,8 @@ let%test_module _ =
               (Error.to_string_hum err) ) ;
       result
 
-    let add_commands' ?local test cs =
-      add_commands ?local test cs >>| assert_pool_apply cs
+    let add_commands' ?local ?cache_proof_db test cs =
+      add_commands ?local ?cache_proof_db test cs >>| assert_pool_apply cs
 
     let reorg ?(reorg_best_tip = false) test new_commands removed_commands =
       let%bind () =

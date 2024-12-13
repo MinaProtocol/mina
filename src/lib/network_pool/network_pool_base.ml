@@ -15,7 +15,9 @@ end)
      and type transition_frontier := Transition_frontier.t
      and type transition_frontier_diff := Resource_pool.transition_frontier_diff
      and type config := Resource_pool.Config.t
+     and type cache_proof_db := Ledger_proof.Cache_tag.Cache.t
      and type rejected_diff := Resource_pool.Diff.rejected = struct
+
   let apply_and_broadcast_thread_label =
     "apply_and_broadcast_" ^ Resource_pool.label ^ "_diffs"
 
@@ -88,6 +90,8 @@ end)
         let label = Resource_pool.label
 
         type pool = Resource_pool.t
+
+        type cache_proof_db =  Ledger_proof.Cache_tag.Cache.t
       end)
       (Broadcast_callback)
 
@@ -99,6 +103,7 @@ end)
         let label = Resource_pool.label
 
         type pool = Resource_pool.t
+
       end)
       (Broadcast_callback)
 
@@ -121,7 +126,7 @@ end)
         (Resource_pool.Diff.max_per_15_seconds, `Per (Time.Span.of_sec 15.0))
 
   let apply_and_broadcast ({ logger; _ } as t)
-      (diff : Resource_pool.Diff.verified Envelope.Incoming.t) cb =
+      (diff : Resource_pool.Diff.verified Envelope.Incoming.t) cb cache_proof_db =
     let env = Envelope.Incoming.map ~f:Resource_pool.Diff.t_of_verified diff in
     let rebroadcast (diff', rejected) =
       let open Broadcast_callback in
@@ -139,7 +144,7 @@ end)
         forward t.write_broadcasts diff' rejected cb )
     in
     O1trace.sync_thread apply_and_broadcast_thread_label (fun () ->
-        match Resource_pool.Diff.unsafe_apply t.resource_pool diff with
+        match Resource_pool.Diff.unsafe_apply t.resource_pool diff cache_proof_db with
         | Ok (`Accept, accepted, rejected) ->
             Resource_pool.Diff.log_internal ~logger "accepted" env ;
             rebroadcast (accepted, rejected)
@@ -189,7 +194,7 @@ end)
     | Transition_frontier_extension of Resource_pool.transition_frontier_diff
 
   let of_resource_pool_and_diffs resource_pool ~logger ~constraint_constants
-      ~tf_diffs ~log_gossip_heard ~on_remote_push ~block_window_duration =
+      ~tf_diffs ~log_gossip_heard ~on_remote_push ~block_window_duration ~cache_proof_db=
     let read_broadcasts, write_broadcasts = Linear_pipe.create () in
     let network_pool =
       { resource_pool
@@ -228,7 +233,7 @@ end)
                match diff_source with
                | Diff ((verified_diff, cb) : Remote_sink.unwrapped_t) ->
                    O1trace.sync_thread processing_diffs_thread_label (fun () ->
-                       apply_and_broadcast network_pool verified_diff cb )
+                       apply_and_broadcast network_pool verified_diff cb cache_proof_db )
                | Transition_frontier_extension diff ->
                    O1trace.sync_thread
                      processing_transition_frontier_diffs_thread_label
@@ -286,7 +291,7 @@ end)
 
   let create ~config ~constraint_constants ~consensus_constants ~time_controller
       ~frontier_broadcast_pipe ~logger ~log_gossip_heard ~on_remote_push
-      ~block_window_duration =
+      ~block_window_duration ~cache_proof_db =
     (* Diffs from transition frontier extensions *)
     let tf_diff_reader, tf_diff_writer =
       Strict_pipe.(
@@ -298,7 +303,7 @@ end)
            ~time_controller ~config ~logger ~frontier_broadcast_pipe
            ~tf_diff_writer )
         ~constraint_constants ~logger ~tf_diffs:tf_diff_reader ~log_gossip_heard
-        ~on_remote_push ~block_window_duration
+        ~on_remote_push ~block_window_duration ~cache_proof_db
     in
     O1trace.background_thread rebroadcast_loop_thread_label (fun () ->
         rebroadcast_loop t logger ) ;

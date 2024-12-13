@@ -865,7 +865,7 @@ let hash_ledger =
      fun () ->
        let open Deferred.Let_syntax in
        let%bind constraint_constants =
-         let logger = Logger.create () in
+         let logger = Logger.null () in
          let%map conf =
            Runtime_config.Constants.load_constants ~logger config_files
          in

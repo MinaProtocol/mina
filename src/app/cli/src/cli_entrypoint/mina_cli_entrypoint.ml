@@ -1268,6 +1268,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~persistent_root_location:(conf_dir ^/ "root")
                  ~persistent_frontier_location:(conf_dir ^/ "frontier")
+                 ~cache_proof_db_location:((conf_dir ^/ "proof_cache.db"))
                  ~epoch_ledger_location ~snark_work_fee ~time_controller
                  ~block_production_keypairs ~monitor ~consensus_local_state
                  ~is_archive_rocksdb ~work_reassignment_wait

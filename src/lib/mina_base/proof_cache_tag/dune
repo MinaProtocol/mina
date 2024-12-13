@@ -4,6 +4,7 @@
  (default_implementation proof_cache_tag.identity)
  (libraries
    ;; opam libraries
+   async
    ppx_inline_test.config
    base.base_internalhash_types
    bin_prot.shape

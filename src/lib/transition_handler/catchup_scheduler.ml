@@ -64,7 +64,7 @@ type t =
   }
 
 let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
-    ~time_controller ~catchup_job_writer
+    ~time_controller ~catchup_job_writer ~cache_proof_db
     ~(catchup_breadcrumbs_writer :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Validation_callback.t option )
@@ -102,6 +102,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
                  [ ("catchup_scheduler", `String "Called from catchup scheduler")
                  ] )
             ~precomputed_values ~verifier ~trust_system ~frontier ~initial_hash
+            ~cache_proof_db
             transition_branches
         with
         | Ok trees_of_breadcrumbs ->
@@ -395,6 +396,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
     let%test_unit "catchup jobs fire after the timeout" =
       let timeout_duration = Block_time.Span.of_ms 200L in
       let test_delta = Block_time.Span.of_ms 100L in
+      let cache_proof_db = Ledger_proof.Cache_tag.For_tests.random () in
       Quickcheck.test ~trials:3
         (Transition_frontier.For_tests.gen_with_branch ~precomputed_values
            ~verifier ~max_length ~frontier_size:1 ~branch_size:2 () )
@@ -410,7 +412,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let disjoint_breadcrumb = List.last_exn branch in
           let scheduler =
             create ~frontier ~precomputed_values ~verifier ~catchup_job_writer
-              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+              ~catchup_breadcrumbs_writer ~cache_proof_db ~clean_up_signal:(Ivar.create ())
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
@@ -445,6 +447,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                    invalidated" =
       let timeout_duration = Block_time.Span.of_ms 200L in
       let test_delta = Block_time.Span.of_ms 400L in
+      let cache_proof_db = Ledger_proof.Cache_tag.For_tests.random () in
       Quickcheck.test ~trials:3
         (Transition_frontier.For_tests.gen_with_branch ~precomputed_values
            ~verifier ~max_length ~frontier_size:1 ~branch_size:2 () )
@@ -470,7 +473,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let scheduler =
             create ~precomputed_values ~frontier ~verifier ~catchup_job_writer
-              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+              ~catchup_breadcrumbs_writer ~cache_proof_db ~clean_up_signal:(Ivar.create ())
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
@@ -532,6 +535,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
     let%test_unit "catchup scheduler should not create duplicate jobs when a \
                    sequence of transitions is added in reverse order" =
       let timeout_duration = Block_time.Span.of_ms 400L in
+      let cache_proof_db = Ledger_proof.Cache_tag.For_tests.random () in
       Quickcheck.test ~trials:3
         (Transition_frontier.For_tests.gen_with_branch ~precomputed_values
            ~verifier ~max_length ~frontier_size:1 ~branch_size:5 () )
@@ -546,7 +550,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let scheduler =
             create ~precomputed_values ~frontier ~verifier ~catchup_job_writer
-              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+              ~catchup_breadcrumbs_writer ~cache_proof_db ~clean_up_signal:(Ivar.create ())
           in
           let[@warning "-8"] (oldest_breadcrumb :: dependent_breadcrumbs) =
             List.rev branch

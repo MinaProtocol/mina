@@ -20,6 +20,7 @@ module type CONTEXT = sig
   val zkapp_cmd_limit : int option ref
 
   val vrf_poll_interval : Time.Span.t
+
 end
 
 type Structured_log_events.t += Block_produced
@@ -170,7 +171,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
     ~previous_protocol_state ~time_controller ~staged_ledger ~transactions
     ~get_completed_work ~logger ~(block_data : Consensus.Data.Block_data.t)
     ~winner_pk ~scheduled_time ~log_block_creation ~block_reward_threshold
-    ~zkapp_cmd_limit_hardcap ~slot_tx_end ~slot_chain_end =
+    ~zkapp_cmd_limit_hardcap ~slot_tx_end ~slot_chain_end ~cache_proof_db =
   let open Interruptible.Let_syntax in
   let global_slot_since_hard_fork =
     Consensus.Data.Block_data.global_slot block_data
@@ -344,7 +345,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 let opt_ledger_proof_statement =
                   Option.map ledger_proof_opt ~f:(fun (proof, _) ->
                       Ledger_proof.statement
-                      @@ Ledger_proof.Cache_tag.unwrap proof )
+                      @@ Ledger_proof.Cache_tag.unwrap proof cache_proof_db)
                 in
                 let ledger_proof_statement =
                   match ledger_proof_opt with
@@ -414,7 +415,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                       ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
                       ~ledger_proof:
                         (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
-                             Ledger_proof.Cache_tag.unwrap proof ) ) )
+                             Ledger_proof.Cache_tag.unwrap proof cache_proof_db) ) )
               in
               let witness =
                 { Pending_coinbase_witness.pending_coinbases =
@@ -701,6 +702,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
     ~verifier ~trust_system ~get_completed_work ~transaction_resource_pool
     ~frontier_reader ~time_controller ~transition_writer ~log_block_creation
     ~block_reward_threshold ~block_produced_bvar ~slot_tx_end ~slot_chain_end
+    ~cache_proof_db
     ~net ~zkapp_cmd_limit_hardcap ivar
     (scheduled_time, block_data, winner_pubkey) =
   let open Context in
@@ -798,7 +800,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
           ~transactions ~get_completed_work ~logger ~log_block_creation
           ~winner_pk:winner_pubkey ~block_reward_threshold
           ~zkapp_cmd_limit:!zkapp_cmd_limit ~zkapp_cmd_limit_hardcap
-          ~slot_tx_end ~slot_chain_end
+          ~slot_tx_end ~slot_chain_end ~cache_proof_db
       in
       [%log internal] "Generate_next_state_done" ;
       match next_state_opt with
@@ -932,10 +934,11 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                   "Build breadcrumb on produced block" (fun () ->
                     Breadcrumb.build ~logger ~precomputed_values ~verifier
                       ~get_completed_work:(Fn.const None) ~trust_system
-                      ~parent:crumb ~transition
+                      ~parent:crumb 
+                      ~transition
                       ~sender:None (* Consider skipping `All here *)
                       ~skip_staged_ledger_verification:`Proofs
-                      ~transition_receipt_time () )
+                      ~transition_receipt_time ~cache_proof_db () )
                 |> Deferred.Result.map_error ~f:(function
                      | `Invalid_staged_ledger_diff e ->
                          `Invalid_staged_ledger_diff (e, staged_ledger_diff)
@@ -1224,7 +1227,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~time_controller ~consensus_local_state ~coinbase_receiver ~frontier_reader
     ~transition_writer ~set_next_producer_timing ~log_block_creation
     ~block_reward_threshold ~block_produced_bvar ~vrf_evaluation_state ~net
-    ~zkapp_cmd_limit_hardcap =
+    ~zkapp_cmd_limit_hardcap ~cache_proof_db =
   let open Context in
   O1trace.sync_thread "produce_blocks" (fun () ->
       let genesis_breadcrumb =
@@ -1243,7 +1246,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
           ~transaction_resource_pool ~frontier_reader ~time_controller
           ~transition_writer ~log_block_creation ~block_reward_threshold
           ~block_produced_bvar ~slot_tx_end ~slot_chain_end ~net
-          ~zkapp_cmd_limit_hardcap
+          ~zkapp_cmd_limit_hardcap ~cache_proof_db
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
       let production_supervisor = Singleton_supervisor.create ~task:produce in
@@ -1372,7 +1375,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
             : unit Block_time.Timeout.t ) )
 
 let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
-    ~time_controller ~frontier_reader ~transition_writer ~precomputed_blocks =
+    ~time_controller ~frontier_reader ~transition_writer ~precomputed_blocks ~cache_proof_db =
   let open Context in
   let rejected_blocks_logger =
     Logger.create ~id:Logger.Logger_id.rejected_blocks ()
@@ -1499,7 +1502,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                   ~get_completed_work:(Fn.const None) ~trust_system
                   ~parent:crumb ~transition ~sender:None
                   ~skip_staged_ledger_verification:`Proofs
-                  ~transition_receipt_time ()
+                  ~transition_receipt_time ~cache_proof_db ()
                 |> Deferred.Result.map_error ~f:(function
                      | `Invalid_staged_ledger_diff e ->
                          `Invalid_staged_ledger_diff (e, staged_ledger_diff)

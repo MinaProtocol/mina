@@ -46,12 +46,26 @@ module type S = sig
   val snarked_ledger_hash : t -> Frozen_ledger_hash.t
 
   module Cache_tag : sig
+    
+    module Cache : sig 
+
+      type t
+
+      val initialize : string -> t
+
+    end
+    
     type value := t
 
     type t [@@deriving compare, equal, sexp, yojson, hash]
 
-    val unwrap : t -> value
+    val unwrap : t -> Cache.t -> value
 
-    val generate : value -> t
+    val generate : value -> Cache.t -> t
+
+    module For_tests : sig
+      
+      val random : unit -> Cache.t
+    end
   end
 end

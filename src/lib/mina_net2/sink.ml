@@ -5,7 +5,9 @@ module type S = sig
 
   type msg
 
-  val push : t -> msg -> unit Deferred.t
+  type cache_proof_db
+
+  val push : t -> msg -> cache_proof_db -> unit Deferred.t
 end
 
 module type S_with_void = sig

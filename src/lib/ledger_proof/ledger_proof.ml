@@ -35,14 +35,21 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
     Transaction_snark.create ~statement:{ statement with sok_digest } ~proof
 
   module Cache_tag = struct
+
+    module Cache = Transaction_snark.Cache_tag.Cache
+
     type value = t [@@deriving compare, equal, sexp, yojson, hash]
 
+    
     type t = Transaction_snark.Cache_tag.t
     [@@deriving compare, equal, sexp, yojson, hash]
 
-    let unwrap (x : t) : value = Transaction_snark.Cache_tag.unwrap x
+    let unwrap (x : t) (db : Cache.t) : value = Transaction_snark.Cache_tag.unwrap x db
 
-    let generate (x : value) : t = Transaction_snark.Cache_tag.generate x
+    let generate (x : value) (db : Cache.t) : t = Transaction_snark.Cache_tag.generate x db
+
+    module For_tests = Transaction_snark.Cache_tag.For_tests
+
   end
 end
 

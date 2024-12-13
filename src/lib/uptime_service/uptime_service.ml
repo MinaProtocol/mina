@@ -195,7 +195,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
         ~produced:true block_data
 
 let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
-    ~url ~snark_worker ~transition_frontier ~peer_id
+    ~url ~snark_worker ~transition_frontier ~peer_id ~cache_proof_db
     ~(submitter_keypair : Keypair.t) ~snark_work_fee ~graphql_control_port
     ~built_with_commit_sha =
   match Broadcast_pipe.Reader.peek transition_frontier with
@@ -325,7 +325,7 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                     (Uptime_snark_worker.perform_single snark_worker
                        ( message
                        , Snark_work_lib.Work.Single.Spec.map_proof
-                           ~f:Ledger_proof.Cache_tag.unwrap single_spec ) )
+                           ~f:(fun proof ->Ledger_proof.Cache_tag.unwrap proof cache_proof_db) single_spec) )
                 with
                 | Error e ->
                     (* error in submitting to process *)
@@ -364,7 +364,7 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                       ~url ~state_hash ~produced:false block_data ) ) )
 
 let start ~logger ~uptime_url ~snark_worker_opt ~constraint_constants
-    ~protocol_constants ~transition_frontier ~time_controller
+    ~protocol_constants ~transition_frontier ~time_controller ~cache_proof_db
     ~block_produced_bvar ~uptime_submitter_keypair ~get_next_producer_timing
     ~get_snark_work_fee ~get_peer ~graphql_control_port ~built_with_commit_sha =
   match uptime_url with
@@ -472,7 +472,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~constraint_constants
                 in
                 match get_next_producer_time_opt () with
                 | None ->
-                    send_block_and_snark_work ()
+                    send_block_and_snark_work ~cache_proof_db () 
                 | Some next_producer_time ->
                     (* we look for block production within 4 slots of the *desired*
                        iteration start time, so a late iteration won't affect the
@@ -485,9 +485,9 @@ let start ~logger ~uptime_url ~snark_worker_opt ~constraint_constants
                     in
                     if Time.( <= ) next_producer_time four_slots_from_start then
                       (* send a block w/ SNARK work, then the produced block *)
-                      let%bind () = send_block_and_snark_work () in
+                      let%bind () = send_block_and_snark_work ~cache_proof_db () in
                       send_just_block next_producer_time
-                    else send_block_and_snark_work () ) ) ;
+                    else send_block_and_snark_work ~cache_proof_db ()) ) ;
         Deferred.return (Block_time.add next_block_tm five_slots_span)
       in
       (* sync to slot boundary *)

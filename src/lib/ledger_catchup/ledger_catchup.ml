@@ -13,15 +13,15 @@ end
 
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
-    ~unprocessed_transition_cache : unit =
+    ~unprocessed_transition_cache ~cache_proof_db : unit =
   match Transition_frontier.catchup_state frontier with
   | Hash _ ->
       Normal_catchup.run
         ~context:(module Context)
         ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
-        ~catchup_breadcrumbs_writer ~unprocessed_transition_cache
+        ~catchup_breadcrumbs_writer ~unprocessed_transition_cache ~cache_proof_db
   | Full _ ->
       Super_catchup.run
         ~context:(module Context)
         ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
-        ~catchup_breadcrumbs_writer ~unprocessed_transition_cache
+        ~catchup_breadcrumbs_writer ~unprocessed_transition_cache ~cache_proof_db

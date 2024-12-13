@@ -5,6 +5,7 @@ open Lmdb_storage.Generic
 
 type value = Pickles.Proof.Proofs_verified_2.Stable.Latest.t
 
+
 module F (Db : Db) = struct
   type holder = (int, value) Db.t
 
@@ -18,17 +19,37 @@ end
 
 module Rw = Read_write (F)
 
-let db_dir = Filename.temp_dir "mina" "proof_cache.lmdb"
-
 type t = { idx : int } [@@deriving compare, equal, sexp, yojson, hash]
 
-let unwrap ({ idx = x } : t) : value =
+let counter = ref 0
+
+module Cache = struct
+
+
+  let initialize path = Rw.create path
+
+  type t = Rw.t * Rw.holder
+
+end
+
+let unwrap ({ idx = x } : t) (db: Cache.t) : value =
   (* Read from the db. *)
-  let env, db = Rw.create db_dir in
+  let env, db = db in 
   Rw.get ~env db x |> Option.value_exn
 
-let generate (x : value) : t =
-  let env, db = Rw.create db_dir in
-  let hash = Pickles.Proof.Proofs_verified_2.Stable.Latest.hash x in
-  let res = { idx = hash } in
-  Rw.set ~env db hash x ; res
+let generate (x : value) (db: Cache.t) : t =
+  let env, db = db in 
+  let idx= !counter in
+  incr counter ;
+  let res = { idx } in
+  Gc.Expert.add_finalizer_last_exn res (fun () ->
+    Rw.remove ~env db idx
+  ) ;
+  Rw.set ~env db idx x ; res
+
+
+module For_tests = struct 
+  
+  let random () = Cache.initialize @@ Filename.temp_dir "mina" "proof_cache"
+
+end
