@@ -2,8 +2,11 @@ use crate::arkworks::CamlBigInteger256;
 use crate::caml::caml_bytes_string::CamlBytesString;
 use ark_ff::{FftField, Field, One, PrimeField, UniformRand, Zero};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
-use mina_curves::pasta::{fields::{fq::FqParameters as Fq_params, fft::FpParameters}, Fq};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use mina_curves::pasta::{
+    fields::{fft::FpParameters, fq::FqParameters as Fq_params},
+    Fq,
+};
 use num_bigint::BigUint;
 use rand::rngs::StdRng;
 use std::{
