@@ -9,8 +9,6 @@ let
     };
   toolchainHashes = {
     "1.72" = "sha256-dxE7lmCFWlq0nl/wKcmYvpP9zqQbBitAQgZ1zx9Ooik=";
-    "nightly-2023-09-01" =
-      "sha256-zek9JAnRaoX8V0U2Y5ssXVe9tvoQ0ERGXfUCUGYdrMA=";
     # copy the placeholder line with the correct toolchain name when adding a new toolchain
     # That is,
     # 1. Put the correct version name;
@@ -89,7 +87,7 @@ in {
   };
 
   kimchi-rust = rustChannelFromToolchainFileOf
-    ../src/lib/crypto/kimchi_bindings/wasm/rust-toolchain.toml;
+    ../src/lib/crypto/proof-systems/rust-toolchain.toml;
 
   # TODO: raise issue on nixpkgs and remove workaround when fix is applied
   kimchi-rust-wasm = (final.kimchi-rust.rust.override {
@@ -111,7 +109,7 @@ in {
   };
 
   plonk_wasm = let
-    lock = ../src/lib/crypto/kimchi_bindings/wasm/Cargo.lock;
+    lock = ../src/lib/crypto/proof-systems/Cargo.lock;
 
     deps = builtins.listToAttrs (map (pkg: {
       inherit (pkg) name;
@@ -120,7 +118,7 @@ in {
 
     rustPlatform = rustPlatformFor final.kimchi-rust-wasm;
 
-    wasm-bindgen-cli = rustPlatform.buildRustPackage rec {
+    wasm-bindgen-cli = final.rustPlatform.buildRustPackage rec {
       pname = "wasm-bindgen-cli";
       version = deps.wasm-bindgen.version;
       src = final.fetchCrate {
@@ -148,10 +146,10 @@ in {
     pname = "plonk_wasm";
     version = "0.1.0";
     src = final.lib.sourceByRegex ../src [
-      "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
       "^lib(/crypto(/proof-systems(/.*)?)?)?$"
     ];
-    sourceRoot = "source/lib/crypto/kimchi_bindings/wasm";
+    buildAndTestSubdir = "plonk-wasm";
+    sourceRoot = "source/lib/crypto/proof-systems";
     nativeBuildInputs = [ final.wasm-pack wasm-bindgen-cli ];
     buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
     cargoLock.lockFile = lock;
@@ -178,8 +176,8 @@ in {
       (
       set -x
       export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features -C link-arg=--max-memory=4294967296"
-      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs ./. -- --features nodejs
-      wasm-pack build --mode no-install --target web --out-dir $out/web ./.
+      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs ./plonk-wasm -- --features nodejs
+      wasm-pack build --mode no-install --target web --out-dir $out/web  ./plonk-wasm
       )
       runHook postBuild
     '';

@@ -12,7 +12,7 @@ This way, when calling the function `FunnyLittleModule.do_cool_thingies`, we tel
 
 We use this for many things. Many things in the code base rely of implementations in Rust. For example, we use Kimchi to generate proofs! So in order to tell OCaml to generate a Kimchi proof, we need to point it to the correct function that's living in the Rust proof-systems repository.
 
-The other side of the `external` keyword is somewhere in the Rust bindings layer, more specifically somewhere in `src/lib/crypto/kimchi_bindings/wasm/src` - in our case where we want to establish bindings between OCaml that has been compiled to JavaScript using JSOO and Rust (compiled to WASM).
+The other side of the `external` keyword is somewhere in the Rust bindings layer, more specifically somewhere in `src/lib/crypto/proof-systems/plonk-wasm/src` - in our case where we want to establish bindings between OCaml that has been compiled to JavaScript using JSOO and Rust (compiled to WASM).
 
 For example, the implementation of `caml_do_cool_thingies` could look like this:
 
