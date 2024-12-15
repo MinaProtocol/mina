@@ -1,6 +1,6 @@
 # Buildkite CI
 
-This folder contains all dhall code which is an backbone for our CI related code for buildkite.
+This folder contains all dhall code which is a backbone for our CI related code for buildkite.
 
 # Structure
 
