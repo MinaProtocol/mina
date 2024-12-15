@@ -195,7 +195,7 @@ Pipeline with create 6 jobs for each Docker and Debian component separately.
 
 #### Promoting dockers form gcr to dockerhub
 
-We want only to move dockers from gcr to dockerhub without changing version. Current implementation of pipeline is not user friendly so we need to still define `FROM_VERSION` and `TO_VERSION`. They should be equal.
+We want only to move dockers from gcr to dockerhub without changing version. Current implementation of pipeline is not user-friendly so we need to still define `FROM_VERSION` and `TO_VERSION`. They should be equal.
 
 ```
   - "DOCKERS=Archive,Daemon,Rosetta"
