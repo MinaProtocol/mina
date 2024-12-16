@@ -207,7 +207,6 @@ module type Full = sig
 
     val proof_level : Genesis_constants.Proof_level.t
   end) : S
-  [@@warning "-67"]
 
   val constraint_system_digests :
        constraint_constants:Genesis_constants.Constraint_constants.t
