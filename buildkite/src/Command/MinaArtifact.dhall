@@ -46,6 +46,7 @@ let MinaBuildSpec =
           , mode : PipelineMode.Type
           , tags : List PipelineTag.Type
           , channel : DebianChannel.Type
+          , debianRepo : DebianRepo.Type
           }
       , default =
           { prefix = "MinaArtifact"
@@ -58,6 +59,7 @@ let MinaBuildSpec =
           , mode = PipelineMode.Type.PullRequest
           , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
           , channel = DebianChannel.Type.Unstable
+          , debianRepo = DebianRepo.Type.PackagesO1Test
           }
       }
 
@@ -105,31 +107,30 @@ let build_artifacts
 
 let publish_to_debian_repo =
           \(spec : MinaBuildSpec.Type)
+      ->  \(dependsOn : List Command.TaggedKey.Type)
       ->  Command.build
             Command.Config::{
             , commands =
                 Toolchain.select
                   spec.toolchainSelectMode
                   spec.debVersion
-                  [ "AWS_ACCESS_KEY_ID"
-                  , "AWS_SECRET_ACCESS_KEY"
-                  , "MINA_DEB_CODENAME=${DebianVersions.lowerName
-                                           spec.debVersion}"
-                  , "MINA_DEB_RELEASE=${DebianChannel.lowerName spec.channel}"
-                  ]
+                  (   [ "AWS_ACCESS_KEY_ID"
+                      , "AWS_SECRET_ACCESS_KEY"
+                      , "MINA_DEB_CODENAME=${DebianVersions.lowerName
+                                               spec.debVersion}"
+                      , "MINA_DEB_RELEASE=${DebianChannel.lowerName
+                                              spec.channel}"
+                      ]
+                    # DebianRepo.keyIdEnvList spec.debianRepo
+                  )
                   "./buildkite/scripts/debian/publish.sh"
             , label =
                 "Publish Mina for ${DebianVersions.capitalName
                                       spec.debVersion} ${Profiles.toSuffixUppercase
                                                            spec.profile}"
-            , key = "publish-deb-pkg"
-            , depends_on =
-                DebianVersions.dependsOnStep
-                  (Some spec.prefix)
-                  spec.debVersion
-                  spec.profile
-                  spec.buildFlags
-                  "build"
+            , key =
+                "publish-${DebianVersions.lowerName spec.debVersion}-deb-pkg"
+            , depends_on = dependsOn
             , target = Size.Small
             }
 
@@ -318,18 +319,25 @@ let onlyDebianPipeline
     =     \(spec : MinaBuildSpec.Type)
       ->  pipelineBuilder
             spec
-            [ build_artifacts spec, publish_to_debian_repo spec ]
+            [ build_artifacts spec
+            , publish_to_debian_repo
+                spec
+                ( DebianVersions.dependsOnStep
+                    (Some spec.prefix)
+                    spec.debVersion
+                    spec.profile
+                    spec.buildFlags
+                    "build"
+                )
+            ]
 
 let pipeline
     : MinaBuildSpec.Type -> Pipeline.Config.Type
     =     \(spec : MinaBuildSpec.Type)
-      ->  pipelineBuilder
-            spec
-            (   [ build_artifacts spec, publish_to_debian_repo spec ]
-              # docker_commands spec
-            )
+      ->  pipelineBuilder spec ([ build_artifacts spec ] # docker_commands spec)
 
 in  { pipeline = pipeline
     , onlyDebianPipeline = onlyDebianPipeline
+    , publishToDebian = publish_to_debian_repo
     , MinaBuildSpec = MinaBuildSpec
     }

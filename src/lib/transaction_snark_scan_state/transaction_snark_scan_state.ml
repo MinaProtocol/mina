@@ -166,7 +166,6 @@ module Stable = struct
           Transaction_with_witness.Stable.V2.t list
           * [ `Border_block_continued_in_the_next_tree of bool ]
       }
-    [@@deriving sexp]
 
     let to_latest = Fn.id
 
@@ -328,8 +327,6 @@ end) =
 struct
   module Fold = Parallel_scan.State.Make_foldable (Deferred)
 
-  let logger = lazy (Logger.create ())
-
   module Timer = struct
     module Info = struct
       module Time_span = struct
@@ -356,15 +353,15 @@ struct
         }
     end
 
-    type t = Info.t String.Table.t
+    type t = { table : Info.t String.Table.t; logger : Logger.t }
 
-    let create () : t = String.Table.create ()
+    let create ~logger () : t = { table = String.Table.create (); logger }
 
     let time (t : t) label f =
       let start = Time.now () in
       let x = f () in
       let elapsed = Time.(diff (now ()) start) in
-      Hashtbl.update t label ~f:(function
+      Hashtbl.update t.table label ~f:(function
         | None ->
             Info.singleton elapsed
         | Some acc ->
@@ -372,23 +369,22 @@ struct
       x
 
     let log label (t : t) =
-      let logger = Lazy.force logger in
-      [%log debug]
+      [%log' debug t.logger]
         ~metadata:
-          (List.map (Hashtbl.to_alist t) ~f:(fun (k, info) ->
+          (List.map (Hashtbl.to_alist t.table) ~f:(fun (k, info) ->
                (k, Info.to_yojson info) ) )
         "%s timing" label
   end
 
   (*TODO: fold over the pending_coinbase tree and validate the statements?*)
-  let scan_statement ~constraint_constants
+  let scan_statement ~constraint_constants ~logger
       ({ scan_state = tree; previous_incomplete_zkapp_updates = _ } : t)
       ~statement_check ~verifier :
       ( Transaction_snark.Statement.t
       , [ `Error of Error.t | `Empty ] )
       Deferred.Result.t =
     let open Deferred.Or_error.Let_syntax in
-    let timer = Timer.create () in
+    let timer = Timer.create ~logger () in
     let yield_occasionally =
       let f = Staged.unstage (Async.Scheduler.yield_every ~n:50) in
       fun () -> f () |> Deferred.map ~f:Or_error.return
@@ -556,8 +552,8 @@ struct
     | Error e ->
         Deferred.return (Error (`Error e))
 
-  let check_invariants t ~constraint_constants ~statement_check ~verifier
-      ~error_prefix
+  let check_invariants t ~constraint_constants ~logger ~statement_check
+      ~verifier ~error_prefix
       ~(last_proof_statement : Transaction_snark.Statement.t option)
       ~(registers_end :
          ( Frozen_ledger_hash.t
@@ -595,7 +591,8 @@ struct
     in
     match%map
       O1trace.sync_thread "validate_transaction_snark_scan_state" (fun () ->
-          scan_statement t ~constraint_constants ~statement_check ~verifier )
+          scan_statement t ~constraint_constants ~logger ~statement_check
+            ~verifier )
     with
     | Error (`Error e) ->
         Error e

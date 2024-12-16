@@ -93,12 +93,18 @@ module Prefix_mask = struct
     | [ true; false ] ->
         invalid_arg "Prefix_mask.back: invalid mask [false; true]"
 
-  let typ (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) :
-      (f Checked.t, proofs_verified) Impl.Typ.t =
-    let open Impl in
+  open Kimchi_pasta_snarky_backend
+
+  let typ : (_ Checked.t, proofs_verified) Step_impl.Typ.t =
+    let open Step_impl in
     Typ.transport
       (Pickles_types.Vector.typ Boolean.typ Pickles_types.Nat.N2.n)
+      ~there ~back
+
+  let wrap_typ : (_ Checked.t, proofs_verified) Wrap_impl.Typ.t =
+    let open Wrap_impl in
+    Wrap_impl.Typ.transport
+      (Pickles_types.Vector.wrap_typ Boolean.typ Pickles_types.Nat.N2.n)
       ~there ~back
 end
 
@@ -137,10 +143,13 @@ module One_hot = struct
     in
     Random_oracle_input.Chunked.packeds (Array.map one_hot ~f:(fun b -> (b, 1)))
 
-  let typ (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) :
-      (f Checked.t, proofs_verified) Impl.Typ.t =
-    let module M = One_hot_vector.Make (Impl) in
-    let open Impl in
-    Typ.transport (M.typ Pickles_types.Nat.N3.n) ~there ~back
+  open Kimchi_pasta_snarky_backend
+
+  let typ : (_ Checked.t, proofs_verified) Step_impl.Typ.t =
+    let module M = One_hot_vector.Make (Step_impl) in
+    Step_impl.Typ.transport (M.typ Pickles_types.Nat.N3.n) ~there ~back
+
+  let wrap_typ : (_ Checked.t, proofs_verified) Wrap_impl.Typ.t =
+    let module M = One_hot_vector.Make (Wrap_impl) in
+    Wrap_impl.Typ.transport (M.typ Pickles_types.Nat.N3.n) ~there ~back
 end

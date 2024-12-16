@@ -248,6 +248,9 @@ module type Network_pool_base_intf = sig
     -> resource_pool_diff_verified Envelope.Incoming.t
     -> Broadcast_callback.t
     -> unit
+
+  val apply_no_broadcast :
+    t -> resource_pool_diff_verified Envelope.Incoming.t -> unit
 end
 
 (** A [Snark_resource_pool_intf] is a superset of a

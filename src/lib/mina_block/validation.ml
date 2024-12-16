@@ -18,6 +18,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val compile_config : Mina_compile_config.t
 end
 
 let validation (_, v) = v
@@ -483,7 +485,11 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
   let body = Block.body block in
   let apply_start_time = Core.Time.now () in
   let body_ref_from_header = Blockchain_state.body_reference blockchain_state in
-  let body_ref_computed = Staged_ledger_diff.Body.compute_reference body in
+  let body_ref_computed =
+    Staged_ledger_diff.Body.compute_reference
+      ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
+      body
+  in
   let%bind.Deferred.Result () =
     if Blake2.equal body_ref_computed body_ref_from_header then
       Deferred.Result.return ()

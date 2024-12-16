@@ -29,9 +29,9 @@ let test_hash_messages_for_next_wrap_proof (type n) (n : n Nat.t) () =
   in
   Internal_Basic.Test.test_equal ~sexp_of_t:Field.Constant.sexp_of_t
     ~equal:Field.Constant.equal
-    (Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.typ
+    (Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.wrap_typ
        Wrap_main_inputs.Inner_curve.typ
-       (Vector.typ Field.typ Backend.Tock.Rounds.n)
+       (Vector.wrap_typ Field.typ Backend.Tock.Rounds.n)
        ~length:n )
     Field.typ
     (fun t ->

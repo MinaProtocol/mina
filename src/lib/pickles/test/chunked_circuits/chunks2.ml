@@ -108,7 +108,7 @@ let test () =
           ; main =
               (fun _ ->
                 let proof =
-                  exists (Typ.Internal.ref ()) ~request:(fun () ->
+                  exists (Typ.prover_value ()) ~request:(fun () ->
                       Requests.Proof )
                 in
                 { previous_proof_statements =

@@ -4,9 +4,9 @@ module Stable : sig
     type t = Mina_wire_types.Pickles_base.Proofs_verified.V1.t = N0 | N1 | N2
     [@@deriving sexp, compare, yojson, hash, equal]
 
-    include Pickles_types.Sigs.Binable.S with type t := t
+    include Plonkish_prelude.Sigs.Binable.S with type t := t
 
-    include Pickles_types.Sigs.VERSIONED
+    include Plonkish_prelude.Sigs.VERSIONED
   end
 end
 
@@ -35,9 +35,11 @@ module One_hot : sig
 
   val to_input : zero:'a -> one:'a -> t -> 'a Random_oracle_input.Chunked.t
 
-  val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> ('f Checked.t, t, 'f) Snarky_backendless.Typ.t
+  open Kimchi_pasta_snarky_backend
+
+  val typ : (Step_impl.Field.Constant.t Checked.t, t) Step_impl.Typ.t
+
+  val wrap_typ : (Wrap_impl.Field.Constant.t Checked.t, t) Wrap_impl.Typ.t
 end
 
 type 'f boolean = 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
@@ -54,11 +56,9 @@ module Prefix_mask : sig
 
   val back : bool vec2 -> t
 
-  val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> ( 'f Checked.t
-       , t
-       , 'f
-       , (unit, 'f) Snarky_backendless.Checked_runner.Simple.t )
-       Snarky_backendless__.Types.Typ.t
+  open Kimchi_pasta_snarky_backend
+
+  val typ : (Step_impl.Field.Constant.t Checked.t, t) Step_impl.Typ.t
+
+  val wrap_typ : (Wrap_impl.Field.Constant.t Checked.t, t) Wrap_impl.Typ.t
 end
