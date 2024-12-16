@@ -11,15 +11,23 @@ module Make
     (Inputs : Intf.Step_main_inputs.S
                 with type Impl.field = Backend.Tick.Field.t
                  and type Impl.Bigint.t = Backend.Tick.Bigint.t
-                 and type ('var, 'value, 'aux, 'field, 'checked) Impl.Typ.typ' =
+                 and type ( 'var
+                          , 'value
+                          , 'aux
+                          , 'field
+                          , 'checked )
+                          Impl.Internal_Basic.Typ.typ' =
                   ( 'var
                   , 'value
                   , 'aux
                   , 'field
                   , 'checked )
-                  Step_main_inputs.Impl.Typ.typ'
-                 and type ('var, 'value, 'field, 'checked) Impl.Typ.typ =
-                  ('var, 'value, 'field, 'checked) Step_main_inputs.Impl.Typ.typ
+                  Step_main_inputs.Impl.Internal_Basic.Typ.typ'
+                 and type ('var, 'value, 'checked) Impl.Internal_Basic.Typ.typ =
+                  ( 'var
+                  , 'value
+                  , 'checked )
+                  Step_main_inputs.Impl.Internal_Basic.Typ.typ
                  and type Inner_curve.Constant.Scalar.t = Backend.Tock.Field.t) =
 struct
   open Inputs
