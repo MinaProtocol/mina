@@ -13,7 +13,7 @@ let naive_num_bits n =
 
 let test_num_bits () =
   Quickcheck.test (Int.gen_uniform_incl 0 Int.max_value) ~f:(fun n ->
-      [%test_eq: int] (Pickles_types.Pcs_batch.num_bits n) (naive_num_bits n) )
+      [%test_eq: int] (Plonkish_prelude.Pcs_batch.num_bits n) (naive_num_bits n) )
 
 let tests =
   let open Alcotest in

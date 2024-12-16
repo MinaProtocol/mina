@@ -111,6 +111,14 @@ val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 
 val add_work : t -> Snark_worker.Work.Result.t -> unit
 
+val add_work_graphql :
+     t
+  -> Network_pool.Snark_pool.Resource_pool.Diff.t
+  -> ( [ `Broadcasted | `Not_broadcasted ]
+     * Network_pool.Snark_pool.Resource_pool.Diff.t
+     * Network_pool.Snark_pool.Resource_pool.Diff.rejected )
+     Deferred.Or_error.t
+
 val snark_job_state : t -> Work_selector.State.t
 
 val get_current_nonce :

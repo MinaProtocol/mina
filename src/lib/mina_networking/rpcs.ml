@@ -33,6 +33,12 @@ module type CONTEXT = sig
   val list_peers : unit -> Peer.t list Deferred.t
 
   val get_transition_frontier : unit -> Transition_frontier.t option
+
+  val get_snark_pool : unit -> Network_pool.Snark_pool.t option
+
+  val snark_job_state : unit -> Work_selector.State.t option
+
+  val compile_config : Mina_compile_config.t
 end
 
 type ctx = (module CONTEXT)
@@ -789,6 +795,95 @@ module Get_transition_chain_proof = struct
 end]
 
 [%%versioned_rpc
+module Get_completed_snarks = struct
+  type nonrec ctx = ctx
+
+  module Master = struct
+    let name = "get_completed_snarks"
+
+    module T = struct
+      type query = unit [@@deriving sexp, to_yojson]
+
+      type response = Transaction_snark_work.Stable.V2.t list option
+    end
+
+    module Caller = T
+    module Callee = T
+  end
+
+  include Master.T
+
+  let sent_counter = Mina_metrics.Network.get_completed_snarks_rpcs_sent
+
+  let received_counter = Mina_metrics.Network.get_completed_snarks_rpcs_received
+
+  let failed_request_counter =
+    Mina_metrics.Network.get_completed_snarks_rpc_requests_failed
+
+  let failed_response_counter =
+    Mina_metrics.Network.get_completed_snarks_rpc_responses_failed
+
+  module M = Versioned_rpc.Both_convert.Plain.Make (Master)
+  include M
+
+  include Perf_histograms.Rpc.Plain.Extend (struct
+    include M
+    include Master
+  end)
+
+  module V1 = struct
+    module T = struct
+      type query = unit [@@deriving sexp]
+
+      type response = Transaction_snark_work.Stable.V2.t list option
+
+      let query_of_caller_model = Fn.id
+
+      let callee_model_of_query = Fn.id
+
+      let response_of_callee_model = ident
+
+      let caller_model_of_response = ident
+    end
+
+    module T' =
+      Perf_histograms.Rpc.Plain.Decorate_bin_io
+        (struct
+          include M
+          include Master
+        end)
+        (T)
+
+    include T'
+    include Register (T')
+  end
+
+  let receipt_trust_action_message query =
+    ("Get_completed_snarks query", [ ("query", query_to_yojson query) ])
+
+  let log_request_received ~logger ~sender _request =
+    [%log debug] "Sending completed snarks to $peer"
+      ~metadata:[ ("peer", Peer.to_yojson sender) ]
+
+  let response_is_successful = Option.is_some
+
+  let handle_request (module Context : CONTEXT) ~version:_ _request =
+    let open Context in
+    (* the maximum number of completed snarks to return over rpc *)
+    let limit = 32 in
+    match (get_snark_pool (), snark_job_state ()) with
+    | Some snark_pool, Some snark_state ->
+        Work_selector.completed_work_statements ~snark_pool snark_state
+        |> Fn.flip List.take limit |> Option.some |> return
+    | _, _ ->
+        return None
+
+  let rate_limit_budget = (1, `Per Time.Span.minute)
+
+  let rate_limit_cost = Fn.const 1
+end]
+
+[%%versioned_rpc
 module Get_ancestry = struct
   type nonrec ctx = ctx
 
@@ -1136,6 +1231,8 @@ type ('query, 'response) rpc =
   | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
   | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
   | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
+  | Get_completed_snarks
+      : (Get_completed_snarks.query, Get_completed_snarks.response) rpc
 
 type any_rpc = Rpc : ('q, 'r) rpc -> any_rpc
 
@@ -1149,6 +1246,7 @@ let all_rpcs =
   ; Rpc Get_transition_chain
   ; Rpc Get_transition_chain_proof
   ; Rpc Ban_notify
+  ; Rpc Get_completed_snarks
   ]
 
 let implementation :
@@ -1171,3 +1269,5 @@ let implementation :
       (module Ban_notify)
   | Get_best_tip ->
       (module Get_best_tip)
+  | Get_completed_snarks ->
+      (module Get_completed_snarks)

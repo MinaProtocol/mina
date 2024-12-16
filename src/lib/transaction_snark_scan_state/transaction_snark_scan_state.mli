@@ -7,7 +7,7 @@ module Ledger = Mina_ledger.Ledger
 [%%versioned:
 module Stable : sig
   module V2 : sig
-    type t [@@deriving sexp]
+    type t
 
     val hash : t -> Staged_ledger_hash.Aux_hash.t
   end

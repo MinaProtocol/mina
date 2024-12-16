@@ -21,6 +21,8 @@ module Test_inputs = struct
 
     let fee = Fn.id
 
+    let prover _ = Key_gen.Sample_keypairs.genesis_winner |> fst
+
     module Statement = struct
       type t = Transaction_snark.Statement.t One_or_two.t
     end
