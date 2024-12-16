@@ -59,7 +59,6 @@
 (package (name heap_usage))
 (package (name hex))
 (package (name immutable_array))
-(package (name inline_test_quiet_logs))
 (package (name integers_stubs_js))
 (package (name integration_test_local_engine))
 (package (name integration_test_lib))
