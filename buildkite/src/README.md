@@ -1,6 +1,6 @@
 # Buildkite CI
 
-This folder contains all dhall code which is an backbone for our CI related code for buildkite.
+This folder contains all dhall code which is a backbone for our CI related code for buildkite.
 
 # Structure
 
@@ -53,7 +53,7 @@ User defined value which describe current pipeline chunk of jobs to be executed.
 - coverage gathering - which gathers coverage artifacts and uploads it to coveralls.io
 
 To reach above pipeline configuration below configuration can be provided:
-(non important attributes where omitted)
+(non-important attributes where omitted)
 ```
 steps:
   - commands:
@@ -195,7 +195,7 @@ Pipeline with create 6 jobs for each Docker and Debian component separately.
 
 #### Promoting dockers form gcr to dockerhub
 
-We want only to move dockers from gcr to dockerhub without changing version. Current implementation of pipeline is not user friendly so we need to still define `FROM_VERSION` and `TO_VERSION`. They should be equal.
+We want only to move dockers from gcr to dockerhub without changing version. Current implementation of pipeline is not user-friendly so we need to still define `FROM_VERSION` and `TO_VERSION`. They should be equal.
 
 ```
   - "DOCKERS=Archive,Daemon,Rosetta"
