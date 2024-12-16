@@ -1,25 +1,26 @@
 (library
  (name base58_check)
  (public_name base58_check)
- (inline_tests (flags -verbose -show-counts))
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
-   ;; opam libraries
-   digestif
-   core_kernel
-   base58
-   base
-   ppx_inline_test.config
- )
+  ;; opam libraries
+  digestif
+  core_kernel
+  base58
+  base
+  ppx_inline_test.config)
  (library_flags (-linkall))
  (preprocess
   (pps
-    ppx_assert
-    ppx_base
-    ppx_deriving.std
-    ppx_deriving_yojson
-    ppx_inline_test
-    ppx_let
-    ppx_sexp_conv
-    ppx_version))
- (instrumentation (backend bisect_ppx))
+   ppx_assert
+   ppx_base
+   ppx_deriving.std
+   ppx_deriving_yojson
+   ppx_inline_test
+   ppx_let
+   ppx_sexp_conv
+   ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
  (synopsis "Base58Check implementation"))
