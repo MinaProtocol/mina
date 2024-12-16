@@ -375,6 +375,7 @@ struct
                 Account_id.create prover Token_id.default
                 |> Base_ledger.location_of_account ledger
               in
+
               Base_ledger.get ledger loc
           in
           let prover_account_exists = Option.is_some account_opt in
@@ -562,6 +563,9 @@ end
 let%test_module "random set test" =
   ( module struct
     open Mina_base
+    module Mock_snark_pool =
+      Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
+    open Ledger_proof.For_tests
 
     let trust_system = Mocks.trust_system
 
@@ -593,10 +597,6 @@ let%test_module "random set test" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
             () )
-
-    module Mock_snark_pool =
-      Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
-    open Ledger_proof.For_tests
 
     let apply_diff resource_pool work
         ?(proof = One_or_two.map ~f:mk_dummy_proof)
