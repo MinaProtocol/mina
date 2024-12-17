@@ -704,7 +704,7 @@ let get_snarked_ledger_full t state_hash_opt =
                       (State_hash.to_base58_check state_hash)
               in
               let apply_first_pass =
-                Ledger.apply_transaction_first_pass
+                Ledger.apply_transaction_first_pass ?precomputed:None
                   ~constraint_constants:
                     t.config.precomputed_values.constraint_constants
               in
