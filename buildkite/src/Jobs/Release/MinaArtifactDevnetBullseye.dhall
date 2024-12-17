@@ -21,13 +21,13 @@ in  Pipeline.build
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
             ]
-          , networks = [ Network.Type.Mainnet ]
+          , networks = [ Network.Type.Devnet ]
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Stable
             ]
           , mode = PipelineMode.Type.Stable
-          , prefix = "MinaArtifactMainnet"
+          , prefix = "MinaArtifactDevnet"
           }
       )

@@ -67,9 +67,9 @@ let command
             , target = Size.XLarge
             , soft_fail = Some spec.softFail
             , depends_on =
-                Dockers.dependsOnStep
+                Dockers.dependsOnPrefix
                   spec.dockerType
-                  "MinaArtifactMainnet"
+                  "MinaArtifact${Network.capitalName spec.network}"
                   (Some spec.network)
                   Profiles.Type.Standard
                   Artifacts.Type.Rosetta

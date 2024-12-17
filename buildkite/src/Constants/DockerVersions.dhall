@@ -34,7 +34,7 @@ let lowerName =
             }
             docker
 
-let dependsOnStep =
+let dependsOnPrefix =
           \(docker : Docker)
       ->  \(prefix : Text)
       ->  \(network : Optional Network.Type)
@@ -86,11 +86,11 @@ let dependsOn =
       ->  \(network : Optional Network.Type)
       ->  \(profile : Profiles.Type)
       ->  \(binary : Artifacts.Type)
-      ->  dependsOnStep docker "MinaArtifact" network profile binary
+      ->  dependsOnPrefix docker "MinaArtifact" network profile binary
 
 in  { Type = Docker
     , capitalName = capitalName
     , lowerName = lowerName
     , dependsOn = dependsOn
-    , dependsOnStep = dependsOnStep
+    , dependsOnPrefix = dependsOnPrefix
     }
