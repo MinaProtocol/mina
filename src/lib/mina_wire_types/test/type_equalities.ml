@@ -1,8 +1,6 @@
 (** Test that wire types and original types can be used interchangeably in the
     eyes of the type system. *)
 
-[@@@warning "-34"]
-
 module WT = Mina_wire_types
 open WT.Utils
 
