@@ -2,8 +2,9 @@
  (name merkle_address)
  (public_name merkle_address)
  (library_flags -linkall)
- (inline_tests (flags -verbose -show-counts))
-(libraries
+ (inline_tests
+  (flags -verbose -show-counts))
+ (libraries
   ;; opam libraries
   base.base_internalhash_types
   bin_prot.shape
@@ -18,7 +19,14 @@
   bounded_types
   test_util)
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane ppx_hash ppx_compare ppx_deriving_yojson
-       ppx_bitstring))
- (instrumentation (backend bisect_ppx))
+  (pps
+   ppx_mina
+   ppx_version
+   ppx_jane
+   ppx_hash
+   ppx_compare
+   ppx_deriving_yojson
+   ppx_bitstring))
+ (instrumentation
+  (backend bisect_ppx))
  (synopsis "Address for merkle database representations"))

@@ -4,38 +4,46 @@
  (library_flags -linkall)
  (flags
   (:standard -warn-error +a)
-   -open Core_kernel )
- (preprocess (pps ppx_version ppx_jane ppx_compare ppx_deriving.show ppx_deriving_yojson))
+  -open
+  Core_kernel)
+ (preprocess
+  (pps
+   ppx_version
+   ppx_jane
+   ppx_compare
+   ppx_deriving.show
+   ppx_deriving_yojson))
  (libraries
-   ; Opam
-   alcotest
-   async
-   async_kernel
-   async_unix
-   base.base_internalhash_types
-   base.caml
-   bin_prot.shape
-   core
-   core.uuid
-   core_kernel
-   core_kernel.uuid
-   result
-   sexplib0
-   ; Mina
-   base58_check
-   bounded_types
-   codable
-   currency
-   data_hash_lib
-   direction
-   key_value_database
-   merkle_address
-   merkle_ledger
-   merkle_mask
-   mina_base
-   mina_base.import
-   mina_numbers
-   mina_stdlib
-   ppx_version.runtime
-   signature_lib )
- (instrumentation (backend bisect_ppx)) )
+  ; Opam
+  alcotest
+  async
+  async_kernel
+  async_unix
+  base.base_internalhash_types
+  base.caml
+  bin_prot.shape
+  core
+  core.uuid
+  core_kernel
+  core_kernel.uuid
+  result
+  sexplib0
+  ; Mina
+  base58_check
+  bounded_types
+  codable
+  currency
+  data_hash_lib
+  direction
+  key_value_database
+  merkle_address
+  merkle_ledger
+  merkle_mask
+  mina_base
+  mina_base.import
+  mina_numbers
+  mina_stdlib
+  ppx_version.runtime
+  signature_lib)
+ (instrumentation
+  (backend bisect_ppx)))
