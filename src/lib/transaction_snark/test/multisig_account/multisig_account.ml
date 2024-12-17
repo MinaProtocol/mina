@@ -245,7 +245,7 @@ let%test_module "multisig_account" =
                                   assert false )
                             in
                             let proof =
-                              Run.exists (Typ.Internal.ref ())
+                              Run.exists (Typ.prover_value ())
                                 ~compute:(fun () -> assert false)
                             in
                             Impl.run_checked

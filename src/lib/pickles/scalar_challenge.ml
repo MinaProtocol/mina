@@ -43,9 +43,7 @@ let to_field_checked' (type f) ?(num_bits = num_bits)
   let bits_msb =
     lazy
       (let open Field.Constant in
-      unpack !!scalar |> Fn.flip List.take num_bits |> Array.of_list_rev
-      (*
-    |> Array.of_list_rev_map ~f:(fun b -> if b then one else zero) *))
+      unpack !!scalar |> Fn.flip List.take num_bits |> Array.of_list_rev)
   in
   let nybbles_per_row = 8 in
   let bits_per_row = 2 * nybbles_per_row in

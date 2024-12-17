@@ -450,7 +450,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%snarkydef_ compute_as_prover ~constraint_constants ~txn_global_slot
           (txn : Transaction_union.var) =
         let%bind data =
-          exists (Typ.Internal.ref ())
+          exists (Typ.prover_value ())
             ~compute:
               As_prover.(
                 let%map txn = read Transaction_union.typ txn in
@@ -468,54 +468,54 @@ module Make_str (A : Wire_types.Concrete) = struct
                 (txn, fee_payer, source, receiver))
         in
         let%bind fee_payer_idx =
-          exists (Typ.Internal.ref ())
+          exists (Typ.prover_value ())
             ~request:
               As_prover.(
                 let%map _txn, fee_payer, _source, _receiver =
-                  read (Typ.Internal.ref ()) data
+                  read (Typ.prover_value ()) data
                 in
                 Ledger_hash.Find_index fee_payer)
         in
         let%bind fee_payer_account =
-          exists (Typ.Internal.ref ())
+          exists (Typ.prover_value ())
             ~request:
               As_prover.(
                 let%map fee_payer_idx =
-                  read (Typ.Internal.ref ()) fee_payer_idx
+                  read (Typ.prover_value ()) fee_payer_idx
                 in
                 Ledger_hash.Get_element fee_payer_idx)
         in
         let%bind source_idx =
-          exists (Typ.Internal.ref ())
+          exists (Typ.prover_value ())
             ~request:
               As_prover.(
                 let%map _txn, _fee_payer, source, _receiver =
-                  read (Typ.Internal.ref ()) data
+                  read (Typ.prover_value ()) data
                 in
                 Ledger_hash.Find_index source)
         in
         let%bind source_account =
-          exists (Typ.Internal.ref ())
+          exists (Typ.prover_value ())
             ~request:
               As_prover.(
-                let%map source_idx = read (Typ.Internal.ref ()) source_idx in
+                let%map source_idx = read (Typ.prover_value ()) source_idx in
                 Ledger_hash.Get_element source_idx)
         in
         let%bind receiver_idx =
-          exists (Typ.Internal.ref ())
+          exists (Typ.prover_value ())
             ~request:
               As_prover.(
                 let%map _txn, _fee_payer, _source, receiver =
-                  read (Typ.Internal.ref ()) data
+                  read (Typ.prover_value ()) data
                 in
                 Ledger_hash.Find_index receiver)
         in
         let%bind receiver_account =
-          exists (Typ.Internal.ref ())
+          exists (Typ.prover_value ())
             ~request:
               As_prover.(
                 let%map receiver_idx =
-                  read (Typ.Internal.ref ()) receiver_idx
+                  read (Typ.prover_value ()) receiver_idx
                 in
                 Ledger_hash.Get_element receiver_idx)
         in
@@ -523,16 +523,16 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~compute:
             As_prover.(
               let%bind txn, _fee_payer, _source, _receiver =
-                read (Typ.Internal.ref ()) data
+                read (Typ.prover_value ()) data
               in
               let%bind fee_payer_account, _path =
-                read (Typ.Internal.ref ()) fee_payer_account
+                read (Typ.prover_value ()) fee_payer_account
               in
               let%bind source_account, _path =
-                read (Typ.Internal.ref ()) source_account
+                read (Typ.prover_value ()) source_account
               in
               let%bind receiver_account, _path =
-                read (Typ.Internal.ref ()) receiver_account
+                read (Typ.prover_value ()) receiver_account
               in
               let%map txn_global_slot =
                 read Mina_numbers.Global_slot_since_genesis.typ txn_global_slot
@@ -939,7 +939,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                      { a with
                        zkapp =
                          ( Zkapp_account.Checked.digest a.zkapp
-                         , As_prover.Ref.create (fun () -> None) )
+                         , exists (Typ.prover_value ()) ~compute:(fun () ->
+                               None ) )
                      }
                    in
                    run_checked (Account.Checked.digest a) ) )
@@ -1430,8 +1431,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                   let vk =
                     exists Side_loaded_verification_key.typ ~compute:(fun () ->
                         Option.value_exn
-                          (As_prover.Ref.get
-                             (Data_as_hash.ref a.zkapp.verification_key.data) )
+                          (As_prover.read (Typ.prover_value ())
+                             (Data_as_hash.prover_value
+                                a.zkapp.verification_key.data ) )
                             .data )
                   in
                   let expected_hash =
@@ -1924,7 +1926,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           (g, l)
         in
         let start_zkapp_command =
-          As_prover.Ref.create (fun () -> !witness.start_zkapp_command)
+          exists (Typ.prover_value ()) ~compute:(fun () ->
+              ref !witness.start_zkapp_command )
         in
         let zkapp_input = ref None in
         let must_verify = ref Boolean.true_ in
@@ -1999,7 +2002,11 @@ module Make_str (A : Wire_types.Concrete) = struct
                     (global_state, local_state)
                 | `Compute_in_circuit ->
                     V.create (fun () ->
-                        match As_prover.Ref.get start_zkapp_command with
+                        let start_zkapp_command =
+                          As_prover.read (Typ.prover_value ())
+                            start_zkapp_command
+                        in
+                        match Stdlib.( ! ) start_zkapp_command with
                         | [] ->
                             `Skip
                         | p :: ps ->
@@ -2008,7 +2015,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                                 (V.get local.stack_frame.data.calls.data)
                             in
                             if should_pop then (
-                              As_prover.Ref.set start_zkapp_command ps ;
+                              start_zkapp_command := ps ;
                               `Start p )
                             else `Skip )
                     |> finish
@@ -2018,11 +2025,15 @@ module Make_str (A : Wire_types.Concrete) = struct
                           Mina_base.Zkapp_command.Call_forest.is_empty
                             (V.get local.stack_frame.data.calls.data) ) ) ;
                     V.create (fun () ->
-                        match As_prover.Ref.get start_zkapp_command with
+                        let start_zkapp_command =
+                          As_prover.read (Typ.prover_value ())
+                            start_zkapp_command
+                        in
+                        match Stdlib.( ! ) start_zkapp_command with
                         | [] ->
                             assert false
                         | p :: ps ->
-                            As_prover.Ref.set start_zkapp_command ps ;
+                            start_zkapp_command := ps ;
                             `Start p )
                     |> finish
               in
@@ -2116,7 +2127,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     main ?witness:!witness s ~constraint_constants stmt
                   in
                   let proof =
-                    Run.exists (Typ.Internal.ref ()) ~request:(fun () ->
+                    Run.exists (Typ.prover_value ()) ~request:(fun () ->
                         Zkapp_proof )
                   in
                   { previous_proof_statements =
@@ -3285,7 +3296,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             let s1, s2 = Run.run_checked (main x) in
             let p1, p2 =
               Run.exists
-                Typ.(Internal.ref () * Internal.ref ())
+                Typ.(prover_value () * prover_value ())
                 ~request:(fun () -> Proofs_to_merge)
             in
             { previous_proof_statements =
