@@ -204,7 +204,7 @@ val apply :
   -> zkapp_cmd_limit_hardcap:int
   -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
        * [ `Ledger_proof of
-           ( Ledger_proof.t
+           ( Ledger_proof.Cache_tag.t
            * ( Transaction.t With_status.t
              * State_hash.t
              * Mina_numbers.Global_slot_since_genesis.t )
@@ -229,7 +229,7 @@ val apply_diff_unchecked :
   -> zkapp_cmd_limit_hardcap:int
   -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
        * [ `Ledger_proof of
-           ( Ledger_proof.t
+           ( Ledger_proof.Cache_tag.t
            * ( Transaction.t With_status.t
              * State_hash.t
              * Mina_numbers.Global_slot_since_genesis.t )
@@ -325,7 +325,9 @@ val of_scan_state_pending_coinbases_and_snarked_ledger_unchecked :
 val all_work_pairs :
      t
   -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-  -> (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
+  -> ( Transaction_witness.t
+     , Ledger_proof.Cache_tag.t )
+     Snark_work_lib.Work.Single.Spec.t
      One_or_two.t
      list
      Or_error.t
