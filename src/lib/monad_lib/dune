@@ -2,5 +2,7 @@
  (name monad_lib)
  (public_name monad_lib)
  (libraries core_kernel)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane)))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane)))

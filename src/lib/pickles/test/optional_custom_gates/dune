@@ -1,5 +1,8 @@
 (tests
- (names test_fix_domains pickles_test_optional_custom_gates lookup_range_check)
+ (names
+  test_fix_domains
+  pickles_test_optional_custom_gates
+  lookup_range_check)
  (libraries
   ;; opam libraries
   alcotest

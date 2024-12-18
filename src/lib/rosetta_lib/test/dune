@@ -5,13 +5,14 @@
  (modes native)
  (modules test_encodings)
  (libraries
-   ;; opam libraries
-   core_kernel
-   base
-   ;; local libraries
-   signature_lib
-   rosetta_lib
-   rosetta_coding
-)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version)))
+  ;; opam libraries
+  core_kernel
+  base
+  ;; local libraries
+  signature_lib
+  rosetta_lib
+  rosetta_coding)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

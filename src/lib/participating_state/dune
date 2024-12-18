@@ -1,6 +1,8 @@
 (library
  (name participating_state)
  (public_name participating_state)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version))
  (libraries async_kernel core_kernel base))
