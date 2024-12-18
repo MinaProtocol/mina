@@ -55,6 +55,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           work_delay = Some 1
         ; transaction_capacity =
             Some Runtime_config.Proof_keys.Transaction_capacity.small
+        ; block_window_duration_ms = Some 60000
         }
     }
 
