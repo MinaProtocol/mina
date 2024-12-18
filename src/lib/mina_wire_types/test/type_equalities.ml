@@ -224,11 +224,11 @@ module Mina_base = struct
       (O.Zkapp_precondition.Account.Stable)
       (W.Zkapp_precondition.Account)
   include
-    Assert_equal0V1
+    Assert_equal0V2
       (O.Account_update.Account_precondition.Stable)
       (W.Account_update.Account_precondition)
   include
-    Assert_equal0V1
+    Assert_equal0V2
       (O.Account_update.Preconditions.Stable)
       (W.Account_update.Preconditions)
   include Assert_equal0V1 (O.Account_update.Body.Stable) (W.Account_update.Body)
