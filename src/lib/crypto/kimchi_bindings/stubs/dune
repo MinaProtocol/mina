@@ -21,7 +21,8 @@
   (<> %{env:RUST_TARGET_FEATURE_OPTIMISATIONS=y} n))
  (targets rustflags.sexp)
  (action
-  (with-stdout-to rustflags.sexp
+  (with-stdout-to
+   rustflags.sexp
    (echo "-C target-feature=+bmi2,+adx"))))
 
 (rule
@@ -29,7 +30,8 @@
   (= %{env:RUST_TARGET_FEATURE_OPTIMISATIONS=y} n))
  (targets rustflags.sexp)
  (action
-  (with-stdout-to rustflags.sexp
+  (with-stdout-to
+   rustflags.sexp
    (echo "-C target-feature=-bmi2,-adx"))))
 
 ;;
@@ -90,7 +92,8 @@
  (instrumentation
   (backend bisect_ppx))
  (libraries bounded_types)
- (inline_tests (flags -verbose -show-counts))
+ (inline_tests
+  (flags -verbose -show-counts))
  (preprocess
   (pps ppx_version ppx_inline_test)))
 
@@ -101,7 +104,8 @@
  (libraries kimchi_types pasta_bindings.backend bounded_types)
  (instrumentation
   (backend bisect_ppx))
- (inline_tests (flags -verbose -show-counts))
+ (inline_tests
+  (flags -verbose -show-counts))
  (preprocess
   (pps ppx_version ppx_inline_test)))
 
@@ -112,7 +116,8 @@
  (libraries pasta_bindings kimchi_types bounded_types)
  (instrumentation
   (backend bisect_ppx))
- (inline_tests (flags -verbose -show-counts))
+ (inline_tests
+  (flags -verbose -show-counts))
  (preprocess
   (pps ppx_version ppx_inline_test)))
 
@@ -128,7 +133,8 @@
  (libraries bounded_types)
  (instrumentation
   (backend bisect_ppx))
- (inline_tests (flags -verbose -show-counts))
+ (inline_tests
+  (flags -verbose -show-counts))
  (preprocess
   (pps ppx_version ppx_inline_test))
  (implements pasta_bindings.backend))

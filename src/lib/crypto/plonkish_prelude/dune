@@ -25,7 +25,7 @@
  (instrumentation
   (backend bisect_ppx))
  (libraries
-   ;; opam libraries
+  ;; opam libraries
   sexplib0
   result
   core_kernel
@@ -37,5 +37,4 @@
   tuple_lib
   ppx_version.runtime
   bounded_types
-  mina_wire_types
-  ))
+  mina_wire_types))
