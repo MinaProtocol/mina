@@ -433,7 +433,7 @@ type var =
   , Timing.var
   , Permissions.Checked.t
     (* TODO: This is a hack that lets us avoid unhashing zkApp accounts when we don't need to *)
-  , Field.Var.t * Zkapp_account.t option As_prover.Ref.t )
+  , Field.Var.t * Zkapp_account.t option Typ.prover_value )
   Poly.t
 
 let identifier_of_var ({ public_key; token_id; _ } : var) =
@@ -461,12 +461,13 @@ let typ' zkapp =
 
 let typ : (var, value) Typ.t =
   let zkapp :
-      ( Field.Var.t * Zkapp_account.t option As_prover.Ref.t
+      ( Field.Var.t * Zkapp_account.t option Typ.prover_value
       , Zkapp_account.t option )
       Typ.t =
     let account :
-        (Zkapp_account.t option As_prover.Ref.t, Zkapp_account.t option) Typ.t =
-      Typ.Internal.ref ()
+        (Zkapp_account.t option Typ.prover_value, Zkapp_account.t option) Typ.t
+        =
+      Typ.prover_value ()
     in
     Typ.(Field.typ * account)
     |> Typ.transport ~there:(fun x -> (hash_zkapp_account_opt x, x)) ~back:snd

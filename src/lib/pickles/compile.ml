@@ -1319,7 +1319,7 @@ struct
     ; main =
         (fun { public_input = () } ->
           let dummy_proof =
-            As_prover.Ref.create (fun () ->
+            exists (Typ.prover_value ()) ~compute:(fun () ->
                 Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15 )
           in
           Promise.return
@@ -1396,7 +1396,7 @@ struct
                 ; main =
                     (fun { public_input = () } ->
                       let proof =
-                        exists (Typ.Internal.ref ()) ~request:(fun () -> Proof)
+                        exists (Typ.prover_value ()) ~request:(fun () -> Proof)
                       in
                       Promise.return
                         { Inductive_rule.previous_proof_statements =
