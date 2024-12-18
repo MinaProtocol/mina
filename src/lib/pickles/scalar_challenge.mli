@@ -8,6 +8,12 @@ val to_field_constant :
   -> Import.Challenge.Constant.t Import.Scalar_challenge.t
   -> 'f
 
+(** [to_field_checked' ?num_bits backend chal] builds a circuit using the gate
+    [Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(T
+    EC_endoscalar)] to decompose into [num_bits] bits a scalar challenge [chal].
+
+    The default value of [num_bits] is 128, and the gadget requires 8 rows.
+*)
 val to_field_checked' :
      ?num_bits:int
   -> (module Snarky_backendless.Snark_intf.Run with type field = 'f)
