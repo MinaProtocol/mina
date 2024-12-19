@@ -28,4 +28,5 @@ source scripts/debian/publish.sh \
   --release $MINA_DEB_RELEASE \
   --version $MINA_DEB_VERSION \
   --codename $MINA_DEB_CODENAME \
+  --bucket $BUCKET \
   $SIGN_ARG
