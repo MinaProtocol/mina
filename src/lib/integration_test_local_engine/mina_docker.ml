@@ -43,6 +43,7 @@ module Network_config = struct
                  map )] )
     ; constants : Test_config.constants
     ; docker : docker_config
+    ; commit_id : string
     }
   [@@deriving to_yojson]
 
@@ -543,6 +544,7 @@ module Network_config = struct
     { debug_arg = debug
     ; genesis_keypairs
     ; constants
+    ; commit_id = git_commit
     ; docker =
         { docker_swarm_version
         ; stack_name
@@ -730,6 +732,7 @@ module Network_manager = struct
        context)" ;
     let entrypoint_filename, entrypoint_script =
       Docker_node_config.Base_node_config.entrypoint_script
+        network_config.commit_id
     in
     Out_channel.with_file ~fail_if_exists:true
       (docker_dir ^/ entrypoint_filename) ~f:(fun ch ->
