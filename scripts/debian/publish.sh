@@ -38,7 +38,6 @@ if [[ -z "$DEB_VERSION" ]]; then usage "Version is not set!"; fi;
 if [[ -z "$DEB_CODENAME" ]]; then usage "Codename is not set!"; fi;
 if [[ -z "$DEB_RELEASE" ]]; then usage "Release is not set!"; fi;
 
-BUCKET_ARG="--bucket=$BUCKET"
 
 if [[ -z "${SIGN:-}" ]]; then 
   SIGN_ARG=""
@@ -46,7 +45,7 @@ else
   SIGN_ARG="--sign=$SIGN"
 fi
 
-BUCKET_ARG="--bucket=packages.o1test.net"
+BUCKET_ARG="--bucket=$BUCKET"
 S3_REGION_ARG="--s3-region=us-west-2"
 # utility for publishing deb repo with commons options
 # deb-s3 https://github.com/krobertson/deb-s3
@@ -74,10 +73,7 @@ echo "Publishing debs: ${DEB_NAMES} to Release: ${DEB_RELEASE} and Codename: ${D
 # Upload the deb files to s3.
 # If this fails, attempt to remove the lockfile and retry.
 for _ in {1..10}; do (
-  "${DEBS3_UPLOAD}" \
-     --component "${DEB_RELEASE}" \
-     --codename "${DEB_CODENAME}" \
-     "${DEB_NAMES}"
+  ${DEBS3_UPLOAD} --component "${DEB_RELEASE}" --codename "${DEB_CODENAME}" "${GPG_OPTS[@]}" "${DEB_NAMES}"
 ) && break || (MINA_DEB_BUCKET=${BUCKET} scripts/debian/clear-s3-lockfile.sh); done
 
 for deb in $DEB_NAMES
