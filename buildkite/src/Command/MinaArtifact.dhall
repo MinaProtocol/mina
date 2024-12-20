@@ -142,6 +142,7 @@ let publish_to_debian_repo =
                                               spec.channel}"
                       ]
                     # DebianRepo.keyIdEnvList spec.debianRepo
+                    # DebianRepo.bucketEnvList spec.debianRepo
                   )
                   "./buildkite/scripts/debian/publish.sh"
             , label =
