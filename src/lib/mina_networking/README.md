@@ -2,7 +2,7 @@
 
 ## Typing Conventions
 
-In the context of this document, we will describe query and response types using a psuedo type-system. Tuples of data are in the form `(a, ..., b)`, lists are in the form `[a]`, and polymorphic types are represented as functions returning types. For example, we use the standard polymorphic types `optional :: type -> type` and `result :: type -> type -> type` throughout this document. The `optional` type constructor means that a value can be null, and a `result` type constructor means that there is 1 of 2 possible return types (typically a success type and an error type). For example, `optional int` might be an int or null, where as `result int error` is either an int or an error.
+In the context of this document, we will describe query and response types using a pseudo type-system. Tuples of data are in the form `(a, ..., b)`, lists are in the form `[a]`, and polymorphic types are represented as functions returning types. For example, we use the standard polymorphic types `optional :: type -> type` and `result :: type -> type -> type` throughout this document. The `optional` type constructor means that a value can be null, and a `result` type constructor means that there is 1 of 2 possible return types (typically a success type and an error type). For example, `optional int` might be an int or null, where as `result int error` is either an int or an error.
 
 ### Relevant types
 
@@ -136,4 +136,4 @@ Returns the best tip block along with the root block of the frontier, and a merk
 
 **Response**: `result node_status error`
 
-This acts as a telemetry RPC which asks a peer to provide invformation about their node status. Daemons do not have to respond to this request, and node operators may pass a command line flag to opt-out of responding to these node status requests.
+This acts as a telemetry RPC which asks a peer to provide information about their node status. Daemons do not have to respond to this request, and node operators may pass a command line flag to opt-out of responding to these node status requests.
