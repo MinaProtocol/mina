@@ -61,10 +61,8 @@ let dummy_proof =
 
 let dummy_vk = Mina_base.Side_loaded_verification_key.dummy
 
-let verification_key ~constraint_constants =
-  let `VK vk, `Prover _ =
-    Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
-  in
+let verification_key =
+  let `VK vk, `Prover _ = Transaction_snark.For_tests.create_trivial_snapp () in
   let%map.Async.Deferred vk = vk in
   With_hash.data vk
 

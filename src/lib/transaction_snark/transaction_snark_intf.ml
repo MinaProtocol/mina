@@ -361,8 +361,7 @@ module type Full = sig
       -> Zkapp_command.t Async.Deferred.t
 
     val create_trivial_predicate_snapp :
-         constraint_constants:Genesis_constants.Constraint_constants.t
-      -> ?protocol_state_predicate:Zkapp_precondition.Protocol_state.t
+         ?protocol_state_predicate:Zkapp_precondition.Protocol_state.t
       -> snapp_kp:Signature_lib.Keypair.t
       -> Mina_transaction_logic.For_tests.Transaction_spec.t
       -> Mina_ledger.Ledger.t
@@ -383,7 +382,6 @@ module type Full = sig
 
     val create_trivial_snapp :
          ?unique_id:int
-      -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> unit
       -> [> `VK of
             (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
