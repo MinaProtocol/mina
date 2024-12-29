@@ -151,7 +151,6 @@ module For_tests : sig
        Account_id.Map.t
 
   val currency_consumed :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> Transaction_hash.User_command_with_valid_signature.t
+       Transaction_hash.User_command_with_valid_signature.t
     -> Currency.Amount.t option
 end
