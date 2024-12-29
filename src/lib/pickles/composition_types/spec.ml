@@ -464,9 +464,7 @@ struct
             T
               ( Typ
                   { typ with
-                    check =
-                      (fun _ ->
-                        Snarky_backendless.Checked_runner.Simple.return () )
+                    check = (fun _ -> Impl.Internal_Basic.Checked.return ())
                   }
               , (fun _ -> f constant_var)
               , f' )
