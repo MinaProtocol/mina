@@ -40,6 +40,8 @@ module Vesta_based_plonk = struct
       (struct
         let params = poseidon_params
       end)
+
+  module Run_state = Snarky_backendless.Run_state
 end
 
 module Pallas_based_plonk = struct
@@ -70,6 +72,8 @@ module Pallas_based_plonk = struct
       (struct
         let params = poseidon_params
       end)
+
+  module Run_state = Snarky_backendless.Run_state
 end
 
 module Step_impl = Snarky_backendless.Snark.Run.Make (Vesta_based_plonk)

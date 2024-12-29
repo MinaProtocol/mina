@@ -175,6 +175,7 @@ module Pasta : sig
     module Proof = Kimchi_pasta.Pallas_based_plonk.Proof
     module Proving_key = Kimchi_pasta.Pallas_based_plonk.Proving_key
     module Oracles = Kimchi_pasta.Pallas_based_plonk.Oracles
+    module Run_state = Kimchi_pasta.Pallas_based_plonk.Run_state
   end
 
   (* module Pasta = Kimchi_pasta.Pasta *)
@@ -204,5 +205,6 @@ module Pasta : sig
     module Proof = Kimchi_pasta.Vesta_based_plonk.Proof
     module Proving_key = Kimchi_pasta.Vesta_based_plonk.Proving_key
     module Oracles = Kimchi_pasta.Vesta_based_plonk.Oracles
+    module Run_state = Kimchi_pasta.Vesta_based_plonk.Run_state
   end
 end
