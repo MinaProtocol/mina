@@ -1750,8 +1750,7 @@ let%test_module _ =
     let constraint_constants =
       Genesis_constants.For_unit_tests.Constraint_constants.t
 
-    let `VK vk, `Prover _ =
-      Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+    let `VK vk, `Prover _ = Transaction_snark.For_tests.create_trivial_snapp ()
 
     let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
 

@@ -30,9 +30,6 @@ let%test_module "Initialize state test" =
         ~branches:(module Nat.N2)
         ~max_proofs_verified:(module Nat.N0)
         ~name:"empty_update"
-        ~constraint_constants:
-          (Genesis_constants.Constraint_constants.to_snark_keys_header
-             constraint_constants )
         ~choices:(fun ~self:_ ->
           [ Zkapps_initialize_state.initialize_rule pk_compressed
           ; Zkapps_initialize_state.update_state_rule pk_compressed

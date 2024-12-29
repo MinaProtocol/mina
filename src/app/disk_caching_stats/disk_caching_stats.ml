@@ -735,7 +735,7 @@ let () =
   in
   let%map.Async_kernel.Deferred vk =
     let `VK vk, `Prover _ =
-      Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+      Transaction_snark.For_tests.create_trivial_snapp ()
     in
     vk
   in

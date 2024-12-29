@@ -3326,9 +3326,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~branches:(module Nat.N5)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"transaction-snark"
-      ~constraint_constants:
-        (Genesis_constants.Constraint_constants.to_snark_keys_header
-           constraint_constants )
       ~choices:(fun ~self ->
         let zkapp_command x =
           Base.Zkapp_command_snark.rule ~constraint_constants ~proof_level x
@@ -4145,7 +4142,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let set_proof_cache x = proof_cache := Some x
 
-    let create_trivial_snapp ?unique_id ~constraint_constants () =
+    let create_trivial_snapp ?unique_id () =
       let tag, _, (module P), Pickles.Provers.[ trivial_prover ] =
         let trivial_rule : _ Pickles.Inductive_rule.t =
           let trivial_main () : unit Checked.t =
@@ -4179,9 +4176,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~branches:(module Nat.N1)
           ~max_proofs_verified:(module Nat.N0)
           ~name:"trivial"
-          ~constraint_constants:
-            (Genesis_constants.Constraint_constants.to_snark_keys_header
-               constraint_constants )
           ~choices:(fun ~self:_ -> [ trivial_rule ])
       in
       let trivial_prover ?handler stmt =
@@ -4218,16 +4212,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         assert (Or_error.is_error invalid_verification)
       in
-      let constraint_constants =
-        Genesis_constants.For_unit_tests.Constraint_constants.t
-      in
-      let `VK vk_a, `Prover prover_a =
-        create_trivial_snapp ~unique_id:0 ~constraint_constants ()
-      in
+      let `VK vk_a, `Prover prover_a = create_trivial_snapp ~unique_id:0 () in
       let vk_a = Async.Thread_safe.block_on_async_exn (fun () -> vk_a) in
-      let `VK vk_b, `Prover prover_b =
-        create_trivial_snapp ~unique_id:1 ~constraint_constants ()
-      in
+      let `VK vk_b, `Prover prover_b = create_trivial_snapp ~unique_id:1 () in
       let vk_b = Async.Thread_safe.block_on_async_exn (fun () -> vk_b) in
       assert (
         not
@@ -4581,9 +4568,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let deploy_snapp ?(no_auth = false) ?permissions ~constraint_constants
         (spec : Deploy_snapp_spec.t) =
-      let `VK vk, `Prover _trivial_prover =
-        create_trivial_snapp ~constraint_constants ()
-      in
+      let `VK vk, `Prover _trivial_prover = create_trivial_snapp () in
       let%map.Async.Deferred vk = vk in
       (* only allow timing on a single new snapp account
          balance changes for other new snapp accounts are just the account creation fee
@@ -4713,7 +4698,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         | Some (prover, vk) ->
             (`VK vk, `Prover prover)
         | None ->
-            create_trivial_snapp ~constraint_constants ()
+            create_trivial_snapp ()
       in
       let%bind.Async.Deferred vk = vk in
       let ( `Zkapp_command { Zkapp_command.fee_payer; memo; _ }
@@ -4864,9 +4849,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             (prover, vk)
         | None ->
             (* we don't always need this, but calculate it just once *)
-            let `VK vk, `Prover prover =
-              create_trivial_snapp ~constraint_constants ()
-            in
+            let `VK vk, `Prover prover = create_trivial_snapp () in
             (prover, vk)
       in
       let%bind.Async.Deferred vk = vk in
@@ -5044,7 +5027,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let account : Account.t = trivial_zkapp_account ~permissions ~vk pk in
       create ledger id account
 
-    let create_trivial_predicate_snapp ~constraint_constants
+    let create_trivial_predicate_snapp
         ?(protocol_state_predicate = Zkapp_precondition.Protocol_state.accept)
         ~(snapp_kp : Signature_lib.Keypair.t) spec ledger =
       let { Mina_transaction_logic.For_tests.Transaction_spec.fee
@@ -5057,9 +5040,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let trivial_account_pk =
         Signature_lib.Public_key.compress snapp_kp.public_key
       in
-      let `VK vk, `Prover trivial_prover =
-        create_trivial_snapp ~constraint_constants ()
-      in
+      let `VK vk, `Prover trivial_prover = create_trivial_snapp () in
       let%bind.Async.Deferred vk = vk in
       let _v =
         let id =

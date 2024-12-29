@@ -64,9 +64,7 @@ let pending_coinbase_state_stack ~state_body_hash ~global_slot =
       Pending_coinbase.Stack.push_state state_body_hash global_slot init_stack
   }
 
-let trivial_zkapp =
-  lazy
-    (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
+let trivial_zkapp = lazy (Transaction_snark.For_tests.create_trivial_snapp ())
 
 type pass_number = Pass_1 | Pass_2
 

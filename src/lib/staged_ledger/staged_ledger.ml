@@ -2375,7 +2375,7 @@ let%test_module "staged ledger tests" =
     let logger = Logger.null ()
 
     let `VK vk, `Prover zkapp_prover =
-      Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+      Transaction_snark.For_tests.create_trivial_snapp ()
 
     let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
 
@@ -4791,13 +4791,11 @@ let%test_module "staged ledger tests" =
         ~setup_test:(fun _ledger (a, privkey_a, _loc_a) (b, privkey_b, _loc_b)
                     ->
           let `VK vk_a, `Prover prover_a =
-            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:0
-              ~constraint_constants ()
+            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:0 ()
           in
           let%bind.Async.Deferred vk_a = vk_a in
           let `VK vk_b, `Prover _prover_b =
-            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:1
-              ~constraint_constants ()
+            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:1 ()
           in
           let%bind.Async.Deferred vk_b = vk_b in
           let keymap =
@@ -4863,13 +4861,11 @@ let%test_module "staged ledger tests" =
         ~setup_test:(fun _ledger (a, privkey_a, _loc_a) (_b, _privkey_b, _loc_b)
                     ->
           let `VK vk_a, `Prover prover_a =
-            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:0
-              ~constraint_constants ()
+            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:0 ()
           in
           let%bind.Async.Deferred vk_a = vk_a in
           let `VK vk_b, `Prover _prover_b =
-            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:1
-              ~constraint_constants ()
+            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:1 ()
           in
           let%bind.Async.Deferred vk_b = vk_b in
           let keymap =
