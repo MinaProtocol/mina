@@ -47,10 +47,7 @@ struct
         t.(0) <- init ;
         (let open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint in
         with_label __LOC__ (fun () ->
-            Impl.assert_
-              { basic = T (Poseidon { state = t })
-              ; annotation = Some "plonk-poseidon"
-              } )) ;
+            Impl.assert_ (T (Poseidon { state = t })) )) ;
         t.(Int.(Array.length t - 1)) )
 
   let add_assign ~state i x =

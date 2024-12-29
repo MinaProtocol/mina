@@ -45,12 +45,9 @@ let add_fast (type f)
   let p3 = (x3, y3) in
   with_label "add_fast" (fun () ->
       assert_
-        { Snarky_backendless.Constraint.annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (EC_add_complete
-                 { p1; p2; p3; inf; same_x; slope = s; inf_z; x21_inv } )
-        } ;
+        (Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+           (EC_add_complete
+              { p1; p2; p3; inf; same_x; slope = s; inf_z; x21_inv } ) ) ;
       p3 )
 
 module Make
@@ -125,11 +122,8 @@ struct
         :: !rounds_rev
     done ;
     assert_
-      { Snarky_backendless.Constraint.annotation = Some __LOC__
-      ; basic =
-          Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-            (EC_scale { state = Array.of_list_rev !rounds_rev })
-      } ;
+      (Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+         (EC_scale { state = Array.of_list_rev !rounds_rev }) ) ;
     (* TODO: Return n_acc ? *)
     !acc
 
@@ -200,11 +194,8 @@ struct
         :: !rounds_rev
     done ;
     assert_
-      { Snarky_backendless.Constraint.annotation = Some __LOC__
-      ; basic =
-          Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-            (EC_scale { state = Array.of_list_rev !rounds_rev })
-      } ;
+      (Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+         (EC_scale { state = Array.of_list_rev !rounds_rev }) ) ;
     Field.Assert.equal !n_acc scalar ;
     let bits_lsb =
       let bs = Array.map bits_msb ~f:Boolean.Unsafe.of_cvar in

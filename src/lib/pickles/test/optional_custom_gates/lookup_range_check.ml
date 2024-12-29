@@ -6,7 +6,7 @@ let () = Pickles.Backend.Tick.Keypair.set_urs_info []
 
 let () = Pickles.Backend.Tock.Keypair.set_urs_info []
 
-let add_constraint c = assert_ { basic = c; annotation = None }
+let add_constraint c = assert_ c
 
 let add_plonk_constraint c =
   add_constraint

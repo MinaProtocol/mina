@@ -118,12 +118,8 @@ let to_field_checked' (type f) ?(num_bits = num_bits)
   done ;
   with_label __LOC__ (fun () ->
       assert_
-        Snarky_backendless.Constraint.
-          { annotation = Some __LOC__
-          ; basic =
-              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
-                T (EC_endoscalar { state = Array.of_list_rev !state }))
-          } ) ;
+        Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
+          T (EC_endoscalar { state = Array.of_list_rev !state })) ) ;
   (!a, !b, !n)
 
 let to_field_checked (type f) ?num_bits
@@ -257,17 +253,14 @@ struct
     let xs, ys = !acc in
     with_label __LOC__ (fun () ->
         assert_
-          { annotation = Some __LOC__
-          ; basic =
-              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
-                T
-                  (EC_endoscale
-                     { xs
-                     ; ys
-                     ; n_acc = !n_acc
-                     ; state = Array.of_list_rev !rounds_rev
-                     } ))
-          } ) ;
+          Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
+            T
+              (EC_endoscale
+                 { xs
+                 ; ys
+                 ; n_acc = !n_acc
+                 ; state = Array.of_list_rev !rounds_rev
+                 } )) ) ;
     with_label __LOC__ (fun () -> Field.Assert.equal !n_acc scalar) ;
     !acc
 

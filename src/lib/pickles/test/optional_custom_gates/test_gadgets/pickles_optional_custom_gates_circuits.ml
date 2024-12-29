@@ -2,7 +2,7 @@ open Core_kernel
 open Pickles_types
 open Pickles.Impls.Step
 
-let add_constraint c = assert_ { basic = c; annotation = None }
+let add_constraint c = assert_ c
 
 let add_plonk_constraint c =
   add_constraint

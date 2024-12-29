@@ -856,8 +856,7 @@ module Make
   val finalize_runtime_lookup_tables : t -> unit
 
   val add_constraint :
-       ?label:string
-    -> t
+       t
     -> ( Fp.t Snarky_backendless.Cvar.t
        , Fp.t )
        Snarky_backendless.Constraint.basic
@@ -1412,7 +1411,7 @@ end = struct
             (Fp.one, `Var res) )
 
   (** Adds a constraint to the constraint system. *)
-  let add_constraint ?label:_ sys
+  let add_constraint sys
       (constr :
         ( Fp.t Snarky_backendless.Cvar.t
         , Fp.t )

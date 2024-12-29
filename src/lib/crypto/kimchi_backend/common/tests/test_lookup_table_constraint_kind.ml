@@ -14,7 +14,7 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 module Tick = Kimchi_backend.Pasta.Vesta_based_plonk
 module Impl = Snarky_backendless.Snark.Run.Make (Tick)
 
-let add_constraint c = Impl.assert_ { basic = T c; annotation = None }
+let add_constraint c = Impl.assert_ (T c)
 
 (* Verify finalize_and_get_gates *)
 let test_finalize_and_get_gates_with_lookup_tables () =

@@ -36,8 +36,7 @@ module type Full = sig
       with type t = (fp, gates) Kimchi_backend_common.Plonk_constraint_system.t
 
   val add_constraint :
-       ?label:string
-    -> t
+       t
     -> (fp Snarky_backendless.Cvar.t, fp) Snarky_backendless.Constraint.basic
     -> unit
 
