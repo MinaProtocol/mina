@@ -31,6 +31,9 @@ module type Full = sig
 
   type gates
 
+  type constraint_ =
+    (fp Snarky_backendless.Cvar.t, fp) Snarky_backendless.Constraint.basic
+
   include
     With_accessors
       with type t = (fp, gates) Kimchi_backend_common.Plonk_constraint_system.t

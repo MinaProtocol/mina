@@ -824,6 +824,9 @@ module Make
 
   type nonrec t = (Fp.t, Gates.t) t
 
+  type constraint_ =
+    (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic
+
   val create : unit -> t
 
   val get_public_input_size : t -> int Set_once.t
@@ -882,6 +885,9 @@ module Make
   val to_json : t -> string
 end = struct
   open Core_kernel
+
+  type constraint_ =
+    (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic
 
   (* Used by compute_witness to build the runtime tables from the Lookup
      constraint *)
