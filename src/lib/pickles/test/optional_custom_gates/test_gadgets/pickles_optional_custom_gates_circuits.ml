@@ -4,9 +4,7 @@ open Pickles.Impls.Step
 
 let add_constraint c = assert_ c
 
-let add_plonk_constraint c =
-  add_constraint
-    (Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T c)
+let add_plonk_constraint c = add_constraint c
 
 let fresh_int i = exists Field.typ ~compute:(fun () -> Field.Constant.of_int i)
 

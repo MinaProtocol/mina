@@ -1,5 +1,5 @@
 module Make
-    (Impl : Snarky_backendless.Snark_intf.Run_with_constraint) (B : sig
+    (Impl : Kimchi_pasta_snarky_backend.Snark_intf) (B : sig
       open Impl
 
       val params : field Sponge.Params.t
@@ -46,8 +46,7 @@ struct
         in
         t.(0) <- init ;
         (let open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint in
-        with_label __LOC__ (fun () ->
-            Impl.assert_ (T (Poseidon { state = t })) )) ;
+        with_label __LOC__ (fun () -> Impl.assert_ (Poseidon { state = t }))) ;
         t.(Int.(Array.length t - 1)) )
 
   let add_assign ~state i x =

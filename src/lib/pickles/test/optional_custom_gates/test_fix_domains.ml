@@ -10,7 +10,7 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 open Pickles.Impls.Step
 
-let add_constraint c = assert_ (T c)
+let add_constraint c = assert_ c
 
 let add_plonk_constraint c = add_constraint c
 

@@ -13,23 +13,20 @@ val absorb :
 val ones_vector :
   'f 'n.
      first_zero:'f Snarky_backendless.Cvar.t
-  -> (module Snarky_backendless.Snark_intf.Run_with_constraint
-        with type field = 'f )
+  -> (module Kimchi_pasta_snarky_backend.Snark_intf with type field = 'f)
   -> 'n Pickles_types.Nat.t
   -> ( 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
      , 'n )
      Pickles_types.Vector.t
 
 val seal :
-     (module Snarky_backendless.Snark_intf.Run_with_constraint
-        with type field = 'f )
+     (module Kimchi_pasta_snarky_backend.Snark_intf with type field = 'f)
   -> 'f Snarky_backendless.Cvar.t
   -> 'f Snarky_backendless.Cvar.t
 
 val lowest_128_bits :
      constrain_low_bits:bool
   -> assert_128_bits:('f Snarky_backendless.Cvar.t -> unit)
-  -> (module Snarky_backendless.Snark_intf.Run_with_constraint
-        with type field = 'f )
+  -> (module Kimchi_pasta_snarky_backend.Snark_intf with type field = 'f)
   -> 'f Snarky_backendless.Cvar.t
   -> 'f Snarky_backendless.Cvar.t

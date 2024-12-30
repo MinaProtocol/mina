@@ -5,6 +5,8 @@ module Intf = Intf
 module Plonk_constraint_system = Plonk_constraint_system
 module Scale_round = Scale_round
 
+module type Snark_intf = Plonk_constraint_system.Snark_intf
+
 module Bigint256 =
   Bigint.Make
     (Pasta_bindings.BigInt256)

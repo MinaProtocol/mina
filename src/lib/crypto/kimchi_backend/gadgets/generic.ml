@@ -20,14 +20,13 @@ let add (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
   (* Set up generic add gate *)
   with_label "generic_add_gadget" (fun () ->
       assert_
-        (Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-           (Basic
-              { l = (Field.Constant.one, left_input)
-              ; r = (Field.Constant.one, right_input)
-              ; o = (neg_one, sum)
-              ; m = Field.Constant.zero
-              ; c = Field.Constant.zero
-              } ) ) ;
+        (Basic
+           { l = (Field.Constant.one, left_input)
+           ; r = (Field.Constant.one, right_input)
+           ; o = (neg_one, sum)
+           ; m = Field.Constant.zero
+           ; c = Field.Constant.zero
+           } ) ;
       sum )
 
 (* Generic subtraction gate gadget *)
@@ -48,14 +47,13 @@ let sub (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
   (* Set up generic sub gate *)
   with_label "generic_sub_gadget" (fun () ->
       assert_
-        (Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-           (Basic
-              { l = (Field.Constant.one, left_input)
-              ; r = (neg_one, right_input)
-              ; o = (neg_one, difference)
-              ; m = Field.Constant.zero
-              ; c = Field.Constant.zero
-              } ) ) ;
+        (Basic
+           { l = (Field.Constant.one, left_input)
+           ; r = (neg_one, right_input)
+           ; o = (neg_one, difference)
+           ; m = Field.Constant.zero
+           ; c = Field.Constant.zero
+           } ) ;
       difference )
 
 (* Generic multiplication gate gadget *)
@@ -74,14 +72,13 @@ let mul (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
   (* Set up generic mul gate *)
   with_label "generic_mul_gadget" (fun () ->
       assert_
-        (Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-           (Basic
-              { l = (Field.Constant.zero, left_input)
-              ; r = (Field.Constant.zero, right_input)
-              ; o = (neg_one, prod)
-              ; m = Field.Constant.one
-              ; c = Field.Constant.zero
-              } ) ) ;
+        (Basic
+           { l = (Field.Constant.zero, left_input)
+           ; r = (Field.Constant.zero, right_input)
+           ; o = (neg_one, prod)
+           ; m = Field.Constant.one
+           ; c = Field.Constant.zero
+           } ) ;
       prod )
 
 (*********)

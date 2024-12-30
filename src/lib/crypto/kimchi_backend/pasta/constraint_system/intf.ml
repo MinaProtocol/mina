@@ -33,7 +33,9 @@ module type Full = sig
 
   module Constraint : sig
     type t =
-      (fp Snarky_backendless.Cvar.t, fp) Snarky_backendless.Constraint.basic
+      ( fp Snarky_backendless.Cvar.t
+      , fp )
+      Kimchi_pasta_snarky_backend.Plonk_constraint_system.Plonk_constraint.basic
     [@@deriving sexp]
 
     val boolean : fp Snarky_backendless.Cvar.t -> t
@@ -61,10 +63,7 @@ module type Full = sig
     With_accessors
       with type t = (fp, gates) Kimchi_backend_common.Plonk_constraint_system.t
 
-  val add_constraint :
-       t
-    -> (fp Snarky_backendless.Cvar.t, fp) Snarky_backendless.Constraint.basic
-    -> unit
+  val add_constraint : t -> Constraint.t -> unit
 
   val compute_witness :
     t -> (int -> fp) -> fp array array * fp Kimchi_types.runtime_table array

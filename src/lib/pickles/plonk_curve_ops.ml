@@ -5,9 +5,9 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 let seal i = Tuple_lib.Double.map ~f:(Util.seal i)
 
 let add_fast (type f)
-    (module Impl : Snarky_backendless.Snark_intf.Run_with_constraint
-      with type field = f ) ?(check_finite = true) ((x1, y1) as p1)
-    ((x2, y2) as p2) : Impl.Field.t * Impl.Field.t =
+    (module Impl : Kimchi_pasta_snarky_backend.Snark_intf with type field = f)
+    ?(check_finite = true) ((x1, y1) as p1) ((x2, y2) as p2) :
+    Impl.Field.t * Impl.Field.t =
   let p1 = seal (module Impl) p1 in
   let p2 = seal (module Impl) p2 in
   let open Impl in
@@ -45,13 +45,11 @@ let add_fast (type f)
   let p3 = (x3, y3) in
   with_label "add_fast" (fun () ->
       assert_
-        (Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-           (EC_add_complete
-              { p1; p2; p3; inf; same_x; slope = s; inf_z; x21_inv } ) ) ;
+        (EC_add_complete { p1; p2; p3; inf; same_x; slope = s; inf_z; x21_inv }) ;
       p3 )
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.Run_with_constraint)
+    (Impl : Kimchi_pasta_snarky_backend.Snark_intf)
     (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t) =
 struct
   open Impl
@@ -121,9 +119,7 @@ struct
         }
         :: !rounds_rev
     done ;
-    assert_
-      (Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-         (EC_scale { state = Array.of_list_rev !rounds_rev }) ) ;
+    assert_ (EC_scale { state = Array.of_list_rev !rounds_rev }) ;
     (* TODO: Return n_acc ? *)
     !acc
 
@@ -193,9 +189,7 @@ struct
         }
         :: !rounds_rev
     done ;
-    assert_
-      (Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-         (EC_scale { state = Array.of_list_rev !rounds_rev }) ) ;
+    assert_ (EC_scale { state = Array.of_list_rev !rounds_rev }) ;
     Field.Assert.equal !n_acc scalar ;
     let bits_lsb =
       let bs = Array.map bits_msb ~f:Boolean.Unsafe.of_cvar in

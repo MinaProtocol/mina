@@ -37,8 +37,9 @@ module Aux (Impl : Snarky_backendless.Snark_intf.Run) = struct
     (sqrt_exn (Field.if_ is_square ~then_:x ~else_:(Field.scale x m)), is_square)
 end
 
-let wrap (type f) ((module Impl) : f Snarky_backendless.Snark0.m) ~potential_xs
-    ~y_squared =
+let wrap (type f)
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+    ~potential_xs ~y_squared =
   let open Impl in
   let module A = Aux (Impl) in
   let open A in
@@ -55,7 +56,7 @@ let wrap (type f) ((module Impl) : f Snarky_backendless.Snark0.m) ~potential_xs
       , Field.((x1_is_first * y1) + (x2_is_first * y2) + (x3_is_first * y3)) ) )
 
 module Make
-    (M : Snarky_backendless.Snark_intf.Run_with_constraint) (P : sig
+    (M : Snarky_backendless.Snark_intf.Run) (P : sig
       val params : M.field Group_map.Params.t
     end) =
 struct
