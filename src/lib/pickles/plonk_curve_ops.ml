@@ -5,9 +5,9 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 let seal i = Tuple_lib.Double.map ~f:(Util.seal i)
 
 let add_fast (type f)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(check_finite = true) ((x1, y1) as p1) ((x2, y2) as p2) :
-    Impl.Field.t * Impl.Field.t =
+    (module Impl : Snarky_backendless.Snark_intf.Run_with_constraint
+      with type field = f ) ?(check_finite = true) ((x1, y1) as p1)
+    ((x2, y2) as p2) : Impl.Field.t * Impl.Field.t =
   let p1 = seal (module Impl) p1 in
   let p2 = seal (module Impl) p2 in
   let open Impl in
@@ -51,7 +51,7 @@ let add_fast (type f)
       p3 )
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.Run)
+    (Impl : Snarky_backendless.Snark_intf.Run_with_constraint)
     (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t) =
 struct
   open Impl

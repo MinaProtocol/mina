@@ -8,7 +8,7 @@
 *)
 
 module Test_make
-    (Impl : Snarky_backendless.Snark_intf.Run)
+    (Impl : Snarky_backendless.Snark_intf.Run_with_constraint)
     (G : Pickles__Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t) =
 struct
   open Impl

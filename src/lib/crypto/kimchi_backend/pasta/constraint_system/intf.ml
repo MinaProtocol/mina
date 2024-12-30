@@ -31,8 +31,31 @@ module type Full = sig
 
   type gates
 
-  type constraint_ =
-    (fp Snarky_backendless.Cvar.t, fp) Snarky_backendless.Constraint.basic
+  module Constraint : sig
+    type t =
+      (fp Snarky_backendless.Cvar.t, fp) Snarky_backendless.Constraint.basic
+    [@@deriving sexp]
+
+    val boolean : fp Snarky_backendless.Cvar.t -> t
+
+    val equal :
+      fp Snarky_backendless.Cvar.t -> fp Snarky_backendless.Cvar.t -> t
+
+    val r1cs :
+         fp Snarky_backendless.Cvar.t
+      -> fp Snarky_backendless.Cvar.t
+      -> fp Snarky_backendless.Cvar.t
+      -> t
+
+    val square :
+      fp Snarky_backendless.Cvar.t -> fp Snarky_backendless.Cvar.t -> t
+
+    val eval : t -> (fp Snarky_backendless.Cvar.t -> fp) -> bool
+
+    val log_constraint : t -> (fp Snarky_backendless.Cvar.t -> fp) -> string
+  end
+
+  type constraint_ = Constraint.t
 
   include
     With_accessors

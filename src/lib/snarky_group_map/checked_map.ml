@@ -55,7 +55,7 @@ let wrap (type f) ((module Impl) : f Snarky_backendless.Snark0.m) ~potential_xs
       , Field.((x1_is_first * y1) + (x2_is_first * y2) + (x3_is_first * y3)) ) )
 
 module Make
-    (M : Snarky_backendless.Snark_intf.Run) (P : sig
+    (M : Snarky_backendless.Snark_intf.Run_with_constraint) (P : sig
       val params : M.field Group_map.Params.t
     end) =
 struct

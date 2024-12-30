@@ -1,5 +1,5 @@
 module Make
-    (Impl : Snarky_backendless.Snark_intf.Run) (B : sig
+    (Impl : Snarky_backendless.Snark_intf.Run_with_constraint) (B : sig
       open Impl
 
       val params : field Sponge.Params.t

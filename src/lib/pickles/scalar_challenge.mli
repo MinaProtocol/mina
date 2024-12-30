@@ -16,7 +16,8 @@ val to_field_constant :
 *)
 val to_field_checked' :
      ?num_bits:int
-  -> (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+  -> (module Snarky_backendless.Snark_intf.Run_with_constraint
+        with type field = 'f )
   -> 'f Snarky_backendless.Cvar.t Import.Scalar_challenge.t
   -> 'f Snarky_backendless.Cvar.t
      * 'f Snarky_backendless.Cvar.t
@@ -24,13 +25,14 @@ val to_field_checked' :
 
 val to_field_checked :
      ?num_bits:int
-  -> (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+  -> (module Snarky_backendless.Snark_intf.Run_with_constraint
+        with type field = 'f )
   -> endo:'f
   -> 'f Snarky_backendless.Cvar.t Import.Scalar_challenge.t
   -> 'f Snarky_backendless.Cvar.t
 
 module Make : functor
-  (Impl : Snarky_backendless.Snark_intf.Run)
+  (Impl : Snarky_backendless.Snark_intf.Run_with_constraint)
   (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t)
   (Challenge : Import.Challenge.S with module Impl := Impl)
   (_ : sig

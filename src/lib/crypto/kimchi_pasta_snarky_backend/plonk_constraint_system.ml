@@ -824,8 +824,31 @@ module Make
 
   type nonrec t = (Fp.t, Gates.t) t
 
-  type constraint_ =
-    (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic
+  module Constraint : sig
+    type t =
+      (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic
+    [@@deriving sexp]
+
+    val boolean : Fp.t Snarky_backendless.Cvar.t -> t
+
+    val equal :
+      Fp.t Snarky_backendless.Cvar.t -> Fp.t Snarky_backendless.Cvar.t -> t
+
+    val r1cs :
+         Fp.t Snarky_backendless.Cvar.t
+      -> Fp.t Snarky_backendless.Cvar.t
+      -> Fp.t Snarky_backendless.Cvar.t
+      -> t
+
+    val square :
+      Fp.t Snarky_backendless.Cvar.t -> Fp.t Snarky_backendless.Cvar.t -> t
+
+    val eval : t -> (Fp.t Snarky_backendless.Cvar.t -> Fp.t) -> bool
+
+    val log_constraint : t -> (Fp.t Snarky_backendless.Cvar.t -> Fp.t) -> string
+  end
+
+  type constraint_ = Constraint.t
 
   val create : unit -> t
 
@@ -858,12 +881,7 @@ module Make
       called twice. *)
   val finalize_runtime_lookup_tables : t -> unit
 
-  val add_constraint :
-       t
-    -> ( Fp.t Snarky_backendless.Cvar.t
-       , Fp.t )
-       Snarky_backendless.Constraint.basic
-    -> unit
+  val add_constraint : t -> constraint_ -> unit
 
   val compute_witness :
        t
@@ -886,8 +904,46 @@ module Make
 end = struct
   open Core_kernel
 
-  type constraint_ =
-    (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic
+  module Constraint = struct
+    include Snarky_backendless.Constraint.T
+
+    type t =
+      (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.t
+    [@@deriving sexp]
+
+    let m = (module Fp : Snarky_intf.Field.S with type t = Fp.t)
+
+    let log_constraint (basic : t) get_value =
+      let open Snarky_backendless.Constraint in
+      match basic with
+      | Boolean var ->
+          Format.(asprintf "Boolean %s" (Fp.to_string (get_value var)))
+      | Equal (var1, var2) ->
+          Format.(
+            asprintf "Equal %s %s"
+              (Fp.to_string (get_value var1))
+              (Fp.to_string (get_value var2)))
+      | Square (var1, var2) ->
+          Format.(
+            asprintf "Square %s %s"
+              (Fp.to_string (get_value var1))
+              (Fp.to_string (get_value var2)))
+      | R1CS (var1, var2, var3) ->
+          Format.(
+            asprintf "R1CS %s %s %s"
+              (Fp.to_string (get_value var1))
+              (Fp.to_string (get_value var2))
+              (Fp.to_string (get_value var3)))
+      | _ ->
+          Format.asprintf
+            !"%{sexp:(Fp.t, Fp.t) Snarky_backendless.Constraint.basic}"
+            (Snarky_backendless.Constraint.Basic.map basic ~f:get_value)
+
+    let eval basic get_value =
+      Snarky_backendless.Constraint.Basic.eval m get_value basic
+  end
+
+  type constraint_ = Constraint.t
 
   (* Used by compute_witness to build the runtime tables from the Lookup
      constraint *)

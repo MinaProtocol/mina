@@ -10,8 +10,8 @@ let num_bits = 128
 
 (* Has the side effect of checking that [scalar] fits in 128 bits. *)
 let to_field_checked' (type f) ?(num_bits = num_bits)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-    { SC.inner = (scalar : Impl.Field.t) } =
+    (module Impl : Snarky_backendless.Snark_intf.Run_with_constraint
+      with type field = f ) { SC.inner = (scalar : Impl.Field.t) } =
   let open Impl in
   let neg_one = Field.Constant.(negate one) in
   let a_func = function
@@ -123,8 +123,9 @@ let to_field_checked' (type f) ?(num_bits = num_bits)
   (!a, !b, !n)
 
 let to_field_checked (type f) ?num_bits
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) ~endo
-    ({ SC.inner = (scalar : Impl.Field.t) } as s) =
+    (module Impl : Snarky_backendless.Snark_intf.Run_with_constraint
+      with type field = f ) ~endo ({ SC.inner = (scalar : Impl.Field.t) } as s)
+    =
   let open Impl in
   let a, b, n = to_field_checked' ?num_bits (module Impl) s in
   Field.Assert.equal n scalar ;
@@ -147,7 +148,7 @@ let to_field_constant (type f) ~endo
   F.((!a * endo) + !b)
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.Run)
+    (Impl : Snarky_backendless.Snark_intf.Run_with_constraint)
     (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t)
     (Challenge : Challenge.S with module Impl := Impl) (Endo : sig
       val base : Impl.Field.Constant.t

@@ -41,6 +41,8 @@ module Vesta_based_plonk = struct
         let params = poseidon_params
       end)
 
+  module Constraint = R1CS_constraint_system.Constraint
+
   module Run_state = struct
     include Snarky_backendless.Run_state
 
@@ -76,6 +78,8 @@ module Pallas_based_plonk = struct
       (struct
         let params = poseidon_params
       end)
+
+  module Constraint = R1CS_constraint_system.Constraint
 
   module Run_state = struct
     include Snarky_backendless.Run_state
