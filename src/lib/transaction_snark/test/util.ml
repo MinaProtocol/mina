@@ -347,7 +347,7 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
           Run.exists Zkapp_statement.typ ~compute:(fun () -> assert false)
         in
         let proof =
-          Run.exists (Typ.Internal.ref ()) ~compute:(fun () -> assert false)
+          Run.exists (Typ.prover_value ()) ~compute:(fun () -> assert false)
         in
         Impl.run_checked (Transaction_snark.dummy_constraints ()) ;
         (* Unsatisfiable. *)

@@ -2,11 +2,12 @@
  (name error_json)
  (public_name error_json)
  (libraries
-   ;; opam libraries
-   sexplib0
-   yojson
-   base
-   sexplib
- )
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_deriving_yojson ppx_version)))
+  ;; opam libraries
+  sexplib0
+  yojson
+  base
+  sexplib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_deriving_yojson ppx_version)))
