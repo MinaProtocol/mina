@@ -190,18 +190,6 @@ let
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
         nativeBuildInputs = s.nativeBuildInputs ++ [ pkgs.capnproto ];
       });
-      pkgs.bindings_js = super.pkgs.bindings_js.overrideAttrs {
-        PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
-        PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
-      };
-      files.src-lib-crypto-kimchi_bindings-js-node_js =
-        super.files.src-lib-crypto-kimchi_bindings-js-node_js.overrideAttrs {
-          PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
-        };
-      files.src-lib-crypto-kimchi_bindings-js-web =
-        super.files.src-lib-crypto-kimchi_bindings-js-web.overrideAttrs {
-          PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
-        };
       pkgs.__src-lib-ppx_mina-tests__ =
         makefileTest "__src-lib-ppx_mina-tests__" super;
       pkgs.__src-lib-ppx_version-test__ =
@@ -321,9 +309,6 @@ let
         DISABLE_CHECK_OPAM_SWITCH = "true";
 
         MINA_VERSION_IMPLEMENTATION = "mina_version.runtime";
-
-        PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
-        PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
 
         configurePhase = ''
           export MINA_ROOT="$PWD"
