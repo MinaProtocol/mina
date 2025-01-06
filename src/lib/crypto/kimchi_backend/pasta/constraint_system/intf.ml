@@ -29,32 +29,28 @@ end
 module type Full = sig
   type fp
 
+  type field_var
+
   type gates
 
   module Constraint : sig
     type t =
-      ( fp Snarky_backendless.Cvar.t
+      ( field_var
       , fp )
       Kimchi_pasta_snarky_backend.Plonk_constraint_system.Plonk_constraint.basic
     [@@deriving sexp]
 
-    val boolean : fp Snarky_backendless.Cvar.t -> t
+    val boolean : field_var -> t
 
-    val equal :
-      fp Snarky_backendless.Cvar.t -> fp Snarky_backendless.Cvar.t -> t
+    val equal : field_var -> field_var -> t
 
-    val r1cs :
-         fp Snarky_backendless.Cvar.t
-      -> fp Snarky_backendless.Cvar.t
-      -> fp Snarky_backendless.Cvar.t
-      -> t
+    val r1cs : field_var -> field_var -> field_var -> t
 
-    val square :
-      fp Snarky_backendless.Cvar.t -> fp Snarky_backendless.Cvar.t -> t
+    val square : field_var -> field_var -> t
 
-    val eval : t -> (fp Snarky_backendless.Cvar.t -> fp) -> bool
+    val eval : t -> (field_var -> fp) -> bool
 
-    val log_constraint : t -> (fp Snarky_backendless.Cvar.t -> fp) -> string
+    val log_constraint : t -> (field_var -> fp) -> string
   end
 
   type constraint_ = Constraint.t
