@@ -114,7 +114,6 @@ val verify :
   -> wrap_domain:
        [ `Known of Import.Domain.t
        | `Side_loaded of
-         Impl.field
          Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ]
   -> wrap_verification_key:
        Step_main_inputs.Inner_curve.t array

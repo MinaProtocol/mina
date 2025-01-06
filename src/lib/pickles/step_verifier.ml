@@ -484,9 +484,9 @@ struct
       ~(domain :
          [ `Known of Domain.t
          | `Side_loaded of
-           _ Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ]
-         ) ~srs ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi
-      ~sponge ~sponge_after_index
+           Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ] )
+      ~srs ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
+      ~sponge_after_index
       ~(public_input :
          [ `Field of Field.t | `Packed_bits of Field.t * int ] array )
       ~(sg_old : (_, Proofs_verified.n) Vector.t) ~advice

@@ -109,14 +109,17 @@ module Prefix_mask = struct
 end
 
 module One_hot = struct
-  module Checked = struct
-    type 'f t = ('f, Pickles_types.Nat.N3.n) One_hot_vector.t
+  open Kimchi_pasta_snarky_backend
 
-    let to_input (type f) (t : f t) =
+  module Checked = struct
+    type t = (Step_impl.field, Pickles_types.Nat.N3.n) One_hot_vector.t
+
+    let to_input (t : t) =
       Random_oracle_input.Chunked.packeds
         (Array.map
-           Pickles_types.(Vector.to_array (t :> (f boolean, Nat.N3.n) Vector.t))
-           ~f:(fun b -> ((b :> f Snarky_backendless.Cvar.t), 1)) )
+           Pickles_types.(
+             Vector.to_array (t :> (Step_impl.Boolean.var, Nat.N3.n) Vector.t))
+           ~f:(fun b -> ((b :> Step_impl.Field.t), 1)) )
   end
 
   let there : proofs_verified -> int = function N0 -> 0 | N1 -> 1 | N2 -> 2
@@ -143,13 +146,7 @@ module One_hot = struct
     in
     Random_oracle_input.Chunked.packeds (Array.map one_hot ~f:(fun b -> (b, 1)))
 
-  open Kimchi_pasta_snarky_backend
-
-  let typ : (_ Checked.t, proofs_verified) Step_impl.Typ.t =
+  let typ : (Checked.t, proofs_verified) Step_impl.Typ.t =
     let module M = One_hot_vector.Make (Step_impl) in
     Step_impl.Typ.transport (M.typ Pickles_types.Nat.N3.n) ~there ~back
-
-  let wrap_typ : (_ Checked.t, proofs_verified) Wrap_impl.Typ.t =
-    let module M = One_hot_vector.Make (Wrap_impl) in
-    Wrap_impl.Typ.transport (M.typ Pickles_types.Nat.N3.n) ~there ~back
 end

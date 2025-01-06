@@ -26,20 +26,17 @@ val of_int_exn : int -> t
 val to_int : t -> int
 
 module One_hot : sig
-  module Checked : sig
-    type 'f t = ('f, Pickles_types.Nat.N3.n) One_hot_vector.t
+  open Kimchi_pasta_snarky_backend
 
-    val to_input :
-      'f t -> 'f Snarky_backendless.Cvar.t Random_oracle_input.Chunked.t
+  module Checked : sig
+    type t = (Step_impl.field, Pickles_types.Nat.N3.n) One_hot_vector.t
+
+    val to_input : t -> Step_impl.Field.t Random_oracle_input.Chunked.t
   end
 
   val to_input : zero:'a -> one:'a -> t -> 'a Random_oracle_input.Chunked.t
 
-  open Kimchi_pasta_snarky_backend
-
-  val typ : (Step_impl.Field.Constant.t Checked.t, t) Step_impl.Typ.t
-
-  val wrap_typ : (Wrap_impl.Field.Constant.t Checked.t, t) Wrap_impl.Typ.t
+  val typ : (Checked.t, t) Step_impl.Typ.t
 end
 
 type 'f boolean = 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
