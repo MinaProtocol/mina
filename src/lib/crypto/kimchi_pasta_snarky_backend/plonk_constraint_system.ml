@@ -702,6 +702,15 @@ module Plonk_constraint = struct
 
     let eval (t : t) (eval_one : _ -> Fp.t) =
       match t with
+      | Boolean v ->
+          let x = eval_one v in
+          Fp.(equal x zero || equal x one)
+      | Equal (v1, v2) ->
+          Fp.equal (eval_one v1) (eval_one v2)
+      | R1CS (v1, v2, v3) ->
+          Fp.(equal (mul (eval_one v1) (eval_one v2)) (eval_one v3))
+      | Square (a, c) ->
+          Fp.equal (Fp.square (eval_one a)) (eval_one c)
       (* cl * vl + cr * vr + co * vo + m * vl*vr + c = 0 *)
       | Basic { l = cl, vl; r = cr, vr; o = co, vo; m; c } ->
           let vl = eval_one vl in
