@@ -14,10 +14,7 @@ module Pseudo : module type of Pseudo.Make (Impl)
 module Inner_curve : sig
   type t = Step_main_inputs.Inner_curve.t
 
-  val typ :
-    ( t
-    , Step_main_inputs.Inner_curve.Inputs.Constant.t )
-    Step_main_inputs.Inner_curve.Inputs.Impl.Typ.t
+  val typ : (t, Step_main_inputs.Inner_curve.Constant.t) Impl.Typ.t
 end
 
 module Other_field : sig
