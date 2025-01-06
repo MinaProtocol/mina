@@ -722,7 +722,22 @@ module Plonk_constraint = struct
               [ mul cl vl; mul cr vr; mul co vo; mul m (mul vl vr); c ]
           in
           equal zero res
-      | _ ->
+      | Poseidon _
+      | EC_add_complete _
+      | EC_scale _
+      | EC_endoscale _
+      | EC_endoscalar _
+      | Lookup _
+      | RangeCheck0 _
+      | RangeCheck1 _
+      | Xor _
+      | ForeignFieldAdd _
+      | ForeignFieldMul _
+      | Rot64 _
+      | AddFixedLookupTable _
+      | AddRuntimeTableCfg _
+      | Raw _ ->
+          (* Skip validation *)
           true
   end
 end
