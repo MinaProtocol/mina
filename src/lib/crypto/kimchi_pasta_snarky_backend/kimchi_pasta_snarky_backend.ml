@@ -35,6 +35,8 @@ module Vesta_based_plonk = struct
 
   let field_size = Field.size
 
+  module Cvar = Snarky_backendless.Cvar.Make (Field)
+
   module R1CS_constraint_system =
     Plonk_constraint_system.Make
       (Field)
@@ -72,6 +74,8 @@ module Pallas_based_plonk = struct
   end
 
   let field_size = Field.size
+
+  module Cvar = Snarky_backendless.Cvar.Make (Field)
 
   module R1CS_constraint_system =
     Plonk_constraint_system.Make
