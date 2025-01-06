@@ -1,8 +1,6 @@
 open Pickles_types
 
-type inner_curve_var =
-  Backend.Tick.Field.t Snarky_backendless.Cvar.t
-  * Backend.Tick.Field.t Snarky_backendless.Cvar.t
+type inner_curve_var = Impls.Step.Field.t * Impls.Step.Field.t
 
 module Basic : sig
   type ('var, 'value, 'n1, 'n2) t =

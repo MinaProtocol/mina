@@ -6,9 +6,7 @@ open Backend
 (* We maintain a global hash table which stores for each inductive proof system some
    data.
 *)
-type inner_curve_var =
-  Tick.Field.t Snarky_backendless.Cvar.t
-  * Tick.Field.t Snarky_backendless.Cvar.t
+type inner_curve_var = Impls.Step.Field.t * Impls.Step.Field.t
 
 module Basic = struct
   type ('var, 'value, 'n1, 'n2) t =
