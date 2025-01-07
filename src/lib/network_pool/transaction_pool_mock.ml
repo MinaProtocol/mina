@@ -27,49 +27,6 @@ let block_window_duration =
 let extra_keys =
   Array.init num_extra_keys ~f:(fun _ -> Signature_lib.Keypair.create ())
 
-let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
-
-let consensus_constants = precomputed_values.consensus_constants
-
-let constraint_constants = precomputed_values.constraint_constants
-
-let compile_config = precomputed_values.compile_config
-
-let proof_level = precomputed_values.proof_level
-
-let genesis_constants = precomputed_values.genesis_constants
-
-let minimum_fee =
-  Currency.Fee.to_nanomina_int genesis_constants.minimum_user_command_fee
-
-let logger = Logger.create ()
-
-let time_controller = Block_time.Controller.basic ~logger
-
-let `VK vk, `Prover prover = Transaction_snark.For_tests.create_trivial_snapp ()
-
-let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
-
-let dummy_state_view =
-  let state_body =
-    let consensus_constants =
-      Consensus.Constants.create ~constraint_constants
-        ~protocol_constants:genesis_constants.protocol
-    in
-    let compile_time_genesis =
-      (*not using Precomputed_values.for_unit_test because of dependency cycle*)
-      Mina_state.Genesis_protocol_state.t
-        ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
-        ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
-        ~constraint_constants ~consensus_constants
-        ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
-    in
-    compile_time_genesis.data |> Mina_state.Protocol_state.body
-  in
-  { (Mina_state.Protocol_state.Body.view state_body) with
-    global_slot_since_genesis = Mina_numbers.Global_slot_since_genesis.zero
-  }
-
 module Mock_transition_frontier = struct
   module Breadcrumb = struct
     type t = Mock_staged_ledger.t
@@ -85,7 +42,8 @@ module Mock_transition_frontier = struct
 
   type t = best_tip_diff Broadcast_pipe.Reader.t * Breadcrumb.t ref
 
-  let create ?permissions : unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
+  let create ~vk ?permissions :
+      unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
    fun () ->
     let zkappify_account (account : Account.t) : Account.t =
       let zkapp =
@@ -132,15 +90,50 @@ end
 module Test =
   Make0 (Mock_base_ledger) (Mock_staged_ledger) (Mock_transition_frontier)
 
-type test =
+type t =
   { txn_pool : Test.Resource_pool.t
   ; best_tip_diff_w :
       Mock_transition_frontier.best_tip_diff Broadcast_pipe.Writer.t
-  ; best_tip_ref : Mina_ledger.Ledger.t ref
+  ; best_tip_ref : Mock_staged_ledger.t ref
   ; frontier_pipe_w : Mock_transition_frontier.t option Broadcast_pipe.Writer.t
+  ; verifier : Verifier.t
+  ; prover :
+         ?handler:
+           (   Snarky_backendless.Request.request
+            -> Snarky_backendless.Request.response )
+      -> Zkapp_statement.t
+      -> ( unit
+         * unit
+         * (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t )
+         Deferred.t
+  ; genesis_constants : Genesis_constants.t
+  ; consensus_constants : Consensus.Constants.t
+  ; constraint_constants : Genesis_constants.Constraint_constants.t
+  ; compile_config : Mina_compile_config.t
+  ; zkapp_vk : Verification_key_wire.t
   }
 
 let pool_max_size = 25
+
+let dummy_state_view t =
+  let state_body =
+    let consensus_constants =
+      Consensus.Constants.create ~constraint_constants:t.constraint_constants
+        ~protocol_constants:t.genesis_constants.protocol
+    in
+    let compile_time_genesis =
+      (*not using Precomputed_values.for_unit_test because of dependency cycle*)
+      Mina_state.Genesis_protocol_state.t
+        ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+        ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+        ~constraint_constants:t.constraint_constants ~consensus_constants
+        ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
+    in
+    compile_time_genesis.data |> Mina_state.Protocol_state.body
+  in
+  { (Mina_state.Protocol_state.Body.view state_body) with
+    global_slot_since_genesis = Mina_numbers.Global_slot_since_genesis.zero
+  }
 
 let apply_initial_ledger_state t init_ledger_state =
   let new_ledger =
@@ -185,7 +178,7 @@ let assert_user_command_sets_equal cs1 cs2 =
       report_additional additional2 "expected" "actual" ) ;
   [%test_eq: Transaction_hash.Set.t] set1 set2
 
-let replace_valid_zkapp_command_authorizations ~keymap ~ledger valid_cmds :
+let replace_valid_zkapp_command_authorizations t ~keymap ~ledger valid_cmds :
     User_command.Valid.t list Deferred.t =
   let open Deferred.Let_syntax in
   let%map zkapp_commands_fixed =
@@ -194,7 +187,8 @@ let replace_valid_zkapp_command_authorizations ~keymap ~ledger valid_cmds :
       ~f:(function
         | Zkapp_command zkapp_command_dummy_auths ->
             let%map cmd =
-              Zkapp_command_builder.replace_authorizations ~keymap ~prover
+              Zkapp_command_builder.replace_authorizations ~keymap
+                ~prover:t.prover
                 (Zkapp_command.Valid.forget zkapp_command_dummy_auths)
             in
             User_command.Zkapp_command cmd
@@ -220,10 +214,10 @@ let replace_valid_zkapp_command_authorizations ~keymap ~ledger valid_cmds :
       Error.raise @@ Error.tag ~tag:"Could not create Zkapp_command.Valid.t" err
 
 (** Assert the invariants of the locally generated command tracking system. *)
-let assert_locally_generated (pool : Test.Resource_pool.t) =
+let assert_locally_generated t =
   ignore
-    ( Hashtbl.merge pool.locally_generated_committed
-        pool.locally_generated_uncommitted ~f:(fun ~key -> function
+    ( Hashtbl.merge t.txn_pool.locally_generated_committed
+        t.txn_pool.locally_generated_uncommitted ~f:(fun ~key -> function
         | `Both ((committed, _), (uncommitted, _)) ->
             failwithf
               !"Command \
@@ -239,15 +233,15 @@ let assert_locally_generated (pool : Test.Resource_pool.t) =
             (* Locally generated uncommitted transactions should be in the
                pool, so long as we're not in the middle of updating it. *)
             assert (
-              Indexed_pool.member pool.pool
+              Indexed_pool.member t.txn_pool.pool
                 (Transaction_hash.User_command.of_checked key) ) ;
             Some cmd )
       : ( Transaction_hash.User_command_with_valid_signature.t
         , Time.t * [ `Batch of int ] )
         Hashtbl.t )
 
-let assert_fee_wu_ordering (pool : Test.Resource_pool.t) =
-  let txns = Test.Resource_pool.transactions pool |> Sequence.to_list in
+let assert_fee_wu_ordering t =
+  let txns = Test.Resource_pool.transactions t.txn_pool |> Sequence.to_list in
   let compare txn1 txn2 =
     let open Transaction_hash.User_command_with_valid_signature in
     let cmd1 = command txn1 in
@@ -268,23 +262,25 @@ let assert_fee_wu_ordering (pool : Test.Resource_pool.t) =
   in
   assert (List.is_sorted txns ~compare)
 
-let assert_pool_txs test txs =
-  Indexed_pool.For_tests.assert_pool_consistency test.txn_pool.pool ;
-  assert_locally_generated test.txn_pool ;
-  assert_fee_wu_ordering test.txn_pool ;
+let assert_pool_txs t txs =
+  Indexed_pool.For_tests.assert_pool_consistency t.txn_pool.pool ;
+  assert_locally_generated t ;
+  assert_fee_wu_ordering t ;
   assert_user_command_sets_equal
     ( Sequence.to_list
     @@ Sequence.map ~f:Transaction_hash.User_command.of_checked
-    @@ Test.Resource_pool.transactions test.txn_pool )
+    @@ Test.Resource_pool.transactions t.txn_pool )
     (List.map
        ~f:
          (Fn.compose Transaction_hash.User_command.create
             User_command.forget_check )
        txs )
 
-let setup_test ~verifier ?permissions ?slot_tx_end () =
+let create ~verifier ~prover ~genesis_constants ~compile_config ~time_controller
+    ~consensus_constants ~constraint_constants ~vk ?permissions ?slot_tx_end ()
+    =
   let frontier, best_tip_diff_w =
-    Mock_transition_frontier.create ?permissions ()
+    Mock_transition_frontier.create ~vk ?permissions ()
   in
   let _, best_tip_ref = frontier in
   let frontier_pipe_r, frontier_pipe_w =
@@ -303,7 +299,18 @@ let setup_test ~verifier ?permissions ?slot_tx_end () =
   in
   let txn_pool = Test.resource_pool pool_ in
   let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
-  { txn_pool; best_tip_diff_w; best_tip_ref; frontier_pipe_w }
+  { txn_pool
+  ; best_tip_diff_w
+  ; best_tip_ref
+  ; frontier_pipe_w
+  ; verifier
+  ; prover
+  ; genesis_constants
+  ; consensus_constants
+  ; constraint_constants
+  ; compile_config
+  ; zkapp_vk = vk
+  }
 
 let independent_cmds : User_command.Valid.t list =
   let rec go n cmds =
@@ -322,8 +329,8 @@ let independent_cmds : User_command.Valid.t list =
   in
   Quickcheck.random_value ~seed:(`Deterministic "constant") (go 0 [])
 
-let mk_zkapp_user_cmd (pool : Test.Resource_pool.t) zkapp_command =
-  let best_tip_ledger = Option.value_exn pool.best_tip_ledger in
+let mk_zkapp_user_cmd t zkapp_command =
+  let best_tip_ledger = Option.value_exn t.txn_pool.best_tip_ledger in
   let keymap =
     Array.fold (Array.append test_keys extra_keys)
       ~init:Public_key.Compressed.Map.empty
@@ -343,7 +350,7 @@ let mk_zkapp_user_cmd (pool : Test.Resource_pool.t) zkapp_command =
   in
   let zkapp_command = User_command.Zkapp_command zkapp_command in
   let%bind zkapp_command =
-    replace_valid_zkapp_command_authorizations ~keymap ~ledger:best_tip_ledger
+    replace_valid_zkapp_command_authorizations t ~keymap ~ledger:best_tip_ledger
       [ zkapp_command ]
   in
   let zkapp_command = List.hd_exn zkapp_command in
@@ -400,7 +407,7 @@ let mk_payment' ?valid_until ~sender_idx ~receiver_idx ~fee ~nonce ~amount () =
             ; amount = Currency.Amount.of_nanomina_int_exn amount
             } ) )
 
-let mk_single_account_update ~chain ~fee_payer_idx ~zkapp_account_idx ~fee
+let mk_single_account_update t ~chain ~fee_payer_idx ~zkapp_account_idx ~fee
     ~nonce ~ledger =
   let fee = Currency.Fee.of_nanomina_int_exn fee in
   let fee_payer_kp = test_keys.(fee_payer_idx) in
@@ -419,7 +426,7 @@ let mk_single_account_update ~chain ~fee_payer_idx ~zkapp_account_idx ~fee
   in
   let%map zkapp_command =
     Transaction_snark.For_tests.single_account_update ~chain spec
-      ~constraint_constants
+      ~constraint_constants:t.constraint_constants
   in
   Or_error.ok_exn
     (Zkapp_command.Verifiable.create ~failed:false
@@ -429,8 +436,8 @@ let mk_single_account_update ~chain ~fee_payer_idx ~zkapp_account_idx ~fee
             ~location_of_account:(Mina_ledger.Ledger.location_of_account ledger) )
        zkapp_command )
 
-let mk_transfer_zkapp_command ?valid_period ?fee_payer_idx ~sender_idx
-    ~receiver_idx ~fee ~nonce ~amount () =
+let mk_transfer_zkapp_command ~constraint_constants ?valid_period ?fee_payer_idx
+    ~sender_idx ~receiver_idx ~fee ~nonce ~amount () =
   let sender_kp = test_keys.(sender_idx) in
   let sender_nonce = Account.Nonce.of_int nonce in
   let sender = (sender_kp, sender_nonce) in
@@ -501,10 +508,10 @@ let mk_payment ?valid_until ~sender_idx ~receiver_idx ~fee ~nonce ~amount () =
   User_command.Signed_command
     (mk_payment' ?valid_until ~sender_idx ~fee ~nonce ~receiver_idx ~amount ())
 
-let mk_zkapp_commands_single_block num_cmds (pool : Test.Resource_pool.t) :
+let mk_zkapp_commands_single_block num_cmds t :
     User_command.Valid.t list Deferred.t =
   assert (num_cmds < Array.length test_keys - 1) ;
-  let best_tip_ledger = Option.value_exn pool.best_tip_ledger in
+  let best_tip_ledger = Option.value_exn t.txn_pool.best_tip_ledger in
   let keymap =
     Array.fold (Array.append test_keys extra_keys)
       ~init:Public_key.Compressed.Map.empty
@@ -538,9 +545,9 @@ let mk_zkapp_commands_single_block num_cmds (pool : Test.Resource_pool.t) :
         let fee_payer_keypair = test_keys.(n) in
         let%map (zkapp_command : Zkapp_command.t) =
           Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-            ~constraint_constants ~max_token_updates:1 ~keymap
-            ~account_state_tbl ~fee_payer_keypair ~ledger:best_tip_ledger
-            ~genesis_constants ()
+            ~constraint_constants:t.constraint_constants ~max_token_updates:1
+            ~keymap ~account_state_tbl ~fee_payer_keypair
+            ~ledger:best_tip_ledger ~genesis_constants:t.genesis_constants ()
         in
         let zkapp_command =
           { zkapp_command with
@@ -566,7 +573,7 @@ let mk_zkapp_commands_single_block num_cmds (pool : Test.Resource_pool.t) :
           }
         in
         let zkapp_command_valid_vk_hashes =
-          Zkapp_command.For_tests.replace_vks zkapp_command vk
+          Zkapp_command.For_tests.replace_vks zkapp_command t.zkapp_vk
         in
         let valid_zkapp_command =
           Or_error.ok_exn
@@ -585,7 +592,7 @@ let mk_zkapp_commands_single_block num_cmds (pool : Test.Resource_pool.t) :
   let valid_zkapp_commands =
     Quickcheck.random_value ~seed:(`Deterministic "zkapp_command") (go 0 [])
   in
-  replace_valid_zkapp_command_authorizations ~keymap ~ledger:best_tip_ledger
+  replace_valid_zkapp_command_authorizations t ~keymap ~ledger:best_tip_ledger
     valid_zkapp_commands
 
 type pool_apply = (User_command.t list, [ `Other of Error.t ]) Result.t
@@ -665,8 +672,9 @@ let _user_command_to_base64 c =
   | User_command.Zkapp_command p ->
       Zkapp_command.to_base64 p
 
-let commit_commands test cs =
-  let ledger = Option.value_exn test.txn_pool.best_tip_ledger in
+let commit_commands t cs =
+  let state_view = dummy_state_view t in
+  let ledger = Option.value_exn t.txn_pool.best_tip_ledger in
   List.iter cs ~f:(fun c ->
       match User_command.forget_check c with
       | User_command.Signed_command c -> (
@@ -675,7 +683,8 @@ let commit_commands test cs =
           in
           let applied =
             Or_error.ok_exn
-            @@ Mina_ledger.Ledger.apply_user_command ~constraint_constants
+            @@ Mina_ledger.Ledger.apply_user_command
+                 ~constraint_constants:t.constraint_constants
                  ~txn_global_slot:Mina_numbers.Global_slot_since_genesis.zero
                  ledger valid
           in
@@ -688,8 +697,9 @@ let commit_commands test cs =
           let applied, _ =
             Or_error.ok_exn
             @@ Mina_ledger.Ledger.apply_zkapp_command_unchecked
-                 ~global_slot:dummy_state_view.global_slot_since_genesis
-                 ~constraint_constants ~state_view:dummy_state_view ledger p
+                 ~global_slot:state_view.global_slot_since_genesis
+                 ~constraint_constants:t.constraint_constants ~state_view ledger
+                 p
           in
           match With_status.status applied.command with
           | Failed failures ->
@@ -703,30 +713,24 @@ let commit_commands test cs =
           | Applied ->
               () ) )
 
-let commit_commands' test cs =
+let commit_commands' t cs =
   let open Mina_ledger in
-  let ledger = Option.value_exn test.txn_pool.best_tip_ledger in
-  test.best_tip_ref :=
+  let ledger = Option.value_exn t.txn_pool.best_tip_ledger in
+  t.best_tip_ref :=
     Ledger.Maskable.register_mask
       (Ledger.Any_ledger.cast (module Mina_ledger.Ledger) ledger)
       (Ledger.Mask.create ~depth:(Ledger.depth ledger) ()) ;
-  let%map () = reorg test [] [] in
+  let%map () = reorg t [] [] in
+  assert (not (phys_equal (Option.value_exn t.txn_pool.best_tip_ledger) ledger)) ;
   assert (
-    not (phys_equal (Option.value_exn test.txn_pool.best_tip_ledger) ledger) ) ;
+    phys_equal (Option.value_exn t.txn_pool.best_tip_ledger) !(t.best_tip_ref) ) ;
+  commit_commands t cs ;
+  assert (not (phys_equal (Option.value_exn t.txn_pool.best_tip_ledger) ledger)) ;
   assert (
-    phys_equal
-      (Option.value_exn test.txn_pool.best_tip_ledger)
-      !(test.best_tip_ref) ) ;
-  commit_commands test cs ;
-  assert (
-    not (phys_equal (Option.value_exn test.txn_pool.best_tip_ledger) ledger) ) ;
-  assert (
-    phys_equal
-      (Option.value_exn test.txn_pool.best_tip_ledger)
-      !(test.best_tip_ref) ) ;
+    phys_equal (Option.value_exn t.txn_pool.best_tip_ledger) !(t.best_tip_ref) ) ;
   ledger
 
-let advance_chain test cs = commit_commands test cs ; reorg test cs []
+let advance_chain t cs = commit_commands t cs ; reorg t cs []
 
 (* TODO: remove this (all of these test should be expressed by committing txns to the ledger, not mutating accounts *)
 let modify_ledger ledger ~idx ~balance ~nonce =

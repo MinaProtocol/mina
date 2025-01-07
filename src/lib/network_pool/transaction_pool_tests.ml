@@ -4,17 +4,46 @@ open Mina_base
 open Mina_transaction
 open Pipe_lib
 open Network_peer
-open Test_utils
+open Transaction_pool_mock
 open Signature_lib
 
 let%test_module "transaction pool" =
   ( module struct
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let consensus_constants = precomputed_values.consensus_constants
+
+    let constraint_constants = precomputed_values.constraint_constants
+
+    let compile_config = precomputed_values.compile_config
+
+    let proof_level = precomputed_values.proof_level
+
+    let genesis_constants = precomputed_values.genesis_constants
+
+    let minimum_fee =
+      Currency.Fee.to_nanomina_int genesis_constants.minimum_user_command_fee
+
+    let logger = Logger.create ()
+
+    let time_controller = Block_time.Controller.basic ~logger
+
+    let `VK vk, `Prover prover =
+      Transaction_snark.For_tests.create_trivial_snapp ()
+
+    let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.For_tests.default ~logger ~proof_level ~conf_dir:None
             ~constraint_constants
             ~pids:(Child_processes.Termination.create_pid_table ())
             ~commit_id:"not specified for unit tests" () )
+
+    let setup_test ~verifier ?permissions ?slot_tx_end () =
+      Transaction_pool_mock.create ~verifier ~prover ~vk ~genesis_constants
+        ~compile_config ~constraint_constants ~time_controller
+        ~consensus_constants ?permissions ?slot_tx_end ()
 
     let%test_unit "transactions are removed in linear case (user cmds)" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -24,8 +53,7 @@ let%test_module "transaction pool" =
     let%test_unit "transactions are removed in linear case (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test ~verifier () in
-          mk_zkapp_commands_single_block 7 test.txn_pool
-          >>= mk_linear_case_test test )
+          mk_zkapp_commands_single_block 7 test >>= mk_linear_case_test test )
 
     let mk_remove_and_add_test t cmds =
       assert_pool_txs t [] ;
@@ -46,8 +74,7 @@ let%test_module "transaction pool" =
                    (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test ~verifier () in
-          mk_zkapp_commands_single_block 7 test.txn_pool
-          >>= mk_remove_and_add_test test )
+          mk_zkapp_commands_single_block 7 test >>= mk_remove_and_add_test test )
 
     let mk_invalid_test t cmds =
       assert_pool_txs t [] ;
@@ -66,8 +93,7 @@ let%test_module "transaction pool" =
     let%test_unit "invalid transactions are not accepted (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test ~verifier () in
-          mk_zkapp_commands_single_block 7 test.txn_pool
-          >>= mk_invalid_test test )
+          mk_zkapp_commands_single_block 7 test >>= mk_invalid_test test )
 
     let current_global_slot () =
       let current_time = Block_time.now time_controller in
@@ -104,11 +130,11 @@ let%test_module "transaction pool" =
                    changes (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test ~verifier () in
-          mk_zkapp_commands_single_block 7 test.txn_pool
+          mk_zkapp_commands_single_block 7 test
           >>= mk_now_invalid_test test
                 ~mk_command:
-                  (mk_transfer_zkapp_command ?valid_period:None
-                     ?fee_payer_idx:None ) )
+                  (mk_transfer_zkapp_command ~constraint_constants
+                     ?valid_period:None ?fee_payer_idx:None ) )
 
     let mk_expired_not_accepted_test t ~padding cmds =
       assert_pool_txs t [] ;
@@ -161,7 +187,7 @@ let%test_module "transaction pool" =
     let%test_unit "expired transactions are not accepted (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test ~verifier () in
-          mk_zkapp_commands_single_block 7 test.txn_pool
+          mk_zkapp_commands_single_block 7 test
           >>= mk_expired_not_accepted_test test ~padding:55 )
 
     let%test_unit "Expired transactions that are already in the pool are \
@@ -263,13 +289,13 @@ let%test_module "transaction pool" =
             List.take independent_cmds (List.length independent_cmds / 2)
           in
           let expires_later1 =
-            mk_transfer_zkapp_command
+            mk_transfer_zkapp_command ~constraint_constants
               ~valid_period:{ lower = curr_slot; upper = curr_slot_plus_three }
               ~fee_payer_idx:(0, 1) ~sender_idx:1 ~receiver_idx:9
               ~fee:minimum_fee ~amount:10_000_000_000 ~nonce:1 ()
           in
           let expires_later2 =
-            mk_transfer_zkapp_command
+            mk_transfer_zkapp_command ~constraint_constants
               ~valid_period:{ lower = curr_slot; upper = curr_slot_plus_seven }
               ~fee_payer_idx:(2, 1) ~sender_idx:3 ~receiver_idx:9
               ~fee:minimum_fee ~amount:10_000_000_000 ~nonce:1 ()
@@ -308,7 +334,7 @@ let%test_module "transaction pool" =
           let%bind _ = Broadcast_pipe.Writer.write t.frontier_pipe_w None in
           (* Set up second frontier *)
           let ((_, ledger_ref2) as frontier2), _best_tip_diff_w2 =
-            Mock_transition_frontier.create ()
+            Mock_transition_frontier.create ~vk ()
           in
           modify_ledger !ledger_ref2 ~idx:0 ~balance:20_000_000_000_000 ~nonce:5 ;
           modify_ledger !ledger_ref2 ~idx:1 ~balance:0 ~nonce:0 ;
@@ -531,8 +557,7 @@ let%test_module "transaction pool" =
     let%test_unit "rebroadcastable transaction behavior (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test ~verifier () in
-          mk_zkapp_commands_single_block 7 test.txn_pool
-          >>= mk_rebroadcastable_test test )
+          mk_zkapp_commands_single_block 7 test >>= mk_rebroadcastable_test test )
 
     let%test_unit "apply user cmds and zkapps" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -545,7 +570,7 @@ let%test_module "transaction pool" =
           *)
           let take_len = num_cmds / 2 in
           let%bind snapp_cmds =
-            let%map cmds = mk_zkapp_commands_single_block 7 t.txn_pool in
+            let%map cmds = mk_zkapp_commands_single_block 7 t in
             List.take cmds take_len
           in
           let user_cmds = List.drop independent_cmds take_len in
@@ -563,11 +588,11 @@ let%test_module "transaction pool" =
           let fee_payer_kp = test_keys.(0) in
           let%bind valid_command1 =
             mk_basic_zkapp ~fee:10_000_000_000 0 fee_payer_kp
-            |> mk_zkapp_user_cmd t.txn_pool
+            |> mk_zkapp_user_cmd t
           in
           let%bind valid_command2 =
             mk_basic_zkapp ~fee:20_000_000_000 ~empty_update:true 0 fee_payer_kp
-            |> mk_zkapp_user_cmd t.txn_pool
+            |> mk_zkapp_user_cmd t
           in
           let%bind () =
             add_commands t ([ valid_command1 ] @ [ valid_command2 ])
@@ -581,8 +606,7 @@ let%test_module "transaction pool" =
         let%bind t = setup_test ~verifier () in
         assert_pool_txs t [] ;
         let%bind set_permissions_command =
-          mk_basic_zkapp 0 test_keys.(0) ~permissions
-          |> mk_zkapp_user_cmd t.txn_pool
+          mk_basic_zkapp 0 test_keys.(0) ~permissions |> mk_zkapp_user_cmd t
         in
         let%bind () = add_commands' t [ set_permissions_command ] in
         let%bind () = advance_chain t [ set_permissions_command ] in
@@ -694,8 +718,9 @@ let%test_module "transaction pool" =
           in
           let%bind () =
             let send_command =
-              mk_transfer_zkapp_command ~fee_payer_idx:(0, 1) ~sender_idx:0
-                ~fee:minimum_fee ~nonce:2 ~receiver_idx:1 ~amount:1_000_000 ()
+              mk_transfer_zkapp_command ~constraint_constants
+                ~fee_payer_idx:(0, 1) ~sender_idx:0 ~fee:minimum_fee ~nonce:2
+                ~receiver_idx:1 ~amount:1_000_000 ()
             in
             run_test_cases send_command
           in
@@ -717,7 +742,7 @@ let%test_module "transaction pool" =
               ()
           in
           let%bind zkapp_command =
-            mk_single_account_update
+            mk_single_account_update test
               ~chain:Mina_signature_kind.(Other_network "invalid")
               ~fee_payer_idx:0 ~fee:minimum_fee ~nonce:0 ~zkapp_account_idx:1
               ~ledger:(Option.value_exn test.txn_pool.best_tip_ledger)
@@ -787,6 +812,5 @@ let%test_module "transaction pool" =
     let%test_unit "transactions are removed in linear case (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test ~verifier () in
-          mk_zkapp_commands_single_block 7 test.txn_pool
-          >>= mk_linear_case_test test )
+          mk_zkapp_commands_single_block 7 test >>= mk_linear_case_test test )
   end )
