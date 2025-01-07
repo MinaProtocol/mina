@@ -27,6 +27,7 @@ struct
   open Impl
   module Challenge = Challenge.Make (Impl)
   module Digest = Digest.Make (Impl)
+  module Utils = Util.Make (Impl)
 
   (* Other_field.size > Field.size *)
   module Other_field = struct
@@ -81,7 +82,7 @@ struct
 
   let lowest_128_bits ~constrain_low_bits x =
     let assert_128_bits = assert_n_bits ~n:128 in
-    Util.lowest_128_bits ~constrain_low_bits ~assert_128_bits (module Impl) x
+    Utils.lowest_128_bits ~constrain_low_bits ~assert_128_bits x
 
   module Scalar_challenge =
     SC.Make (Impl) (Inner_curve) (Challenge) (Endo.Step_inner_curve)
@@ -399,7 +400,7 @@ struct
                     Field.((b :> t) * x, (b :> t) * y) ) )
             |> Vector.reduce_exn
                  ~f:(Vector.map2 ~f:(Double.map2 ~f:Field.( + )))
-            |> Vector.map ~f:(Double.map ~f:(Util.seal (module Impl)))
+            |> Vector.map ~f:(Double.map ~f:Utils.seal)
     in
     let lagrange i =
       select_curve_points ~points_for_domain:(fun d ->
@@ -671,7 +672,7 @@ struct
     fun ~(log2_size : Field.t) ->
       let domain ~max =
         let (T max_n) = Nat.of_int max in
-        let mask = ones_vector (module Impl) max_n ~first_zero:log2_size in
+        let mask = Utils.ones_vector max_n ~first_zero:log2_size in
         let log2_sizes =
           ( O.of_index log2_size ~length:(S max_n)
           , Vector.init (S max_n) ~f:Fn.id )

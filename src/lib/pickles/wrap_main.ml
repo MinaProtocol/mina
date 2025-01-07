@@ -176,8 +176,7 @@ let wrap_main
             Wrap_verifier.One_hot_vector.of_index which_branch' ~length:branches
           in
           let actual_proofs_verified_mask =
-            Util.ones_vector
-              (module Impl)
+            Util.Wrap.ones_vector
               ~first_zero:
                 (Wrap_verifier.Pseudo.choose
                    (which_branch, step_widths)

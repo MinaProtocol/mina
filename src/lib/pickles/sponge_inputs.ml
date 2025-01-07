@@ -13,6 +13,7 @@ module Make
     end) =
 struct
   include Make_sponge.Rounds
+  module Utils = Util.Make (Impl)
 
   let round_table start =
     let ({ round_constants; mds } : _ Sponge.Params.t) = B.params in
@@ -49,8 +50,7 @@ struct
         with_label __LOC__ (fun () -> Impl.assert_ (Poseidon { state = t }))) ;
         t.(Int.(Array.length t - 1)) )
 
-  let add_assign ~state i x =
-    state.(i) <- Util.seal (module Impl) Field.(state.(i) + x)
+  let add_assign ~state i x = state.(i) <- Utils.seal Field.(state.(i) + x)
 
   let copy = Array.copy
 end

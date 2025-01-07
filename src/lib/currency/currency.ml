@@ -207,7 +207,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%bind actual = image_from_bits_unsafe t in
       with_label "range_check" (fun () -> Field.Checked.Assert.equal actual t)
 
-    let seal x = make_checked (fun () -> Pickles.Util.seal (module Run) x)
+    let seal x = make_checked (fun () -> Pickles.Util.Step.seal x)
 
     let modulus_as_field =
       lazy (Fn.apply_n_times ~n:length_in_bits Field.(mul (of_int 2)) Field.one)
