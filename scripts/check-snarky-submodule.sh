@@ -19,8 +19,7 @@ function in_branch {
   fi
 }
 
-if (! in_branch "coda") && (! in_branch "compatible") && (! in_branch "rampup"); then
-  echo "Snarky submodule commit is an ancestor of neither snarky/coda or snarky/compatible or snarky/rampup"
+if (! in_branch "master"); then
   exit 1
 fi
 
