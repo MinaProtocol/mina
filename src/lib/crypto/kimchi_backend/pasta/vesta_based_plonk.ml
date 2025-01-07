@@ -176,3 +176,5 @@ module Oracles = Plonk_dlog_oracles.Make (struct
     let create_with_public_evals = with_lagrange create_with_public_evals
   end
 end)
+
+module Run_state = Kimchi_pasta_snarky_backend.Vesta_based_plonk.Run_state

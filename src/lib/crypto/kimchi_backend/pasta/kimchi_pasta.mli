@@ -15,6 +15,7 @@ module Pallas_based_plonk : sig
   module Proof = Pallas_based_plonk.Proof
   module Proving_key = Pallas_based_plonk.Proving_key
   module Oracles = Pallas_based_plonk.Oracles
+  module Run_state = Pallas_based_plonk.Run_state
 end
 
 module Vesta_based_plonk : sig
@@ -32,6 +33,7 @@ module Vesta_based_plonk : sig
   module Proof = Vesta_based_plonk.Proof
   module Proving_key = Vesta_based_plonk.Proving_key
   module Oracles = Vesta_based_plonk.Oracles
+  module Run_state = Vesta_based_plonk.Run_state
 end
 
 module Pasta : sig
