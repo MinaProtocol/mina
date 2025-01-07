@@ -134,19 +134,16 @@ module Wrap : sig
          , Impl.Field.t Composition_types.Scalar_challenge.t
          , Impl.Field.t Pickles_types.Shifted_value.Type1.t
          , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
-           , Impl.Field.t
-             Snarky_backendless.Snark_intf.Boolean0.t )
+           , Impl.Field.t Snarky_backendless.Snark_intf.Boolean0.t )
            Pickles_types.Opt.t
          , ( Impl.Field.t Composition_types.Scalar_challenge.t
-           , Impl.Field.t
-             Snarky_backendless.Snark_intf.Boolean0.t )
+           , Impl.Field.t Snarky_backendless.Snark_intf.Boolean0.t )
            Pickles_types.Opt.t
          , Impl.Boolean.var
          , Impl.Field.t
          , Impl.Field.t
          , Impl.Field.t
-         , ( Impl.Field.t
-             Kimchi_backend_common.Scalar_challenge.t
+         , ( Impl.Field.t Kimchi_backend_common.Scalar_challenge.t
              Composition_types.Bulletproof_challenge.t
            , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
            Pickles_types.Vector.t
