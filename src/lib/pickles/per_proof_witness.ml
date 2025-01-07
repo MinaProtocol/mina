@@ -2,7 +2,7 @@ open Backend
 open Pickles_types
 open Import
 module Impl = Impls.Step
-module One_hot_vector = One_hot_vector.Make (Impl)
+module One_hot_vector = One_hot_vector.Step
 
 (* Let F, K be the two fields (either (Fp, Fq) or (Fq, Fp)).
    Each proof over F has an accumulator state which contains

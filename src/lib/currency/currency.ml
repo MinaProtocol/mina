@@ -936,9 +936,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         include
           Basic
             with type t := Stable.Latest.t
-             and type var =
-              Pickles.Impls.Step.Impl.Internal_Basic.field
-              Snarky_backendless.Cvar.t
+             and type var = Pickles.Impls.Step.Field.t
 
         include Arithmetic_intf with type t := t
 
@@ -1197,9 +1195,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         type magnitude = t [@@deriving sexp, compare]
 
         type var
-
-        (* TODO =
-           field Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t list *)
 
         val zero : t
 

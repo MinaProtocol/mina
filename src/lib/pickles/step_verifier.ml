@@ -365,7 +365,7 @@ struct
     | _ ->
         assert false
 
-  module O = One_hot_vector.Make (Impl)
+  module O = One_hot_vector.Step
   open Tuple_lib
 
   let public_input_commitment_dynamic (type n) ~srs (which : n O.t)
@@ -635,7 +635,7 @@ struct
 
   let challenge_polynomial = Wrap_verifier.challenge_polynomial (module Field)
 
-  module Pseudo = Pseudo.Make (Impl)
+  module Pseudo = Pseudo.Step
 
   (* module Bounded = struct
        type t = { max : int; actual : Field.t }

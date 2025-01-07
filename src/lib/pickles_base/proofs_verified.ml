@@ -121,7 +121,7 @@ module One_hot = struct
   open Kimchi_pasta_snarky_backend
 
   module Checked = struct
-    type t = (Step_impl.field, Pickles_types.Nat.N3.n) One_hot_vector.t
+    type t = Pickles_types.Nat.N3.n One_hot_vector.Step.t
 
     let to_input (t : t) =
       Random_oracle_input.Chunked.packeds

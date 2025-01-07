@@ -2,8 +2,7 @@
 
 open Pickles_types
 module Impl = Impls.Step
-
-module One_hot_vector : module type of One_hot_vector.Make (Impls.Step)
+module One_hot_vector = One_hot_vector.Step
 
 type challenge = Import.Challenge.Make(Impls.Step).t
 

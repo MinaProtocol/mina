@@ -31,7 +31,7 @@ module One_hot : sig
   open Kimchi_pasta_snarky_backend
 
   module Checked : sig
-    type t = (Step_impl.field, Nat.N3.n) One_hot_vector.t
+    type t = Pickles_types.Nat.N3.n One_hot_vector.Step.t
 
     val to_input : t -> Step_impl.Field.t Random_oracle_input.Chunked.t
   end

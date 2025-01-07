@@ -48,3 +48,6 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
         in
         i )
 end
+
+module Step = Make (Kimchi_pasta_snarky_backend.Step_impl)
+module Wrap = Make (Kimchi_pasta_snarky_backend.Wrap_impl)
