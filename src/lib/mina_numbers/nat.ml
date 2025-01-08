@@ -10,6 +10,10 @@ module Make_checked
 struct
   open Snark_params.Tick
 
+  let m =
+    (module Run : Kimchi_pasta_snarky_backend.Snark_intf
+      with type field = Run.field )
+
   type var = Field.Var.t
 
   let () = assert (Int.(N.length_in_bits < Field.size_in_bits))
@@ -33,7 +37,8 @@ struct
 
   let range_check' (t : var) =
     let _, _, actual_packed =
-      Pickles.Scalar_challenge.to_field_checked' ~num_bits:N.length_in_bits m
+      Pickles.Scalar_challenge.to_field_checked' ~num_bits:N.length_in_bits
+        (module Run)
         (Kimchi_backend_common.Scalar_challenge.create t)
     in
     actual_packed

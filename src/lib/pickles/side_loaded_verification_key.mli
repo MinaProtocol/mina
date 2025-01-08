@@ -61,9 +61,7 @@ module Checked : sig
   [@@deriving hlist, fields]
 
   val to_input :
-       t
-    -> Pasta_bindings.Fp.t Snarky_backendless.Cvar.t
-       Random_oracle_input.Chunked.t
+    t -> Step_main_inputs.Impl.Field.t Random_oracle_input.Chunked.t
 end
 
 module Vk : sig

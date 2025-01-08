@@ -35,25 +35,19 @@ let test () =
                 *)
                 let fresh_zero = fresh_zero () in
                 Impl.assert_
-                  { basic =
-                      Kimchi_backend_common.Plonk_constraint_system
-                      .Plonk_constraint
-                      .T
-                        (Raw
-                           { kind = Generic
-                           ; values =
-                               [| fresh_zero
-                                ; fresh_zero
-                                ; fresh_zero
-                                ; fresh_zero
-                                ; fresh_zero
-                                ; fresh_zero
-                                ; fresh_zero
-                               |]
-                           ; coeffs = [||]
-                           } )
-                  ; annotation = Some __LOC__
-                  } ;
+                  (Raw
+                     { kind = Generic
+                     ; values =
+                         [| fresh_zero
+                          ; fresh_zero
+                          ; fresh_zero
+                          ; fresh_zero
+                          ; fresh_zero
+                          ; fresh_zero
+                          ; fresh_zero
+                         |]
+                     ; coeffs = [||]
+                     } ) ;
                 { previous_proof_statements = []
                 ; public_output = ()
                 ; auxiliary_output = ()

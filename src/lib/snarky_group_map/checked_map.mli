@@ -2,7 +2,7 @@ open Core_kernel
 open Snarky_backendless
 
 val wrap :
-     'f Snark.m
+     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
   -> potential_xs:('input -> 'f Cvar.t * 'f Cvar.t * 'f Cvar.t)
   -> y_squared:(x:'f Cvar.t -> 'f Cvar.t)
   -> ('input -> 'f Cvar.t * 'f Cvar.t) Staged.t
