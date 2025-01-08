@@ -54,8 +54,7 @@ module Make : functor
 
   val num_bits : int
 
-  val seal :
-    Impl.Field.t -> Impl.Field.t
+  val seal : Impl.Field.t -> Impl.Field.t
 
   val endo :
        ?num_bits:int
