@@ -54,12 +54,11 @@ module Make : functor
 
   val num_bits : int
 
-  val seal :
-    Impl.field Snarky_backendless.Cvar.t -> Impl.field Snarky_backendless.Cvar.t
+  val seal : Impl.Field.t -> Impl.Field.t
 
   val endo :
        ?num_bits:int
-    -> Impl.field Snarky_backendless.Cvar.t Tuple_lib.Double.t
+    -> Impl.Field.t Tuple_lib.Double.t
     -> Impl.Field.t Import.Scalar_challenge.t
     -> G.t
 
