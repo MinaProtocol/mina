@@ -33,6 +33,8 @@ end
 module R1CS_constraint_system =
   Kimchi_pasta_constraint_system.Vesta_constraint_system
 
+module Constraint = R1CS_constraint_system.Constraint
+
 let lagrange srs domain_log2 : _ Kimchi_types.poly_comm array =
   let domain_size = Int.pow 2 domain_log2 in
   Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitments_whole_domain srs

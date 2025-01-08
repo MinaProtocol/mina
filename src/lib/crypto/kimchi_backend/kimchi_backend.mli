@@ -169,6 +169,7 @@ module Pasta : sig
     module R1CS_constraint_system =
       Kimchi_pasta.Pallas_based_plonk.R1CS_constraint_system
 
+    module Constraint = Kimchi_pasta.Pallas_based_plonk.Constraint
     module Rounds_vector = Kimchi_pasta.Pallas_based_plonk.Rounds_vector
     module Rounds = Kimchi_pasta.Pallas_based_plonk.Rounds
     module Keypair = Kimchi_pasta.Pallas_based_plonk.Keypair
@@ -199,6 +200,7 @@ module Pasta : sig
     module Verification_key = Kimchi_pasta.Vesta_based_plonk.Verification_key
     module R1CS_constraint_system =
       Kimchi_pasta.Vesta_based_plonk.R1CS_constraint_system
+    module Constraint = Kimchi_pasta.Vesta_based_plonk.Constraint
     module Rounds_vector = Kimchi_pasta.Vesta_based_plonk.Rounds_vector
     module Rounds = Kimchi_pasta.Vesta_based_plonk.Rounds
     module Keypair = Kimchi_pasta.Vesta_based_plonk.Keypair
