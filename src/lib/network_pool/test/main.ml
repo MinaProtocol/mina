@@ -42,4 +42,91 @@ let () =
                account's balance can't support them anymore"
               `Quick transaction_replacement_insufficient_balance
           ] )
+    ; Transaction_pool_tests.
+        ( "transaction pool"
+        , [ test_case "Transactions are removed in linear case (user cmds)"
+              `Quick transactions_are_removed_in_linear_case_zkapps
+          ; test_case "Transactions are removed in linear case (zkapps)" `Quick
+              transactions_are_removed_in_linear_case_zkapps
+          ; test_case
+              "Transactions are removed and added back in fork changes (user \
+               cmds)"
+              `Quick
+              transactions_are_removed_and_added_back_in_fork_changes_user_cmds
+          ; test_case
+              "Transactions are removed and added back in fork changes (zkapps)"
+              `Quick
+              transactions_are_removed_and_added_back_in_fork_changes_zkapps
+          ; test_case "Invalid transactions are not accepted (user cmds)" `Quick
+              invalid_transactions_are_not_accepted_user_cmds
+          ; test_case "Invalid transactions are not accepted (zkapps)" `Quick
+              invalid_transactions_are_not_accepted_zkapps
+          ; test_case
+              "Now-invalid transactions are removed from the pool on fork \
+               changes (user cmds)"
+              `Quick
+              now_invalid_transactions_are_removed_from_pool_on_fork_changes_user_cmds
+          ; test_case
+              "Now-invalid transactions are removed from the pool on fork \
+               changes (zkapps)"
+              `Quick
+              now_invalid_transactions_are_removed_from_pool_on_fork_changes_zkapps
+          ; test_case "Expired transactions are not accepted (user cmds)" `Quick
+              expired_transactions_are_not_accepted_user_cmds
+          ; test_case "Expired transactions are not accepted (zkapps)" `Quick
+              expired_transactions_are_not_accepted_zkapps
+          ; test_case
+              "Expired transactions that are already in the pool are removed \
+               from the pool when best tip changes (user commands)"
+              `Quick
+              expired_transactions_that_are_already_in_pool_are_removed_from_pool_on_best_tip_change_uc
+          ; test_case
+              "Expired transactions that are already in the pool are removed \
+               from the pool when best tip changes (zkapps)"
+              `Quick
+              expired_transactions_that_are_already_in_pool_are_removed_from_pool_on_best_tip_change_zkapp
+          ; test_case
+              "Now-invalid transactions are removed from the pool when the \
+               transition frontier is recreated (user cmds)"
+              `Quick
+              now_invalid_transactions_are_removed_from_the_pool_when_the_transition_frontier_is_recreated_uc
+          ; test_case "transaction replacement works" `Quick
+              transaction_replacement_works
+          ; test_case
+              "it drops queued transactions if a committed one makes there be \
+               insufficient funds"
+              `Quick
+              it_drops_queued_transactions_if_a_committed_one_makes_there_be_insufficient_funds
+          ; test_case "max size is maintained" `Quick max_size_is_maintained
+          ; test_case "rebroadcastable transaction behavior (user cmds)" `Quick
+              rebroadcastable_transaction_behavior_user_cmds
+          ; test_case "rebroadcastable transaction behavior (zkapps)" `Quick
+              rebroadcastable_transaction_behavior_zkapps
+          ; test_case "apply user cmds and zkapps" `Quick
+              apply_user_cmds_and_zkapps
+          ; test_case
+              "zkapp cmd with same nonce should replace previous submitted \
+               zkapp with same nonce"
+              `Quick
+              zkapp_cmd_with_same_nonce_should_replace_previous_submitted_zkapp_with_same_nonce
+          ; test_case
+              "commands are rejected if fee payer permissions are not handled"
+              `Quick
+              commands_are_rejected_if_fee_payer_permissions_are_not_handled
+          ; test_case
+              "account update with a different network id that uses proof \
+               authorization would be rejected"
+              `Quick
+              account_update_with_a_different_network_id_that_uses_proof_authorization_would_be_rejected
+          ; test_case "transactions added before slot_tx_end are accepted"
+              `Quick transactions_added_before_slot_tx_end_are_accepted
+          ; test_case "transactions added at slot_tx_end are rejected" `Quick
+              transactions_added_at_slot_tx_end_are_rejected
+          ; test_case "transactions added after slot_tx_end are rejected" `Quick
+              transactions_added_after_slot_tx_end_are_rejected
+          ; test_case "transactions are removed in linear case (user cmds)"
+              `Quick transactions_are_removed_in_linear_case_user_cmds
+          ; test_case "transactions are removed in linear case (zkapps)" `Quick
+              transactions_are_removed_in_linear_case_zkapps
+          ] )
     ]

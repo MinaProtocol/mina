@@ -5,7 +5,8 @@ open Mina_base
 open Mina_transaction
 open Pipe_lib
 open Network_peer
-open Transaction_pool
+open Network_pool
+open Network_pool.Transaction_pool
 module Mock_base_ledger = Mocks.Base_ledger
 module Mock_staged_ledger = Mocks.Staged_ledger
 
@@ -203,7 +204,8 @@ let replace_valid_zkapp_command_authorizations t ~keymap ~ledger valid_cmds :
              ~get_batch:(Mina_ledger.Ledger.get_batch ledger)
              ~location_of_account_batch:
                (Mina_ledger.Ledger.location_of_account_batch ledger)
-        |> Map.map ~f:(fun vk -> Zkapp_basic.F_map.Map.singleton vk.hash vk) )
+        |> Map.map ~f:(fun (vk : Verification_key_wire.t) ->
+               Zkapp_basic.F_map.Map.singleton vk.hash vk ) )
     |> Or_error.bind ~f:(fun xs ->
            List.map xs ~f:User_command.check_verifiable
            |> Or_error.combine_errors )
@@ -521,7 +523,7 @@ let mk_zkapp_commands_single_block num_cmds t :
   in
   let account_state_tbl =
     List.take (Array.to_list test_keys) num_cmds
-    |> List.map ~f:(fun kp ->
+    |> List.map ~f:(fun (kp : Keypair.t) ->
            let id =
              Account_id.create
                (Public_key.compress kp.public_key)

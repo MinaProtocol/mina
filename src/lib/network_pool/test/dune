@@ -39,11 +39,13 @@
   snark_params
   staged_ledger_diff
   mina_transaction
-  with_hash)
+  with_hash
+  )
  (preprocess
   (pps
    ppx_base
    ppx_let
+   ppx_mina
    ppx_custom_printf
    ppx_assert))
  (instrumentation
