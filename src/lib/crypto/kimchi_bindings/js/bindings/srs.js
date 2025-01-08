@@ -39,6 +39,16 @@ var caml_fp_srs_read = function (offset, path) {
   }
 };
 
+// Provides: caml_fp_srs_lagrange_commitments_whole_domain
+// Requires: tsSrs
+var caml_fp_srs_lagrange_commitments_whole_domain =
+  tsSrs.fp.lagrangeCommitmentsWholeDomain;
+
+// Provides: caml_fq_srs_lagrange_commitments_whole_domain
+// Requires: tsSrs
+var caml_fq_srs_lagrange_commitments_whole_domain =
+  tsSrs.fq.lagrangeCommitmentsWholeDomain;
+
 // Provides: caml_fp_srs_lagrange_commitment
 // Requires: tsSrs
 var caml_fp_srs_lagrange_commitment = tsSrs.fp.lagrangeCommitment;
