@@ -1166,8 +1166,8 @@ let check_and_stop_daemon t ~wait =
 
 let stop_long_running_daemon t =
   (*let wait_mins = (t.config.stop_time * 60) + (Random.int 10 * 60) in *)
-  let wait_sec = 10 in
-  let wait_mins = wait_sec in
+  let wait_sec = 10 in 
+  let wait_mins = wait_sec  in
   [%log' info t.config.logger]
     "Stopping daemon after $wait mins and when there are no blocks to be \
      produced"
@@ -1191,7 +1191,7 @@ let stop_long_running_daemon t =
         | `Check_in tm ->
             go tm )
   in
-  go (Time.Span.of_ms (wait_mins * 60 * 1000 |> Float.of_int))
+  go (Time.Span.of_ms (wait_mins |> Float.of_int))
 
 let offline_time
     { Genesis_constants.Constraint_constants.block_window_duration_ms; _ } =
