@@ -1131,7 +1131,7 @@ let perform_compaction compaction_interval t =
 
 let check_and_stop_daemon t ~wait =
   let uptime_mins =
-    Time_ns.(diff (now ()) daemon_start_time |> Span.to_min |> Int.of_float)
+    Time_ns.(diff (now ()) daemon_start_time |> Span.to_sec |> Int.of_float)
   in
   let max_catchup_time = Time.Span.of_hr 1. in
   if uptime_mins <= wait then
@@ -1165,14 +1165,16 @@ let check_and_stop_daemon t ~wait =
             `Check_in (Core.Time.Span.scale vrf_poll_interval 2.0) )
 
 let stop_long_running_daemon t =
-  let wait_mins = (t.config.stop_time * 60) + (Random.int 10 * 60) in
+  (*let wait_mins = (t.config.stop_time * 60) + (Random.int 10 * 60) in *)
+  let wait_sec = 10 in 
+  let wait_mins = wait_sec  in
   [%log' info t.config.logger]
     "Stopping daemon after $wait mins and when there are no blocks to be \
      produced"
     ~metadata:[ ("wait", `Int wait_mins) ] ;
   let stop_daemon () =
     let uptime_mins =
-      Time_ns.(diff (now ()) daemon_start_time |> Span.to_min |> Int.of_float)
+      Time_ns.(diff (now ()) daemon_start_time |> Span.to_sec |> Int.of_float)
     in
     [%log' info t.config.logger]
       "Deamon has been running for $uptime mins. Stopping now..."
@@ -1189,7 +1191,7 @@ let stop_long_running_daemon t =
         | `Check_in tm ->
             go tm )
   in
-  go (Time.Span.of_ms (wait_mins * 60 * 1000 |> Float.of_int))
+  go (Time.Span.of_ms (wait_mins |> Float.of_int))
 
 let offline_time
     { Genesis_constants.Constraint_constants.block_window_duration_ms; _ } =
