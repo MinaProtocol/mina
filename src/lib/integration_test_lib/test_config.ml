@@ -96,7 +96,14 @@ let proof_config_default : Runtime_config.Proof_keys.t =
   ; coinbase_amount = None
   ; supercharged_coinbase_factor = None
   ; account_creation_fee = None
-  ; fork = None
+  ; fork =
+      Some
+        { blockchain_length = 0
+        ; global_slot_since_genesis = 0
+        ; state_hash =
+            "3NKSvjaGSKiQuAt8BP1b1VCpLbJc9RcEFjYCaBYsJJFdrtd6tpaV"
+            (*any state hash would do*)
+        }
   }
 
 let log_filter_of_event_type ev_existential =
