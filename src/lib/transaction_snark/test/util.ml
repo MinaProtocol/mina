@@ -64,9 +64,7 @@ let pending_coinbase_state_stack ~state_body_hash ~global_slot =
       Pending_coinbase.Stack.push_state state_body_hash global_slot init_stack
   }
 
-let trivial_zkapp =
-  lazy
-    (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
+let trivial_zkapp = lazy (Transaction_snark.For_tests.create_trivial_snapp ())
 
 type pass_number = Pass_1 | Pass_2
 
@@ -347,7 +345,7 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
           Run.exists Zkapp_statement.typ ~compute:(fun () -> assert false)
         in
         let proof =
-          Run.exists (Typ.Internal.ref ()) ~compute:(fun () -> assert false)
+          Run.exists (Typ.prover_value ()) ~compute:(fun () -> assert false)
         in
         Impl.run_checked (Transaction_snark.dummy_constraints ()) ;
         (* Unsatisfiable. *)

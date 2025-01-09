@@ -4,8 +4,9 @@ module Domain = Plonk_checks.Domain
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
   open Impl
+  module One_hot_vector = One_hot_vector.Make (Impl)
 
-  type ('a, 'n) t = 'n One_hot_vector.T(Impl).t * ('a, 'n) Vector.t
+  type ('a, 'n) t = 'n One_hot_vector.t * ('a, 'n) Vector.t
 
   (* TODO: Use version in common. *)
   let seal (x : Impl.Field.t) : Impl.Field.t =
@@ -19,7 +20,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
         let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
         Field.Assert.equal x y ; y
 
-  let mask (type n) (bits : n One_hot_vector.T(Impl).t) xs =
+  let mask (type n) (bits : n One_hot_vector.t) xs =
     with_label __LOC__ (fun () ->
         Vector.map
           (Vector.zip (bits :> (Boolean.var, n) Vector.t) xs)
@@ -127,3 +128,6 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
       end
   end
 end
+
+module Step = Make (Kimchi_pasta_snarky_backend.Step_impl)
+module Wrap = Make (Kimchi_pasta_snarky_backend.Wrap_impl)

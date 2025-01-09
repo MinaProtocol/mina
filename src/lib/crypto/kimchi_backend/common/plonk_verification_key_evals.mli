@@ -14,7 +14,7 @@ module Stable : sig
       ; endomul_scalar_comm : 'comm
       }
 
-    include Sigs.Full.S1 with type 'a t := 'a t
+    include Plonkish_prelude.Sigs.Full.S1 with type 'a t := 'a t
   end
 
   module Latest = V2

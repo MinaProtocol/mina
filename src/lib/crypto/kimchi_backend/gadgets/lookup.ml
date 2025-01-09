@@ -12,19 +12,15 @@ let three_12bit (v0 : Circuit.Field.t) (v1 : Circuit.Field.t)
   let open Circuit in
   with_label "triple_lookup" (fun () ->
       assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Lookup
-                 { w0 = Field.one
-                 ; w1 = v0
-                 ; w2 = Field.zero
-                 ; w3 = v1
-                 ; w4 = Field.zero
-                 ; w5 = v2
-                 ; w6 = Field.zero
-                 } )
-        } ) ;
+        (Lookup
+           { w0 = Field.one
+           ; w1 = v0
+           ; w2 = Field.zero
+           ; w3 = v1
+           ; w4 = Field.zero
+           ; w5 = v2
+           ; w6 = Field.zero
+           } ) ) ;
   ()
 
 (* Check that one value is at most X bits (at most 12), default is 12.

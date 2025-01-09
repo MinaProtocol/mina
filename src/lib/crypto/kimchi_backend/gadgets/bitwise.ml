@@ -89,28 +89,24 @@ let rot_aux ?(check64 = false) (word : Circuit.Field.t) (bits : int)
   with_label "rot64_gate" (fun () ->
       (* Set up Rot64 gate *)
       assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Rot64
-                 { word
-                 ; rotated
-                 ; excess
-                 ; bound_limb0 = of_bits bound 52 64
-                 ; bound_limb1 = of_bits bound 40 52
-                 ; bound_limb2 = of_bits bound 28 40
-                 ; bound_limb3 = of_bits bound 16 28
-                 ; bound_crumb0 = of_bits bound 14 16
-                 ; bound_crumb1 = of_bits bound 12 14
-                 ; bound_crumb2 = of_bits bound 10 12
-                 ; bound_crumb3 = of_bits bound 8 10
-                 ; bound_crumb4 = of_bits bound 6 8
-                 ; bound_crumb5 = of_bits bound 4 6
-                 ; bound_crumb6 = of_bits bound 2 4
-                 ; bound_crumb7 = of_bits bound 0 2
-                 ; two_to_rot = Common.bignum_bigint_to_field big_2_pow_rot
-                 } )
-        } ) ;
+        (Rot64
+           { word
+           ; rotated
+           ; excess
+           ; bound_limb0 = of_bits bound 52 64
+           ; bound_limb1 = of_bits bound 40 52
+           ; bound_limb2 = of_bits bound 28 40
+           ; bound_limb3 = of_bits bound 16 28
+           ; bound_crumb0 = of_bits bound 14 16
+           ; bound_crumb1 = of_bits bound 12 14
+           ; bound_crumb2 = of_bits bound 10 12
+           ; bound_crumb3 = of_bits bound 8 10
+           ; bound_crumb4 = of_bits bound 6 8
+           ; bound_crumb5 = of_bits bound 4 6
+           ; bound_crumb6 = of_bits bound 2 4
+           ; bound_crumb7 = of_bits bound 0 2
+           ; two_to_rot = Common.bignum_bigint_to_field big_2_pow_rot
+           } ) ) ;
 
   (* Next row *)
   Range_check.bits64 shifted ;
@@ -211,15 +207,7 @@ let bxor ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
     if length = 0 then (
       with_label "xor_zero_check" (fun () ->
           assert_
-            { annotation = Some __LOC__
-            ; basic =
-                Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-                  (Raw
-                     { kind = Zero
-                     ; values = [| in1; in2; out |]
-                     ; coeffs = [||]
-                     } )
-            } ) ;
+            (Raw { kind = Zero; values = [| in1; in2; out |]; coeffs = [||] }) ) ;
       Field.Assert.equal Field.zero in1 ;
       Field.Assert.equal Field.zero in2 ;
       Field.Assert.equal Field.zero out ;
@@ -251,27 +239,23 @@ let bxor ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
       with_label "xor_gate" (fun () ->
           (* Set up Xor gate *)
           assert_
-            { annotation = Some __LOC__
-            ; basic =
-                Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-                  (Xor
-                     { in1
-                     ; in2
-                     ; out
-                     ; in1_0
-                     ; in1_1
-                     ; in1_2
-                     ; in1_3
-                     ; in2_0
-                     ; in2_1
-                     ; in2_2
-                     ; in2_3
-                     ; out_0
-                     ; out_1
-                     ; out_2
-                     ; out_3
-                     } )
-            } ) ;
+            (Xor
+               { in1
+               ; in2
+               ; out
+               ; in1_0
+               ; in1_1
+               ; in1_2
+               ; in1_3
+               ; in2_0
+               ; in2_1
+               ; in2_2
+               ; in2_3
+               ; out_0
+               ; out_1
+               ; out_2
+               ; out_3
+               } ) ) ;
 
       let next_in1 = as_prover_next_var in1 in1_0 in1_1 in1_2 in1_3 len_xor in
       let next_in2 = as_prover_next_var in2 in2_0 in2_1 in2_2 in2_3 len_xor in
@@ -405,17 +389,13 @@ let band ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
   (* Constrain AND as 2 * and = sum - xor *)
   with_label "and_equation" (fun () ->
       assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Basic
-                 { l = (Field.Constant.one, sum)
-                 ; r = (neg_one, xor_output)
-                 ; o = (neg_two, and_output)
-                 ; m = Field.Constant.zero
-                 ; c = Field.Constant.zero
-                 } )
-        } ) ;
+        (Basic
+           { l = (Field.Constant.one, sum)
+           ; r = (neg_one, xor_output)
+           ; o = (neg_two, and_output)
+           ; m = Field.Constant.zero
+           ; c = Field.Constant.zero
+           } ) ) ;
 
   and_output
 

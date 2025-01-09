@@ -55,6 +55,7 @@
    pickles.pseudo
    pickles.limb_vector
    pickles_base
+   plonkish_prelude
    kimchi_backend
    base58_check
    codable

@@ -150,7 +150,7 @@ module Make (W : Pickles_types.Nat.Intf) (MLMB : Pickles_types.Nat.Intf) : sig
 
   val to_yojson : t -> [> `String of string ]
 
-  val to_yojson_full : t Pickles_types.Sigs.jsonable
+  val to_yojson_full : t Plonkish_prelude.Sigs.jsonable
 
   val of_yojson : [> `String of string ] -> (t, string) result
 end
@@ -163,9 +163,9 @@ module Proofs_verified_2 : sig
     module V2 : sig
       include module type of T with module Repr := T.Repr
 
-      include Pickles_types.Sigs.VERSIONED
+      include Plonkish_prelude.Sigs.VERSIONED
 
-      include Pickles_types.Sigs.Binable.S with type t := t
+      include Plonkish_prelude.Sigs.Binable.S with type t := t
     end
   end]
 
@@ -184,9 +184,9 @@ module Proofs_verified_max : sig
     module V2 : sig
       include module type of T with module Repr := T.Repr
 
-      include Pickles_types.Sigs.VERSIONED
+      include Plonkish_prelude.Sigs.VERSIONED
 
-      include Pickles_types.Sigs.Binable.S with type t := t
+      include Plonkish_prelude.Sigs.Binable.S with type t := t
     end
   end]
 

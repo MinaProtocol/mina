@@ -123,9 +123,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~branches:(module Pickles_types.Nat.N1)
         ~max_proofs_verified:(module Pickles_types.Nat.N0)
         ~name:"trivial1"
-        ~constraint_constants:
-          (Genesis_constants.Constraint_constants.to_snark_keys_header
-             constraint_constants )
         ~choices:(fun ~self:_ -> [ Trivial_rule1.rule ])
     in
     let%bind.Async.Deferred vk1 =
@@ -137,9 +134,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~branches:(module Pickles_types.Nat.N1)
         ~max_proofs_verified:(module Pickles_types.Nat.N0)
         ~name:"trivial2"
-        ~constraint_constants:
-          (Genesis_constants.Constraint_constants.to_snark_keys_header
-             constraint_constants )
         ~choices:(fun ~self:_ -> [ Trivial_rule2.rule ])
     in
     let%bind.Async.Deferred vk2 =

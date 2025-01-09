@@ -6,19 +6,6 @@ let () = Pickles.Backend.Tick.Keypair.set_urs_info []
 
 let () = Pickles.Backend.Tock.Keypair.set_urs_info []
 
-let constraint_constants =
-  { Snark_keys_header.Constraint_constants.sub_windows_per_window = 0
-  ; ledger_depth = 0
-  ; work_delay = 0
-  ; block_window_duration_ms = 0
-  ; transaction_capacity = Log_2 0
-  ; pending_coinbase_depth = 0
-  ; coinbase_amount = Unsigned.UInt64.of_int 0
-  ; supercharged_coinbase_factor = 0
-  ; account_creation_fee = Unsigned.UInt64.of_int 0
-  ; fork = None
-  }
-
 let test () =
   let t11 = Sys.time () in
   let _tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
@@ -27,7 +14,6 @@ let test () =
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N0)
       ~num_chunks:4 ~override_wrap_domain:N1 ~name:"chunked_circuits"
-      ~constraint_constants (* TODO(mrmr1993): This was misguided.. Delete. *)
       ~choices:(fun ~self:_ ->
         [ { identifier = "2^17"
           ; prevs = []
@@ -49,25 +35,19 @@ let test () =
                 *)
                 let fresh_zero = fresh_zero () in
                 Impl.assert_
-                  { basic =
-                      Kimchi_backend_common.Plonk_constraint_system
-                      .Plonk_constraint
-                      .T
-                        (Raw
-                           { kind = Generic
-                           ; values =
-                               [| fresh_zero
-                                ; fresh_zero
-                                ; fresh_zero
-                                ; fresh_zero
-                                ; fresh_zero
-                                ; fresh_zero
-                                ; fresh_zero
-                               |]
-                           ; coeffs = [||]
-                           } )
-                  ; annotation = Some __LOC__
-                  } ;
+                  (Raw
+                     { kind = Generic
+                     ; values =
+                         [| fresh_zero
+                          ; fresh_zero
+                          ; fresh_zero
+                          ; fresh_zero
+                          ; fresh_zero
+                          ; fresh_zero
+                          ; fresh_zero
+                         |]
+                     ; coeffs = [||]
+                     } ) ;
                 { previous_proof_statements = []
                 ; public_output = ()
                 ; auxiliary_output = ()
