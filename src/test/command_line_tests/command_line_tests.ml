@@ -68,8 +68,8 @@ module CliTests = struct
       if not (String.is_prefix ~prefix:"j" hash) then
         failwith "invalid ledger hash prefix" ;
 
-      if Int.( <> ) (String.length hash) 51 then
-        failwith "invalid ledger hash length" ;
+      if Int.( <> ) (String.length hash) 52 then
+        failwithf "invalid ledger hash length (%d)" (String.length hash) () ;
 
       return ()
     in
