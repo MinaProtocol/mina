@@ -1131,7 +1131,7 @@ let perform_compaction compaction_interval t =
 
 let check_and_stop_daemon t ~wait =
   let uptime_mins =
-    Time_ns.(diff (now ()) daemon_start_time |> Span.to_min |> Int.of_float)
+    Time_ns.(diff (now ()) daemon_start_time |> Span.to_sec |> Int.of_float)
   in
   let max_catchup_time = Time.Span.of_hr 1. in
   if uptime_mins <= wait then
@@ -1174,7 +1174,7 @@ let stop_long_running_daemon t =
     ~metadata:[ ("wait", `Int wait_mins) ] ;
   let stop_daemon () =
     let uptime_mins =
-      Time_ns.(diff (now ()) daemon_start_time |> Span.to_min |> Int.of_float)
+      Time_ns.(diff (now ()) daemon_start_time |> Span.to_sec |> Int.of_float)
     in
     [%log' info t.config.logger]
       "Deamon has been running for $uptime mins. Stopping now..."
