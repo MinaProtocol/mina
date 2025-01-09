@@ -40,6 +40,7 @@ let pack_statement max_proofs_verified t =
   let open Types.Step in
   Spec.pack
     (module Impl)
+    (module Branch_data.Checked.Wrap)
     (Statement.spec max_proofs_verified Backend.Tock.Rounds.n)
     (Statement.to_data t)
 
@@ -175,8 +176,7 @@ let wrap_main
             Wrap_verifier.One_hot_vector.of_index which_branch' ~length:branches
           in
           let actual_proofs_verified_mask =
-            Util.ones_vector
-              (module Impl)
+            Util.Wrap.ones_vector
               ~first_zero:
                 (Wrap_verifier.Pseudo.choose
                    (which_branch, step_widths)
@@ -193,8 +193,7 @@ let wrap_main
           let () =
             with_label __LOC__ (fun () ->
                 (* Check that the branch_data public-input is correct *)
-                Branch_data.Checked.pack
-                  (module Impl)
+                Branch_data.Checked.Wrap.pack
                   { proofs_verified_mask =
                       Vector.extend_front_exn actual_proofs_verified_mask
                         Nat.N2.n Boolean.false_
