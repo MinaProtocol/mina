@@ -67,17 +67,16 @@ let of_int_exn (n : int) : t =
       raise
         (Invalid_argument (Printf.sprintf "Proofs_verified.of_int: got %d" n))
 
-let[@warning "-40-42"] to_bool_vec :
-    proofs_verified -> (bool, Nat.N2.n) Vector.t = function
+let to_bool_vec : proofs_verified -> (bool, Nat.N2.n) Vector.t = function
   | N0 ->
-      [ false; false ]
+      Vector.of_list_and_length_exn [ false; false ] Nat.N2.n
   | N1 ->
-      [ false; true ]
+      Vector.of_list_and_length_exn [ false; true ] Nat.N2.n
   | N2 ->
-      [ true; true ]
+      Vector.of_list_and_length_exn [ true; true ] Nat.N2.n
 
-let[@warning "-40-42"] of_bool_vec :
-    (bool, Nat.N2.n) Vector.t -> proofs_verified = function
+let of_bool_vec (v : (bool, Nat.N2.n) Vector.t) : proofs_verified =
+  match Vector.to_list v with
   | [ false; false ] ->
       N0
   | [ false; true ] ->
@@ -86,6 +85,8 @@ let[@warning "-40-42"] of_bool_vec :
       N2
   | [ true; false ] ->
       invalid_arg "Prefix_mask.back: invalid mask [false; true]"
+  | _ ->
+      invalid_arg "Invalid size"
 
 module Prefix_mask = struct
   open Kimchi_pasta_snarky_backend
