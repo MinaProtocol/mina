@@ -814,7 +814,7 @@ module Wrap : sig
       (** A layout of the raw data in a statement, which is needed for
           representing it inside the circuit. *)
       val spec :
-           ('a, 'v) Spec.impl
+           ('f, 'v) Spec.impl
         -> ('challenge1, 'challenge2, 'field1, 'field2) Lookup_parameters.t
         -> Opt.Flag.t Plonk_types.Features.t
         -> ( ( 'field1
