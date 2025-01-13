@@ -67,26 +67,21 @@ let of_int_exn (n : int) : t =
       raise
         (Invalid_argument (Printf.sprintf "Proofs_verified.of_int: got %d" n))
 
-let to_bool_vec : proofs_verified -> (bool, Nat.N2.n) Vector.t = function
-  | N0 ->
-      Vector.of_list_and_length_exn [ false; false ] Nat.N2.n
-  | N1 ->
-      Vector.of_list_and_length_exn [ false; true ] Nat.N2.n
-  | N2 ->
-      Vector.of_list_and_length_exn [ true; true ] Nat.N2.n
+let to_bool_vec : 'n Nat.t -> proofs_verified -> (bool, 'n) Vector.t =
+ fun n t ->
+  let stop_idx = to_int t in
+  Vector.init n ~f:(fun idx -> idx < stop_idx)
 
-let of_bool_vec (v : (bool, Nat.N2.n) Vector.t) : proofs_verified =
-  match Vector.to_list v with
-  | [ false; false ] ->
-      N0
-  | [ false; true ] ->
-      N1
-  | [ true; true ] ->
-      N2
-  | [ true; false ] ->
-      invalid_arg "Prefix_mask.back: invalid mask [false; true]"
-  | _ ->
-      invalid_arg "Invalid size"
+let of_bool_vec (v : (bool, 'n) Vector.t) : proofs_verified =
+  Vector.foldi v ~init:0 ~f:(fun idx count value ->
+      if value then
+        if idx = count then count + 1
+        else
+          invalid_arg
+            "Prefix_mask.of_bool_vec: expected [true; true; ...; true; false; \
+             false; ... false]"
+      else count )
+  |> of_int_exn
 
 module Prefix_mask = struct
   open Kimchi_pasta_snarky_backend
@@ -101,7 +96,7 @@ module Prefix_mask = struct
     let typ : (Checked.t, proofs_verified) Typ.t =
       Typ.transport
         (Pickles_types.Vector.typ Boolean.typ Pickles_types.Nat.N2.n)
-        ~there:to_bool_vec ~back:of_bool_vec
+        ~there:(to_bool_vec Nat.N2.n) ~back:of_bool_vec
   end
 
   module Wrap = struct
@@ -114,7 +109,7 @@ module Prefix_mask = struct
     let typ : (Checked.t, proofs_verified) Typ.t =
       Typ.transport
         (Pickles_types.Vector.wrap_typ Boolean.typ Pickles_types.Nat.N2.n)
-        ~there:to_bool_vec ~back:of_bool_vec
+        ~there:(to_bool_vec Nat.N2.n) ~back:of_bool_vec
   end
 end
 

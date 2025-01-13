@@ -1,3 +1,5 @@
+open Pickles_types
+
 module type S = sig
   open Core_kernel
   module Proofs_verified = Pickles_base.Proofs_verified
@@ -62,9 +64,11 @@ module type S = sig
        assert_16_bits:(Impls.Wrap_impl.Field.t -> unit)
     -> (Checked.Wrap.t, t) Impls.Wrap_impl.Typ.t
 
-  val packed_typ : (Impls.Step_impl.Field.t, t) Impls.Step_impl.Typ.t
+  val packed_typ :
+    'n Nat.s Nat.s Nat.t -> (Impls.Step_impl.Field.t, t) Impls.Step_impl.Typ.t
 
-  val wrap_packed_typ : (Impls.Wrap_impl.Field.t, t) Impls.Wrap_impl.Typ.t
+  val wrap_packed_typ :
+    'n Nat.s Nat.s Nat.t -> (Impls.Wrap_impl.Field.t, t) Impls.Wrap_impl.Typ.t
 
   val length_in_bits : int
 
