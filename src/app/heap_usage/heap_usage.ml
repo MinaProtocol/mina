@@ -23,7 +23,7 @@ let main ~genesis_constants ~constraint_constants () =
   in
   print_heap_usage "Zkapp_command.t" zkapp_command ;
   print_heap_usage "Pickles.Side_loaded.Proof.t" @@ zkapp_proof ~zkapp_command ;
-  let%bind verification_key = verification_key ~constraint_constants in
+  let%bind verification_key = Lazy.force verification_key in
   print_heap_usage "Mina_base.Side_loaded_verification_key.t" verification_key ;
   print_heap_usage "Dummy Pickles.Side_loaded.Proof.t" dummy_proof ;
   print_heap_usage "Dummy Mina_base.Side_loaded_verification_key.t" dummy_vk ;

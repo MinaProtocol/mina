@@ -46,7 +46,7 @@ module MinaBootstrapper = struct
     Process.create ~prog ~args ()
 
   let wait_for_bootstrap t =
-    let mina_cli = MinaCli.create t.config.port t.config.mina_exe in
+    let mina_cli = MinaCli.create ~port:t.config.port t.config.mina_exe in
     Async.printf "Waiting initial %d s. before connecting\n"
       (int_of_float t.client_delay) ;
     let%bind _ =

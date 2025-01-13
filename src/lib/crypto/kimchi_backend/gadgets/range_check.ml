@@ -47,29 +47,25 @@ let range_check0 ~(label : string) ?(is_compact : bool = false)
   (* Create RangeCheck0 gate *)
   with_label label (fun () ->
       assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (RangeCheck0
-                 { (* Current row *) v0
-                 ; v0p0
-                 ; v0p1
-                 ; v0p2
-                 ; v0p3
-                 ; v0p4
-                 ; v0p5
-                 ; v0c0
-                 ; v0c1
-                 ; v0c2
-                 ; v0c3
-                 ; v0c4
-                 ; v0c5
-                 ; v0c6
-                 ; v0c7
-                 ; (* Coefficients *)
-                   compact
-                 } )
-        } )
+        (RangeCheck0
+           { (* Current row *) v0
+           ; v0p0
+           ; v0p1
+           ; v0p2
+           ; v0p3
+           ; v0p4
+           ; v0p5
+           ; v0c0
+           ; v0c1
+           ; v0c2
+           ; v0c3
+           ; v0c4
+           ; v0c5
+           ; v0c6
+           ; v0c7
+           ; (* Coefficients *)
+             compact
+           } ) )
 
 (* Helper to create RangeCheck1 gate *)
 let range_check1 ~(label : string) (v0p0 : Circuit.Field.t)
@@ -110,42 +106,38 @@ let range_check1 ~(label : string) (v0p0 : Circuit.Field.t)
   (* Create RangeCheck0 gate *)
   with_label label (fun () ->
       assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (RangeCheck1
-                 { (* Current row *) v2
-                 ; v12
-                 ; v2c0
-                 ; v2p0
-                 ; v2p1
-                 ; v2p2
-                 ; v2p3
-                 ; v2c1
-                 ; v2c2
-                 ; v2c3
-                 ; v2c4
-                 ; v2c5
-                 ; v2c6
-                 ; v2c7
-                 ; v2c8
-                 ; (* Next row *) v2c9
-                 ; v2c10
-                 ; v2c11
-                 ; v0p0
-                 ; v0p1
-                 ; v1p0
-                 ; v1p1
-                 ; v2c12
-                 ; v2c13
-                 ; v2c14
-                 ; v2c15
-                 ; v2c16
-                 ; v2c17
-                 ; v2c18
-                 ; v2c19
-                 } )
-        } )
+        (RangeCheck1
+           { (* Current row *) v2
+           ; v12
+           ; v2c0
+           ; v2p0
+           ; v2p1
+           ; v2p2
+           ; v2p3
+           ; v2c1
+           ; v2c2
+           ; v2c3
+           ; v2c4
+           ; v2c5
+           ; v2c6
+           ; v2c7
+           ; v2c8
+           ; (* Next row *) v2c9
+           ; v2c10
+           ; v2c11
+           ; v0p0
+           ; v0p1
+           ; v1p0
+           ; v1p1
+           ; v2c12
+           ; v2c13
+           ; v2c14
+           ; v2c15
+           ; v2c16
+           ; v2c17
+           ; v2c18
+           ; v2c19
+           } ) )
 
 (* 64-bit range-check gadget - checks v0 \in [0, 2^64) *)
 let bits64 (v0 : Circuit.Field.t) =

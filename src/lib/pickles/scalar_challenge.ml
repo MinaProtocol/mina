@@ -10,7 +10,7 @@ let num_bits = 128
 
 (* Has the side effect of checking that [scalar] fits in 128 bits. *)
 let to_field_checked' (type f) ?(num_bits = num_bits)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+    (module Impl : Kimchi_pasta_snarky_backend.Snark_intf with type field = f)
     { SC.inner = (scalar : Impl.Field.t) } =
   let open Impl in
   let neg_one = Field.Constant.(negate one) in
@@ -117,18 +117,12 @@ let to_field_checked' (type f) ?(num_bits = num_bits)
     ()
   done ;
   with_label __LOC__ (fun () ->
-      assert_
-        Snarky_backendless.Constraint.
-          { annotation = Some __LOC__
-          ; basic =
-              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
-                T (EC_endoscalar { state = Array.of_list_rev !state }))
-          } ) ;
+      assert_ (EC_endoscalar { state = Array.of_list_rev !state }) ) ;
   (!a, !b, !n)
 
 let to_field_checked (type f) ?num_bits
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) ~endo
-    ({ SC.inner = (scalar : Impl.Field.t) } as s) =
+    (module Impl : Kimchi_pasta_snarky_backend.Snark_intf with type field = f)
+    ~endo ({ SC.inner = (scalar : Impl.Field.t) } as s) =
   let open Impl in
   let a, b, n = to_field_checked' ?num_bits (module Impl) s in
   Field.Assert.equal n scalar ;
@@ -151,7 +145,7 @@ let to_field_constant (type f) ~endo
   F.((!a * endo) + !b)
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.Run)
+    (Impl : Kimchi_pasta_snarky_backend.Snark_intf)
     (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t)
     (Challenge : Challenge.S with module Impl := Impl) (Endo : sig
       val base : Impl.Field.Constant.t
@@ -160,6 +154,7 @@ module Make
     end) =
 struct
   open Impl
+  module Utils = Util.Make (Impl)
   module Scalar = G.Constant.Scalar
 
   type t = Challenge.t SC.t
@@ -176,7 +171,7 @@ struct
 
   let num_bits = 128
 
-  let seal = Util.seal (module Impl)
+  let seal = Utils.seal
 
   let endo ?(num_bits = num_bits) t { SC.inner = (scalar : Field.t) } =
     let ( !! ) = As_prover.read_var in
@@ -257,17 +252,9 @@ struct
     let xs, ys = !acc in
     with_label __LOC__ (fun () ->
         assert_
-          { annotation = Some __LOC__
-          ; basic =
-              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
-                T
-                  (EC_endoscale
-                     { xs
-                     ; ys
-                     ; n_acc = !n_acc
-                     ; state = Array.of_list_rev !rounds_rev
-                     } ))
-          } ) ;
+          (EC_endoscale
+             { xs; ys; n_acc = !n_acc; state = Array.of_list_rev !rounds_rev }
+          ) ) ;
     with_label __LOC__ (fun () -> Field.Assert.equal !n_acc scalar) ;
     !acc
 
