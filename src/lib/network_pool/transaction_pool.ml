@@ -3,8 +3,6 @@
     transactions (user commands) and providing them to the block producer code.
 *)
 
-(* Only show stdout for failed inline tests.*)
-open Inline_test_quiet_logs
 open Core
 open Async
 open Mina_base
@@ -1674,7 +1672,7 @@ let%test_module _ =
     let minimum_fee =
       Currency.Fee.to_nanomina_int genesis_constants.minimum_user_command_fee
 
-    let logger = Logger.null ()
+    let logger = Logger.create ()
 
     let time_controller = Block_time.Controller.basic ~logger
 
@@ -1794,27 +1792,6 @@ let%test_module _ =
       in
       Mina_ledger.Ledger.apply_initial_ledger_state new_ledger init_ledger_state ;
       t.best_tip_ref := new_ledger
-
-    let ledger_snapshot t =
-      Array.map test_keys ~f:(fun kp ->
-          let ledger = Option.value_exn t.txn_pool.best_tip_ledger in
-          let account_id =
-            Account_id.create
-              (Public_key.compress kp.public_key)
-              Token_id.default
-          in
-          let loc =
-            Option.value_exn
-            @@ Mina_ledger.Ledger.Ledger_inner.location_of_account ledger
-                 account_id
-          in
-          let account =
-            Option.value_exn @@ Mina_ledger.Ledger.Ledger_inner.get ledger loc
-          in
-          ( kp
-          , Account.balance account |> Currency.Balance.to_amount
-          , Account.nonce account
-          , Account.timing account ) )
 
     let assert_user_command_sets_equal cs1 cs2 =
       let index cs =
@@ -3406,8 +3383,8 @@ let%test_module _ =
             |> Quickcheck_lib.of_array
           in
 
-          let%bind s1_length = Int.gen_incl 2 5 in
-          let%bind s2_length = Int.gen_incl 1 2 in
+          let%bind s1_length = Int.gen_incl 2 10 in
+          let%bind s2_length = Int.gen_incl 2 4 in
           let s2_length = s2_length + s1_length + initial_nonce in
           let initial_balance = account_with_limited_capacity.balance in
           let b = account_with_limited_capacity.balance / 2 in
@@ -3456,8 +3433,10 @@ let%test_module _ =
                   ; fee
                   ; amount = amount + (initial_balance - b1 - t2)
                   }
-            | Command_spec.Zkapp_blocking_send { sender; fee } ->
-                Command_spec.Zkapp_blocking_send { sender; fee }
+            | _ ->
+                failwith
+                  "Only payments are supported in limite account capacity \
+                   corner case"
           in
 
           account_state_on_major := Account_spec.seal !account_state_on_major ;
@@ -3469,9 +3448,70 @@ let%test_module _ =
             !account_state_on_minor ;
           Array.set s1 random_idx increased_tx ;
 
+          let split_by_account (account : Account_spec.t) commands =
+            let f cmd =
+              let sender = Command_spec.sender cmd in
+              sender.key_idx = account.key_idx
+            in
+            let cmds_from_acc = Array.filter commands ~f in
+            let others = Array.filter commands ~f:(fun x -> not (f x)) in
+            (cmds_from_acc, others)
+          in
+
+          let unchanged_major_command_spec, major_command_spec_to_merge =
+            split_by_account account_with_limited_capacity major_command_spec
+          in
+
+          let unchanged_minor_command_spec, minor_command_spec_to_merge =
+            split_by_account account_with_limited_capacity minor_command_spec
+          in
+
+          let rec gen_merge (a : 'a list) (b : 'a list) (c : 'a list) =
+            match (a, b) with
+            | [], [] ->
+                return c
+            | [ left ], [] ->
+                return (c @ [ left ])
+            | [], [ right ] ->
+                return (c @ [ right ])
+            | [ left ], [ right ] -> (
+                match%bind Bool.quickcheck_generator with
+                | true ->
+                    gen_merge [] [ right ] (c @ [ left ])
+                | false ->
+                    gen_merge [ left ] [] (c @ [ right ]) )
+            | [], right :: tail ->
+                gen_merge [] tail (c @ [ right ])
+            | left :: tail, [] ->
+                gen_merge tail [] (c @ [ left ])
+            | left :: left_tail, right :: right_tail -> (
+                match%bind Bool.quickcheck_generator with
+                | true ->
+                    gen_merge left_tail (right :: right_tail) (c @ [ left ])
+                | false ->
+                    gen_merge (left :: left_tail) right_tail (c @ [ right ]) )
+          in
+
+          let%bind major_command_spec =
+            gen_merge
+              (Array.to_list major_command_spec_to_merge)
+              (Array.to_list s1) []
+          in
+          let%bind minor_command_spec =
+            gen_merge
+              (Array.to_list minor_command_spec_to_merge)
+              (Array.to_list s2) []
+          in
+
           return
-            ( Array.append major_command_spec s1
-            , Array.append minor_command_spec s2 ) )
+            ( List.append
+                (Array.to_list unchanged_major_command_spec)
+                major_command_spec
+              |> List.to_array
+            , List.append
+                (Array.to_list unchanged_minor_command_spec)
+                minor_command_spec
+              |> List.to_array ) )
         else return (major_command_spec, minor_command_spec)
       in
 
@@ -3574,7 +3614,7 @@ let%test_module _ =
         let init_ledger_state = ledger_snapshot test in
         let%bind prefix, major, minor, minor_account_spec, major_account_spec =
           gen_branches init_ledger_state ~permission_change:true
-            ~limited_capacity:true ~sequence_max_length:5 ()
+            ~limited_capacity:true ~sequence_max_length:10 ()
         in
         return
           (test, prefix, major, minor, major_account_spec, minor_account_spec))
