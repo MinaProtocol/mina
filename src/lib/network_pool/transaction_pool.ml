@@ -2246,13 +2246,6 @@ let%test_module _ =
       in
       Async.Scheduler.yield_until_no_jobs_remain ()
 
-    let _user_command_to_base64 c =
-      match User_command.forget_check c with
-      | User_command.Signed_command c ->
-          Signed_command.to_base64 c
-      | User_command.Zkapp_command p ->
-          Zkapp_command.to_base64 p
-
     let commit_commands test cs =
       let ledger = Option.value_exn test.txn_pool.best_tip_ledger in
       List.iter cs ~f:(fun c ->
