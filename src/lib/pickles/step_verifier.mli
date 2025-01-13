@@ -9,7 +9,7 @@ module Scalar_challenge :
       Scalar_challenge.Make (Impl) (Step_main_inputs.Inner_curve) (Challenge)
         (Endo.Step_inner_curve)
 
-module Pseudo : module type of Pseudo.Make (Impl)
+module Pseudo = Pseudo.Step
 
 module Inner_curve : sig
   type t = Step_main_inputs.Inner_curve.t
@@ -48,7 +48,7 @@ val finalize_other_proof :
      , ( Impl.Field.t Import.Scalar_challenge.t Import.Bulletproof_challenge.t
        , 'c )
        Pickles_types.Vector.t
-     , Impl.Field.Constant.t Import.Branch_data.Checked.t
+     , Import.Branch_data.Checked.Step.t
      , Impl.Boolean.var )
      Import.Types.Wrap.Proof_state.Deferred_values.In_circuit.t
   -> ( Impl.Field.t
@@ -103,7 +103,7 @@ val verify :
   -> sponge_after_index:Step_main_inputs.Sponge.t
   -> lookup_parameters:
        ( Limb_vector.Challenge.Constant.t
-       , Impl.field Limb_vector.Challenge.t
+       , Impl.Field.t
        , 'b
        , Impl.Field.t Pickles_types.Shifted_value.Type1.t )
        Composition_types.Wrap.Lookup_parameters.t
@@ -114,30 +114,28 @@ val verify :
   -> wrap_domain:
        [ `Known of Import.Domain.t
        | `Side_loaded of
-         Impl.field
          Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ]
   -> wrap_verification_key:
        Step_main_inputs.Inner_curve.t array
        Pickles_types.Plonk_verification_key_evals.t
-  -> ( Impl.field Limb_vector.Challenge.t
-     , Impl.field Limb_vector.Challenge.t Composition_types.Scalar_challenge.t
+  -> ( Impl.Field.t
+     , Impl.Field.t Composition_types.Scalar_challenge.t
      , Impl.Field.t Pickles_types.Shifted_value.Type1.t
      , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
        , Impl.Boolean.var )
        Pickles_types.Opt.t
-     , ( Impl.field Limb_vector.Challenge.t Composition_types.Scalar_challenge.t
-       , Impl.Field.t Snarky_backendless.Snark_intf.Boolean0.t )
+     , ( Impl.Field.t Composition_types.Scalar_challenge.t
+       , Impl.Field.t Snarky_backendless.Boolean.t )
        Pickles_types.Opt.t
      , Impl.Boolean.var
      , Impl.Field.t
      , Impl.Field.t
      , Impl.Field.t
-     , ( Impl.field Limb_vector.Challenge.t
-         Kimchi_backend_common.Scalar_challenge.t
+     , ( Impl.Field.t Kimchi_backend_common.Scalar_challenge.t
          Composition_types.Bulletproof_challenge.t
        , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
        Pickles_types.Vector.t
-     , Impl.field Composition_types.Branch_data.Checked.t )
+     , Composition_types.Branch_data.Checked.Step.t )
      Import.Types.Wrap.Statement.In_circuit.t
      (* statement *)
   -> Impls.Step.unfinalized_proof_var (* unfinalized *)

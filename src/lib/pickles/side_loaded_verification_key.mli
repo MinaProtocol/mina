@@ -43,13 +43,9 @@ end
 
 module Checked : sig
   type t =
-    { max_proofs_verified :
-        Step_main_inputs.Impl.field
-        Pickles_base.Proofs_verified.One_hot.Checked.t
+    { max_proofs_verified : Pickles_base.Proofs_verified.One_hot.Checked.t
           (** The maximum of all of the [step_widths]. *)
-    ; actual_wrap_domain_size :
-        Step_main_inputs.Impl.field
-        Pickles_base.Proofs_verified.One_hot.Checked.t
+    ; actual_wrap_domain_size : Pickles_base.Proofs_verified.One_hot.Checked.t
           (** The actual domain size used by the wrap circuit. *)
     ; wrap_index :
         Step_main_inputs.Inner_curve.t

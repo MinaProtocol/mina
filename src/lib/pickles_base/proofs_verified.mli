@@ -1,3 +1,5 @@
+open Pickles_types
+
 (** Represents how many proofs are verified. Currently only [0], [1] or [2] *)
 module Stable : sig
   module V1 : sig
@@ -15,7 +17,7 @@ type t = Stable.V1.t = N0 | N1 | N2
 
 (** [of_nat_exn t_n] converts the type level natural [t_n] to the data type natural.
     Raise an exception if [t_n] represents a value above or equal to 3 *)
-val of_nat_exn : 'n Pickles_types.Nat.t -> t
+val of_nat_exn : 'n Nat.t -> t
 
 (** [of_int_exn n] converts the runtime natural [n] to the data type natural. Raise
     an exception if the value [n] is above or equal to 3 *)
@@ -26,39 +28,39 @@ val of_int_exn : int -> t
 val to_int : t -> int
 
 module One_hot : sig
-  module Checked : sig
-    type 'f t = ('f, Pickles_types.Nat.N3.n) One_hot_vector.t
+  open Kimchi_pasta_snarky_backend
 
-    val to_input :
-      'f t -> 'f Snarky_backendless.Cvar.t Random_oracle_input.Chunked.t
+  module Checked : sig
+    type t = Pickles_types.Nat.N3.n One_hot_vector.Step.t
+
+    val to_input : t -> Step_impl.Field.t Random_oracle_input.Chunked.t
   end
 
   val to_input : zero:'a -> one:'a -> t -> 'a Random_oracle_input.Chunked.t
 
-  open Kimchi_pasta_snarky_backend
-
-  val typ : (Step_impl.Field.Constant.t Checked.t, t) Step_impl.Typ.t
-
-  val wrap_typ : (Wrap_impl.Field.Constant.t Checked.t, t) Wrap_impl.Typ.t
+  val typ : (Checked.t, t) Step_impl.Typ.t
 end
 
-type 'f boolean = 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
+val to_bool_vec : t -> (bool, Nat.N2.n) Vector.t
 
-(** Vector of 2 elements *)
-type 'a vec2 = ('a, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
+val of_bool_vec : (bool, Nat.N2.n) Vector.t -> t
 
 module Prefix_mask : sig
-  module Checked : sig
-    type 'f t = 'f boolean vec2
-  end
-
-  val there : t -> bool vec2
-
-  val back : bool vec2 -> t
-
   open Kimchi_pasta_snarky_backend
 
-  val typ : (Step_impl.Field.Constant.t Checked.t, t) Step_impl.Typ.t
+  module Step : sig
+    module Checked : sig
+      type t = (Step_impl.Boolean.var, Nat.N2.n) Vector.t
+    end
 
-  val wrap_typ : (Wrap_impl.Field.Constant.t Checked.t, t) Wrap_impl.Typ.t
+    val typ : (Checked.t, t) Step_impl.Typ.t
+  end
+
+  module Wrap : sig
+    module Checked : sig
+      type t = (Wrap_impl.Boolean.var, Nat.N2.n) Vector.t
+    end
+
+    val typ : (Checked.t, t) Wrap_impl.Typ.t
+  end
 end

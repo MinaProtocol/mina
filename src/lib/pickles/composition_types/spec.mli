@@ -1,4 +1,18 @@
-type 'f impl = (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+type ('f, 'v) impl =
+  (module Snarky_backendless.Snark_intf.Run
+     with type field = 'f
+      and type field_var = 'v )
+
+module type Branch_data_checked = sig
+  type field_var
+
+  type t
+
+  val pack : t -> field_var
+end
+
+type ('branch_data, 'f) branch_data =
+  (module Branch_data_checked with type field_var = 'f and type t = 'branch_data)
 
 (** Basic types *)
 type (_, _, _) basic =
@@ -84,17 +98,16 @@ val typ :
      , < bool1 : bool
        ; bool2 : Step_impl.Boolean.var
        ; branch_data1 : Branch_data.t
-       ; branch_data2 : Step_impl.Field.Constant.t Branch_data.Checked.t
+       ; branch_data2 : Branch_data.Checked.Step.t
        ; bulletproof_challenge1 :
            Limb_vector.Challenge.Constant.t
            Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
-           Step_impl.Field.Constant.t Limb_vector.Challenge.t
-           Kimchi_backend_common.Scalar_challenge.t
+           Step_impl.Field.t Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; challenge1 : Limb_vector.Challenge.Constant.t
-       ; challenge2 : Step_impl.Field.Constant.t Limb_vector.Challenge.t
+       ; challenge2 : Step_impl.Field.t
        ; digest1 : Digest.Constant.t
        ; digest2 : Step_impl.Field.t
        ; field1 : 'c
@@ -111,17 +124,16 @@ val wrap_typ :
      , < bool1 : bool
        ; bool2 : Wrap_impl.Boolean.var
        ; branch_data1 : Branch_data.t
-       ; branch_data2 : Wrap_impl.Field.Constant.t Branch_data.Checked.t
+       ; branch_data2 : Branch_data.Checked.Wrap.t
        ; bulletproof_challenge1 :
            Limb_vector.Challenge.Constant.t
            Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
-           Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
-           Kimchi_backend_common.Scalar_challenge.t
+           Wrap_impl.Field.t Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; challenge1 : Limb_vector.Challenge.Constant.t
-       ; challenge2 : Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
+       ; challenge2 : Wrap_impl.Field.t
        ; digest1 : Digest.Constant.t
        ; digest2 : Wrap_impl.Field.t
        ; field1 : 'c
@@ -198,28 +210,27 @@ val wrap_packed_typ :
   -> ('e, 'd) Wrap_etyp.t
 
 val pack :
-     'f impl
+     ('f, 'v) impl
+  -> ('branch_data_checked, 'v) branch_data
   -> ( 'a
      , 'b
      , < bool1 : bool
-       ; bool2 :
-           'f Snarky_backendless.Cvar.t Snarky_backendless.Snark_intf.Boolean0.t
+       ; bool2 : 'v Snarky_backendless.Boolean.t
        ; branch_data1 : Branch_data.t
-       ; branch_data2 : 'f Branch_data.Checked.t
+       ; branch_data2 : 'branch_data_checked
        ; bulletproof_challenge1 :
            Limb_vector.Challenge.Constant.t
            Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
-           'f Limb_vector.Challenge.t Kimchi_backend_common.Scalar_challenge.t
-           Bulletproof_challenge.t
+           'v Kimchi_backend_common.Scalar_challenge.t Bulletproof_challenge.t
        ; challenge1 : Limb_vector.Challenge.Constant.t
-       ; challenge2 : 'f Limb_vector.Challenge.t
+       ; challenge2 : 'v
        ; digest1 : Digest.Constant.t
-       ; digest2 : 'f Snarky_backendless.Cvar.t
+       ; digest2 : 'v
        ; field1 : 'c
        ; field2 : 'd
        ; .. > )
      T.t
   -> 'b
-  -> [ `Field of 'd | `Packed_bits of 'f Snarky_backendless.Cvar.t * int ] array
+  -> [ `Field of 'd | `Packed_bits of 'v * int ] array

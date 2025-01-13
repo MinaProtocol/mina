@@ -154,6 +154,7 @@ module Make
     end) =
 struct
   open Impl
+  module Utils = Util.Make (Impl)
   module Scalar = G.Constant.Scalar
 
   type t = Challenge.t SC.t
@@ -170,7 +171,7 @@ struct
 
   let num_bits = 128
 
-  let seal = Util.seal (module Impl)
+  let seal = Utils.seal
 
   let endo ?(num_bits = num_bits) t { SC.inner = (scalar : Field.t) } =
     let ( !! ) = As_prover.read_var in
