@@ -41,9 +41,9 @@ module One_hot : sig
   val typ : (Checked.t, t) Step_impl.Typ.t
 end
 
-val to_bool_vec : t -> (bool, Nat.N2.n) Vector.t
+val to_bool_vec : 'n Nat.t -> t -> (bool, 'n) Vector.t
 
-val of_bool_vec : (bool, Nat.N2.n) Vector.t -> t
+val of_bool_vec : (bool, 'n) Vector.t -> t
 
 module Prefix_mask : sig
   open Kimchi_pasta_snarky_backend

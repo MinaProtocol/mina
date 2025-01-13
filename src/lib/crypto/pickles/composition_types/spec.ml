@@ -562,7 +562,7 @@ module Step =
           | Challenge ->
               T (Challenge.typ, Fn.id, Fn.id)
           | Branch_data ->
-              T (Branch_data.packed_typ, Fn.id, Fn.id)
+              T (Branch_data.packed_typ Nat.N2.n, Fn.id, Fn.id)
           | Bulletproof_challenge ->
               let typ =
                 let there bp_challenge =
@@ -655,7 +655,7 @@ module Wrap =
           | Challenge ->
               T (Challenge.typ, Fn.id, Fn.id)
           | Branch_data ->
-              T (Branch_data.wrap_packed_typ, Fn.id, Fn.id)
+              T (Branch_data.wrap_packed_typ Nat.N2.n, Fn.id, Fn.id)
           | Bulletproof_challenge ->
               let typ =
                 let there bp_challenge =
