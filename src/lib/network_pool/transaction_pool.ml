@@ -3289,7 +3289,7 @@ let%test_module _ =
             fee
     end
 
-    let log_cmd_spec arr =
+    let cmd_specs_to_json arr =
       Array.map arr ~f:(fun cmd ->
           let sender = Command_spec.sender cmd in
           let content =
@@ -3300,7 +3300,7 @@ let%test_module _ =
           `String content )
       |> Array.to_list
 
-    let log_account_spec_arr arr =
+    let account_specs_to_json arr =
       Array.map arr ~f:(fun spec ->
           `String (Printf.sprintf !"%{sexp: Account_spec.t}\n" spec) )
       |> Array.to_list
@@ -3618,15 +3618,15 @@ let%test_module _ =
                 , major_account_spec
                 , minor_account_spec ) ->
           Thread_safe.block_on_async_exn (fun () ->
-              [%log info] "Sequences"
+              [%log info] "Input Data"
                 ~metadata:
-                  [ ("prefix", `List (log_cmd_spec prefix_specs))
-                  ; ("major", `List (log_cmd_spec major_specs))
-                  ; ("minor", `List (log_cmd_spec minor_specs))
+                  [ ("prefix", `List (cmd_specs_to_json prefix_specs))
+                  ; ("major", `List (cmd_specs_to_json major_specs))
+                  ; ("minor", `List (cmd_specs_to_json minor_specs))
                   ; ( "minor accounts state"
-                    , `List (log_account_spec_arr minor_account_spec) )
+                    , `List (account_specs_to_json minor_account_spec) )
                   ; ( "major accounts state"
-                    , `List (log_account_spec_arr major_account_spec) )
+                    , `List (account_specs_to_json major_account_spec) )
                   ] ;
 
               let prefix = gen_commands_from_specs prefix_specs test in
