@@ -58,24 +58,37 @@ module Make_str (A : Wire_types.Concrete) = struct
   let length_in_bits = 10
 
   let pack (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) n
       ({ proofs_verified; domain_log2 } : t) : f =
     let open Impl.Field.Constant in
     let double x = x + x in
     let times4 x = double (double x) in
     let domain_log2 = of_int (Char.to_int domain_log2) in
+    let (x0 :: x1 :: proofs_verified_rest) =
+      Proofs_verified.to_bool_vec n proofs_verified
+    in
     (* shift domain_log2 over by 2 bits (multiply by 4) *)
-    times4 domain_log2
-    + project
-        (Pickles_types.Vector.to_list
-           (Proofs_verified.to_bool_vec proofs_verified) )
+    (of_int 1024 * project (Pickles_types.Vector.to_list proofs_verified_rest))
+    + times4 domain_log2
+    + project [ x0; x1 ]
 
   let unpack (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) n
       (x : f) : t =
+    let open Pickles_types in
     match Impl.Field.Constant.unpack x with
-    | x0 :: x1 :: y0 :: y1 :: y2 :: y3 :: y4 :: y5 :: y6 :: y7 :: _ ->
-        { proofs_verified = Proofs_verified.of_bool_vec [ x0; x1 ]
+    | x0
+      :: x1
+         :: y0 :: y1 :: y2 :: y3 :: y4 :: y5 :: y6 :: y7 :: proofs_verified_rest
+      ->
+        let (Nat.S (Nat.S n_sub_2)) = n in
+        let proofs_verified_rest =
+          Vector.of_list_and_length_exn
+            (List.take proofs_verified_rest (Nat.to_int n_sub_2))
+            n_sub_2
+        in
+        { proofs_verified =
+            Proofs_verified.of_bool_vec (x0 :: x1 :: proofs_verified_rest)
         ; domain_log2 =
             Domain_log2.of_bits_msb [ y7; y6; y5; y4; y3; y2; y1; y0 ]
         }
@@ -122,15 +135,15 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
   end
 
-  let packed_typ =
+  let packed_typ n =
     Step_impl.Typ.transport Step_impl.Typ.field
-      ~there:(pack (module Step_impl))
-      ~back:(unpack (module Step_impl))
+      ~there:(pack (module Step_impl) n)
+      ~back:(unpack (module Step_impl) n)
 
-  let wrap_packed_typ =
+  let wrap_packed_typ n =
     Wrap_impl.Typ.transport Wrap_impl.Typ.field
-      ~there:(pack (module Wrap_impl))
-      ~back:(unpack (module Wrap_impl))
+      ~there:(pack (module Wrap_impl) n)
+      ~back:(unpack (module Wrap_impl) n)
 
   let typ
       ~(* We actually only need it to be less than 252 bits in order to pack
