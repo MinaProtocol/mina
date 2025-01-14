@@ -1,4 +1,5 @@
 open Core_kernel
+open Pickles_types
 
 module Instance : sig
   type chunking_data = { num_chunks : int; domain_size : int; zk_rows : int }
@@ -7,6 +8,7 @@ module Instance : sig
     | T :
         (module Pickles_types.Nat.Intf with type n = 'n)
         * (module Intf.Statement_value with type t = 'a)
+        * 'num_additional_proofs Nat.N2.plus_n Nat.t
         * chunking_data option
         * Verification_key.t
         * 'a

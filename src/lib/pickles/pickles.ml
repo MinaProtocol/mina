@@ -299,7 +299,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     { constraints = 0 }
                 }
               in
-              Verify.Instance.T (max_proofs_verified, m, None, vk, x, p) )
+              Verify.Instance.T
+                (max_proofs_verified, m, Nat.N2.n, None, vk, x, p) )
           |> Verify.verify_heterogenous )
 
     let verify ~typ ts = verify_promise ~typ ts |> Promise.to_deferred
@@ -328,8 +329,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let choices = choices ~self in
       let rec go :
           type a b c d e f g h i j.
-             (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule).t
-          -> (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule.Promise).t =
+             (a, b, c, d, e, f, g, h, i, j) H5_6.T(Inductive_rule).t
+          -> (a, b, c, d, e, f, g, h, i, j) H5_6.T(Inductive_rule.Promise).t =
         function
         | [] ->
             []
@@ -368,8 +369,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let choices = choices ~self in
       let rec go :
           type a b c d e f g h i j.
-             (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule.Deferred).t
-          -> (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule.Promise).t =
+             (a, b, c, d, e, f, g, h, i, j) H5_6.T(Inductive_rule.Deferred).t
+          -> (a, b, c, d, e, f, g, h, i, j) H5_6.T(Inductive_rule.Promise).t =
         function
         | [] ->
             []

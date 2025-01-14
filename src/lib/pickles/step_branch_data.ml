@@ -15,7 +15,8 @@ type ( 'a_var
      , 'prev_vars
      , 'prev_values
      , 'local_widths
-     , 'local_heights )
+     , 'local_heights
+     , 'num_additional_proofs )
      t =
   | T :
       { proofs_verified :
@@ -28,6 +29,7 @@ type ( 'a_var
           , 'prev_values
           , 'local_widths
           , 'local_heights
+          , 'num_additional_proofs
           , 'a_var
           , 'a_value
           , 'ret_var
@@ -67,16 +69,20 @@ type ( 'a_var
          , 'prev_vars
          , 'prev_values
          , 'local_widths
-         , 'local_heights )
+         , 'local_heights
+         , 'num_additional_proofs )
          t
 
 (* Compile an inductive rule. *)
 let create
-    (type branches max_proofs_verified var value a_var a_value ret_var ret_value)
-    ~index ~(self : (var, value, max_proofs_verified, branches) Tag.t)
-    ~wrap_domains ~(feature_flags : Opt.Flag.t Plonk_types.Features.Full.t)
+    (type branches max_proofs_verified num_additional_proofs var value a_var
+    a_value ret_var ret_value ) ~index
+    ~(self :
+       (var, value, max_proofs_verified, branches, num_additional_proofs) Tag.t
+       ) ~wrap_domains ~(feature_flags : Opt.Flag.t Plonk_types.Features.Full.t)
     ~num_chunks ~(actual_feature_flags : bool Plonk_types.Features.t)
     ~(max_proofs_verified : max_proofs_verified Nat.t)
+    ~(num_allowable_proofs : num_additional_proofs Nat.N2.plus_n Nat.t)
     ~(proofs_verifieds : (int, branches) Vector.t) ~(branches : branches Nat.t)
     ~(public_input :
        ( var
@@ -89,11 +95,11 @@ let create
     _value_to_field_elements ~(chain_to : unit Promise.t)
     (rule : _ Inductive_rule.Promise.t) =
   Timer.clock __LOC__ ;
-  let module HT = H4.T (Tag) in
+  let module HT = H5.T (Tag) in
   let (T (self_width, proofs_verified)) = HT.length rule.prevs in
   let rec extract_lengths :
-      type a b n m k.
-         (a, b, n, m) HT.t
+      type a b n m k num_additional_proofss.
+         (a, b, n, m, num_additional_proofss) HT.t
       -> (a, k) Length.t
       -> n H1.T(Nat).t * m H1.T(Nat).t * (n, k) Length.t * (m, k) Length.t =
    fun ts len ->
@@ -143,9 +149,9 @@ let create
   let module Optional_wrap_key = Types_map.For_step.Optional_wrap_key in
   let known_wrap_keys =
     let rec go :
-        type a1 a2 n m.
-        (a1, a2, n, m) H4.T(Tag).t -> m H1.T(Optional_wrap_key).t Promise.t =
-      function
+        type a1 a2 n m num_additional_proofss.
+           (a1, a2, n, m, num_additional_proofss) H5.T(Tag).t
+        -> m H1.T(Optional_wrap_key).t Promise.t = function
       | [] ->
           Promise.return ([] : _ H1.T(Optional_wrap_key).t)
       | tag :: tags ->
@@ -215,6 +221,7 @@ let create
     in
     let etyp =
       Impls.Step.input ~proofs_verified:max_proofs_verified
+        ~num_allowable_proofs
       (* TODO *)
     in
     let%bind.Promise () = chain_to in

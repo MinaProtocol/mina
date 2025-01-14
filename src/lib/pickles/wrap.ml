@@ -299,7 +299,7 @@ let wrap
       (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t )
     ~dlog_plonk_index wrap_main ~(typ : _ Impls.Step.Typ.t) ~step_vk
     ~actual_wrap_domains ~step_plonk_indices:_ ~feature_flags
-    ~actual_feature_flags ?tweak_statement pk
+    ~num_allowable_proofs ~actual_feature_flags ?tweak_statement pk
     ({ statement = prev_statement; prev_evals; proof; index = which_index } :
       ( _
       , _
@@ -430,7 +430,7 @@ let wrap
   in
 
   let public_input =
-    tick_public_input_of_statement ~max_proofs_verified
+    tick_public_input_of_statement ~max_proofs_verified ~num_allowable_proofs
       prev_statement_with_hashes
   in
   let prev_challenges =
@@ -520,7 +520,9 @@ let wrap
     |> Wrap_hack.pad_accumulator
   in
   let%map.Promise next_proof =
-    let (T (input, conv, _conv_inv)) = Impls.Wrap.input ~feature_flags () in
+    let (T (input, conv, _conv_inv)) =
+      Impls.Wrap.input ~feature_flags ~num_allowable_proofs ()
+    in
     Common.time "wrap proof" (fun () ->
         [%log internal] "Wrap_generate_witness_conv" ;
         Impls.Wrap.generate_witness_conv

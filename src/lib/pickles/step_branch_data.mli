@@ -15,7 +15,8 @@ type ( 'a_var
      (* type level nat *)
      , 'local_widths
      (* type level nat *)
-     , 'local_heights )
+     , 'local_heights
+     , 'num_additional_proofs )
      t =
   | T :
       { proofs_verified :
@@ -29,6 +30,7 @@ type ( 'a_var
           , 'prev_values
           , 'local_widths
           , 'local_heights
+          , 'num_additional_proofs
           , 'a_var
           , 'a_value
           , 'ret_var
@@ -75,7 +77,8 @@ type ( 'a_var
          (* type level nat *)
          , 'local_widths
          (* type level nat *)
-         , 'local_heights )
+         , 'local_heights
+         , 'num_additional_proofs )
          t
 
 (** Compile one rule into a value of type [t]
@@ -85,12 +88,19 @@ type ( 'a_var
 *)
 val create :
      index:int
-  -> self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
+  -> self:
+       ( 'var
+       , 'value
+       , 'max_proofs_verified
+       , 'branches
+       , 'num_additional_proofs )
+       Tag.t
   -> wrap_domains:Import.Domains.t
   -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
   -> num_chunks:int
   -> actual_feature_flags:bool Plonk_types.Features.t
   -> max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
+  -> num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
   -> proofs_verifieds:(int, 'branches) Pickles_types.Vector.t
   -> branches:'branches Pickles_types.Nat.t
   -> public_input:
@@ -109,6 +119,7 @@ val create :
      , 'f
      , 'g
      , 'h
+     , 'num_additional_proofs
      , 'a_var
      , 'a_value
      , 'ret_var
@@ -127,5 +138,6 @@ val create :
      , 'e
      , 'f
      , 'g
-     , 'h )
+     , 'h
+     , 'num_additional_proofs )
      t

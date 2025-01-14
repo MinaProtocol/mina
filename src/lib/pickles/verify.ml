@@ -10,6 +10,7 @@ module Instance = struct
     | T :
         (module Nat.Intf with type n = 'n)
         * (module Intf.Statement_value with type t = 'a)
+        * 'num_additional_proofs Nat.N2.plus_n Nat.t
         * chunking_data option
         * Verification_key.t
         * 'a
@@ -44,6 +45,7 @@ let verify_heterogenous (ts : Instance.t list) =
            (T
              ( _max_proofs_verified
              , _statement
+             , _num_allowable_proofs
              , chunking_data
              , key
              , _app_state
@@ -153,7 +155,7 @@ let verify_heterogenous (ts : Instance.t list) =
   [%log internal] "Accumulator_check" ;
   let%bind accumulator_check =
     Ipa.Step.accumulator_check
-      (List.map ts ~f:(fun (T (_, _, _, _, _, T t)) ->
+      (List.map ts ~f:(fun (T (_, _, _, _, _, _, T t)) ->
            ( t.statement.proof_state.messages_for_next_wrap_proof
                .challenge_polynomial_commitment
            , Ipa.Step.compute_challenges
@@ -170,6 +172,7 @@ let verify_heterogenous (ts : Instance.t list) =
            (T
              ( (module Max_proofs_verified)
              , (module A_value)
+             , num_allowable_proofs
              , _chunking_data
              , key
              , app_state
@@ -210,7 +213,8 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         let input =
           tock_unpadded_public_input_of_statement
-            ~feature_flags:Plonk_types.Features.Full.maybe prepared_statement
+            ~feature_flags:Plonk_types.Features.Full.maybe ~num_allowable_proofs
+            prepared_statement
         in
         let message =
           Wrap_hack.pad_accumulator
@@ -247,5 +251,6 @@ let verify (type a n) ?chunking_data
     (key : Verification_key.t) (ts : (a * (n, n) Proof.t) list) =
   verify_heterogenous
     (List.map ts ~f:(fun (x, p) ->
-         Instance.T (max_proofs_verified, a_value, chunking_data, key, x, p) )
+         Instance.T
+           (max_proofs_verified, a_value, Nat.N2.n, chunking_data, key, x, p) )
     )

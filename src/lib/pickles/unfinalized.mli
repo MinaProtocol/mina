@@ -1,3 +1,5 @@
+open Pickles_types
+
 module Constant : sig
   type t = Impls.Step.unfinalized_proof
 
@@ -8,6 +10,9 @@ end
 
 type t = Impls.Step.unfinalized_proof_var
 
-val typ : wrap_rounds:'a -> (t, Constant.t) Impls.Step.Typ.t
+val typ :
+     wrap_rounds:'a
+  -> num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
+  -> (t, Constant.t) Impls.Step.Typ.t
 
 val dummy : unit -> t

@@ -21,7 +21,8 @@ module Make
        , 'prev_vars
        , 'prev_values
        , 'local_widths
-       , 'local_heights )
+       , 'local_heights
+       , 'num_additional_proofs )
        Step_branch_data.t
     -> A_value.t
     -> maxes:
@@ -29,9 +30,10 @@ module Make
             with type length = Max_proofs_verified.n
              and type ns = 'max_local_max_proof_verifieds )
     -> prevs_length:('prev_vars, 'prevs_length) Pickles_types.Hlist.Length.t
-    -> self:('a, 'b, 'c, 'd) Tag.t
+    -> self:('a, 'b, 'c, 'd, 'num_additional_proofs) Tag.t
     -> step_domains:
          (Import.Domains.t, 'self_branches) Pickles_types.Vector.t Promise.t
+    -> num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
     -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
     -> self_dlog_plonk_index:
          Backend.Tick.Inner_curve.Affine.t array

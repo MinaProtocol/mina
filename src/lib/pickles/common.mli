@@ -1,3 +1,5 @@
+open Pickles_types
+
 val wrap_domains : proofs_verified:int -> Import.Domains.Stable.V2.t
 
 val actual_wrap_domain_size :
@@ -162,12 +164,14 @@ val hash_messages_for_next_step_proof :
 
 val tick_public_input_of_statement :
      max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
+  -> num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
   -> 'max_proofs_verified Impls.Step.statement
   -> Backend.Tick.Field.Vector.elt list
 
 val tock_public_input_of_statement :
      feature_flags:
        Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.Full.t
+  -> num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
   -> ( Limb_vector.Challenge.Constant.t
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
@@ -191,6 +195,7 @@ val tock_public_input_of_statement :
 val tock_unpadded_public_input_of_statement :
      feature_flags:
        Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.Full.t
+  -> num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
   -> ( Limb_vector.Challenge.Constant.t
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t

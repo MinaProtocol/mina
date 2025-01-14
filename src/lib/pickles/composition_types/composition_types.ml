@@ -1286,15 +1286,17 @@ module Step = struct
           }
       end
 
-      let typ fq ~assert_16_bits =
+      let typ ~num_allowable_proofs fq ~assert_16_bits =
         let open In_circuit in
-        Spec.typ fq ~assert_16_bits (spec Backend.Tock.Rounds.n)
+        Spec.typ ~num_allowable_proofs fq ~assert_16_bits
+          (spec Backend.Tock.Rounds.n)
         |> Step_impl.Typ.transport ~there:to_data ~back:of_data
         |> Step_impl.Typ.transport_var ~there:to_data ~back:of_data
 
-      let wrap_typ fq ~assert_16_bits =
+      let wrap_typ ~num_allowable_proofs fq ~assert_16_bits =
         let open In_circuit in
-        Spec.wrap_typ fq ~assert_16_bits (spec Backend.Tock.Rounds.n)
+        Spec.wrap_typ ~num_allowable_proofs fq ~assert_16_bits
+          (spec Backend.Tock.Rounds.n)
         |> Wrap_impl.Typ.transport ~there:to_data ~back:of_data
         |> Wrap_impl.Typ.transport_var ~there:to_data ~back:of_data
     end
@@ -1327,15 +1329,17 @@ module Step = struct
         }
     end [@@warning "-45"]
 
-    let[@warning "-60"] wrap_typ (type n) ~assert_16_bits
+    let[@warning "-60"] wrap_typ (type n) ~assert_16_bits ~num_allowable_proofs
         (proofs_verified : (Opt.Flag.t Plonk_types.Features.t, n) Vector.t) fq :
         (((_, _) Vector.t, _) t, ((_, _) Vector.t, _) t) Wrap_impl.Typ.t =
-      let per_proof _ = Per_proof.wrap_typ fq ~assert_16_bits in
+      let per_proof _ =
+        Per_proof.wrap_typ ~num_allowable_proofs fq ~assert_16_bits
+      in
       let unfinalized_proofs =
         Vector.wrap_typ' (Vector.map proofs_verified ~f:per_proof)
       in
       let messages_for_next_step_proof =
-        Spec.wrap_typ fq ~assert_16_bits (B Spec.Digest)
+        Spec.wrap_typ ~num_allowable_proofs fq ~assert_16_bits (B Spec.Digest)
       in
       Wrap_impl.Typ.of_hlistable
         [ unfinalized_proofs; messages_for_next_step_proof ]

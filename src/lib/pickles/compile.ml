@@ -290,7 +290,7 @@ struct
     Inductive_rule.Promise.T (Arg_var) (Arg_value) (Ret_var) (Ret_value)
       (Auxiliary_var)
       (Auxiliary_value)
-  module HIR = H4.T (IR)
+  module HIR = H5.T (IR)
 
   let max_local_max_proofs_verifieds ~self (type n)
       (module Max_proofs_verified : Nat.Intf with type n = n) branches choices =
@@ -298,15 +298,15 @@ struct
       type t = (int, Max_proofs_verified.n) Vector.t
     end in
     let module M =
-      H4.Map (IR) (E04 (Local_max_proofs_verifieds))
+      H5.Map (IR) (E05 (Local_max_proofs_verifieds))
         (struct
-          module V = H4.To_vector (Int)
-          module HT = H4.T (Tag)
+          module V = H5.To_vector (Int)
+          module HT = H5.T (Tag)
 
           module M =
-            H4.Map (Tag) (E04 (Int))
+            H5.Map (Tag) (E05 (Int))
               (struct
-                let f (type a b c d) (t : (a, b, c, d) Tag.t) : int =
+                let f (type a b c d e) (t : (a, b, c, d, e) Tag.t) : int =
                   if Type_equal.Id.same t.id self then
                     Nat.to_int Max_proofs_verified.n
                   else
@@ -315,7 +315,8 @@ struct
               end)
 
           let f :
-              type a b c d. (a, b, c, d) IR.t -> Local_max_proofs_verifieds.t =
+              type a b c d e.
+              (a, b, c, d, e) IR.t -> Local_max_proofs_verifieds.t =
            fun rule ->
             let (T (_, l)) = HT.length rule.prevs in
             Vector.extend_front_exn
@@ -323,7 +324,7 @@ struct
               Max_proofs_verified.n 0
         end)
     in
-    let module V = H4.To_vector (Local_max_proofs_verifieds) in
+    let module V = H5.To_vector (Local_max_proofs_verifieds) in
     let padded = V.f branches (M.f choices) |> Vector.transpose in
     (padded, Maxes.m padded)
 
@@ -334,8 +335,14 @@ struct
   end
 
   let compile :
-      type var value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
-         self:(var, value, max_proofs_verified, branches) Tag.t
+      type var value prev_varss prev_valuess widthss heightss max_proofs_verified branches num_additional_proofs num_additional_proofss.
+         self:
+           ( var
+           , value
+           , max_proofs_verified
+           , branches
+           , num_additional_proofs )
+           Tag.t
       -> cache:Key_cache.Spec.t list
       -> storables:Storables.t
       -> proof_cache:Proof_cache.t option
@@ -361,8 +368,19 @@ struct
            Inductive_rule.public_input
       -> auxiliary_typ:(Auxiliary_var.t, Auxiliary_value.t) Impls.Step.Typ.t
       -> choices:
-           (   self:(var, value, max_proofs_verified, branches) Tag.t
-            -> (prev_varss, prev_valuess, widthss, heightss) H4.T(IR).t )
+           (   self:
+                 ( var
+                 , value
+                 , max_proofs_verified
+                 , branches
+                 , num_additional_proofs )
+                 Tag.t
+            -> ( prev_varss
+               , prev_valuess
+               , widthss
+               , heightss
+               , num_additional_proofss )
+               H5.T(IR).t )
       -> unit
       -> ( prev_valuess
          , widthss
@@ -430,8 +448,8 @@ struct
     Timer.clock __LOC__ ;
     let feature_flags =
       let rec go :
-          type a b c d.
-          (a, b, c, d) H4.T(IR).t -> Opt.Flag.t Plonk_types.Features.Full.t =
+          type a b c d e.
+          (a, b, c, d, e) H5.T(IR).t -> Opt.Flag.t Plonk_types.Features.Full.t =
        fun rules ->
         match rules with
         | [] ->
@@ -471,6 +489,7 @@ struct
       | Some override ->
           Common.wrap_domains
             ~proofs_verified:(Pickles_base.Proofs_verified.to_int override)
+            ~num_allowable_proofs
     in
     Timer.clock __LOC__ ;
     let module Branch_data = struct

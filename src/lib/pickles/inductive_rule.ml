@@ -107,6 +107,7 @@ struct
        , 'prev_values
        , 'widths
        , 'heights
+       , 'num_additional_proofss
        , 'a_var
        , 'a_value
        , 'ret_var
@@ -115,7 +116,13 @@ struct
        , 'auxiliary_value )
        t =
     { identifier : string
-    ; prevs : ('prev_vars, 'prev_values, 'widths, 'heights) H4.T(Tag).t
+    ; prevs :
+        ( 'prev_vars
+        , 'prev_values
+        , 'widths
+        , 'heights
+        , 'num_additional_proofss )
+        H5.T(Tag).t
     ; main :
            'a_var main_input
         -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return M.t
@@ -130,11 +137,17 @@ struct
       (Auxiliary_var : T0)
       (Auxiliary_value : T0) =
   struct
-    type nonrec ('prev_vars, 'prev_values, 'widths, 'heights) t =
+    type nonrec ( 'prev_vars
+                , 'prev_values
+                , 'widths
+                , 'heights
+                , 'num_additional_proofss )
+                t =
       ( 'prev_vars
       , 'prev_values
       , 'widths
       , 'heights
+      , 'num_additional_proofss
       , Statement.t
       , Statement_value.t
       , Return_var.t

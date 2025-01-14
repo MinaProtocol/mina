@@ -57,6 +57,11 @@ module E04 : functor (T : T0) -> sig
   type (_, _, _, _) t = T.t
 end
 
+(** Map arity 0 to 5: [let e02 t = fun _ _ _ _ _ -> t] *)
+module E05 : functor (T : T0) -> sig
+  type (_, _, _, _, _) t = T.t
+end
+
 (** Map arity 0 to 6: [let e06 t = fun _ _ _ _ _ _ -> t] *)
 module E06 (T : T0) : sig
   type (_, _, _, _, _, _) t = T.t
@@ -791,6 +796,111 @@ module H4 : sig
   end
 end
 
+(** {2 Over four type parameters} *)
+
+(** Operations on heterogeneous lists whose content type varies over a four
+    type parameters.
+
+    Similar to {!H1}.
+*)
+module H5 : sig
+  (** Core data type. *)
+  module T : functor
+    (A : sig
+       type (_, _, _, _, _) t
+     end)
+    -> sig
+    type (_, _, _, _, _) t =
+      | [] : (unit, unit, unit, unit, unit) t
+      | ( :: ) :
+          ('a1, 'a2, 'a3, 'a4, 'a5) A.t * ('b1, 'b2, 'b3, 'b4, 'b5) t
+          -> ('a1 * 'b1, 'a2 * 'b2, 'a3 * 'b3, 'a4 * 'b4, 'a5 * 'b5) t
+
+    val length : ('tail1, 'tail2, 'tail3, 'tail4, 'tail5) t -> 'tail1 Length.n
+  end
+
+  (** See {!H1.Fold}. *)
+  module Fold : functor
+    (A : T5)
+    (X : T0)
+    (_ : sig
+       val f : X.t -> ('a, 'b, 'c, 'd, 'e) A.t -> X.t
+     end)
+    -> sig
+    val f : init:X.t -> ('a, 'b, 'c, 'd, 'e) T(A).t -> X.t
+  end
+
+  (** See {!H1.Iter}. *)
+  module Iter : functor
+    (A : T5)
+    (_ : sig
+       val f : ('a, 'b, 'c, 'd, 'e) A.t -> unit
+     end)
+    -> sig
+    val f : ('a, 'b, 'c, 'd, 'e) T(A).t -> unit
+  end
+
+  (** See {!H1.Map}. *)
+  module Map : functor
+    (A : T5)
+    (B : T5)
+    (_ : sig
+       val f : ('a, 'b, 'c, 'd, 'e) A.t -> ('a, 'b, 'c, 'd, 'e) B.t
+     end)
+    -> sig
+    val f : ('a, 'b, 'c, 'd, 'e) T(A).t -> ('a, 'b, 'c, 'd, 'e) T(B).t
+  end
+
+  (** See {!H1.To_vector}. *)
+  module To_vector : functor (X : T0) -> sig
+    val f :
+         ('a, 'length) Length.t
+      -> ('a, 'b, 'c, 'd, 'e) T(E05(X)).t
+      -> (X.t, 'length) Vector.t
+  end
+
+  (** See {!H1.Tuple2}. *)
+  module Tuple2 : functor (A : T5) (B : T5) -> sig
+    type ('a, 'b, 'c, 'd, 'e) t =
+      ('a, 'b, 'c, 'd, 'e) A.t * ('a, 'b, 'c, 'd, 'e) B.t
+  end
+
+  (** See {!H1.Zip}. *)
+  module Zip : functor (A : T5) (B : T5) -> sig
+    val f :
+         ('a, 'b, 'c, 'd, 'e) T(A).t
+      -> ('a, 'b, 'c, 'd, 'e) T(B).t
+      -> ('a, 'b, 'c, 'd, 'e) T(Tuple2(A)(B)).t
+  end
+
+  (** Convert a length counting on the first type parameter of a list into the
+      same length counting on the second type parameter of the list. *)
+  module Length_1_to_2 : functor (A : T5) -> sig
+    val f :
+      ('xs, 'ys, 'a, 'b, 'c) T(A).t -> ('xs, 'n) Length.t -> ('ys, 'n) Length.t
+  end
+
+  (** See {!H1.Typ}. *)
+  module Typ : functor
+    (A : T5)
+    (Var : T4)
+    (Val : T4)
+    (_ : sig
+       val f :
+            ('var, 'value, 'n1, 'n2, 'n3) A.t
+         -> ( ('var, 'n1, 'n2, 'n3) Var.t
+            , ('value, 'n1, 'n2, 'n3) Val.t )
+            Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+     end)
+    -> sig
+    val f :
+         ('vars, 'values, 'ns1, 'ns2, 'ns3) T(A).t
+      -> ( ('vars, 'ns1, 'ns2, 'ns3) H4.T(Var).t
+         , ('values, 'ns1, 'ns2, 'ns3) H4.T(Val).t )
+         Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+  end
+end
+
 (** Operations on heterogeneous lists whose content type varies over a four
     type parameters.
 
@@ -957,6 +1067,39 @@ module H4_6 : sig
 
     val length :
       ('t1, 't2, 't3, 't4, 'e1, 'e2, 'e3, 'e4, 'e5, 'e6) t -> 't1 Length.n
+  end
+end
+
+(** Data type of heterogeneous lists whose content type varies over four type
+    parameters, but also varies homogeneously over six other type parameters.
+    It supports no operations. See {!Hlist0.H1_1}.
+*)
+module H5_6 : sig
+  module T : functor
+    (A : sig
+       type (_, _, _, _, _, _, _, _, _, _, _) t
+     end)
+    -> sig
+    type (_, _, _, _, _, 's1, 's2, 's3, 's4, 's5, 's6) t =
+      | [] : (unit, unit, unit, unit, unit, 's1, 's2, 's3, 's4, 's5, 's6) t
+      | ( :: ) :
+          ('a1, 'a2, 'a3, 'a4, 'a5, 's1, 's2, 's3, 's4, 's5, 's6) A.t
+          * ('b1, 'b2, 'b3, 'b4, 'b5, 's1, 's2, 's3, 's4, 's5, 's6) t
+          -> ( 'a1 * 'b1
+             , 'a2 * 'b2
+             , 'a3 * 'b3
+             , 'a4 * 'b4
+             , 'a5 * 'b5
+             , 's1
+             , 's2
+             , 's3
+             , 's4
+             , 's5
+             , 's6 )
+             t
+
+    val length :
+      ('t1, 't2, 't3, 't4, 't5, 'e1, 'e2, 'e3, 'e4, 'e5, 'e6) t -> 't1 Length.n
   end
 end
 

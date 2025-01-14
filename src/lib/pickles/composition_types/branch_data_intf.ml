@@ -32,12 +32,13 @@ module type S = sig
 
       type field_var = Field.t
 
-      type t =
-        { proofs_verified_mask : Proofs_verified.Prefix_mask.Step.Checked.t
+      type 'num_additional_proofs t =
+        { proofs_verified_mask :
+            'num_additional_proofs Proofs_verified.Prefix_mask.Step.Checked.t
         ; domain_log2 : Field.t
         }
 
-      val pack : t -> Field.t
+      val pack : 'num_additional_proofs t -> Field.t
     end
 
     module Wrap : sig
@@ -45,30 +46,35 @@ module type S = sig
 
       type field_var = Field.t
 
-      type t =
-        { proofs_verified_mask : Proofs_verified.Prefix_mask.Wrap.Checked.t
+      type 'num_additional_proofs t =
+        { proofs_verified_mask :
+            'num_additional_proofs Proofs_verified.Prefix_mask.Wrap.Checked.t
         ; domain_log2 : Field.t
         }
 
-      val pack : t -> Field.t
+      val pack : 'num_additional_proofs t -> Field.t
     end
   end
 
   module Impls := Kimchi_pasta_snarky_backend
 
   val typ :
-       assert_16_bits:(Impls.Step_impl.Field.t -> unit)
-    -> (Checked.Step.t, t) Impls.Step_impl.Typ.t
+       num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
+    -> assert_16_bits:(Impls.Step_impl.Field.t -> unit)
+    -> ('num_additional_proofs Checked.Step.t, t) Impls.Step_impl.Typ.t
 
   val wrap_typ :
-       assert_16_bits:(Impls.Wrap_impl.Field.t -> unit)
-    -> (Checked.Wrap.t, t) Impls.Wrap_impl.Typ.t
+       num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
+    -> assert_16_bits:(Impls.Wrap_impl.Field.t -> unit)
+    -> ('num_additional_proofs Checked.Wrap.t, t) Impls.Wrap_impl.Typ.t
 
   val packed_typ :
-    'n Nat.s Nat.s Nat.t -> (Impls.Step_impl.Field.t, t) Impls.Step_impl.Typ.t
+       num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
+    -> (Impls.Step_impl.Field.t, t) Impls.Step_impl.Typ.t
 
   val wrap_packed_typ :
-    'n Nat.s Nat.s Nat.t -> (Impls.Wrap_impl.Field.t, t) Impls.Wrap_impl.Typ.t
+       num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
+    -> (Impls.Wrap_impl.Field.t, t) Impls.Wrap_impl.Typ.t
 
   val length_in_bits : int
 

@@ -4,6 +4,7 @@ open Pickles_types
     keys **)
 val wrap_main :
      num_chunks:int
+  -> num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
   -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
   -> ( 'max_proofs_verified
      , 'branches

@@ -147,11 +147,11 @@ module Step = struct
     , (Impl.Field.t, 'proofs_verified) Pickles_types.Vector.t )
     Import.Types.Step.Statement.t
 
-  let input ~proofs_verified =
+  let input ~proofs_verified ~num_allowable_proofs =
     let open Types.Step.Statement in
     let spec = spec proofs_verified Tock.Rounds.n in
     let (T (typ, f, f_inv)) =
-      Spec.packed_typ
+      Spec.packed_typ ~num_allowable_proofs
         (T
            ( Shifted_value.Type2.typ Other_field.typ_unchecked
            , (fun (Shifted_value.Type2.Shifted_value x as t) ->
@@ -233,7 +233,8 @@ module Wrap = struct
 
   let input
       ~feature_flags:
-        ({ Plonk_types.Features.Full.uses_lookups; _ } as feature_flags) () =
+        ({ Plonk_types.Features.Full.uses_lookups; _ } as feature_flags)
+      ~num_allowable_proofs () =
     let feature_flags = Plonk_types.Features.of_full feature_flags in
     let lookup =
       { Types.Wrap.Lookup_parameters.use = uses_lookups
@@ -255,7 +256,7 @@ module Wrap = struct
     in
     let open Types.Wrap.Statement in
     let (T (typ, f, f_inv)) =
-      Spec.wrap_packed_typ
+      Spec.wrap_packed_typ ~num_allowable_proofs
         (T
            ( Shifted_value.Type1.wrap_typ fp
            , (fun (Shifted_value x as t) ->

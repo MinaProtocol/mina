@@ -1188,7 +1188,8 @@ module Step : sig
       end
 
       val typ :
-           ('b, 'c) Step_impl.Typ.t
+           num_allowable_proofs:'n Nat.N2.plus_n Nat.t
+        -> ('b, 'c) Step_impl.Typ.t
         -> assert_16_bits:(Step_impl.Field.t -> unit)
         -> ( ( Step_impl.Field.t
              , Step_impl.Field.t Scalar_challenge.t
@@ -1232,6 +1233,7 @@ module Step : sig
 
     val wrap_typ :
          assert_16_bits:(Wrap_impl.Field.t -> unit)
+      -> num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
       -> (Opt.Flag.t Plonk_types.Features.t, 'n) Vector.t
       -> ('b, 'a) Wrap_impl.Typ.t
       -> ( ( ( ( Wrap_impl.Field.t

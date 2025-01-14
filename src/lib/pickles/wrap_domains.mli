@@ -16,6 +16,7 @@ module Make
     -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
     -> num_chunks:int
     -> max_proofs_verified:(module Nat.Add.Intf with type n = 'a)
+    -> num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
     -> Import.Domains.t Promise.t
 
   val f :
@@ -25,6 +26,7 @@ module Make
     -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
     -> num_chunks:int
     -> max_proofs_verified:(module Nat.Add.Intf with type n = 'a)
+    -> num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
     -> Import.Domains.t
 end
 [@@warning "-67"]

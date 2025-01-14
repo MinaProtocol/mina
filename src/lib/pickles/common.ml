@@ -205,23 +205,27 @@ module Ipa = struct
   end
 end
 
-let tock_unpadded_public_input_of_statement ~feature_flags prev_statement =
+let tock_unpadded_public_input_of_statement ~feature_flags ~num_allowable_proofs
+    prev_statement =
   let input =
-    let (T (typ, _conv, _conv_inv)) = Impls.Wrap.input ~feature_flags () in
+    let (T (typ, _conv, _conv_inv)) =
+      Impls.Wrap.input ~feature_flags ~num_allowable_proofs ()
+    in
     Impls.Wrap.generate_public_input typ prev_statement
   in
   List.init
     (Backend.Tock.Field.Vector.length input)
     ~f:(Backend.Tock.Field.Vector.get input)
 
-let tock_public_input_of_statement ~feature_flags s =
-  tock_unpadded_public_input_of_statement ~feature_flags s
+let tock_public_input_of_statement ~feature_flags ~num_allowable_proofs s =
+  tock_unpadded_public_input_of_statement ~feature_flags ~num_allowable_proofs s
 
-let tick_public_input_of_statement ~max_proofs_verified
+let tick_public_input_of_statement ~max_proofs_verified ~num_allowable_proofs
     (prev_statement : _ Impls.Step.statement) =
   let input =
     let (T (input, _conv, _conv_inv)) =
       Impls.Step.input ~proofs_verified:max_proofs_verified
+        ~num_allowable_proofs
     in
     Impls.Step.generate_public_input input prev_statement
   in

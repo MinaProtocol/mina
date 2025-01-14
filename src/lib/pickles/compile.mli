@@ -129,7 +129,12 @@ module Side_loaded : sig
     -> max_proofs_verified:(module Nat.Add.Intf with type n = 'n1)
     -> feature_flags:Opt.Flag.t Plonk_types.Features.t
     -> typ:('var, 'value) Impls.Step.Typ.t
-    -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
+    -> ( 'var
+       , 'value
+       , 'n1
+       , Verification_key.Max_branches.n
+       , 'num_additional_proofs )
+       Tag.t
 
   val verify_promise :
        typ:('var, 'value) Impls.Step.Typ.t
@@ -144,11 +149,16 @@ module Side_loaded : sig
   (* Must be called in the inductive rule snarky function defining a
      rule for which this tag is used as a predecessor. *)
   val in_circuit :
-    ('var, 'value, 'n1, 'n2) Tag.t -> Verification_key.Checked.t -> unit
+       ('var, 'value, 'n1, 'n2, 'num_additional_proofs) Tag.t
+    -> Verification_key.Checked.t
+    -> unit
 
   (* Must be called immediately before calling the prover for the inductive rule
      for which this tag is used as a predecessor. *)
-  val in_prover : ('var, 'value, 'n1, 'n2) Tag.t -> Verification_key.t -> unit
+  val in_prover :
+       ('var, 'value, 'n1, 'n2, 'num_additional_proofs) Tag.t
+    -> Verification_key.t
+    -> unit
 
   val srs_precomputation : unit -> unit
 end
@@ -288,7 +298,13 @@ end
       system for proving membership in that set, with a prover corresponding
       to each inductive rule. *)
 val compile_with_wrap_main_override_promise :
-     ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
+     ?self:
+       ( 'var
+       , 'value
+       , 'max_proofs_verified
+       , 'branches
+       , 'num_additional_proofs )
+       Tag.t
   -> ?cache:Key_cache.Spec.t list
   -> ?storables:Storables.t
   -> ?proof_cache:Proof_cache.t
@@ -313,20 +329,32 @@ val compile_with_wrap_main_override_promise :
   -> name:string
   -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
   -> choices:
-       (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
+       (   self:
+             ( 'var
+             , 'value
+             , 'max_proofs_verified
+             , 'branches
+             , 'num_additional_proofs )
+             Tag.t
         -> ( 'prev_varss
            , 'prev_valuess
            , 'widthss
            , 'heightss
+           , 'num_additional_proofs
            , 'a_var
            , 'a_value
            , 'ret_var
            , 'ret_value
            , 'auxiliary_var
            , 'auxiliary_value )
-           H4_6.T(Inductive_rule.Promise).t )
+           H5_6.T(Inductive_rule.Promise).t )
   -> unit
-  -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
+  -> ( 'var
+     , 'value
+     , 'max_proofs_verified
+     , 'branches
+     , 'num_additional_proofs )
+     Tag.t
      * Cache_handle.t
      * (module Proof_intf
           with type t = ('max_proofs_verified, 'max_proofs_verified) Proof.t

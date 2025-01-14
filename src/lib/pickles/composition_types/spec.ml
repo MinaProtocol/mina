@@ -12,13 +12,10 @@ type ('f, 'v) impl =
 module type Branch_data_checked = sig
   type field_var
 
-  type t
+  type 'n t
 
-  val pack : t -> field_var
+  val pack : 'n t -> field_var
 end
-
-type ('branch_data, 'f) branch_data =
-  (module Branch_data_checked with type field_var = 'f and type t = 'branch_data)
 
 type ('a, 'b, 'c) basic =
   | Unit : (unit, unit, < .. >) basic
@@ -182,7 +179,7 @@ struct
   open Impl
 
   module Env = struct
-    type ('other_field, 'other_field_var, 'a) t =
+    type ('other_field, 'other_field_var, 'n, 'a) t =
       < field1 : 'other_field
       ; field2 : 'other_field_var
       ; bool1 : bool
@@ -195,58 +192,12 @@ struct
           Challenge.Constant.t Sc.t Bulletproof_challenge.t
       ; bulletproof_challenge2 : Challenge.t Sc.t Bulletproof_challenge.t
       ; branch_data1 : Branch_data.t
-      ; branch_data2 : Branch_data_checked.t
+      ; branch_data2 : 'n Branch_data_checked.t
       ; .. >
       as
       'a
   end
 end
-
-let pack_basic
-    (type field field_var other_field other_field_var branch_data_var)
-    ((module Impl) : (field, field_var) impl)
-    ((module Branch_data_checked) : (branch_data_var, Impl.Field.t) branch_data)
-    =
-  let open Impl in
-  let module C = Common (Impl) (Branch_data_checked) in
-  let open C in
-  let pack :
-      type a b.
-         (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
-      -> a option
-      -> b
-      -> [ `Field of other_field_var | `Packed_bits of Field.t * int ] array =
-   fun basic x_constant_opt x ->
-    (* TODO *)
-    ignore x_constant_opt ;
-    match basic with
-    | Unit ->
-        [||]
-    | Field ->
-        [| `Field x |]
-    | Bool ->
-        [| `Packed_bits ((x :> Field.t), 1) |]
-    | Digest ->
-        [| `Packed_bits (x, Field.size_in_bits) |]
-    | Challenge ->
-        [| `Packed_bits (x, Challenge.length) |]
-    | Branch_data ->
-        [| `Packed_bits (Branch_data_checked.pack x, Branch_data.length_in_bits)
-        |]
-    | Bulletproof_challenge ->
-        let { Sc.inner = pre } = Bulletproof_challenge.pack x in
-        [| `Packed_bits (pre, Challenge.length) |]
-  in
-  { pack }
-
-let pack (type f v) ((module Impl) as impl : (f, v) impl) branch_data t =
-  let open Impl in
-  pack
-    (pack_basic impl branch_data)
-    t
-    ~zero:(`Packed_bits (Field.zero, 1))
-    ~one:(`Packed_bits (Field.one, 1))
-    None
 
 module Make
     (Impl : Snarky_backendless.Snark_intf.Run)
@@ -254,14 +205,15 @@ module Make
                              with type field_var := Impl.Field.t)
     (Basic : sig
       val typ_basic :
-           assert_16_bits:(Impl.Field.t -> unit)
+           num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
+        -> assert_16_bits:(Impl.Field.t -> unit)
         -> ('other_field_var, 'other_field) Impl.Typ.t
         -> ( 'a
            , 'b
            , < bool1 : bool
              ; bool2 : Impl.Boolean.var
              ; branch_data1 : Branch_data.t
-             ; branch_data2 : Branch_data_checked.t
+             ; branch_data2 : 'num_additional_proofs Branch_data_checked.t
              ; bulletproof_challenge1 :
                  Common(Impl)(Branch_data_checked).Challenge.Constant.t Sc.t
                  Bulletproof_challenge.t
@@ -280,7 +232,8 @@ module Make
         -> ('b, 'a) Impl.Typ.t
 
       val packed_typ_basic :
-           ('other_field_var, 'other_field) Make_ETyp(Impl).t
+           num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
+        -> ('other_field_var, 'other_field) Make_ETyp(Impl).t
         -> ( 'a
            , 'b
            , < bool1 : bool
@@ -319,8 +272,8 @@ struct
 
   module Vector_typ = Vector.Make_typ (Impl)
 
-  let typ (type other_field other_field_var) ~assert_16_bits
-      (field : (other_field_var, other_field) Impl.Typ.t) t =
+  let typ (type other_field other_field_var) ~num_allowable_proofs
+      ~assert_16_bits (field : (other_field_var, other_field) Impl.Typ.t) t =
     let module Typ_record = struct
       type 'env typ =
         { typ :
@@ -394,10 +347,13 @@ struct
             |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant_var)
     in
     typ
-      { typ = (fun basic -> Basic.typ_basic ~assert_16_bits field basic) }
+      { typ =
+          (fun basic ->
+            Basic.typ_basic ~num_allowable_proofs ~assert_16_bits field basic )
+      }
       Is_boolean t
 
-  let packed_typ (type other_field other_field_var)
+  let packed_typ (type other_field other_field_var) ~num_allowable_proofs
       (field : (other_field_var, other_field) Make_ETyp(Impl).t) t =
     let module ETyp_record = struct
       type ('f, 'env) etyp =
@@ -494,8 +450,59 @@ struct
               , f' )
     in
     etyp
-      { ETyp_record.etyp = (fun basic -> Basic.packed_typ_basic field basic) }
+      { ETyp_record.etyp =
+          (fun basic -> Basic.packed_typ_basic ~num_allowable_proofs field basic)
+      }
       Is_boolean t
+
+  let pack_basic (type other_field other_field_var max_additional_proofs)
+      ~(num_allowable_proofs : max_additional_proofs Nat.N2.plus_n Nat.t) =
+    let open Impl in
+    let module C = Common (Impl) (Branch_data_checked) in
+    let open C in
+    let pack :
+        type a b.
+           ( a
+           , b
+           , ((other_field, other_field_var, max_additional_proofs, 'e) Env.t
+              as
+              'e ) )
+           basic
+        -> a option
+        -> b
+        -> [ `Field of other_field_var | `Packed_bits of Field.t * int ] array =
+     fun basic x_constant_opt x ->
+      (* TODO *)
+      ignore x_constant_opt ;
+      match basic with
+      | Unit ->
+          [||]
+      | Field ->
+          [| `Field x |]
+      | Bool ->
+          [| `Packed_bits ((x :> Field.t), 1) |]
+      | Digest ->
+          [| `Packed_bits (x, Field.size_in_bits) |]
+      | Challenge ->
+          [| `Packed_bits (x, Challenge.length) |]
+      | Branch_data ->
+          [| `Packed_bits
+               (Branch_data_checked.pack x, Nat.to_int num_allowable_proofs)
+          |]
+      | Bulletproof_challenge ->
+          let { Sc.inner = pre } = Bulletproof_challenge.pack x in
+          [| `Packed_bits (pre, Challenge.length) |]
+    in
+    { pack }
+
+  let pack ~num_allowable_proofs t =
+    let open Impl in
+    pack
+      (pack_basic ~num_allowable_proofs)
+      t
+      ~zero:(`Packed_bits (Field.zero, 1))
+      ~one:(`Packed_bits (Field.one, 1))
+      None
 end
 
 module Step =
@@ -504,11 +511,21 @@ module Step =
       module Impl = Kimchi_pasta_snarky_backend.Step_impl
       module C = Common (Impl) (Branch_data.Checked.Step)
 
-      let typ_basic (type other_field other_field_var) ~assert_16_bits
+      let typ_basic (type other_field other_field_var max_additional_proofs)
+          ~num_allowable_proofs ~assert_16_bits
           (field : (other_field_var, other_field) Impl.Typ.t) =
         let typ_basic :
             type a b.
-               (a, b, ((other_field, other_field_var, 'e) C.Env.t as 'e)) basic
+               ( a
+               , b
+               , (( other_field
+                  , other_field_var
+                  , max_additional_proofs
+                  , 'e )
+                  C.Env.t
+                  as
+                  'e ) )
+               basic
             -> (b, a) Impl.Typ.t =
           let open Impl in
           let open C in
@@ -521,7 +538,7 @@ module Step =
             | Bool ->
                 Boolean.typ
             | Branch_data ->
-                Branch_data.typ ~assert_16_bits
+                Branch_data.typ ~num_allowable_proofs ~assert_16_bits
             | Digest ->
                 Digest.typ
             | Challenge ->
@@ -532,6 +549,7 @@ module Step =
         typ_basic
 
       let packed_typ_basic (type other_field other_field_var)
+          ~num_allowable_proofs
           (field : (other_field_var, other_field) Make_ETyp(Impl).t) =
         let open Impl in
         let open C in
@@ -569,7 +587,7 @@ module Step =
           | Challenge ->
               T (Challenge.typ, Fn.id, Fn.id)
           | Branch_data ->
-              T (Branch_data.packed_typ Nat.N2.n, Fn.id, Fn.id)
+              T (Branch_data.packed_typ ~num_allowable_proofs, Fn.id, Fn.id)
           | Bulletproof_challenge ->
               let typ =
                 let there bp_challenge =
@@ -599,11 +617,14 @@ module Wrap =
       module Impl = Kimchi_pasta_snarky_backend.Wrap_impl
       module C = Common (Impl) (Branch_data.Checked.Wrap)
 
-      let typ_basic (type other_field other_field_var) ~assert_16_bits
-          (field : (other_field_var, other_field) Impl.Typ.t) =
+      let typ_basic (type other_field other_field_var n) ~num_allowable_proofs
+          ~assert_16_bits (field : (other_field_var, other_field) Impl.Typ.t) =
         let typ_basic :
             type a b.
-               (a, b, ((other_field, other_field_var, 'e) C.Env.t as 'e)) basic
+               ( a
+               , b
+               , ((other_field, other_field_var, n, 'e) C.Env.t as 'e) )
+               basic
             -> (b, a) Impl.Typ.t =
           let open Impl in
           let open C in
@@ -616,7 +637,7 @@ module Wrap =
             | Bool ->
                 Boolean.typ
             | Branch_data ->
-                Branch_data.wrap_typ ~assert_16_bits
+                Branch_data.wrap_typ ~num_allowable_proofs ~assert_16_bits
             | Digest ->
                 Digest.typ
             | Challenge ->
@@ -627,6 +648,7 @@ module Wrap =
         typ_basic
 
       let packed_typ_basic (type other_field other_field_var)
+          ~num_allowable_proofs
           (field : (other_field_var, other_field) Make_ETyp(Impl).t) =
         let open Impl in
         let open C in
@@ -664,7 +686,7 @@ module Wrap =
           | Challenge ->
               T (Challenge.typ, Fn.id, Fn.id)
           | Branch_data ->
-              T (Branch_data.wrap_packed_typ Nat.N2.n, Fn.id, Fn.id)
+              T (Branch_data.wrap_packed_typ ~num_allowable_proofs, Fn.id, Fn.id)
           | Bulletproof_challenge ->
               let typ =
                 let there bp_challenge =
@@ -692,6 +714,10 @@ let typ = Step.typ
 
 let packed_typ = Step.packed_typ
 
+let pack = Step.pack
+
 let wrap_typ = Wrap.typ
 
 let wrap_packed_typ = Wrap.packed_typ
+
+let wrap_pack = Wrap.pack

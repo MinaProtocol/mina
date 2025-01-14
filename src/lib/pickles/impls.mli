@@ -80,6 +80,7 @@ module Step : sig
 
   val input :
        proofs_verified:'proofs_verified Nat.t
+    -> num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
     -> ( 'proofs_verified statement_var
        , 'proofs_verified statement )
        Import.Spec.Step_etyp.t
@@ -129,6 +130,7 @@ module Wrap : sig
 
   val input :
        feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
+    -> num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
     -> unit
     -> ( ( Impl.Field.t
          , Impl.Field.t Composition_types.Scalar_challenge.t

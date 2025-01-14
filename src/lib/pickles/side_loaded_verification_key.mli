@@ -2,6 +2,7 @@
     pickles proof regardless of its original structure.
 *)
 
+open Pickles_types
 module V = Pickles_base.Side_loaded_verification_key
 
 include
@@ -26,9 +27,9 @@ module Width : sig
 
   val typ : (Checked.t, t) Impls.Step.Typ.t
 
-  module Max = Pickles_types.Nat.N2
+  module Max = Nat.N2
 
-  module Max_vector : Pickles_types.Vector.With_version(Max).S
+  module Max_vector : Vector.With_version(Max).S
 
   module Max_at_most : sig
     [%%versioned:
@@ -42,10 +43,12 @@ module Width : sig
 end
 
 module Checked : sig
-  type t =
-    { max_proofs_verified : Pickles_base.Proofs_verified.One_hot.Checked.t
+  type 'num_additional_proofs t =
+    { max_proofs_verified :
+        'num_additional_proofs Pickles_base.Proofs_verified.One_hot.Checked.t
           (** The maximum of all of the [step_widths]. *)
-    ; actual_wrap_domain_size : Pickles_base.Proofs_verified.One_hot.Checked.t
+    ; actual_wrap_domain_size :
+        'num_additional_proofs Pickles_base.Proofs_verified.One_hot.Checked.t
           (** The actual domain size used by the wrap circuit. *)
     ; wrap_index :
         Step_main_inputs.Inner_curve.t
@@ -57,7 +60,8 @@ module Checked : sig
   [@@deriving hlist, fields]
 
   val to_input :
-    t -> Step_main_inputs.Impl.Field.t Random_oracle_input.Chunked.t
+       'num_additional_proofs t
+    -> Step_main_inputs.Impl.Field.t Random_oracle_input.Chunked.t
 end
 
 module Vk : sig
@@ -90,7 +94,7 @@ include Codable.Base58_check_intf with type t := t
 
 include Codable.Base64_intf with type t := t
 
-val typ : (Checked.t, t) Impls.Step.Typ.t
+val typ : (Nat.N0.n Checked.t, t) Impls.Step.Typ.t
 
 val to_yojson : t -> [> `String of string ]
 

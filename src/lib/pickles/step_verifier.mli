@@ -1,3 +1,4 @@
+open Pickles_types
 module Impl := Step_main_inputs.Impl
 
 module Challenge : module type of Import.Challenge.Make (Impl)
@@ -28,11 +29,12 @@ end
 val assert_n_bits : n:int -> Impl.Field.t -> unit
 
 val finalize_other_proof :
-     (module Pickles_types.Nat.Add.Intf with type n = 'b)
+     (module Nat.Add.Intf with type n = 'b)
   -> step_domains:
        [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
        | `Side_loaded ]
   -> zk_rows:int
+  -> num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
   -> sponge:Step_main_inputs.Sponge.t
   -> prev_challenges:
        ((Impl.Field.t, 'a) Pickles_types.Vector.t, 'b) Pickles_types.Vector.t
@@ -48,7 +50,7 @@ val finalize_other_proof :
      , ( Impl.Field.t Import.Scalar_challenge.t Import.Bulletproof_challenge.t
        , 'c )
        Pickles_types.Vector.t
-     , Import.Branch_data.Checked.Step.t
+     , 'num_additional_proofs Import.Branch_data.Checked.Step.t
      , Impl.Boolean.var )
      Import.Types.Wrap.Proof_state.Deferred_values.In_circuit.t
   -> ( Impl.Field.t
@@ -97,7 +99,7 @@ val hash_messages_for_next_step_proof_opt :
 (** Actual verification using cryptographic tools. Returns [true] (encoded as a
     in-circuit Boolean variable) if the verification is successful *)
 val verify :
-     proofs_verified:(module Pickles_types.Nat.Add.Intf with type n = 'a)
+     proofs_verified:(module Nat.Add.Intf with type n = 'a)
   -> is_base_case:Impl.Boolean.var
   -> sg_old:(Impls.Step.Field.t Tuple_lib.Double.t, 'a) Pickles_types.Vector.t
   -> sponge_after_index:Step_main_inputs.Sponge.t
@@ -109,11 +111,13 @@ val verify :
        Composition_types.Wrap.Lookup_parameters.t
        (* lookup arguments parameters *)
   -> feature_flags:Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.t
+  -> num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
   -> proof:Wrap_proof.Checked.t
   -> srs:Kimchi_bindings.Protocol.SRS.Fq.t
   -> wrap_domain:
        [ `Known of Import.Domain.t
        | `Side_loaded of
+         'num_additional_proofs
          Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ]
   -> wrap_verification_key:
        Step_main_inputs.Inner_curve.t array
@@ -135,7 +139,7 @@ val verify :
          Composition_types.Bulletproof_challenge.t
        , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
        Pickles_types.Vector.t
-     , Composition_types.Branch_data.Checked.Step.t )
+     , 'num_additional_proofs Composition_types.Branch_data.Checked.Step.t )
      Import.Types.Wrap.Statement.In_circuit.t
      (* statement *)
   -> Impls.Step.unfinalized_proof_var (* unfinalized *)

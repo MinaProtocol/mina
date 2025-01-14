@@ -186,7 +186,8 @@ module Stable = struct
         let log2_size = Import.Domain.log2_size d in
         let public =
           let (T (input, _conv, _conv_inv)) =
-            Impls.Wrap.input ~feature_flags:Plonk_types.Features.Full.maybe ()
+            Impls.Wrap.input ~feature_flags:Plonk_types.Features.Full.maybe
+              ~num_allowable_proofs:Nat.N2.n ()
           in
           let (Typ typ) = input in
           typ.size_in_field_elements
@@ -304,10 +305,12 @@ let dummy : t =
 module Checked = struct
   open Step_main_inputs
 
-  type t =
-    { max_proofs_verified : Pickles_base.Proofs_verified.One_hot.Checked.t
+  type 'num_additional_proofs t =
+    { max_proofs_verified :
+        'num_additional_proofs Pickles_base.Proofs_verified.One_hot.Checked.t
           (** The maximum of all of the [step_widths]. *)
-    ; actual_wrap_domain_size : Pickles_base.Proofs_verified.One_hot.Checked.t
+    ; actual_wrap_domain_size :
+        'num_additional_proofs Pickles_base.Proofs_verified.One_hot.Checked.t
           (** The actual domain size used by the wrap circuit. *)
     ; wrap_index : Inner_curve.t Plonk_verification_key_evals.t
           (** The plonk verification key for the 'wrapping' proof that this key
@@ -340,12 +343,12 @@ module Checked = struct
         ]
 end
 
-let typ : (Checked.t, t) Impls.Step.Typ.t =
+let typ : (Nat.N0.n Checked.t, t) Impls.Step.Typ.t =
   let open Step_main_inputs in
   let open Impl in
   Typ.of_hlistable
-    [ Pickles_base.Proofs_verified.One_hot.typ
-    ; Pickles_base.Proofs_verified.One_hot.typ
+    [ Pickles_base.Proofs_verified.One_hot.typ (Nat.S Width.Max.n)
+    ; Pickles_base.Proofs_verified.One_hot.typ (Nat.S Width.Max.n)
     ; Plonk_verification_key_evals.typ Inner_curve.typ
     ]
     ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist

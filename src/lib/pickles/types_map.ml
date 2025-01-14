@@ -24,13 +24,14 @@ end
 
 module Side_loaded = struct
   module Ephemeral = struct
-    type t =
+    type 'num_additional_proofs t =
       { index :
-          [ `In_circuit of Side_loaded_verification_key.Checked.t
+          [ `In_circuit of
+            'num_additional_proofs Side_loaded_verification_key.Checked.t
           | `In_prover of Side_loaded_verification_key.t
           | `In_both of
             Side_loaded_verification_key.t
-            * Side_loaded_verification_key.Checked.t ]
+            * 'num_additional_proofs Side_loaded_verification_key.Checked.t ]
       }
   end
 
@@ -45,13 +46,16 @@ module Side_loaded = struct
       }
   end
 
-  type ('var, 'value, 'n1, 'n2) t =
-    { ephemeral : Ephemeral.t option
+  type ('var, 'value, 'n1, 'n2, 'num_additional_proofs) t =
+    { ephemeral : 'num_additional_proofs Ephemeral.t option
     ; permanent : ('var, 'value, 'n1, 'n2) Permanent.t
     }
 
   type packed =
-    | T : ('var, 'value, 'n1, 'n2) Tag.id * ('var, 'value, 'n1, 'n2) t -> packed
+    | T :
+        ('var, 'value, 'n1, 'n2, Nat.N0.n) Tag.id
+        * ('var, 'value, 'n1, 'n2, Nat.N0.n) t
+        -> packed
 
   let to_basic
       { permanent =
@@ -122,7 +126,10 @@ module Compiled = struct
     }
 
   type packed =
-    | T : ('var, 'value, 'n1, 'n2) Tag.id * ('var, 'value, 'n1, 'n2) t -> packed
+    | T :
+        ('var, 'value, 'n1, 'n2, 'num_additional_proofs) Tag.id
+        * ('var, 'value, 'n1, 'n2) t
+        -> packed
 
   let to_basic
       { branches = _
@@ -152,7 +159,12 @@ module Compiled = struct
 end
 
 module For_step = struct
-  type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
+  type ( 'a_var
+       , 'a_value
+       , 'max_proofs_verified
+       , 'branches
+       , 'num_additional_proofs )
+       t =
     { branches : 'branches Nat.t
     ; max_proofs_verified :
         (module Nat.Add.Intf with type n = 'max_proofs_verified)
@@ -162,7 +174,9 @@ module For_step = struct
     ; wrap_key : inner_curve_var array Plonk_verification_key_evals.t
     ; wrap_domain :
         [ `Known of Domain.t
-        | `Side_loaded of Pickles_base.Proofs_verified.One_hot.Checked.t ]
+        | `Side_loaded of
+          'num_additional_proofs Pickles_base.Proofs_verified.One_hot.Checked.t
+        ]
     ; step_domains : [ `Known of (Domains.t, 'branches) Vector.t | `Side_loaded ]
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int
@@ -180,7 +194,8 @@ module For_step = struct
            ; zk_rows
            }
        } :
-        (a, b, c, d) Side_loaded.t ) : (a, b, c, d) t =
+        (a, b, c, d, 'num_additional_proofs) Side_loaded.t ) :
+      (a, b, c, d, 'num_additional_proofs) t =
     let index =
       match ephemeral with
       | Some { index = `In_circuit i | `In_both (_, i) } ->
@@ -273,24 +288,27 @@ let find t k =
   match Hashtbl.find t k with None -> failwith "key not found" | Some x -> x
 
 let lookup_compiled :
-    type var value n m.
-    (var, value, n, m) Tag.id -> (var, value, n, m) Compiled.t =
+    type var value n m num_additional_proofs.
+       (var, value, n, m, num_additional_proofs) Tag.id
+    -> (var, value, n, m) Compiled.t =
  fun t ->
   let (T (other_id, d)) = find univ.compiled (Type_equal.Id.uid t) in
   let T = Type_equal.Id.same_witness_exn t other_id in
   d
 
 let lookup_side_loaded :
-    type var value n m.
-    (var, value, n, m) Tag.id -> (var, value, n, m) Side_loaded.t =
+    type var value n m num_additional_proofs.
+       (var, value, n, m, num_additional_proofs) Tag.id
+    -> (var, value, n, m, num_additional_proofs) Side_loaded.t =
  fun t ->
   let (T (other_id, d)) = find univ.side_loaded (Type_equal.Id.uid t) in
   let T = Type_equal.Id.same_witness_exn t other_id in
   d
 
 let lookup_basic :
-    type var value n m.
-    (var, value, n, m) Tag.t -> (var, value, n, m) Basic.t Promise.t =
+    type var value n m num_additional_proofs.
+       (var, value, n, m, num_additional_proofs) Tag.t
+    -> (var, value, n, m) Basic.t Promise.t =
  fun t ->
   match t.kind with
   | Compiled ->
@@ -299,7 +317,7 @@ let lookup_basic :
       Promise.return @@ Side_loaded.to_basic (lookup_side_loaded t.id)
 
 let max_proofs_verified :
-    type n1. (_, _, n1, _) Tag.t -> (module Nat.Add.Intf with type n = n1) =
+    type n1. (_, _, n1, _, _) Tag.t -> (module Nat.Add.Intf with type n = n1) =
  fun tag ->
   match tag.kind with
   | Compiled ->
@@ -308,7 +326,8 @@ let max_proofs_verified :
       (lookup_side_loaded tag.id).permanent.max_proofs_verified
 
 let public_input :
-    type var value. (var, value, _, _) Tag.t -> (var, value) Impls.Step.Typ.t =
+    type var value. (var, value, _, _, _) Tag.t -> (var, value) Impls.Step.Typ.t
+    =
  fun tag ->
   match tag.kind with
   | Compiled ->
@@ -318,7 +337,7 @@ let public_input :
 
 let feature_flags :
     type var value.
-    (var, value, _, _) Tag.t -> Opt.Flag.t Plonk_types.Features.Full.t =
+    (var, value, _, _, _) Tag.t -> Opt.Flag.t Plonk_types.Features.Full.t =
  fun tag ->
   match tag.kind with
   | Compiled ->
@@ -326,7 +345,7 @@ let feature_flags :
   | Side_loaded ->
       (lookup_side_loaded tag.id).permanent.feature_flags
 
-let num_chunks : type var value. (var, value, _, _) Tag.t -> int =
+let num_chunks : type var value. (var, value, _, _, _) Tag.t -> int =
  fun tag ->
   match tag.kind with
   | Compiled ->
@@ -335,16 +354,17 @@ let num_chunks : type var value. (var, value, _, _) Tag.t -> int =
       (lookup_side_loaded tag.id).permanent.num_chunks
 
 let _value_to_field_elements :
-    type a. (_, a, _, _) Tag.t -> a -> Backend.Tick.Field.t array =
+    type a. (_, a, _, _, _) Tag.t -> a -> Backend.Tick.Field.t array =
  fun t ->
   let (Typ typ) = public_input t in
   fun x -> fst (typ.value_to_fields x)
 
-let _lookup_map (type var value c d) (t : (var, value, c, d) Tag.t) ~self
-    ~default
+let _lookup_map (type var value c d num_additional_proofs)
+    (t : (var, value, c, d, num_additional_proofs) Tag.t) ~self ~default
     ~(f :
           [ `Compiled of (var, value, c, d) Compiled.t
-          | `Side_loaded of (var, value, c, d) Side_loaded.t ]
+          | `Side_loaded of
+            (var, value, c, d, num_additional_proofs) Side_loaded.t ]
        -> _ ) =
   match Type_equal.Id.same_witness t.id self with
   | Some _ ->
@@ -368,7 +388,7 @@ let add_side_loaded ~name permanent =
     ~data:(T (id, { ephemeral = None; permanent })) ;
   tag
 
-let set_ephemeral { Tag.kind; id } (eph : Side_loaded.Ephemeral.t) =
+let set_ephemeral { Tag.kind; id } (eph : Nat.N0.n Side_loaded.Ephemeral.t) =
   assert (match kind with Side_loaded -> true | Compiled -> false) ;
   Hashtbl.update univ.side_loaded (Type_equal.Id.uid id) ~f:(function
     | None ->
@@ -389,7 +409,8 @@ let set_ephemeral { Tag.kind; id } (eph : Side_loaded.Ephemeral.t) =
         in
         T (id, { d with ephemeral }) )
 
-let add_exn (type var value c d) (tag : (var, value, c, d) Tag.t)
+let add_exn (type var value c d num_additional_proofs)
+    (tag : (var, value, c, d, num_additional_proofs) Tag.t)
     (data : (var, value, c, d) Compiled.t) =
   Hashtbl.add_exn univ.compiled ~key:(Type_equal.Id.uid tag.id)
     ~data:(Compiled.T (tag.id, data))

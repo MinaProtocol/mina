@@ -37,6 +37,7 @@ val wrap :
   -> actual_wrap_domains:(Core_kernel.Int.t, 'c) Pickles_types.Vector.t
   -> step_plonk_indices:'d
   -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
+  -> num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
   -> actual_feature_flags:bool Plonk_types.Features.t
   -> ?tweak_statement:
        (   ( Import.Challenge.Constant.t

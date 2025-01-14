@@ -20,12 +20,13 @@ end
 
 module Side_loaded : sig
   module Ephemeral : sig
-    type t =
+    type 'num_additional_proofs t =
       { index :
           [ `In_both of
             Side_loaded_verification_key.t
-            * Side_loaded_verification_key.Checked.t
-          | `In_circuit of Side_loaded_verification_key.Checked.t
+            * 'num_additional_proofs Side_loaded_verification_key.Checked.t
+          | `In_circuit of
+            'num_additional_proofs Side_loaded_verification_key.Checked.t
           | `In_prover of Side_loaded_verification_key.t ]
       }
   end
@@ -42,15 +43,19 @@ module Side_loaded : sig
       }
   end
 
-  type ('var, 'value, 'n1, 'n2) t =
-    { ephemeral : Ephemeral.t option
+  type ('var, 'value, 'n1, 'n2, 'num_additional_proofs) t =
+    { ephemeral : 'num_additional_proofs Ephemeral.t option
     ; permanent : ('var, 'value, 'n1, 'n2) Permanent.t
     }
 
   type packed =
-    | T : ('var, 'value, 'n1, 'n2) Tag.id * ('var, 'value, 'n1, 'n2) t -> packed
+    | T :
+        ('var, 'value, 'n1, 'n2, Nat.N0.n) Tag.id
+        * ('var, 'value, 'n1, 'n2, Nat.N0.n) t
+        -> packed
 
-  val to_basic : ('a, 'b, 'c, 'd) t -> ('a, 'b, 'c, 'd) Basic.t
+  val to_basic :
+    ('a, 'b, 'c, 'd, 'num_additional_proofs) t -> ('a, 'b, 'c, 'd) Basic.t
 end
 
 module Compiled : sig
@@ -88,7 +93,12 @@ module Compiled : sig
 end
 
 module For_step : sig
-  type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
+  type ( 'a_var
+       , 'a_value
+       , 'max_proofs_verified
+       , 'branches
+       , 'num_additional_proofs )
+       t =
     { branches : 'branches Pickles_types.Nat.t
     ; max_proofs_verified :
         (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
@@ -100,7 +110,9 @@ module For_step : sig
         inner_curve_var array Pickles_types.Plonk_verification_key_evals.t
     ; wrap_domain :
         [ `Known of Import.Domain.t
-        | `Side_loaded of Pickles_base.Proofs_verified.One_hot.Checked.t ]
+        | `Side_loaded of
+          'num_additional_proofs Pickles_base.Proofs_verified.One_hot.Checked.t
+        ]
     ; step_domains :
         [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
         | `Side_loaded ]
@@ -109,7 +121,8 @@ module For_step : sig
     ; zk_rows : int
     }
 
-  val of_side_loaded : ('a, 'b, 'c, 'd) Side_loaded.t -> ('a, 'b, 'c, 'd) t
+  val of_side_loaded :
+    ('a, 'b, 'c, 'd, 'e) Side_loaded.t -> ('a, 'b, 'c, 'd, 'e) t
 
   module Optional_wrap_key : sig
     type 'branches known =
@@ -125,9 +138,10 @@ module For_step : sig
   val of_compiled_with_known_wrap_key :
        'branches Optional_wrap_key.known
     -> ('a, 'b, 'c, 'branches) Compiled.t
-    -> ('a, 'b, 'c, 'branches) t
+    -> ('a, 'b, 'c, 'branches, 'num_additional_proofs) t
 
-  val of_compiled : ('a, 'b, 'c, 'd) Compiled.t -> ('a, 'b, 'c, 'd) t Promise.t
+  val of_compiled :
+    ('a, 'b, 'c, 'd) Compiled.t -> ('a, 'b, 'c, 'd, 'e) t Promise.t
 end
 
 type t
@@ -135,21 +149,24 @@ type t
 val univ : t
 
 val lookup_compiled :
-  ('var, 'value, 'n, 'm) Tag.id -> ('var, 'value, 'n, 'm) Compiled.t
+     ('var, 'value, 'n, 'm, 'num_additional_proofs) Tag.id
+  -> ('var, 'value, 'n, 'm) Compiled.t
 
 val lookup_side_loaded :
-  ('var, 'value, 'n, 'm) Tag.id -> ('var, 'value, 'n, 'm) Side_loaded.t
+     ('var, 'value, 'n, 'm, 'num_additional_proofs) Tag.id
+  -> ('var, 'value, 'n, 'm, 'num_additional_proofs) Side_loaded.t
 
 val lookup_basic :
-  ('var, 'value, 'n, 'm) Tag.t -> ('var, 'value, 'n, 'm) Basic.t Promise.t
+     ('var, 'value, 'n, 'm, 'num_additional_proofs) Tag.t
+  -> ('var, 'value, 'n, 'm) Basic.t Promise.t
 
 val add_side_loaded :
      name:string
   -> ('a, 'b, 'c, 'd) Side_loaded.Permanent.t
-  -> ('a, 'b, 'c, 'd) Tag.t
+  -> ('a, 'b, 'c, 'd, Pickles_types.Nat.N0.n) Tag.t
 
 val max_proofs_verified :
-     ('a, 'b, 'n1, 'c) Tag.t
+     ('a, 'b, 'n1, 'c, 'num_additional_proofs) Tag.t
   -> (module Pickles_types.Nat.Add.Intf with type n = 'n1)
 
 val feature_flags : _ Tag.t -> Opt.Flag.t Plonk_types.Features.Full.t
@@ -157,8 +174,12 @@ val feature_flags : _ Tag.t -> Opt.Flag.t Plonk_types.Features.Full.t
 val num_chunks : _ Tag.t -> int
 
 val add_exn :
-  ('var, 'value, 'c, 'd) Tag.t -> ('var, 'value, 'c, 'd) Compiled.t -> unit
+     ('var, 'value, 'c, 'd, 'num_additional_proofs) Tag.t
+  -> ('var, 'value, 'c, 'd) Compiled.t
+  -> unit
 
-val set_ephemeral : _ Tag.t -> Side_loaded.Ephemeral.t -> unit
+val set_ephemeral :
+  (_, _, _, _, Nat.N0.n) Tag.t -> Nat.N0.n Side_loaded.Ephemeral.t -> unit
 
-val public_input : ('var, 'value, _, _) Tag.t -> ('var, 'value) Impls.Step.Typ.t
+val public_input :
+  ('var, 'value, _, _, _) Tag.t -> ('var, 'value) Impls.Step.Typ.t

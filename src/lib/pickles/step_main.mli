@@ -2,7 +2,7 @@
 val step_main :
   'proofs_verified 'self_branches 'prev_vars 'prev_values 'var 'value 'a_var
   'a_value 'ret_var 'ret_value 'auxiliary_var 'auxiliary_value
-  'max_proofs_verified 'local_branches 'local_signature.
+  'max_proofs_verified 'local_branches 'local_signature 'num_additional_proofs.
      (module Requests.Step.S
         with type auxiliary_value = 'auxiliary_value
          and type local_branches = 'local_branches
@@ -42,11 +42,18 @@ val step_main :
   -> known_wrap_keys:
        'local_branches
        Pickles_types.Hlist.H1.T(Types_map.For_step.Optional_wrap_key).t
-  -> self:('var, 'value, 'max_proofs_verified, 'self_branches) Tag.t
+  -> self:
+       ( 'var
+       , 'value
+       , 'max_proofs_verified
+       , 'self_branches
+       , 'num_additional_proofs )
+       Tag.t
   -> ( 'prev_vars
      , 'prev_values
      , 'local_signature
      , 'local_branches
+     , 'num_additional_proofs
      , 'a_var
      , 'a_value
      , 'ret_var

@@ -49,7 +49,7 @@ type scalar_challenge = challenge Scalar_challenge.t
     To have some notation, the proof S itself comes from a circuit that verified
     up to 'max_proofs_verified many wrap proofs W_0, ..., W_max_proofs_verified.
 *)
-type ('app_state, 'max_proofs_verified, 'num_branches) t =
+type ('app_state, 'max_proofs_verified, 'num_branches, 'num_additional_proofs) t =
   { app_state : 'app_state
         (** The user-level statement corresponding to this proof. *)
   ; wrap_proof : Wrap_proof.Checked.t
@@ -68,7 +68,7 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       , unit
       , Digest.Make(Impl).t
       , scalar_challenge Types.Bulletproof_challenge.t Types.Step_bp_vec.t
-      , Branch_data.Checked.Step.t )
+      , 'num_additional_proofs Branch_data.Checked.Step.t )
       Types.Wrap.Proof_state.In_circuit.t
         (** The accumulator state corresponding to the above proof. Contains
       - `deferred_values`: The values necessary for finishing the deferred "scalar field" computations.
@@ -96,8 +96,8 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
 [@@deriving hlist]
 
 module No_app_state = struct
-  type nonrec (_, 'max_proofs_verified, 'num_branches) t =
-    (unit, 'max_proofs_verified, 'num_branches) t
+  type nonrec (_, 'max_proofs_verified, 'num_branches, 'num_additional_proofs) t =
+    (unit, 'max_proofs_verified, 'num_branches, 'num_additional_proofs) t
 end
 
 module Constant = struct
@@ -136,7 +136,7 @@ end
 
 let typ (type n avar aval) ~feature_flags ~num_chunks
     (statement : (avar, aval) Impls.Step.Typ.t) (max_proofs_verified : n Nat.t)
-    =
+    ~num_allowable_proofs =
   let module Sc = Scalar_challenge in
   let open Impls.Step in
   let open Step_verifier in
@@ -149,7 +149,8 @@ let typ (type n avar aval) ~feature_flags ~num_chunks
         ~dummy_scalar_challenge:(Sc.create Limb_vector.Challenge.Constant.zero)
         (Shifted_value.Type1.typ Field.typ)
         Impls.Step.Typ.unit Digest.typ
-        (Branch_data.typ ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16))
+        (Branch_data.typ ~num_allowable_proofs
+           ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
     ; Plonk_types.All_evals.typ ~num_chunks
         (* Assume we have lookup iff we have runtime tables *)
         feature_flags

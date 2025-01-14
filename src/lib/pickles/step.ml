@@ -38,8 +38,8 @@ struct
                a rule in proof system i. max_local_max_proof_verifieds is the max of the N_i.
             *)
       max_local_max_proof_verifieds self_branches prev_vars prev_values
-      local_widths local_heights prevs_length var value ret_var ret_value
-      auxiliary_var auxiliary_value ) ?handler ~proof_cache
+      local_widths local_heights num_additional_proofs prevs_length var value
+      ret_var ret_value auxiliary_var auxiliary_value ) ?handler ~proof_cache
       (T branch_data :
         ( A.t
         , A_value.t
@@ -52,13 +52,15 @@ struct
         , prev_vars
         , prev_values
         , local_widths
-        , local_heights )
+        , local_heights
+        , num_additional_proofs )
         Step_branch_data.t ) (next_state : A_value.t)
       ~maxes:
         (module Maxes : Pickles_types.Hlist.Maxes.S
           with type length = Max_proofs_verified.n
            and type ns = max_local_max_proof_verifieds )
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
+      ~(num_allowable_proofs : num_additional_proofs Nat.N2.plus_n Nat.t)
       ~feature_flags ~self_dlog_plonk_index
       ~(public_input :
          ( var
@@ -92,7 +94,7 @@ struct
       Hlist.Length.contr (snd branch_data.proofs_verified) prev_vars_length
     in
     let prev_values_length =
-      let module L12 = H4.Length_1_to_2 (Tag) in
+      let module L12 = H5.Length_1_to_2 (Tag) in
       L12.f branch_data.rule.prevs prev_vars_length
     in
     let lte = branch_data.lte in
@@ -298,7 +300,7 @@ struct
       let module O = Tock.Oracles in
       let o =
         let public_input =
-          tock_public_input_of_statement ~feature_flags
+          tock_public_input_of_statement ~feature_flags ~num_allowable_proofs
             prev_statement_with_hashes
         in
         O.create dlog_vk
@@ -548,8 +550,8 @@ struct
       [%log internal] "Step_compute_prev_proof_parts" ;
       let%map.Promise prevs =
         let rec go :
-            type vars values ns ms.
-               (vars, values, ns, ms) H4.T(Tag).t
+            type vars values ns ms num_additional_proofss.
+               (vars, values, ns, ms, num_additional_proofss) H5.T(Tag).t
             -> (vars, values, ns, ms) H4.T(Types_map.Basic).t Promise.t =
           function
           | [] ->
@@ -569,8 +571,8 @@ struct
           , prev_proofs'
           , actual_wrap_domains' ) =
         let[@warning "-4"] rec go :
-            type vars values ns ms k.
-               (vars, values, ns, ms) H4.T(Tag).t
+            type vars values ns ms k num_additional_proofss.
+               (vars, values, ns, ms, num_additional_proofss) H5.T(Tag).t
             -> (vars, values, ns, ms) H4.T(Types_map.Basic).t
             -> ( values
                , ns )
@@ -649,9 +651,9 @@ struct
     let extract_from_proofs (type res)
         (module Extract : Extract.S with type res = res) =
       let rec go :
-          type vars values ns ms len.
+          type vars values ns ms len num_additional_proofss.
              (ns, ns) H2.T(Proof).t
-          -> (values, vars, ns, ms) H4.T(Tag).t
+          -> (values, vars, ns, ms, num_additional_proofss) H5.T(Tag).t
           -> (vars, len) Length.t
           -> (res, len) Vector.t =
        fun prevs tags len ->
@@ -803,6 +805,7 @@ struct
                     , _next_statement_hashed ) =
       let (T (input, _conv, conv_inv)) =
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
+          ~num_allowable_proofs
       in
       let%bind.Promise main = branch_data.main ~step_domains in
       let%bind.Promise step_domains = step_domains in

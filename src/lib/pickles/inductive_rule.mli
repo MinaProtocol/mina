@@ -99,6 +99,7 @@ end) : sig
        , 'prev_values
        , 'widths
        , 'heights
+       , 'num_additional_proofss
        , 'a_var
        , 'a_value
        , 'ret_var
@@ -111,8 +112,9 @@ end) : sig
         ( 'prev_vars
         , 'prev_values
         , 'widths
-        , 'heights )
-        Pickles_types.Hlist.H4.T(Tag).t
+        , 'heights
+        , 'num_additional_proofss )
+        Pickles_types.Hlist.H5.T(Tag).t
     ; main :
            'a_var main_input
         -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return M.t
@@ -126,11 +128,17 @@ end) : sig
       (Return_value : Pickles_types.Poly_types.T0)
       (Auxiliary_var : Pickles_types.Poly_types.T0)
       (Auxiliary_value : Pickles_types.Poly_types.T0) : sig
-    type nonrec ('prev_vars, 'prev_values, 'widths, 'heights) t =
+    type nonrec ( 'prev_vars
+                , 'prev_values
+                , 'widths
+                , 'heights
+                , 'num_additional_proofss )
+                t =
       ( 'prev_vars
       , 'prev_values
       , 'widths
       , 'heights
+      , 'num_additional_proofss
       , Statement.t
       , Statement_value.t
       , Return_var.t

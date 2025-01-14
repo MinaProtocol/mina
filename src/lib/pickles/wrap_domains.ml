@@ -15,7 +15,7 @@ module Make
     (Auxiliary_value : T0) =
 struct
   let f_debug full_signature _num_choices choices_length ~feature_flags
-      ~num_chunks ~max_proofs_verified =
+      ~num_chunks ~max_proofs_verified ~num_allowable_proofs =
     let num_choices = Hlist.Length.to_nat choices_length in
     let dummy_step_domains =
       Promise.return
@@ -41,22 +41,22 @@ struct
     Timer.clock __LOC__ ;
     let srs = Backend.Tick.Keypair.load_urs () in
     let _, main =
-      Wrap_main.wrap_main ~feature_flags ~num_chunks ~srs full_signature
-        choices_length dummy_step_keys dummy_step_widths dummy_step_domains
-        max_proofs_verified
+      Wrap_main.wrap_main ~feature_flags ~num_chunks ~num_allowable_proofs ~srs
+        full_signature choices_length dummy_step_keys dummy_step_widths
+        dummy_step_domains max_proofs_verified
     in
     Timer.clock __LOC__ ;
     let%bind.Promise main = Lazy.force main in
     let t =
       Fix_domains.wrap_domains
-        (Impls.Wrap.input ~feature_flags ())
+        (Impls.Wrap.input ~feature_flags ~num_allowable_proofs ())
         (T (Impls.Wrap.Typ.unit, Fn.id, Fn.id))
         (fun input -> Promise.return (main input))
     in
     Timer.clock __LOC__ ; t
 
-  let f full_signature num_choices choices_length ~feature_flags ~num_chunks
-      ~max_proofs_verified =
+  let f _full_signature _num_choices _choices_length ~feature_flags:_
+      ~num_chunks:_ ~max_proofs_verified ~num_allowable_proofs:_ =
     Common.wrap_domains
       ~proofs_verified:(Nat.to_int (Nat.Add.n max_proofs_verified))
 end

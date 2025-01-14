@@ -36,11 +36,9 @@ module Old_bulletproof_chals = struct
         -> t
 end
 
-let pack_statement max_proofs_verified t =
+let pack_statement ~num_allowable_proofs max_proofs_verified t =
   let open Types.Step in
-  Spec.pack
-    (module Impl)
-    (module Branch_data.Checked.Wrap)
+  Spec.wrap_pack ~num_allowable_proofs
     (Statement.spec max_proofs_verified Backend.Tock.Rounds.n)
     (Statement.to_data t)
 
@@ -84,7 +82,7 @@ let split_field (x : Field.t) : Field.t * Boolean.var =
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
 let wrap_main
     (type max_proofs_verified branches prev_varss max_local_max_proofs_verifieds)
-    ~num_chunks ~feature_flags
+    ~num_chunks ~num_allowable_proofs ~feature_flags
     (full_signature :
       ( max_proofs_verified
       , branches
@@ -205,7 +203,7 @@ let wrap_main
             with_label __LOC__ (fun () ->
                 let open Types.Step.Proof_state in
                 let typ =
-                  wrap_typ
+                  wrap_typ ~num_allowable_proofs
                     ~assert_16_bits:(Wrap_verifier.assert_n_bits ~n:16)
                     (Vector.init Max_proofs_verified.n ~f:(fun _ ->
                          Plonk_types.Features.none ) )
@@ -498,8 +496,8 @@ let wrap_main
                     ~verification_key:step_plonk_index ~srs ~xi ~sponge
                     ~public_input:
                       (Array.map
-                         (pack_statement Max_proofs_verified.n prev_statement)
-                         ~f:(function
+                         (pack_statement ~num_allowable_proofs
+                            Max_proofs_verified.n prev_statement ) ~f:(function
                         | `Field (Shifted_value x) ->
                             `Field (split_field x)
                         | `Packed_bits (x, n) ->

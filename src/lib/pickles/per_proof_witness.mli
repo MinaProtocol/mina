@@ -14,7 +14,7 @@ type scalar_challenge = challenge Import.Scalar_challenge.t
     To have some notation, the proof S itself comes from a circuit that verified
     up to 'max_proofs_verified many wrap proofs W_0, ..., W_max_proofs_verified.
 *)
-type ('app_state, 'max_proofs_verified, 'num_branches) t =
+type ('app_state, 'max_proofs_verified, 'num_branches, 'num_additional_proofs) t =
   { app_state : 'app_state
         (** The user-level statement corresponding to this proof. *)
   ; wrap_proof : Wrap_proof.Checked.t
@@ -34,7 +34,7 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       , Import.Digest.Make(Impl).t
       , scalar_challenge Import.Bulletproof_challenge.t
         Import.Types.Step_bp_vec.t
-      , Import.Branch_data.Checked.Step.t )
+      , 'num_additional_proofs Import.Branch_data.Checked.Step.t )
       Import.Types.Wrap.Proof_state.In_circuit.t
         (** The accumulator state corresponding to the above proof. Contains
       - `deferred_values`: The values necessary for finishing the deferred "scalar field" computations.
@@ -66,8 +66,8 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
 [@@deriving hlist]
 
 module No_app_state : sig
-  type nonrec (_, 'max_proofs_verified, 'num_branches) t =
-    (unit, 'max_proofs_verified, 'num_branches) t
+  type nonrec (_, 'max_proofs_verified, 'num_branches, 'num_additional_proofs) t =
+    (unit, 'max_proofs_verified, 'num_branches, 'num_additional_proofs) t
 end
 
 module Constant : sig
@@ -114,5 +114,8 @@ val typ :
      feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
   -> num_chunks:int
   -> ('avar, 'aval) Impl.Typ.t
-  -> 'n Pickles_types.Nat.t
-  -> (('avar, 'n, _) t, ('aval, 'n) Constant.t) Impl.Typ.t
+  -> 'n Nat.t
+  -> num_allowable_proofs:'num_additional_proofs Nat.N2.plus_n Nat.t
+  -> ( ('avar, 'n, _, 'num_additional_proofs) t
+     , ('aval, 'n) Constant.t )
+     Impl.Typ.t

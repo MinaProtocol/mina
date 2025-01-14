@@ -481,11 +481,13 @@ struct
     in
     x_hat
 
-  let incrementally_verify_proof (type b)
-      (module Proofs_verified : Nat.Add.Intf with type n = b) ~srs:_
+  let incrementally_verify_proof (type b num_additional_proofs)
+      (module Proofs_verified : Nat.Add.Intf with type n = b)
+      ~(num_allowable_proofs : num_additional_proofs Nat.N2.plus_n Nat.t) ~srs:_
       ~(domain :
          [ `Known of Domain.t
          | `Side_loaded of
+           num_additional_proofs
            Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ] )
       ~srs ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
       ~sponge_after_index
@@ -532,10 +534,9 @@ struct
                   |> Inner_curve.negate
               | `Side_loaded which ->
                   public_input_commitment_dynamic ~srs which
-                    (Vector.map
+                    (Vector.init (Nat.S num_allowable_proofs)
                        ~f:(fun proofs_verified ->
-                         Common.wrap_domains ~proofs_verified )
-                       [ 0; 1; 2 ] )
+                         Common.wrap_domains ~proofs_verified ) )
                     ~public_input )
         in
         let x_hat =
@@ -794,9 +795,9 @@ struct
         end)
   end
 
-  let domain_for_compiled (type branches)
+  let domain_for_compiled (type branches num_additional_proofs)
       (domains : (Domains.t, branches) Vector.t)
-      (branch_data : Branch_data.Checked.Step.t) :
+      (branch_data : num_additional_proofs Branch_data.Checked.Step.t) :
       Field.t Plonk_checks.plonk_domain =
     let (T unique_domains) =
       List.map (Vector.to_list domains) ~f:Domains.h
@@ -827,10 +828,11 @@ struct
      4. Perform the arithmetic checks from marlin. *)
   (* TODO: This needs to handle the fact of variable length evaluations.
      Meaning it needs opt sponge. *)
-  let finalize_other_proof (type b branches)
+  let finalize_other_proof (type b branches num_additional_proofs)
       (module Proofs_verified : Nat.Add.Intf with type n = b)
       ~(step_domains :
          [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] ) ~zk_rows
+      ~(num_allowable_proofs : num_additional_proofs Nat.N2.plus_n Nat.t)
       ~(* TODO: Add "actual proofs verified" so that proofs don't
           carry around dummy "old bulletproof challenges" *)
        sponge ~(prev_challenges : (_, b) Vector.t)
@@ -847,7 +849,7 @@ struct
         , _
         , _
         , _
-        , Branch_data.Checked.Step.t
+        , num_additional_proofs Branch_data.Checked.Step.t
         , _ )
         Types.Wrap.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
@@ -884,7 +886,7 @@ struct
         Vector.map2
           ~f:(fun keep f -> (keep, f pt))
           (Vector.trim_front actual_width_mask
-             (Nat.lte_exn Proofs_verified.n Nat.N2.n) )
+             (Nat.lte_exn Proofs_verified.n num_allowable_proofs) )
           sg_olds
       in
       (sg_evals plonk.zeta, sg_evals zetaw)
@@ -894,7 +896,7 @@ struct
         let opt_sponge = Opt_sponge.create sponge_params in
         Vector.iter2
           (Vector.trim_front actual_width_mask
-             (Nat.lte_exn Proofs_verified.n Nat.N2.n) )
+             (Nat.lte_exn Proofs_verified.n num_allowable_proofs) )
           prev_challenges
           ~f:(fun keep chals ->
             Vector.iter chals ~f:(fun chal ->
@@ -1169,15 +1171,13 @@ struct
     Boolean.false_
 
   let verify ~proofs_verified ~is_base_case ~sg_old ~sponge_after_index
-      ~lookup_parameters ~feature_flags ~(proof : Wrap_proof.Checked.t) ~srs
-      ~wrap_domain ~wrap_verification_key statement
-      (unfinalized : Impls.Step.unfinalized_proof_var) =
+      ~lookup_parameters ~feature_flags ~num_allowable_proofs
+      ~(proof : Wrap_proof.Checked.t) ~srs ~wrap_domain ~wrap_verification_key
+      statement (unfinalized : Impls.Step.unfinalized_proof_var) =
     let public_input :
         [ `Field of Field.t | `Packed_bits of Field.t * int ] array =
       with_label "pack_statement" (fun () ->
-          Spec.pack
-            (module Impl)
-            (module Branch_data.Checked.Step)
+          Spec.pack ~num_allowable_proofs
             (Types.Wrap.Statement.In_circuit.spec
                (module Impl)
                lookup_parameters feature_flags )
@@ -1199,9 +1199,9 @@ struct
     in
     let ( sponge_digest_before_evaluations_actual
         , (`Success bulletproof_success, bulletproof_challenges_actual) ) =
-      incrementally_verify_proof ~srs proofs_verified ~srs ~domain:wrap_domain
-        ~xi ~verification_key:wrap_verification_key ~sponge ~sponge_after_index
-        ~public_input ~sg_old
+      incrementally_verify_proof ~srs proofs_verified ~num_allowable_proofs ~srs
+        ~domain:wrap_domain ~xi ~verification_key:wrap_verification_key ~sponge
+        ~sponge_after_index ~public_input ~sg_old
         ~advice:{ b; combined_inner_product }
         ~proof
         ~plonk:

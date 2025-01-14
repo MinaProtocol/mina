@@ -58,14 +58,14 @@ module Make_str (A : Wire_types.Concrete) = struct
   let length_in_bits = 10
 
   let pack (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) n
-      ({ proofs_verified; domain_log2 } : t) : f =
+      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+      ~num_allowable_proofs ({ proofs_verified; domain_log2 } : t) : f =
     let open Impl.Field.Constant in
     let double x = x + x in
     let times4 x = double (double x) in
     let domain_log2 = of_int (Char.to_int domain_log2) in
     let (x0 :: x1 :: proofs_verified_rest) =
-      Proofs_verified.to_bool_vec n proofs_verified
+      Proofs_verified.to_bool_vec num_allowable_proofs proofs_verified
     in
     (* shift domain_log2 over by 2 bits (multiply by 4) *)
     (of_int 1024 * project (Pickles_types.Vector.to_list proofs_verified_rest))
@@ -73,15 +73,15 @@ module Make_str (A : Wire_types.Concrete) = struct
     + project [ x0; x1 ]
 
   let unpack (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) n
-      (x : f) : t =
+      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+      ~num_allowable_proofs (x : f) : t =
     let open Pickles_types in
     match Impl.Field.Constant.unpack x with
     | x0
       :: x1
          :: y0 :: y1 :: y2 :: y3 :: y4 :: y5 :: y6 :: y7 :: proofs_verified_rest
       ->
-        let (Nat.S (Nat.S n_sub_2)) = n in
+        let (Nat.S (Nat.S n_sub_2)) = num_allowable_proofs in
         let proofs_verified_rest =
           Vector.of_list_and_length_exn
             (List.take proofs_verified_rest (Nat.to_int n_sub_2))
@@ -103,17 +103,28 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       type field_var = Field.t
 
-      type t =
-        { proofs_verified_mask : Proofs_verified.Prefix_mask.Step.Checked.t
+      type 'n t =
+        { proofs_verified_mask : 'n Proofs_verified.Prefix_mask.Step.Checked.t
         ; domain_log2 : Field.t
         }
       [@@deriving hlist]
 
-      let pack ({ proofs_verified_mask; domain_log2 } : t) : Field.t =
+      let pack ({ proofs_verified_mask; domain_log2 } : 'n t) : Field.t =
         let open Field in
-        let four = of_int 4 in
-        (four * domain_log2)
-        + pack (Pickles_types.Vector.to_list proofs_verified_mask)
+        let (x0 :: x1 :: proofs_verified_rest) = proofs_verified_mask in
+        let proofs_verified_rest =
+          Pickles_types.Vector.to_list proofs_verified_rest
+        in
+        match proofs_verified_rest with
+        | [] ->
+            let four = of_int 4 in
+            (four * domain_log2)
+            + pack (Pickles_types.Vector.to_list [ x0; x1 ])
+        | proofs_verified_rest ->
+            let four = of_int 4 in
+            (of_int 1024 * pack proofs_verified_rest)
+            + (four * domain_log2)
+            + pack (Pickles_types.Vector.to_list [ x0; x1 ])
     end
 
     module Wrap = struct
@@ -121,40 +132,52 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       type field_var = Field.t
 
-      type t =
-        { proofs_verified_mask : Proofs_verified.Prefix_mask.Wrap.Checked.t
+      type 'n t =
+        { proofs_verified_mask : 'n Proofs_verified.Prefix_mask.Wrap.Checked.t
         ; domain_log2 : Field.t
         }
       [@@deriving hlist]
 
-      let pack ({ proofs_verified_mask; domain_log2 } : t) : Field.t =
+      let pack ({ proofs_verified_mask; domain_log2 } : 'n t) : Field.t =
         let open Field in
-        let four = of_int 4 in
-        (four * domain_log2)
-        + pack (Pickles_types.Vector.to_list proofs_verified_mask)
+        let (x0 :: x1 :: proofs_verified_rest) = proofs_verified_mask in
+        let proofs_verified_rest =
+          Pickles_types.Vector.to_list proofs_verified_rest
+        in
+        match proofs_verified_rest with
+        | [] ->
+            let four = of_int 4 in
+            (four * domain_log2)
+            + pack (Pickles_types.Vector.to_list [ x0; x1 ])
+        | proofs_verified_rest ->
+            let four = of_int 4 in
+            (of_int 1024 * pack proofs_verified_rest)
+            + (four * domain_log2)
+            + pack (Pickles_types.Vector.to_list [ x0; x1 ])
     end
   end
 
-  let packed_typ n =
+  let packed_typ ~num_allowable_proofs =
     Step_impl.Typ.transport Step_impl.Typ.field
-      ~there:(pack (module Step_impl) n)
-      ~back:(unpack (module Step_impl) n)
+      ~there:(pack (module Step_impl) ~num_allowable_proofs)
+      ~back:(unpack (module Step_impl) ~num_allowable_proofs)
 
-  let wrap_packed_typ n =
+  let wrap_packed_typ ~num_allowable_proofs =
     Wrap_impl.Typ.transport Wrap_impl.Typ.field
-      ~there:(pack (module Wrap_impl) n)
-      ~back:(unpack (module Wrap_impl) n)
+      ~there:(pack (module Wrap_impl) ~num_allowable_proofs)
+      ~back:(unpack (module Wrap_impl) ~num_allowable_proofs)
 
-  let typ
+  let typ ~num_allowable_proofs
       ~(* We actually only need it to be less than 252 bits in order to pack
           the whole branch_data struct safely, but it's cheapest to check that it's
           under 16 bits *)
       (assert_16_bits : Step_impl.Field.t -> unit) :
-      (Checked.Step.t, t) Step_impl.Typ.t =
+      ('n Checked.Step.t, t) Step_impl.Typ.t =
     let open Step_impl in
     let proofs_verified_mask :
-        (Proofs_verified.Prefix_mask.Step.Checked.t, Proofs_verified.t) Typ.t =
-      Proofs_verified.Prefix_mask.Step.typ
+        ('n Proofs_verified.Prefix_mask.Step.Checked.t, Proofs_verified.t) Typ.t
+        =
+      Proofs_verified.Prefix_mask.Step.typ num_allowable_proofs
     in
     let domain_log2 : (Field.t, Domain_log2.t) Typ.t =
       let (Typ t) =
@@ -170,16 +193,17 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~value_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~var_to_hlist:Checked.Step.to_hlist ~var_of_hlist:Checked.Step.of_hlist
 
-  let wrap_typ
+  let wrap_typ ~num_allowable_proofs
       ~(* We actually only need it to be less than 252 bits in order to pack
           the whole branch_data struct safely, but it's cheapest to check that it's
           under 16 bits *)
       (assert_16_bits : Wrap_impl.Field.t -> unit) :
-      (Checked.Wrap.t, t) Wrap_impl.Typ.t =
+      ('n Checked.Wrap.t, t) Wrap_impl.Typ.t =
     let open Wrap_impl in
     let proofs_verified_mask :
-        (Proofs_verified.Prefix_mask.Wrap.Checked.t, Proofs_verified.t) Typ.t =
-      Proofs_verified.Prefix_mask.Wrap.typ
+        ('n Proofs_verified.Prefix_mask.Wrap.Checked.t, Proofs_verified.t) Typ.t
+        =
+      Proofs_verified.Prefix_mask.Wrap.typ num_allowable_proofs
     in
     let domain_log2 : (Field.t, Domain_log2.t) Typ.t =
       let (Typ t) =

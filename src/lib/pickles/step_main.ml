@@ -18,7 +18,7 @@ let _one_hot_vector_to_num (type n) (v : n Per_proof_witness.One_hot_vector.t) :
   let open Step_verifier in
   Pseudo.choose (v, Vector.init n ~f:Field.of_int) ~f:Fn.id
 
-let verify_one ~srs
+let verify_one ~srs ~num_allowable_proofs
     ({ app_state
      ; wrap_proof
      ; proof_state
@@ -42,8 +42,8 @@ let verify_one ~srs
         in
         (* TODO: Refactor args into an "unfinalized proof" struct *)
         Step_verifier.finalize_other_proof d.max_proofs_verified
-          ~step_domains:d.step_domains ~zk_rows:d.zk_rows ~sponge
-          ~prev_challenges deferred_values prev_proof_evals )
+          ~num_allowable_proofs ~step_domains:d.step_domains ~zk_rows:d.zk_rows
+          ~sponge ~prev_challenges deferred_values prev_proof_evals )
   in
   let branch_data = deferred_values.branch_data in
   let sponge_after_index, hash_messages_for_next_step_proof =
@@ -88,7 +88,7 @@ let verify_one ~srs
      statement *)
   let verified =
     with_label __LOC__ (fun () ->
-        Step_verifier.verify ~srs
+        Step_verifier.verify ~srs ~num_allowable_proofs
           ~feature_flags:(Plonk_types.Features.of_full d.feature_flags)
           ~lookup_parameters:
             { use = d.feature_flags.uses_lookups
@@ -123,7 +123,7 @@ let verify_one ~srs
 
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main :
-    type proofs_verified self_branches prev_vars prev_values var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value max_proofs_verified local_branches local_signature.
+    type proofs_verified self_branches prev_vars prev_values var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value max_proofs_verified local_branches local_signature num_additional_proofs.
        (module Requests.Step.S
           with type local_signature = local_signature
            and type local_branches = local_branches
@@ -163,11 +163,18 @@ let step_main :
          Types_map.Compiled.basic
     -> known_wrap_keys:
          local_branches H1.T(Types_map.For_step.Optional_wrap_key).t
-    -> self:(var, value, max_proofs_verified, self_branches) Tag.t
+    -> self:
+         ( var
+         , value
+         , max_proofs_verified
+         , self_branches
+         , num_additional_proofs )
+         Tag.t
     -> ( prev_vars
        , prev_values
        , local_signature
        , local_branches
+       , num_additional_proofs
        , a_var
        , a_value
        , ret_var
@@ -190,7 +197,8 @@ let step_main :
     type ('var, 'value, 'local_max_proofs_verified, 'local_branches) t =
       ( ( 'var
         , 'local_max_proofs_verified
-        , 'local_branches )
+        , 'local_branches
+        , num_additional_proofs )
         Per_proof_witness.No_app_state.t
       , ( 'value
         , 'local_max_proofs_verified
@@ -205,8 +213,8 @@ let step_main :
   in
   let feature_flags_and_num_chunks =
     let rec go :
-        type pvars pvals ns1 ns2 br.
-           (pvars, pvals, ns1, ns2) H4.T(Tag).t
+        type pvars pvals ns1 ns2 br num_additional_proofss.
+           (pvars, pvals, ns1, ns2, num_additional_proofss) H5.T(Tag).t
         -> (pvars, br) Length.t
         -> (Opt.Flag.t Plonk_types.Features.Full.t * int, br) Vector.t =
      fun ds ld ->
@@ -224,8 +232,8 @@ let step_main :
   in
   let prev_proof_typs =
     let rec join :
-        type pvars pvals ns1 ns2 br.
-           (pvars, pvals, ns1, ns2) H4.T(Tag).t
+        type pvars pvals ns1 ns2 br num_additional_proofss.
+           (pvars, pvals, ns1, ns2, num_additional_proofss) H5.T(Tag).t
         -> ns1 H1.T(Nat).t
         -> ns2 H1.T(Nat).t
         -> (pvars, br) Length.t
@@ -544,7 +552,7 @@ let step_main :
                 (struct
                   let f :
                       type a b c.
-                         (a, b, c) Per_proof_witness.t
+                         (a, b, c, num_additional_proofs) Per_proof_witness.t
                       -> Step_verifier.Inner_curve.t =
                    fun acc ->
                     acc.wrap_proof.opening.challenge_polynomial_commitment

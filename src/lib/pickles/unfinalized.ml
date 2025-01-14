@@ -104,15 +104,15 @@ module Constant = struct
        } )
 end
 
-let typ ~wrap_rounds:_ : (t, Constant.t) Typ.t =
-  Types.Step.Proof_state.Per_proof.typ
+let typ ~wrap_rounds:_ ~num_allowable_proofs : (t, Constant.t) Typ.t =
+  Types.Step.Proof_state.Per_proof.typ ~num_allowable_proofs
     (Shifted_value.typ Other_field.typ)
     ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16)
 
 let dummy : unit -> t =
   Memo.unit (fun () ->
       let (Typ { var_of_fields; value_to_fields; _ }) =
-        typ ~wrap_rounds:Backend.Tock.Rounds.n
+        typ ~num_allowable_proofs:Nat.N2.n ~wrap_rounds:Backend.Tock.Rounds.n
       in
       let xs, aux = value_to_fields (Lazy.force Constant.dummy) in
       var_of_fields (Array.map ~f:Field.constant xs, aux) )
