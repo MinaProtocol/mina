@@ -3707,33 +3707,38 @@ let%test_module _ =
         in
         return (test, branches))
         ~f:(fun ( test
-                , { prefix_commands = prefix_specs
-                  ; major_commands = major_specs
-                  ; minor_commands = minor_specs
+                , { prefix_commands
+                  ; major_commands
+                  ; minor_commands
                   ; minor = minor_account_spec
                   ; major = major_account_spec
                   } ) ->
           Thread_safe.block_on_async_exn (fun () ->
               [%log info] "Input Data"
                 ~metadata:
-                  [ ("prefix", [%to_yojson: Simple_command.t array] prefix_specs)
-                  ; ("major", [%to_yojson: Simple_command.t array] major_specs)
-                  ; ("minor", [%to_yojson: Simple_command.t array] minor_specs)
+                  [ ( "prefix_commands"
+                    , [%to_yojson: Simple_command.t array] prefix_commands )
+                  ; ( "major_commands"
+                    , [%to_yojson: Simple_command.t array] major_commands )
+                  ; ( "minor_commands"
+                    , [%to_yojson: Simple_command.t array] minor_commands )
                   ; ( "minor accounts state"
                     , [%to_yojson: Simple_ledger.t] minor_account_spec )
                   ; ( "major accounts state"
                     , [%to_yojson: Simple_ledger.t] major_account_spec )
                   ] ;
 
-              let prefix = gen_commands_from_specs prefix_specs test in
-              let minor = gen_commands_from_specs minor_specs test in
-              let major = gen_commands_from_specs major_specs test in
+              let prefix_cmds = gen_commands_from_specs prefix_commands test in
+              let minor_cmds = gen_commands_from_specs minor_commands test in
+              let major_cmds = gen_commands_from_specs major_commands test in
 
-              commit_commands test (prefix @ major) ;
+              commit_commands test (prefix_cmds @ major_cmds) ;
 
               Test.Resource_pool.handle_transition_frontier_diff_inner
-                ~new_commands:(List.map ~f:mk_with_status (prefix @ major))
-                ~removed_commands:(List.map ~f:mk_with_status (prefix @ minor))
+                ~new_commands:
+                  (List.map ~f:mk_with_status (prefix_cmds @ major_cmds))
+                ~removed_commands:
+                  (List.map ~f:mk_with_status (prefix_cmds @ minor_cmds))
                 ~best_tip_ledger:
                   (Option.value_exn test.txn_pool.best_tip_ledger)
                 test.txn_pool ;
@@ -3817,12 +3822,12 @@ let%test_module _ =
               in
 
               let total_cost sender =
-                find_owned sender minor_specs
+                find_owned sender minor_commands
                 |> Array.map ~f:Simple_command.total_cost
                 |> Array.sum ~f:Fn.id (module Int)
               in
 
-              Array.iter minor_specs ~f:(fun (spec : Simple_command.t) ->
+              Array.iter minor_commands ~f:(fun (spec : Simple_command.t) ->
                   let sender = Simple_command.sender spec in
                   let pk, nonce = Simple_account.to_key_and_nonce sender in
 
@@ -3845,8 +3850,8 @@ let%test_module _ =
                                    pk nonce ) )
                           ] ;
                       assert_pool_doesn't_contain pool_state (pk, nonce)
-                  | Some _account_spec when sent_blocking_zkapp major_specs pk
-                    ->
+                  | Some _account_spec
+                    when sent_blocking_zkapp major_commands pk ->
                       [%log info]
                         "major chain contains blocking zkapp. command should \
                          be dropped"
