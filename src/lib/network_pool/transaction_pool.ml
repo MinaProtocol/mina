@@ -3391,8 +3391,8 @@ let%test_module _ =
           in
 
           let%bind major_sequence_length = Int.gen_incl 2 10 in
-          let%bind minor_sequence_length = Int.gen_incl 2 4 in
-          let minor_sequence_length =
+          let%bind minor_sequence_length =
+            let%map minor_sequence_length = Int.gen_incl 2 4 in
             minor_sequence_length + major_sequence_length + initial_nonce
           in
           let initial_balance = account_with_limited_capacity.balance in
