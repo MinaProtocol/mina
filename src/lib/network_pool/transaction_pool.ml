@@ -3202,10 +3202,10 @@ let%test_module _ =
               t.key_idx t.balance fee ()
           else apply_cmd fee t
         else apply_cmd (amount + fee) t
-    end
 
-    let get_random_acc (arr : Account_spec.t array) =
-      get_random_from_array (Array.filter arr ~f:(fun x -> not x.sealed))
+      let get_random_unsealed (arr : t array) =
+        get_random_from_array (Array.filter arr ~f:(fun x -> not x.sealed))
+    end
 
     let ledger_snapshot t =
       Array.mapi test_keys ~f:(fun i kp ->
@@ -3243,7 +3243,9 @@ let%test_module _ =
 
       let gen_zkapp_blocking_send (spec : Account_spec.t array) =
         let open Quickcheck.Generator.Let_syntax in
-        let%bind random_idx, account_spec = get_random_acc spec in
+        let%bind random_idx, account_spec =
+          Account_spec.get_random_unsealed spec
+        in
         let new_account_spec =
           Account_spec.apply_cmd_or_fail 0 minimum_fee account_spec
         in
@@ -3271,7 +3273,9 @@ let%test_module _ =
           ?(higher = 10_000_000_000_000) (spec : Account_spec.t array) ~length =
         let open Quickcheck.Generator.Let_syntax in
         Quickcheck_lib.init_gen_array length ~f:(fun _ ->
-            let%bind random_idx, account_spec = get_random_acc spec in
+            let%bind random_idx, account_spec =
+              Account_spec.get_random_unsealed spec
+            in
             gen_single_from ~lower ~higher spec (random_idx, account_spec) )
 
       let sender t =
@@ -3367,7 +3371,7 @@ let%test_module _ =
           (*find account in major and minor branches with the same nonces and similar balances (less than 100k mina diff)*)
           let%bind ( account_with_limited_capacity_idx
                    , account_with_limited_capacity ) =
-            get_random_acc major
+            Account_spec.get_random_unsealed major
           in
 
           let initial_nonce = account_with_limited_capacity.nonce in
