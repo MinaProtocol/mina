@@ -3299,11 +3299,11 @@ let%test_module _ =
 
       let set = Array.set
 
-      let get_random_unsealed spec = Simple_account.get_random_unsealed spec
+      let get_random_unsealed ledger = Simple_account.get_random_unsealed ledger
 
-      let find_by_key_idx (spec : t) key_idx =
-        Array.findi spec ~f:(fun _idx spec ->
-            Int.equal key_idx (Simple_account.key_idx spec) )
+      let find_by_key_idx (ledger : t) key_idx =
+        Array.findi ledger ~f:(fun _idx account ->
+            Int.equal key_idx (Simple_account.key_idx account) )
     end
 
     module Simple_command = struct
