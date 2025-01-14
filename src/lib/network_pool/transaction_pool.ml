@@ -3560,34 +3560,32 @@ let%test_module _ =
             (cmds_from_acc, others)
           in
 
-          let unchanged_major_command_spec, major_command_spec_to_merge =
+          let unchanged_major_commands, major_commands_to_merge =
             split_by_account account_with_limited_capacity major_commands
           in
 
-          let unchanged_minor_command_spec, minor_command_spec_to_merge =
+          let unchanged_minor_commands, minor_commands_to_merge =
             split_by_account account_with_limited_capacity minor_commands
           in
 
           let%bind major_commands =
             gen_merge
-              (Array.to_list major_command_spec_to_merge)
+              (Array.to_list major_commands_to_merge)
               (Array.to_list major_sequence)
               []
           in
           let%bind minor_commands =
             gen_merge
-              (Array.to_list minor_command_spec_to_merge)
+              (Array.to_list minor_commands_to_merge)
               (Array.to_list minor_sequence)
               []
           in
 
           return
-            ( List.append
-                (Array.to_list unchanged_major_command_spec)
-                major_commands
+            ( List.append (Array.to_list unchanged_major_commands) major_commands
               |> List.to_array
             , List.append
-                (Array.to_list unchanged_minor_command_spec)
+                (Array.to_list unchanged_minor_commands)
                 minor_commands
               |> List.to_array ) )
         else return (major_commands, minor_commands)
