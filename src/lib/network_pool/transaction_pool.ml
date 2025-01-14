@@ -3164,6 +3164,12 @@ let%test_module _ =
           assert_pool_txs t [] ;
           add_commands t independent_cmds >>| assert_pool_apply [] )
 
+    let get_random_from_array arr =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind idx = Int.gen_incl 0 (Array.length arr - 1) in
+      let item = arr.(idx) in
+      return (idx, item)
+
     module Account_spec = struct
       type t = { key_idx : int; balance : int; nonce : int; sealed : bool }
       [@@deriving sexp, yojson]
@@ -3198,14 +3204,8 @@ let%test_module _ =
         else apply_cmd (amount + fee) t
     end
 
-    let get_random arr =
-      let open Quickcheck.Generator.Let_syntax in
-      let%bind idx = Int.gen_incl 0 (Array.length arr - 1) in
-      let item = arr.(idx) in
-      return (idx, item)
-
     let get_random_acc (arr : Account_spec.t array) =
-      get_random (Array.filter arr ~f:(fun x -> not x.sealed))
+      get_random_from_array (Array.filter arr ~f:(fun x -> not x.sealed))
 
     let ledger_snapshot t =
       Array.mapi test_keys ~f:(fun i kp ->
@@ -3425,7 +3425,7 @@ let%test_module _ =
                    acc + Command_spec.total_cost item )
           in
 
-          let%bind random_idx, tx_to_increase = get_random s1 in
+          let%bind random_idx, tx_to_increase = get_random_from_array s1 in
 
           let increased_tx =
             match tx_to_increase with
