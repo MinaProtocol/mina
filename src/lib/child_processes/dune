@@ -28,6 +28,5 @@
    error_json
    logger
    pipe_lib
-   inline_test_quiet_logs
  )
 )

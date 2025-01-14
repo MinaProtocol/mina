@@ -5,7 +5,7 @@ module Stable : sig
       { prechallenge : 'challenge }
     [@@deriving sexp, compare, yojson, hash, equal, bin_shape, bin_io]
 
-    include Pickles_types.Sigs.VERSIONED
+    include Plonkish_prelude.Sigs.VERSIONED
   end
 end
 
@@ -19,8 +19,13 @@ val unpack : 'a -> 'a t
 val map : 'a t -> f:('a -> 'b) -> 'b t
 
 val typ :
-     ('a, 'b, 'c) Snarky_backendless.Typ.t
+     ('a, 'b) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
   -> ( 'a Kimchi_backend_common.Scalar_challenge.t t
-     , 'b Kimchi_backend_common.Scalar_challenge.t t
-     , 'c )
-     Snarky_backendless.Typ.t
+     , 'b Kimchi_backend_common.Scalar_challenge.t t )
+     Kimchi_pasta_snarky_backend.Step_impl.Typ.t
+
+val wrap_typ :
+     ('a, 'b) Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
+  -> ( 'a Kimchi_backend_common.Scalar_challenge.t t
+     , 'b Kimchi_backend_common.Scalar_challenge.t t )
+     Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t

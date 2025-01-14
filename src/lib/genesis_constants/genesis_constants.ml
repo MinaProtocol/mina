@@ -1,9 +1,15 @@
 open Core_kernel
 
 module Proof_level = struct
-  type t = Full | Check | None [@@deriving bin_io_unversioned, equal]
+  type t = Full | Check | No_check [@@deriving bin_io_unversioned, equal]
 
-  let to_string = function Full -> "full" | Check -> "check" | None -> "none"
+  let to_string = function
+    | Full ->
+        "full"
+    | Check ->
+        "check"
+    | No_check ->
+        "none"
 
   let of_string = function
     | "full" ->
@@ -11,7 +17,7 @@ module Proof_level = struct
     | "check" ->
         Check
     | "none" ->
-        None
+        No_check
     | s ->
         failwithf "unrecognised proof level %s" s ()
 end
@@ -419,14 +425,13 @@ module Make (Node_config : Node_config_intf.S) : S = struct
         }
     ; txpool_max_size = pool_max_size
     ; num_accounts = None
-    ; zkapp_proof_update_cost = Node_config.zkapp_proof_update_cost
-    ; zkapp_signed_single_update_cost =
-        Node_config.zkapp_signed_single_update_cost
-    ; zkapp_signed_pair_update_cost = Node_config.zkapp_signed_pair_update_cost
-    ; zkapp_transaction_cost_limit = Node_config.zkapp_transaction_cost_limit
-    ; max_event_elements = Node_config.max_event_elements
-    ; max_action_elements = Node_config.max_action_elements
-    ; zkapp_cmd_limit_hardcap = Node_config.zkapp_cmd_limit_hardcap
+    ; zkapp_proof_update_cost = 10.26
+    ; zkapp_signed_pair_update_cost = 10.08
+    ; zkapp_signed_single_update_cost = 9.14
+    ; zkapp_transaction_cost_limit = 69.45
+    ; max_event_elements = 100
+    ; max_action_elements = 100
+    ; zkapp_cmd_limit_hardcap = 128
     ; minimum_user_command_fee =
         Currency.Fee.of_mina_string_exn Node_config.minimum_user_command_fee
     }

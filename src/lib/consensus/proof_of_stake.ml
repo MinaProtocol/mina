@@ -30,6 +30,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     val constraint_constants : Genesis_constants.Constraint_constants.t
 
     val consensus_constants : Constants.t
+
+    val compile_config : Mina_compile_config.t
   end
 
   let make_checked t = Snark_params.Tick.Run.make_checked t
@@ -2111,7 +2113,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Global_slot.Checked.of_slot_number ~constants transition_data
         in
         let%bind slot_diff =
-          [%with_label_ "Next global slot is less than previous global slot"]
+          [%with_label_ "Next global slot is larger than previous global slot"]
             (fun () ->
               Global_slot.Checked.diff_slots next_global_slot prev_global_slot )
         in
@@ -2678,8 +2680,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                          (next_epoch_ledger_location local_state)
               in
               let sync_ledger =
-                Mina_ledger.Sync_ledger.Db.create ~logger ~trust_system
-                  db_ledger
+                Mina_ledger.Sync_ledger.Db.create
+                  ~context:(module Context)
+                  ~trust_system db_ledger
               in
               let query_reader =
                 Mina_ledger.Sync_ledger.Db.query_reader sync_ledger
@@ -3107,6 +3110,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           Genesis_constants.For_unit_tests.Constraint_constants.t
 
         let consensus_constants = Lazy.force Constants.for_unit_tests
+
+        let compile_config = Mina_compile_config.For_unit_tests.t
       end in
       (* Even when consensus constants are of prod sizes, candidate should still trigger a bootstrap *)
       should_bootstrap_len
@@ -3433,6 +3438,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let constraint_constants = constraint_constants
 
         let consensus_constants = constants
+
+        let compile_config = Mina_compile_config.For_unit_tests.t
       end
 
       let test_update constraint_constants =

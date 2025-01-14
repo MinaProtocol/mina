@@ -1,6 +1,6 @@
 open Core_kernel
 open Async_kernel
-open Pickles_types
+open Plonkish_prelude
 
 let tuple15_to_vec
     (w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14) =
@@ -27,7 +27,7 @@ module type Stable_v1 = sig
 end
 
 module type Inputs_intf = sig
-  open Intf
+  open Kimchi_pasta_snarky_backend.Intf
 
   val id : string
 
@@ -52,10 +52,12 @@ module type Inputs_intf = sig
       end
 
       val of_backend :
-        Backend.t -> (Base_field.t * Base_field.t) Pickles_types.Or_infinity.t
+           Backend.t
+        -> (Base_field.t * Base_field.t) Plonkish_prelude.Or_infinity.t
 
       val to_backend :
-        (Base_field.t * Base_field.t) Pickles_types.Or_infinity.t -> Backend.t
+           (Base_field.t * Base_field.t) Plonkish_prelude.Or_infinity.t
+        -> Backend.t
     end
   end
 
@@ -167,24 +169,24 @@ module Make (Inputs : Inputs_intf) = struct
           ( G.Affine.Stable.V1.t
           , Fq.Stable.V1.t
           , Fq.Stable.V1.t Bounded_types.ArrayN16.Stable.V1.t )
-          Pickles_types.Plonk_types.Proof.Stable.V2.t
+          Plonk_types.Proof.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
         let id = "plong_dlog_proof_" ^ Inputs.id
 
         type 'a creator =
-             messages:G.Affine.t Pickles_types.Plonk_types.Messages.Stable.V2.t
+             messages:G.Affine.t Plonk_types.Messages.Stable.V2.t
           -> openings:
                ( G.Affine.t
                , Fq.t
                , Fq.t Bounded_types.ArrayN16.Stable.V1.t )
-               Pickles_types.Plonk_types.Openings.Stable.V2.t
+               Plonk_types.Openings.Stable.V2.t
           -> 'a
 
         let map_creator c ~f ~messages ~openings = f (c ~messages ~openings)
 
         let create ~messages ~openings =
-          let open Pickles_types.Plonk_types.Proof.Stable.Latest in
+          let open Plonk_types.Proof.Stable.Latest in
           { messages; openings }
       end
 
@@ -202,21 +204,20 @@ module Make (Inputs : Inputs_intf) = struct
   end]
 
   module T = struct
-    type t = (G.Affine.t, Fq.t, Fq.t array) Pickles_types.Plonk_types.Proof.t
+    type t = (G.Affine.t, Fq.t, Fq.t array) Plonk_types.Proof.t
     [@@deriving compare, sexp, yojson, hash, equal]
 
     let id = "plong_dlog_proof_" ^ Inputs.id
 
     type 'a creator =
-         messages:G.Affine.t Pickles_types.Plonk_types.Messages.t
-      -> openings:
-           (G.Affine.t, Fq.t, Fq.t array) Pickles_types.Plonk_types.Openings.t
+         messages:G.Affine.t Plonk_types.Messages.t
+      -> openings:(G.Affine.t, Fq.t, Fq.t array) Plonk_types.Openings.t
       -> 'a
 
     let map_creator c ~f ~messages ~openings = f (c ~messages ~openings)
 
     let create ~messages ~openings =
-      let open Pickles_types.Plonk_types.Proof in
+      let open Plonk_types.Proof in
       { messages; openings }
   end
 
@@ -261,14 +262,13 @@ module Make (Inputs : Inputs_intf) = struct
       infinity *)
   let opening_proof_of_backend_exn (t : Opening_proof_backend.t) =
     let g (x : G.Affine.Backend.t) : G.Affine.t =
-      G.Affine.of_backend x |> Pickles_types.Or_infinity.finite_exn
+      G.Affine.of_backend x |> Plonkish_prelude.Or_infinity.finite_exn
     in
     let gpair ((g1, g2) : G.Affine.Backend.t * G.Affine.Backend.t) :
         G.Affine.t * G.Affine.t =
       (g g1, g g2)
     in
-    { Pickles_types.Plonk_types.Openings.Bulletproof.lr =
-        Array.map ~f:gpair t.lr
+    { Plonk_types.Openings.Bulletproof.lr = Array.map ~f:gpair t.lr
     ; z_1 = t.z1
     ; z_2 = t.z2
     ; delta = g t.delta
@@ -302,7 +302,7 @@ module Make (Inputs : Inputs_intf) = struct
        ; range_check_lookup_selector
        ; foreign_field_mul_lookup_selector
        } :
-        Evaluations_backend.t ) : _ Pickles_types.Plonk_types.Evals.t =
+        Evaluations_backend.t ) : _ Plonk_types.Evals.t =
     { w = tuple15_to_vec w
     ; coefficients = tuple15_to_vec coefficients
     ; z
@@ -348,7 +348,7 @@ module Make (Inputs : Inputs_intf) = struct
           assert false
     in
     let w_comm =
-      tuple15_to_vec t.commitments.w_comm |> Pickles_types.Vector.map ~f:wo
+      tuple15_to_vec t.commitments.w_comm |> Plonkish_prelude.Vector.map ~f:wo
     in
     create
       ~messages:
@@ -357,19 +357,16 @@ module Make (Inputs : Inputs_intf) = struct
         ; t_comm = wo t.commitments.t_comm
         ; lookup =
             Option.map t.commitments.lookup
-              ~f:(fun l : _ Pickles_types.Plonk_types.Messages.Lookup.t ->
+              ~f:(fun l : _ Plonk_types.Messages.Lookup.t ->
                 { sorted =
-                    Vector.init
-                      Pickles_types.Plonk_types.Lookup_sorted_minus_1.n
-                      ~f:(fun i -> wo l.sorted.(i))
+                    Vector.init Plonk_types.Lookup_sorted_minus_1.n ~f:(fun i ->
+                        wo l.sorted.(i) )
                 ; sorted_5th_column =
                     (* TODO: This is ugly and error-prone *)
                     Option.try_with (fun () ->
                         wo
                           l.sorted.(Nat.to_int
-                                      Pickles_types.Plonk_types
-                                      .Lookup_sorted_minus_1
-                                      .n) )
+                                      Plonk_types.Lookup_sorted_minus_1.n) )
                 ; aggreg = wo l.aggreg
                 ; runtime = Option.map ~f:wo l.runtime
                 } )
@@ -383,7 +380,7 @@ module Make (Inputs : Inputs_intf) = struct
     }
 
   let eval_to_backend
-      { Pickles_types.Plonk_types.Evals.w
+      { Plonk_types.Evals.w
       ; coefficients
       ; z
       ; s
@@ -453,11 +450,11 @@ module Make (Inputs : Inputs_intf) = struct
            }
        } :
         t ) : Backend.t =
-    let g x = G.Affine.to_backend (Pickles_types.Or_infinity.Finite x) in
+    let g x = G.Affine.to_backend (Plonkish_prelude.Or_infinity.Finite x) in
     let pcwo t = Poly_comm.to_backend (`Without_degree_bound t) in
     let lr = Array.map lr ~f:(fun (x, y) -> (g x, g y)) in
     { commitments =
-        { w_comm = tuple15_of_vec (Pickles_types.Vector.map ~f:pcwo w_comm)
+        { w_comm = tuple15_of_vec (Plonkish_prelude.Vector.map ~f:pcwo w_comm)
         ; z_comm = pcwo z_comm
         ; t_comm = pcwo t_comm
         ; lookup =

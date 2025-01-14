@@ -5,13 +5,13 @@ open Mina_transaction
 open Signature_lib
 module Ledger = Mina_ledger.Ledger
 
-type t [@@deriving sexp]
+type t
 
 module Scan_state : sig
   [%%versioned:
   module Stable : sig
     module V2 : sig
-      type t [@@deriving sexp]
+      type t
 
       val hash : t -> Staged_ledger_hash.Aux_hash.t
     end
@@ -93,7 +93,7 @@ module Scan_state : sig
     -> apply_second_pass:
          (   Ledger.t
           -> Ledger.Transaction_partially_applied.t
-          -> Ledger.Transaction_applied.t Or_error.t )
+          -> Mina_transaction_logic.Transaction_applied.t Or_error.t )
     -> apply_first_pass_sparse_ledger:
          (   global_slot:Mina_numbers.Global_slot_since_genesis.t
           -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
@@ -121,7 +121,7 @@ module Scan_state : sig
     -> apply_second_pass:
          (   Ledger.t
           -> Ledger.Transaction_partially_applied.t
-          -> Ledger.Transaction_applied.t Or_error.t )
+          -> Mina_transaction_logic.Transaction_applied.t Or_error.t )
     -> apply_first_pass_sparse_ledger:
          (   global_slot:Mina_numbers.Global_slot_since_genesis.t
           -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
@@ -312,6 +312,7 @@ val of_scan_state_pending_coinbases_and_snarked_ledger :
 
 val of_scan_state_pending_coinbases_and_snarked_ledger_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> logger:Logger.t
   -> scan_state:Scan_state.t
   -> snarked_ledger:Ledger.t
   -> snarked_local_state:Mina_state.Local_state.t

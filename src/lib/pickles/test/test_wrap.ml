@@ -69,7 +69,7 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
   (* Constants helper - takes an OCaml value and converts it to a snarky value, where
                         all values here are constant literals.  N.b. this should be
                         encapsulated as Snarky internals, but it never got merged. *)
-  let constant (Typ typ : _ Snarky_backendless.Typ.t) x =
+  let constant (Typ typ : _ Impls.Step.Typ.t) x =
     let xs, aux = typ.value_to_fields x in
     typ.var_of_fields (Array.map xs ~f:Impls.Step.Field.constant, aux)
   in
@@ -123,10 +123,8 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
      once for the wrap circuit.  It was decided not to use a functor for this. *)
   let deferred_values_typ =
     let open Impls.Step in
-    let open Step_main_inputs in
     let open Step_verifier in
     Import.Types.Wrap.Proof_state.Deferred_values.In_circuit.typ
-      (module Impls.Step)
       ~feature_flags:full_features ~challenge:Challenge.typ
       ~scalar_challenge:Challenge.typ
       ~dummy_scalar_challenge:
@@ -134,7 +132,6 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
            Limb_vector.Challenge.Constant.zero )
       (Shifted_value.Type1.typ Field.typ)
       (Import.Branch_data.typ
-         (module Impl)
          ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
   in
 
@@ -154,9 +151,7 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
      for use in the circuit *)
   and evals =
     constant
-      (Plonk_types.All_evals.typ ~num_chunks:1
-         (module Impls.Step)
-         full_features )
+      (Plonk_types.All_evals.typ ~num_chunks:1 full_features)
       { evals =
           { public_input = x_hat_evals; evals = proof.proof.openings.evals }
       ; ft_eval1 = proof.proof.openings.ft_eval1

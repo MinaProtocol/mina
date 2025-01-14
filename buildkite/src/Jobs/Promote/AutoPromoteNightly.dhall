@@ -44,7 +44,7 @@ let promotePackages =
       , codenames =
         [ DebianVersions.DebVersion.Bullseye, DebianVersions.DebVersion.Focal ]
       , from_channel = DebianChannel.Type.Unstable
-      , to_channel = DebianChannel.Type.NightlyCompatible
+      , to_channel = DebianChannel.Type.Compatible
       , new_tags =
         [ "latest-compatible-nightly"
         , "compatible-nightly-\\\$(date \"+%Y%m%d\")"
@@ -67,7 +67,7 @@ let verifyPackages =
       , network = Network.Type.Devnet
       , codenames =
         [ DebianVersions.DebVersion.Bullseye, DebianVersions.DebVersion.Focal ]
-      , channel = DebianChannel.Type.NightlyCompatible
+      , channel = DebianChannel.Type.Compatible
       , new_tags =
         [ "latest-compatible-nightly"
         , "compatible-nightly-\\\$(date \"+%Y%m%d\")"
