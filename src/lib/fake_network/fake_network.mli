@@ -10,8 +10,6 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
-
-  val compile_config : Mina_compile_config.t
 end
 
 (* There must be at least 2 peers to create a network *)
@@ -19,6 +17,7 @@ type 'n num_peers = 'n Peano.gt_1
 
 type peer_state =
   { frontier : Transition_frontier.t
+  ; snark : Network_pool.Snark_pool.t option
   ; consensus_local_state : Consensus.Data.Local_state.t
   ; rpc_mocks : Mina_networking.Gossip_net.Fake.rpc_mocks
   }
@@ -71,6 +70,10 @@ include sig
          ( Rpcs.Get_best_tip.query
          , Rpcs.Get_best_tip.response )
          Gossip_net.Fake.rpc_mock
+    -> ?get_completed_snarks:
+         ( Rpcs.Get_completed_snarks.query
+         , Rpcs.Get_completed_snarks.response )
+         Gossip_net.Fake.rpc_mock
     -> 'a
 end
 
@@ -100,6 +103,5 @@ module Generator : sig
     -> max_frontier_length:int
     -> use_super_catchup:bool
     -> (peer_config, 'n num_peers) Vect.t
-    -> compile_config:Mina_compile_config.t
     -> 'n num_peers t Generator.t
 end

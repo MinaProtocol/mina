@@ -746,21 +746,20 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
       assert_
         { annotation = Some __LOC__
         ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (ForeignFieldAdd
-                 { left_input_lo = left_input0
-                 ; left_input_mi = left_input1
-                 ; left_input_hi = left_input2
-                 ; right_input_lo = right_input0
-                 ; right_input_mi = right_input1
-                 ; right_input_hi = right_input2
-                 ; field_overflow
-                 ; carry
-                 ; foreign_field_modulus0
-                 ; foreign_field_modulus1
-                 ; foreign_field_modulus2
-                 ; sign
-                 } )
+            ForeignFieldAdd
+              { left_input_lo = left_input0
+              ; left_input_mi = left_input1
+              ; left_input_hi = left_input2
+              ; right_input_lo = right_input0
+              ; right_input_mi = right_input1
+              ; right_input_hi = right_input2
+              ; field_overflow
+              ; carry
+              ; foreign_field_modulus0
+              ; foreign_field_modulus1
+              ; foreign_field_modulus2
+              ; sign
+              }
         } ) ;
 
   (* Return the result *)
@@ -775,12 +774,11 @@ let result_row (type f) (module Circuit : Snark_intf.Run with type field = f)
       assert_
         { annotation = Some __LOC__
         ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Raw
-                 { kind = Zero
-                 ; values = [| result0; result1; result2 |]
-                 ; coeffs = [||]
-                 } )
+            Raw
+              { kind = Zero
+              ; values = [| result0; result1; result2 |]
+              ; coeffs = [||]
+              }
         } )
 
 (* Gadget to check the supplied value is a valid foreign field element for the
@@ -1393,36 +1391,35 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
       assert_
         { annotation = Some __LOC__
         ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (ForeignFieldMul
-                 { (* Current row *) left_input0
-                 ; left_input1
-                 ; left_input2
-                 ; right_input0
-                 ; right_input1
-                 ; right_input2
-                 ; carry1_lo
-                 ; carry1_hi
-                 ; carry0
-                 ; quotient0
-                 ; quotient1
-                 ; quotient2
-                 ; quotient_bound_carry
-                 ; product1_hi_1
-                 ; (* Next row *) remainder0
-                 ; remainder1
-                 ; remainder2
-                 ; quotient_bound01
-                 ; quotient_bound2
-                 ; product1_lo
-                 ; product1_hi_0
-                 ; (* Coefficients *) foreign_field_modulus0
-                 ; foreign_field_modulus1
-                 ; foreign_field_modulus2
-                 ; neg_foreign_field_modulus0
-                 ; neg_foreign_field_modulus1
-                 ; neg_foreign_field_modulus2
-                 } )
+            ForeignFieldMul
+              { (* Current row *) left_input0
+              ; left_input1
+              ; left_input2
+              ; right_input0
+              ; right_input1
+              ; right_input2
+              ; carry1_lo
+              ; carry1_hi
+              ; carry0
+              ; quotient0
+              ; quotient1
+              ; quotient2
+              ; quotient_bound_carry
+              ; product1_hi_1
+              ; (* Next row *) remainder0
+              ; remainder1
+              ; remainder2
+              ; quotient_bound01
+              ; quotient_bound2
+              ; product1_lo
+              ; product1_hi_0
+              ; (* Coefficients *) foreign_field_modulus0
+              ; foreign_field_modulus1
+              ; foreign_field_modulus2
+              ; neg_foreign_field_modulus0
+              ; neg_foreign_field_modulus1
+              ; neg_foreign_field_modulus2
+              }
         } ) ;
   Element.Standard.of_limbs (remainder0, remainder1, remainder2)
 

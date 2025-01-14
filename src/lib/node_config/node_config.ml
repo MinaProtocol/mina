@@ -7,11 +7,8 @@
 *)
 
 include Node_config_version
-include Node_config_unconfigurable_constants
 
 [%%inject "ledger_depth", ledger_depth]
-
-[%%inject "curve_size", curve_size]
 
 [%%inject "coinbase", coinbase]
 
@@ -28,6 +25,11 @@ include Node_config_unconfigurable_constants
 [%%inject "grace_period_slots", grace_period_slots]
 
 [%%inject "scan_state_with_tps_goal", scan_state_with_tps_goal]
+
+[%%inject "sync_ledger_max_subtree_depth", sync_ledger_max_subtree_depth]
+
+[%%inject
+"sync_ledger_default_subtree_depth", sync_ledger_default_subtree_depth]
 
 [%%ifndef scan_state_transaction_capacity_log_2]
 
@@ -50,8 +52,6 @@ let scan_state_transaction_capacity_log_2 =
 [%%inject "pool_max_size", pool_max_size]
 
 [%%inject "account_creation_fee_int", account_creation_fee_int]
-
-[%%inject "default_transaction_fee", default_transaction_fee]
 
 [%%inject "default_snark_worker_fee", default_snark_worker_fee]
 

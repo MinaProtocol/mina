@@ -67,8 +67,7 @@ let%test_module "account timing check" =
           Balance.Checked.equal checked_min_balance
             (Balance.var_of_t unchecked_min_balance)
         in
-        Snarky_backendless.As_prover0.read Tick.Boolean.typ
-          equal_balances_checked
+        As_prover.read Tick.Boolean.typ equal_balances_checked
       in
       Or_error.ok_exn @@ Tick.run_and_check equal_balances_computation
 
@@ -362,7 +361,7 @@ let%test_module "account timing check" =
             stack_with_state
       in
       let supply_increase =
-        Mina_ledger.Ledger.Transaction_applied.supply_increase
+        Mina_transaction_logic.Transaction_applied.supply_increase
           ~constraint_constants txn_applied
         |> Or_error.ok_exn
       in

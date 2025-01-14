@@ -29,7 +29,9 @@ struct
       lazy
         (Promise.return
            (Vector.init num_choices ~f:(fun _ ->
-                let num_chunks = (* TODO *) 1 in
+                let num_chunks =
+                  (* TODO *) Plonk_checks.num_chunks_by_default
+                in
                 let g =
                   Array.init num_chunks ~f:(fun _ ->
                       Backend.Tock.Inner_curve.(to_affine_exn one) )
@@ -46,10 +48,9 @@ struct
     Timer.clock __LOC__ ;
     let%bind.Promise main = Lazy.force main in
     let t =
-      Fix_domains.domains
-        (module Impls.Wrap)
+      Fix_domains.wrap_domains
         (Impls.Wrap.input ~feature_flags ())
-        (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
+        (T (Impls.Wrap.Typ.unit, Fn.id, Fn.id))
         (fun input -> Promise.return (main input))
     in
     Timer.clock __LOC__ ; t

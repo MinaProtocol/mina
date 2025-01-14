@@ -1,4 +1,5 @@
 open Core_kernel
+open Pickles_types
 
 [@@@warning "-4"] (* sexp-related fragile pattern-matching warning *)
 
@@ -40,8 +41,8 @@ let to_int : t -> int = function N0 -> 0 | N1 -> 1 | N2 -> 2
 
 type proofs_verified = t
 
-let of_nat_exn (type n) (n : n Pickles_types.Nat.t) : t =
-  let open Pickles_types.Nat in
+let of_nat_exn (type n) (n : n Nat.t) : t =
+  let open Nat in
   match n with
   | Z ->
       N0
@@ -66,51 +67,69 @@ let of_int_exn (n : int) : t =
       raise
         (Invalid_argument (Printf.sprintf "Proofs_verified.of_int: got %d" n))
 
-type 'f boolean = 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
+let to_bool_vec : proofs_verified -> (bool, Nat.N2.n) Vector.t = function
+  | N0 ->
+      Vector.of_list_and_length_exn [ false; false ] Nat.N2.n
+  | N1 ->
+      Vector.of_list_and_length_exn [ false; true ] Nat.N2.n
+  | N2 ->
+      Vector.of_list_and_length_exn [ true; true ] Nat.N2.n
 
-type 'a vec2 = ('a, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
+let of_bool_vec (v : (bool, Nat.N2.n) Vector.t) : proofs_verified =
+  match Vector.to_list v with
+  | [ false; false ] ->
+      N0
+  | [ false; true ] ->
+      N1
+  | [ true; true ] ->
+      N2
+  | [ true; false ] ->
+      invalid_arg "Prefix_mask.back: invalid mask [false; true]"
+  | _ ->
+      invalid_arg "Invalid size"
 
 module Prefix_mask = struct
-  module Checked = struct
-    type 'f t = 'f boolean vec2
+  open Kimchi_pasta_snarky_backend
+
+  module Step = struct
+    open Step_impl
+
+    module Checked = struct
+      type t = (Boolean.var, Nat.N2.n) Vector.t
+    end
+
+    let typ : (Checked.t, proofs_verified) Typ.t =
+      Typ.transport
+        (Pickles_types.Vector.typ Boolean.typ Pickles_types.Nat.N2.n)
+        ~there:to_bool_vec ~back:of_bool_vec
   end
 
-  let[@warning "-40-42"] there : proofs_verified -> bool vec2 = function
-    | N0 ->
-        [ false; false ]
-    | N1 ->
-        [ false; true ]
-    | N2 ->
-        [ true; true ]
+  module Wrap = struct
+    open Wrap_impl
 
-  let[@warning "-40-42"] back : bool vec2 -> proofs_verified = function
-    | [ false; false ] ->
-        N0
-    | [ false; true ] ->
-        N1
-    | [ true; true ] ->
-        N2
-    | [ true; false ] ->
-        invalid_arg "Prefix_mask.back: invalid mask [false; true]"
+    module Checked = struct
+      type t = (Boolean.var, Nat.N2.n) Vector.t
+    end
 
-  let typ (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) :
-      (f Checked.t, proofs_verified) Impl.Typ.t =
-    let open Impl in
-    Typ.transport
-      (Pickles_types.Vector.typ Boolean.typ Pickles_types.Nat.N2.n)
-      ~there ~back
+    let typ : (Checked.t, proofs_verified) Typ.t =
+      Typ.transport
+        (Pickles_types.Vector.wrap_typ Boolean.typ Pickles_types.Nat.N2.n)
+        ~there:to_bool_vec ~back:of_bool_vec
+  end
 end
 
 module One_hot = struct
-  module Checked = struct
-    type 'f t = ('f, Pickles_types.Nat.N3.n) One_hot_vector.t
+  open Kimchi_pasta_snarky_backend
 
-    let to_input (type f) (t : f t) =
+  module Checked = struct
+    type t = Pickles_types.Nat.N3.n One_hot_vector.Step.t
+
+    let to_input (t : t) =
       Random_oracle_input.Chunked.packeds
         (Array.map
-           Pickles_types.(Vector.to_array (t :> (f boolean, Nat.N3.n) Vector.t))
-           ~f:(fun b -> ((b :> f Snarky_backendless.Cvar.t), 1)) )
+           Pickles_types.(
+             Vector.to_array (t :> (Step_impl.Boolean.var, Nat.N3.n) Vector.t))
+           ~f:(fun b -> ((b :> Step_impl.Field.t), 1)) )
   end
 
   let there : proofs_verified -> int = function N0 -> 0 | N1 -> 1 | N2 -> 2
@@ -137,10 +156,7 @@ module One_hot = struct
     in
     Random_oracle_input.Chunked.packeds (Array.map one_hot ~f:(fun b -> (b, 1)))
 
-  let typ (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) :
-      (f Checked.t, proofs_verified) Impl.Typ.t =
-    let module M = One_hot_vector.Make (Impl) in
-    let open Impl in
-    Typ.transport (M.typ Pickles_types.Nat.N3.n) ~there ~back
+  let typ : (Checked.t, proofs_verified) Step_impl.Typ.t =
+    let module M = One_hot_vector.Make (Step_impl) in
+    Step_impl.Typ.transport (M.typ Pickles_types.Nat.N3.n) ~there ~back
 end

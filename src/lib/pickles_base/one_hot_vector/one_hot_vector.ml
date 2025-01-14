@@ -7,11 +7,10 @@ end
 
 (* TODO: Optimization(?) Have this have length n - 1 since the last one is
     determined by the remaining ones. *)
-type ('f, 'n) t =
-  ('f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t, 'n) Vector.t
+type ('v, 'n) t = ('v Snarky_backendless.Boolean.t, 'n) Vector.t
 
 module T (Impl : Snarky_backendless.Snark_intf.Run) = struct
-  type nonrec 'n t = (Impl.field, 'n) t
+  type nonrec 'n t = (Impl.field_var, 'n) t
 end
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
@@ -26,8 +25,10 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
 
   let of_vector_unsafe = Fn.id
 
+  module Vector_typ = Vector.Make_typ (Impl)
+
   let typ (n : 'n Nat.t) : ('n t, Constant.t) Typ.t =
-    let (Typ typ) = Vector.typ Boolean.typ n in
+    let (Typ typ) = Vector_typ.typ Boolean.typ n in
     let typ : _ Typ.t =
       Typ
         { typ with
@@ -46,3 +47,6 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
         in
         i )
 end
+
+module Step = Make (Kimchi_pasta_snarky_backend.Step_impl)
+module Wrap = Make (Kimchi_pasta_snarky_backend.Wrap_impl)

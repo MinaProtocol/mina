@@ -229,7 +229,7 @@ module Stable = struct
                    } )
               ; shifts = Common.tock_shifts ~log2_size
               ; lookup_index = None
-              ; zk_rows = 3
+              ; zk_rows = Plonk_checks.zk_rows_by_default
               } )
         in
         { Poly.max_proofs_verified
@@ -303,14 +303,11 @@ let dummy : t =
 
 module Checked = struct
   open Step_main_inputs
-  open Impl
 
   type t =
-    { max_proofs_verified :
-        Impl.field Pickles_base.Proofs_verified.One_hot.Checked.t
+    { max_proofs_verified : Pickles_base.Proofs_verified.One_hot.Checked.t
           (** The maximum of all of the [step_widths]. *)
-    ; actual_wrap_domain_size :
-        Impl.field Pickles_base.Proofs_verified.One_hot.Checked.t
+    ; actual_wrap_domain_size : Pickles_base.Proofs_verified.One_hot.Checked.t
           (** The actual domain size used by the wrap circuit. *)
     ; wrap_index : Inner_curve.t Plonk_verification_key_evals.t
           (** The plonk verification key for the 'wrapping' proof that this key
@@ -347,8 +344,8 @@ let typ : (Checked.t, t) Impls.Step.Typ.t =
   let open Step_main_inputs in
   let open Impl in
   Typ.of_hlistable
-    [ Pickles_base.Proofs_verified.One_hot.typ (module Impls.Step)
-    ; Pickles_base.Proofs_verified.One_hot.typ (module Impls.Step)
+    [ Pickles_base.Proofs_verified.One_hot.typ
+    ; Pickles_base.Proofs_verified.One_hot.typ
     ; Plonk_verification_key_evals.typ Inner_curve.typ
     ]
     ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
