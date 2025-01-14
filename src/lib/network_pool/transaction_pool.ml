@@ -3411,24 +3411,24 @@ let%test_module _ =
         
           On top of that one can enable/disable two special corner cases (permission change and limited capacity)
         *)
-    let gen_branches spec ~permission_change ~limited_capacity
+    let gen_branches ledger ~permission_change ~limited_capacity
         ?(sequence_max_length = 3) () =
       let open Quickcheck.Generator.Let_syntax in
       let%bind prefix_length = Int.gen_incl 0 sequence_max_length in
       let%bind major_length = Int.gen_incl 0 sequence_max_length in
       let%bind minor_length = Int.gen_incl 0 sequence_max_length in
 
-      let%bind prefix_command_spec =
-        Simple_command.gen_sequence spec ~length:prefix_length
+      let%bind prefix_commands =
+        Simple_command.gen_sequence ledger ~length:prefix_length
       in
 
-      let minor = Simple_ledger.copy spec in
-      let%bind minor_command_spec =
+      let minor = Simple_ledger.copy ledger in
+      let%bind minor_commands =
         Simple_command.gen_sequence minor ~length:minor_length
       in
 
-      let major = Simple_ledger.copy spec in
-      let%bind major_command_spec =
+      let major = Simple_ledger.copy ledger in
+      let%bind major_commands =
         Simple_command.gen_sequence major ~length:major_length
       in
 
@@ -3440,7 +3440,7 @@ let%test_module _ =
          - When applying *minor sequence* without the transaction `T'` (of the same nonce as the large-amount transaction `T` in major sequence),
              the sequence becomes partially applicable, forcing the mempool logic to drop some transactions at the end of *minor sequence*.
       *)
-      let%bind major_command_spec, minor_command_spec =
+      let%bind major_commands, minor_commands =
         if limited_capacity then (
           (*find account in major and minor branches with the same nonces and similar balances (less than 100k mina diff)*)
           let%bind ( account_with_limited_capacity_idx
@@ -3561,20 +3561,20 @@ let%test_module _ =
           in
 
           let unchanged_major_command_spec, major_command_spec_to_merge =
-            split_by_account account_with_limited_capacity major_command_spec
+            split_by_account account_with_limited_capacity major_commands
           in
 
           let unchanged_minor_command_spec, minor_command_spec_to_merge =
-            split_by_account account_with_limited_capacity minor_command_spec
+            split_by_account account_with_limited_capacity minor_commands
           in
 
-          let%bind major_command_spec =
+          let%bind major_commands =
             gen_merge
               (Array.to_list major_command_spec_to_merge)
               (Array.to_list major_sequence)
               []
           in
-          let%bind minor_command_spec =
+          let%bind minor_commands =
             gen_merge
               (Array.to_list minor_command_spec_to_merge)
               (Array.to_list minor_sequence)
@@ -3584,13 +3584,13 @@ let%test_module _ =
           return
             ( List.append
                 (Array.to_list unchanged_major_command_spec)
-                major_command_spec
+                major_commands
               |> List.to_array
             , List.append
                 (Array.to_list unchanged_minor_command_spec)
-                minor_command_spec
+                minor_commands
               |> List.to_array ) )
-        else return (major_command_spec, minor_command_spec)
+        else return (major_commands, minor_commands)
       in
 
       (* Optional Edge Case : Permission Changes:
@@ -3602,7 +3602,7 @@ let%test_module _ =
              but after the permission-modifying transaction in major sequence,
              the new transaction becomes invalid and must be dropped.
       *)
-      let%bind major_command_spec, minor_command_spec =
+      let%bind major_commands, minor_commands =
         if permission_change then
           let%bind permission_change_cmd =
             Simple_command.gen_zkapp_blocking_send major
@@ -3631,17 +3631,12 @@ let%test_module _ =
           in
 
           return
-            ( Array.append major_command_spec [| permission_change_cmd |]
-            , Array.append minor_command_spec aux_minor_cmd )
-        else return (major_command_spec, minor_command_spec)
+            ( Array.append major_commands [| permission_change_cmd |]
+            , Array.append minor_commands aux_minor_cmd )
+        else return (major_commands, minor_commands)
       in
 
-      return
-        ( prefix_command_spec
-        , major_command_spec
-        , minor_command_spec
-        , minor
-        , major )
+      return (prefix_commands, major_commands, minor_commands, minor, major)
 
     let gen_commands_from_specs (sequence : Simple_command.t array) test :
         User_command.Valid.t list =
