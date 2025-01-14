@@ -3170,9 +3170,37 @@ let%test_module _ =
       let item = arr.(idx) in
       return (idx, item)
 
-    module Account_spec = struct
+    module Account_spec : sig
+      type t [@@deriving yojson]
+
+      val key_idx : t -> int
+
+      val balance : t -> int
+
+      val nonce : t -> int
+
+      val seal : t -> t
+
+      val to_key_and_nonce : t -> Public_key.Compressed.t * int
+
+      val subtract_balance : t -> int -> t
+
+      val apply_cmd : int -> t -> t
+
+      val apply_cmd_or_fail : amount:int -> fee:int -> t -> t
+
+      val get_random_unsealed : t array -> (int * t) Quickcheck.Generator.t
+
+      val of_account : key_idx:int -> Account.t -> t
+    end = struct
       type t = { key_idx : int; balance : int; nonce : int; sealed : bool }
-      [@@deriving sexp, yojson]
+      [@@deriving yojson]
+
+      let key_idx { key_idx; _ } = key_idx
+
+      let balance { balance; _ } = balance
+
+      let nonce { nonce; _ } = nonce
 
       let seal t =
         { key_idx = t.key_idx
@@ -3186,6 +3214,13 @@ let%test_module _ =
 
       let can_apply amount t = amount < t.balance
 
+      let subtract_balance t amount =
+        { key_idx = t.key_idx
+        ; balance = t.balance - amount
+        ; nonce = t.nonce
+        ; sealed = t.sealed
+        }
+
       let apply_cmd amount t =
         { key_idx = t.key_idx
         ; balance = t.balance - amount
@@ -3193,7 +3228,7 @@ let%test_module _ =
         ; sealed = t.sealed
         }
 
-      let apply_cmd_or_fail amount fee t =
+      let apply_cmd_or_fail ~amount ~fee t =
         if not (can_apply (amount + fee) t) then
           if not (can_apply fee t) then
             failwithf
@@ -3205,10 +3240,17 @@ let%test_module _ =
 
       let get_random_unsealed (arr : t array) =
         get_random_from_array (Array.filter arr ~f:(fun x -> not x.sealed))
+
+      let of_account ~key_idx (account : Account.t) =
+        { key_idx
+        ; balance = Account.balance account |> Currency.Balance.to_nanomina_int
+        ; nonce = Account.nonce account |> Account.Nonce.to_int
+        ; sealed = false
+        }
     end
 
     module Account_spec_ledger : sig
-      type t [@@deriving yojson]
+      type t [@@deriving to_yojson]
 
       type index
 
@@ -3227,14 +3269,14 @@ let%test_module _ =
 
       val find_by_key_idx : t -> int -> (index * Account_spec.t) option
     end = struct
-      type t = Account_spec.t array [@@deriving yojson]
+      type t = Account_spec.t array [@@deriving to_yojson]
 
       type index = int
 
       let index_of_int x = x
 
       let ledger_snapshot t =
-        Array.mapi test_keys ~f:(fun i kp ->
+        Array.mapi test_keys ~f:(fun key_idx kp ->
             let ledger = Option.value_exn t.txn_pool.best_tip_ledger in
             let account_id =
               Account_id.create
@@ -3249,12 +3291,7 @@ let%test_module _ =
             let account =
               Option.value_exn @@ Mina_ledger.Ledger.Ledger_inner.get ledger loc
             in
-            { Account_spec.key_idx = i
-            ; balance =
-                Account.balance account |> Currency.Balance.to_nanomina_int
-            ; nonce = Account.nonce account |> Account.Nonce.to_int
-            ; sealed = false
-            } )
+            Account_spec.of_account ~key_idx account )
 
       let copy = Array.copy
 
@@ -3265,7 +3302,8 @@ let%test_module _ =
       let get_random_unsealed spec = Account_spec.get_random_unsealed spec
 
       let find_by_key_idx (spec : t) key_idx =
-        Array.findi spec ~f:(fun _idx spec -> Int.equal key_idx spec.key_idx)
+        Array.findi spec ~f:(fun _idx spec ->
+            Int.equal key_idx (Account_spec.key_idx spec) )
     end
 
     module Command_spec = struct
@@ -3277,7 +3315,7 @@ let%test_module _ =
             ; amount : int
             }
         | Zkapp_blocking_send of { sender : Account_spec.t; fee : int }
-      [@@deriving sexp, yojson]
+      [@@deriving yojson]
 
       let gen_zkapp_blocking_send (spec : Account_spec_ledger.t) =
         let open Quickcheck.Generator.Let_syntax in
@@ -3285,7 +3323,7 @@ let%test_module _ =
           Account_spec_ledger.get_random_unsealed spec
         in
         let new_account_spec =
-          Account_spec.apply_cmd_or_fail 0 minimum_fee account_spec
+          Account_spec.apply_cmd_or_fail ~amount:0 ~fee:minimum_fee account_spec
         in
         Account_spec_ledger.set spec random_idx new_account_spec ;
         return (Zkapp_blocking_send { sender = account_spec; fee = minimum_fee })
@@ -3299,7 +3337,7 @@ let%test_module _ =
         in
         let%bind amount = Int.gen_incl lower higher in
         let new_account_spec =
-          Account_spec.apply_cmd_or_fail amount minimum_fee account_spec
+          Account_spec.apply_cmd_or_fail ~amount ~fee:minimum_fee account_spec
         in
         Account_spec_ledger.set spec idx new_account_spec ;
         return
@@ -3413,7 +3451,9 @@ let%test_module _ =
             Account_spec_ledger.get_random_unsealed major
           in
 
-          let initial_nonce = account_with_limited_capacity.nonce in
+          let initial_nonce =
+            Account_spec.nonce account_with_limited_capacity
+          in
           let account_state_on_major = account_with_limited_capacity in
           let account_state_on_minor =
             Account_spec_ledger.get minor account_with_limited_capacity_idx
@@ -3423,8 +3463,10 @@ let%test_module _ =
           let%bind receiver_idx =
             test_keys
             |> Array.filter_mapi ~f:(fun i _ ->
-                   if Int.equal i account_with_limited_capacity.key_idx then
-                     None
+                   if
+                     Int.equal i
+                       (Account_spec.key_idx account_with_limited_capacity)
+                   then None
                    else Some i )
             |> Quickcheck_lib.of_array
           in
@@ -3434,8 +3476,10 @@ let%test_module _ =
             let%map minor_sequence_length = Int.gen_incl 2 4 in
             minor_sequence_length + major_sequence_length + initial_nonce
           in
-          let initial_balance = account_with_limited_capacity.balance in
-          let b = account_with_limited_capacity.balance / 2 in
+          let initial_balance =
+            Account_spec.balance account_with_limited_capacity
+          in
+          let b = Account_spec.balance account_with_limited_capacity / 2 in
 
           let gen_sequence len sender =
             let sender = ref sender in
@@ -3512,7 +3556,7 @@ let%test_module _ =
           let split_by_account (account : Account_spec.t) commands =
             let f cmd =
               let sender = Command_spec.sender cmd in
-              sender.key_idx = account.key_idx
+              Account_spec.key_idx sender = Account_spec.key_idx account
             in
             let cmds_from_acc = Array.filter commands ~f in
             let others = Array.filter commands ~f:(fun x -> not (f x)) in
@@ -3571,18 +3615,22 @@ let%test_module _ =
              Otherwise it will be dropped as we already have transaction with the same nonce from major sequence
           *)
           let sender_index =
-            Account_spec_ledger.index_of_int sender_on_major.key_idx
+            Account_spec_ledger.index_of_int
+              (Account_spec.key_idx sender_on_major)
           in
           let sender_on_minor = Account_spec_ledger.get minor sender_index in
           let%bind aux_minor_cmd =
             Quickcheck_lib.init_gen_array
-              (sender_on_major.nonce - sender_on_minor.nonce + 1)
+              ( Account_spec.nonce sender_on_major
+              - Account_spec.nonce sender_on_minor
+              + 1 )
               ~f:(fun _ ->
                 let sender_on_minor =
                   Account_spec_ledger.get minor sender_index
                 in
                 let sender_on_minor_idx =
-                  Account_spec_ledger.index_of_int sender_on_minor.key_idx
+                  Account_spec_ledger.index_of_int
+                    (Account_spec.key_idx sender_on_minor)
                 in
                 Command_spec.gen_single_from minor
                   (sender_on_minor_idx, sender_on_minor) )
@@ -3609,7 +3657,9 @@ let%test_module _ =
              match spec with
              | Zkapp_blocking_send { sender; _ } ->
                  let zkapp =
-                   mk_basic_zkapp sender.nonce test_keys.(sender.key_idx)
+                   mk_basic_zkapp
+                     (Account_spec.nonce sender)
+                     test_keys.(Account_spec.key_idx sender)
                      ~permissions:
                        { Permissions.user_default with
                          send = Permissions.Auth_required.Impossible
@@ -3626,13 +3676,12 @@ let%test_module _ =
                                 best_tip_ledger ) )
                       zkapp )
                  |> User_command.Zkapp_command
-             | Payment
-                 { sender = { key_idx = sender_idx; nonce; _ }
-                 ; fee
-                 ; amount
-                 ; receiver_idx
-                 } ->
-                 mk_payment ~sender_idx ~fee ~nonce ~receiver_idx ~amount () )
+             | Payment { sender; fee; amount; receiver_idx } ->
+                 mk_payment
+                   ~sender_idx:(Account_spec.key_idx sender)
+                   ~fee
+                   ~nonce:(Account_spec.nonce sender)
+                   ~receiver_idx ~amount () )
       |> Array.to_list
 
     let%test_unit "Handle transition frontier diff (permission send tx updated)"
@@ -3763,8 +3812,10 @@ let%test_module _ =
                   =
                 Array.filter txs ~f:(fun x ->
                     let sender = Command_spec.sender x in
-                    Int.equal acc.key_idx sender.key_idx
-                    && Int.( > ) acc.nonce sender.nonce )
+                    Int.equal (Account_spec.key_idx acc)
+                      (Account_spec.key_idx sender)
+                    && Int.( > ) (Account_spec.nonce acc)
+                         (Account_spec.nonce sender) )
               in
 
               let total_cost sender =
@@ -3779,11 +3830,12 @@ let%test_module _ =
 
                   let account_spec_pair_opt =
                     Account_spec_ledger.find_by_key_idx major_account_spec
-                      sender.key_idx
+                      (Account_spec.key_idx sender)
                   in
                   match account_spec_pair_opt with
                   | Some (_, account_spec)
-                    when sender.nonce < account_spec.nonce ->
+                    when Account_spec.nonce sender
+                         < Account_spec.nonce account_spec ->
                       [%log info]
                         "sender nonce is smaller or equal than last major \
                          nonce. command should be dropped"
@@ -3809,7 +3861,8 @@ let%test_module _ =
                           ] ;
                       assert_pool_doesn't_contain pool_state (pk, nonce)
                   | Some (idx, account_spec)
-                    when account_spec.balance > total_cost sender ->
+                    when Account_spec.balance account_spec > total_cost sender
+                    ->
                       [%log info]
                         "sender nonce is greater than last major nonce. should \
                          be in the pool"
@@ -3822,11 +3875,8 @@ let%test_module _ =
                           ] ;
                       assert_pool_contains pool_state (pk, nonce) ;
                       Account_spec_ledger.set major_account_spec idx
-                        { balance = account_spec.balance - total_cost sender
-                        ; key_idx = account_spec.key_idx
-                        ; nonce = account_spec.nonce
-                        ; sealed = account_spec.sealed
-                        }
+                        (Account_spec.subtract_balance account_spec
+                           (total_cost sender) )
                   | Some _account_spec ->
                       [%log info]
                         "balance is negative. should be dropped from pool"
