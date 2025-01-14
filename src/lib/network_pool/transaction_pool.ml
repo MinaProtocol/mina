@@ -3390,9 +3390,11 @@ let%test_module _ =
             |> Quickcheck_lib.of_array
           in
 
-          let%bind s1_length = Int.gen_incl 2 10 in
-          let%bind s2_length = Int.gen_incl 2 4 in
-          let s2_length = s2_length + s1_length + initial_nonce in
+          let%bind major_sequence_length = Int.gen_incl 2 10 in
+          let%bind minor_sequence_length = Int.gen_incl 2 4 in
+          let minor_sequence_length =
+            minor_sequence_length + major_sequence_length + initial_nonce
+          in
           let initial_balance = account_with_limited_capacity.balance in
           let b = account_with_limited_capacity.balance / 2 in
 
@@ -3418,27 +3420,34 @@ let%test_module _ =
             (sequence, !sender)
           in
 
-          let%bind s1, account_state_on_major =
-            gen_sequence s1_length account_state_on_major
+          let%bind major_sequence, account_state_on_major =
+            gen_sequence major_sequence_length account_state_on_major
           in
-          let%bind s2, account_state_on_minor =
-            gen_sequence s2_length account_state_on_minor
+          let%bind minor_sequence, account_state_on_minor =
+            gen_sequence minor_sequence_length account_state_on_minor
           in
 
           let b1 =
-            Array.fold ~init:0 s1 ~f:(fun acc item ->
+            Array.fold ~init:0 major_sequence ~f:(fun acc item ->
                 acc + Command_spec.total_cost item )
           in
 
-          let%bind i = Int.gen_incl 1 (s2_length - s1_length) in
+          let%bind i =
+            Int.gen_incl 1 (minor_sequence_length - major_sequence_length)
+          in
 
           let t2 =
-            List.sub (Array.to_list s2) ~pos:(s1_length - 1) ~len:i
+            List.sub
+              (Array.to_list minor_sequence)
+              ~pos:(major_sequence_length - 1)
+              ~len:i
             |> List.fold_left ~init:0 ~f:(fun acc item ->
                    acc + Command_spec.total_cost item )
           in
 
-          let%bind random_idx, tx_to_increase = get_random_from_array s1 in
+          let%bind random_idx, tx_to_increase =
+            get_random_from_array major_sequence
+          in
 
           let increased_tx =
             match tx_to_increase with
@@ -3459,7 +3468,7 @@ let%test_module _ =
             (Account_spec.seal account_state_on_major) ;
           Array.set minor account_with_limited_capacity_idx
             (Account_spec.seal account_state_on_minor) ;
-          Array.set s1 random_idx increased_tx ;
+          Array.set major_sequence random_idx increased_tx ;
 
           let split_by_account (account : Account_spec.t) commands =
             let f cmd =
@@ -3482,12 +3491,14 @@ let%test_module _ =
           let%bind major_command_spec =
             gen_merge
               (Array.to_list major_command_spec_to_merge)
-              (Array.to_list s1) []
+              (Array.to_list major_sequence)
+              []
           in
           let%bind minor_command_spec =
             gen_merge
               (Array.to_list minor_command_spec_to_merge)
-              (Array.to_list s2) []
+              (Array.to_list minor_sequence)
+              []
           in
 
           return
