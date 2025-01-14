@@ -687,7 +687,7 @@ let staged_ledger_diff =
     }
       |json}
   in
-  Staged_ledger_diff.of_yojson json |> Result.ok_or_failwith
+  Staged_ledger_diff.Stable.Latest.of_yojson json |> Result.ok_or_failwith
 
 let merkle_path
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) =

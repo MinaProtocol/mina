@@ -62,7 +62,6 @@ module T = struct
     ; accounts_created : (Account_id.t * Currency.Fee.t) list
     ; tokens_used : (Token_id.t * Account_id.t option) list
     }
-  [@@deriving yojson]
 end
 
 include T
@@ -90,6 +89,7 @@ module Stable = struct
       ; tokens_used :
           (Token_id.Stable.V2.t * Account_id.Stable.V2.t option) list
       }
+    [@@deriving yojson]
 
     let to_latest = Fn.id
   end
