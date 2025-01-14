@@ -3649,16 +3649,12 @@ let%test_module _ =
                        (fee_payer_pk, nonce) )
               in
 
-              let log_pool_content =
-                List.map pool_state ~f:(fun (fee_payer_pk, nonce) ->
-                    `String
-                      (Printf.sprintf
-                         !"%{sexp: Public_key.Compressed.t} : %d"
-                         fee_payer_pk nonce ) )
-              in
-
               [%log info] "Pool state"
-                ~metadata:[ ("pool state", `List log_pool_content) ] ;
+                ~metadata:
+                  [ ( "pool state"
+                    , [%to_yojson: (Public_key.Compressed.t * int) list]
+                        pool_state )
+                  ] ;
 
               let actual_nonce_opt pk nonce =
                 List.find ~f:(fun (fee_payer_pk, actual_nonce) ->
