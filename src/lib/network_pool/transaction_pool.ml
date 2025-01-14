@@ -3289,6 +3289,32 @@ let%test_module _ =
             fee
     end
 
+    let rec gen_merge (a : 'a list) (b : 'a list) (c : 'a list) =
+      let open Quickcheck.Generator.Let_syntax in
+      match (a, b) with
+      | [], [] ->
+          return c
+      | [ left ], [] ->
+          return (c @ [ left ])
+      | [], [ right ] ->
+          return (c @ [ right ])
+      | [ left ], [ right ] -> (
+          match%bind Bool.quickcheck_generator with
+          | true ->
+              gen_merge [] [ right ] (c @ [ left ])
+          | false ->
+              gen_merge [ left ] [] (c @ [ right ]) )
+      | [], right :: tail ->
+          gen_merge [] tail (c @ [ right ])
+      | left :: tail, [] ->
+          gen_merge tail [] (c @ [ left ])
+      | left :: left_tail, right :: right_tail -> (
+          match%bind Bool.quickcheck_generator with
+          | true ->
+              gen_merge left_tail (right :: right_tail) (c @ [ left ])
+          | false ->
+              gen_merge (left :: left_tail) right_tail (c @ [ right ]) )
+
     (** Main generator for prefix, minor and major sequences. This generator has a more firm grip
            on how data is generated than usual. It uses Command_spec and Account_spec modules for 
            user command definitions which then are carved into Signed_command list. By default generator
@@ -3441,32 +3467,6 @@ let%test_module _ =
 
           let unchanged_minor_command_spec, minor_command_spec_to_merge =
             split_by_account account_with_limited_capacity minor_command_spec
-          in
-
-          let rec gen_merge (a : 'a list) (b : 'a list) (c : 'a list) =
-            match (a, b) with
-            | [], [] ->
-                return c
-            | [ left ], [] ->
-                return (c @ [ left ])
-            | [], [ right ] ->
-                return (c @ [ right ])
-            | [ left ], [ right ] -> (
-                match%bind Bool.quickcheck_generator with
-                | true ->
-                    gen_merge [] [ right ] (c @ [ left ])
-                | false ->
-                    gen_merge [ left ] [] (c @ [ right ]) )
-            | [], right :: tail ->
-                gen_merge [] tail (c @ [ right ])
-            | left :: tail, [] ->
-                gen_merge tail [] (c @ [ left ])
-            | left :: left_tail, right :: right_tail -> (
-                match%bind Bool.quickcheck_generator with
-                | true ->
-                    gen_merge left_tail (right :: right_tail) (c @ [ left ])
-                | false ->
-                    gen_merge (left :: left_tail) right_tail (c @ [ right ]) )
           in
 
           let%bind major_command_spec =
