@@ -3710,8 +3710,8 @@ let%test_module _ =
                 , { prefix_commands
                   ; major_commands
                   ; minor_commands
-                  ; minor = minor_account_spec
-                  ; major = major_account_spec
+                  ; minor
+                  ; major
                   } ) ->
           Thread_safe.block_on_async_exn (fun () ->
               [%log info] "Input Data"
@@ -3722,10 +3722,8 @@ let%test_module _ =
                     , [%to_yojson: Simple_command.t array] major_commands )
                   ; ( "minor_commands"
                     , [%to_yojson: Simple_command.t array] minor_commands )
-                  ; ( "minor accounts state"
-                    , [%to_yojson: Simple_ledger.t] minor_account_spec )
-                  ; ( "major accounts state"
-                    , [%to_yojson: Simple_ledger.t] major_account_spec )
+                  ; ("minor accounts state", [%to_yojson: Simple_ledger.t] minor)
+                  ; ("major accounts state", [%to_yojson: Simple_ledger.t] major)
                   ] ;
 
               let prefix_cmds = gen_commands_from_specs prefix_commands test in
@@ -3832,7 +3830,7 @@ let%test_module _ =
                   let pk, nonce = Simple_account.to_key_and_nonce sender in
 
                   let account_spec_pair_opt =
-                    Simple_ledger.find_by_key_idx major_account_spec
+                    Simple_ledger.find_by_key_idx major
                       (Simple_account.key_idx sender)
                   in
                   match account_spec_pair_opt with
@@ -3877,7 +3875,7 @@ let%test_module _ =
                                    pk nonce ) )
                           ] ;
                       assert_pool_contains pool_state (pk, nonce) ;
-                      Simple_ledger.set major_account_spec idx
+                      Simple_ledger.set major idx
                         (Simple_account.subtract_balance account_spec
                            (total_cost sender) )
                   | Some _account_spec ->
