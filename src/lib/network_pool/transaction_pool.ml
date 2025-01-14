@@ -3375,9 +3375,9 @@ let%test_module _ =
           in
 
           let initial_nonce = account_with_limited_capacity.nonce in
-          let account_state_on_major = ref account_with_limited_capacity in
+          let account_state_on_major = account_with_limited_capacity in
           let account_state_on_minor =
-            ref minor.(account_with_limited_capacity_idx)
+            minor.(account_with_limited_capacity_idx)
           in
 
           (* find receiver which is not our selected account*)
@@ -3397,24 +3397,33 @@ let%test_module _ =
           let b = account_with_limited_capacity.balance / 2 in
 
           let gen_sequence len sender =
-            Quickcheck_lib.init_gen_array len ~f:(fun _ ->
-                let%bind amount =
-                  Int.gen_incl 5_000_000_000_000_000 (b / len)
-                in
-                let tx =
-                  Command_spec.Payment
-                    { sender = !sender
-                    ; receiver_idx
-                    ; fee = minimum_fee
-                    ; amount
-                    }
-                in
-                sender := Account_spec.apply_cmd (amount + minimum_fee) !sender ;
-                return tx )
+            let sender = ref sender in
+            let%map sequence =
+              Quickcheck_lib.init_gen_array len ~f:(fun _ ->
+                  let%bind amount =
+                    Int.gen_incl 5_000_000_000_000_000 (b / len)
+                  in
+                  let tx =
+                    Command_spec.Payment
+                      { sender = !sender
+                      ; receiver_idx
+                      ; fee = minimum_fee
+                      ; amount
+                      }
+                  in
+                  sender :=
+                    Account_spec.apply_cmd (amount + minimum_fee) !sender ;
+                  return tx )
+            in
+            (sequence, !sender)
           in
 
-          let%bind s1 = gen_sequence s1_length account_state_on_major in
-          let%bind s2 = gen_sequence s2_length account_state_on_minor in
+          let%bind s1, account_state_on_major =
+            gen_sequence s1_length account_state_on_major
+          in
+          let%bind s2, account_state_on_minor =
+            gen_sequence s2_length account_state_on_minor
+          in
 
           let b1 =
             Array.fold ~init:0 s1 ~f:(fun acc item ->
@@ -3446,13 +3455,10 @@ let%test_module _ =
                    corner case"
           in
 
-          account_state_on_major := Account_spec.seal !account_state_on_major ;
-          account_state_on_minor := Account_spec.seal !account_state_on_minor ;
-
           Array.set major account_with_limited_capacity_idx
-            !account_state_on_major ;
+            (Account_spec.seal account_state_on_major) ;
           Array.set minor account_with_limited_capacity_idx
-            !account_state_on_minor ;
+            (Account_spec.seal account_state_on_minor) ;
           Array.set s1 random_idx increased_tx ;
 
           let split_by_account (account : Account_spec.t) commands =
