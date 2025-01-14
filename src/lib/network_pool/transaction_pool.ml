@@ -3306,7 +3306,7 @@ let%test_module _ =
             Int.equal key_idx (Simple_account.key_idx spec) )
     end
 
-    module Command_spec = struct
+    module Simple_command = struct
       type t =
         | Payment of
             { sender : Simple_account.t
@@ -3397,7 +3397,7 @@ let%test_module _ =
               gen_merge (left :: left_tail) right_tail (c @ [ right ]) )
 
     (** Main generator for prefix, minor and major sequences. This generator has a more firm grip
-           on how data is generated than usual. It uses Command_spec and Simple_account modules for 
+           on how data is generated than usual. It uses Simple_command and Simple_account modules for 
            user command definitions which then are carved into Signed_command list. By default generator
            fulfill standard use cases for ledger reorg, like merging transactions from minor and major sequences
            with preference for major sequence as well as 2 additional corner cases:
@@ -3422,17 +3422,17 @@ let%test_module _ =
       let%bind minor_length = Int.gen_incl 0 sequence_max_length in
 
       let%bind prefix_command_spec =
-        Command_spec.gen_sequence spec ~length:prefix_length
+        Simple_command.gen_sequence spec ~length:prefix_length
       in
 
       let minor = Simple_ledger.copy spec in
       let%bind minor_command_spec =
-        Command_spec.gen_sequence minor ~length:minor_length
+        Simple_command.gen_sequence minor ~length:minor_length
       in
 
       let major = Simple_ledger.copy spec in
       let%bind major_command_spec =
-        Command_spec.gen_sequence major ~length:major_length
+        Simple_command.gen_sequence major ~length:major_length
       in
 
       (* Optional Edge Case 1: Limited Account Capacity
@@ -3489,7 +3489,7 @@ let%test_module _ =
                     Int.gen_incl 5_000_000_000_000_000 (b / len)
                   in
                   let tx =
-                    Command_spec.Payment
+                    Simple_command.Payment
                       { sender = !sender
                       ; receiver_idx
                       ; fee = minimum_fee
@@ -3512,7 +3512,7 @@ let%test_module _ =
 
           let b1 =
             Array.fold ~init:0 major_sequence ~f:(fun acc item ->
-                acc + Command_spec.total_cost item )
+                acc + Simple_command.total_cost item )
           in
 
           let%bind i =
@@ -3525,7 +3525,7 @@ let%test_module _ =
               ~pos:(major_sequence_length - 1)
               ~len:i
             |> List.fold_left ~init:0 ~f:(fun acc item ->
-                   acc + Command_spec.total_cost item )
+                   acc + Simple_command.total_cost item )
           in
 
           let%bind random_idx, tx_to_increase =
@@ -3535,7 +3535,7 @@ let%test_module _ =
           let increased_tx =
             match tx_to_increase with
             | Payment { sender; receiver_idx; fee; amount } ->
-                Command_spec.Payment
+                Simple_command.Payment
                   { sender
                   ; receiver_idx
                   ; fee
@@ -3555,7 +3555,7 @@ let%test_module _ =
 
           let split_by_account (account : Simple_account.t) commands =
             let f cmd =
-              let sender = Command_spec.sender cmd in
+              let sender = Simple_command.sender cmd in
               Simple_account.key_idx sender = Simple_account.key_idx account
             in
             let cmds_from_acc = Array.filter commands ~f in
@@ -3608,9 +3608,9 @@ let%test_module _ =
       let%bind major_command_spec, minor_command_spec =
         if permission_change then
           let%bind permission_change_cmd =
-            Command_spec.gen_zkapp_blocking_send major
+            Simple_command.gen_zkapp_blocking_send major
           in
-          let sender_on_major = Command_spec.sender permission_change_cmd in
+          let sender_on_major = Simple_command.sender permission_change_cmd in
           (* We need to increase nonce so transaction has a chance to be placed in the pool.
              Otherwise it will be dropped as we already have transaction with the same nonce from major sequence
           *)
@@ -3629,7 +3629,7 @@ let%test_module _ =
                   Simple_ledger.index_of_int
                     (Simple_account.key_idx sender_on_minor)
                 in
-                Command_spec.gen_single_from minor
+                Simple_command.gen_single_from minor
                   (sender_on_minor_idx, sender_on_minor) )
           in
 
@@ -3646,7 +3646,7 @@ let%test_module _ =
         , minor
         , major )
 
-    let gen_commands_from_specs (sequence : Command_spec.t array) test :
+    let gen_commands_from_specs (sequence : Simple_command.t array) test :
         User_command.Valid.t list =
       let best_tip_ledger = Option.value_exn test.txn_pool.best_tip_ledger in
       sequence
@@ -3718,9 +3718,9 @@ let%test_module _ =
           Thread_safe.block_on_async_exn (fun () ->
               [%log info] "Input Data"
                 ~metadata:
-                  [ ("prefix", [%to_yojson: Command_spec.t array] prefix_specs)
-                  ; ("major", [%to_yojson: Command_spec.t array] major_specs)
-                  ; ("minor", [%to_yojson: Command_spec.t array] minor_specs)
+                  [ ("prefix", [%to_yojson: Simple_command.t array] prefix_specs)
+                  ; ("major", [%to_yojson: Simple_command.t array] major_specs)
+                  ; ("minor", [%to_yojson: Simple_command.t array] minor_specs)
                   ; ( "minor accounts state"
                     , [%to_yojson: Simple_ledger.t] minor_account_spec )
                   ; ( "major accounts state"
@@ -3794,7 +3794,7 @@ let%test_module _ =
                     ()
               in
 
-              let sent_blocking_zkapp (specs : Command_spec.t array) pk =
+              let sent_blocking_zkapp (specs : Simple_command.t array) pk =
                 Array.find specs ~f:(fun s ->
                     match s with
                     | Payment _ ->
@@ -3808,9 +3808,9 @@ let%test_module _ =
               in
 
               let find_owned (acc : Simple_account.t)
-                  (txs : Command_spec.t array) =
+                  (txs : Simple_command.t array) =
                 Array.filter txs ~f:(fun x ->
-                    let sender = Command_spec.sender x in
+                    let sender = Simple_command.sender x in
                     Int.equal
                       (Simple_account.key_idx acc)
                       (Simple_account.key_idx sender)
@@ -3820,12 +3820,12 @@ let%test_module _ =
 
               let total_cost sender =
                 find_owned sender minor_specs
-                |> Array.map ~f:Command_spec.total_cost
+                |> Array.map ~f:Simple_command.total_cost
                 |> Array.sum ~f:Fn.id (module Int)
               in
 
-              Array.iter minor_specs ~f:(fun (spec : Command_spec.t) ->
-                  let sender = Command_spec.sender spec in
+              Array.iter minor_specs ~f:(fun (spec : Simple_command.t) ->
+                  let sender = Simple_command.sender spec in
                   let pk, nonce = Simple_account.to_key_and_nonce sender in
 
                   let account_spec_pair_opt =
