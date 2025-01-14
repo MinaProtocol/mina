@@ -3249,7 +3249,7 @@ let%test_module _ =
         }
     end
 
-    module Account_spec_ledger : sig
+    module Simple_ledger : sig
       type t [@@deriving to_yojson]
 
       type index
@@ -3317,20 +3317,20 @@ let%test_module _ =
         | Zkapp_blocking_send of { sender : Simple_account.t; fee : int }
       [@@deriving yojson]
 
-      let gen_zkapp_blocking_send (spec : Account_spec_ledger.t) =
+      let gen_zkapp_blocking_send (spec : Simple_ledger.t) =
         let open Quickcheck.Generator.Let_syntax in
         let%bind random_idx, account_spec =
-          Account_spec_ledger.get_random_unsealed spec
+          Simple_ledger.get_random_unsealed spec
         in
         let new_account_spec =
           Simple_account.apply_cmd_or_fail ~amount:0 ~fee:minimum_fee
             account_spec
         in
-        Account_spec_ledger.set spec random_idx new_account_spec ;
+        Simple_ledger.set spec random_idx new_account_spec ;
         return (Zkapp_blocking_send { sender = account_spec; fee = minimum_fee })
 
       let gen_single_from ?(lower = 5_000_000_000_000)
-          ?(higher = 10_000_000_000_000) (spec : Account_spec_ledger.t)
+          ?(higher = 10_000_000_000_000) (spec : Simple_ledger.t)
           (idx, account_spec) =
         let open Quickcheck.Generator.Let_syntax in
         let%bind receiver_idx =
@@ -3340,19 +3340,18 @@ let%test_module _ =
         let new_account_spec =
           Simple_account.apply_cmd_or_fail ~amount ~fee:minimum_fee account_spec
         in
-        Account_spec_ledger.set spec idx new_account_spec ;
+        Simple_ledger.set spec idx new_account_spec ;
         return
           (Payment
              { sender = account_spec; fee = minimum_fee; receiver_idx; amount }
           )
 
       let gen_sequence ?(lower = 5_000_000_000_000)
-          ?(higher = 10_000_000_000_000) (spec : Account_spec_ledger.t) ~length
-          =
+          ?(higher = 10_000_000_000_000) (spec : Simple_ledger.t) ~length =
         let open Quickcheck.Generator.Let_syntax in
         Quickcheck_lib.init_gen_array length ~f:(fun _ ->
             let%bind random_idx, account_spec =
-              Account_spec_ledger.get_random_unsealed spec
+              Simple_ledger.get_random_unsealed spec
             in
             gen_single_from ~lower ~higher spec (random_idx, account_spec) )
 
@@ -3426,12 +3425,12 @@ let%test_module _ =
         Command_spec.gen_sequence spec ~length:prefix_length
       in
 
-      let minor = Account_spec_ledger.copy spec in
+      let minor = Simple_ledger.copy spec in
       let%bind minor_command_spec =
         Command_spec.gen_sequence minor ~length:minor_length
       in
 
-      let major = Account_spec_ledger.copy spec in
+      let major = Simple_ledger.copy spec in
       let%bind major_command_spec =
         Command_spec.gen_sequence major ~length:major_length
       in
@@ -3449,7 +3448,7 @@ let%test_module _ =
           (*find account in major and minor branches with the same nonces and similar balances (less than 100k mina diff)*)
           let%bind ( account_with_limited_capacity_idx
                    , account_with_limited_capacity ) =
-            Account_spec_ledger.get_random_unsealed major
+            Simple_ledger.get_random_unsealed major
           in
 
           let initial_nonce =
@@ -3457,7 +3456,7 @@ let%test_module _ =
           in
           let account_state_on_major = account_with_limited_capacity in
           let account_state_on_minor =
-            Account_spec_ledger.get minor account_with_limited_capacity_idx
+            Simple_ledger.get minor account_with_limited_capacity_idx
           in
 
           (* find receiver which is not our selected account*)
@@ -3548,9 +3547,9 @@ let%test_module _ =
                    corner case"
           in
 
-          Account_spec_ledger.set major account_with_limited_capacity_idx
+          Simple_ledger.set major account_with_limited_capacity_idx
             (Simple_account.seal account_state_on_major) ;
-          Account_spec_ledger.set minor account_with_limited_capacity_idx
+          Simple_ledger.set minor account_with_limited_capacity_idx
             (Simple_account.seal account_state_on_minor) ;
           Array.set major_sequence random_idx increased_tx ;
 
@@ -3616,21 +3615,18 @@ let%test_module _ =
              Otherwise it will be dropped as we already have transaction with the same nonce from major sequence
           *)
           let sender_index =
-            Account_spec_ledger.index_of_int
-              (Simple_account.key_idx sender_on_major)
+            Simple_ledger.index_of_int (Simple_account.key_idx sender_on_major)
           in
-          let sender_on_minor = Account_spec_ledger.get minor sender_index in
+          let sender_on_minor = Simple_ledger.get minor sender_index in
           let%bind aux_minor_cmd =
             Quickcheck_lib.init_gen_array
               ( Simple_account.nonce sender_on_major
               - Simple_account.nonce sender_on_minor
               + 1 )
               ~f:(fun _ ->
-                let sender_on_minor =
-                  Account_spec_ledger.get minor sender_index
-                in
+                let sender_on_minor = Simple_ledger.get minor sender_index in
                 let sender_on_minor_idx =
-                  Account_spec_ledger.index_of_int
+                  Simple_ledger.index_of_int
                     (Simple_account.key_idx sender_on_minor)
                 in
                 Command_spec.gen_single_from minor
@@ -3706,7 +3702,7 @@ let%test_module _ =
       Quickcheck.test ~trials:1 ~seed:(`Deterministic "")
         (let open Quickcheck.Generator.Let_syntax in
         let test = Thread_safe.block_on_async_exn (fun () -> setup_test ()) in
-        let init_ledger_state = Account_spec_ledger.ledger_snapshot test in
+        let init_ledger_state = Simple_ledger.ledger_snapshot test in
         let%bind prefix, major, minor, minor_account_spec, major_account_spec =
           gen_branches init_ledger_state ~permission_change:true
             ~limited_capacity:true ~sequence_max_length:10 ()
@@ -3726,9 +3722,9 @@ let%test_module _ =
                   ; ("major", [%to_yojson: Command_spec.t array] major_specs)
                   ; ("minor", [%to_yojson: Command_spec.t array] minor_specs)
                   ; ( "minor accounts state"
-                    , [%to_yojson: Account_spec_ledger.t] minor_account_spec )
+                    , [%to_yojson: Simple_ledger.t] minor_account_spec )
                   ; ( "major accounts state"
-                    , [%to_yojson: Account_spec_ledger.t] major_account_spec )
+                    , [%to_yojson: Simple_ledger.t] major_account_spec )
                   ] ;
 
               let prefix = gen_commands_from_specs prefix_specs test in
@@ -3833,7 +3829,7 @@ let%test_module _ =
                   let pk, nonce = Simple_account.to_key_and_nonce sender in
 
                   let account_spec_pair_opt =
-                    Account_spec_ledger.find_by_key_idx major_account_spec
+                    Simple_ledger.find_by_key_idx major_account_spec
                       (Simple_account.key_idx sender)
                   in
                   match account_spec_pair_opt with
@@ -3878,7 +3874,7 @@ let%test_module _ =
                                    pk nonce ) )
                           ] ;
                       assert_pool_contains pool_state (pk, nonce) ;
-                      Account_spec_ledger.set major_account_spec idx
+                      Simple_ledger.set major_account_spec idx
                         (Simple_account.subtract_balance account_spec
                            (total_cost sender) )
                   | Some _account_spec ->
