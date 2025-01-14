@@ -20,7 +20,7 @@ module Node = struct
     ; successor_hashes : State_hash.t list
     ; length : int
     }
-  [@@deriving sexp, fields]
+  [@@deriving fields]
 
   type display =
     { length : int

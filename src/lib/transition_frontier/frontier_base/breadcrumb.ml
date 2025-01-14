@@ -10,11 +10,11 @@ module T = struct
 
   type t =
     { validated_transition : Mina_block.Validated.t
-    ; staged_ledger : (Staged_ledger.t[@sexp.opaque])
+    ; staged_ledger : Staged_ledger.t
     ; just_emitted_a_proof : bool
     ; transition_receipt_time : Time.t option
     }
-  [@@deriving sexp, fields]
+  [@@deriving fields]
 
   type 'a creator =
        validated_transition:Mina_block.Validated.t
@@ -63,7 +63,7 @@ T.
   , transition_receipt_time
   , to_yojson )]
 
-include Allocation_functor.Make.Sexp (T)
+include Allocation_functor.Make.Basic (T)
 
 let compute_block_trace_metadata transition_with_validation =
   (* No need to compute anything if internal tracing is disabled, will be dropped anyway *)
