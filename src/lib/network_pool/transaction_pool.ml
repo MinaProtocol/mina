@@ -3166,7 +3166,7 @@ let%test_module _ =
 
     module Account_spec = struct
       type t = { key_idx : int; balance : int; nonce : int; sealed : bool }
-      [@@deriving sexp]
+      [@@deriving sexp, yojson]
 
       let seal t =
         { key_idx = t.key_idx
@@ -3239,7 +3239,7 @@ let%test_module _ =
             ; amount : int
             }
         | Zkapp_blocking_send of { sender : Account_spec.t; fee : int }
-      [@@deriving sexp]
+      [@@deriving sexp, yojson]
 
       let gen_zkapp_blocking_send (spec : Account_spec.t array) =
         let open Quickcheck.Generator.Let_syntax in
@@ -3288,22 +3288,6 @@ let%test_module _ =
         | Zkapp_blocking_send { fee; _ } ->
             fee
     end
-
-    let cmd_specs_to_json arr =
-      Array.map arr ~f:(fun cmd ->
-          let sender = Command_spec.sender cmd in
-          let content =
-            Printf.sprintf
-              !"%{sexp: Public_key.t} %{sexp: Command_spec.t}"
-              test_keys.(sender.key_idx).public_key cmd
-          in
-          `String content )
-      |> Array.to_list
-
-    let account_specs_to_json arr =
-      Array.map arr ~f:(fun spec ->
-          `String (Printf.sprintf !"%{sexp: Account_spec.t}\n" spec) )
-      |> Array.to_list
 
     (** Main generator for prefix, minor and major sequences. This generator has a more firm grip
            on how data is generated than usual. It uses Command_spec and Account_spec modules for 
@@ -3620,13 +3604,13 @@ let%test_module _ =
           Thread_safe.block_on_async_exn (fun () ->
               [%log info] "Input Data"
                 ~metadata:
-                  [ ("prefix", `List (cmd_specs_to_json prefix_specs))
-                  ; ("major", `List (cmd_specs_to_json major_specs))
-                  ; ("minor", `List (cmd_specs_to_json minor_specs))
+                  [ ("prefix", [%to_yojson: Command_spec.t array] prefix_specs)
+                  ; ("major", [%to_yojson: Command_spec.t array] major_specs)
+                  ; ("minor", [%to_yojson: Command_spec.t array] minor_specs)
                   ; ( "minor accounts state"
-                    , `List (account_specs_to_json minor_account_spec) )
+                    , [%to_yojson: Account_spec.t array] minor_account_spec )
                   ; ( "major accounts state"
-                    , `List (account_specs_to_json major_account_spec) )
+                    , [%to_yojson: Account_spec.t array] major_account_spec )
                   ] ;
 
               let prefix = gen_commands_from_specs prefix_specs test in
