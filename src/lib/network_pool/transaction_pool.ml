@@ -3393,6 +3393,14 @@ let%test_module _ =
           | false ->
               gen_merge (left :: left_tail) right_tail (c @ [ right ]) )
 
+    type branches =
+      { prefix_commands : Simple_command.t array
+      ; major_commands : Simple_command.t array
+      ; minor_commands : Simple_command.t array
+      ; minor : Simple_ledger.t
+      ; major : Simple_ledger.t
+      }
+
     (** Main generator for prefix, minor and major sequences. This generator has a more firm grip
            on how data is generated than usual. It uses Simple_command and Simple_account modules for 
            user command definitions which then are carved into Signed_command list. By default generator
@@ -3634,7 +3642,7 @@ let%test_module _ =
         else return (major_commands, minor_commands)
       in
 
-      return (prefix_commands, major_commands, minor_commands, minor, major)
+      return { prefix_commands; major_commands; minor_commands; minor; major }
 
     let gen_commands_from_specs (sequence : Simple_command.t array) test :
         User_command.Valid.t list =
@@ -3693,18 +3701,18 @@ let%test_module _ =
         (let open Quickcheck.Generator.Let_syntax in
         let test = Thread_safe.block_on_async_exn (fun () -> setup_test ()) in
         let init_ledger_state = Simple_ledger.ledger_snapshot test in
-        let%bind prefix, major, minor, minor_account_spec, major_account_spec =
+        let%bind branches =
           gen_branches init_ledger_state ~permission_change:true
             ~limited_capacity:true ~sequence_max_length:10 ()
         in
-        return
-          (test, prefix, major, minor, major_account_spec, minor_account_spec))
+        return (test, branches))
         ~f:(fun ( test
-                , prefix_specs
-                , major_specs
-                , minor_specs
-                , major_account_spec
-                , minor_account_spec ) ->
+                , { prefix_commands = prefix_specs
+                  ; major_commands = major_specs
+                  ; minor_commands = minor_specs
+                  ; minor = minor_account_spec
+                  ; major = major_account_spec
+                  } ) ->
           Thread_safe.block_on_async_exn (fun () ->
               [%log info] "Input Data"
                 ~metadata:
