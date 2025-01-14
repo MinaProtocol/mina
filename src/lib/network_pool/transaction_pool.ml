@@ -3400,6 +3400,7 @@ let%test_module _ =
       ; minor : Simple_ledger.t
       ; major : Simple_ledger.t
       }
+    [@@deriving to_yojson]
 
     (** Main generator for prefix, minor and major sequences. This generator has a more firm grip
            on how data is generated than usual. It uses Simple_command and Simple_account modules for 
@@ -3707,24 +3708,15 @@ let%test_module _ =
         in
         return (test, branches))
         ~f:(fun ( test
-                , { prefix_commands
-                  ; major_commands
-                  ; minor_commands
-                  ; minor
-                  ; major
-                  } ) ->
+                , ( { prefix_commands
+                    ; major_commands
+                    ; minor_commands
+                    ; minor = _
+                    ; major
+                    } as input_data ) ) ->
           Thread_safe.block_on_async_exn (fun () ->
-              [%log info] "Input Data"
-                ~metadata:
-                  [ ( "prefix_commands"
-                    , [%to_yojson: Simple_command.t array] prefix_commands )
-                  ; ( "major_commands"
-                    , [%to_yojson: Simple_command.t array] major_commands )
-                  ; ( "minor_commands"
-                    , [%to_yojson: Simple_command.t array] minor_commands )
-                  ; ("minor accounts state", [%to_yojson: Simple_ledger.t] minor)
-                  ; ("major accounts state", [%to_yojson: Simple_ledger.t] major)
-                  ] ;
+              [%log info] "Input Data $data"
+                ~metadata:[ ("data", [%to_yojson: branches] input_data) ] ;
 
               let prefix_cmds = gen_commands_from_specs prefix_commands test in
               let minor_cmds = gen_commands_from_specs minor_commands test in
