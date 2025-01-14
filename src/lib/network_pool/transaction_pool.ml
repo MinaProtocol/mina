@@ -3317,43 +3317,40 @@ let%test_module _ =
         | Zkapp_blocking_send of { sender : Simple_account.t; fee : int }
       [@@deriving yojson]
 
-      let gen_zkapp_blocking_send (spec : Simple_ledger.t) =
+      let gen_zkapp_blocking_send (ledger : Simple_ledger.t) =
         let open Quickcheck.Generator.Let_syntax in
-        let%bind random_idx, account_spec =
-          Simple_ledger.get_random_unsealed spec
+        let%bind random_idx, account =
+          Simple_ledger.get_random_unsealed ledger
         in
         let new_account_spec =
-          Simple_account.apply_cmd_or_fail ~amount:0 ~fee:minimum_fee
-            account_spec
+          Simple_account.apply_cmd_or_fail ~amount:0 ~fee:minimum_fee account
         in
-        Simple_ledger.set spec random_idx new_account_spec ;
-        return (Zkapp_blocking_send { sender = account_spec; fee = minimum_fee })
+        Simple_ledger.set ledger random_idx new_account_spec ;
+        return (Zkapp_blocking_send { sender = account; fee = minimum_fee })
 
       let gen_single_from ?(lower = 5_000_000_000_000)
-          ?(higher = 10_000_000_000_000) (spec : Simple_ledger.t)
-          (idx, account_spec) =
+          ?(higher = 10_000_000_000_000) (ledger : Simple_ledger.t)
+          (idx, account) =
         let open Quickcheck.Generator.Let_syntax in
         let%bind receiver_idx =
           test_keys |> Array.mapi ~f:(fun i _ -> i) |> Quickcheck_lib.of_array
         in
         let%bind amount = Int.gen_incl lower higher in
         let new_account_spec =
-          Simple_account.apply_cmd_or_fail ~amount ~fee:minimum_fee account_spec
+          Simple_account.apply_cmd_or_fail ~amount ~fee:minimum_fee account
         in
-        Simple_ledger.set spec idx new_account_spec ;
+        Simple_ledger.set ledger idx new_account_spec ;
         return
-          (Payment
-             { sender = account_spec; fee = minimum_fee; receiver_idx; amount }
-          )
+          (Payment { sender = account; fee = minimum_fee; receiver_idx; amount })
 
       let gen_sequence ?(lower = 5_000_000_000_000)
-          ?(higher = 10_000_000_000_000) (spec : Simple_ledger.t) ~length =
+          ?(higher = 10_000_000_000_000) (ledger : Simple_ledger.t) ~length =
         let open Quickcheck.Generator.Let_syntax in
         Quickcheck_lib.init_gen_array length ~f:(fun _ ->
-            let%bind random_idx, account_spec =
-              Simple_ledger.get_random_unsealed spec
+            let%bind random_idx, account =
+              Simple_ledger.get_random_unsealed ledger
             in
-            gen_single_from ~lower ~higher spec (random_idx, account_spec) )
+            gen_single_from ~lower ~higher ledger (random_idx, account) )
 
       let sender t =
         match t with
