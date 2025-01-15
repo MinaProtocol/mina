@@ -3543,11 +3543,13 @@ let%test_module _ =
         Array.fold ~init:0 major_sequence ~f:(fun acc item ->
             acc + Simple_command.total_cost item )
       in
-      let%bind i =
+      let%bind num_suffix_commands =
         Int.gen_incl 1 (minor_sequence_length - major_sequence_length)
       in
-      let t2 =
-        Array.sub minor_sequence ~pos:(major_sequence_length - 1) ~len:i
+      let suffix_commands_total_cost =
+        Array.sub minor_sequence
+          ~pos:(major_sequence_length - 1)
+          ~len:num_suffix_commands
         |> Array.fold ~init:0 ~f:(fun acc item ->
                acc + Simple_command.total_cost item )
       in
@@ -3562,7 +3564,9 @@ let%test_module _ =
               ; receiver_idx
               ; fee
               ; amount =
-                  amount + (initial_balance - major_sequence_total_cost - t2)
+                  amount
+                  + ( initial_balance - major_sequence_total_cost
+                    - suffix_commands_total_cost )
               }
         | _ ->
             failwith
