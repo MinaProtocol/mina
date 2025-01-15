@@ -3468,167 +3468,168 @@ let%test_module _ =
              the sequence becomes partially applicable, forcing the mempool logic to drop some transactions at the end of *minor sequence*.
       *)
       let%bind branches =
-        if limited_capacity then (
-          let { prefix_commands; major_commands; minor_commands; minor; major }
+        if limited_capacity then
+          let gen_updated_branches_for_limited_capacity
+              { prefix_commands; major_commands; minor_commands; minor; major }
               =
-            branches
-          in
-          (*find account in major and minor branches with the same nonces and similar balances (less than 100k mina diff)*)
-          let%bind ( account_with_limited_capacity_idx
-                   , account_with_limited_capacity ) =
-            Simple_ledger.get_random_unsealed major
-          in
-
-          let initial_nonce =
-            Simple_account.nonce account_with_limited_capacity
-          in
-          let account_state_on_major = account_with_limited_capacity in
-          let account_state_on_minor =
-            Simple_ledger.get minor account_with_limited_capacity_idx
-          in
-
-          (* find receiver which is not our selected account*)
-          let%bind receiver_idx =
-            test_keys
-            |> Array.filter_mapi ~f:(fun i _ ->
-                   if
-                     Int.equal i
-                       (Simple_account.key_idx account_with_limited_capacity)
-                   then None
-                   else Some i )
-            |> Quickcheck_lib.of_array
-          in
-
-          let%bind major_sequence_length = Int.gen_incl 2 10 in
-          let%bind minor_sequence_length =
-            let%map minor_sequence_length = Int.gen_incl 2 4 in
-            minor_sequence_length + major_sequence_length + initial_nonce
-          in
-          let initial_balance =
-            Simple_account.balance account_with_limited_capacity
-          in
-          let b = Simple_account.balance account_with_limited_capacity / 2 in
-
-          let gen_sequence_and_update_account len sender =
-            let sender = ref sender in
-            let%map sequence =
-              Quickcheck_lib.init_gen_array len ~f:(fun _ ->
-                  let%bind amount =
-                    Int.gen_incl 5_000_000_000_000_000 (b / len)
-                  in
-                  let tx =
-                    Simple_command.Payment
-                      { sender = Simple_account.to_sender_info !sender
-                      ; receiver_idx
-                      ; fee = minimum_fee
-                      ; amount
-                      }
-                  in
-                  sender :=
-                    Simple_account.apply_cmd (amount + minimum_fee) !sender ;
-                  return tx )
+            (*find account in major and minor branches with the same nonces and similar balances (less than 100k mina diff)*)
+            let%bind ( account_with_limited_capacity_idx
+                     , account_with_limited_capacity ) =
+              Simple_ledger.get_random_unsealed major
             in
-            (sequence, !sender)
-          in
 
-          let%bind major_sequence, account_state_on_major =
-            gen_sequence_and_update_account major_sequence_length
-              account_state_on_major
-          in
-          let%bind minor_sequence, account_state_on_minor =
-            gen_sequence_and_update_account minor_sequence_length
-              account_state_on_minor
-          in
-
-          let b1 =
-            Array.fold ~init:0 major_sequence ~f:(fun acc item ->
-                acc + Simple_command.total_cost item )
-          in
-
-          let%bind i =
-            Int.gen_incl 1 (minor_sequence_length - major_sequence_length)
-          in
-
-          let t2 =
-            List.sub
-              (Array.to_list minor_sequence)
-              ~pos:(major_sequence_length - 1)
-              ~len:i
-            |> List.fold_left ~init:0 ~f:(fun acc item ->
-                   acc + Simple_command.total_cost item )
-          in
-
-          let%bind random_idx, tx_to_increase =
-            get_random_from_array major_sequence
-          in
-
-          let increased_tx =
-            match tx_to_increase with
-            | Payment { sender; receiver_idx; fee; amount } ->
-                Simple_command.Payment
-                  { sender
-                  ; receiver_idx
-                  ; fee
-                  ; amount = amount + (initial_balance - b1 - t2)
-                  }
-            | _ ->
-                failwith
-                  "Only payments are supported in limite account capacity \
-                   corner case"
-          in
-
-          Simple_ledger.set major account_with_limited_capacity_idx
-            (Simple_account.seal account_state_on_major) ;
-          Simple_ledger.set minor account_with_limited_capacity_idx
-            (Simple_account.seal account_state_on_minor) ;
-          Array.set major_sequence random_idx increased_tx ;
-
-          let split_by_account (account : Simple_account.t) commands =
-            let f cmd =
-              let sender = Simple_command.sender cmd in
-              sender.key_idx = Simple_account.key_idx account
+            let initial_nonce =
+              Simple_account.nonce account_with_limited_capacity
             in
-            let cmds_from_acc = Array.filter commands ~f in
-            let others = Array.filter commands ~f:(fun x -> not (f x)) in
-            (cmds_from_acc, others)
-          in
+            let account_state_on_major = account_with_limited_capacity in
+            let account_state_on_minor =
+              Simple_ledger.get minor account_with_limited_capacity_idx
+            in
 
-          let unchanged_major_commands, major_commands_to_merge =
-            split_by_account account_with_limited_capacity major_commands
-          in
+            (* find receiver which is not our selected account*)
+            let%bind receiver_idx =
+              test_keys
+              |> Array.filter_mapi ~f:(fun i _ ->
+                     if
+                       Int.equal i
+                         (Simple_account.key_idx account_with_limited_capacity)
+                     then None
+                     else Some i )
+              |> Quickcheck_lib.of_array
+            in
 
-          let unchanged_minor_commands, minor_commands_to_merge =
-            split_by_account account_with_limited_capacity minor_commands
-          in
+            let%bind major_sequence_length = Int.gen_incl 2 10 in
+            let%bind minor_sequence_length =
+              let%map minor_sequence_length = Int.gen_incl 2 4 in
+              minor_sequence_length + major_sequence_length + initial_nonce
+            in
+            let initial_balance =
+              Simple_account.balance account_with_limited_capacity
+            in
+            let b = Simple_account.balance account_with_limited_capacity / 2 in
 
-          let%bind major_commands =
-            gen_merge
-              (Array.to_list major_commands_to_merge)
-              (Array.to_list major_sequence)
-              []
-          in
-          let%bind minor_commands =
-            gen_merge
-              (Array.to_list minor_commands_to_merge)
-              (Array.to_list minor_sequence)
-              []
-          in
+            let gen_sequence_and_update_account len sender =
+              let sender = ref sender in
+              let%map sequence =
+                Quickcheck_lib.init_gen_array len ~f:(fun _ ->
+                    let%bind amount =
+                      Int.gen_incl 5_000_000_000_000_000 (b / len)
+                    in
+                    let tx =
+                      Simple_command.Payment
+                        { sender = Simple_account.to_sender_info !sender
+                        ; receiver_idx
+                        ; fee = minimum_fee
+                        ; amount
+                        }
+                    in
+                    sender :=
+                      Simple_account.apply_cmd (amount + minimum_fee) !sender ;
+                    return tx )
+              in
+              (sequence, !sender)
+            in
 
-          return
-            { prefix_commands
-            ; major_commands =
-                List.append
-                  (Array.to_list unchanged_major_commands)
-                  major_commands
-                |> List.to_array
-            ; minor_commands =
-                List.append
-                  (Array.to_list unchanged_minor_commands)
-                  minor_commands
-                |> List.to_array
-            ; minor
-            ; major
-            } )
+            let%bind major_sequence, account_state_on_major =
+              gen_sequence_and_update_account major_sequence_length
+                account_state_on_major
+            in
+            let%bind minor_sequence, account_state_on_minor =
+              gen_sequence_and_update_account minor_sequence_length
+                account_state_on_minor
+            in
+
+            let b1 =
+              Array.fold ~init:0 major_sequence ~f:(fun acc item ->
+                  acc + Simple_command.total_cost item )
+            in
+
+            let%bind i =
+              Int.gen_incl 1 (minor_sequence_length - major_sequence_length)
+            in
+
+            let t2 =
+              List.sub
+                (Array.to_list minor_sequence)
+                ~pos:(major_sequence_length - 1)
+                ~len:i
+              |> List.fold_left ~init:0 ~f:(fun acc item ->
+                     acc + Simple_command.total_cost item )
+            in
+
+            let%bind random_idx, tx_to_increase =
+              get_random_from_array major_sequence
+            in
+
+            let increased_tx =
+              match tx_to_increase with
+              | Payment { sender; receiver_idx; fee; amount } ->
+                  Simple_command.Payment
+                    { sender
+                    ; receiver_idx
+                    ; fee
+                    ; amount = amount + (initial_balance - b1 - t2)
+                    }
+              | _ ->
+                  failwith
+                    "Only payments are supported in limite account capacity \
+                     corner case"
+            in
+
+            Simple_ledger.set major account_with_limited_capacity_idx
+              (Simple_account.seal account_state_on_major) ;
+            Simple_ledger.set minor account_with_limited_capacity_idx
+              (Simple_account.seal account_state_on_minor) ;
+            Array.set major_sequence random_idx increased_tx ;
+
+            let split_by_account (account : Simple_account.t) commands =
+              let f cmd =
+                let sender = Simple_command.sender cmd in
+                sender.key_idx = Simple_account.key_idx account
+              in
+              let cmds_from_acc = Array.filter commands ~f in
+              let others = Array.filter commands ~f:(fun x -> not (f x)) in
+              (cmds_from_acc, others)
+            in
+
+            let unchanged_major_commands, major_commands_to_merge =
+              split_by_account account_with_limited_capacity major_commands
+            in
+
+            let unchanged_minor_commands, minor_commands_to_merge =
+              split_by_account account_with_limited_capacity minor_commands
+            in
+
+            let%bind major_commands =
+              gen_merge
+                (Array.to_list major_commands_to_merge)
+                (Array.to_list major_sequence)
+                []
+            in
+            let%bind minor_commands =
+              gen_merge
+                (Array.to_list minor_commands_to_merge)
+                (Array.to_list minor_sequence)
+                []
+            in
+
+            return
+              { prefix_commands
+              ; major_commands =
+                  List.append
+                    (Array.to_list unchanged_major_commands)
+                    major_commands
+                  |> List.to_array
+              ; minor_commands =
+                  List.append
+                    (Array.to_list unchanged_minor_commands)
+                    minor_commands
+                  |> List.to_array
+              ; minor
+              ; major
+              }
+          in
+          gen_updated_branches_for_limited_capacity branches
         else return branches
       in
 
@@ -3643,42 +3644,45 @@ let%test_module _ =
       *)
       let%bind branches =
         if permission_change then
-          let { prefix_commands; major_commands; minor_commands; minor; major }
+          let gen_updated_branches_for_permission_change
+              { prefix_commands; major_commands; minor_commands; minor; major }
               =
-            branches
-          in
-          let%bind permission_change_cmd =
-            Simple_command.gen_zkapp_blocking_send_and_update_ledger major
-          in
-          let sender_on_major = Simple_command.sender permission_change_cmd in
-          (* We need to increase nonce so transaction has a chance to be placed in the pool.
-             Otherwise it will be dropped as we already have transaction with the same nonce from major sequence
-          *)
-          let sender_index =
-            Simple_ledger.index_of_int sender_on_major.key_idx
-          in
-          let sender_on_minor = Simple_ledger.get minor sender_index in
-          let%bind aux_minor_cmd =
-            Quickcheck_lib.init_gen_array
-              (sender_on_major.nonce - Simple_account.nonce sender_on_minor + 1)
-              ~f:(fun _ ->
-                let sender_on_minor = Simple_ledger.get minor sender_index in
-                let sender_on_minor_idx =
-                  Simple_ledger.index_of_int
-                    (Simple_account.key_idx sender_on_minor)
-                in
-                Simple_command.gen_single_and_update_ledger minor
-                  (sender_on_minor_idx, sender_on_minor) )
-          in
+            let%bind permission_change_cmd =
+              Simple_command.gen_zkapp_blocking_send_and_update_ledger major
+            in
+            let sender_on_major = Simple_command.sender permission_change_cmd in
+            (* We need to increase nonce so transaction has a chance to be placed in the pool.
+               Otherwise it will be dropped as we already have transaction with the same nonce from major sequence
+            *)
+            let sender_index =
+              Simple_ledger.index_of_int sender_on_major.key_idx
+            in
+            let sender_on_minor = Simple_ledger.get minor sender_index in
+            let%bind aux_minor_cmd =
+              Quickcheck_lib.init_gen_array
+                ( sender_on_major.nonce
+                - Simple_account.nonce sender_on_minor
+                + 1 )
+                ~f:(fun _ ->
+                  let sender_on_minor = Simple_ledger.get minor sender_index in
+                  let sender_on_minor_idx =
+                    Simple_ledger.index_of_int
+                      (Simple_account.key_idx sender_on_minor)
+                  in
+                  Simple_command.gen_single_and_update_ledger minor
+                    (sender_on_minor_idx, sender_on_minor) )
+            in
 
-          return
-            { prefix_commands
-            ; major_commands =
-                Array.append major_commands [| permission_change_cmd |]
-            ; minor_commands = Array.append minor_commands aux_minor_cmd
-            ; minor
-            ; major
-            }
+            return
+              { prefix_commands
+              ; major_commands =
+                  Array.append major_commands [| permission_change_cmd |]
+              ; minor_commands = Array.append minor_commands aux_minor_cmd
+              ; minor
+              ; major
+              }
+          in
+          gen_updated_branches_for_permission_change branches
         else return branches
       in
 
