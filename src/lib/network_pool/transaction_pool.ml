@@ -3507,8 +3507,8 @@ let%test_module _ =
       let half_initial_balance =
         Simple_account.balance account_with_limited_capacity / 2
       in
-      let gen_sequence_and_update_account len sender =
-        let sender = ref sender in
+      let gen_sequence_and_update_account len account =
+        let account = ref account in
         let%map sequence =
           Quickcheck_lib.init_gen_array len ~f:(fun _ ->
               let%bind amount =
@@ -3516,16 +3516,17 @@ let%test_module _ =
               in
               let tx =
                 Simple_command.Payment
-                  { sender = Simple_account.to_sender_info !sender
+                  { sender = Simple_account.to_sender_info !account
                   ; receiver_idx
                   ; fee = minimum_fee
                   ; amount
                   }
               in
-              sender := Simple_account.apply_cmd (amount + minimum_fee) !sender ;
+              account :=
+                Simple_account.apply_cmd (amount + minimum_fee) !account ;
               return tx )
         in
-        (sequence, !sender)
+        (sequence, !account)
       in
       let%bind major_sequence =
         let account = account_with_limited_capacity in
