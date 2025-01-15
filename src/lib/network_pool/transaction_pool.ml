@@ -3382,6 +3382,30 @@ let%test_module _ =
             amount + fee
         | Zkapp_blocking_send { fee; _ } ->
             fee
+
+      let to_full_command ~ledger spec =
+        match spec with
+        | Zkapp_blocking_send { sender; _ } ->
+            let zkapp =
+              mk_basic_zkapp sender.nonce test_keys.(sender.key_idx)
+                ~permissions:
+                  { Permissions.user_default with
+                    send = Permissions.Auth_required.Impossible
+                  ; increment_nonce = Permissions.Auth_required.Impossible
+                  }
+            in
+            Or_error.ok_exn
+              (Zkapp_command.Valid.to_valid ~failed:false
+                 ~find_vk:
+                   (Zkapp_command.Verifiable.load_vk_from_ledger
+                      ~get:(Mina_ledger.Ledger.get ledger)
+                      ~location_of_account:
+                        (Mina_ledger.Ledger.location_of_account ledger) )
+                 zkapp )
+            |> User_command.Zkapp_command
+        | Payment { sender; fee; amount; receiver_idx } ->
+            mk_payment ~sender_idx:sender.key_idx ~fee ~nonce:sender.nonce
+              ~receiver_idx ~amount ()
     end
 
     let rec gen_merge (a : 'a list) (b : 'a list) (c : 'a list) =
@@ -3689,30 +3713,7 @@ let%test_module _ =
         User_command.Valid.t list =
       let best_tip_ledger = Option.value_exn test.txn_pool.best_tip_ledger in
       sequence
-      |> Array.map ~f:(fun spec ->
-             match spec with
-             | Zkapp_blocking_send { sender; _ } ->
-                 let zkapp =
-                   mk_basic_zkapp sender.nonce test_keys.(sender.key_idx)
-                     ~permissions:
-                       { Permissions.user_default with
-                         send = Permissions.Auth_required.Impossible
-                       ; increment_nonce = Permissions.Auth_required.Impossible
-                       }
-                 in
-                 Or_error.ok_exn
-                   (Zkapp_command.Valid.to_valid ~failed:false
-                      ~find_vk:
-                        (Zkapp_command.Verifiable.load_vk_from_ledger
-                           ~get:(Mina_ledger.Ledger.get best_tip_ledger)
-                           ~location_of_account:
-                             (Mina_ledger.Ledger.location_of_account
-                                best_tip_ledger ) )
-                      zkapp )
-                 |> User_command.Zkapp_command
-             | Payment { sender; fee; amount; receiver_idx } ->
-                 mk_payment ~sender_idx:sender.key_idx ~fee ~nonce:sender.nonce
-                   ~receiver_idx ~amount () )
+      |> Array.map ~f:(Simple_command.to_full_command ~ledger:best_tip_ledger)
       |> Array.to_list
 
     let%test_unit "Handle transition frontier diff (permission send tx updated)"
