@@ -1672,7 +1672,7 @@ let%test_module _ =
     let minimum_fee =
       Currency.Fee.to_nanomina_int genesis_constants.minimum_user_command_fee
 
-    let logger = Logger.create ()
+    let logger = Logger.null ()
 
     let time_controller = Block_time.Controller.basic ~logger
 
@@ -1940,7 +1940,7 @@ let%test_module _ =
           ~genesis_constants ~slot_tx_end ~compile_config
       in
       let pool_, _, _ =
-        Test.create ~config ~logger:(Logger.create ()) ~constraint_constants
+        Test.create ~config ~logger:(Logger.null ()) ~constraint_constants
           ~consensus_constants ~time_controller
           ~frontier_broadcast_pipe:frontier_pipe_r ~log_gossip_heard:false
           ~on_remote_push:(Fn.const Deferred.unit) ~block_window_duration
