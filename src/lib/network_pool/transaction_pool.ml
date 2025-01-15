@@ -3748,13 +3748,10 @@ let%test_module _ =
           Thread_safe.block_on_async_exn (fun () ->
               [%log info] "Input Data $data"
                 ~metadata:[ ("data", [%to_yojson: branches] input_data) ] ;
-
               let prefix_cmds = commands_from_specs prefix_commands test in
               let minor_cmds = commands_from_specs minor_commands test in
               let major_cmds = commands_from_specs major_commands test in
-
               commit_commands test (prefix_cmds @ major_cmds) ;
-
               Test.Resource_pool.handle_transition_frontier_diff_inner
                 ~new_commands:
                   (List.map ~f:mk_with_status (prefix_cmds @ major_cmds))
@@ -3763,7 +3760,6 @@ let%test_module _ =
                 ~best_tip_ledger:
                   (Option.value_exn test.txn_pool.best_tip_ledger)
                 test.txn_pool ;
-
               let pool_state =
                 Test.Resource_pool.get_all test.txn_pool
                 |> List.map ~f:(fun tx ->
@@ -3781,7 +3777,6 @@ let%test_module _ =
                        in
                        (fee_payer_pk, nonce) )
               in
-
               [%log info] "Pool state"
                 ~metadata:
                   [ ( "pool state"
@@ -3845,7 +3840,6 @@ let%test_module _ =
               Array.iter minor_commands ~f:(fun (spec : Simple_command.t) ->
                   let sender = Simple_command.sender spec in
                   let pk, nonce = Sender_info.to_key_and_nonce sender in
-
                   let account_spec_pair_opt =
                     Simple_ledger.find_by_key_idx major sender.key_idx
                   in
