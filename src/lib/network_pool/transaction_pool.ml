@@ -3528,25 +3528,23 @@ let%test_module _ =
         (sequence, !sender)
       in
       let%bind major_sequence =
-        let account_state_on_major = account_with_limited_capacity in
-        let%bind major_sequence, account_state_on_major =
-          gen_sequence_and_update_account major_sequence_length
-            account_state_on_major
+        let account = account_with_limited_capacity in
+        let%bind major_sequence, account =
+          gen_sequence_and_update_account major_sequence_length account
         in
         Simple_ledger.set major account_with_limited_capacity_idx
-          (Simple_account.seal account_state_on_major) ;
+          (Simple_account.seal account) ;
         return major_sequence
       in
       let%bind minor_sequence =
-        let account_state_on_minor =
+        let account =
           Simple_ledger.get minor account_with_limited_capacity_idx
         in
-        let%bind minor_sequence, account_state_on_minor =
-          gen_sequence_and_update_account minor_sequence_length
-            account_state_on_minor
+        let%bind minor_sequence, account =
+          gen_sequence_and_update_account minor_sequence_length account
         in
         Simple_ledger.set minor account_with_limited_capacity_idx
-          (Simple_account.seal account_state_on_minor) ;
+          (Simple_account.seal account) ;
         return minor_sequence
       in
       let major_sequence_total_cost =
