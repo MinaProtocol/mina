@@ -3246,7 +3246,11 @@ let%test_module _ =
         else apply_cmd (amount + fee) t
 
       let get_random_unsealed (arr : t array) =
-        get_random_from_array (Array.filter arr ~f:(fun x -> not x.sealed))
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind item =
+          Array.filter arr ~f:(fun x -> not x.sealed) |> Quickcheck_lib.of_array
+        in
+        return (item.key_idx, item)
 
       let of_account ~key_idx (account : Account.t) =
         { key_idx
@@ -3548,15 +3552,18 @@ let%test_module _ =
       let increased_tx =
         match tx_to_increase with
         | Payment { sender; receiver_idx; fee; amount } ->
+            let addition =
+              initial_balance - major_sequence_total_cost
+              - suffix_commands_total_cost
+            in
+            let () =
+              (* Update account in ledger *)
+              Simple_ledger.get major target_account_idx
+              |> (fun acct -> Simple_account.subtract_balance acct addition)
+              |> Simple_ledger.set major target_account_idx
+            in
             Simple_command.Payment
-              { sender
-              ; receiver_idx
-              ; fee
-              ; amount =
-                  amount
-                  + ( initial_balance - major_sequence_total_cost
-                    - suffix_commands_total_cost )
-              }
+              { sender; receiver_idx; fee; amount = amount + addition }
         | _ ->
             failwith
               "Only payments are supported in limited account capacity corner \
@@ -3864,6 +3871,9 @@ let%test_module _ =
                                 (Printf.sprintf
                                    !"%{sexp: Public_key.Compressed.t} -> %d}"
                                    pk nonce ) )
+                          ; ( "balance"
+                            , `Int (Simple_account.balance account_spec) )
+                          ; ("cost", `Int (total_cost sender))
                           ] ;
                       assert_pool_contains pool_state (pk, nonce) ;
                       Simple_ledger.set major idx
