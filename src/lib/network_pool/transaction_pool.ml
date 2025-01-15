@@ -3781,15 +3781,14 @@ let%test_module _ =
                        let data =
                          Transaction_hash.User_command_with_valid_signature.data
                            tx
+                         |> User_command.forget_check
                        in
                        let nonce =
-                         data |> User_command.forget_check
-                         |> User_command.applicable_at_nonce
+                         data |> User_command.applicable_at_nonce
                          |> Unsigned.UInt32.to_int
                        in
                        let fee_payer_pk =
-                         data |> User_command.forget_check
-                         |> User_command.fee_payer |> Account_id.public_key
+                         data |> User_command.fee_payer |> Account_id.public_key
                        in
                        (fee_payer_pk, nonce) )
               in
