@@ -3485,10 +3485,6 @@ let%test_module _ =
         Simple_ledger.get_random_unsealed major
       in
       let initial_nonce = Simple_account.nonce account_with_limited_capacity in
-      let account_state_on_major = account_with_limited_capacity in
-      let account_state_on_minor =
-        Simple_ledger.get minor account_with_limited_capacity_idx
-      in
       (* find receiver which is not our selected account*)
       let%bind receiver_idx =
         test_keys
@@ -3531,13 +3527,27 @@ let%test_module _ =
         in
         (sequence, !sender)
       in
-      let%bind major_sequence, account_state_on_major =
-        gen_sequence_and_update_account major_sequence_length
-          account_state_on_major
+      let%bind major_sequence =
+        let account_state_on_major = account_with_limited_capacity in
+        let%bind major_sequence, account_state_on_major =
+          gen_sequence_and_update_account major_sequence_length
+            account_state_on_major
+        in
+        Simple_ledger.set major account_with_limited_capacity_idx
+          (Simple_account.seal account_state_on_major) ;
+        return major_sequence
       in
-      let%bind minor_sequence, account_state_on_minor =
-        gen_sequence_and_update_account minor_sequence_length
-          account_state_on_minor
+      let%bind minor_sequence =
+        let account_state_on_minor =
+          Simple_ledger.get minor account_with_limited_capacity_idx
+        in
+        let%bind minor_sequence, account_state_on_minor =
+          gen_sequence_and_update_account minor_sequence_length
+            account_state_on_minor
+        in
+        Simple_ledger.set minor account_with_limited_capacity_idx
+          (Simple_account.seal account_state_on_minor) ;
+        return minor_sequence
       in
       let major_sequence_total_cost =
         Array.fold ~init:0 major_sequence ~f:(fun acc item ->
@@ -3573,10 +3583,6 @@ let%test_module _ =
               "Only payments are supported in limited account capacity corner \
                case"
       in
-      Simple_ledger.set major account_with_limited_capacity_idx
-        (Simple_account.seal account_state_on_major) ;
-      Simple_ledger.set minor account_with_limited_capacity_idx
-        (Simple_account.seal account_state_on_minor) ;
       Array.set major_sequence random_idx increased_tx ;
       let split_by_account (account : Simple_account.t) commands =
         Array.partition_tf commands ~f:(fun cmd ->
