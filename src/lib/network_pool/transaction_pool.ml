@@ -3541,7 +3541,7 @@ let%test_module _ =
           account_state_on_minor
       in
 
-      let b1 =
+      let major_sequence_total_cost =
         Array.fold ~init:0 major_sequence ~f:(fun acc item ->
             acc + Simple_command.total_cost item )
       in
@@ -3570,7 +3570,8 @@ let%test_module _ =
               { sender
               ; receiver_idx
               ; fee
-              ; amount = amount + (initial_balance - b1 - t2)
+              ; amount =
+                  amount + (initial_balance - major_sequence_total_cost - t2)
               }
         | _ ->
             failwith
