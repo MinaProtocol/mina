@@ -4759,8 +4759,12 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
               exit 1 ) ;
             let%bind.Deferred.Result () = Conn.start () in
             let open Deferred.Let_syntax in
+            let genesis_accounts_count = List.length account_ids in
+            [%log info] "Archiving genesis accounts"
+              ~metadata:[ ("count", `Int genesis_accounts_count) ] ;
+
             let%bind () =
-              Deferred.List.iter account_ids ~f:(fun acct_id ->
+              Deferred.List.iteri account_ids ~f:(fun i acct_id ->
                   match
                     Mina_ledger.Ledger.location_of_account ledger acct_id
                   with
@@ -4791,6 +4795,10 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
                           genesis_block_id (index, acct)
                       with
                       | Ok _ ->
+                          [%log trace] "Archived account %d of %d" (i + 1)
+                            genesis_accounts_count
+                            ~metadata:
+                              [ ("account_id", Account_id.to_yojson acct_id) ] ;
                           return ()
                       | Error err ->
                           [%log error] "Could not add genesis account"
