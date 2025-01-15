@@ -3507,8 +3507,10 @@ let%test_module _ =
       let half_initial_balance =
         Simple_account.balance account_with_limited_capacity / 2
       in
-      let gen_sequence_and_update_account len account =
-        let account = ref account in
+      let gen_sequence_and_update_account ledger len =
+        let account =
+          ref (Simple_ledger.get ledger account_with_limited_capacity_idx)
+        in
         let%map sequence =
           Quickcheck_lib.init_gen_array len ~f:(fun _ ->
               let%bind amount =
@@ -3526,27 +3528,15 @@ let%test_module _ =
                 Simple_account.apply_cmd (amount + minimum_fee) !account ;
               return tx )
         in
-        (sequence, !account)
+        Simple_ledger.set ledger account_with_limited_capacity_idx
+          (Simple_account.seal !account) ;
+        sequence
       in
       let%bind major_sequence =
-        let account = account_with_limited_capacity in
-        let%bind major_sequence, account =
-          gen_sequence_and_update_account major_sequence_length account
-        in
-        Simple_ledger.set major account_with_limited_capacity_idx
-          (Simple_account.seal account) ;
-        return major_sequence
+        gen_sequence_and_update_account major major_sequence_length
       in
       let%bind minor_sequence =
-        let account =
-          Simple_ledger.get minor account_with_limited_capacity_idx
-        in
-        let%bind minor_sequence, account =
-          gen_sequence_and_update_account minor_sequence_length account
-        in
-        Simple_ledger.set minor account_with_limited_capacity_idx
-          (Simple_account.seal account) ;
-        return minor_sequence
+        gen_sequence_and_update_account minor minor_sequence_length
       in
       let major_sequence_total_cost =
         Array.fold ~init:0 major_sequence ~f:(fun acc item ->
