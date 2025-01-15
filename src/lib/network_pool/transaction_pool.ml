@@ -3480,19 +3480,15 @@ let%test_module _ =
         { prefix_commands; major_commands; minor_commands; minor; major } =
       let open Quickcheck.Generator.Let_syntax in
       (*find account in major and minor branches with the same nonces and similar balances (less than 100k mina diff)*)
-      let%bind account_with_limited_capacity_idx, account_with_limited_capacity
-          =
+      let%bind target_account_idx, target_account =
         Simple_ledger.get_random_unsealed major
       in
-      let initial_nonce = Simple_account.nonce account_with_limited_capacity in
+      let initial_nonce = Simple_account.nonce target_account in
       (* find receiver which is not our selected account*)
       let%bind receiver_idx =
         test_keys
         |> Array.filter_mapi ~f:(fun i _ ->
-               if
-                 Int.equal i
-                   (Simple_account.key_idx account_with_limited_capacity)
-               then None
+               if Int.equal i (Simple_account.key_idx target_account) then None
                else Some i )
         |> Quickcheck_lib.of_array
       in
@@ -3501,16 +3497,10 @@ let%test_module _ =
         let%map minor_sequence_length = Int.gen_incl 2 4 in
         minor_sequence_length + major_sequence_length + initial_nonce
       in
-      let initial_balance =
-        Simple_account.balance account_with_limited_capacity
-      in
-      let half_initial_balance =
-        Simple_account.balance account_with_limited_capacity / 2
-      in
+      let initial_balance = Simple_account.balance target_account in
+      let half_initial_balance = Simple_account.balance target_account / 2 in
       let gen_sequence_and_update_account ledger len =
-        let account =
-          ref (Simple_ledger.get ledger account_with_limited_capacity_idx)
-        in
+        let account = ref (Simple_ledger.get ledger target_account_idx) in
         let%map sequence =
           Quickcheck_lib.init_gen_array len ~f:(fun _ ->
               let%bind amount =
@@ -3528,7 +3518,7 @@ let%test_module _ =
                 Simple_account.apply_cmd (amount + minimum_fee) !account ;
               return tx )
         in
-        Simple_ledger.set ledger account_with_limited_capacity_idx
+        Simple_ledger.set ledger target_account_idx
           (Simple_account.seal !account) ;
         sequence
       in
@@ -3579,10 +3569,10 @@ let%test_module _ =
             sender.key_idx = Simple_account.key_idx account )
       in
       let unchanged_major_commands, major_commands_to_merge =
-        split_by_account account_with_limited_capacity major_commands
+        split_by_account target_account major_commands
       in
       let unchanged_minor_commands, minor_commands_to_merge =
-        split_by_account account_with_limited_capacity minor_commands
+        split_by_account target_account minor_commands
       in
       let%bind major_commands =
         gen_merge
