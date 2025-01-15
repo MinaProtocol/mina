@@ -3575,13 +3575,9 @@ let%test_module _ =
         (Simple_account.seal account_state_on_minor) ;
       Array.set major_sequence random_idx increased_tx ;
       let split_by_account (account : Simple_account.t) commands =
-        let f cmd =
-          let sender = Simple_command.sender cmd in
-          sender.key_idx = Simple_account.key_idx account
-        in
-        let cmds_from_acc = Array.filter commands ~f in
-        let others = Array.filter commands ~f:(fun x -> not (f x)) in
-        (cmds_from_acc, others)
+        Array.partition_tf commands ~f:(fun cmd ->
+            let sender = Simple_command.sender cmd in
+            sender.key_idx = Simple_account.key_idx account )
       in
       let unchanged_major_commands, major_commands_to_merge =
         split_by_account account_with_limited_capacity major_commands
