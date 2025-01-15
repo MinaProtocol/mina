@@ -3511,13 +3511,17 @@ let%test_module _ =
       let initial_balance =
         Simple_account.balance account_with_limited_capacity
       in
-      let b = Simple_account.balance account_with_limited_capacity / 2 in
+      let half_initial_balance =
+        Simple_account.balance account_with_limited_capacity / 2
+      in
 
       let gen_sequence_and_update_account len sender =
         let sender = ref sender in
         let%map sequence =
           Quickcheck_lib.init_gen_array len ~f:(fun _ ->
-              let%bind amount = Int.gen_incl 5_000_000_000_000_000 (b / len) in
+              let%bind amount =
+                Int.gen_incl 5_000_000_000_000_000 (half_initial_balance / len)
+              in
               let tx =
                 Simple_command.Payment
                   { sender = Simple_account.to_sender_info !sender
