@@ -3547,11 +3547,8 @@ let%test_module _ =
         Int.gen_incl 1 (minor_sequence_length - major_sequence_length)
       in
       let t2 =
-        List.sub
-          (Array.to_list minor_sequence)
-          ~pos:(major_sequence_length - 1)
-          ~len:i
-        |> List.fold_left ~init:0 ~f:(fun acc item ->
+        Array.sub minor_sequence ~pos:(major_sequence_length - 1) ~len:i
+        |> Array.fold ~init:0 ~f:(fun acc item ->
                acc + Simple_command.total_cost item )
       in
       let%bind random_idx, tx_to_increase =
