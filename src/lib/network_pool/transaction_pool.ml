@@ -3187,6 +3187,13 @@ let%test_module _ =
         ; sealed = t.sealed
         }
 
+      let substract_balance amount t =
+        { key_idx = t.key_idx
+        ; balance = t.balance - amount
+        ; nonce = t.nonce
+        ; sealed = t.sealed
+        }
+
       let apply_cmd_or_fail amount fee t =
         if not (can_apply (amount + fee) t) then
           if not (can_apply fee t) then
@@ -3205,7 +3212,11 @@ let%test_module _ =
       return (idx, item)
 
     let get_random_acc (arr : Account_spec.t array) =
-      get_random (Array.filter arr ~f:(fun x -> not x.sealed))
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind item =
+        Array.filter arr ~f:(fun x -> not x.sealed) |> Quickcheck_lib.of_array
+      in
+      return (item.key_idx, item)
 
     let ledger_snapshot t =
       Array.mapi test_keys ~f:(fun i kp ->
@@ -3229,6 +3240,11 @@ let%test_module _ =
           ; nonce = Account.nonce account |> Account.Nonce.to_int
           ; sealed = false
           } )
+
+    let account_specs_to_json arr =
+      Array.map arr ~f:(fun spec ->
+          `String (Printf.sprintf !"%{sexp: Account_spec.t}\n" spec) )
+      |> Array.to_list
 
     module Command_spec = struct
       type t =
@@ -3298,11 +3314,6 @@ let%test_module _ =
               test_keys.(sender.key_idx).public_key cmd
           in
           `String content )
-      |> Array.to_list
-
-    let account_specs_to_json arr =
-      Array.map arr ~f:(fun spec ->
-          `String (Printf.sprintf !"%{sexp: Account_spec.t}\n" spec) )
       |> Array.to_list
 
     (** Main generator for prefix, minor and major sequences. This generator has a more firm grip
@@ -3420,12 +3431,12 @@ let%test_module _ =
           let increased_tx =
             match tx_to_increase with
             | Payment { sender; receiver_idx; fee; amount } ->
+                let addition = initial_balance - b1 - t2 in
+                account_state_on_major :=
+                  Account_spec.substract_balance addition
+                    !account_state_on_major ;
                 Command_spec.Payment
-                  { sender
-                  ; receiver_idx
-                  ; fee
-                  ; amount = amount + (initial_balance - b1 - t2)
-                  }
+                  { sender; receiver_idx; fee; amount = amount + addition }
             | _ ->
                 failwith
                   "Only payments are supported in limite account capacity \
@@ -3771,6 +3782,8 @@ let%test_module _ =
                                 (Printf.sprintf
                                    !"%{sexp: Public_key.Compressed.t} -> %d}"
                                    pk nonce ) )
+                          ; ("balance", `Int account_spec.balance)
+                          ; ("cost", `Int (total_cost sender))
                           ] ;
                       assert_pool_contains pool_state (pk, nonce) ;
                       Array.set major_account_spec idx
