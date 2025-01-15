@@ -3570,7 +3570,7 @@ let%test_module _ =
               }
         | _ ->
             failwith
-              "Only payments are supported in limite account capacity corner \
+              "Only payments are supported in limited account capacity corner \
                case"
       in
       Simple_ledger.set major account_with_limited_capacity_idx
