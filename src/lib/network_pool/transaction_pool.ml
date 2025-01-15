@@ -3324,7 +3324,7 @@ let%test_module _ =
         | Zkapp_blocking_send of { sender : Sender_info.t; fee : int }
       [@@deriving yojson]
 
-      let gen_zkapp_blocking_send (ledger : Simple_ledger.t) =
+      let gen_zkapp_blocking_send_and_update_ledger (ledger : Simple_ledger.t) =
         let open Quickcheck.Generator.Let_syntax in
         let%bind random_idx, account =
           Simple_ledger.get_random_unsealed ledger
@@ -3339,7 +3339,7 @@ let%test_module _ =
              ; fee = minimum_fee
              } )
 
-      let gen_single_from ?(lower = 5_000_000_000_000)
+      let gen_single_and_update_ledger ?(lower = 5_000_000_000_000)
           ?(higher = 10_000_000_000_000) (ledger : Simple_ledger.t)
           (idx, account) =
         let open Quickcheck.Generator.Let_syntax in
@@ -3359,14 +3359,15 @@ let%test_module _ =
              ; amount
              } )
 
-      let gen_sequence ?(lower = 5_000_000_000_000)
+      let gen_sequence_and_update_ledger ?(lower = 5_000_000_000_000)
           ?(higher = 10_000_000_000_000) (ledger : Simple_ledger.t) ~length =
         let open Quickcheck.Generator.Let_syntax in
         Quickcheck_lib.init_gen_array length ~f:(fun _ ->
             let%bind random_idx, account =
               Simple_ledger.get_random_unsealed ledger
             in
-            gen_single_from ~lower ~higher ledger (random_idx, account) )
+            gen_single_and_update_ledger ~lower ~higher ledger
+              (random_idx, account) )
 
       let sender t =
         match t with
@@ -3444,17 +3445,18 @@ let%test_module _ =
       let%bind minor_length = Int.gen_incl 0 sequence_max_length in
 
       let%bind prefix_commands =
-        Simple_command.gen_sequence ledger ~length:prefix_length
+        Simple_command.gen_sequence_and_update_ledger ledger
+          ~length:prefix_length
       in
 
       let minor = Simple_ledger.copy ledger in
       let%bind minor_commands =
-        Simple_command.gen_sequence minor ~length:minor_length
+        Simple_command.gen_sequence_and_update_ledger minor ~length:minor_length
       in
 
       let major = Simple_ledger.copy ledger in
       let%bind major_commands =
-        Simple_command.gen_sequence major ~length:major_length
+        Simple_command.gen_sequence_and_update_ledger major ~length:major_length
       in
 
       (* Optional Edge Case 1: Limited Account Capacity
@@ -3503,7 +3505,7 @@ let%test_module _ =
           in
           let b = Simple_account.balance account_with_limited_capacity / 2 in
 
-          let gen_sequence len sender =
+          let gen_sequence_and_update_account len sender =
             let sender = ref sender in
             let%map sequence =
               Quickcheck_lib.init_gen_array len ~f:(fun _ ->
@@ -3526,10 +3528,12 @@ let%test_module _ =
           in
 
           let%bind major_sequence, account_state_on_major =
-            gen_sequence major_sequence_length account_state_on_major
+            gen_sequence_and_update_account major_sequence_length
+              account_state_on_major
           in
           let%bind minor_sequence, account_state_on_minor =
-            gen_sequence minor_sequence_length account_state_on_minor
+            gen_sequence_and_update_account minor_sequence_length
+              account_state_on_minor
           in
 
           let b1 =
@@ -3628,7 +3632,7 @@ let%test_module _ =
       let%bind major_commands, minor_commands =
         if permission_change then
           let%bind permission_change_cmd =
-            Simple_command.gen_zkapp_blocking_send major
+            Simple_command.gen_zkapp_blocking_send_and_update_ledger major
           in
           let sender_on_major = Simple_command.sender permission_change_cmd in
           (* We need to increase nonce so transaction has a chance to be placed in the pool.
@@ -3647,7 +3651,7 @@ let%test_module _ =
                   Simple_ledger.index_of_int
                     (Simple_account.key_idx sender_on_minor)
                 in
-                Simple_command.gen_single_from minor
+                Simple_command.gen_single_and_update_ledger minor
                   (sender_on_minor_idx, sender_on_minor) )
           in
 
