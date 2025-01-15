@@ -3709,7 +3709,7 @@ let%test_module _ =
       in
       return branches
 
-    let gen_commands_from_specs (sequence : Simple_command.t array) test :
+    let commands_from_specs (sequence : Simple_command.t array) test :
         User_command.Valid.t list =
       let best_tip_ledger = Option.value_exn test.txn_pool.best_tip_ledger in
       sequence
@@ -3761,9 +3761,9 @@ let%test_module _ =
               [%log info] "Input Data $data"
                 ~metadata:[ ("data", [%to_yojson: branches] input_data) ] ;
 
-              let prefix_cmds = gen_commands_from_specs prefix_commands test in
-              let minor_cmds = gen_commands_from_specs minor_commands test in
-              let major_cmds = gen_commands_from_specs major_commands test in
+              let prefix_cmds = commands_from_specs prefix_commands test in
+              let minor_cmds = commands_from_specs minor_commands test in
+              let major_cmds = commands_from_specs major_commands test in
 
               commit_commands test (prefix_cmds @ major_cmds) ;
 
