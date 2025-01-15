@@ -3484,13 +3484,11 @@ let%test_module _ =
           =
         Simple_ledger.get_random_unsealed major
       in
-
       let initial_nonce = Simple_account.nonce account_with_limited_capacity in
       let account_state_on_major = account_with_limited_capacity in
       let account_state_on_minor =
         Simple_ledger.get minor account_with_limited_capacity_idx
       in
-
       (* find receiver which is not our selected account*)
       let%bind receiver_idx =
         test_keys
@@ -3502,7 +3500,6 @@ let%test_module _ =
                else Some i )
         |> Quickcheck_lib.of_array
       in
-
       let%bind major_sequence_length = Int.gen_incl 2 10 in
       let%bind minor_sequence_length =
         let%map minor_sequence_length = Int.gen_incl 2 4 in
@@ -3514,7 +3511,6 @@ let%test_module _ =
       let half_initial_balance =
         Simple_account.balance account_with_limited_capacity / 2
       in
-
       let gen_sequence_and_update_account len sender =
         let sender = ref sender in
         let%map sequence =
@@ -3535,7 +3531,6 @@ let%test_module _ =
         in
         (sequence, !sender)
       in
-
       let%bind major_sequence, account_state_on_major =
         gen_sequence_and_update_account major_sequence_length
           account_state_on_major
@@ -3544,16 +3539,13 @@ let%test_module _ =
         gen_sequence_and_update_account minor_sequence_length
           account_state_on_minor
       in
-
       let major_sequence_total_cost =
         Array.fold ~init:0 major_sequence ~f:(fun acc item ->
             acc + Simple_command.total_cost item )
       in
-
       let%bind i =
         Int.gen_incl 1 (minor_sequence_length - major_sequence_length)
       in
-
       let t2 =
         List.sub
           (Array.to_list minor_sequence)
@@ -3562,11 +3554,9 @@ let%test_module _ =
         |> List.fold_left ~init:0 ~f:(fun acc item ->
                acc + Simple_command.total_cost item )
       in
-
       let%bind random_idx, tx_to_increase =
         get_random_from_array major_sequence
       in
-
       let increased_tx =
         match tx_to_increase with
         | Payment { sender; receiver_idx; fee; amount } ->
@@ -3582,13 +3572,11 @@ let%test_module _ =
               "Only payments are supported in limite account capacity corner \
                case"
       in
-
       Simple_ledger.set major account_with_limited_capacity_idx
         (Simple_account.seal account_state_on_major) ;
       Simple_ledger.set minor account_with_limited_capacity_idx
         (Simple_account.seal account_state_on_minor) ;
       Array.set major_sequence random_idx increased_tx ;
-
       let split_by_account (account : Simple_account.t) commands =
         let f cmd =
           let sender = Simple_command.sender cmd in
@@ -3598,15 +3586,12 @@ let%test_module _ =
         let others = Array.filter commands ~f:(fun x -> not (f x)) in
         (cmds_from_acc, others)
       in
-
       let unchanged_major_commands, major_commands_to_merge =
         split_by_account account_with_limited_capacity major_commands
       in
-
       let unchanged_minor_commands, minor_commands_to_merge =
         split_by_account account_with_limited_capacity minor_commands
       in
-
       let%bind major_commands =
         gen_merge
           (Array.to_list major_commands_to_merge)
@@ -3619,7 +3604,6 @@ let%test_module _ =
           (Array.to_list minor_sequence)
           []
       in
-
       return
         { prefix_commands
         ; major_commands =
@@ -3665,7 +3649,6 @@ let%test_module _ =
             Simple_command.gen_single_and_update_ledger minor
               (sender_on_minor_idx, sender_on_minor) )
       in
-
       return
         { prefix_commands
         ; major_commands =
