@@ -3419,24 +3419,6 @@ let%test_module _ =
       }
     [@@deriving to_yojson]
 
-    (** Main generator for prefix, minor and major sequences. This generator has a more firm grip
-           on how data is generated than usual. It uses Simple_command and Simple_account modules for 
-           user command definitions which then are carved into Signed_command list. By default generator
-           fulfill standard use cases for ledger reorg, like merging transactions from minor and major sequences
-           with preference for major sequence as well as 2 additional corner cases:
-      
-           ### Edge Case : Nonce Precedence
-      
-            - In major sequence, transactions update the account state to a point where the nonce of the account is smaller 
-               than the first nonce in the sequence of removed transactions.
-            - The mempool logic determines that if this condition is true, the entire minor sequence should be dropped.
-      
-           ### Edge Case : Nonce Intersection
-      
-            - Transactions using the same account appear in all three sequences (prefix, minor, major)
-        
-          On top of that one can enable/disable two special corner cases (permission change and limited capacity)
-        *)
     let gen_branches_basic ledger ?(sequence_max_length = 3) () =
       let open Quickcheck.Generator.Let_syntax in
       let%bind prefix_length = Int.gen_incl 0 sequence_max_length in
@@ -3456,13 +3438,19 @@ let%test_module _ =
       in
       return { prefix_commands; major_commands; minor_commands; minor; major }
 
-    (* Optional Edge Case 1: Limited Account Capacity
+    (** Optional Edge Case 1: Limited Account Capacity
 
-       - In major sequence*, a transaction `T` from a specific account decreases its balance by amount `X`.
-       - In minor sequence*, the same account decreases its balance in a similar transaction `T'`, but by an amount much smaller than `X`, followed by several other transactions using the same account.
-       - The prefix ledger* contains just enough funds to process major sequence, with a small surplus.
-       - When applying *minor sequence* without the transaction `T'` (of the same nonce as the large-amount transaction `T` in major sequence),
-           the sequence becomes partially applicable, forcing the mempool logic to drop some transactions at the end of *minor sequence*.
+        - In major sequence*, a transaction `T` from a specific account
+          decreases its balance by amount `X`.
+        - In minor sequence*, the same account decreases its balance in a
+          similar transaction `T'`, but by an amount much smaller than `X`,
+          followed by several other transactions using the same account.
+        - The prefix ledger* contains just enough funds to process major
+          sequence, with a small surplus.
+        - When applying *minor sequence* without the transaction `T'` (of the
+          same nonce as the large-amount transaction `T` in major sequence), the
+          sequence becomes partially applicable, forcing the mempool logic to
+          drop some transactions at the end of *minor sequence*.
     *)
     let gen_updated_branches_for_limited_capacity
         { prefix_commands; major_commands; minor_commands; minor; major } =
@@ -3615,14 +3603,14 @@ let%test_module _ =
         ; major
         }
 
-    (* Optional Edge Case : Permission Changes:
+    (** Optional Edge Case : Permission Changes:
 
-       - In major sequence, a transaction modifies an account's permissions:
-           1. It removes the permission to maintain the nonce.
-           2. It removes the permission to send transactions.
-       - In minor sequence, there is a regular transaction involving the same account,
-           but after the permission-modifying transaction in major sequence,
-           the new transaction becomes invalid and must be dropped.
+        - In major sequence, a transaction modifies an account's permissions:
+            1. It removes the permission to maintain the nonce.
+            2. It removes the permission to send transactions.
+        - In minor sequence, there is a regular transaction involving the same account,
+          but after the permission-modifying transaction in major sequence,
+          the new transaction becomes invalid and must be dropped.
     *)
     let gen_updated_branches_for_permission_change
         { prefix_commands; major_commands; minor_commands; minor; major } =
@@ -3658,6 +3646,29 @@ let%test_module _ =
         ; major
         }
 
+    (** Main generator for prefix, minor and major sequences. This generator
+        has a more firm grip on how data is generated than usual. It uses
+        Simple_command and Simple_account modules for user command definitions
+        which then are carved into Signed_command list. By default generator
+        fulfill standard use cases for ledger reorg, like merging transactions
+        from minor and major sequences with preference for major sequence as
+        well as 2 additional corner cases:
+
+        ### Edge Case : Nonce Precedence
+
+        - In major sequence, transactions update the account state to a point
+          where the nonce of the account is smaller than the first nonce in the
+          sequence of removed transactions.
+        - The mempool logic determines that if this condition is true, the
+           entire minor sequence should be dropped.
+
+        ### Edge Case : Nonce Intersection
+
+        - Transactions using the same account appear in all three sequences (prefix, minor, major)
+
+        On top of that one can enable/disable two special corner cases
+        (permission change and limited capacity).
+    *)
     let gen_branches ledger ~permission_change ~limited_capacity
         ?sequence_max_length () =
       let open Quickcheck.Generator.Let_syntax in
@@ -3706,22 +3717,29 @@ let%test_module _ =
 
     let%test_unit "Handle transition frontier diff (permission send tx updated)"
         =
-      (*
-                 Testing strategy focuses specifically on the mempool layer, where we are given the following inputs:
-      
-                   - A list of transactions that were **removed** due to the blockchain reorganization.
-                   - A list of transactions that were **added** in the new blocks.
-                   - The new **ledger** after the reorganization.
-      
-               This property-based test that generates three transaction sequences,
-               computes intermediate ledgers and verifies certain invariants after the call to `handle_transition_frontier_diff`.
-      
-               - Prefix sequence: a sequence of transactions originating from initial ledger
-               - Major sequence: a sequence of transactions originating from prefix ledger
-               - Major ledger: result of application of joint prefix and major sequences to prefix ledger
-               - Minor sequence: a sequence of transactions originating from *prefix ledger
-                 -  It’s role in testing is that of a transaction sequence extracted from an “rolled back” chain
-            *)
+      (* Testing strategy focuses specifically on the mempool layer, where we
+         are given the following inputs:
+
+         - A list of transactions that were **removed** due to the blockchain
+           reorganization.
+         - A list of transactions that were **added** in the new blocks.
+         - The new **ledger** after the reorganization.
+
+         This property-based test that generates three transaction sequences,
+         computes intermediate ledgers and verifies certain invariants after
+         the call to `handle_transition_frontier_diff`.
+
+         - Prefix sequence: a sequence of transactions originating from initial
+           ledger
+         - Major sequence: a sequence of transactions originating from prefix
+           ledger
+         - Major ledger: result of application of joint prefix and major
+           sequences to prefix ledger
+         - Minor sequence: a sequence of transactions originating from *prefix
+           ledger
+         - It’s role in testing is that of a transaction sequence extracted
+           from an “rolled back” chain
+      *)
       Quickcheck.test ~trials:1 ~seed:(`Deterministic "")
         (let open Quickcheck.Generator.Let_syntax in
         let test = Thread_safe.block_on_async_exn (fun () -> setup_test ()) in
