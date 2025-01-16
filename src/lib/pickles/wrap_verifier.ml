@@ -48,6 +48,7 @@ end
 module Make
     (Inputs : Intf.Wrap_main_inputs.S
                 with type Impl.field = Backend.Tock.Field.t
+                 and type Impl.field_var = Wrap_main_inputs.Impl.field_var
                  and type Impl.Bigint.t = Backend.Tock.Bigint.t
                  and type Impl.Constraint.t = Backend.Tock.Constraint.t
                  and type 'a Impl.Internal_Basic.Checked.t =

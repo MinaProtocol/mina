@@ -181,4 +181,6 @@ module Oracles = Plonk_dlog_oracles.Make (struct
   end
 end)
 
+module Cvar = Kimchi_pasta_snarky_backend.Pallas_based_plonk.Cvar
+
 module Run_state = Kimchi_pasta_snarky_backend.Pallas_based_plonk.Run_state

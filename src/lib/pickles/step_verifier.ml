@@ -10,6 +10,7 @@ open Pickles_types
 module Make
     (Inputs : Intf.Step_main_inputs.S
                 with type Impl.field = Backend.Tick.Field.t
+                 and type Impl.field_var = Step_main_inputs.Impl.field_var
                  and type Impl.Bigint.t = Backend.Tick.Bigint.t
                  and type Impl.Constraint.t = Backend.Tick.Constraint.t
                  and type 'a Impl.Internal_Basic.Checked.t =
