@@ -11,13 +11,13 @@ module Rejected = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = unit [@@deriving sexp, yojson]
+      type t = unit [@@deriving to_yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, yojson]
+  type t = Stable.Latest.t [@@deriving to_yojson]
 end
 
 module Make
@@ -28,13 +28,13 @@ module Make
   type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
     | Add_solved_work of Work.t * Ledger_proof.t One_or_two.t Priced_proof.t
     | Empty
-  [@@deriving compare, sexp, to_yojson, hash]
+  [@@deriving compare, to_yojson, hash]
 
-  type verified = t [@@deriving compare, sexp, to_yojson]
+  type verified = t [@@deriving compare, to_yojson, hash]
 
   let t_of_verified = ident
 
-  type rejected = Rejected.t [@@deriving sexp, yojson]
+  type rejected = Rejected.t [@@deriving to_yojson]
 
   let label = Pool.label
 
