@@ -1250,14 +1250,13 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                       | Remote peer ->
                           Downloader.add_knowledge downloader peer
                             [ (target_parent_hash, target_length) ] ) ;
-                      let%bind.Option { proof = path, root; _ } =
+                      let%bind.Option { proof = path, root_header; _ } =
                         Best_tip_lru.get h
                       in
                       let%bind.Option p =
                         Transition_chain_verifier.verify ~target_hash:h
                           ~transition_chain_proof:
-                            ( ( Mina_block.header root
-                              |> Mina_block.Header.protocol_state
+                            ( ( Mina_block.Header.protocol_state root_header
                               |> Mina_state.Protocol_state.hashes )
                                 .state_hash
                             , path )
