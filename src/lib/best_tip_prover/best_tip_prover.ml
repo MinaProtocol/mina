@@ -2,7 +2,6 @@ open Core_kernel
 open Mina_base
 open Mina_state
 open Async_kernel
-open Mina_block
 
 module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier
@@ -28,7 +27,8 @@ module Make (Inputs : Inputs_intf) :
 
     let get_previous ~context transition =
       let parent_hash =
-        transition |> Mina_block.Validated.header |> Header.protocol_state
+        transition |> Mina_block.Validated.header
+        |> Mina_block.Header.protocol_state
         |> Protocol_state.previous_state_hash
       in
       let open Option.Let_syntax in
@@ -88,24 +88,19 @@ module Make (Inputs : Inputs_intf) :
       }
 
   let validate_proof ~verifier ~genesis_state_hash
-      (transition_with_hash : Mina_block.with_hash) :
-      Mina_block.initial_valid_block Deferred.Or_error.t =
-    let validate (b, v) =
-      let open Deferred.Result.Let_syntax in
-      let h = (With_hash.map ~f:Mina_block.header b, v) in
-      Deferred.return (Validation.validate_protocol_versions h)
-      >>= Fn.compose Deferred.return
-            (Validation.validate_genesis_protocol_state ~genesis_state_hash)
-      >>= Validation.validate_single_proof ~verifier ~genesis_state_hash
-      >>| Fn.flip Validation.with_body (Mina_block.body @@ With_hash.data b)
-    in
+      (header_hashed : Mina_block.Header.with_hash) :
+      Mina_block.initial_valid_header Deferred.Or_error.t =
+    let open Mina_block.Validation in
     let%map validation =
-      Validation.wrap transition_with_hash
-      |> Validation.skip_time_received_validation
+      wrap_header header_hashed
+      |> skip_time_received_validation `This_block_was_not_received_via_gossip
+      |> skip_delta_block_chain_validation
            `This_block_was_not_received_via_gossip
-      |> Validation.skip_delta_block_chain_validation
-           `This_block_was_not_received_via_gossip
-      |> validate
+      |> validate_protocol_versions
+      |> Result.bind ~f:(validate_genesis_protocol_state ~genesis_state_hash)
+      |> Deferred.return
+      |> Deferred.Result.bind
+           ~f:(validate_single_proof ~verifier ~genesis_state_hash)
     in
     match validation with
     | Ok block ->
@@ -122,7 +117,9 @@ module Make (Inputs : Inputs_intf) :
             Error (Error.tag ~tag:"verifier proof" e) )
 
   let verify ~verifier ~genesis_constants ~precomputed_values
-      { Proof_carrying_data.data = best_tip; proof = merkle_list, root } =
+      { Proof_carrying_data.data = (best_tip : Mina_block.Header.t)
+      ; proof = merkle_list, (root : Mina_block.Header.t)
+      } =
     let open Deferred.Or_error.Let_syntax in
     let merkle_list_length = List.length merkle_list in
     let max_length = Transition_frontier.global_max_length genesis_constants in
@@ -132,11 +129,13 @@ module Make (Inputs : Inputs_intf) :
     let genesis_state_hash =
       State_hash.With_state_hashes.state_hash genesis_protocol_state
     in
-    let state_hashes block =
-      Mina_block.header block |> Header.protocol_state |> Protocol_state.hashes
+    let state_hashes h =
+      Mina_block.Header.protocol_state h |> Protocol_state.hashes
     in
-    let root_state_hash = (state_hashes root).state_hash in
-    let root_is_genesis = State_hash.(root_state_hash = genesis_state_hash) in
+    let root_with_hash = With_hash.of_data root ~hash_data:state_hashes in
+    let root_is_genesis =
+      State_hash.(root_with_hash.hash.state_hash = genesis_state_hash)
+    in
     let%bind () =
       Deferred.return
         (Result.ok_if_true
@@ -150,16 +149,11 @@ module Make (Inputs : Inputs_intf) :
     let best_tip_with_hash =
       With_hash.of_data best_tip ~hash_data:state_hashes
     in
-    let root_transition_with_hash =
-      With_hash.of_data root ~hash_data:state_hashes
-    in
     let%bind (_ : State_hash.t Mina_stdlib.Nonempty_list.t) =
       Deferred.return
         (Result.of_option
            (Merkle_list_verifier.verify
-              ~init:
-                (State_hash.With_state_hashes.state_hash
-                   root_transition_with_hash )
+              ~init:(State_hash.With_state_hashes.state_hash root_with_hash)
               merkle_list
               (State_hash.With_state_hashes.state_hash best_tip_with_hash) )
            ~error:
@@ -169,12 +163,15 @@ module Make (Inputs : Inputs_intf) :
     in
     let%map root, best_tip =
       Deferred.Or_error.both
-        (validate_proof ~genesis_state_hash ~verifier root_transition_with_hash)
+        (validate_proof ~genesis_state_hash ~verifier root_with_hash)
         (validate_proof ~genesis_state_hash ~verifier best_tip_with_hash)
     in
-    (`Root root, `Best_tip best_tip)
+    ( `Root (root : Mina_block.Validation.initial_valid_with_header)
+    , `Best_tip (best_tip : Mina_block.Validation.initial_valid_with_header) )
 end
 
 include Make (struct
   module Transition_frontier = Transition_frontier
 end)
+
+module Wrap_for_block = Wrap_for_block
