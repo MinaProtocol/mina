@@ -10,7 +10,7 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, to_yojson, equal]
+type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
 type with_hash = t State_hash.With_state_hashes.t [@@deriving sexp]
 
