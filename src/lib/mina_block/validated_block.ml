@@ -3,6 +3,8 @@ open Mina_base
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       Block.Stable.V2.t State_hash.With_state_hashes.Stable.V1.t
@@ -10,15 +12,17 @@ module Stable = struct
     [@@deriving equal]
 
     let to_latest = ident
+
+    let hashes (t, _) = With_hash.hash t
   end
 end]
 
-type t = Stable.Latest.t
+type t =
+  Block.t State_hash.With_state_hashes.t
+  * State_hash.t Mina_stdlib.Nonempty_list.t
 
 let to_yojson (block_with_hashes, _) =
   State_hash.With_state_hashes.to_yojson Block.to_yojson block_with_hashes
-
-[%%define_locally Stable.Latest.(equal)]
 
 let lift (b, v) =
   match v with
@@ -66,3 +70,5 @@ let state_body_hash (t, _) =
 let header t = t |> forget |> With_hash.data |> Block.header
 
 let body t = t |> forget |> With_hash.data |> Block.body
+
+let unwrap = Fn.id

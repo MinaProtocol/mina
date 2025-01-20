@@ -1637,7 +1637,7 @@ let%test_module "Ledger_catchup tests" =
             (* We force evaluation of state body hash for both blocks for further equality check *)
             let _hash1 = Mina_block.Validated.state_body_hash b1 in
             let _hash2 = Mina_block.Validated.state_body_hash b2 in
-            Mina_block.Validated.equal b1 b2 )
+            Mina_block.Validated.(Stable.Latest.equal (unwrap b1) (unwrap b2)) )
       in
       if not catchup_breadcrumbs_are_best_tip_path then
         failwith
