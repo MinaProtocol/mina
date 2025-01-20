@@ -1940,10 +1940,10 @@ let%test_module _ =
           ~genesis_constants ~slot_tx_end ~compile_config
       in
       let pool_, _, _ =
-        Test.create ~config ~logger ~constraint_constants
-          ~consensus_constants ~time_controller
-          ~frontier_broadcast_pipe:frontier_pipe_r ~log_gossip_heard:false
-          ~on_remote_push:(Fn.const Deferred.unit) ~block_window_duration
+        Test.create ~config ~logger ~constraint_constants ~consensus_constants
+          ~time_controller ~frontier_broadcast_pipe:frontier_pipe_r
+          ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
+          ~block_window_duration
       in
       let txn_pool = Test.resource_pool pool_ in
       let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
@@ -3194,7 +3194,7 @@ let%test_module _ =
 
       val apply_cmd : int -> t -> t
 
-      val apply_cmd_or_fail : amount:int -> fee:int -> t -> t
+      val apply_cmd_or_fail : amount:int -> fee:int -> t -> t * int
 
       val get_random_unsealed : t array -> (int * t) Quickcheck.Generator.t
 
@@ -3267,6 +3267,8 @@ let%test_module _ =
 
       val index_of_int : int -> index
 
+      val index_to_int : index -> int
+
       val ledger_snapshot : test -> t
 
       val copy : t -> t
@@ -3278,13 +3280,15 @@ let%test_module _ =
       val get_random_unsealed :
         t -> (index * Simple_account.t) Quickcheck.Generator.t
 
-      val find_by_key_idx : t -> int -> (index * Simple_account.t) option
+      val find_by_key_idx : t -> int -> Simple_account.t
     end = struct
       type t = Simple_account.t array [@@deriving to_yojson]
 
       type index = int
 
       let index_of_int x = x
+
+      let index_to_int x = x
 
       let ledger_snapshot t =
         Array.mapi test_keys ~f:(fun key_idx kp ->
@@ -3312,8 +3316,7 @@ let%test_module _ =
 
       let get_random_unsealed ledger = Simple_account.get_random_unsealed ledger
 
-      let find_by_key_idx (ledger : t) key_idx =
-        ledger.(key_idx)
+      let find_by_key_idx (ledger : t) key_idx = ledger.(key_idx)
     end
 
     module Simple_command = struct
@@ -3411,6 +3414,9 @@ let%test_module _ =
               ~receiver_idx ~amount ()
     end
 
+    (** appends a and b to the end of c, taking an element of a or b at random, 
+       continuing until both a and b run out of elements
+    *)
     let rec gen_merge (a : 'a list) (b : 'a list) (c : 'a list) =
       let open Quickcheck.Generator.Let_syntax in
       match (a, b) with
@@ -3423,11 +3429,11 @@ let%test_module _ =
       | [ left ], [ right ] -> (
           match%bind Bool.quickcheck_generator with
           | true ->
-              return  (c @ [ left; right ])
+              return (c @ [ left; right ])
           | false ->
               return (c @ [ right; left ]) )
       | [], right :: tail ->
-          return (c @ [ right ] @ tail )
+          return (c @ [ right ] @ tail)
       | left :: tail, [] ->
           gen_merge tail [] (c @ [ left ])
       | left :: left_tail, right :: right_tail -> (
@@ -3465,6 +3471,11 @@ let%test_module _ =
       in
       return { prefix_commands; major_commands; minor_commands; minor; major }
 
+    let split_by_account (account : Simple_account.t) commands =
+      Array.partition_tf commands ~f:(fun cmd ->
+          let sender = Simple_command.sender cmd in
+          sender.key_idx = Simple_account.key_idx account )
+
     (** Optional Edge Case 1: Limited Account Capacity
 
         - In major sequence*, a transaction `T` from a specific account
@@ -3482,7 +3493,6 @@ let%test_module _ =
     let gen_updated_branches_for_limited_capacity
         { prefix_commands; major_commands; minor_commands; minor; major } =
       let open Quickcheck.Generator.Let_syntax in
-      (*find account in major and minor branches with the same nonces and similar balances (less than 100k mina diff)*)
       let%bind target_account_idx, target_account =
         Simple_ledger.get_random_unsealed major
       in
@@ -3502,6 +3512,20 @@ let%test_module _ =
       in
       let initial_balance = Simple_account.balance target_account in
       let half_initial_balance = Simple_account.balance target_account / 2 in
+      let recieved_amount =
+        Array.filter_map (Array.append prefix_commands major_commands)
+          ~f:(fun cmd ->
+            match cmd with
+            | Payment cmd ->
+                Option.some_if
+                  ( cmd.receiver_idx
+                  = Simple_ledger.index_to_int target_account_idx )
+                  cmd.amount
+            | Zkapp_blocking_send _cmd ->
+                None )
+        |> Array.fold ~init:0 ~f:(fun acc el -> acc + el)
+      in
+
       let gen_sequence_and_update_account ledger len =
         let account = ref (Simple_ledger.get ledger target_account_idx) in
         let%map sequence =
@@ -3552,7 +3576,7 @@ let%test_module _ =
         match tx_to_increase with
         | Payment { sender; receiver_idx; fee; amount } ->
             let addition =
-              initial_balance - major_sequence_total_cost
+              initial_balance + recieved_amount - major_sequence_total_cost
               - suffix_commands_total_cost
             in
             let () =
@@ -3569,11 +3593,6 @@ let%test_module _ =
                case"
       in
       Array.set major_sequence random_idx increased_tx ;
-      let split_by_account (account : Simple_account.t) commands =
-        Array.partition_tf commands ~f:(fun cmd ->
-            let sender = Simple_command.sender cmd in
-            sender.key_idx = Simple_account.key_idx account )
-      in
       let unchanged_major_commands, major_commands_to_merge =
         split_by_account target_account major_commands
       in
@@ -3637,11 +3656,25 @@ let%test_module _ =
             Simple_command.gen_single_and_update_ledger minor
               (sender_on_minor_idx, sender_on_minor) )
       in
+
+      let unchanged_minor_commands, minor_commands_to_merge =
+        split_by_account sender_on_minor minor_commands
+      in
+
+      let%bind minor_commands =
+        gen_merge
+          (Array.to_list minor_commands_to_merge)
+          (Array.to_list aux_minor_cmd)
+          []
+      in
+
       return
         { prefix_commands
         ; major_commands =
             Array.append major_commands [| permission_change_cmd |]
-        ; minor_commands = Array.append minor_commands aux_minor_cmd
+        ; minor_commands =
+            List.append (Array.to_list unchanged_minor_commands) minor_commands
+            |> List.to_array
         ; minor
         ; major
         }
@@ -3828,78 +3861,64 @@ let%test_module _ =
               Array.iter minor_commands ~f:(fun (spec : Simple_command.t) ->
                   let sender = Simple_command.sender spec in
                   let pk, nonce = Sender_info.to_key_and_nonce sender in
-                  let account_spec_pair_opt =
+                  let account_spec =
                     Simple_ledger.find_by_key_idx major sender.key_idx
                   in
-                  match account_spec_pair_opt with
-                  | Some (_, account_spec)
-                    when sender.nonce < Simple_account.nonce account_spec ->
-                      [%log info]
-                        "sender nonce is smaller or equal than last major \
-                         nonce. command should be dropped"
-                        ~metadata:
-                          [ ( "sent from"
-                            , `String
-                                (Printf.sprintf
-                                   !"%{sexp: Public_key.Compressed.t} -> %d"
-                                   pk nonce ) )
-                          ] ;
-                      assert_pool_doesn't_contain pool_state (pk, nonce)
-                  | Some _account_spec
-                    when sent_blocking_zkapp major_commands pk ->
-                      [%log info]
-                        "major chain contains blocking zkapp. command should \
-                         be dropped"
-                        ~metadata:
-                          [ ( "sent from"
-                            , `String
-                                (Printf.sprintf
-                                   !"%{sexp: Public_key.Compressed.t}"
-                                   pk ) )
-                          ] ;
-                      assert_pool_doesn't_contain pool_state (pk, nonce)
-                  | Some (idx, account_spec)
-                    when Simple_account.balance account_spec > total_cost sender
-                    ->
-                      [%log info]
-                        "sender nonce is greater than last major nonce. should \
-                         be in the pool"
-                        ~metadata:
-                          [ ( "sent from"
-                            , `String
-                                (Printf.sprintf
-                                   !"%{sexp: Public_key.Compressed.t} -> %d}"
-                                   pk nonce ) )
-                          ; ( "balance"
-                            , `Int (Simple_account.balance account_spec) )
-                          ; ("cost", `Int (total_cost sender))
-                          ] ;
-                      assert_pool_contains pool_state (pk, nonce) ;
-                      Simple_ledger.set major idx
-                        (Simple_account.subtract_balance account_spec
-                           (total_cost sender) )
-                  | Some _account_spec ->
-                      [%log info]
-                        "balance is negative. should be dropped from pool"
-                        ~metadata:
-                          [ ( "sent from"
-                            , `String
-                                (Printf.sprintf
-                                   !"%{sexp: Public_key.Compressed.t} -> %d"
-                                   pk nonce ) )
-                          ] ;
-                      assert_pool_doesn't_contain pool_state (pk, nonce)
-                  | None ->
-                      [%log info]
-                        "sender didn't send any tx to major branch. command \
-                         should be in the pool"
-                        ~metadata:
-                          [ ( "sent from"
-                            , `String
-                                (Printf.sprintf
-                                   !"%{sexp: Public_key.Compressed.t} -> %d"
-                                   pk nonce ) )
-                          ] ;
-                      assert_pool_contains pool_state (pk, nonce) ) ;
+                  if sender.nonce < Simple_account.nonce account_spec then (
+                    [%log info]
+                      "sender nonce is smaller or equal than last major nonce. \
+                       command should be dropped"
+                      ~metadata:
+                        [ ( "sent from"
+                          , `String
+                              (Printf.sprintf
+                                 !"%{sexp: Public_key.Compressed.t} -> %d"
+                                 pk nonce ) )
+                        ] ;
+                    assert_pool_doesn't_contain pool_state (pk, nonce) )
+                  else if sent_blocking_zkapp major_commands pk then (
+                    [%log info]
+                      "major chain contains blocking zkapp. command should be \
+                       dropped"
+                      ~metadata:
+                        [ ( "sent from"
+                          , `String
+                              (Printf.sprintf
+                                 !"%{sexp: Public_key.Compressed.t}"
+                                 pk ) )
+                        ] ;
+                    assert_pool_doesn't_contain pool_state (pk, nonce) )
+                  else if
+                    Simple_account.balance account_spec > total_cost sender
+                  then (
+                    [%log info]
+                      "sender nonce is greater than last major nonce. should \
+                       be in the pool"
+                      ~metadata:
+                        [ ( "sent from"
+                          , `String
+                              (Printf.sprintf
+                                 !"%{sexp: Public_key.Compressed.t} -> %d}"
+                                 pk nonce ) )
+                        ; ("balance", `Int (Simple_account.balance account_spec))
+                        ; ("cost", `Int (total_cost sender))
+                        ] ;
+                    assert_pool_contains pool_state (pk, nonce) ;
+                    Simple_ledger.set major
+                      ( Simple_account.key_idx account_spec
+                      |> Simple_ledger.index_of_int )
+                      (Simple_account.subtract_balance account_spec
+                         (total_cost sender) ) )
+                  else (
+                    [%log info]
+                      "balance is negative. should be dropped from pool"
+                      ~metadata:
+                        [ ( "sent from"
+                          , `String
+                              (Printf.sprintf
+                                 !"%{sexp: Public_key.Compressed.t} -> %d"
+                                 pk nonce ) )
+                        ] ;
+                    assert_pool_doesn't_contain pool_state (pk, nonce) ) ) ;
               Deferred.unit ) )
   end )
