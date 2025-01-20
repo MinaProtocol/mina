@@ -1940,7 +1940,7 @@ let%test_module _ =
           ~genesis_constants ~slot_tx_end ~compile_config
       in
       let pool_, _, _ =
-        Test.create ~config ~logger:(Logger.null ()) ~constraint_constants
+        Test.create ~config ~logger ~constraint_constants
           ~consensus_constants ~time_controller
           ~frontier_broadcast_pipe:frontier_pipe_r ~log_gossip_heard:false
           ~on_remote_push:(Fn.const Deferred.unit) ~block_window_duration
@@ -3242,8 +3242,8 @@ let%test_module _ =
               "cannot generate tx for key: %d as balance (%d) is less than fee \
                (%d)"
               t.key_idx t.balance fee ()
-          else apply_cmd fee t
-        else apply_cmd (amount + fee) t
+          else (apply_cmd fee t, 0)
+        else (apply_cmd (amount + fee) t, amount)
 
       let get_random_unsealed (arr : t array) =
         let open Quickcheck.Generator.Let_syntax in
@@ -3313,8 +3313,7 @@ let%test_module _ =
       let get_random_unsealed ledger = Simple_account.get_random_unsealed ledger
 
       let find_by_key_idx (ledger : t) key_idx =
-        Array.findi ledger ~f:(fun _idx account ->
-            Int.equal key_idx (Simple_account.key_idx account) )
+        ledger.(key_idx)
     end
 
     module Simple_command = struct
@@ -3333,7 +3332,7 @@ let%test_module _ =
         let%bind random_idx, account =
           Simple_ledger.get_random_unsealed ledger
         in
-        let new_account_spec =
+        let new_account_spec, _ =
           Simple_account.apply_cmd_or_fail ~amount:0 ~fee:minimum_fee account
         in
         Simple_ledger.set ledger random_idx new_account_spec ;
@@ -3351,7 +3350,7 @@ let%test_module _ =
           test_keys |> Array.mapi ~f:(fun i _ -> i) |> Quickcheck_lib.of_array
         in
         let%bind amount = Int.gen_incl lower higher in
-        let new_account_spec =
+        let new_account_spec, amount =
           Simple_account.apply_cmd_or_fail ~amount ~fee:minimum_fee account
         in
         Simple_ledger.set ledger idx new_account_spec ;
@@ -3424,11 +3423,11 @@ let%test_module _ =
       | [ left ], [ right ] -> (
           match%bind Bool.quickcheck_generator with
           | true ->
-              gen_merge [] [ right ] (c @ [ left ])
+              return  (c @ [ left; right ])
           | false ->
-              gen_merge [ left ] [] (c @ [ right ]) )
+              return (c @ [ right; left ]) )
       | [], right :: tail ->
-          gen_merge [] tail (c @ [ right ])
+          return (c @ [ right ] @ tail )
       | left :: tail, [] ->
           gen_merge tail [] (c @ [ left ])
       | left :: left_tail, right :: right_tail -> (
