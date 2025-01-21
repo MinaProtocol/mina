@@ -97,10 +97,10 @@ let is_transition_for_bootstrap
           ~existing:root_consensus_state ~candidate:new_consensus_state
 
 let start_transition_frontier_controller ~context:(module Context : CONTEXT)
-    ~trust_system ~verifier ~network ~time_controller ~get_completed_work
-    ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
-    ~collected_transitions ~cache_exceptions ?transition_writer_ref ~frontier_w
-    frontier =
+    ~proof_cache_db ~trust_system ~verifier ~network ~time_controller
+    ~get_completed_work ~producer_transition_writer_ref
+    ~verified_transition_writer ~clear_reader ~collected_transitions
+    ~cache_exceptions ?transition_writer_ref ~frontier_w frontier =
   let open Context in
   [%str_log info] Starting_transition_frontier_controller ;
   let ( transition_frontier_controller_reader
@@ -143,8 +143,8 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
   let new_verified_transition_reader =
     Transition_frontier_controller.run
       ~context:(module Context)
-      ~trust_system ~verifier ~network ~time_controller ~collected_transitions
-      ~frontier ~get_completed_work
+      ~proof_cache_db ~trust_system ~verifier ~network ~time_controller
+      ~collected_transitions ~frontier ~get_completed_work
       ~network_transition_reader:transition_frontier_controller_reader
       ~producer_transition_reader ~clear_reader ~cache_exceptions
   in
@@ -155,12 +155,12 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
   |> don't_wait_for ;
   transition_writer_ref
 
-let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
-    ~verifier ~network ~time_controller ~get_completed_work
-    ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
-    ?transition_writer_ref ~consensus_local_state ~frontier_w
-    ~initial_root_transition ~persistent_root ~persistent_frontier
-    ~cache_exceptions ~best_seen_transition ~catchup_mode =
+let start_bootstrap_controller ~context:(module Context : CONTEXT)
+    ~proof_cache_db ~trust_system ~verifier ~network ~time_controller
+    ~get_completed_work ~producer_transition_writer_ref
+    ~verified_transition_writer ~clear_reader ?transition_writer_ref
+    ~consensus_local_state ~frontier_w ~initial_root_transition ~persistent_root
+    ~persistent_frontier ~cache_exceptions ~best_seen_transition ~catchup_mode =
   let open Context in
   [%str_log info] Starting_bootstrap_controller ;
   [%log info] "Starting Bootstrap Controller phase" ;
@@ -202,7 +202,7 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
   upon
     (Bootstrap_controller.run
        ~context:(module Context)
-       ~trust_system ~verifier ~network ~consensus_local_state
+       ~proof_cache_db ~trust_system ~verifier ~network ~consensus_local_state
        ~transition_reader:bootstrap_controller_reader ~persistent_frontier
        ~persistent_root ~initial_root_transition ~preferred_peers ~catchup_mode )
     (fun (new_frontier, collected_transitions) ->
@@ -216,9 +216,9 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
       |> Fn.const () ) ;
   transition_writer_ref
 
-let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
-    ~network ~verifier ~trust_system ~most_recent_valid_block_writer
-    ~genesis_constants =
+let download_best_tip ~context:(module Context : CONTEXT) ~proof_cache_db
+    ~notify_online ~network ~verifier ~trust_system
+    ~most_recent_valid_block_writer ~genesis_constants =
   let open Context in
   let num_peers = 16 in
   let%bind peers = Mina_networking.random_peers network num_peers in
@@ -278,7 +278,7 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
                   "Successfully verified best tip from $peer" ;
                 let body =
                   Mina_block.Stable.Latest.body peer_best_tip.data
-                  |> Staged_ledger_diff.Body.generate
+                  |> Staged_ledger_diff.Body.generate ~proof_cache_db
                 in
                 return
                   (Some
@@ -343,14 +343,14 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
              } ;
            data ) )
 
-let load_frontier ~context:(module Context : CONTEXT) ~verifier
+let load_frontier ~context:(module Context : CONTEXT) ~proof_cache_db ~verifier
     ~persistent_frontier ~persistent_root ~consensus_local_state ~catchup_mode =
   let open Context in
   match%map
     Transition_frontier.load
       ~context:(module Context)
-      ~verifier ~consensus_local_state ~persistent_root ~persistent_frontier
-      ~catchup_mode ()
+      ~proof_cache_db ~verifier ~consensus_local_state ~persistent_root
+      ~persistent_frontier ~catchup_mode ()
   with
   | Ok frontier ->
       [%log info] "Successfully loaded frontier" ;
@@ -411,12 +411,12 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
             "Will start initialization without connecting to too many peers" )
     ]
 
-let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
-    ~is_seed ~is_demo_mode ~verifier ~trust_system ~time_controller
-    ~get_completed_work ~frontier_w ~producer_transition_writer_ref
-    ~clear_reader ~verified_transition_writer ~cache_exceptions
-    ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
-    ~consensus_local_state ~catchup_mode ~notify_online =
+let initialize ~context:(module Context : CONTEXT) ~proof_cache_db
+    ~sync_local_state ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
+    ~time_controller ~get_completed_work ~frontier_w
+    ~producer_transition_writer_ref ~clear_reader ~verified_transition_writer
+    ~cache_exceptions ~most_recent_valid_block_writer ~persistent_root
+    ~persistent_frontier ~consensus_local_state ~catchup_mode ~notify_online =
   let open Context in
   [%log info] "Initializing transition router" ;
   let%bind () =
@@ -435,27 +435,28 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
     Deferred.both
       (download_best_tip
          ~context:(module Context)
-         ~notify_online ~network ~verifier ~trust_system
+         ~proof_cache_db ~notify_online ~network ~verifier ~trust_system
          ~most_recent_valid_block_writer ~genesis_constants )
       (load_frontier
          ~context:(module Context)
-         ~verifier ~persistent_frontier ~persistent_root ~consensus_local_state
-         ~catchup_mode )
+         ~proof_cache_db ~verifier ~persistent_frontier ~persistent_root
+         ~consensus_local_state ~catchup_mode )
   with
   | best_seen_transition, None ->
       [%log info] "Unable to load frontier; starting bootstrap" ;
       let%map initial_root_transition =
         Persistent_frontier.(
-          with_instance_exn persistent_frontier ~f:Instance.get_root_transition)
+          with_instance_exn persistent_frontier
+            ~f:(Instance.get_root_transition ~proof_cache_db))
         >>| Result.ok_or_failwith
       in
       start_bootstrap_controller
         ~context:(module Context)
-        ~trust_system ~verifier ~network ~time_controller ~get_completed_work
-        ~producer_transition_writer_ref ~verified_transition_writer
-        ~clear_reader ?transition_writer_ref:None ~consensus_local_state
-        ~frontier_w ~persistent_root ~persistent_frontier ~cache_exceptions
-        ~initial_root_transition ~catchup_mode
+        ~proof_cache_db ~trust_system ~verifier ~network ~time_controller
+        ~get_completed_work ~producer_transition_writer_ref
+        ~verified_transition_writer ~clear_reader ?transition_writer_ref:None
+        ~consensus_local_state ~frontier_w ~persistent_root ~persistent_frontier
+        ~cache_exceptions ~initial_root_transition ~catchup_mode
         ~best_seen_transition:
           (Option.map ~f:(fun x -> `Block x) best_seen_transition)
   | Some best_tip, Some frontier
@@ -480,11 +481,11 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
       let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
       start_bootstrap_controller
         ~context:(module Context)
-        ~trust_system ~verifier ~network ~time_controller ~get_completed_work
-        ~producer_transition_writer_ref ~verified_transition_writer
-        ~clear_reader ?transition_writer_ref:None ~consensus_local_state
-        ~frontier_w ~initial_root_transition ~persistent_root
-        ~persistent_frontier ~cache_exceptions ~catchup_mode
+        ~proof_cache_db ~trust_system ~verifier ~network ~time_controller
+        ~get_completed_work ~producer_transition_writer_ref
+        ~verified_transition_writer ~clear_reader ?transition_writer_ref:None
+        ~consensus_local_state ~frontier_w ~initial_root_transition
+        ~persistent_root ~persistent_frontier ~cache_exceptions ~catchup_mode
         ~best_seen_transition:(Some (`Block best_tip))
   | best_tip_opt, Some frontier ->
       let collected_transitions =
@@ -540,10 +541,10 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
       in
       start_transition_frontier_controller
         ~context:(module Context)
-        ~trust_system ~verifier ~network ~time_controller ~get_completed_work
-        ~producer_transition_writer_ref ~verified_transition_writer
-        ~clear_reader ~collected_transitions ~cache_exceptions
-        ?transition_writer_ref:None ~frontier_w frontier
+        ~proof_cache_db ~trust_system ~verifier ~network ~time_controller
+        ~get_completed_work ~producer_transition_writer_ref
+        ~verified_transition_writer ~clear_reader ~collected_transitions
+        ~cache_exceptions ?transition_writer_ref:None ~frontier_w frontier
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
@@ -588,8 +589,8 @@ let wait_till_genesis ~logger ~time_controller
    to set local state in the test
 *)
 let run ?(sync_local_state = true) ?(cache_exceptions = false)
-    ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~is_seed ~is_demo_mode ~time_controller ~consensus_local_state
+    ~context:(module Context : CONTEXT) ~proof_cache_db ~trust_system ~verifier
+    ~network ~is_seed ~is_demo_mode ~time_controller ~consensus_local_state
     ~persistent_root_location ~persistent_frontier_location
     ~get_current_frontier ~frontier_broadcast_writer:frontier_w
     ~network_transition_reader ~producer_transition_reader
@@ -672,7 +673,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
       in
       let%map transition_writer_ref =
-        initialize ~sync_local_state ~cache_exceptions
+        initialize ~sync_local_state ~cache_exceptions ~proof_cache_db
           ~context:(module Context)
           ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
           ~persistent_frontier ~persistent_root ~time_controller
@@ -734,12 +735,13 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                         ignore
                         @@ start_bootstrap_controller
                              ~context:(module Context)
-                             ~trust_system ~verifier ~network ~time_controller
-                             ~get_completed_work ~producer_transition_writer_ref
-                             ~cache_exceptions ~verified_transition_writer
-                             ~clear_reader ~transition_writer_ref
-                             ~consensus_local_state ~frontier_w ~persistent_root
-                             ~persistent_frontier ~initial_root_transition
+                             ~proof_cache_db ~trust_system ~verifier ~network
+                             ~time_controller ~get_completed_work
+                             ~producer_transition_writer_ref ~cache_exceptions
+                             ~verified_transition_writer ~clear_reader
+                             ~transition_writer_ref ~consensus_local_state
+                             ~frontier_w ~persistent_root ~persistent_frontier
+                             ~initial_root_transition
                              ~best_seen_transition:(Some b_or_h) ~catchup_mode )
                       else Deferred.unit
                   | None ->

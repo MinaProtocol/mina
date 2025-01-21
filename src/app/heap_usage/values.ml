@@ -231,6 +231,8 @@ let scan_state_base_node_zkapp ~constraint_constants ~zkapp_command =
   in
   mk_scan_state_base_node varying ~constraint_constants
 
+let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
 let scan_state_merge_node :
     Transaction_snark_scan_state.Ledger_proof_with_sok_message.t
     Parallel_scan.Merge.t =
@@ -269,6 +271,12 @@ let scan_state_merge_node :
       in
       let ledger_proof = Transaction_snark.create ~statement ~proof in
       (ledger_proof, sok_msg)
+    in
+    let left =
+      Tuple2.map_fst ~f:(Ledger_proof.Cached.generate ~proof_cache_db) left
+    in
+    let right =
+      Tuple2.map_fst ~f:(Ledger_proof.Cached.generate ~proof_cache_db) right
     in
     Full { left; right; seq_no = 1; status = Todo }
   in

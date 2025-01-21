@@ -582,7 +582,8 @@ module Verify_work_batcher = struct
             |> List.concat_map ~f:(fun { fee; prover; proofs } ->
                    let msg = Sok_message.create ~fee ~prover in
                    One_or_two.to_list
-                     (One_or_two.map proofs ~f:(fun p -> (p, msg))) ) )
+                     (One_or_two.map proofs ~f:(fun p ->
+                          (Ledger_proof.Cached.unwrap p, msg) ) ) ) )
         |> Verifier.verify_transaction_snarks verifier
         >>| function
         | Ok (Ok ()) ->
@@ -1074,8 +1075,8 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
   run_node
 
 (* TODO: In the future, this could take over scheduling bootstraps too. *)
-let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
-    ~network ~frontier ~build_func
+let run_catchup ~context:(module Context : CONTEXT) ~proof_cache_db
+    ~trust_system ~verifier ~network ~frontier ~build_func
     ~(catchup_job_reader :
        ( State_hash.t
        * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
@@ -1167,7 +1168,8 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
         Mina_networking.get_transition_chain
           ~heartbeat_timeout:(Time_ns.Span.of_sec sec)
           ~timeout:(Time.Span.of_sec sec) network peer (List.map hs ~f:fst)
-        |> Deferred.Or_error.map ~f:(List.map ~f:Mina_block.generate) )
+        |> Deferred.Or_error.map
+             ~f:(List.map ~f:(Mina_block.generate ~proof_cache_db)) )
       ~peers:(fun () -> Mina_networking.peers network)
       ~knowledge_context:
         (Broadcast_pipe.map best_tip_r
@@ -1404,14 +1406,15 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                           (h, l) )
                       : State_hash.t * Length.t ) ) ) )
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
+let run ~context:(module Context : CONTEXT) ~proof_cache_db ~trust_system
+    ~verifier ~network ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
     ~unprocessed_transition_cache : unit =
   O1trace.background_thread "perform_super_catchup" (fun () ->
       run_catchup
         ~context:(module Context)
-        ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
-        ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
+        ~proof_cache_db ~trust_system ~verifier ~network ~frontier
+        ~catchup_job_reader ~unprocessed_transition_cache
+        ~catchup_breadcrumbs_writer
         ~build_func:
           (Transition_frontier.Breadcrumb.build
              ~get_completed_work:(Fn.const None) ) )
@@ -1466,6 +1469,8 @@ let%test_module "Ledger_catchup tests" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
             () )
+
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
 
     module Context = struct
       let logger = logger
@@ -1534,7 +1539,7 @@ let%test_module "Ledger_catchup tests" =
       run
         ~context:(module Context)
         ~verifier ~trust_system ~network ~frontier ~catchup_breadcrumbs_writer
-        ~catchup_job_reader ~unprocessed_transition_cache ;
+        ~catchup_job_reader ~unprocessed_transition_cache ~proof_cache_db ;
       { cache = unprocessed_transition_cache
       ; job_writer = catchup_job_writer
       ; breadcrumbs_reader = catchup_breadcrumbs_reader

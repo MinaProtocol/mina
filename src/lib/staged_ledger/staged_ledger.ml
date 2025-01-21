@@ -222,7 +222,8 @@ module T = struct
 
     let verify ~verifier:{ logger; verifier } ts =
       verify_proofs ~logger ~verifier
-        (List.map ts ~f:(fun (p, m) -> (p, Ledger_proof.statement p, m)))
+        (List.map ts ~f:(fun (p, m) ->
+             (Ledger_proof.Cached.unwrap p, Ledger_proof.statement p, m) ) )
   end
 
   module Statement_scanner_with_proofs =
@@ -718,7 +719,7 @@ module T = struct
           let verified_proofs =
             Transaction_snark_work.Checked.proofs completed_work
           in
-          let block_work_proofs = Transaction_snark_work.proofs work in
+          let block_proofs = Transaction_snark_work.proofs work in
           if
             not
             @@ Fee.equal
@@ -731,12 +732,20 @@ module T = struct
                  (Transaction_snark_work.Checked.prover completed_work)
                  (Transaction_snark_work.prover work)
           then Second "prover_account_not_equal"
-          else if
-            not
-            @@ One_or_two.equal Ledger_proof.equal verified_proofs
-                 block_work_proofs
-          then Second "proof_not_equal"
-          else First ()
+          else
+            (* We read the proofs' contents from cache to be able to perform the equality check *)
+            let verified_proofs_unwrapped =
+              One_or_two.map ~f:Ledger_proof.Cached.unwrap verified_proofs
+            in
+            let block_proofs_unwrapped =
+              One_or_two.map ~f:Ledger_proof.Cached.unwrap block_proofs
+            in
+            if
+              not
+              @@ One_or_two.equal Ledger_proof.equal verified_proofs_unwrapped
+                   block_proofs_unwrapped
+            then Second "proof_not_equal"
+            else First ()
       | _ ->
           Second "not_found_in_pool"
     with Statement_of_job_failure -> Second "statement_of_job_failure"
@@ -761,10 +770,11 @@ module T = struct
               let message =
                 Sok_message.create ~fee:work.fee ~prover:work.prover
               in
+              (* We read the proof's contents from cache to be able to perform the verification *)
               One_or_two.(
                 to_list
                   (map (zip_exn jobs work.proofs) ~f:(fun (job, proof) ->
-                       (job, message, proof) ) )) )
+                       (job, message, Ledger_proof.Cached.unwrap proof) ) )) )
     in
     [%log debug]
       ~metadata:
@@ -2607,11 +2617,8 @@ let%test_module "staged ledger tests" =
       Quickcheck.random_value ~seed:(`Deterministic prover_seed)
         Public_key.Compressed.gen
 
-    let proofs stmts : Ledger_proof.t One_or_two.t =
-      let sok_digest = Sok_message.Digest.default in
-      One_or_two.map stmts ~f:(fun statement ->
-          Ledger_proof.create ~statement ~sok_digest
-            ~proof:(Lazy.force Proof.transaction_dummy) )
+    let proofs stmts : Ledger_proof.Cached.t One_or_two.t =
+      One_or_two.map stmts ~f:Ledger_proof.For_tests.mk_dummy_proof_cached
 
     let stmt_to_work_random_prover (stmts : Transaction_snark_work.Statement.t)
         : Transaction_snark_work.Checked.t option =
@@ -2694,7 +2701,7 @@ let%test_module "staged ledger tests" =
 
     (* Fee excess at top level ledger proofs should always be zero *)
     let assert_fee_excess :
-           ( Ledger_proof.t
+           ( Ledger_proof.Cached.t
            * (Transaction.t With_status.t * _ * _)
              Sl.Scan_state.Transactions_ordered.Poly.t
              list )

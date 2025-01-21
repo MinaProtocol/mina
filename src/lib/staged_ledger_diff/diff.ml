@@ -178,8 +178,10 @@ module Make_str (A : Wire_types.Concrete) = struct
     type t =
       (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_two.t
 
-    let generate : Stable.Latest.t -> t =
-      Pre_diff_two.map ~f1:Transaction_snark_work.generate ~f2:Fn.id
+    let generate ~proof_cache_db : Stable.Latest.t -> t =
+      Pre_diff_two.map
+        ~f1:(Transaction_snark_work.generate ~proof_cache_db)
+        ~f2:Fn.id
 
     let unwrap : t -> Stable.Latest.t =
       Pre_diff_two.map ~f1:Transaction_snark_work.unwrap ~f2:Fn.id
@@ -204,8 +206,10 @@ module Make_str (A : Wire_types.Concrete) = struct
     type t =
       (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_one.t
 
-    let generate : Stable.Latest.t -> t =
-      Pre_diff_one.map ~f1:Transaction_snark_work.generate ~f2:Fn.id
+    let generate ~proof_cache_db : Stable.Latest.t -> t =
+      Pre_diff_one.map
+        ~f1:(Transaction_snark_work.generate ~proof_cache_db)
+        ~f2:Fn.id
 
     let unwrap : t -> Stable.Latest.t =
       Pre_diff_one.map ~f1:Transaction_snark_work.unwrap ~f2:Fn.id
@@ -230,14 +234,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       Pre_diff_with_at_most_two_coinbase.t
       * Pre_diff_with_at_most_one_coinbase.t option
 
-    let generate
+    let generate ~proof_cache_db
         (( pre_diff_with_at_most_two_coinbase
          , pre_diff_with_at_most_one_coinbase_opt ) :
           Stable.Latest.t ) : t =
-      ( Pre_diff_with_at_most_two_coinbase.generate
+      ( Pre_diff_with_at_most_two_coinbase.generate ~proof_cache_db
           pre_diff_with_at_most_two_coinbase
       , Option.map pre_diff_with_at_most_one_coinbase_opt
-          ~f:Pre_diff_with_at_most_one_coinbase.generate )
+          ~f:(Pre_diff_with_at_most_one_coinbase.generate ~proof_cache_db) )
 
     let unwrap
         (( pre_diff_with_at_most_two_coinbase
@@ -272,7 +276,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   type t = { diff : Diff.t } [@@deriving fields]
 
-  let generate t = { diff = Diff.generate t.Stable.Latest.diff }
+  let generate ~proof_cache_db t =
+    { diff = Diff.generate ~proof_cache_db t.Stable.Latest.diff }
 
   let unwrap t = { Stable.Latest.diff = Diff.unwrap t.diff }
 

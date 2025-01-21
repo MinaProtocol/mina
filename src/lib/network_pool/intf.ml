@@ -262,6 +262,7 @@ module type Snark_resource_pool_intf = sig
        trust_system:Trust_system.t
     -> verifier:Verifier.t
     -> disk_location:string
+    -> proof_cache_db:Proof_cache_tag.cache_db
     -> Config.t
 
   val add_snark :

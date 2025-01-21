@@ -48,7 +48,7 @@ end]
 (* bin_io, version omitted *)
 type t =
   { snark_transition : Snark_transition.Value.t
-  ; ledger_proof : Ledger_proof.t option
+  ; ledger_proof : Ledger_proof.Cached.t option
   ; prover_state : Consensus.Data.Prover_state.t
   ; staged_ledger_diff : Staged_ledger_diff.t
   }

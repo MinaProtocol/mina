@@ -656,8 +656,8 @@ let garbage_collect_subtrees ~logger ~subtrees =
           ignore @@ Cached.invalidate_with_failure node ) ) ;
   [%log trace] "garbage collected failed cached transitions"
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
+let run ~context:(module Context : CONTEXT) ~proof_cache_db ~trust_system
+    ~verifier ~network ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
     ~unprocessed_transition_cache : unit =
   let open Context in
   let hash_tree =
@@ -823,7 +823,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                    >>| List.map
                          ~f:
                            (Envelope.Incoming.map
-                              ~f:(With_hash.map ~f:Mina_block.generate) )
+                              ~f:
+                                (With_hash.map
+                                   ~f:(Mina_block.generate ~proof_cache_db) ) )
                in
                [%log debug]
                  ~metadata:[ ("target_hash", State_hash.to_yojson target_hash) ]
@@ -923,6 +925,8 @@ let%test_module "Ledger_catchup tests" =
           Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
             () )
 
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
     module Context = struct
       let logger = logger
 
@@ -983,8 +987,9 @@ let%test_module "Ledger_catchup tests" =
       in
       run
         ~context:(module Context)
-        ~verifier ~trust_system ~network ~frontier ~catchup_breadcrumbs_writer
-        ~catchup_job_reader ~unprocessed_transition_cache ;
+        ~proof_cache_db ~verifier ~trust_system ~network ~frontier
+        ~catchup_breadcrumbs_writer ~catchup_job_reader
+        ~unprocessed_transition_cache ;
       { cache = unprocessed_transition_cache
       ; job_writer = catchup_job_writer
       ; breadcrumbs_reader = catchup_breadcrumbs_reader

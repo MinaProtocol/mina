@@ -330,6 +330,7 @@ module type Transition_router_intf = sig
        ?sync_local_state:bool
     -> ?cache_exceptions:bool
     -> context:(module CONTEXT)
+    -> proof_cache_db:Proof_cache_tag.cache_db
     -> trust_system:Trust_system.t
     -> verifier:Verifier.t
     -> network:network

@@ -151,8 +151,8 @@ let to_consensus_state h =
     that transition to its root and verify it. If we get a better root than
     the existing one, then reset the Sync_ledger's target by calling
     [start_sync_job_with_peer] function. *)
-let on_transition ({ context = (module Context); _ } as t) ~sender
-    ~root_sync_ledger candidate_header =
+let on_transition ({ context = (module Context); _ } as t) ~proof_cache_db
+    ~sender ~root_sync_ledger candidate_header =
   let open Context in
   let candidate_consensus_state =
     With_hash.map ~f:to_consensus_state candidate_header
@@ -174,9 +174,9 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
     | Ok peer_root_with_proof -> (
         let pcd =
           peer_root_with_proof.data
-          |> Proof_carrying_data.map ~f:Mina_block.generate
+          |> Proof_carrying_data.map ~f:(Mina_block.generate ~proof_cache_db)
           |> Proof_carrying_data.map_proof
-               ~f:(Tuple2.map_snd ~f:Mina_block.generate)
+               ~f:(Tuple2.map_snd ~f:(Mina_block.generate ~proof_cache_db))
         in
         match%bind
           Best_tip_prover.Wrap_for_block.map
@@ -196,8 +196,8 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
 (** A helper function that wraps the calls to Sync_ledger and iterate through
     incoming transitions, add those to the transition_cache and calls
     [on_transition] function. *)
-let sync_ledger ({ context = (module Context); _ } as t) ~preferred
-    ~root_sync_ledger ~transition_graph ~sync_ledger_reader =
+let sync_ledger ({ context = (module Context); _ } as t) ~proof_cache_db
+    ~preferred ~root_sync_ledger ~transition_graph ~sync_ledger_reader =
   let open Context in
   let query_reader = Sync_ledger.Db.query_reader root_sync_ledger in
   let response_writer = Sync_ledger.Db.answer_writer root_sync_ledger in
@@ -240,7 +240,8 @@ let sync_ledger ({ context = (module Context); _ } as t) ~preferred
             ] ;
 
         Deferred.ignore_m
-        @@ on_transition t ~sender ~root_sync_ledger header_with_hash )
+        @@ on_transition ~proof_cache_db t ~sender ~root_sync_ledger
+             header_with_hash )
       else Deferred.unit )
 
 let external_transition_compare ~context:(module Context : CONTEXT) =
@@ -282,9 +283,10 @@ let external_transition_compare ~context:(module Context : CONTEXT) =
     4. Synchronize the consensus local state if necessary.
     5. Close the old frontier and reload a new one from disk.
  *)
-let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~consensus_local_state ~transition_reader ~preferred_peers ~persistent_root
-    ~persistent_frontier ~initial_root_transition ~catchup_mode =
+let run ~context:(module Context : CONTEXT) ~proof_cache_db ~trust_system
+    ~verifier ~network ~consensus_local_state ~transition_reader
+    ~preferred_peers ~persistent_root ~persistent_frontier
+    ~initial_root_transition ~catchup_mode =
   let open Context in
   O1trace.thread "bootstrap" (fun () ->
       let rec loop previous_cycles =
@@ -354,8 +356,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                  ~trust_system
              in
              don't_wait_for
-               (sync_ledger t ~preferred:preferred_peers ~root_sync_ledger
-                  ~transition_graph ~sync_ledger_reader ) ;
+               (sync_ledger t ~proof_cache_db ~preferred:preferred_peers
+                  ~root_sync_ledger ~transition_graph ~sync_ledger_reader ) ;
              (* We ignore the resulting ledger returned here since it will always
                 * be the same as the ledger we started with because we are syncing
                 * a db ledger. *)
@@ -426,7 +428,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                         ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
                     in
                     let scan_state =
-                      Staged_ledger.Scan_state.generate scan_state_uncached
+                      Staged_ledger.Scan_state.generate ~proof_cache_db
+                        scan_state_uncached
                     in
                     let%bind protocol_states =
                       Staged_ledger.Scan_state.check_required_protocol_states
@@ -638,8 +641,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                   in
                   Transition_frontier.load
                     ~context:(module Consensus_context)
-                    ~retry_with_fresh_db:false ~verifier ~consensus_local_state
-                    ~persistent_root ~persistent_frontier ~catchup_mode ()
+                    ~proof_cache_db ~retry_with_fresh_db:false ~verifier
+                    ~consensus_local_state ~persistent_root ~persistent_frontier
+                    ~catchup_mode ()
                   >>| function
                   | Ok frontier ->
                       frontier
@@ -762,6 +766,8 @@ let%test_module "Bootstrap_controller tests" =
 
     let constraint_constants = precomputed_values.constraint_constants
 
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
     module Context = struct
       let logger = logger
 
@@ -859,7 +865,7 @@ let%test_module "Bootstrap_controller tests" =
           Async.Thread_safe.block_on_async_exn (fun () ->
               let sync_deferred =
                 sync_ledger bootstrap ~root_sync_ledger ~transition_graph
-                  ~preferred:[] ~sync_ledger_reader
+                  ~preferred:[] ~sync_ledger_reader ~proof_cache_db
               in
               let%bind () =
                 Deferred.List.iter branch ~f:(fun breadcrumb ->
@@ -918,7 +924,8 @@ let%test_module "Bootstrap_controller tests" =
       Block_time.Timeout.await_exn time_controller ~timeout_duration
         (run
            ~context:(module Context)
-           ~trust_system ~verifier ~network:my_net.network ~preferred_peers:[]
+           ~proof_cache_db ~trust_system ~verifier ~network:my_net.network
+           ~preferred_peers:[]
            ~consensus_local_state:my_net.state.consensus_local_state
            ~transition_reader ~persistent_root ~persistent_frontier
            ~catchup_mode:`Normal ~initial_root_transition )

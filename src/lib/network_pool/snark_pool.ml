@@ -97,6 +97,7 @@ struct
           { trust_system : (Trust_system.t[@sexp.opaque])
           ; verifier : (Verifier.t[@sexp.opaque])
           ; disk_location : string
+          ; proof_cache_db : Proof_cache_tag.cache_db
           }
         [@@deriving make]
       end
@@ -500,10 +501,14 @@ struct
     let get_rebroadcastable = Resource_pool.get_rebroadcastable
   end
 
-  let get_completed_work t statement =
+  let get_completed_work (t : t) statement =
+    let proof_cache_db = (resource_pool t).config.proof_cache_db in
     Option.map
       (Resource_pool.request_proof (resource_pool t) statement)
       ~f:(fun Priced_proof.{ proof; fee = { fee; prover } } ->
+        let proof =
+          One_or_two.map proof ~f:(Ledger_proof.Cached.generate ~proof_cache_db)
+        in
         Transaction_snark_work.Checked.create_unsafe
           { Transaction_snark_work.fee; proofs = proof; prover } )
 end
@@ -617,6 +622,7 @@ let%test_module "random set test" =
     let config =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
         ~disk_location:"/tmp/snark-pool"
+        ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
 
     let gen ?length () =
       let open Quickcheck.Generator.Let_syntax in

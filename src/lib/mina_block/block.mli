@@ -44,6 +44,6 @@ val account_ids_accessed :
   -> t
   -> (Account_id.t * [ `Accessed | `Not_accessed ]) list
 
-val generate : Stable.Latest.t -> t
+val generate : proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
 
 val unwrap : t -> Stable.Latest.t

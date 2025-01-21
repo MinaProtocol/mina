@@ -58,12 +58,12 @@ module type S = sig
 
   val prover : t -> Public_key.Compressed.t
 
-  val proofs : t -> Ledger_proof.t One_or_two.t
+  val proofs : t -> Ledger_proof.Cached.t One_or_two.t
 end
 
 type t =
   { fee : Currency.Fee.t
-  ; proofs : Ledger_proof.t One_or_two.t
+  ; proofs : Ledger_proof.Cached.t One_or_two.t
   ; prover : Public_key.Compressed.t
   }
 
@@ -100,6 +100,6 @@ end
 
 val forget : Checked.t -> t
 
-val generate : Stable.Latest.t -> t
+val generate : proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
 
 val unwrap : t -> Stable.Latest.t

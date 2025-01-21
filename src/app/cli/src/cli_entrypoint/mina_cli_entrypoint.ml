@@ -1166,6 +1166,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ; time_controller
               ; pubsub_v1
               ; pubsub_v0
+              ; proof_cache_db = Proof_cache_tag.create_db ()
               }
           in
           let net_config =
@@ -1279,7 +1280,9 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~node_status_url ~graphql_control_port:itn_graphql_port
                  ~simplified_node_stats
                  ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
-                 ~compile_config () )
+                 ~compile_config
+                 ~proof_cache_db:(Proof_cache_tag.create_db ())
+                 () )
           in
           { mina
           ; client_trustlist

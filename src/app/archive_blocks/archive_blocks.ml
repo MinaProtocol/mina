@@ -5,7 +5,8 @@ open Async
 open Archive_lib
 
 let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
-    ~extensional ~success_file ~failure_file ~log_successes ~files () =
+    ~extensional ~success_file ~failure_file ~log_successes ~files
+    ~proof_cache_db () =
   let output_file_line path =
     match path with
     | Some path ->
@@ -58,8 +59,9 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
               Error (Error.to_string_hum err)
         in
         make_add_block of_yojson
-          (Processor.add_block_aux_precomputed ~genesis_constants
-             ~constraint_constants ~pool ~delete_older_than:None ~logger )
+          (Processor.add_block_aux_precomputed ~proof_cache_db
+             ~genesis_constants ~constraint_constants ~pool
+             ~delete_older_than:None ~logger )
       in
       let add_extensional_block =
         (* allow use of older-versioned blocks *)
@@ -134,5 +136,7 @@ let () =
                 processed successfully"
              (Flag.optional_with_default true Param.bool)
          and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
+         let proof_cache_db = Proof_cache_tag.create_db () in
          main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
-           ~extensional ~success_file ~failure_file ~log_successes ~files )))
+           ~extensional ~success_file ~failure_file ~log_successes ~files
+           ~proof_cache_db )))
