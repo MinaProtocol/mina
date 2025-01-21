@@ -61,7 +61,7 @@ let to_yojson t =
     ]
 
 [%%define_locally
-Stable.Latest.(create, header, body, equal)]
+Stable.Latest.(create, header, body)]
 
 let wrap_with_hash block =
   With_hash.of_data block
