@@ -4691,6 +4691,9 @@ let run pool reader ~genesis_constants ~constraint_constants ~logger
           { block; accounts_accessed; accounts_created; tokens_used; _ } ) -> (
         let add_block = Block.add_if_doesn't_exist ~constraint_constants in
         let hash = State_hash.With_state_hashes.state_hash in
+        let block =
+          With_hash.map ~f:Mina_block.write_all_proofs_to_disk block
+        in
         match%bind
           add_block_aux ~logger ~genesis_constants ~pool ~delete_older_than
             ~hash ~add_block ~accounts_accessed ~accounts_created ~tokens_used

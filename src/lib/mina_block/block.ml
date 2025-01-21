@@ -42,7 +42,8 @@ module Stable = struct
 
       type nonrec t = t
 
-      type 'a creator = header:Header.t -> body:Staged_ledger_diff.Body.t -> 'a
+      type 'a creator =
+        header:Header.t -> body:Staged_ledger_diff.Body.Stable.Latest.t -> 'a
 
       let map_creator c ~f ~header ~body = f (c ~header ~body)
 
@@ -66,6 +67,7 @@ end]
 
 type t = Stable.Latest.t =
   { header : Header.t; body : Staged_ledger_diff.Body.t }
+[@@deriving fields]
 
 type with_hash = t State_hash.With_state_hashes.t
 
@@ -87,7 +89,7 @@ let to_logging_yojson header : Yojson.Safe.t =
              ~default:"<None>" ~f:Protocol_version.to_string ) )
     ]
 
-[%%define_locally Stable.Latest.(create, header, body)]
+let create ~header ~body = { header; body }
 
 let wrap_with_hash block =
   With_hash.of_data block
@@ -112,3 +114,7 @@ let account_ids_accessed ~constraint_constants t =
   |> List.concat
   |> List.dedup_and_sort
        ~compare:[%compare: Account_id.t * [ `Accessed | `Not_accessed ]]
+
+let write_all_proofs_to_disk = Fn.id
+
+let read_all_proofs_from_disk = Fn.id

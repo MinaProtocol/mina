@@ -108,7 +108,7 @@ module Make_verifier (Source : Submission.Data_source) = struct
             verify_snark_work ~verify_transaction_snarks ~proof ~message
       else return ()
     in
-    let header = Mina_block.header block in
+    let header = Mina_block.Stable.Latest.header block in
     let protocol_state = Mina_block.Header.protocol_state header in
     let consensus_state =
       Mina_state.Protocol_state.consensus_state protocol_state
