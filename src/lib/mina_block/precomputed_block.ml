@@ -53,7 +53,7 @@ module T = struct
     { scheduled_time : Block_time.t
     ; protocol_state : Protocol_state.value
     ; protocol_state_proof : Proof.t
-    ; staged_ledger_diff : Staged_ledger_diff.t
+    ; staged_ledger_diff : Staged_ledger_diff.Stable.Latest.t
     ; delta_transition_chain_proof :
         Frozen_ledger_hash.t * Frozen_ledger_hash.t list
     ; protocol_version : Protocol_version.t
@@ -181,6 +181,7 @@ let of_block ~logger
   ; protocol_state_proof = Header.protocol_state_proof header
   ; staged_ledger_diff =
       Staged_ledger_diff.Body.staged_ledger_diff (Block.body block)
+      |> Staged_ledger_diff.unwrap
   ; delta_transition_chain_proof = Header.delta_block_chain_proof header
   ; protocol_version
   ; proposed_protocol_version

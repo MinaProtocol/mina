@@ -43,8 +43,7 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t =
-  { header : Header.t; body : Staged_ledger_diff.Body.t }
+type t = { header : Header.t; body : Staged_ledger_diff.Body.t }
 [@@deriving fields]
 
 type with_hash = t State_hash.With_state_hashes.t
@@ -105,6 +104,8 @@ let account_ids_accessed ~constraint_constants t =
   |> List.dedup_and_sort
        ~compare:[%compare: Account_id.t * [ `Accessed | `Not_accessed ]]
 
-let generate = Fn.id
+let generate { Stable.Latest.header; body } =
+  { header; body = Staged_ledger_diff.Body.generate body }
 
-let unwrap = Fn.id
+let unwrap { header; body } =
+  { Stable.Latest.header; body = Staged_ledger_diff.Body.unwrap body }

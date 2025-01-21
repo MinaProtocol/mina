@@ -14,7 +14,7 @@ module Make_sig (A : Wire_types.Types.S) = struct
        and type ('a, 'b) Pre_diff_one.Stable.V2.t = ('a, 'b) A.Pre_diff_one.V2.t
        and type Pre_diff_with_at_most_one_coinbase.Stable.V2.t =
         A.Pre_diff_with_at_most_one_coinbase.V2.t
-       and type t = A.V2.t
+       and type Diff.Stable.V2.t = A.Diff.V2.t
        and type Stable.V2.t = A.V2.t
 end
 
@@ -175,7 +175,12 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
-    type t = Stable.Latest.t
+    type t =
+      (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_two.t
+
+    let generate : Stable.Latest.t -> t = Fn.id
+
+    let unwrap : t -> Stable.Latest.t = Fn.id
   end
 
   module Pre_diff_with_at_most_one_coinbase = struct
@@ -194,7 +199,12 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
-    type t = Stable.Latest.t
+    type t =
+      (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_one.t
+
+    let generate : Stable.Latest.t -> t = Fn.id
+
+    let unwrap : t -> Stable.Latest.t = Fn.id
   end
 
   module Diff = struct
@@ -212,7 +222,27 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
-    type t = Stable.Latest.t
+    type t =
+      Pre_diff_with_at_most_two_coinbase.t
+      * Pre_diff_with_at_most_one_coinbase.t option
+
+    let generate
+        (( pre_diff_with_at_most_two_coinbase
+         , pre_diff_with_at_most_one_coinbase_opt ) :
+          Stable.Latest.t ) : t =
+      ( Pre_diff_with_at_most_two_coinbase.generate
+          pre_diff_with_at_most_two_coinbase
+      , Option.map pre_diff_with_at_most_one_coinbase_opt
+          ~f:Pre_diff_with_at_most_one_coinbase.generate )
+
+    let unwrap
+        (( pre_diff_with_at_most_two_coinbase
+         , pre_diff_with_at_most_one_coinbase_opt ) :
+          t ) : Stable.Latest.t =
+      ( Pre_diff_with_at_most_two_coinbase.unwrap
+          pre_diff_with_at_most_two_coinbase
+      , Option.map pre_diff_with_at_most_one_coinbase_opt
+          ~f:Pre_diff_with_at_most_one_coinbase.unwrap )
   end
 
   [%%versioned
@@ -223,10 +253,24 @@ module Make_str (A : Wire_types.Concrete) = struct
       type t = A.V2.t = { diff : Diff.Stable.V2.t } [@@deriving yojson]
 
       let to_latest = Fn.id
+
+      let empty_diff : t =
+        { diff =
+            ( { completed_works = []
+              ; commands = []
+              ; coinbase = At_most_two.Zero
+              ; internal_command_statuses = []
+              }
+            , None )
+        }
     end
   end]
 
-  type t = Stable.Latest.t = { diff : Diff.t } [@@deriving fields]
+  type t = { diff : Diff.t } [@@deriving fields]
+
+  let generate t = { diff = Diff.generate t.Stable.Latest.diff }
+
+  let unwrap t = { Stable.Latest.diff = Diff.unwrap t.diff }
 
   module With_valid_signatures_and_proofs = struct
     type pre_diff_with_at_most_two_coinbase =
