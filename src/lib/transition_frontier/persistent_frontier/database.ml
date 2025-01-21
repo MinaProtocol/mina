@@ -340,7 +340,7 @@ let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
       let%map.Result () =
         List.fold2_exn ~init:(Result.return ()) ~f:populate parent_hashes arcs
       in
-      old_root
+      Root_data.Minimal.hash old_root
   | _ ->
       Error (`Not_found `Old_root_transition)
 
@@ -359,9 +359,8 @@ let add ~arcs_cache ~transition =
     Batch.set batch ~key:(Arcs hash) ~data:[] ;
     Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs)
 
-let move_root ~old_root ~new_root ~garbage =
+let move_root ~old_root_hash ~new_root ~garbage =
   let open Root_data.Limited in
-  let old_root_hash = Root_data.Minimal.hash old_root in
   fun batch ->
     Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited new_root) ;
     Batch.set batch ~key:Protocol_states_for_root_scan_state
