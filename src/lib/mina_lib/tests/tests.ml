@@ -48,6 +48,8 @@ let%test_module "Epoch ledger sync tests" =
 
     let dir_prefix = "sync_test_data"
 
+    let proof_cache_db = Proof_cache_tag.create_db ()
+
     let make_dirname s =
       let open Core in
       let uuid = Uuid_unix.create () |> Uuid.to_string in
@@ -218,7 +220,7 @@ let%test_module "Epoch ledger sync tests" =
       let snark_remote_sink, snark_pool =
         let config =
           Network_pool.Snark_pool.Resource_pool.make_config ~verifier
-            ~trust_system
+            ~trust_system ~proof_cache_db
             ~disk_location:(make_dirname "snark_pool_config")
         in
         let snark_pool, snark_remote_sink, _snark_local_sink =
@@ -290,6 +292,7 @@ let%test_module "Epoch ledger sync tests" =
           ; time_controller
           ; pubsub_v1
           ; pubsub_v0
+          ; proof_cache_db
           }
         in
         Mina_networking.Gossip_net.(
@@ -353,7 +356,7 @@ let%test_module "Epoch ledger sync tests" =
           ~get_completed_work:(Fn.const None) ~catchup_mode:`Normal
           ~network_transition_reader:block_reader ~producer_transition_reader
           ~get_most_recent_valid_block ~most_recent_valid_block_writer
-          ~notify_online ()
+          ~notify_online ~proof_cache_db ()
       in
       let%bind () = Ivar.read initialization_finish_signal in
       let tr_tm1 = Unix.gettimeofday () in

@@ -629,6 +629,11 @@ module Snark_work_bundle = struct
     }
 
   let spec =
+    let work_to_yojson (w : Work_selector.work) =
+      Snark_worker.Work.Single.Spec.to_yojson
+      @@ Snark_work_lib.Work.Single.Spec.map_proof ~f:Ledger_proof.Cached.unwrap
+           w
+    in
     obj "WorkBundleSpec"
       ~doc:
         "Witnesses and statements for snark work bundles. Includes optional \
@@ -638,8 +643,8 @@ module Snark_work_bundle = struct
             ~doc:"Snark work specification in json format"
             ~args:Arg.[]
             ~resolve:(fun _ { spec; _ } ->
-              One_or_two.to_yojson Work_selector.work_to_yojson spec
-              |> Yojson.Safe.to_string )
+              One_or_two.to_yojson work_to_yojson spec |> Yojson.Safe.to_string
+              )
         ; field "snarkFee" ~typ:fee
             ~doc:"Fee if proof for the spec exists in snark pool"
             ~args:Arg.[]

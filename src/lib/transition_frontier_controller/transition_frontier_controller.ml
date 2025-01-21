@@ -13,10 +13,10 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 end
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~time_controller ~collected_transitions ~frontier ~get_completed_work
-    ~network_transition_reader ~producer_transition_reader ~clear_reader
-    ~cache_exceptions =
+let run ~context:(module Context : CONTEXT) ~proof_cache_db ~trust_system
+    ~verifier ~network ~time_controller ~collected_transitions ~frontier
+    ~get_completed_work ~network_transition_reader ~producer_transition_reader
+    ~clear_reader ~cache_exceptions =
   let open Context in
   let valid_transition_pipe_capacity = 50 in
   let start_time = Time.now () in
@@ -137,8 +137,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~catchup_breadcrumbs_writer ~processed_transition_writer ;
   Ledger_catchup.run
     ~context:(module Context)
-    ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
-    ~catchup_breadcrumbs_writer ~unprocessed_transition_cache ;
+    ~proof_cache_db ~trust_system ~verifier ~network ~frontier
+    ~catchup_job_reader ~catchup_breadcrumbs_writer
+    ~unprocessed_transition_cache ;
   upon (Strict_pipe.Reader.read clear_reader) (fun _ ->
       let open Strict_pipe.Writer in
       kill valid_transition_writer ;

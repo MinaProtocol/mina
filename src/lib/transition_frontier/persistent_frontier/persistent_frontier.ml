@@ -159,10 +159,10 @@ module Instance = struct
 
   let check_database t = Database.check t.db
 
-  let get_root_transition t =
+  let get_root_transition ~proof_cache_db t =
     let open Result.Let_syntax in
     Database.get_root_hash t.db
-    >>= Database.get_transition t.db
+    >>= Database.get_transition ~proof_cache_db t.db
     |> Result.map_error ~f:Database.Error.message
 
   let fast_forward t target_root :
@@ -187,9 +187,9 @@ module Instance = struct
          ($current_root --> $target_root)" ;
       Error `Bootstrap_required )
 
-  let load_full_frontier t ~context:(module Context : CONTEXT) ~root_ledger
-      ~consensus_local_state ~max_length ~ignore_consensus_local_state
-      ~persistent_root_instance =
+  let load_full_frontier t ~proof_cache_db ~context:(module Context : CONTEXT)
+      ~root_ledger ~consensus_local_state ~max_length
+      ~ignore_consensus_local_state ~persistent_root_instance =
     let open Context in
     let open Deferred.Result.Let_syntax in
     let validate genesis_state_hash (b, v) =
@@ -214,9 +214,11 @@ module Instance = struct
     (* read basic information from the database *)
     let%bind root, root_transition, best_tip, protocol_states, root_hash =
       (let open Result.Let_syntax in
-      let%bind root = Database.get_root t.db in
+      let%bind root = Database.get_root ~proof_cache_db t.db in
       let root_hash = Root_data.Minimal.hash root in
-      let%bind root_transition = Database.get_transition t.db root_hash in
+      let%bind root_transition =
+        Database.get_transition ~proof_cache_db t.db root_hash
+      in
       let%bind best_tip = Database.get_best_tip t.db in
       let%map protocol_states =
         Database.get_protocol_states_for_root_scan_state t.db
@@ -285,7 +287,7 @@ module Instance = struct
     (* crawl through persistent frontier and load transitions into in memory frontier *)
     let%bind () =
       Deferred.map
-        (Database.crawl_successors t.db root_hash
+        (Database.crawl_successors ~proof_cache_db t.db root_hash
            ~init:(Full_frontier.root frontier) ~f:(fun parent transition ->
              let%bind transition =
                match

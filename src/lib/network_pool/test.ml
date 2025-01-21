@@ -37,6 +37,7 @@ let%test_module "network pool test" =
     let config =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
         ~disk_location:"/tmp/snark-pool"
+        ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =

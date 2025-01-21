@@ -61,8 +61,10 @@ module Make_str (A : Wire_types.Concrete) = struct
          (Bitswap_block.blocks_of_data ~max_block_size:262144)
          (serialize_with_len_and_tag ~tag)
 
-  let generate t =
-    { staged_ledger_diff = Diff.generate t.Stable.Latest.staged_ledger_diff }
+  let generate ~proof_cache_db t =
+    { staged_ledger_diff =
+        Diff.generate ~proof_cache_db t.Stable.Latest.staged_ledger_diff
+    }
 
   let unwrap t =
     { Stable.Latest.staged_ledger_diff = Diff.unwrap t.staged_ledger_diff }

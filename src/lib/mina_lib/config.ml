@@ -64,5 +64,6 @@ type t =
   ; graphql_control_port : int option [@default None]
   ; zkapp_cmd_limit : int option ref
   ; compile_config : Mina_compile_config.t
+  ; proof_cache_db : Proof_cache_tag.cache_db
   }
 [@@deriving make]

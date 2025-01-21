@@ -93,9 +93,9 @@ let genesis_root_data ~precomputed_values =
     ~protocol_states
 
 let load_from_persistence_and_start ~context:(module Context : CONTEXT)
-    ~verifier ~consensus_local_state ~max_length ~persistent_root
-    ~persistent_root_instance ~persistent_frontier ~persistent_frontier_instance
-    ~catchup_mode ignore_consensus_local_state =
+    ~proof_cache_db ~verifier ~consensus_local_state ~max_length
+    ~persistent_root ~persistent_root_instance ~persistent_frontier
+    ~persistent_frontier_instance ~catchup_mode ignore_consensus_local_state =
   let open Context in
   let open Deferred.Result.Let_syntax in
   let root_identifier =
@@ -133,7 +133,7 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
     O1trace.thread "persistent_frontier_read_from_disk" (fun () ->
         let open Deferred.Let_syntax in
         match%map
-          Persistent_frontier.Instance.load_full_frontier
+          Persistent_frontier.Instance.load_full_frontier ~proof_cache_db
             ~context:(module Context)
             persistent_frontier_instance ~max_length
             ~root_ledger:
@@ -188,6 +188,7 @@ let time ~logger ~label f =
 
 let rec load_with_max_length :
        context:(module CONTEXT)
+    -> proof_cache_db:Proof_cache_tag.cache_db
     -> max_length:int
     -> ?retry_with_fresh_db:bool
     -> verifier:Verifier.t
@@ -202,7 +203,7 @@ let rec load_with_max_length :
          | `Snarked_ledger_mismatch
          | `Failure of string ] )
        Deferred.Result.t =
- fun ~context:(module Context : CONTEXT) ~max_length
+ fun ~context:(module Context : CONTEXT) ~proof_cache_db ~max_length
      ?(retry_with_fresh_db = true) ~verifier ~consensus_local_state
      ~persistent_root ~persistent_frontier ~catchup_mode () ->
   let open Context in
@@ -233,9 +234,10 @@ let rec load_with_max_length :
         match%bind
           load_from_persistence_and_start
             ~context:(module Context)
-            ~verifier ~consensus_local_state ~max_length ~persistent_root
-            ~persistent_root_instance ~catchup_mode ~persistent_frontier
-            ~persistent_frontier_instance ignore_consensus_local_state
+            ~proof_cache_db ~verifier ~consensus_local_state ~max_length
+            ~persistent_root ~persistent_root_instance ~catchup_mode
+            ~persistent_frontier ~persistent_frontier_instance
+            ignore_consensus_local_state
         with
         | Ok _ as result ->
             [%str_log trace] Persisted_frontier_loaded ;
@@ -337,8 +339,9 @@ let rec load_with_max_length :
         in
         load_with_max_length
           ~context:(module Context)
-          ~max_length ~verifier ~consensus_local_state ~persistent_root
-          ~persistent_frontier ~retry_with_fresh_db:false ~catchup_mode ()
+          ~proof_cache_db ~max_length ~verifier ~consensus_local_state
+          ~persistent_root ~persistent_frontier ~retry_with_fresh_db:false
+          ~catchup_mode ()
         >>| Result.map_error ~f:(function
               | `Persistent_frontier_malformed ->
                   `Failure
@@ -366,8 +369,8 @@ let rec load_with_max_length :
           return res )
 
 let load ?(retry_with_fresh_db = true) ~context:(module Context : CONTEXT)
-    ~verifier ~consensus_local_state ~persistent_root ~persistent_frontier
-    ~catchup_mode () =
+    ~proof_cache_db ~verifier ~consensus_local_state ~persistent_root
+    ~persistent_frontier ~catchup_mode () =
   let open Context in
   O1trace.thread "transition_frontier_load" (fun () ->
       let max_length =
@@ -376,8 +379,9 @@ let load ?(retry_with_fresh_db = true) ~context:(module Context : CONTEXT)
       in
       load_with_max_length
         ~context:(module Context)
-        ~max_length ~retry_with_fresh_db ~verifier ~consensus_local_state
-        ~persistent_root ~persistent_frontier ~catchup_mode () )
+        ~proof_cache_db ~max_length ~retry_with_fresh_db ~verifier
+        ~consensus_local_state ~persistent_root ~persistent_frontier
+        ~catchup_mode () )
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
@@ -783,9 +787,11 @@ module For_tests = struct
         ignore
         @@ Ledger_transfer.transfer_accounts ~src:root_snarked_ledger
              ~dest:(Persistent_root.Instance.snarked_ledger instance) ) ;
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db () in
     let frontier_result =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          load_with_max_length ~max_length ~retry_with_fresh_db:false
+          load_with_max_length ~proof_cache_db ~max_length
+            ~retry_with_fresh_db:false
             ~context:(module Context)
             ~verifier ~consensus_local_state ~persistent_root
             ~catchup_mode:

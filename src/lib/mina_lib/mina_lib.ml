@@ -825,11 +825,6 @@ let most_recent_valid_transition t = t.components.most_recent_valid_block
 
 let block_produced_bvar t = t.components.block_produced_bvar
 
-let staged_ledger_ledger_proof t =
-  let open Option.Let_syntax in
-  let%bind sl = best_staged_ledger_opt t in
-  Staged_ledger.current_ledger_proof sl
-
 let validated_transitions t = t.pipes.validated_transitions_reader
 
 let initialization_finish_signal t = t.initialization_finish_signal
@@ -871,6 +866,12 @@ let request_work t =
       ~snark_pool:(snark_pool t) (snark_job_state t)
   in
   Option.map instances_opt ~f:(fun instances ->
+      let instances =
+        One_or_two.map instances
+          ~f:
+            (Snark_work_lib.Work.Single.Spec.map_proof
+               ~f:Ledger_proof.Cached.unwrap )
+      in
       { Snark_work_lib.Work.Spec.instances; fee } )
 
 let work_selection_method t = t.config.work_selection_method
@@ -889,7 +890,13 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     Mina_metrics.(
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
-  let spec = work.spec.instances in
+  let cache =
+    Ledger_proof.Cached.generate ~proof_cache_db:t.config.proof_cache_db
+  in
+  let spec =
+    One_or_two.map work.spec.instances
+      ~f:(Snark_work_lib.Work.Single.Spec.map_proof ~f:cache)
+  in
   let cb _ =
     (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
      * If the diff is accepted then remove it from the seen jobs.
@@ -1424,7 +1431,8 @@ let start_with_precomputed_blocks t blocks =
   let%bind () =
     Block_producer.run_precomputed
       ~context:(module Context)
-      ~verifier:t.processes.verifier ~trust_system:t.config.trust_system
+      ~proof_cache_db:t.config.proof_cache_db ~verifier:t.processes.verifier
+      ~trust_system:t.config.trust_system
       ~time_controller:t.config.time_controller
       ~frontier_reader:t.components.transition_frontier
       ~transition_writer:t.pipes.producer_transition_writer
@@ -2002,6 +2010,7 @@ let create ~commit_id ?wallets (config : Config.t) =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
               ~disk_location:config.snark_pool_disk_location
+              ~proof_cache_db:config.proof_cache_db
           in
           let snark_pool, snark_remote_sink, snark_local_sink =
             Network_pool.Snark_pool.create ~config:snark_pool_config
@@ -2103,6 +2112,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
+              ~proof_cache_db:config.proof_cache_db
               ~trust_system:config.trust_system ~verifier ~network:net
               ~is_seed:config.is_seed ~is_demo_mode:config.demo_mode
               ~time_controller:config.time_controller

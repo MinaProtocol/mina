@@ -1351,8 +1351,9 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
               ~f:(fun _ -> start ())
             : unit Block_time.Timeout.t ) )
 
-let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
-    ~time_controller ~frontier_reader ~transition_writer ~precomputed_blocks =
+let run_precomputed ~context:(module Context : CONTEXT) ~proof_cache_db
+    ~verifier ~trust_system ~time_controller ~frontier_reader ~transition_writer
+    ~precomputed_blocks =
   let open Context in
   let rejected_blocks_logger =
     Logger.create ~id:Logger.Logger_id.rejected_blocks ()
@@ -1441,7 +1442,8 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
               ~delta_block_chain_proof ()
           in
           let body =
-            Body.create (Staged_ledger_diff.generate staged_ledger_diff)
+            Body.create
+              (Staged_ledger_diff.generate ~proof_cache_db staged_ledger_diff)
           in
           let%bind transition =
             let open Result.Let_syntax in

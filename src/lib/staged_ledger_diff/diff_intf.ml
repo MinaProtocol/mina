@@ -124,7 +124,7 @@ module type Full = sig
     module Latest = V2
   end
 
-  val generate : Stable.Latest.t -> t
+  val generate : proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
 
   val unwrap : t -> Stable.Latest.t
 

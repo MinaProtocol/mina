@@ -30,6 +30,7 @@ type Structured_log_events.t += Bootstrap_complete [@@deriving register_event]
  *)
 val run :
      context:(module CONTEXT)
+  -> proof_cache_db:Proof_cache_tag.cache_db
   -> trust_system:Trust_system.t
   -> verifier:Verifier.t
   -> network:Mina_networking.t

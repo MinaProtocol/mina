@@ -542,7 +542,8 @@ let prove t ~prev_state ~prev_state_proof ~next_state
       (Blockchain.create ~proof:prev_state_proof ~state:prev_state)
       next_state
       (Internal_transition.snark_transition transition)
-      (Internal_transition.ledger_proof transition)
+      ( Internal_transition.ledger_proof transition
+      |> Option.map ~f:Ledger_proof.Cached.unwrap )
       (Internal_transition.prover_state transition)
       pending_coinbase
   in

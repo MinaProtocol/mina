@@ -61,6 +61,8 @@ end
 module Ledger_proof_with_sok_message = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t = Ledger_proof.Stable.V2.t * Sok_message.Stable.V1.t
       [@@deriving sexp]
@@ -68,6 +70,8 @@ module Ledger_proof_with_sok_message = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Ledger_proof.Cached.t * Sok_message.t
 end
 
 module Available_job = struct
@@ -155,6 +159,8 @@ type job = Available_job.t
    the snarked ledger*)
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       { scan_state :
@@ -195,7 +201,15 @@ module Stable = struct
   end
 end]
 
-[%%define_locally Stable.Latest.(hash)]
+type t =
+  { scan_state :
+      ( Ledger_proof_with_sok_message.t
+      , Transaction_with_witness.t )
+      Parallel_scan.State.t
+  ; previous_incomplete_zkapp_updates :
+      Transaction_with_witness.t list
+      * [ `Border_block_continued_in_the_next_tree of bool ]
+  }
 
 (**********Helpers*************)
 
@@ -294,7 +308,8 @@ let create_expected_statement ~constraint_constants
   ; sok_digest = ()
   }
 
-let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
+let completed_work_to_scanable_work (job : job)
+    (fee, (current_proof : Ledger_proof.Cached.t), prover) :
     Ledger_proof_with_sok_message.t Or_error.t =
   let sok_digest = Ledger_proof.sok_digest current_proof
   and proof = Ledger_proof.underlying_proof current_proof in
@@ -1260,7 +1275,9 @@ let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
 
 let all_work_pairs t
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t) :
-    (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
+    ( Transaction_witness.t
+    , Ledger_proof.Cached.t )
+    Snark_work_lib.Work.Single.Spec.t
     One_or_two.t
     list
     Or_error.t =
@@ -1332,7 +1349,7 @@ let update_metrics t = Parallel_scan.update_metrics t.scan_state
 let fill_work_and_enqueue_transactions t ~logger transactions work =
   let open Or_error.Let_syntax in
   let fill_in_transaction_snark_work tree (works : Transaction_snark_work.t list)
-      : (Ledger_proof.t * Sok_message.t) list Or_error.t =
+      : (Ledger_proof.Cached.t * Sok_message.t) list Or_error.t =
     let next_jobs =
       List.(
         take
@@ -1455,6 +1472,16 @@ let check_required_protocol_states t ~protocol_states =
   let%map () = check_length protocol_states_assoc in
   protocol_states_assoc
 
-let generate = Fn.id
+let generate ~proof_cache_db
+    { Stable.Latest.scan_state = uncached; previous_incomplete_zkapp_updates } =
+  let f1 (p, v) = (Ledger_proof.Cached.generate ~proof_cache_db p, v) in
+  { scan_state = Parallel_scan.State.map uncached ~f1 ~f2:ident
+  ; previous_incomplete_zkapp_updates
+  }
 
-let unwrap = Fn.id
+let unwrap { scan_state = cached; previous_incomplete_zkapp_updates } =
+  let f1 (p, v) = (Ledger_proof.Cached.unwrap p, v) in
+  let scan_state = Parallel_scan.State.map ~f1 ~f2:ident cached in
+  Stable.Latest.{ scan_state; previous_incomplete_zkapp_updates }
+
+let hash = Fn.compose Stable.Latest.hash unwrap

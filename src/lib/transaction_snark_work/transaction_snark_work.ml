@@ -81,7 +81,7 @@ module type S = sig
 
   val prover : t -> Public_key.Compressed.t
 
-  val proofs : t -> Ledger_proof.t One_or_two.t
+  val proofs : t -> Ledger_proof.Cached.t One_or_two.t
 end
 
 module T = struct
@@ -103,9 +103,9 @@ module T = struct
     end
   end]
 
-  type t = Stable.Latest.t =
+  type t =
     { fee : Fee.t
-    ; proofs : Ledger_proof.t One_or_two.t
+    ; proofs : Ledger_proof.Cached.t One_or_two.t
     ; prover : Public_key.Compressed.t
     }
   [@@deriving fields]
@@ -120,9 +120,18 @@ module T = struct
     ; prover = t.prover
     }
 
-  let generate = Fn.id
+  let generate ~proof_cache_db { Stable.Latest.fee; proofs = uncached; prover }
+      =
+    let proofs =
+      One_or_two.map uncached ~f:(Ledger_proof.Cached.generate ~proof_cache_db)
+    in
+    { fee; proofs; prover }
 
-  let unwrap = Fn.id
+  let unwrap { fee; proofs; prover } =
+    { Stable.Latest.fee
+    ; proofs = One_or_two.map proofs ~f:Ledger_proof.Cached.unwrap
+    ; prover
+    }
 end
 
 include T

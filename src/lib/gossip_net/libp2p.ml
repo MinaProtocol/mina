@@ -52,6 +52,7 @@ module Config = struct
     ; mutable keypair : Mina_net2.Keypair.t option
     ; all_peers_seen_metric : bool
     ; known_private_ip_nets : Core.Unix.Cidr.t list
+    ; proof_cache_db : Proof_cache_tag.cache_db
     }
   [@@deriving make]
 end
@@ -485,7 +486,10 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                 ~fn:(fun (env, vc) ->
                   match Envelope.Incoming.data env with
                   | Message.Latest.T.New_state state ->
-                      let state_cached = Mina_block.generate state in
+                      let state_cached =
+                        Mina_block.generate
+                          ~proof_cache_db:config.proof_cache_db state
+                      in
                       Sinks.Block_sink.push sink_block
                         ( `Block
                             (Envelope.Incoming.map ~f:(const state_cached) env)

@@ -69,7 +69,8 @@ let command_run =
          ~postgres_address:postgres.value
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)
-         ~delete_older_than ~precomputed_values_opt ~missing_blocks_width )
+         ~delete_older_than ~precomputed_values_opt ~missing_blocks_width
+         ~proof_cache_db:(Proof_cache_tag.create_db ()) )
 
 let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)

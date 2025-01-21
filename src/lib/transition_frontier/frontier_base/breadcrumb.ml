@@ -360,10 +360,8 @@ module For_tests = struct
           (Transaction_snark_work.Checked.create_unsafe
              { fee = Fee.of_nanomina_int_exn 1
              ; proofs =
-                 One_or_two.map stmts ~f:(fun statement ->
-                     Ledger_proof.create ~statement
-                       ~sok_digest:Sok_message.Digest.default
-                       ~proof:(Lazy.force Proof.transaction_dummy) )
+                 One_or_two.map stmts
+                   ~f:Ledger_proof.For_tests.mk_dummy_proof_cached
              ; prover
              } )
       in

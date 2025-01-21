@@ -104,8 +104,8 @@ let account_ids_accessed ~constraint_constants t =
   |> List.dedup_and_sort
        ~compare:[%compare: Account_id.t * [ `Accessed | `Not_accessed ]]
 
-let generate { Stable.Latest.header; body } =
-  { header; body = Staged_ledger_diff.Body.generate body }
+let generate ~proof_cache_db { Stable.Latest.header; body } =
+  { header; body = Staged_ledger_diff.Body.generate ~proof_cache_db body }
 
 let unwrap { header; body } =
   { Stable.Latest.header; body = Staged_ledger_diff.Body.unwrap body }
