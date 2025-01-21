@@ -68,7 +68,7 @@ module Rpcs : sig
   module Get_transition_chain : sig
     type query = State_hash.t list
 
-    type response = Mina_block.t list option
+    type response = Mina_block.Stable.Latest.t list option
   end
 
   module Get_transition_chain_proof : sig
@@ -88,8 +88,8 @@ module Rpcs : sig
       (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
 
     type response =
-      ( Mina_block.t
-      , State_body_hash.t list * Mina_block.t )
+      ( Mina_block.Stable.Latest.t
+      , State_body_hash.t list * Mina_block.Stable.Latest.t )
       Proof_carrying_data.t
       option
   end
@@ -105,8 +105,8 @@ module Rpcs : sig
     type query = unit
 
     type response =
-      ( Mina_block.t
-      , State_body_hash.t list * Mina_block.t )
+      ( Mina_block.Stable.Latest.t
+      , State_body_hash.t list * Mina_block.Stable.Latest.t )
       Proof_carrying_data.t
       option
   end
@@ -189,7 +189,9 @@ val get_ancestry :
      t
   -> Peer.Id.t
   -> (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
-  -> (Mina_block.t, State_body_hash.t list * Mina_block.t) Proof_carrying_data.t
+  -> ( Mina_block.Stable.Latest.t
+     , State_body_hash.t list * Mina_block.Stable.Latest.t )
+     Proof_carrying_data.t
      Envelope.Incoming.t
      Deferred.Or_error.t
 
@@ -198,7 +200,9 @@ val get_best_tip :
   -> ?timeout:Time.Span.t
   -> t
   -> Network_peer.Peer.t
-  -> (Mina_block.t, State_body_hash.t list * Mina_block.t) Proof_carrying_data.t
+  -> ( Mina_block.Stable.Latest.t
+     , State_body_hash.t list * Mina_block.Stable.Latest.t )
+     Proof_carrying_data.t
      Deferred.Or_error.t
 
 val get_transition_chain_proof :
@@ -215,7 +219,7 @@ val get_transition_chain :
   -> t
   -> Network_peer.Peer.t
   -> State_hash.t list
-  -> Mina_block.t list Deferred.Or_error.t
+  -> Mina_block.Stable.Latest.t list Deferred.Or_error.t
 
 val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      t

@@ -1168,7 +1168,9 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
         in
         Mina_networking.get_transition_chain
           ~heartbeat_timeout:(Time_ns.Span.of_sec sec)
-          ~timeout:(Time.Span.of_sec sec) network peer (List.map hs ~f:fst) )
+          ~timeout:(Time.Span.of_sec sec) network peer (List.map hs ~f:fst)
+        |> Deferred.Or_error.map
+             ~f:(List.map ~f:Mina_block.write_all_proofs_to_disk) )
       ~peers:(fun () -> Mina_networking.peers network)
       ~knowledge_context:
         (Broadcast_pipe.map best_tip_r

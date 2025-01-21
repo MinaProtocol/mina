@@ -247,16 +247,16 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
                 [ ("peer", Network_peer.Peer.to_yojson peer)
                 ; ( "length"
                   , Length.to_yojson
-                      (Mina_block.blockchain_length peer_best_tip.data) )
+                      ( Mina_block.Stable.Latest.header peer_best_tip.data
+                      |> Mina_block.Header.blockchain_length ) )
                 ]
               "Successfully downloaded best tip with $length from $peer" ;
             (* TODO: Use batch verification instead *)
             match%bind
-              Best_tip_prover.Wrap_for_block.map
-                ~f:
-                  (Best_tip_prover.verify ~verifier ~genesis_constants
-                     ~precomputed_values )
-                peer_best_tip
+              Best_tip_prover.verify ~verifier ~genesis_constants
+                ~precomputed_values
+              @@ Best_tip_prover.Wrap_for_block.to_header_data
+                   ~to_header:Mina_block.Stable.Latest.header peer_best_tip
             with
             | Error e ->
                 [%log warn]
@@ -278,10 +278,16 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
                 [%log debug]
                   ~metadata:[ ("peer", Network_peer.Peer.to_yojson peer) ]
                   "Successfully verified best tip from $peer" ;
+                let body = Mina_block.Stable.Latest.body peer_best_tip.data in
                 return
                   (Some
                      (Envelope.Incoming.wrap_peer
-                        ~data:{ peer_best_tip with data = candidate_best_tip }
+                        ~data:
+                          { peer_best_tip with
+                            data =
+                              Mina_block.Validation.with_body candidate_best_tip
+                                body
+                          }
                         ~sender:peer ) ) ) )
   in
   [%log debug]
@@ -332,7 +338,7 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
              { Proof_carrying_data.data =
                  Mina_block.Validation.block_with_hash data
                  |> Mina_base.State_hash.With_state_hashes.state_hash
-             ; proof = (path, Mina_block.header root)
+             ; proof = (path, Mina_block.Stable.Latest.header root)
              } ;
            data ) )
 
