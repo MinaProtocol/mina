@@ -3,7 +3,8 @@ open Mina_base
 
 module type S = Ledger_proof_intf.S
 
-module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
+module Prod :
+  Ledger_proof_intf.S with type 'a Poly.t = 'a Transaction_snark.Poly.t = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
@@ -14,9 +15,11 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
     end
   end]
 
-  let statement (t : t) = Transaction_snark.statement t
+  module Poly = Transaction_snark.Poly
 
-  let statement_with_sok (t : t) = Transaction_snark.statement_with_sok t
+  let statement = Transaction_snark.statement
+
+  let statement_with_sok = Transaction_snark.statement_with_sok
 
   let sok_digest = Transaction_snark.sok_digest
 
@@ -28,11 +31,27 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
 
   let underlying_proof = Transaction_snark.proof
 
-  let snarked_ledger_hash =
-    Fn.compose Mina_state.Snarked_ledger_state.snarked_ledger_hash statement
+  let snarked_ledger_hash p =
+    Mina_state.Snarked_ledger_state.snarked_ledger_hash (statement p)
 
   let create ~statement ~sok_digest ~proof =
     Transaction_snark.create ~statement:{ statement with sok_digest } ~proof
+
+  module Cached = struct
+    type t = Proof_cache_tag.t Poly.t
+
+    let generate ~proof_cache_db t =
+      { t with
+        Proof_carrying_data.proof =
+          Proof_cache_tag.generate proof_cache_db t.Proof_carrying_data.proof
+      }
+
+    let unwrap t =
+      { t with
+        Proof_carrying_data.proof =
+          Proof_cache_tag.unwrap t.Proof_carrying_data.proof
+      }
+  end
 end
 
 include Prod
@@ -41,4 +60,8 @@ module For_tests = struct
   let mk_dummy_proof statement =
     create ~statement ~sok_digest:Sok_message.Digest.default
       ~proof:(Lazy.force Proof.transaction_dummy)
+
+  let mk_dummy_proof_cached statement =
+    create ~statement ~sok_digest:Sok_message.Digest.default
+      ~proof:(Lazy.force Proof_cache_tag.For_tests.transaction_dummy)
 end
