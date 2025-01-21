@@ -6,7 +6,7 @@ module Stable : sig
   [@@@no_toplevel_latest_type]
 
   module V2 : sig
-    type t [@@deriving to_yojson, equal]
+    type t [@@deriving equal]
   end
 end]
 
