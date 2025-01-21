@@ -485,8 +485,10 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                 ~fn:(fun (env, vc) ->
                   match Envelope.Incoming.data env with
                   | Message.Latest.T.New_state state ->
+                      let state_cached = Mina_block.generate state in
                       Sinks.Block_sink.push sink_block
-                        ( `Block (Envelope.Incoming.map ~f:(const state) env)
+                        ( `Block
+                            (Envelope.Incoming.map ~f:(const state_cached) env)
                         , `Time_received (Block_time.now config.time_controller)
                         , `Valid_cb vc )
                   | Message.Latest.T.Transaction_pool_diff
@@ -951,7 +953,9 @@ module Make (Rpc_interface : RPC_INTERFACE) :
         guard_topic ?origin_topic v1_topic_block pfs.publish_v1_block
           (Mina_block.header state)
       in
-      guard_topic ?origin_topic v0_topic pfs.publish_v0 (Message.New_state state)
+      let state_unwrapped = Mina_block.unwrap state in
+      guard_topic ?origin_topic v0_topic pfs.publish_v0
+        (Message.New_state state_unwrapped)
 
     let broadcast_transaction_pool_diff ?origin_topic ?(nonce = 0) t diff =
       let pfs = !(t.publish_functions) in

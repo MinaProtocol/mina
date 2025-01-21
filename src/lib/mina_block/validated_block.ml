@@ -71,4 +71,4 @@ let header t = t |> forget |> With_hash.data |> Block.header
 
 let body t = t |> forget |> With_hash.data |> Block.body
 
-let unwrap = Fn.id
+let unwrap ((b, v) : t) : Stable.Latest.t = (With_hash.map ~f:Block.unwrap b, v)

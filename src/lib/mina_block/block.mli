@@ -7,10 +7,14 @@ module Stable : sig
 
   module V2 : sig
     type t [@@deriving equal]
+
+    val header : t -> Header.Stable.V2.t
+
+    val body : t -> Staged_ledger_diff.Body.Stable.V1.t
   end
 end]
 
-type t = Stable.Latest.t [@@deriving to_yojson]
+type t [@@deriving to_yojson]
 
 type with_hash = t State_hash.With_state_hashes.t
 
@@ -39,3 +43,7 @@ val account_ids_accessed :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> t
   -> (Account_id.t * [ `Accessed | `Not_accessed ]) list
+
+val generate : Stable.Latest.t -> t
+
+val unwrap : t -> Stable.Latest.t
