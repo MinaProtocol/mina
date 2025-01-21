@@ -52,7 +52,7 @@ type t = Stable.Latest.t =
   ; prover_state : Consensus.Data.Prover_state.t
   ; staged_ledger_diff : Staged_ledger_diff.t
   }
-[@@deriving sexp, fields, to_yojson]
+[@@deriving fields]
 
 let create ~snark_transition ~ledger_proof ~prover_state ~staged_ledger_diff =
   { Stable.Latest.snark_transition

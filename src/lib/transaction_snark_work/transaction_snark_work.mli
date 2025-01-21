@@ -56,7 +56,6 @@ type t = Mina_wire_types.Transaction_snark_work.V2.t =
   ; proofs : Ledger_proof.t One_or_two.t
   ; prover : Public_key.Compressed.t
   }
-[@@deriving compare, sexp, yojson]
 
 val fee : t -> Fee.t
 
@@ -68,7 +67,7 @@ val statement : t -> Statement.t
 
 module Stable : sig
   module V2 : sig
-    type t [@@deriving equal, sexp, compare, bin_io, yojson, version]
+    type t [@@deriving bin_io, version, yojson]
   end
 end
 with type V2.t = t
@@ -81,7 +80,6 @@ module Checked : sig
     ; proofs : Ledger_proof.t One_or_two.t
     ; prover : Public_key.Compressed.t
     }
-  [@@deriving sexp, compare, to_yojson]
 
   module Stable : module type of Stable
 
