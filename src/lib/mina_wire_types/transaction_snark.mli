@@ -2,7 +2,18 @@ open Utils
 
 module Types : sig
   module type S = sig
-    module V2 : S0
+    module Proof : sig
+      module V2 : sig
+        type t = Pickles.Proof.Proofs_verified_2.V2.t
+      end
+    end
+
+    module V2 : sig
+      type t =
+        ( Mina_state.Snarked_ledger_state.With_sok.V2.t
+        , Proof.V2.t )
+        Proof_carrying_data.V1.t
+    end
   end
 end
 
