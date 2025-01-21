@@ -3528,11 +3528,11 @@ let%test_module _ =
 
       let gen_sequence_and_update_account ledger len =
         let account = ref (Simple_ledger.get ledger target_account_idx) in
+        let amount_max = half_initial_balance / len in
+        let amount_min = amount_max / 100 in
         let%map sequence =
           Quickcheck_lib.init_gen_array len ~f:(fun _ ->
-              let%bind amount =
-                Int.gen_incl 5_000_000_000_000_000 (half_initial_balance / len)
-              in
+              let%bind amount = Int.gen_incl amount_min amount_max in
               let tx =
                 Simple_command.Payment
                   { sender = Simple_account.to_sender_info !account
