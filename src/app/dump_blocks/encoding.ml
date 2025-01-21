@@ -3,7 +3,7 @@ open Core
 type t = Sexp | Json | Binary
 
 type 'a content =
-  | Block : Mina_block.t content
+  | Block : Mina_block.Stable.Latest.t content
   | Precomputed : Mina_block.Precomputed.t content
 
 let append_newline s = s ^ "\n"
@@ -13,7 +13,7 @@ let block_of_breadcrumb ?with_parent_statehash breadcrumb =
   let block = Frontier_base.Breadcrumb.block breadcrumb in
   match with_parent_statehash with
   | None ->
-      block
+      block |> Mina_block.read_all_proofs_from_disk
   | Some hash ->
       let previous_state_hash = Mina_base.State_hash.of_base58_check_exn hash in
       let h = header block in
@@ -29,6 +29,7 @@ let block_of_breadcrumb ?with_parent_statehash breadcrumb =
           ()
       in
       Mina_block.create ~header ~body:(body block)
+      |> Mina_block.read_all_proofs_from_disk
 
 module type S = sig
   type t
@@ -43,8 +44,8 @@ module type S = sig
   val of_string : string -> t
 end
 
-module Sexp_block : S with type t = Mina_block.t = struct
-  type t = Mina_block.t
+module Sexp_block : S with type t = Mina_block.Stable.Latest.t = struct
+  type t = Mina_block.Stable.Latest.t
 
   let name = "sexp"
 
@@ -56,8 +57,8 @@ module Sexp_block : S with type t = Mina_block.t = struct
   let of_string s = Sexp.of_string s |> Mina_block.Stable.Latest.t_of_sexp
 end
 
-module Binary_block : S with type t = Mina_block.t = struct
-  type t = Mina_block.t
+module Binary_block : S with type t = Mina_block.Stable.Latest.t = struct
+  type t = Mina_block.Stable.Latest.t
 
   let name = "binary"
 
@@ -84,7 +85,8 @@ let precomputed_of_breadcrumb ?with_parent_statehash breadcrumb =
   let block = block_of_breadcrumb ?with_parent_statehash breadcrumb in
   let staged_ledger = Transition_frontier.Breadcrumb.staged_ledger breadcrumb in
   let scheduled_time =
-    Mina_block.(Header.protocol_state @@ header block)
+    Mina_block.Stable.Latest.header block
+    |> Mina_block.Header.protocol_state
     |> Mina_state.Protocol_state.blockchain_state
     |> Mina_state.Blockchain_state.timestamp
   in
