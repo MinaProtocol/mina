@@ -715,11 +715,21 @@ module T = struct
       let matching_completed_work_in_pool = get_completed_work work_statement in
       match (statements_match, matching_completed_work_in_pool) with
       | true, Some (completed_work : Transaction_snark_work.Checked.t) ->
-          let verified_proofs = completed_work.proofs in
-          let block_work_proofs = work.proofs in
-          if not @@ Fee.equal completed_work.fee work.fee then
-            Second "fee_not_equal"
-          else if not @@ Account.Key.equal completed_work.prover work.prover
+          let verified_proofs =
+            Transaction_snark_work.Checked.proofs completed_work
+          in
+          let block_work_proofs = Transaction_snark_work.proofs work in
+          if
+            not
+            @@ Fee.equal
+                 (Transaction_snark_work.Checked.fee completed_work)
+                 (Transaction_snark_work.fee work)
+          then Second "fee_not_equal"
+          else if
+            not
+            @@ Account.Key.equal
+                 (Transaction_snark_work.Checked.prover completed_work)
+                 (Transaction_snark_work.prover work)
           then Second "prover_account_not_equal"
           else if
             not
@@ -1344,25 +1354,28 @@ module T = struct
       }
 
     let coinbase_ft (cw : Transaction_snark_work.Checked.t) =
+      let fee = Transaction_snark_work.Checked.fee cw in
+      let receiver_pk = Transaction_snark_work.Checked.prover cw in
       (* Here we could not add the fee transfer if the prover=receiver_pk but
          retaining it to preserve that information in the
          staged_ledger_diff. It will be checked in apply_diff before adding*)
       Option.some_if
-        Fee.(cw.fee > Fee.zero)
-        (Coinbase.Fee_transfer.create ~receiver_pk:cw.prover ~fee:cw.fee)
+        Fee.(fee > Fee.zero)
+        (Coinbase.Fee_transfer.create ~receiver_pk ~fee)
 
     let cheapest_two_work (works : Transaction_snark_work.Checked.t Sequence.t)
         =
+      let open Transaction_snark_work.Checked in
       Sequence.fold works ~init:(None, None) ~f:(fun (w1, w2) w ->
           match (w1, w2) with
           | None, _ ->
               (Some w, None)
           | Some x, None ->
-              if Currency.Fee.compare w.fee x.fee < 0 then (Some w, w1)
+              if Fee.compare (fee w) (fee x) < 0 then (Some w, w1)
               else (w1, Some w)
           | Some x, Some y ->
-              if Currency.Fee.compare w.fee x.fee < 0 then (Some w, w1)
-              else if Currency.Fee.compare w.fee y.fee < 0 then (w1, Some w)
+              if Fee.compare (fee w) (fee x) < 0 then (Some w, w1)
+              else if Fee.compare (fee w) (fee y) < 0 then (w1, Some w)
               else (w1, w2) )
 
     let coinbase_work
@@ -1395,7 +1408,8 @@ module T = struct
         | None, _ ->
             None
         | Some w, None ->
-            if Amount.(of_fee w.fee <= budget) then
+            if Amount.(of_fee (Transaction_snark_work.Checked.fee w) <= budget)
+            then
               let cb =
                 Staged_ledger_diff.At_most_two.Two
                   (Option.map (coinbase_ft w) ~f:(fun ft -> (ft, None)))
@@ -1405,7 +1419,11 @@ module T = struct
               let cb = Staged_ledger_diff.At_most_two.Two None in
               Some (cb, works)
         | Some w1, Some w2 ->
-            let%map sum = Fee.add w1.fee w2.fee in
+            let%map sum =
+              Fee.add
+                (Transaction_snark_work.Checked.fee w1)
+                (Transaction_snark_work.Checked.fee w2)
+            in
             if Amount.(of_fee sum <= budget) then
               let cb =
                 Staged_ledger_diff.At_most_two.Two
@@ -1420,7 +1438,9 @@ module T = struct
                   reduce the slots occupied by fee transfers*)
               in
               (cb, diff works (Sequence.of_list [ stmt w1; stmt w2 ]))
-            else if Amount.(of_fee w1.fee <= coinbase_amount) then
+            else if
+              Amount.(of_fee (Transaction_snark_work.Checked.fee w1) <= budget)
+            then
               let cb =
                 Staged_ledger_diff.At_most_two.Two
                   (Option.map (coinbase_ft w1) ~f:(fun ft -> (ft, None)))
@@ -1431,7 +1451,8 @@ module T = struct
               (cb, works)
       else
         Option.map min1 ~f:(fun w ->
-            if Amount.(of_fee w.fee <= budget) then
+            if Amount.(of_fee (Transaction_snark_work.Checked.fee w) <= budget)
+            then
               let cb = Staged_ledger_diff.At_most_two.One (coinbase_ft w) in
               (cb, diff works (Sequence.of_list [ stmt w ]))
             else
@@ -2110,6 +2131,10 @@ module T = struct
                 ~f:(fun (seq, count) w ->
                   match get_completed_work w with
                   | Some cw_checked ->
+                      let fee = Transaction_snark_work.Checked.fee cw_checked in
+                      let prover =
+                        Transaction_snark_work.Checked.prover cw_checked
+                      in
                       (*If new provers can't pay the account-creation-fee then discard
                         their work unless their fee is zero in which case their account
                         won't be created. This is to encourage using an existing accounts
@@ -2117,26 +2142,24 @@ module T = struct
                         This also imposes new snarkers to have a min fee until one of
                         their snarks are purchased and their accounts get created*)
                       if
-                        Currency.Fee.(cw_checked.fee = zero)
+                        Currency.Fee.(fee = zero)
                         || Currency.Fee.(
-                             cw_checked.fee
-                             >= constraint_constants.account_creation_fee)
-                        || not (is_new_account cw_checked.prover)
+                             fee >= constraint_constants.account_creation_fee)
+                        || not (is_new_account prover)
                       then
                         Continue
                           ( Sequence.append seq (Sequence.singleton cw_checked)
-                          , One_or_two.length cw_checked.proofs + count )
+                          , One_or_two.length
+                              (Transaction_snark_work.Checked.proofs cw_checked)
+                            + count )
                       else (
                         [%log debug]
                           ~metadata:
-                            [ ( "prover"
-                              , Public_key.Compressed.to_yojson
-                                  cw_checked.prover )
+                            [ ("prover", Public_key.Compressed.to_yojson prover)
                             ; ( "work_ids"
                               , Transaction_snark_work.Statement.compact_json w
                               )
-                            ; ( "snark_fee"
-                              , Currency.Fee.to_yojson cw_checked.fee )
+                            ; ("snark_fee", Currency.Fee.to_yojson fee)
                             ; ( "account_creation_fee"
                               , Currency.Fee.to_yojson
                                   constraint_constants.account_creation_fee )
@@ -2594,19 +2617,15 @@ let%test_module "staged ledger tests" =
         : Transaction_snark_work.Checked.t option =
       let prover = stmt_to_prover stmts in
       Some
-        { Transaction_snark_work.Checked.fee = work_fee
-        ; proofs = proofs stmts
-        ; prover
-        }
+        (Transaction_snark_work.Checked.create_unsafe
+           { fee = work_fee; proofs = proofs stmts; prover } )
 
     let stmt_to_work_zero_fee ~prover
         (stmts : Transaction_snark_work.Statement.t) :
         Transaction_snark_work.Checked.t option =
       Some
-        { Transaction_snark_work.Checked.fee = Currency.Fee.zero
-        ; proofs = proofs stmts
-        ; prover
-        }
+        (Transaction_snark_work.Checked.create_unsafe
+           { fee = Currency.Fee.zero; proofs = proofs stmts; prover } )
 
     (* Fixed public key for when there is only one snark worker. *)
     let snark_worker_pk =
@@ -2615,7 +2634,9 @@ let%test_module "staged ledger tests" =
 
     let stmt_to_work_one_prover (stmts : Transaction_snark_work.Statement.t) :
         Transaction_snark_work.Checked.t option =
-      Some { fee = work_fee; proofs = proofs stmts; prover = snark_worker_pk }
+      Some
+        (Transaction_snark_work.Checked.create_unsafe
+           { fee = work_fee; proofs = proofs stmts; prover = snark_worker_pk } )
 
     let coinbase_first_prediff = function
       | Staged_ledger_diff.At_most_two.Zero ->
@@ -3243,10 +3264,11 @@ let%test_module "staged ledger tests" =
     let%test_unit "Zero proof-fee should not create a fee transfer" =
       let stmt_to_work_zero_fee stmts =
         Some
-          { Transaction_snark_work.Checked.fee = Currency.Fee.zero
-          ; proofs = proofs stmts
-          ; prover = snark_worker_pk
-          }
+          (Transaction_snark_work.Checked.create_unsafe
+             { fee = Currency.Fee.zero
+             ; proofs = proofs stmts
+             ; prover = snark_worker_pk
+             } )
       in
       let expected_proof_count = 3 in
       Quickcheck.test
@@ -3339,10 +3361,11 @@ let%test_module "staged ledger tests" =
                     let work_done =
                       List.map
                         ~f:(fun stmts ->
-                          { Transaction_snark_work.Checked.fee = Fee.zero
-                          ; proofs = proofs stmts
-                          ; prover = snark_worker_pk
-                          } )
+                          Transaction_snark_work.Checked.create_unsafe
+                            { fee = Fee.zero
+                            ; proofs = proofs stmts
+                            ; prover = snark_worker_pk
+                            } )
                         work
                     in
                     let cmds_this_iter = cmds_this_iter |> Sequence.to_list in
@@ -3401,12 +3424,13 @@ let%test_module "staged ledger tests" =
       let stmt_to_work stmts =
         let prover = stmt_to_prover stmts in
         Some
-          { Transaction_snark_work.Checked.fee =
-              Currency.Fee.(sub work_fee (of_nanomina_int_exn 1))
-              |> Option.value_exn
-          ; proofs = proofs stmts
-          ; prover
-          }
+          (Transaction_snark_work.Checked.create_unsafe
+             { fee =
+                 Currency.Fee.(sub work_fee (of_nanomina_int_exn 1))
+                 |> Option.value_exn
+             ; proofs = proofs stmts
+             ; prover
+             } )
       in
       Quickcheck.test
         Quickcheck.Generator.(tuple2 (gen_below_capacity ()) small_positive_int)
@@ -3468,10 +3492,8 @@ let%test_module "staged ledger tests" =
                Transaction_snark_work.Statement.compare s stmts = 0 ) )
       then
         Some
-          { Transaction_snark_work.Checked.fee = work_fee
-          ; proofs = proofs stmts
-          ; prover
-          }
+          (Transaction_snark_work.Checked.create_unsafe
+             { fee = work_fee; proofs = proofs stmts; prover } )
       else None
 
     (** Like test_simple but with a random number of completed jobs available.
@@ -3657,8 +3679,8 @@ let%test_module "staged ledger tests" =
         (List.find work_list ~f:(fun (s, _) ->
              Transaction_snark_work.Statement.compare s stmts = 0 ) )
         ~f:(fun (_, fee) ->
-          { Transaction_snark_work.Checked.fee; proofs = proofs stmts; prover }
-          )
+          Transaction_snark_work.Checked.create_unsafe
+            { fee; proofs = proofs stmts; prover } )
 
     (** Like test_random_number_of_proofs but with random proof fees.
                    *)
