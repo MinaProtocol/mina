@@ -25,15 +25,24 @@ module type Full = sig
     end
   end]
 
-  val create : statement:Statement.With_sok.t -> proof:Mina_base.Proof.t -> t
+  module Poly : sig
+    type 'a t =
+      (Mina_state.Snarked_ledger_state.With_sok.t, 'a) Proof_carrying_data.t
+  end
 
-  val proof : t -> Mina_base.Proof.t
+  module Cached : sig
+    type t = Proof_cache_tag.t Poly.t
+  end
 
-  val statement : t -> Statement.t
+  val create : statement:Statement.With_sok.t -> proof:'p -> 'p Poly.t
 
-  val statement_with_sok : t -> Statement.With_sok.t
+  val proof : 'p Poly.t -> 'p
 
-  val sok_digest : t -> Sok_message.Digest.t
+  val statement : _ Poly.t -> Statement.t
+
+  val statement_with_sok : _ Poly.t -> Statement.With_sok.t
+
+  val sok_digest : _ Poly.t -> Sok_message.Digest.t
 
   open Pickles_types
 
