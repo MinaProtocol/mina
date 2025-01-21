@@ -178,9 +178,11 @@ module Make_str (A : Wire_types.Concrete) = struct
     type t =
       (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_two.t
 
-    let generate : Stable.Latest.t -> t = Fn.id
+    let generate : Stable.Latest.t -> t =
+      Pre_diff_two.map ~f1:Transaction_snark_work.generate ~f2:Fn.id
 
-    let unwrap : t -> Stable.Latest.t = Fn.id
+    let unwrap : t -> Stable.Latest.t =
+      Pre_diff_two.map ~f1:Transaction_snark_work.unwrap ~f2:Fn.id
   end
 
   module Pre_diff_with_at_most_one_coinbase = struct
@@ -202,9 +204,11 @@ module Make_str (A : Wire_types.Concrete) = struct
     type t =
       (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_one.t
 
-    let generate : Stable.Latest.t -> t = Fn.id
+    let generate : Stable.Latest.t -> t =
+      Pre_diff_one.map ~f1:Transaction_snark_work.generate ~f2:Fn.id
 
-    let unwrap : t -> Stable.Latest.t = Fn.id
+    let unwrap : t -> Stable.Latest.t =
+      Pre_diff_one.map ~f1:Transaction_snark_work.unwrap ~f2:Fn.id
   end
 
   module Diff = struct

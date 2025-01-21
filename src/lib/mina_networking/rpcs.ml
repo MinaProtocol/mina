@@ -880,7 +880,7 @@ module Get_completed_snarks = struct
     | Some snark_pool, Some snark_state ->
         Work_selector.completed_work_statements ~snark_pool snark_state
         |> Fn.flip List.take limit
-        |> List.map ~f:Transaction_snark_work.forget
+        |> List.map ~f:Transaction_snark_work.(Fn.compose unwrap forget)
         |> Option.some |> return
     | _, _ ->
         return None

@@ -97,6 +97,8 @@ module T = struct
         }
       [@@deriving yojson]
 
+      let statement t = One_or_two.map t.proofs ~f:Ledger_proof.statement
+
       let to_latest = Fn.id
     end
   end]
@@ -117,6 +119,10 @@ module T = struct
     ; fee = t.fee
     ; prover = t.prover
     }
+
+  let generate = Fn.id
+
+  let unwrap = Fn.id
 end
 
 include T
