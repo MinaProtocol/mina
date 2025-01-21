@@ -114,7 +114,7 @@ module Rpcs : sig
   module Get_completed_snarks : sig
     type query = unit
 
-    type response = Transaction_snark_work.unchecked list option
+    type response = Transaction_snark_work.Stable.Latest.t list option
   end
 
   type ('query, 'response) rpc = ('query, 'response) Rpcs.rpc =
