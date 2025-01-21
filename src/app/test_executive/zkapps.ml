@@ -781,23 +781,25 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       *)
       let next_slot_time =
         let genesis_timestamp =
-          constants.genesis_constants.genesis_state_timestamp |> Int64.to_float
-          |> Time.Span.of_ms |> Time.of_span_since_epoch
+          constants.genesis_constants.protocol.genesis_state_timestamp
+          |> Int64.to_float |> Time.Span.of_ms |> Time.of_span_since_epoch
         in
         let block_duration_ms =
           constants.constraint_constants.block_window_duration_ms
           |> Int.to_float
         in
         let current_slot_span_ms =
-          Time.(now () - genesis_timestamp) |> Time.Span.to_ms
+          Time.(diff (now ()) genesis_timestamp) |> Time.Span.to_ms
         in
         let target_slot =
-          block_duration_ms /. current_slot_span_ms |> Float.iround_up_exn
+          block_duration_ms /. current_slot_span_ms |> Float.round_up
         in
-        let target_slot_span_ms = target_slot *. current_slot_span_ms in
+        let target_slot_span_ms =
+          target_slot *. current_slot_span_ms |> Time.Span.of_ms
+        in
         Time.add genesis_timestamp target_slot_span_ms
       in
-      after Time.(now () - next_slot_time)
+      after Time.(diff (now ()) next_slot_time)
     in
     (* Won't be accepted until the previous transactions are applied *)
     let%bind () =
