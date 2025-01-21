@@ -178,9 +178,13 @@ module Make_str (A : Wire_types.Concrete) = struct
     type t =
       (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_two.t
 
-    let write_all_proofs_to_disk : Stable.Latest.t -> t = Fn.id
+    let write_all_proofs_to_disk : Stable.Latest.t -> t =
+      Pre_diff_two.map ~f1:Transaction_snark_work.write_all_proofs_to_disk
+        ~f2:Fn.id
 
-    let read_all_proofs_from_disk : t -> Stable.Latest.t = Fn.id
+    let read_all_proofs_from_disk : t -> Stable.Latest.t =
+      Pre_diff_two.map ~f1:Transaction_snark_work.read_all_proofs_from_disk
+        ~f2:Fn.id
   end
 
   module Pre_diff_with_at_most_one_coinbase = struct
@@ -202,9 +206,13 @@ module Make_str (A : Wire_types.Concrete) = struct
     type t =
       (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_one.t
 
-    let write_all_proofs_to_disk : Stable.Latest.t -> t = Fn.id
+    let write_all_proofs_to_disk : Stable.Latest.t -> t =
+      Pre_diff_one.map ~f1:Transaction_snark_work.write_all_proofs_to_disk
+        ~f2:Fn.id
 
-    let read_all_proofs_from_disk : t -> Stable.Latest.t = Fn.id
+    let read_all_proofs_from_disk : t -> Stable.Latest.t =
+      Pre_diff_one.map ~f1:Transaction_snark_work.read_all_proofs_from_disk
+        ~f2:Fn.id
   end
 
   module Diff = struct

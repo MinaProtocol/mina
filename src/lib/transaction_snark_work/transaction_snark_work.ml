@@ -97,6 +97,8 @@ module T = struct
         }
       [@@deriving equal, sexp, yojson]
 
+      let statement t = One_or_two.map t.proofs ~f:Ledger_proof.statement
+
       let to_latest = Fn.id
     end
   end]
@@ -117,6 +119,10 @@ module T = struct
     ; fee = t.fee
     ; prover = t.prover
     }
+
+  let write_all_proofs_to_disk = Fn.id
+
+  let read_all_proofs_from_disk = Fn.id
 end
 
 include T
