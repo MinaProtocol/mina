@@ -211,7 +211,7 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       type query = State_hash.t
 
       type response =
-        ( Staged_ledger.Scan_state.t
+        ( Staged_ledger.Scan_state.Stable.Latest.t
         * Ledger_hash.t
         * Pending_coinbase.t
         * Mina_state.Protocol_state.value list )
@@ -321,7 +321,12 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
                 ( Requested_unknown_item
                 , Some (receipt_trust_action_message hash) ))
     in
-    result
+    Option.map result
+      ~f:(fun (scan_state, query, pending_coinbases, protocol_states) ->
+        ( Staged_ledger.Scan_state.unwrap scan_state
+        , query
+        , pending_coinbases
+        , protocol_states ) )
 
   let rate_limit_budget = (4, `Per Time.Span.minute)
 
