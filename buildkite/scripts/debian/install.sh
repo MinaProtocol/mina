@@ -59,7 +59,8 @@ source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $
 echo "Installing mina packages: $DEBS"
 echo "deb [trusted=yes] http://localhost:8080 $MINA_DEB_CODENAME unstable" | $SUDO tee /etc/apt/sources.list.d/mina.list
 
-$SUDO apt-get update --yes
+# Update apt packages for the new repo, preserving all others
+$SUDO apt-get update --yes -o Dir::Etc::sourcelist="sources.list.d/mina.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"
 $SUDO apt-get remove --yes "${debs[@]}"
 $SUDO apt-get install --yes --allow-downgrades "${debs_with_version[@]}"
 
