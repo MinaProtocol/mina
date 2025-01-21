@@ -7,7 +7,7 @@ module Stable = struct
     type t =
       Block.Stable.V2.t State_hash.With_state_hashes.Stable.V1.t
       * State_hash.Stable.V1.t Mina_stdlib.Nonempty_list.Stable.V1.t
-    [@@deriving sexp, equal]
+    [@@deriving equal]
 
     let to_yojson (block_with_hashes, _) =
       State_hash.With_state_hashes.Stable.V1.to_yojson Block.Stable.V2.to_yojson
@@ -19,7 +19,7 @@ end]
 
 type t = Stable.Latest.t
 
-[%%define_locally Stable.Latest.(t_of_sexp, sexp_of_t, equal, to_yojson)]
+[%%define_locally Stable.Latest.(equal, to_yojson)]
 
 let lift (b, v) =
   match v with

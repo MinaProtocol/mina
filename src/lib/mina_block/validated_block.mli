@@ -3,13 +3,13 @@ open Mina_base
 [%%versioned:
 module Stable : sig
   module V2 : sig
-    type t [@@deriving sexp, equal]
+    type t [@@deriving equal]
 
     val to_yojson : t -> Yojson.Safe.t
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, to_yojson, equal]
+type t = Stable.Latest.t [@@deriving to_yojson, equal]
 
 val lift : Validation.fully_valid_with_block -> t
 

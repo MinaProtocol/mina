@@ -1,6 +1,6 @@
 open Core
 
-type t = Sexp | Json | Binary
+type t = Json | Binary
 
 type 'a content =
   | Block : Mina_block.t content
@@ -43,18 +43,6 @@ module type S = sig
   val of_string : string -> t
 end
 
-module Sexp_block : S with type t = Mina_block.t = struct
-  type t = Mina_block.t
-
-  let name = "sexp"
-
-  let of_breadcrumb = block_of_breadcrumb
-
-  let to_string b = Mina_block.sexp_of_t b |> Sexp.to_string |> append_newline
-
-  let of_string s = Sexp.of_string s |> Mina_block.t_of_sexp
-end
-
 module Binary_block : S with type t = Mina_block.t = struct
   type t = Mina_block.t
 
@@ -90,19 +78,6 @@ let precomputed_of_breadcrumb ?with_parent_statehash breadcrumb =
   Mina_block.Precomputed.of_block ~logger ~constraint_constants ~staged_ledger
     ~scheduled_time
     (Breadcrumb.block_with_hash breadcrumb)
-
-module Sexp_precomputed : S with type t = Mina_block.Precomputed.t = struct
-  type t = Mina_block.Precomputed.t
-
-  let name = "sexp"
-
-  let of_breadcrumb = precomputed_of_breadcrumb
-
-  let to_string b =
-    Mina_block.Precomputed.sexp_of_t b |> Sexp.to_string |> append_newline
-
-  let of_string s = Sexp.of_string s |> Mina_block.Precomputed.t_of_sexp
-end
 
 module Json_precomputed : S with type t = Mina_block.Precomputed.t = struct
   type t = Mina_block.Precomputed.t
