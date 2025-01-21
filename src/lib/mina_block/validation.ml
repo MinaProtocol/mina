@@ -388,7 +388,7 @@ let validate_delta_block_chain (t, validation) =
 let skip_delta_block_chain_validation `This_block_was_not_received_via_gossip
     (t, validation) =
   let previous_protocol_state_hash =
-    t |> With_hash.data |> Block.header |> Header.protocol_state
+    t |> With_hash.data |> Header.protocol_state
     |> Protocol_state.previous_state_hash
   in
   ( t
