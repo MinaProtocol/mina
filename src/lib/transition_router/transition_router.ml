@@ -278,7 +278,10 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
                 [%log debug]
                   ~metadata:[ ("peer", Network_peer.Peer.to_yojson peer) ]
                   "Successfully verified best tip from $peer" ;
-                let body = Mina_block.Stable.Latest.body peer_best_tip.data in
+                let body =
+                  Mina_block.Stable.Latest.body peer_best_tip.data
+                  |> Staged_ledger_diff.Body.write_all_proofs_to_disk
+                in
                 return
                   (Some
                      (Envelope.Incoming.wrap_peer

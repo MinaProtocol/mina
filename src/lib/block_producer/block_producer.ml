@@ -316,6 +316,7 @@ let generate_next_state ~proof_cache_db ~commit_id ~zkapp_cmd_limit
                             (Staged_ledger.Staged_ledger_error.to_string e) )
                       ; ( "diff"
                         , Staged_ledger_diff.Stable.Latest.to_yojson
+                          @@ Staged_ledger_diff.read_all_proofs_from_disk
                           @@ Staged_ledger_diff.forget diff )
                       ]
                     "Error applying the diff $diff: $error"
@@ -338,6 +339,10 @@ let generate_next_state ~proof_cache_db ~commit_id ~zkapp_cmd_limit
           , ledger_proof_opt
           , is_new_stack
           , pending_coinbase_update ) ->
+          let diff_unwrapped =
+            Staged_ledger_diff.read_all_proofs_from_disk
+            @@ Staged_ledger_diff.forget diff
+          in
           let%bind protocol_state, consensus_transition_data =
             lift_sync (fun () ->
                 let previous_ledger_hash =
@@ -368,7 +373,7 @@ let generate_next_state ~proof_cache_db ~commit_id ~zkapp_cmd_limit
                 let body_reference =
                   Staged_ledger_diff.Body.compute_reference
                     ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
-                    (Body.create @@ Staged_ledger_diff.forget diff)
+                    (Body.Stable.Latest.create diff_unwrapped)
                 in
                 let blockchain_state =
                   (* We use the time of the beginning of the slot because if things
@@ -916,7 +921,10 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                       ~transition_receipt_time () )
                 |> Deferred.Result.map_error ~f:(function
                      | `Invalid_staged_ledger_diff e ->
-                         `Invalid_staged_ledger_diff (e, staged_ledger_diff)
+                         `Invalid_staged_ledger_diff
+                           ( e
+                           , Staged_ledger_diff.read_all_proofs_from_disk
+                               staged_ledger_diff )
                      | ( `Fatal_error _
                        | `Invalid_genesis_protocol_state
                        | `Invalid_staged_ledger_hash _
@@ -1438,7 +1446,10 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
             Header.create ~protocol_state ~protocol_state_proof
               ~delta_block_chain_proof ()
           in
-          let body = Body.create staged_ledger_diff in
+          let body =
+            Body.create
+              (Staged_ledger_diff.write_all_proofs_to_disk staged_ledger_diff)
+          in
           let%bind transition =
             let open Result.Let_syntax in
             Validation.wrap_header
