@@ -51,15 +51,15 @@ end
        H(all_statements_in_bundle || fee || public_key)
 *)
 
-type t = Mina_wire_types.Transaction_snark_work.V2.t =
-  { fee : Fee.t
-  ; proofs : Ledger_proof.t One_or_two.t
-  ; prover : Public_key.Compressed.t
-  }
+module type S = sig
+  type t =
+    { fee : Fee.t
+    ; proofs : Ledger_proof.t One_or_two.t
+    ; prover : Public_key.Compressed.t
+    }
+end
 
-val fee : t -> Fee.t
-
-val prover : t -> Public_key.Compressed.t
+include S with type t = Mina_wire_types.Transaction_snark_work.V2.t
 
 val info : t -> Info.t
 
@@ -75,11 +75,7 @@ with type V2.t = t
 type unchecked = t
 
 module Checked : sig
-  type nonrec t = t =
-    { fee : Fee.t
-    ; proofs : Ledger_proof.t One_or_two.t
-    ; prover : Public_key.Compressed.t
-    }
+  include S
 
   module Stable : module type of Stable
 

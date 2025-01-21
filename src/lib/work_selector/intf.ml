@@ -1,6 +1,14 @@
 open Core
 open Currency
 
+module type Transaction_snark_work_intf = sig
+  type t
+
+  val fee : t -> Fee.t
+
+  val prover : t -> Signature_lib.Public_key.Compressed.t
+end
+
 module type Inputs_intf = sig
   module Ledger_hash : sig
     type t
@@ -23,15 +31,13 @@ module type Inputs_intf = sig
   end
 
   module Transaction_snark_work : sig
-    type t
-
-    val fee : t -> Fee.t
-
-    val prover : t -> Signature_lib.Public_key.Compressed.t
+    include Transaction_snark_work_intf
 
     module Statement : sig
       type t = Transaction_snark.Statement.t One_or_two.t
     end
+
+    module Checked : Transaction_snark_work_intf
   end
 
   module Snark_pool : sig
@@ -40,7 +46,7 @@ module type Inputs_intf = sig
     val get_completed_work :
          t
       -> Transaction_snark.Statement.t One_or_two.t
-      -> Transaction_snark_work.t option
+      -> Transaction_snark_work.Checked.t option
   end
 
   module Transaction_protocol_state : sig

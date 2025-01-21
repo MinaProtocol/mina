@@ -874,7 +874,9 @@ module Get_completed_snarks = struct
     match (get_snark_pool (), snark_job_state ()) with
     | Some snark_pool, Some snark_state ->
         Work_selector.completed_work_statements ~snark_pool snark_state
-        |> Fn.flip List.take limit |> Option.some |> return
+        |> Fn.flip List.take limit
+        |> List.map ~f:Transaction_snark_work.forget
+        |> Option.some |> return
     | _, _ ->
         return None
 

@@ -74,6 +74,15 @@ module Info = struct
   [@@deriving to_yojson, sexp, compare]
 end
 
+module type S = sig
+  type t =
+    { fee : Fee.t
+    ; proofs : Ledger_proof.t One_or_two.t
+    ; prover : Public_key.Compressed.t
+    }
+  [@@deriving compare, fields, yojson, sexp]
+end
+
 module T = struct
   [%%versioned
   module Stable = struct
@@ -119,7 +128,3 @@ module Checked = struct
 end
 
 let forget = Fn.id
-
-let fee { fee; _ } = fee
-
-let prover { prover; _ } = prover

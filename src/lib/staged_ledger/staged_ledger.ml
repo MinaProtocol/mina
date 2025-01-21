@@ -1343,7 +1343,7 @@ module T = struct
       ; logger : (Logger.t[@sexp.opaque])
       }
 
-    let coinbase_ft (cw : Transaction_snark_work.t) =
+    let coinbase_ft (cw : Transaction_snark_work.Checked.t) =
       (* Here we could not add the fee transfer if the prover=receiver_pk but
          retaining it to preserve that information in the
          staged_ledger_diff. It will be checked in apply_diff before adding*)
@@ -1374,7 +1374,7 @@ module T = struct
       let diff ws ws' =
         Sequence.filter ws ~f:(fun w ->
             Sequence.mem ws'
-              (Transaction_snark_work.statement w)
+              (Transaction_snark_work.Checked.statement w)
               ~equal:Transaction_snark_work.Statement.equal
             |> not )
       in
@@ -1389,7 +1389,7 @@ module T = struct
               (of_fee constraint_constants.account_creation_fee))
         else Some coinbase_amount
       in
-      let stmt = Transaction_snark_work.statement in
+      let stmt = Transaction_snark_work.Checked.statement in
       if is_two then
         match (min1, min2) with
         | None, _ ->
@@ -2196,7 +2196,19 @@ module T = struct
             in
             [%log internal] "Generate_staged_ledger_diff" ;
             let diff, log =
-              O1trace.sync_thread "generate_staged_ledger_diff" (fun () ->
+              O1trace.sync_thread "generate_staged_ledger_diff"
+                (fun
+                  ()
+                  :
+                  (( ( Transaction_snark_work.Checked.t
+                     , User_command.Valid.t )
+                     Staged_ledger_diff.Pre_diff_two.t
+                   * ( Transaction_snark_work.Checked.t
+                     , User_command.Valid.t )
+                     Staged_ledger_diff.Pre_diff_one.t
+                     option )
+                  * _)
+                ->
                   generate ~constraint_constants logger completed_works_seq
                     valid_on_this_ledger ~receiver:coinbase_receiver
                     ~is_coinbase_receiver_new ~supercharge_coinbase partitions )
@@ -3727,27 +3739,20 @@ let%test_module "staged ledger tests" =
                   Option.value_map ft_opt ~default:() ~f:(fun single ->
                       let work =
                         List.hd_exn (sorted_work_from_diff1 first_pre_diff)
-                        |> Transaction_snark_work.forget
                       in
                       assert_same_fee single work.fee )
               | Zero, One ft_opt ->
                   Option.value_map ft_opt ~default:() ~f:(fun single ->
                       let work =
                         List.hd_exn (sorted_work_from_diff2 second_pre_diff_opt)
-                        |> Transaction_snark_work.forget
                       in
                       assert_same_fee single work.fee )
               | Two (Some (ft, ft_opt)), Zero ->
                   let work_done = sorted_work_from_diff1 first_pre_diff in
-                  let work =
-                    List.hd_exn work_done |> Transaction_snark_work.forget
-                  in
+                  let work = List.hd_exn work_done in
                   assert_same_fee ft work.fee ;
                   Option.value_map ft_opt ~default:() ~f:(fun single ->
-                      let work =
-                        List.hd_exn (List.drop work_done 1)
-                        |> Transaction_snark_work.forget
-                      in
+                      let work = List.hd_exn (List.drop work_done 1) in
                       assert_same_fee single work.fee )
               | _ ->
                   failwith @@ "Incorrect coinbase in the diff "

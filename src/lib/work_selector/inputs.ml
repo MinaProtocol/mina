@@ -17,11 +17,15 @@ module Test_inputs = struct
   end
 
   module Transaction_snark_work = struct
-    type t = Fee.t
+    module Checked = struct
+      type t = Fee.t
 
-    let fee = Fn.id
+      let fee = Fn.id
 
-    let prover _ = Key_gen.Sample_keypairs.genesis_winner |> fst
+      let prover _ = Key_gen.Sample_keypairs.genesis_winner |> fst
+    end
+
+    include Checked
 
     module Statement = struct
       type t = Transaction_snark.Statement.t One_or_two.t
