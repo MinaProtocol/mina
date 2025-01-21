@@ -52,10 +52,6 @@ for i in "${debs[@]}"; do
    debs_with_version+=("${i}=${MINA_DEB_VERSION}")
 done
 
-# Install aptly
-$SUDO apt-get update 
-$SUDO apt-get install -y aptly
-
 # Start aptly
 source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --clean --background
 
