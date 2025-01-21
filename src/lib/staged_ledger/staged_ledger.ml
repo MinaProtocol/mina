@@ -3742,7 +3742,8 @@ let%test_module "staged ledger tests" =
                       assert_same_fee single work.fee )
               | _ ->
                   failwith @@ "Incorrect coinbase in the diff "
-                  ^ ( Staged_ledger_diff.Stable.Latest.to_yojson diff
+                  ^ ( Staged_ledger_diff.read_all_proofs_from_disk diff
+                    |> Staged_ledger_diff.Stable.Latest.to_yojson
                     |> Yojson.Safe.to_string )
             in
             (diff, List.tl_exn proofs_available_left) )
@@ -4696,9 +4697,7 @@ let%test_module "staged ledger tests" =
             *)
               let diff : Staged_ledger_diff.t =
                 let pre_diff :
-                    Staged_ledger_diff.Pre_diff_with_at_most_two_coinbase.Stable
-                    .V2
-                    .t =
+                    Staged_ledger_diff.Pre_diff_with_at_most_two_coinbase.t =
                   { completed_works = []
                   ; commands = cmds
                   ; coinbase = Zero

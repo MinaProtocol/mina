@@ -5,16 +5,24 @@ module type Full = sig
 
     module V1 : sig
       type t [@@deriving equal, sexp]
+
+      val create : Diff.Stable.V2.t -> t
+
+      val staged_ledger_diff : t -> Diff.Stable.V2.t
     end
   end]
 
-  type t = Stable.Latest.t
+  type t
 
   val create : Diff.t -> t
 
   val staged_ledger_diff : t -> Diff.t
 
-  val to_binio_bigstring : t -> Core_kernel.Bigstring.t
+  val to_binio_bigstring : Stable.V1.t -> Core_kernel.Bigstring.t
 
-  val compute_reference : tag:int -> t -> Consensus.Body_reference.t
+  val compute_reference : tag:int -> Stable.V1.t -> Consensus.Body_reference.t
+
+  val write_all_proofs_to_disk : Stable.Latest.t -> t
+
+  val read_all_proofs_from_disk : t -> Stable.Latest.t
 end
