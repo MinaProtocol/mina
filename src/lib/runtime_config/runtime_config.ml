@@ -514,6 +514,8 @@ module Json_layout = struct
             [@default None] [@key "validation-queue-size"]
       ; stop_time : int option [@default None] [@key "stop-time"]
       ; peers : string list option [@default None] [@key "peers"]
+      ; sync_ledger_max_subtree_depth : int option [@default None]
+      ; sync_ledger_default_subtree_depth : int option [@default None]
       }
     [@@deriving yojson, fields]
 
@@ -1289,6 +1291,8 @@ module Daemon = struct
     ; validation_queue_size : int option [@default None]
     ; stop_time : int option [@default None]
     ; peers : string list option [@default None]
+    ; sync_ledger_max_subtree_depth : int option [@default None]
+    ; sync_ledger_default_subtree_depth : int option [@default None]
     }
   [@@deriving bin_io_unversioned, fields]
 
@@ -1330,6 +1334,8 @@ module Daemon = struct
     ; validation_queue_size = None
     ; stop_time = None
     ; peers = None
+    ; sync_ledger_max_subtree_depth = None
+    ; sync_ledger_default_subtree_depth = None
     }
 
   let to_json_layout : t -> Json_layout.Daemon.t = Fn.id
@@ -1420,6 +1426,12 @@ module Daemon = struct
           t2.validation_queue_size
     ; stop_time = opt_fallthrough ~default:t1.stop_time t2.stop_time
     ; peers = opt_fallthrough ~default:t1.peers t2.peers
+    ; sync_ledger_max_subtree_depth =
+        opt_fallthrough ~default:t1.sync_ledger_max_subtree_depth
+          t2.sync_ledger_max_subtree_depth
+    ; sync_ledger_default_subtree_depth =
+        opt_fallthrough ~default:t1.sync_ledger_default_subtree_depth
+          t2.sync_ledger_default_subtree_depth
     }
 end
 
@@ -1765,6 +1777,7 @@ module Json_loader : Json_loader_intf = struct
       in
       [%log info] "Reading configuration files $config_files"
         ~metadata:[ ("config_files", `List config_files_paths) ] ;
+
       Deferred.Or_error.List.filter_map config_files
         ~f:(fun (config_file, handle_missing) ->
           match%bind.Deferred load_config_file config_file with
@@ -1804,6 +1817,14 @@ module type Constants_intf = sig
   type constants
 
   val load_constants :
+       ?conf_dir:string
+    -> ?commit_id_short:string
+    -> ?itn_features:bool
+    -> ?cli_proof_level:Genesis_constants.Proof_level.t
+    -> string list
+    -> constants Deferred.t
+
+  val load_constants_with_logging :
        ?conf_dir:string
     -> ?commit_id_short:string
     -> ?itn_features:bool
@@ -1980,6 +2001,13 @@ module Constants : Constants_intf = struct
         network_id =
           Option.value ~default:a.compile_config.network_id
             Option.(b.daemon >>= fun d -> d.network_id)
+      ; sync_ledger_max_subtree_depth =
+          Option.value ~default:a.compile_config.sync_ledger_max_subtree_depth
+            Option.(b.daemon >>= fun d -> d.sync_ledger_max_subtree_depth)
+      ; sync_ledger_default_subtree_depth =
+          Option.value
+            ~default:a.compile_config.sync_ledger_default_subtree_depth
+            Option.(b.daemon >>= fun d -> d.sync_ledger_default_subtree_depth)
       ; default_snark_worker_fee =
           Option.value ~default:a.compile_config.default_snark_worker_fee
             Option.(
@@ -2008,8 +2036,9 @@ module Constants : Constants_intf = struct
     }
 
   (* Use this function if you don't need/want the ledger configuration *)
-  let load_constants ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
-      ~logger config_files =
+  let load_constants_with_logging ?conf_dir ?commit_id_short ?itn_features
+      ?cli_proof_level ~logger config_files =
+    (* do not log reading compile time constants as this impacs cli command output *)
     Deferred.Or_error.ok_exn
     @@
     let open Deferred.Or_error.Let_syntax in
@@ -2018,6 +2047,8 @@ module Constants : Constants_intf = struct
         config_files
     in
     load_constants' ?itn_features ?cli_proof_level runtime_config
+
+  let load_constants = load_constants_with_logging ~logger:(Logger.null ())
 
   let magic_for_unit_tests t =
     let compile_constants =

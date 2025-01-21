@@ -105,6 +105,8 @@ end) : sig
   val check_invariant : t -> unit
 
   val set_check_invariant : (t -> unit) -> unit
+
+  val logger : t -> Logger.t
 end = struct
   let max_wait = Time.Span.of_ms 100.
 
@@ -626,6 +628,8 @@ end = struct
     ; trust_system : Trust_system.t
     ; stop : unit Deferred.t
     }
+
+  let logger t = t.logger
 
   let jobs_added t = Bvar.broadcast t.jobs_added_bvar ()
 

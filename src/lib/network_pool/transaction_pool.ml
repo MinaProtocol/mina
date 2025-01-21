@@ -1677,7 +1677,7 @@ let%test_module _ =
             () )
 
     let `VK vk, `Prover prover =
-      Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+      Transaction_snark.For_tests.create_trivial_snapp ()
 
     let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
 

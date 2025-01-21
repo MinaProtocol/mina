@@ -146,7 +146,7 @@ copy_common_daemon_configs() {
   cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/mina-create-genesis"
   cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
   cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
-
+  cp ./default/src/lib/snark_worker/standalone/run_snark_worker.exe "${BUILDDIR}/usr/local/bin/mina-standalone-snark-worker"
   # Copy signature-based Binaries (based on signature type $2 passed into the function)
   cp ./default/src/app/cli/src/mina_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
 

@@ -10,9 +10,9 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 open Pickles.Impls.Step
 
-let add_constraint c = assert_ { basic = T c; annotation = None }
+let add_constraint c = assert_ c
 
-let add_plonk_constraint c = assert_ { basic = T c; annotation = None }
+let add_plonk_constraint c = add_constraint c
 
 let etyp_unit =
   Composition_types.Spec.Step_etyp.T

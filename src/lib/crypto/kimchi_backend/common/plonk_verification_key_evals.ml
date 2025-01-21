@@ -32,8 +32,8 @@ let map
     ; emul_comm
     ; endomul_scalar_comm
     } ~f =
-  { sigma_comm = Vector.map ~f sigma_comm
-  ; coefficients_comm = Vector.map ~f coefficients_comm
+  { sigma_comm = Plonkish_prelude.Vector.map ~f sigma_comm
+  ; coefficients_comm = Plonkish_prelude.Vector.map ~f coefficients_comm
   ; generic_comm = f generic_comm
   ; psm_comm = f psm_comm
   ; complete_add_comm = f complete_add_comm
@@ -43,8 +43,9 @@ let map
   }
 
 let map2 t1 t2 ~f =
-  { sigma_comm = Vector.map2 ~f t1.sigma_comm t2.sigma_comm
-  ; coefficients_comm = Vector.map2 ~f t1.coefficients_comm t2.coefficients_comm
+  { sigma_comm = Plonkish_prelude.Vector.map2 ~f t1.sigma_comm t2.sigma_comm
+  ; coefficients_comm =
+      Plonkish_prelude.Vector.map2 ~f t1.coefficients_comm t2.coefficients_comm
   ; generic_comm = f t1.generic_comm t2.generic_comm
   ; psm_comm = f t1.psm_comm t2.psm_comm
   ; complete_add_comm = f t1.complete_add_comm t2.complete_add_comm
@@ -55,8 +56,8 @@ let map2 t1 t2 ~f =
 
 let typ g =
   Kimchi_pasta_snarky_backend.Step_impl.Typ.of_hlistable
-    [ Vector.typ g Plonk_types.Permuts.n
-    ; Vector.typ g Plonk_types.Columns.n
+    [ Plonkish_prelude.Vector.typ g Plonk_types.Permuts.n
+    ; Plonkish_prelude.Vector.typ g Plonk_types.Columns.n
     ; g
     ; g
     ; g
@@ -116,8 +117,8 @@ module Step = struct
       ; lookup_selector_range_check
       ; lookup_selector_ffmul
       } ~f ~f_opt =
-    { sigma_comm = Vector.map ~f sigma_comm
-    ; coefficients_comm = Vector.map ~f coefficients_comm
+    { sigma_comm = Plonkish_prelude.Vector.map ~f sigma_comm
+    ; coefficients_comm = Plonkish_prelude.Vector.map ~f coefficients_comm
     ; generic_comm = f generic_comm
     ; psm_comm = f psm_comm
     ; complete_add_comm = f complete_add_comm
@@ -130,7 +131,7 @@ module Step = struct
     ; foreign_field_add_comm = f_opt foreign_field_add_comm
     ; foreign_field_mul_comm = f_opt foreign_field_mul_comm
     ; rot_comm = f_opt rot_comm
-    ; lookup_table_comm = Vector.map ~f:f_opt lookup_table_comm
+    ; lookup_table_comm = Plonkish_prelude.Vector.map ~f:f_opt lookup_table_comm
     ; lookup_table_ids = f_opt lookup_table_ids
     ; runtime_tables_selector = f_opt runtime_tables_selector
     ; lookup_selector_lookup = f_opt lookup_selector_lookup
@@ -140,9 +141,10 @@ module Step = struct
     }
 
   let map2 t1 t2 ~f ~f_opt =
-    { sigma_comm = Vector.map2 ~f t1.sigma_comm t2.sigma_comm
+    { sigma_comm = Plonkish_prelude.Vector.map2 ~f t1.sigma_comm t2.sigma_comm
     ; coefficients_comm =
-        Vector.map2 ~f t1.coefficients_comm t2.coefficients_comm
+        Plonkish_prelude.Vector.map2 ~f t1.coefficients_comm
+          t2.coefficients_comm
     ; generic_comm = f t1.generic_comm t2.generic_comm
     ; psm_comm = f t1.psm_comm t2.psm_comm
     ; complete_add_comm = f t1.complete_add_comm t2.complete_add_comm
@@ -158,7 +160,8 @@ module Step = struct
         f_opt t1.foreign_field_mul_comm t2.foreign_field_mul_comm
     ; rot_comm = f_opt t1.rot_comm t2.rot_comm
     ; lookup_table_comm =
-        Vector.map2 ~f:f_opt t1.lookup_table_comm t2.lookup_table_comm
+        Plonkish_prelude.Vector.map2 ~f:f_opt t1.lookup_table_comm
+          t2.lookup_table_comm
     ; lookup_table_ids = f_opt t1.lookup_table_ids t2.lookup_table_ids
     ; runtime_tables_selector =
         f_opt t1.runtime_tables_selector t2.runtime_tables_selector

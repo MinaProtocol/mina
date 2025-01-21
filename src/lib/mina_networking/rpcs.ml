@@ -34,6 +34,10 @@ module type CONTEXT = sig
 
   val get_transition_frontier : unit -> Transition_frontier.t option
 
+  val get_snark_pool : unit -> Network_pool.Snark_pool.t option
+
+  val snark_job_state : unit -> Work_selector.State.t option
+
   val compile_config : Mina_compile_config.t
 end
 
@@ -366,13 +370,13 @@ module Answer_sync_ledger_query = struct
     include Master
   end)
 
-  module V3 = struct
+  module V4 = struct
     module T = struct
-      type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
+      type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V2.t
       [@@deriving sexp]
 
       type response =
-        (( Sync_ledger.Answer.Stable.V2.t
+        (( Sync_ledger.Answer.Stable.V3.t
          , Bounded_types.Wrapped_error.Stable.V1.t )
          Result.t
         [@version_asserted] )
@@ -385,6 +389,49 @@ module Answer_sync_ledger_query = struct
       let response_of_callee_model = Fn.id
 
       let caller_model_of_response = Fn.id
+    end
+
+    module T' =
+      Perf_histograms.Rpc.Plain.Decorate_bin_io
+        (struct
+          include M
+          include Master
+        end)
+        (T)
+
+    include T'
+    include Register (T')
+  end
+
+  module V3 = struct
+    module T = struct
+      type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
+      [@@deriving sexp]
+
+      type response =
+        (( Sync_ledger.Answer.Stable.V2.t
+         , Bounded_types.Wrapped_error.Stable.V1.t )
+         Result.t
+        [@version_asserted] )
+      [@@deriving sexp]
+
+      let query_of_caller_model : Master.T.query -> query =
+       fun (h, q) -> (h, Sync_ledger.Query.Stable.V1.from_v2 q)
+
+      let callee_model_of_query : query -> Master.T.query =
+       fun (h, q) -> (h, Sync_ledger.Query.Stable.V1.to_latest q)
+
+      let response_of_callee_model : Master.T.response -> response = function
+        | Ok a ->
+            Sync_ledger.Answer.Stable.V2.from_v3 a
+        | Error e ->
+            Error e
+
+      let caller_model_of_response : response -> Master.T.response = function
+        | Ok a ->
+            Ok (Sync_ledger.Answer.Stable.V2.to_latest a)
+        | Error e ->
+            Error e
     end
 
     module T' =
@@ -412,17 +459,20 @@ module Answer_sync_ledger_query = struct
     let ledger_hash, _ = Envelope.Incoming.data request in
     let query = Envelope.Incoming.map request ~f:Tuple2.get2 in
     let%bind answer =
-      let%bind.Deferred.Option frontier = return (get_transition_frontier ()) in
-      Sync_handler.answer_query ~frontier ledger_hash query ~logger
-        ~trust_system
+      match get_transition_frontier () with
+      | Some frontier ->
+          Sync_handler.answer_query ~frontier ledger_hash query
+            ~context:(module Context)
+            ~trust_system
+      | None ->
+          return (Or_error.error_string "No Frontier")
     in
     let result =
-      Result.of_option answer
-        ~error:
-          (Error.createf
-             !"Refusing to answer sync ledger query for ledger_hash: \
-               %{sexp:Ledger_hash.t}"
-             ledger_hash )
+      Result.map_error answer ~f:(fun e ->
+          Error.createf
+            !"Refusing to answer sync ledger query for ledger_hash: \
+              %{sexp:Ledger_hash.t}. Error: %s"
+            ledger_hash (Error.to_string_hum e) )
     in
     let%map () =
       match result with
@@ -740,6 +790,95 @@ module Get_transition_chain_proof = struct
     result
 
   let rate_limit_budget = (3, `Per Time.Span.minute)
+
+  let rate_limit_cost = Fn.const 1
+end]
+
+[%%versioned_rpc
+module Get_completed_snarks = struct
+  type nonrec ctx = ctx
+
+  module Master = struct
+    let name = "get_completed_snarks"
+
+    module T = struct
+      type query = unit [@@deriving sexp, to_yojson]
+
+      type response = Transaction_snark_work.Stable.V2.t list option
+    end
+
+    module Caller = T
+    module Callee = T
+  end
+
+  include Master.T
+
+  let sent_counter = Mina_metrics.Network.get_completed_snarks_rpcs_sent
+
+  let received_counter = Mina_metrics.Network.get_completed_snarks_rpcs_received
+
+  let failed_request_counter =
+    Mina_metrics.Network.get_completed_snarks_rpc_requests_failed
+
+  let failed_response_counter =
+    Mina_metrics.Network.get_completed_snarks_rpc_responses_failed
+
+  module M = Versioned_rpc.Both_convert.Plain.Make (Master)
+  include M
+
+  include Perf_histograms.Rpc.Plain.Extend (struct
+    include M
+    include Master
+  end)
+
+  module V1 = struct
+    module T = struct
+      type query = unit [@@deriving sexp]
+
+      type response = Transaction_snark_work.Stable.V2.t list option
+
+      let query_of_caller_model = Fn.id
+
+      let callee_model_of_query = Fn.id
+
+      let response_of_callee_model = ident
+
+      let caller_model_of_response = ident
+    end
+
+    module T' =
+      Perf_histograms.Rpc.Plain.Decorate_bin_io
+        (struct
+          include M
+          include Master
+        end)
+        (T)
+
+    include T'
+    include Register (T')
+  end
+
+  let receipt_trust_action_message query =
+    ("Get_completed_snarks query", [ ("query", query_to_yojson query) ])
+
+  let log_request_received ~logger ~sender _request =
+    [%log debug] "Sending completed snarks to $peer"
+      ~metadata:[ ("peer", Peer.to_yojson sender) ]
+
+  let response_is_successful = Option.is_some
+
+  let handle_request (module Context : CONTEXT) ~version:_ _request =
+    let open Context in
+    (* the maximum number of completed snarks to return over rpc *)
+    let limit = 32 in
+    match (get_snark_pool (), snark_job_state ()) with
+    | Some snark_pool, Some snark_state ->
+        Work_selector.completed_work_statements ~snark_pool snark_state
+        |> Fn.flip List.take limit |> Option.some |> return
+    | _, _ ->
+        return None
+
+  let rate_limit_budget = (1, `Per Time.Span.minute)
 
   let rate_limit_cost = Fn.const 1
 end]
@@ -1092,6 +1231,8 @@ type ('query, 'response) rpc =
   | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
   | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
   | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
+  | Get_completed_snarks
+      : (Get_completed_snarks.query, Get_completed_snarks.response) rpc
 
 type any_rpc = Rpc : ('q, 'r) rpc -> any_rpc
 
@@ -1105,6 +1246,7 @@ let all_rpcs =
   ; Rpc Get_transition_chain
   ; Rpc Get_transition_chain_proof
   ; Rpc Ban_notify
+  ; Rpc Get_completed_snarks
   ]
 
 let implementation :
@@ -1127,3 +1269,5 @@ let implementation :
       (module Ban_notify)
   | Get_best_tip ->
       (module Get_best_tip)
+  | Get_completed_snarks ->
+      (module Get_completed_snarks)

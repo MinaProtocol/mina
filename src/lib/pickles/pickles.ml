@@ -316,14 +316,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-      ~max_proofs_verified ~name ?constraint_constants ~choices () =
+      ~max_proofs_verified ~name ~choices () =
     compile_with_wrap_main_override_promise ?self ?cache ?storables ?proof_cache
       ?disk_keys ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
-      ~branches ~max_proofs_verified ~name ?constraint_constants ~choices ()
+      ~branches ~max_proofs_verified ~name ~choices ()
 
   let compile ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-      ~max_proofs_verified ~name ?constraint_constants ~choices () =
+      ~max_proofs_verified ~name ~choices () =
     let choices ~self =
       let choices = choices ~self in
       let rec go :
@@ -346,7 +346,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
         ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-        ~max_proofs_verified ~name ?constraint_constants ~choices ()
+        ~max_proofs_verified ~name ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
@@ -363,7 +363,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let compile_async ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-      ~max_proofs_verified ~name ?constraint_constants ~choices () =
+      ~max_proofs_verified ~name ~choices () =
     let choices ~self =
       let choices = choices ~self in
       let rec go :
@@ -391,7 +391,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
         ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-        ~max_proofs_verified ~name ?constraint_constants ~choices ()
+        ~max_proofs_verified ~name ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
@@ -560,7 +560,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                             exists Field.typ ~request:(fun () -> Prev_input)
                           in
                           let proof =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
+                            exists (Typ.prover_value ()) ~request:(fun () ->
                                 Proof )
                           in
                           let is_base_case = Field.equal Field.zero self in
@@ -657,7 +657,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                 No_recursion_input )
                           in
                           let no_recursive_proof =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
+                            exists (Typ.prover_value ()) ~request:(fun () ->
                                 No_recursion_proof )
                           in
                           let prev =
@@ -665,7 +665,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                 Recursive_input )
                           in
                           let prev_proof =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
+                            exists (Typ.prover_value ()) ~request:(fun () ->
                                 Recursive_proof )
                           in
                           let is_base_case = Field.equal Field.zero self in
@@ -777,7 +777,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                 No_recursion_input )
                           in
                           let no_recursive_proof =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
+                            exists (Typ.prover_value ()) ~request:(fun () ->
                                 No_recursion_proof )
                           in
                           let prev =
@@ -785,7 +785,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                 Recursive_input )
                           in
                           let prev_proof =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
+                            exists (Typ.prover_value ()) ~request:(fun () ->
                                 Recursive_proof )
                           in
                           let is_base_case =
@@ -1001,7 +1001,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ; main =
             (fun { public_input = () } ->
               let dummy_proof =
-                As_prover.Ref.create (fun () ->
+                exists (Typ.prover_value ()) ~compute:(fun () ->
                     Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15 )
               in
               Promise.return
@@ -1902,7 +1902,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     ; main =
                         (fun { public_input = () } ->
                           let proof =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
+                            exists (Typ.prover_value ()) ~request:(fun () ->
                                 Proof )
                           in
                           Promise.return
@@ -2177,19 +2177,22 @@ module Make_str (_ : Wire_types.Concrete) = struct
                             exists Field.typ ~request:(fun () -> Prev_input)
                           in
                           let proof =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
+                            exists (Typ.prover_value ()) ~request:(fun () ->
                                 Proof )
                           in
                           let vk =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
+                            exists (Typ.prover_value ()) ~request:(fun () ->
                                 Verifier_index )
                           in
                           as_prover (fun () ->
-                              let vk = As_prover.Ref.get vk in
+                              let vk =
+                                As_prover.read (Typ.prover_value ()) vk
+                              in
                               Side_loaded.in_prover side_loaded_tag vk ) ;
                           let vk =
                             exists Side_loaded_verification_key.typ
-                              ~compute:(fun () -> As_prover.Ref.get vk)
+                              ~compute:(fun () ->
+                                As_prover.read (Typ.prover_value ()) vk )
                           in
                           Side_loaded.in_circuit side_loaded_tag vk ;
                           let is_base_case = Field.equal Field.zero self in
@@ -2489,19 +2492,22 @@ module Make_str (_ : Wire_types.Concrete) = struct
                             exists Field.typ ~request:(fun () -> Prev_input)
                           in
                           let proof =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
+                            exists (Typ.prover_value ()) ~request:(fun () ->
                                 Proof )
                           in
                           let vk =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
+                            exists (Typ.prover_value ()) ~request:(fun () ->
                                 Verifier_index )
                           in
                           as_prover (fun () ->
-                              let vk = As_prover.Ref.get vk in
+                              let vk =
+                                As_prover.read (Typ.prover_value ()) vk
+                              in
                               Side_loaded.in_prover side_loaded_tag vk ) ;
                           let vk =
                             exists Side_loaded_verification_key.typ
-                              ~compute:(fun () -> As_prover.Ref.get vk)
+                              ~compute:(fun () ->
+                                As_prover.read (Typ.prover_value ()) vk )
                           in
                           Side_loaded.in_circuit side_loaded_tag vk ;
                           let is_base_case = Field.equal Field.zero self in

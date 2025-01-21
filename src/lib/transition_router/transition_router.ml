@@ -12,8 +12,6 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
-
-  val compile_config : Mina_compile_config.t
 end
 
 type Structured_log_events.t += Starting_transition_frontier_controller
@@ -57,8 +55,8 @@ let to_consensus_state h =
          (Fn.compose Mina_state.Protocol_state.consensus_state
             Mina_block.Header.protocol_state )
 
-let is_transition_for_bootstrap ~context:(module Context : CONTEXT) frontier
-    new_header =
+let is_transition_for_bootstrap
+    ~context:(module Context : Consensus.Intf.CONTEXT) frontier new_header =
   let root_consensus_state =
     Transition_frontier.root frontier
     |> Transition_frontier.Breadcrumb.consensus_state_with_hashes
@@ -200,6 +198,7 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
   in
   let preferred_peers = Option.value_map ~f ~default:[] best_seen_transition in
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
+
   upon
     (Bootstrap_controller.run
        ~context:(module Context)
@@ -285,6 +284,11 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
       [ ("actual", `Int (List.length tips)); ("expected", `Int num_peers) ]
     "Finished requesting tips. Got $actual / $expected" ;
   let%map () = notify_online () in
+  let module Consensus_context = struct
+    include Context
+
+    let compile_config = precomputed_values.compile_config
+  end in
   let res =
     List.fold tips ~init:None ~f:(fun acc enveloped_candidate_best_tip ->
         Option.merge acc (Option.return enveloped_candidate_best_tip)
@@ -295,7 +299,7 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
             in
             match
               Consensus.Hooks.select
-                ~context:(module Context)
+                ~context:(module Consensus_context)
                 ~existing:(f enveloped_existing_best_tip.data.data)
                 ~candidate:(f enveloped_candidate_best_tip.data.data)
             with
@@ -404,6 +408,11 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
   let genesis_constants =
     Precomputed_values.genesis_constants precomputed_values
   in
+  let module Consensus_context = struct
+    include Context
+
+    let compile_config = precomputed_values.compile_config
+  end in
   match%bind
     Deferred.both
       (download_best_tip
@@ -433,7 +442,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
           (Option.map ~f:(fun x -> `Block x) best_seen_transition)
   | Some best_tip, Some frontier
     when is_transition_for_bootstrap
-           ~context:(module Context)
+           ~context:(module Consensus_context)
            frontier
            ( best_tip |> Envelope.Incoming.data
            |> Mina_block.Validation.to_header ) ->
@@ -503,7 +512,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
                 Consensus.Hooks.sync_local_state
                   ~local_state:consensus_local_state
                   ~glue_sync_ledger:(Mina_networking.glue_sync_ledger network)
-                  ~context:(module Context)
+                  ~context:(module Consensus_context)
                   ~trust_system sync_jobs
               with
               | Error e ->
@@ -569,6 +578,11 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
     ~get_most_recent_valid_block ~most_recent_valid_block_writer
     ~get_completed_work ~catchup_mode ~notify_online () =
   let open Context in
+  let module Consensus_context = struct
+    include Context
+
+    let compile_config = precomputed_values.compile_config
+  end in
   [%log info] "Starting transition router" ;
   let initialization_finish_signal = Ivar.create () in
   let clear_reader, clear_writer =
@@ -650,6 +664,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~consensus_local_state ~notify_online
       in
       Ivar.fill_if_empty initialization_finish_signal () ;
+
       let valid_transition_reader1, valid_transition_reader2 =
         Strict_pipe.Reader.Fork.two valid_transition_reader
       in
@@ -662,7 +677,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
              if
                Consensus.Hooks.equal_select_status `Take
                  (Consensus.Hooks.select
-                    ~context:(module Context)
+                    ~context:(module Consensus_context)
                     ~existing:(to_consensus_state current_header_with_hash)
                     ~candidate:(to_consensus_state header_with_hash) )
              then
@@ -682,7 +697,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                   | Some frontier ->
                       if
                         is_transition_for_bootstrap
-                          ~context:(module Context)
+                          ~context:(module Consensus_context)
                           frontier header_with_hash
                       then (
                         Strict_pipe.Writer.kill !transition_writer_ref ;

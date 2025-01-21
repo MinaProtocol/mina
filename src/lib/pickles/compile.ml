@@ -139,14 +139,14 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
                    Opt.t
                  , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
                    , Impls.Wrap.Boolean.var )
-                   Pickles_types__Opt.t
+                   Plonkish_prelude.Opt.t
                  , Impls.Wrap.Boolean.var )
                  Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                  .In_circuit
                  .t
                , Wrap_verifier.Challenge.t Kimchi_types.scalar_challenge
                , Wrap_verifier.Other_field.Packed.t
-                 Pickles_types__Shifted_value.Type1.t
+                 Plonkish_prelude.Shifted_value.Type1.t
                , Impls.Wrap.Field.t
                , Impls.Wrap.Field.t
                , Impls.Wrap.Field.t
@@ -1319,7 +1319,7 @@ struct
     ; main =
         (fun { public_input = () } ->
           let dummy_proof =
-            As_prover.Ref.create (fun () ->
+            exists (Typ.prover_value ()) ~compute:(fun () ->
                 Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15 )
           in
           Promise.return
@@ -1396,7 +1396,7 @@ struct
                 ; main =
                     (fun { public_input = () } ->
                       let proof =
-                        exists (Typ.Internal.ref ()) ~request:(fun () -> Proof)
+                        exists (Typ.prover_value ()) ~request:(fun () -> Proof)
                       in
                       Promise.return
                         { Inductive_rule.previous_proof_statements =

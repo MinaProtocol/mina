@@ -131,24 +131,22 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
 
   val checked :
-       (module Snarky_backendless.Snark_intf.Run with type field = 't)
-    -> shift:'t Snarky_backendless.Cvar.t Shifted_value.Shift.t
-    -> env:'t Snarky_backendless.Cvar.t Scalars.Env.t
-    -> ( 't Snarky_backendless.Cvar.t
-       , 't Snarky_backendless.Cvar.t
-       , 't Snarky_backendless.Cvar.t Shifted_value.t
-       , ( 't Snarky_backendless.Cvar.t Shifted_value.t
-         , 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
+       (module Snarky_backendless.Snark_intf.Run
+          with type field = 'f
+           and type field_var = 'v )
+    -> shift:'v Shifted_value.Shift.t
+    -> env:'v Scalars.Env.t
+    -> ( 'v
+       , 'v
+       , 'v Shifted_value.t
+       , ( 'v Shifted_value.t
+         , 'v Snarky_backendless.Boolean.t )
          Pickles_types.Opt.t
-       , ( 't Snarky_backendless.Cvar.t
-         , 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
-         Pickles_types.Opt.t
-       , 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
+       , ('v, 'v Snarky_backendless.Boolean.t) Pickles_types.Opt.t
+       , 'v Snarky_backendless.Boolean.t )
        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
-    -> ( 't Snarky_backendless.Cvar.t * 't Snarky_backendless.Cvar.t
-       , 'a )
-       Pickles_types.Plonk_types.Evals.In_circuit.t
-    -> 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
+    -> ('v * 'v, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
+    -> 'v Snarky_backendless.Boolean.t
 end
 
 (** [Domain] is re-exported from library Pickles_base *)
