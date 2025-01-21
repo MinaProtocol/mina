@@ -1454,3 +1454,7 @@ let check_required_protocol_states t ~protocol_states =
   in
   let%map () = check_length protocol_states_assoc in
   protocol_states_assoc
+
+let generate = Fn.id
+
+let unwrap = Fn.id

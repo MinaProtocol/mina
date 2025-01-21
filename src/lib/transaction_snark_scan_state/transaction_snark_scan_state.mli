@@ -6,12 +6,16 @@ module Ledger = Mina_ledger.Ledger
 
 [%%versioned:
 module Stable : sig
+  [@@@no_toplevel_latest_type]
+
   module V2 : sig
     type t
 
     val hash : t -> Staged_ledger_hash.Aux_hash.t
   end
 end]
+
+type t
 
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
@@ -272,3 +276,7 @@ val all_work_pairs :
      One_or_two.t
      list
      Or_error.t
+
+val generate : Stable.Latest.t -> t
+
+val unwrap : t -> Stable.Latest.t

@@ -10,12 +10,16 @@ type t
 module Scan_state : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V2 : sig
       type t
 
       val hash : t -> Staged_ledger_hash.Aux_hash.t
     end
   end]
+
+  type t
 
   module Job_view : sig
     type t [@@deriving sexp, to_yojson]
@@ -131,6 +135,10 @@ module Scan_state : sig
              Or_error.t )
     -> t
     -> unit Deferred.Or_error.t
+
+  val generate : Stable.Latest.t -> t
+
+  val unwrap : t -> Stable.Latest.t
 end
 
 module Pre_diff_info : Pre_diff_info.S
