@@ -24,9 +24,6 @@ let tag, _cache, _p_module, Pickles.Provers.[ prover ] =
     ~branches:(module Nat.N1)
     ~max_proofs_verified:(module Nat.N0)
     ~name:"big_circuit"
-    ~constraint_constants:
-      (Genesis_constants.Constraint_constants.to_snark_keys_header
-         constraint_constants )
     ~choices:(fun ~self:_ ->
       [ Zkapps_big_circuit.rule ~num_constraints pk_compressed ] )
 

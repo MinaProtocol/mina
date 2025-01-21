@@ -68,58 +68,86 @@ module Make_str (A : Wire_types.Concrete) = struct
     times4 domain_log2
     + project
         (Pickles_types.Vector.to_list
-           (Proofs_verified.Prefix_mask.there proofs_verified) )
+           (Proofs_verified.to_bool_vec proofs_verified) )
 
   let unpack (type f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
       (x : f) : t =
     match Impl.Field.Constant.unpack x with
     | x0 :: x1 :: y0 :: y1 :: y2 :: y3 :: y4 :: y5 :: y6 :: y7 :: _ ->
-        { proofs_verified = Proofs_verified.Prefix_mask.back [ x0; x1 ]
+        { proofs_verified = Proofs_verified.of_bool_vec [ x0; x1 ]
         ; domain_log2 =
             Domain_log2.of_bits_msb [ y7; y6; y5; y4; y3; y2; y1; y0 ]
         }
     | _ ->
         assert false
 
-  module Checked = struct
-    type 'f t =
-      { proofs_verified_mask : 'f Proofs_verified.Prefix_mask.Checked.t
-      ; domain_log2 : 'f Snarky_backendless.Cvar.t
-      }
-    [@@deriving hlist]
+  open Kimchi_pasta_snarky_backend
 
-    let pack (type f)
-        (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-        ({ proofs_verified_mask; domain_log2 } : f t) : Impl.Field.t =
-      let open Impl.Field in
-      let four = of_int 4 in
-      (four * domain_log2)
-      + pack (Pickles_types.Vector.to_list proofs_verified_mask)
+  module Checked = struct
+    module Step = struct
+      open Step_impl
+
+      type field_var = Field.t
+
+      type t =
+        { proofs_verified_mask : Proofs_verified.Prefix_mask.Step.Checked.t
+        ; domain_log2 : Field.t
+        }
+      [@@deriving hlist]
+
+      let pack ({ proofs_verified_mask; domain_log2 } : t) : Field.t =
+        let open Field in
+        let four = of_int 4 in
+        (four * domain_log2)
+        + pack (Pickles_types.Vector.to_list proofs_verified_mask)
+    end
+
+    module Wrap = struct
+      open Wrap_impl
+
+      type field_var = Field.t
+
+      type t =
+        { proofs_verified_mask : Proofs_verified.Prefix_mask.Wrap.Checked.t
+        ; domain_log2 : Field.t
+        }
+      [@@deriving hlist]
+
+      let pack ({ proofs_verified_mask; domain_log2 } : t) : Field.t =
+        let open Field in
+        let four = of_int 4 in
+        (four * domain_log2)
+        + pack (Pickles_types.Vector.to_list proofs_verified_mask)
+    end
   end
 
-  let packed_typ (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) =
-    Impl.Typ.transport Impl.Typ.field
-      ~there:(pack (module Impl))
-      ~back:(unpack (module Impl))
+  let packed_typ =
+    Step_impl.Typ.transport Step_impl.Typ.field
+      ~there:(pack (module Step_impl))
+      ~back:(unpack (module Step_impl))
 
-  let typ (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+  let wrap_packed_typ =
+    Wrap_impl.Typ.transport Wrap_impl.Typ.field
+      ~there:(pack (module Wrap_impl))
+      ~back:(unpack (module Wrap_impl))
+
+  let typ
       ~(* We actually only need it to be less than 252 bits in order to pack
           the whole branch_data struct safely, but it's cheapest to check that it's
           under 16 bits *)
-      (assert_16_bits : Impl.Field.t -> unit) : (f Checked.t, t) Impl.Typ.t =
-    let open Impl in
+      (assert_16_bits : Step_impl.Field.t -> unit) :
+      (Checked.Step.t, t) Step_impl.Typ.t =
+    let open Step_impl in
     let proofs_verified_mask :
-        (f Proofs_verified.Prefix_mask.Checked.t, Proofs_verified.t) Typ.t =
-      Proofs_verified.Prefix_mask.typ (module Impl)
+        (Proofs_verified.Prefix_mask.Step.Checked.t, Proofs_verified.t) Typ.t =
+      Proofs_verified.Prefix_mask.Step.typ
     in
     let domain_log2 : (Field.t, Domain_log2.t) Typ.t =
       let (Typ t) =
         Typ.transport Field.typ
           ~there:(fun (x : char) -> Field.Constant.of_int (Char.to_int x))
-          ~back:(Domain_log2.of_field_exn (module Impl))
+          ~back:(Domain_log2.of_field_exn (module Step_impl))
       in
       let check (x : Field.t) = make_checked (fun () -> assert_16_bits x) in
       Typ { t with check }
@@ -127,7 +155,32 @@ module Make_str (A : Wire_types.Concrete) = struct
     Typ.of_hlistable
       [ proofs_verified_mask; domain_log2 ]
       ~value_of_hlist:of_hlist ~value_to_hlist:to_hlist
-      ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
+      ~var_to_hlist:Checked.Step.to_hlist ~var_of_hlist:Checked.Step.of_hlist
+
+  let wrap_typ
+      ~(* We actually only need it to be less than 252 bits in order to pack
+          the whole branch_data struct safely, but it's cheapest to check that it's
+          under 16 bits *)
+      (assert_16_bits : Wrap_impl.Field.t -> unit) :
+      (Checked.Wrap.t, t) Wrap_impl.Typ.t =
+    let open Wrap_impl in
+    let proofs_verified_mask :
+        (Proofs_verified.Prefix_mask.Wrap.Checked.t, Proofs_verified.t) Typ.t =
+      Proofs_verified.Prefix_mask.Wrap.typ
+    in
+    let domain_log2 : (Field.t, Domain_log2.t) Typ.t =
+      let (Typ t) =
+        Typ.transport Field.typ
+          ~there:(fun (x : char) -> Field.Constant.of_int (Char.to_int x))
+          ~back:(Domain_log2.of_field_exn (module Wrap_impl))
+      in
+      let check (x : Field.t) = make_checked (fun () -> assert_16_bits x) in
+      Typ { t with check }
+    in
+    Typ.of_hlistable
+      [ proofs_verified_mask; domain_log2 ]
+      ~value_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~var_to_hlist:Checked.Wrap.to_hlist ~var_of_hlist:Checked.Wrap.of_hlist
 
   let domain { domain_log2; _ } =
     Pickles_base.Domain.Pow_2_roots_of_unity (Char.to_int domain_log2)

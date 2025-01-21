@@ -2,6 +2,8 @@ let Package = ../../Constants/DebianPackage.dhall
 
 let DebianChannel = ../../Constants/DebianChannel.dhall
 
+let DebianRepo = ../../Constants/DebianRepo.dhall
+
 let Profiles = ../../Constants/Profiles.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
@@ -30,9 +32,10 @@ let promoteDebianVerificationStep =
                 Command.Config::{
                 , commands =
                   [ Cmd.run
-                      "source buildkite/scripts/export-git-env-vars.sh && ./scripts/debian/verify.sh --package ${name} --version ${spec.new_version} --codename ${DebianVersions.lowerName
-                                                                                                                                                                    spec.codename}  --channel ${DebianChannel.lowerName
-                                                                                                                                                                                                  spec.to_channel}"
+                      "source buildkite/scripts/export-git-env-vars.sh && ./scripts/debian/verify.sh --bucket ${DebianRepo.bucket_or_default
+                                                                                                                  spec.target_repo}--package ${name} --version ${spec.new_version} --codename ${DebianVersions.lowerName
+                                                                                                                                                                                                  spec.codename}  --channel ${DebianChannel.lowerName
+                                                                                                                                                                                                                                spec.to_channel}"
                   ]
                 , label = "Debian: ${spec.step_key}"
                 , key = spec.step_key

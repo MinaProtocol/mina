@@ -622,6 +622,55 @@ let pending_work =
           ~resolve:(fun _ w -> One_or_two.to_list w)
       ] )
 
+module Snark_work_bundle = struct
+  type t =
+    { spec : Work_selector.work One_or_two.t
+    ; fee_prover : (Currency.Fee.t * Public_key.Compressed.t) option
+    }
+
+  let spec =
+    obj "WorkBundleSpec"
+      ~doc:
+        "Witnesses and statements for snark work bundles. Includes optional \
+         fees and prover public keys for ones that have proofs in the snark \
+         pool" ~fields:(fun _ ->
+        [ field "spec" ~typ:(non_null string)
+            ~doc:"Snark work specification in json format"
+            ~args:Arg.[]
+            ~resolve:(fun _ { spec; _ } ->
+              One_or_two.to_yojson Work_selector.work_to_yojson spec
+              |> Yojson.Safe.to_string )
+        ; field "snarkFee" ~typ:fee
+            ~doc:"Fee if proof for the spec exists in snark pool"
+            ~args:Arg.[]
+            ~resolve:(fun _ w -> Option.map w.fee_prover ~f:fst)
+        ; field "snarkProverKey" ~typ:public_key
+            ~doc:"Prover public key if proof for the spec exists in snark pool"
+            ~args:Arg.[]
+            ~resolve:(fun _ w -> Option.map w.fee_prover ~f:snd)
+        ; field "workIds" ~doc:"Unique identifier for a snark work"
+            ~typ:(non_null (list (non_null int)))
+            ~args:Arg.[]
+            ~resolve:(fun _ { spec; _ } ->
+              One_or_two.map spec ~f:(fun w ->
+                  Transaction_snark.Statement.hash
+                    (Snark_work_lib.Work.Single.Spec.statement w) )
+              |> One_or_two.to_list )
+        ] )
+end
+
+let pending_work_spec =
+  obj "PendingSnarkWorkSpec"
+    ~doc:
+      "Snark work witnesses and statements that are yet to be proven or \
+       included in blocks" ~fields:(fun _ ->
+      [ field "workBundleSpec"
+          ~args:Arg.[]
+          ~doc:"Work bundle spec with one or two snark work"
+          ~typ:(non_null Snark_work_bundle.spec)
+          ~resolve:(fun _ w -> w)
+      ] )
+
 let state_stack =
   let module M = Pending_coinbase.State_stack in
   obj "StateStack" ~fields:(fun _ ->
@@ -2579,6 +2628,22 @@ module Input = struct
           |> Result.map_error ~f:(fun ex -> Exn.to_string ex) )
         ~to_json:(fun (x : input) ->
           Yojson.Safe.to_basic @@ Mina_base.Zkapp_command.to_json x )
+  end
+
+  module ProofBundleInput = struct
+    type input = Ledger_proof.t Snark_work_lib.Work.Result_without_metrics.t
+
+    let arg_typ =
+      scalar "ProofBundleInput"
+        ~doc:"Proof bundle for a given spec in json format"
+        ~coerce:(fun json ->
+          let json = Utils.to_yojson json in
+          Snark_work_lib.Work.Result_without_metrics.of_yojson
+            Ledger_proof.of_yojson json )
+        ~to_json:(fun (res : input) ->
+          Snark_work_lib.Work.Result_without_metrics.to_yojson
+            Ledger_proof.to_yojson res
+          |> Yojson.Safe.to_basic )
   end
 
   module PrecomputedBlock = struct

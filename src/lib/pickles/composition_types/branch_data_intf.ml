@@ -25,25 +25,46 @@ module type S = sig
   end]
 
   module Checked : sig
-    type 'f t =
-      { proofs_verified_mask : 'f Proofs_verified.Prefix_mask.Checked.t
-      ; domain_log2 : 'f Snarky_backendless.Cvar.t
-      }
+    module Step : sig
+      open Kimchi_pasta_snarky_backend.Step_impl
 
-    val pack :
-         (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-      -> 'f t
-      -> 'f Snarky_backendless.Cvar.t
+      type field_var = Field.t
+
+      type t =
+        { proofs_verified_mask : Proofs_verified.Prefix_mask.Step.Checked.t
+        ; domain_log2 : Field.t
+        }
+
+      val pack : t -> Field.t
+    end
+
+    module Wrap : sig
+      open Kimchi_pasta_snarky_backend.Wrap_impl
+
+      type field_var = Field.t
+
+      type t =
+        { proofs_verified_mask : Proofs_verified.Prefix_mask.Wrap.Checked.t
+        ; domain_log2 : Field.t
+        }
+
+      val pack : t -> Field.t
+    end
   end
 
-  val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> assert_16_bits:('f Snarky_backendless.Cvar.t -> unit)
-    -> ('f Checked.t, t, 'f) Snarky_backendless.Typ.t
+  module Impls := Kimchi_pasta_snarky_backend
 
-  val packed_typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> ('f Snarky_backendless.Cvar.t, t, 'f) Snarky_backendless.Typ.t
+  val typ :
+       assert_16_bits:(Impls.Step_impl.Field.t -> unit)
+    -> (Checked.Step.t, t) Impls.Step_impl.Typ.t
+
+  val wrap_typ :
+       assert_16_bits:(Impls.Wrap_impl.Field.t -> unit)
+    -> (Checked.Wrap.t, t) Impls.Wrap_impl.Typ.t
+
+  val packed_typ : (Impls.Step_impl.Field.t, t) Impls.Step_impl.Typ.t
+
+  val wrap_packed_typ : (Impls.Wrap_impl.Field.t, t) Impls.Wrap_impl.Typ.t
 
   val length_in_bits : int
 

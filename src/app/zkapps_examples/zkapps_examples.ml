@@ -454,20 +454,22 @@ let exists_deferred ?request:req ?compute typ =
   (* Set up a full Ivar, in case we are generating the constraint system. *)
   let deferred = ref (Ivar.create_full ()) in
   (* Request or compute the [Deferred.t] value. *)
-  let requested = exists ?request:req ?compute (Typ.Internal.ref ()) in
+  let requested = exists ?request:req ?compute (Typ.prover_value ()) in
   as_prover (fun () ->
       (* If we are generating the witness, create a new Ivar.. *)
       deferred := Ivar.create () ;
       (* ..and fill it when the value we want to read resolves. *)
-      Deferred.upon (As_prover.Ref.get requested) (fun _ ->
-          Ivar.fill !deferred () ) ) ;
+      Deferred.upon
+        (As_prover.read (Typ.prover_value ()) requested)
+        (fun _ -> Ivar.fill !deferred ()) ) ;
   (* Await the [Deferred.t] if we're generating the witness, otherwise we
      immediately bind over the filled Ivar and continue.
   *)
   Deferred.map (Ivar.read !deferred) ~f:(fun () ->
       (* Retrieve the value by peeking in the known-resolved deferred. *)
       exists typ ~compute:(fun () ->
-          Option.value_exn @@ Deferred.peek @@ As_prover.Ref.get requested ) )
+          Option.value_exn @@ Deferred.peek
+          @@ As_prover.read (Typ.prover_value ()) requested ) )
 
 type return_type =
   { account_update : Account_update.Body.t
@@ -543,7 +545,6 @@ let compile :
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = max_proofs_verified)
     -> name:string
-    -> ?constraint_constants:_
     -> choices:
          (   self:
                ( Zkapp_statement.Checked.t
@@ -586,7 +587,7 @@ let compile :
            Deferred.t )
          H3_2.T(Pickles.Prover).t =
  fun ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain ~auxiliary_typ
-     ~branches ~max_proofs_verified ~name ?constraint_constants ~choices () ->
+     ~branches ~max_proofs_verified ~name ~choices () ->
   let vk_hash = ref None in
   let choices ~self =
     let rec go :
@@ -647,7 +648,7 @@ let compile :
     Pickles.compile_async () ?self ?cache ?proof_cache ?disk_keys
       ?override_wrap_domain ~public_input:(Output Zkapp_statement.typ)
       ~auxiliary_typ:Typ.(Prover_value.typ () * auxiliary_typ)
-      ~branches ~max_proofs_verified ~name ?constraint_constants ~choices
+      ~branches ~max_proofs_verified ~name ~choices
   in
   let () =
     vk_hash :=

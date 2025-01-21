@@ -14,7 +14,7 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 module Tick = Kimchi_backend.Pasta.Vesta_based_plonk
 module Impl = Snarky_backendless.Snark.Run.Make (Tick)
 
-let add_constraint c = Impl.assert_ { basic = T c; annotation = None }
+let add_constraint c = Impl.assert_ c
 
 (* Verify finalize_and_get_gates *)
 let test_finalize_and_get_gates_with_lookup_tables () =
@@ -35,11 +35,11 @@ let test_finalize_and_get_gates_with_lookup_tables () =
   in
   let () =
     Tick.R1CS_constraint_system.(
-      add_constraint cs (T (AddFixedLookupTable { id = 1l; data = xor_table })))
+      add_constraint cs (AddFixedLookupTable { id = 1l; data = xor_table }))
   in
   let () =
     Tick.R1CS_constraint_system.(
-      add_constraint cs (T (AddFixedLookupTable { id = 2l; data = and_table })))
+      add_constraint cs (AddFixedLookupTable { id = 2l; data = and_table }))
   in
   let () = Tick.R1CS_constraint_system.set_primary_input_size cs 1 in
   let _gates, lts, _rt =
@@ -57,9 +57,8 @@ let test_finalize_and_get_gates_with_runtime_table_cfg () =
   let () =
     Tick.R1CS_constraint_system.(
       add_constraint cs
-        (T
-           (AddRuntimeTableCfg
-              { id = 1l; first_column = indexed_runtime_table_cfg } ) ))
+        (AddRuntimeTableCfg
+           { id = 1l; first_column = indexed_runtime_table_cfg } ))
   in
   let () = Tick.R1CS_constraint_system.set_primary_input_size cs 1 in
   let _aux = Tick.R1CS_constraint_system.set_auxiliary_input_size cs 1 in
@@ -435,7 +434,7 @@ let test_cannot_finalize_twice_the_fixed_lookup_tables () =
   let () =
     Tick.R1CS_constraint_system.(
       add_constraint cs
-        (T (AddFixedLookupTable { id = 1l; data = [| indexes; values |] })))
+        (AddFixedLookupTable { id = 1l; data = [| indexes; values |] }))
   in
   let () = Tick.R1CS_constraint_system.finalize_fixed_lookup_tables cs in
   Alcotest.check_raises "Finalize a second time the fixed lookup tables"
@@ -449,7 +448,7 @@ let test_cannot_finalize_twice_the_runtime_table_cfgs () =
   let cs = Tick.R1CS_constraint_system.create () in
   let () =
     Tick.R1CS_constraint_system.(
-      add_constraint cs (T (AddRuntimeTableCfg { id = 1l; first_column })))
+      add_constraint cs (AddRuntimeTableCfg { id = 1l; first_column }))
   in
   let () = Tick.R1CS_constraint_system.finalize_runtime_lookup_tables cs in
   Alcotest.check_raises

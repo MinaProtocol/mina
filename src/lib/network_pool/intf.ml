@@ -248,6 +248,9 @@ module type Network_pool_base_intf = sig
     -> resource_pool_diff_verified Envelope.Incoming.t
     -> Broadcast_callback.t
     -> unit
+
+  val apply_no_broadcast :
+    t -> resource_pool_diff_verified Envelope.Incoming.t -> unit
 end
 
 (** A [Snark_resource_pool_intf] is a superset of a
@@ -384,6 +387,7 @@ module type Transaction_resource_pool_intf = sig
     -> verifier:Verifier.t
     -> genesis_constants:Genesis_constants.t
     -> slot_tx_end:Mina_numbers.Global_slot_since_hard_fork.t option
+    -> compile_config:Mina_compile_config.t
     -> Config.t
 
   val member : t -> Transaction_hash.User_command_with_valid_signature.t -> bool

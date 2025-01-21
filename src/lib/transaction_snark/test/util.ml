@@ -64,9 +64,7 @@ let pending_coinbase_state_stack ~state_body_hash ~global_slot =
       Pending_coinbase.Stack.push_state state_body_hash global_slot init_stack
   }
 
-let trivial_zkapp =
-  lazy
-    (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
+let trivial_zkapp = lazy (Transaction_snark.For_tests.create_trivial_snapp ())
 
 type pass_number = Pass_1 | Pass_2
 
@@ -173,7 +171,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
               let open Async.Deferred.Let_syntax in
               let applied, statement_opt =
                 if ignore_outside_snark then
-                  ( Ledger.Transaction_applied.Varying.Command
+                  ( Mina_transaction_logic.Transaction_applied.Varying.Command
                       (Zkapp_command
                          { command =
                              { With_status.status = Applied
@@ -213,8 +211,8 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                     ; connecting_ledger_right = connecting_ledger
                     ; fee_excess = Zkapp_command.fee_excess zkapp_command
                     ; supply_increase =
-                        Ledger.Transaction_applied.supply_increase
-                          ~constraint_constants applied_txn
+                        Mina_transaction_logic.Transaction_applied
+                        .supply_increase ~constraint_constants applied_txn
                         |> Or_error.ok_exn
                     ; sok_digest = ()
                     }
@@ -347,7 +345,7 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
           Run.exists Zkapp_statement.typ ~compute:(fun () -> assert false)
         in
         let proof =
-          Run.exists (Typ.Internal.ref ()) ~compute:(fun () -> assert false)
+          Run.exists (Typ.prover_value ()) ~compute:(fun () -> assert false)
         in
         Impl.run_checked (Transaction_snark.dummy_constraints ()) ;
         (* Unsatisfiable. *)
@@ -620,7 +618,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
     with
     | Ok res ->
         ( if Option.is_some expected_failure then
-          match Ledger.Transaction_applied.transaction_status res with
+          match Ledger.status_of_applied res with
           | Applied ->
               failwith
                 (sprintf "Expected Ledger.apply_transaction to fail with %s"
@@ -665,7 +663,8 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   let supply_increase =
     Option.value_map applied_transaction ~default:Amount.Signed.zero
       ~f:(fun txn ->
-        Ledger.Transaction_applied.supply_increase ~constraint_constants txn
+        Mina_transaction_logic.Transaction_applied.supply_increase
+          ~constraint_constants txn
         |> Or_error.ok_exn )
   in
   match
