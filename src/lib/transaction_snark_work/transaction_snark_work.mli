@@ -52,7 +52,7 @@ end
 *)
 
 module type S = sig
-  type t [@@deriving compare, sexp, yojson]
+  type t
 
   val fee : t -> Fee.t
 
