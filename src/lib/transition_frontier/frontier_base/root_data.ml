@@ -70,18 +70,16 @@ module Limited = struct
         ; common : Common.Stable.V2.t
         }
 
-      let to_yojson { transition; protocol_states = _; common } =
-        `Assoc
-          [ ("transition", Mina_block.Validated.Stable.V2.to_yojson transition)
-          ; ("protocol_states", `String "<opaque>")
-          ; ("common", Common.Stable.V2.to_yojson common)
-          ]
-
       let to_latest = Fn.id
     end
   end]
 
-  [%%define_locally Stable.Latest.(to_yojson)]
+  let to_yojson { transition; protocol_states = _; common } =
+    `Assoc
+      [ ("transition", Mina_block.Validated.to_yojson transition)
+      ; ("protocol_states", `String "<opaque>")
+      ; ("common", Common.Stable.V2.to_yojson common)
+      ]
 
   let create ~transition ~scan_state ~pending_coinbase ~protocol_states =
     let common = { Common.scan_state; pending_coinbase } in

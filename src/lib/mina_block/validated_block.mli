@@ -4,8 +4,6 @@ open Mina_base
 module Stable : sig
   module V2 : sig
     type t [@@deriving sexp, equal]
-
-    val to_yojson : t -> Yojson.Safe.t
   end
 end]
 
