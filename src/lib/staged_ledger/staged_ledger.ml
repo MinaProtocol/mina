@@ -116,8 +116,6 @@ module T = struct
     | Error e ->
         Error (Staged_ledger_error.Unexpected e)
 
-  type job = Scan_state.Available_job.t [@@deriving sexp]
-
   let verify_proofs ~logger ~verifier proofs =
     let statements () =
       `List
@@ -199,9 +197,7 @@ module T = struct
     with
     | None ->
         Deferred.return
-          ( Or_error.errorf
-              !"Error creating statement from job %{sexp:job list}"
-              (List.map job_msg_proofs ~f:(fun (j, _, _) -> j))
+          ( Or_error.error_string "Error creating statement from job"
           |> to_staged_ledger_or_error )
     | Some proof_statement_msgs -> (
         match%map verify_proofs ~logger ~verifier proof_statement_msgs with
