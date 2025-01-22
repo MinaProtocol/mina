@@ -7,6 +7,10 @@ repository = "https://github.com/MinaProtocol/mina"
 license = "MIT/Apache-2.0"
 edition = "2021"
 
+[lib]
+name = "wires_15_stubs"
+crate-type = ["lib", "staticlib"]
+
 [dependencies]
 array-init = { workspace = true }
 libc = { workspace = true }
