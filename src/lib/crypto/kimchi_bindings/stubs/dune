@@ -1,8 +1,3 @@
-;; src/ contains no dune-related files
-;; kimchi-stubs-vendors contains the vendors for Kimchi stubs
-
-(data_only_dirs src kimchi-stubs-vendors)
-
 ;; Ignore target if it exists locally
 
 (dirs :standard .cargo \ target)
