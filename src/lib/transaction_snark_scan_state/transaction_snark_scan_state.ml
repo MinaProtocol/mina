@@ -75,7 +75,6 @@ module Available_job = struct
     ( Ledger_proof_with_sok_message.t
     , Transaction_with_witness.t )
     Parallel_scan.Available_job.t
-  [@@deriving sexp]
 end
 
 module Space_partition = Parallel_scan.Space_partition
@@ -149,7 +148,7 @@ module Job_view = struct
     `List [ `Int position; job_to_yojson ]
 end
 
-type job = Available_job.t [@@deriving sexp]
+type job = Available_job.t
 
 (*Scan state and any zkapp updates that were applied to the to the most recent
    snarked ledger but are from the tree just before the tree corresponding to
@@ -1341,9 +1340,11 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
           (total_proofs works))
     in
     map2_or_error next_jobs
-      (List.concat_map works
-         ~f:(fun { Transaction_snark_work.fee; proofs; prover } ->
-           One_or_two.map proofs ~f:(fun proof -> (fee, proof, prover))
+      (List.concat_map works ~f:(fun w ->
+           let fee = Transaction_snark_work.fee w in
+           let prover = Transaction_snark_work.prover w in
+           One_or_two.map (Transaction_snark_work.proofs w) ~f:(fun proof ->
+               (fee, proof, prover) )
            |> One_or_two.to_list ) )
       ~f:completed_work_to_scanable_work
   in

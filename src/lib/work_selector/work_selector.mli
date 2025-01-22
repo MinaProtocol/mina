@@ -41,4 +41,4 @@ val all_work :
      list
 
 val completed_work_statements :
-  snark_pool:snark_pool -> State.t -> Transaction_snark_work.unchecked list
+  snark_pool:snark_pool -> State.t -> Transaction_snark_work.Checked.t list
