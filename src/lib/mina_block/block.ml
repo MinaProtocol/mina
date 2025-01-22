@@ -60,7 +60,7 @@ let to_yojson t =
              ~default:"<None>" ~f:Protocol_version.to_string ) )
     ]
 
-[%%define_locally Stable.Latest.(create, header, body, equal)]
+[%%define_locally Stable.Latest.(create, header, body)]
 
 let wrap_with_hash block =
   With_hash.of_data block
