@@ -32,7 +32,7 @@ module Ledger_proof_with_sok_message : sig
 end
 
 module Available_job : sig
-  type t [@@deriving sexp]
+  type t
 end
 
 module Space_partition : sig

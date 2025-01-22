@@ -75,7 +75,6 @@ module Available_job = struct
     ( Ledger_proof_with_sok_message.t
     , Transaction_with_witness.t )
     Parallel_scan.Available_job.t
-  [@@deriving sexp]
 end
 
 module Space_partition = Parallel_scan.Space_partition
@@ -149,7 +148,7 @@ module Job_view = struct
     `List [ `Int position; job_to_yojson ]
 end
 
-type job = Available_job.t [@@deriving sexp]
+type job = Available_job.t
 
 (*Scan state and any zkapp updates that were applied to the to the most recent
    snarked ledger but are from the tree just before the tree corresponding to
