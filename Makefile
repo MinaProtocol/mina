@@ -175,6 +175,11 @@ macos-portable:
 update-graphql:
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build --profile=$(DUNE_PROFILE) graphql_schema.json
 
+update-rust-dependencies:
+	@cargo vendor src/lib/crypto/mina-rust-dependencies/ -q > /dev/null
+	@echo "cargo vendor output written to src/lib/crypto/mina-rust-dependencies"
+	@echo "Create a new branch and commit the change in src/lib/crypto/mina-rust-dependencies"
+
 ########################################
 ## Lint
 
@@ -297,4 +302,4 @@ ml-docs: ocaml_checks
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
 
-.PHONY: all build check-format clean deb dev mina-docker reformat doc_diagrams ml-docs macos-setup macos-setup-download setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor extract_blocks archive_blocks ocaml_version ocaml_word_size ocaml_checks switch
+.PHONY: all build check-format clean deb dev mina-docker reformat doc_diagrams ml-docs macos-setup macos-setup-download setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor extract_blocks archive_blocks ocaml_version ocaml_word_size ocaml_checks switch update-rust-dependencies
