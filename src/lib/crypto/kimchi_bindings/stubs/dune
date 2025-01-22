@@ -40,12 +40,17 @@
   (= %{env:MARLIN_PLONK_STUBS=n} n))
  (targets libwires_15_stubs.a)
  (deps
-  Cargo.toml
+  %{workspace_root}/Cargo.toml
+  %{workspace_root}/Cargo.lock
+  ./Cargo.toml
   rust-toolchain.toml
   (source_tree src)
-  (source_tree kimchi-stubs-vendors)
   (source_tree .cargo)
-  (source_tree ../../proof-systems)
+  ;; Required as Cargo asks for all members of the workspace.
+  ;; This is temporary until we move into proof-systems
+  ../wasm/Cargo.toml
+  (source_tree ../wasm/src)
+  (source_tree ../wasm/.cargo)
   (env_var MARLIN_PLONK_STUBS))
  (locks /cargo-lock) ;; lock for rustup
  (action
@@ -56,7 +61,7 @@
     (setenv
      RUSTFLAGS
      %{read:rustflags.sexp}
-     (run cargo build --release)))
+     (run cargo build --release -p wires_15_stubs)))
    (run
     cp
     %{read:../dune-build-root}/cargo_kimchi_stubs/release/libwires_15_stubs.a
@@ -146,13 +151,18 @@
   (= %{env:MARLIN_PLONK_STUBS=n} n))
  (mode promote)
  (deps
+  %{workspace_root}/Cargo.toml
+  %{workspace_root}/Cargo.lock
+  ./Cargo.toml
+  ./rust-toolchain.toml
   ../../../../.ocamlformat
-  Cargo.toml
-  rust-toolchain.toml
   (source_tree src)
-  (source_tree kimchi-stubs-vendors)
   (source_tree .cargo)
-  (source_tree ../../proof-systems)
+  ;; Required as Cargo asks for all members of the workspace.
+  ;; This is temporary until we move into proof-systems
+  ../wasm/Cargo.toml
+  (source_tree ../wasm/src)
+  (source_tree ../wasm/.cargo)
   (env_var MARLIN_PLONK_STUBS))
  (locks /cargo-lock) ;; lock for rustup
  (action
@@ -160,7 +170,7 @@
    (setenv
     CARGO_TARGET_DIR
     "%{read:../dune-build-root}/cargo_kimchi_bindgen"
-    (run cargo run %{targets}))
+    (run cargo run %{targets} -p wires_15_stubs))
    (run ocamlformat -i %{targets}))))
 
 ;; this is used by nix
