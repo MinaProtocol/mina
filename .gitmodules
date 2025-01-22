@@ -1,3 +1,6 @@
 [submodule "src/lib/snarky"]
 	path = src/lib/snarky
 	url = https://github.com/o1-labs/snarky
+[submodule "src/lib/crypto/mina-rust-dependencies"]
+	path = src/lib/crypto/mina-rust-dependencies
+	url = https://github.com/o1-labs/proof-systems-vendors/
