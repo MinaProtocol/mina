@@ -8,22 +8,18 @@
 //!   a math library that Marlin builds on top of.
 //!
 
-use wasm_bindgen::prelude::*;
 
 mod wasm_flat_vector;
 mod wasm_vector;
 
-#[wasm_bindgen]
 extern "C" {
     pub fn alert(s: &str);
 }
 
-#[wasm_bindgen]
 pub fn greet(name: &str) {
     alert(&format!("Hello, {name}!"));
 }
 
-#[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_namespace = console)]
     fn log(s: &str);
@@ -34,22 +30,18 @@ extern "C" {
 //     ($($t:tt)*) => (crate::log(&format_args!($($t)*).to_string()))
 // }
 
-#[wasm_bindgen]
 pub fn console_log(s: &str) {
     log(s);
 }
 
-#[wasm_bindgen]
 pub fn create_zero_u32_ptr() -> *mut u32 {
     Box::into_raw(std::boxed::Box::new(0))
 }
 
-#[wasm_bindgen]
 pub fn free_u32_ptr(ptr: *mut u32) {
     let _drop_me = unsafe { std::boxed::Box::from_raw(ptr) };
 }
 
-#[wasm_bindgen]
 pub fn set_u32_ptr(ptr: *mut u32, arg: u32) {
     // The rust docs explicitly forbid using this for cross-thread syncronization. Oh well, we
     // don't have anything better. As long as it works in practice, we haven't upset the undefined
@@ -60,7 +52,7 @@ pub fn set_u32_ptr(ptr: *mut u32, arg: u32) {
 }
 
 #[allow(unreachable_code)]
-#[wasm_bindgen]
+
 pub fn wait_until_non_zero(ptr: *const u32) -> u32 {
     // The rust docs explicitly forbid using this for cross-thread syncronization. Oh well, we
     // don't have anything better. As long as it works in practice, we haven't upset the undefined
