@@ -12,8 +12,8 @@
 mod wasm_flat_vector;
 mod wasm_vector;
 
-extern "C" {
-    pub fn alert(s: &str);
+pub fn alert(s: &str) {
+    println!("{}", s);
 }
 
 pub fn greet(name: &str) {
