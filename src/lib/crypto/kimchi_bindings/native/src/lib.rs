@@ -20,9 +20,12 @@ pub fn greet(name: &str) {
     alert(&format!("Hello, {name}!"));
 }
 
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
+
+/// was calling into javascript namespace previously
+///     #[wasm_bindgen(js_namespace = console)]
+///    fn log(s: &str); 
+pub fn log(s: &str) {
+    println!("{}", s);
 }
 
 // produces a warning, but can be useful
