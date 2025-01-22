@@ -189,9 +189,10 @@ module Transaction_data_getter (T : Transaction_snark_work.S) = struct
     let open Result.Let_syntax in
     let singles =
       (if Currency.Fee.(equal zero delta) then [] else [ (public_key, delta) ])
-      @ List.filter_map completed_works ~f:(fun { T.fee; prover; _ } ->
+      @ List.filter_map completed_works ~f:(fun w ->
+            let fee = T.fee w in
             if Currency.Fee.equal fee Currency.Fee.zero then None
-            else Some (prover, fee) )
+            else Some (T.prover w, fee) )
     in
     let%bind singles_map =
       Or_error.try_with (fun () ->
@@ -230,8 +231,7 @@ module Transaction_data_getter (T : Transaction_snark_work.S) = struct
       |> to_staged_ledger_or_error
     in
     let%bind work_fee =
-      sum_fees completed_works ~f:(fun { T.fee; _ } -> fee)
-      |> to_staged_ledger_or_error
+      sum_fees completed_works ~f:T.fee |> to_staged_ledger_or_error
     in
     let total_work_fee =
       Option.value ~default:Currency.Fee.zero
@@ -259,8 +259,8 @@ module Transaction_data_getter (T : Transaction_snark_work.S) = struct
       sum_fees ~f:Coinbase.Fee_transfer.fee coinbase_fts |> Or_error.ok_exn
     in
     let txn_works_others =
-      List.filter completed_works ~f:(fun { T.prover; _ } ->
-          not (Public_key.Compressed.equal receiver prover) )
+      List.filter completed_works ~f:(fun w ->
+          not (Public_key.Compressed.equal receiver (T.prover w)) )
     in
     let%bind delta =
       fee_remainder commands txn_works_others coinbase_work_fees

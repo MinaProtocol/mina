@@ -75,12 +75,13 @@ module Info = struct
 end
 
 module type S = sig
-  type t =
-    { fee : Fee.t
-    ; proofs : Ledger_proof.t One_or_two.t
-    ; prover : Public_key.Compressed.t
-    }
-  [@@deriving compare, fields, yojson, sexp]
+  type t [@@deriving compare, sexp, yojson]
+
+  val fee : t -> Fee.t
+
+  val prover : t -> Public_key.Compressed.t
+
+  val proofs : t -> Ledger_proof.t One_or_two.t
 end
 
 module T = struct

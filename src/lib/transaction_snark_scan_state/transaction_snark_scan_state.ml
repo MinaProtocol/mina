@@ -1340,9 +1340,11 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
           (total_proofs works))
     in
     map2_or_error next_jobs
-      (List.concat_map works
-         ~f:(fun { Transaction_snark_work.fee; proofs; prover } ->
-           One_or_two.map proofs ~f:(fun proof -> (fee, proof, prover))
+      (List.concat_map works ~f:(fun w ->
+           let fee = Transaction_snark_work.fee w in
+           let prover = Transaction_snark_work.prover w in
+           One_or_two.map (Transaction_snark_work.proofs w) ~f:(fun proof ->
+               (fee, proof, prover) )
            |> One_or_two.to_list ) )
       ~f:completed_work_to_scanable_work
   in

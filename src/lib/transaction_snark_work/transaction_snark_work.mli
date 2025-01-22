@@ -52,15 +52,22 @@ end
 *)
 
 module type S = sig
-  type t =
-    { fee : Fee.t
-    ; proofs : Ledger_proof.t One_or_two.t
-    ; prover : Public_key.Compressed.t
-    }
-  [@@deriving compare, fields, sexp, yojson]
+  type t [@@deriving compare, sexp, yojson]
+
+  val fee : t -> Fee.t
+
+  val prover : t -> Public_key.Compressed.t
+
+  val proofs : t -> Ledger_proof.t One_or_two.t
 end
 
-include S with type t = Mina_wire_types.Transaction_snark_work.V2.t
+type t = Mina_wire_types.Transaction_snark_work.V2.t =
+  { fee : Currency.Fee.t
+  ; proofs : Ledger_proof.t One_or_two.t
+  ; prover : Public_key.Compressed.t
+  }
+
+include S with type t := t
 
 val info : t -> Info.t
 
