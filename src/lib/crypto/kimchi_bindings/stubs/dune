@@ -157,8 +157,6 @@
  (locks /cargo-lock) ;; lock for rustup
  (action
   (progn
-   (run rm -rf ./target)
-   (run rm -f ./Cargo.lock)
    (setenv
     CARGO_TARGET_DIR
     "%{read:../dune-build-root}/cargo_kimchi_bindgen"
