@@ -10,6 +10,8 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
+let Network = ../../Constants/Network.dhall
+
 let Profiles = ../../Constants/Profiles.dhall
 
 let Command = ../../Command/Base.dhall
@@ -42,6 +44,7 @@ let Spec =
           , dependsOn =
               DebianVersions.dependsOn
                 DebianVersions.DebVersion.Bullseye
+                Network.Type.Devnet
                 Profiles.Type.Standard
           , additionalDirtyWhen = [] : List SelectFiles.Type
           , yellowThreshold = 0.1
