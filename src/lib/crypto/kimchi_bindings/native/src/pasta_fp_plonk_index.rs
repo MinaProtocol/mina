@@ -25,13 +25,11 @@ use wasm_bindgen::prelude::*;
 //
 
 /// Boxed so that we don't store large proving indexes in the OCaml heap.
-#[wasm_bindgen]
 pub struct WasmPastaFpPlonkIndex(
     #[wasm_bindgen(skip)] pub Box<ProverIndex<GAffine, OpeningProof<GAffine>>>,
 );
 
-// This should mimic LookupTable structure
-#[wasm_bindgen]
+// This should mimic LookupTable structure              
 pub struct WasmPastaFpLookupTable {
     #[wasm_bindgen(skip)]
     pub id: i32,
@@ -51,7 +49,6 @@ impl From<WasmPastaFpLookupTable> for LookupTable<Fp> {
 }
 
 // JS constructor for js/bindings.js
-#[wasm_bindgen]
 impl WasmPastaFpLookupTable {
     #[wasm_bindgen(constructor)]
     pub fn new(id: i32, data: WasmVecVecFp) -> WasmPastaFpLookupTable {
@@ -60,8 +57,6 @@ impl WasmPastaFpLookupTable {
 }
 
 // Runtime table config
-
-#[wasm_bindgen]
 pub struct WasmPastaFpRuntimeTableCfg {
     #[wasm_bindgen(skip)]
     pub id: i32,
@@ -70,7 +65,6 @@ pub struct WasmPastaFpRuntimeTableCfg {
 }
 
 // JS constructor for js/bindings.js
-#[wasm_bindgen]
 impl WasmPastaFpRuntimeTableCfg {
     #[wasm_bindgen(constructor)]
     pub fn new(id: i32, first_column: WasmFlatVector<WasmPastaFp>) -> Self {
@@ -95,7 +89,6 @@ impl From<WasmPastaFpRuntimeTableCfg> for RuntimeTableCfg<Fp> {
 //
 
 // Change js/web/worker-spec.js accordingly
-#[wasm_bindgen]
 pub fn caml_pasta_fp_plonk_index_create(
     gates: &WasmGateVector,
     public_: i32,
@@ -160,32 +153,27 @@ pub fn caml_pasta_fp_plonk_index_create(
     }
 }
 
-#[wasm_bindgen]
 pub fn caml_pasta_fp_plonk_index_max_degree(index: &WasmPastaFpPlonkIndex) -> i32 {
     index.0.srs.max_degree() as i32
 }
 
-#[wasm_bindgen]
 pub fn caml_pasta_fp_plonk_index_public_inputs(index: &WasmPastaFpPlonkIndex) -> i32 {
     index.0.cs.public as i32
 }
 
-#[wasm_bindgen]
+
 pub fn caml_pasta_fp_plonk_index_domain_d1_size(index: &WasmPastaFpPlonkIndex) -> i32 {
     index.0.cs.domain.d1.size() as i32
 }
 
-#[wasm_bindgen]
 pub fn caml_pasta_fp_plonk_index_domain_d4_size(index: &WasmPastaFpPlonkIndex) -> i32 {
     index.0.cs.domain.d4.size() as i32
 }
 
-#[wasm_bindgen]
 pub fn caml_pasta_fp_plonk_index_domain_d8_size(index: &WasmPastaFpPlonkIndex) -> i32 {
     index.0.cs.domain.d8.size() as i32
 }
 
-#[wasm_bindgen]
 pub fn caml_pasta_fp_plonk_index_decode(
     bytes: &[u8],
     srs: &WasmSrs,
@@ -203,7 +191,6 @@ pub fn caml_pasta_fp_plonk_index_decode(
     Ok(WasmPastaFpPlonkIndex(Box::new(index)))
 }
 
-#[wasm_bindgen]
 pub fn caml_pasta_fp_plonk_index_encode(index: &WasmPastaFpPlonkIndex) -> Result<Vec<u8>, JsError> {
     let mut buffer = Vec::new();
     let mut serializer = rmp_serde::Serializer::new(&mut buffer);
@@ -214,7 +201,6 @@ pub fn caml_pasta_fp_plonk_index_encode(index: &WasmPastaFpPlonkIndex) -> Result
     Ok(buffer)
 }
 
-#[wasm_bindgen]
 pub fn caml_pasta_fp_plonk_index_read(
     offset: Option<i32>,
     srs: &WasmSrs,
@@ -247,7 +233,6 @@ pub fn caml_pasta_fp_plonk_index_read(
     Ok(WasmPastaFpPlonkIndex(Box::new(t)))
 }
 
-#[wasm_bindgen]
 pub fn caml_pasta_fp_plonk_index_write(
     append: Option<bool>,
     index: &WasmPastaFpPlonkIndex,
@@ -264,7 +249,6 @@ pub fn caml_pasta_fp_plonk_index_write(
         .map_err(|e| JsValue::from_str(&format!("caml_pasta_fp_plonk_index_read: {e}")))
 }
 
-#[wasm_bindgen]
 pub fn caml_pasta_fp_plonk_index_serialize(index: &WasmPastaFpPlonkIndex) -> String {
     let serialized = rmp_serde::to_vec(&index.0).unwrap();
     base64::encode(serialized)
