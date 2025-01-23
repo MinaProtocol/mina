@@ -14,7 +14,8 @@
    bindings/prover-index.js
    bindings/util.js
    bindings/srs.js
-   bindings/verifier-index.js))
+   bindings/verifier-index.js
+   bindings/rusty.js))
  (instrumentation
   (backend bisect_ppx))
  (preprocess

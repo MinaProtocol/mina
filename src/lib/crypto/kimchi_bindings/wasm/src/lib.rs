@@ -112,3 +112,6 @@ pub mod poseidon;
 pub mod circuit;
 
 pub mod wasm_ocaml_serde;
+
+// funny rust thingies
+pub mod funny_rust_stuff;
