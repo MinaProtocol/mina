@@ -163,7 +163,8 @@ module Token_symbol = struct
     let%bind actual =
       make_checked (fun () ->
           let _, _, actual_packed =
-            Pickles.Scalar_challenge.to_field_checked' ~num_bits m
+            Pickles.Scalar_challenge.to_field_checked' ~num_bits
+              (module Run)
               (Kimchi_backend_common.Scalar_challenge.create t)
           in
           actual_packed )

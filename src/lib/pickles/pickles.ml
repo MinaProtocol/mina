@@ -316,14 +316,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-      ~max_proofs_verified ~name ?constraint_constants ~choices () =
+      ~max_proofs_verified ~name ~choices () =
     compile_with_wrap_main_override_promise ?self ?cache ?storables ?proof_cache
       ?disk_keys ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
-      ~branches ~max_proofs_verified ~name ?constraint_constants ~choices ()
+      ~branches ~max_proofs_verified ~name ~choices ()
 
   let compile ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-      ~max_proofs_verified ~name ?constraint_constants ~choices () =
+      ~max_proofs_verified ~name ~choices () =
     let choices ~self =
       let choices = choices ~self in
       let rec go :
@@ -346,7 +346,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
         ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-        ~max_proofs_verified ~name ?constraint_constants ~choices ()
+        ~max_proofs_verified ~name ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
@@ -363,7 +363,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let compile_async ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-      ~max_proofs_verified ~name ?constraint_constants ~choices () =
+      ~max_proofs_verified ~name ~choices () =
     let choices ~self =
       let choices = choices ~self in
       let rec go :
@@ -391,7 +391,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
         ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-        ~max_proofs_verified ~name ?constraint_constants ~choices ()
+        ~max_proofs_verified ~name ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.

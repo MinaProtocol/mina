@@ -487,9 +487,6 @@ end) : S = struct
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"blockchain-snark"
-      ~constraint_constants:
-        (Genesis_constants.Constraint_constants.to_snark_keys_header
-           constraint_constants )
       ~choices:(fun ~self ->
         [ rule ~proof_level ~constraint_constants T.tag self ] )
 

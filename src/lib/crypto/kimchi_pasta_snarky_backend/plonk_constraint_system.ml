@@ -146,176 +146,223 @@ end
 
 (** The PLONK constraints. *)
 module Plonk_constraint = struct
-  open Core_kernel
-
-  (** A PLONK constraint (or gate) can be [Basic], [Poseidon], [EC_add_complete], [EC_scale], [EC_endoscale], [EC_endoscalar], [RangeCheck0], [RangeCheck1], [Xor] *)
   module T = struct
-    type ('v, 'f) t =
-      | Basic of { l : 'f * 'v; r : 'f * 'v; o : 'f * 'v; m : 'f; c : 'f }
-          (** the Poseidon state is an array of states (and states are arrays of size 3). *)
-      | Poseidon of { state : 'v array array }
-      | EC_add_complete of
-          { p1 : 'v * 'v
-          ; p2 : 'v * 'v
-          ; p3 : 'v * 'v
-          ; inf : 'v
-          ; same_x : 'v
-          ; slope : 'v
-          ; inf_z : 'v
-          ; x21_inv : 'v
+    open Core_kernel
+
+    type ('field_var, 'fp) basic =
+      | Boolean of 'field_var
+      | Equal of 'field_var * 'field_var
+      | Square of 'field_var * 'field_var
+      | R1CS of 'field_var * 'field_var * 'field_var
+      | Basic of
+          { l : 'fp * 'field_var
+          ; r : 'fp * 'field_var
+          ; o : 'fp * 'field_var
+          ; m : 'fp
+          ; c : 'fp
           }
-      | EC_scale of { state : 'v Scale_round.t array }
+          (** the Poseidon state is an array of states (and states are arrays of size 3). *)
+      | Poseidon of { state : 'field_var array array }
+      | EC_add_complete of
+          { p1 : 'field_var * 'field_var
+          ; p2 : 'field_var * 'field_var
+          ; p3 : 'field_var * 'field_var
+          ; inf : 'field_var
+          ; same_x : 'field_var
+          ; slope : 'field_var
+          ; inf_z : 'field_var
+          ; x21_inv : 'field_var
+          }
+      | EC_scale of { state : 'field_var Scale_round.t array }
       | EC_endoscale of
-          { state : 'v Endoscale_round.t array; xs : 'v; ys : 'v; n_acc : 'v }
-      | EC_endoscalar of { state : 'v Endoscale_scalar_round.t array }
+          { state : 'field_var Endoscale_round.t array
+          ; xs : 'field_var
+          ; ys : 'field_var
+          ; n_acc : 'field_var
+          }
+      | EC_endoscalar of { state : 'field_var Endoscale_scalar_round.t array }
       | Lookup of
-          { w0 : 'v; w1 : 'v; w2 : 'v; w3 : 'v; w4 : 'v; w5 : 'v; w6 : 'v }
+          { w0 : 'field_var
+          ; w1 : 'field_var
+          ; w2 : 'field_var
+          ; w3 : 'field_var
+          ; w4 : 'field_var
+          ; w5 : 'field_var
+          ; w6 : 'field_var
+          }
       | RangeCheck0 of
-          { v0 : 'v (* Value to constrain to 88-bits *)
-          ; v0p0 : 'v (* MSBs *)
-          ; v0p1 : 'v (* vpX are 12-bit plookup chunks *)
-          ; v0p2 : 'v
-          ; v0p3 : 'v
-          ; v0p4 : 'v
-          ; v0p5 : 'v
-          ; v0c0 : 'v (* vcX are 2-bit crumbs *)
-          ; v0c1 : 'v
-          ; v0c2 : 'v
-          ; v0c3 : 'v
-          ; v0c4 : 'v
-          ; v0c5 : 'v
-          ; v0c6 : 'v
-          ; v0c7 : 'v (* LSBs *)
+          { v0 : 'field_var (* Value to constrain to 88-bits *)
+          ; v0p0 : 'field_var (* MSBs *)
+          ; v0p1 : 'field_var (* vpX are 12-bit plookup chunks *)
+          ; v0p2 : 'field_var
+          ; v0p3 : 'field_var
+          ; v0p4 : 'field_var
+          ; v0p5 : 'field_var
+          ; v0c0 : 'field_var (* vcX are 2-bit crumbs *)
+          ; v0c1 : 'field_var
+          ; v0c2 : 'field_var
+          ; v0c3 : 'field_var
+          ; v0c4 : 'field_var
+          ; v0c5 : 'field_var
+          ; v0c6 : 'field_var
+          ; v0c7 : 'field_var (* LSBs *)
           ; (* Coefficients *)
-            compact : 'f
+            compact : 'fp
                 (* Limbs mode coefficient: 0 (standard 3-limb) or 1 (compact 2-limb) *)
           }
       | RangeCheck1 of
           { (* Current row *)
-            v2 : 'v (* Value to constrain to 88-bits *)
-          ; v12 : 'v (* Optional value used in compact 2-limb mode *)
-          ; v2c0 : 'v (* MSBs, 2-bit crumb *)
-          ; v2p0 : 'v (* vpX are 12-bit plookup chunks *)
-          ; v2p1 : 'v
-          ; v2p2 : 'v
-          ; v2p3 : 'v
-          ; v2c1 : 'v (* vcX are 2-bit crumbs *)
-          ; v2c2 : 'v
-          ; v2c3 : 'v
-          ; v2c4 : 'v
-          ; v2c5 : 'v
-          ; v2c6 : 'v
-          ; v2c7 : 'v
-          ; v2c8 : 'v (* LSBs *)
-          ; (* Next row *) v2c9 : 'v
-          ; v2c10 : 'v
-          ; v2c11 : 'v
-          ; v0p0 : 'v
-          ; v0p1 : 'v
-          ; v1p0 : 'v
-          ; v1p1 : 'v
-          ; v2c12 : 'v
-          ; v2c13 : 'v
-          ; v2c14 : 'v
-          ; v2c15 : 'v
-          ; v2c16 : 'v
-          ; v2c17 : 'v
-          ; v2c18 : 'v
-          ; v2c19 : 'v
+            v2 : 'field_var (* Value to constrain to 88-bits *)
+          ; v12 : 'field_var (* Optional value used in compact 2-limb mode *)
+          ; v2c0 : 'field_var (* MSBs, 2-bit crumb *)
+          ; v2p0 : 'field_var (* vpX are 12-bit plookup chunks *)
+          ; v2p1 : 'field_var
+          ; v2p2 : 'field_var
+          ; v2p3 : 'field_var
+          ; v2c1 : 'field_var (* vcX are 2-bit crumbs *)
+          ; v2c2 : 'field_var
+          ; v2c3 : 'field_var
+          ; v2c4 : 'field_var
+          ; v2c5 : 'field_var
+          ; v2c6 : 'field_var
+          ; v2c7 : 'field_var
+          ; v2c8 : 'field_var (* LSBs *)
+          ; (* Next row *) v2c9 : 'field_var
+          ; v2c10 : 'field_var
+          ; v2c11 : 'field_var
+          ; v0p0 : 'field_var
+          ; v0p1 : 'field_var
+          ; v1p0 : 'field_var
+          ; v1p1 : 'field_var
+          ; v2c12 : 'field_var
+          ; v2c13 : 'field_var
+          ; v2c14 : 'field_var
+          ; v2c15 : 'field_var
+          ; v2c16 : 'field_var
+          ; v2c17 : 'field_var
+          ; v2c18 : 'field_var
+          ; v2c19 : 'field_var
           }
       | Xor of
-          { in1 : 'v
-          ; in2 : 'v
-          ; out : 'v
-          ; in1_0 : 'v
-          ; in1_1 : 'v
-          ; in1_2 : 'v
-          ; in1_3 : 'v
-          ; in2_0 : 'v
-          ; in2_1 : 'v
-          ; in2_2 : 'v
-          ; in2_3 : 'v
-          ; out_0 : 'v
-          ; out_1 : 'v
-          ; out_2 : 'v
-          ; out_3 : 'v
+          { in1 : 'field_var
+          ; in2 : 'field_var
+          ; out : 'field_var
+          ; in1_0 : 'field_var
+          ; in1_1 : 'field_var
+          ; in1_2 : 'field_var
+          ; in1_3 : 'field_var
+          ; in2_0 : 'field_var
+          ; in2_1 : 'field_var
+          ; in2_2 : 'field_var
+          ; in2_3 : 'field_var
+          ; out_0 : 'field_var
+          ; out_1 : 'field_var
+          ; out_2 : 'field_var
+          ; out_3 : 'field_var
           }
       | ForeignFieldAdd of
-          { left_input_lo : 'v
-          ; left_input_mi : 'v
-          ; left_input_hi : 'v
-          ; right_input_lo : 'v
-          ; right_input_mi : 'v
-          ; right_input_hi : 'v
-          ; field_overflow : 'v
-          ; carry : 'v
-          ; (* Coefficients *) foreign_field_modulus0 : 'f
-          ; foreign_field_modulus1 : 'f
-          ; foreign_field_modulus2 : 'f
-          ; sign : 'f
+          { left_input_lo : 'field_var
+          ; left_input_mi : 'field_var
+          ; left_input_hi : 'field_var
+          ; right_input_lo : 'field_var
+          ; right_input_mi : 'field_var
+          ; right_input_hi : 'field_var
+          ; field_overflow : 'field_var
+          ; carry : 'field_var
+          ; (* Coefficients *) foreign_field_modulus0 : 'fp
+          ; foreign_field_modulus1 : 'fp
+          ; foreign_field_modulus2 : 'fp
+          ; sign : 'fp
           }
       | ForeignFieldMul of
-          { left_input0 : 'v
-          ; left_input1 : 'v
-          ; left_input2 : 'v
-          ; right_input0 : 'v
-          ; right_input1 : 'v
-          ; right_input2 : 'v
-          ; remainder01 : 'v
-          ; remainder2 : 'v
-          ; quotient0 : 'v
-          ; quotient1 : 'v
-          ; quotient2 : 'v
-          ; quotient_hi_bound : 'v
-          ; product1_lo : 'v
-          ; product1_hi_0 : 'v
-          ; product1_hi_1 : 'v
-          ; carry0 : 'v
-          ; carry1_0 : 'v
-          ; carry1_12 : 'v
-          ; carry1_24 : 'v
-          ; carry1_36 : 'v
-          ; carry1_48 : 'v
-          ; carry1_60 : 'v
-          ; carry1_72 : 'v
-          ; carry1_84 : 'v
-          ; carry1_86 : 'v
-          ; carry1_88 : 'v
-          ; carry1_90 : 'v
-          ; (* Coefficients *) foreign_field_modulus2 : 'f
-          ; neg_foreign_field_modulus0 : 'f
-          ; neg_foreign_field_modulus1 : 'f
-          ; neg_foreign_field_modulus2 : 'f
+          { left_input0 : 'field_var
+          ; left_input1 : 'field_var
+          ; left_input2 : 'field_var
+          ; right_input0 : 'field_var
+          ; right_input1 : 'field_var
+          ; right_input2 : 'field_var
+          ; remainder01 : 'field_var
+          ; remainder2 : 'field_var
+          ; quotient0 : 'field_var
+          ; quotient1 : 'field_var
+          ; quotient2 : 'field_var
+          ; quotient_hi_bound : 'field_var
+          ; product1_lo : 'field_var
+          ; product1_hi_0 : 'field_var
+          ; product1_hi_1 : 'field_var
+          ; carry0 : 'field_var
+          ; carry1_0 : 'field_var
+          ; carry1_12 : 'field_var
+          ; carry1_24 : 'field_var
+          ; carry1_36 : 'field_var
+          ; carry1_48 : 'field_var
+          ; carry1_60 : 'field_var
+          ; carry1_72 : 'field_var
+          ; carry1_84 : 'field_var
+          ; carry1_86 : 'field_var
+          ; carry1_88 : 'field_var
+          ; carry1_90 : 'field_var
+          ; (* Coefficients *) foreign_field_modulus2 : 'fp
+          ; neg_foreign_field_modulus0 : 'fp
+          ; neg_foreign_field_modulus1 : 'fp
+          ; neg_foreign_field_modulus2 : 'fp
           }
       | Rot64 of
           { (* Current row *)
-            word : 'v
-          ; rotated : 'v
-          ; excess : 'v
-          ; bound_limb0 : 'v
-          ; bound_limb1 : 'v
-          ; bound_limb2 : 'v
-          ; bound_limb3 : 'v
-          ; bound_crumb0 : 'v
-          ; bound_crumb1 : 'v
-          ; bound_crumb2 : 'v
-          ; bound_crumb3 : 'v
-          ; bound_crumb4 : 'v
-          ; bound_crumb5 : 'v
-          ; bound_crumb6 : 'v
-          ; bound_crumb7 : 'v
-          ; (* Coefficients *) two_to_rot : 'f (* Rotation scalar 2^rot *)
+            word : 'field_var
+          ; rotated : 'field_var
+          ; excess : 'field_var
+          ; bound_limb0 : 'field_var
+          ; bound_limb1 : 'field_var
+          ; bound_limb2 : 'field_var
+          ; bound_limb3 : 'field_var
+          ; bound_crumb0 : 'field_var
+          ; bound_crumb1 : 'field_var
+          ; bound_crumb2 : 'field_var
+          ; bound_crumb3 : 'field_var
+          ; bound_crumb4 : 'field_var
+          ; bound_crumb5 : 'field_var
+          ; bound_crumb6 : 'field_var
+          ; bound_crumb7 : 'field_var
+          ; (* Coefficients *) two_to_rot : 'fp (* Rotation scalar 2^rot *)
           }
-      | AddFixedLookupTable of { id : int32; data : 'f array array }
-      | AddRuntimeTableCfg of { id : int32; first_column : 'f array }
+      | AddFixedLookupTable of { id : int32; data : 'fp array array }
+      | AddRuntimeTableCfg of { id : int32; first_column : 'fp array }
       | Raw of
-          { kind : Kimchi_gate_type.t; values : 'v array; coeffs : 'f array }
+          { kind : Kimchi_gate_type.t
+          ; values : 'field_var array
+          ; coeffs : 'fp array
+          }
     [@@deriving sexp]
+  end
 
-    (** map t *)
-    let map (type a b f) (t : (a, f) t) ~(f : a -> b) =
+  include T
+
+  module Make (Fp : Field.S) = struct
+    open Core_kernel
+    include T
+
+    type t = (Fp.t Snarky_backendless.Cvar.t, Fp.t) basic [@@deriving sexp]
+
+    let equal x y = Equal (x, y)
+
+    let boolean x = Boolean x
+
+    let r1cs a b c = R1CS (a, b, c)
+
+    let square a c = Square (a, c)
+
+    let map (t : t) ~f =
       let fp (x, y) = (f x, f y) in
       match t with
+      | Boolean v ->
+          Boolean (f v)
+      | Equal (v1, v2) ->
+          Equal (f v1, f v2)
+      | R1CS (v1, v2, v3) ->
+          R1CS (f v1, f v2, f v3)
+      | Square (a, c) ->
+          Square (f a, f c)
       | Basic { l; r; o; m; c } ->
           let p (x, y) = (x, f y) in
           Basic { l = p l; r = p r; o = p o; m; c }
@@ -630,33 +677,80 @@ module Plonk_constraint = struct
       | Raw { kind; values; coeffs } ->
           Raw { kind; values = Array.map ~f values; coeffs }
 
-    (** [eval (module F) get_variable gate] checks that [gate]'s polynomial is
-        satisfied by the assignments given by [get_variable].
-        Warning: currently only implemented for the [Basic] gate.
-    *)
-    let eval (type v f)
-        (module F : Snarky_backendless.Field_intf.S with type t = f)
-        (eval_one : v -> f) (t : (v, f) t) =
+    let log_constraint (basic : t) get_value =
+      match basic with
+      | Boolean var ->
+          Format.(asprintf "Boolean %s" (Fp.to_string (get_value var)))
+      | Equal (var1, var2) ->
+          Format.(
+            asprintf "Equal %s %s"
+              (Fp.to_string (get_value var1))
+              (Fp.to_string (get_value var2)))
+      | Square (var1, var2) ->
+          Format.(
+            asprintf "Square %s %s"
+              (Fp.to_string (get_value var1))
+              (Fp.to_string (get_value var2)))
+      | R1CS (var1, var2, var3) ->
+          Format.(
+            asprintf "R1CS %s %s %s"
+              (Fp.to_string (get_value var1))
+              (Fp.to_string (get_value var2))
+              (Fp.to_string (get_value var3)))
+      | _ ->
+          Format.asprintf !"%{sexp:(Fp.t, Fp.t) basic}" (map basic ~f:get_value)
+
+    let eval (t : t) (eval_one : _ -> Fp.t) =
       match t with
+      | Boolean v ->
+          let x = eval_one v in
+          Fp.(equal x zero || equal x one)
+      | Equal (v1, v2) ->
+          Fp.equal (eval_one v1) (eval_one v2)
+      | R1CS (v1, v2, v3) ->
+          Fp.(equal (mul (eval_one v1) (eval_one v2)) (eval_one v3))
+      | Square (a, c) ->
+          Fp.equal (Fp.square (eval_one a)) (eval_one c)
       (* cl * vl + cr * vr + co * vo + m * vl*vr + c = 0 *)
       | Basic { l = cl, vl; r = cr, vr; o = co, vo; m; c } ->
           let vl = eval_one vl in
           let vr = eval_one vr in
           let vo = eval_one vo in
-          let open F in
+          let open Fp in
           let res =
             List.reduce_exn ~f:add
               [ mul cl vl; mul cr vr; mul co vo; mul m (mul vl vr); c ]
           in
           equal zero res
-      | _ ->
+      | Poseidon _
+      | EC_add_complete _
+      | EC_scale _
+      | EC_endoscale _
+      | EC_endoscalar _
+      | Lookup _
+      | RangeCheck0 _
+      | RangeCheck1 _
+      | Xor _
+      | ForeignFieldAdd _
+      | ForeignFieldMul _
+      | Rot64 _
+      | AddFixedLookupTable _
+      | AddRuntimeTableCfg _
+      | Raw _ ->
+          (* Skip validation *)
           true
   end
+end
 
-  include T
+module type Snark_intf = sig
+  type field
 
-  (* Adds our constraint enum to the list of constraints handled by Snarky. *)
-  include Snarky_backendless.Constraint.Add_kind (T)
+  include
+    Snarky_backendless.Snark_intf.Run
+      with type field := field
+       and type field_var = field Snarky_backendless.Cvar.t
+       and type Constraint.t =
+        (field Snarky_backendless.Cvar.t, field) Plonk_constraint.basic
 end
 
 module Internal_var = Core_kernel.Unique_id.Int ()
@@ -824,6 +918,31 @@ module Make
 
   type nonrec t = (Fp.t, Gates.t) t
 
+  module Constraint : sig
+    type t = (Fp.t Snarky_backendless.Cvar.t, Fp.t) Plonk_constraint.basic
+    [@@deriving sexp]
+
+    val boolean : Fp.t Snarky_backendless.Cvar.t -> t
+
+    val equal :
+      Fp.t Snarky_backendless.Cvar.t -> Fp.t Snarky_backendless.Cvar.t -> t
+
+    val r1cs :
+         Fp.t Snarky_backendless.Cvar.t
+      -> Fp.t Snarky_backendless.Cvar.t
+      -> Fp.t Snarky_backendless.Cvar.t
+      -> t
+
+    val square :
+      Fp.t Snarky_backendless.Cvar.t -> Fp.t Snarky_backendless.Cvar.t -> t
+
+    val eval : t -> (Fp.t Snarky_backendless.Cvar.t -> Fp.t) -> bool
+
+    val log_constraint : t -> (Fp.t Snarky_backendless.Cvar.t -> Fp.t) -> string
+  end
+
+  type constraint_ = Constraint.t
+
   val create : unit -> t
 
   val get_public_input_size : t -> int Set_once.t
@@ -855,13 +974,7 @@ module Make
       called twice. *)
   val finalize_runtime_lookup_tables : t -> unit
 
-  val add_constraint :
-       ?label:string
-    -> t
-    -> ( Fp.t Snarky_backendless.Cvar.t
-       , Fp.t )
-       Snarky_backendless.Constraint.basic
-    -> unit
+  val add_constraint : t -> constraint_ -> unit
 
   val compute_witness :
        t
@@ -883,6 +996,9 @@ module Make
   val to_json : t -> string
 end = struct
   open Core_kernel
+  module Constraint = Plonk_constraint.Make (Fp)
+
+  type constraint_ = Constraint.t
 
   (* Used by compute_witness to build the runtime tables from the Lookup
      constraint *)
@@ -1412,11 +1528,7 @@ end = struct
             (Fp.one, `Var res) )
 
   (** Adds a constraint to the constraint system. *)
-  let add_constraint ?label:_ sys
-      (constr :
-        ( Fp.t Snarky_backendless.Cvar.t
-        , Fp.t )
-        Snarky_backendless.Constraint.basic ) =
+  let add_constraint sys (constr : Constraint.t) =
     let red = reduce_lincom sys in
     (* reduce any [Cvar.t] to a single internal variable *)
     let reduce_to_v (x : Fp.t Snarky_backendless.Cvar.t) : V.t =
@@ -1443,7 +1555,7 @@ end = struct
               x )
     in
     match constr with
-    | Snarky_backendless.Constraint.Square (v1, v2) -> (
+    | Square (v1, v2) -> (
         match (red v1, red v2) with
         | (sl, `Var xl), (so, `Var xo) ->
             (* (sl * xl)^2 = so * xo
@@ -1464,7 +1576,7 @@ end = struct
               sys
         | (sl, `Constant), (so, `Constant) ->
             assert (Fp.(equal (square sl) so)) )
-    | Snarky_backendless.Constraint.R1CS (v1, v2, v3) -> (
+    | R1CS (v1, v2, v3) -> (
         match (red v1, red v2, red v3) with
         | (s1, `Var x1), (s2, `Var x2), (s3, `Var x3) ->
             (* s1 x1 * s2 x2 = s3 x3
@@ -1501,7 +1613,7 @@ end = struct
               sys
         | (s1, `Constant), (s2, `Constant), (s3, `Constant) ->
             assert (Fp.(equal s3 Fp.(s1 * s2))) )
-    | Snarky_backendless.Constraint.Boolean v -> (
+    | Boolean v -> (
         let s, x = red v in
         match x with
         | `Var x ->
@@ -1511,7 +1623,7 @@ end = struct
               sys
         | `Constant ->
             assert (Fp.(equal s (s * s))) )
-    | Snarky_backendless.Constraint.Equal (v1, v2) -> (
+    | Equal (v1, v2) -> (
         let (s1, x1), (s2, x2) = (red v1, red v2) in
         match (x1, x2) with
         | `Var x1, `Var x2 ->
@@ -1556,7 +1668,7 @@ end = struct
                 Hashtbl.set sys.cached_constants ~key:ratio ~data:x2 )
         | `Constant, `Constant ->
             assert (Fp.(equal s1 s2)) )
-    | Plonk_constraint.T (Basic { l; r; o; m; c }) ->
+    | Basic { l; r; o; m; c } ->
         (* 0
            = l.s * l.x
            + r.s * r.x
@@ -1620,7 +1732,7 @@ end = struct
        state = [ x , x  , x ], [ y, y, y ], ... ]
                  i=0, perm^   i=1, perm^
     *)
-    | Plonk_constraint.T (Poseidon { state }) ->
+    | Poseidon { state } ->
         (* reduce the state *)
         let reduce_state sys (s : Fp.t Snarky_backendless.Cvar.t array array) :
             V.t array array =
@@ -1701,8 +1813,7 @@ end = struct
               failwith "incorrect number of states given"
         in
         process_5_states_at_a_time ~round:0 (Array.to_list state)
-    | Plonk_constraint.T
-        (EC_add_complete { p1; p2; p3; inf; same_x; slope; inf_z; x21_inv }) ->
+    | EC_add_complete { p1; p2; p3; inf; same_x; slope; inf_z; x21_inv } ->
         let reduce_curve_point (x, y) = (reduce_to_v x, reduce_to_v y) in
 
         (*
@@ -1731,7 +1842,7 @@ end = struct
           |]
         in
         add_row sys vars CompleteAdd [||]
-    | Plonk_constraint.T (EC_scale { state }) ->
+    | EC_scale { state } ->
         let i = ref 0 in
         (*
  0   1   2   3   4   5   6   7   8   9   10  11  12  13  14
@@ -1784,7 +1895,7 @@ end = struct
           ~f:(fun round -> add_ecscale_round round ; incr i)
           (Array.map state ~f:(Scale_round.map ~f:reduce_to_v)) ;
         ()
-    | Plonk_constraint.T (EC_endoscale { state; xs; ys; n_acc }) ->
+    | EC_endoscale { state; xs; ys; n_acc } ->
         (* Reduce state. *)
         let state = Array.map state ~f:(Endoscale_round.map ~f:reduce_to_v) in
         (* Add round function. *)
@@ -1830,8 +1941,7 @@ end = struct
           |]
         in
         add_row sys vars Zero [||]
-    | Plonk_constraint.T
-        (EC_endoscalar { state : 'v Endoscale_scalar_round.t array }) ->
+    | EC_endoscalar { state : 'v Endoscale_scalar_round.t array } ->
         (* Add round function. *)
         let add_endoscale_scalar_round (round : V.t Endoscale_scalar_round.t) =
           let row =
@@ -1858,7 +1968,7 @@ end = struct
           ~f:
             (Fn.compose add_endoscale_scalar_round
                (Endoscale_scalar_round.map ~f:reduce_to_v) )
-    | Plonk_constraint.T (Lookup { w0; w1; w2; w3; w4; w5; w6 }) ->
+    | Lookup { w0; w1; w2; w3; w4; w5; w6 } ->
         (* table ID *)
         let red_w0 = reduce_to_v w0 in
         (* idx1 *)
@@ -1891,25 +2001,24 @@ end = struct
         sys.runtime_lookups_rev <-
           lookup3 :: lookup2 :: lookup1 :: sys.runtime_lookups_rev ;
         add_row sys vars Lookup [||]
-    | Plonk_constraint.T
-        (RangeCheck0
-          { v0
-          ; v0p0
-          ; v0p1
-          ; v0p2
-          ; v0p3
-          ; v0p4
-          ; v0p5
-          ; v0c0
-          ; v0c1
-          ; v0c2
-          ; v0c3
-          ; v0c4
-          ; v0c5
-          ; v0c6
-          ; v0c7
-          ; compact
-          } ) ->
+    | RangeCheck0
+        { v0
+        ; v0p0
+        ; v0p1
+        ; v0p2
+        ; v0p3
+        ; v0p4
+        ; v0p5
+        ; v0c0
+        ; v0c1
+        ; v0c2
+        ; v0c3
+        ; v0c4
+        ; v0c5
+        ; v0c6
+        ; v0c7
+        ; compact
+        } ->
         (*
         //! 0   1   2   3   4   5   6   7   8   9  10  11  12  13  14
         //! v vp0 vp1 vp2 vp3 vp4 vp5 vc0 vc1 vc2 vc3 vc4 vc5 vc6 vc7
@@ -1934,39 +2043,38 @@ end = struct
         in
         let coeff = if Fp.equal compact Fp.one then Fp.one else Fp.zero in
         add_row sys vars RangeCheck0 [| coeff |]
-    | Plonk_constraint.T
-        (RangeCheck1
-          { (* Current row *) v2
-          ; v12
-          ; v2c0
-          ; v2p0
-          ; v2p1
-          ; v2p2
-          ; v2p3
-          ; v2c1
-          ; v2c2
-          ; v2c3
-          ; v2c4
-          ; v2c5
-          ; v2c6
-          ; v2c7
-          ; v2c8
-          ; (* Next row *) v2c9
-          ; v2c10
-          ; v2c11
-          ; v0p0
-          ; v0p1
-          ; v1p0
-          ; v1p1
-          ; v2c12
-          ; v2c13
-          ; v2c14
-          ; v2c15
-          ; v2c16
-          ; v2c17
-          ; v2c18
-          ; v2c19
-          } ) ->
+    | RangeCheck1
+        { (* Current row *) v2
+        ; v12
+        ; v2c0
+        ; v2p0
+        ; v2p1
+        ; v2p2
+        ; v2p3
+        ; v2c1
+        ; v2c2
+        ; v2c3
+        ; v2c4
+        ; v2c5
+        ; v2c6
+        ; v2c7
+        ; v2c8
+        ; (* Next row *) v2c9
+        ; v2c10
+        ; v2c11
+        ; v0p0
+        ; v0p1
+        ; v1p0
+        ; v1p1
+        ; v2c12
+        ; v2c13
+        ; v2c14
+        ; v2c15
+        ; v2c16
+        ; v2c17
+        ; v2c18
+        ; v2c19
+        } ->
         (*
         //!       0      1      2     3    4    5    6     7     8     9    10    11    12   13     14
         //! Curr: v2   v12   v2c0  v2p0 v2p1 v2p2 v2p3  v2c1  v2c2  v2c3  v2c4  v2c5  v2c6 v2c7   v2c8
@@ -2010,24 +2118,23 @@ end = struct
         in
         add_row sys vars_curr RangeCheck1 [||] ;
         add_row sys vars_next Zero [||]
-    | Plonk_constraint.T
-        (Xor
-          { in1
-          ; in2
-          ; out
-          ; in1_0
-          ; in1_1
-          ; in1_2
-          ; in1_3
-          ; in2_0
-          ; in2_1
-          ; in2_2
-          ; in2_3
-          ; out_0
-          ; out_1
-          ; out_2
-          ; out_3
-          } ) ->
+    | Xor
+        { in1
+        ; in2
+        ; out
+        ; in1_0
+        ; in1_1
+        ; in1_2
+        ; in1_3
+        ; in2_0
+        ; in2_1
+        ; in2_2
+        ; in2_3
+        ; out_0
+        ; out_1
+        ; out_2
+        ; out_3
+        } ->
         (* | Column |          Curr    | Next (gadget responsibility) |
            | ------ | ---------------- | ---------------------------- |
            |      0 | copy     `in1`   | copy     `in1'`              |
@@ -2068,21 +2175,20 @@ end = struct
            For that, the first coefficient is 1 and the rest will be zero.
            This will be included in the gadget for a chain of Xors, not here.*)
         add_row sys curr_row Xor16 [||]
-    | Plonk_constraint.T
-        (ForeignFieldAdd
-          { left_input_lo
-          ; left_input_mi
-          ; left_input_hi
-          ; right_input_lo
-          ; right_input_mi
-          ; right_input_hi
-          ; field_overflow
-          ; carry
-          ; (* Coefficients *) foreign_field_modulus0
-          ; foreign_field_modulus1
-          ; foreign_field_modulus2
-          ; sign
-          } ) ->
+    | ForeignFieldAdd
+        { left_input_lo
+        ; left_input_mi
+        ; left_input_hi
+        ; right_input_lo
+        ; right_input_mi
+        ; right_input_hi
+        ; field_overflow
+        ; carry
+        ; (* Coefficients *) foreign_field_modulus0
+        ; foreign_field_modulus1
+        ; foreign_field_modulus2
+        ; sign
+        } ->
         (*
         //! | Gate   | `ForeignFieldAdd`        | Circuit/gadget responsibility  |
         //! | ------ | ------------------------ | ------------------------------ |
@@ -2128,40 +2234,39 @@ end = struct
            ; foreign_field_modulus2
            ; sign
           |]
-    | Plonk_constraint.T
-        (ForeignFieldMul
-          { left_input0
-          ; left_input1
-          ; left_input2
-          ; right_input0
-          ; right_input1
-          ; right_input2
-          ; remainder01
-          ; remainder2
-          ; quotient0
-          ; quotient1
-          ; quotient2
-          ; quotient_hi_bound
-          ; product1_lo
-          ; product1_hi_0
-          ; product1_hi_1
-          ; carry0
-          ; carry1_0
-          ; carry1_12
-          ; carry1_24
-          ; carry1_36
-          ; carry1_48
-          ; carry1_60
-          ; carry1_72
-          ; carry1_84
-          ; carry1_86
-          ; carry1_88
-          ; carry1_90
-          ; (* Coefficients *) foreign_field_modulus2
-          ; neg_foreign_field_modulus0
-          ; neg_foreign_field_modulus1
-          ; neg_foreign_field_modulus2
-          } ) ->
+    | ForeignFieldMul
+        { left_input0
+        ; left_input1
+        ; left_input2
+        ; right_input0
+        ; right_input1
+        ; right_input2
+        ; remainder01
+        ; remainder2
+        ; quotient0
+        ; quotient1
+        ; quotient2
+        ; quotient_hi_bound
+        ; product1_lo
+        ; product1_hi_0
+        ; product1_hi_1
+        ; carry0
+        ; carry1_0
+        ; carry1_12
+        ; carry1_24
+        ; carry1_36
+        ; carry1_48
+        ; carry1_60
+        ; carry1_72
+        ; carry1_84
+        ; carry1_86
+        ; carry1_88
+        ; carry1_90
+        ; (* Coefficients *) foreign_field_modulus2
+        ; neg_foreign_field_modulus0
+        ; neg_foreign_field_modulus1
+        ; neg_foreign_field_modulus2
+        } ->
         (*
           | col | `ForeignFieldMul`       | `Zero`                     |
           | --- | ----------------------- | -------------------------- |
@@ -2226,25 +2331,24 @@ end = struct
            ; neg_foreign_field_modulus2
           |] ;
         add_row sys vars_next Zero [||]
-    | Plonk_constraint.T
-        (Rot64
-          { word
-          ; rotated
-          ; excess
-          ; bound_limb0
-          ; bound_limb1
-          ; bound_limb2
-          ; bound_limb3
-          ; bound_crumb0
-          ; bound_crumb1
-          ; bound_crumb2
-          ; bound_crumb3
-          ; bound_crumb4
-          ; bound_crumb5
-          ; bound_crumb6
-          ; bound_crumb7
-          ; (* Coefficients *) two_to_rot
-          } ) ->
+    | Rot64
+        { word
+        ; rotated
+        ; excess
+        ; bound_limb0
+        ; bound_limb1
+        ; bound_limb2
+        ; bound_limb3
+        ; bound_crumb0
+        ; bound_crumb1
+        ; bound_crumb2
+        ; bound_crumb3
+        ; bound_crumb4
+        ; bound_crumb5
+        ; bound_crumb6
+        ; bound_crumb7
+        ; (* Coefficients *) two_to_rot
+        } ->
         (*
         //! | Gate   | `Rot64`             | `RangeCheck0` gadgets (designer's duty)                   |
         //! | ------ | ------------------- | --------------------------------------------------------- |
@@ -2285,7 +2389,7 @@ end = struct
           |]
         in
         add_row sys vars_curr Rot64 [| two_to_rot |]
-    | Plonk_constraint.T (AddFixedLookupTable { id; data }) -> (
+    | AddFixedLookupTable { id; data } -> (
         match sys.fixed_lookup_tables with
         | Unfinalized_fixed_lookup_tables_rev fixed_lookup_tables ->
             let lt : Fp.t Kimchi_types.lookup_table list =
@@ -2296,7 +2400,7 @@ end = struct
             failwith
               "Trying to add a fixed lookup tables when it has been already \
                finalized" )
-    | Plonk_constraint.T (AddRuntimeTableCfg { id; first_column }) -> (
+    | AddRuntimeTableCfg { id; first_column } -> (
         match sys.runtime_tables_cfg with
         | Unfinalized_runtime_tables_cfg_rev runtime_tables_cfg ->
             let rt_cfg : Fp.t Kimchi_types.runtime_table_cfg list =
@@ -2307,7 +2411,7 @@ end = struct
             failwith
               "Trying to add a runtime table configuration  it has been \
                already finalized" )
-    | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
+    | Raw { kind; values; coeffs } ->
         let values =
           Array.init 15 ~f:(fun i ->
               (* Insert [None] if the index is beyond the end of the [values]
@@ -2316,8 +2420,4 @@ end = struct
               Option.try_with (fun () -> reduce_to_v values.(i)) )
         in
         add_row sys values kind coeffs
-    | constr ->
-        failwithf "Unhandled constraint %s"
-          Obj.(Extension_constructor.name (Extension_constructor.of_val constr))
-          ()
 end
