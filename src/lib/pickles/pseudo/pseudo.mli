@@ -6,12 +6,12 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) : sig
   (** The type parameter ['n] is the size of the vector, and ['a] is the domains
       of the vector elements. *)
   type ('a, 'n) t =
-    'n One_hot_vector.T(Impl).t * ('a, 'n) Pickles_types.Vector.t
+    'n One_hot_vector.Make(Impl).t * ('a, 'n) Pickles_types.Vector.t
 
   val seal : Impl.Field.t -> Impl.Field.t
 
   val mask :
-       'n One_hot_vector.T(Impl).t
+       'n One_hot_vector.Make(Impl).t
     -> (Impl.Field.t, 'n) Pickles_types.Vector.t
     -> Impl.Field.t
 
@@ -51,3 +51,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) : sig
       -> Impl.Field.t Plonk_checks.plonk_domain
   end
 end
+
+module Step : module type of Make (Kimchi_pasta_snarky_backend.Step_impl)
+
+module Wrap : module type of Make (Kimchi_pasta_snarky_backend.Wrap_impl)

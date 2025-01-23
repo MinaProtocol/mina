@@ -612,14 +612,9 @@ module Wrap : sig
     val opt_spec :
          ('a, 'b, 'c, 'd) t
       -> ( ('a Scalar_challenge.t * unit) Hlist.HlistId.t option
-         , ( ('b Scalar_challenge.t * unit) Hlist.HlistId.t
-           , 'f Snarky_backendless.Cvar.t
-             Snarky_backendless__Snark_intf.Boolean0.t )
-           opt
+         , (('b Scalar_challenge.t * unit) Hlist.HlistId.t, 'bool2) opt
          , < bool1 : bool
-           ; bool2 :
-               'f Snarky_backendless.Cvar.t
-               Snarky_backendless__Snark_intf.Boolean0.t
+           ; bool2 : 'bool2
            ; challenge1 : 'a
            ; challenge2 : 'b
            ; field1 : 'c
@@ -819,7 +814,7 @@ module Wrap : sig
       (** A layout of the raw data in a statement, which is needed for
           representing it inside the circuit. *)
       val spec :
-           'a Spec.impl
+           ('f, 'v) Spec.impl
         -> ('challenge1, 'challenge2, 'field1, 'field2) Lookup_parameters.t
         -> Opt.Flag.t Plonk_types.Features.t
         -> ( ( 'field1
@@ -845,11 +840,7 @@ module Wrap : sig
              , 'bool2 )
              flat_repr
            , < bool1 : bool
-             ; bool2 :
-                 ('a Snarky_backendless.Cvar.t
-                  Snarky_backendless__Snark_intf.Boolean0.t
-                  as
-                  'bool2 )
+             ; bool2 : 'bool2
              ; branch_data1 : 'branch_data1
              ; branch_data2 : 'branch_data2
              ; bulletproof_challenge1 : 'bulletproof_challenge1
@@ -1173,7 +1164,7 @@ module Step : sig
                ; digest1 : 'digest1
                ; digest2 : 'digest2
                ; field1 : 'field1
-               ; field2 : ('f Snarky_backendless.Cvar.t as 'field2)
+               ; field2 : 'field2
                ; .. > )
              Spec.T.t
 
@@ -1199,13 +1190,10 @@ module Step : sig
       val typ :
            ('b, 'c) Step_impl.Typ.t
         -> assert_16_bits:(Step_impl.Field.t -> unit)
-        -> ( ( Step_impl.Field.Constant.t Limb_vector.Challenge.t
-             , Step_impl.Field.Constant.t Limb_vector.Challenge.t
-               Scalar_challenge.t
+        -> ( ( Step_impl.Field.t
+             , Step_impl.Field.t Scalar_challenge.t
              , 'b
-             , ( Step_impl.Field.Constant.t Limb_vector.Challenge.t
-                 Scalar_challenge.t
-                 Bulletproof_challenge.t
+             , ( Step_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
                , Backend.Tock.Rounds.n )
                Vector.t
              , Step_impl.Field.t
@@ -1246,13 +1234,10 @@ module Step : sig
          assert_16_bits:(Wrap_impl.Field.t -> unit)
       -> (Opt.Flag.t Plonk_types.Features.t, 'n) Vector.t
       -> ('b, 'a) Wrap_impl.Typ.t
-      -> ( ( ( ( Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
-               , Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
-                 Scalar_challenge.t
+      -> ( ( ( ( Wrap_impl.Field.t
+               , Wrap_impl.Field.t Scalar_challenge.t
                , 'b
-               , ( Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
-                   Scalar_challenge.t
-                   Bulletproof_challenge.t
+               , ( Wrap_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
                  , Backend.Tock.Rounds.n )
                  Vector.t
                , Wrap_impl.Field.t
@@ -1344,21 +1329,15 @@ module Step : sig
                * ( ('j, Nat.N1.n) Vector.t
                  * ( ('e, Nat.N2.n) Vector.t
                    * ( ('e Scalar_challenge.t, Nat.N3.n) Vector.t
-                     * ( ('k, 'c) Vector.t
-                       * ( ( 'a Snarky_backendless.Cvar.t
-                             Snarky_backendless__Snark_intf.Boolean0.t
-                           , Nat.N1.n )
-                           Vector.t
-                         * unit ) ) ) ) ) )
+                     * (('k, 'c) Vector.t * (('bool2, Nat.N1.n) Vector.t * unit))
+                     ) ) ) )
                Hlist.HlistId.t
              , 'b )
              Vector.t
            * ('j * (('j, 'b) Vector.t * unit)) )
            Hlist.HlistId.t
          , < bool1 : bool
-           ; bool2 :
-               'a Snarky_backendless.Cvar.t
-               Snarky_backendless__Snark_intf.Boolean0.t
+           ; bool2 : 'bool2
            ; bulletproof_challenge1 : 'i
            ; bulletproof_challenge2 : 'k
            ; challenge1 : 'd
@@ -1373,11 +1352,10 @@ module Step : sig
 end
 
 module Challenges_vector : sig
-  type 'n t =
-    (Backend.Tock.Field.t Snarky_backendless.Cvar.t Wrap_bp_vec.t, 'n) Vector.t
+  type 'n t = (Wrap_impl.Field.t Wrap_bp_vec.t, 'n) Vector.t
 
   module Constant : sig
-    type 'n t = (Backend.Tock.Field.t Wrap_bp_vec.t, 'n) Vector.t
+    type 'n t = (Wrap_impl.Field.Constant.t Wrap_bp_vec.t, 'n) Vector.t
   end
 end
 

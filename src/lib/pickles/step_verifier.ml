@@ -10,22 +10,25 @@ open Pickles_types
 module Make
     (Inputs : Intf.Step_main_inputs.S
                 with type Impl.field = Backend.Tick.Field.t
+                 and type Impl.field_var = Step_main_inputs.Impl.field_var
                  and type Impl.Bigint.t = Backend.Tick.Bigint.t
-                 and type ('var, 'value, 'aux, 'field, 'checked) Impl.Typ.typ' =
+                 and type Impl.Constraint.t = Backend.Tick.Constraint.t
+                 and type 'a Impl.Internal_Basic.Checked.t =
+                  'a Step_main_inputs.Impl.Internal_Basic.Checked.t
+                 and type ('var, 'value, 'aux) Impl.Internal_Basic.Typ.typ' =
                   ( 'var
                   , 'value
-                  , 'aux
-                  , 'field
-                  , 'checked )
-                  Step_main_inputs.Impl.Typ.typ'
-                 and type ('var, 'value, 'field, 'checked) Impl.Typ.typ =
-                  ('var, 'value, 'field, 'checked) Step_main_inputs.Impl.Typ.typ
+                  , 'aux )
+                  Step_main_inputs.Impl.Internal_Basic.Typ.typ'
+                 and type ('var, 'value) Impl.Internal_Basic.Typ.typ =
+                  ('var, 'value) Step_main_inputs.Impl.Internal_Basic.Typ.typ
                  and type Inner_curve.Constant.Scalar.t = Backend.Tock.Field.t) =
 struct
   open Inputs
   open Impl
   module Challenge = Challenge.Make (Impl)
   module Digest = Digest.Make (Impl)
+  module Utils = Util.Make (Impl)
 
   (* Other_field.size > Field.size *)
   module Other_field = struct
@@ -80,7 +83,7 @@ struct
 
   let lowest_128_bits ~constrain_low_bits x =
     let assert_128_bits = assert_n_bits ~n:128 in
-    Util.lowest_128_bits ~constrain_low_bits ~assert_128_bits (module Impl) x
+    Utils.lowest_128_bits ~constrain_low_bits ~assert_128_bits x
 
   module Scalar_challenge =
     SC.Make (Impl) (Inner_curve) (Challenge) (Endo.Step_inner_curve)
@@ -363,7 +366,7 @@ struct
     | _ ->
         assert false
 
-  module O = One_hot_vector.Make (Impl)
+  module O = One_hot_vector.Step
   open Tuple_lib
 
   let public_input_commitment_dynamic (type n) ~srs (which : n O.t)
@@ -398,7 +401,7 @@ struct
                     Field.((b :> t) * x, (b :> t) * y) ) )
             |> Vector.reduce_exn
                  ~f:(Vector.map2 ~f:(Double.map2 ~f:Field.( + )))
-            |> Vector.map ~f:(Double.map ~f:(Util.seal (module Impl)))
+            |> Vector.map ~f:(Double.map ~f:Utils.seal)
     in
     let lagrange i =
       select_curve_points ~points_for_domain:(fun d ->
@@ -483,9 +486,9 @@ struct
       ~(domain :
          [ `Known of Domain.t
          | `Side_loaded of
-           _ Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ]
-         ) ~srs ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi
-      ~sponge ~sponge_after_index
+           Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ] )
+      ~srs ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
+      ~sponge_after_index
       ~(public_input :
          [ `Field of Field.t | `Packed_bits of Field.t * int ] array )
       ~(sg_old : (_, Proofs_verified.n) Vector.t) ~advice
@@ -633,7 +636,7 @@ struct
 
   let challenge_polynomial = Wrap_verifier.challenge_polynomial (module Field)
 
-  module Pseudo = Pseudo.Make (Impl)
+  module Pseudo = Pseudo.Step
 
   (* module Bounded = struct
        type t = { max : int; actual : Field.t }
@@ -670,7 +673,7 @@ struct
     fun ~(log2_size : Field.t) ->
       let domain ~max =
         let (T max_n) = Nat.of_int max in
-        let mask = ones_vector (module Impl) max_n ~first_zero:log2_size in
+        let mask = Utils.ones_vector max_n ~first_zero:log2_size in
         let log2_sizes =
           ( O.of_index log2_size ~length:(S max_n)
           , Vector.init (S max_n) ~f:Fn.id )
@@ -793,7 +796,7 @@ struct
 
   let domain_for_compiled (type branches)
       (domains : (Domains.t, branches) Vector.t)
-      (branch_data : Impl.field Branch_data.Checked.t) :
+      (branch_data : Branch_data.Checked.Step.t) :
       Field.t Plonk_checks.plonk_domain =
     let (T unique_domains) =
       List.map (Vector.to_list domains) ~f:Domains.h
@@ -844,7 +847,7 @@ struct
         , _
         , _
         , _
-        , Field.Constant.t Branch_data.Checked.t
+        , Branch_data.Checked.Step.t
         , _ )
         Types.Wrap.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
@@ -1174,6 +1177,7 @@ struct
       with_label "pack_statement" (fun () ->
           Spec.pack
             (module Impl)
+            (module Branch_data.Checked.Step)
             (Types.Wrap.Statement.In_circuit.spec
                (module Impl)
                lookup_parameters feature_flags )

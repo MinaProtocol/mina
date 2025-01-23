@@ -619,15 +619,7 @@ let serial_bench (type a) ~(name : string)
 
 let compute_ram_usage ~config (sizes : size_params) =
   let format_gb size = Int.to_float size /. (1024.0 **. 3.0) in
-  (*
-  let format_kb size = (Int.to_float size /. 1024.0) in
-  Printf.printf "verification key = %fKB, side_loaded_proof = %fKB, account update = %fKB\n, command = %fKB, %d\n"
-    (format_kb Sizes.verification_key)
-    (format_kb Sizes.side_loaded_proof)
-    (format_kb Sizes.zkapp_account_update)
-    (format_kb Sizes.zkapp_command)
-    Params.max_zkapp_txn_account_updates ;
-  *)
+
   (* this baseline measurement was taken from a fresh daemon, and serves to show the general overhead a daemon has before bootstrapping *)
   let baseline =
     let prover = Int.of_float (1.04 *. 1024.0 *. 1024.0 *. 1024.0) in
@@ -735,7 +727,7 @@ let () =
   in
   let%map.Async_kernel.Deferred vk =
     let `VK vk, `Prover _ =
-      Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+      Transaction_snark.For_tests.create_trivial_snapp ()
     in
     vk
   in
@@ -744,6 +736,15 @@ let () =
 
     let vk = vk
   end) in
+  let format_kb size = Int.to_float size /. 1024.0 in
+
+  Printf.printf
+    "verification key = %fKB, side_loaded_proof = %fKB, command = %fKB, %d\n"
+    (format_kb Sizes.verification_key)
+    (format_kb Sizes.side_loaded_proof)
+    (format_kb Sizes.zkapp_command)
+    Params.max_zkapp_txn_account_updates ;
+
   let module Values = Sizes.Values in
   print_header "PRE FIX SIZES" ;
   Printf.printf !"%{sexp: size_params}\n" Sizes.pre_fix ;
