@@ -23,7 +23,6 @@ pub struct WasmGateWires(
 );
 
 impl WasmGateWires {
-    #[wasm_bindgen(constructor)]
     pub fn new(w0: Wire, w1: Wire, w2: Wire, w3: Wire, w4: Wire, w5: Wire, w6: Wire) -> Self {
         WasmGateWires(w0, w1, w2, w3, w4, w5, w6)
     }
