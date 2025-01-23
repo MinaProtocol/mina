@@ -45,7 +45,7 @@ let%test_unit "in_seed_update_range unchecked vs. checked equality" =
   let module Length = Mina_numbers.Length in
   let test x =
     Test_util.test_equal
-      (Snarky_backendless.Typ.tuple2 Constants.typ typ)
+      (Tick.Typ.tuple2 Constants.typ typ)
       Tick.Boolean.typ
       (fun (c, x) -> Checked.in_seed_update_range ~constants:c x)
       (fun (c, x) -> in_seed_update_range ~constants:c x)

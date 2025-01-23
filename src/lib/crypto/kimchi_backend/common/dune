@@ -30,11 +30,12 @@
   ;; local libraries
   tuple_lib
   key_cache
-  pickles_types
   hex
   kimchi_bindings
+  kimchi_pasta_snarky_backend
   kimchi_types
   pasta_bindings
+  plonkish_prelude
   sponge
   allocation_functor
   snarky.intf

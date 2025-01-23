@@ -20,6 +20,7 @@
    mina_state
    pipe_lib
    network_peer
+    network_pool
    logger
    trust_system
    block_time

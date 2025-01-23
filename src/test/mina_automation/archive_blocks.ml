@@ -9,7 +9,7 @@ include Executor
 let of_context context =
   Executor.of_context ~context
     ~dune_name:"src/app/archive_blocks/archive_blocks.exe"
-    ~official_name:"/usr/local/bin/mina-archive-blocks"
+    ~official_name:"mina-archive-blocks"
 
 type format = Precomputed | Extensional
 

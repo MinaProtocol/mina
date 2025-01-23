@@ -43,4 +43,5 @@ let for_unit_tests =
     ; protocol_state_with_hashes
     ; constraint_system_digests = hashes
     ; proof_data = None
+    ; compile_config = Mina_compile_config.For_unit_tests.t
     })

@@ -6,9 +6,7 @@ open Backend
 (* We maintain a global hash table which stores for each inductive proof system some
    data.
 *)
-type inner_curve_var =
-  Tick.Field.t Snarky_backendless.Cvar.t
-  * Tick.Field.t Snarky_backendless.Cvar.t
+type inner_curve_var = Impls.Step.Field.t * Impls.Step.Field.t
 
 module Basic = struct
   type ('var, 'value, 'n1, 'n2) t =
@@ -164,8 +162,7 @@ module For_step = struct
     ; wrap_key : inner_curve_var array Plonk_verification_key_evals.t
     ; wrap_domain :
         [ `Known of Domain.t
-        | `Side_loaded of
-          Impls.Step.field Pickles_base.Proofs_verified.One_hot.Checked.t ]
+        | `Side_loaded of Pickles_base.Proofs_verified.One_hot.Checked.t ]
     ; step_domains : [ `Known of (Domains.t, 'branches) Vector.t | `Side_loaded ]
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     ; num_chunks : int

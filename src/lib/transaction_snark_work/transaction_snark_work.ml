@@ -74,6 +74,16 @@ module Info = struct
   [@@deriving to_yojson, sexp, compare]
 end
 
+module type S = sig
+  type t [@@deriving compare, sexp, yojson]
+
+  val fee : t -> Fee.t
+
+  val prover : t -> Public_key.Compressed.t
+
+  val proofs : t -> Ledger_proof.t One_or_two.t
+end
+
 module T = struct
   [%%versioned
   module Stable = struct
@@ -96,7 +106,7 @@ module T = struct
     ; proofs : Ledger_proof.t One_or_two.t
     ; prover : Public_key.Compressed.t
     }
-  [@@deriving compare, yojson, sexp]
+  [@@deriving compare, fields, yojson, sexp]
 
   let statement t = One_or_two.map t.proofs ~f:Ledger_proof.statement
 
@@ -120,5 +130,3 @@ module Checked = struct
 end
 
 let forget = Fn.id
-
-let fee { fee; _ } = fee

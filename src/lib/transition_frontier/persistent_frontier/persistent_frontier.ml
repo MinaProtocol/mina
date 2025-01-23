@@ -58,7 +58,7 @@ let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
   let%bind staged_ledger =
     Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
       ~snarked_local_state:local_state ~snarked_ledger:mask ~scan_state
-      ~constraint_constants:precomputed_values.constraint_constants
+      ~constraint_constants:precomputed_values.constraint_constants ~logger
       ~pending_coinbases
       ~expected_merkle_root:(Staged_ledger_hash.ledger_hash staged_ledger_hash)
       ~get_state
@@ -171,10 +171,9 @@ module Instance = struct
     let open Result.Let_syntax in
     let%bind () = assert_no_sync t in
     let lift_error r msg = Result.map_error r ~f:(Fn.const (`Failure msg)) in
-    let%bind root =
-      lift_error (Database.get_root t.db) "failed to get root hash"
+    let%bind root_hash =
+      lift_error (Database.get_root_hash t.db) "failed to get root hash"
     in
-    let root_hash = Root_data.Minimal.hash root in
     if State_hash.equal root_hash target_root.state_hash then
       (* If the target hash is already the root hash, no fast forward required, but we should check the frontier hash. *)
       Ok ()
@@ -193,6 +192,14 @@ module Instance = struct
       ~persistent_root_instance =
     let open Context in
     let open Deferred.Result.Let_syntax in
+    let validate genesis_state_hash (b, v) =
+      Validation.validate_genesis_protocol_state ~genesis_state_hash
+        (With_hash.map ~f:Mina_block.header b, v)
+      |> Result.map
+           ~f:
+             (Fn.flip Validation.with_body
+                (Mina_block.body @@ With_hash.data b) )
+    in
     let downgrade_transition transition genesis_state_hash :
         ( Mina_block.almost_valid_block
         , [ `Invalid_genesis_protocol_state ] )
@@ -201,7 +208,7 @@ module Instance = struct
       transition |> Mina_block.Validated.remember
       |> Validation.reset_staged_ledger_diff_validation
       |> Validation.reset_genesis_protocol_state_validation
-      |> Validation.validate_genesis_protocol_state ~genesis_state_hash
+      |> validate genesis_state_hash
     in
     let%bind () = Deferred.return (assert_no_sync t) in
     (* read basic information from the database *)

@@ -32,7 +32,7 @@ let buildTestCmd
             , commands =
                 RunInToolchain.runInToolchain
                   ([] : List Text)
-                  "buildkite/scripts/run-snark-transaction-profiler.sh"
+                  "buildkite/scripts/bench/snark_transaction_profiler.sh"
             , label = "Snark Transaction Profiler"
             , key = "snark-transaction-profiler"
             , target = cmd_target
@@ -48,9 +48,9 @@ in  Pipeline.build
                 [ S.strictlyStart (S.contains "src")
                 , S.exactly "buildkite/src/Jobs/Test/RunSnarkProfiler" "dhall"
                 , S.exactly
-                    "buildkite/scripts/run-snark-transaction-profiler"
+                    "buildkite/scripts/bench/snark_transaction_profiler"
                     "sh"
-                , S.exactly "scripts/snark_transaction_profiler" "py"
+                , S.strictlyStart (S.contains "scripts/benchmarks")
                 ]
 
           in  JobSpec::{
