@@ -448,7 +448,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let%bind completed_works_fees =
       List.fold ~init:(Some Fee.zero) (completed_works t) ~f:(fun sum work ->
           let%bind sum = sum in
-          Fee.( + ) sum work.Transaction_snark_work.fee )
+          Fee.(sum + Transaction_snark_work.fee work) )
     in
     Amount.(of_fee total_reward - of_fee completed_works_fees)
 

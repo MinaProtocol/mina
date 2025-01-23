@@ -41,7 +41,7 @@ pub struct WasmPastaFqLookupTable {
 impl From<WasmPastaFqLookupTable> for LookupTable<Fq> {
     fn from(wasm_lt: WasmPastaFqLookupTable) -> LookupTable<Fq> {
         LookupTable {
-            id: wasm_lt.id.into(),
+            id: wasm_lt.id,
             data: wasm_lt.data.0,
         }
     }
