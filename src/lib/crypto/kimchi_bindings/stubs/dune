@@ -171,10 +171,10 @@
    (run
     cargo
     run
+    --offline
     %{targets}
     -p
     wires_15_stubs
-    --offline
     --target-dir
     %{workspace_root}/target)
    (run ocamlformat -i %{targets}))))
