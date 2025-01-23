@@ -99,10 +99,9 @@ mod cache {
         }
     }
 
-    /*
-    The FileCache implementation uses a directory as a cache for the Lagrange basis hash map --
-    i.e every file corresponds to a Lagrange basis for a given G-basis and domain size.
-    */
+    // The FileCache implementation uses a directory as a cache for the Lagrange
+    // basis hash map -- i.e every file corresponds to a Lagrange basis for a
+    // given G-basis and domain size.
     impl<G: AffineRepr> LagrangeCache<G> for FileCache<G> {
         type CacheKey = PathBuf;
 
@@ -156,8 +155,8 @@ mod cache {
         }
     }
 
-    // The following two caches are all that we need for mina tests. These will not be initialized unless they are
-    // explicitly called.
+    // The following two caches are all that we need for mina tests. These will
+    // not be initialized unless they are explicitly called.
     static VESTA_FILE_CACHE: Lazy<FileCache<Vesta>> = Lazy::new(|| {
         let cache_base_dir: String =
             env::var("LAGRANGE_CACHE_DIR").expect("LAGRANGE_CACHE_DIR missing in env");
