@@ -166,6 +166,7 @@
   (env_var MARLIN_PLONK_STUBS))
  (locks /cargo-lock) ;; lock for rustup
  (action
+  ;; Not using --release to speed up the build
   (progn
    (run
     cargo
