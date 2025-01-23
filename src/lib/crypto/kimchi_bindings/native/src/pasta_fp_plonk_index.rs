@@ -18,7 +18,6 @@ use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
 };
-use wasm_bindgen::prelude::*;
 
 //
 // CamlPastaFpPlonkIndex (custom type)
