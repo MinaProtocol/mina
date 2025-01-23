@@ -11,7 +11,7 @@ use paste::paste;
 use poly_commitment::commitment::{shift_scalar, PolyComm};
 use poly_commitment::evaluation_proof::OpeningProof;
 use poly_commitment::SRS;
-use wasm_bindgen::prelude::*;
+
 // use wasm_bindgen::convert::{IntoWasmAbi, FromWasmAbi};
 use crate::wasm_vector::WasmVector;
 // use crate::wasm_flat_vector::WasmFlatVector;
@@ -58,7 +58,7 @@ macro_rules! impl_oracles {
             }
             type WasmRandomOracles = [<Wasm $field_name:camel RandomOracles>];
 
-            #[wasm_bindgen]
+            
             impl [<Wasm $field_name:camel RandomOracles>] {
                 #[allow(clippy::too_many_arguments)]
                 #[wasm_bindgen(constructor)]
@@ -138,7 +138,7 @@ macro_rules! impl_oracles {
                 }
             }
 
-            #[wasm_bindgen]
+            
             #[derive(Clone)]
             pub struct [<Wasm $field_name:camel Oracles>] {
                 pub o: [<Wasm $field_name:camel RandomOracles>],
@@ -149,7 +149,6 @@ macro_rules! impl_oracles {
                 pub digest_before_evaluations: $WasmF,
             }
 
-            #[wasm_bindgen]
             impl [<Wasm $field_name:camel Oracles>] {
                 #[wasm_bindgen(constructor)]
                 pub fn new(
@@ -172,7 +171,6 @@ macro_rules! impl_oracles {
                 }
             }
 
-            #[wasm_bindgen]
             pub fn [<$F:snake _oracles_create>](
                 lgr_comm: WasmVector<$WasmPolyComm>, // the bases to commit polynomials
                 index: $index,    // parameters
@@ -255,7 +253,6 @@ macro_rules! impl_oracles {
                 }
             }
 
-            #[wasm_bindgen]
             pub fn [<$F:snake _oracles_dummy>]() -> [<Wasm $field_name:camel Oracles>] {
                 [<Wasm $field_name:camel Oracles>] {
                     o: RandomOracles::<$F>::default().into(),
@@ -266,7 +263,6 @@ macro_rules! impl_oracles {
                 }
             }
 
-            #[wasm_bindgen]
             pub fn [<$F:snake _oracles_deep_copy>](
                 x: $WasmProverProof,
             ) -> $WasmProverProof {
