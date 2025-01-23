@@ -12,8 +12,9 @@ use poly_commitment::commitment::{shift_scalar, PolyComm};
 use poly_commitment::evaluation_proof::OpeningProof;
 use poly_commitment::SRS;
 
-use crate::wasm_vector::WasmVector;
-// use crate::wasm_flat_vector::WasmFlatVector;
+// use crate::wasm_vector::WasmVector; 
+// probably can remove
+
 use ark_ff::{One, Zero};
 
 //
@@ -168,7 +169,7 @@ macro_rules! impl_oracles {
                 lgr_comm: WasmVector<$WasmPolyComm>, // the bases to commit polynomials
                 index: $index,    // parameters
                 proof: $WasmProverProof, // the final proof (contains public elements at the beginning)
-            ) -> Result<[<Wasm $field_name:camel Oracles>], JsError> {
+            ) -> Result<[<Wasm $field_name:camel Oracles>], String> {
                 // conversions
                 let result = crate::rayon::run_in_pool(|| {
                     let index: DlogVerifierIndex<$G, OpeningProof<$G>> = index.into();
@@ -242,7 +243,8 @@ macro_rules! impl_oracles {
                         opening_prechallenges,
                         digest_before_evaluations: digest.into()
                     }),
-                    Err(err) => Err(JsError::new(&err))
+                    // Instead of `Err(JsError::new(&err))`, return the err String
+                    Err(err) => Err(err),
                 }
             }
 
