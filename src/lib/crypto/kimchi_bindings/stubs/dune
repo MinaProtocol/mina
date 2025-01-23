@@ -1,7 +1,3 @@
-;; Ignore target if it exists locally
-
-(dirs :standard .cargo \ target)
-
 ;;
 ;; Rules to set the optimisation flags for the rust compiler.
 ;;
