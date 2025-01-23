@@ -3,7 +3,6 @@ use kimchi::circuits::constraints::ConstraintSystem;
 use kimchi::circuits::gate::CircuitGate;
 use mina_curves::pasta::Fp;
 use serde::Serialize;
-use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::pasta_fp_plonk_index::WasmPastaFpPlonkIndex;
 
