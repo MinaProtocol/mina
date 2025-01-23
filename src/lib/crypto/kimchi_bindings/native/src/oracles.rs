@@ -12,7 +12,6 @@ use poly_commitment::commitment::{shift_scalar, PolyComm};
 use poly_commitment::evaluation_proof::OpeningProof;
 use poly_commitment::SRS;
 
-// use wasm_bindgen::convert::{IntoWasmAbi, FromWasmAbi};
 use crate::wasm_vector::WasmVector;
 // use crate::wasm_flat_vector::WasmFlatVector;
 use ark_ff::{One, Zero};
@@ -40,7 +39,6 @@ macro_rules! impl_oracles {
             use crate::wasm_flat_vector::WasmFlatVector;
             use mina_poseidon::sponge::ScalarChallenge;
 
-            #[wasm_bindgen]
             #[derive(Clone, Copy)]
             pub struct [<Wasm $field_name:camel RandomOracles>] {
                 pub joint_combiner_chal: Option<$WasmF>,
