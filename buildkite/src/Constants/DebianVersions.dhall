@@ -83,8 +83,6 @@ let minimalDirtyWhen =
       , S.exactly "buildkite/scripts/build-artifact" "sh"
       , S.exactly "buildkite/scripts/build-hardfork-package" "sh"
       , S.exactly "buildkite/scripts/check-compatibility" "sh"
-      , S.exactly "buildkite/src/Jobs/Test/RunSnarkProfiler" "dhall"
-      , S.exactly "buildkite/scripts/bench/snark_transaction_profiler" "sh"
       , S.exactly "buildkite/scripts/version-linter" "sh"
       , S.exactly "scripts/version-linter" "py"
       ]

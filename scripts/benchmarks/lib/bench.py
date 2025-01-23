@@ -256,18 +256,24 @@ class JaneStreetBenchmark(Benchmark, ABC):
                             else:
                                 raise Exception(
                                     "Time can be expressed only in us or ns")
+
                         else:
                             # us
                             rows[1] = time[:-2]
-                            # kc
+
+                        if rows[2].endswith("kc"):
                             rows[2] = rows[2][:-2]
-                            # w
-                            rows[3] = rows[3][:-1]
-                            # w
-                            rows[4] = rows[4][:-1]
-                            # w
-                            rows[5] = rows[5][:-1]
-                            rows.append(branch)
+                        else:
+                            #c
+                            rows[2] = rows[2][:-1]
+                        # w
+                        rows[3] = rows[3][:-1]
+                        # w
+                        rows[4] = rows[4][:-1]
+                        # w
+                        rows[5] = rows[5][:-1]
+
+                        rows.append(branch)
 
                     csvwriter.writerow(rows[:])
 
@@ -288,11 +294,12 @@ class JaneStreetBenchmark(Benchmark, ABC):
         ends = []
         files = []
         for i, e in enumerate(lines):
-            if "Running" in e:
+            if "Estimated testing" in e:
                 starts.append(i)
 
         if not any(starts):
             self.export_to_csv(lines, output_filename, influxdb, branch)
+            files.append(output_filename)
         else:
             for start in starts[1:]:
                 ends.append(start)
@@ -301,7 +308,7 @@ class JaneStreetBenchmark(Benchmark, ABC):
 
             for start, end in zip(starts, ends):
                 name = parse.parse('Running inline tests in library "{}"',
-                                   lines[start].strip())[0]
+                                   lines[start-1].strip())[0]
                 file = f'{name}_{output_filename}'
                 logger.info(f"exporting {file}..")
                 self.export_to_csv(lines[start:end], f'{file}', influxdb,
