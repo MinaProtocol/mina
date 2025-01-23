@@ -173,9 +173,11 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
         Deferred.return `Ignored
     | Ok peer_root_with_proof -> (
         match%bind
-          Sync_handler.Root.verify
-            ~context:(module Context)
-            ~verifier:t.verifier candidate_consensus_state
+          Best_tip_prover.Wrap_for_block.map
+            ~f:
+              (Sync_handler.Root.verify
+                 ~context:(module Context)
+                 ~verifier:t.verifier candidate_consensus_state )
             peer_root_with_proof.data
         with
         | Ok (`Root root, `Best_tip best_tip) ->

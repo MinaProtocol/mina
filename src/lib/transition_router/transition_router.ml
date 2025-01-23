@@ -250,8 +250,11 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
               "Successfully downloaded best tip with $length from $peer" ;
             (* TODO: Use batch verification instead *)
             match%bind
-              Best_tip_prover.verify ~verifier peer_best_tip ~genesis_constants
-                ~precomputed_values
+              Best_tip_prover.Wrap_for_block.map
+                ~f:
+                  (Best_tip_prover.verify ~verifier ~genesis_constants
+                     ~precomputed_values )
+                peer_best_tip
             with
             | Error e ->
                 [%log warn]
