@@ -96,7 +96,14 @@ let proof_config_default : Runtime_config.Proof_keys.t =
   ; coinbase_amount = Some (Currency.Amount.of_mina_int_exn 720)
   ; supercharged_coinbase_factor = Some 1
   ; account_creation_fee = Some (Currency.Fee.of_mina_string_exn "1")
-  ; fork = None
+  ; fork =
+      Some
+        { blockchain_length = 0
+        ; global_slot_since_genesis = 0
+        ; state_hash =
+            "3NKSvjaGSKiQuAt8BP1b1VCpLbJc9RcEFjYCaBYsJJFdrtd6tpaV"
+            (*any state hash would do*)
+        }
   }
 
 let log_filter_of_event_type ev_existential =
