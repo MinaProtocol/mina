@@ -59,7 +59,6 @@ macro_rules! impl_oracles {
             
             impl [<Wasm $field_name:camel RandomOracles>] {
                 #[allow(clippy::too_many_arguments)]
-                #[wasm_bindgen(constructor)]
                 pub fn new(
                     joint_combiner_chal: Option<$WasmF>,
                     joint_combiner: Option<$WasmF>,
@@ -142,13 +141,11 @@ macro_rules! impl_oracles {
                 pub o: [<Wasm $field_name:camel RandomOracles>],
                 pub p_eval0: $WasmF,
                 pub p_eval1: $WasmF,
-                #[wasm_bindgen(skip)]
                 pub opening_prechallenges: WasmFlatVector<$WasmF>,
                 pub digest_before_evaluations: $WasmF,
             }
 
             impl [<Wasm $field_name:camel Oracles>] {
-                #[wasm_bindgen(constructor)]
                 pub fn new(
                     o: WasmRandomOracles,
                     p_eval0: $WasmF,
@@ -158,12 +155,10 @@ macro_rules! impl_oracles {
                     Self {o, p_eval0, p_eval1, opening_prechallenges, digest_before_evaluations}
                 }
 
-                #[wasm_bindgen(getter)]
                 pub fn opening_prechallenges(&self) -> WasmFlatVector<$WasmF> {
                     self.opening_prechallenges.clone()
                 }
 
-                #[wasm_bindgen(setter)]
                 pub fn set_opening_prechallenges(&mut self, x: WasmFlatVector<$WasmF>) {
                     self.opening_prechallenges = x;
                 }
