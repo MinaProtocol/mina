@@ -6,7 +6,6 @@ use crate::wasm_vector::fq::WasmVecVecFq;
 use crate::wasm_vector::WasmVector;
 use paste::paste;
 use std::convert::TryInto;
-use wasm_bindgen::prelude::*;
 // use std::sync::Arc;
 // use poly_commitment::srs::SRS;
 use kimchi::circuits::lookup::runtime_tables::RuntimeTable;
@@ -36,7 +35,7 @@ use poly_commitment::{
 };
 use serde::{Deserialize, Serialize};
 
-#[wasm_bindgen]
+
 extern "C" {
     #[wasm_bindgen(js_namespace = console)]
     fn log(s: &str);
@@ -121,7 +120,7 @@ macro_rules! impl_proof {
                 }
             }
 
-            #[wasm_bindgen]
+            
             #[derive(Clone)]
             pub struct [<Wasm $field_name:camel LookupCommitments>]
             {
@@ -135,7 +134,7 @@ macro_rules! impl_proof {
 
             type WasmLookupCommitments = [<Wasm $field_name:camel LookupCommitments>];
 
-            #[wasm_bindgen]
+            
             impl [<Wasm $field_name:camel LookupCommitments>] {
                 #[wasm_bindgen(constructor)]
                 pub fn new(
@@ -217,7 +216,7 @@ macro_rules! impl_proof {
                 }
             }
 
-            #[wasm_bindgen]
+            
             #[derive(Clone)]
             pub struct [<Wasm $field_name:camel ProverCommitments>]
             {
@@ -232,7 +231,7 @@ macro_rules! impl_proof {
             }
             type WasmProverCommitments = [<Wasm $field_name:camel ProverCommitments>];
 
-            #[wasm_bindgen]
+            
             impl [<Wasm $field_name:camel ProverCommitments>] {
                 #[wasm_bindgen(constructor)]
                 pub fn new(
@@ -325,7 +324,7 @@ macro_rules! impl_proof {
                 }
             }
 
-            #[wasm_bindgen]
+            
             #[derive(Clone, Debug)]
             pub struct [<Wasm $field_name:camel OpeningProof>] {
                 #[wasm_bindgen(skip)]
@@ -341,7 +340,7 @@ macro_rules! impl_proof {
             }
             type WasmOpeningProof = [<Wasm $field_name:camel OpeningProof>];
 
-            #[wasm_bindgen]
+            
             impl [<Wasm $field_name:camel OpeningProof>] {
                 #[wasm_bindgen(constructor)]
                 pub fn new(
@@ -442,7 +441,7 @@ macro_rules! impl_proof {
                 }
             }
 
-            #[wasm_bindgen]
+            
             pub struct [<Wasm $field_name:camel ProverProof>] {
                 #[wasm_bindgen(skip)]
                 pub commitments: WasmProverCommitments,
@@ -550,7 +549,7 @@ macro_rules! impl_proof {
                 }
             }
 
-            #[wasm_bindgen]
+            
             impl [<Wasm $field_name:camel ProverProof>] {
                 #[wasm_bindgen(constructor)]
                 pub fn new(
@@ -622,7 +621,7 @@ macro_rules! impl_proof {
                     self.prev_challenges_comms = prev_challenges_comms
                 }
 
-                #[wasm_bindgen]
+                
                 pub fn serialize(&self) -> String {
                     let (proof, _public_input) = self.into();
                     let serialized = rmp_serde::to_vec(&proof).unwrap();
@@ -630,14 +629,14 @@ macro_rules! impl_proof {
                 }
             }
 
-            #[wasm_bindgen]
+            
             pub struct [<Wasm $field_name:camel RuntimeTable>] {
                 id: i32,
                 data: WasmFlatVector<$WasmF>
             }
             type WasmRuntimeTable = [<Wasm $field_name:camel RuntimeTable>];
 
-            #[wasm_bindgen]
+            
             impl [<Wasm $field_name:camel RuntimeTable>] {
                 #[wasm_bindgen(constructor)]
                 pub fn new(id: i32, data: WasmFlatVector<$WasmF>) -> WasmRuntimeTable {
@@ -654,7 +653,7 @@ macro_rules! impl_proof {
                 }
             }
 
-            #[wasm_bindgen]
+            
             pub fn [<$name:snake _create>](
                 index: &$WasmIndex,
                 witness: WasmVecVecF,
@@ -716,7 +715,7 @@ macro_rules! impl_proof {
                 }
             }
 
-            #[wasm_bindgen]
+            
             pub fn [<$name:snake _verify>](
                 index: $WasmVerifierIndex,
                 proof: WasmProverProof,
@@ -737,23 +736,23 @@ macro_rules! impl_proof {
                 })
             }
 
-            #[wasm_bindgen]
+            
             pub struct [<WasmVecVec $field_name:camel PolyComm>](Vec<Vec<PolyComm<$G>>>);
 
-            #[wasm_bindgen]
+            
             impl [<WasmVecVec $field_name:camel PolyComm>] {
                 #[wasm_bindgen(constructor)]
                 pub fn create(n: i32) -> Self {
                     [<WasmVecVec $field_name:camel PolyComm>](Vec::with_capacity(n as usize))
                 }
 
-                #[wasm_bindgen]
+                
                 pub fn push(&mut self, x: WasmVector<$WasmPolyComm>) {
                     self.0.push(x.into_iter().map(Into::into).collect())
                 }
             }
 
-            #[wasm_bindgen]
+            
             pub fn [<$name:snake _batch_verify>](
                 indexes: WasmVector<$WasmVerifierIndex>,
                 proofs: WasmVector<WasmProverProof>,
@@ -777,7 +776,7 @@ macro_rules! impl_proof {
                 })
             }
 
-            #[wasm_bindgen]
+            
             pub fn [<$name:snake _dummy>]() -> WasmProverProof {
                 fn comm() -> PolyComm<$G> {
                     let g = $G::generator();
@@ -850,7 +849,7 @@ macro_rules! impl_proof {
                 (dlogproof, public).into()
             }
 
-            #[wasm_bindgen]
+            
             pub fn [<$name:snake _deep_copy>](
                 x: WasmProverProof
             ) -> WasmProverProof {
