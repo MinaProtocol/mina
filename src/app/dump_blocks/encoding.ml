@@ -90,9 +90,9 @@ let precomputed_of_breadcrumb ?with_parent_statehash breadcrumb =
     |> Mina_state.Protocol_state.blockchain_state
     |> Mina_state.Blockchain_state.timestamp
   in
-  Mina_block.Precomputed.of_block ~logger ~constraint_constants ~staged_ledger
-    ~scheduled_time
-    (Breadcrumb.block_with_hash breadcrumb)
+  Mina_block.Precomputed.of_validated_block ~logger ~constraint_constants
+    ~staged_ledger ~scheduled_time
+    (Breadcrumb.validated_transition breadcrumb)
 
 module Sexp_precomputed : S with type t = Mina_block.Precomputed.t = struct
   type t = Mina_block.Precomputed.t

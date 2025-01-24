@@ -916,8 +916,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 >>| Validation.skip_delta_block_chain_validation
                       `This_block_was_not_received_via_gossip
                 >>= Validation.validate_frontier_dependencies
-                      ~to_header:Mina_block.header
-                      ~context:(module Context)
+                      ~context:(module Consensus_context)
                       ~root_block:
                         ( Transition_frontier.root frontier
                         |> Breadcrumb.block_with_hash )
@@ -1483,8 +1482,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                       ~state_hash:(Some previous_protocol_state_hash)
                       previous_protocol_state )
             >>= Validation.validate_frontier_dependencies
-                  ~to_header:Mina_block.header
-                  ~context:(module Context)
+                  ~context:(module Consensus_context)
                   ~root_block:
                     ( Transition_frontier.root frontier
                     |> Breadcrumb.block_with_hash )

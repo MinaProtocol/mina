@@ -102,9 +102,11 @@ module Limited = struct
 
   let to_yojson { transition; protocol_states = _; common } =
     `Assoc
-      [ ("transition", Mina_block.Validated.to_yojson transition)
+      [ ( "transition"
+        , State_hash.With_state_hashes.to_yojson Mina_block.to_yojson transition
+        )
       ; ("protocol_states", `String "<opaque>")
-      ; ("common", Common.Stable.V2.to_yojson common)
+      ; ("common", Common.Wire.Stable.V2.to_yojson common)
       ]
 
   let create ~transition ~scan_state ~pending_coinbase ~protocol_states =

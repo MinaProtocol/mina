@@ -2231,13 +2231,15 @@ let%test_module _ =
       let tm1 = Time.now () in
       [%log' info test.txn_pool.logger] "Time for add_commands: %0.04f sec"
         (Time.diff tm1 tm0 |> Time.Span.to_sec) ;
+      let debug = false in
       ( match result with
       | Ok (`Accept, _, rejects) ->
-          List.iter rejects ~f:(fun (cmd, err) ->
-              Core.Printf.printf
-                !"command was rejected because %s: %{Yojson.Safe}\n%!"
-                (Diff_versioned.Diff_error.to_string_name err)
-                (User_command.Wire.to_yojson cmd) )
+          if debug then
+            List.iter rejects ~f:(fun (cmd, err) ->
+                Core.Printf.printf
+                  !"command was rejected because %s: %{Yojson.Safe}\n%!"
+                  (Diff_versioned.Diff_error.to_string_name err)
+                  (User_command.Wire.to_yojson cmd) )
       | Ok (`Reject, _, _) ->
           failwith "diff was rejected during application"
       | Error (`Other err) ->
@@ -2342,23 +2344,6 @@ let%test_module _ =
           balance = Currency.Balance.of_nanomina_int_exn balance
         ; nonce = Account.Nonce.of_int nonce
         }
-
-    let test_to_wire (valid : User_command.Valid.t) =
-      let cmd = User_command.forget_check valid in
-      let pass = User_command.(Fn.compose of_wire to_wire) in
-      let cmd' = pass cmd in
-      let cmd'' = pass cmd' in
-      [%test_eq: User_command.t] cmd' cmd'' ;
-      [%test_eq: User_command.t] cmd cmd'
-
-    (* This test is added due to an issue that was originally found in
-       the generator used by other tests of this module. It also checks
-       an invariant of to_wire/of_wire. *)
-    let%test_unit "zkapps: Fn.compose of_wire to_wire = ident" =
-      Thread_safe.block_on_async_exn (fun () ->
-          let%bind test = setup_test () in
-          mk_zkapp_commands_single_block 7 test.txn_pool
-          >>| List.iter ~f:test_to_wire )
 
     let mk_linear_case_test t cmds =
       assert_pool_txs t [] ;

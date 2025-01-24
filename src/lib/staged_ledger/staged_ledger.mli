@@ -8,7 +8,7 @@ module Ledger = Mina_ledger.Ledger
 type t
 
 module Scan_state : sig
-  type t = Transaction_snark_scan_state.t [@@deriving sexp]
+  type t = Transaction_snark_scan_state.t
 
   module Job_view : sig
     type t [@@deriving sexp, to_yojson]

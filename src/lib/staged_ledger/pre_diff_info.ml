@@ -241,8 +241,8 @@ module Transaction_data_getter (T : Transaction_snark_work.S) = struct
         |> Or_error.all )
     |> Or_error.join |> to_staged_ledger_or_error
 
-  let fee_remainder (type c) ~(to_user_command : c -> User_command.t)
-      (commands : c list) completed_works coinbase_fee =
+  let fee_remainder (type c) ~(to_user_command : c -> _) (commands : c list)
+      completed_works coinbase_fee =
     let open Result.Let_syntax in
     let%bind budget =
       sum_fees commands ~f:(fun t -> User_command.fee (to_user_command t))
@@ -261,9 +261,8 @@ module Transaction_data_getter (T : Transaction_snark_work.S) = struct
       (Currency.Fee.sub budget total_work_fee)
 
   let get (type c) ~constraint_constants coinbase_parts ~receiver
-      ~coinbase_amount ~(to_user_command : c -> User_command.t)
-      (commands : c list) (completed_works : T.t list) :
-      (c Transaction_data.t, Error.t) Result.t =
+      ~coinbase_amount ~(to_user_command : c -> _) (commands : c list)
+      (completed_works : T.t list) : (c Transaction_data.t, Error.t) Result.t =
     let open Result.Let_syntax in
     let%bind coinbases =
       O1trace.sync_thread "create_coinbase" (fun () ->
