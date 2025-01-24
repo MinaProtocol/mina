@@ -49,6 +49,6 @@ poly-commitment = { workspace = true, features = ["ocaml_types"] }
 ## requires rustc 1.73.0 or newer, while the currently
 ## active rustc version is 1.72.1
 ## ```
-bumpalo = { version = "=3.14.0" }
+bumpalo = { workspace = true }
 
-cc = { version = "=1.0.79" }
+cc = { workspace = true }
