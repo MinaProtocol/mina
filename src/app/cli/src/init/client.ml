@@ -567,7 +567,6 @@ let send_payment_graphql =
             graphql_endpoint
             ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver, amount)
           ->
-         let open Deferred.Let_syntax in
          let fee = Option.value ~default:default_transaction_fee fee in
          let%map response =
            let input =
@@ -596,7 +595,6 @@ let delegate_stake_graphql =
             graphql_endpoint
             ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver)
           ->
-         let open Deferred.Let_syntax in
          let fee = Option.value ~default:default_transaction_fee fee in
          let%map response =
            Graphql_client.query_exn
