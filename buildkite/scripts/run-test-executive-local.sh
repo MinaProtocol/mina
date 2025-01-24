@@ -26,7 +26,7 @@ cleanup
 
 TEST_NAME="$1"
 
-MINA_IMAGE="gcr.io/o1labs-192920/mina-daemon:$MINA_DOCKER_TAG-berkeley"
+MINA_IMAGE="gcr.io/o1labs-192920/mina-daemon:$MINA_DOCKER_TAG-devnet"
 ARCHIVE_IMAGE="gcr.io/o1labs-192920/mina-archive:$MINA_DOCKER_TAG"
 
 if [[ "${TEST_NAME:0:15}" == "block-prod-prio" ]] && [[ "$RUN_OPT_TESTS" == "" ]]; then
@@ -41,8 +41,6 @@ rm -f /etc/apt/sources.list.d/hashicorp.list
 
 apt-get update
 apt-get install -y git apt-transport-https ca-certificates tzdata curl
-
-TESTNET_NAME="berkeley"
 
 git config --global --add safe.directory /workdir
 
