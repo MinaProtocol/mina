@@ -4,3 +4,6 @@
 [submodule "src/lib/crypto/mina-rust-dependencies"]
 	path = src/lib/crypto/mina-rust-dependencies
 	url = https://github.com/o1-labs/proof-systems-vendors/
+[submodule "src/lib/crypto/proof-systems"]
+	path = src/lib/crypto/proof-systems
+	url = https://github.com/o1-labs/proof-systems
