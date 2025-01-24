@@ -1,5 +1,3 @@
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Core_kernel
 open Lmdb_storage
 
@@ -151,7 +149,12 @@ let%test_module "Block storage tests" =
           f conf_dir helper )
 
     let send_and_receive ~helper ~reader ~db breadcrumb =
-      let body = Breadcrumb.block breadcrumb |> Mina_block.body in
+      let body =
+        Breadcrumb.block_with_hash breadcrumb
+        |> With_hash.data |> snd
+        |> Staged_ledger_diff.With_hashes_computed.forget
+        |> Mina_block.Body.create
+      in
       let body_ref =
         Staged_ledger_diff.Body.compute_reference
           ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
