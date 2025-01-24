@@ -19,9 +19,9 @@
   flags.sexp)
  (deps
   build.sh
-  %{workspace_root}/Cargo.toml
-  %{workspace_root}/Cargo.lock
-  (source_tree %{workspace_root}/.cargo)
+  ../../../../../../Cargo.toml
+  ../../../../../../Cargo.lock
+  (source_tree ../../../../../.cargo)
   ../../wasm/Cargo.toml
   (source_tree ../../wasm/src))
  (locks /cargo-lock) ; lock for rustup

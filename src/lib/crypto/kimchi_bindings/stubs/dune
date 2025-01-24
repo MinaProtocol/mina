@@ -36,12 +36,12 @@
   (= %{env:MARLIN_PLONK_STUBS=n} n))
  (targets libwires_15_stubs.a)
  (deps
-  %{workspace_root}/Cargo.toml
-  %{workspace_root}/Cargo.lock
+  ../../../../../Cargo.toml
+  ../../../../../Cargo.lock
   ./Cargo.toml
-  %{workspace_root}/rust-toolchain.toml
+  ../../../../../rust-toolchain.toml
   (source_tree src)
-  (source_tree .cargo)
+  (source_tree ../../../../../.cargo)
   (source_tree ../../mina-rust-dependencies)
   ;; Required as Cargo asks for all members of the workspace.
   ;; This is temporary until we move into proof-systems
@@ -150,14 +150,14 @@
   (= %{env:MARLIN_PLONK_STUBS=n} n))
  (mode promote)
  (deps
-  %{workspace_root}/Cargo.toml
-  %{workspace_root}/Cargo.lock
+  ../../../../../Cargo.toml
+  ../../../../../Cargo.lock
   ./Cargo.toml
-  %{workspace_root}/rust-toolchain.toml
+  ../../../../../rust-toolchain.toml
   ../../../../.ocamlformat
   (source_tree ../../mina-rust-dependencies)
   (source_tree src)
-  (source_tree .cargo)
+  (source_tree ../../../../../.cargo)
   ;; Required as Cargo asks for all members of the workspace.
   ;; This is temporary until we move into proof-systems
   ../wasm/Cargo.toml
