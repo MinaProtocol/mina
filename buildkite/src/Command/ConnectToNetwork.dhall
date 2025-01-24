@@ -10,6 +10,7 @@ let Cmd = ../Lib/Cmds.dhall
 
 in  { step =
             \(dependsOn : List Command.TaggedKey.Type)
+        ->  \(mina_suffix : Text)
         ->  \(testnet : Text)
         ->  \(wait_between_graphql_poll : Text)
         ->  \(wait_before_final_check : Text)
@@ -21,7 +22,7 @@ in  { step =
                     Cmd.Docker::{
                     , image = (../Constants/ContainerImages.dhall).ubuntu2004
                     }
-                    "./buildkite/scripts/connect-to-testnet.sh ${testnet} ${wait_between_graphql_poll} ${wait_before_final_check}"
+                    "./buildkite/scripts/connect/connect-to-network.sh ${mina_suffix} ${testnet} ${wait_between_graphql_poll} ${wait_before_final_check} "
                 ]
               , label = "Connect to ${testnet}"
               , soft_fail = Some soft_fail

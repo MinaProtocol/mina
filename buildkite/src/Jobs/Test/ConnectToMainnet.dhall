@@ -23,7 +23,7 @@ let Dockers = ../../Constants/DockerVersions.dhall
 let dependsOn =
       Dockers.dependsOn
         Dockers.Type.Bullseye
-        (Some Network.Type.Devnet)
+        (Some Network.Type.Mainnet)
         Profiles.Type.Standard
         Artifacts.Type.Daemon
 
@@ -33,18 +33,18 @@ in  Pipeline.build
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
           , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
-          , S.exactly "buildkite/src/Jobs/Test/ConnectToDevnet" "dhall"
+          , S.exactly "buildkite/src/Jobs/Test/ConnectToMainnet" "dhall"
           , S.exactly "buildkite/src/Command/ConnectToNetwork" "dhall"
           ]
         , path = "Test"
-        , name = "ConnectToDevnet"
+        , name = "ConnectToMainnet"
         , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
         }
       , steps =
         [ ConnectToTestnet.step
             dependsOn
-            "devnet"
-            "devnet"
+            "mainnet"
+            "mainnet"
             "40s"
             "2m"
             (B/SoftFail.Boolean False)

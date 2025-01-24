@@ -2,13 +2,15 @@
 
 set -eo pipefail
 
-case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
-  compatible|release/*|develop|master)
-  ;;
-  *)
-    echo "Not pulling against mainline branch, not running the connect test"
-    exit 0 ;;
-esac
+if [[ $# -ne 4 ]]; then
+    echo "Usage: $0 '<mina-debian-network>''<testnet-name>' '<wait-between-polling-graphql>''<wait-after-final-check>' "
+    exit 1
+fi
+
+MINA_DEBIAN_NETWORK=$1
+NETWORK_NAME=$2
+WAIT_BETWEEN_POLLING_GRAPHQL=$3
+WAIT_AFTER_FINAL_CHECK=$4
 
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
@@ -16,14 +18,11 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y git apt-transport-https ca-certificates tzdata curl
 
-TESTNET_VERSION_NAME="devnet"
-TESTNET_NAME="testworld-2-0"
-
 git config --global --add safe.directory /workdir
 
 source buildkite/scripts/export-git-env-vars.sh
 
-source buildkite/scripts/debian/install.sh "mina-${TESTNET_VERSION_NAME}"
+source buildkite/scripts/debian/install.sh "mina-${MINA_DEBIAN_NETWORK}"
 
 # Remove lockfile if present
 rm ~/.mina-config/.mina-lock ||:
@@ -37,14 +36,14 @@ chmod -R 0700 /root/libp2p-keys/
 
 # Restart in the background
 mina daemon \
-  --peer-list-url "https://storage.googleapis.com/seed-lists/${TESTNET_NAME}_seeds.txt" \
+  --peer-list-url "https://storage.googleapis.com/seed-lists/${NETWORK_NAME}_seeds.txt" \
   --libp2p-keypair "/root/libp2p-keys/key" \
 & # -background
 
-# Attempt to connect to the GraphQL client every 30s for up to 12 minutes
+# Attempt to connect to the GraphQL client every 10s for up to 8 minutes
 num_status_retries=24
 for ((i=1;i<=$num_status_retries;i++)); do
-  sleep 30s
+  sleep $WAIT_BETWEEN_POLLING_GRAPHQL
   set +e
   mina client status
   status_exit_code=$?
@@ -57,9 +56,9 @@ for ((i=1;i<=$num_status_retries;i++)); do
 done
 
 # Check that the daemon has connected to peers and is still up after 2 mins
-sleep 2m
+sleep $WAIT_AFTER_FINAL_CHECK
 mina client status
-if [ $(mina advanced get-peers | wc -l) -gt 0 ]; then
+if [ "$(mina advanced get-peers | wc -l)" -gt 0 ]; then
     echo "Found some peers"
 else
     echo "No peers found"
