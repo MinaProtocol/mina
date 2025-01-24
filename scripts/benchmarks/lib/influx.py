@@ -88,11 +88,16 @@ class Influx:
         if Influx.bucket not in os.environ:
             raise RuntimeError(f"{Influx.bucket} env var not defined")
 
+    @staticmethod
+    def influx_host():
+        url = os.environ[Influx.host]
+        return url if url.startswith('https://') else 'https://' + url
+
+
     def client(self):
         Influx.check_envs()
-        url = os.environ[Influx.host]
         return influxdb_client.InfluxDBClient(
-            url= url if url.startswith('https://') else 'https://' + url,
+            url=influx_host(),
             token=os.environ[Influx.token],
             org=os.environ[Influx.org],
             bucket=os.environ[Influx.bucket])
@@ -152,7 +157,7 @@ class Influx:
             )
 
         process = subprocess.Popen([
-            "influx", "write", f"--host={self.client.url}", "--http-debug", "--format=csv", f"--file={file}"
+            "influx", "write", f"--host={self.influx_host()}", "--http-debug", "--format=csv", f"--file={file}"
         ],
             stderr=subprocess.PIPE )
         
