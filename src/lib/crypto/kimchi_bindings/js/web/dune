@@ -21,6 +21,7 @@
   build.sh
   ../../../../../../Cargo.toml
   ../../../../../../Cargo.lock
+  (source_tree ../../../mina-rust-dependencies)
   (source_tree ../../../../../.cargo)
   ../../wasm/Cargo.toml
   (source_tree ../../wasm/src))
