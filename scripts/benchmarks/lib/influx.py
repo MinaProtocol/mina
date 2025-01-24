@@ -90,12 +90,13 @@ class Influx:
 
     def client(self):
         Influx.check_envs()
+        url = os.environ[Influx.host]
         return influxdb_client.InfluxDBClient(
-            url=os.environ[Influx.host],
+            url= url if url.startswith('https://') else 'https://' + url,
             token=os.environ[Influx.token],
             org=os.environ[Influx.org],
             bucket=os.environ[Influx.bucket])
-        
+
     def __init__(self, moving_average_size=10):
         self.moving_average_size = moving_average_size
 
