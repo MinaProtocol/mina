@@ -384,55 +384,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         Pending_coinbase.Stack.typ Fee_excess.typ Sok_message.Digest.typ
         Local_state.typ
 
-    let to_input ({ sok_digest; _ } as t : t) =
-      let input =
-        let input_without_sok = to_input { t with sok_digest = () } in
-        Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
-          [| Sok_message.Digest.to_input sok_digest; input_without_sok |]
-      in
-      if !top_hash_logging_enabled then
-        Format.eprintf
-          !"Generating unchecked top hash from:@.%{sexp: Tick.Field.t \
-            Random_oracle.Input.Chunked.t}@."
-          input ;
-      input
-
-    let to_field_elements t = Random_oracle.pack_input (to_input t)
-
-    module Checked = struct
-      type t = var
-
-      module Checked_without_sok = Checked
-
-      let to_input ({ sok_digest; _ } as t : t) =
-        let open Tick in
-        let open Checked.Let_syntax in
-        let%bind input_without_sok =
-          Checked_without_sok.to_input { t with sok_digest = () }
-        in
-        let input =
-          Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
-            [| Sok_message.Digest.Checked.to_input sok_digest
-             ; input_without_sok
-            |]
-        in
-        let%map () =
-          as_prover
-            As_prover.(
-              if !top_hash_logging_enabled then
-                let%map input = Random_oracle.read_typ' input in
-                Format.eprintf
-                  !"Generating checked top hash from:@.%{sexp: Field.t \
-                    Random_oracle.Input.Chunked.t}@."
-                  input
-              else return ())
-        in
-        input
-
-      let to_field_elements t =
-        let open Tick.Checked.Let_syntax in
-        Tick.Run.run_checked (to_input t >>| Random_oracle.Checked.pack_input)
-    end
+    let to_field_elements =
+      let (Typ { value_to_fields; _ }) = typ in
+      Fn.compose fst value_to_fields
   end
 
   let option lab =

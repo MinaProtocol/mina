@@ -1,0 +1,12 @@
+(library
+ (public_name proof_cache_tag.identity)
+ (name proof_cache_tag_identity)
+ (implements proof_cache_tag)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   ;; local libraries
+   mina_base)
+ (preprocess
+  (pps ppx_mina ppx_version))
+ (instrumentation (backend bisect_ppx)))

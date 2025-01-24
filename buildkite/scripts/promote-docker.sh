@@ -4,6 +4,7 @@ set -eo pipefail
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
+PUBLISH=0
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -n|--name) NAME="$2"; shift;;
@@ -18,12 +19,12 @@ function usage() {
     echo -e "${RED}☞  $1${CLEAR}\n";
   fi
   echo "Usage: $0 [-n name] [-v version] [-t tag] [-c codename] "
-  echo "  -n, --name      The Docker name (mina-berkeley, mina-archive etc.)"
+  echo "  -n, --name      The Docker name (mina-devnet, mina-archive etc.)"
   echo "  -v, --version   The Docker version"
   echo "  -t, --tag       The Additional tag"
   echo "  -p, --publish   The Publish to docker.io flag. If defined script will publish docker do docker.io. Otherwise it will still resides in gcr.io"
   echo ""
-  echo "Example: $0 --name mina-archive --version 2.0.0berkeley-rc1-berkeley-48efea4 --tag berkeley-latest-nightly-bullseye "
+  echo "Example: $0 --name mina-archive --version 2.0.0-rc1-48efea4 --tag devnet-latest-nightly-bullseye "
   exit 1
 }
 
@@ -45,7 +46,7 @@ docker pull ${GCR_REPO}/${NAME}:${VERSION}
 
 source buildkite/scripts/export-git-env-vars.sh
 
-if [[ -v PUBLISH ]]; then
+if [[ $PUBLISH == 1 ]]; then
   TARGET_REPO=docker.io/minaprotocol
   docker tag ${GCR_REPO}/${NAME}:${VERSION} ${TARGET_REPO}/${NAME}:${TAG}
   docker push "${TARGET_REPO}/${NAME}:${TAG}"

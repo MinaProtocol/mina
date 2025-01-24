@@ -1,5 +1,3 @@
-let Cmd = ../../Lib/Cmds.dhall
-
 let S = ../../Lib/SelectFiles.dhall
 
 let B = ../../External/Buildkite.dhall
@@ -34,9 +32,9 @@ let buildTestCmd
                   RunInToolchain.runInToolchain
                     ([] : List Text)
                     "buildkite/scripts/dump-mina-type-shapes.sh"
-                # [ Cmd.run
-                      "gsutil cp \$(git log -n 1 --format=%h --abbrev=7)-type_shape.txt \$MINA_TYPE_SHAPE gs://mina-type-shapes"
-                  ]
+                # RunInToolchain.runInToolchain
+                    ([] : List Text)
+                    "buildkite/scripts/version-linter-patch-missing-type-shapes.sh ${release_branch}"
                 # RunInToolchain.runInToolchain
                     ([] : List Text)
                     "buildkite/scripts/version-linter.sh ${release_branch}"

@@ -106,7 +106,6 @@ end
 
 let typ ~wrap_rounds:_ : (t, Constant.t) Typ.t =
   Types.Step.Proof_state.Per_proof.typ
-    (module Impl)
     (Shifted_value.typ Other_field.typ)
     ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16)
 

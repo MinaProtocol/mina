@@ -52,7 +52,6 @@ module Config = struct
     ; mutable keypair : Mina_net2.Keypair.t option
     ; all_peers_seen_metric : bool
     ; known_private_ip_nets : Core.Unix.Cidr.t list
-    ; block_window_duration : Time.Span.t
     }
   [@@deriving make]
 end
@@ -220,8 +219,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
         ctx first_peer_ivar high_connectivity_ivar ~added_seeds ~pids
         ~on_unexpected_termination
         ~sinks:
-          (Message.Any_sinks (sinksM, (sink_block, sink_tx, sink_snark_work)))
-        ~block_window_duration =
+          (Message.Any_sinks (sinksM, (sink_block, sink_tx, sink_snark_work))) =
       let module Sinks = (val sinksM) in
       let ctr = ref 0 in
       let record_peer_connection () =
@@ -258,7 +256,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                   ~all_peers_seen_metric:config.all_peers_seen_metric
                   ~on_peer_connected:(fun _ -> record_peer_connection ())
                   ~on_peer_disconnected:ignore ~logger:config.logger ~conf_dir
-                  ~pids ~block_window_duration () ) )
+                  ~pids () ) )
       with
       | Ok (Ok net2) -> (
           let open Mina_net2 in
@@ -629,7 +627,6 @@ module Make (Rpc_interface : RPC_INTERFACE) :
             create_libp2p ~allow_multiple_instances config rpc_handlers
               first_peer_ivar high_connectivity_ivar ~added_seeds ~pids
               ~on_unexpected_termination:restart_libp2p ~sinks
-              ~block_window_duration:config.block_window_duration
           in
           on_libp2p_create libp2p ; Deferred.ignore_m libp2p
         and restart_libp2p () = don't_wait_for (start_libp2p ()) in

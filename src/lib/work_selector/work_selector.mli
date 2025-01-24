@@ -3,6 +3,7 @@ module State :
 
 type work =
   (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
+[@@deriving yojson]
 
 type snark_pool = Network_pool.Snark_pool.t
 
@@ -31,3 +32,13 @@ val pending_work_statements :
   -> fee_opt:Currency.Fee.t option
   -> State.t
   -> Transaction_snark.Statement.t One_or_two.t list
+
+val all_work :
+     snark_pool:snark_pool
+  -> State.t
+  -> ( work One_or_two.t
+     * (Currency.Fee.t * Signature_lib.Public_key.Compressed.t) option )
+     list
+
+val completed_work_statements :
+  snark_pool:snark_pool -> State.t -> Transaction_snark_work.Checked.t list

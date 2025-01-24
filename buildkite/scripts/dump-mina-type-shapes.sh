@@ -20,3 +20,5 @@ export TYPE_SHAPE_FILE=${MINA_COMMIT_SHA1}-type_shape.txt
 
 echo "--- Create type shapes git note for commit: ${MINA_COMMIT_SHA1}"
 mina internal dump-type-shapes > ${TYPE_SHAPE_FILE}
+
+source buildkite/scripts/gsutil-upload.sh ${TYPE_SHAPE_FILE} gs://mina-type-shapes

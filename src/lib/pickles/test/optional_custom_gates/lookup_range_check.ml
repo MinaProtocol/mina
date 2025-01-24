@@ -6,11 +6,9 @@ let () = Pickles.Backend.Tick.Keypair.set_urs_info []
 
 let () = Pickles.Backend.Tock.Keypair.set_urs_info []
 
-let add_constraint c = assert_ { basic = c; annotation = None }
+let add_constraint c = assert_ c
 
-let add_plonk_constraint c =
-  add_constraint
-    (Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T c)
+let add_plonk_constraint c = add_constraint c
 
 let fresh_int i = exists Field.typ ~compute:(fun () -> Field.Constant.of_int i)
 
@@ -48,19 +46,6 @@ let range_check_in_lookup_gate () =
        ; w6 = fresh_int 0
        } )
 
-let constraint_constants =
-  { Snark_keys_header.Constraint_constants.sub_windows_per_window = 0
-  ; ledger_depth = 0
-  ; work_delay = 0
-  ; block_window_duration_ms = 0
-  ; transaction_capacity = Log_2 0
-  ; pending_coinbase_depth = 0
-  ; coinbase_amount = Unsigned.UInt64.of_int 0
-  ; supercharged_coinbase_factor = 0
-  ; account_creation_fee = Unsigned.UInt64.of_int 0
-  ; fork = None
-  }
-
 let test_range_check_lookup () =
   let _tag, _cache_handle, (module Proof), Pickles.Provers.[ prove ] =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
@@ -68,7 +53,6 @@ let test_range_check_lookup () =
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N0)
       ~name:"lookup range-check"
-      ~constraint_constants (* TODO(mrmr1993): This was misguided.. Delete. *)
       ~choices:(fun ~self:_ ->
         [ { identifier = "main"
           ; prevs = []

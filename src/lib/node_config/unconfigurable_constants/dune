@@ -1,7 +1,0 @@
-(library
- (name node_config_unconfigurable_constants)
- (public_name mina_node_config.unconfigurable_constants)
- (libraries node_config_intf)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_base ppx_optcomp))
-)

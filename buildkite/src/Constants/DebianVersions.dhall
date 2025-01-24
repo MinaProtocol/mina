@@ -90,6 +90,8 @@ let minimalDirtyWhen =
       , S.exactly "buildkite/src/Constants/ContainerImages" "dhall"
       , S.exactly "buildkite/src/Command/HardforkPackageGeneration" "dhall"
       , S.exactly "buildkite/src/Command/MinaArtifact" "dhall"
+      , S.exactly "buildkite/src/Command/PatchArchiveTest" "dhall"
+      , S.exactly "buildkite/src/Command/ReplayerTest" "dhall"
       , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact")
       , S.strictlyStart (S.contains "dockerfiles/stages")
       , S.exactly "scripts/debian/build" "sh"
@@ -99,9 +101,6 @@ let minimalDirtyWhen =
       , S.exactly "buildkite/scripts/build-artifact" "sh"
       , S.exactly "buildkite/scripts/build-hardfork-package" "sh"
       , S.exactly "buildkite/scripts/check-compatibility" "sh"
-      , S.exactly "buildkite/src/Jobs/Test/RunSnarkProfiler" "dhall"
-      , S.exactly "buildkite/scripts/run-snark-transaction-profiler" "sh"
-      , S.exactly "scripts/snark_transaction_profiler" "py"
       , S.exactly "buildkite/scripts/version-linter" "sh"
       , S.exactly "scripts/version-linter" "py"
       ]
