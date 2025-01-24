@@ -43,6 +43,7 @@
   (source_tree src)
   (source_tree ../../../../../.cargo)
   (source_tree ../../mina-rust-dependencies)
+  (source_tree ../../proof-systems)
   ;; Required as Cargo asks for all members of the workspace.
   ;; This is temporary until we move into proof-systems
   ../wasm/Cargo.toml
@@ -156,6 +157,7 @@
   ../../../../../rust-toolchain.toml
   ../../../../.ocamlformat
   (source_tree ../../mina-rust-dependencies)
+  (source_tree ../../proof-systems)
   (source_tree src)
   (source_tree ../../../../../.cargo)
   ;; Required as Cargo asks for all members of the workspace.
