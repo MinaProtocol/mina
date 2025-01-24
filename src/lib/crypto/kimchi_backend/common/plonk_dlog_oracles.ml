@@ -1,5 +1,5 @@
 open Core_kernel
-open Intf
+open Kimchi_pasta_snarky_backend.Intf
 
 module type Inputs_intf = sig
   module Verifier_index : T0

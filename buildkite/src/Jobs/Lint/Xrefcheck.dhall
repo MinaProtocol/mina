@@ -1,5 +1,3 @@
-let B = ../../External/Buildkite.dhall
-
 let SelectFiles = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -13,8 +11,6 @@ let Cmd = ../../Lib/Cmds.dhall
 let Command = ../../Command/Base.dhall
 
 let Size = ../../Command/Size.dhall
-
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -39,8 +35,9 @@ in  Pipeline.build
               [ Cmd.runInDocker
                   Cmd.Docker::{
                   , image = (../../Constants/ContainerImages.dhall).xrefcheck
+                  , useBash = False
                   }
-                  (     "awesome_bot -allow-dupe "
+                  (     "awesome_bot --allow-dupe "
                     ++  "--allow-redirect "
                     ++  "--allow 403,401 "
                     ++  "--skip-save-results "
@@ -54,8 +51,7 @@ in  Pipeline.build
               ]
             , label = "Verifies references in markdown"
             , key = "xrefcheck"
-            , target = Size.Small
-            , soft_fail = Some (B/SoftFail.Boolean True)
+            , target = Size.Multi
             }
         ]
       }

@@ -1,5 +1,3 @@
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Core_kernel
 open Async
 open Mina_base
@@ -237,14 +235,12 @@ module T = struct
   type t =
     { scan_state : Scan_state.t
     ; ledger :
-        ((* Invariant: this is the ledger after having applied all the
-             transactions in the above state. *)
-         Ledger.attached_mask
-        [@sexp.opaque] )
+        (* Invariant: this is the ledger after having applied all the
+            transactions in the above state. *)
+        Ledger.attached_mask
     ; constraint_constants : Genesis_constants.Constraint_constants.t
     ; pending_coinbase_collection : Pending_coinbase.t
     }
-  [@@deriving sexp]
 
   let proof_txns_with_state_hashes t =
     Scan_state.latest_ledger_proof t.scan_state
@@ -312,7 +308,7 @@ module T = struct
     in
     let%bind () =
       Statement_scanner_with_proofs.check_invariants ~constraint_constants
-        scan_state ~statement_check:(`Full get_state)
+        ~logger scan_state ~statement_check:(`Full get_state)
         ~verifier:{ Statement_scanner_proof_verifier.logger; verifier }
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~last_proof_statement
@@ -327,7 +323,7 @@ module T = struct
     return t
 
   let of_scan_state_and_ledger_unchecked
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~logger
       ~last_proof_statement ~ledger ~scan_state ~pending_coinbase_collection
       ~first_pass_ledger_target =
     let open Deferred.Or_error.Let_syntax in
@@ -340,8 +336,8 @@ module T = struct
       |> Deferred.return
     in
     let%bind () =
-      Statement_scanner.check_invariants ~constraint_constants scan_state
-        ~statement_check:`Partial ~verifier:()
+      Statement_scanner.check_invariants ~constraint_constants ~logger
+        scan_state ~statement_check:`Partial ~verifier:()
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~last_proof_statement
         ~registers_end:
@@ -405,11 +401,12 @@ module T = struct
       (of_scan_state_and_ledger ~logger ~get_state ~verifier)
 
   let of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
-      ~constraint_constants ~scan_state ~snarked_ledger ~snarked_local_state
-      ~expected_merkle_root ~pending_coinbases ~get_state =
+      ~constraint_constants ~logger ~scan_state ~snarked_ledger
+      ~snarked_local_state ~expected_merkle_root ~pending_coinbases ~get_state =
     of_scan_state_pending_coinbases_and_snarked_ledger' ~constraint_constants
       ~pending_coinbases ~scan_state ~snarked_ledger ~snarked_local_state
-      ~expected_merkle_root ~get_state of_scan_state_and_ledger_unchecked
+      ~expected_merkle_root ~get_state
+      (of_scan_state_and_ledger_unchecked ~logger)
 
   let copy
       { scan_state; ledger; constraint_constants; pending_coinbase_collection }
@@ -1144,7 +1141,7 @@ module T = struct
         [%log internal] "Verify_scan_state_after_apply" ;
         O1trace.thread "verify_scan_state_after_apply" (fun () ->
             Deferred.(
-              verify_scan_state_after_apply ~constraint_constants
+              verify_scan_state_after_apply ~constraint_constants ~logger
                 ~first_pass_ledger_end
                 ~second_pass_ledger_end:
                   (Frozen_ledger_hash.of_ledger_hash
@@ -2378,16 +2375,14 @@ let%test_module "staged ledger tests" =
     let logger = Logger.null ()
 
     let `VK vk, `Prover zkapp_prover =
-      Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+      Transaction_snark.For_tests.create_trivial_snapp ()
 
     let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            ~commit_id:"not specified for unit tests" () )
+          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
+            () )
 
     let find_vk ledger =
       Zkapp_command.Verifiable.load_vk_from_ledger ~get:(Ledger.get ledger)
@@ -4282,7 +4277,7 @@ let%test_module "staged ledger tests" =
 
     let%test_unit "Blocks having commands with insufficient funds are rejected"
         =
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let g =
         let open Quickcheck.Generator.Let_syntax in
         let%map ledger_init_state = Ledger.gen_initial_ledger_state
@@ -4796,13 +4791,11 @@ let%test_module "staged ledger tests" =
         ~setup_test:(fun _ledger (a, privkey_a, _loc_a) (b, privkey_b, _loc_b)
                     ->
           let `VK vk_a, `Prover prover_a =
-            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:0
-              ~constraint_constants ()
+            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:0 ()
           in
           let%bind.Async.Deferred vk_a = vk_a in
           let `VK vk_b, `Prover _prover_b =
-            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:1
-              ~constraint_constants ()
+            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:1 ()
           in
           let%bind.Async.Deferred vk_b = vk_b in
           let keymap =
@@ -4868,13 +4861,11 @@ let%test_module "staged ledger tests" =
         ~setup_test:(fun _ledger (a, privkey_a, _loc_a) (_b, _privkey_b, _loc_b)
                     ->
           let `VK vk_a, `Prover prover_a =
-            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:0
-              ~constraint_constants ()
+            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:0 ()
           in
           let%bind.Async.Deferred vk_a = vk_a in
           let `VK vk_b, `Prover _prover_b =
-            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:1
-              ~constraint_constants ()
+            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:1 ()
           in
           let%bind.Async.Deferred vk_b = vk_b in
           let keymap =
@@ -5182,12 +5173,10 @@ let%test_module "staged ledger tests" =
                           (Staged_ledger_diff.With_valid_signatures_and_proofs
                            .commands diff )
                         = 1 ) ;
+
                       let%bind verifier_full =
-                        Verifier.create ~logger ~proof_level:Full
-                          ~constraint_constants ~conf_dir:None
-                          ~pids:
-                            (Child_processes.Termination.create_pid_table ())
-                          ~commit_id:"not specified for unit tests" ()
+                        Verifier.For_tests.default ~constraint_constants ~logger
+                          ~proof_level:Full ()
                       in
                       match%map
                         Sl.apply ~constraint_constants ~global_slot !sl

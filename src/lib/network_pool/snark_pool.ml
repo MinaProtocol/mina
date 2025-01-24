@@ -375,6 +375,7 @@ struct
                 Account_id.create prover Token_id.default
                 |> Base_ledger.location_of_account ledger
               in
+
               Base_ledger.get ledger loc
           in
           let prover_account_exists = Option.is_some account_opt in
@@ -562,13 +563,19 @@ end
 let%test_module "random set test" =
   ( module struct
     open Mina_base
+    module Mock_snark_pool =
+      Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
+    open Ledger_proof.For_tests
 
     let trust_system = Mocks.trust_system
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     let block_window_duration =
-      Mina_compile_config.For_unit_tests.t.block_window_duration
+      Float.of_int
+        Genesis_constants.For_unit_tests.Constraint_constants.t
+          .block_window_duration_ms
+      |> Time.Span.of_ms
 
     (* SNARK work is rejected if the prover doesn't have an account and the fee
        is below the account creation fee. So, just to make generating valid SNARK
@@ -588,14 +595,8 @@ let%test_module "random set test" =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            ~commit_id:"not specified for unit tests" () )
-
-    module Mock_snark_pool =
-      Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
-    open Ledger_proof.For_tests
+          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
+            () )
 
     let apply_diff resource_pool work
         ?(proof = One_or_two.map ~f:mk_dummy_proof)

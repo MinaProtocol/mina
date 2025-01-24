@@ -729,9 +729,10 @@ macro_rules! impl_verification_key {
                     .lookup_index.as_ref()
                     .map_or(false, |li| li.lookup_info.features.patterns.lookup);
 
-                // TODO
-                let runtime_tables = false;
-
+                let runtime_tables = index
+                    .lookup_index.as_ref()
+                    .map_or(false, |li| li.runtime_tables_selector.is_some());
+                
                 let patterns = LookupPatterns {
                     xor,
                     lookup,

@@ -22,9 +22,6 @@ open Core
 open Async
 open Mina_net2
 
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
-
 type status = NotMet | Connected | Disconnected [@@deriving sexp]
 
 type typed_msg = { a : int; b : string option }
@@ -63,7 +60,7 @@ let or_timeout ?(timeout = 60) ~msg action =
 
 let%test_module "all-ipc test" =
   ( module struct
-    let logger = Logger.create ()
+    let logger = Logger.null ()
 
     let pids = Child_processes.Termination.create_pid_table ()
 

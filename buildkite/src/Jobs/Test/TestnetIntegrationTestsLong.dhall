@@ -21,12 +21,12 @@ let Artifacts = ../../Constants/Artifacts.dhall
 let dependsOn =
         Dockers.dependsOn
           Dockers.Type.Bullseye
-          (Some Network.Type.Berkeley)
+          Network.Type.Devnet
           Profiles.Type.Standard
           Artifacts.Type.Daemon
       # Dockers.dependsOn
           Dockers.Type.Bullseye
-          (None Network.Type)
+          Network.Type.Devnet
           Profiles.Type.Standard
           Artifacts.Type.Archive
 
@@ -39,10 +39,6 @@ in  Pipeline.build
           , S.strictlyStart
               (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest")
           , S.strictlyStart (S.contains "buildkite/src/Command/TestExecutive")
-          , S.strictlyStart
-              (S.contains "automation/terraform/modules/o1-integration")
-          , S.strictlyStart
-              (S.contains "automation/terraform/modules/kubernetes/testnet")
           ]
         , path = "Test"
         , name = "TestnetIntegrationTestsLong"

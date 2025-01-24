@@ -7,6 +7,7 @@ module Libp2p_stream = Libp2p_stream
 module Multiaddr = Multiaddr
 module Validation_callback = Validation_callback
 module Sink = Sink
+module Bitswap_tag = Bitswap_tag
 
 exception
   Libp2p_helper_died_unexpectedly = Libp2p_helper

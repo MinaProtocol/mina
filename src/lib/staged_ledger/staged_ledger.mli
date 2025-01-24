@@ -5,13 +5,13 @@ open Mina_transaction
 open Signature_lib
 module Ledger = Mina_ledger.Ledger
 
-type t [@@deriving sexp]
+type t
 
 module Scan_state : sig
   [%%versioned:
   module Stable : sig
     module V2 : sig
-      type t [@@deriving sexp]
+      type t
 
       val hash : t -> Staged_ledger_hash.Aux_hash.t
     end
@@ -312,6 +312,7 @@ val of_scan_state_pending_coinbases_and_snarked_ledger :
 
 val of_scan_state_pending_coinbases_and_snarked_ledger_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> logger:Logger.t
   -> scan_state:Scan_state.t
   -> snarked_ledger:Ledger.t
   -> snarked_local_state:Mina_state.Local_state.t

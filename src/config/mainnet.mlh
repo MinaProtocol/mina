@@ -1,10 +1,5 @@
 [%%define ledger_depth 35]
 
-(*BEGIN src/config/curve/medium.mlh*)
-[%%define curve_size 255]
-(*END src/config/curve/medium.mlh*)
-
-
 (*BEGIN src/config/coinbase/realistic.mlh*)
 [%%define coinbase "720"]
 (*END src/config/coinbase/realistic.mlh*)
@@ -78,3 +73,7 @@
 [%%define vrf_poll_interval 5000]
 [%%define zkapp_cmd_limit 24]
 [%%undef scan_state_transaction_capacity_log_2]
+
+(* Constants determining sync ledger query/response size*)
+[%%define sync_ledger_max_subtree_depth 8]
+[%%define sync_ledger_default_subtree_depth 6]

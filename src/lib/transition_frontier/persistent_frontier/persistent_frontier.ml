@@ -58,7 +58,7 @@ let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
   let%bind staged_ledger =
     Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
       ~snarked_local_state:local_state ~snarked_ledger:mask ~scan_state
-      ~constraint_constants:precomputed_values.constraint_constants
+      ~constraint_constants:precomputed_values.constraint_constants ~logger
       ~pending_coinbases
       ~expected_merkle_root:(Staged_ledger_hash.ledger_hash staged_ledger_hash)
       ~get_state

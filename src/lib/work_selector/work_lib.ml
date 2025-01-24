@@ -147,6 +147,23 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     List.filter statements ~f:(fun st ->
         Option.is_none (Inputs.Snark_pool.get_completed_work snark_pool st) )
 
+  let all_work ~snark_pool (state : State.t) =
+    O1trace.sync_thread "work_lib_all_unseen_works" (fun () ->
+        List.map state.available_jobs ~f:(fun job ->
+            let statement = One_or_two.map ~f:Work_spec.statement job in
+            let fee_prover_opt =
+              Option.map
+                (Inputs.Snark_pool.get_completed_work snark_pool statement)
+                ~f:(fun (p : Inputs.Transaction_snark_work.t) ->
+                  ( Inputs.Transaction_snark_work.fee p
+                  , Inputs.Transaction_snark_work.prover p ) )
+            in
+            (job, fee_prover_opt) ) )
+
+  let all_completed_work ~snark_pool statements =
+    List.filter_map statements ~f:(fun st ->
+        Inputs.Snark_pool.get_completed_work snark_pool st )
+
   (*Seen/Unseen jobs that are not in the snark pool yet*)
   let pending_work_statements ~snark_pool ~fee_opt (state : State.t) =
     let all_todo_statements =
@@ -160,4 +177,10 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         all_pending_work ~snark_pool all_todo_statements
     | Some fee ->
         expensive_work all_todo_statements ~fee
+
+  let completed_work_statements ~snark_pool (state : State.t) =
+    let all_todo_statements =
+      List.map state.available_jobs ~f:(One_or_two.map ~f:Work_spec.statement)
+    in
+    all_completed_work ~snark_pool all_todo_statements
 end

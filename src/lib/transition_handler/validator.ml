@@ -22,6 +22,8 @@ let validate_header_is_relevant ~context:(module Context : CONTEXT) ~frontier
   let module Context = struct
     include Context
 
+    let compile_config = precomputed_values.compile_config
+
     let logger =
       Logger.extend logger
         [ ("selection_context", `String "Transition_handler.Validator") ]

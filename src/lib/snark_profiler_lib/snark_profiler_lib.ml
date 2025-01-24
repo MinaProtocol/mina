@@ -190,7 +190,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
     ~max_num_updates () :
     (Mina_ledger.Ledger.t * Zkapp_command.t list) Async.Deferred.t =
   let `VK verification_key, `Prover prover =
-    Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+    Transaction_snark.For_tests.create_trivial_snapp ()
   in
   let zkapp_prover_and_vk = (prover, verification_key) in
   let%bind.Async.Deferred verification_key = verification_key in

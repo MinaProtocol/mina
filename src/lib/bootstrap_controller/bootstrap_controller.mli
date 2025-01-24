@@ -11,8 +11,6 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
-
-  val compile_config : Mina_compile_config.t
 end
 
 type Structured_log_events.t += Bootstrap_complete [@@deriving register_event]

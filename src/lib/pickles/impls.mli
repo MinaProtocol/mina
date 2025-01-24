@@ -1,10 +1,15 @@
 open Pickles_types
 
 module Wrap_impl :
-    module type of Snarky_backendless.Snark.Run.Make (Backend.Tock)
+    module type of
+      Snarky_backendless.Snark.Run.Make
+        (Kimchi_pasta_snarky_backend.Pallas_based_plonk)
 
 module Step : sig
-  module Impl : module type of Snarky_backendless.Snark.Run.Make (Backend.Tick)
+  module Impl :
+      module type of
+        Snarky_backendless.Snark.Run.Make
+          (Kimchi_pasta_snarky_backend.Vesta_based_plonk)
 
   include module type of Impl
 
@@ -35,7 +40,7 @@ module Step : sig
 
     val typ_unchecked : (t, Constant.t) Typ.t
 
-    val typ : (t, Constant.t, Internal_Basic.field) Snarky_backendless.Typ.t
+    val typ : (t, Constant.t) Impl.Typ.t
   end
 
   type unfinalized_proof =
@@ -69,22 +74,24 @@ module Step : sig
 
   type 'proofs_verified statement_var =
     ( (unfinalized_proof_var, 'proofs_verified) Vector.t
-    , Impl.field Snarky_backendless.Cvar.t
-    , (Impl.field Snarky_backendless.Cvar.t, 'proofs_verified) Vector.t )
+    , Impl.Field.t
+    , (Impl.Field.t, 'proofs_verified) Vector.t )
     Import.Types.Step.Statement.t
 
   val input :
        proofs_verified:'proofs_verified Nat.t
     -> ( 'proofs_verified statement_var
-       , 'proofs_verified statement
-       , Impl.field )
-       Import.Spec.ETyp.t
+       , 'proofs_verified statement )
+       Import.Spec.Step_etyp.t
 
   module Async_promise : module type of Async_generic (Promise)
 end
 
 module Wrap : sig
-  module Impl : module type of Snarky_backendless.Snark.Run.Make (Backend.Tock)
+  module Impl :
+      module type of
+        Snarky_backendless.Snark.Run.Make
+          (Kimchi_pasta_snarky_backend.Pallas_based_plonk)
 
   include module type of Impl
 
@@ -117,11 +124,7 @@ module Wrap : sig
 
     val typ_unchecked : (Impl.Field.t, Backend.Tick.Field.t) Impl.Typ.t
 
-    val typ :
-      ( Impl.Field.t
-      , Backend.Tick.Field.t
-      , Wrap_impl.Internal_Basic.Field.t )
-      Snarky_backendless.Typ.t
+    val typ : (Impl.Field.t, Backend.Tick.Field.t) Impl.Typ.t
   end
 
   val input :
@@ -131,23 +134,20 @@ module Wrap : sig
          , Impl.Field.t Composition_types.Scalar_challenge.t
          , Impl.Field.t Pickles_types.Shifted_value.Type1.t
          , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
-           , Impl.field Snarky_backendless.Cvar.t
-             Snarky_backendless.Snark_intf.Boolean0.t )
+           , Impl.Field.t Snarky_backendless.Snark_intf.Boolean0.t )
            Pickles_types.Opt.t
          , ( Impl.Field.t Composition_types.Scalar_challenge.t
-           , Impl.field Snarky_backendless.Cvar.t
-             Snarky_backendless.Snark_intf.Boolean0.t )
+           , Impl.Field.t Snarky_backendless.Snark_intf.Boolean0.t )
            Pickles_types.Opt.t
          , Impl.Boolean.var
-         , Impl.field Snarky_backendless.Cvar.t
-         , Impl.field Snarky_backendless.Cvar.t
-         , Impl.field Snarky_backendless.Cvar.t
-         , ( Impl.field Snarky_backendless.Cvar.t
-             Kimchi_backend_common.Scalar_challenge.t
+         , Impl.Field.t
+         , Impl.Field.t
+         , Impl.Field.t
+         , ( Impl.Field.t Kimchi_backend_common.Scalar_challenge.t
              Composition_types.Bulletproof_challenge.t
            , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
            Pickles_types.Vector.t
-         , Impl.field Snarky_backendless.Cvar.t )
+         , Impl.Field.t )
          Import.Types.Wrap.Statement.In_circuit.t
        , ( Limb_vector.Challenge.Constant.t
          , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
@@ -165,7 +165,6 @@ module Wrap : sig
            , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
            Pickles_types.Vector.t
          , Composition_types.Branch_data.t )
-         Import.Types.Wrap.Statement.In_circuit.t
-       , Wrap_impl.field )
-       Import.Spec.ETyp.t
+         Import.Types.Wrap.Statement.In_circuit.t )
+       Import.Spec.Wrap_etyp.t
 end

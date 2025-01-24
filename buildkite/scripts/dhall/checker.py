@@ -73,9 +73,10 @@ class PipelineInfoBuilder:
         return dirty
 
     def build(self):
+        name = self.pipeline["spec"]["name"]
         steps = self.get_steps()
         dirty = self.get_dirty()
-        return PipelineInfo(self.file, self.pipeline, steps, dirty)
+        return PipelineInfo(self.file, self.pipeline, name, steps, dirty)
 
 
 class DirtyWhen:
@@ -114,8 +115,9 @@ class Step:
 
 class PipelineInfo:
 
-    def __init__(self, file, pipeline, steps, dirty):
+    def __init__(self, file, pipeline, name, steps, dirty):
         self.file = file
+        self.name = name
         self.pipeline = pipeline
         self.steps = steps
         self.dirty = dirty
@@ -140,6 +142,9 @@ run = subparsers.add_parser('print-cmd')
 run.add_argument("--job", required=True, help="job to run")
 run.add_argument("--step", required=False, help="job to run")
 
+subparsers.add_parser('dups')
+
+subparsers.add_parser('names')
 
 args = parser.parse_args()
 
@@ -201,6 +206,47 @@ if args.cmd == "dirty-when":
             file = str.replace(pipeline.file, ".yml", ".dhall")
             print(
                 f"\t{CmdColors.FAIL}[FATAL] Unresolved dirtyWhen path  in '{file}' ('{str(dirty)}'){CmdColors.ENDC}")
+        exit(1)
+    else:
+        print('Pipelines definitions correct')
+
+if args.cmd == "dups":
+
+    unique_names = set()
+    dups = []
+
+    for pipeline in pipelinesInfo:
+        for step in pipeline.steps:
+            before = len(unique_names)
+            unique_names.add(step.key)
+            if len(unique_names) == before:
+                dups.append((pipeline,step.key))
+
+    if any(dups):
+        print("Fatal: Step name duplication detected:")
+        for pipeline,step in dups:
+            file = str.replace(pipeline.file, ".yml", ".dhall")
+            print(
+                f"\t{CmdColors.FAIL}[FATAL] Step with name '{step}' in '{file}' is defined more than once{CmdColors.ENDC}")
+        exit(1)
+    else:
+        print('Pipelines definitions correct')
+
+if args.cmd == "names":
+    invalid = []
+
+    for pipeline in pipelinesInfo:
+        stem = str.replace(pipeline.file, ".yml", "")
+        if pipeline.name != stem:
+            invalid.append(pipeline)
+
+    if any(invalid):
+        print("Fatal: Invalid pipeline name detected:")
+        for pipeline in invalid:
+            file = str.replace(pipeline.file, ".yml", ".dhall")
+            print(
+                f"\t{CmdColors.FAIL}[FATAL] Job name '{pipeline.name}' in '{file}' is incorrect. "
+                f"Pipeline name (spec.name) and pipeline filename should match {CmdColors.ENDC}")
         exit(1)
     else:
         print('Pipelines definitions correct')

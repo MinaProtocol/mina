@@ -17,6 +17,14 @@ let map { prechallenge } ~f = { prechallenge = f prechallenge }
 let typ chal =
   let there = pack in
   let back = unpack in
-  let open Snarky_backendless in
+  let open Kimchi_pasta_snarky_backend.Step_impl in
   Typ.transport ~there ~back (Kimchi_backend_common.Scalar_challenge.typ chal)
+  |> Typ.transport_var ~there ~back
+
+let wrap_typ chal =
+  let there = pack in
+  let back = unpack in
+  let open Kimchi_pasta_snarky_backend.Wrap_impl in
+  Typ.transport ~there ~back
+    (Kimchi_backend_common.Scalar_challenge.wrap_typ chal)
   |> Typ.transport_var ~there ~back

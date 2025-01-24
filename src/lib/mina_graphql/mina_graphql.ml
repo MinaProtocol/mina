@@ -785,6 +785,41 @@ module Mutations = struct
             Error "Internal error: response from transaction pool was malformed"
         )
 
+  let add_snark_work =
+    io_field "sendProofBundle" ~doc:"Transaction SNARKs for a given spec"
+      ~args:
+        Arg.
+          [ arg "input"
+              ~doc:
+                "Proof bundle for a given spec in json format including fees \
+                 and prover public key"
+              ~typ:(non_null Types.Input.ProofBundleInput.arg_typ)
+          ]
+      ~typ:(non_null string)
+      ~resolve:(fun { ctx = mina; _ } ()
+                    (proof_bundle :
+                      Ledger_proof.t
+                      Snark_work_lib.Work.Result_without_metrics.t ) ->
+        let solved_work =
+          Network_pool.Snark_pool.Resource_pool.Diff.Add_solved_work
+            ( proof_bundle.statements
+            , { proof = proof_bundle.proofs
+              ; fee = { fee = proof_bundle.fee; prover = proof_bundle.prover }
+              } )
+        in
+        match%map Mina_lib.add_work_graphql mina solved_work with
+        | Ok
+            ( `Broadcasted
+            , Network_pool.Snark_pool.Resource_pool.Diff.Add_solved_work _
+            , _ ) ->
+            Ok "Accepted"
+        | Error err ->
+            Error (Error.to_string_hum err)
+        | Ok _ ->
+            Error
+              "Internal error: Transaction proofs could not be added to the \
+               pool" )
+
   let export_logs =
     io_field "exportLogs" ~doc:"Export daemon logs to tar archive"
       ~args:Arg.[ arg "basename" ~typ:string ]
@@ -1006,6 +1041,7 @@ module Mutations = struct
     ; archive_precomputed_block
     ; archive_extensional_block
     ; send_rosetta_transaction
+    ; add_snark_work
     ]
 
   module Itn = struct
@@ -2216,6 +2252,52 @@ module Queries = struct
         Work_selector.pending_work_statements ~snark_pool ~fee_opt
           snark_job_state )
 
+  let snark_work_range =
+    field "snarkWorkRange"
+      ~doc:
+        "Find any sequence of snark work between two indexes in all available \
+         snark work. Returns both completed and uncompleted work."
+      ~args:
+        Arg.
+          [ arg "startingIndex"
+              ~doc:"The first index to be taken from all available snark work"
+              ~typ:(non_null Types.Input.UInt32.arg_typ)
+          ; arg "endingIndex"
+              ~doc:
+                "The last index to be taken from all available snark work \
+                 (exclusive). If not specified or greater than the available \
+                 snark work list,all elements from index [startingIndex] will \
+                 be returned. An empty list will be returned if startingIndex \
+                 is not a valid index or if startingIndex >= endingIndex."
+              ~typ:Types.Input.UInt32.arg_typ
+          ]
+      ~typ:(non_null @@ list @@ non_null Types.pending_work_spec)
+      ~resolve:(fun { ctx = mina; _ } () start_idx end_idx ->
+        let snark_job_state = Mina_lib.snark_job_state mina in
+        let snark_pool = Mina_lib.snark_pool mina in
+        let all_work = Work_selector.all_work ~snark_pool snark_job_state in
+        let work_size = all_work |> List.length |> Unsigned.UInt32.of_int in
+        let less_than uint1 uint2 = Unsigned.UInt32.compare uint1 uint2 < 0 in
+        let to_bundle_specs =
+          List.map ~f:(fun (spec, fee_prover) ->
+              { Types.Snark_work_bundle.spec; fee_prover } )
+        in
+        match end_idx with
+        | None when less_than start_idx work_size ->
+            (* drop handles case when start_idx is greater than pending work and is O(start_idx)*)
+            let start = Unsigned.UInt32.to_int start_idx in
+            List.drop all_work start |> to_bundle_specs
+        | Some end_idx
+          when less_than start_idx end_idx && less_than start_idx work_size ->
+            let pos = Unsigned.UInt32.to_int start_idx in
+            let len =
+              Unsigned.UInt32.(
+                min (sub end_idx start_idx) (sub work_size start_idx) |> to_int)
+            in
+            List.sub ~pos ~len all_work |> to_bundle_specs
+        | _ ->
+            [] )
+
   module SnarkedLedgerMembership = struct
     let resolve_membership :
            mapper:(Ledger.path -> Account.t -> 'a)
@@ -2663,7 +2745,7 @@ module Queries = struct
       ~args:Arg.[]
       ~resolve:(fun { ctx = mina; _ } () ->
         let open Deferred.Result.Let_syntax in
-        Mina_lib.verifier mina |> Verifier.get_blockchain_verification_key
+        Mina_lib.prover mina |> Prover.get_blockchain_verification_key
         |> Deferred.Result.map_error ~f:Error.to_string_hum
         >>| Pickles.Verification_key.to_yojson >>| Yojson.Safe.to_basic )
 
@@ -2784,6 +2866,7 @@ module Queries = struct
     ; trust_status_all
     ; snark_pool
     ; pending_snark_work
+    ; snark_work_range
     ; SnarkedLedgerMembership.snarked_ledger_account_membership
     ; SnarkedLedgerMembership.encoded_snarked_ledger_account_membership
     ; genesis_constants

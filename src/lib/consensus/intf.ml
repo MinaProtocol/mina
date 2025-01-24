@@ -11,6 +11,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Constants.t
+
+  val compile_config : Mina_compile_config.t
 end
 
 module type Constants = sig

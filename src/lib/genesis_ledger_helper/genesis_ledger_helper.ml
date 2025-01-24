@@ -808,38 +808,37 @@ module Config_loader : Config_loader_intf = struct
     in
     [%log info] "Loaded genesis ledger from $ledger_file"
       ~metadata:[ ("ledger_file", `String ledger_file) ] ;
-    let%bind genesis_epoch_data, genesis_epoch_data_config =
+    let%map genesis_epoch_data, genesis_epoch_data_config =
       Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
         config.epoch_data
     in
-    let config =
+    let c1 =
       { config with
         ledger = Option.map config.ledger ~f:(fun _ -> ledger_config)
       ; epoch_data = genesis_epoch_data_config
       }
     in
-    let%map genesis_constants =
-      Deferred.return
-      @@ make_genesis_constants ~logger ~default:genesis_constants config
-    in
+    let c2 = Runtime_config.of_constants constants in
+    (* This should give us the entire configuration object, including the implied constants *)
+    let runtime_config = Runtime_config.combine c1 c2 in
     let proof_inputs =
-      Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
+      Genesis_proof.generate_inputs ~runtime_config ~proof_level
         ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
         ~compile_config ~blockchain_proof_system_id:None ~genesis_epoch_data
     in
-    (proof_inputs, config)
+    (proof_inputs, runtime_config)
 
   let init_from_config_file ?overwrite_version ?genesis_dir ~logger
       ~(constants : Runtime_config.Constants.constants)
       (config : Runtime_config.t) :
       (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
     let open Deferred.Or_error.Let_syntax in
-    let%map inputs, config =
+    let%map inputs, runtime_config =
       inputs_from_config_file ?genesis_dir ~constants ~logger ?overwrite_version
         config
     in
     let values = Genesis_proof.create_values_no_proof inputs in
-    (values, config)
+    (values, runtime_config)
 
   let load_config_files ?overwrite_version ?genesis_dir ?(itn_features = false)
       ?cli_proof_level ?conf_dir ~logger (config_files : string list) =
@@ -849,8 +848,8 @@ module Config_loader : Config_loader_intf = struct
       Option.value ~default:(conf_dir ^/ "genesis") genesis_dir
     in
     let%bind.Deferred constants =
-      Runtime_config.Constants.load_constants ?conf_dir ?cli_proof_level
-        ~itn_features ~logger config_files
+      Runtime_config.Constants.load_constants_with_logging ?conf_dir
+        ?cli_proof_level ~logger ~itn_features config_files
     in
     let%bind config =
       Runtime_config.Json_loader.load_config_files ?conf_dir ~logger

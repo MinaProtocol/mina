@@ -27,6 +27,8 @@ module type Inputs_intf = sig
 
     val fee : t -> Fee.t
 
+    val prover : t -> Signature_lib.Public_key.Compressed.t
+
     module Statement : sig
       type t = Transaction_snark.Statement.t One_or_two.t
     end

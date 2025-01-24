@@ -1,4 +1,3 @@
-open Inline_test_quiet_logs
 open Core_kernel
 open Mina_base
 open Mina_transaction
@@ -73,6 +72,20 @@ let%test_module "transaction_status" =
 
     let logger = Logger.null ()
 
+    let () =
+      (* Disable log messages from best_tip_diff logger. *)
+      Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+        ~id:Logger.Logger_id.best_tip_diff ~processor:(Logger.Processor.raw ())
+        ~transport:
+          (Logger.Transport.create
+             ( module struct
+               type t = unit
+
+               let transport () _ = ()
+             end )
+             () )
+        ()
+
     let time_controller = Block_time.Controller.basic ~logger
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
@@ -88,14 +101,15 @@ let%test_module "transaction_status" =
     let pool_max_size = precomputed_values.genesis_constants.txpool_max_size
 
     let block_window_duration =
-      Mina_compile_config.For_unit_tests.t.block_window_duration
+      Float.of_int
+        Genesis_constants.For_unit_tests.Constraint_constants.t
+          .block_window_duration_ms
+      |> Time.Span.of_ms
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            ~commit_id:"not specified for unit tests" () )
+          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
+            () )
 
     let key_gen =
       let open Quickcheck.Generator in

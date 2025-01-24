@@ -11,8 +11,6 @@ module type S = sig
 
   val ledger_depth : int
 
-  val curve_size : int
-
   val coinbase : string
 
   val k : int
@@ -62,4 +60,8 @@ module type S = sig
   val zkapp_cmd_limit : int option
 
   val scan_state_tps_goal_x10 : int option
+
+  val sync_ledger_max_subtree_depth : int
+
+  val sync_ledger_default_subtree_depth : int
 end
