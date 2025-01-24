@@ -18,7 +18,6 @@ use poly_commitment::commitment::PolyComm;
 use poly_commitment::srs::SRS;
 use std::path::Path;
 use std::sync::Arc;
-use wasm_bindgen::prelude::*;
 
 macro_rules! impl_verification_key {
     (
@@ -36,7 +35,7 @@ macro_rules! impl_verification_key {
      $field_name: ident
      ) => {
         paste! {
-            #[wasm_bindgen]
+            
             #[derive(Clone, Copy)]
             pub struct [<Wasm $field_name:camel Domain>] {
                 pub log_size_of_group: i32,
@@ -44,7 +43,7 @@ macro_rules! impl_verification_key {
             }
             type WasmDomain = [<Wasm $field_name:camel Domain>];
 
-            #[wasm_bindgen]
+            
             impl [<Wasm $field_name:camel Domain>]{
                 #[wasm_bindgen(constructor)]
                 pub fn new(log_size_of_group: i32, group_gen: $WasmF) -> Self {
@@ -52,7 +51,7 @@ macro_rules! impl_verification_key {
                 }
             }
 
-            #[wasm_bindgen]
+            
             #[derive(Clone)]
             pub struct [<Wasm $field_name:camel PlonkVerificationEvals>] {
                 #[wasm_bindgen(skip)]
@@ -88,7 +87,7 @@ macro_rules! impl_verification_key {
             type WasmPlonkVerificationEvals = [<Wasm $field_name:camel PlonkVerificationEvals>];
 
 
-            #[wasm_bindgen]
+            
             impl [<Wasm $field_name:camel PlonkVerificationEvals>] {
                 #[allow(clippy::too_many_arguments)]
                 #[wasm_bindgen(constructor)]
@@ -269,7 +268,7 @@ macro_rules! impl_verification_key {
             }
 
             #[derive(Clone, Copy)]
-            #[wasm_bindgen]
+            
             pub struct [<Wasm $field_name:camel Shifts>] {
                 pub s0: $WasmF,
                 pub s1: $WasmF,
@@ -281,7 +280,7 @@ macro_rules! impl_verification_key {
             }
             type WasmShifts = [<Wasm $field_name:camel Shifts>];
 
-            #[wasm_bindgen]
+            
             impl [<Wasm $field_name:camel Shifts>] {
                 #[wasm_bindgen(constructor)]
                 pub fn new(
@@ -297,7 +296,7 @@ macro_rules! impl_verification_key {
                 }
             }
 
-            #[wasm_bindgen]
+            
             #[derive(Clone)]
             pub struct [<Wasm $field_name:camel LookupSelectors>] {
                 #[wasm_bindgen(skip)]
@@ -356,7 +355,7 @@ macro_rules! impl_verification_key {
                 }
             }
 
-            #[wasm_bindgen]
+            
             impl [<Wasm $field_name:camel LookupSelectors>] {
                 #[wasm_bindgen(constructor)]
                 pub fn new(
@@ -414,7 +413,7 @@ macro_rules! impl_verification_key {
                 }
             }
 
-            #[wasm_bindgen]
+            
             #[derive(Clone)]
             pub struct [<Wasm $field_name:camel LookupVerifierIndex>] {
                 pub joint_lookup_used: bool,
@@ -490,7 +489,7 @@ macro_rules! impl_verification_key {
                 }
             }
 
-            #[wasm_bindgen]
+            
             impl [<Wasm $field_name:camel LookupVerifierIndex>] {
                 #[wasm_bindgen(constructor)]
                 pub fn new(
@@ -562,7 +561,7 @@ macro_rules! impl_verification_key {
                 }
             }
 
-            #[wasm_bindgen]
+            
             #[derive(Clone)]
             pub struct [<Wasm $field_name:camel PlonkVerifierIndex>] {
                 pub domain: WasmDomain,
@@ -580,7 +579,7 @@ macro_rules! impl_verification_key {
             }
             type WasmPlonkVerifierIndex = [<Wasm $field_name:camel PlonkVerifierIndex>];
 
-            #[wasm_bindgen]
+            
             impl [<Wasm $field_name:camel PlonkVerifierIndex>] {
                 #[wasm_bindgen(constructor)]
                 pub fn new(
@@ -861,7 +860,7 @@ macro_rules! impl_verification_key {
                 ).map_err(|e| JsValue::from_str(format!("read_raw: {}", e).as_str()))
             }
 
-            #[wasm_bindgen]
+            
             pub fn [<$name:snake _read>](
                 offset: Option<i32>,
                 srs: &$WasmSrs,
@@ -871,7 +870,7 @@ macro_rules! impl_verification_key {
                 Ok(to_wasm(srs, vi.into()))
             }
 
-            #[wasm_bindgen]
+            
             pub fn [<$name:snake _write>](
                 append: Option<bool>,
                 index: WasmPlonkVerifierIndex,
@@ -887,7 +886,7 @@ macro_rules! impl_verification_key {
 
             // TODO understand what serialization format we need
 
-            // #[wasm_bindgen]
+            // 
             // pub fn [<$name:snake _serialize>](
             //     index: WasmPlonkVerifierIndex,
             // ) -> Box<[u8]> {
@@ -895,7 +894,7 @@ macro_rules! impl_verification_key {
             //     rmp_serde::to_vec(&index).unwrap().into_boxed_slice()
             // }
 
-            // #[wasm_bindgen]
+            // 
             // pub fn [<$name:snake _deserialize>](
             //     srs: &$WasmSrs,
             //     index: Box<[u8]>,
@@ -905,7 +904,7 @@ macro_rules! impl_verification_key {
             //     return to_wasm(srs, vi.into())
             // }
 
-            #[wasm_bindgen]
+            
             pub fn [<$name:snake _serialize>](
                 index: WasmPlonkVerifierIndex,
             ) -> String {
@@ -913,7 +912,7 @@ macro_rules! impl_verification_key {
                 serde_json::to_string(&index).unwrap()
             }
 
-            #[wasm_bindgen]
+            
             pub fn [<$name:snake _deserialize>](
                 srs: &$WasmSrs,
                 index: String,
@@ -925,7 +924,7 @@ macro_rules! impl_verification_key {
                 }
             }
 
-            #[wasm_bindgen]
+            
             pub fn [<$name:snake _create>](
                 index: &$WasmIndex,
             ) -> WasmPlonkVerifierIndex {
@@ -934,7 +933,7 @@ macro_rules! impl_verification_key {
                 to_wasm(&index.0.as_ref().srs, verifier_index)
             }
 
-            #[wasm_bindgen]
+            
             pub fn [<$name:snake _shifts>](log2_size: i32) -> WasmShifts {
                 let domain = Domain::<$F>::new(1 << log2_size).unwrap();
                 let shifts = Shifts::new(&domain);
@@ -950,7 +949,7 @@ macro_rules! impl_verification_key {
                 }
             }
 
-            #[wasm_bindgen]
+            
             pub fn [<$name:snake _dummy>]() -> WasmPlonkVerifierIndex {
                 fn comm() -> $WasmPolyComm {
                     let g: $WasmG = $G::generator().into();
@@ -1003,7 +1002,7 @@ macro_rules! impl_verification_key {
                 }
             }
 
-            #[wasm_bindgen]
+            
             pub fn [<$name:snake _deep_copy>](
                 x: &WasmPlonkVerifierIndex,
             ) -> WasmPlonkVerifierIndex {
