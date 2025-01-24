@@ -2,9 +2,6 @@
 [target.'cfg(not(target_arch = "wasm32"))']
 rustflags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup"]
 
-[target.wasm32-unknown-unknown]
-rustflags = ["-C", "target-feature=+atomics,+bulk-memory", "-C", "link-arg=--no-check-features"]
-
 [profile.release.target.wasm32-unknown-unknown]
 debug = true
 
