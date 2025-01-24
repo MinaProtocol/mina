@@ -67,3 +67,5 @@ poly-commitment = { git = "https://github.com/o1-labs/proof-systems", rev = "0c6
 ## active rustc version is 1.72.1
 ## ```
 bumpalo = { version = "=3.14.0" }
+
+cc = { version = "=1.0.79" }

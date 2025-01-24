@@ -50,3 +50,5 @@ poly-commitment = { workspace = true, features = ["ocaml_types"] }
 ## active rustc version is 1.72.1
 ## ```
 bumpalo = { version = "=3.14.0" }
+
+cc = { version = "=1.0.79" }
