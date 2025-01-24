@@ -8,13 +8,8 @@ debug = true
 [source.crates-io]
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/o1-labs/proof-systems?rev=0c64141221529455d1dfcd72570c9f40834c1280"]
-git = "https://github.com/o1-labs/proof-systems"
-rev = "0c64141221529455d1dfcd72570c9f40834c1280"
-replace-with = "vendored-sources"
-
 [source.vendored-sources]
-directory = "src/lib/crypto/mina-rust-dependencies/"
+directory = "src/lib/crypto/mina-rust-dependencies"
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false
