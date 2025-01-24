@@ -25,8 +25,10 @@ $ wasm-pack build --mode no-install --target web --out-dir ./web ./.
 
 Note that optimized versions of these commands are available in:
 
-- [/src/lib/crypto/kimchi_bindings/js/node_js/build.sh](/src/lib/crypto/kimchi_bindings/js/node_js/build.sh) (also called from the `dune` file in the same folder)
-- [/src/lib/crypto/kimchi_bindings/js/web/build.sh](/src/lib/crypto/kimchi_bindings/js/web/build.sh) (also called from the `dune` file in the same folder)
+- [/src/lib/crypto/kimchi_bindings/js/node_js/build.sh](/src/lib/crypto/kimchi_bindings/js/node_js/build.sh)
+  (also called from the `dune` file in the same folder)
+- [/src/lib/crypto/kimchi_bindings/js/web/build.sh](/src/lib/crypto/kimchi_bindings/js/web/build.sh)
+  (also called from the `dune` file in the same folder)
 
 ## Resources
 
