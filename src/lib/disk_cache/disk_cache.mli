@@ -8,9 +8,9 @@ module Make: functor (T: Binable.S) -> sig
     (** Initialize the on-disk cache explicitly before interactions with it take place. *)
     val initialize : string -> (t, [> `Initialization_error of Error.t ]) Deferred.Result.t
 
-    type id [@@deriving compare, equal, sexp, hash]
+    type id
 
-    (** Increment the cache ref count, saving a value if the ref count was 0. *)
+    (** Put the value to disk, return an identifier that is associated with a special handler in GC. *)
     val put : t ->  T.t -> id
     
     (** Read from the cache, crashing if the value cannot be found. *)

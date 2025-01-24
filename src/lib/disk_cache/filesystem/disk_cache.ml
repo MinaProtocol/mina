@@ -11,7 +11,7 @@ module Make (B: sig include Binable.S end) = struct
   
   type t = string
 
-  type id = { idx : int } [@@deriving compare, equal, sexp, hash]
+  type id = { idx : int }
 
   let initialize path = 
     let logger = Logger.create () in
