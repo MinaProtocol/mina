@@ -13,15 +13,15 @@ struct
 
   type t = string
 
-  type id = { idx : int } [@@deriving compare, equal, sexp, hash]
+  type id = { idx : int }
 
-  let initialize path =
-    let logger = Logger.create () in
-
-    let failed_to_get_cache_folder_status ~logger ~error_msg ~path =
-      [%log error] error_msg ~metadata:[ ("path", `String path) ] ;
+  let initialize path ~logger =
+    let open Deferred.Let_syntax in
+    let failed_to_get_cache_folder_status ~logger ~(error_msg : string) ~path =
+      [%log error] "%s" error_msg ~metadata:[ ("path", `String path) ] ;
       failwithf "%s (%s)" error_msg path ()
     in
+
     match%bind Sys.is_directory path with
     | `Yes ->
         let%bind () = File_system.clear_dir path in
