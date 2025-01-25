@@ -9,7 +9,7 @@ module Stable = struct
       { header : Header.Stable.V2.t
       ; body : Staged_ledger_diff.Body.Stable.V1.t
       }
-    [@@deriving fields]
+    [@@deriving fields, sexp]
 
     let to_latest = Fn.id
 
