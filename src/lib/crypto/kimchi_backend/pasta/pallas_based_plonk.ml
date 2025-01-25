@@ -34,6 +34,8 @@ end
 module R1CS_constraint_system =
   Kimchi_pasta_constraint_system.Pallas_constraint_system
 
+module Constraint = R1CS_constraint_system.Constraint
+
 let lagrange (srs : Kimchi_bindings.Protocol.SRS.Fq.t) domain_log2 :
     _ Kimchi_types.poly_comm array =
   let domain_size = Int.pow 2 domain_log2 in
@@ -178,3 +180,7 @@ module Oracles = Plonk_dlog_oracles.Make (struct
     let create_with_public_evals = with_lagrange create_with_public_evals
   end
 end)
+
+module Cvar = Kimchi_pasta_snarky_backend.Pallas_based_plonk.Cvar
+
+module Run_state = Kimchi_pasta_snarky_backend.Pallas_based_plonk.Run_state

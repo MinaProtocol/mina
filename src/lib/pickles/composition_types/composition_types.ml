@@ -1397,10 +1397,9 @@ module Wrap_bp_vec = Backend.Tock.Rounds_vector
 module Step_bp_vec = Backend.Tick.Rounds_vector
 
 module Challenges_vector = struct
-  type 'n t =
-    (Backend.Tock.Field.t Snarky_backendless.Cvar.t Wrap_bp_vec.t, 'n) Vector.t
+  type 'n t = (Wrap_impl.Field.t Wrap_bp_vec.t, 'n) Vector.t
 
   module Constant = struct
-    type 'n t = (Backend.Tock.Field.t Wrap_bp_vec.t, 'n) Vector.t
+    type 'n t = (Wrap_impl.Field.Constant.t Wrap_bp_vec.t, 'n) Vector.t
   end
 end
