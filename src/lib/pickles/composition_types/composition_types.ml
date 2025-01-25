@@ -6,8 +6,8 @@ module Digest = Digest
 module Spec = Spec
 module Opt = Opt
 open Core_kernel
-
-type 'f impl = 'f Spec.impl
+module Step_impl = Kimchi_pasta_snarky_backend.Step_impl
+module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl
 
 let index_to_field_elements =
   Pickles_base.Side_loaded_verification_key.index_to_field_elements
@@ -132,14 +132,12 @@ module Wrap = struct
             ; perm = f t.perm
             }
 
-          let typ (type f fp)
-              (module Impl : Snarky_backendless.Snark_intf.Run
-                with type field = f ) ~dummy_scalar_challenge ~challenge
-              ~scalar_challenge ~bool
+          let typ (type fp) ~dummy_scalar_challenge ~challenge ~scalar_challenge
+              ~bool
               ~feature_flags:
                 ({ Plonk_types.Features.Full.uses_lookups; _ } as feature_flags)
-              (fp : (fp, _, f) Snarky_backendless.Typ.t) =
-            Snarky_backendless.Typ.of_hlistable
+              (fp : (fp, _) Step_impl.Typ.t) =
+            Step_impl.Typ.of_hlistable
               [ Scalar_challenge.typ scalar_challenge
               ; challenge
               ; challenge
@@ -150,8 +148,7 @@ module Wrap = struct
               ; Plonk_types.Features.typ
                   ~feature_flags:(Plonk_types.Features.of_full feature_flags)
                   bool
-              ; Opt.typ Impl.Boolean.typ uses_lookups
-                  ~dummy:dummy_scalar_challenge
+              ; Opt.typ uses_lookups ~dummy:dummy_scalar_challenge
                   (Scalar_challenge.typ scalar_challenge)
               ]
               ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
@@ -325,14 +322,11 @@ module Wrap = struct
 
         let to_hlist, of_hlist = (to_hlist, of_hlist)
 
-        let typ (type f fp)
-            ((module Impl) as impl :
-              (module Snarky_backendless.Snark_intf.Run with type field = f) )
-            ~dummy_scalar_challenge ~challenge ~scalar_challenge ~feature_flags
-            (fp : (fp, _, f) Snarky_backendless.Typ.t) index =
-          Snarky_backendless.Typ.of_hlistable
-            [ Plonk.In_circuit.typ impl ~dummy_scalar_challenge ~challenge
-                ~scalar_challenge ~bool:Impl.Boolean.typ ~feature_flags fp
+        let typ (type fp) ~dummy_scalar_challenge ~challenge ~scalar_challenge
+            ~feature_flags (fp : (fp, _) Step_impl.Typ.t) index =
+          Step_impl.Typ.of_hlistable
+            [ Plonk.In_circuit.typ ~dummy_scalar_challenge ~challenge
+                ~scalar_challenge ~bool:Step_impl.Boolean.typ ~feature_flags fp
             ; fp
             ; fp
             ; Scalar_challenge.typ scalar_challenge
@@ -389,9 +383,9 @@ module Wrap = struct
           ; Array.of_list (g1_to_field_elements challenge_polynomial_commitment)
           ]
 
-      let typ g1 chal ~length =
-        Snarky_backendless.Typ.of_hlistable
-          [ g1; Vector.typ chal length ]
+      let wrap_typ g1 chal ~length =
+        Wrap_impl.Typ.of_hlistable
+          [ g1; Vector.wrap_typ chal length ]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
     end
@@ -504,14 +498,12 @@ module Wrap = struct
 
       let to_hlist, of_hlist = (to_hlist, of_hlist)
 
-      let typ (type f fp)
-          (impl : (module Snarky_backendless.Snark_intf.Run with type field = f))
-          ~dummy_scalar_challenge ~challenge ~scalar_challenge ~feature_flags
-          (fp : (fp, _, f) Snarky_backendless.Typ.t)
+      let typ (type fp) ~dummy_scalar_challenge ~challenge ~scalar_challenge
+          ~feature_flags (fp : (fp, _) Step_impl.Typ.t)
           messages_for_next_wrap_proof digest index =
-        Snarky_backendless.Typ.of_hlistable
-          [ Deferred_values.In_circuit.typ impl ~dummy_scalar_challenge
-              ~challenge ~scalar_challenge ~feature_flags fp index
+        Step_impl.Typ.of_hlistable
+          [ Deferred_values.In_circuit.typ ~dummy_scalar_challenge ~challenge
+              ~scalar_challenge ~feature_flags fp index
           ; digest
           ; messages_for_next_wrap_proof
           ]
@@ -603,17 +595,6 @@ module Wrap = struct
       ; challenge_polynomial_commitments
       ; old_bulletproof_challenges
       }
-
-    let typ comm g s chal proofs_verified =
-      Snarky_backendless.Typ.of_hlistable
-        [ s
-        ; Plonk_verification_key_evals.typ comm
-        ; Vector.typ g proofs_verified
-        ; chal
-        ]
-        (* TODO: Should this really just be a vector typ of length Rounds.n ?*)
-        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-        ~value_of_hlist:of_hlist
   end
 
   module Lookup_parameters = struct
@@ -623,8 +604,7 @@ module Wrap = struct
       ; use : Opt.Flag.t
       }
 
-    let opt_spec (type f) ((module Impl) : f impl)
-        { zero = { value; var }; use } =
+    let opt_spec { zero = { value; var }; use } =
       Spec.T.Opt
         { inner = Struct [ Scalar Challenge ]
         ; flag = use
@@ -632,7 +612,6 @@ module Wrap = struct
             [ Kimchi_backend_common.Scalar_challenge.create value.challenge ]
         ; dummy2 =
             [ Kimchi_backend_common.Scalar_challenge.create var.challenge ]
-        ; bool = (module Impl.Boolean)
         }
   end
 
@@ -790,7 +769,7 @@ module Wrap = struct
           ; Vector (B Bulletproof_challenge, Backend.Tick.Rounds.n)
           ; Vector (B Branch_data, Nat.N1.n)
           ; feature_flags_spec
-          ; Lookup_parameters.opt_spec impl lookup
+          ; Lookup_parameters.opt_spec lookup
           ]
 
       (** Convert a statement (as structured data) into the flat data-based representation. *)
@@ -1089,20 +1068,6 @@ module Step = struct
             ; zeta_to_domain_size = f t.zeta_to_domain_size
             ; perm = f t.perm
             }
-
-          let typ (type f fp) _ ~challenge ~scalar_challenge
-              (fp : (fp, _, f) Snarky_backendless.Typ.t) =
-            Snarky_backendless.Typ.of_hlistable
-              [ Scalar_challenge.typ scalar_challenge
-              ; challenge
-              ; challenge
-              ; Scalar_challenge.typ scalar_challenge
-              ; fp
-              ; fp
-              ; fp
-              ]
-              ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-              ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         end
 
         let to_minimal (type challenge scalar_challenge fp)
@@ -1321,11 +1286,17 @@ module Step = struct
           }
       end
 
-      let typ impl fq ~assert_16_bits =
+      let typ fq ~assert_16_bits =
         let open In_circuit in
-        Spec.typ impl fq ~assert_16_bits (spec Backend.Tock.Rounds.n)
-        |> Snarky_backendless.Typ.transport ~there:to_data ~back:of_data
-        |> Snarky_backendless.Typ.transport_var ~there:to_data ~back:of_data
+        Spec.typ fq ~assert_16_bits (spec Backend.Tock.Rounds.n)
+        |> Step_impl.Typ.transport ~there:to_data ~back:of_data
+        |> Step_impl.Typ.transport_var ~there:to_data ~back:of_data
+
+      let wrap_typ fq ~assert_16_bits =
+        let open In_circuit in
+        Spec.wrap_typ fq ~assert_16_bits (spec Backend.Tock.Rounds.n)
+        |> Wrap_impl.Typ.transport ~there:to_data ~back:of_data
+        |> Wrap_impl.Typ.transport_var ~there:to_data ~back:of_data
     end
 
     type ('unfinalized_proofs, 'messages_for_next_step_proof) t =
@@ -1356,22 +1327,17 @@ module Step = struct
         }
     end [@@warning "-45"]
 
-    let[@warning "-60"] typ (type n f)
-        ( (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-        as impl ) ~assert_16_bits
+    let[@warning "-60"] wrap_typ (type n) ~assert_16_bits
         (proofs_verified : (Opt.Flag.t Plonk_types.Features.t, n) Vector.t) fq :
-        ( ((_, _) Vector.t, _) t
-        , ((_, _) Vector.t, _) t
-        , _ )
-        Snarky_backendless.Typ.t =
-      let per_proof _ = Per_proof.typ impl fq ~assert_16_bits in
+        (((_, _) Vector.t, _) t, ((_, _) Vector.t, _) t) Wrap_impl.Typ.t =
+      let per_proof _ = Per_proof.wrap_typ fq ~assert_16_bits in
       let unfinalized_proofs =
-        Vector.typ' (Vector.map proofs_verified ~f:per_proof)
+        Vector.wrap_typ' (Vector.map proofs_verified ~f:per_proof)
       in
       let messages_for_next_step_proof =
-        Spec.typ impl fq ~assert_16_bits (B Spec.Digest)
+        Spec.wrap_typ fq ~assert_16_bits (B Spec.Digest)
       in
-      Snarky_backendless.Typ.of_hlistable
+      Wrap_impl.Typ.of_hlistable
         [ unfinalized_proofs; messages_for_next_step_proof ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
@@ -1431,10 +1397,9 @@ module Wrap_bp_vec = Backend.Tock.Rounds_vector
 module Step_bp_vec = Backend.Tick.Rounds_vector
 
 module Challenges_vector = struct
-  type 'n t =
-    (Backend.Tock.Field.t Snarky_backendless.Cvar.t Wrap_bp_vec.t, 'n) Vector.t
+  type 'n t = (Wrap_impl.Field.t Wrap_bp_vec.t, 'n) Vector.t
 
   module Constant = struct
-    type 'n t = (Backend.Tock.Field.t Wrap_bp_vec.t, 'n) Vector.t
+    type 'n t = (Wrap_impl.Field.Constant.t Wrap_bp_vec.t, 'n) Vector.t
   end
 end

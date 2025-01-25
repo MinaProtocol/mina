@@ -219,8 +219,7 @@ let create
     in
     let%bind.Promise () = chain_to in
     Fix_domains.domains ~feature_flags:actual_feature_flags
-      (module Impls.Step)
-      (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
+      (T (Impls.Step.Typ.unit, Fn.id, Fn.id))
       etyp main
   in
   let step ~step_domains =

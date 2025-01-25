@@ -135,10 +135,20 @@ type 'a log_function =
   -> ('a, unit, string, unit) format4
   -> 'a
 
+type itn_logger_config
+
+val make_itn_logger_config :
+     rpc_handshake_timeout:Time.Span.t
+  -> rpc_heartbeat_timeout:Time_ns.Span.t
+  -> rpc_heartbeat_send_every:Time_ns.Span.t
+  -> itn_logger_config
+
+val with_itn : itn_logger_config -> t -> t
+
 val create :
      ?metadata:(string, Yojson.Safe.t) List.Assoc.t
   -> ?id:string
-  -> ?itn_features:bool
+  -> ?itn_config:itn_logger_config
   -> unit
   -> t
 

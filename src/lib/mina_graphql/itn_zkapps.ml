@@ -181,7 +181,7 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
     `Repeat (next_tm_next, counter + 1)
   in
   let `VK vk, `Prover prover =
-    Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+    Transaction_snark.For_tests.create_trivial_snapp ()
   in
   let%bind.Deferred vk = vk in
   let account_queue = Queue.create () in

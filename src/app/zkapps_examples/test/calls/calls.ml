@@ -71,9 +71,6 @@ let%test_module "Composability test" =
         ~branches:(module Nat.N4)
         ~max_proofs_verified:(module Nat.N0)
         ~name:"empty_update"
-        ~constraint_constants:
-          (Genesis_constants.Constraint_constants.to_snark_keys_header
-             constraint_constants )
         ~choices:(fun ~self:_ ->
           [ Zkapps_calls.Rules.Initialize_state.rule
           ; Zkapps_calls.Rules.Update_state.rule

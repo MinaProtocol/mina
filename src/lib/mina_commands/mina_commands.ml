@@ -7,6 +7,8 @@ open Mina_base
 (** For status *)
 let txn_count = ref 0
 
+let sync_lag = 5
+
 let get_account t (addr : Account_id.t) =
   let open Participating_state.Let_syntax in
   let%map ledger = Mina_lib.best_ledger t in
@@ -347,7 +349,7 @@ let get_status ~flag t =
   in
   let new_block_length_received =
     let open Mina_block in
-    Length.to_int @@ Mina_block.blockchain_length @@ Validation.block
+    Length.to_int @@ Mina_block.Header.blockchain_length @@ Validation.header
     @@ Pipe_lib.Broadcast_pipe.Reader.peek
          (Mina_lib.most_recent_valid_transition t)
   in
@@ -391,7 +393,7 @@ let get_status ~flag t =
       | `Synced | `Catchup ->
           if
             (Mina_lib.config t).demo_mode
-            || abs (!max_block_height - blockchain_length) < 5
+            || abs (!max_block_height - blockchain_length) < sync_lag
           then `Active `Synced
           else `Active `Catchup
     in

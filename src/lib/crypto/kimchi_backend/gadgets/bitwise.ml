@@ -3,27 +3,22 @@ open Core_kernel
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
+module Circuit = Kimchi_pasta_snarky_backend.Step_impl
 
 let tests_enabled = true
 
 (* Auxiliary functions *)
 
 (* returns a field containing the all one word of length bits *)
-let all_ones_field (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (length : int) : f =
-  Common.bignum_bigint_to_field (module Circuit)
+let all_ones_field (length : int) =
+  Common.bignum_bigint_to_field
   @@ Bignum_bigint.(pow (of_int 2) (of_int length) - one)
 
-let fits_in_bits_as_prover (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (word : Circuit.Field.t) (length : int) =
+let fits_in_bits_as_prover (word : Circuit.Field.t) (length : int) =
   let open Common in
   assert (
     Bignum_bigint.(
-      field_to_bignum_bigint
-        (module Circuit)
-        (cvar_field_to_field_as_prover (module Circuit) word)
+      field_to_bignum_bigint (cvar_field_to_field_as_prover word)
       < pow (of_int 2) (of_int length)) )
 
 (* ROT64 *)
@@ -32,10 +27,8 @@ let fits_in_bits_as_prover (type f)
 type rot_mode = Left | Right
 
 (* Performs the 64bit rotation and returns rotated word, excess, and shifted *)
-let rot_aux (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(check64 = false) (word : Circuit.Field.t) (bits : int) (mode : rot_mode) :
-    Circuit.Field.t * Circuit.Field.t * Circuit.Field.t =
+let rot_aux ?(check64 = false) (word : Circuit.Field.t) (bits : int)
+    (mode : rot_mode) : Circuit.Field.t * Circuit.Field.t * Circuit.Field.t =
   let open Circuit in
   (* Check that the rotation bits is smaller than 64 *)
   assert (bits < 64) ;
@@ -44,7 +37,7 @@ let rot_aux (type f)
 
   (* Check that the input word has at most 64 bits *)
   as_prover (fun () ->
-      fits_in_bits_as_prover (module Circuit) word 64 ;
+      fits_in_bits_as_prover word 64 ;
       () ) ;
 
   (* Compute actual length depending on whether the rotation mode is Left or Right *)
@@ -59,10 +52,7 @@ let rot_aux (type f)
     exists (Typ.array ~length:4 Field.typ) ~compute:(fun () ->
         (* Assert that word is at most 64 bits*)
         let word_big =
-          Common.(
-            field_to_bignum_bigint
-              (module Circuit)
-              (cvar_field_to_field_as_prover (module Circuit) word))
+          Common.(field_to_bignum_bigint (cvar_field_to_field_as_prover word))
         in
         assert (Bignum_bigint.(word_big < big_2_pow_64)) ;
 
@@ -84,62 +74,47 @@ let rot_aux (type f)
         in
 
         (* Convert back to field *)
-        let shifted =
-          Common.bignum_bigint_to_field (module Circuit) shifted_big
-        in
-        let excess =
-          Common.bignum_bigint_to_field (module Circuit) excess_big
-        in
-        let rotated =
-          Common.bignum_bigint_to_field (module Circuit) rotated_big
-        in
-        let bound = Common.bignum_bigint_to_field (module Circuit) bound_big in
+        let shifted = Common.bignum_bigint_to_field shifted_big in
+        let excess = Common.bignum_bigint_to_field excess_big in
+        let rotated = Common.bignum_bigint_to_field rotated_big in
+        let bound = Common.bignum_bigint_to_field bound_big in
 
         [| rotated; excess; shifted; bound |] )
     |> Common.tuple4_of_array
   in
 
-  let of_bits =
-    Common.as_prover_cvar_field_bits_le_to_cvar_field (module Circuit)
-  in
+  let of_bits = Common.as_prover_cvar_field_bits_le_to_cvar_field in
 
   (* Current row *)
   with_label "rot64_gate" (fun () ->
       (* Set up Rot64 gate *)
       assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Rot64
-                 { word
-                 ; rotated
-                 ; excess
-                 ; bound_limb0 = of_bits bound 52 64
-                 ; bound_limb1 = of_bits bound 40 52
-                 ; bound_limb2 = of_bits bound 28 40
-                 ; bound_limb3 = of_bits bound 16 28
-                 ; bound_crumb0 = of_bits bound 14 16
-                 ; bound_crumb1 = of_bits bound 12 14
-                 ; bound_crumb2 = of_bits bound 10 12
-                 ; bound_crumb3 = of_bits bound 8 10
-                 ; bound_crumb4 = of_bits bound 6 8
-                 ; bound_crumb5 = of_bits bound 4 6
-                 ; bound_crumb6 = of_bits bound 2 4
-                 ; bound_crumb7 = of_bits bound 0 2
-                 ; two_to_rot =
-                     Common.bignum_bigint_to_field
-                       (module Circuit)
-                       big_2_pow_rot
-                 } )
-        } ) ;
+        (Rot64
+           { word
+           ; rotated
+           ; excess
+           ; bound_limb0 = of_bits bound 52 64
+           ; bound_limb1 = of_bits bound 40 52
+           ; bound_limb2 = of_bits bound 28 40
+           ; bound_limb3 = of_bits bound 16 28
+           ; bound_crumb0 = of_bits bound 14 16
+           ; bound_crumb1 = of_bits bound 12 14
+           ; bound_crumb2 = of_bits bound 10 12
+           ; bound_crumb3 = of_bits bound 8 10
+           ; bound_crumb4 = of_bits bound 6 8
+           ; bound_crumb5 = of_bits bound 4 6
+           ; bound_crumb6 = of_bits bound 2 4
+           ; bound_crumb7 = of_bits bound 0 2
+           ; two_to_rot = Common.bignum_bigint_to_field big_2_pow_rot
+           } ) ) ;
 
   (* Next row *)
-  Range_check.bits64 (module Circuit) shifted ;
+  Range_check.bits64 shifted ;
 
   (* Following row *)
-  Range_check.bits64 (module Circuit) excess ;
+  Range_check.bits64 excess ;
 
-  if check64 then Range_check.bits64 (module Circuit) word ;
+  if check64 then Range_check.bits64 word ;
 
   (rotated, excess, shifted)
 
@@ -151,13 +126,9 @@ let rot_aux (type f)
  *     - mode: Left or Right
  * Output: rotated word
  *)
-let rot64 (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(check64 : bool = false) (word : Circuit.Field.t) (rot_bits : int)
+let rot64 ?(check64 : bool = false) (word : Circuit.Field.t) (rot_bits : int)
     (mode : rot_mode) : Circuit.Field.t =
-  let rotated, _excess, _shifted =
-    rot_aux (module Circuit) ~check64 word rot_bits mode
-  in
+  let rotated, _excess, _shifted = rot_aux ~check64 word rot_bits mode in
 
   rotated
 
@@ -168,13 +139,9 @@ let rot64 (type f)
  *  - bits: number of bits to be shifted
  * Output: left shifted word (with bits 0s at the least significant positions)
  *)
-let lsl64 (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(check64 : bool = false) (word : Circuit.Field.t) (bits : int) :
+let lsl64 ?(check64 : bool = false) (word : Circuit.Field.t) (bits : int) :
     Circuit.Field.t =
-  let _rotated, _excess, shifted =
-    rot_aux (module Circuit) ~check64 word bits Left
-  in
+  let _rotated, _excess, shifted = rot_aux ~check64 word bits Left in
 
   shifted
 
@@ -185,13 +152,9 @@ let lsl64 (type f)
    *  - bits: number of bits to be shifted
    * Output: right shifted word (with bits 0s at the most significant positions)
 *)
-let lsr64 (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(check64 : bool = false) (word : Circuit.Field.t) (bits : int) :
+let lsr64 ?(check64 : bool = false) (word : Circuit.Field.t) (bits : int) :
     Circuit.Field.t =
-  let _rotated, excess, _shifted =
-    rot_aux (module Circuit) ~check64 word bits Right
-  in
+  let _rotated, excess, _shifted = rot_aux ~check64 word bits Right in
 
   excess
 
@@ -202,20 +165,15 @@ let lsr64 (type f)
  * length is the number of bits to Xor
  * len_xor is the number of bits of the lookup table (default is 4)
  *)
-let bxor (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
+let bxor ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
     (length : int) : Circuit.Field.t =
   (* Auxiliar function to compute the next variable for the chain of Xors *)
-  let as_prover_next_var (type f)
-      (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-      (curr_var : Circuit.Field.t) (var0 : Circuit.Field.t)
+  let as_prover_next_var (curr_var : Circuit.Field.t) (var0 : Circuit.Field.t)
       (var1 : Circuit.Field.t) (var2 : Circuit.Field.t) (var3 : Circuit.Field.t)
       (len_xor : int) : Circuit.Field.t =
     let open Circuit in
     let two_pow_len =
       Common.bignum_bigint_to_field
-        (module Circuit)
         Bignum_bigint.(pow (of_int 2) (of_int len_xor))
     in
     let two_pow_2len = Field.Constant.(two_pow_len * two_pow_len) in
@@ -223,21 +181,11 @@ let bxor (type f)
     let two_pow_4len = Field.Constant.(two_pow_3len * two_pow_len) in
     let next_var =
       exists Field.typ ~compute:(fun () ->
-          let curr_field =
-            Common.cvar_field_to_field_as_prover (module Circuit) curr_var
-          in
-          let field0 =
-            Common.cvar_field_to_field_as_prover (module Circuit) var0
-          in
-          let field1 =
-            Common.cvar_field_to_field_as_prover (module Circuit) var1
-          in
-          let field2 =
-            Common.cvar_field_to_field_as_prover (module Circuit) var2
-          in
-          let field3 =
-            Common.cvar_field_to_field_as_prover (module Circuit) var3
-          in
+          let curr_field = Common.cvar_field_to_field_as_prover curr_var in
+          let field0 = Common.cvar_field_to_field_as_prover var0 in
+          let field1 = Common.cvar_field_to_field_as_prover var1 in
+          let field2 = Common.cvar_field_to_field_as_prover var2 in
+          let field3 = Common.cvar_field_to_field_as_prover var3 in
           Field.Constant.(
             ( curr_field - field0 - (field1 * two_pow_len)
             - (field2 * two_pow_2len) - (field3 * two_pow_3len) )
@@ -259,24 +207,14 @@ let bxor (type f)
     if length = 0 then (
       with_label "xor_zero_check" (fun () ->
           assert_
-            { annotation = Some __LOC__
-            ; basic =
-                Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-                  (Raw
-                     { kind = Zero
-                     ; values = [| in1; in2; out |]
-                     ; coeffs = [||]
-                     } )
-            } ) ;
+            (Raw { kind = Zero; values = [| in1; in2; out |]; coeffs = [||] }) ) ;
       Field.Assert.equal Field.zero in1 ;
       Field.Assert.equal Field.zero in2 ;
       Field.Assert.equal Field.zero out ;
       () )
     else
       (* Define shorthand helper *)
-      let of_bits =
-        Common.as_prover_cvar_field_bits_le_to_cvar_field (module Circuit)
-      in
+      let of_bits = Common.as_prover_cvar_field_bits_le_to_cvar_field in
 
       (* Nibble offsets *)
       let first = len_xor in
@@ -301,37 +239,27 @@ let bxor (type f)
       with_label "xor_gate" (fun () ->
           (* Set up Xor gate *)
           assert_
-            { annotation = Some __LOC__
-            ; basic =
-                Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-                  (Xor
-                     { in1
-                     ; in2
-                     ; out
-                     ; in1_0
-                     ; in1_1
-                     ; in1_2
-                     ; in1_3
-                     ; in2_0
-                     ; in2_1
-                     ; in2_2
-                     ; in2_3
-                     ; out_0
-                     ; out_1
-                     ; out_2
-                     ; out_3
-                     } )
-            } ) ;
+            (Xor
+               { in1
+               ; in2
+               ; out
+               ; in1_0
+               ; in1_1
+               ; in1_2
+               ; in1_3
+               ; in2_0
+               ; in2_1
+               ; in2_2
+               ; in2_3
+               ; out_0
+               ; out_1
+               ; out_2
+               ; out_3
+               } ) ) ;
 
-      let next_in1 =
-        as_prover_next_var (module Circuit) in1 in1_0 in1_1 in1_2 in1_3 len_xor
-      in
-      let next_in2 =
-        as_prover_next_var (module Circuit) in2 in2_0 in2_1 in2_2 in2_3 len_xor
-      in
-      let next_out =
-        as_prover_next_var (module Circuit) out out_0 out_1 out_2 out_3 len_xor
-      in
+      let next_in1 = as_prover_next_var in1 in1_0 in1_1 in1_2 in1_3 len_xor in
+      let next_in2 = as_prover_next_var in2 in2_0 in2_1 in2_2 in2_3 len_xor in
+      let next_out = as_prover_next_var out out_0 out_1 out_2 out_3 len_xor in
 
       (* Next length is 4*n less bits *)
       let next_length = length - (4 * len_xor) in
@@ -355,16 +283,12 @@ let bxor (type f)
   (* Sanity checks about lengths of inputs using bignum *)
   as_prover (fun () ->
       (* Read inputs, Convert to field type *)
-      let input1_field =
-        cvar_field_to_field_as_prover (module Circuit) input1
-      in
-      let input2_field =
-        cvar_field_to_field_as_prover (module Circuit) input2
-      in
+      let input1_field = cvar_field_to_field_as_prover input1 in
+      let input2_field = cvar_field_to_field_as_prover input2 in
 
       (* Check real lengths are at most the desired length *)
-      fits_in_bits_as_prover (module Circuit) input1 length ;
-      fits_in_bits_as_prover (module Circuit) input2 length ;
+      fits_in_bits_as_prover input1 length ;
+      fits_in_bits_as_prover input2 length ;
 
       (* Convert inputs field elements to list of bits of length 255 *)
       let input1_bits = Field.Constant.unpack @@ input1_field in
@@ -386,15 +310,11 @@ let bxor (type f)
     exists Field.typ ~compute:(fun () ->
         (* Sanity checks about lengths of inputs using bignum *)
         (* Check real lengths are at most the desired length *)
-        fits_in_bits_as_prover (module Circuit) input1 length ;
-        fits_in_bits_as_prover (module Circuit) input2 length ;
+        fits_in_bits_as_prover input1 length ;
+        fits_in_bits_as_prover input2 length ;
 
-        let input1_field =
-          cvar_field_to_field_as_prover (module Circuit) input1
-        in
-        let input2_field =
-          cvar_field_to_field_as_prover (module Circuit) input2
-        in
+        let input1_field = cvar_field_to_field_as_prover input1 in
+        let input2_field = cvar_field_to_field_as_prover input2 in
 
         (* Convert inputs field elements to list of bits of length 255 *)
         let input1_bits = Field.Constant.unpack @@ input1_field in
@@ -428,20 +348,18 @@ let bxor (type f)
  * Receives two input words to Xor together, of maximum 16 bits each.
  * Returns the Xor of the two words.
  *)
-let bxor16 (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) : Circuit.Field.t =
-  bxor (module Circuit) input1 input2 16 ~len_xor:4
+let bxor16 (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) :
+    Circuit.Field.t =
+  bxor input1 input2 16 ~len_xor:4
 
 (* Boolean Xor of 64 bits
  * This is a special case of Xor for 64 bits for Xor lookup table of 4 bits of inputs.
  * Receives two input words to Xor together, of maximum 64 bits each.
  * Returns the Xor of the two words.
  *)
-let bxor64 (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) : Circuit.Field.t =
-  bxor (module Circuit) input1 input2 64 ~len_xor:4
+let bxor64 (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) :
+    Circuit.Field.t =
+  bxor input1 input2 64 ~len_xor:4
 
 (* AND *)
 
@@ -450,42 +368,34 @@ let bxor64 (type f)
  *  length is the number of bits to AND
  *  len_xor is the number of bits of the inputs of the Xor lookup table (default is 4)
  *)
-let band (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
+let band ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
     (length : int) : Circuit.Field.t =
   let open Circuit in
   (* Recursively build And gadget with leading Xors and a final Generic gate *)
   (* It will also check the correct lengths of the inputs, no need to do it again *)
-  let xor_output = bxor (module Circuit) input1 input2 length ~len_xor in
+  let xor_output = bxor input1 input2 length ~len_xor in
 
   let and_output =
     exists Field.typ ~compute:(fun () ->
-        Common.cvar_field_bits_combine_as_prover
-          (module Circuit)
-          input1 input2
-          (fun b1 b2 -> b1 && b2) )
+        Common.cvar_field_bits_combine_as_prover input1 input2 (fun b1 b2 ->
+            b1 && b2 ) )
   in
 
   (* Compute sum of a + b and constrain in the circuit *)
-  let sum = Generic.add (module Circuit) input1 input2 in
+  let sum = Generic.add input1 input2 in
   let neg_one = Field.Constant.(negate one) in
   let neg_two = Field.Constant.(neg_one + neg_one) in
 
   (* Constrain AND as 2 * and = sum - xor *)
   with_label "and_equation" (fun () ->
       assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Basic
-                 { l = (Field.Constant.one, sum)
-                 ; r = (neg_one, xor_output)
-                 ; o = (neg_two, and_output)
-                 ; m = Field.Constant.zero
-                 ; c = Field.Constant.zero
-                 } )
-        } ) ;
+        (Basic
+           { l = (Field.Constant.one, sum)
+           ; r = (neg_one, xor_output)
+           ; o = (neg_two, and_output)
+           ; m = Field.Constant.zero
+           ; c = Field.Constant.zero
+           } ) ) ;
 
   and_output
 
@@ -494,10 +404,9 @@ let band (type f)
  * Receives two input words to And together, of maximum 64 bits each.
  * Returns the And of the two words.
  *)
-let band64 (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) : Circuit.Field.t =
-  band (module Circuit) input1 input2 64
+let band64 (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) :
+    Circuit.Field.t =
+  band input1 input2 64
 
 (* NOT *)
 
@@ -507,18 +416,17 @@ let band64 (type f)
  *   - len_xor is the length of the Xor lookup table to use beneath (default 4)
  * Note that the length needs to be less than the bit length of the field.
  *)
-let bnot_checked (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(len_xor = 4) (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
+let bnot_checked ?(len_xor = 4) (input : Circuit.Field.t) (length : int) :
+    Circuit.Field.t =
   let open Circuit in
   (* Check it is not 255 or else 2^255-1 will not fit in Pallas *)
   assert (length < Circuit.Field.size_in_bits) ;
 
-  let all_ones_f = all_ones_field (module Circuit) length in
+  let all_ones_f = all_ones_field length in
   let all_ones_var = exists Field.typ ~compute:(fun () -> all_ones_f) in
 
   (* Negating is equivalent to XORing with all one word *)
-  let out_not = bxor (module Circuit) input all_ones_var length ~len_xor in
+  let out_not = bxor input all_ones_var length ~len_xor in
 
   (* Doing this afterwards or else it can break chainability with Xor16's and Zero *)
   Field.Assert.equal (Field.constant all_ones_f) all_ones_var ;
@@ -527,10 +435,8 @@ let bnot_checked (type f)
 
 (* Negates a word of 64 bits with checked length of 64 bits.
  * This means that the bound in lenght is constrained in the circuit. *)
-let bnot64_checked (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (input : Circuit.Field.t) : Circuit.Field.t =
-  bnot_checked (module Circuit) input 64
+let bnot64_checked (input : Circuit.Field.t) : Circuit.Field.t =
+  bnot_checked input 64
 
 (* Boolean Not of length bits for unchecked length (uses Generic subtractions inside)
  *  - input of word to negate
@@ -538,9 +444,7 @@ let bnot64_checked (type f)
  * (Note that this can negate two words per row, but it inputs need to be a copy of another
  * variable with a correct length in order to make sure that the length is correct)
  *)
-let bnot_unchecked (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
+let bnot_unchecked (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
   let open Circuit in
   (* Check it is not 255 or else 2^255-1 will not fit in Pallas *)
   assert (length < Circuit.Field.size_in_bits) ;
@@ -549,23 +453,21 @@ let bnot_unchecked (type f)
   (* Check that the input word has at most length bits.
      In the checked version this is done in the Xor *)
   as_prover (fun () ->
-      fits_in_bits_as_prover (module Circuit) input length ;
+      fits_in_bits_as_prover input length ;
       () ) ;
 
-  let all_ones_f = all_ones_field (module Circuit) length in
+  let all_ones_f = all_ones_field length in
   let all_ones_var = exists Field.typ ~compute:(fun () -> all_ones_f) in
   Field.Assert.equal all_ones_var (Field.constant all_ones_f) ;
 
   (* Negating is equivalent to subtracting with all one word *)
   (* [2^len - 1] - input = not (input) *)
-  Generic.sub (module Circuit) all_ones_var input
+  Generic.sub all_ones_var input
 
 (* Negates a word of 64 bits, but its length goes unconstrained in the circuit
    (unless it is copied from a checked length value) *)
-let bnot64_unchecked (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (input : Circuit.Field.t) : Circuit.Field.t =
-  bnot_unchecked (module Circuit) input 64
+let bnot64_unchecked (input : Circuit.Field.t) : Circuit.Field.t =
+  bnot_unchecked input 64
 
 (**************)
 (* UNIT TESTS *)
@@ -598,7 +500,7 @@ let%test_unit "bitwise rotation gadget" =
                   Field.Constant.of_string result )
             in
             (* Use the rot gate gadget *)
-            let output_rot = rot64 (module Runner.Impl) word length mode in
+            let output_rot = rot64 word length mode in
             Field.Assert.equal output_rot result
             (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *) )
       in
@@ -655,9 +557,9 @@ let%test_unit "bitwise shift gadgets" =
             let output_shift =
               match mode with
               | Left ->
-                  lsl64 (module Runner.Impl) word length
+                  lsl64 word length
               | Right ->
-                  lsr64 (module Runner.Impl) word length
+                  lsr64 word length
             in
             Field.Assert.equal output_shift result )
       in
@@ -708,20 +610,18 @@ let%test_unit "bitwise xor gadget" =
             (* Set up snarky variables for inputs and output *)
             let left_input =
               exists Field.typ ~compute:(fun () ->
-                  Common.field_of_hex (module Runner.Impl) left_input )
+                  Common.field_of_hex left_input )
             in
             let right_input =
               exists Field.typ ~compute:(fun () ->
-                  Common.field_of_hex (module Runner.Impl) right_input )
+                  Common.field_of_hex right_input )
             in
             let output_xor =
               exists Field.typ ~compute:(fun () ->
-                  Common.field_of_hex (module Runner.Impl) output_xor )
+                  Common.field_of_hex output_xor )
             in
             (* Use the xor gate gadget *)
-            let result =
-              bxor (module Runner.Impl) left_input right_input length
-            in
+            let result = bxor left_input right_input length in
 
             (* Check that the result is equal to the expected output *)
             Field.Assert.equal output_xor result )
@@ -791,20 +691,18 @@ let%test_unit "bitwise and gadget" =
             (* Set up snarky variables for inputs and outputs *)
             let left_input =
               exists Field.typ ~compute:(fun () ->
-                  Common.field_of_hex (module Runner.Impl) left_input )
+                  Common.field_of_hex left_input )
             in
             let right_input =
               exists Field.typ ~compute:(fun () ->
-                  Common.field_of_hex (module Runner.Impl) right_input )
+                  Common.field_of_hex right_input )
             in
             let output_and =
               exists Field.typ ~compute:(fun () ->
-                  Common.field_of_hex (module Runner.Impl) output_and )
+                  Common.field_of_hex output_and )
             in
             (* Use the and gate gadget *)
-            let result =
-              band (module Runner.Impl) left_input right_input length
-            in
+            let result = band left_input right_input length in
             Field.Assert.equal output_and result )
       in
       cs
@@ -855,22 +753,16 @@ let%test_unit "bitwise not gadget" =
             let open Runner.Impl in
             (* Set up snarky variables for input and output *)
             let input =
-              exists Field.typ ~compute:(fun () ->
-                  Common.field_of_hex (module Runner.Impl) input )
+              exists Field.typ ~compute:(fun () -> Common.field_of_hex input)
             in
 
             let output =
-              exists Field.typ ~compute:(fun () ->
-                  Common.field_of_hex (module Runner.Impl) output )
+              exists Field.typ ~compute:(fun () -> Common.field_of_hex output)
             in
 
             (* Use the not gate gadget *)
-            let result_checked =
-              bnot_checked (module Runner.Impl) input length
-            in
-            let result_unchecked =
-              bnot_unchecked (module Runner.Impl) input length
-            in
+            let result_checked = bnot_checked input length in
+            let result_unchecked = bnot_unchecked input length in
             Field.Assert.equal output result_checked ;
             Field.Assert.equal output result_unchecked )
       in

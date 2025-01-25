@@ -357,15 +357,15 @@ module For_tests = struct
         let { Keypair.public_key; _ } = Keypair.create () in
         let prover = Public_key.compress public_key in
         Some
-          Transaction_snark_work.Checked.
-            { fee = Fee.of_nanomina_int_exn 1
-            ; proofs =
-                One_or_two.map stmts ~f:(fun statement ->
-                    Ledger_proof.create ~statement
-                      ~sok_digest:Sok_message.Digest.default
-                      ~proof:(Lazy.force Proof.transaction_dummy) )
-            ; prover
-            }
+          (Transaction_snark_work.Checked.create_unsafe
+             { fee = Fee.of_nanomina_int_exn 1
+             ; proofs =
+                 One_or_two.map stmts ~f:(fun statement ->
+                     Ledger_proof.create ~statement
+                       ~sok_digest:Sok_message.Digest.default
+                       ~proof:(Lazy.force Proof.transaction_dummy) )
+             ; prover
+             } )
       in
       let current_state_view, state_and_body_hash =
         let prev_state =
@@ -437,7 +437,10 @@ module For_tests = struct
         Blockchain_state.create_value
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
           ~staged_ledger_hash:next_staged_ledger_hash ~genesis_ledger_hash
-          ~body_reference:(Body.compute_reference body)
+          ~body_reference:
+            (Body.compute_reference
+               ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
+               body )
           ~ledger_proof_statement
       in
       let previous_state_hashes =

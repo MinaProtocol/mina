@@ -75,10 +75,7 @@ in  Pipeline.build
                   (S.contains "buildkite/src/Jobs/Lint/ValidationService")
 
           in  JobSpec::{
-              , dirtyWhen =
-                [ dirtyDhallDir
-                , S.strictlyStart (S.contains ValidationService.rootPath)
-                ]
+              , dirtyWhen = [ dirtyDhallDir ]
               , path = "Lint"
               , name = "ValidationService"
               , tags =
@@ -94,7 +91,7 @@ in  Pipeline.build
             , label =
                 "Validation service lint steps; employs various forms static analysis on the elixir codebase"
             , key = "lint"
-            , target = Size.Small
+            , target = Size.Multi
             , skip = Some
                 ( B/Skip.String
                     "https://github.com/MinaProtocol/mina/issues/6285"

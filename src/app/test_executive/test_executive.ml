@@ -47,9 +47,7 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
   else Deferred.return ()
 
 let engines : engine list =
-  [ ("cloud", (module Integration_test_cloud_engine : Intf.Engine.S))
-  ; ("local", (module Integration_test_local_engine : Intf.Engine.S))
-  ]
+  [ ("local", (module Integration_test_local_engine : Intf.Engine.S)) ]
 
 let tests : test list =
   [ ( "peers-reliability"
@@ -477,7 +475,7 @@ let help_term = Term.(ret @@ const (`Help (`Plain, None)))
 
 let engine_cmd ((engine_name, (module Engine)) : engine) =
   let info =
-    let doc = "Run mina integration test(s) on remote cloud provider." in
+    let doc = "Run mina integration test(s) on engine." in
     Term.info engine_name ~doc ~exits:Term.default_exits
   in
   let test_inputs_with_cli_inputs_arg =

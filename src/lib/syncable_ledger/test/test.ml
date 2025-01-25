@@ -18,6 +18,8 @@ module type Input_intf = sig
     val equal : t -> t -> bool
   end
 
+  module Context : Syncable_ledger.CONTEXT
+
   module Ledger :
     Ledger_intf
       with type root_hash := Root_hash.t
@@ -35,6 +37,64 @@ module type Input_intf = sig
        and type answer := (Root_hash.t, Ledger.account) Syncable_ledger.Answer.t
 end
 
+module Make_context (Subtree_depth : sig
+  val sync_ledger_max_subtree_depth : int
+
+  val sync_ledger_default_subtree_depth : int
+end) : Syncable_ledger.CONTEXT = struct
+  let logger = Logger.null ()
+
+  let compile_config =
+    { Mina_compile_config.For_unit_tests.t with
+      sync_ledger_max_subtree_depth =
+        Subtree_depth.sync_ledger_max_subtree_depth
+    ; sync_ledger_default_subtree_depth =
+        Subtree_depth.sync_ledger_default_subtree_depth
+    }
+end
+
+module Context_subtree_depth32 = Make_context (struct
+  let sync_ledger_max_subtree_depth = 3
+
+  let sync_ledger_default_subtree_depth = 2
+end)
+
+module Context_subtree_depth81 = Make_context (struct
+  let sync_ledger_max_subtree_depth = 8
+
+  let sync_ledger_default_subtree_depth = 1
+end)
+
+module Context_subtree_depth82 = Make_context (struct
+  let sync_ledger_max_subtree_depth = 8
+
+  let sync_ledger_default_subtree_depth = 2
+end)
+
+module Context_subtree_depth86 = Make_context (struct
+  let sync_ledger_max_subtree_depth = 8
+
+  let sync_ledger_default_subtree_depth = 6
+end)
+
+module Context_subtree_depth88 = Make_context (struct
+  let sync_ledger_max_subtree_depth = 8
+
+  let sync_ledger_default_subtree_depth = 8
+end)
+
+module Context_subtree_depth68 = Make_context (struct
+  let sync_ledger_max_subtree_depth = 6
+
+  let sync_ledger_default_subtree_depth = 8
+end)
+
+module Context_subtree_depth80 = Make_context (struct
+  let sync_ledger_max_subtree_depth = 8
+
+  let sync_ledger_default_subtree_depth = 0
+end)
+
 module Make_test
     (Input : Input_intf) (Input' : sig
       val num_accts : int
@@ -48,8 +108,6 @@ struct
    * in before we need it. *)
   let total_queries = ref None
 
-  let logger = Logger.null ()
-
   let trust_system = Trust_system.null ()
 
   let () =
@@ -60,24 +118,23 @@ struct
     let l1, _k1 = Ledger.load_ledger 1 1 in
     let l2, _k2 = Ledger.load_ledger num_accts 2 in
     let desired_root = Ledger.merkle_root l2 in
-    let lsync = Sync_ledger.create l1 ~logger ~trust_system in
+    let lsync = Sync_ledger.create l1 ~context:(module Context) ~trust_system in
     let qr = Sync_ledger.query_reader lsync in
     let aw = Sync_ledger.answer_writer lsync in
     let seen_queries = ref [] in
     let sr =
       Sync_responder.create l2
         (fun q -> seen_queries := q :: !seen_queries)
-        ~logger ~trust_system
+        ~context:(module Context)
+        ~trust_system
     in
     don't_wait_for
       (Linear_pipe.iter_unordered ~max_concurrency:3 qr
          ~f:(fun (root_hash, query) ->
-           let%bind answ_opt =
+           let%bind answ_or_error =
              Sync_responder.answer_query sr (Envelope.Incoming.local query)
            in
-           let answ =
-             Option.value_exn ~message:"refused to answer query" answ_opt
-           in
+           let answ = Or_error.ok_exn answ_or_error in
            let%bind () =
              if match query with What_contents _ -> true | _ -> false then
                Clock_ns.after
@@ -103,7 +160,7 @@ struct
     let l2, _k2 = Ledger.load_ledger num_accts 2 in
     let l3, _k3 = Ledger.load_ledger num_accts 3 in
     let desired_root = ref @@ Ledger.merkle_root l2 in
-    let lsync = Sync_ledger.create l1 ~logger ~trust_system in
+    let lsync = Sync_ledger.create l1 ~context:(module Context) ~trust_system in
     let qr = Sync_ledger.query_reader lsync in
     let aw = Sync_ledger.answer_writer lsync in
     let seen_queries = ref [] in
@@ -111,7 +168,8 @@ struct
       ref
       @@ Sync_responder.create l2
            (fun q -> seen_queries := q :: !seen_queries)
-           ~logger ~trust_system
+           ~context:(module Context)
+           ~trust_system
     in
     let ctr = ref 0 in
     don't_wait_for
@@ -123,7 +181,8 @@ struct
                  sr :=
                    Sync_responder.create l3
                      (fun q -> seen_queries := q :: !seen_queries)
-                     ~logger ~trust_system ;
+                     ~context:(module Context)
+                     ~trust_system ;
                  desired_root := Ledger.merkle_root l3 ;
                  ignore
                    ( Sync_ledger.new_goal lsync !desired_root ~data:()
@@ -131,13 +190,11 @@ struct
                      : [ `New | `Repeat | `Update_data ] ) ;
                  Deferred.unit )
                else
-                 let%bind answ_opt =
+                 let%bind answ_or_error =
                    Sync_responder.answer_query !sr
                      (Envelope.Incoming.local query)
                  in
-                 let answ =
-                   Option.value_exn ~message:"refused to answer query" answ_opt
-                 in
+                 let answ = Or_error.ok_exn answ_or_error in
                  Linear_pipe.write aw
                    (!desired_root, query, Envelope.Incoming.local answ)
              in
@@ -162,6 +219,89 @@ struct
             failwith "the target changed again" )
 end
 
+module Make_test_edge_cases (Input : Input_intf) = struct
+  open Input
+  module Sync_responder = Sync_ledger.Responder
+
+  let trust_system = Trust_system.null ()
+
+  let num_accts = 1026
+
+  let () =
+    Async.Scheduler.set_record_backtraces true ;
+    Core.Backtrace.elide := false
+
+  let check_answer (query : Ledger.addr Syncable_ledger.Query.t) answer =
+    match query with
+    | What_child_hashes (_, depth) -> (
+        let invalid_depth = depth < 1 in
+        match answer with
+        | Error s ->
+            if
+              invalid_depth
+              && String.is_substring (Error.to_string_hum s)
+                   ~substring:
+                     "Invalid depth requested in What_child_hashes request"
+            then `Failure_as_expected
+            else
+              failwithf
+                "Expected failure due to invalid subtree depth, returned %s"
+                (Error.to_string_hum s) ()
+        | Ok a ->
+            if invalid_depth then
+              failwith
+                "Expected failure due to invalid subtree depth, returned a \
+                 successful answer"
+            else `Answer a )
+    | _ ->
+        `Answer (Or_error.ok_exn answer)
+
+  let%test "try full_sync_entirely_different with failures" =
+    let l1, _k1 = Ledger.load_ledger 1 1 in
+    let l2, _k2 = Ledger.load_ledger num_accts 2 in
+    let desired_root = Ledger.merkle_root l2 in
+    let got_failure_ivar = Ivar.create () in
+
+    let lsync = Sync_ledger.create l1 ~context:(module Context) ~trust_system in
+    let qr = Sync_ledger.query_reader lsync in
+    let aw = Sync_ledger.answer_writer lsync in
+    let sr =
+      Sync_responder.create l2 ignore ~context:(module Context) ~trust_system
+    in
+    don't_wait_for
+      (Linear_pipe.iter_unordered ~max_concurrency:3 qr
+         ~f:(fun (root_hash, query) ->
+           let%bind answ_or_error =
+             Sync_responder.answer_query sr (Envelope.Incoming.local query)
+           in
+           match check_answer query answ_or_error with
+           | `Answer answ ->
+               let%bind () =
+                 if match query with What_contents _ -> true | _ -> false then
+                   Clock_ns.after
+                     (Time_ns.Span.randomize (Time_ns.Span.of_ms 0.2)
+                        ~percent:(Percent.of_percentage 20.) )
+                 else Deferred.unit
+               in
+               Linear_pipe.write aw
+                 (root_hash, query, Envelope.Incoming.local answ)
+           | `Failure_as_expected ->
+               Ivar.fill got_failure_ivar true ;
+               Deferred.unit ) ) ;
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        let deferred_res =
+          match%map
+            Sync_ledger.fetch lsync desired_root ~data:() ~equal:(fun () () ->
+                true )
+          with
+          | `Ok mt ->
+              Root_hash.equal desired_root (Ledger.merkle_root mt)
+          | `Target_changed _ ->
+              false
+        in
+        Deferred.any [ deferred_res; Ivar.read got_failure_ivar ] )
+end
+
 module Root_hash = struct
   include Merkle_ledger_tests.Test_stubs.Hash
 
@@ -176,9 +316,10 @@ end
 (* Testing different ledger instantiations on Syncable_ledger *)
 
 module Db = struct
-  module Make (Depth : sig
-    val depth : int
-  end) =
+  module Make
+      (Context : Syncable_ledger.CONTEXT) (Depth : sig
+        val depth : int
+      end) =
   struct
     open Merkle_ledger_tests.Test_stubs
 
@@ -242,19 +383,61 @@ module Db = struct
       module MT = Ledger
       include Base_ledger_inputs
 
-      let account_subtree_height = 3
+      let account_subtree_height = 6
     end
 
     module Sync_ledger = Syncable_ledger.Make (Syncable_ledger_inputs)
+    module Context = Context
   end
 
-  module DB3 = Make (struct
-    let depth = 3
-  end)
+  module DB3 =
+    Make
+      (Context_subtree_depth32)
+      (struct
+        let depth = 3
+      end)
 
-  module DB16 = Make (struct
-    let depth = 16
-  end)
+  module DB16_subtree_depths81 =
+    Make
+      (Context_subtree_depth81)
+      (struct
+        let depth = 16
+      end)
+
+  module DB16_subtree_depths82 =
+    Make
+      (Context_subtree_depth82)
+      (struct
+        let depth = 16
+      end)
+
+  module DB16_subtree_depths86 =
+    Make
+      (Context_subtree_depth86)
+      (struct
+        let depth = 16
+      end)
+
+  module DB16_subtree_depths88 =
+    Make
+      (Context_subtree_depth88)
+      (struct
+        let depth = 16
+      end)
+
+  module DB16_subtree_depths68 =
+    Make
+      (Context_subtree_depth68)
+      (struct
+        let depth = 16
+      end)
+
+  module DB16_subtree_depths80 =
+    Make
+      (Context_subtree_depth80)
+      (struct
+        let depth = 16
+      end)
 
   module TestDB3_3 =
     Make_test
@@ -272,32 +455,62 @@ module Db = struct
 
   module TestDB16_20 =
     Make_test
-      (DB16)
+      (DB16_subtree_depths86)
       (struct
         let num_accts = 20
       end)
 
   module TestDB16_1024 =
     Make_test
-      (DB16)
+      (DB16_subtree_depths86)
       (struct
         let num_accts = 1024
       end)
 
-  module TestDB16_1026 =
+  module TestDB16_1026_subtree_depth81 =
     Make_test
-      (DB16)
+      (DB16_subtree_depths81)
       (struct
         let num_accts = 1026
       end)
+
+  module TestDB16_1026_subtree_depth82 =
+    Make_test
+      (DB16_subtree_depths82)
+      (struct
+        let num_accts = 1026
+      end)
+
+  module TestDB16_1026_subtree_depth86 =
+    Make_test
+      (DB16_subtree_depths86)
+      (struct
+        let num_accts = 1026
+      end)
+
+  (*Test till sync_ledger_max_subtree_depth*)
+  module TestDB16_1026_subtree_depth88 =
+    Make_test
+      (DB16_subtree_depths88)
+      (struct
+        let num_accts = 1026
+      end)
+
+  module TestDB16_Edge_Cases_subtree_depth68 =
+    Make_test_edge_cases (DB16_subtree_depths68)
+  module TestDB16_Edge_Cases_subtree_depth86 =
+    Make_test_edge_cases (DB16_subtree_depths81)
+  module TestDB16_Edge_Cases_subtree_depth80 =
+    Make_test_edge_cases (DB16_subtree_depths80)
 end
 
 module Mask = struct
-  module Make (Input : sig
-    val depth : int
+  module Make
+      (Context : Syncable_ledger.CONTEXT) (Input : sig
+        val depth : int
 
-    val mask_layers : int
-  end) =
+        val mask_layers : int
+      end) =
   struct
     open Merkle_ledger_tests.Test_stubs
 
@@ -387,29 +600,84 @@ module Mask = struct
       module MT = Ledger
       include Base_ledger_inputs
 
-      let account_subtree_height = 3
+      let account_subtree_height = 6
     end
 
     module Sync_ledger = Syncable_ledger.Make (Syncable_ledger_inputs)
+    module Context = Context
   end
 
-  module Mask3_Layer1 = Make (struct
-    let depth = 3
+  module Mask3_Layer1 =
+    Make
+      (Context_subtree_depth32)
+      (struct
+        let depth = 3
 
-    let mask_layers = 1
-  end)
+        let mask_layers = 1
+      end)
 
-  module Mask16_Layer1 = Make (struct
-    let depth = 16
+  module Mask16_Layer1 =
+    Make
+      (Context_subtree_depth32)
+      (struct
+        let depth = 16
 
-    let mask_layers = 1
-  end)
+        let mask_layers = 1
+      end)
 
-  module Mask16_Layer2 = Make (struct
-    let depth = 16
+  module Mask16_Layer2 =
+    Make
+      (Context_subtree_depth32)
+      (struct
+        let depth = 16
 
-    let mask_layers = 2
-  end)
+        let mask_layers = 2
+      end)
+
+  module Mask16_Layer2_Depth81 =
+    Make
+      (Context_subtree_depth81)
+      (struct
+        let depth = 16
+
+        let mask_layers = 2
+      end)
+
+  module Mask16_Layer2_Depth86 =
+    Make
+      (Context_subtree_depth86)
+      (struct
+        let depth = 16
+
+        let mask_layers = 2
+      end)
+
+  module Mask16_Layer2_Depth88 =
+    Make
+      (Context_subtree_depth88)
+      (struct
+        let depth = 16
+
+        let mask_layers = 2
+      end)
+
+  module Mask16_Layer2_Depth68 =
+    Make
+      (Context_subtree_depth68)
+      (struct
+        let depth = 16
+
+        let mask_layers = 2
+      end)
+
+  module Mask16_Layer2_Depth80 =
+    Make
+      (Context_subtree_depth80)
+      (struct
+        let depth = 16
+
+        let mask_layers = 2
+      end)
 
   module TestMask3_Layer1_3 =
     Make_test
@@ -452,4 +720,32 @@ module Mask = struct
       (struct
         let num_accts = 1024
       end)
+
+  module TestMask16_Layer2_1024_Depth81 =
+    Make_test
+      (Mask16_Layer2_Depth81)
+      (struct
+        let num_accts = 1024
+      end)
+
+  module TestMask16_Layer2_1024_Depth86 =
+    Make_test
+      (Mask16_Layer2_Depth86)
+      (struct
+        let num_accts = 1024
+      end)
+
+  module TestMask16_Layer2_1024_Depth88 =
+    Make_test
+      (Mask16_Layer2_Depth88)
+      (struct
+        let num_accts = 1024
+      end)
+
+  module TestMask16_Edge_Cases_Depth68 =
+    Make_test_edge_cases (Mask16_Layer2_Depth68)
+  module TestMask16_Edge_Cases_Depth81 =
+    Make_test_edge_cases (Mask16_Layer2_Depth81)
+  module TestMask16_Edge_Cases_Depth80 =
+    Make_test_edge_cases (Mask16_Layer2_Depth80)
 end

@@ -1,5 +1,3 @@
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Core_kernel
 open Async
 open Mina_base
@@ -118,8 +116,6 @@ module T = struct
     | Error e ->
         Error (Staged_ledger_error.Unexpected e)
 
-  type job = Scan_state.Available_job.t [@@deriving sexp]
-
   let verify_proofs ~logger ~verifier proofs =
     let statements () =
       `List
@@ -201,9 +197,7 @@ module T = struct
     with
     | None ->
         Deferred.return
-          ( Or_error.errorf
-              !"Error creating statement from job %{sexp:job list}"
-              (List.map job_msg_proofs ~f:(fun (j, _, _) -> j))
+          ( Or_error.error_string "Error creating statement from job"
           |> to_staged_ledger_or_error )
     | Some proof_statement_msgs -> (
         match%map verify_proofs ~logger ~verifier proof_statement_msgs with
@@ -237,14 +231,12 @@ module T = struct
   type t =
     { scan_state : Scan_state.t
     ; ledger :
-        ((* Invariant: this is the ledger after having applied all the
-             transactions in the above state. *)
-         Ledger.attached_mask
-        [@sexp.opaque] )
+        (* Invariant: this is the ledger after having applied all the
+            transactions in the above state. *)
+        Ledger.attached_mask
     ; constraint_constants : Genesis_constants.Constraint_constants.t
     ; pending_coinbase_collection : Pending_coinbase.t
     }
-  [@@deriving sexp]
 
   let proof_txns_with_state_hashes t =
     Scan_state.latest_ledger_proof t.scan_state
@@ -312,7 +304,7 @@ module T = struct
     in
     let%bind () =
       Statement_scanner_with_proofs.check_invariants ~constraint_constants
-        scan_state ~statement_check:(`Full get_state)
+        ~logger scan_state ~statement_check:(`Full get_state)
         ~verifier:{ Statement_scanner_proof_verifier.logger; verifier }
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~last_proof_statement
@@ -327,7 +319,7 @@ module T = struct
     return t
 
   let of_scan_state_and_ledger_unchecked
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~logger
       ~last_proof_statement ~ledger ~scan_state ~pending_coinbase_collection
       ~first_pass_ledger_target =
     let open Deferred.Or_error.Let_syntax in
@@ -340,8 +332,8 @@ module T = struct
       |> Deferred.return
     in
     let%bind () =
-      Statement_scanner.check_invariants ~constraint_constants scan_state
-        ~statement_check:`Partial ~verifier:()
+      Statement_scanner.check_invariants ~constraint_constants ~logger
+        scan_state ~statement_check:`Partial ~verifier:()
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~last_proof_statement
         ~registers_end:
@@ -405,11 +397,12 @@ module T = struct
       (of_scan_state_and_ledger ~logger ~get_state ~verifier)
 
   let of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
-      ~constraint_constants ~scan_state ~snarked_ledger ~snarked_local_state
-      ~expected_merkle_root ~pending_coinbases ~get_state =
+      ~constraint_constants ~logger ~scan_state ~snarked_ledger
+      ~snarked_local_state ~expected_merkle_root ~pending_coinbases ~get_state =
     of_scan_state_pending_coinbases_and_snarked_ledger' ~constraint_constants
       ~pending_coinbases ~scan_state ~snarked_ledger ~snarked_local_state
-      ~expected_merkle_root ~get_state of_scan_state_and_ledger_unchecked
+      ~expected_merkle_root ~get_state
+      (of_scan_state_and_ledger_unchecked ~logger)
 
   let copy
       { scan_state; ledger; constraint_constants; pending_coinbase_collection }
@@ -580,20 +573,17 @@ module T = struct
     let second_pass_ledger_target_hash = Ledger.merkle_root ledger in
     let%bind supply_increase =
       to_staged_ledger_or_error
-        (Ledger.Transaction_applied.supply_increase ~constraint_constants
-           applied_txn )
+        (Mina_transaction_logic.Transaction_applied.supply_increase
+           ~constraint_constants applied_txn )
     in
     let%map () =
-      let actual_status =
-        Ledger.Transaction_applied.transaction_status applied_txn
-      in
+      let actual_status = Ledger.status_of_applied applied_txn in
       if Transaction_status.equal pre_stmt.expected_status actual_status then
         return ()
       else
         let txn_with_expected_status =
           { With_status.data =
-              With_status.data
-                (Ledger.Transaction_applied.transaction applied_txn)
+              With_status.data (Ledger.transaction_of_applied applied_txn)
           ; status = pre_stmt.expected_status
           }
         in
@@ -725,11 +715,21 @@ module T = struct
       let matching_completed_work_in_pool = get_completed_work work_statement in
       match (statements_match, matching_completed_work_in_pool) with
       | true, Some (completed_work : Transaction_snark_work.Checked.t) ->
-          let verified_proofs = completed_work.proofs in
-          let block_work_proofs = work.proofs in
-          if not @@ Fee.equal completed_work.fee work.fee then
-            Second "fee_not_equal"
-          else if not @@ Account.Key.equal completed_work.prover work.prover
+          let verified_proofs =
+            Transaction_snark_work.Checked.proofs completed_work
+          in
+          let block_work_proofs = Transaction_snark_work.proofs work in
+          if
+            not
+            @@ Fee.equal
+                 (Transaction_snark_work.Checked.fee completed_work)
+                 (Transaction_snark_work.fee work)
+          then Second "fee_not_equal"
+          else if
+            not
+            @@ Account.Key.equal
+                 (Transaction_snark_work.Checked.prover completed_work)
+                 (Transaction_snark_work.prover work)
           then Second "prover_account_not_equal"
           else if
             not
@@ -789,9 +789,7 @@ module T = struct
       List.fold_right ~init:(Ok []) data
         ~f:(fun (d : Scan_state.Transaction_with_witness.t) acc ->
           let%map.Or_error acc = acc in
-          let t =
-            d.transaction_with_info |> Ledger.Transaction_applied.transaction
-          in
+          let t = d.transaction_with_info |> Ledger.transaction_of_applied in
           t :: acc )
     in
     let total_fee_excess txns =
@@ -1149,7 +1147,7 @@ module T = struct
         [%log internal] "Verify_scan_state_after_apply" ;
         O1trace.thread "verify_scan_state_after_apply" (fun () ->
             Deferred.(
-              verify_scan_state_after_apply ~constraint_constants
+              verify_scan_state_after_apply ~constraint_constants ~logger
                 ~first_pass_ledger_end
                 ~second_pass_ledger_end:
                   (Frozen_ledger_hash.of_ledger_hash
@@ -1357,26 +1355,29 @@ module T = struct
       }
     [@@deriving sexp_of]
 
-    let coinbase_ft (cw : Transaction_snark_work.t) =
+    let coinbase_ft (cw : Transaction_snark_work.Checked.t) =
+      let fee = Transaction_snark_work.Checked.fee cw in
+      let receiver_pk = Transaction_snark_work.Checked.prover cw in
       (* Here we could not add the fee transfer if the prover=receiver_pk but
          retaining it to preserve that information in the
          staged_ledger_diff. It will be checked in apply_diff before adding*)
       Option.some_if
-        Fee.(cw.fee > Fee.zero)
-        (Coinbase.Fee_transfer.create ~receiver_pk:cw.prover ~fee:cw.fee)
+        Fee.(fee > Fee.zero)
+        (Coinbase.Fee_transfer.create ~receiver_pk ~fee)
 
     let cheapest_two_work (works : Transaction_snark_work.Checked.t Sequence.t)
         =
+      let open Transaction_snark_work.Checked in
       Sequence.fold works ~init:(None, None) ~f:(fun (w1, w2) w ->
           match (w1, w2) with
           | None, _ ->
               (Some w, None)
           | Some x, None ->
-              if Currency.Fee.compare w.fee x.fee < 0 then (Some w, w1)
+              if Fee.compare (fee w) (fee x) < 0 then (Some w, w1)
               else (w1, Some w)
           | Some x, Some y ->
-              if Currency.Fee.compare w.fee x.fee < 0 then (Some w, w1)
-              else if Currency.Fee.compare w.fee y.fee < 0 then (w1, Some w)
+              if Fee.compare (fee w) (fee x) < 0 then (Some w, w1)
+              else if Fee.compare (fee w) (fee y) < 0 then (w1, Some w)
               else (w1, w2) )
 
     let coinbase_work
@@ -1388,7 +1389,7 @@ module T = struct
       let diff ws ws' =
         Sequence.filter ws ~f:(fun w ->
             Sequence.mem ws'
-              (Transaction_snark_work.statement w)
+              (Transaction_snark_work.Checked.statement w)
               ~equal:Transaction_snark_work.Statement.equal
             |> not )
       in
@@ -1403,13 +1404,14 @@ module T = struct
               (of_fee constraint_constants.account_creation_fee))
         else Some coinbase_amount
       in
-      let stmt = Transaction_snark_work.statement in
+      let stmt = Transaction_snark_work.Checked.statement in
       if is_two then
         match (min1, min2) with
         | None, _ ->
             None
         | Some w, None ->
-            if Amount.(of_fee w.fee <= budget) then
+            if Amount.(of_fee (Transaction_snark_work.Checked.fee w) <= budget)
+            then
               let cb =
                 Staged_ledger_diff.At_most_two.Two
                   (Option.map (coinbase_ft w) ~f:(fun ft -> (ft, None)))
@@ -1419,7 +1421,11 @@ module T = struct
               let cb = Staged_ledger_diff.At_most_two.Two None in
               Some (cb, works)
         | Some w1, Some w2 ->
-            let%map sum = Fee.add w1.fee w2.fee in
+            let%map sum =
+              Fee.add
+                (Transaction_snark_work.Checked.fee w1)
+                (Transaction_snark_work.Checked.fee w2)
+            in
             if Amount.(of_fee sum <= budget) then
               let cb =
                 Staged_ledger_diff.At_most_two.Two
@@ -1434,7 +1440,9 @@ module T = struct
                   reduce the slots occupied by fee transfers*)
               in
               (cb, diff works (Sequence.of_list [ stmt w1; stmt w2 ]))
-            else if Amount.(of_fee w1.fee <= coinbase_amount) then
+            else if
+              Amount.(of_fee (Transaction_snark_work.Checked.fee w1) <= budget)
+            then
               let cb =
                 Staged_ledger_diff.At_most_two.Two
                   (Option.map (coinbase_ft w1) ~f:(fun ft -> (ft, None)))
@@ -1445,7 +1453,8 @@ module T = struct
               (cb, works)
       else
         Option.map min1 ~f:(fun w ->
-            if Amount.(of_fee w.fee <= budget) then
+            if Amount.(of_fee (Transaction_snark_work.Checked.fee w) <= budget)
+            then
               let cb = Staged_ledger_diff.At_most_two.One (coinbase_ft w) in
               (cb, diff works (Sequence.of_list [ stmt w ]))
             else
@@ -2124,6 +2133,10 @@ module T = struct
                 ~f:(fun (seq, count) w ->
                   match get_completed_work w with
                   | Some cw_checked ->
+                      let fee = Transaction_snark_work.Checked.fee cw_checked in
+                      let prover =
+                        Transaction_snark_work.Checked.prover cw_checked
+                      in
                       (*If new provers can't pay the account-creation-fee then discard
                         their work unless their fee is zero in which case their account
                         won't be created. This is to encourage using an existing accounts
@@ -2131,26 +2144,24 @@ module T = struct
                         This also imposes new snarkers to have a min fee until one of
                         their snarks are purchased and their accounts get created*)
                       if
-                        Currency.Fee.(cw_checked.fee = zero)
+                        Currency.Fee.(fee = zero)
                         || Currency.Fee.(
-                             cw_checked.fee
-                             >= constraint_constants.account_creation_fee)
-                        || not (is_new_account cw_checked.prover)
+                             fee >= constraint_constants.account_creation_fee)
+                        || not (is_new_account prover)
                       then
                         Continue
                           ( Sequence.append seq (Sequence.singleton cw_checked)
-                          , One_or_two.length cw_checked.proofs + count )
+                          , One_or_two.length
+                              (Transaction_snark_work.Checked.proofs cw_checked)
+                            + count )
                       else (
                         [%log debug]
                           ~metadata:
-                            [ ( "work"
-                              , Transaction_snark_work.Checked.to_yojson
-                                  cw_checked )
+                            [ ("prover", Public_key.Compressed.to_yojson prover)
                             ; ( "work_ids"
                               , Transaction_snark_work.Statement.compact_json w
                               )
-                            ; ( "snark_fee"
-                              , Currency.Fee.to_yojson cw_checked.fee )
+                            ; ("snark_fee", Currency.Fee.to_yojson fee)
                             ; ( "account_creation_fee"
                               , Currency.Fee.to_yojson
                                   constraint_constants.account_creation_fee )
@@ -2210,7 +2221,19 @@ module T = struct
             in
             [%log internal] "Generate_staged_ledger_diff" ;
             let diff, log =
-              O1trace.sync_thread "generate_staged_ledger_diff" (fun () ->
+              O1trace.sync_thread "generate_staged_ledger_diff"
+                (fun
+                  ()
+                  :
+                  (( ( Transaction_snark_work.Checked.t
+                     , User_command.Valid.t )
+                     Staged_ledger_diff.Pre_diff_two.t
+                   * ( Transaction_snark_work.Checked.t
+                     , User_command.Valid.t )
+                     Staged_ledger_diff.Pre_diff_one.t
+                     option )
+                  * _)
+                ->
                   generate ~constraint_constants logger completed_works_seq
                     valid_on_this_ledger ~receiver:coinbase_receiver
                     ~is_coinbase_receiver_new ~supercharge_coinbase partitions )
@@ -2383,16 +2406,14 @@ let%test_module "staged ledger tests" =
     let logger = Logger.null ()
 
     let `VK vk, `Prover zkapp_prover =
-      Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+      Transaction_snark.For_tests.create_trivial_snapp ()
 
     let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            ~commit_id:"not specified for unit tests" () )
+          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
+            () )
 
     let find_vk ledger =
       Zkapp_command.Verifiable.load_vk_from_ledger ~get:(Ledger.get ledger)
@@ -2598,19 +2619,15 @@ let%test_module "staged ledger tests" =
         : Transaction_snark_work.Checked.t option =
       let prover = stmt_to_prover stmts in
       Some
-        { Transaction_snark_work.Checked.fee = work_fee
-        ; proofs = proofs stmts
-        ; prover
-        }
+        (Transaction_snark_work.Checked.create_unsafe
+           { fee = work_fee; proofs = proofs stmts; prover } )
 
     let stmt_to_work_zero_fee ~prover
         (stmts : Transaction_snark_work.Statement.t) :
         Transaction_snark_work.Checked.t option =
       Some
-        { Transaction_snark_work.Checked.fee = Currency.Fee.zero
-        ; proofs = proofs stmts
-        ; prover
-        }
+        (Transaction_snark_work.Checked.create_unsafe
+           { fee = Currency.Fee.zero; proofs = proofs stmts; prover } )
 
     (* Fixed public key for when there is only one snark worker. *)
     let snark_worker_pk =
@@ -2619,7 +2636,9 @@ let%test_module "staged ledger tests" =
 
     let stmt_to_work_one_prover (stmts : Transaction_snark_work.Statement.t) :
         Transaction_snark_work.Checked.t option =
-      Some { fee = work_fee; proofs = proofs stmts; prover = snark_worker_pk }
+      Some
+        (Transaction_snark_work.Checked.create_unsafe
+           { fee = work_fee; proofs = proofs stmts; prover = snark_worker_pk } )
 
     let coinbase_first_prediff = function
       | Staged_ledger_diff.At_most_two.Zero ->
@@ -3247,10 +3266,11 @@ let%test_module "staged ledger tests" =
     let%test_unit "Zero proof-fee should not create a fee transfer" =
       let stmt_to_work_zero_fee stmts =
         Some
-          { Transaction_snark_work.Checked.fee = Currency.Fee.zero
-          ; proofs = proofs stmts
-          ; prover = snark_worker_pk
-          }
+          (Transaction_snark_work.Checked.create_unsafe
+             { fee = Currency.Fee.zero
+             ; proofs = proofs stmts
+             ; prover = snark_worker_pk
+             } )
       in
       let expected_proof_count = 3 in
       Quickcheck.test
@@ -3343,10 +3363,11 @@ let%test_module "staged ledger tests" =
                     let work_done =
                       List.map
                         ~f:(fun stmts ->
-                          { Transaction_snark_work.Checked.fee = Fee.zero
-                          ; proofs = proofs stmts
-                          ; prover = snark_worker_pk
-                          } )
+                          Transaction_snark_work.Checked.create_unsafe
+                            { fee = Fee.zero
+                            ; proofs = proofs stmts
+                            ; prover = snark_worker_pk
+                            } )
                         work
                     in
                     let cmds_this_iter = cmds_this_iter |> Sequence.to_list in
@@ -3405,12 +3426,13 @@ let%test_module "staged ledger tests" =
       let stmt_to_work stmts =
         let prover = stmt_to_prover stmts in
         Some
-          { Transaction_snark_work.Checked.fee =
-              Currency.Fee.(sub work_fee (of_nanomina_int_exn 1))
-              |> Option.value_exn
-          ; proofs = proofs stmts
-          ; prover
-          }
+          (Transaction_snark_work.Checked.create_unsafe
+             { fee =
+                 Currency.Fee.(sub work_fee (of_nanomina_int_exn 1))
+                 |> Option.value_exn
+             ; proofs = proofs stmts
+             ; prover
+             } )
       in
       Quickcheck.test
         Quickcheck.Generator.(tuple2 (gen_below_capacity ()) small_positive_int)
@@ -3472,10 +3494,8 @@ let%test_module "staged ledger tests" =
                Transaction_snark_work.Statement.compare s stmts = 0 ) )
       then
         Some
-          { Transaction_snark_work.Checked.fee = work_fee
-          ; proofs = proofs stmts
-          ; prover
-          }
+          (Transaction_snark_work.Checked.create_unsafe
+             { fee = work_fee; proofs = proofs stmts; prover } )
       else None
 
     (** Like test_simple but with a random number of completed jobs available.
@@ -3661,8 +3681,8 @@ let%test_module "staged ledger tests" =
         (List.find work_list ~f:(fun (s, _) ->
              Transaction_snark_work.Statement.compare s stmts = 0 ) )
         ~f:(fun (_, fee) ->
-          { Transaction_snark_work.Checked.fee; proofs = proofs stmts; prover }
-          )
+          Transaction_snark_work.Checked.create_unsafe
+            { fee; proofs = proofs stmts; prover } )
 
     (** Like test_random_number_of_proofs but with random proof fees.
                    *)
@@ -3743,27 +3763,20 @@ let%test_module "staged ledger tests" =
                   Option.value_map ft_opt ~default:() ~f:(fun single ->
                       let work =
                         List.hd_exn (sorted_work_from_diff1 first_pre_diff)
-                        |> Transaction_snark_work.forget
                       in
                       assert_same_fee single work.fee )
               | Zero, One ft_opt ->
                   Option.value_map ft_opt ~default:() ~f:(fun single ->
                       let work =
                         List.hd_exn (sorted_work_from_diff2 second_pre_diff_opt)
-                        |> Transaction_snark_work.forget
                       in
                       assert_same_fee single work.fee )
               | Two (Some (ft, ft_opt)), Zero ->
                   let work_done = sorted_work_from_diff1 first_pre_diff in
-                  let work =
-                    List.hd_exn work_done |> Transaction_snark_work.forget
-                  in
+                  let work = List.hd_exn work_done in
                   assert_same_fee ft work.fee ;
                   Option.value_map ft_opt ~default:() ~f:(fun single ->
-                      let work =
-                        List.hd_exn (List.drop work_done 1)
-                        |> Transaction_snark_work.forget
-                      in
+                      let work = List.hd_exn (List.drop work_done 1) in
                       assert_same_fee single work.fee )
               | _ ->
                   failwith
@@ -4287,7 +4300,7 @@ let%test_module "staged ledger tests" =
 
     let%test_unit "Blocks having commands with insufficient funds are rejected"
         =
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let g =
         let open Quickcheck.Generator.Let_syntax in
         let%map ledger_init_state = Ledger.gen_initial_ledger_state
@@ -4801,13 +4814,11 @@ let%test_module "staged ledger tests" =
         ~setup_test:(fun _ledger (a, privkey_a, _loc_a) (b, privkey_b, _loc_b)
                     ->
           let `VK vk_a, `Prover prover_a =
-            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:0
-              ~constraint_constants ()
+            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:0 ()
           in
           let%bind.Async.Deferred vk_a = vk_a in
           let `VK vk_b, `Prover _prover_b =
-            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:1
-              ~constraint_constants ()
+            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:1 ()
           in
           let%bind.Async.Deferred vk_b = vk_b in
           let keymap =
@@ -4873,13 +4884,11 @@ let%test_module "staged ledger tests" =
         ~setup_test:(fun _ledger (a, privkey_a, _loc_a) (_b, _privkey_b, _loc_b)
                     ->
           let `VK vk_a, `Prover prover_a =
-            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:0
-              ~constraint_constants ()
+            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:0 ()
           in
           let%bind.Async.Deferred vk_a = vk_a in
           let `VK vk_b, `Prover _prover_b =
-            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:1
-              ~constraint_constants ()
+            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:1 ()
           in
           let%bind.Async.Deferred vk_b = vk_b in
           let keymap =
@@ -5187,12 +5196,10 @@ let%test_module "staged ledger tests" =
                           (Staged_ledger_diff.With_valid_signatures_and_proofs
                            .commands diff )
                         = 1 ) ;
+
                       let%bind verifier_full =
-                        Verifier.create ~logger ~proof_level:Full
-                          ~constraint_constants ~conf_dir:None
-                          ~pids:
-                            (Child_processes.Termination.create_pid_table ())
-                          ~commit_id:"not specified for unit tests" ()
+                        Verifier.For_tests.default ~constraint_constants ~logger
+                          ~proof_level:Full ()
                       in
                       match%map
                         Sl.apply ~constraint_constants ~global_slot !sl

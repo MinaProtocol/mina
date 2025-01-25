@@ -1128,7 +1128,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
     ?(no_token_accounts = false) ?(limited = false)
     ?(generate_new_accounts = true) ?failure
     ?(max_account_updates = max_account_updates)
-    ?(max_token_updates = max_token_updates)
+    ?(max_token_updates = max_token_updates) ?(map_account_update = ident)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
@@ -1529,8 +1529,9 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
   let zkapp_command_dummy_authorizations : Zkapp_command.t =
     { fee_payer
     ; account_updates =
-        account_updates
-        |> Zkapp_command.Call_forest.map ~f:Account_update.of_simple
+        Zkapp_command.Call_forest.map
+          ~f:(Fn.compose map_account_update Account_update.of_simple)
+          account_updates
         |> Zkapp_command.Call_forest.accumulate_hashes_predicated
     ; memo
     }
@@ -1748,8 +1749,7 @@ let%test_module _ =
     let constraint_constants =
       Genesis_constants.For_unit_tests.Constraint_constants.t
 
-    let `VK vk, `Prover _ =
-      Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+    let `VK vk, `Prover _ = Transaction_snark.For_tests.create_trivial_snapp ()
 
     let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
 

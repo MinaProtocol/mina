@@ -26,7 +26,6 @@ module type Pool_sink = sig
     -> trace_label:string
     -> logger:Logger.t
     -> pool
-    -> block_window_duration:Time.Span.t
     -> 'wrapped_t Strict_pipe.Reader.t * t * Rate_limiter.t
 end
 
@@ -72,7 +71,6 @@ module Base
         ; throttle : unit Throttle.t
         ; on_push : unit -> unit Deferred.t
         ; log_gossip_heard : bool
-        ; block_window_duration : Time.Span.t
         }
         -> t
     | Void
@@ -145,7 +143,6 @@ module Base
         ; throttle
         ; on_push
         ; log_gossip_heard
-        ; block_window_duration
         } ->
         O1trace.sync_thread (sprintf "handle_%s_gossip" trace_label)
         @@ fun () ->
@@ -157,10 +154,7 @@ module Base
         | BC.External cb'' ->
             Diff.update_metrics env' cb'' ~log_gossip_heard ~logger ;
             don't_wait_for
-              ( match%map
-                  Mina_net2.Validation_callback.await ~block_window_duration
-                    cb''
-                with
+              ( match%map Mina_net2.Validation_callback.await cb'' with
               | None ->
                   let diff = Envelope.Incoming.data env' in
                   [%log error]
@@ -197,7 +191,7 @@ module Base
         Deferred.unit
 
   let create ?(on_push = Fn.const Deferred.unit) ?(log_gossip_heard = false)
-      ~wrap ~unwrap ~trace_label ~logger pool ~block_window_duration =
+      ~wrap ~unwrap ~trace_label ~logger pool =
     let r, writer =
       Strict_pipe.create ~name:"verified network pool diffs"
         (Buffered
@@ -223,7 +217,6 @@ module Base
         ; throttle
         ; on_push
         ; log_gossip_heard
-        ; block_window_duration
         }
     , rate_limiter )
 
