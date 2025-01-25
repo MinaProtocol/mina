@@ -157,7 +157,7 @@ class Influx:
             )
 
         process = subprocess.Popen([
-            "influx", "write", f"--host={self.influx_host()}", "--http-debug", "--format=csv", f"--file={file}"
+            "influx", "write", f"--host={Influx.influx_host()}", "--http-debug", "--format=csv", f"--file={file}"
         ],
             stderr=subprocess.PIPE )
         
