@@ -8,9 +8,11 @@ end
 module Make_str (A : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = A.V1.t = { staged_ledger_diff : Diff.Stable.V2.t }
-      [@@deriving fields]
+      [@@deriving fields, sexp]
 
       let to_latest = Fn.id
 

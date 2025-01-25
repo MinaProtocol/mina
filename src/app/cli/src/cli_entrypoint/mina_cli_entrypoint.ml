@@ -1378,6 +1378,9 @@ let replay_blocks ~itn_features logger =
                      block
                  | Error err ->
                      failwithf "Could not read block: %s" err () )
+           | Some "sexp" ->
+               fun line ->
+                 Sexp.of_string_conv_exn line Mina_block.Precomputed.t_of_sexp
            | _ ->
                failwith "Expected one of 'json', 'sexp' for -format flag"
          in

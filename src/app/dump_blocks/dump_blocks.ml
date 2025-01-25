@@ -20,10 +20,14 @@ let mk_io : type a. a Encoding.content -> Encoding.t io -> a codec io =
   { io with
     encoding =
       ( match (content, io.encoding) with
+      | Precomputed, Sexp ->
+          (module Sexp_precomputed)
       | Precomputed, Json ->
           (module Json_precomputed)
       | Precomputed, Binary ->
           (module Binary_precomputed)
+      | Block, Sexp ->
+          (module Sexp_block)
       | Block, Json ->
           failwith "Json encoding for full blocks not supported."
       | Block, Binary ->
@@ -36,8 +40,10 @@ let encoded_block =
       | [ encoding; filename ] ->
           { encoding =
               ( match String.lowercase encoding with
+              | "sexp" ->
+                  Encoding.Sexp
               | "json" ->
-                  Encoding.Json
+                  Json
               | "bin" | "binary" ->
                   Binary
               | _ ->
@@ -92,7 +98,10 @@ let f (type a) ?parent (outputs : a codec io list) make_breadcrumb =
           output_block content output ) ;
       clean_up_persistent_root ~frontier )
 
-let default_outputs = [ { encoding = Encoding.Json; filename = "-" } ]
+let default_outputs =
+  [ { encoding = Encoding.Sexp; filename = "-" }
+  ; { encoding = Encoding.Json; filename = "-" }
+  ]
 
 let command =
   Command.basic

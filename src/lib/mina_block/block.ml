@@ -4,12 +4,14 @@ open Mina_state
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       { header : Header.Stable.V2.t
       ; body : Staged_ledger_diff.Body.Stable.V1.t
       }
-    [@@deriving fields]
+    [@@deriving fields, sexp]
 
     let to_latest = Fn.id
 
@@ -39,6 +41,9 @@ module Stable = struct
              and type 'a creator := 'a Creatable.creator )
   end
 end]
+
+type t = Stable.Latest.t =
+  { header : Header.t; body : Staged_ledger_diff.Body.t }
 
 type with_hash = t State_hash.With_state_hashes.t
 

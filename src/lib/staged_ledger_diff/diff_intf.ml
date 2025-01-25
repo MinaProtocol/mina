@@ -105,7 +105,8 @@ module type Full = sig
 
   module Stable : sig
     module V2 : sig
-      type t = { diff : Diff.Stable.V2.t } [@@deriving bin_io, version, yojson]
+      type t = { diff : Diff.Stable.V2.t }
+      [@@deriving bin_io, version, sexp, yojson]
 
       val to_latest : t -> t
     end
