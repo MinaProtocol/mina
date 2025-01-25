@@ -10,9 +10,8 @@ module Ledger = Mina_ledger.Ledger
 include User_command.Gen
 
 let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
-    ?num_keypairs ?max_account_updates ?max_token_updates
-    ?(account_state_tbl = ref Account_id.Map.empty) ?vk ?failure
-    ~(genesis_constants : Genesis_constants.t)
+    ?num_keypairs ?max_account_updates ?max_token_updates ?account_state_tbl ?vk
+    ?failure ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) () =
   let ledger_depth = constraint_constants.ledger_depth in
   let open Quickcheck.Let_syntax in
@@ -136,6 +135,9 @@ let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
     (List.mapi accounts ~f:(fun i account ->
          (Ledger.Addr.of_int_exn ~ledger_depth i, account) ) ) ;
   (* to keep track of account states across transactions *)
+  let account_state_tbl =
+    Option.value account_state_tbl ~default:(ref Account_id.Map.empty)
+  in
   let%bind zkapp_command =
     Zkapp_command_generators.gen_zkapp_command_from ~max_account_updates
       ~max_token_updates ~fee_payer_keypair ~keymap ~ledger ~account_state_tbl
