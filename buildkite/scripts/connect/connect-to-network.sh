@@ -15,14 +15,14 @@ WAIT_AFTER_FINAL_CHECK=$4
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
 
-apt-get update
-apt-get install -y git apt-transport-https ca-certificates tzdata curl
+sudo apt-get update
+sudo apt-get install -y git apt-transport-https ca-certificates tzdata curl
 
 git config --global --add safe.directory /workdir
 
 source buildkite/scripts/export-git-env-vars.sh
 
-source buildkite/scripts/debian/install.sh "mina-${MINA_DEBIAN_NETWORK}"
+source buildkite/scripts/debian/install.sh "mina-${MINA_DEBIAN_NETWORK}" 1
 
 # Remove lockfile if present
 rm ~/.mina-config/.mina-lock ||:
