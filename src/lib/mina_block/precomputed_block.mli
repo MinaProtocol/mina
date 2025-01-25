@@ -49,7 +49,7 @@ type t = Stable.Latest.t =
   ; accounts_created : (Account_id.t * Currency.Fee.t) list
   ; tokens_used : (Token_id.t * Account_id.t option) list
   }
-[@@deriving yojson]
+[@@deriving sexp, yojson]
 
 val of_block :
      logger:Logger.t

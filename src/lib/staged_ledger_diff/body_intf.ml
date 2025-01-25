@@ -4,7 +4,7 @@ module type Full = sig
     [@@@no_toplevel_latest_type]
 
     module V1 : sig
-      type t
+      type t [@@deriving sexp]
 
       val create : Diff.Stable.V2.t -> t
 

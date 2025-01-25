@@ -114,7 +114,7 @@ module type Full = sig
 
   module Stable : sig
     module V2 : sig
-      type t [@@deriving bin_io, version, yojson]
+      type t [@@deriving bin_io, version, yojson, sexp]
 
       val to_latest : t -> t
 

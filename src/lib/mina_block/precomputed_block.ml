@@ -89,14 +89,14 @@ module Stable = struct
       ; tokens_used :
           (Token_id.Stable.V2.t * Account_id.Stable.V2.t option) list
       }
-    [@@deriving yojson]
+    [@@deriving sexp, yojson]
 
     let to_latest = Fn.id
   end
 end]
 
 (* functions for the versioned json, not the unversioned ones provided by `T` *)
-[%%define_locally Stable.Latest.(to_yojson, of_yojson)]
+[%%define_locally Stable.Latest.(to_yojson, of_yojson, sexp_of_t, t_of_sexp)]
 
 let of_block ~logger
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -189,6 +189,22 @@ let of_block ~logger
   ; accounts_created
   ; tokens_used
   }
+
+(* NOTE: This serialization is used externally and MUST NOT change.
+    If the underlying types change, you should write a conversion, or add
+    optional fields and handle them appropriately.
+*)
+(* But if you really need to update it, you can generate new samples using:
+   `dune exec dump_blocks 1> block.txt` *)
+let%test_unit "Sexp serialization is stable" =
+  let serialized_block = Sample_precomputed_block.sample_block_sexp in
+  ignore @@ t_of_sexp @@ Sexp.of_string serialized_block
+
+let%test_unit "Sexp serialization roundtrips" =
+  let serialized_block = Sample_precomputed_block.sample_block_sexp in
+  let sexp = Sexp.of_string serialized_block in
+  let sexp_roundtrip = sexp_of_t @@ t_of_sexp sexp in
+  [%test_eq: Sexp.t] sexp sexp_roundtrip
 
 (* NOTE: This serialization is used externally and MUST NOT change.
     If the underlying types change, you should write a conversion, or add
