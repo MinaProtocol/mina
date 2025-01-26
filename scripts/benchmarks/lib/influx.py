@@ -97,7 +97,7 @@ class Influx:
     def client(self):
         Influx.check_envs()
         return influxdb_client.InfluxDBClient(
-            url=influx_host(),
+            url=Influx.influx_host(),
             token=os.environ[Influx.token],
             org=os.environ[Influx.org],
             bucket=os.environ[Influx.bucket])
