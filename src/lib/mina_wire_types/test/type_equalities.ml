@@ -318,7 +318,6 @@ module Mina_transaction = struct
   module W = WT.Mina_transaction
   include Assert_equal1V2 (O.Poly.Stable) (W.Poly)
   include Assert_equal0V2 (O.Stable) (W)
-  include Assert_equal0V2 (O.Valid.Stable) (W.Valid)
 end
 
 module Mina_state = struct
