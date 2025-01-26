@@ -27,17 +27,17 @@ source buildkite/scripts/debian/install.sh "mina-${MINA_DEBIAN_NETWORK}" 1
 # Remove lockfile if present
 rm ~/.mina-config/.mina-lock ||:
 
-mkdir -p /root/libp2p-keys/
+mkdir -p ~/libp2p-keys/
 # Pre-generated random password for this quick test
 export MINA_LIBP2P_PASS=eithohShieshichoh8uaJ5iefo1reiRudaekohG7AeCeib4XuneDet2uGhu7lahf
-mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key
+mina libp2p generate-keypair --privkey-path ~/libp2p-keys/key
 # Set permissions on the keypair so the daemon doesn't complain
-chmod -R 0700 /root/libp2p-keys/
+chmod -R 0700 ~/libp2p-keys/
 
 # Restart in the background
 mina daemon \
   --peer-list-url "https://storage.googleapis.com/seed-lists/${NETWORK_NAME}_seeds.txt" \
-  --libp2p-keypair "/root/libp2p-keys/key" \
+  --libp2p-keypair "~/libp2p-keys/key" \
 & # -background
 
 # Attempt to connect to the GraphQL client every 10s for up to 8 minutes
