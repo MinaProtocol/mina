@@ -82,7 +82,7 @@ Serves merkle ledger information over a "sync ledger" protocol. The sync ledger 
 
 **Response**: `optional [block]`
 
-Returns a bulk bulk set of blocks associated with a provided set of state hashes. This is used by the catchup routine when it is downloading old blocks to re synchronize with the network over short distances of missing information. At the current moment, the maximum number of blocks that can be requested in a single batch is 20 (requesting more than 20 will result in no response).
+Returns a bulk set of blocks associated with a provided set of state hashes. This is used by the catchup routine when it is downloading old blocks to re synchronize with the network over short distances of missing information. At the current moment, the maximum number of blocks that can be requested in a single batch is 20 (requesting more than 20 will result in no response).
 
 ### get\_transition\_chain\_proof
 
