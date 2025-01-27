@@ -814,7 +814,7 @@ module Wrap : sig
       (** A layout of the raw data in a statement, which is needed for
           representing it inside the circuit. *)
       val spec :
-           'a Spec.impl
+           ('f, 'v) Spec.impl
         -> ('challenge1, 'challenge2, 'field1, 'field2) Lookup_parameters.t
         -> Opt.Flag.t Plonk_types.Features.t
         -> ( ( 'field1
@@ -1190,13 +1190,10 @@ module Step : sig
       val typ :
            ('b, 'c) Step_impl.Typ.t
         -> assert_16_bits:(Step_impl.Field.t -> unit)
-        -> ( ( Step_impl.Field.Constant.t Limb_vector.Challenge.t
-             , Step_impl.Field.Constant.t Limb_vector.Challenge.t
-               Scalar_challenge.t
+        -> ( ( Step_impl.Field.t
+             , Step_impl.Field.t Scalar_challenge.t
              , 'b
-             , ( Step_impl.Field.Constant.t Limb_vector.Challenge.t
-                 Scalar_challenge.t
-                 Bulletproof_challenge.t
+             , ( Step_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
                , Backend.Tock.Rounds.n )
                Vector.t
              , Step_impl.Field.t
@@ -1237,13 +1234,10 @@ module Step : sig
          assert_16_bits:(Wrap_impl.Field.t -> unit)
       -> (Opt.Flag.t Plonk_types.Features.t, 'n) Vector.t
       -> ('b, 'a) Wrap_impl.Typ.t
-      -> ( ( ( ( Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
-               , Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
-                 Scalar_challenge.t
+      -> ( ( ( ( Wrap_impl.Field.t
+               , Wrap_impl.Field.t Scalar_challenge.t
                , 'b
-               , ( Wrap_impl.Field.Constant.t Limb_vector.Challenge.t
-                   Scalar_challenge.t
-                   Bulletproof_challenge.t
+               , ( Wrap_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
                  , Backend.Tock.Rounds.n )
                  Vector.t
                , Wrap_impl.Field.t

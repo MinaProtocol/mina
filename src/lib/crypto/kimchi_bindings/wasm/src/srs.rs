@@ -125,11 +125,30 @@ macro_rules! impl_srs {
             }
 
             #[wasm_bindgen]
-            pub fn [<$name:snake _lagrange_commitments_whole_domain>](
+            pub fn [<$name:snake _lagrange_commitments_whole_domain_ptr>](
                 srs: &[<Wasm $field_name:camel Srs>],
                 domain_size: i32,
+            ) -> *mut WasmVector<$WasmPolyComm> {
+                // this is the best workaround we have, for now
+                // returns a pointer to the commitment
+                // later, we read the commitment from the pointer
+                let comm = srs
+                    .get_lagrange_basis_from_domain_size(domain_size as usize)
+                    .clone()
+                    .into_iter()
+                    .map(|x| x.into())
+                    .collect();
+                let boxed_comm = Box::<WasmVector<WasmPolyComm>>::new(comm);
+                Box::into_raw(boxed_comm)
+            }
+
+            #[wasm_bindgen]
+            pub fn [<$name:snake _lagrange_commitments_whole_domain_read_from_ptr>](
+                ptr: *mut WasmVector<$WasmPolyComm>,
             ) -> WasmVector<$WasmPolyComm> {
-                srs.get_lagrange_basis_from_domain_size(domain_size as usize).clone().into_iter().map(|x| x.into()).collect()
+                // read the commitment at the pointers address, hack for the web worker implementation (see o1js web worker impl for details)
+                let b = unsafe { Box::from_raw(ptr) };
+                b.as_ref().clone()
             }
 
             #[wasm_bindgen]
@@ -224,7 +243,6 @@ pub mod fp {
     use mina_curves::pasta::{Fp, Vesta as G};
 
     impl_srs!(caml_fp_srs, WasmPastaFp, WasmG, Fp, G, WasmPolyComm, Fp);
-
     #[wasm_bindgen]
     pub fn caml_fp_srs_create_parallel(depth: i32) -> WasmFpSrs {
         crate::rayon::run_in_pool(|| Arc::new(SRS::<G>::create_parallel(depth as usize)).into())

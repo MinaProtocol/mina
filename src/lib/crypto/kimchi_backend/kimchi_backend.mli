@@ -164,6 +164,7 @@ module Pasta : sig
 
     val field_size : Pasta_bindings.BigInt256.t
 
+    module Cvar = Kimchi_pasta.Pallas_based_plonk.Cvar
     module Verification_key = Kimchi_pasta.Pallas_based_plonk.Verification_key
 
     module R1CS_constraint_system =
@@ -197,6 +198,7 @@ module Pasta : sig
 
     val field_size : Pasta_bindings.BigInt256.t
 
+    module Cvar = Kimchi_pasta.Vesta_based_plonk.Cvar
     module Verification_key = Kimchi_pasta.Vesta_based_plonk.Verification_key
     module R1CS_constraint_system =
       Kimchi_pasta.Vesta_based_plonk.R1CS_constraint_system

@@ -103,7 +103,7 @@ val verify :
   -> sponge_after_index:Step_main_inputs.Sponge.t
   -> lookup_parameters:
        ( Limb_vector.Challenge.Constant.t
-       , Impl.field Limb_vector.Challenge.t
+       , Impl.Field.t
        , 'b
        , Impl.Field.t Pickles_types.Shifted_value.Type1.t )
        Composition_types.Wrap.Lookup_parameters.t
@@ -118,21 +118,20 @@ val verify :
   -> wrap_verification_key:
        Step_main_inputs.Inner_curve.t array
        Pickles_types.Plonk_verification_key_evals.t
-  -> ( Impl.field Limb_vector.Challenge.t
-     , Impl.field Limb_vector.Challenge.t Composition_types.Scalar_challenge.t
+  -> ( Impl.Field.t
+     , Impl.Field.t Composition_types.Scalar_challenge.t
      , Impl.Field.t Pickles_types.Shifted_value.Type1.t
      , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
        , Impl.Boolean.var )
        Pickles_types.Opt.t
-     , ( Impl.field Limb_vector.Challenge.t Composition_types.Scalar_challenge.t
-       , Impl.Field.t Snarky_backendless.Snark_intf.Boolean0.t )
+     , ( Impl.Field.t Composition_types.Scalar_challenge.t
+       , Impl.Field.t Snarky_backendless.Boolean.t )
        Pickles_types.Opt.t
      , Impl.Boolean.var
      , Impl.Field.t
      , Impl.Field.t
      , Impl.Field.t
-     , ( Impl.field Limb_vector.Challenge.t
-         Kimchi_backend_common.Scalar_challenge.t
+     , ( Impl.Field.t Kimchi_backend_common.Scalar_challenge.t
          Composition_types.Bulletproof_challenge.t
        , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
        Pickles_types.Vector.t
