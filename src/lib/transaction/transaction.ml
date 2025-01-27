@@ -26,18 +26,14 @@ module Poly = struct
 end
 
 module Valid = struct
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t = User_command.Valid.Stable.V2.t Poly.Stable.V2.t
-      [@@deriving sexp, compare, equal, hash, yojson]
+  module T = struct
+    type t = User_command.Valid.t Poly.t
+    [@@deriving sexp, compare, equal, hash, yojson]
+  end
 
-      let to_latest = Fn.id
-    end
-  end]
-
-  include Hashable.Make (Stable.Latest)
-  include Comparable.Make (Stable.Latest)
+  include T
+  include Hashable.Make (T)
+  include Comparable.Make (T)
 end
 
 [%%versioned
