@@ -949,6 +949,7 @@ module Zkapp_account_precondition = struct
     ; action_state_id : int option
     ; proved_state : bool option
     ; is_new : bool option
+    ; extra_bool : bool option
     }
   [@@deriving fields, hlist]
 
@@ -961,6 +962,7 @@ module Zkapp_account_precondition = struct
         ; option int
         ; int
         ; option int
+        ; option bool
         ; option bool
         ; option bool
         ]
@@ -1000,6 +1002,7 @@ module Zkapp_account_precondition = struct
     in
     let proved_state = Zkapp_basic.Or_ignore.to_option acct.proved_state in
     let is_new = Zkapp_basic.Or_ignore.to_option acct.is_new in
+    let extra_bool = Zkapp_basic.Or_ignore.to_option acct.extra_bool in
     let value =
       { balance_id
       ; nonce_id
@@ -1009,6 +1012,7 @@ module Zkapp_account_precondition = struct
       ; action_state_id
       ; proved_state
       ; is_new
+      ; extra_bool
       }
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+#set -e
 
 # go to root of mina repo
 cd $(dirname -- "${BASH_SOURCE[0]}")/../../../..
@@ -22,7 +22,7 @@ rec_cleanup(){
   do
     rec_cleanup $p
   done
-  kill $1
+  kill $1 || true
 }
 trap "rec_cleanup $PID" EXIT
 
@@ -32,7 +32,7 @@ while true; do
   # psql outputs "    " until there are blocks in the db, the +0 defaults that to 0
   BLOCKS="$(( $(psql -U postgres archive -t -c  "select MAX(global_slot_since_genesis) from blocks" 2> /dev/null) +0))"
   echo Generated $BLOCKS/25 blocks
-  if [ "$((BLOCKS+0))" -ge  4 ] ; then
+  if [ "$((BLOCKS+0))" -ge  2 ] ; then
     rec_cleanup $PID
     break
   fi
@@ -57,12 +57,14 @@ cp ~/.mina-network/mina-local-network-2-1-1/genesis_ledger.json _tmp1.json
 cat _tmp1.json | jq '.accounts' > _tmp2.json
 echo '{ "genesis_ledger": { "accounts": '$(cat _tmp2.json)' } }' | jq > _tmp3.json
 NEW_HASH=$(psql -U postgres archive -t -c  'SELECT state_hash from blocks where global_slot_since_genesis = (SELECT MAX(global_slot_since_genesis) from blocks)' | head -n1 | sed 's/^ *//')
-cat _tmp3.json | jq -c '.+{"target_epoch_ledgers_state_hash": "'$NEW_HASH'"}' > ./src/test/archive/sample_db/replayer_input_file.json
+cat _tmp3.json > ./src/test/archive/sample_db/replayer_input_file.json
 rm _tmp*.json
 
 # regenerate genesis_ledger
 cat src/test/archive/sample_db/genesis.json | jq ".ledger=$(cat ~/.mina-network/mina-local-network-2-1-1/genesis_ledger.json | jq -c)"  > _tmp.json
 mv _tmp.json src/test/archive/sample_db/genesis.json
+
+echo Finished regenerating running replayer
 
 sudo -u postgres dropdb archive
 psql -U postgres -c 'CREATE DATABASE archive'

@@ -2554,6 +2554,14 @@
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "extraBool",
+              "description": null,
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": [
@@ -2625,6 +2633,12 @@
             },
             {
               "name": "isNew",
+              "description": null,
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "defaultValue": null
+            },
+            {
+              "name": "extraBool",
               "description": null,
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
               "defaultValue": null
@@ -7469,6 +7483,14 @@
             },
             {
               "name": "isNew",
+              "description": null,
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "extraBool",
               "description": null,
               "args": [],
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },

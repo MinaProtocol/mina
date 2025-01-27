@@ -464,7 +464,7 @@ let%test_module "Account precondition tests" =
           | Some pk ->
               Or_ignore.Check pk
         in
-        let state, action_state, proved_state, is_new =
+        let state, action_state, proved_state, is_new , extra_bool =
           match zkapp with
           | None ->
               let len = Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n in
@@ -476,7 +476,8 @@ let%test_module "Account precondition tests" =
               let action_state = Or_ignore.Ignore in
               let proved_state = Or_ignore.Ignore in
               let is_new = Or_ignore.Ignore in
-              (state, action_state, proved_state, is_new)
+              let extra_bool = Or_ignore.Ignore in
+              (state, action_state, proved_state, is_new , extra_bool)
           | Some { app_state; action_state; proved_state; _ } ->
               let state =
                 Zkapp_state.V.map app_state ~f:(fun field ->
@@ -492,7 +493,8 @@ let%test_module "Account precondition tests" =
               let proved_state = Or_ignore.Check proved_state in
               (* the account is in the ledger *)
               let is_new = Or_ignore.Check false in
-              (state, action_state, proved_state, is_new)
+              let extra_bool = Or_ignore.Check false in
+              (state, action_state, proved_state, is_new , extra_bool)
         in
         { Zkapp_precondition.Account.balance
         ; nonce
@@ -502,6 +504,7 @@ let%test_module "Account precondition tests" =
         ; action_state
         ; proved_state
         ; is_new
+        ; extra_bool
         }
       in
       predicate_account
@@ -634,6 +637,7 @@ let%test_module "Account precondition tests" =
       ; action_state = Ignore
       ; proved_state = Ignore
       ; is_new = Check true
+      ; extra_bool = Check true
       }
 
     let add_account_precondition ~at precondition account_updates =

@@ -72,6 +72,7 @@ module Account = struct
           Snark_params.Tick.Field.t Mina_base_zkapp_basic.Or_ignore.V1.t
       ; proved_state : bool Mina_base_zkapp_basic.Or_ignore.V1.t
       ; is_new : bool Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; extra_bool : bool Mina_base_zkapp_basic.Or_ignore.V1.t
       }
   end
 end

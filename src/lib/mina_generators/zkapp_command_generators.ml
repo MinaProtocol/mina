@@ -150,6 +150,7 @@ let gen_account_precondition_from_account ?failure
           ; action_state
           ; proved_state
           ; is_new
+          ; extra_bool = Ignore
           }
       in
       match failure with

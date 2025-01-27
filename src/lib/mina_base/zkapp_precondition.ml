@@ -463,6 +463,7 @@ module Account = struct
         ; action_state : F.Stable.V1.t Eq_data.Stable.V1.t
         ; proved_state : bool Eq_data.Stable.V1.t
         ; is_new : bool Eq_data.Stable.V1.t
+        ; extra_bool : bool Eq_data.Stable.V1.t
         }
       [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
 
@@ -499,6 +500,7 @@ module Account = struct
     ; action_state
     ; proved_state
     ; is_new
+    ; extra_bool = Ignore
     }
 
   let accept : t =
@@ -511,6 +513,7 @@ module Account = struct
     ; action_state = Ignore
     ; proved_state = Ignore
     ; is_new = Ignore
+    ; extra_bool = Ignore
     }
 
   let is_accept : t -> bool = equal accept
@@ -542,6 +545,7 @@ module Account = struct
       ~action_state:!.(Or_ignore.deriver action_state)
       ~proved_state:!.(Or_ignore.deriver bool)
       ~is_new:!.(Or_ignore.deriver bool)
+      ~extra_bool:!.(Or_ignore.deriver bool)
     |> finish "AccountPrecondition" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
@@ -566,6 +570,7 @@ module Account = struct
        ; action_state
        ; proved_state
        ; is_new
+       ; extra_bool
        } :
         t ) =
     let open Random_oracle_input.Chunked in
@@ -579,6 +584,7 @@ module Account = struct
       ; Eq_data.(to_input (Lazy.force Tc.action_state)) action_state
       ; Eq_data.(to_input Tc.boolean) proved_state
       ; Eq_data.(to_input Tc.boolean) is_new
+      ; Eq_data.(to_input Tc.boolean) extra_bool
       ]
 
   let digest t =
@@ -596,6 +602,7 @@ module Account = struct
       ; action_state : Field.Var.t Eq_data.Checked.t
       ; proved_state : Boolean.var Eq_data.Checked.t
       ; is_new : Boolean.var Eq_data.Checked.t
+      ; extra_bool : Boolean.var Eq_data.Checked.t
       }
     [@@deriving hlist]
 
@@ -608,6 +615,7 @@ module Account = struct
          ; action_state
          ; proved_state
          ; is_new
+         ; extra_bool
          } :
           t ) =
       let open Random_oracle_input.Chunked in
@@ -621,6 +629,7 @@ module Account = struct
         ; Eq_data.(to_input_checked (Lazy.force Tc.action_state)) action_state
         ; Eq_data.(to_input_checked Tc.boolean) proved_state
         ; Eq_data.(to_input_checked Tc.boolean) is_new
+        ; Eq_data.(to_input_checked Tc.boolean) extra_bool
         ]
 
     open Impl
@@ -634,6 +643,7 @@ module Account = struct
         ; action_state
         ; proved_state
         ; is_new
+        ; extra_bool = _
         } (a : Account.Checked.Unhashed.t) =
       [ ( Transaction_status.Failure.Account_balance_precondition_unsatisfied
         , Numeric.(Checked.check Tc.balance balance a.balance) )
@@ -700,6 +710,7 @@ module Account = struct
           ~ignore:Zkapp_account.Actions.empty_state_element
       ; Or_ignore.typ Boolean.typ ~ignore:false
       ; Or_ignore.typ Boolean.typ ~ignore:false
+      ; Or_ignore.typ Boolean.typ ~ignore:false
       ]
       ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -713,6 +724,7 @@ module Account = struct
       ; action_state
       ; proved_state
       ; is_new
+      ; extra_bool = _
       } (a : Account.t) =
     [ ( Transaction_status.Failure.Account_balance_precondition_unsatisfied
       , Numeric.(check ~label:"balance" Tc.balance balance a.balance) )

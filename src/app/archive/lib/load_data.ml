@@ -479,6 +479,7 @@ let get_account_update_body ~pool body_id =
               ; action_state_id
               ; proved_state
               ; is_new
+              ; extra_bool
               }
                : Processor.Zkapp_account_precondition.t ) =
       query_db ~f:(fun db ->
@@ -572,6 +573,7 @@ let get_account_update_body ~pool body_id =
     in
     let proved_state = Or_ignore.of_option proved_state in
     let is_new = Or_ignore.of_option is_new in
+    let extra_bool = Or_ignore.of_option extra_bool in
     return
       ( { balance
         ; nonce
@@ -581,6 +583,7 @@ let get_account_update_body ~pool body_id =
         ; action_state
         ; proved_state
         ; is_new
+        ; extra_bool
         }
         : Zkapp_precondition.Account.t )
   in

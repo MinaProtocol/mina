@@ -136,7 +136,8 @@ let mk_zkapp_with_vesting_period n =
                 ],
                 "action_state": [ "Ignore" ],
                 "proved_state": [ "Ignore" ],
-                "is_new": [ "Ignore" ]
+                "is_new": [ "Ignore" ],
+                "extra_bool": [ "Ignore" ]
               },
               "valid_while": [ "Ignore" ]
             },
@@ -244,7 +245,8 @@ let mk_zkapp_with_vesting_period n =
                 ],
                 "action_state": [ "Ignore" ],
                 "proved_state": [ "Ignore" ],
-                "is_new": [ "Ignore" ]
+                "is_new": [ "Ignore" ],
+                "extra_bool": [ "Ignore" ]
               },
               "valid_while": [ "Ignore" ]
             },

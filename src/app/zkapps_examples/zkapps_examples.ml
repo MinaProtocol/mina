@@ -44,6 +44,7 @@ module Account_update_under_construction = struct
             ; action_state = Ignore
             ; proved_state = Ignore
             ; is_new = Ignore
+            ; extra_bool = Ignore
             }
         in
         let proved_state =
