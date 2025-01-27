@@ -193,7 +193,7 @@ module User_command_with_valid_signature = struct
 
   let command ({ data; _ } : t) = User_command.forget_check data
 
-  let hash ({ hash; _ } : t) = hash
+  let transaction_hash ({ hash; _ } : t) = hash
 
   let forget_check ({ data; hash } : t) =
     { With_hash.data = User_command.forget_check data; hash }
