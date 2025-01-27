@@ -49,6 +49,7 @@ compare_bench.add_argument("--red-threshold",help="defines how many percent curr
 
 upload_bench = subparsers.add_parser('upload')
 upload_bench.add_argument("--infile")
+upload_bench.add_argument("--benchmark", type=BenchmarkType, help="benchmark to upload")
 
 test_bench = subparsers.add_parser('test', help="Performs entire cycle of operations from run till upload")
 test_bench.add_argument("--benchmark", type=BenchmarkType, help="benchmark to test")
@@ -72,7 +73,7 @@ test_bench.add_argument("--max-num-updates", default=4 , type=int)
 test_bench.add_argument("--min-num-updates", default=2, type=int)
 
 
-upload_bench = subparsers.add_parser('ls')
+ls_bench = subparsers.add_parser('ls')
 
 args = parser.parse_args()
 
