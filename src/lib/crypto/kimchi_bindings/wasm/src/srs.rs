@@ -124,13 +124,13 @@ macro_rules! impl_srs {
                 Ok(Some(Arc::new(srs).into()))
             }
 
-            #[wasm_bindgen]
+/*             #[wasm_bindgen]
             pub fn [<$name:snake _lagrange_commitments_whole_domain>](
                 srs: &[<Wasm $field_name:camel Srs>],
                 domain_size: i32,
             ) -> WasmVector<$WasmPolyComm> {
                 srs.get_lagrange_basis_from_domain_size(domain_size as usize).clone().into_iter().map(|x| x.into()).collect()
-            }
+            } */
 
             #[wasm_bindgen]
             pub fn [<$name:snake _lagrange_commitment>](
@@ -218,12 +218,37 @@ macro_rules! impl_srs {
 //
 
 pub mod fp {
+    use std::ptr;
+
     use super::*;
     use crate::arkworks::{WasmGVesta as WasmG, WasmPastaFp};
     use crate::poly_comm::vesta::WasmFpPolyComm as WasmPolyComm;
     use mina_curves::pasta::{Fp, Vesta as G};
 
     impl_srs!(caml_fp_srs, WasmPastaFp, WasmG, Fp, G, WasmPolyComm, Fp);
+
+    #[wasm_bindgen]
+    pub fn caml_fp_srs_lagrange_commitments_whole_domain(
+        srs: &WasmFpSrs,
+        domain_size: i32,
+    ) -> *mut WasmVector<WasmPolyComm> {
+        let comm = srs
+            .get_lagrange_basis_from_domain_size(domain_size as usize)
+            .clone()
+            .into_iter()
+            .map(|x| x.into())
+            .collect();
+        let boxed_comm = Box::<WasmVector<WasmPolyComm>>::new(comm);
+        Box::into_raw(boxed_comm)
+    }
+
+    #[wasm_bindgen]
+    pub fn caml_fp_srs_lagrange_commitments_whole_domain_read_from_pointer(
+        pointer: *mut WasmVector<WasmPolyComm>,
+    ) -> WasmVector<WasmPolyComm> {
+        let b = unsafe { Box::from_raw(pointer) };
+        b.as_ref().clone()
+    }
 
     #[wasm_bindgen]
     pub fn caml_fp_srs_create_parallel(depth: i32) -> WasmFpSrs {
@@ -298,12 +323,38 @@ pub mod fp {
 }
 
 pub mod fq {
+    use std::ptr;
+
     use super::*;
     use crate::arkworks::{WasmGPallas as WasmG, WasmPastaFq};
     use crate::poly_comm::pallas::WasmFqPolyComm as WasmPolyComm;
     use mina_curves::pasta::{Fq, Pallas as G};
 
     impl_srs!(caml_fq_srs, WasmPastaFq, WasmG, Fq, G, WasmPolyComm, Fq);
+
+    #[wasm_bindgen]
+    pub fn caml_fq_srs_lagrange_commitments_whole_domain(
+        srs: &WasmFqSrs,
+        domain_size: i32,
+    ) -> *mut WasmVector<WasmPolyComm> {
+        let comm = srs
+            .get_lagrange_basis_from_domain_size(domain_size as usize)
+            .clone()
+            .into_iter()
+            .map(|x| x.into())
+            .collect();
+        /* ptr::addr_of!(comm) */
+        let boxed_comm = Box::<WasmVector<WasmPolyComm>>::new(comm);
+        Box::into_raw(boxed_comm)
+    }
+
+    #[wasm_bindgen]
+    pub fn caml_fq_srs_lagrange_commitments_whole_domain_read_from_pointer(
+        pointer: *mut WasmVector<WasmPolyComm>,
+    ) -> WasmVector<WasmPolyComm> {
+        let b = unsafe { Box::from_raw(pointer) };
+        b.as_ref().clone()
+    }
 
     #[wasm_bindgen]
     pub fn caml_fq_srs_create_parallel(depth: i32) -> WasmFqSrs {
