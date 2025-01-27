@@ -58,8 +58,7 @@ let
     }) package;
 in {
   kimchi_bindings_stubs = let
-    toolchain = rustChannelFromToolchainFileOf
-      ../rust-toolchain.toml;
+    toolchain = rustChannelFromToolchainFileOf ../rust-toolchain.toml;
     rust_platform = rustPlatformFor toolchain.rust;
   in rust_platform.buildRustPackage {
     pname = "kimchi_bindings_stubs";
@@ -74,20 +73,16 @@ in {
       # TODO do not include sources
       "^src(/lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?)?$"
     ];
-    cargoBuildFlags="-p wires_15_stubs";
+    cargoBuildFlags = "-p wires_15_stubs";
     nativeBuildInputs = [ final.ocamlPackages_mina.ocaml ];
     buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
     cargoLock = let fixupLockFile = path: builtins.readFile path;
-    in {
-      lockFileContents =
-        fixupLockFile ../Cargo.lock;
-    };
+    in { lockFileContents = fixupLockFile ../Cargo.lock; };
     # FIXME: tests fail
     doCheck = false;
   };
 
-  kimchi-rust = rustChannelFromToolchainFileOf
-    ../rust-toolchain.toml;
+  kimchi-rust = rustChannelFromToolchainFileOf ../rust-toolchain.toml;
 
   # TODO: raise issue on nixpkgs and remove workaround when fix is applied
   kimchi-rust-wasm = (final.kimchi-rust.rust.override {
@@ -136,13 +131,23 @@ in {
   in rustPlatform.buildRustPackage {
     pname = "plonk_wasm";
     version = "0.1.0";
-    src = final.lib.sourceByRegex ../src [
-      "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
-      "^lib(/crypto(/mina-rust-dependencies(/.*)?)?)?$"
-      "^lib(/crypto(/proof-systems(/.*)?)?)?$"
+    src = final.lib.sourceByRegex ../. [
+      "^Cargo\\.toml$"
+      "^Cargo\\.lock$"
+      "^src(/lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?)?$"
+      "^src(/lib(/crypto(/mina-rust-dependencies(/.*)?)?)?)?$"
+      "^src(/lib(/crypto(/proof-systems(/.*)?)?)?)?$"
+      "^\\.cargo(/config\\.toml)?$"
+      # TODO do not include sources
+      "^src(/lib(/crypto(/kimchi_bindings(/stubs(/.*)?)?)?)?)?$"
     ];
-    sourceRoot = "source/lib/crypto/kimchi_bindings/wasm";
-    nativeBuildInputs = [ final.wasm-pack wasm-bindgen-cli ];
+    cargoBuildFlags = "-p plonk_wasm";
+    nativeBuildInputs = [
+      final.wasm-pack
+      wasm-bindgen-cli
+      # for wasm-opt
+      final.binaryen
+    ];
     buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
     cargoLock.lockFile = lock;
     cargoLock.outputHashes = narHashesFromCargoLock lock;
@@ -157,8 +162,8 @@ in {
       (
       set -x
       export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features -C link-arg=--max-memory=4294967296"
-      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs ./. -- --features nodejs
-      wasm-pack build --mode no-install --target web --out-dir $out/web ./.
+      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs ./src/lib/crypto/kimchi_bindings/wasm -- --features nodejs
+      wasm-pack build --mode no-install --target web --out-dir $out/web ./src/lib/crypto/kimchi_bindings/wasm
       )
       runHook postBuild
     '';
