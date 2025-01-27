@@ -171,10 +171,9 @@ module Instance = struct
     let open Result.Let_syntax in
     let%bind () = assert_no_sync t in
     let lift_error r msg = Result.map_error r ~f:(Fn.const (`Failure msg)) in
-    let%bind root =
-      lift_error (Database.get_root t.db) "failed to get root hash"
+    let%bind root_hash =
+      lift_error (Database.get_root_hash t.db) "failed to get root hash"
     in
-    let root_hash = Root_data.Minimal.hash root in
     if State_hash.equal root_hash target_root.state_hash then
       (* If the target hash is already the root hash, no fast forward required, but we should check the frontier hash. *)
       Ok ()

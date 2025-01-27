@@ -4,6 +4,8 @@ let Optional/default = Prelude.Optional.default
 
 let Profiles = ./Profiles.dhall
 
+let Network = ./Network.dhall
+
 let BuildFlags = ./BuildFlags.dhall
 
 let S = ../Lib/SelectFiles.dhall
@@ -33,6 +35,7 @@ let lowerName =
 let dependsOnStep =
           \(prefix : Optional Text)
       ->  \(debVersion : DebVersion)
+      ->  \(network : Network.Type)
       ->  \(profile : Profiles.Type)
       ->  \(buildFlag : BuildFlags.Type)
       ->  \(step : Text)
@@ -40,47 +43,28 @@ let dependsOnStep =
 
           let prefix = Optional/default Text "MinaArtifact" prefix
 
+          let name =
+                "${prefix}${capitalName
+                              debVersion}${Network.capitalName
+                                             network}${profileSuffix}${BuildFlags.toSuffixUppercase
+                                                                         buildFlag}"
+
           in  merge
-                { Bookworm =
-                  [ { name =
-                        "${prefix}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                      buildFlag}"
-                    , key = "${step}-deb-pkg"
-                    }
-                  ]
-                , Bullseye =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      debVersion}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                                     buildFlag}"
-                    , key = "${step}-deb-pkg"
-                    }
-                  ]
-                , Jammy =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      debVersion}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                                     buildFlag}"
-                    , key = "${step}-deb-pkg"
-                    }
-                  ]
-                , Focal =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      debVersion}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                                     buildFlag}"
-                    , key = "${step}-deb-pkg"
-                    }
-                  ]
+                { Bookworm = [ { name = name, key = "${step}-deb-pkg" } ]
+                , Bullseye = [ { name = name, key = "${step}-deb-pkg" } ]
+                , Jammy = [ { name = name, key = "${step}-deb-pkg" } ]
+                , Focal = [ { name = name, key = "${step}-deb-pkg" } ]
                 }
                 debVersion
 
 let dependsOn =
           \(debVersion : DebVersion)
+      ->  \(network : Network.Type)
       ->  \(profile : Profiles.Type)
       ->  dependsOnStep
             (None Text)
             debVersion
+            network
             profile
             BuildFlags.Type.None
             "build"
@@ -94,15 +78,11 @@ let minimalDirtyWhen =
       , S.exactly "buildkite/src/Command/ReplayerTest" "dhall"
       , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact")
       , S.strictlyStart (S.contains "dockerfiles/stages")
-      , S.exactly "scripts/debian/build" "sh"
-      , S.exactly "scripts/debian/builder-helpers" "sh"
-      , S.exactly "scripts/docker/release" "sh"
-      , S.exactly "scripts/docker/build" "sh"
+      , S.strictlyStart (S.contains "scripts/debian")
+      , S.strictlyStart (S.contains "scripts/docker")
       , S.exactly "buildkite/scripts/build-artifact" "sh"
       , S.exactly "buildkite/scripts/build-hardfork-package" "sh"
       , S.exactly "buildkite/scripts/check-compatibility" "sh"
-      , S.exactly "buildkite/src/Jobs/Test/RunSnarkProfiler" "dhall"
-      , S.exactly "buildkite/scripts/bench/snark_transaction_profiler" "sh"
       , S.exactly "buildkite/scripts/version-linter" "sh"
       , S.exactly "scripts/version-linter" "py"
       ]
@@ -111,7 +91,7 @@ let bullseyeDirtyWhen =
         [ S.strictlyStart (S.contains "src")
         , S.strictlyStart (S.contains "automation")
         , S.strictly (S.contains "Makefile")
-        , S.exactly "buildkite/scripts/connect-to-berkeley" "sh"
+        , S.exactly "buildkite/scripts/connect-to-testnet" "sh"
         , S.exactly "buildkite/scripts/connect-to-mainnet-on-compatible" "sh"
         , S.exactly "buildkite/scripts/rosetta-integration-tests" "sh"
         , S.exactly "buildkite/scripts/rosetta-integration-tests-full" "sh"
