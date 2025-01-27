@@ -95,13 +95,6 @@ in {
     '';
   });
 
-  # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
-  kimchi-rust-std-deps = final.rustPlatform.importCargoLock {
-    lockFile = final.runCommand "cargo.lock" { } ''
-      cp ${final.kimchi-rust.rust-src}/lib/rustlib/src/rust/Cargo.lock $out
-    '';
-  };
-
   plonk_wasm = let
     lock = ../Cargo.lock;
 
@@ -152,17 +145,6 @@ in {
     # Without this env variable, wasm pack attempts to create cache dir in root
     # which leads to permissions issue
     WASM_PACK_CACHE = ".wasm-pack-cache";
-
-    # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
-    # Want to run after cargoSetupPostUnpackHook
-    prePatch = ''
-      chmod +w $NIX_BUILD_TOP/cargo-vendor-dir
-      for name in $(ls ${final.kimchi-rust-std-deps}); do
-        dest="$NIX_BUILD_TOP/cargo-vendor-dir/$name"
-        [ -e "$dest" ] || ln -s ${final.kimchi-rust-std-deps}/$name "$dest"
-      done
-      chmod -w $NIX_BUILD_TOP/cargo-vendor-dir
-    '';
 
     # adapted from cargoBuildHook
     buildPhase = ''
