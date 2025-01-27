@@ -1,8 +1,9 @@
 (library
  (name empty_hashes)
  (public_name empty_hashes)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version))
  (library_flags (-linkall))
- (libraries core_kernel immutable_array base)
-)
+ (libraries core_kernel immutable_array base))
