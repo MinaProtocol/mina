@@ -59,7 +59,7 @@ let
 in {
   kimchi_bindings_stubs = let
     toolchain = rustChannelFromToolchainFileOf
-      ../src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml;
+      ../rust-toolchain.toml;
     rust_platform = rustPlatformFor toolchain.rust;
   in rust_platform.buildRustPackage {
     pname = "kimchi_bindings_stubs";
@@ -74,14 +74,14 @@ in {
     cargoLock = let fixupLockFile = path: builtins.readFile path;
     in {
       lockFileContents =
-        fixupLockFile ../src/lib/crypto/kimchi_bindings/stubs/Cargo.lock;
+        fixupLockFile ../Cargo.lock;
     };
     # FIXME: tests fail
     doCheck = false;
   };
 
   kimchi-rust = rustChannelFromToolchainFileOf
-    ../src/lib/crypto/kimchi_bindings/wasm/rust-toolchain.toml;
+    ../rust-toolchain.toml;
 
   # TODO: raise issue on nixpkgs and remove workaround when fix is applied
   kimchi-rust-wasm = (final.kimchi-rust.rust.override {
@@ -103,7 +103,7 @@ in {
   };
 
   plonk_wasm = let
-    lock = ../src/lib/crypto/kimchi_bindings/wasm/Cargo.lock;
+    lock = ../Cargo.lock;
 
     deps = builtins.listToAttrs (map (pkg: {
       inherit (pkg) name;
