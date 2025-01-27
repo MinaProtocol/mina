@@ -3,25 +3,20 @@
 open Core
 open Async
 
-let counter = ref 0
-
 module Make (B : sig
   include Binable.S
 end) =
 struct
-  (** Root folder *)
-
-  type t = string
+  type t = string * int ref
 
   type id = { idx : int }
 
+  let failed_to_get_cache_folder_status ~logger ~(error_msg : string) ~path =
+    [%log error] "%s" error_msg ~metadata:[ ("path", `String path) ] ;
+    failwithf "%s (%s)" error_msg path ()
+
   let initialize path ~logger =
     let open Deferred.Let_syntax in
-    let failed_to_get_cache_folder_status ~logger ~(error_msg : string) ~path =
-      [%log error] "%s" error_msg ~metadata:[ ("path", `String path) ] ;
-      failwithf "%s (%s)" error_msg path ()
-    in
-
     match%bind Sys.is_directory path with
     | `Yes ->
         let%bind () = File_system.clear_dir path in
@@ -51,7 +46,7 @@ struct
         let str = In_channel.input_all chan in
         Binable.of_string (module B) str )
 
-  let put t x : id =
+  let put ((t, counter) : t) x : id =
     let new_counter = !counter in
     incr counter ;
     let res = { idx = new_counter } in
