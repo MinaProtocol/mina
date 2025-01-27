@@ -66,6 +66,7 @@ in {
     version = "0.1.0";
     src = final.lib.sourceByRegex ../src [
       "^lib(/crypto(/kimchi_bindings(/stubs(/.*)?)?)?)?$"
+      "^lib(/crypto(/mina-rust-dependencies(/.*)?)?)?$"
       "^lib(/crypto(/proof-systems(/.*)?)?)?$"
     ];
     sourceRoot = "source/lib/crypto/kimchi_bindings/stubs";
@@ -132,6 +133,7 @@ in {
     version = "0.1.0";
     src = final.lib.sourceByRegex ../src [
       "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
+      "^lib(/crypto(/mina-rust-dependencies(/.*)?)?)?$"
       "^lib(/crypto(/proof-systems(/.*)?)?)?$"
     ];
     sourceRoot = "source/lib/crypto/kimchi_bindings/wasm";
