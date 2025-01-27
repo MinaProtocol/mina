@@ -104,6 +104,7 @@
 (package (name mina_ledger))
 (package (name mina_lib))
 (package (name mina_lib_tests))
+(package (name mina_lmdb_storage))
 (package (name mina_metrics))
 (package (name mina_net2))
 (package (name mina_networking))
