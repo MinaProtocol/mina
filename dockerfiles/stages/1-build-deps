@@ -21,12 +21,8 @@ ARG GO_CAPNP_VERSION=v3.0.0-alpha.5
 
 # Rust Version passed into rustup-init, can also be "stable", "nightly" or similar
 # This should stay in line with:
-# - src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml
-# - src/lib/crypto/proof-systems/rust-toolchain.toml
+# - rust-toolchain.toml
 ARG RUST_VERSION=1.72
-# Nightly Rust Version used for WebAssembly builds
-# - src/lib/crypto/kimchi_bindings/wasm/rust-toolchain.toml
-ARG RUST_NIGHTLY=2023-09-01
 # wasm-pack version
 ARG WASM_PACK_VERSION=v0.12.1
 
@@ -106,7 +102,6 @@ RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
   https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init \
   && chmod +x /tmp/rustup-init \
   && /tmp/rustup-init -y --default-toolchain "${RUST_VERSION}" --profile minimal --component rust-src --target wasm32-unknown-unknown \
-  && $HOME/.cargo/bin/rustup toolchain install "nightly-${RUST_NIGHTLY}" --profile minimal --component rust-src --target wasm32-unknown-unknown --no-self-update \
   && rm /tmp/rustup-init
 USER root
 
