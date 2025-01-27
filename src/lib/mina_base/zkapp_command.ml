@@ -46,7 +46,57 @@ end
 module Call_forest = Zkapp_call_forest_base
 module Digest = Call_forest.Digest
 
-module T = struct
+module T : sig
+  type t =
+    (Account_update.t, Digest.Account_update.t, Digest.Forest.t) Call_forest.t
+    Poly.t
+  [@@deriving sexp, compare, equal, hash, yojson]
+
+  [%%versioned:
+  module Stable : sig
+    [@@@with_top_version_tag]
+
+    [@@@no_toplevel_latest_type]
+
+    (* DO NOT DELETE VERSIONS!
+       so we can always get transaction hashes from old transaction ids
+       the version linter should be checking this
+
+       IF YOU CREATE A NEW VERSION:
+       update Transaction_hash.hash_of_transaction_id to handle it
+       add hash_zkapp_command_vn for that version
+    *)
+
+    module V1 : sig
+      type t =
+        ( Account_update.Stable.V1.t
+        , Digest.Account_update.Stable.V1.t
+        , Digest.Forest.Stable.V1.t )
+        Call_forest.Stable.V1.t
+        Poly.Stable.V1.t
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      module Wire : sig
+        type t = (Account_update.t, unit, unit) Call_forest.t Poly.t
+        [@@deriving sexp, compare]
+
+        val gen : t Base_quickcheck.Generator.t
+
+        val shrinker : t Base_quickcheck.Shrinker.t
+
+        val of_graphql_repr : Graphql_repr.t -> t
+
+        val to_graphql_repr : t -> Graphql_repr.t
+      end
+
+      val of_wire : Wire.t -> t
+
+      val to_wire : t -> Wire.t
+
+      val version : int
+    end
+  end]
+end = struct
   [%%versioned_binable
   module Stable = struct
     [@@@with_top_version_tag]
