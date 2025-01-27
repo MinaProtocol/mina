@@ -14,11 +14,9 @@ let ConnectToNetwork = ../../Command/ConnectToNetwork.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
-let DebianVersions = ../../Constants/DebianVersions.dhall
+let Artifacts = ../../Constants/Artifacts.dhall
 
 let Network = ../../Constants/Network.dhall
-
-let Artifacts = ../../Constants/Artifacts.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
@@ -26,7 +24,7 @@ let dependsOn =
       Dockers.dependsOnStep
         Dockers.Type.Bullseye
         "MinaArtifactMainnet"
-        Network.Type.Devnet
+        Network.Type.Mainnet
         Profiles.Type.Standard
         Artifacts.Type.Daemon
 
@@ -35,24 +33,20 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
-          , S.exactly "buildkite/scripts/connect-to-testnet" "sh"
-          , S.exactly "buildkite/src/Jobs/Test/ConnectToDevnet" "dhall"
-          , S.exactly "buildkite/src/Command/ConnectToTestnet" "dhall"
+          , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
+          , S.exactly "buildkite/src/Jobs/Test/ConnectToMainnet" "dhall"
+          , S.exactly "buildkite/src/Command/ConnectToNetwork" "dhall"
           ]
         , path = "Test"
-        , name = "ConnectToDevnet"
-        , tags =
-          [ PipelineTag.Type.Long
-          , PipelineTag.Type.Test
-          , PipelineTag.Type.Stable
-          ]
+        , name = "ConnectToMainnet"
+        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
         }
       , steps =
         [ ConnectToNetwork.step
             dependsOn
             "${Network.lowerName Network.Type.Devnet}"
-            "devnet"
-            "devnet"
+            "mainnet"
+            "mainnet"
             "40s"
             "2m"
             (B/SoftFail.Boolean False)
