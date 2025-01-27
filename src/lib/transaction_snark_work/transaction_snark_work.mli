@@ -85,8 +85,6 @@ type unchecked = t
 module Checked : sig
   include S
 
-  module Stable : module type of Stable
-
   val create_unsafe : unchecked -> t
 
   val statement : t -> Statement.t

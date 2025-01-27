@@ -79,8 +79,8 @@ macro_rules! impl_srs {
             pub fn [<$name:snake _lagrange_commitments_whole_domain>](
                 srs: $name,
                 domain_size: ocaml::Int,
-            ) -> Result<Vec<CamlPolyComm<$CamlG>>, ocaml::Error> {
-                Ok(srs.get_lagrange_basis_from_domain_size(domain_size as usize).clone().into_iter().map(|x| x.into()).collect())
+            ) -> Vec<CamlPolyComm<$CamlG>> {
+                srs.get_lagrange_basis_from_domain_size(domain_size as usize).clone().into_iter().map(|x| x.into()).collect()
             }
 
 
