@@ -20,11 +20,12 @@ let Network = ../../Constants/Network.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
+let network = Network.Type.Mainnet
+
 let dependsOn =
-      Dockers.dependsOnStep
+      Dockers.dependsOn
         Dockers.Type.Bullseye
-        "MinaArtifactMainnet"
-        Network.Type.Mainnet
+        network
         Profiles.Type.Standard
         Artifacts.Type.Daemon
 
@@ -44,9 +45,8 @@ in  Pipeline.build
       , steps =
         [ ConnectToNetwork.step
             dependsOn
-            "${Network.lowerName Network.Type.Devnet}"
-            "mainnet"
-            "mainnet"
+            "${Network.lowerName network}"
+            "${Network.lowerName network}"
             "40s"
             "2m"
             (B/SoftFail.Boolean False)
