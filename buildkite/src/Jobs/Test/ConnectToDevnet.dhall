@@ -39,7 +39,11 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "ConnectToDevnet"
-        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test, PipelineTag.Type.Stable ]
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
         }
       , steps =
         [ ConnectToNetwork.step
