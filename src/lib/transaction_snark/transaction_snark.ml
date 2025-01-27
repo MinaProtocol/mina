@@ -4603,7 +4603,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                      } )
           }
       in
-      let ( `Zkapp_command { Zkapp_command.fee_payer; account_updates; memo }
+      let ( `Zkapp_command
+              { Zkapp_command.Poly.fee_payer; account_updates; memo }
           , `Sender_account_update sender_account_update
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment commitment
@@ -4711,7 +4712,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             create_trivial_snapp ()
       in
       let%bind.Async.Deferred vk = vk in
-      let ( `Zkapp_command { Zkapp_command.fee_payer; memo; _ }
+      let ( `Zkapp_command { Zkapp_command.Poly.fee_payer; memo; _ }
           , `Sender_account_update _
           , `Proof_zkapp_command _
           , `Txn_commitment _
@@ -4863,7 +4864,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             (prover, vk)
       in
       let%bind.Async.Deferred vk = vk in
-      let ( `Zkapp_command ({ Zkapp_command.fee_payer; memo; _ } as p)
+      let ( `Zkapp_command ({ Zkapp_command.Poly.fee_payer; memo; _ } as p)
           , `Sender_account_update sender_account_update
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment commitment
