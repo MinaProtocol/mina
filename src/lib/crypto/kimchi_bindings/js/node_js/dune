@@ -24,6 +24,10 @@
   (source_tree ../../../mina-rust-dependencies)
   (source_tree ../../../proof-systems)
   (source_tree ../../../../../.cargo)
+  ;; Required as we use Cargo workspace, and the build requires the Cargo.toml
+  ;; and sources for each members
+  ../../stubs/Cargo.toml
+  (source_tree ../../stubs/src)
   ../../wasm/Cargo.toml
   (source_tree ../../wasm/src))
  (locks /cargo-lock) ; lock for rustup
