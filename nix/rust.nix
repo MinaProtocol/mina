@@ -64,12 +64,17 @@ in {
   in rust_platform.buildRustPackage {
     pname = "kimchi_bindings_stubs";
     version = "0.1.0";
-    src = final.lib.sourceByRegex ../src [
-      "^lib(/crypto(/kimchi_bindings(/stubs(/.*)?)?)?)?$"
-      "^lib(/crypto(/mina-rust-dependencies(/.*)?)?)?$"
-      "^lib(/crypto(/proof-systems(/.*)?)?)?$"
+    src = final.lib.sourceByRegex ../. [
+      "^Cargo\\.toml$"
+      "^Cargo\\.lock$"
+      "^src(/lib(/crypto(/kimchi_bindings(/stubs(/.*)?)?)?)?)?$"
+      "^src(/lib(/crypto(/mina-rust-dependencies(/.*)?)?)?)?$"
+      "^src(/lib(/crypto(/proof-systems(/.*)?)?)?)?$"
+      "^\\.cargo(/config\\.toml)?$"
+      # TODO do not include sources
+      "^src(/lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?)?$"
     ];
-    sourceRoot = "source/lib/crypto/kimchi_bindings/stubs";
+    cargoBuildFlags="-p wires_15_stubs";
     nativeBuildInputs = [ final.ocamlPackages_mina.ocaml ];
     buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
     cargoLock = let fixupLockFile = path: builtins.readFile path;
