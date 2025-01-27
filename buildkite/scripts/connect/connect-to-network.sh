@@ -60,9 +60,8 @@ sleep $WAIT_AFTER_FINAL_CHECK
 mina client status
 if [ "$(mina advanced get-peers | wc -l)" -gt 0 ]; then
     echo "Found some peers"
+    exit 0
 else
     echo "No peers found"
     exit 1
 fi
-
-exit 1;
