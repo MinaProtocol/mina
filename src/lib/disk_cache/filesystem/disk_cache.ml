@@ -20,7 +20,7 @@ struct
     match%bind Sys.is_directory path with
     | `Yes ->
         let%bind () = File_system.clear_dir path in
-        Deferred.Result.return path
+        Deferred.Result.return (path, ref 0)
     | `No -> (
         match%bind Sys.is_file path with
         | `Yes ->
@@ -30,7 +30,7 @@ struct
               ~path
         | `No ->
             let%bind () = File_system.create_dir path in
-            Deferred.Result.return path
+            Deferred.Result.return (path, ref 0)
         | `Unknown ->
             failed_to_get_cache_folder_status ~logger
               ~error_msg:"Cannot evaluate existence of cache folder" ~path )
@@ -38,23 +38,23 @@ struct
         failed_to_get_cache_folder_status ~logger
           ~error_msg:"Cannot evaluate existence of cache folder" ~path
 
-  let path t i = t ^ Filename.dir_sep ^ Int.to_string i
+  let path root i = root ^ Filename.dir_sep ^ Int.to_string i
 
-  let get t (id : id) : B.t =
+  let get ((root, _counter) : t) (id : id) : B.t =
     (* Read from the file. *)
-    In_channel.with_file ~binary:true (path t id.idx) ~f:(fun chan ->
+    In_channel.with_file ~binary:true (path root id.idx) ~f:(fun chan ->
         let str = In_channel.input_all chan in
         Binable.of_string (module B) str )
 
-  let put ((t, counter) : t) x : id =
+  let put ((root, counter) : t) x : id =
     let new_counter = !counter in
     incr counter ;
     let res = { idx = new_counter } in
     (* When this reference is GC'd, delete the file. *)
     Core.Gc.Expert.add_finalizer_last_exn res (fun () ->
-        Core.Unix.unlink (path t new_counter) ) ;
+        Core.Unix.unlink (path root new_counter) ) ;
     (* Write the proof to the file. *)
-    Out_channel.with_file ~binary:true (path t new_counter) ~f:(fun chan ->
+    Out_channel.with_file ~binary:true (path root new_counter) ~f:(fun chan ->
         Out_channel.output_string chan @@ Binable.to_string (module B) x ) ;
     res
 end
