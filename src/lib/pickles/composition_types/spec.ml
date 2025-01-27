@@ -4,7 +4,10 @@ open Pickles_types
 open Hlist
 module Sc = Kimchi_backend_common.Scalar_challenge
 
-type 'f impl = (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+type ('f, 'v) impl =
+  (module Snarky_backendless.Snark_intf.Run
+     with type field = 'f
+      and type field_var = 'v )
 
 module type Branch_data_checked = sig
   type field_var
@@ -199,8 +202,9 @@ struct
   end
 end
 
-let pack_basic (type field other_field other_field_var branch_data_var)
-    ((module Impl) : field impl)
+let pack_basic
+    (type field field_var other_field other_field_var branch_data_var)
+    ((module Impl) : (field, field_var) impl)
     ((module Branch_data_checked) : (branch_data_var, Impl.Field.t) branch_data)
     =
   let open Impl in
@@ -235,7 +239,7 @@ let pack_basic (type field other_field other_field_var branch_data_var)
   in
   { pack }
 
-let pack (type f) ((module Impl) as impl : f impl) branch_data t =
+let pack (type f v) ((module Impl) as impl : (f, v) impl) branch_data t =
   let open Impl in
   pack
     (pack_basic impl branch_data)
@@ -381,10 +385,7 @@ struct
             let (Typ typ) = typ t is_boolean spec in
             let constant_var =
               let fields, aux = typ.value_to_fields x in
-              let fields =
-                Array.map fields ~f:(fun x ->
-                    Snarky_backendless.Cvar.Constant x )
-              in
+              let fields = Array.map ~f:Impl.Field.constant fields in
               typ.var_of_fields (fields, aux)
             in
             let open Impl.Typ in
@@ -477,10 +478,7 @@ struct
             let (T (Typ typ, f, f')) = etyp e is_boolean spec in
             let constant_var =
               let fields, aux = typ.value_to_fields x in
-              let fields =
-                Array.map fields ~f:(fun x ->
-                    Snarky_backendless.Cvar.Constant x )
-              in
+              let fields = Array.map ~f:Impl.Field.constant fields in
               typ.var_of_fields (fields, aux)
             in
             (* We skip any constraints that would be added here, but we *do* use

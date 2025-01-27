@@ -357,15 +357,15 @@ module For_tests = struct
         let { Keypair.public_key; _ } = Keypair.create () in
         let prover = Public_key.compress public_key in
         Some
-          Transaction_snark_work.Checked.
-            { fee = Fee.of_nanomina_int_exn 1
-            ; proofs =
-                One_or_two.map stmts ~f:(fun statement ->
-                    Ledger_proof.create ~statement
-                      ~sok_digest:Sok_message.Digest.default
-                      ~proof:(Lazy.force Proof.transaction_dummy) )
-            ; prover
-            }
+          (Transaction_snark_work.Checked.create_unsafe
+             { fee = Fee.of_nanomina_int_exn 1
+             ; proofs =
+                 One_or_two.map stmts ~f:(fun statement ->
+                     Ledger_proof.create ~statement
+                       ~sok_digest:Sok_message.Digest.default
+                       ~proof:(Lazy.force Proof.transaction_dummy) )
+             ; prover
+             } )
       in
       let current_state_view, state_and_body_hash =
         let prev_state =

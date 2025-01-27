@@ -654,6 +654,27 @@ module Sql = struct
                 AND bic.internal_command_id = cri.internal_command_id
                 AND bic.sequence_no = cri.sequence_no
                 AND bic.secondary_sequence_no = cri.secondary_sequence_no
+            INNER JOIN account_identifiers ai
+              ON ai.public_key_id = receiver_id
+            LEFT JOIN accounts_created ac
+              ON ac.account_identifier_id = ai.id
+              AND ac.block_id = bic.block_id
+              AND bic.sequence_no =
+                  (SELECT LEAST(
+                      (SELECT min(bic2.sequence_no)
+                      FROM blocks_internal_commands bic2
+                      INNER JOIN internal_commands ic2
+                          ON bic2.internal_command_id = ic2.id
+                      WHERE ic2.receiver_id = i.receiver_id
+                          AND bic2.block_id = bic.block_id
+                          AND bic2.status = 'applied'),
+                      (SELECT min(buc2.sequence_no)
+                        FROM blocks_user_commands buc2
+                        INNER JOIN user_commands uc2
+                          ON buc2.user_command_id = uc2.id
+                        WHERE uc2.receiver_id = i.receiver_id
+                          AND buc2.block_id = bic.block_id
+                          AND buc2.status = 'applied')))
             WHERE %{filters}
         |sql}]
     end

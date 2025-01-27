@@ -7,6 +7,7 @@ module Pallas_based_plonk : sig
 
   val field_size : Pasta_bindings.BigInt256.t
 
+  module Cvar = Pallas_based_plonk.Cvar
   module Verification_key = Pallas_based_plonk.Verification_key
   module R1CS_constraint_system = Pallas_based_plonk.R1CS_constraint_system
   module Constraint = R1CS_constraint_system.Constraint
@@ -26,6 +27,7 @@ module Vesta_based_plonk : sig
 
   val field_size : Pasta_bindings.BigInt256.t
 
+  module Cvar = Vesta_based_plonk.Cvar
   module Verification_key = Vesta_based_plonk.Verification_key
   module R1CS_constraint_system = Vesta_based_plonk.R1CS_constraint_system
   module Constraint = R1CS_constraint_system.Constraint

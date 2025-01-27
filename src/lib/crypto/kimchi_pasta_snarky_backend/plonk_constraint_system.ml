@@ -748,6 +748,7 @@ module type Snark_intf = sig
   include
     Snarky_backendless.Snark_intf.Run
       with type field := field
+       and type field_var = field Snarky_backendless.Cvar.t
        and type Constraint.t =
         (field Snarky_backendless.Cvar.t, field) Plonk_constraint.basic
 end
