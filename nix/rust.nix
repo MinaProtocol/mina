@@ -86,8 +86,6 @@ in {
   # TODO: raise issue on nixpkgs and remove workaround when fix is applied
   kimchi-rust-wasm = (final.kimchi-rust.rust.override {
     targets = [ "wasm32-unknown-unknown" ];
-    # rust-src is needed for -Zbuild-std
-    extensions = [ "rust-src" ];
   }).overrideAttrs (oa: {
     nativeBuildInputs = oa.nativeBuildInputs or [ ] ++ [ final.makeWrapper ];
     buildCommand = oa.buildCommand + ''
