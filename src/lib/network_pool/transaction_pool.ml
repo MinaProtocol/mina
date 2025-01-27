@@ -681,14 +681,16 @@ struct
               let cmd_hash =
                 With_status.data cmd
                 |> Transaction_hash.User_command_with_valid_signature.create
-                |> Transaction_hash.User_command_with_valid_signature.hash
+                |> Transaction_hash.User_command_with_valid_signature
+                   .transaction_hash
               in
               Set.add set cmd_hash )
         in
         Sequence.to_list dropped_commands
         |> List.partition_tf ~f:(fun cmd ->
                Set.mem command_hashes
-                 (Transaction_hash.User_command_with_valid_signature.hash cmd) )
+                 (Transaction_hash.User_command_with_valid_signature
+                  .transaction_hash cmd ) )
       in
       List.iter committed_commands ~f:(fun cmd ->
           vk_table_lift_hashed vk_table_dec cmd ;
@@ -1371,12 +1373,16 @@ struct
         in
         let dropped_for_add_hashes =
           List.map dropped_for_add
-            ~f:Transaction_hash.User_command_with_valid_signature.hash
+            ~f:
+              Transaction_hash.User_command_with_valid_signature
+              .transaction_hash
           |> Transaction_hash.Set.of_list
         in
         let dropped_for_size_hashes =
           List.map dropped_for_size
-            ~f:Transaction_hash.User_command_with_valid_signature.hash
+            ~f:
+              Transaction_hash.User_command_with_valid_signature
+              .transaction_hash
           |> Transaction_hash.Set.of_list
         in
         let all_dropped_cmd_hashes =
@@ -1414,8 +1420,8 @@ struct
                 if
                   not
                     (Set.mem all_dropped_cmd_hashes
-                       (Transaction_hash.User_command_with_valid_signature.hash
-                          cmd ) )
+                       (Transaction_hash.User_command_with_valid_signature
+                        .transaction_hash cmd ) )
                 then register_locally_generated t cmd
             | Error _ ->
                 () ) ;
@@ -1438,7 +1444,8 @@ struct
                 *)
                 if
                   Set.mem all_dropped_cmd_hashes
-                    (Transaction_hash.User_command_with_valid_signature.hash cmd)
+                    (Transaction_hash.User_command_with_valid_signature
+                     .transaction_hash cmd )
                 then `Trd cmd
                 else `Fst cmd
             | Error (cmd, error) ->
@@ -1572,7 +1579,8 @@ struct
                       ->
                let cmp = compare batch1 batch2 in
                let get_hash =
-                 Transaction_hash.User_command_with_valid_signature.hash
+                 Transaction_hash.User_command_with_valid_signature
+                 .transaction_hash
                in
                let get_nonce txn =
                  Transaction_hash.User_command_with_valid_signature.command txn

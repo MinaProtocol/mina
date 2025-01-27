@@ -63,7 +63,7 @@ module User_command_with_valid_signature : sig
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, to_yojson]
+  type t = Stable.Latest.t [@@deriving hash, sexp, compare, to_yojson]
 
   val create : User_command.Valid.t -> t
 
@@ -71,7 +71,7 @@ module User_command_with_valid_signature : sig
 
   val command : t -> User_command.t
 
-  val hash : t -> hash
+  val transaction_hash : t -> hash
 
   val forget_check : t -> (User_command.t, hash) With_hash.t
 
