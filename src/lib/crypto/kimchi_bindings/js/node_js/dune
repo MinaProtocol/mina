@@ -19,6 +19,7 @@
   flags.sexp)
  (deps
   build.sh
+  ../../../../../../rust-toolchain.toml
   ../../../../../../Cargo.toml
   ../../../../../../Cargo.lock
   (source_tree ../../../mina-rust-dependencies)

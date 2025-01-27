@@ -1,5 +1,0 @@
-[toolchain]
-# This should stay in line with the versions in
-# - kimchi_bindings/js/node_js/build.sh
-# - kimchi_bindings/js/web/build.sh
-channel = "1.72"
