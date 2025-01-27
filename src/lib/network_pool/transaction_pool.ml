@@ -828,12 +828,10 @@ struct
               ~time_controller ~slot_tx_end:config.Config.slot_tx_end
         ; locally_generated_uncommitted =
             Hashtbl.create
-              ( module Transaction_hash.User_command_with_valid_signature.Stable
-                       .Latest )
+              (module Transaction_hash.User_command_with_valid_signature)
         ; locally_generated_committed =
             Hashtbl.create
-              ( module Transaction_hash.User_command_with_valid_signature.Stable
-                       .Latest )
+              (module Transaction_hash.User_command_with_valid_signature)
         ; current_batch = 0
         ; remaining_in_batch = max_per_15_seconds
         ; config
