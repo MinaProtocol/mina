@@ -28,14 +28,8 @@ let
       # nice error message if the toolchain is missing
       placeholderPos = builtins.unsafeGetAttrPos "placeholder" toolchainHashes;
     in final.rustChannelOf rec {
-      channel = if hasPrefix "nightly-" toolchain.channel then
-        "nightly"
-      else
-        toolchain.channel;
-      date = if channel == "nightly" then
-        removePrefix "nightly-" toolchain.channel
-      else
-        null;
+      channel = toolchain.channel;
+      date = null;
       sha256 = toolchainHashes.${toolchain.channel} or (warn ''
         Please add the rust toolchain hash (see error message below) for "${toolchain.channel}" at ${placeholderPos.file}:${
           toString placeholderPos.line
