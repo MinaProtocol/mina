@@ -12,6 +12,7 @@ module Inputs = struct
     ; minimum_user_command_fee_string : string
     ; itn_features : bool
     ; compaction_interval_ms : int option
+    ; block_window_duration_ms : int
     ; vrf_poll_interval_ms : int
     ; network_id : string
     ; zkapp_cmd_limit : int option
@@ -30,6 +31,7 @@ type t =
   ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t
   ; itn_features : bool
   ; compaction_interval : Time.Span.t option
+  ; block_window_duration : Time.Span.t
   ; vrf_poll_interval : Time.Span.t
   ; network_id : string
   ; zkapp_cmd_limit : int option
@@ -52,6 +54,8 @@ let make (inputs : Inputs.t) =
       Option.map
         ~f:(fun x -> Float.of_int x |> Time.Span.of_ms)
         inputs.compaction_interval_ms
+  ; block_window_duration =
+      Float.of_int inputs.block_window_duration_ms |> Time.Span.of_ms
   ; vrf_poll_interval =
       Float.of_int inputs.vrf_poll_interval_ms |> Time.Span.of_ms
   ; rpc_handshake_timeout = Time.Span.of_sec inputs.rpc_handshake_timeout_sec
@@ -76,6 +80,7 @@ let to_yojson t =
       , Option.value_map ~default:`Null
           ~f:(fun x -> `Float (Time.Span.to_ms x))
           t.compaction_interval )
+    ; ("block_window_duration", `Float (Time.Span.to_ms t.block_window_duration))
     ; ("vrf_poll_interval", `Float (Time.Span.to_ms t.vrf_poll_interval))
     ; ( "rpc_handshake_timeout"
       , `Float (Time.Span.to_sec t.rpc_handshake_timeout) )
@@ -101,6 +106,7 @@ module Compiled = struct
       ; minimum_user_command_fee_string = Node_config.minimum_user_command_fee
       ; itn_features = Node_config.itn_features
       ; compaction_interval_ms = Node_config.compaction_interval
+      ; block_window_duration_ms = Node_config.block_window_duration
       ; vrf_poll_interval_ms = Node_config.vrf_poll_interval
       ; network_id = Node_config.network
       ; zkapp_cmd_limit = Node_config.zkapp_cmd_limit
@@ -126,6 +132,8 @@ module For_unit_tests = struct
           Node_config_for_unit_tests.minimum_user_command_fee
       ; itn_features = Node_config_for_unit_tests.itn_features
       ; compaction_interval_ms = Node_config_for_unit_tests.compaction_interval
+      ; block_window_duration_ms =
+          Node_config_for_unit_tests.block_window_duration
       ; vrf_poll_interval_ms = Node_config_for_unit_tests.vrf_poll_interval
       ; rpc_handshake_timeout_sec =
           Node_config_for_unit_tests.rpc_handshake_timeout_sec
