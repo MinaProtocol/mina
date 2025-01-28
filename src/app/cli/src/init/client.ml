@@ -1832,9 +1832,9 @@ let compile_time_constants =
              in
              Option.value ~default config_file
            in
-           Genesis_ledger_helper.Config_loader.init_from_config_file_legacy
-             ~genesis_constants ~constraint_constants ~logger:(Logger.null ())
-             ~proof_level ~cli_proof_level:None ~genesis_dir runtime_config
+           Genesis_ledger_helper.init_from_config_file ~genesis_constants
+             ~constraint_constants ~logger:(Logger.null ()) ~proof_level
+             ~cli_proof_level:None ~genesis_dir runtime_config
            >>| Or_error.ok_exn
          in
          let all_constants =

@@ -57,9 +57,8 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
     Runtime_config.Json_loader.load_config_files ~conf_dir ~logger config_files
   in
   match%bind.Deferred
-    Genesis_ledger_helper.Config_loader.init_from_config_file_legacy
-      ~cli_proof_level ~genesis_dir ~logger ~genesis_constants
-      ~constraint_constants ~proof_level config
+    Genesis_ledger_helper.init_from_config_file ~cli_proof_level ~genesis_dir
+      ~logger ~genesis_constants ~constraint_constants ~proof_level config
   with
   | Ok a ->
       return a

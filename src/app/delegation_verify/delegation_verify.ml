@@ -54,9 +54,8 @@ let instantiate_verify_functions ~logger ~genesis_constants
         let%bind.Deferred.Or_error config =
           Runtime_config.Json_loader.load_config_files ~logger [ config_file ]
         in
-        Genesis_ledger_helper.Config_loader.init_from_config_file_legacy ~logger
-          ~proof_level ~constraint_constants ~genesis_constants config
-          ~cli_proof_level
+        Genesis_ledger_helper.init_from_config_file ~logger ~proof_level
+          ~constraint_constants ~genesis_constants config ~cli_proof_level
       in
       let%map.Deferred precomputed_values =
         match precomputed_values with
