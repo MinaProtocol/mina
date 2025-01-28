@@ -1867,7 +1867,7 @@ let compile_time_constants =
          (* This is kind of ugly because we are allowing for supplying a runtime_config value directly, rather than force what is read from the environment *)
          (* TODO: See if we can initialize consensus_constants without also initializing the ledger *)
          let logger = Logger.null () in
-         let%bind m_conf =
+         let%bind runtime_config_opt =
            Runtime_config.Json_loader.load_config_files ~conf_dir ~logger
              config_files
            >>| Or_error.ok
@@ -1883,7 +1883,7 @@ let compile_time_constants =
              }
            |> Result.ok_or_failwith
          in
-         let runtime_config = Option.value ~default m_conf in
+         let runtime_config = Option.value ~default runtime_config_opt in
          let constants =
            Runtime_config.Constants.constants_of_config runtime_config
          in
