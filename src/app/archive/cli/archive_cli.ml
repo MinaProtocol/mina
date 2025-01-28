@@ -42,7 +42,7 @@ let command_run =
        let logger = Logger.create () in
        let open Deferred.Let_syntax in
        let%bind config =
-         Runtime_config.Json_loader.load_config_files
+         Runtime_config.Json_loader.load_config_files ~logger
            (Option.to_list runtime_config_file)
          |> Deferred.Or_error.ok_exn
        in

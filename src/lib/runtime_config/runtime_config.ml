@@ -1714,6 +1714,7 @@ module type Json_loader_intf = sig
   val load_config_files :
        ?conf_dir:string
     -> ?commit_id_short:string
+    -> logger:Logger.t
     -> string list
     -> t Deferred.Or_error.t
 end
@@ -1764,13 +1765,18 @@ module Json_loader : Json_loader_intf = struct
     List.filter_opt
       [ config_file_installed; config_file_configdir; config_file_envvar ]
 
-  let load_config_files ?conf_dir ?commit_id_short config_files =
+  let load_config_files ?conf_dir ?commit_id_short ~logger config_files =
     let open Deferred.Or_error.Let_syntax in
     let config_files = List.map ~f:(fun a -> (a, `Must_exist)) config_files in
     let config_files =
       get_magic_config_files ?conf_dir ?commit_id_short () @ config_files
     in
     let%map config_jsons =
+      let config_files_paths =
+        List.map config_files ~f:(fun (config_file, _) -> `String config_file)
+      in
+      [%log info] "Reading configuration files $config_files"
+        ~metadata:[ ("config_files", `List config_files_paths) ] ;
       Deferred.Or_error.List.filter_map config_files
         ~f:(fun (config_file, handle_missing) ->
           match%bind.Deferred load_config_file config_file with
@@ -1783,6 +1789,11 @@ module Json_loader : Json_loader_intf = struct
                     "The configuration file %s could not be read:\n%s"
                     config_file (Error.to_string_hum err)
               | `May_be_missing ->
+                  [%log warn] "Could not read configuration from $config_file"
+                    ~metadata:
+                      [ ("config_file", `String config_file)
+                      ; ("error", Error_json.error_to_yojson err)
+                      ] ;
                   return None ) )
     in
     List.fold ~init:default config_jsons
@@ -1791,8 +1802,14 @@ module Json_loader : Json_loader_intf = struct
         | Ok loaded_config ->
             combine config loaded_config
         | Error err ->
-            failwithf "Could not parse file %s configuration file: %s"
-              config_file err () )
+            [%log fatal]
+              "Could not parse configuration from $config_file: $error"
+              ~metadata:
+                [ ("config_file", `String config_file)
+                ; ("config_json", config_json)
+                ; ("error", `String err)
+                ] ;
+            failwithf "Could not parse configuration file: %s" err () )
 end
 
 module type Constants_intf = sig
@@ -1803,6 +1820,7 @@ module type Constants_intf = sig
     -> ?commit_id_short:string
     -> ?itn_features:bool
     -> ?cli_proof_level:Genesis_constants.Proof_level.t
+    -> logger:Logger.t
     -> string list
     -> constants Deferred.t
 
@@ -2010,13 +2028,13 @@ module Constants : Constants_intf = struct
 
   (* Use this function if you don't need/want the ledger configuration *)
   let load_constants ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
-      config_files =
-    (* do not log reading compile time constants as this impacs cli command output *)
+      ~logger config_files =
     Deferred.Or_error.ok_exn
     @@
     let open Deferred.Or_error.Let_syntax in
     let%map runtime_config =
-      Json_loader.load_config_files ?conf_dir ?commit_id_short config_files
+      Json_loader.load_config_files ?conf_dir ?commit_id_short ~logger
+        config_files
     in
     load_constants' ?itn_features ?cli_proof_level runtime_config
 

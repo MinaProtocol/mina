@@ -43,8 +43,8 @@ let or_error_str ~f_ok ~error = function
   | Error e ->
       sprintf "%s\n%s\n" error (Error.to_string_hum e)
 
-let load_compile_config config_files =
-  let%map conf = Runtime_config.Constants.load_constants config_files in
+let load_compile_config ?(logger = Logger.null ()) config_files =
+  let%map conf = Runtime_config.Constants.load_constants ~logger config_files in
   Runtime_config.Constants.compile_config conf
 
 let stop_daemon =
@@ -865,7 +865,10 @@ let hash_ledger =
      fun () ->
        let open Deferred.Let_syntax in
        let%bind constraint_constants =
-         let%map conf = Runtime_config.Constants.load_constants config_files in
+         let logger = Logger.create () in
+         let%map conf =
+           Runtime_config.Constants.load_constants ~logger config_files
+         in
          Runtime_config.Constants.constraint_constants conf
        in
        let process_accounts accounts =
@@ -973,7 +976,10 @@ let constraint_system_digests =
      fun () ->
        let open Deferred.Let_syntax in
        let%bind constraint_constants, proof_level =
-         let%map conf = Runtime_config.Constants.load_constants config_files in
+         let logger = Logger.create () in
+         let%map conf =
+           Runtime_config.Constants.load_constants ~logger config_files
+         in
          Runtime_config.Constants.(constraint_constants conf, proof_level conf)
        in
        let all =
@@ -1864,9 +1870,10 @@ let compile_time_constants =
        let%map ({ consensus_constants; _ } as precomputed_values), _ =
          (* This is kind of ugly because we are allowing for supplying a runtime_config value directly, rather than force what is read from the environment *)
          (* TODO: See if we can initialize consensus_constants without also initializing the ledger *)
-         let logger = Logger.null () in
+         let logger = Logger.create () in
          let%bind m_conf =
-           Runtime_config.Json_loader.load_config_files ~conf_dir config_files
+           Runtime_config.Json_loader.load_config_files ~conf_dir ~logger
+             config_files
            >>| Or_error.ok
          in
          let default =
@@ -2387,7 +2394,10 @@ let test_ledger_application =
      @@ fun () ->
      let open Deferred.Let_syntax in
      let%bind genesis_constants, constraint_constants =
-       let%map conf = Runtime_config.Constants.load_constants config_files in
+       let logger = Logger.create () in
+       let%map conf =
+         Runtime_config.Constants.load_constants ~logger config_files
+       in
        Runtime_config.Constants.
          (genesis_constants conf, constraint_constants conf)
      in
@@ -2432,7 +2442,10 @@ let itn_create_accounts =
          ->
         let open Deferred.Let_syntax in
         let%bind genesis_constants, constraint_constants, compile_config =
-          let%map conf = Runtime_config.Constants.load_constants config_files in
+          let logger = Logger.create () in
+          let%map conf =
+            Runtime_config.Constants.load_constants ~logger config_files
+          in
           Runtime_config.Constants.
             ( genesis_constants conf
             , constraint_constants conf

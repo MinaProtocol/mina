@@ -647,12 +647,13 @@ let api_tests =
 let () =
   Async.Thread_safe.block_on_async_exn
   @@ fun () ->
+  let logger = Logger.null () in
   let range_checks =
     List.map ~f:QCheck_alcotest.to_alcotest [ RangeCircuits.test_range_gates ]
   in
   let%map.Async.Deferred constraint_constants =
     let%map.Async.Deferred config =
-      Runtime_config.Constants.load_constants []
+      Runtime_config.Constants.load_constants ~logger []
     in
     Runtime_config.Constants.constraint_constants config
   in

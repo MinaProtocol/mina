@@ -107,8 +107,10 @@ let command =
        let open Async in
        let open Deferred.Let_syntax in
        let%bind constraint_constants, proof_level =
+         let logger = Logger.null () in
          let%map conf =
-           Runtime_config.Constants.load_constants ~cli_proof_level config_file
+           Runtime_config.Constants.load_constants ~cli_proof_level ~logger
+             config_file
          in
          Runtime_config.Constants.(constraint_constants conf, proof_level conf)
        in
