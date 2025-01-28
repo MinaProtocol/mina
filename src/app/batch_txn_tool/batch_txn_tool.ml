@@ -387,7 +387,7 @@ let output_there_and_back_cmds =
             transactions, if this is not present then we use the env var \
             MINA_PRIVKEY_PASS"
          (optional string)
-     and config_file = Cli_lib.Flag.config_files
+     and config_files = Cli_lib.Flag.config_files
      and graphql_target_node_option =
        flag "--graphql-target-node" ~aliases:[ "graphql-target-node" ]
          ~doc:
@@ -401,7 +401,7 @@ let output_there_and_back_cmds =
        let%bind minimum_user_command_fee =
          let%map conf =
            Runtime_config.Constants.load_constants_with_logging ~logger
-             config_file
+             config_files
          in
          Option.value
            ~default:

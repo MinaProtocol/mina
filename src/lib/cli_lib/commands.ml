@@ -230,13 +230,13 @@ module Vrf = struct
         flag "--total-stake"
           ~doc:"AMOUNT The total balance of all accounts in the epoch ledger"
           (optional int)
-      and config_file = Flag.config_files in
+      and config_files = Flag.config_files in
       Exceptions.handle_nicely
       @@ fun () ->
       let env = Secrets.Keypair.env in
       let open Deferred.Let_syntax in
       let%bind constraint_constants =
-        let%map conf = Runtime_config.Constants.load_constants config_file in
+        let%map conf = Runtime_config.Constants.load_constants config_files in
         Runtime_config.Constants.constraint_constants conf
       in
       if Option.is_some (Sys.getenv env) then
@@ -299,7 +299,7 @@ module Vrf = struct
          stdin"
       (let open Command.Let_syntax in
       let%map_open privkey_path = Flag.privkey_read_path
-      and config_file = Flag.config_files in
+      and config_files = Flag.config_files in
       Exceptions.handle_nicely
       @@ fun () ->
       let env = Secrets.Keypair.env in
@@ -307,7 +307,7 @@ module Vrf = struct
         eprintf "Using password from environment variable %s\n" env ;
       let open Deferred.Let_syntax in
       let%bind constraint_constants =
-        let%map conf = Runtime_config.Constants.load_constants config_file in
+        let%map conf = Runtime_config.Constants.load_constants config_files in
         Runtime_config.Constants.constraint_constants conf
       in
       let%bind () =

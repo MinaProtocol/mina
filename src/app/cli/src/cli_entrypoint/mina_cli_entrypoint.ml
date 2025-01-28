@@ -1593,14 +1593,14 @@ let internal_commands ~itn_features logger =
         let%map_open filename =
           flag "--file" (required string)
             ~doc:"File containing the s-expression of the snark work to execute"
-        and config_file = Cli_lib.Flag.config_files in
+        and config_files = Cli_lib.Flag.config_files in
 
         fun () ->
           let open Deferred.Let_syntax in
           let%bind constraint_constants, proof_level, compile_config =
             let%map conf =
               Runtime_config.Constants.load_constants_with_logging ~logger
-                config_file
+                config_files
             in
             Runtime_config.Constants.
               (constraint_constants conf, proof_level conf, compile_config conf)
@@ -1652,13 +1652,13 @@ let internal_commands ~itn_features logger =
         and limit =
           flag "--limit" ~aliases:[ "-limit" ] (optional int)
             ~doc:"limit the number of proofs taken from the file"
-        and config_file = Cli_lib.Flag.config_files in
+        and config_files = Cli_lib.Flag.config_files in
         fun () ->
           let open Async in
           let%bind constraint_constants, proof_level, compile_config =
             let%map conf =
               Runtime_config.Constants.load_constants_with_logging ~logger
-                config_file
+                config_files
             in
             Runtime_config.Constants.
               (constraint_constants conf, proof_level conf, compile_config conf)

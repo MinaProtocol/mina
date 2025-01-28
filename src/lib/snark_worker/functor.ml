@@ -354,7 +354,7 @@ module Make (Inputs : Intf.Inputs_intf) :
           (optional bool)
           ~doc:
             "true|false Shutdown when disconnected from daemon (default:true)"
-      and config_file = Cli_lib.Flag.config_files
+      and config_files = Cli_lib.Flag.config_files
       and conf_dir = Cli_lib.Flag.conf_dir in
       fun () ->
         let logger =
@@ -363,7 +363,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         let%bind.Deferred constraint_constants, proof_level, compile_config =
           let%map.Deferred config =
             Runtime_config.Constants.load_constants_with_logging ~logger
-              ?conf_dir ?cli_proof_level config_file
+              ?conf_dir ?cli_proof_level config_files
           in
           Runtime_config.Constants.
             ( constraint_constants config

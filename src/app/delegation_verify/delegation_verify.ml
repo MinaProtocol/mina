@@ -13,8 +13,6 @@ let get_filenames =
 let verify_snark_work ~verify_transaction_snarks ~proof ~message =
   verify_transaction_snarks [ (proof, message) ]
 
-let config_flag = Cli_lib.Flag.config_files
-
 let keyspace_flag =
   let open Command.Param in
   flag "--keyspace" ~doc:"Name of the Cassandra keyspace" (required string)
@@ -127,10 +125,10 @@ let filesystem_command ~logger =
       let%map_open block_dir = block_dir_flag
       and inputs = anon (sequence ("filename" %: Filename.arg_type))
       and no_checks = no_checks_flag
-      and config_file = config_flag in
+      and config_files = Cli_lib.Flag.config_files in
       fun () ->
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger config_file
+          instantiate_verify_functions ~logger config_files
         in
 
         let submission_paths = get_filenames inputs in
@@ -156,14 +154,14 @@ let cassandra_command ~logger =
     Command.Let_syntax.(
       let%map_open cqlsh = cassandra_executable_flag
       and no_checks = no_checks_flag
-      and config_file = config_flag
+      and config_files = Cli_lib.Flag.config_files
       and keyspace = keyspace_flag
       and period_start = timestamp
       and period_end = timestamp in
       fun () ->
         let open Deferred.Let_syntax in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger config_file
+          instantiate_verify_functions ~logger config_files
         in
         let module V = Make_verifier (struct
           include Submission.Cassandra
@@ -190,11 +188,12 @@ let stdin_command ~logger =
   Command.async
     ~summary:"Verify submissions and blocks read from standard input"
     Command.Let_syntax.(
-      let%map_open config_file = config_flag and no_checks = no_checks_flag in
+      let%map_open config_files = Cli_lib.Flag.config_files
+      and no_checks = no_checks_flag in
       fun () ->
         let open Deferred.Let_syntax in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger config_file
+          instantiate_verify_functions ~logger config_files
         in
         let module V = Make_verifier (struct
           include Submission.Stdin
