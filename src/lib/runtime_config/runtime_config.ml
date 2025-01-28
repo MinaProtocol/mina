@@ -1088,19 +1088,6 @@ module Proof_keys = struct
     ; fork
     }
 
-  let default =
-    { level = None
-    ; sub_windows_per_window = None
-    ; ledger_depth = None
-    ; work_delay = None
-    ; block_window_duration_ms = None
-    ; transaction_capacity = None
-    ; coinbase_amount = None
-    ; supercharged_coinbase_factor = None
-    ; account_creation_fee = None
-    ; fork = None
-    }
-
   let to_json_layout
       { level
       ; sub_windows_per_window

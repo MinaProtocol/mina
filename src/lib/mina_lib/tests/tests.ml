@@ -48,6 +48,11 @@ let%test_module "Epoch ledger sync tests" =
 
     let dir_prefix = "sync_test_data"
 
+    let genesis_constants = Genesis_constants.For_unit_tests.t
+
+    let constraint_constants =
+      Genesis_constants.For_unit_tests.Constraint_constants.t
+
     let make_dirname s =
       let open Core in
       let uuid = Uuid_unix.create () |> Uuid.to_string in
@@ -58,9 +63,7 @@ let%test_module "Epoch ledger sync tests" =
         let runtime_config : Runtime_config.t =
           { daemon = None
           ; genesis = None
-          ; proof =
-              Some
-                { Runtime_config.Proof_keys.default with level = Some No_check }
+          ; proof = None
           ; ledger =
               Some
                 { base = Named "test"
@@ -75,11 +78,10 @@ let%test_module "Epoch ledger sync tests" =
           }
         in
         match%map
-          Genesis_ledger_helper.Config_loader.init_from_config_file
+          Genesis_ledger_helper.Config_loader.init_from_config_file_legacy
             ~genesis_dir:(make_dirname "genesis_dir")
-            ~constants:
-              (Runtime_config.Constants.magic_for_unit_tests runtime_config)
-            ~logger runtime_config
+            ~constraint_constants ~genesis_constants ~logger
+            ~proof_level:No_check runtime_config ~cli_proof_level:None
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
