@@ -49,7 +49,7 @@ let plugin_flag =
          times"
   else Command.Param.return []
 
-let setup_daemon logger ~itn_features =
+let setup_daemon logger ~itn_features ~default_snark_worker_fee =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
   let receiver_key_warning = Cli_lib.Default.receiver_key_warning in
@@ -216,8 +216,10 @@ let setup_daemon logger ~itn_features =
   and snark_work_fee =
     flag "--snark-worker-fee" ~aliases:[ "snark-worker-fee" ]
       ~doc:
-        "FEE Amount a worker wants to get compensated for generating a snark \
-         proof"
+        (sprintf
+           "FEE Amount a worker wants to get compensated for generating a \
+            snark proof (default: %d)"
+           (Currency.Fee.to_nanomina_int default_snark_worker_fee) )
       (optional txn_fee)
   and work_reassignment_wait =
     flag "--work-reassignment-wait"
@@ -1336,7 +1338,8 @@ let daemon logger =
   let compile_config = Mina_compile_config.Compiled.t in
   Command.async ~summary:"Mina daemon"
     (Command.Param.map
-       (setup_daemon logger ~itn_features:compile_config.itn_features)
+       (setup_daemon logger ~itn_features:compile_config.itn_features
+          ~default_snark_worker_fee:compile_config.default_snark_worker_fee )
        ~f:(fun setup_daemon () ->
          (* Immediately disable updating the time offset. *)
          Block_time.Controller.disable_setting_offset () ;
@@ -1359,7 +1362,8 @@ let replay_blocks logger =
   let compile_config = Mina_compile_config.Compiled.t in
   Command.async ~summary:"Start mina daemon with blocks replayed from a file"
     (Command.Param.map3 replay_flag read_kind
-       (setup_daemon logger ~itn_features:compile_config.itn_features)
+       (setup_daemon logger ~itn_features:compile_config.itn_features
+          ~default_snark_worker_fee:compile_config.default_snark_worker_fee )
        ~f:(fun blocks_filename read_kind setup_daemon () ->
          (* Enable updating the time offset. *)
          Block_time.Controller.enable_setting_offset () ;
