@@ -210,10 +210,7 @@ let%test_module "Epoch ledger sync tests" =
           ~consensus_constants ~time_controller ~logger
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r ~on_remote_push
           ~log_gossip_heard:false
-          ~block_window_duration:
-            ( Float.of_int
-                precomputed_values.constraint_constants.block_window_duration_ms
-            |> Time.Span.of_ms )
+          ~block_window_duration:compile_config.block_window_duration
       in
       let snark_remote_sink, snark_pool =
         let config =
@@ -226,11 +223,7 @@ let%test_module "Epoch ledger sync tests" =
             ~consensus_constants ~time_controller ~logger
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r ~on_remote_push
             ~log_gossip_heard:false
-            ~block_window_duration:
-              ( Float.of_int
-                  precomputed_values.constraint_constants
-                    .block_window_duration_ms
-              |> Time.Span.of_ms )
+            ~block_window_duration:compile_config.block_window_duration
         in
         (snark_remote_sink, snark_pool)
       in

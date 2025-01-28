@@ -101,10 +101,7 @@ let%test_module "transaction_status" =
     let pool_max_size = precomputed_values.genesis_constants.txpool_max_size
 
     let block_window_duration =
-      Float.of_int
-        Genesis_constants.For_unit_tests.Constraint_constants.t
-          .block_window_duration_ms
-      |> Time.Span.of_ms
+      Mina_compile_config.For_unit_tests.t.block_window_duration
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->

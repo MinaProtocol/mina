@@ -1961,7 +1961,10 @@ module Constants : Constants_intf = struct
     in
     let compile_config =
       { a.compile_config with
-        network_id =
+        block_window_duration =
+          constraint_constants.block_window_duration_ms |> Float.of_int
+          |> Time.Span.of_ms
+      ; network_id =
           Option.value ~default:a.compile_config.network_id
             Option.(b.daemon >>= fun d -> d.network_id)
       ; sync_ledger_max_subtree_depth =

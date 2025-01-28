@@ -1639,11 +1639,7 @@ let create ~commit_id ?wallets (config : Config.t) =
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let compile_config = config.precomputed_values.compile_config in
-  let block_window_duration =
-    Float.of_int
-      config.precomputed_values.constraint_constants.block_window_duration_ms
-    |> Time.Span.of_ms
-  in
+  let block_window_duration = config.compile_config.block_window_duration in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
