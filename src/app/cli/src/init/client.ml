@@ -925,28 +925,22 @@ let currency_in_ledger =
              ignore (exit 1 : 'a Deferred.t) )
 
 let constraint_system_digests =
-  let open Command.Let_syntax in
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
-    (let%map_open config_file = Cli_lib.Flag.config_files in
-     fun () ->
-       let open Deferred.Let_syntax in
-       let%bind constraint_constants, proof_level =
-         let logger = Logger.create () in
-         let%map conf =
-           Runtime_config.Constants.load_constants ~logger config_file
+    (Command.Param.return (fun () ->
+         let constraint_constants =
+           Genesis_constants.Compiled.constraint_constants
          in
-         Runtime_config.Constants.(constraint_constants conf, proof_level conf)
-       in
-       let all =
-         Transaction_snark.constraint_system_digests ~constraint_constants ()
-         @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
-             ~proof_level ~constraint_constants ()
-       in
-       let all =
-         List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
-       in
-       List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
-       Deferred.unit )
+         let proof_level = Genesis_constants.Compiled.proof_level in
+         let all =
+           Transaction_snark.constraint_system_digests ~constraint_constants ()
+           @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
+               ~proof_level ~constraint_constants ()
+         in
+         let all =
+           List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
+         in
+         List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
+         Deferred.unit ) )
 
 let snark_job_list =
   let open Deferred.Let_syntax in
