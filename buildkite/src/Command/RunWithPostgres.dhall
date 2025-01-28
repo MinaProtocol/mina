@@ -4,11 +4,11 @@ let P = Prelude
 
 let Text/concatMap = P.Text.concatMap
 
+let Cmd = ../Lib/Cmds.dhall
+
 let Optional/map = Prelude.Optional.map
 
 let Optional/default = Prelude.Optional.default
-
-let Cmd = ../Lib/Cmds.dhall
 
 let ContainerImages = ../Constants/ContainerImages.dhall
 
