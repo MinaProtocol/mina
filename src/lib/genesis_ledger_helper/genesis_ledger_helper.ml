@@ -848,8 +848,8 @@ module Config_loader : Config_loader_intf = struct
       Option.value ~default:(conf_dir ^/ "genesis") genesis_dir
     in
     let%bind.Deferred constants =
-      Runtime_config.Constants.load_constants_with_logging ?conf_dir
-        ?cli_proof_level ~logger ~itn_features config_files
+      Runtime_config.Constants.load_constants ?conf_dir ?cli_proof_level
+        ~itn_features ~logger config_files
     in
     let%bind config =
       Runtime_config.Json_loader.load_config_files ?conf_dir ~logger

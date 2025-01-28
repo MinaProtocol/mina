@@ -650,9 +650,10 @@ let () =
   let range_checks =
     List.map ~f:QCheck_alcotest.to_alcotest [ RangeCircuits.test_range_gates ]
   in
+  let logger = Logger.create () in
   let%map.Async.Deferred constraint_constants =
     let%map.Async.Deferred config =
-      Runtime_config.Constants.load_constants []
+      Runtime_config.Constants.load_constants ~logger []
     in
     Runtime_config.Constants.constraint_constants config
   in

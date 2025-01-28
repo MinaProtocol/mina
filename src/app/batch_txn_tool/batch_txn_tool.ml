@@ -400,8 +400,7 @@ let output_there_and_back_cmds =
        let logger = Logger.create () in
        let%bind minimum_user_command_fee =
          let%map conf =
-           Runtime_config.Constants.load_constants_with_logging ~logger
-             config_file
+           Runtime_config.Constants.load_constants ~logger config_file
          in
          Option.value
            ~default:
