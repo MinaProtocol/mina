@@ -815,16 +815,10 @@ let hash_ledger =
          flag "--ledger-file"
            ~doc:"LEDGER-FILE File containing an exported ledger"
            (required string))
-     and config_file = Cli_lib.Flag.config_files
      and plaintext = Cli_lib.Flag.plaintext in
      fun () ->
-       let open Deferred.Let_syntax in
-       let%bind constraint_constants =
-         let logger = Logger.create () in
-         let%map conf =
-           Runtime_config.Constants.load_constants ~logger config_file
-         in
-         Runtime_config.Constants.constraint_constants conf
+       let constraint_constants =
+         Genesis_constants.Compiled.constraint_constants
        in
        let process_accounts accounts =
          let packed_ledger =
@@ -2321,31 +2315,26 @@ let test_ledger_application =
        flag "--has-second-partition"
          ~doc:"Assume there is a second partition (scan state)" no_arg
      and tracing = flag "--tracing" ~doc:"Wrap test into tracing" no_arg
-     and config_file = Cli_lib.Flag.config_files
      and no_masks = flag "--no-masks" ~doc:"Do not create masks" no_arg in
      Cli_lib.Exceptions.handle_nicely
      @@ fun () ->
-     let open Deferred.Let_syntax in
-     let%bind genesis_constants, constraint_constants =
-       let logger = Logger.create () in
-       let%map conf =
-         Runtime_config.Constants.load_constants ~logger config_file
-       in
-       Runtime_config.Constants.
-         (genesis_constants conf, constraint_constants conf)
-     in
      let first_partition_slots =
        Option.value ~default:128 first_partition_slots
      in
      let num_txs_per_round = Option.value ~default:3 num_txs_per_round in
      let rounds = Option.value ~default:580 rounds in
      let max_depth = Option.value ~default:290 max_depth in
+     let constraint_constants =
+       Genesis_constants.Compiled.constraint_constants
+     in
+     let genesis_constants = Genesis_constants.Compiled.genesis_constants in
      Test_ledger_application.test ~privkey_path ~ledger_path ?prev_block_path
        ~first_partition_slots ~no_new_stack ~has_second_partition
        ~num_txs_per_round ~rounds ~no_masks ~max_depth ~tracing num_txs
        ~constraint_constants ~genesis_constants )
 
 let itn_create_accounts =
+  let compile_config = Mina_compile_config.Compiled.t in
   Command.async ~summary:"Fund new accounts for incentivized testnet"
     (let open Command.Param in
     let privkey_path = Cli_lib.Flag.privkey_read_path in
@@ -2356,7 +2345,10 @@ let itn_create_accounts =
       flag "--num-accounts" ~doc:"NN Number of new accounts" (required int)
     in
     let fee =
-      flag "--fee" ~doc:"NN Fee in nanomina paid to create an account"
+      flag "--fee"
+        ~doc:
+          (sprintf "NN Fee in nanomina paid to create an account (minimum: %s)"
+             (Currency.Fee.to_string compile_config.minimum_user_command_fee) )
         (required int)
     in
     let amount =
@@ -2364,28 +2356,13 @@ let itn_create_accounts =
         ~doc:"NN Amount in nanomina to be divided among new accounts"
         (required int)
     in
-    let config_file = Cli_lib.Flag.config_files in
-    let args =
-      Args.zip6 privkey_path key_prefix num_accounts fee amount config_file
+    let args = Args.zip5 privkey_path key_prefix num_accounts fee amount in
+    let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+    let constraint_constants =
+      Genesis_constants.Compiled.constraint_constants
     in
     Cli_lib.Background_daemon.rpc_init args
-      ~f:(fun
-           port
-           (privkey_path, key_prefix, num_accounts, fee, amount, config_file)
-         ->
-        let open Deferred.Let_syntax in
-        let%bind genesis_constants, constraint_constants =
-          let logger = Logger.create () in
-          let%map conf =
-            Runtime_config.Constants.load_constants ~logger config_file
-          in
-          Runtime_config.Constants.
-            (genesis_constants conf, constraint_constants conf)
-        in
-        let args' = (privkey_path, key_prefix, num_accounts, fee, amount) in
-        let genesis_constants = genesis_constants in
-        let constraint_constants = constraint_constants in
-        Itn.create_accounts ~genesis_constants ~constraint_constants port args' ))
+      ~f:(Itn.create_accounts ~genesis_constants ~constraint_constants))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
