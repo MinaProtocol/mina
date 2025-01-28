@@ -1638,17 +1638,14 @@ let internal_commands logger =
         let%map_open filename =
           flag "--file" (required string)
             ~doc:"File containing the s-expression of the snark work to execute"
-        and config_file = Cli_lib.Flag.config_files in
+        in
         fun () ->
           let open Deferred.Let_syntax in
           let logger = Logger.create () in
-          let%bind constraint_constants, proof_level =
-            let%map conf =
-              Runtime_config.Constants.load_constants ~logger config_file
-            in
-            Runtime_config.Constants.
-              (constraint_constants conf, proof_level conf)
+          let constraint_constants =
+            Genesis_constants.Compiled.constraint_constants
           in
+          let proof_level = Genesis_constants.Compiled.proof_level in
           Parallel.init_master () ;
           match%bind
             Reader.with_file filename ~f:(fun reader ->
@@ -1695,17 +1692,14 @@ let internal_commands logger =
         and limit =
           flag "--limit" ~aliases:[ "-limit" ] (optional int)
             ~doc:"limit the number of proofs taken from the file"
-        and config_file = Cli_lib.Flag.config_files in
+        in
         fun () ->
           let open Async in
           let logger = Logger.create () in
-          let%bind constraint_constants, proof_level =
-            let%map conf =
-              Runtime_config.Constants.load_constants ~logger config_file
-            in
-            Runtime_config.Constants.
-              (constraint_constants conf, proof_level conf)
+          let constraint_constants =
+            Genesis_constants.Compiled.constraint_constants
           in
+          let proof_level = Genesis_constants.Compiled.proof_level in
           Parallel.init_master () ;
           let%bind conf_dir = Unix.mkdtemp "/tmp/mina-verifier" in
           let mode =
