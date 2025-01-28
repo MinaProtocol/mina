@@ -1,5 +1,9 @@
+# Used to build stanzas in ../js/node_js and ../js/web.
+# Must be in line with ../../../../../dockerfiles/stages/1-build-deps
+#
+# 2023-09-18 is used because serde 1.0.217 uses the feature Saturating not
+# working for versions before 2023-09-18
+# For more information regarding the usage of nightly, see
+# https://github.com/o1-labs/o1js/issues/1989
 [toolchain]
-# This should stay in line with the versions in
-# - kimchi_bindings/js/node_js/build.sh
-# - kimchi_bindings/js/web/build.sh
-channel = "1.72"
+channel = "nightly-2023-09-18"

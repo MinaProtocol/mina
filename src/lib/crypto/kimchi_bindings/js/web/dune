@@ -31,6 +31,8 @@
   ;; Required as we use Cargo workspace, and the build requires the Cargo.toml
   ;; and sources for each members
   ../../wasm/Cargo.toml
+  ;; Enforcing the rust version used for the build
+  ../../wasm/rust-toolchain.toml
   (source_tree ../../wasm/src))
  (locks /cargo-lock) ; lock for rustup
  (action
