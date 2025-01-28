@@ -775,56 +775,11 @@ end
 
 module Config_loader : Config_loader_intf = struct
   let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-      ~(constants : Runtime_config.Constants.constants) ?overwrite_version
-      ?blockchain_proof_system_id (config : Runtime_config.t) =
-    print_config ~logger config ;
-    let open Deferred.Or_error.Let_syntax in
-    let constraint_constants =
-      Runtime_config.Constants.constraint_constants constants
-    in
-    let proof_level = Runtime_config.Constants.proof_level constants in
-    let _compile_config = Runtime_config.Constants.compile_config constants in
-    let genesis_constants =
-      Runtime_config.Constants.genesis_constants constants
-    in
-    let%bind genesis_ledger, ledger_config, ledger_file =
-      match config.ledger with
-      | Some ledger ->
-          Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-            ?overwrite_version ledger
-      | None ->
-          [%log fatal] "No ledger was provided in the runtime configuration" ;
-          Deferred.Or_error.errorf
-            "No ledger was provided in the runtime configuration"
-    in
-    [%log info] "Loaded genesis ledger from $ledger_file"
-      ~metadata:[ ("ledger_file", `String ledger_file) ] ;
-    let%bind genesis_epoch_data, genesis_epoch_data_config =
-      Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-        config.epoch_data
-    in
-    let config =
-      { config with
-        ledger = Option.map config.ledger ~f:(fun _ -> ledger_config)
-      ; epoch_data = genesis_epoch_data_config
-      }
-    in
-    let%map genesis_constants =
-      Deferred.return
-      @@ make_genesis_constants ~logger ~default:genesis_constants config
-    in
-    let proof_inputs =
-      Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
-        ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
-        ~blockchain_proof_system_id ~genesis_epoch_data
-    in
-    (proof_inputs, config)
-
-  let inputs_from_config_file_legacy ?(genesis_dir = Cache_dir.autogen_path)
-      ~logger ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
+      ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~proof_level:compiled_proof_level ?overwrite_version
       (config : Runtime_config.t) =
+    print_config ~logger config ;
     let open Deferred.Or_error.Let_syntax in
     let proof_level =
       List.find_map_exn ~f:Fn.id
@@ -879,12 +834,38 @@ module Config_loader : Config_loader_intf = struct
             "Proof level %s is not compatible with compile-time proof level %s"
             (str proof_level) (str compiled)
     in
-    let compile_config = Mina_compile_config.Compiled.t in
-    let constants : Runtime_config.Constants.constants =
-      { proof_level; compile_config; constraint_constants; genesis_constants }
+    let%bind genesis_ledger, ledger_config, ledger_file =
+      match config.ledger with
+      | Some ledger ->
+          Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
+            ?overwrite_version ledger
+      | None ->
+          [%log fatal] "No ledger was provided in the runtime configuration" ;
+          Deferred.Or_error.errorf
+            "No ledger was provided in the runtime configuration"
     in
-    inputs_from_config_file ~genesis_dir ~logger ~constants ?overwrite_version
-      ?blockchain_proof_system_id config
+    [%log info] "Loaded genesis ledger from $ledger_file"
+      ~metadata:[ ("ledger_file", `String ledger_file) ] ;
+    let%bind genesis_epoch_data, genesis_epoch_data_config =
+      Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
+        config.epoch_data
+    in
+    let config =
+      { config with
+        ledger = Option.map config.ledger ~f:(fun _ -> ledger_config)
+      ; epoch_data = genesis_epoch_data_config
+      }
+    in
+    let%map genesis_constants =
+      Deferred.return
+      @@ make_genesis_constants ~logger ~default:genesis_constants config
+    in
+    let proof_inputs =
+      Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
+        ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
+        ~blockchain_proof_system_id ~genesis_epoch_data
+    in
+    (proof_inputs, config)
 
   let init_from_config_file_legacy ?genesis_dir ~cli_proof_level
       ~genesis_constants ~constraint_constants ~logger ~proof_level
@@ -892,9 +873,8 @@ module Config_loader : Config_loader_intf = struct
       (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
     let open Deferred.Or_error.Let_syntax in
     let%map inputs, config =
-      inputs_from_config_file_legacy ?genesis_dir ~cli_proof_level
-        ~genesis_constants ~constraint_constants ~logger ~proof_level
-        ?overwrite_version config
+      inputs_from_config_file ?genesis_dir ~cli_proof_level ~genesis_constants
+        ~constraint_constants ~logger ~proof_level ?overwrite_version config
     in
     let values = Genesis_proof.create_values_no_proof inputs in
     (values, config)
