@@ -1814,7 +1814,7 @@ end
 module type Constants_intf = sig
   type constants
 
-  val load_constants :
+  val load_constants_exn :
        ?conf_dir:string
     -> ?commit_id_short:string
     -> ?itn_features:bool
@@ -2043,7 +2043,8 @@ module Constants : Constants_intf = struct
             config_files
         >>| constants_of_config ?itn_features ?cli_proof_level ))
 
-  let load_constants = load_constants_with_logging_exn ~logger:(Logger.null ())
+  let load_constants_exn =
+    load_constants_with_logging_exn ~logger:(Logger.null ())
 
   let magic_for_unit_tests t =
     let compile_constants =

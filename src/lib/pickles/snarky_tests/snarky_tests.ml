@@ -652,7 +652,7 @@ let () =
   in
   let%map.Async.Deferred constraint_constants =
     let%map.Async.Deferred config =
-      Runtime_config.Constants.load_constants []
+      Runtime_config.Constants.load_constants_exn []
     in
     Runtime_config.Constants.constraint_constants config
   in

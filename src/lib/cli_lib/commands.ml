@@ -236,7 +236,9 @@ module Vrf = struct
       let env = Secrets.Keypair.env in
       let open Deferred.Let_syntax in
       let%bind constraint_constants =
-        let%map conf = Runtime_config.Constants.load_constants config_files in
+        let%map conf =
+          Runtime_config.Constants.load_constants_exn config_files
+        in
         Runtime_config.Constants.constraint_constants conf
       in
       if Option.is_some (Sys.getenv env) then
@@ -307,7 +309,9 @@ module Vrf = struct
         eprintf "Using password from environment variable %s\n" env ;
       let open Deferred.Let_syntax in
       let%bind constraint_constants =
-        let%map conf = Runtime_config.Constants.load_constants config_files in
+        let%map conf =
+          Runtime_config.Constants.load_constants_exn config_files
+        in
         Runtime_config.Constants.constraint_constants conf
       in
       let%bind () =
@@ -370,7 +374,9 @@ module Vrf = struct
       @@ fun () ->
       let open Deferred.Let_syntax in
       let%bind constraint_constants =
-        let%map conf = Runtime_config.Constants.load_constants config_file in
+        let%map conf =
+          Runtime_config.Constants.load_constants_exn config_file
+        in
         Runtime_config.Constants.constraint_constants conf
       in
       let lexbuf = Lexing.from_channel In_channel.stdin in

@@ -44,7 +44,7 @@ let or_error_str ~f_ok ~error = function
       sprintf "%s\n%s\n" error (Error.to_string_hum e)
 
 let load_compile_config config_files =
-  let%map conf = Runtime_config.Constants.load_constants config_files in
+  let%map conf = Runtime_config.Constants.load_constants_exn config_files in
   Runtime_config.Constants.compile_config conf
 
 let stop_daemon =
@@ -863,7 +863,9 @@ let hash_ledger =
      fun () ->
        let open Deferred.Let_syntax in
        let%bind constraint_constants =
-         let%map conf = Runtime_config.Constants.load_constants config_files in
+         let%map conf =
+           Runtime_config.Constants.load_constants_exn config_files
+         in
          Runtime_config.Constants.constraint_constants conf
        in
        let process_accounts accounts =
@@ -971,7 +973,9 @@ let constraint_system_digests =
      fun () ->
        let open Deferred.Let_syntax in
        let%bind constraint_constants, proof_level =
-         let%map conf = Runtime_config.Constants.load_constants config_files in
+         let%map conf =
+           Runtime_config.Constants.load_constants_exn config_files
+         in
          Runtime_config.Constants.(constraint_constants conf, proof_level conf)
        in
        let all =
@@ -2434,7 +2438,9 @@ let itn_create_accounts =
          ->
         let open Deferred.Let_syntax in
         let%bind genesis_constants, constraint_constants, compile_config =
-          let%map conf = Runtime_config.Constants.load_constants config_files in
+          let%map conf =
+            Runtime_config.Constants.load_constants_exn config_files
+          in
           Runtime_config.Constants.
             ( genesis_constants conf
             , constraint_constants conf
