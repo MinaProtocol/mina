@@ -852,8 +852,8 @@ module Config_loader : Config_loader_intf = struct
         config_files
     in
     let constants =
-      Runtime_config.Constants.load_constants' ?cli_proof_level ~itn_features
-        config
+      Runtime_config.Constants.constants_of_config ?cli_proof_level
+        ~itn_features config
     in
     match%bind.Deferred
       init_from_config_file ?overwrite_version ?genesis_dir ~logger ~constants

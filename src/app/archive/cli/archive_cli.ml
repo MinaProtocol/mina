@@ -46,7 +46,7 @@ let command_run =
            (Option.to_list runtime_config_file)
          |> Deferred.Or_error.ok_exn
        in
-       let constants = Runtime_config.Constants.load_constants' config in
+       let constants = Runtime_config.Constants.constants_of_config config in
        let%bind precomputed_values_opt =
          match runtime_config_file with
          | None ->

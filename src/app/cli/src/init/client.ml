@@ -1881,7 +1881,7 @@ let compile_time_constants =
          in
          let runtime_config = Option.value ~default m_conf in
          let constants =
-           Runtime_config.Constants.load_constants' runtime_config
+           Runtime_config.Constants.constants_of_config runtime_config
          in
          Genesis_ledger_helper.Config_loader.init_from_config_file ~genesis_dir
            ~logger ~constants runtime_config

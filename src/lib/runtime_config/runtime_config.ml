@@ -1831,7 +1831,7 @@ module type Constants_intf = sig
     -> string list
     -> constants Deferred.t
 
-  val load_constants' :
+  val constants_of_config :
        ?itn_features:bool
     -> ?cli_proof_level:Genesis_constants.Proof_level.t
     -> t
@@ -2014,7 +2014,9 @@ module Constants : Constants_intf = struct
     in
     { genesis_constants; constraint_constants; proof_level; compile_config }
 
-  let load_constants' ?itn_features ?cli_proof_level runtime_config =
+  (** Combine a runtime config with the compile-time config and return
+      a constants record *)
+  let constants_of_config ?itn_features ?cli_proof_level runtime_config =
     let compile_constants =
       { genesis_constants = Genesis_constants.Compiled.genesis_constants
       ; constraint_constants = Genesis_constants.Compiled.constraint_constants
@@ -2039,7 +2041,7 @@ module Constants : Constants_intf = struct
       ok_exn
         ( Json_loader.load_config_files ?conf_dir ?commit_id_short ~logger
             config_files
-        >>| load_constants' ?itn_features ?cli_proof_level ))
+        >>| constants_of_config ?itn_features ?cli_proof_level ))
 
   let load_constants = load_constants_with_logging ~logger:(Logger.null ())
 
