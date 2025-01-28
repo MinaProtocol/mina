@@ -1606,31 +1606,25 @@ let internal_commands logger =
   ; ( "run-prover"
     , Command.async
         ~summary:"Run prover on a sexp provided on a single line of stdin"
-        (let open Command.Let_syntax in
-        let%map_open config_file = Cli_lib.Flag.config_files in
-        fun () ->
-          let logger = Logger.create () in
-          let open Deferred.Let_syntax in
-          let%bind constraint_constants, proof_level =
-            let%map conf =
-              Runtime_config.Constants.load_constants ~logger config_file
-            in
-            Runtime_config.Constants.
-              (constraint_constants conf, proof_level conf)
-          in
-          Parallel.init_master () ;
-          match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
-          | `Ok sexp ->
-              let%bind conf_dir = Unix.mkdtemp "/tmp/mina-prover" in
-              [%log info] "Prover state being logged to %s" conf_dir ;
-              let%bind prover =
-                Prover.create ~commit_id:Mina_version.commit_id ~logger
-                  ~proof_level ~constraint_constants ~pids:(Pid.Table.create ())
-                  ~conf_dir ()
-              in
-              Prover.prove_from_input_sexp prover sexp >>| ignore
-          | `Eof ->
-              failwith "early EOF while reading sexp") )
+        (Command.Param.return (fun () ->
+             let logger = Logger.create () in
+             let constraint_constants =
+               Genesis_constants.Compiled.constraint_constants
+             in
+             let proof_level = Genesis_constants.Compiled.proof_level in
+             Parallel.init_master () ;
+             match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
+             | `Ok sexp ->
+                 let%bind conf_dir = Unix.mkdtemp "/tmp/mina-prover" in
+                 [%log info] "Prover state being logged to %s" conf_dir ;
+                 let%bind prover =
+                   Prover.create ~commit_id:Mina_version.commit_id ~logger
+                     ~proof_level ~constraint_constants
+                     ~pids:(Pid.Table.create ()) ~conf_dir ()
+                 in
+                 Prover.prove_from_input_sexp prover sexp >>| ignore
+             | `Eof ->
+                 failwith "early EOF while reading sexp" ) ) )
   ; ( "run-snark-worker-single"
     , Command.async
         ~summary:"Run snark-worker on a sexp provided on a single line of stdin"
