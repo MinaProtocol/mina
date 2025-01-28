@@ -216,9 +216,8 @@ let setup_daemon logger ~itn_features =
   and snark_work_fee =
     flag "--snark-worker-fee" ~aliases:[ "snark-worker-fee" ]
       ~doc:
-        (sprintf
-           "FEE Amount a worker wants to get compensated for generating a \
-            snark proof" )
+        "FEE Amount a worker wants to get compensated for generating a snark \
+         proof"
       (optional txn_fee)
   and work_reassignment_wait =
     flag "--work-reassignment-wait"

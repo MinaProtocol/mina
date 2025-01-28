@@ -527,19 +527,9 @@ let send_payment_graphql =
             , amount
             , config_file )
           ->
-         let open Deferred.Let_syntax in
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
-         let fee =
-           Option.value ~default:compile_config.default_transaction_fee fee
-         in
          let%map response =
            let input =
+             let fee = Option.value ~default:default_transaction_fee fee in
              Mina_graphql.Types.Input.SendPaymentInput.make_input ~to_:receiver
                ~from:sender ~amount ~fee ?memo ?nonce ()
            in
@@ -569,17 +559,7 @@ let delegate_stake_graphql =
             graphql_endpoint
             ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver, config_file)
           ->
-         let open Deferred.Let_syntax in
-         let%bind compile_config =
-           let logger = Logger.create () in
-           let%map conf =
-             Runtime_config.Constants.load_constants ~logger config_file
-           in
-           Runtime_config.Constants.compile_config conf
-         in
-         let fee =
-           Option.value ~default:compile_config.default_transaction_fee fee
-         in
+         let fee = Option.value ~default:default_transaction_fee fee in
          let%map response =
            Graphql_client.query_exn
              Graphql_queries.Send_delegation.(
