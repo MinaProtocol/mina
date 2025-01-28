@@ -76,8 +76,7 @@ let command =
            "Snark work spec in sexp format (json formats are preferred over \
             sexp if both are passed)"
          (optional string)
-     and config_file = Cli_lib.Flag.config_files
-     and cli_proof_level =
+     and proof_level =
        flag "--proof-level" ~doc:""
          (optional_with_default Genesis_constants.Proof_level.Full
             (Command.Arg_type.of_alist_exn
@@ -105,14 +104,8 @@ let command =
      in
      fun () ->
        let open Async in
-       let open Deferred.Let_syntax in
-       let%bind constraint_constants, proof_level =
-         let logger = Logger.null () in
-         let%map conf =
-           Runtime_config.Constants.load_constants ~cli_proof_level ~logger
-             config_file
-         in
-         Runtime_config.Constants.(constraint_constants conf, proof_level conf)
+       let constraint_constants =
+         Genesis_constants.Compiled.constraint_constants
        in
        let%bind worker_state =
          Prod.Worker_state.create ~constraint_constants ~proof_level ()
