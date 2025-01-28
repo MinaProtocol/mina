@@ -2038,11 +2038,15 @@ module Constants : Constants_intf = struct
   (* Use this function if you don't need/want the ledger configuration *)
   let load_constants_with_logging ?conf_dir ?commit_id_short ?itn_features
       ?cli_proof_level ~logger config_files =
-    Deferred.Or_error.(
-      ok_exn
-        ( Json_loader.load_config_files ?conf_dir ?commit_id_short ~logger
-            config_files
-        >>| load_constants' ?itn_features ?cli_proof_level ))
+    (* do not log reading compile time constants as this impacs cli command output *)
+    Deferred.Or_error.ok_exn
+    @@
+    let open Deferred.Or_error.Let_syntax in
+    let%map runtime_config =
+      Json_loader.load_config_files ?conf_dir ?commit_id_short ~logger
+        config_files
+    in
+    load_constants' ?itn_features ?cli_proof_level runtime_config
 
   let load_constants = load_constants_with_logging ~logger:(Logger.null ())
 
