@@ -43,7 +43,7 @@ let or_error_str ~f_ok ~error = function
   | Error e ->
       sprintf "%s\n%s\n" error (Error.to_string_hum e)
 
-let load_compile_config ?(logger = Logger.null ()) config_files =
+let load_compile_config ?(logger = Logger.create ()) config_files =
   let%map conf = Runtime_config.Constants.load_constants ~logger config_files in
   Runtime_config.Constants.compile_config conf
 
