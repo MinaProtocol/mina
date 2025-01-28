@@ -8,7 +8,6 @@ module Inputs = struct
     ; constraint_constants : Genesis_constants.Constraint_constants.t
     ; proof_level : Genesis_constants.Proof_level.t
     ; genesis_constants : Genesis_constants.t
-    ; compile_config : Mina_compile_config.t
     ; genesis_ledger : Genesis_ledger.Packed.t
     ; genesis_epoch_data : Consensus.Genesis_epoch_data.t
     ; genesis_body_reference : Consensus.Body_reference.t
@@ -86,7 +85,6 @@ module T = struct
     ; constraint_constants : Genesis_constants.Constraint_constants.t
     ; genesis_constants : Genesis_constants.t
     ; proof_level : Genesis_constants.Proof_level.t
-    ; compile_config : Mina_compile_config.t
     ; genesis_ledger : Genesis_ledger.Packed.t
     ; genesis_epoch_data : Consensus.Genesis_epoch_data.t
     ; genesis_body_reference : Consensus.Body_reference.t
@@ -225,7 +223,6 @@ let create_values_no_proof (t : Inputs.t) =
   ; constraint_constants = t.constraint_constants
   ; proof_level = t.proof_level
   ; genesis_constants = t.genesis_constants
-  ; compile_config = t.compile_config
   ; genesis_ledger = t.genesis_ledger
   ; genesis_epoch_data = t.genesis_epoch_data
   ; genesis_body_reference = t.genesis_body_reference
@@ -243,7 +240,6 @@ let to_inputs (t : t) : Inputs.t =
   ; constraint_constants = t.constraint_constants
   ; proof_level = t.proof_level
   ; genesis_constants = t.genesis_constants
-  ; compile_config = t.compile_config
   ; genesis_ledger = t.genesis_ledger
   ; genesis_epoch_data = t.genesis_epoch_data
   ; genesis_body_reference = t.genesis_body_reference

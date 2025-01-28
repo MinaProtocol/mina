@@ -56,6 +56,8 @@ let scan_state_transaction_capacity_log_2 =
 
 [%%inject "account_creation_fee_int", account_creation_fee_int]
 
+[%%inject "default_transaction_fee", default_transaction_fee]
+
 [%%inject "default_snark_worker_fee", default_snark_worker_fee]
 
 [%%inject "minimum_user_command_fee", minimum_user_command_fee]

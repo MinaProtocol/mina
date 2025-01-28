@@ -340,7 +340,8 @@ module Make (Inputs : Intf.Inputs_intf) :
     in
     go ()
 
-  let command_from_rpcs ~commit_id
+  let command_from_rpcs ~commit_id ~proof_level:default_proof_level
+      ~constraint_constants
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
         with type Work.ledger_proof = Inputs.Ledger_proof.t ) =
     Command.async ~summary:"Snark worker"
@@ -349,7 +350,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         flag "--daemon-address" ~aliases:[ "daemon-address" ]
           (required (Arg_type.create Host_and_port.of_string))
           ~doc:"HOST-AND-PORT address daemon is listening on"
-      and cli_proof_level =
+      and proof_level =
         flag "--proof-level" ~aliases:[ "proof-level" ]
           (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
           ~doc:"full|check|none"
@@ -359,19 +360,13 @@ module Make (Inputs : Intf.Inputs_intf) :
           (optional bool)
           ~doc:
             "true|false Shutdown when disconnected from daemon (default:true)"
-      and config_file = Cli_lib.Flag.config_files
       and conf_dir = Cli_lib.Flag.conf_dir in
       fun () ->
         let logger =
           Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
         in
-        let%bind.Deferred constraint_constants, proof_level =
-          let%map.Deferred config =
-            Runtime_config.Constants.load_constants ?conf_dir ?cli_proof_level
-              ~logger config_file
-          in
-          Runtime_config.Constants.
-            (constraint_constants config, proof_level config)
+        let proof_level =
+          Option.value ~default:default_proof_level proof_level
         in
         Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
             let logrotate_max_size = 1024 * 10 in

@@ -66,6 +66,8 @@ module type S = sig
 
   val account_creation_fee_int : string
 
+  val default_transaction_fee : string
+
   val default_snark_worker_fee : string
 
   val minimum_user_command_fee : string
