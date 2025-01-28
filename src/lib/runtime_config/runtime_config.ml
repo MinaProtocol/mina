@@ -1822,7 +1822,7 @@ module type Constants_intf = sig
     -> string list
     -> constants Deferred.t
 
-  val load_constants_with_logging :
+  val load_constants_with_logging_exn :
        ?conf_dir:string
     -> ?commit_id_short:string
     -> ?itn_features:bool
@@ -2035,7 +2035,7 @@ module Constants : Constants_intf = struct
     }
 
   (* Use this function if you don't need/want the ledger configuration *)
-  let load_constants_with_logging ?conf_dir ?commit_id_short ?itn_features
+  let load_constants_with_logging_exn ?conf_dir ?commit_id_short ?itn_features
       ?cli_proof_level ~logger config_files =
     Deferred.Or_error.(
       ok_exn
@@ -2043,7 +2043,7 @@ module Constants : Constants_intf = struct
             config_files
         >>| constants_of_config ?itn_features ?cli_proof_level ))
 
-  let load_constants = load_constants_with_logging ~logger:(Logger.null ())
+  let load_constants = load_constants_with_logging_exn ~logger:(Logger.null ())
 
   let magic_for_unit_tests t =
     let compile_constants =

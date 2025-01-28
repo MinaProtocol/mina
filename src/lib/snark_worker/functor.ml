@@ -362,7 +362,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         in
         let%bind.Deferred constraint_constants, proof_level, compile_config =
           let%map.Deferred config =
-            Runtime_config.Constants.load_constants_with_logging ~logger
+            Runtime_config.Constants.load_constants_with_logging_exn ~logger
               ?conf_dir ?cli_proof_level config_files
           in
           Runtime_config.Constants.

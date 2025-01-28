@@ -43,7 +43,7 @@ let timestamp =
 let instantiate_verify_functions ~logger config_file =
   let open Deferred.Let_syntax in
   let%map constants =
-    Runtime_config.Constants.load_constants_with_logging ~logger config_file
+    Runtime_config.Constants.load_constants_with_logging_exn ~logger config_file
   in
   let constraint_constants =
     Runtime_config.Constants.constraint_constants constants

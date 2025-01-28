@@ -2387,7 +2387,7 @@ let test_ledger_application =
      let open Deferred.Let_syntax in
      let%bind genesis_constants, constraint_constants =
        let%map conf =
-         Runtime_config.Constants.load_constants_with_logging
+         Runtime_config.Constants.load_constants_with_logging_exn
            ~logger:(Logger.create ()) config_files
        in
        Runtime_config.Constants.

@@ -1560,7 +1560,7 @@ let internal_commands ~itn_features logger =
           let open Deferred.Let_syntax in
           let%bind constraint_constants, proof_level, compile_config =
             let%map conf =
-              Runtime_config.Constants.load_constants_with_logging ~logger
+              Runtime_config.Constants.load_constants_with_logging_exn ~logger
                 config_file
             in
             Runtime_config.Constants.
@@ -1593,7 +1593,7 @@ let internal_commands ~itn_features logger =
           let open Deferred.Let_syntax in
           let%bind constraint_constants, proof_level, compile_config =
             let%map conf =
-              Runtime_config.Constants.load_constants_with_logging ~logger
+              Runtime_config.Constants.load_constants_with_logging_exn ~logger
                 config_files
             in
             Runtime_config.Constants.
@@ -1651,7 +1651,7 @@ let internal_commands ~itn_features logger =
           let open Async in
           let%bind constraint_constants, proof_level, compile_config =
             let%map conf =
-              Runtime_config.Constants.load_constants_with_logging ~logger
+              Runtime_config.Constants.load_constants_with_logging_exn ~logger
                 config_files
             in
             Runtime_config.Constants.

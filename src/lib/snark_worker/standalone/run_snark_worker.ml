@@ -108,7 +108,7 @@ let command =
        let open Deferred.Let_syntax in
        let%bind constraint_constants, proof_level =
          let%map conf =
-           Runtime_config.Constants.load_constants_with_logging
+           Runtime_config.Constants.load_constants_with_logging_exn
              ~logger:(Logger.create ()) ~cli_proof_level config_files
          in
          Runtime_config.Constants.(constraint_constants conf, proof_level conf)
