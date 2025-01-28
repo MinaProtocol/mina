@@ -1054,9 +1054,7 @@ module Proof_keys = struct
               - At least 3 ensures a transaction per block and the staged-ledger
                 unit tests pass.
           *)
-          1
-          + Core_kernel.Int.ceil_log2
-              (max_user_commands_per_block + max_coinbases)
+          1 + Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
   end
 
   type t =
@@ -1949,8 +1947,7 @@ let make_constraint_constants (a : Genesis_constants.Constraint_constants.t)
   ; block_window_duration_ms
   ; transaction_capacity_log_2
   ; pending_coinbase_depth =
-      Core_kernel.Int.ceil_log2
-        (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
+      Int.ceil_log2 (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
   ; coinbase_amount =
       Option.value ~default:a.coinbase_amount
         Option.(b.proof >>= fun p -> p.coinbase_amount)
