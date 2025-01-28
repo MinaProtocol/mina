@@ -372,13 +372,7 @@ let setup_daemon logger ~itn_features =
       ~aliases:[ "proposed-protocol-version" ]
       (optional string)
       ~doc:"NN.NN.NN Proposed protocol version to signal other nodes"
-  and config_files =
-    flag "--config-file" ~aliases:[ "config-file" ]
-      ~doc:
-        "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
-         default: <config_dir>/daemon.json). Pass multiple times to override \
-         fields from earlier config files"
-      (listed string)
+  and config_files = Cli_lib.Flag.config_files_legacy
   and _may_generate =
     flag "--generate-genesis-proof"
       ~aliases:[ "generate-genesis-proof" ]

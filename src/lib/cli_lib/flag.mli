@@ -14,6 +14,8 @@ val conf_dir : string option Command.Param.t
 
 val config_files : string list Command.Param.t
 
+val config_files_legacy : string list Command.Param.t
+
 module Types : sig
   type 'a with_name = { name : string; value : 'a }
 
