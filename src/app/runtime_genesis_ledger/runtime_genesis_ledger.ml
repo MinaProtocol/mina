@@ -90,10 +90,10 @@ let extract_accounts_exn = function
   | _ ->
       failwith "Wrong ledger supplied"
 
-let load_config_exn ~logger config_file =
+let load_config_exn ~logger config_files =
   let%map config =
     Deferred.Or_error.ok_exn
-    @@ Runtime_config.Json_loader.load_config_files ~logger [ config_file ]
+    @@ Runtime_config.Json_loader.load_config_files ~logger config_files
   in
   if
     Option.(
@@ -115,9 +115,9 @@ let load_config_exn ~logger config_file =
   , Option.map ~f:extract_accounts_exn next_ledger )
 
 let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields () =
+    ~config_files ~genesis_dir ~hash_output_file ~ignore_missing_fields () =
   let%bind accounts, staking_accounts_opt, next_accounts_opt =
-    load_config_exn ~logger config_file
+    load_config_exn ~logger config_files
   in
   let ledger =
     load_ledger ~ignore_missing_fields ~constraint_constants accounts
@@ -149,9 +149,7 @@ let () =
        Command.(
          let open Let_syntax in
          let open Command.Param in
-         let%map config_file =
-           flag "--config-file" ~doc:"PATH path to the JSON configuration file"
-             (required string)
+         let%map config_files = Cli_lib.Flag.config_files
          and genesis_dir =
            flag "--genesis-dir"
              ~doc:
@@ -171,5 +169,5 @@ let () =
                "BOOL whether to ignore missing fields in account definition \
                 (and replace with default values)"
          in
-         main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
+         main ~constraint_constants ~config_files ~genesis_dir ~hash_output_file
            ~ignore_missing_fields) )
