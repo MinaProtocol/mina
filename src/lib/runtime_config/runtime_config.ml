@@ -1775,9 +1775,8 @@ module Json_loader : Json_loader_intf = struct
       let config_files_paths =
         List.map config_files ~f:(fun (config_file, _) -> `String config_file)
       in
-      if not (List.is_empty config_files_paths) then
-        [%log info] "Reading configuration files $config_files"
-          ~metadata:[ ("config_files", `List config_files_paths) ] ;
+      [%log info] "Reading configuration files $config_files"
+        ~metadata:[ ("config_files", `List config_files_paths) ] ;
 
       Deferred.Or_error.List.filter_map config_files
         ~f:(fun (config_file, handle_missing) ->
