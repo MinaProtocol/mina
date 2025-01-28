@@ -852,8 +852,7 @@ module Config_loader : Config_loader_intf = struct
         ~itn_features config_files
     in
     let%bind config =
-      Runtime_config.Json_loader.load_config_files ?conf_dir ~logger
-        config_files
+      Runtime_config.Json_loader.load_config_files ?conf_dir config_files
     in
     match%bind.Deferred
       init_from_config_file ?overwrite_version ?genesis_dir ~logger ~constants

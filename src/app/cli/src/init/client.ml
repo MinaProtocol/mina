@@ -1866,8 +1866,7 @@ let compile_time_constants =
          (* TODO: See if we can initialize consensus_constants without also initializing the ledger *)
          let logger = Logger.null () in
          let%bind m_conf =
-           Runtime_config.Json_loader.load_config_files ~conf_dir
-             ~logger:(Logger.null ()) config_files
+           Runtime_config.Json_loader.load_config_files ~conf_dir config_files
            >>| Or_error.ok
          in
          let default =
