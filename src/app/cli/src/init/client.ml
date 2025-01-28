@@ -2388,10 +2388,7 @@ let test_ledger_application =
      @@ fun () ->
      let open Deferred.Let_syntax in
      let%bind genesis_constants, constraint_constants =
-       let%map conf =
-         Runtime_config.Constants.load_constants_with_logging
-           ~logger:(Logger.create ()) config_files
-       in
+       let%map conf = Runtime_config.Constants.load_constants config_files in
        Runtime_config.Constants.
          (genesis_constants conf, constraint_constants conf)
      in

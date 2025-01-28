@@ -1824,15 +1824,6 @@ module type Constants_intf = sig
     -> string list
     -> constants Deferred.t
 
-  val load_constants_with_logging :
-       ?conf_dir:string
-    -> ?commit_id_short:string
-    -> ?itn_features:bool
-    -> ?cli_proof_level:Genesis_constants.Proof_level.t
-    -> logger:Logger.t
-    -> string list
-    -> constants Deferred.t
-
   val load_constants' :
        ?itn_features:bool
     -> ?cli_proof_level:Genesis_constants.Proof_level.t
@@ -2036,19 +2027,17 @@ module Constants : Constants_intf = struct
     }
 
   (* Use this function if you don't need/want the ledger configuration *)
-  let load_constants_with_logging ?conf_dir ?commit_id_short ?itn_features
-      ?cli_proof_level ~logger config_files =
+  let load_constants ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
+      config_files =
     (* do not log reading compile time constants as this impacs cli command output *)
     Deferred.Or_error.ok_exn
     @@
     let open Deferred.Or_error.Let_syntax in
     let%map runtime_config =
-      Json_loader.load_config_files ?conf_dir ?commit_id_short ~logger
-        config_files
+      Json_loader.load_config_files ?conf_dir ?commit_id_short
+        ~logger:(Logger.null ()) config_files
     in
     load_constants' ?itn_features ?cli_proof_level runtime_config
-
-  let load_constants = load_constants_with_logging ~logger:(Logger.null ())
 
   let magic_for_unit_tests t =
     let compile_constants =

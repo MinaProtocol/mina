@@ -399,10 +399,7 @@ let output_there_and_back_cmds =
        let open Deferred.Let_syntax in
        let logger = Logger.create () in
        let%bind minimum_user_command_fee =
-         let%map conf =
-           Runtime_config.Constants.load_constants_with_logging ~logger
-             config_file
-         in
+         let%map conf = Runtime_config.Constants.load_constants config_file in
          Option.value
            ~default:
              (Runtime_config.Constants.genesis_constants conf)
