@@ -572,12 +572,14 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
     function
-    | "ro" ->
+    | `String "ro" ->
         Some RO
-    | "rw" ->
+    | `String "rw" ->
         Some RW
-    | "none" ->
+    | `String "none" ->
         Some N
+    | `Null ->
+        None
     | _ ->
         raise (Error.to_exn (Error.of_string "Invalid pubsub topic mode"))
   in
@@ -785,74 +787,75 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           constraint_constants.block_window_duration_ms |> Float.of_int
           |> Time.Span.of_ms |> Mina_metrics.initialize_all ;
 
-          (* We reverse the list because we want to find the "most relevant" value, i.e. the
-             last time it was declared in the list of supplied config files
-          *)
           let rev_daemon_configs =
             List.rev_filter_map config_jsons
               ~f:(fun (config_file, config_json) ->
-                Yojson.Safe.Util.member "daemon" config_json
-                |> fun x ->
-                Runtime_config.Daemon.of_yojson x
-                |> Result.ok
-                |> Option.map ~f:(fun daemon_config ->
-                       (config_file, daemon_config) ) )
+                Option.map
+                  YJ.Util.(
+                    to_option Fn.id (YJ.Util.member "daemon" config_json))
+                  ~f:(fun daemon_config -> (config_file, daemon_config)) )
           in
-
-          let module DC = Runtime_config.Daemon in
-          (* The explicit typing here is necessary to prevent type inference from specializing according
-             to the first usage.
-          *)
-          let maybe_from_config (type a) :
-                 getter:(DC.t -> a option)
-              -> keyname:string
-              -> preferred_value:a option
-              -> a option =
-           fun ~getter ~keyname ~preferred_value ->
-            Runtime_config.Config_loader.maybe_from_config ~logger
-              ~configs:rev_daemon_configs ~getter ~keyname ~preferred_value
+          let maybe_from_config (type a) (f : YJ.t -> a option)
+              (keyname : string) (actual_value : a option) : a option =
+            let open Option.Let_syntax in
+            let open YJ.Util in
+            match actual_value with
+            | Some v ->
+                Some v
+            | None ->
+                (* Load value from the latest config file that both
+                   * has the key we are looking for, and
+                   * has the key in a format that [f] can parse.
+                *)
+                let%map config_file, data =
+                  List.find_map rev_daemon_configs
+                    ~f:(fun (config_file, daemon_config) ->
+                      let%bind json_val =
+                        to_option Fn.id (member keyname daemon_config)
+                      in
+                      let%map data = f json_val in
+                      (config_file, data) )
+                in
+                [%log debug] "Key $key being used from config file $config_file"
+                  ~metadata:
+                    [ ("key", `String keyname)
+                    ; ("config_file", `String config_file)
+                    ] ;
+                data
           in
-          let or_from_config (type a) :
-                 getter:(DC.t -> a option)
-              -> keyname:string
-              -> preferred_value:a option
-              -> default:a
-              -> a =
-           fun ~getter ~keyname ~preferred_value ~default ->
-            Runtime_config.Config_loader.or_from_config ~logger
-              ~configs:rev_daemon_configs ~getter ~keyname ~preferred_value
-              ~default
+          let or_from_config map keyname actual_value ~default =
+            match maybe_from_config map keyname actual_value with
+            | Some x ->
+                x
+            | None ->
+                [%log trace]
+                  "Key '$key' not found in the config file, using default"
+                  ~metadata:[ ("key", `String keyname) ] ;
+                default
           in
-
-          let libp2p_port =
-            or_from_config ~keyname:"libp2p-port" ~getter:DC.libp2p_port
-              ~preferred_value:libp2p_port.value ~default:libp2p_port.default
+          let get_port { Flag.Types.value; default; name } =
+            or_from_config YJ.Util.to_int_option name ~default value
           in
-          let rest_server_port =
-            or_from_config ~keyname:"rest-port" ~getter:DC.rest_port
-              ~preferred_value:rest_server_port.value
-              ~default:rest_server_port.default
-          in
+          let libp2p_port = get_port libp2p_port in
+          let rest_server_port = get_port rest_server_port in
           let limited_graphql_port =
-            maybe_from_config ~keyname:"limited-graphql-port"
-              ~getter:DC.graphql_port
-              ~preferred_value:limited_graphql_port.value
+            let ({ value; name } : int option Flag.Types.with_name) =
+              limited_graphql_port
+            in
+            maybe_from_config YJ.Util.to_int_option name value
           in
-          let client_port =
-            or_from_config ~keyname:"client-port" ~getter:DC.client_port
-              ~preferred_value:client_port.value ~default:client_port.default
-          in
-          let snark_work_fee =
-            or_from_config ~keyname:"snark-worker-fee"
-              ~getter:(fun x ->
-                DC.snark_worker_fee x
-                |> Option.map ~f:Currency.Fee.of_nanomina_int_exn )
-              ~preferred_value:snark_work_fee
-              ~default:compile_config.default_snark_worker_fee
+          let client_port = get_port client_port in
+          let snark_work_fee_flag =
+            let json_to_currency_fee_option json =
+              YJ.Util.to_int_option json
+              |> Option.map ~f:Currency.Fee.of_nanomina_int_exn
+            in
+            or_from_config json_to_currency_fee_option "snark-worker-fee"
+              ~default:compile_config.default_snark_worker_fee snark_work_fee
           in
           let node_status_url =
-            maybe_from_config ~keyname:"node-status-url"
-              ~getter:DC.node_status_url ~preferred_value:node_status_url
+            maybe_from_config YJ.Util.to_string_option "node-status-url"
+              node_status_url
           in
           (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
           let _max_concurrent_connections =
@@ -864,33 +867,29 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             None
           in
           let work_selection_method =
-            or_from_config ~keyname:"work-selection"
-              ~getter:(fun x ->
-                DC.work_selection x
-                |> Option.map ~f:Cli_lib.Arg_type.work_selection_method_val )
-              ~preferred_value:work_selection_method_flag
+            or_from_config
+              (Fn.compose Option.return
+                 (Fn.compose work_selection_method_val YJ.Util.to_string) )
+              "work-selection"
               ~default:Cli_lib.Arg_type.Work_selection_method.Random
+              work_selection_method_flag
           in
           let work_reassignment_wait =
-            or_from_config ~keyname:"work-reassignment-wait"
-              ~getter:DC.work_reassignment_wait
-              ~preferred_value:work_reassignment_wait
+            or_from_config YJ.Util.to_int_option "work-reassignment-wait"
               ~default:Cli_lib.Default.work_reassignment_wait
+              work_reassignment_wait
           in
           let log_received_snark_pool_diff =
-            or_from_config ~keyname:"log-snark-work-gossip"
-              ~getter:DC.log_snark_work_gossip
-              ~preferred_value:log_received_snark_pool_diff ~default:false
+            or_from_config YJ.Util.to_bool_option "log-snark-work-gossip"
+              ~default:false log_received_snark_pool_diff
           in
           let log_transaction_pool_diff =
-            or_from_config ~keyname:"log-txn-pool-gossip"
-              ~getter:DC.log_txn_pool_gossip
-              ~preferred_value:log_transaction_pool_diff ~default:false
+            or_from_config YJ.Util.to_bool_option "log-txn-pool-gossip"
+              ~default:false log_transaction_pool_diff
           in
           let log_block_creation =
-            or_from_config ~keyname:"log-block-creation"
-              ~getter:DC.log_block_creation ~preferred_value:log_block_creation
-              ~default:true
+            or_from_config YJ.Util.to_bool_option "log-block-creation"
+              ~default:true log_block_creation
           in
           let log_gossip_heard =
             { Mina_networking.Config.snark_pool_diff =
@@ -899,51 +898,42 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             ; new_state = true
             }
           in
-          let to_publickey_compressed_option which pk_str =
-            match Public_key.Compressed.of_base58_check pk_str with
-            | Ok key -> (
-                match Public_key.decompress key with
-                | None ->
-                    Mina_user_error.raisef ~where:"decompressing a public key"
-                      "The %s public key %s could not be decompressed." which
-                      pk_str
-                | Some _ ->
-                    Some key )
-            | Error _e ->
-                Mina_user_error.raisef ~where:"decoding a public key"
-                  "The %s public key %s could not be decoded." which pk_str
+          let json_to_publickey_compressed_option which json =
+            YJ.Util.to_string_option json
+            |> Option.bind ~f:(fun pk_str ->
+                   match Public_key.Compressed.of_base58_check pk_str with
+                   | Ok key -> (
+                       match Public_key.decompress key with
+                       | None ->
+                           Mina_user_error.raisef
+                             ~where:"decompressing a public key"
+                             "The %s public key %s could not be decompressed."
+                             which pk_str
+                       | Some _ ->
+                           Some key )
+                   | Error _e ->
+                       Mina_user_error.raisef ~where:"decoding a public key"
+                         "The %s public key %s could not be decoded." which
+                         pk_str )
           in
           let run_snark_worker_flag =
-            maybe_from_config ~keyname:"run-snark-worker"
-              ~getter:
-                Option.(
-                  fun x ->
-                    DC.run_snark_worker x
-                    >>= to_publickey_compressed_option "snark_worker")
-              ~preferred_value:run_snark_worker_flag
+            maybe_from_config
+              (json_to_publickey_compressed_option "snark worker")
+              "run-snark-worker" run_snark_worker_flag
           in
           let run_snark_coordinator_flag =
-            maybe_from_config ~keyname:"run-snark-coordinator"
-              ~getter:
-                Option.(
-                  fun x ->
-                    DC.run_snark_coordinator x
-                    >>= to_publickey_compressed_option "snark_coordinator")
-              ~preferred_value:run_snark_coordinator_flag
+            maybe_from_config
+              (json_to_publickey_compressed_option "snark coordinator")
+              "run-snark-coordinator" run_snark_coordinator_flag
           in
           let snark_worker_parallelism_flag =
-            maybe_from_config ~keyname:"snark-worker-parallelism"
-              ~getter:DC.snark_worker_parallelism
-              ~preferred_value:snark_worker_parallelism_flag
+            maybe_from_config YJ.Util.to_int_option "snark-worker-parallelism"
+              snark_worker_parallelism_flag
           in
           let coinbase_receiver_flag =
-            maybe_from_config ~keyname:"coinbase-receiver"
-              ~getter:
-                Option.(
-                  fun x ->
-                    DC.coinbase_receiver x
-                    >>= to_publickey_compressed_option "coinbase_receiver")
-              ~preferred_value:coinbase_receiver_flag
+            maybe_from_config
+              (json_to_publickey_compressed_option "coinbase receiver")
+              "coinbase-receiver" coinbase_receiver_flag
           in
           let%bind external_ip =
             match external_ip_opt with
@@ -960,23 +950,17 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             { external_ip; bind_ip; peer = None; client_port; libp2p_port }
           in
           let block_production_key =
-            maybe_from_config ~keyname:"block-producer-key"
-              ~getter:DC.block_producer_key
-              ~preferred_value:block_production_key
+            maybe_from_config YJ.Util.to_string_option "block-producer-key"
+              block_production_key
           in
           let block_production_pubkey =
-            maybe_from_config ~keyname:"block-producer-pubkey"
-              ~getter:
-                Option.(
-                  fun x ->
-                    DC.block_producer_pubkey x
-                    >>= to_publickey_compressed_option "block_producer")
-              ~preferred_value:block_production_pubkey
+            maybe_from_config
+              (json_to_publickey_compressed_option "block producer")
+              "block-producer-pubkey" block_production_pubkey
           in
           let block_production_password =
-            maybe_from_config ~keyname:"block-producer-password"
-              ~getter:DC.block_producer_password
-              ~preferred_value:block_production_password
+            maybe_from_config YJ.Util.to_string_option "block-producer-password"
+              block_production_password
           in
           Option.iter
             ~f:(fun password ->
@@ -1203,28 +1187,26 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                    /ip4/IPADDR/tcp/PORT/p2p/PEERID)"
                   raw_peer ) ;
           let initial_peers =
-            let peers =
-              or_from_config ~keyname:"peers" ~getter:DC.peers
-                ~preferred_value:None ~default:[]
-            in
             List.concat
               [ List.map ~f:Mina_net2.Multiaddr.of_string libp2p_peers_raw
               ; peer_list_file_contents_or_empty
-              ; List.map ~f:Mina_net2.Multiaddr.of_string @@ peers
+              ; List.map ~f:Mina_net2.Multiaddr.of_string
+                @@ or_from_config
+                     (Fn.compose Option.some
+                        (YJ.Util.convert_each YJ.Util.to_string) )
+                     "peers" None ~default:[]
               ]
           in
           let direct_peers =
             List.map ~f:Mina_net2.Multiaddr.of_string direct_peers_raw
           in
           let min_connections =
-            or_from_config ~keyname:"min-connections" ~getter:DC.min_connections
-              ~preferred_value:min_connections
-              ~default:Cli_lib.Default.min_connections
+            or_from_config YJ.Util.to_int_option "min-connections"
+              ~default:Cli_lib.Default.min_connections min_connections
           in
           let max_connections =
-            or_from_config ~keyname:"max-connections" ~getter:DC.max_connections
-              ~preferred_value:max_connections
-              ~default:Cli_lib.Default.max_connections
+            or_from_config YJ.Util.to_int_option "max-connections"
+              ~default:Cli_lib.Default.max_connections max_connections
           in
           let pubsub_v1 = Gossip_net.Libp2p.N in
           (* TODO uncomment after introducing Bitswap-based block retrieval *)
@@ -1233,21 +1215,17 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                  ~default:Cli_lib.Default.pubsub_v1 pubsub_v1
              in *)
           let pubsub_v0 =
-            or_from_config ~keyname:"pubsub-v0"
-              ~getter:
-                Option.(fun x -> DC.pubsub_v0 x >>= to_pubsub_topic_mode_option)
-              ~preferred_value:None ~default:Cli_lib.Default.pubsub_v0
+            or_from_config to_pubsub_topic_mode_option "pubsub-v0"
+              ~default:Cli_lib.Default.pubsub_v0 None
           in
-
           let validation_queue_size =
-            or_from_config ~keyname:"validation-queue-size"
-              ~getter:DC.validation_queue_size
-              ~preferred_value:validation_queue_size
+            or_from_config YJ.Util.to_int_option "validation-queue-size"
               ~default:Cli_lib.Default.validation_queue_size
+              validation_queue_size
           in
           let stop_time =
-            or_from_config ~keyname:"stop-time" ~getter:DC.stop_time
-              ~preferred_value:stop_time ~default:Cli_lib.Default.stop_time
+            or_from_config YJ.Util.to_int_option "stop-time"
+              ~default:Cli_lib.Default.stop_time stop_time
           in
           if enable_tracing then Mina_tracing.start conf_dir |> don't_wait_for ;
           let%bind () =
@@ -1418,16 +1396,16 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~persistent_root_location:(conf_dir ^/ "root")
                  ~persistent_frontier_location:(conf_dir ^/ "frontier")
-                 ~epoch_ledger_location ~snark_work_fee ~time_controller
-                 ~block_production_keypairs ~monitor ~consensus_local_state
-                 ~is_archive_rocksdb ~work_reassignment_wait
-                 ~archive_process_location ~log_block_creation
-                 ~precomputed_values ~start_time ?precomputed_blocks_path
-                 ~log_precomputed_blocks ~start_filtered_logs
-                 ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-                 ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
-                 ~node_status_url ~graphql_control_port:itn_graphql_port
-                 ~simplified_node_stats
+                 ~epoch_ledger_location ~snark_work_fee:snark_work_fee_flag
+                 ~time_controller ~block_production_keypairs ~monitor
+                 ~consensus_local_state ~is_archive_rocksdb
+                 ~work_reassignment_wait ~archive_process_location
+                 ~log_block_creation ~precomputed_values ~start_time
+                 ?precomputed_blocks_path ~log_precomputed_blocks
+                 ~start_filtered_logs ~upload_blocks_to_gcloud
+                 ~block_reward_threshold ~uptime_url ~uptime_submitter_keypair
+                 ~uptime_send_node_commit ~stop_time ~node_status_url
+                 ~graphql_control_port:itn_graphql_port ~simplified_node_stats
                  ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
                  ~compile_config () )
           in

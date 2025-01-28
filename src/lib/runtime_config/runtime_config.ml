@@ -9,6 +9,14 @@ module Fork_config = struct
     ; global_slot_since_genesis : int (* global slot since genesis *)
     }
   [@@deriving yojson, bin_io_unversioned]
+
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind global_slot_since_genesis = Int.gen_incl 0 1_000_000 in
+    let%bind blockchain_length = Int.gen_incl 0 global_slot_since_genesis in
+    let%map state_hash = Mina_base.State_hash.gen in
+    let state_hash = Mina_base.State_hash.to_base58_check state_hash in
+    { state_hash; blockchain_length; global_slot_since_genesis }
 end
 
 let yojson_strip_fields ~keep_fields = function
@@ -467,42 +475,6 @@ module Json_layout = struct
       ; slot_chain_end : int option [@default None]
       ; minimum_user_command_fee : Currency.Fee.t option [@default None]
       ; network_id : string option [@default None]
-      ; client_port : int option [@default None] [@key "client-port"]
-      ; libp2p_port : int option [@default None] [@key "libp2p-port"]
-      ; rest_port : int option [@default None] [@key "rest-port"]
-      ; graphql_port : int option [@default None] [@key "limited-graphql-port"]
-      ; node_status_url : string option [@default None] [@key "node-status-url"]
-      ; block_producer_key : string option
-            [@default None] [@key "block-producer-key"]
-      ; block_producer_pubkey : string option
-            [@default None] [@key "block-producer-pubkey"]
-      ; block_producer_password : string option
-            [@default None] [@key "block-producer-password"]
-      ; coinbase_receiver : string option
-            [@default None] [@key "coinbase-receiver"]
-      ; run_snark_worker : string option
-            [@default None] [@key "run-snark-worker"]
-      ; run_snark_coordinator : string option
-            [@default None] [@key "run-snark-coordinator"]
-      ; snark_worker_fee : int option [@default None] [@key "snark-worker-fee"]
-      ; snark_worker_parallelism : int option
-            [@default None] [@key "snark-worker-parallelism"]
-      ; work_selection : string option [@default None] [@key "work-selection"]
-      ; work_reassignment_wait : int option
-            [@default None] [@key "work-reassignment-wait"]
-      ; log_txn_pool_gossip : bool option
-            [@default None] [@key "log-txn-pool-gossip"]
-      ; log_snark_work_gossip : bool option
-            [@default None] [@key "log-snark-work-gossip"]
-      ; log_block_creation : bool option
-            [@default None] [@key "log-block-creation"]
-      ; min_connections : int option [@default None] [@key "min-connections"]
-      ; max_connections : int option [@default None] [@key "max-connections"]
-      ; pubsub_v0 : string option [@default None] [@key "pubsub-v0"]
-      ; validation_queue_size : int option
-            [@default None] [@key "validation-queue-size"]
-      ; stop_time : int option [@default None] [@key "stop-time"]
-      ; peers : string list option [@default None] [@key "peers"]
       ; sync_ledger_max_subtree_depth : int option [@default None]
       ; sync_ledger_default_subtree_depth : int option [@default None]
       }
@@ -800,6 +772,11 @@ module Accounts = struct
       ; permissions
       ; zkapp = Option.map ~f:mk_zkapp a.zkapp
       }
+
+    let gen =
+      Quickcheck.Generator.map Mina_base.Account.gen ~f:(fun a ->
+          (* This will never fail with a proper account generator. *)
+          of_account a |> Result.ok_or_failwith )
   end
 
   type single = Single.t =
@@ -937,6 +914,29 @@ module Ledger = struct
 
   let of_yojson json =
     Result.bind ~f:of_json_layout (Json_layout.Ledger.of_yojson json)
+
+  let gen =
+    let open Quickcheck in
+    let open Generator.Let_syntax in
+    let%bind accounts = Generator.list Accounts.Single.gen in
+    let num_accounts = List.length accounts in
+    let balances =
+      List.mapi accounts ~f:(fun number a -> (number, a.balance))
+    in
+    let%bind hash =
+      Mina_base.Ledger_hash.(Generator.map ~f:to_base58_check gen)
+      |> Option.quickcheck_generator
+    in
+    let%bind name = String.gen_nonempty in
+    let%map add_genesis_winner = Bool.quickcheck_generator in
+    { base = Accounts accounts
+    ; num_accounts = Some num_accounts
+    ; balances
+    ; hash
+    ; s3_data_hash = None
+    ; name = Some name
+    ; add_genesis_winner = Some add_genesis_winner
+    }
 end
 
 module Proof_keys = struct
@@ -978,6 +978,8 @@ module Proof_keys = struct
           Error
             "Runtime_config.Proof_keys.Level.of_json_layout: Expected the \
              field 'level' to contain a string"
+
+    let gen = Quickcheck.Generator.of_list [ Full; Check; No_check ]
   end
 
   module Transaction_capacity = struct
@@ -1010,6 +1012,16 @@ module Proof_keys = struct
     let of_yojson json =
       Result.bind ~f:of_json_layout
         (Json_layout.Proof_keys.Transaction_capacity.of_yojson json)
+
+    let gen =
+      let open Quickcheck in
+      let log_2_gen =
+        Generator.map ~f:(fun i -> Log_2 i) @@ Int.gen_incl 0 10
+      in
+      let txns_per_second_x10_gen =
+        Generator.map ~f:(fun i -> Txns_per_second_x10 i) @@ Int.gen_incl 0 1000
+      in
+      Generator.union [ log_2_gen; txns_per_second_x10_gen ]
 
     let small : t = Log_2 2
 
@@ -1125,6 +1137,37 @@ module Proof_keys = struct
         opt_fallthrough ~default:t1.account_creation_fee t2.account_creation_fee
     ; fork = opt_fallthrough ~default:t1.fork t2.fork
     }
+
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind level = Level.gen in
+    let%bind sub_windows_per_window = Int.gen_incl 0 1000 in
+    let%bind ledger_depth = Int.gen_incl 0 64 in
+    let%bind work_delay = Int.gen_incl 0 1000 in
+    let%bind block_window_duration_ms = Int.gen_incl 1_000 360_000 in
+    let%bind transaction_capacity = Transaction_capacity.gen in
+    let%bind coinbase_amount =
+      Currency.Amount.(gen_incl zero (of_mina_int_exn 1))
+    in
+    let%bind supercharged_coinbase_factor = Int.gen_incl 0 100 in
+    let%bind account_creation_fee =
+      Currency.Fee.(gen_incl one (of_mina_int_exn 10))
+    in
+    let%map fork =
+      let open Quickcheck.Generator in
+      union [ map ~f:Option.some Fork_config.gen; return None ]
+    in
+    { level = Some level
+    ; sub_windows_per_window = Some sub_windows_per_window
+    ; ledger_depth = Some ledger_depth
+    ; work_delay = Some work_delay
+    ; block_window_duration_ms = Some block_window_duration_ms
+    ; transaction_capacity = Some transaction_capacity
+    ; coinbase_amount = Some coinbase_amount
+    ; supercharged_coinbase_factor = Some supercharged_coinbase_factor
+    ; account_creation_fee = Some account_creation_fee
+    ; fork
+    }
 end
 
 module Genesis = struct
@@ -1161,6 +1204,30 @@ module Genesis = struct
         opt_fallthrough ~default:t1.genesis_state_timestamp
           t2.genesis_state_timestamp
     }
+
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind k = Int.gen_incl 0 1000 in
+    let%bind delta = Int.gen_incl 0 1000 in
+    let%bind slots_per_epoch = Int.gen_incl 1 1_000_000 in
+    let%bind slots_per_sub_window = Int.gen_incl 1 1_000 in
+    let%bind grace_period_slots =
+      Quickcheck.Generator.union
+        [ return None
+        ; Quickcheck.Generator.map ~f:Option.some @@ Int.gen_incl 0 1000
+        ]
+    in
+    let%map genesis_state_timestamp =
+      Time.(gen_incl epoch (of_string "2050-01-01 00:00:00Z"))
+      |> Quickcheck.Generator.map ~f:Time.to_string
+    in
+    { k = Some k
+    ; delta = Some delta
+    ; slots_per_epoch = Some slots_per_epoch
+    ; slots_per_sub_window = Some slots_per_sub_window
+    ; grace_period_slots
+    ; genesis_state_timestamp = Some genesis_state_timestamp
+    }
 end
 
 module Daemon = struct
@@ -1182,76 +1249,10 @@ module Daemon = struct
     ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t option
           [@default None]
     ; network_id : string option [@default None]
-    ; client_port : int option [@default None]
-    ; libp2p_port : int option [@default None]
-    ; rest_port : int option [@default None]
-    ; graphql_port : int option [@default None]
-    ; node_status_url : string option [@default None]
-    ; block_producer_key : string option [@default None]
-    ; block_producer_pubkey : string option [@default None]
-    ; block_producer_password : string option [@default None]
-    ; coinbase_receiver : string option [@default None]
-    ; run_snark_worker : string option [@default None]
-    ; run_snark_coordinator : string option [@default None]
-    ; snark_worker_fee : int option [@default None]
-    ; snark_worker_parallelism : int option [@default None]
-    ; work_selection : string option [@default None]
-    ; work_reassignment_wait : int option [@default None]
-    ; log_txn_pool_gossip : bool option [@default None]
-    ; log_snark_work_gossip : bool option [@default None]
-    ; log_block_creation : bool option [@default None]
-    ; min_connections : int option [@default None]
-    ; max_connections : int option [@default None]
-    ; pubsub_v0 : string option [@default None]
-    ; validation_queue_size : int option [@default None]
-    ; stop_time : int option [@default None]
-    ; peers : string list option [@default None]
     ; sync_ledger_max_subtree_depth : int option [@default None]
     ; sync_ledger_default_subtree_depth : int option [@default None]
     }
-  [@@deriving bin_io_unversioned, fields]
-
-  let default : t =
-    { txpool_max_size = None
-    ; peer_list_url = None
-    ; zkapp_proof_update_cost = None
-    ; zkapp_signed_single_update_cost = None
-    ; zkapp_signed_pair_update_cost = None
-    ; zkapp_transaction_cost_limit = None
-    ; max_event_elements = None
-    ; max_action_elements = None
-    ; zkapp_cmd_limit_hardcap = None
-    ; slot_tx_end = None
-    ; slot_chain_end = None
-    ; minimum_user_command_fee = None
-    ; network_id = None
-    ; client_port = None
-    ; libp2p_port = None
-    ; rest_port = None
-    ; graphql_port = None
-    ; node_status_url = None
-    ; block_producer_key = None
-    ; block_producer_pubkey = None
-    ; block_producer_password = None
-    ; coinbase_receiver = None
-    ; run_snark_worker = None
-    ; run_snark_coordinator = None
-    ; snark_worker_fee = None
-    ; snark_worker_parallelism = None
-    ; work_selection = None
-    ; work_reassignment_wait = None
-    ; log_txn_pool_gossip = None
-    ; log_snark_work_gossip = None
-    ; log_block_creation = None
-    ; min_connections = None
-    ; max_connections = None
-    ; pubsub_v0 = None
-    ; validation_queue_size = None
-    ; stop_time = None
-    ; peers = None
-    ; sync_ledger_max_subtree_depth = None
-    ; sync_ledger_default_subtree_depth = None
-    }
+  [@@deriving bin_io_unversioned]
 
   let to_json_layout : t -> Json_layout.Daemon.t = Fn.id
 
@@ -1293,54 +1294,6 @@ module Daemon = struct
         opt_fallthrough ~default:t1.minimum_user_command_fee
           t2.minimum_user_command_fee
     ; network_id = opt_fallthrough ~default:t1.network_id t2.network_id
-    ; client_port = opt_fallthrough ~default:t1.client_port t2.client_port
-    ; libp2p_port = opt_fallthrough ~default:t1.libp2p_port t2.libp2p_port
-    ; rest_port = opt_fallthrough ~default:t1.rest_port t2.rest_port
-    ; graphql_port = opt_fallthrough ~default:t1.graphql_port t2.graphql_port
-    ; node_status_url =
-        opt_fallthrough ~default:t1.node_status_url t2.node_status_url
-    ; block_producer_key =
-        opt_fallthrough ~default:t1.block_producer_key t2.block_producer_key
-    ; block_producer_pubkey =
-        opt_fallthrough ~default:t1.block_producer_pubkey
-          t2.block_producer_pubkey
-    ; block_producer_password =
-        opt_fallthrough ~default:t1.block_producer_password
-          t2.block_producer_password
-    ; coinbase_receiver =
-        opt_fallthrough ~default:t1.coinbase_receiver t2.coinbase_receiver
-    ; run_snark_worker =
-        opt_fallthrough ~default:t1.run_snark_worker t2.run_snark_worker
-    ; run_snark_coordinator =
-        opt_fallthrough ~default:t1.run_snark_coordinator
-          t2.run_snark_coordinator
-    ; snark_worker_fee =
-        opt_fallthrough ~default:t1.snark_worker_fee t2.snark_worker_fee
-    ; snark_worker_parallelism =
-        opt_fallthrough ~default:t1.snark_worker_parallelism
-          t2.snark_worker_parallelism
-    ; work_selection =
-        opt_fallthrough ~default:t1.work_selection t2.work_selection
-    ; work_reassignment_wait =
-        opt_fallthrough ~default:t1.work_reassignment_wait
-          t2.work_reassignment_wait
-    ; log_txn_pool_gossip =
-        opt_fallthrough ~default:t1.log_txn_pool_gossip t2.log_txn_pool_gossip
-    ; log_snark_work_gossip =
-        opt_fallthrough ~default:t1.log_snark_work_gossip
-          t2.log_snark_work_gossip
-    ; log_block_creation =
-        opt_fallthrough ~default:t1.log_block_creation t2.log_block_creation
-    ; min_connections =
-        opt_fallthrough ~default:t1.min_connections t2.min_connections
-    ; max_connections =
-        opt_fallthrough ~default:t1.max_connections t2.max_connections
-    ; pubsub_v0 = opt_fallthrough ~default:t1.pubsub_v0 t2.pubsub_v0
-    ; validation_queue_size =
-        opt_fallthrough ~default:t1.validation_queue_size
-          t2.validation_queue_size
-    ; stop_time = opt_fallthrough ~default:t1.stop_time t2.stop_time
-    ; peers = opt_fallthrough ~default:t1.peers t2.peers
     ; sync_ledger_max_subtree_depth =
         opt_fallthrough ~default:t1.sync_ledger_max_subtree_depth
           t2.sync_ledger_max_subtree_depth
@@ -1348,12 +1301,48 @@ module Daemon = struct
         opt_fallthrough ~default:t1.sync_ledger_default_subtree_depth
           t2.sync_ledger_default_subtree_depth
     }
+
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind txpool_max_size = Int.gen_incl 0 1000 in
+    let%bind zkapp_proof_update_cost = Float.gen_incl 0.0 100.0 in
+    let%bind zkapp_signed_single_update_cost = Float.gen_incl 0.0 100.0 in
+    let%bind zkapp_signed_pair_update_cost = Float.gen_incl 0.0 100.0 in
+    let%bind zkapp_transaction_cost_limit = Float.gen_incl 0.0 100.0 in
+    let%bind max_event_elements = Int.gen_incl 0 100 in
+    let%bind zkapp_cmd_limit_hardcap = Int.gen_incl 0 1000 in
+    let%bind minimum_user_command_fee =
+      Currency.Fee.(gen_incl one (of_mina_int_exn 10))
+    in
+    let%map max_action_elements = Int.gen_incl 0 1000 in
+    { txpool_max_size = Some txpool_max_size
+    ; peer_list_url = None
+    ; zkapp_proof_update_cost = Some zkapp_proof_update_cost
+    ; zkapp_signed_single_update_cost = Some zkapp_signed_single_update_cost
+    ; zkapp_signed_pair_update_cost = Some zkapp_signed_pair_update_cost
+    ; zkapp_transaction_cost_limit = Some zkapp_transaction_cost_limit
+    ; max_event_elements = Some max_event_elements
+    ; max_action_elements = Some max_action_elements
+    ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
+    ; slot_tx_end = None
+    ; slot_chain_end = None
+    ; minimum_user_command_fee = Some minimum_user_command_fee
+    ; network_id = None
+    ; sync_ledger_max_subtree_depth = None
+    ; sync_ledger_default_subtree_depth = None
+    }
 end
 
 module Epoch_data = struct
   module Data = struct
     type t = { ledger : Ledger.t; seed : string }
     [@@deriving bin_io_unversioned, yojson]
+
+    let gen =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind ledger = Ledger.gen in
+      let%map seed = String.gen_nonempty in
+      { ledger; seed }
   end
 
   type t =
@@ -1428,6 +1417,12 @@ module Epoch_data = struct
 
   let of_yojson json =
     Result.bind ~f:of_json_layout (Json_layout.Epoch_data.of_yojson json)
+
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind staking = Data.gen in
+    let%map next = Option.quickcheck_generator Data.gen in
+    { staking; next }
 end
 
 type t =
@@ -1437,7 +1432,7 @@ type t =
   ; ledger : Ledger.t option
   ; epoch_data : Epoch_data.t option
   }
-[@@deriving bin_io_unversioned, fields]
+[@@deriving bin_io_unversioned]
 
 let make ?daemon ?genesis ?proof ?ledger ?epoch_data () =
   { daemon; genesis; proof; ledger; epoch_data }
@@ -1517,6 +1512,20 @@ let combine t1 t2 =
   ; proof = merge ~combine:Proof_keys.combine t1.proof t2.proof
   ; ledger = opt_fallthrough ~default:t1.ledger t2.ledger
   ; epoch_data = opt_fallthrough ~default:t1.epoch_data t2.epoch_data
+  }
+
+let gen =
+  let open Quickcheck.Generator.Let_syntax in
+  let%map daemon = Daemon.gen
+  and genesis = Genesis.gen
+  and proof = Proof_keys.gen
+  and ledger = Ledger.gen
+  and epoch_data = Epoch_data.gen in
+  { daemon = Some daemon
+  ; genesis = Some genesis
+  ; proof = Some proof
+  ; ledger = Some ledger
+  ; epoch_data = Some epoch_data
   }
 
 let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
@@ -1624,38 +1633,3 @@ let slot_tx_end, slot_chain_end =
     t.daemon >>= get_runtime >>| Mina_numbers.Global_slot_since_hard_fork.of_int
   in
   (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))
-
-module Config_loader = struct
-  (* Use the prefered value if available. Otherwise, given a list of confs
-     find the first conf such that the getter returns a Some.
-  *)
-  let maybe_from_config (type conf a) ~(logger : Logger.t)
-      ~(configs : (string * conf) list) ~(getter : conf -> a option)
-      ~(keyname : string) ~(preferred_value : a option) : a option =
-    match preferred_value with
-    | Some v ->
-        Some v
-    | None ->
-        let open Option.Let_syntax in
-        let%map config_file, data =
-          List.find_map configs ~f:(fun (config_file, daemon_config) ->
-              let%map a = getter daemon_config in
-              (config_file, a) )
-        in
-        [%log debug] "Key $key being used from config file $config_file"
-          ~metadata:
-            [ ("key", `String keyname); ("config_file", `String config_file) ] ;
-        data
-
-  let or_from_config ~logger ~configs ~getter ~keyname ~preferred_value ~default
-      =
-    match
-      maybe_from_config ~logger ~configs ~getter ~keyname ~preferred_value
-    with
-    | Some x ->
-        x
-    | None ->
-        [%log trace] "Key '$key' not found in any config files, using default"
-          ~metadata:[ ("key", `String keyname) ] ;
-        default
-end
