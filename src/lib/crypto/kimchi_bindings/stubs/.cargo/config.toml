@@ -9,4 +9,4 @@ rustflags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup"]
 replace-with = "vendored-sources"
 
 [source.vendored-sources]
-directory = "../../../mina-rust-dependencies"
+directory = "../../mina-rust-dependencies"
