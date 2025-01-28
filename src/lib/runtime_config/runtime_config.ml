@@ -1184,49 +1184,20 @@ module Proof_keys = struct
 end
 
 module Genesis = struct
-  type t =
+  type t = Json_layout.Genesis.t =
     { k : int option (* the depth of finality constant (in slots) *)
     ; delta : int option (* max permissible delay of packets (in slots) *)
     ; slots_per_epoch : int option
     ; slots_per_sub_window : int option
     ; grace_period_slots : int option
-    ; genesis_state_timestamp : int64 option
+    ; genesis_state_timestamp : string option
     }
   [@@deriving bin_io_unversioned]
 
-  let to_json_layout : t -> Json_layout.Genesis.t =
-   fun a ->
-    { Json_layout.Genesis.k = a.k
-    ; delta = a.delta
-    ; slots_per_epoch = a.slots_per_epoch
-    ; slots_per_sub_window = a.slots_per_sub_window
-    ; grace_period_slots = a.grace_period_slots
-    ; genesis_state_timestamp =
-        Option.map a.genesis_state_timestamp
-          ~f:Genesis_constants.genesis_timestamp_to_string
-    }
+  let to_json_layout : t -> Json_layout.Genesis.t = Fn.id
 
   let of_json_layout : Json_layout.Genesis.t -> (t, string) Result.t =
-   fun a ->
-    match a.genesis_state_timestamp with
-    | None ->
-        Ok
-          { k = a.k
-          ; delta = a.delta
-          ; slots_per_epoch = a.slots_per_epoch
-          ; slots_per_sub_window = a.slots_per_sub_window
-          ; grace_period_slots = a.grace_period_slots
-          ; genesis_state_timestamp = None
-          }
-    | Some ts ->
-        let%map.Result ts = Genesis_constants.validate_time (Some ts) in
-        { k = a.k
-        ; delta = a.delta
-        ; slots_per_epoch = a.slots_per_epoch
-        ; slots_per_sub_window = a.slots_per_sub_window
-        ; grace_period_slots = a.grace_period_slots
-        ; genesis_state_timestamp = Some ts
-        }
+    Result.return
 
   let to_yojson x = Json_layout.Genesis.to_yojson (to_json_layout x)
 
@@ -1881,7 +1852,12 @@ module Constants : Constants_intf = struct
           ; genesis_state_timestamp =
               Option.value
                 ~default:a.genesis_constants.protocol.genesis_state_timestamp
-                Option.(b.genesis >>= fun g -> g.genesis_state_timestamp)
+                Option.(
+                  b.genesis
+                  >>= fun g ->
+                  g.genesis_state_timestamp
+                  >>| Genesis_constants.genesis_timestamp_of_string
+                  >>| Genesis_constants.of_time)
           }
       ; txpool_max_size =
           Option.value ~default:a.genesis_constants.txpool_max_size
@@ -1937,32 +1913,27 @@ module Constants : Constants_intf = struct
         Option.value ~default:a.constraint_constants.block_window_duration_ms
           Option.(b.proof >>= fun p -> p.block_window_duration_ms)
       in
-      let transaction_capacity_log_2 =
-        Option.value ~default:a.constraint_constants.transaction_capacity_log_2
-          Option.(
-            b.proof
-            >>= fun p ->
-            p.transaction_capacity
-            >>| fun transaction_capacity ->
-            Proof_keys.Transaction_capacity.to_transaction_capacity_log_2
-              ~block_window_duration_ms ~transaction_capacity)
-      in
-      let work_delay =
-        Option.value ~default:a.constraint_constants.work_delay
-          Option.(b.proof >>= fun p -> p.work_delay)
-      in
-      { Genesis_constants.Constraint_constants.sub_windows_per_window =
+      { a.constraint_constants with
+        sub_windows_per_window =
           Option.value ~default:a.constraint_constants.sub_windows_per_window
             Option.(b.proof >>= fun p -> p.sub_windows_per_window)
       ; ledger_depth =
           Option.value ~default:a.constraint_constants.ledger_depth
             Option.(b.proof >>= fun p -> p.ledger_depth)
-      ; work_delay
+      ; work_delay =
+          Option.value ~default:a.constraint_constants.work_delay
+            Option.(b.proof >>= fun p -> p.work_delay)
       ; block_window_duration_ms
-      ; transaction_capacity_log_2
-      ; pending_coinbase_depth =
-          Core_kernel.Int.ceil_log2
-            (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
+      ; transaction_capacity_log_2 =
+          Option.value
+            ~default:a.constraint_constants.transaction_capacity_log_2
+            Option.(
+              b.proof
+              >>= fun p ->
+              p.transaction_capacity
+              >>| fun transaction_capacity ->
+              Proof_keys.Transaction_capacity.to_transaction_capacity_log_2
+                ~block_window_duration_ms ~transaction_capacity)
       ; coinbase_amount =
           Option.value ~default:a.constraint_constants.coinbase_amount
             Option.(b.proof >>= fun p -> p.coinbase_amount)
@@ -2000,11 +1971,6 @@ module Constants : Constants_intf = struct
           Option.value
             ~default:a.compile_config.sync_ledger_default_subtree_depth
             Option.(b.daemon >>= fun d -> d.sync_ledger_default_subtree_depth)
-      ; default_snark_worker_fee =
-          Option.value ~default:a.compile_config.default_snark_worker_fee
-            Option.(
-              b.daemon
-              >>= fun d -> d.snark_worker_fee >>= Currency.Fee.of_mina_int)
       }
     in
     { genesis_constants; constraint_constants; proof_level; compile_config }
@@ -2050,79 +2016,3 @@ module Constants : Constants_intf = struct
     in
     combine compile_constants t
 end
-
-(* This function is useful when you want to generate a runtime config which can recreate
-   the provided constants.
-*)
-let of_constants (constants : Constants.constants) : t =
-  let genesis_constants = Constants.genesis_constants constants in
-  let constraint_constants = Constants.constraint_constants constants in
-  let proof_level = Constants.proof_level constants in
-  let compile_config = Constants.compile_config constants in
-  let proof =
-    { Proof_keys.level =
-        ( match proof_level with
-        | Full ->
-            Some Full
-        | Check ->
-            Some Check
-        | No_check ->
-            Some No_check )
-    ; sub_windows_per_window = Some constraint_constants.sub_windows_per_window
-    ; ledger_depth = Some constraint_constants.ledger_depth
-    ; work_delay = Some constraint_constants.work_delay
-    ; block_window_duration_ms =
-        Some constraint_constants.block_window_duration_ms
-    ; transaction_capacity =
-        Some (Log_2 constraint_constants.transaction_capacity_log_2)
-    ; coinbase_amount = Some constraint_constants.coinbase_amount
-    ; supercharged_coinbase_factor =
-        Some constraint_constants.supercharged_coinbase_factor
-    ; account_creation_fee = Some constraint_constants.account_creation_fee
-    ; fork =
-        Option.map constraint_constants.fork
-          ~f:(fun { state_hash; blockchain_length; global_slot_since_genesis }
-             ->
-            { Fork_config.state_hash =
-                Mina_base.State_hash.to_base58_check state_hash
-            ; blockchain_length = Mina_numbers.Length.to_int blockchain_length
-            ; global_slot_since_genesis =
-                Mina_numbers.Global_slot_since_genesis.to_int
-                  global_slot_since_genesis
-            } )
-    }
-  in
-  let genesis =
-    { Genesis.k = Some genesis_constants.protocol.k
-    ; delta = Some genesis_constants.protocol.delta
-    ; slots_per_epoch = Some genesis_constants.protocol.slots_per_epoch
-    ; slots_per_sub_window =
-        Some genesis_constants.protocol.slots_per_sub_window
-    ; grace_period_slots = Some genesis_constants.protocol.grace_period_slots
-    ; genesis_state_timestamp =
-        Some genesis_constants.protocol.genesis_state_timestamp
-    }
-  in
-  let daemon =
-    { Daemon.default with
-      txpool_max_size = Some genesis_constants.txpool_max_size
-    ; zkapp_proof_update_cost = Some genesis_constants.zkapp_proof_update_cost
-    ; zkapp_signed_single_update_cost =
-        Some genesis_constants.zkapp_signed_single_update_cost
-    ; zkapp_signed_pair_update_cost =
-        Some genesis_constants.zkapp_signed_pair_update_cost
-    ; zkapp_transaction_cost_limit =
-        Some genesis_constants.zkapp_transaction_cost_limit
-    ; max_event_elements = Some genesis_constants.max_event_elements
-    ; max_action_elements = Some genesis_constants.max_action_elements
-    ; zkapp_cmd_limit_hardcap = Some genesis_constants.zkapp_cmd_limit_hardcap
-    ; minimum_user_command_fee = Some genesis_constants.minimum_user_command_fee
-    ; snark_worker_fee =
-        Some (Currency.Fee.to_mina_int compile_config.default_snark_worker_fee)
-    }
-  in
-  { default with
-    genesis = Some genesis
-  ; proof = Some proof
-  ; daemon = Some daemon
-  }
