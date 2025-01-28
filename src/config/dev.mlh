@@ -4,6 +4,11 @@
 (*END src/config/ledger_depth/small.mlh*)
 
 
+(*BEGIN src/config/curve/medium.mlh*)
+[%%define curve_size 255]
+(*END src/config/curve/medium.mlh*)
+
+
 (*BEGIN src/config/coinbase/standard.mlh*)
 [%%define coinbase "20"]
 (*END src/config/coinbase/standard.mlh*)

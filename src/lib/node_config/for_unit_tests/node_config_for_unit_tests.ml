@@ -7,6 +7,8 @@ include Node_config_version
 
 let (ledger_depth : int) = (10 : int)
 
+let (curve_size : int) = (255 : int)
+
 let (coinbase : string) = ("20" : string)
 
 let (k : int) = (24 : int)

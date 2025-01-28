@@ -1,5 +1,10 @@
 [%%define ledger_depth 35]
 
+(*BEGIN src/config/curve/medium.mlh*)
+[%%define curve_size 255]
+(*END src/config/curve/medium.mlh*)
+
+
 (*BEGIN src/config/coinbase/realistic.mlh*)
 [%%define coinbase "720"]
 (*END src/config/coinbase/realistic.mlh*)
