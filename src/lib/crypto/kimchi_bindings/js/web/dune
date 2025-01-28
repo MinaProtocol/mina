@@ -23,7 +23,6 @@
   ../../../../../../Cargo.lock
   (source_tree ../../../mina-rust-dependencies)
   (source_tree ../../../proof-systems)
-  (source_tree ../../../../../.cargo)
   ;; Required as we use Cargo workspace, and the build requires the Cargo.toml
   ;; and sources for each members
   ../../stubs/Cargo.toml
@@ -33,6 +32,7 @@
   ../../wasm/Cargo.toml
   ;; Enforcing the rust version used for the build
   ../../wasm/rust-toolchain.toml
+  (source_tree ../../wasm/.cargo)
   (source_tree ../../wasm/src))
  (locks /cargo-lock) ; lock for rustup
  (action

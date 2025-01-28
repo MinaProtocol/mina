@@ -1,0 +1,12 @@
+# Keep this config.toml and do not make one global with `../wasm/config.toml` as
+# stubs must use the vendored libraries.
+# plonk_wasm cannot be compiled, for now, with the vendored libraries as it is
+# using nightly and the stdlib is required.
+[target]
+rustflags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup"]
+
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "../../../mina-rust-dependencies"

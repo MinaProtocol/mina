@@ -41,14 +41,13 @@
   ./Cargo.toml
   ../../../../../rust-toolchain.toml
   (source_tree src)
-  (source_tree ../../../../../.cargo)
+  (source_tree .cargo)
   (source_tree ../../mina-rust-dependencies)
   (source_tree ../../proof-systems)
   ;; Required as Cargo asks for all members of the workspace.
   ;; This is temporary until we move into proof-systems
   ../wasm/Cargo.toml
   (source_tree ../wasm/src)
-  (source_tree ../wasm/.cargo)
   (env_var MARLIN_PLONK_STUBS))
  (locks /cargo-lock) ;; lock for rustup
  (action
@@ -159,7 +158,7 @@
   (source_tree ../../mina-rust-dependencies)
   (source_tree ../../proof-systems)
   (source_tree src)
-  (source_tree ../../../../../.cargo)
+  (source_tree .cargo)
   ;; Required as Cargo asks for all members of the workspace.
   ;; This is temporary until we move into proof-systems
   ../wasm/Cargo.toml
