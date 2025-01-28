@@ -32,7 +32,7 @@ let%test_module "Epoch ledger sync tests" =
 
     let () =
       (* Disable log messages from best_tip_diff logger. *)
-      Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+      Logger.Consumer_registry.register ~commit_id:""
         ~id:Logger.Logger_id.best_tip_diff ~processor:(Logger.Processor.raw ())
         ~transport:
           (Logger.Transport.create
