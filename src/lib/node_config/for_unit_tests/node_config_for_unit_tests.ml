@@ -37,6 +37,8 @@ let (pool_max_size : int) = (3000 : int)
 
 let (account_creation_fee_int : string) = ("0.001" : string)
 
+let (default_transaction_fee : string) = ("5" : string)
+
 let (default_snark_worker_fee : string) = ("1" : string)
 
 let (minimum_user_command_fee : string) = ("2" : string)

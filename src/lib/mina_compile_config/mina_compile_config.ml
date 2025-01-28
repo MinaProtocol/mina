@@ -8,7 +8,8 @@ open Core_kernel
 
 module Inputs = struct
   type t =
-    { default_snark_worker_fee_string : string
+    { default_transaction_fee_string : string
+    ; default_snark_worker_fee_string : string
     ; minimum_user_command_fee_string : string
     ; itn_features : bool
     ; compaction_interval_ms : int option
@@ -34,7 +35,8 @@ module Inputs = struct
 end
 
 type t =
-  { default_snark_worker_fee : Currency.Fee.Stable.Latest.t
+  { default_transaction_fee : Currency.Fee.Stable.Latest.t
+  ; default_snark_worker_fee : Currency.Fee.Stable.Latest.t
   ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t
   ; itn_features : bool
   ; compaction_interval : Time.Span.t option
@@ -59,7 +61,9 @@ type t =
 [@@deriving sexp_of, bin_io_unversioned]
 
 let make (inputs : Inputs.t) =
-  { default_snark_worker_fee =
+  { default_transaction_fee =
+      Currency.Fee.of_mina_string_exn inputs.default_transaction_fee_string
+  ; default_snark_worker_fee =
       Currency.Fee.of_mina_string_exn inputs.default_snark_worker_fee_string
   ; minimum_user_command_fee =
       Currency.Fee.of_mina_string_exn inputs.minimum_user_command_fee_string
@@ -92,7 +96,9 @@ let make (inputs : Inputs.t) =
 
 let to_yojson t =
   `Assoc
-    [ ( "default_snark_worker_fee"
+    [ ( "default_transaction_fee"
+      , Currency.Fee.to_yojson t.default_transaction_fee )
+    ; ( "default_snark_worker_fee"
       , Currency.Fee.to_yojson t.default_snark_worker_fee )
     ; ( "minimum_user_command_fee"
       , Currency.Fee.to_yojson t.minimum_user_command_fee )
@@ -131,7 +137,8 @@ let to_yojson t =
 module Compiled = struct
   let t : t =
     let (inputs : Inputs.t) =
-      { default_snark_worker_fee_string = Node_config.default_snark_worker_fee
+      { default_transaction_fee_string = Node_config.default_transaction_fee
+      ; default_snark_worker_fee_string = Node_config.default_snark_worker_fee
       ; minimum_user_command_fee_string = Node_config.minimum_user_command_fee
       ; itn_features = Node_config.itn_features
       ; compaction_interval_ms = Node_config.compaction_interval
@@ -164,7 +171,9 @@ end
 module For_unit_tests = struct
   let t : t =
     let inputs : Inputs.t =
-      { default_snark_worker_fee_string =
+      { default_transaction_fee_string =
+          Node_config_for_unit_tests.default_transaction_fee
+      ; default_snark_worker_fee_string =
           Node_config_for_unit_tests.default_snark_worker_fee
       ; minimum_user_command_fee_string =
           Node_config_for_unit_tests.minimum_user_command_fee

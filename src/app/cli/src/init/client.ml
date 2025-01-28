@@ -4,10 +4,6 @@ open Signature_lib
 open Mina_base
 open Mina_transaction
 
-(* TODO consider a better way of setting a default transaction fee than
-   a fixed compile-time value *)
-let default_transaction_fee = Currency.Fee.of_nanomina_int_exn 250000000
-
 module Client = Graphql_lib.Client.Make (struct
   let preprocess_variables_string = Fn.id
 
@@ -517,17 +513,31 @@ let send_payment_graphql =
     flag "--amount" ~aliases:[ "amount" ]
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
+  let config_file = Cli_lib.Flag.config_files in
   let args =
-    Args.zip3 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
+    Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
+      config_file
   in
   Command.async ~summary:"Send payment to an address"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun
             graphql_endpoint
-            ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver, amount)
+            ( { Cli_lib.Flag.sender; fee; nonce; memo }
+            , receiver
+            , amount
+            , config_file )
           ->
          let open Deferred.Let_syntax in
-         let fee = Option.value ~default:default_transaction_fee fee in
+         let%bind compile_config =
+           let logger = Logger.create () in
+           let%map conf =
+             Runtime_config.Constants.load_constants ~logger config_file
+           in
+           Runtime_config.Constants.compile_config conf
+         in
+         let fee =
+           Option.value ~default:compile_config.default_transaction_fee fee
+         in
          let%map response =
            let input =
              Mina_graphql.Types.Input.SendPaymentInput.make_input ~to_:receiver
@@ -548,15 +558,28 @@ let delegate_stake_graphql =
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
-  let args = Args.zip2 Cli_lib.Flag.signed_command_common receiver_flag in
+  let config_file = Cli_lib.Flag.config_files in
+  let args =
+    Args.zip3 Cli_lib.Flag.signed_command_common receiver_flag config_file
+  in
+
   Command.async ~summary:"Delegate your stake to another public key"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun
             graphql_endpoint
-            ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver)
+            ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver, config_file)
           ->
          let open Deferred.Let_syntax in
-         let fee = Option.value ~default:default_transaction_fee fee in
+         let%bind compile_config =
+           let logger = Logger.create () in
+           let%map conf =
+             Runtime_config.Constants.load_constants ~logger config_file
+           in
+           Runtime_config.Constants.compile_config conf
+         in
+         let fee =
+           Option.value ~default:compile_config.default_transaction_fee fee
+         in
          let%map response =
            Graphql_client.query_exn
              Graphql_queries.Send_delegation.(
