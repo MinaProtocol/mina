@@ -513,23 +513,23 @@ let send_payment_graphql =
     flag "--amount" ~aliases:[ "amount" ]
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
-  let config_file = Cli_lib.Flag.config_files in
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let compile_config = Mina_compile_config.Compiled.t in
   let args =
-    Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
-      config_file
+    Args.zip3
+      (Cli_lib.Flag.signed_command_common
+         ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
+         ~default_transaction_fee:compile_config.default_transaction_fee )
+      receiver_flag amount_flag
   in
   Command.async ~summary:"Send payment to an address"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun
             graphql_endpoint
-            ( { Cli_lib.Flag.sender; fee; nonce; memo }
-            , receiver
-            , amount
-            , config_file )
+            ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver, amount)
           ->
          let%map response =
            let input =
-             let fee = Option.value ~default:default_transaction_fee fee in
              Mina_graphql.Types.Input.SendPaymentInput.make_input ~to_:receiver
                ~from:sender ~amount ~fee ?memo ?nonce ()
            in
@@ -548,18 +548,21 @@ let delegate_stake_graphql =
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
-  let config_file = Cli_lib.Flag.config_files in
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let compile_config = Mina_compile_config.Compiled.t in
   let args =
-    Args.zip3 Cli_lib.Flag.signed_command_common receiver_flag config_file
+    Args.zip2
+      (Cli_lib.Flag.signed_command_common
+         ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
+         ~default_transaction_fee:compile_config.default_transaction_fee )
+      receiver_flag
   in
-
   Command.async ~summary:"Delegate your stake to another public key"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun
             graphql_endpoint
-            ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver, config_file)
+            ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver)
           ->
-         let fee = Option.value ~default:default_transaction_fee fee in
          let%map response =
            Graphql_client.query_exn
              Graphql_queries.Send_delegation.(
