@@ -1842,118 +1842,6 @@ module type Constants_intf = sig
   val magic_for_unit_tests : t -> constants
 end
 
-let make_genesis_constants (a : Genesis_constants.t) (b : t) :
-    Genesis_constants.t =
-  { Genesis_constants.protocol =
-      { k =
-          Option.value ~default:a.protocol.k Option.(b.genesis >>= fun g -> g.k)
-      ; delta =
-          Option.value ~default:a.protocol.delta
-            Option.(b.genesis >>= fun g -> g.delta)
-      ; slots_per_epoch =
-          Option.value ~default:a.protocol.slots_per_epoch
-            Option.(b.genesis >>= fun g -> g.slots_per_epoch)
-      ; slots_per_sub_window =
-          Option.value ~default:a.protocol.slots_per_sub_window
-            Option.(b.genesis >>= fun g -> g.slots_per_sub_window)
-      ; grace_period_slots =
-          Option.value ~default:a.protocol.grace_period_slots
-            Option.(b.genesis >>= fun g -> g.grace_period_slots)
-      ; genesis_state_timestamp =
-          Option.value ~default:a.protocol.genesis_state_timestamp
-            Option.(b.genesis >>= fun g -> g.genesis_state_timestamp)
-      }
-  ; txpool_max_size =
-      Option.value ~default:a.txpool_max_size
-        Option.(b.daemon >>= fun d -> d.txpool_max_size)
-  ; num_accounts =
-      Option.first_some
-        Option.(b.ledger >>= fun l -> l.num_accounts)
-        a.num_accounts
-  ; zkapp_proof_update_cost =
-      Option.value ~default:a.zkapp_proof_update_cost
-        Option.(b.daemon >>= fun d -> d.zkapp_proof_update_cost)
-  ; zkapp_signed_single_update_cost =
-      Option.value ~default:a.zkapp_signed_single_update_cost
-        Option.(b.daemon >>= fun d -> d.zkapp_signed_single_update_cost)
-  ; zkapp_signed_pair_update_cost =
-      Option.value ~default:a.zkapp_signed_pair_update_cost
-        Option.(b.daemon >>= fun d -> d.zkapp_signed_pair_update_cost)
-  ; zkapp_transaction_cost_limit =
-      Option.value ~default:a.zkapp_transaction_cost_limit
-        Option.(b.daemon >>= fun d -> d.zkapp_transaction_cost_limit)
-  ; max_event_elements =
-      Option.value ~default:a.max_event_elements
-        Option.(b.daemon >>= fun d -> d.max_event_elements)
-  ; max_action_elements =
-      Option.value ~default:a.max_action_elements
-        Option.(b.daemon >>= fun d -> d.max_action_elements)
-  ; zkapp_cmd_limit_hardcap =
-      Option.value ~default:a.zkapp_cmd_limit_hardcap
-        Option.(b.daemon >>= fun d -> d.zkapp_cmd_limit_hardcap)
-  ; minimum_user_command_fee =
-      Option.value ~default:a.minimum_user_command_fee
-        Option.(b.daemon >>= fun d -> d.minimum_user_command_fee)
-  }
-
-let make_constraint_constants (a : Genesis_constants.Constraint_constants.t)
-    (b : t) : Genesis_constants.Constraint_constants.t =
-  let fork =
-    let a = a.fork in
-    let b =
-      let%map.Option f = Option.(b.proof >>= fun x -> x.fork) in
-      { Genesis_constants.Fork_constants.state_hash =
-          Mina_base.State_hash.of_base58_check_exn f.state_hash
-      ; blockchain_length = Mina_numbers.Length.of_int f.blockchain_length
-      ; global_slot_since_genesis =
-          Mina_numbers.Global_slot_since_genesis.of_int
-            f.global_slot_since_genesis
-      }
-    in
-    Option.first_some b a
-  in
-  let block_window_duration_ms =
-    Option.value ~default:a.block_window_duration_ms
-      Option.(b.proof >>= fun p -> p.block_window_duration_ms)
-  in
-  let transaction_capacity_log_2 =
-    Option.value ~default:a.transaction_capacity_log_2
-      Option.(
-        b.proof
-        >>= fun p ->
-        p.transaction_capacity
-        >>| fun transaction_capacity ->
-        Proof_keys.Transaction_capacity.to_transaction_capacity_log_2
-          ~block_window_duration_ms ~transaction_capacity)
-  in
-  let work_delay =
-    Option.value ~default:a.work_delay
-      Option.(b.proof >>= fun p -> p.work_delay)
-  in
-  { Genesis_constants.Constraint_constants.sub_windows_per_window =
-      Option.value ~default:a.sub_windows_per_window
-        Option.(b.proof >>= fun p -> p.sub_windows_per_window)
-  ; ledger_depth =
-      Option.value ~default:a.ledger_depth
-        Option.(b.proof >>= fun p -> p.ledger_depth)
-  ; work_delay
-  ; block_window_duration_ms
-  ; transaction_capacity_log_2
-  ; pending_coinbase_depth =
-      Core_kernel.Int.ceil_log2
-        (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
-  ; coinbase_amount =
-      Option.value ~default:a.coinbase_amount
-        Option.(b.proof >>= fun p -> p.coinbase_amount)
-  ; supercharged_coinbase_factor =
-      Option.value ~default:a.supercharged_coinbase_factor
-        Option.(b.proof >>= fun p -> p.supercharged_coinbase_factor)
-  ; account_creation_fee =
-      Option.value ~default:a.account_creation_fee
-        Option.(b.proof >>= fun p -> p.account_creation_fee)
-  ; fork
-  }
-
 module Constants : Constants_intf = struct
   type constants =
     { genesis_constants : Genesis_constants.t
@@ -1971,9 +1859,122 @@ module Constants : Constants_intf = struct
   let compile_config t = t.compile_config
 
   let combine (a : constants) (b : t) : constants =
-    let genesis_constants = make_genesis_constants a.genesis_constants b in
+    let genesis_constants =
+      { Genesis_constants.protocol =
+          { k =
+              Option.value ~default:a.genesis_constants.protocol.k
+                Option.(b.genesis >>= fun g -> g.k)
+          ; delta =
+              Option.value ~default:a.genesis_constants.protocol.delta
+                Option.(b.genesis >>= fun g -> g.delta)
+          ; slots_per_epoch =
+              Option.value ~default:a.genesis_constants.protocol.slots_per_epoch
+                Option.(b.genesis >>= fun g -> g.slots_per_epoch)
+          ; slots_per_sub_window =
+              Option.value
+                ~default:a.genesis_constants.protocol.slots_per_sub_window
+                Option.(b.genesis >>= fun g -> g.slots_per_sub_window)
+          ; grace_period_slots =
+              Option.value
+                ~default:a.genesis_constants.protocol.grace_period_slots
+                Option.(b.genesis >>= fun g -> g.grace_period_slots)
+          ; genesis_state_timestamp =
+              Option.value
+                ~default:a.genesis_constants.protocol.genesis_state_timestamp
+                Option.(b.genesis >>= fun g -> g.genesis_state_timestamp)
+          }
+      ; txpool_max_size =
+          Option.value ~default:a.genesis_constants.txpool_max_size
+            Option.(b.daemon >>= fun d -> d.txpool_max_size)
+      ; num_accounts =
+          Option.first_some
+            Option.(b.ledger >>= fun l -> l.num_accounts)
+            a.genesis_constants.num_accounts
+      ; zkapp_proof_update_cost =
+          Option.value ~default:a.genesis_constants.zkapp_proof_update_cost
+            Option.(b.daemon >>= fun d -> d.zkapp_proof_update_cost)
+      ; zkapp_signed_single_update_cost =
+          Option.value
+            ~default:a.genesis_constants.zkapp_signed_single_update_cost
+            Option.(b.daemon >>= fun d -> d.zkapp_signed_single_update_cost)
+      ; zkapp_signed_pair_update_cost =
+          Option.value
+            ~default:a.genesis_constants.zkapp_signed_pair_update_cost
+            Option.(b.daemon >>= fun d -> d.zkapp_signed_pair_update_cost)
+      ; zkapp_transaction_cost_limit =
+          Option.value ~default:a.genesis_constants.zkapp_transaction_cost_limit
+            Option.(b.daemon >>= fun d -> d.zkapp_transaction_cost_limit)
+      ; max_event_elements =
+          Option.value ~default:a.genesis_constants.max_event_elements
+            Option.(b.daemon >>= fun d -> d.max_event_elements)
+      ; max_action_elements =
+          Option.value ~default:a.genesis_constants.max_action_elements
+            Option.(b.daemon >>= fun d -> d.max_action_elements)
+      ; zkapp_cmd_limit_hardcap =
+          Option.value ~default:a.genesis_constants.zkapp_cmd_limit_hardcap
+            Option.(b.daemon >>= fun d -> d.zkapp_cmd_limit_hardcap)
+      ; minimum_user_command_fee =
+          Option.value ~default:a.genesis_constants.minimum_user_command_fee
+            Option.(b.daemon >>= fun d -> d.minimum_user_command_fee)
+      }
+    in
     let constraint_constants =
-      make_constraint_constants a.constraint_constants b
+      let fork =
+        let a = a.constraint_constants.fork in
+        let b =
+          let%map.Option f = Option.(b.proof >>= fun x -> x.fork) in
+          { Genesis_constants.Fork_constants.state_hash =
+              Mina_base.State_hash.of_base58_check_exn f.state_hash
+          ; blockchain_length = Mina_numbers.Length.of_int f.blockchain_length
+          ; global_slot_since_genesis =
+              Mina_numbers.Global_slot_since_genesis.of_int
+                f.global_slot_since_genesis
+          }
+        in
+        Option.first_some b a
+      in
+      let block_window_duration_ms =
+        Option.value ~default:a.constraint_constants.block_window_duration_ms
+          Option.(b.proof >>= fun p -> p.block_window_duration_ms)
+      in
+      let transaction_capacity_log_2 =
+        Option.value ~default:a.constraint_constants.transaction_capacity_log_2
+          Option.(
+            b.proof
+            >>= fun p ->
+            p.transaction_capacity
+            >>| fun transaction_capacity ->
+            Proof_keys.Transaction_capacity.to_transaction_capacity_log_2
+              ~block_window_duration_ms ~transaction_capacity)
+      in
+      let work_delay =
+        Option.value ~default:a.constraint_constants.work_delay
+          Option.(b.proof >>= fun p -> p.work_delay)
+      in
+      { Genesis_constants.Constraint_constants.sub_windows_per_window =
+          Option.value ~default:a.constraint_constants.sub_windows_per_window
+            Option.(b.proof >>= fun p -> p.sub_windows_per_window)
+      ; ledger_depth =
+          Option.value ~default:a.constraint_constants.ledger_depth
+            Option.(b.proof >>= fun p -> p.ledger_depth)
+      ; work_delay
+      ; block_window_duration_ms
+      ; transaction_capacity_log_2
+      ; pending_coinbase_depth =
+          Core_kernel.Int.ceil_log2
+            (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
+      ; coinbase_amount =
+          Option.value ~default:a.constraint_constants.coinbase_amount
+            Option.(b.proof >>= fun p -> p.coinbase_amount)
+      ; supercharged_coinbase_factor =
+          Option.value
+            ~default:a.constraint_constants.supercharged_coinbase_factor
+            Option.(b.proof >>= fun p -> p.supercharged_coinbase_factor)
+      ; account_creation_fee =
+          Option.value ~default:a.constraint_constants.account_creation_fee
+            Option.(b.proof >>= fun p -> p.account_creation_fee)
+      ; fork
+      }
     in
     let proof_level =
       let coerce_proof_level = function
