@@ -1046,8 +1046,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let module Context = struct
             let logger = logger
 
-            let compile_config = precomputed_values.compile_config
-
             let constraint_constants = precomputed_values.constraint_constants
 
             let consensus_constants = precomputed_values.consensus_constants

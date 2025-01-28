@@ -14,6 +14,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val ledger_sync_config : Syncable_ledger.daemon_config
 end
 
 module type Inputs_intf = sig
@@ -92,13 +94,6 @@ module Make (Inputs : Inputs_intf) :
       -> trust_system:Trust_system.t
       -> Sync_ledger.Answer.t Or_error.t Deferred.t =
    fun ~frontier hash query ~context:(module Context) ~trust_system ->
-    let (module C : Syncable_ledger.CONTEXT) =
-      ( module struct
-        let logger = Context.logger
-
-        let compile_config = Context.precomputed_values.compile_config
-      end )
-    in
     match get_ledger_by_hash ~frontier hash with
     | None ->
         return
@@ -109,7 +104,7 @@ module Make (Inputs : Inputs_intf) :
     | Some ledger ->
         let responder =
           Sync_ledger.Any_ledger.Responder.create ledger ignore
-            ~context:(module C)
+            ~context:(module Context)
             ~trust_system
         in
         Sync_ledger.Any_ledger.Responder.answer_query responder query
@@ -208,8 +203,6 @@ module Make (Inputs : Inputs_intf) :
       let module Context = struct
         include Context
 
-        let compile_config = precomputed_values.compile_config
-
         let logger =
           Logger.extend logger [ ("selection_context", `String "Root.prove") ]
       end in
@@ -236,8 +229,6 @@ module Make (Inputs : Inputs_intf) :
         peer_root =
       let module Context = struct
         include Context
-
-        let compile_config = precomputed_values.compile_config
 
         let logger =
           Logger.extend logger [ ("selection_context", `String "Root.verify") ]

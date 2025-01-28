@@ -38,7 +38,7 @@ module type CONTEXT = sig
 
   val snark_job_state : unit -> Work_selector.State.t option
 
-  val compile_config : Mina_compile_config.t
+  val ledger_sync_config : Syncable_ledger.daemon_config
 end
 
 type ctx = (module CONTEXT)
