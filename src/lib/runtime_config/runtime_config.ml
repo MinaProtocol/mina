@@ -1,5 +1,4 @@
 open Core_kernel
-open Async
 
 module Fork_config = struct
   (* Note that length might be smaller than the gernesis_slot
@@ -394,16 +393,6 @@ module Json_layout = struct
     let fields = Fields.names |> Array.of_list
 
     let of_yojson json = of_yojson_generic ~fields of_yojson json
-
-    let default : t =
-      { accounts = None
-      ; num_accounts = None
-      ; balances = []
-      ; hash = None
-      ; s3_data_hash = None
-      ; name = None
-      ; add_genesis_winner = None
-      }
   end
 
   module Proof_keys = struct
@@ -562,14 +551,6 @@ module Json_layout = struct
   let fields = Fields.names |> Array.of_list
 
   let of_yojson json = of_yojson_generic ~fields of_yojson json
-
-  let default : t =
-    { daemon = None
-    ; genesis = None
-    ; proof = None
-    ; ledger = None
-    ; epoch_data = None
-    }
 end
 
 (** JSON representation:
@@ -1644,104 +1625,37 @@ let slot_tx_end, slot_chain_end =
   in
   (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))
 
-module type Json_loader_intf = sig
-  val load_config_files :
-       ?conf_dir:string
-    -> ?commit_id_short:string
-    -> logger:Logger.t
-    -> string list
-    -> t Deferred.Or_error.t
-end
+module Config_loader = struct
+  (* Use the prefered value if available. Otherwise, given a list of confs
+     find the first conf such that the getter returns a Some.
+  *)
+  let maybe_from_config (type conf a) ~(logger : Logger.t)
+      ~(configs : (string * conf) list) ~(getter : conf -> a option)
+      ~(keyname : string) ~(preferred_value : a option) : a option =
+    match preferred_value with
+    | Some v ->
+        Some v
+    | None ->
+        let open Option.Let_syntax in
+        let%map config_file, data =
+          List.find_map configs ~f:(fun (config_file, daemon_config) ->
+              let%map a = getter daemon_config in
+              (config_file, a) )
+        in
+        [%log debug] "Key $key being used from config file $config_file"
+          ~metadata:
+            [ ("key", `String keyname); ("config_file", `String config_file) ] ;
+        data
 
-module Json_loader : Json_loader_intf = struct
-  let load_config_file filename =
-    Monitor.try_with_or_error ~here:[%here] (fun () ->
-        let%map json = Reader.file_contents filename in
-        Yojson.Safe.from_string json )
-
-  let get_magic_config_files ?conf_dir
-      ?(commit_id_short = Mina_version.commit_id_short) () =
-    let config_file_installed =
-      (* Search for config files installed as part of a deb/brew package.
-         These files are commit-dependent, to ensure that we don't clobber
-         configuration for dev builds or use incompatible configs.
-      *)
-      let config_file_installed =
-        let json = "config_" ^ commit_id_short ^ ".json" in
-        List.fold_until ~init:None
-          (Cache_dir.possible_paths json)
-          ~f:(fun _acc f ->
-            match Core.Sys.file_exists f with
-            | `Yes ->
-                Stop (Some f)
-            | _ ->
-                Continue None )
-          ~finish:Fn.id
-      in
-      match config_file_installed with
-      | Some config_file ->
-          Some (config_file, `Must_exist)
-      | None ->
-          None
-    in
-
-    let config_file_configdir =
-      Option.map conf_dir ~f:(fun dir ->
-          (dir ^ "/" ^ "daemon.json", `May_be_missing) )
-    in
-    let config_file_envvar =
-      match Sys.getenv "MINA_CONFIG_FILE" with
-      | Some config_file ->
-          Some (config_file, `Must_exist)
-      | None ->
-          None
-    in
-    List.filter_opt
-      [ config_file_installed; config_file_configdir; config_file_envvar ]
-
-  let load_config_files ?conf_dir ?commit_id_short ~logger config_files =
-    let open Deferred.Or_error.Let_syntax in
-    let config_files = List.map ~f:(fun a -> (a, `Must_exist)) config_files in
-    let config_files =
-      get_magic_config_files ?conf_dir ?commit_id_short () @ config_files
-    in
-    let%map config_jsons =
-      let config_files_paths =
-        List.map config_files ~f:(fun (config_file, _) -> `String config_file)
-      in
-      [%log info] "Reading configuration files $config_files"
-        ~metadata:[ ("config_files", `List config_files_paths) ] ;
-      Deferred.Or_error.List.filter_map config_files
-        ~f:(fun (config_file, handle_missing) ->
-          match%bind.Deferred load_config_file config_file with
-          | Ok config_json ->
-              Deferred.Or_error.return @@ Some (config_file, config_json)
-          | Error err -> (
-              match handle_missing with
-              | `Must_exist ->
-                  Mina_user_error.raisef ~where:"reading configuration file"
-                    "The configuration file %s could not be read:\n%s"
-                    config_file (Error.to_string_hum err)
-              | `May_be_missing ->
-                  [%log warn] "Could not read configuration from $config_file"
-                    ~metadata:
-                      [ ("config_file", `String config_file)
-                      ; ("error", Error_json.error_to_yojson err)
-                      ] ;
-                  return None ) )
-    in
-    List.fold ~init:default config_jsons
-      ~f:(fun config (config_file, config_json) ->
-        match of_yojson config_json with
-        | Ok loaded_config ->
-            combine config loaded_config
-        | Error err ->
-            [%log fatal]
-              "Could not parse configuration from $config_file: $error"
-              ~metadata:
-                [ ("config_file", `String config_file)
-                ; ("config_json", config_json)
-                ; ("error", `String err)
-                ] ;
-            failwithf "Could not parse configuration file: %s" err () )
+  let or_from_config ~logger ~configs ~getter ~keyname ~preferred_value ~default
+      =
+    match
+      maybe_from_config ~logger ~configs ~getter ~keyname ~preferred_value
+    with
+    | Some x ->
+        x
+    | None ->
+        [%log trace] "Key '$key' not found in any config files, using default"
+          ~metadata:[ ("key", `String keyname) ] ;
+        default
 end
