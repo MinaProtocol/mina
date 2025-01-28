@@ -42,8 +42,16 @@ let timestamp =
 
 let instantiate_verify_functions ~logger config_file =
   let open Deferred.Let_syntax in
+  let%bind constants_or_error =
+    Runtime_config.Constants.load_constants_with_logging ~logger config_file
+  in
   let%map constants =
-    Runtime_config.Constants.load_constants_with_logging_exn ~logger config_file
+    match constants_or_error with
+    | Ok constants ->
+        return constants
+    | Error _ ->
+        Output.display_error "fail to read config file" ;
+        exit 4
   in
   let constraint_constants =
     Runtime_config.Constants.constraint_constants constants
