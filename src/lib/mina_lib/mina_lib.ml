@@ -1247,7 +1247,7 @@ module type CONTEXT = sig
 
   val compaction_interval : Time.Span.t option
 
-  val compile_config : Mina_compile_config.t
+  val ledger_sync_config : Syncable_ledger.daemon_config
 end
 
 let context ~commit_id (config : Config.t) : (module CONTEXT) =
@@ -1274,9 +1274,18 @@ let context ~commit_id (config : Config.t) : (module CONTEXT) =
 
     let compaction_interval = config.compile_config.compaction_interval
 
-    (*Same as config.precomputed_values.compile_config.
-      TODO: Remove redundant fields *)
-    let compile_config = config.compile_config
+    let ledger_sync_config =
+      let open Option.Let_syntax in
+      let max_subtree_depth =
+        let%bind daemon = precomputed_values.runtime_config.daemon in
+        daemon.sync_ledger_max_subtree_depth
+      in
+      let default_subtree_depth =
+        let%bind daemon = precomputed_values.runtime_config.daemon in
+        daemon.sync_ledger_default_subtree_depth
+      in
+      Syncable_ledger.create_config ~compile_config:config.compile_config
+        ~max_subtree_depth ~default_subtree_depth ()
   end )
 
 let start t =
@@ -1753,9 +1762,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                     Vrf_evaluator.create ~commit_id ~constraint_constants
                       ~pids:config.pids ~logger:config.logger
                       ~conf_dir:config.conf_dir ~consensus_constants
-                      ~keypairs:config.block_production_keypairs
-                      ~compile_config:config.precomputed_values.compile_config )
-                )
+                      ~keypairs:config.block_production_keypairs ) )
             >>| Result.ok_exn
           in
           let snark_worker =

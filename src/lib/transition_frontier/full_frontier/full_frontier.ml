@@ -563,11 +563,6 @@ let calculate_diffs ({ context = (module Context); _ } as t) breadcrumb =
         ]
   end in
   let open Diff in
-  let module Consensus_context = struct
-    include Context
-
-    let compile_config = precomputed_values.compile_config
-  end in
   O1trace.sync_thread "calculate_diff_frontier_diffs" (fun () ->
       let breadcrumb_hash = Breadcrumb.state_hash breadcrumb in
       let parent_node =
@@ -588,7 +583,7 @@ let calculate_diffs ({ context = (module Context); _ } as t) breadcrumb =
         if
           Consensus.Hooks.equal_select_status
             (Consensus.Hooks.select
-               ~context:(module Consensus_context)
+               ~context:(module Context)
                ~existing:
                  (Breadcrumb.consensus_state_with_hashes current_best_tip)
                ~candidate:(Breadcrumb.consensus_state_with_hashes breadcrumb) )
@@ -963,8 +958,6 @@ module For_tests = struct
     let precomputed_values = precomputed_values
 
     let consensus_constants = precomputed_values.consensus_constants
-
-    let compile_config = precomputed_values.compile_config
   end
 
   let verifier () =

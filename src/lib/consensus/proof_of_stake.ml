@@ -30,8 +30,12 @@ module Make_str (A : Wire_types.Concrete) = struct
     val constraint_constants : Genesis_constants.Constraint_constants.t
 
     val consensus_constants : Constants.t
+  end
 
-    val compile_config : Mina_compile_config.t
+  module type CONTEXT_WITH_LEDGER_SYNC = sig
+    include CONTEXT
+
+    val ledger_sync_config : Syncable_ledger.daemon_config
   end
 
   let make_checked t = Snark_params.Tick.Run.make_checked t
@@ -2591,8 +2595,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                    ; staking = staking.expected_root
                    } ) )
 
-    let sync_local_state ~context:(module Context : CONTEXT) ~trust_system
-        ~local_state ~glue_sync_ledger requested_syncs =
+    let sync_local_state ~context:(module Context : CONTEXT_WITH_LEDGER_SYNC)
+        ~trust_system ~local_state ~glue_sync_ledger requested_syncs =
       let open Context in
       let open Local_state in
       let open Snapshot in
@@ -3110,8 +3114,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           Genesis_constants.For_unit_tests.Constraint_constants.t
 
         let consensus_constants = Lazy.force Constants.for_unit_tests
-
-        let compile_config = Mina_compile_config.For_unit_tests.t
       end in
       (* Even when consensus constants are of prod sizes, candidate should still trigger a bootstrap *)
       should_bootstrap_len
@@ -3438,8 +3440,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         let constraint_constants = constraint_constants
 
         let consensus_constants = constants
-
-        let compile_config = Mina_compile_config.For_unit_tests.t
       end
 
       let test_update constraint_constants =
