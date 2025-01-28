@@ -195,7 +195,6 @@ let%test_module "Epoch ledger sync tests" =
           ; consensus_constants
           ; genesis_constants = precomputed_values.genesis_constants
           ; constraint_constants
-          ; compile_config
           }
       in
       let _transaction_pool, tx_remote_sink, _tx_local_sink =
@@ -204,7 +203,7 @@ let%test_module "Epoch ledger sync tests" =
             ~trust_system
             ~pool_max_size:precomputed_values.genesis_constants.txpool_max_size
             ~genesis_constants:precomputed_values.genesis_constants
-            ~slot_tx_end:None ~compile_config
+            ~slot_tx_end:None
         in
         Network_pool.Transaction_pool.create ~config ~constraint_constants
           ~consensus_constants ~time_controller ~logger

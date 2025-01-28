@@ -134,15 +134,7 @@ type t = Metadata.Stable.Latest.t [@@deriving bin_io_unversioned]
 
 let metadata = Fn.id
 
-type itn_logger_config = unit
-
-let make_itn_logger_config ~rpc_handshake_timeout:_ ~rpc_heartbeat_timeout:_
-    ~rpc_heartbeat_send_every:_ =
-  ()
-
-let create ?metadata:_ ?id:_ ?itn_config:_ () = Metadata.empty
-
-let with_itn _ = Fn.id
+let create ?metadata:_ ?id:_ ?itn_features:_ () = Metadata.empty
 
 let null () = Metadata.empty
 
