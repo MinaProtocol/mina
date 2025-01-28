@@ -23,10 +23,14 @@ end
 module Limited : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V3 : sig
-      type t [@@deriving to_yojson]
+      type t
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving to_yojson]
 
   val transition : t -> Mina_block.Validated.t
 
