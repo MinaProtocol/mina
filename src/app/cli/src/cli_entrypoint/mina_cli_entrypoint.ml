@@ -640,15 +640,23 @@ let setup_daemon logger ~itn_features =
         in
         let pids = Child_processes.Termination.create_pid_table () in
         let mina_initialization_deferred () =
+          let genesis_constants =
+            Genesis_constants.Compiled.genesis_constants
+          in
+          let constraint_constants =
+            Genesis_constants.Compiled.constraint_constants
+          in
+          let compile_config = Mina_compile_config.Compiled.t in
           let%bind precomputed_values, config =
             Genesis_ledger_helper.Config_loader.load_config_files ~logger
-              ~conf_dir ?genesis_dir ?cli_proof_level ~itn_features config_files
+              ~conf_dir ~genesis_dir
+              ~proof_level:Genesis_constants.Compiled.proof_level config_files
+              ~genesis_constants ~constraint_constants ~cli_proof_level
             |> Deferred.Or_error.ok_exn
           in
-          let constraint_constants = precomputed_values.consensus_constants in
-          let compile_config = precomputed_values.compile_config in
-          constraint_constants.block_window_duration_ms |> Block_time.Span.to_ms
-          |> Float.of_int64 |> Time.Span.of_ms |> Mina_metrics.initialize_all ;
+
+          constraint_constants.block_window_duration_ms |> Float.of_int
+          |> Time.Span.of_ms |> Mina_metrics.initialize_all ;
 
           let module DC = Runtime_config.Daemon in
           (* The explicit typing here is necessary to prevent type inference from specializing according
@@ -1324,9 +1332,11 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
         let () = Mina_plugins.init_plugins ~logger mina plugins in
         return mina )
 
-let daemon logger ~itn_features =
+let daemon logger =
+  let compile_config = Mina_compile_config.Compiled.t in
   Command.async ~summary:"Mina daemon"
-    (Command.Param.map (setup_daemon logger ~itn_features)
+    (Command.Param.map
+       (setup_daemon logger ~itn_features:compile_config.itn_features)
        ~f:(fun setup_daemon () ->
          (* Immediately disable updating the time offset. *)
          Block_time.Controller.disable_setting_offset () ;
@@ -1335,7 +1345,7 @@ let daemon logger ~itn_features =
          [%log info] "Daemon ready. Clients can now connect" ;
          Async.never () ) )
 
-let replay_blocks ~itn_features logger =
+let replay_blocks logger =
   let replay_flag =
     let open Command.Param in
     flag "--blocks-filename" ~aliases:[ "-blocks-filename" ] (required string)
@@ -1346,9 +1356,10 @@ let replay_blocks ~itn_features logger =
     flag "--format" ~aliases:[ "-format" ] (optional string)
       ~doc:"json|sexp The format to read lines of the file in (default: json)"
   in
+  let compile_config = Mina_compile_config.Compiled.t in
   Command.async ~summary:"Start mina daemon with blocks replayed from a file"
     (Command.Param.map3 replay_flag read_kind
-       (setup_daemon logger ~itn_features)
+       (setup_daemon logger ~itn_features:compile_config.itn_features)
        ~f:(fun blocks_filename read_kind setup_daemon () ->
          (* Enable updating the time offset. *)
          Block_time.Controller.enable_setting_offset () ;
@@ -1540,7 +1551,7 @@ let snark_hashes =
       let json = Cli_lib.Flag.json in
       fun () -> if json then Core.printf "[]\n%!"]
 
-let internal_commands ~itn_features logger =
+let internal_commands logger =
   [ ( Snark_worker.Intf.command_name
     , Snark_worker.command ~commit_id:Mina_version.commit_id )
   ; ("snark-hashes", snark_hashes)
@@ -1580,7 +1591,6 @@ let internal_commands ~itn_features logger =
           flag "--file" (required string)
             ~doc:"File containing the s-expression of the snark work to execute"
         and config_file = Cli_lib.Flag.config_files in
-
         fun () ->
           let open Deferred.Let_syntax in
           let logger = Logger.create () in
@@ -1784,12 +1794,18 @@ let internal_commands ~itn_features logger =
               () ) ;
           Deferred.return ()) )
   ; ("dump-type-shapes", dump_type_shapes)
-  ; ("replay-blocks", replay_blocks ~itn_features logger)
+  ; ("replay-blocks", replay_blocks logger)
   ; ("audit-type-shapes", audit_type_shapes)
   ; ( "test-genesis-block-generation"
     , Command.async ~summary:"Generate a genesis proof"
         (let open Command.Let_syntax in
-        let%map_open config_file = Cli_lib.Flag.config_files
+        let%map_open config_files =
+          flag "--config-file" ~aliases:[ "config-file" ]
+            ~doc:
+              "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
+               default: <config_dir>/daemon.json). Pass multiple times to \
+               override fields from earlier config files"
+            (listed string)
         and conf_dir = Cli_lib.Flag.conf_dir
         and genesis_dir =
           flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
@@ -1803,10 +1819,17 @@ let internal_commands ~itn_features logger =
           Parallel.init_master () ;
           let logger = Logger.create () in
           let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
+          let genesis_constants =
+            Genesis_constants.Compiled.genesis_constants
+          in
+          let constraint_constants =
+            Genesis_constants.Compiled.constraint_constants
+          in
+          let proof_level = Genesis_constants.Proof_level.Full in
           let%bind precomputed_values, _ =
             Genesis_ledger_helper.Config_loader.load_config_files ~logger
-              ~conf_dir ?genesis_dir ~cli_proof_level:Full ~itn_features
-              config_file
+              ~conf_dir ~genesis_dir ~genesis_constants ~constraint_constants
+              ~proof_level config_files ~cli_proof_level:None
             |> Deferred.Or_error.ok_exn
           in
           let pids = Child_processes.Termination.create_pid_table () in
@@ -1815,7 +1838,7 @@ let internal_commands ~itn_features logger =
                realistic test.
             *)
             Prover.create ~commit_id:Mina_version.commit_id ~logger ~pids
-              ~conf_dir ~proof_level:precomputed_values.proof_level
+              ~conf_dir ~proof_level
               ~constraint_constants:precomputed_values.constraint_constants ()
           in
           match%bind
@@ -1835,14 +1858,13 @@ let internal_commands ~itn_features logger =
 
 let mina_commands logger ~itn_features =
   [ ("accounts", Client.accounts)
-  ; ("daemon", daemon ~itn_features logger)
+  ; ("daemon", daemon logger)
   ; ("client", Client.client)
   ; ("advanced", Client.advanced ~itn_features)
   ; ("ledger", Client.ledger)
   ; ("libp2p", Client.libp2p)
   ; ( "internal"
-    , Command.group ~summary:"Internal commands"
-        (internal_commands ~itn_features logger) )
+    , Command.group ~summary:"Internal commands" (internal_commands logger) )
   ; (Parallel.worker_command_name, Parallel.worker_command)
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
   ]
@@ -1880,10 +1902,11 @@ let () =
    | [| _mina_exe; version |] when is_version_cmd version ->
        Mina_version.print_version ()
    | _ ->
-       let itn_features = Mina_compile_config.Compiled.t.itn_features in
+       let compile_config = Mina_compile_config.Compiled.t in
        Command.run
          (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
-            (mina_commands logger ~itn_features) ) ) ;
+            (mina_commands logger ~itn_features:compile_config.itn_features) )
+  ) ;
   Core.exit 0
 
 let linkme = ()

@@ -783,14 +783,16 @@ module type Config_loader_intf = sig
     -> (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t
 
   val load_config_files :
-       ?overwrite_version:Unsigned.uint32
-    -> ?genesis_dir:string
-    -> ?itn_features:bool
-    -> ?cli_proof_level:Genesis_constants.Proof_level.t
-    -> ?conf_dir:string
-    -> logger:Logger.t
+       logger:Logger.t
+    -> genesis_constants:Genesis_constants.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> conf_dir:string
+    -> genesis_dir:string option
+    -> cli_proof_level:Genesis_constants.Proof_level.t option
+    -> proof_level:Genesis_constants.Proof_level.t
     -> string list
-    -> (Precomputed_values.t * Runtime_config.t) Or_error.t Deferred.t
+    -> (Precomputed_values.t * Runtime_config.t)
+       Async_kernel.Deferred.Or_error.t
 end
 
 module Config_loader : Config_loader_intf = struct
@@ -931,24 +933,20 @@ module Config_loader : Config_loader_intf = struct
     let values = Genesis_proof.create_values_no_proof inputs in
     (values, config)
 
-  let load_config_files ?overwrite_version ?genesis_dir ?(itn_features = false)
-      ?cli_proof_level ?conf_dir ~logger (config_files : string list) =
+  let load_config_files ~logger ~genesis_constants ~constraint_constants
+      ~conf_dir ~genesis_dir ~cli_proof_level ~proof_level
+      (config_files : string list) =
     let open Deferred.Or_error.Let_syntax in
     let genesis_dir =
-      let%map.Option conf_dir = conf_dir in
       Option.value ~default:(conf_dir ^/ "genesis") genesis_dir
     in
-    let%bind.Deferred constants =
-      Runtime_config.Constants.load_constants ?conf_dir ?cli_proof_level
-        ~itn_features ~logger config_files
-    in
     let%bind config =
-      Runtime_config.Json_loader.load_config_files ?conf_dir ~logger
+      Runtime_config.Json_loader.load_config_files ~conf_dir ~logger
         config_files
     in
     match%bind.Deferred
-      init_from_config_file ?overwrite_version ?genesis_dir ~logger ~constants
-        config
+      init_from_config_file_legacy ~cli_proof_level ~genesis_dir ~logger
+        ~genesis_constants ~constraint_constants ~proof_level config
     with
     | Ok a ->
         return a
