@@ -773,14 +773,6 @@ module type Config_loader_intf = sig
     -> ?overwrite_version:Mina_numbers.Txn_version.t
     -> Runtime_config.t
     -> (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t
-
-  val init_from_config_file :
-       ?overwrite_version:Mina_numbers.Txn_version.t
-    -> ?genesis_dir:string
-    -> logger:Logger.t
-    -> constants:Runtime_config.Constants.constants
-    -> Runtime_config.t
-    -> (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t
 end
 
 module Config_loader : Config_loader_intf = struct
@@ -829,18 +821,6 @@ module Config_loader : Config_loader_intf = struct
         ~compile_config ~blockchain_proof_system_id ~genesis_epoch_data
     in
     (proof_inputs, config)
-
-  let init_from_config_file ?overwrite_version ?genesis_dir ~logger
-      ~(constants : Runtime_config.Constants.constants)
-      (config : Runtime_config.t) :
-      (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
-    let open Deferred.Or_error.Let_syntax in
-    let%map inputs, config =
-      inputs_from_config_file ?genesis_dir ~constants ~logger ?overwrite_version
-        config
-    in
-    let values = Genesis_proof.create_values_no_proof inputs in
-    (values, config)
 
   let inputs_from_config_file_legacy ?(genesis_dir = Cache_dir.autogen_path)
       ~logger ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
