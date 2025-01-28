@@ -1794,82 +1794,90 @@ let add_peers_graphql =
                   } ) ) ) )
 
 let compile_time_constants =
-  let open Command.Let_syntax in
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let proof_level = Genesis_constants.Compiled.proof_level in
   Command.async
     ~summary:"Print a JSON map of the compile-time consensus parameters"
-    (let%map_open config_file = Cli_lib.Flag.config_files in
-     fun () ->
-       let home = Core.Sys.home_directory () in
-       let conf_dir = home ^/ Cli_lib.Default.conf_dir_name in
-       let genesis_dir =
+    (Command.Param.return (fun () ->
          let home = Core.Sys.home_directory () in
-         home ^/ Cli_lib.Default.conf_dir_name
-       in
-       let open Deferred.Let_syntax in
-       let%map ({ consensus_constants; _ } as precomputed_values), _ =
-         (* This is kind of ugly because we are allowing for supplying a runtime_config value directly, rather than force what is read from the environment *)
-         (* TODO: See if we can initialize consensus_constants without also initializing the ledger *)
+         let conf_dir = home ^/ Cli_lib.Default.conf_dir_name in
+         let genesis_dir =
+           let home = Core.Sys.home_directory () in
+           home ^/ Cli_lib.Default.conf_dir_name
+         in
+         let config_file =
+           match Sys.getenv "MINA_CONFIG_FILE" with
+           | Some config_file ->
+               config_file
+           | None ->
+               conf_dir ^/ "daemon.json"
+         in
+         let open Async in
          let logger = Logger.create () in
-         let%bind m_conf =
-           Runtime_config.Json_loader.load_config_files ~conf_dir ~logger
-             config_file
-           >>| Or_error.ok
+         let%map ({ consensus_constants; _ } as precomputed_values), _ =
+           let%bind runtime_config =
+             let%map config_file =
+               Runtime_config.Json_loader.load_config_files ~conf_dir ~logger
+                 [ config_file ]
+               >>| Or_error.ok
+             in
+             let default =
+               Runtime_config.of_json_layout
+                 { Runtime_config.Json_layout.default with
+                   ledger =
+                     Some
+                       { Runtime_config.Json_layout.Ledger.default with
+                         accounts = Some []
+                       }
+                 }
+               |> Result.ok_or_failwith
+             in
+             Option.value ~default config_file
+           in
+           Genesis_ledger_helper.Config_loader.init_from_config_file_legacy
+             ~genesis_constants ~constraint_constants ~logger:(Logger.null ())
+             ~proof_level ~cli_proof_level:None ~genesis_dir runtime_config
+           >>| Or_error.ok_exn
          in
-         let default =
-           Runtime_config.of_json_layout
-             { Runtime_config.Json_layout.default with
-               ledger =
-                 Some
-                   { Runtime_config.Json_layout.Ledger.default with
-                     accounts = Some []
-                   }
-             }
-           |> Result.ok_or_failwith
+         let all_constants =
+           `Assoc
+             [ ( "genesis_state_timestamp"
+               , `String
+                   ( Block_time.to_time_exn
+                       consensus_constants.genesis_state_timestamp
+                   |> Core.Time.to_string_iso8601_basic ~zone:Core.Time.Zone.utc
+                   ) )
+             ; ("k", `Int (Unsigned.UInt32.to_int consensus_constants.k))
+             ; ( "coinbase"
+               , `String
+                   (Currency.Amount.to_mina_string
+                      precomputed_values.constraint_constants.coinbase_amount )
+               )
+             ; ( "block_window_duration_ms"
+               , `Int
+                   precomputed_values.constraint_constants
+                     .block_window_duration_ms )
+             ; ("delta", `Int (Unsigned.UInt32.to_int consensus_constants.delta))
+             ; ( "sub_windows_per_window"
+               , `Int
+                   (Unsigned.UInt32.to_int
+                      consensus_constants.sub_windows_per_window ) )
+             ; ( "slots_per_sub_window"
+               , `Int
+                   (Unsigned.UInt32.to_int
+                      consensus_constants.slots_per_sub_window ) )
+             ; ( "slots_per_window"
+               , `Int
+                   (Unsigned.UInt32.to_int consensus_constants.slots_per_window)
+               )
+             ; ( "slots_per_epoch"
+               , `Int
+                   (Unsigned.UInt32.to_int consensus_constants.slots_per_epoch)
+               )
+             ]
          in
-         let runtime_config = Option.value ~default m_conf in
-         let constants =
-           Runtime_config.Constants.load_constants' runtime_config
-         in
-         Genesis_ledger_helper.Config_loader.init_from_config_file ~genesis_dir
-           ~logger ~constants runtime_config
-         |> Deferred.Or_error.ok_exn
-       in
-       let all_constants =
-         `Assoc
-           [ ( "genesis_state_timestamp"
-             , `String
-                 ( Block_time.to_time_exn
-                     consensus_constants.genesis_state_timestamp
-                 |> Core.Time.to_string_iso8601_basic ~zone:Core.Time.Zone.utc
-                 ) )
-           ; ("k", `Int (Unsigned.UInt32.to_int consensus_constants.k))
-           ; ( "coinbase"
-             , `String
-                 (Currency.Amount.to_mina_string
-                    precomputed_values.constraint_constants.coinbase_amount ) )
-           ; ( "block_window_duration_ms"
-             , `Int
-                 precomputed_values.constraint_constants
-                   .block_window_duration_ms )
-           ; ("delta", `Int (Unsigned.UInt32.to_int consensus_constants.delta))
-           ; ( "sub_windows_per_window"
-             , `Int
-                 (Unsigned.UInt32.to_int
-                    consensus_constants.sub_windows_per_window ) )
-           ; ( "slots_per_sub_window"
-             , `Int
-                 (Unsigned.UInt32.to_int
-                    consensus_constants.slots_per_sub_window ) )
-           ; ( "slots_per_window"
-             , `Int
-                 (Unsigned.UInt32.to_int consensus_constants.slots_per_window)
-             )
-           ; ( "slots_per_epoch"
-             , `Int (Unsigned.UInt32.to_int consensus_constants.slots_per_epoch)
-             )
-           ]
-       in
-       Core_kernel.printf "%s\n%!" (Yojson.Safe.to_string all_constants) )
+         Core_kernel.printf "%s\n%!" (Yojson.Safe.to_string all_constants) ) )
 
 let node_status =
   let open Command.Param in
