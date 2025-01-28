@@ -781,18 +781,6 @@ module type Config_loader_intf = sig
     -> constants:Runtime_config.Constants.constants
     -> Runtime_config.t
     -> (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t
-
-  val load_config_files :
-       logger:Logger.t
-    -> genesis_constants:Genesis_constants.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> conf_dir:string
-    -> genesis_dir:string option
-    -> cli_proof_level:Genesis_constants.Proof_level.t option
-    -> proof_level:Genesis_constants.Proof_level.t
-    -> string list
-    -> (Precomputed_values.t * Runtime_config.t)
-       Async_kernel.Deferred.Or_error.t
 end
 
 module Config_loader : Config_loader_intf = struct
@@ -932,54 +920,6 @@ module Config_loader : Config_loader_intf = struct
     in
     let values = Genesis_proof.create_values_no_proof inputs in
     (values, config)
-
-  let load_config_files ~logger ~genesis_constants ~constraint_constants
-      ~conf_dir ~genesis_dir ~cli_proof_level ~proof_level
-      (config_files : string list) =
-    let open Deferred.Or_error.Let_syntax in
-    let genesis_dir =
-      Option.value ~default:(conf_dir ^/ "genesis") genesis_dir
-    in
-    let%bind config =
-      Runtime_config.Json_loader.load_config_files ~conf_dir ~logger
-        config_files
-    in
-    match%bind.Deferred
-      init_from_config_file_legacy ~cli_proof_level ~genesis_dir ~logger
-        ~genesis_constants ~constraint_constants ~proof_level config
-    with
-    | Ok a ->
-        return a
-    | Error err ->
-        let ( json_config
-            , `Accounts_omitted
-                ( `Genesis genesis_accounts_omitted
-                , `Staking staking_accounts_omitted
-                , `Next next_accounts_omitted ) ) =
-          Runtime_config.to_yojson_without_accounts config
-        in
-        let append_accounts_omitted s =
-          Option.value_map
-            ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
-            ~default:Fn.id
-        in
-        let metadata =
-          append_accounts_omitted "genesis" genesis_accounts_omitted
-          @@ append_accounts_omitted "staking" staking_accounts_omitted
-          @@ append_accounts_omitted "next" next_accounts_omitted []
-          @ [ ("config", json_config)
-            ; ( "name"
-              , `String
-                  (Option.value ~default:"not provided"
-                     (let%bind.Option ledger = config.ledger in
-                      Option.first_some ledger.name ledger.hash ) ) )
-            ; ("error", Error_json.error_to_yojson err)
-            ]
-        in
-        [%log info]
-          "Initializing with runtime configuration. Ledger source: $name"
-          ~metadata ;
-        Error.raise err
 end
 
 let%test_module "Account config test" =
