@@ -1784,7 +1784,12 @@ module Json_loader : Json_loader_intf = struct
 end
 
 module type Constants_intf = sig
-  type constants
+  type constants =
+    { genesis_constants : Genesis_constants.t
+    ; constraint_constants : Genesis_constants.Constraint_constants.t
+    ; proof_level : Genesis_constants.Proof_level.t
+    ; compile_config : Mina_compile_config.t
+    }
 
   val load_constants :
        ?conf_dir:string

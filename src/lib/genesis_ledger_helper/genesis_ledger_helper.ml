@@ -762,17 +762,18 @@ let print_config ~logger (config : Runtime_config.t) =
     ~metadata
 
 module type Config_loader_intf = sig
-  val load_config_files :
-       ?overwrite_version:Mina_numbers.Txn_version.t
-    -> ?genesis_dir:string
-    -> ?itn_features:bool
-    -> ?cli_proof_level:Genesis_constants.Proof_level.t
-    -> ?conf_dir:string
+  (* Mostly loads genesis ledger and epoch data *)
+  val init_from_config_file_legacy :
+       ?genesis_dir:string
+    -> cli_proof_level:Genesis_constants.Proof_level.t option
+    -> genesis_constants:Genesis_constants.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> logger:Logger.t
-    -> string list
+    -> proof_level:Genesis_constants.Proof_level.t
+    -> ?overwrite_version:Mina_numbers.Txn_version.t
+    -> Runtime_config.t
     -> (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t
 
-  (* Mostly loads genesis ledger and epoch data *)
   val init_from_config_file :
        ?overwrite_version:Mina_numbers.Txn_version.t
     -> ?genesis_dir:string
@@ -780,12 +781,22 @@ module type Config_loader_intf = sig
     -> constants:Runtime_config.Constants.constants
     -> Runtime_config.t
     -> (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t
+
+  val load_config_files :
+       ?overwrite_version:Unsigned.uint32
+    -> ?genesis_dir:string
+    -> ?itn_features:bool
+    -> ?cli_proof_level:Genesis_constants.Proof_level.t
+    -> ?conf_dir:string
+    -> logger:Logger.t
+    -> string list
+    -> (Precomputed_values.t * Runtime_config.t) Or_error.t Deferred.t
 end
 
 module Config_loader : Config_loader_intf = struct
   let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
       ~(constants : Runtime_config.Constants.constants) ?overwrite_version
-      (config : Runtime_config.t) =
+      ?blockchain_proof_system_id (config : Runtime_config.t) =
     print_config ~logger config ;
     let open Deferred.Or_error.Let_syntax in
     let constraint_constants =
@@ -825,7 +836,7 @@ module Config_loader : Config_loader_intf = struct
     let proof_inputs =
       Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
         ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
-        ~compile_config ~blockchain_proof_system_id:None ~genesis_epoch_data
+        ~compile_config ~blockchain_proof_system_id ~genesis_epoch_data
     in
     (proof_inputs, config)
 
@@ -837,6 +848,85 @@ module Config_loader : Config_loader_intf = struct
     let%map inputs, config =
       inputs_from_config_file ?genesis_dir ~constants ~logger ?overwrite_version
         config
+    in
+    let values = Genesis_proof.create_values_no_proof inputs in
+    (values, config)
+
+  let inputs_from_config_file_legacy ?(genesis_dir = Cache_dir.autogen_path)
+      ~logger ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~proof_level:compiled_proof_level ?overwrite_version
+      (config : Runtime_config.t) =
+    let open Deferred.Or_error.Let_syntax in
+    let proof_level =
+      List.find_map_exn ~f:Fn.id
+        [ cli_proof_level
+        ; Option.Let_syntax.(
+            let%bind proof = config.proof in
+            match%map proof.level with
+            | Full ->
+                Genesis_constants.Proof_level.Full
+            | Check ->
+                Check
+            | No_check ->
+                No_check)
+        ; Some compiled_proof_level
+        ]
+    in
+    let constraint_constants, blockchain_proof_system_id =
+      match config.proof with
+      | None ->
+          [%log info] "Using the compiled constraint constants" ;
+          (constraint_constants, Some (Pickles.Verification_key.Id.dummy ()))
+      | Some config ->
+          [%log info]
+            "Using the constraint constants from the configuration file" ;
+          let blockchain_proof_system_id =
+            (* We pass [None] here, which will force the constraint systems to be
+               set up and their hashes evaluated before we can calculate the
+               genesis proof's filename.
+               This adds no overhead if we are generating a genesis proof, since
+               we will do these evaluations anyway to load the blockchain proving
+               key. Otherwise, this will in a slight slowdown.
+            *)
+            None
+          in
+          ( make_constraint_constants ~default:constraint_constants config
+          , blockchain_proof_system_id )
+    in
+    let%bind () =
+      match (proof_level, compiled_proof_level) with
+      | _, Full | (Check | No_check), _ ->
+          return ()
+      | Full, ((Check | No_check) as compiled) ->
+          let str = Genesis_constants.Proof_level.to_string in
+          [%log fatal]
+            "Proof level $proof_level is not compatible with compile-time \
+             proof level $compiled_proof_level"
+            ~metadata:
+              [ ("proof_level", `String (str proof_level))
+              ; ("compiled_proof_level", `String (str compiled))
+              ] ;
+          Deferred.Or_error.errorf
+            "Proof level %s is not compatible with compile-time proof level %s"
+            (str proof_level) (str compiled)
+    in
+    let compile_config = Mina_compile_config.Compiled.t in
+    let constants : Runtime_config.Constants.constants =
+      { proof_level; compile_config; constraint_constants; genesis_constants }
+    in
+    inputs_from_config_file ~genesis_dir ~logger ~constants ?overwrite_version
+      ?blockchain_proof_system_id config
+
+  let init_from_config_file_legacy ?genesis_dir ~cli_proof_level
+      ~genesis_constants ~constraint_constants ~logger ~proof_level
+      ?overwrite_version (config : Runtime_config.t) :
+      (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
+    let open Deferred.Or_error.Let_syntax in
+    let%map inputs, config =
+      inputs_from_config_file_legacy ?genesis_dir ~cli_proof_level
+        ~genesis_constants ~constraint_constants ~logger ~proof_level
+        ?overwrite_version config
     in
     let values = Genesis_proof.create_values_no_proof inputs in
     (values, config)
