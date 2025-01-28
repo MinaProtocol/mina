@@ -666,7 +666,7 @@ module Genesis_proof = struct
         return None
 
   let generate_inputs ~runtime_config ~proof_level ~ledger ~genesis_epoch_data
-      ~constraint_constants ~blockchain_proof_system_id ~compile_config
+      ~constraint_constants ~blockchain_proof_system_id
       ~(genesis_constants : Genesis_constants.t) =
     let consensus_constants =
       Consensus.Constants.create ~constraint_constants
@@ -682,7 +682,6 @@ module Genesis_proof = struct
     { Genesis_proof.Inputs.runtime_config
     ; constraint_constants
     ; proof_level
-    ; compile_config
     ; blockchain_proof_system_id
     ; genesis_ledger = ledger
     ; genesis_epoch_data
@@ -709,7 +708,6 @@ module Genesis_proof = struct
              ; consensus_constants = inputs.consensus_constants
              ; constraint_constants = inputs.constraint_constants
              ; genesis_body_reference = inputs.genesis_body_reference
-             ; compile_config = inputs.compile_config
              }
     | _ ->
         Deferred.return (Genesis_proof.create_values_no_proof inputs)
@@ -785,7 +783,7 @@ module Config_loader : Config_loader_intf = struct
       Runtime_config.Constants.constraint_constants constants
     in
     let proof_level = Runtime_config.Constants.proof_level constants in
-    let compile_config = Runtime_config.Constants.compile_config constants in
+    let _compile_config = Runtime_config.Constants.compile_config constants in
     let genesis_constants =
       Runtime_config.Constants.genesis_constants constants
     in
@@ -818,7 +816,7 @@ module Config_loader : Config_loader_intf = struct
     let proof_inputs =
       Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
         ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
-        ~compile_config ~blockchain_proof_system_id ~genesis_epoch_data
+        ~blockchain_proof_system_id ~genesis_epoch_data
     in
     (proof_inputs, config)
 
