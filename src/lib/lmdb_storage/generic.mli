@@ -54,6 +54,8 @@ module Read_write : functor (F_func : F) -> sig
 
   val remove : env:t -> ('k, 'v) Db.t -> 'k -> unit
 
+  val close : t -> unit
+
   val with_txn :
        ?perm:[ `Read | `Write ] Lmdb.perm
     -> f:(Db.getter -> Db.setter -> 'r)

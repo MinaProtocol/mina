@@ -7,6 +7,7 @@ open Archive_lib
 let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
     ~extensional ~success_file ~failure_file ~log_successes ~files
     ~proof_cache_db () =
+  let logger = Logger.create () in
   let output_file_line path =
     match path with
     | Some path ->
@@ -15,12 +16,24 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
     | None ->
         fun _line -> ()
   in
+  let%bind proof_cache_db =
+    match%bind Proof_cache_tag.create_db proof_cache_db with
+    | Ok proof_cache_db ->
+        return proof_cache_db
+    | Error err -> (
+        match err with
+        | `Initialization_error e ->
+            [%log error] "Failed to initialize proof cache db at '%s': $error"
+              proof_cache_db
+              ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
+            failwithf "Failed to initialize proof cache db at '%s': %s"
+              proof_cache_db (Error.to_string_hum e) () )
+  in
   let add_to_success_file = output_file_line success_file in
   let add_to_failure_file = output_file_line failure_file in
   let archive_uri = Uri.of_string archive_uri in
   if Bool.equal precomputed extensional then
     failwith "Must provide exactly one of -precomputed and -extensional" ;
-  let logger = Logger.create () in
   match Caqti_async.connect_pool archive_uri with
   | Error e ->
       [%log fatal]
@@ -135,8 +148,13 @@ let () =
                "true/false Whether to log messages for files that were \
                 processed successfully"
              (Flag.optional_with_default true Param.bool)
+         and proof_cache_db =
+           Param.flag "--proof-cache-db" ~aliases:[ "-proof-cache-db" ]
+             (Flag.optional_with_default "~/.mina-config/proof_cache.db"
+                Param.string )
+             ~doc:
+               "PATH to proof caching db. Default ~/.mina-config/proof_cache.db"
          and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
-         let proof_cache_db = Proof_cache_tag.create_db () in
          main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
            ~extensional ~success_file ~failure_file ~log_successes ~files
            ~proof_cache_db )))

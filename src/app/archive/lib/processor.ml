@@ -4880,6 +4880,21 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
   let extensional_block_reader, extensional_block_writer =
     Strict_pipe.create ~name:"extensional_archive_block" Synchronous
   in
+  let%bind proof_cache_db = match%bind Proof_cache_tag.create_db proof_cache_db with 
+    | Ok proof_cache_db -> 
+      (  [%log info] "Proof cache db initialized";
+         return proof_cache_db
+      )
+    | Error err -> 
+      match err with 
+      | `Initialization_error e ->
+      (
+        [%log error]
+          "Failed to initialize proof cache db at '%s': $error" proof_cache_db
+          ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
+        failwithf "Failed to initialize proof cache db at '%s': %s" proof_cache_db (Error.to_string_hum e) ()
+      )
+  in
   let implementations =
     [ Async.Rpc.Rpc.implement Archive_rpc.t (fun () archive_diff ->
           Strict_pipe.Writer.write writer archive_diff )

@@ -1,0 +1,16 @@
+(library
+ (public_name disk_cache)
+ (virtual_modules disk_cache)
+ (default_implementation disk_cache.lmdb)
+ (libraries
+   ;; opam libraries
+   core
+   async
+   ppx_inline_test.config
+   ;; local libraries
+   logger
+   file_system
+   )
+ (preprocess
+  (pps ppx_mina ppx_version ppx_jane ))
+ (instrumentation (backend bisect_ppx)))

@@ -20,6 +20,7 @@
    ;; local libraries
    mina_block ; temp
    mina_base
+   logger
    mina_base.import
    mina_numbers
    currency

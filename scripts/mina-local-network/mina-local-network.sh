@@ -174,6 +174,7 @@ exec-daemon() {
     -log-level ${LOG_LEVEL} \
     -file-log-level ${FILE_LOG_LEVEL} \
     -precomputed-blocks-file ${FOLDER}/precomputed_blocks.log \
+    -proof-cache-db ${FOLDER}/proof_cache.db \
     -log-precomputed-blocks ${LOG_PRECOMPUTED_BLOCKS} \
     $@
 }
@@ -197,6 +198,7 @@ exec-archive-node() {
   exec ${ARCHIVE_EXE} run \
     --config-file ${CONFIG} \
     --log-level ${LOG_LEVEL} \
+    --proof-cache-db ${NODES_FOLDER}/archive_proof_cache.db \
     --postgres-uri postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT}/${PG_DB} \
     --server-port ${ARCHIVE_SERVER_PORT} \
     $@

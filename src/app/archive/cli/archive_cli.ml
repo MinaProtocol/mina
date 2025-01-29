@@ -37,6 +37,10 @@ let command_run =
          ~doc:
            "int Delete blocks that are more than n blocks lower than the \
             maximum seen block."
+     and proof_cache_db = 
+        flag "--proof-cache-db" ~aliases:[ "-proof-cache-db" ]
+        (optional_with_default "~/.mina-config/proof_cache.db" string)
+        ~doc:"PATH to proof caching db. Default ~/.mina-config/proof_cache.db"
      in
      fun () ->
        let logger = Logger.create () in
@@ -70,7 +74,7 @@ let command_run =
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)
          ~delete_older_than ~precomputed_values_opt ~missing_blocks_width
-         ~proof_cache_db:(Proof_cache_tag.create_db ()) )
+         ~proof_cache_db )
 
 let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)

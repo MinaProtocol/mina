@@ -84,12 +84,12 @@ module Base (F_func : F) = struct
 
   let open_env ~force ~perm ~max_maps dir =
     let create_do () =
-      Lmdb.Env.create ~flags:env_flags ~max_maps
+      Lmdb.Env.create ~flags:env_flags ~max_maps ~mode:0o755
         ~map_size:F.config.initial_mmap_size perm dir
     in
     if Sys.file_exists dir then Some (create_do ())
     else if force then (
-      Core.Unix.mkdir_p ~perm:0777 dir ;
+      Core.Unix.mkdir_p ~perm:0o755 dir ;
       Some (create_do ()) )
     else None
 

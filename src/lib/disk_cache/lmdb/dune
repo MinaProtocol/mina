@@ -1,0 +1,15 @@
+(library
+ (public_name disk_cache.lmdb)
+ (name disk_cache_lmdb)
+ (implements disk_cache)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   core
+   ;; local libraries
+   lmdb_storage
+  ) 
+ (preprocess
+  (pps ppx_mina ppx_version ))
+ (instrumentation (backend bisect_ppx))
+ )

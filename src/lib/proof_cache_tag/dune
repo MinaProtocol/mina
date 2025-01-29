@@ -1,10 +1,11 @@
 (library
  (public_name proof_cache_tag)
  (virtual_modules proof_cache_tag)
- (default_implementation proof_cache_tag.identity)
+ (default_implementation proof_cache_tag.lmdb)
  (libraries
    ;; opam libraries
    core_kernel
+   async
    ;; local libraries
    mina_base)
  (preprocess
