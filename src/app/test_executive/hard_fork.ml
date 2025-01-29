@@ -206,7 +206,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           work_delay = Some 1
         ; transaction_capacity =
             Some Runtime_config.Proof_keys.Transaction_capacity.small
-        ; fork = Some fork_config
+        ; fork = Some (Some fork_config)
         }
     }
 
