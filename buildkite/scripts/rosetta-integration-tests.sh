@@ -105,7 +105,8 @@ cat <<EOF >"$MINA_CONFIG_FILE"
       { "pk": "${TIME_VESTING_ACCOUNT_1_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null, "timing": { "initial_minimum_balance": "1000000", "cliff_time": "10", "cliff_amount": "1000000", "vesting_period": "1", "vesting_increment": "0" } },
       { "pk": "${TIME_VESTING_ACCOUNT_2_PUB_KEY}", "balance": "2000000", "delegate": null, "sk": null, "timing": { "initial_minimum_balance": "1000000", "cliff_time": "5", "cliff_amount": "1000000", "vesting_period": "1", "vesting_increment": "200000" } }
     ]
-  }
+  },
+  "epoch_data": {}
 }
 EOF
 
