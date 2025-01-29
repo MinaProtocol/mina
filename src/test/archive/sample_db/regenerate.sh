@@ -40,7 +40,9 @@ rm -rf precomputed_blocks || true
 mkdir precomputed_blocks
 find ~/.mina-network -name 'precomputed_blocks.log' | xargs -I ! ./scripts/mina-local-network/split_precomputed_log.sh ! precomputed_blocks
 rm ./src/test/archive/sample_db/precomputed_blocks.tar.xz || true
+rm ./src/test/archive/sample_db/precomputed_blocks.zip || true
 tar cvf ./src/test/archive/sample_db/precomputed_blocks.tar.xz precomputed_blocks
+zip -r ./src/test/archive/sample_db/precomputed_blocks.zip precomputed_blocks
 rm -rf precomputed_blocks
 
 echo Regenerateing archive_db.sql
@@ -48,12 +50,9 @@ pg_dump -U postgres -d archive > ./src/test/archive/sample_db/archive_db.sql
 
 
 echo Regenerateing input file
-cp ~/.mina-network/mina-local-network-2-1-1/genesis_ledger.json _tmp1.json
-cat _tmp1.json | jq '.accounts' > _tmp2.json
-echo '{ "genesis_ledger": { "accounts": '$(cat _tmp2.json)' } }' | jq > _tmp3.json
-NEW_HASH=$(psql -U postgres archive -t -c  'SELECT state_hash from blocks where global_slot_since_genesis = (SELECT MAX(global_slot_since_genesis) from blocks)' | head -n1 | sed 's/^ *//')
-cat _tmp3.json | jq -c '.+{"target_epoch_ledgers_state_hash": "'$NEW_HASH'"}' > ./src/test/archive/sample_db/replayer_input_file.json
-rm _tmp*.json
+cp ~/.mina-network/mina-local-network-2-1-1/genesis_ledger.json _tmp.json
+echo '{ "genesis_ledger": { "accounts": '$(cat _tmp.json | jq '.accounts')' } }' | jq > ./src/test/archive/sample_db/replayer_input_file.json
+rm _tmp.json
 
 echo Regenerateing genesis_ledger
 cat src/test/archive/sample_db/genesis.json | jq ".ledger=$(cat ~/.mina-network/mina-local-network-2-1-1/genesis_ledger.json | jq -c)"  > _tmp.json
