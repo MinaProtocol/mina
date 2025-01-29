@@ -810,12 +810,12 @@ module Config_loader : Config_loader_intf = struct
       ~metadata:[ ("ledger_file", `String ledger_file) ] ;
     let%map genesis_epoch_data, genesis_epoch_data_config =
       Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-        config.epoch_data
+        (Option.join config.epoch_data)
     in
     let c1 =
       { config with
         ledger = Option.map config.ledger ~f:(fun _ -> ledger_config)
-      ; epoch_data = genesis_epoch_data_config
+      ; epoch_data = Option.map ~f:Option.some genesis_epoch_data_config
       }
     in
     let c2 = Runtime_config.of_constants constants in
