@@ -10,6 +10,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let PipelineMode = ../../Pipeline/Mode.dhall
+
 let ConnectToNetwork = ../../Command/ConnectToNetwork.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
@@ -40,7 +42,12 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "ConnectToMainnet"
-        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
+        , mode = PipelineMode.Type.Stable
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
         }
       , steps =
         [ ConnectToNetwork.step
