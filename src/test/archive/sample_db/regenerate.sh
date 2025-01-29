@@ -40,9 +40,7 @@ rm -rf precomputed_blocks || true
 mkdir precomputed_blocks
 find ~/.mina-network -name 'precomputed_blocks.log' | xargs -I ! ./scripts/mina-local-network/split_precomputed_log.sh ! precomputed_blocks
 rm ./src/test/archive/sample_db/precomputed_blocks.tar.xz || true
-rm ./src/test/archive/sample_db/precomputed_blocks.zip || true
 tar cvf ./src/test/archive/sample_db/precomputed_blocks.tar.xz precomputed_blocks
-zip -r ./src/test/archive/sample_db/precomputed_blocks.zip precomputed_blocks
 rm -rf precomputed_blocks
 
 echo Regenerateing archive_db.sql
