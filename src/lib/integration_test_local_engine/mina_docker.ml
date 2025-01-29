@@ -169,6 +169,8 @@ module Network_config = struct
             ; slot_chain_end
             ; minimum_user_command_fee = None
             ; network_id
+            ; sync_ledger_max_subtree_depth = None
+            ; sync_ledger_default_subtree_depth = None
             }
       ; genesis =
           Some
