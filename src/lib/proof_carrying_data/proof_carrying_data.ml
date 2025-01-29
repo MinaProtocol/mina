@@ -6,7 +6,7 @@ open Core_kernel
 module Stable = struct
   module V1 = struct
     type ('a, 'p) t = ('a, 'p) Mina_wire_types.Proof_carrying_data.V1.t =
-      { data : 'a; proof : 'p }
+      { data : 'a [@key "statement"]; proof : 'p }
     [@@deriving compare, equal, fields, hash, sexp, version, yojson]
   end
 end]
