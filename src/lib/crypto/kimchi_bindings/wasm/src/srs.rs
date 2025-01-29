@@ -4,7 +4,7 @@ use ark_poly::DenseUVPolynomial;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
 use paste::paste;
 use poly_commitment::SRS as ISRS;
-use poly_commitment::{commitment::b_poly_coefficients, srs::SRS, hash_map_cache::HashMapCache};
+use poly_commitment::{commitment::b_poly_coefficients, hash_map_cache::HashMapCache, srs::SRS};
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 use std::{
@@ -125,6 +125,33 @@ macro_rules! impl_srs {
             }
 
             #[wasm_bindgen]
+            pub fn [<$name:snake _lagrange_commitments_whole_domain_ptr>](
+                srs: &[<Wasm $field_name:camel Srs>],
+                domain_size: i32,
+            ) -> *mut WasmVector<$WasmPolyComm> {
+                // this is the best workaround we have, for now
+                // returns a pointer to the commitment
+                // later, we read the commitment from the pointer
+                let comm = srs
+                    .get_lagrange_basis_from_domain_size(domain_size as usize)
+                    .clone()
+                    .into_iter()
+                    .map(|x| x.into())
+                    .collect();
+                let boxed_comm = Box::<WasmVector<WasmPolyComm>>::new(comm);
+                Box::into_raw(boxed_comm)
+            }
+
+            #[wasm_bindgen]
+            pub fn [<$name:snake _lagrange_commitments_whole_domain_read_from_ptr>](
+                ptr: *mut WasmVector<$WasmPolyComm>,
+            ) -> WasmVector<$WasmPolyComm> {
+                // read the commitment at the pointers address, hack for the web worker implementation (see o1js web worker impl for details)
+                let b = unsafe { Box::from_raw(ptr) };
+                b.as_ref().clone()
+            }
+
+            #[wasm_bindgen]
             pub fn [<$name:snake _lagrange_commitment>](
                 srs: &[<Wasm $field_name:camel Srs>],
                 domain_size: i32,
@@ -216,7 +243,6 @@ pub mod fp {
     use mina_curves::pasta::{Fp, Vesta as G};
 
     impl_srs!(caml_fp_srs, WasmPastaFp, WasmG, Fp, G, WasmPolyComm, Fp);
-
     #[wasm_bindgen]
     pub fn caml_fp_srs_create_parallel(depth: i32) -> WasmFpSrs {
         crate::rayon::run_in_pool(|| Arc::new(SRS::<G>::create_parallel(depth as usize)).into())
@@ -267,9 +293,10 @@ pub mod fp {
         domain_size: i32,
         input_bases: WasmVector<WasmPolyComm>,
     ) {
-        srs.lagrange_bases.get_or_generate(domain_size as usize, || {
-            input_bases.into_iter().map(Into::into).collect()
-        });
+        srs.lagrange_bases
+            .get_or_generate(domain_size as usize, || {
+                input_bases.into_iter().map(Into::into).collect()
+            });
     }
 
     // compute & add lagrange basis internally, return the entire basis
@@ -279,8 +306,7 @@ pub mod fp {
         domain_size: i32,
     ) -> WasmVector<WasmPolyComm> {
         // compute lagrange basis
-        let basis =
-        crate::rayon::run_in_pool(|| {
+        let basis = crate::rayon::run_in_pool(|| {
             let domain =
                 EvaluationDomain::<Fp>::new(domain_size as usize).expect("invalid domain size");
             srs.get_lagrange_basis(domain)
@@ -347,9 +373,10 @@ pub mod fq {
         domain_size: i32,
         input_bases: WasmVector<WasmPolyComm>,
     ) {
-        srs.lagrange_bases.get_or_generate(domain_size as usize, || {
-            input_bases.into_iter().map(Into::into).collect()
-        });
+        srs.lagrange_bases
+            .get_or_generate(domain_size as usize, || {
+                input_bases.into_iter().map(Into::into).collect()
+            });
     }
 
     // compute & add lagrange basis internally, return the entire basis
@@ -359,8 +386,7 @@ pub mod fq {
         domain_size: i32,
     ) -> WasmVector<WasmPolyComm> {
         // compute lagrange basis
-        let basis =
-        crate::rayon::run_in_pool(|| {
+        let basis = crate::rayon::run_in_pool(|| {
             let domain =
                 EvaluationDomain::<Fq>::new(domain_size as usize).expect("invalid domain size");
             srs.get_lagrange_basis(domain)
