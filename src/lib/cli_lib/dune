@@ -2,9 +2,10 @@
  (name cli_lib)
  (public_name cli_lib)
  (library_flags -linkall)
- (inline_tests (flags -verbose -show-counts))
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
-   ;; opam libraries
+  ;; opam libraries
   result
   sexplib0
   async.async_command
@@ -45,8 +46,9 @@
   kimchi_pasta.basic
   ppx_version.runtime
   gossip_net
-  mina_runtime_config)
+  runtime_config)
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make))
- (instrumentation (backend bisect_ppx))
+ (instrumentation
+  (backend bisect_ppx))
  (synopsis "Library to communicate with Mina as cli as the front-end"))

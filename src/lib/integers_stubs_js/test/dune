@@ -1,7 +1,10 @@
 (executable
  (name test)
  (modes js)
- (js_of_ocaml (flags +nat.js --source-map --pretty))
+ (js_of_ocaml
+  (flags +nat.js --source-map --pretty))
  (libraries integers integers_stubs_js)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version)))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

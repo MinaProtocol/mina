@@ -2,15 +2,9 @@
  (name file_system)
  (public_name file_system)
  (library_flags -linkall)
- (libraries
-   core_kernel
-   async_kernel
-   core
-   async
-   async_unix
-   base.caml
- )
+ (libraries core_kernel async_kernel core async async_unix base.caml)
  (preprocess
   (pps ppx_version ppx_jane))
- (instrumentation (backend bisect_ppx))
+ (instrumentation
+  (backend bisect_ppx))
  (synopsis "Interface to make system calls to the Unix file system"))
