@@ -12,6 +12,24 @@ module Fork_config = struct
   [@@deriving yojson, bin_io_unversioned]
 end
 
+module Fork_config_opt = struct
+  (* Note that length might be smaller than the gernesis_slot
+     or equal if a block was produced in every slot possible. *)
+  type t = Fork_config.t option [@@deriving yojson, bin_io_unversioned]
+
+  let to_yojson = function
+    | None ->
+        `Assoc []
+    | Some x ->
+        Fork_config.to_yojson x
+
+  let of_yojson = function
+    | `Assoc [] ->
+        Ok None
+    | json ->
+        Result.map ~f:Option.some (Fork_config.of_yojson json)
+end
+
 let yojson_strip_fields ~keep_fields = function
   | `Assoc l ->
       `Assoc
@@ -438,7 +456,7 @@ module Json_layout = struct
       ; coinbase_amount : Currency.Amount.t option [@default None]
       ; supercharged_coinbase_factor : int option [@default None]
       ; account_creation_fee : Currency.Fee.t option [@default None]
-      ; fork : Fork_config.t option [@default None]
+      ; fork : Fork_config_opt.t option [@default None]
       }
     [@@deriving yojson, fields]
 
@@ -1069,7 +1087,7 @@ module Proof_keys = struct
     ; coinbase_amount : Currency.Amount.Stable.Latest.t option
     ; supercharged_coinbase_factor : int option
     ; account_creation_fee : Currency.Fee.Stable.Latest.t option
-    ; fork : Fork_config.t option
+    ; fork : Fork_config.t option option
     }
   [@@deriving bin_io_unversioned]
 
@@ -1655,11 +1673,12 @@ let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
     @@ Mina_ledger.Ledger.merkle_root staged_ledger
   in
   let fork =
-    Fork_config.
-      { state_hash = Mina_base.State_hash.to_base58_check state_hash
-      ; blockchain_length
-      ; global_slot_since_genesis
-      }
+    Some
+      Fork_config.
+        { state_hash = Mina_base.State_hash.to_base58_check state_hash
+        ; blockchain_length
+        ; global_slot_since_genesis
+        }
   in
   let%bind () = yield () in
   let%bind staking_ledger_accounts = ledger_accounts staking_ledger in
@@ -1911,7 +1930,7 @@ let make_constraint_constants (a : Genesis_constants.Constraint_constants.t)
   let fork =
     let a = a.fork in
     let b =
-      let%map.Option f = Option.(b.proof >>= fun x -> x.fork) in
+      let%map.Option f = Option.(b.proof >>= fun x -> x.fork >>= Fn.id) in
       { Genesis_constants.Fork_constants.state_hash =
           Mina_base.State_hash.of_base58_check_exn f.state_hash
       ; blockchain_length = Mina_numbers.Length.of_int f.blockchain_length
@@ -2091,13 +2110,14 @@ let of_constants (constants : Constants.constants) : t =
         Option.map constraint_constants.fork
           ~f:(fun { state_hash; blockchain_length; global_slot_since_genesis }
              ->
-            { Fork_config.state_hash =
-                Mina_base.State_hash.to_base58_check state_hash
-            ; blockchain_length = Mina_numbers.Length.to_int blockchain_length
-            ; global_slot_since_genesis =
-                Mina_numbers.Global_slot_since_genesis.to_int
-                  global_slot_since_genesis
-            } )
+            Some
+              { Fork_config.state_hash =
+                  Mina_base.State_hash.to_base58_check state_hash
+              ; blockchain_length = Mina_numbers.Length.to_int blockchain_length
+              ; global_slot_since_genesis =
+                  Mina_numbers.Global_slot_since_genesis.to_int
+                    global_slot_since_genesis
+              } )
     }
   in
   let genesis =
