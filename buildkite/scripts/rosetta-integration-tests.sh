@@ -93,7 +93,7 @@ cat <<EOF >"$MINA_CONFIG_FILE"
 {
   "genesis": { "genesis_state_timestamp": "$CURRENT_TIME" },
   "proof": { "block_window_duration_ms": 20000 },
-  "daemon": { "network_id": "${MINA_NETWORK}" },
+  "daemon": { "network_id": "${MINA_NETWORK}", "fork": {} },
   "ledger": {
     "accounts": [
       { "pk": "${BLOCK_PRODUCER_PUB_KEY}", "balance": "600000000", "delegate": null, "sk": null },
