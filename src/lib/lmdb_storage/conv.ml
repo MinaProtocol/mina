@@ -33,9 +33,7 @@ let bin_prot_conv (t : 'a Bin_prot.Type_class.t) =
       ~serialise:(fun alloc x ->
         let sz = t.writer.size x in
         let res = alloc sz in
-        let _pos = t.writer.write ~pos:0 res in
+        let _pos : int = t.writer.write ~pos:0 res x in
         res )
-      ~deserialise:
-        (let pos_ref = ref 0 in
-         t.reader.read ~pos_ref )
+      ~deserialise:(fun x -> t.reader.read ~pos_ref:(ref 0) x)
       ())
