@@ -564,12 +564,11 @@ fi
 if [ ! -z "${OVERRIDE_SLOT_TIME_MS}" ]; then
   echo 'Modifying configuration to override slot time'
   if test -f "${CONFIG}"; then
-    printf "\n"
-
-    tmp=$(mktemp)
   else
     reset-genesis-ledger ${LEDGER_FOLDER} ${CONFIG}
   fi
+  printf "\n"
+  tmp=$(mktemp)
   jq ".proof.block_window_duration_ms=${OVERRIDE_SLOT_TIME_MS}" ${CONFIG} >"$tmp" && mv -f "$tmp" ${CONFIG}
 fi
 
