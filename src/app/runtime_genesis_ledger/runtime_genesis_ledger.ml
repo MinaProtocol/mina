@@ -102,11 +102,13 @@ let load_config_exn ~logger config_file =
   then failwith "Runtime config has unexpected fields" ;
   let ledger = Option.value_exn ~message:"No ledger provided" config.ledger in
   let staking_ledger =
-    let%map.Option { staking; _ } = config.epoch_data in
+    let%bind.Option epoch_data = config.epoch_data in
+    let%map.Option { staking; _ } = epoch_data in
     staking.ledger
   in
   let next_ledger =
-    let%bind.Option { next; _ } = config.epoch_data in
+    let%bind.Option epoch_data = config.epoch_data in
+    let%bind.Option { next; _ } = epoch_data in
     let%map.Option { ledger; _ } = next in
     ledger
   in
