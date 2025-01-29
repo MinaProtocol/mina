@@ -231,25 +231,25 @@ let scan_state_base_node_zkapp ~constraint_constants ~zkapp_command =
   in
   mk_scan_state_base_node varying ~constraint_constants
 
-let proof_cache_db = 
+let proof_cache_db =
   let logger = Logger.create () in
-  let path = "./proof_cache_tag.db" in 
+  let path = "./proof_cache_tag.db" in
   Async.Thread_safe.block_on_async_exn (fun () ->
-    let open Async.Deferred.Let_syntax in 
-    let%bind proof_cache_db = match%bind Proof_cache_tag.create_db path with 
-    | Ok proof_cache_db -> return proof_cache_db
-    | Error err -> 
-      match err with 
-      | `Initialization_error e ->
-      (
-        [%log error]
-          "Failed to initialize proof cache db at '%s': $error" path
-          ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
-        failwithf "Failed to initialize proof cache db at '%s': %s" path (Error.to_string_hum e) ()
-      )
-    in 
-    return proof_cache_db
-    )
+      let open Async.Deferred.Let_syntax in
+      let%bind proof_cache_db =
+        match%bind Proof_cache_tag.create_db path ~logger with
+        | Ok proof_cache_db ->
+            return proof_cache_db
+        | Error err -> (
+            match err with
+            | `Initialization_error e ->
+                [%log error]
+                  "Failed to initialize proof cache db at '%s': $error" path
+                  ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
+                failwithf "Failed to initialize proof cache db at '%s': %s" path
+                  (Error.to_string_hum e) () )
+      in
+      return proof_cache_db )
 
 let scan_state_merge_node :
     Transaction_snark_scan_state.Ledger_proof_with_sok_message.t

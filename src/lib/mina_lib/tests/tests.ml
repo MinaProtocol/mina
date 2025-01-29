@@ -48,12 +48,18 @@ let%test_module "Epoch ledger sync tests" =
 
     let dir_prefix = "sync_test_data"
 
-    let proof_cache_db = Proof_cache_tag.create_db ()
-
     let make_dirname s =
       let open Core in
       let uuid = Uuid_unix.create () |> Uuid.to_string in
       dir_prefix ^/ sprintf "%s_%s" s uuid
+
+    let proof_cache_db =
+      Thread_safe.block_on_async_exn (fun () ->
+          match%bind Proof_cache_tag.create_db ~logger "proof_cache_db" with
+          | Ok cache ->
+              return cache
+          | Error _ ->
+              failwith "error in proof cache initialization" )
 
     let make_context () : (module CONTEXT) Deferred.t =
       let%bind precomputed_values =

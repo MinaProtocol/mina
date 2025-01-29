@@ -17,7 +17,7 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
         fun _line -> ()
   in
   let%bind proof_cache_db =
-    match%bind Proof_cache_tag.create_db proof_cache_db with
+    match%bind Proof_cache_tag.create_db proof_cache_db ~logger with
     | Ok proof_cache_db ->
         return proof_cache_db
     | Error err -> (

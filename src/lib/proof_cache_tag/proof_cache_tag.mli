@@ -5,11 +5,14 @@ type t
 
 type cache_db
 
-val create_db : string -> (cache_db, [> `Initialization_error of Error.t ]) Deferred.Result.t
+val create_db :
+     string
+  -> logger:Logger.t
+  -> (cache_db, [> `Initialization_error of Error.t ]) Deferred.Result.t
 
 val unwrap : t -> Mina_base.Proof.t
 
-val generate : cache_db ->  Mina_base.Proof.t -> t
+val generate : cache_db -> Mina_base.Proof.t -> t
 
 module For_tests : sig
   val blockchain_dummy : t lazy_t

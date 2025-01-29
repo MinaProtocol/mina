@@ -491,10 +491,10 @@ let setup_daemon logger ~itn_features =
         "true|false Whether to send the commit SHA used to build the node to \
          the uptime service. (default: false)"
       no_arg
-  and proof_cache_db = 
-        flag "--proof-cache-db" ~aliases:[ "-proof-cache-db" ]
-        (optional_with_default "~/.mina-config/proof_cache.db" string)
-        ~doc:"PATH to proof caching db. Default ~/.mina-config/proof_cache.db"
+  and proof_cache_db =
+    flag "--proof-cache-db" ~aliases:[ "-proof-cache-db" ]
+      (optional_with_default "~/.mina-config/proof_cache.db" string)
+      ~doc:"PATH to proof caching db. Default ~/.mina-config/proof_cache.db"
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -1142,18 +1142,20 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           [%log info] "Daemon will use chain id %s" chain_id ;
           [%log info] "Daemon running protocol version %s"
             Protocol_version.(to_string current) ;
-          let%bind proof_cache_db = match%bind Proof_cache_tag.create_db proof_cache_db with 
-          | Ok proof_cache_db -> return proof_cache_db
-          | Error err -> 
-            match err with 
-            | `Initialization_error e ->
-            (
-              [%log error]
-                "Failed to initialize proof cache db at '%s': $error" proof_cache_db
-                ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
-              failwithf "Failed to initialize proof cache db at '%s': %s" proof_cache_db (Error.to_string_hum e) ()
-            )
-        in
+          let%bind proof_cache_db =
+            match%bind Proof_cache_tag.create_db proof_cache_db ~logger with
+            | Ok proof_cache_db ->
+                return proof_cache_db
+            | Error err -> (
+                match err with
+                | `Initialization_error e ->
+                    [%log error]
+                      "Failed to initialize proof cache db at '%s': $error"
+                      proof_cache_db
+                      ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
+                    failwithf "Failed to initialize proof cache db at '%s': %s"
+                      proof_cache_db (Error.to_string_hum e) () )
+          in
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
               { timeout = Time.Span.of_sec 3.
@@ -1296,9 +1298,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~node_status_url ~graphql_control_port:itn_graphql_port
                  ~simplified_node_stats
                  ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
-                 ~compile_config
-                 ~proof_cache_db
-                 () )
+                 ~compile_config ~proof_cache_db () )
           in
           { mina
           ; client_trustlist
