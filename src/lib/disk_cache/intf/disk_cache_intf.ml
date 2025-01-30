@@ -1,7 +1,9 @@
 open Core_kernel
 open Async_kernel
 
-module type F = functor (Data : Binable.S) -> sig
+module type S = sig
+  module Data : Binable.S
+
   type t
 
   (** Initialize the on-disk cache explicitly before interactions with it take place. *)
@@ -19,4 +21,16 @@ module type F = functor (Data : Binable.S) -> sig
   val get : t -> id -> Data.t
 
   val count : t -> int
+end
+
+module type F = functor (Data : Binable.S) -> sig
+  include S with module Data := Data
+end
+
+module type F_extended = functor (Data : Binable.S) -> sig
+  include S with module Data := Data
+
+  val iteri : t -> f:(int -> Data.t -> [< `Continue ]) -> unit
+
+  val int_of_id : id -> int
 end
