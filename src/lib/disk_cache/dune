@@ -1,7 +1,7 @@
 (library
  (public_name disk_cache)
  (virtual_modules disk_cache)
- (default_implementation disk_cache.filesystem)
+ (default_implementation disk_cache.identity)
  (libraries
    ;; opam libraries
    core
