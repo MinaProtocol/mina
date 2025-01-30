@@ -2219,19 +2219,7 @@ module T = struct
             in
             [%log internal] "Generate_staged_ledger_diff" ;
             let diff, log =
-              O1trace.sync_thread "generate_staged_ledger_diff"
-                (fun
-                  ()
-                  :
-                  (( ( Transaction_snark_work.Checked.t
-                     , User_command.Valid.t )
-                     Staged_ledger_diff.Pre_diff_two.t
-                   * ( Transaction_snark_work.Checked.t
-                     , User_command.Valid.t )
-                     Staged_ledger_diff.Pre_diff_one.t
-                     option )
-                  * _)
-                ->
+              O1trace.sync_thread "generate_staged_ledger_diff" (fun () ->
                   generate ~constraint_constants logger completed_works_seq
                     valid_on_this_ledger ~receiver:coinbase_receiver
                     ~is_coinbase_receiver_new ~supercharge_coinbase partitions )
