@@ -75,7 +75,7 @@ val statement : t -> Statement.t
 
 module Stable : sig
   module V2 : sig
-    type t [@@deriving bin_io, version, sexp, yojson]
+    type t [@@deriving bin_io, equal, sexp, version, yojson]
   end
 end
 with type V2.t = t

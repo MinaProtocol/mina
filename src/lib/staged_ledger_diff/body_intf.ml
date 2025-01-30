@@ -4,7 +4,7 @@ module type Full = sig
     [@@@no_toplevel_latest_type]
 
     module V1 : sig
-      type t [@@deriving sexp]
+      type t [@@deriving equal, sexp]
     end
   end]
 
