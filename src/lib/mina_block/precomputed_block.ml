@@ -53,7 +53,7 @@ module T = struct
     { scheduled_time : Block_time.t
     ; protocol_state : Protocol_state.value
     ; protocol_state_proof : Proof.t
-    ; staged_ledger_diff : Staged_ledger_diff.t
+    ; staged_ledger_diff : Staged_ledger_diff.Stable.Latest.t
     ; delta_transition_chain_proof :
         Frozen_ledger_hash.t * Frozen_ledger_hash.t list
     ; protocol_version : Protocol_version.t
@@ -62,6 +62,7 @@ module T = struct
     ; accounts_created : (Account_id.t * Currency.Fee.t) list
     ; tokens_used : (Token_id.t * Account_id.t option) list
     }
+  [@@deriving sexp, yojson]
 end
 
 include T
@@ -89,14 +90,13 @@ module Stable = struct
       ; tokens_used :
           (Token_id.Stable.V2.t * Account_id.Stable.V2.t option) list
       }
-    [@@deriving sexp, yojson]
 
     let to_latest = Fn.id
   end
 end]
 
 (* functions for the versioned json, not the unversioned ones provided by `T` *)
-[%%define_locally Stable.Latest.(to_yojson, of_yojson, sexp_of_t, t_of_sexp)]
+[%%define_locally Stable.Latest.(to_yojson, of_yojson)]
 
 let of_block ~logger
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
