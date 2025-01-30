@@ -17,4 +17,6 @@ module Make : functor (T : Binable.S) -> sig
 
   (** Read from the cache, crashing if the value cannot be found. *)
   val get : t -> id -> T.t
+
+  val count : t -> int
 end

@@ -33,4 +33,6 @@ struct
     Out_channel.with_file ~binary:true (path root new_counter) ~f:(fun chan ->
         Out_channel.output_string chan @@ Binable.to_string (module B) x ) ;
     res
+
+  let count ((_, counter) : t) = !counter
 end
