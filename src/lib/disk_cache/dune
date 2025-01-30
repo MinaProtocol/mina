@@ -9,6 +9,7 @@
    ;; local libraries
    file_system
    logger
+   disk_cache.intf
    )
  (preprocess
   (pps ppx_mina ppx_version ppx_jane))
