@@ -228,9 +228,8 @@ let setup_daemon logger ~itn_features =
   and snark_work_fee =
     flag "--snark-worker-fee" ~aliases:[ "snark-worker-fee" ]
       ~doc:
-        (sprintf
-           "FEE Amount a worker wants to get compensated for generating a \
-            snark proof" )
+        "FEE Amount a worker wants to get compensated for generating a snark \
+         proof"
       (optional txn_fee)
   and work_reassignment_wait =
     flag "--work-reassignment-wait"
@@ -1378,6 +1377,9 @@ let replay_blocks ~itn_features logger =
                      block
                  | Error err ->
                      failwithf "Could not read block: %s" err () )
+           | Some "sexp" ->
+               fun line ->
+                 Sexp.of_string_conv_exn line Mina_block.Precomputed.t_of_sexp
            | _ ->
                failwith "Expected one of 'json', 'sexp' for -format flag"
          in

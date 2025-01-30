@@ -6,7 +6,7 @@ module Stable : sig
   [@@@no_toplevel_latest_type]
 
   module V2 : sig
-    type t [@@deriving equal]
+    type t [@@deriving sexp, equal]
   end
 end]
 
