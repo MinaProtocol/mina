@@ -434,12 +434,24 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 (Mina_lib.snark_coordinator_key mina)
                 ~f:Fn.const
             in
-            let%map r = Mina_lib.request_work mina in
+            let%map work = Mina_lib.request_work mina in
+            let work_wire =
+              { work with
+                instances =
+                  One_or_two.map work.instances
+                    ~f:
+                      (Snark_work_lib.Work.Single.Spec.map
+                         ~f_witness:
+                           Transaction_witness.read_all_proofs_from_disk
+                         ~f_proof:ident )
+              }
+            in
             [%log trace]
-              ~metadata:[ ("work_spec", Snark_worker.Work.Spec.to_yojson r) ]
+              ~metadata:
+                [ ("work_spec", Snark_worker.Work.Spec.to_yojson work_wire) ]
               "responding to a Get_work request with some new work" ;
             Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
-            (r, key)) )
+            (work_wire, key)) )
     ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
           [%log trace] "received completed work from a snark worker"

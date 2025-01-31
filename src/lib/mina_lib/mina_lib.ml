@@ -890,7 +890,10 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     Mina_metrics.(
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
-  let spec = work.spec.instances in
+  let spec =
+    One_or_two.map work.spec.instances
+      ~f:Snark_work_lib.Work.Single.Spec.statement
+  in
   let cb _ =
     (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
      * If the diff is accepted then remove it from the seen jobs.
