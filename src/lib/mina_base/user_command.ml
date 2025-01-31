@@ -75,6 +75,8 @@ let gen = Gen.to_signed_command gen_signed
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       (Signed_command.Stable.V2.t, Zkapp_command.Stable.V1.t) Poly.Stable.V2.t
@@ -84,13 +86,31 @@ module Stable = struct
   end
 end]
 
-let to_base64 : t -> string = function
+type t = (Signed_command.t, Zkapp_command.t) Poly.t
+[@@deriving sexp, compare, equal, hash, yojson]
+
+let generate : Stable.Latest.t -> t = function
+  | Signed_command sc ->
+      Signed_command sc
+  | Zkapp_command zc ->
+      Zkapp_command (Zkapp_command.generate zc)
+
+let unwrap : t -> Stable.Latest.t = function
+  | Signed_command sc ->
+      Signed_command sc
+  | Zkapp_command zc ->
+      Zkapp_command (Zkapp_command.unwrap zc)
+
+type ('a, 'b) with_forest =
+  (Signed_command.t, ('a, 'b) Zkapp_command.with_forest) Poly.t
+
+let to_base64 : Stable.Latest.t -> string = function
   | Signed_command sc ->
       Signed_command.to_base64 sc
   | Zkapp_command zc ->
       Zkapp_command.to_base64 zc
 
-let of_base64 s : t Or_error.t =
+let of_base64 s : Stable.Latest.t Or_error.t =
   match Signed_command.of_base64 s with
   | Ok sc ->
       Ok (Signed_command sc)
@@ -105,27 +125,6 @@ let of_base64 s : t Or_error.t =
                   "Could decode Base64 neither to signed command (%s), nor to \
                    zkApp (%s)"
                   (Error.to_string_hum err1) (Error.to_string_hum err2) ) ) )
-
-(*
-include Allocation_functor.Make.Versioned_v1.Full_compare_eq_hash (struct
-  let id = "user_command"
-
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        (Signed_command.Stable.V1.t, Snapp_command.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving sexp, compare, equal, hash, yojson]
-
-      let to_latest = Fn.id
-
-      type 'a creator : Signed_command.t -> Snapp_command.t -> 'a
-
-      let create cmd1 cmd2 = (cmd1, cmd2)
-    end
-  end]
-end)
-*)
 
 module Zero_one_or_two = struct
   [%%versioned
@@ -215,7 +214,7 @@ let of_verifiable (t : Verifiable.t) : t =
   | Zkapp_command p ->
       Zkapp_command (Zkapp_command.of_verifiable p)
 
-let fee : t -> Currency.Fee.t = function
+let fee : (_, _) with_forest -> Currency.Fee.t = function
   | Signed_command x ->
       Signed_command.fee x
   | Zkapp_command p ->
@@ -230,7 +229,7 @@ let is_disabled ~(compile_config : Mina_compile_config.t) = function
       false
 
 (* always `Accessed` for fee payer *)
-let accounts_accessed (t : t) (status : Transaction_status.t) :
+let accounts_accessed (t : (_, _) with_forest) (status : Transaction_status.t) :
     (Account_id.t * [ `Accessed | `Not_accessed ]) list =
   match t with
   | Signed_command x ->
@@ -238,10 +237,10 @@ let accounts_accessed (t : t) (status : Transaction_status.t) :
   | Zkapp_command ps ->
       Zkapp_command.account_access_statuses ps status
 
-let accounts_referenced (t : t) =
+let accounts_referenced (t : (_, _) with_forest) =
   List.map (accounts_accessed t Applied) ~f:(fun (acct_id, _status) -> acct_id)
 
-let fee_payer (t : t) =
+let fee_payer (t : (_, _) with_forest) =
   match t with
   | Signed_command x ->
       Signed_command.fee_payer x
@@ -249,7 +248,7 @@ let fee_payer (t : t) =
       Zkapp_command.fee_payer p
 
 (** The application nonce is the nonce of the fee payer at which a user command can be applied. *)
-let applicable_at_nonce (t : t) =
+let applicable_at_nonce (t : (_, _) with_forest) =
   match t with
   | Signed_command x ->
       Signed_command.nonce x
@@ -266,21 +265,21 @@ let extract_vks : t -> (Account_id.t * Verification_key_wire.t) List.t =
       Zkapp_command.extract_vks cmd
 
 (** The target nonce is what the nonce of the fee payer will be after a user command is successfully applied. *)
-let target_nonce_on_success (t : t) =
+let target_nonce_on_success (t : (_, _) with_forest) =
   match t with
   | Signed_command x ->
       Account.Nonce.succ (Signed_command.nonce x)
   | Zkapp_command p ->
       Zkapp_command.target_nonce_on_success p
 
-let fee_token (t : t) =
+let fee_token (t : (_, _) with_forest) =
   match t with
   | Signed_command x ->
       Signed_command.fee_token x
   | Zkapp_command x ->
       Zkapp_command.fee_token x
 
-let valid_until (t : t) =
+let valid_until (t : (_, _) with_forest) =
   match t with
   | Signed_command x ->
       Signed_command.valid_until x
@@ -347,14 +346,14 @@ let filter_by_participant (commands : t list) public_key =
 
 (* A metric on user commands that should correspond roughly to resource costs
    for validation/application *)
-let weight : t -> int = function
+let weight : (_, _) with_forest -> int = function
   | Signed_command signed_command ->
       Signed_command.payload signed_command |> Signed_command_payload.weight
   | Zkapp_command zkapp_command ->
       Zkapp_command.weight zkapp_command
 
 (* Fee per weight unit *)
-let fee_per_wu (user_command : Stable.Latest.t) : Currency.Fee_rate.t =
+let fee_per_wu (user_command : (_, _) with_forest) : Currency.Fee_rate.t =
   (*TODO: return Or_error*)
   Currency.Fee_rate.make_exn (fee user_command) (weight user_command)
 
@@ -376,7 +375,7 @@ let is_incompatible_version = function
   | Zkapp_command p ->
       Zkapp_command.is_incompatible_version p
 
-let has_invalid_call_forest : t -> bool = function
+let has_invalid_call_forest : (_, _) with_forest -> bool = function
   | Signed_command _ ->
       false
   | Zkapp_command cmd ->
@@ -414,7 +413,7 @@ module Well_formedness_error = struct
 end
 
 let check_well_formedness ~(genesis_constants : Genesis_constants.t)
-    ~(compile_config : Mina_compile_config.t) t :
+    ~(compile_config : Mina_compile_config.t) (t : (_, _) with_forest) :
     (unit, Well_formedness_error.t list) result =
   let preds =
     let open Well_formedness_error in
@@ -443,7 +442,7 @@ let check_well_formedness ~(genesis_constants : Genesis_constants.t)
 type fee_payer_summary_t = Signature.t * Account.key * int
 [@@deriving yojson, hash]
 
-let fee_payer_summary : t -> fee_payer_summary_t = function
+let fee_payer_summary : (_, _) with_forest -> fee_payer_summary_t = function
   | Zkapp_command cmd ->
       let fp = Zkapp_command.fee_payer_account_update cmd in
       let open Account_update in
@@ -455,14 +454,12 @@ let fee_payer_summary : t -> fee_payer_summary_t = function
       Signed_command.
         (signature cmd, fee_payer_pk cmd, nonce cmd |> Unsigned.UInt32.to_int)
 
-let fee_payer_summary_json =
-  Fn.compose fee_payer_summary_t_to_yojson fee_payer_summary
+let fee_payer_summary_json tx =
+  fee_payer_summary_t_to_yojson (fee_payer_summary tx)
 
-let fee_payer_summary_string =
-  let to_string (signature, pk, nonce) =
-    sprintf "%s (%s %d)"
-      (Signature.to_base58_check signature)
-      (Signature_lib.Public_key.Compressed.to_base58_check pk)
-      nonce
-  in
-  Fn.compose to_string fee_payer_summary
+let fee_payer_summary_string tx =
+  let signature, pk, nonce = fee_payer_summary tx in
+  sprintf "%s (%s %d)"
+    (Signature.to_base58_check signature)
+    (Signature_lib.Public_key.Compressed.to_base58_check pk)
+    nonce

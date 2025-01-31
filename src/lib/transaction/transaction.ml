@@ -50,12 +50,11 @@ end]
 
 type t = User_command.t Poly.t [@@deriving sexp, yojson]
 
-let unwrap : t -> Stable.Latest.t = Fn.id
+let unwrap : t -> Stable.Latest.t =
+  Poly.Stable.Latest.map ~f:User_command.unwrap
 
-let generate : Stable.Latest.t -> t = Fn.id
-
-include Hashable.Make (Stable.Latest)
-include Comparable.Make (Stable.Latest)
+let generate : Stable.Latest.t -> t =
+  Poly.Stable.Latest.map ~f:User_command.generate
 
 type 'command t_ = 'command Poly.t =
   | Command of 'command

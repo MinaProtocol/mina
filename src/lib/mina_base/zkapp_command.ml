@@ -241,6 +241,10 @@ end
 
 include T
 
+let generate : Stable.Latest.t -> t = Fn.id
+
+let unwrap : t -> Stable.Latest.t = Fn.id
+
 [%%define_locally Stable.Latest.(of_wire, to_wire)]
 
 [%%define_locally Stable.Latest.Wire.(gen)]

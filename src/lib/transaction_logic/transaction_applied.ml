@@ -76,10 +76,16 @@ module Zkapp_command_applied = struct
     }
 
   let generate { Stable.Latest.accounts; command; new_accounts } : t =
-    { accounts; command; new_accounts }
+    { accounts
+    ; command = With_status.map ~f:Zkapp_command.generate command
+    ; new_accounts
+    }
 
   let unwrap { accounts; command; new_accounts } : Stable.Latest.t =
-    { Stable.Latest.accounts; command; new_accounts }
+    { Stable.Latest.accounts
+    ; command = With_status.map ~f:Zkapp_command.unwrap command
+    ; new_accounts
+    }
 end
 
 module Command_applied = struct
