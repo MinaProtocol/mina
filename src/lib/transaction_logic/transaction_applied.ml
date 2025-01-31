@@ -114,7 +114,26 @@ module Coinbase_applied = struct
   end]
 end
 
-module Varying = struct
+module Varying : sig
+  [%%versioned:
+  module Stable : sig
+    [@@@no_toplevel_latest_type]
+
+    module V2 : sig
+      type t [@@deriving sexp, to_yojson]
+    end
+  end]
+
+  type t =
+    | Command of Command_applied.t
+    | Fee_transfer of Fee_transfer_applied.t
+    | Coinbase of Coinbase_applied.t
+  [@@deriving sexp, to_yojson]
+
+  val generate : Stable.Latest.t -> t
+
+  val unwrap : t -> Stable.Latest.t
+end = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
@@ -127,10 +146,16 @@ module Varying = struct
       let to_latest = Fn.id
     end
   end]
+
+  let generate = Fn.id
+
+  let unwrap = Fn.id
 end
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       { previous_hash : Ledger_hash.Stable.V1.t; varying : Varying.Stable.V2.t }
@@ -139,6 +164,9 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t = { previous_hash : Ledger_hash.t; varying : Varying.t }
+[@@deriving sexp, to_yojson]
 
 let burned_tokens : t -> Currency.Amount.t =
  fun { varying; _ } ->
@@ -239,3 +267,9 @@ let transaction_status : t -> Transaction_status.t =
       f.fee_transfer.status
   | Coinbase c ->
       c.coinbase.status
+
+let generate { Stable.Latest.previous_hash; varying } : t =
+  { previous_hash; varying = Varying.generate varying }
+
+let unwrap { previous_hash; varying } =
+  { Stable.Latest.previous_hash; varying = Varying.unwrap varying }
