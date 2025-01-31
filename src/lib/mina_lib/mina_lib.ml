@@ -865,13 +865,12 @@ let request_work t =
     Work_selection_method.work ~logger:t.config.logger ~fee
       ~snark_pool:(snark_pool t) (snark_job_state t)
   in
+  let map_work =
+    Snark_work_lib.Work.Single.Spec.map ~f_proof:Ledger_proof.Cached.unwrap
+      ~f_witness:Transaction_witness.unwrap
+  in
   Option.map instances_opt ~f:(fun instances ->
-      let instances =
-        One_or_two.map instances
-          ~f:
-            (Snark_work_lib.Work.Single.Spec.map_proof
-               ~f:Ledger_proof.Cached.unwrap )
-      in
+      let instances = One_or_two.map instances ~f:map_work in
       { Snark_work_lib.Work.Spec.instances; fee } )
 
 let work_selection_method t = t.config.work_selection_method
@@ -890,13 +889,12 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     Mina_metrics.(
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
-  let cache =
-    Ledger_proof.Cached.generate ~proof_cache_db:t.config.proof_cache_db
+  let map_work =
+    Snark_work_lib.Work.Single.Spec.map ~f_witness:Transaction_witness.generate
+      ~f_proof:
+        (Ledger_proof.Cached.generate ~proof_cache_db:t.config.proof_cache_db)
   in
-  let spec =
-    One_or_two.map work.spec.instances
-      ~f:(Snark_work_lib.Work.Single.Spec.map_proof ~f:cache)
-  in
+  let spec = One_or_two.map work.spec.instances ~f:map_work in
   let cb _ =
     (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
      * If the diff is accepted then remove it from the seen jobs.

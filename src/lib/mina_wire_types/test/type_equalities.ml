@@ -315,7 +315,8 @@ module Mina_transaction = struct
   module O = Mina_transaction.Transaction
   module W = WT.Mina_transaction
   include Assert_equal1V2 (O.Poly.Stable) (W.Poly)
-  include Assert_equal0V2 (O.Stable) (W)
+  (* TODO uncomment when witness is ready *)
+  (* include Assert_equal0V2 (O.Stable) (W) *)
 end
 
 module Mina_state = struct

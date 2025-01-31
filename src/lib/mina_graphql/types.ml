@@ -631,8 +631,8 @@ module Snark_work_bundle = struct
   let spec =
     let work_to_yojson (w : Work_selector.work) =
       Snark_worker.Work.Single.Spec.to_yojson
-      @@ Snark_work_lib.Work.Single.Spec.map_proof ~f:Ledger_proof.Cached.unwrap
-           w
+      @@ Snark_work_lib.Work.Single.Spec.map ~f_proof:Ledger_proof.Cached.unwrap
+           ~f_witness:Transaction_witness.unwrap w
     in
     obj "WorkBundleSpec"
       ~doc:

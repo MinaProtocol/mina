@@ -47,6 +47,8 @@ end
 
 [%%versioned:
 module Stable : sig
+  [@@@no_toplevel_latest_type]
+
   module V2 : sig
     type t =
       { transaction : Mina_transaction.Transaction.Stable.V2.t
@@ -60,3 +62,18 @@ module Stable : sig
     [@@deriving sexp, yojson]
   end
 end]
+
+type t =
+  { transaction : Mina_transaction.Transaction.t
+  ; first_pass_ledger : Mina_ledger.Sparse_ledger.t
+  ; second_pass_ledger : Mina_ledger.Sparse_ledger.t
+  ; protocol_state_body : Mina_state.Protocol_state.Body.Value.t
+  ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.t
+  ; status : Mina_base.Transaction_status.t
+  ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
+  }
+[@@deriving sexp, yojson]
+
+val unwrap : t -> Stable.Latest.t
+
+val generate : Stable.Latest.t -> t

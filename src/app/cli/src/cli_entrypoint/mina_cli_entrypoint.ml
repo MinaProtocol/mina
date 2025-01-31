@@ -1628,7 +1628,7 @@ let internal_commands ~itn_features logger =
               in
               let spec =
                 [%of_sexp:
-                  ( Transaction_witness.t
+                  ( Transaction_witness.Stable.Latest.t
                   , Ledger_proof.t )
                   Snark_work_lib.Work.Single.Spec.t] sexp
               in
