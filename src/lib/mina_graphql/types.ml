@@ -2021,7 +2021,7 @@ module Zkapp_command = struct
 end
 
 let transactions =
-  let open Filtered_external_transition.Transactions in
+  let open Filtered_external_transition.Transactions.Stable.Latest in
   obj "Transactions" ~doc:"Different types of transactions in a block"
     ~fields:(fun _ ->
       [ field "userCommands"
