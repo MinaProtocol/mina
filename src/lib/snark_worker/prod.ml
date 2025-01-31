@@ -102,7 +102,7 @@ module Inputs = struct
               | Work.Single.Spec.Transition
                   (input, (w : Transaction_witness.Stable.Latest.t)) ->
                   process (fun () ->
-                      match Transaction.Stable.Latest.unwrap w.transaction with
+                      match w.transaction with
                       | Command (Zkapp_command zkapp_command) -> (
                           let%bind witnesses_specs_stmts =
                             Or_error.try_with (fun () ->
@@ -243,9 +243,7 @@ module Inputs = struct
                             Deferred.return
                             @@
                             (* Validate the received transaction *)
-                            match
-                              Transaction.Stable.Latest.unwrap w.transaction
-                            with
+                            match w.transaction with
                             | Command (Signed_command cmd) -> (
                                 match Signed_command.check cmd with
                                 | Some cmd ->

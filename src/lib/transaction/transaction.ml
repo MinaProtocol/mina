@@ -36,46 +36,23 @@ module Valid = struct
   include Comparable.Make (T)
 end
 
-(* TODO unwind the type hiding *)
-include (
-  struct
-    [%%versioned
-    module Stable = struct
-      [@@@no_toplevel_latest_type]
+[%%versioned
+module Stable = struct
+  [@@@no_toplevel_latest_type]
 
-      module V2 = struct
-        type t = User_command.Stable.V2.t Poly.Stable.V2.t
-        [@@deriving sexp, compare, equal, hash, yojson]
+  module V2 = struct
+    type t = User_command.Stable.V2.t Poly.Stable.V2.t
+    [@@deriving sexp, compare, equal, hash, yojson]
 
-        let to_latest = Fn.id
-
-        let unwrap = Fn.id
-
-        let wrap = Fn.id
-      end
-    end]
-  end :
-    sig
-      [%%versioned:
-      module Stable : sig
-        [@@@no_toplevel_latest_type]
-
-        module V2 : sig
-          type t = private User_command.Stable.V2.t Poly.Stable.V2.t
-          [@@deriving sexp, compare, equal, hash, yojson]
-
-          val wrap : User_command.Stable.V2.t Poly.Stable.V2.t -> t
-
-          val unwrap : t -> User_command.Stable.V2.t Poly.Stable.V2.t
-        end
-      end]
-    end )
+    let to_latest = Fn.id
+  end
+end]
 
 type t = User_command.t Poly.t [@@deriving sexp, yojson]
 
-let unwrap : t -> Stable.Latest.t = Stable.Latest.wrap
+let unwrap : t -> Stable.Latest.t = Fn.id
 
-let generate : Stable.Latest.t -> t = Stable.Latest.unwrap
+let generate : Stable.Latest.t -> t = Fn.id
 
 include Hashable.Make (Stable.Latest)
 include Comparable.Make (Stable.Latest)
