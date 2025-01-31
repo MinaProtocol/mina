@@ -53,7 +53,7 @@ User defined value which describe current pipeline chunk of jobs to be executed.
 - coverage gathering - which gathers coverage artifacts and uploads it to coveralls.io
 
 To reach above pipeline configuration below configuration can be provided:
-(non-important attributes where omitted)
+(non-important attributes were omitted)
 ```
 steps:
   - commands:
