@@ -1,9 +1,11 @@
 #/bin/bash
 
 CONN_STR=$1
-LAST_BLOCK_HASH=$(psql $CONN_STR -t -c \
+LAST_BLOCK_HASH=$(psql -U postgres $CONN_STR -t -c \
   'SELECT state_hash from blocks where global_slot_since_genesis = (SELECT MAX(global_slot_since_genesis) from blocks);' \
   | head -n1 | xargs )
+
+echo LAST_BLOCK_HASH: $LAST_BLOCK_HASH
 
 GENESIS_HASH=$(psql $CONN_STR -t -c  \
     "select state_hash from blocks where id = 1;" | xargs)

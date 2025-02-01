@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -e
+TOTAL_BLOCKS=25
 
 # go to root of mina repo
 cd $(dirname -- "${BASH_SOURCE[0]}")/../../../..
@@ -14,7 +15,10 @@ psql -U postgres archive < ./src/app/archive/create_schema.sql
 psql -U postgres -c "ALTER USER postgres WITH PASSWORD 'postgres';"
 
 # start mina-local-network
-./scripts/mina-local-network/mina-local-network.sh -a -r -pu postgres -ppw postgres -zt -vt -lp &
+./scripts/mina-local-network/mina-local-network.sh -a -r \
+    -pu postgres -ppw postgres \
+    -tf 1 --override-slot-time 30000 \
+    -zt -vt -lp &
 
 trap "pkill -f mina-local-network" EXIT
 
@@ -23,8 +27,8 @@ while true; do
   sleep 10s
   # psql outputs "    " until there are blocks in the db, the +0 defaults that to 0
   BLOCKS="$(( $(psql -U postgres archive -t -c  "select MAX(global_slot_since_genesis) from blocks" 2> /dev/null) +0))"
-  echo Generated $BLOCKS/25 blocks
-  if [ "$((BLOCKS+0))" -ge  5 ] ; then
+  echo Generated $BLOCKS/$TOTAL_BLOCKS blocks
+  if [ "$((BLOCKS+0))" -ge  $TOTAL_BLOCKS ] ; then
     pkill -f mina-local-network
     break
   fi
@@ -33,7 +37,7 @@ done
 echo Converting canonical blocks
 
 # make the blocks canonical
-./src/test/archive/sample_db/convert_chain_to_canonical.sh postgres://postgres:postgres@localhost:5432/archive
+source ./src/test/archive/sample_db/convert_chain_to_canonical.sh postgres://postgres:postgres@localhost:5432/archive
 
 echo Regenerateing precomputed_blocks.tar.xz
 rm -rf precomputed_blocks || true
@@ -48,8 +52,9 @@ pg_dump -U postgres -d archive > ./src/test/archive/sample_db/archive_db.sql
 
 
 echo Regenerateing input file
-cp ~/.mina-network/mina-local-network-2-1-1/genesis_ledger.json _tmp.json
-echo '{ "genesis_ledger": { "accounts": '$(cat _tmp.json | jq '.accounts')' } }' | jq > ./src/test/archive/sample_db/replayer_input_file.json
+cp ./scripts/mina-local-network/annotated_ledger.json _tmp.json
+echo '{ "genesis_ledger": { "accounts": '$(cat _tmp.json | jq '.accounts')', "num_accounts": '$(cat _tmp.json | jq '.num_accounts')' }}' \
+  | jq > ./src/test/archive/sample_db/replayer_input_file.json
 rm _tmp.json
 
 echo Regenerateing genesis_ledger
