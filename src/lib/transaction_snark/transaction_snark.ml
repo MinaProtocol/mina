@@ -87,14 +87,18 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
   end]
 
+  module Poly = struct
+    type 'a t =
+      (Mina_state.Snarked_ledger_state.With_sok.t, 'a) Proof_carrying_data.t
+  end
+
+  module Cached = struct
+    type t = Proof_cache_tag.t Poly.t
+  end
+
   let proof t = t.Proof_carrying_data.proof
 
-  let statement
-      (t :
-        ( Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
-        , _ )
-        Proof_carrying_data.t ) =
-    { t.data with sok_digest = () }
+  let statement (t : 'a Poly.t) = { t.data with sok_digest = () }
 
   let statement_with_sok t = t.Proof_carrying_data.data
 
