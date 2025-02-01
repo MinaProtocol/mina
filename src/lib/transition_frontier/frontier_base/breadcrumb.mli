@@ -10,7 +10,7 @@ open Mina_base
 open Mina_state
 open Network_peer
 
-type t [@@deriving sexp, equal, compare, to_yojson]
+type t [@@deriving equal, compare, to_yojson]
 
 type display =
   { state_hash : string
