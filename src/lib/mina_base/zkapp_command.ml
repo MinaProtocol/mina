@@ -49,6 +49,7 @@ module Digest = Call_forest.Digest
 type ('account_update_digest, 'forest_digest) with_forest =
   (Account_update.t, 'account_update_digest, 'forest_digest) Call_forest.t
   Poly.t
+[@@deriving sexp, compare, equal, hash, yojson]
 
 module T : sig
   type t = (Digest.Account_update.t, Digest.Forest.t) with_forest
@@ -71,10 +72,7 @@ module T : sig
 
     module V1 : sig
       type t =
-        ( Account_update.Stable.V1.t
-        , Digest.Account_update.Stable.V1.t
-        , Digest.Forest.Stable.V1.t )
-        Call_forest.Stable.V1.t
+        (Account_update.Stable.V1.t, unit, unit) Call_forest.Stable.V1.t
         Poly.Stable.V1.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
@@ -99,8 +97,13 @@ module T : sig
     end
   end]
 end = struct
-  [%%versioned_binable
+  type t = (Digest.Account_update.t, Digest.Forest.t) with_forest
+  [@@deriving sexp, compare, equal, hash, yojson]
+
+  [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     [@@@with_top_version_tag]
 
     (* DO NOT DELETE VERSIONS!
@@ -114,27 +117,20 @@ end = struct
 
     module V1 = struct
       type t =
-        ( Account_update.Stable.V1.t
-        , Digest.Account_update.Stable.V1.t
-        , Digest.Forest.Stable.V1.t )
-        Call_forest.Stable.V1.t
+        (Account_update.Stable.V1.t, unit, unit) Call_forest.Stable.V1.t
         Poly.Stable.V1.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
 
       module Wire = struct
-        [%%versioned
-        module Stable = struct
-          module V1 = struct
-            type t =
-              (Account_update.Stable.V1.t, unit, unit) Call_forest.Stable.V1.t
-              Poly.Stable.V1.t
-            [@@deriving sexp, compare, equal, hash, yojson]
+        type nonrec t = t
 
-            let to_latest = Fn.id
-          end
-        end]
+        let compare = compare
+
+        let t_of_sexp = t_of_sexp
+
+        let sexp_of_t = sexp_of_t
 
         let of_graphql_repr (t : Graphql_repr.t) : t =
           { fee_payer = t.fee_payer
@@ -192,58 +188,44 @@ end = struct
                   } ) )
       end
 
-      let of_wire (w : Wire.t) : t =
-        { fee_payer = w.fee_payer
-        ; memo = w.memo
-        ; account_updates =
-            w.account_updates
-            |> Call_forest.accumulate_hashes
-                 ~hash_account_update:(fun (p : Account_update.t) ->
-                   Digest.Account_update.create p )
-        }
+      let of_wire = Fn.id
 
-      let to_wire (t : t) : Wire.t =
-        let rec forget_hashes = List.map ~f:forget_hash
-        and forget_hash = function
-          | { With_stack_hash.stack_hash = _
-            ; elt =
-                { Call_forest.Tree.account_update
-                ; account_update_digest = _
-                ; calls
-                }
-            } ->
-              { With_stack_hash.stack_hash = ()
-              ; elt =
-                  { Call_forest.Tree.account_update
-                  ; account_update_digest = ()
-                  ; calls = forget_hashes calls
-                  }
-              }
-        in
-        { fee_payer = t.fee_payer
-        ; memo = t.memo
-        ; account_updates = forget_hashes t.account_updates
-        }
-
-      include
-        Binable.Of_binable_without_uuid
-          (Wire.Stable.V1)
-          (struct
-            type nonrec t = t
-
-            let of_binable t = of_wire t
-
-            let to_binable = to_wire
-          end)
+      let to_wire = Fn.id
     end
   end]
 end
 
 include T
 
-let generate : Stable.Latest.t -> t = Fn.id
+let generate (w : Stable.Latest.t) : t =
+  { fee_payer = w.fee_payer
+  ; memo = w.memo
+  ; account_updates =
+      w.account_updates
+      |> Call_forest.accumulate_hashes
+           ~hash_account_update:(fun (p : Account_update.t) ->
+             Digest.Account_update.create p )
+  }
 
-let unwrap : t -> Stable.Latest.t = Fn.id
+let unwrap (t : t) : Stable.Latest.t =
+  let rec forget_hashes = List.map ~f:forget_hash
+  and forget_hash = function
+    | { With_stack_hash.stack_hash = _
+      ; elt =
+          { Call_forest.Tree.account_update; account_update_digest = _; calls }
+      } ->
+        { With_stack_hash.stack_hash = ()
+        ; elt =
+            { Call_forest.Tree.account_update
+            ; account_update_digest = ()
+            ; calls = forget_hashes calls
+            }
+        }
+  in
+  { fee_payer = t.fee_payer
+  ; memo = t.memo
+  ; account_updates = forget_hashes t.account_updates
+  }
 
 [%%define_locally Stable.Latest.(of_wire, to_wire)]
 
@@ -902,13 +884,10 @@ module Valid : Valid_intf = struct
     Verifiable.create t ~failed ~find_vk |> Or_error.map ~f:of_verifiable
 end
 
-[%%define_locally Stable.Latest.(of_yojson, to_yojson)]
-
 (* so transaction ids have a version tag *)
 include Codable.Make_base64 (Stable.Latest.With_top_version_tag)
 
-type account_updates =
-  (Account_update.t, Digest.Account_update.t, Digest.Forest.t) Call_forest.t
+type account_updates = (Account_update.t, unit, unit) Call_forest.t
 
 let account_updates_deriver obj =
   let of_zkapp_command_with_depth (ps : Account_update.Graphql_repr.t list) :
@@ -917,7 +896,6 @@ let account_updates_deriver obj =
       ~account_update_depth:(fun (p : Account_update.Graphql_repr.t) ->
         p.body.call_depth )
     |> Call_forest.map ~f:Account_update.of_graphql_repr
-    |> Call_forest.accumulate_hashes'
   and to_zkapp_command_with_depth (ps : account_updates) :
       Account_update.Graphql_repr.t list =
     ps
