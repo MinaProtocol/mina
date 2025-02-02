@@ -186,7 +186,7 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
       Format.printf "Processing batch of %d zkApps@." (List.length zkapps_batch) ;
       List.iteri zkapps_batch ~f:(fun i zkapp ->
           let txn_hash =
-            Transaction_hash.hash_command (Zkapp_command zkapp)
+            Transaction_hash.hash_wrapped_zkapp_command zkapp
             |> Transaction_hash.to_base58_check
           in
           Format.printf " zkApp %d, transaction hash: %s@." i txn_hash ;
