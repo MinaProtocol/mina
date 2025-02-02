@@ -78,74 +78,58 @@ module T = struct
 
       let to_latest = Fn.id
 
-      module Wire = struct
-        type nonrec t = t
+      let of_graphql_repr (t : Graphql_repr.t) : t =
+        { fee_payer = t.fee_payer
+        ; memo = t.memo
+        ; account_updates =
+            Call_forest.of_account_updates_map t.account_updates
+              ~f:Account_update.of_graphql_repr
+              ~account_update_depth:(fun (p : Account_update.Graphql_repr.t) ->
+                p.body.call_depth )
+        }
 
-        let compare = compare
+      let to_graphql_repr (t : t) : Graphql_repr.t =
+        { fee_payer = t.fee_payer
+        ; memo = t.memo
+        ; account_updates =
+            t.account_updates
+            |> Call_forest.to_account_updates_map
+                 ~f:(fun ~depth account_update ->
+                   Account_update.to_graphql_repr account_update
+                     ~call_depth:depth )
+        }
 
-        let t_of_sexp = t_of_sexp
+      let gen =
+        let open Quickcheck.Generator in
+        let open Let_syntax in
+        let gen_call_forest =
+          fixed_point (fun self ->
+              let%bind calls_length = small_non_negative_int in
+              list_with_length calls_length
+                (let%map account_update = Account_update.gen and calls = self in
+                 { With_stack_hash.stack_hash = ()
+                 ; elt =
+                     { Call_forest.Tree.account_update
+                     ; account_update_digest = ()
+                     ; calls
+                     }
+                 } ) )
+        in
+        let open Quickcheck.Let_syntax in
+        let%map fee_payer = Account_update.Fee_payer.gen
+        and account_updates = gen_call_forest
+        and memo = Signed_command_memo.gen in
+        { Poly.fee_payer; account_updates; memo }
 
-        let sexp_of_t = sexp_of_t
-
-        let of_graphql_repr (t : Graphql_repr.t) : t =
-          { fee_payer = t.fee_payer
-          ; memo = t.memo
-          ; account_updates =
-              Call_forest.of_account_updates_map t.account_updates
-                ~f:Account_update.of_graphql_repr
-                ~account_update_depth:(fun (p : Account_update.Graphql_repr.t)
-                                      -> p.body.call_depth )
-          }
-
-        let to_graphql_repr (t : t) : Graphql_repr.t =
-          { fee_payer = t.fee_payer
-          ; memo = t.memo
-          ; account_updates =
-              t.account_updates
-              |> Call_forest.to_account_updates_map
-                   ~f:(fun ~depth account_update ->
-                     Account_update.to_graphql_repr account_update
-                       ~call_depth:depth )
-          }
-
-        let gen =
-          let open Quickcheck.Generator in
-          let open Let_syntax in
-          let gen_call_forest =
-            fixed_point (fun self ->
-                let%bind calls_length = small_non_negative_int in
-                list_with_length calls_length
-                  (let%map account_update = Account_update.gen
-                   and calls = self in
-                   { With_stack_hash.stack_hash = ()
-                   ; elt =
-                       { Call_forest.Tree.account_update
-                       ; account_update_digest = ()
-                       ; calls
-                       }
-                   } ) )
-          in
-          let open Quickcheck.Let_syntax in
-          let%map fee_payer = Account_update.Fee_payer.gen
-          and account_updates = gen_call_forest
-          and memo = Signed_command_memo.gen in
-          { Poly.fee_payer; account_updates; memo }
-
-        let shrinker : t Quickcheck.Shrinker.t =
-          Quickcheck.Shrinker.create (fun t ->
-              let shape = Call_forest.shape t.Poly.account_updates in
-              Sequence.map
-                (Quickcheck.Shrinker.shrink
-                   Call_forest.Shape.quickcheck_shrinker shape )
-                ~f:(fun shape' ->
-                  { t with
-                    account_updates = Call_forest.mask t.account_updates shape'
-                  } ) )
-      end
-
-      let of_wire = Fn.id
-
-      let to_wire = Fn.id
+      let shrinker : t Quickcheck.Shrinker.t =
+        Quickcheck.Shrinker.create (fun t ->
+            let shape = Call_forest.shape t.Poly.account_updates in
+            Sequence.map
+              (Quickcheck.Shrinker.shrink Call_forest.Shape.quickcheck_shrinker
+                 shape ) ~f:(fun shape' ->
+                { t with
+                  account_updates = Call_forest.mask t.account_updates shape'
+                } ) )
     end
   end]
 end
@@ -168,9 +152,7 @@ let read_all_proofs_from_disk (t : t) : Stable.Latest.t =
   ; account_updates = Call_forest.forget_hashes t.account_updates
   }
 
-[%%define_locally Stable.Latest.(of_wire, to_wire)]
-
-[%%define_locally Stable.Latest.Wire.(gen)]
+[%%define_locally Stable.Latest.(gen)]
 
 let of_simple (w : Simple.t) : t =
   { fee_payer = w.fee_payer
