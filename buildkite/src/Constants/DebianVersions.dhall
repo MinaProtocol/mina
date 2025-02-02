@@ -91,6 +91,7 @@ let minimalDirtyWhen =
       , S.exactly "buildkite/src/Command/HardforkPackageGeneration" "dhall"
       , S.exactly "buildkite/src/Command/MinaArtifact" "dhall"
       , S.exactly "buildkite/src/Command/PatchArchiveTest" "dhall"
+      , S.exactly "buildkite/src/Command/Bench/Base" "dhall"
       , S.exactly "buildkite/src/Command/ReplayerTest" "dhall"
       , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact")
       , S.strictlyStart (S.contains "dockerfiles/stages")
