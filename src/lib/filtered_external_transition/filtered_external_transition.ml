@@ -163,7 +163,7 @@ let of_transition block tracked_participants
         ; coinbase_receiver = None
         } ~f:(fun acc_transactions -> function
       | { data = Command command; status } -> (
-          let command = (command :> User_command.t) in
+          let command = User_command.unwrap command in
           let should_include_transaction command participants =
             List.exists (User_command.accounts_referenced command)
               ~f:(fun account_id ->
