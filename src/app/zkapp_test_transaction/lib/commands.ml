@@ -5,7 +5,7 @@ module Ledger = Mina_ledger.Ledger
 
 let underToCamel s = String.lowercase s |> Mina_graphql.Reflection.underToCamel
 
-let graphql_zkapp_command (zkapp_command : Zkapp_command.t) =
+let graphql_zkapp_command (zkapp_command : Zkapp_command.Stable.Latest.t) =
   sprintf
     {|
 mutation MyMutation {
@@ -184,7 +184,7 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   printf "ZkApp transaction yojson: %s\n\n%!"
     (Zkapp_command.to_yojson zkapp_command |> Yojson.Safe.to_string) ;
   printf "(ZkApp transaction graphQL input %s\n\n%!"
-    (graphql_zkapp_command zkapp_command) ;
+    (graphql_zkapp_command @@ Zkapp_command.unwrap zkapp_command) ;
   printf "Updated accounts\n" ;
   let%bind accounts = Ledger.to_list ledger in
   List.iter accounts ~f:(fun acc ->
@@ -286,8 +286,10 @@ module Util = struct
       printf "Zkapp transaction yojson:\n %s\n\n%!"
         (Zkapp_command.to_yojson zkapp_command |> Yojson.Safe.to_string) ;
       printf "Zkapp transaction graphQL input %s\n\n%!"
-        (graphql_zkapp_command zkapp_command) )
-    else printf "%s\n%!" (graphql_zkapp_command zkapp_command)
+        (graphql_zkapp_command @@ Zkapp_command.unwrap zkapp_command) )
+    else
+      printf "%s\n%!"
+        (graphql_zkapp_command @@ Zkapp_command.unwrap zkapp_command)
 
   let memo =
     Option.value_map ~default:Signed_command_memo.empty ~f:(fun m ->
@@ -761,7 +763,7 @@ let%test_module "ZkApps test transaction" =
           io_field "sendZkapp" ~typ:(non_null string)
             ~args:Arg.[ arg "input" ~typ:(non_null typ) ]
             ~doc:"sample query"
-            ~resolve:(fun _ () (zkapp_command' : Zkapp_command.t) ->
+            ~resolve:(fun _ () (zkapp_command' : Zkapp_command.Stable.Latest.t) ->
               let ok_fee_payer =
                 print_diff_yojson ~path:[ "fee_payer" ]
                   (Account_update.Fee_payer.to_yojson zkapp_command.fee_payer)
@@ -808,7 +810,7 @@ let%test_module "ZkApps test transaction" =
           match user_cmd with
           | Zkapp_command p ->
               let p = Zkapp_command.Valid.forget p in
-              let q = graphql_zkapp_command p in
+              let q = graphql_zkapp_command (Zkapp_command.unwrap p) in
               Async.Thread_safe.block_on_async_exn (fun () ->
                   match%map hit_server p q with
                   | Ok _res ->
