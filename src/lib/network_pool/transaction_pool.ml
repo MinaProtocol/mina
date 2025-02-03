@@ -1083,6 +1083,40 @@ struct
         | _ ->
             ()
 
+      let load_vk_cache ~t ~ledger account_ids =
+        let account_ids = Set.to_list account_ids in
+        let ledger_vks =
+          Zkapp_command.Verifiable.load_vks_from_ledger
+            ~location_of_account_batch:
+              (Base_ledger.location_of_account_batch ledger)
+            ~get_batch:(Base_ledger.get_batch ledger)
+            account_ids
+        in
+        let ledger_vks =
+          Map.map ledger_vks ~f:(fun vk ->
+              Zkapp_basic.F_map.Map.singleton vk.hash vk )
+        in
+        let mempool_vks =
+          List.map account_ids ~f:(fun account_id ->
+              let vks =
+                Vk_refcount_table.find_vks_by_account_id
+                  t.verification_key_table account_id
+              in
+              let vks =
+                vks
+                |> List.map ~f:(fun vk_cached ->
+                       let vk =
+                         Zkapp_vk_cache_tag.read_key_from_disk vk_cached
+                       in
+                       (vk.hash, vk) )
+                |> Zkapp_basic.F_map.Map.of_alist_exn
+              in
+              (account_id, vks) )
+          |> Account_id.Map.of_alist_exn
+        in
+        Map.merge_skewed ledger_vks mempool_vks ~combine:(fun ~key:_ ->
+            Map.merge_skewed ~combine:(fun ~key:_ _ x -> x) )
+
       (** DO NOT mutate any transaction pool state in this function, you may only mutate in the synchronous `apply` function. *)
       let verify (t : pool)
           Envelope.Incoming.{ data = diff; sender; received_at } :
@@ -1148,41 +1182,7 @@ struct
         let%bind diff' =
           O1trace.sync_thread "convert_transactions_to_verifiable" (fun () ->
               User_command.Unapplied_sequence.to_all_verifiable diff
-                ~load_vk_cache:(fun account_ids ->
-                  let account_ids = Set.to_list account_ids in
-                  let ledger_vks =
-                    Zkapp_command.Verifiable.load_vks_from_ledger
-                      ~location_of_account_batch:
-                        (Base_ledger.location_of_account_batch ledger)
-                      ~get_batch:(Base_ledger.get_batch ledger)
-                      account_ids
-                  in
-                  let ledger_vks =
-                    Map.map ledger_vks ~f:(fun vk ->
-                        Zkapp_basic.F_map.Map.singleton vk.hash vk )
-                  in
-                  let mempool_vks =
-                    List.map account_ids ~f:(fun account_id ->
-                        let vks =
-                          Vk_refcount_table.find_vks_by_account_id
-                            t.verification_key_table account_id
-                        in
-                        let vks =
-                          vks
-                          |> List.map ~f:(fun vk_cached ->
-                                 let vk =
-                                   Zkapp_vk_cache_tag.read_key_from_disk
-                                     vk_cached
-                                 in
-                                 (vk.hash, vk) )
-                          |> Zkapp_basic.F_map.Map.of_alist_exn
-                        in
-                        (account_id, vks) )
-                    |> Account_id.Map.of_alist_exn
-                  in
-                  Map.merge_skewed ledger_vks mempool_vks
-                    ~combine:(fun ~key:_ ->
-                      Map.merge_skewed ~combine:(fun ~key:_ _ x -> x) ) ) )
+                ~load_vk_cache:(load_vk_cache ~t ~ledger) )
           |> Result.map_error ~f:(fun e -> Invalid e)
           |> Deferred.return
         in
