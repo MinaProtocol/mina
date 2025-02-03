@@ -47,7 +47,6 @@ module Scan_state : sig
     end
 
     type t = Transaction_snark_scan_state.Transaction_with_witness.t Poly.t
-    [@@deriving sexp, to_yojson]
   end
 
   val hash : t -> Staged_ledger_hash.Aux_hash.t

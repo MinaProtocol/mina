@@ -42,7 +42,6 @@ fn add_lagrange_basis_with_cache<G: CommitmentCurve, C: LagrangeCache<G>>(
     }
     if let Some(basis) = cache.load_lagrange_basis_from_cache(srs.g.len(), &domain) {
         srs.lagrange_bases.get_or_generate(n, || basis);
-        return;
     } else {
         let basis = srs.get_lagrange_basis(domain);
         cache.cache_lagrange_basis(srs.g.len(), &domain, basis);
@@ -81,7 +80,7 @@ mod cache {
             &self,
             srs_length: usize,
             domain: &D<G::ScalarField>,
-            basis: &Vec<PolyComm<G>>,
+            basis: &[PolyComm<G>],
         );
     }
 
@@ -100,10 +99,9 @@ mod cache {
         }
     }
 
-    /*
-    The FileCache implementation uses a directory as a cache for the Lagrange basis hash map --
-    i.e every file corresponds to a Lagrange basis for a given G-basis and domain size.
-    */
+    // The FileCache implementation uses a directory as a cache for the Lagrange
+    // basis hash map -- i.e every file corresponds to a Lagrange basis for a
+    // given G-basis and domain size.
     impl<G: AffineRepr> LagrangeCache<G> for FileCache<G> {
         type CacheKey = PathBuf;
 
@@ -115,7 +113,7 @@ mod cache {
             self.cache_dir.clone().join(format!(
                 "lagrange_basis_{:}-{:}",
                 srs_length,
-                domain.size().to_string()
+                domain.size()
             ))
         }
 
@@ -126,14 +124,13 @@ mod cache {
         ) -> Option<Vec<PolyComm<G>>> {
             let cache_key = self.lagrange_basis_cache_key(srs_length, domain);
             if Path::exists(&cache_key) {
-                let f = File::open(cache_key.clone()).expect(&format!(
-                    "Missing lagrange basis cache file {:?}",
-                    cache_key
-                ));
-                let basis: Vec<PolyComm<G>> = rmp_serde::decode::from_read(f).expect(&format!(
-                    "Error decoding lagrange cache file {:?}",
-                    cache_key
-                ));
+                let f = File::open(cache_key.clone()).unwrap_or_else(|_| {
+                    panic!("Missing lagrange basis cache file {:?}", cache_key)
+                });
+                let basis: Vec<PolyComm<G>> =
+                    rmp_serde::decode::from_read(f).unwrap_or_else(|_| {
+                        panic!("Error decoding lagrange cache file {:?}", cache_key)
+                    });
                 Some(basis)
             } else {
                 None
@@ -144,26 +141,22 @@ mod cache {
             &self,
             srs_length: usize,
             domain: &D<G::ScalarField>,
-            basis: &Vec<PolyComm<G>>,
+            basis: &[PolyComm<G>],
         ) {
             let cache_key = self.lagrange_basis_cache_key(srs_length, domain);
-            if Path::exists(&cache_key) {
-                return;
-            } else {
-                let mut f = File::create(cache_key.clone()).expect(&format!(
-                    "Error creating lagrabnge basis cache file {:?}",
-                    cache_key
-                ));
-                rmp_serde::encode::write(&mut f, basis).expect(&format!(
-                    "Error encoding lagrange basis to file {:?}",
-                    cache_key
-                ));
+            if !Path::exists(&cache_key) {
+                let mut f = File::create(cache_key.clone()).unwrap_or_else(|_| {
+                    panic!("Error creating lagrabnge basis cache file {:?}", cache_key)
+                });
+                rmp_serde::encode::write(&mut f, basis).unwrap_or_else(|_| {
+                    panic!("Error encoding lagrange basis to file {:?}", cache_key)
+                });
             }
         }
     }
 
-    // The following two caches are all that we need for mina tests. These will not be initialized unless they are
-    // explicitly called.
+    // The following two caches are all that we need for mina tests. These will
+    // not be initialized unless they are explicitly called.
     static VESTA_FILE_CACHE: Lazy<FileCache<Vesta>> = Lazy::new(|| {
         let cache_base_dir: String =
             env::var("LAGRANGE_CACHE_DIR").expect("LAGRANGE_CACHE_DIR missing in env");
@@ -175,7 +168,7 @@ mod cache {
     });
 
     pub fn get_vesta_file_cache() -> &'static FileCache<Vesta> {
-        &*VESTA_FILE_CACHE
+        &VESTA_FILE_CACHE
     }
 
     static PALLAS_FILE_CACHE: Lazy<FileCache<Pallas>> = Lazy::new(|| {
@@ -189,6 +182,6 @@ mod cache {
     });
 
     pub fn get_pallas_file_cache() -> &'static FileCache<Pallas> {
-        &*PALLAS_FILE_CACHE
+        &PALLAS_FILE_CACHE
     }
 }

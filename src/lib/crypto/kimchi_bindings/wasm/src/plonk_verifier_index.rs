@@ -603,7 +603,7 @@ macro_rules! impl_verification_key {
                         evals: evals.clone(),
                         shifts: shifts.clone(),
                         lookup_index: lookup_index.clone(),
-                        zk_rows: zk_rows,
+                        zk_rows,
                     }
                 }
 
@@ -737,7 +737,7 @@ macro_rules! impl_verification_key {
                     xor,
                     lookup,
                     range_check: range_check0 || range_check1 || rot,
-                    foreign_field_mul: foreign_field_mul,
+                    foreign_field_mul,
                 };
 
                 FeatureFlags {

@@ -6,7 +6,7 @@ module Stable : sig
   [@@@no_toplevel_latest_type]
 
   module V2 : sig
-    type t [@@deriving equal]
+    type t [@@deriving equal, sexp]
 
     val header : t -> Header.Stable.V2.t
 
