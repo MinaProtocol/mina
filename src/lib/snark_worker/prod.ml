@@ -56,12 +56,26 @@ module Inputs = struct
     Snark_work_lib.Work.Single.Spec.Stable.Latest.t
   [@@deriving bin_io_unversioned, sexp]
 
-  type zkapp_command_inputs =
-    ( Transaction_witness.Zkapp_command_segment_witness.t
-    * Transaction_snark.Zkapp_command_segment.Basic.t
-    * Transaction_snark.Statement.With_sok.t )
-    list
-  [@@deriving sexp, to_yojson]
+  let zkapp_command_inputs_to_yojson =
+    let convert =
+      List.map
+        ~f:(fun
+             ( (witness : Transaction_witness.Zkapp_command_segment_witness.t)
+             , segment
+             , statement )
+           ->
+          ( Transaction_witness.Zkapp_command_segment_witness.unwrap witness
+          , segment
+          , statement ) )
+    in
+    let impl =
+      [%to_yojson:
+        ( Transaction_witness.Zkapp_command_segment_witness.Stable.Latest.t
+        * Transaction_snark.Zkapp_command_segment.Basic.t
+        * Transaction_snark.Statement.With_sok.t )
+        list]
+    in
+    Fn.compose impl convert
 
   let perform_single ({ m; cache; proof_level } : Worker_state.t) ~message =
     let open Deferred.Or_error.Let_syntax in
