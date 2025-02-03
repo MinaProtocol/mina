@@ -2135,7 +2135,8 @@ let receipt_chain_hash =
              in
              let receipt_elt =
                let _txn_commitment, full_txn_commitment =
-                 Zkapp_command.get_transaction_commitments zkapp_cmd
+                 Zkapp_command.get_transaction_commitments
+                   (Zkapp_command.write_all_proofs_to_disk zkapp_cmd)
                in
                Receipt.Zkapp_command_elt.Zkapp_command_commitment
                  full_txn_commitment
