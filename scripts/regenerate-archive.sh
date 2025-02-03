@@ -4,7 +4,7 @@ set -e
 TOTAL_BLOCKS=25
 
 # go to root of mina repo
-cd $(dirname -- "${BASH_SOURCE[0]}")/../../../..
+cd $(dirname -- "${BASH_SOURCE[0]}")/..
 
 # Prepare the database
 sudo -u postgres dropdb archive || true # fails when db doesn't exist which is fine
@@ -51,7 +51,7 @@ pg_dump -U postgres -d archive > ./src/test/archive/sample_db/archive_db.sql
 echo Regenerateing input file
 cp ./scripts/mina-local-network/annotated_ledger.json _tmp.json
 echo '{ "genesis_ledger": { "accounts": '$(cat _tmp.json | jq '.accounts')', "num_accounts": '$(cat _tmp.json | jq '.num_accounts')' }}' \
-  | jq > ./src/test/archive/sample_db/replayer_input_file.json
+  | jq -c > ./src/test/archive/sample_db/replayer_input_file.json
 rm _tmp.json
 
 echo Regenerateing genesis_ledger
