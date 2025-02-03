@@ -7,6 +7,8 @@ module Zkapp_command_segment_witness : sig
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type t =
         { global_first_pass_ledger : Sparse_ledger.Stable.V2.t
@@ -43,6 +45,37 @@ module Zkapp_command_segment_witness : sig
       [@@deriving sexp, to_yojson]
     end
   end]
+
+  type t =
+    { global_first_pass_ledger : Sparse_ledger.t
+    ; global_second_pass_ledger : Sparse_ledger.t
+    ; local_state_init :
+        ( (Token_id.t, Zkapp_command.Call_forest.With_hashes.t) Stack_frame.t
+        , ( ( (Token_id.t, Zkapp_command.Call_forest.With_hashes.t) Stack_frame.t
+            , Stack_frame.Digest.t )
+            With_hash.t
+          , Call_stack_digest.t )
+          With_stack_hash.t
+          list
+        , (Amount.t, Sgn.t) Signed_poly.t
+        , Sparse_ledger.t
+        , bool
+        , Kimchi_backend.Pasta.Basic.Fp.t
+        , Mina_numbers.Index.t
+        , Transaction_status.Failure.Collection.t )
+        Mina_transaction_logic.Zkapp_command_logic.Local_state.t
+    ; start_zkapp_command :
+        ( Zkapp_command.t
+        , Kimchi_backend.Pasta.Basic.Fp.t
+        , bool )
+        Mina_transaction_logic.Zkapp_command_logic.Start_data.t
+        list
+    ; state_body : Mina_state.Protocol_state.Body.Value.t
+    ; init_stack : Pending_coinbase.Stack_versioned.t
+    ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
+    }
+
+  val read_all_proofs_from_disk : t -> Stable.Latest.t
 end
 
 [%%versioned:
