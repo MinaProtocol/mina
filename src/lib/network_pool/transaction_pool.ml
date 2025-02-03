@@ -1566,38 +1566,35 @@ struct
           | `Ok ->
               true ) ;
       (* Important to maintain ordering here *)
-      let rebroadcastable_txs =
-        Hashtbl.to_alist t.locally_generated_uncommitted
-        |> List.sort
-             ~compare:(fun (txn1, (_, `Batch batch1)) (txn2, (_, `Batch batch2))
-                      ->
-               let cmp = compare batch1 batch2 in
-               let get_hash =
-                 Transaction_hash.User_command_with_valid_signature
-                 .transaction_hash
-               in
-               let get_nonce txn =
-                 Transaction_hash.User_command_with_valid_signature.command txn
-                 |> User_command.applicable_at_nonce
+      Hashtbl.to_alist t.locally_generated_uncommitted
+      |> List.sort
+           ~compare:(fun (txn1, (_, `Batch batch1)) (txn2, (_, `Batch batch2))
+                    ->
+             let cmp = compare batch1 batch2 in
+             let get_hash =
+               Transaction_hash.User_command_with_valid_signature
+               .transaction_hash
+             in
+             let get_nonce txn =
+               Transaction_hash.User_command_with_valid_signature.command txn
+               |> User_command.applicable_at_nonce
+             in
+             if cmp <> 0 then cmp
+             else
+               let cmp =
+                 Mina_numbers.Account_nonce.compare (get_nonce txn1)
+                   (get_nonce txn2)
                in
                if cmp <> 0 then cmp
-               else
-                 let cmp =
-                   Mina_numbers.Account_nonce.compare (get_nonce txn1)
-                     (get_nonce txn2)
-                 in
-                 if cmp <> 0 then cmp
-                 else Transaction_hash.compare (get_hash txn1) (get_hash txn2) )
-        |> List.group
-             ~break:(fun (_, (_, `Batch batch1)) (_, (_, `Batch batch2)) ->
-               batch1 <> batch2 )
-        |> List.map
-             ~f:
-               (List.map ~f:(fun (txn, _) ->
-                    Transaction_hash.User_command_with_valid_signature.command
-                      txn ) )
-      in
-      rebroadcastable_txs
+               else Transaction_hash.compare (get_hash txn1) (get_hash txn2) )
+      |> List.group
+           ~break:(fun (_, (_, `Batch batch1)) (_, (_, `Batch batch2)) ->
+             batch1 <> batch2 )
+      |> List.map
+           ~f:
+             (List.map ~f:(fun (txn, _) ->
+                  Transaction_hash.User_command_with_valid_signature.command txn )
+             )
   end
 
   include Network_pool_base.Make (Transition_frontier) (Resource_pool)
