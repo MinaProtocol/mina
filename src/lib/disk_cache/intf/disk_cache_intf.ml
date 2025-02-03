@@ -20,6 +20,7 @@ module type S = sig
   (** Read from the cache, crashing if the value cannot be found. *)
   val get : t -> id -> Data.t
 
+  (** Count elements in the cache. *)
   val count : t -> int
 end
 
