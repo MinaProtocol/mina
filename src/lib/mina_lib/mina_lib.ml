@@ -71,7 +71,7 @@ type components =
 (* tag commands so they can share a common pipe, to ensure sequentiality of nonces *)
 type command_inputs =
   | Signed_command_inputs of User_command_input.t list
-  | Zkapp_command_command_inputs of Zkapp_command.t list
+  | Zkapp_command_command_inputs of Zkapp_command.Stable.Latest.t list
 
 type pipes =
   { validated_transitions_reader : Mina_block.Validated.t Strict_pipe.Reader.t
@@ -974,7 +974,8 @@ let add_full_transactions t user_commands =
       in
       Deferred.Result.fail error
 
-let add_zkapp_transactions t (zkapp_commands : Zkapp_command.t list) =
+let add_zkapp_transactions t
+    (zkapp_commands : Zkapp_command.Stable.Latest.t list) =
   let add_all_txns () =
     let result_ivar = Ivar.create () in
     let cmd_inputs = Zkapp_command_command_inputs zkapp_commands in
