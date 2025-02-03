@@ -35,8 +35,6 @@ while true; do
 done
 
 echo Converting canonical blocks
-
-# make the blocks canonical
 source ./src/test/archive/sample_db/convert_chain_to_canonical.sh postgres://postgres:postgres@localhost:5432/archive
 
 echo Regenerateing precomputed_blocks.tar.xz
