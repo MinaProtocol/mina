@@ -43,20 +43,7 @@ The recommended way to enable this cache is:
 
 For a concrete example, see commit [61afcaee844d5966331ddaee11fd8820f6dc1c8a](https://github.com/MinaProtocol/mina/commit/61afcaee844d5966331ddaee11fd8820f6dc1c8a).
 
-Then, to update the cache for a set of tests, we can run the tests to update their contents. For example, to update the tests in all of the directories containing a `proof_cache.json` file, we can run:
-```bash
-for DIR in $(find -name proof_cache.json | sed 's/\/proof_cache.json//'); do
-  # Initialize the target file
-  echo [] > $DIR/proof_cache.json;
-  # Stage the new file for a git commit
-  git add -N $DIR/proof_cache.json;
-  # Generate the cache file by running the tests
-  PROOF_CACHE_OUT=$PWD/$DIR/proof_cache.json dune runtest $DIR;
-  # Re-run the tests using the cache. Throws an error if the test is
-  # non-deterministic and caused a cache miss.
-  ERROR_ON_PROOF=true dune runtest $DIR;
-done
-```
+Then, to update the cache for a set of tests, we can run the tests to update their contents. For example, to update the tests in all of the directories containing a `proof_cache.json` file, we can run: `./scripts/regenerate-proof-caches.sh`
 
 **In case an error *is* generated, you should not commit the cache before making the test deterministic.**
 
