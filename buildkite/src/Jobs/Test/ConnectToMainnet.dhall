@@ -16,13 +16,13 @@ let ConnectToNetwork = ../../Command/ConnectToNetwork.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
-let Network = ../../Constants/Network.dhall
-
 let Artifacts = ../../Constants/Artifacts.dhall
+
+let Network = ../../Constants/Network.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
-let network = Network.Type.Devnet
+let network = Network.Type.Mainnet
 
 let dependsOn =
       Dockers.dependsOn
@@ -37,11 +37,11 @@ in  Pipeline.build
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
           , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
-          , S.exactly "buildkite/src/Jobs/Test/ConnectToDevnet" "dhall"
+          , S.exactly "buildkite/src/Jobs/Test/ConnectToMainnet" "dhall"
           , S.exactly "buildkite/src/Command/ConnectToNetwork" "dhall"
           ]
         , path = "Test"
-        , name = "ConnectToDevnet"
+        , name = "ConnectToMainnet"
         , mode = PipelineMode.Type.Stable
         , tags =
           [ PipelineTag.Type.Long

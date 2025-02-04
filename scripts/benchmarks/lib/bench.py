@@ -115,9 +115,9 @@ class Benchmark(abc.ABC):
                     result = self.influx_client.query_moving_average(
                         name, branch, str(field), self.branch_header())
 
-                    if not any(result):
+                    if len(result) < self.influx_client.moving_average_size :
                         logger.warning(
-                            f"Skipping comparison for {name} as there are no historical data available yet"
+                            f"Skipping comparison for {name} as there are no enough ({self.influx_client.moving_average_size}) historical data available yet"
                         )
                     else:
                         average = float(result[-1].records[-1]["_value"])
@@ -161,7 +161,7 @@ class BenchmarkType(Enum):
 
 class JaneStreetBenchmark(Benchmark, ABC):
     """
-        Abstract class for native ocaml benchmarks which has the same format
+        Abstract class for native ocaml benchmarks with unified format
 
     """
     name = MeasurementColumn("Name", 0)
@@ -170,9 +170,11 @@ class JaneStreetBenchmark(Benchmark, ABC):
     minor_words_per_runs = FieldColumn("mWd/Run", 3, "w")
     major_words_per_runs = FieldColumn("mjWd/Run", 4, "w")
     promotions_per_runs = FieldColumn("Prom/Run", 5, "w")
-    branch = TagColumn("gitbranch", 6)
+    category = TagColumn("category", 6)
+    branch = TagColumn("gitbranch", 7)
 
     def __init__(self, kind):
+        self.kind = kind
         Benchmark.__init__(self, kind)
 
     def headers(self):
@@ -181,7 +183,9 @@ class JaneStreetBenchmark(Benchmark, ABC):
             MinaBaseBenchmark.cycles_per_runs,
             MinaBaseBenchmark.minor_words_per_runs,
             MinaBaseBenchmark.major_words_per_runs,
-            MinaBaseBenchmark.promotions_per_runs, MinaBaseBenchmark.branch
+            MinaBaseBenchmark.promotions_per_runs, 
+            MinaBaseBenchmark.category, 
+            MinaBaseBenchmark.branch
         ]
 
     def fields(self):
@@ -242,6 +246,7 @@ class JaneStreetBenchmark(Benchmark, ABC):
                         rows[
                             5] += " " + MinaBaseBenchmark.promotions_per_runs.format_unit(
                             )
+                        rows.append(MinaBaseBenchmark.category.name)
                         rows.append("gitbranch")
 
                     else:
@@ -273,6 +278,7 @@ class JaneStreetBenchmark(Benchmark, ABC):
                         # w
                         rows[5] = rows[5][:-1]
 
+                        rows.append(str(self.kind))
                         rows.append(branch)
 
                     csvwriter.writerow(rows[:])
