@@ -1033,7 +1033,7 @@ let%test_module "Bootstrap_controller tests" =
               in
               assert (
                 Staged_ledger_hash.equal
-                  (Staged_ledger.hash staged_ledger)
+                  (Transition_frontier.Breadcrumb.staged_ledger_hash breadcrumb)
                   (Staged_ledger.hash actual_staged_ledger) ) ) )
 
     (*
