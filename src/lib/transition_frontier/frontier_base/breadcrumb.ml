@@ -13,7 +13,6 @@ module T = struct
     ; staged_ledger : Staged_ledger.t
     ; just_emitted_a_proof : bool
     ; transition_receipt_time : Time.t option
-    ; staged_ledger_hash : Staged_ledger_hash.t
     }
   [@@deriving fields]
 
@@ -36,7 +35,6 @@ module T = struct
     ; staged_ledger
     ; just_emitted_a_proof
     ; transition_receipt_time
-    ; staged_ledger_hash = Staged_ledger.hash staged_ledger
     }
 
   let to_yojson
@@ -44,7 +42,6 @@ module T = struct
       ; staged_ledger = _
       ; just_emitted_a_proof
       ; transition_receipt_time
-      ; staged_ledger_hash = _
       } =
     `Assoc
       [ ( "validated_transition"
@@ -64,8 +61,12 @@ T.
   , staged_ledger
   , just_emitted_a_proof
   , transition_receipt_time
-  , to_yojson
-  , staged_ledger_hash )]
+  , to_yojson )]
+
+let staged_ledger_hash t =
+  Mina_block.Validated.header t.T.validated_transition
+  |> Mina_block.Header.protocol_state |> Protocol_state.blockchain_state
+  |> Blockchain_state.staged_ledger_hash
 
 include Allocation_functor.Make.Basic (T)
 
