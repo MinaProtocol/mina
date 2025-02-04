@@ -1,3 +1,5 @@
+let B = ../../External/Buildkite.dhall
+
 let PipelineMode = ../../Pipeline/Mode.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
@@ -23,6 +25,8 @@ let Size = ../Size.dhall
 let Benchmarks = ../../Constants/Benchmarks.dhall
 
 let SelectFiles = ../../Lib/SelectFiles.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let Spec =
       { Type =
@@ -67,6 +71,7 @@ let command
                 "Perf: ${spec.label} ${PipelineMode.capitalName spec.mode}"
             , key = spec.key
             , target = spec.size
+            , soft_fail = Some (B/SoftFail.Boolean True)
             , docker = None Docker.Type
             , depends_on = spec.dependsOn
             }
