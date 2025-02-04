@@ -17,7 +17,11 @@ module type Full = sig
   [%%versioned:
   module Stable : sig
     module V2 : sig
-      type t [@@deriving compare, equal, sexp, yojson, hash]
+      type t =
+        ( Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
+        , Proof.Stable.V2.t )
+        Proof_carrying_data.Stable.V1.t
+      [@@deriving compare, equal, sexp, yojson, hash]
     end
   end]
 

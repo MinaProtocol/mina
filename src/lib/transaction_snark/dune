@@ -68,6 +68,7 @@
    logger
    zkapp_command_builder
    snark_keys_header
+   proof_cache_tag
    proof_carrying_data
  )
  (preprocess
