@@ -219,8 +219,6 @@ val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
 val base_jobs_on_earlier_tree :
   t -> index:int -> Transaction_with_witness.t list
 
-val hash : t -> Staged_ledger_hash.Aux_hash.t
-
 (** All the transactions with hash of the parent block in which they were included in the order in which they were applied*)
 val staged_transactions_with_state_hash :
      t

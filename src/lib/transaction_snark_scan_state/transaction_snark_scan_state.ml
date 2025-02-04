@@ -61,6 +61,8 @@ end
 module Ledger_proof_with_sok_message = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t = Ledger_proof.Stable.V2.t * Sok_message.Stable.V1.t
       [@@deriving sexp]
@@ -68,6 +70,8 @@ module Ledger_proof_with_sok_message = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Ledger_proof.t * Sok_message.t
 end
 
 module Available_job = struct
@@ -155,6 +159,8 @@ type job = Available_job.t
    the snarked ledger*)
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       { scan_state :
@@ -195,7 +201,15 @@ module Stable = struct
   end
 end]
 
-[%%define_locally Stable.Latest.(hash)]
+type t =
+  { scan_state :
+      ( Ledger_proof_with_sok_message.t
+      , Transaction_with_witness.t )
+      Parallel_scan.State.t
+  ; previous_incomplete_zkapp_updates :
+      Transaction_with_witness.t list
+      * [ `Border_block_continued_in_the_next_tree of bool ]
+  }
 
 (**********Helpers*************)
 
@@ -1455,6 +1469,8 @@ let check_required_protocol_states t ~protocol_states =
   let%map () = check_length protocol_states_assoc in
   protocol_states_assoc
 
-let generate = Fn.id
+let generate { Stable.Latest.scan_state; previous_incomplete_zkapp_updates } =
+  { scan_state; previous_incomplete_zkapp_updates }
 
-let unwrap = Fn.id
+let unwrap { scan_state; previous_incomplete_zkapp_updates } =
+  { Stable.Latest.scan_state; previous_incomplete_zkapp_updates }
