@@ -13,7 +13,7 @@
   mina_version
   bounded_types)
  (instrumentation
-  (backend bisect_ppx))
+  (backend bisect_ppx --bisect-sigterm))
  (preprocess
   (pps ppx_version)))
 
@@ -33,7 +33,7 @@
   mina_version
   bounded_types)
  (instrumentation
-  (backend bisect_ppx))
+  (backend bisect_ppx --bisect-sigterm))
  (preprocess
   (pps ppx_version)))
 
@@ -53,6 +53,6 @@
   mina_version
   bounded_types)
  (instrumentation
-  (backend bisect_ppx))
+  (backend bisect_ppx --bisect-sigterm))
  (preprocess
   (pps ppx_version)))
