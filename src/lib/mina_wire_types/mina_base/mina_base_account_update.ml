@@ -48,16 +48,22 @@ module Update = struct
 end
 
 module Account_precondition = struct
-  module V1 = struct
+  module V2 = struct
     type t = Mina_base_zkapp_precondition.Account.V2.t
   end
 end
 
-module Preconditions = struct
+module Permissions_precondition = struct
   module V1 = struct
+    type t = Mina_base_zkapp_precondition.Permissions.V2.t
+  end
+end
+
+module Preconditions = struct
+  module V2 = struct
     type t =
       { network : Mina_base_zkapp_precondition.Protocol_state.V1.t
-      ; account : Account_precondition.V1.t
+      ; account : Account_precondition.V2.t
       ; valid_while : Mina_base_zkapp_precondition.Valid_while.V1.t
       }
   end
@@ -92,7 +98,7 @@ module Body = struct
       ; events : Events'.V1.t
       ; actions : Events'.V1.t
       ; call_data : Pickles.Backend.Tick.Field.V1.t
-      ; preconditions : Preconditions.V1.t
+      ; preconditions : Preconditions.V2.t
       ; use_full_commitment : bool
       ; implicit_account_creation_fee : bool
       ; may_use_token : May_use_token.V1.t

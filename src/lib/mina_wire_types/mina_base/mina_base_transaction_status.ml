@@ -40,6 +40,7 @@ module Failure = struct
       | Account_app_state_precondition_unsatisfied of int
       | Account_proved_state_precondition_unsatisfied
       | Account_is_new_precondition_unsatisfied
+      | Permissions_precondition_unsatisfied
       | Protocol_state_precondition_unsatisfied
       | Unexpected_verification_key_hash
       | Valid_while_precondition_unsatisfied
