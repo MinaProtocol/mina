@@ -57,12 +57,12 @@ module Make_statement_scanner (Verifier : sig
 end) : sig
   val check_invariants :
        t
+    -> verifier:Verifier.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> logger:Logger.t
     -> statement_check:
          [ `Full of State_hash.t -> Mina_state.Protocol_state.value Or_error.t
          | `Partial ]
-    -> verifier:Verifier.t
     -> error_prefix:string
     -> last_proof_statement:Transaction_snark.Statement.t option
     -> registers_end:Mina_state.Registers.Value.t
