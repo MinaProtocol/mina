@@ -31,3 +31,5 @@ val state_body_hash : t -> State_body_hash.t
 val header : t -> Header.t
 
 val body : t -> Staged_ledger_diff.Body.t
+
+val is_genesis : t -> bool

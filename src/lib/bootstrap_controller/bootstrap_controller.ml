@@ -1031,10 +1031,16 @@ let%test_module "Bootstrap_controller tests" =
                   ~pending_coinbases ~get_state
                 |> Deferred.Or_error.ok_exn
               in
-              assert (
-                Staged_ledger_hash.equal
-                  (Transition_frontier.Breadcrumb.staged_ledger_hash breadcrumb)
-                  (Staged_ledger.hash actual_staged_ledger) ) ) )
+              let height =
+                Transition_frontier.Breadcrumb.consensus_state breadcrumb
+                |> Consensus.Data.Consensus_state.blockchain_length
+                |> Mina_numbers.Length.to_int
+              in
+              [%test_eq: Staged_ledger_hash.t]
+                ~message:
+                  (sprintf "mismatch of staged ledger hash height %d" height)
+                (Transition_frontier.Breadcrumb.staged_ledger_hash breadcrumb)
+                (Staged_ledger.hash actual_staged_ledger) ) )
 
     (*
     let%test_unit "if we see a new transition that is better than the \

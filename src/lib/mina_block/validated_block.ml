@@ -66,3 +66,7 @@ let state_body_hash (t, _) =
 let header t = t |> forget |> With_hash.data |> Block.header
 
 let body t = t |> forget |> With_hash.data |> Block.body
+
+let is_genesis t =
+  header t |> Header.protocol_state |> Mina_state.Protocol_state.consensus_state
+  |> Consensus.Data.Consensus_state.is_genesis_state
