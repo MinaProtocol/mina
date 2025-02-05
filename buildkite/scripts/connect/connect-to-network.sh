@@ -67,7 +67,7 @@ else
 fi
 
 # Check network id
-NETWORK_ID=$('http://localhost:3085/graphql' \
+NETWORK_ID=$('http://localhost:3086/graphql' \
    -H 'accept: application/json' \
    -H 'content-type: application/json' \
    --data-raw '{"query":"query MyQuery {\n  networkID\n}\n","variables":null,"operationName":"MyQuery"}' \
