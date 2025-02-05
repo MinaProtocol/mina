@@ -8,7 +8,9 @@ let unwrap = Fn.id
 
 let generate () = Fn.id
 
-let create_db () = ()
+let create_db path ~logger =
+  [%log trace] "mocking path %s" path ;
+  Async.Deferred.Result.return ()
 
 module For_tests = struct
   let blockchain_dummy = Mina_base.Proof.blockchain_dummy
