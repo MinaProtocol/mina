@@ -74,7 +74,7 @@ NETWORK_ID=$(curl 'http://localhost:3085/graphql' \
 
 EXPECTED_NETWORK=mina:$NETWORK_NAME
 
-if [ "$NETWORK_ID" -eq "$EXPECTED_NETWORK" ]; then
+if [[ "$NETWORK_ID" == "$EXPECTED_NETWORK" ]]; then
     echo "Network id correct ($NETWORK_ID)"
 else
     echo "Network id incorrect (expected: $EXPECTED_NETWORK got: $NETWORK_ID)"
