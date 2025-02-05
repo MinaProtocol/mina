@@ -1,7 +1,7 @@
 (library
  (public_name proof_cache_tag)
  (virtual_modules proof_cache_tag)
- (default_implementation proof_cache_tag.lmdb)
+ (default_implementation proof_cache_tag.identity)
  (libraries
    ;; opam libraries
    core_kernel
