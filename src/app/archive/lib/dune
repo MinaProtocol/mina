@@ -78,7 +78,7 @@
   (flags -verbose -show-counts))
  (modes native)
  (instrumentation
-  (backend bisect_ppx))
+  (backend bisect_ppx --bisect-sigterm))
  (preprocess
   (pps
    ppx_mina
