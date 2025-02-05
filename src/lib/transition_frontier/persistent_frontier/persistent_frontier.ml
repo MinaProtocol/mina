@@ -21,14 +21,14 @@ exception Invalid_genesis_state_hash of Mina_block.Validated.t
 let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
     ~root_ledger ~root_transition ~root ~protocol_states ~logger =
   let open Deferred.Or_error.Let_syntax in
-  let open Root_data.Minimal in
   let blockchain_state =
     root_transition |> Mina_block.Validated.forget |> With_hash.data
     |> Mina_block.header |> Mina_block.Header.protocol_state
     |> Protocol_state.blockchain_state
   in
-  let pending_coinbases = pending_coinbase root in
-  let scan_state = scan_state root in
+  let pending_coinbases, scan_state_unwrapped =
+    Root_data.Minimal.Stable.Latest.(pending_coinbase root, scan_state root)
+  in
   let protocol_states_map =
     List.fold protocol_states ~init:State_hash.Map.empty
       ~f:(fun acc protocol_state ->
@@ -55,6 +55,7 @@ let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
   let staged_ledger_hash =
     Blockchain_state.staged_ledger_hash blockchain_state
   in
+  let scan_state = Staged_ledger.Scan_state.generate scan_state_unwrapped in
   let%bind staged_ledger =
     Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
       ~snarked_local_state:local_state ~snarked_ledger:mask ~scan_state
@@ -210,7 +211,7 @@ module Instance = struct
     let%bind root, root_transition, best_tip, protocol_states, root_hash =
       (let open Result.Let_syntax in
       let%bind root = Database.get_root t.db in
-      let root_hash = Root_data.Minimal.hash root in
+      let root_hash = Root_data.Minimal.Stable.Latest.hash root in
       let%bind root_transition = Database.get_transition t.db root_hash in
       let%bind best_tip = Database.get_best_tip t.db in
       let%map protocol_states =

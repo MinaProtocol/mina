@@ -130,6 +130,10 @@ module Minimal = struct
       let of_limited ~common hash = { hash; common }
 
       let to_latest = Fn.id
+
+      let scan_state t = t.common.Common.Stable.Latest.scan_state
+
+      let pending_coinbase t = t.common.Common.Stable.Latest.pending_coinbase
     end
   end]
 
