@@ -941,7 +941,7 @@ module Account_precondition = struct
 
       let (_ :
             ( t
-            , Mina_wire_types.Mina_base.Account_update.Account_precondition.V2.t
+            , Mina_wire_types.Mina_base.Account_update.Account_precondition.V1.t
             )
             Type_equal.t ) =
         Type_equal.T
@@ -1068,8 +1068,8 @@ end
 module Preconditions = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t = Mina_wire_types.Mina_base.Account_update.Preconditions.V2.t =
+    module V1 = struct
+      type t = Mina_wire_types.Mina_base.Account_update.Preconditions.V1.t =
         { network : Zkapp_precondition.Protocol_state.Stable.V1.t
         ; account : Account_precondition.Stable.V1.t
         ; valid_while :
@@ -1178,7 +1178,7 @@ module Body = struct
           ; actions : Events'.Stable.V1.t
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
           ; call_depth : int
-          ; preconditions : Preconditions.Stable.V2.t
+          ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
           ; implicit_account_creation_fee : bool
           ; may_use_token : May_use_token.Stable.V1.t
@@ -1236,7 +1236,7 @@ module Body = struct
           ; actions : Events'.Stable.V1.t
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
           ; call_depth : int
-          ; preconditions : Preconditions.Stable.V2.t
+          ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
           ; implicit_account_creation_fee : bool
           ; may_use_token : May_use_token.Stable.V1.t
@@ -1262,7 +1262,7 @@ module Body = struct
         ; events : Events'.Stable.V1.t
         ; actions : Events'.Stable.V1.t
         ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
-        ; preconditions : Preconditions.Stable.V2.t
+        ; preconditions : Preconditions.Stable.V1.t
         ; use_full_commitment : bool
         ; implicit_account_creation_fee : bool
         ; may_use_token : May_use_token.Stable.V1.t
