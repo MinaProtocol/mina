@@ -32,8 +32,6 @@ let account : Mina_base.Account.t =
   ; zkapp = Some zkapp_account
   }
 
-let proof_cache_db = Proof_cache_tag.create_db ()
-
 (* beefy zkapp command with all proof updates *)
 let zkapp_command ~genesis_constants ~constraint_constants =
   let num_updates = 16 in
@@ -233,7 +231,7 @@ let scan_state_base_node_zkapp ~constraint_constants ~zkapp_command =
   in
   mk_scan_state_base_node varying ~constraint_constants
 
-let scan_state_merge_node :
+let scan_state_merge_node ~proof_cache_db :
     Transaction_snark_scan_state.Ledger_proof_with_sok_message.t
     Parallel_scan.Merge.t =
   let weight1 : Parallel_scan.Weight.t = { base = 42; merge = 99 } in
