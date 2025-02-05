@@ -28,6 +28,18 @@ module type Inputs_intf = sig
 
   module Ledger_proof : sig
     type t
+
+    module Stable : sig
+      module Latest : sig
+        type nonrec t = t
+      end
+    end
+
+    module Cached : sig
+      type t
+
+      val unwrap : t -> Stable.Latest.t
+    end
   end
 
   module Transaction_snark_work : sig
@@ -61,7 +73,7 @@ module type Inputs_intf = sig
       -> get_state:
            (Mina_base.State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
       -> ( Transaction_witness.t
-         , Ledger_proof.t )
+         , Ledger_proof.Cached.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
          list

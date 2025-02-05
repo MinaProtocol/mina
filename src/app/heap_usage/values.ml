@@ -32,6 +32,8 @@ let account : Mina_base.Account.t =
   ; zkapp = Some zkapp_account
   }
 
+let proof_cache_db = Proof_cache_tag.create_db ()
+
 (* beefy zkapp command with all proof updates *)
 let zkapp_command ~genesis_constants ~constraint_constants =
   let num_updates = 16 in
@@ -252,7 +254,7 @@ let scan_state_merge_node :
         { without_sok with sok_digest = Mina_base.Sok_message.digest sok_msg }
       in
       let ledger_proof = Transaction_snark.create ~statement ~proof in
-      (ledger_proof, sok_msg)
+      (Ledger_proof.Cached.generate ~proof_cache_db ledger_proof, sok_msg)
     in
     let right =
       let sok_msg : Mina_base.Sok_message.t =
@@ -268,7 +270,7 @@ let scan_state_merge_node :
         { without_sok with sok_digest = Mina_base.Sok_message.digest sok_msg }
       in
       let ledger_proof = Transaction_snark.create ~statement ~proof in
-      (ledger_proof, sok_msg)
+      (Ledger_proof.Cached.generate ~proof_cache_db ledger_proof, sok_msg)
     in
     Full { left; right; seq_no = 1; status = Todo }
   in

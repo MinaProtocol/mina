@@ -1250,6 +1250,8 @@ module type CONTEXT = sig
   val compaction_interval : Time.Span.t option
 
   val compile_config : Mina_compile_config.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 let context ~commit_id (config : Config.t) : (module CONTEXT) =
@@ -1279,6 +1281,8 @@ let context ~commit_id (config : Config.t) : (module CONTEXT) =
     (*Same as config.precomputed_values.compile_config.
       TODO: Remove redundant fields *)
     let compile_config = config.compile_config
+
+    let proof_cache_db = Proof_cache_tag.create_db ()
   end )
 
 let start t =

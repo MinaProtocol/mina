@@ -14,12 +14,15 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 exception Invalid_genesis_state_hash of Mina_block.Validated.t
 
-let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
-    ~root_ledger ~root_transition ~root ~protocol_states ~logger =
+let construct_staged_ledger_at_root ~proof_cache_db
+    ~(precomputed_values : Precomputed_values.t) ~root_ledger ~root_transition
+    ~(root : Root_data.Minimal.Stable.Latest.t) ~protocol_states ~logger =
   let open Deferred.Or_error.Let_syntax in
   let blockchain_state =
     root_transition |> Mina_block.Validated.forget |> With_hash.data
@@ -55,7 +58,9 @@ let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
   let staged_ledger_hash =
     Blockchain_state.staged_ledger_hash blockchain_state
   in
-  let scan_state = Staged_ledger.Scan_state.generate scan_state_unwrapped in
+  let scan_state =
+    Staged_ledger.Scan_state.generate ~proof_cache_db scan_state_unwrapped
+  in
   let%bind staged_ledger =
     Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
       ~snarked_local_state:local_state ~snarked_ledger:mask ~scan_state
@@ -231,8 +236,9 @@ module Instance = struct
     let%bind root_staged_ledger =
       let open Deferred.Let_syntax in
       match%map
-        construct_staged_ledger_at_root ~precomputed_values ~root_ledger
-          ~root_transition ~root ~protocol_states ~logger:t.factory.logger
+        construct_staged_ledger_at_root ~proof_cache_db ~precomputed_values
+          ~root_ledger ~root_transition ~root ~protocol_states
+          ~logger:t.factory.logger
       with
       | Error err ->
           Error (`Failure (Error.to_string_hum err))
@@ -314,7 +320,7 @@ module Instance = struct
              let transition_receipt_time = None in
              let%bind breadcrumb =
                Breadcrumb.build ~skip_staged_ledger_verification:`All
-                 ~logger:t.factory.logger ~precomputed_values
+                 ~proof_cache_db ~logger:t.factory.logger ~precomputed_values
                  ~verifier:t.factory.verifier
                  ~trust_system:(Trust_system.null ()) ~parent ~transition
                  ~get_completed_work:(Fn.const None) ~sender:None

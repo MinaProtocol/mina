@@ -133,7 +133,7 @@ module Minimal : sig
     -> pending_coinbase:Pending_coinbase.t
     -> t
 
-  val generate : Stable.Latest.t -> t
+  val generate : proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
 
   val unwrap : t -> Stable.Latest.t
 end

@@ -32,7 +32,7 @@ module Transaction_with_witness : sig
 end
 
 module Ledger_proof_with_sok_message : sig
-  type t = Ledger_proof.t * Sok_message.t
+  type t = Ledger_proof.Cached.t * Sok_message.t
 end
 
 module Available_job : sig
@@ -88,10 +88,11 @@ val empty :
 
 val fill_work_and_enqueue_transactions :
      t
+  -> proof_cache_db:Proof_cache_tag.cache_db
   -> logger:Logger.t
   -> Transaction_with_witness.t list
   -> Transaction_snark_work.t list
-  -> ( ( Ledger_proof.t
+  -> ( ( Ledger_proof.Cached.t
        * ( Transaction.t With_status.t
          * State_hash.t
          * Mina_numbers.Global_slot_since_genesis.t )
@@ -258,11 +259,13 @@ val check_required_protocol_states :
 val all_work_pairs :
      t
   -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-  -> (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
+  -> ( Transaction_witness.t
+     , Ledger_proof.Cached.t )
+     Snark_work_lib.Work.Single.Spec.t
      One_or_two.t
      list
      Or_error.t
 
-val generate : Stable.Latest.t -> t
+val generate : proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
 
 val unwrap : t -> Stable.Latest.t

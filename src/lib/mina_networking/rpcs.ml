@@ -39,6 +39,8 @@ module type CONTEXT = sig
   val snark_job_state : unit -> Work_selector.State.t option
 
   val compile_config : Mina_compile_config.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 type ctx = (module CONTEXT)

@@ -323,7 +323,9 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                 match%bind
                   make_interruptible
                     (Uptime_snark_worker.perform_single snark_worker
-                       (message, single_spec) )
+                       ( message
+                       , Snark_work_lib.Work.Single.Spec.map ~f_witness:ident
+                           ~f_proof:Ledger_proof.Cached.unwrap single_spec ) )
                 with
                 | Error e ->
                     (* error in submitting to process *)
