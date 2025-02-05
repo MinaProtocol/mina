@@ -70,9 +70,9 @@ NETWORK_ID=$(curl 'http://localhost:3085/graphql' \
    -H 'accept: application/json' \
    -H 'content-type: application/json' \
    --data-raw '{"query":"query MyQuery {\n  networkID\n}\n","variables":null,"operationName":"MyQuery"}' \
-  | jq .data.networkID)
+  | jq -r .data.networkID)
 
-EXPECTED_NETWORK="mina:$NETWORK_NAME"
+EXPECTED_NETWORK=mina:$NETWORK_NAME
 
 if [ "$NETWORK_ID" -eq "$EXPECTED_NETWORK" ]; then
     echo "Network id correct ($NETWORK_ID)"
