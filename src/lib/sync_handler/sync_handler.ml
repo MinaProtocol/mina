@@ -139,7 +139,8 @@ module Make (Inputs : Inputs_intf) :
       in
       let scan_state = Staged_ledger.scan_state staged_ledger in
       let merkle_root =
-        Staged_ledger.hash staged_ledger |> Staged_ledger_hash.ledger_hash
+        Breadcrumb.staged_ledger_hash breadcrumb
+        |> Staged_ledger_hash.ledger_hash
       in
       let%map scan_state_protocol_states = protocol_states scan_state in
       let pending_coinbase =

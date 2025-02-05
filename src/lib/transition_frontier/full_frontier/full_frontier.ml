@@ -1010,12 +1010,14 @@ module For_tests = struct
            ~src:(Lazy.force Genesis_ledger.t)
            ~dest:(Mina_ledger.Ledger.create ~depth:ledger_depth ()) )
     in
+    let staged_ledger =
+      Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
+    in
     let root_data =
       let open Root_data in
       { transition =
           Mina_block.Validated.lift @@ Mina_block.genesis ~precomputed_values
-      ; staged_ledger =
-          Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
+      ; staged_ledger
       ; protocol_states = []
       }
     in

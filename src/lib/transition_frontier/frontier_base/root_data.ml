@@ -51,7 +51,7 @@ module Historical = struct
       Staged_ledger.pending_coinbase_collection staged_ledger
     in
     let staged_ledger_target_ledger_hash =
-      Staged_ledger.hash staged_ledger |> Staged_ledger_hash.ledger_hash
+      Breadcrumb.staged_ledger_hash breadcrumb |> Staged_ledger_hash.ledger_hash
     in
     let common = Common.create ~scan_state ~pending_coinbase in
     { transition; common; staged_ledger_target_ledger_hash }
