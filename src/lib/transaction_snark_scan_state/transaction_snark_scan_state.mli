@@ -55,18 +55,6 @@ module Make_statement_scanner (Verifier : sig
     -> Ledger_proof_with_sok_message.t list
     -> unit Or_error.t Deferred.Or_error.t
 end) : sig
-  val scan_statement :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> logger:Logger.t
-    -> t
-    -> statement_check:
-         [ `Full of State_hash.t -> Mina_state.Protocol_state.value Or_error.t
-         | `Partial ]
-    -> verifier:Verifier.t
-    -> ( Transaction_snark.Statement.t
-       , [ `Empty | `Error of Error.t ] )
-       Deferred.Result.t
-
   val check_invariants :
        t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
