@@ -133,7 +133,7 @@ module Minimal : sig
     -> pending_coinbase:Pending_coinbase.t
     -> t
 
-  val unwrap : t -> Stable.Latest.t
+  val read_all_proofs_from_disk : t -> Stable.Latest.t
 end
 
 type t =

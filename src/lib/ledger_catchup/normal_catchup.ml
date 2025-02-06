@@ -1037,12 +1037,12 @@ let%test_module "Ledger_catchup tests" =
         Rose_tree.equal (Rose_tree.of_list_exn target_best_tip_path)
           catchup_breadcrumbs ~f:(fun breadcrumb_tree1 breadcrumb_tree2 ->
             let b1 =
-              Mina_block.Validated.unwrap
+              Mina_block.Validated.read_all_proofs_from_disk
                 (Transition_frontier.Breadcrumb.validated_transition
                    breadcrumb_tree1 )
             in
             let b2 =
-              Mina_block.Validated.unwrap
+              Mina_block.Validated.read_all_proofs_from_disk
                 (Transition_frontier.Breadcrumb.validated_transition
                    breadcrumb_tree2 )
             in

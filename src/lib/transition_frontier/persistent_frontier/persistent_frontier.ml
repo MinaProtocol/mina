@@ -59,7 +59,8 @@ let construct_staged_ledger_at_root ~proof_cache_db
     Blockchain_state.staged_ledger_hash blockchain_state
   in
   let scan_state =
-    Staged_ledger.Scan_state.generate ~proof_cache_db scan_state_unwrapped
+    Staged_ledger.Scan_state.write_all_proofs_to_disk ~proof_cache_db
+      scan_state_unwrapped
   in
   let%bind staged_ledger =
     Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger_unchecked

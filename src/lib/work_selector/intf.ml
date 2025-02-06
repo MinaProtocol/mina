@@ -38,7 +38,7 @@ module type Inputs_intf = sig
     module Cached : sig
       type t
 
-      val unwrap : t -> Stable.Latest.t
+      val read_proof_from_disk : t -> Stable.Latest.t
     end
   end
 

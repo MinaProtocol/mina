@@ -316,7 +316,7 @@ let completed_work_to_scanable_work ~proof_cache_db (job : job)
   | Base { statement; _ } ->
       let ledger_proof =
         Ledger_proof.create ~statement ~sok_digest ~proof
-        |> Ledger_proof.Cached.generate ~proof_cache_db
+        |> Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db
       in
       Ok (ledger_proof, Sok_message.create ~fee ~prover)
   | Merge ((p, _), (p', _)) ->
@@ -325,7 +325,7 @@ let completed_work_to_scanable_work ~proof_cache_db (job : job)
       and s' = Ledger_proof.Cached.statement p' in
       let%map statement = Transaction_snark.Statement.merge s s' in
       ( Ledger_proof.create ~statement ~sok_digest ~proof
-        |> Ledger_proof.Cached.generate ~proof_cache_db
+        |> Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db
       , Sok_message.create ~fee ~prover )
 
 let total_proofs (works : Transaction_snark_work.t list) =
@@ -1476,17 +1476,20 @@ let check_required_protocol_states t ~protocol_states =
   let%map () = check_length protocol_states_assoc in
   protocol_states_assoc
 
-let generate ~proof_cache_db
+let write_all_proofs_to_disk ~proof_cache_db
     { Stable.Latest.scan_state; previous_incomplete_zkapp_updates } =
   let scan_state' =
     Parallel_scan.State.map ~f2:ident scan_state
-      ~f1:(Tuple2.map_fst ~f:(Ledger_proof.Cached.generate ~proof_cache_db))
+      ~f1:
+        (Tuple2.map_fst
+           ~f:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db) )
   in
   { scan_state = scan_state'; previous_incomplete_zkapp_updates }
 
-let unwrap { scan_state; previous_incomplete_zkapp_updates } =
+let read_all_proofs_from_disk { scan_state; previous_incomplete_zkapp_updates }
+    =
   let scan_state' =
     Parallel_scan.State.map ~f2:ident scan_state
-      ~f1:(Tuple2.map_fst ~f:Ledger_proof.Cached.unwrap)
+      ~f1:(Tuple2.map_fst ~f:Ledger_proof.Cached.read_proof_from_disk)
   in
   { Stable.Latest.scan_state = scan_state'; previous_incomplete_zkapp_updates }

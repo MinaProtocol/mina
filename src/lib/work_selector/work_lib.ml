@@ -89,7 +89,8 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                           list =
                         let f =
                           Snark_work_lib.Work.Single.Spec.map ~f_witness:ident
-                            ~f_proof:Inputs.Ledger_proof.Cached.unwrap
+                            ~f_proof:
+                              Inputs.Ledger_proof.Cached.read_proof_from_disk
                         in
                         List.map new_available_jobs ~f:(One_or_two.map ~f)
                       in

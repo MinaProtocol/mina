@@ -413,7 +413,7 @@ let generate_next_state ~proof_cache_db ~commit_id ~zkapp_cmd_limit
                       ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
                       ~ledger_proof:
                         (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
-                             Ledger_proof.Cached.unwrap proof ) ) )
+                             Ledger_proof.Cached.read_proof_from_disk proof ) ) )
               in
               let witness =
                 { Pending_coinbase_witness.pending_coinbases =

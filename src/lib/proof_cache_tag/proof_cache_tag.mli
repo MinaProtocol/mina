@@ -10,9 +10,9 @@ val create_db :
   -> logger:Logger.t
   -> (cache_db, [> `Initialization_error of Error.t ]) Deferred.Result.t
 
-val unwrap : t -> Mina_base.Proof.t
+val read_proof_from_disk : t -> Mina_base.Proof.t
 
-val generate : cache_db -> Mina_base.Proof.t -> t
+val write_proof_to_disk : cache_db -> Mina_base.Proof.t -> t
 
 module For_tests : sig
   val blockchain_dummy : t lazy_t

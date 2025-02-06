@@ -223,8 +223,9 @@ module T = struct
     let verify ~verifier:{ logger; verifier } ts =
       verify_proofs ~logger ~verifier
         (List.map ts ~f:(fun (p, m) ->
-             (Ledger_proof.Cached.unwrap p, Ledger_proof.Cached.statement p, m) )
-        )
+             ( Ledger_proof.Cached.read_proof_from_disk p
+             , Ledger_proof.Cached.statement p
+             , m ) ) )
   end
 
   module Statement_scanner_with_proofs =
@@ -421,7 +422,7 @@ module T = struct
       ; pending_coinbase_collection
       } : Staged_ledger_hash.t =
     Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-      Scan_state.(Stable.Latest.hash @@ unwrap scan_state)
+      Scan_state.(Stable.Latest.hash @@ read_all_proofs_from_disk scan_state)
       (Ledger.merkle_root ledger)
       pending_coinbase_collection
 

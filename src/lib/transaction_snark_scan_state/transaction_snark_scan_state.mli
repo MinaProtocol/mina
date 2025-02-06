@@ -266,6 +266,7 @@ val all_work_pairs :
      list
      Or_error.t
 
-val generate : proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
+val write_all_proofs_to_disk :
+  proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
 
-val unwrap : t -> Stable.Latest.t
+val read_all_proofs_from_disk : t -> Stable.Latest.t

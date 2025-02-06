@@ -40,15 +40,18 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
       , Proof_cache_tag.t )
       Proof_carrying_data.t
 
-    let generate ~proof_cache_db (t : Stable.Latest.t) : t =
+    let write_proof_to_disk ~proof_cache_db (t : Stable.Latest.t) : t =
       { Proof_carrying_data.proof =
-          Proof_cache_tag.generate proof_cache_db (Transaction_snark.proof t)
+          Proof_cache_tag.write_proof_to_disk proof_cache_db
+            (Transaction_snark.proof t)
       ; data = Transaction_snark.statement_with_sok t
       }
 
-    let unwrap ({ Proof_carrying_data.data = statement; proof } : t) :
-        Stable.Latest.t =
-      Transaction_snark.create ~statement ~proof:(Proof_cache_tag.unwrap proof)
+    let read_proof_from_disk
+        ({ Proof_carrying_data.data = statement; proof } : t) : Stable.Latest.t
+        =
+      Transaction_snark.create ~statement
+        ~proof:(Proof_cache_tag.read_proof_from_disk proof)
 
     let statement (t : t) = { t.data with sok_digest = () }
   end

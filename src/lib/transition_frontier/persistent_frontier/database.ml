@@ -320,7 +320,7 @@ let initialize t ~root_data =
           ( Root_data.Minimal.of_limited
               ~common:(Root_data.Limited.common root_data)
               root_state_hash
-          |> Root_data.Minimal.unwrap ) ;
+          |> Root_data.Minimal.read_all_proofs_from_disk ) ;
       Batch.set batch ~key:Best_tip ~data:root_state_hash ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
         ~data:

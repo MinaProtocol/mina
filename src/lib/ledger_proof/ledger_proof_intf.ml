@@ -51,10 +51,10 @@ module type S = sig
       , Proof_cache_tag.t )
       Proof_carrying_data.t
 
-    val generate :
+    val write_proof_to_disk :
       proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
 
-    val unwrap : t -> Stable.Latest.t
+    val read_proof_from_disk : t -> Stable.Latest.t
 
     val statement : t -> Mina_state.Snarked_ledger_state.t
   end

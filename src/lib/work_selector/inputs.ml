@@ -24,7 +24,7 @@ module Test_inputs = struct
     module Cached = struct
       type nonrec t = t
 
-      let unwrap = Fn.id
+      let read_proof_from_disk = Fn.id
     end
   end
 
