@@ -15,6 +15,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -1413,6 +1415,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
         ~build_func:
           (Transition_frontier.Breadcrumb.build
+             ~proof_cache_db:Context.proof_cache_db
              ~get_completed_work:(Fn.const None) ) )
 
 (* Unit tests *)
@@ -1474,6 +1477,8 @@ let%test_module "Ledger_catchup tests" =
       let constraint_constants = constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
     end
 
     (* let mock_verifier =
@@ -1637,7 +1642,10 @@ let%test_module "Ledger_catchup tests" =
             (* We force evaluation of state body hash for both blocks for further equality check *)
             let _hash1 = Mina_block.Validated.state_body_hash b1 in
             let _hash2 = Mina_block.Validated.state_body_hash b2 in
-            Mina_block.Validated.(Stable.Latest.equal (unwrap b1) (unwrap b2)) )
+            Mina_block.Validated.(
+              Stable.Latest.equal
+                (read_all_proofs_from_disk b1)
+                (read_all_proofs_from_disk b2)) )
       in
       if not catchup_breadcrumbs_are_best_tip_path then
         failwith

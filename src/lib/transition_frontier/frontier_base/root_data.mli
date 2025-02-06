@@ -103,6 +103,10 @@ module Minimal : sig
       val hash : t -> State_hash.t
 
       val of_limited : common:Common.Stable.V2.t -> State_hash.Stable.V1.t -> t
+
+      val scan_state : t -> Staged_ledger.Scan_state.Stable.V2.t
+
+      val pending_coinbase : t -> Pending_coinbase.Stable.V2.t
     end
   end]
 
@@ -129,9 +133,7 @@ module Minimal : sig
     -> pending_coinbase:Pending_coinbase.t
     -> t
 
-  val generate : Stable.Latest.t -> t
-
-  val unwrap : t -> Stable.Latest.t
+  val read_all_proofs_from_disk : t -> Stable.Latest.t
 end
 
 type t =

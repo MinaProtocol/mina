@@ -38,4 +38,4 @@ val body : t -> Staged_ledger_diff.Body.t
 
 val is_genesis : t -> bool
 
-val unwrap : t -> Stable.Latest.t
+val read_all_proofs_from_disk : t -> Stable.Latest.t

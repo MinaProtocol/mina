@@ -14,21 +14,24 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 exception Invalid_genesis_state_hash of Mina_block.Validated.t
 
-let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
-    ~root_ledger ~root_transition ~root ~protocol_states ~logger =
+let construct_staged_ledger_at_root ~proof_cache_db
+    ~(precomputed_values : Precomputed_values.t) ~root_ledger ~root_transition
+    ~(root : Root_data.Minimal.Stable.Latest.t) ~protocol_states ~logger =
   let open Deferred.Or_error.Let_syntax in
-  let open Root_data.Minimal in
   let blockchain_state =
     root_transition |> Mina_block.Validated.forget |> With_hash.data
     |> Mina_block.header |> Mina_block.Header.protocol_state
     |> Protocol_state.blockchain_state
   in
-  let pending_coinbases = pending_coinbase root in
-  let scan_state = scan_state root in
+  let pending_coinbases, scan_state_unwrapped =
+    Root_data.Minimal.Stable.Latest.(pending_coinbase root, scan_state root)
+  in
   let protocol_states_map =
     List.fold protocol_states ~init:State_hash.Map.empty
       ~f:(fun acc protocol_state ->
@@ -54,6 +57,10 @@ let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
   let local_state = Blockchain_state.snarked_local_state blockchain_state in
   let staged_ledger_hash =
     Blockchain_state.staged_ledger_hash blockchain_state
+  in
+  let scan_state =
+    Staged_ledger.Scan_state.write_all_proofs_to_disk ~proof_cache_db
+      scan_state_unwrapped
   in
   let%bind staged_ledger =
     Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
@@ -210,7 +217,7 @@ module Instance = struct
     let%bind root, root_transition, best_tip, protocol_states, root_hash =
       (let open Result.Let_syntax in
       let%bind root = Database.get_root t.db in
-      let root_hash = Root_data.Minimal.hash root in
+      let root_hash = Root_data.Minimal.Stable.Latest.hash root in
       let%bind root_transition = Database.get_transition t.db root_hash in
       let%bind best_tip = Database.get_best_tip t.db in
       let%map protocol_states =
@@ -230,8 +237,9 @@ module Instance = struct
     let%bind root_staged_ledger =
       let open Deferred.Let_syntax in
       match%map
-        construct_staged_ledger_at_root ~precomputed_values ~root_ledger
-          ~root_transition ~root ~protocol_states ~logger:t.factory.logger
+        construct_staged_ledger_at_root ~proof_cache_db ~precomputed_values
+          ~root_ledger ~root_transition ~root ~protocol_states
+          ~logger:t.factory.logger
       with
       | Error err ->
           Error (`Failure (Error.to_string_hum err))
@@ -313,7 +321,7 @@ module Instance = struct
              let transition_receipt_time = None in
              let%bind breadcrumb =
                Breadcrumb.build ~skip_staged_ledger_verification:`All
-                 ~logger:t.factory.logger ~precomputed_values
+                 ~proof_cache_db ~logger:t.factory.logger ~precomputed_values
                  ~verifier:t.factory.verifier
                  ~trust_system:(Trust_system.null ()) ~parent ~transition
                  ~get_completed_work:(Fn.const None) ~sender:None

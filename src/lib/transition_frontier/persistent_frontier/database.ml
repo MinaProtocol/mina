@@ -320,7 +320,7 @@ let initialize t ~root_data =
           ( Root_data.Minimal.of_limited
               ~common:(Root_data.Limited.common root_data)
               root_state_hash
-          |> Root_data.Minimal.unwrap ) ;
+          |> Root_data.Minimal.read_all_proofs_from_disk ) ;
       Batch.set batch ~key:Best_tip ~data:root_state_hash ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
         ~data:
@@ -412,17 +412,14 @@ let get_transition t hash =
 
 let get_arcs t hash = get t.db ~key:(Arcs hash) ~error:(`Not_found (`Arcs hash))
 
-let get_root_impl t = get t.db ~key:Root ~error:(`Not_found `Root)
-
-let get_root t = get_root_impl t |> Result.map ~f:Root_data.Minimal.generate
+let get_root t = get t.db ~key:Root ~error:(`Not_found `Root)
 
 let get_protocol_states_for_root_scan_state t =
   get t.db ~key:Protocol_states_for_root_scan_state
     ~error:(`Not_found `Protocol_states_for_root_scan_state)
 
 let get_root_hash t =
-  let%map root = get_root_impl t in
-  Root_data.Minimal.Stable.Latest.hash root
+  Result.map ~f:Root_data.Minimal.Stable.Latest.hash (get_root t)
 
 let get_best_tip t = get t.db ~key:Best_tip ~error:(`Not_found `Best_tip)
 

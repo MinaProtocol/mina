@@ -13,6 +13,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 module type Transition_handler_validator_intf = sig
@@ -57,7 +59,8 @@ module type Breadcrumb_builder_intf = sig
   type transition_frontier_breadcrumb
 
   val build_subtrees_of_breadcrumbs :
-       logger:Logger.t
+       proof_cache_db:Proof_cache_tag.cache_db
+    -> logger:Logger.t
     -> verifier:Verifier.t
     -> trust_system:Trust_system.t
     -> frontier:transition_frontier

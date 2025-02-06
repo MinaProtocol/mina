@@ -17,6 +17,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 type Structured_log_events.t += Bootstrap_complete
@@ -378,7 +380,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
           | Error err ->
               Deferred.return (staged_ledger_data_download_time, None, Error err)
           | Ok
-              ( scan_state
+              ( scan_state_uncached
               , expected_merkle_root
               , pending_coinbases
               , protocol_states ) -> (
@@ -387,7 +389,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                     let open Deferred.Or_error.Let_syntax in
                     let received_staged_ledger_hash =
                       Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-                        (Staged_ledger.Scan_state.hash scan_state)
+                        (Staged_ledger.Scan_state.Stable.Latest.hash
+                           scan_state_uncached )
                         expected_merkle_root pending_coinbases
                     in
                     [%log debug]
@@ -417,6 +420,10 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                     let protocol_states =
                       List.map protocol_states
                         ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
+                    in
+                    let scan_state =
+                      Staged_ledger.Scan_state.write_all_proofs_to_disk
+                        ~proof_cache_db scan_state_uncached
                     in
                     let%bind protocol_states =
                       Staged_ledger.Scan_state.check_required_protocol_states
@@ -761,6 +768,8 @@ let%test_module "Bootstrap_controller tests" =
         Genesis_constants.For_unit_tests.Constraint_constants.t
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
     end
 
     let verifier =
