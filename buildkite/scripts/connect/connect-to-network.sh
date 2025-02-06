@@ -56,12 +56,27 @@ for ((i=1;i<=$num_status_retries;i++)); do
 done
 
 # Check that the daemon has connected to peers and is still up after 2 mins
-sleep $WAIT_AFTER_FINAL_CHECK
+sleep "$WAIT_AFTER_FINAL_CHECK"
 mina client status
 if [ "$(mina advanced get-peers | wc -l)" -gt 0 ]; then
     echo "Found some peers"
-    exit 0
 else
     echo "No peers found"
+    exit 1
+fi
+
+# Check network id
+NETWORK_ID=$(curl 'http://localhost:3085/graphql' \
+   -H 'accept: application/json' \
+   -H 'content-type: application/json' \
+   --data-raw '{"query":"query MyQuery {\n  networkID\n}\n","variables":null,"operationName":"MyQuery"}' \
+  | jq -r .data.networkID)
+
+EXPECTED_NETWORK=mina:$NETWORK_NAME
+
+if [[ "$NETWORK_ID" == "$EXPECTED_NETWORK" ]]; then
+    echo "Network id correct ($NETWORK_ID)"
+else
+    echo "Network id incorrect (expected: $EXPECTED_NETWORK got: $NETWORK_ID)"
     exit 1
 fi
