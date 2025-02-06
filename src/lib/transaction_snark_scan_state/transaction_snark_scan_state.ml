@@ -1468,8 +1468,10 @@ let check_required_protocol_states t ~protocol_states =
   let%map () = check_length protocol_states_assoc in
   protocol_states_assoc
 
-let generate { Stable.Latest.scan_state; previous_incomplete_zkapp_updates } =
+let write_all_proofs_to_disk
+    { Stable.Latest.scan_state; previous_incomplete_zkapp_updates } =
   { scan_state; previous_incomplete_zkapp_updates }
 
-let unwrap { scan_state; previous_incomplete_zkapp_updates } =
+let read_all_proofs_from_disk { scan_state; previous_incomplete_zkapp_updates }
+    =
   { Stable.Latest.scan_state; previous_incomplete_zkapp_updates }

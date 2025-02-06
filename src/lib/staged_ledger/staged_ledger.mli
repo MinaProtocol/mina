@@ -134,9 +134,9 @@ module Scan_state : sig
     -> t
     -> unit Deferred.Or_error.t
 
-  val generate : Stable.Latest.t -> t
+  val write_all_proofs_to_disk : Stable.Latest.t -> t
 
-  val unwrap : t -> Stable.Latest.t
+  val read_all_proofs_from_disk : t -> Stable.Latest.t
 end
 
 module Pre_diff_info : Pre_diff_info.S

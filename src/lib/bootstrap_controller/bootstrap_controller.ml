@@ -418,7 +418,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                         ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
                     in
                     let scan_state =
-                      Staged_ledger.Scan_state.generate scan_state_uncached
+                      Staged_ledger.Scan_state.write_all_proofs_to_disk
+                        scan_state_uncached
                     in
                     let%bind protocol_states =
                       Staged_ledger.Scan_state.check_required_protocol_states

@@ -164,20 +164,23 @@ module Minimal = struct
 
   let pending_coinbase t = Common.pending_coinbase t.common
 
-  let generate { Stable.Latest.hash; common = { scan_state; pending_coinbase } }
-      =
+  let write_all_proofs_to_disk
+      { Stable.Latest.hash; common = { scan_state; pending_coinbase } } =
     { hash
     ; common =
         { pending_coinbase
-        ; scan_state = Staged_ledger.Scan_state.generate scan_state
+        ; scan_state =
+            Staged_ledger.Scan_state.write_all_proofs_to_disk scan_state
         }
     }
 
-  let unwrap { hash; common = { scan_state; pending_coinbase } } =
+  let read_all_proofs_from_disk
+      { hash; common = { scan_state; pending_coinbase } } =
     { Stable.Latest.hash
     ; common =
         { pending_coinbase
-        ; scan_state = Staged_ledger.Scan_state.unwrap scan_state
+        ; scan_state =
+            Staged_ledger.Scan_state.read_all_proofs_from_disk scan_state
         }
     }
 end
