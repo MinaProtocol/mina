@@ -1,14 +1,15 @@
 (library
- (public_name disk_cache.identity)
- (name disk_cache_identity)
+ (public_name disk_cache.lmdb)
+ (name disk_cache_lmdb)
  (implements disk_cache)
  (libraries
    ;; opam libraries
-   async_kernel
    core_kernel
+   core
    ;; local libraries
+   lmdb_storage
    disk_cache.test_lib
-   )
+  ) 
  (preprocess (pps ppx_version ppx_jane))
  (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))

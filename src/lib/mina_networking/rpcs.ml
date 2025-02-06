@@ -293,35 +293,19 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
     let hash = Envelope.Incoming.data request in
     let result =
       let%bind.Option frontier = get_transition_frontier () in
-      Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier
-        hash
+      Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash ~logger
+        ~frontier hash
     in
-    let%map () =
-      match result with
-      | Some
-          (scan_state, expected_merkle_root, pending_coinbases, _protocol_states)
-        ->
-          let staged_ledger_hash =
-            Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-              (Staged_ledger.Scan_state.hash scan_state)
-              expected_merkle_root pending_coinbases
-          in
-          [%log debug]
-            ~metadata:
-              [ ( "staged_ledger_hash"
-                , Staged_ledger_hash.to_yojson staged_ledger_hash )
-              ]
-            "sending scan state and pending coinbase" ;
-          Deferred.unit
-      | None ->
-          Trust_system.(
-            record_envelope_sender trust_system logger
-              (Envelope.Incoming.sender request)
-              Actions.
-                ( Requested_unknown_item
-                , Some (receipt_trust_action_message hash) ))
-    in
-    result
+    match result with
+    | None ->
+        Trust_system.(
+          record_envelope_sender trust_system logger
+            (Envelope.Incoming.sender request)
+            Actions.
+              (Requested_unknown_item, Some (receipt_trust_action_message hash)))
+        >>| const None
+    | _ ->
+        return result
 
   let rate_limit_budget = (4, `Per Time.Span.minute)
 

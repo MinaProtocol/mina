@@ -5,8 +5,11 @@
  (libraries
    ;; opam libraries
    core_kernel
+   async
    ;; local libraries
-   mina_base)
+   mina_base
+   logger
+   )
  (preprocess
   (pps ppx_mina ppx_version))
  (instrumentation (backend bisect_ppx)))
