@@ -1775,8 +1775,10 @@ module Json_loader : Json_loader_intf = struct
       let config_files_paths =
         List.map config_files ~f:(fun (config_file, _) -> `String config_file)
       in
-      [%log info] "Reading configuration files $config_files"
-        ~metadata:[ ("config_files", `List config_files_paths) ] ;
+      if not (List.is_empty config_files_paths) then
+        [%log info] "Reading configuration files $config_files"
+          ~metadata:[ ("config_files", `List config_files_paths) ] ;
+
       Deferred.Or_error.List.filter_map config_files
         ~f:(fun (config_file, handle_missing) ->
           match%bind.Deferred load_config_file config_file with
@@ -1816,6 +1818,14 @@ module type Constants_intf = sig
   type constants
 
   val load_constants :
+       ?conf_dir:string
+    -> ?commit_id_short:string
+    -> ?itn_features:bool
+    -> ?cli_proof_level:Genesis_constants.Proof_level.t
+    -> string list
+    -> constants Deferred.t
+
+  val load_constants_with_logging :
        ?conf_dir:string
     -> ?commit_id_short:string
     -> ?itn_features:bool
@@ -2027,16 +2037,15 @@ module Constants : Constants_intf = struct
     }
 
   (* Use this function if you don't need/want the ledger configuration *)
-  let load_constants ?conf_dir ?commit_id_short ?itn_features ?cli_proof_level
-      ~logger config_files =
-    Deferred.Or_error.ok_exn
-    @@
-    let open Deferred.Or_error.Let_syntax in
-    let%map runtime_config =
-      Json_loader.load_config_files ?conf_dir ?commit_id_short ~logger
-        config_files
-    in
-    load_constants' ?itn_features ?cli_proof_level runtime_config
+  let load_constants_with_logging ?conf_dir ?commit_id_short ?itn_features
+      ?cli_proof_level ~logger config_files =
+    Deferred.Or_error.(
+      ok_exn
+        ( Json_loader.load_config_files ?conf_dir ?commit_id_short ~logger
+            config_files
+        >>| load_constants' ?itn_features ?cli_proof_level ))
+
+  let load_constants = load_constants_with_logging ~logger:(Logger.null ())
 
   let magic_for_unit_tests t =
     let compile_constants =

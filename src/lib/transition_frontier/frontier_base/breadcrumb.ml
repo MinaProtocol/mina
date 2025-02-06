@@ -10,11 +10,11 @@ module T = struct
 
   type t =
     { validated_transition : Mina_block.Validated.t
-    ; staged_ledger : (Staged_ledger.t[@sexp.opaque])
+    ; staged_ledger : Staged_ledger.t
     ; just_emitted_a_proof : bool
     ; transition_receipt_time : Time.t option
     }
-  [@@deriving sexp, fields]
+  [@@deriving fields]
 
   type 'a creator =
        validated_transition:Mina_block.Validated.t
@@ -63,7 +63,7 @@ T.
   , transition_receipt_time
   , to_yojson )]
 
-include Allocation_functor.Make.Sexp (T)
+include Allocation_functor.Make.Basic (T)
 
 let compute_block_trace_metadata transition_with_validation =
   (* No need to compute anything if internal tracing is disabled, will be dropped anyway *)
@@ -357,15 +357,15 @@ module For_tests = struct
         let { Keypair.public_key; _ } = Keypair.create () in
         let prover = Public_key.compress public_key in
         Some
-          Transaction_snark_work.Checked.
-            { fee = Fee.of_nanomina_int_exn 1
-            ; proofs =
-                One_or_two.map stmts ~f:(fun statement ->
-                    Ledger_proof.create ~statement
-                      ~sok_digest:Sok_message.Digest.default
-                      ~proof:(Lazy.force Proof.transaction_dummy) )
-            ; prover
-            }
+          (Transaction_snark_work.Checked.create_unsafe
+             { fee = Fee.of_nanomina_int_exn 1
+             ; proofs =
+                 One_or_two.map stmts ~f:(fun statement ->
+                     Ledger_proof.create ~statement
+                       ~sok_digest:Sok_message.Digest.default
+                       ~proof:(Lazy.force Proof.transaction_dummy) )
+             ; prover
+             } )
       in
       let current_state_view, state_and_body_hash =
         let prev_state =

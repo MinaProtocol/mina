@@ -1,0 +1,12 @@
+(library
+ (public_name disk_cache.identity)
+ (name disk_cache_identity)
+ (implements disk_cache)
+ (libraries
+   ;; opam libraries
+   async_kernel
+   core_kernel
+   )
+ (preprocess (pps ppx_version))
+ (instrumentation (backend bisect_ppx))
+ )

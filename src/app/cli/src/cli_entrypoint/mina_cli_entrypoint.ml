@@ -228,9 +228,8 @@ let setup_daemon logger ~itn_features =
   and snark_work_fee =
     flag "--snark-worker-fee" ~aliases:[ "snark-worker-fee" ]
       ~doc:
-        (sprintf
-           "FEE Amount a worker wants to get compensated for generating a \
-            snark proof" )
+        "FEE Amount a worker wants to get compensated for generating a snark \
+         proof"
       (optional txn_fee)
   and work_reassignment_wait =
     flag "--work-reassignment-wait"
@@ -1567,7 +1566,8 @@ let internal_commands ~itn_features logger =
           let open Deferred.Let_syntax in
           let%bind constraint_constants, proof_level, compile_config =
             let%map conf =
-              Runtime_config.Constants.load_constants ~logger config_file
+              Runtime_config.Constants.load_constants_with_logging ~logger
+                config_file
             in
             Runtime_config.Constants.
               (constraint_constants conf, proof_level conf, compile_config conf)
@@ -1599,7 +1599,8 @@ let internal_commands ~itn_features logger =
           let open Deferred.Let_syntax in
           let%bind constraint_constants, proof_level, compile_config =
             let%map conf =
-              Runtime_config.Constants.load_constants ~logger config_file
+              Runtime_config.Constants.load_constants_with_logging ~logger
+                config_file
             in
             Runtime_config.Constants.
               (constraint_constants conf, proof_level conf, compile_config conf)
@@ -1656,7 +1657,8 @@ let internal_commands ~itn_features logger =
           let open Async in
           let%bind constraint_constants, proof_level, compile_config =
             let%map conf =
-              Runtime_config.Constants.load_constants ~logger config_file
+              Runtime_config.Constants.load_constants_with_logging ~logger
+                config_file
             in
             Runtime_config.Constants.
               (constraint_constants conf, proof_level conf, compile_config conf)

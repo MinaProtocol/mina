@@ -1,3 +1,5 @@
+let B = ../../External/Buildkite.dhall
+
 let PipelineMode = ../../Pipeline/Mode.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
@@ -23,6 +25,8 @@ let Size = ../Size.dhall
 let Benchmarks = ../../Constants/Benchmarks.dhall
 
 let SelectFiles = ../../Lib/SelectFiles.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let Spec =
       { Type =
@@ -60,12 +64,14 @@ let command
             , commands =
                 RunInToolchain.runInToolchain
                   (Benchmarks.toEnvList Benchmarks.Type::{=})
-                  "./buildkite/scripts/benchmarks.sh  ${spec.bench} --red-threshold ${Double/show
-                                                                                        spec.redThreshold} --yellow-threshold ${Double/show
-                                                                                                                                  spec.yellowThreshold}"
-            , label = "Perf: ${spec.label}"
+                  "./buildkite/scripts/bench/run.sh  ${spec.bench} --red-threshold ${Double/show
+                                                                                       spec.redThreshold} --yellow-threshold ${Double/show
+                                                                                                                                 spec.yellowThreshold}"
+            , label =
+                "Perf: ${spec.label} ${PipelineMode.capitalName spec.mode}"
             , key = spec.key
             , target = spec.size
+            , soft_fail = Some (B/SoftFail.Boolean True)
             , docker = None Docker.Type
             , depends_on = spec.dependsOn
             }
@@ -80,8 +86,12 @@ let pipeline
                   , SelectFiles.exactly
                       "buildkite/src/Command/Bench/Base"
                       "dhall"
+                  , SelectFiles.exactly "buildkite/scripts/bench/install" "sh"
+                  , SelectFiles.exactly "buildkite/scripts/bench/run" "sh"
                   , SelectFiles.contains "scripts/benchmark"
-                  , SelectFiles.contains "buildkite/scripts/benchmark"
+                  , SelectFiles.exactly
+                      "buildkite/src/Jobs/Bench/${spec.name}"
+                      "dhall"
                   ]
                 # spec.additionalDirtyWhen
             , path = spec.path

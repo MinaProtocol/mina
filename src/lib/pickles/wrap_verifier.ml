@@ -48,16 +48,18 @@ end
 module Make
     (Inputs : Intf.Wrap_main_inputs.S
                 with type Impl.field = Backend.Tock.Field.t
+                 and type Impl.field_var = Wrap_main_inputs.Impl.field_var
                  and type Impl.Bigint.t = Backend.Tock.Bigint.t
-                 and type ('var, 'value, 'aux, 'field, 'checked) Impl.Typ.typ' =
+                 and type Impl.Constraint.t = Backend.Tock.Constraint.t
+                 and type 'a Impl.Internal_Basic.Checked.t =
+                  'a Wrap_main_inputs.Impl.Internal_Basic.Checked.t
+                 and type ('var, 'value, 'aux) Impl.Internal_Basic.Typ.typ' =
                   ( 'var
                   , 'value
-                  , 'aux
-                  , 'field
-                  , 'checked )
-                  Wrap_main_inputs.Impl.Typ.typ'
-                 and type ('var, 'value, 'field, 'checked) Impl.Typ.typ =
-                  ('var, 'value, 'field, 'checked) Wrap_main_inputs.Impl.Typ.typ
+                  , 'aux )
+                  Wrap_main_inputs.Impl.Internal_Basic.Typ.typ'
+                 and type ('var, 'value) Impl.Internal_Basic.Typ.typ =
+                  ('var, 'value) Wrap_main_inputs.Impl.Internal_Basic.Typ.typ
                  and type Inner_curve.Constant.Scalar.t = Backend.Tick.Field.t) =
 struct
   open Inputs
@@ -158,7 +160,7 @@ struct
 
   let lowest_128_bits ~constrain_low_bits x =
     let assert_128_bits = assert_n_bits ~n:128 in
-    Util.lowest_128_bits ~constrain_low_bits ~assert_128_bits (module Impl) x
+    Util.Wrap.lowest_128_bits ~constrain_low_bits ~assert_128_bits x
 
   let squeeze_challenge sponge : Field.t =
     lowest_128_bits (* I think you may not have to constrain these actually *)
@@ -309,17 +311,16 @@ struct
                in
                Opt.Maybe (is_yes, sum) )
       |> Plonk_verification_key_evals.Step.map
-           ~f:(fun g -> Array.map ~f:(Double.map ~f:(Util.seal (module Impl))) g)
+           ~f:(fun g -> Array.map ~f:(Double.map ~f:Util.Wrap.seal) g)
            ~f_opt:(function
              | Opt.Nothing ->
                  Opt.Nothing
              | Opt.Maybe (b, x) ->
                  Opt.Maybe
-                   ( Boolean.Unsafe.of_cvar (Util.seal (module Impl) (b :> t))
-                   , Array.map ~f:(Double.map ~f:(Util.seal (module Impl))) x )
+                   ( Boolean.Unsafe.of_cvar (Util.Wrap.seal (b :> t))
+                   , Array.map ~f:(Double.map ~f:Util.Wrap.seal) x )
              | Opt.Just x ->
-                 Opt.Just
-                   (Array.map ~f:(Double.map ~f:(Util.seal (module Impl))) x) )
+                 Opt.Just (Array.map ~f:(Double.map ~f:Util.Wrap.seal) x) )
 
   (* TODO: Unify with the code in step_verifier *)
   let lagrange (type n)
@@ -431,8 +432,7 @@ struct
                    ~f:
                      (Array.map2_exn
                         ~f:(Double.map2 ~f:(Double.map2 ~f:Field.( + ))) )
-              |> Array.map
-                   ~f:(Double.map ~f:(Double.map ~f:(Util.seal (module Impl)))) )
+              |> Array.map ~f:(Double.map ~f:(Double.map ~f:Util.Wrap.seal)) )
 
   let _h_precomp =
     Lazy.map ~f:Inner_curve.Scaling_precomputation.create Generators.h
@@ -654,7 +654,7 @@ struct
     in
     let length = Pseudo.choose (choice, lengths) ~f:Field.of_int in
     let (T max) = Nat.of_int max in
-    Vector.to_array (ones_vector (module Impl) ~first_zero:length max)
+    Vector.to_array (Util.Wrap.ones_vector ~first_zero:length max)
 
   module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk
 
@@ -1420,17 +1420,13 @@ struct
                 (* 0 = - acc' + y + pt_n_acc *)
                 let open Field.Constant in
                 assert_
-                  { annotation = None
-                  ; basic =
-                      T
-                        (Basic
-                           { l = (one, y)
-                           ; r = (one, pt_n_acc)
-                           ; o = (negate one, acc')
-                           ; m = zero
-                           ; c = zero
-                           } )
-                  } ;
+                  (Basic
+                     { l = (one, y)
+                     ; r = (one, pt_n_acc)
+                     ; o = (negate one, acc')
+                     ; m = zero
+                     ; c = zero
+                     } ) ;
                 acc' )
         | [] ->
             failwith "empty list" )
@@ -1445,10 +1441,9 @@ struct
 
   let map_plonk_to_field plonk =
     Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
-      ~f:(Util.seal (module Impl))
-      ~scalar:scalar_to_field plonk
+      ~f:Util.Wrap.seal ~scalar:scalar_to_field plonk
     |> Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_fields
-         ~f:(Shifted_value.Type2.map ~f:(Util.seal (module Impl)))
+         ~f:(Shifted_value.Type2.map ~f:Util.Wrap.seal)
 
   module Plonk_checks = struct
     include Plonk_checks

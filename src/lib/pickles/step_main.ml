@@ -339,7 +339,7 @@ let step_main :
                           tag public_input
                       in
                       { public_input
-                      ; proof = As_prover.Ref.get proof
+                      ; proof = As_prover.read (Typ.prover_value ()) proof
                       ; proof_must_verify =
                           As_prover.read Boolean.typ proof_must_verify
                       }
@@ -371,7 +371,7 @@ let step_main :
             ~request:(fun () -> Req.Messages_for_next_wrap_proof)
         and actual_wrap_domains =
           exists
-            (Vector.typ (Typ.Internal.ref ()) (Length.to_nat proofs_verified))
+            (Vector.typ (Typ.prover_value ()) (Length.to_nat proofs_verified))
             ~request:(fun () -> Req.Wrap_domain_indices)
         in
         let proof_witnesses =
@@ -403,7 +403,7 @@ let step_main :
                   -> (vars, ns1) H2.T(Inductive_rule.Previous_proof_statement).t
                   -> (vars, n) Length.t
                   -> actual_wrap_domains:
-                       ( Pickles_base.Proofs_verified.t As_prover.Ref.t
+                       ( Pickles_base.Proofs_verified.t Typ.prover_value
                        , n )
                        Vector.t
                   -> (_, n) Vector.t * B.t list =
@@ -436,7 +436,8 @@ let step_main :
                       | `Known wrap_domain ->
                           as_prover (fun () ->
                               let actual_wrap_domain =
-                                As_prover.Ref.get actual_wrap_domain
+                                As_prover.read (Typ.prover_value ())
+                                  actual_wrap_domain
                                 |> Pickles_base.Proofs_verified.to_int
                               in
                               let actual_wrap_domain =

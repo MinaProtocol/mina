@@ -4,7 +4,21 @@ open Pickles_types
 open Hlist
 module Sc = Kimchi_backend_common.Scalar_challenge
 
-type 'f impl = (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+type ('f, 'v) impl =
+  (module Snarky_backendless.Snark_intf.Run
+     with type field = 'f
+      and type field_var = 'v )
+
+module type Branch_data_checked = sig
+  type field_var
+
+  type t
+
+  val pack : t -> field_var
+end
+
+type ('branch_data, 'f) branch_data =
+  (module Branch_data_checked with type field_var = 'f and type t = 'branch_data)
 
 type ('a, 'b, 'c) basic =
   | Unit : (unit, unit, < .. >) basic
@@ -158,7 +172,11 @@ end
 module Step_etyp = Make_ETyp (Kimchi_pasta_snarky_backend.Step_impl)
 module Wrap_etyp = Make_ETyp (Kimchi_pasta_snarky_backend.Wrap_impl)
 
-module Common (Impl : Snarky_backendless.Snark_intf.Run) = struct
+module Common
+    (Impl : Snarky_backendless.Snark_intf.Run)
+    (Branch_data_checked : Branch_data_checked
+                             with type field_var := Impl.Field.t) =
+struct
   module Digest = D.Make (Impl)
   module Challenge = Limb_vector.Challenge.Make (Impl)
   open Impl
@@ -177,17 +195,20 @@ module Common (Impl : Snarky_backendless.Snark_intf.Run) = struct
           Challenge.Constant.t Sc.t Bulletproof_challenge.t
       ; bulletproof_challenge2 : Challenge.t Sc.t Bulletproof_challenge.t
       ; branch_data1 : Branch_data.t
-      ; branch_data2 : Impl.field Branch_data.Checked.t
+      ; branch_data2 : Branch_data_checked.t
       ; .. >
       as
       'a
   end
 end
 
-let pack_basic (type field other_field other_field_var)
-    ((module Impl) : field impl) =
+let pack_basic
+    (type field field_var other_field other_field_var branch_data_var)
+    ((module Impl) : (field, field_var) impl)
+    ((module Branch_data_checked) : (branch_data_var, Impl.Field.t) branch_data)
+    =
   let open Impl in
-  let module C = Common (Impl) in
+  let module C = Common (Impl) (Branch_data_checked) in
   let open C in
   let pack :
       type a b.
@@ -210,9 +231,7 @@ let pack_basic (type field other_field other_field_var)
     | Challenge ->
         [| `Packed_bits (x, Challenge.length) |]
     | Branch_data ->
-        [| `Packed_bits
-             ( Branch_data.Checked.pack (module Impl) x
-             , Branch_data.length_in_bits )
+        [| `Packed_bits (Branch_data_checked.pack x, Branch_data.length_in_bits)
         |]
     | Bulletproof_challenge ->
         let { Sc.inner = pre } = Bulletproof_challenge.pack x in
@@ -220,15 +239,20 @@ let pack_basic (type field other_field other_field_var)
   in
   { pack }
 
-let pack (type f) ((module Impl) as impl : f impl) t =
+let pack (type f v) ((module Impl) as impl : (f, v) impl) branch_data t =
   let open Impl in
-  pack (pack_basic impl) t
+  pack
+    (pack_basic impl branch_data)
+    t
     ~zero:(`Packed_bits (Field.zero, 1))
     ~one:(`Packed_bits (Field.one, 1))
     None
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.Run) (Basic : sig
+    (Impl : Snarky_backendless.Snark_intf.Run)
+    (Branch_data_checked : Branch_data_checked
+                             with type field_var := Impl.Field.t)
+    (Basic : sig
       val typ_basic :
            assert_16_bits:(Impl.Field.t -> unit)
         -> ('other_field_var, 'other_field) Impl.Typ.t
@@ -237,15 +261,18 @@ module Make
            , < bool1 : bool
              ; bool2 : Impl.Boolean.var
              ; branch_data1 : Branch_data.t
-             ; branch_data2 : Impl.field Branch_data.Checked.t
+             ; branch_data2 : Branch_data_checked.t
              ; bulletproof_challenge1 :
-                 Common(Impl).Challenge.Constant.t Sc.t Bulletproof_challenge.t
+                 Common(Impl)(Branch_data_checked).Challenge.Constant.t Sc.t
+                 Bulletproof_challenge.t
              ; bulletproof_challenge2 :
-                 Common(Impl).Challenge.t Sc.t Bulletproof_challenge.t
-             ; challenge1 : Common(Impl).Challenge.Constant.t
-             ; challenge2 : Common(Impl).Challenge.t
-             ; digest1 : Common(Impl).Digest.Constant.t
-             ; digest2 : Common(Impl).Digest.t
+                 Common(Impl)(Branch_data_checked).Challenge.t Sc.t
+                 Bulletproof_challenge.t
+             ; challenge1 :
+                 Common(Impl)(Branch_data_checked).Challenge.Constant.t
+             ; challenge2 : Common(Impl)(Branch_data_checked).Challenge.t
+             ; digest1 : Common(Impl)(Branch_data_checked).Digest.Constant.t
+             ; digest2 : Common(Impl)(Branch_data_checked).Digest.t
              ; field1 : 'other_field
              ; field2 : 'other_field_var
              ; .. > )
@@ -259,15 +286,18 @@ module Make
            , < bool1 : bool
              ; bool2 : Impl.Boolean.var
              ; branch_data1 : Branch_data.t
-             ; branch_data2 : Common(Impl).Digest.t
+             ; branch_data2 : Common(Impl)(Branch_data_checked).Digest.t
              ; bulletproof_challenge1 :
-                 Common(Impl).Challenge.Constant.t Sc.t Bulletproof_challenge.t
+                 Common(Impl)(Branch_data_checked).Challenge.Constant.t Sc.t
+                 Bulletproof_challenge.t
              ; bulletproof_challenge2 :
-                 Common(Impl).Digest.t Sc.t Bulletproof_challenge.t
-             ; challenge1 : Common(Impl).Challenge.Constant.t
-             ; challenge2 : Common(Impl).Digest.t
-             ; digest1 : Common(Impl).Digest.Constant.t
-             ; digest2 : Common(Impl).Digest.t
+                 Common(Impl)(Branch_data_checked).Digest.t Sc.t
+                 Bulletproof_challenge.t
+             ; challenge1 :
+                 Common(Impl)(Branch_data_checked).Challenge.Constant.t
+             ; challenge2 : Common(Impl)(Branch_data_checked).Digest.t
+             ; digest1 : Common(Impl)(Branch_data_checked).Digest.Constant.t
+             ; digest2 : Common(Impl)(Branch_data_checked).Digest.t
              ; field1 : 'other_field
              ; field2 : 'other_field_var
              ; .. > )
@@ -355,10 +385,7 @@ struct
             let (Typ typ) = typ t is_boolean spec in
             let constant_var =
               let fields, aux = typ.value_to_fields x in
-              let fields =
-                Array.map fields ~f:(fun x ->
-                    Snarky_backendless.Cvar.Constant x )
-              in
+              let fields = Array.map ~f:Impl.Field.constant fields in
               typ.var_of_fields (fields, aux)
             in
             let open Impl.Typ in
@@ -451,10 +478,7 @@ struct
             let (T (Typ typ, f, f')) = etyp e is_boolean spec in
             let constant_var =
               let fields, aux = typ.value_to_fields x in
-              let fields =
-                Array.map fields ~f:(fun x ->
-                    Snarky_backendless.Cvar.Constant x )
-              in
+              let fields = Array.map ~f:Impl.Field.constant fields in
               typ.var_of_fields (fields, aux)
             in
             (* We skip any constraints that would be added here, but we *do* use
@@ -464,9 +488,7 @@ struct
             T
               ( Typ
                   { typ with
-                    check =
-                      (fun _ ->
-                        Snarky_backendless.Checked_runner.Simple.return () )
+                    check = (fun _ -> Impl.Internal_Basic.Checked.return ())
                   }
               , (fun _ -> f constant_var)
               , f' )
@@ -477,11 +499,10 @@ struct
 end
 
 module Step =
-  Make
-    (Kimchi_pasta_snarky_backend.Step_impl)
+  Make (Kimchi_pasta_snarky_backend.Step_impl) (Branch_data.Checked.Step)
     (struct
       module Impl = Kimchi_pasta_snarky_backend.Step_impl
-      module C = Common (Impl)
+      module C = Common (Impl) (Branch_data.Checked.Step)
 
       let typ_basic (type other_field other_field_var) ~assert_16_bits
           (field : (other_field_var, other_field) Impl.Typ.t) =
@@ -573,11 +594,10 @@ module Step =
     end)
 
 module Wrap =
-  Make
-    (Kimchi_pasta_snarky_backend.Wrap_impl)
+  Make (Kimchi_pasta_snarky_backend.Wrap_impl) (Branch_data.Checked.Wrap)
     (struct
       module Impl = Kimchi_pasta_snarky_backend.Wrap_impl
-      module C = Common (Impl)
+      module C = Common (Impl) (Branch_data.Checked.Wrap)
 
       let typ_basic (type other_field other_field_var) ~assert_16_bits
           (field : (other_field_var, other_field) Impl.Typ.t) =

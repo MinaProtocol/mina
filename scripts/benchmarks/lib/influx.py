@@ -88,14 +88,20 @@ class Influx:
         if Influx.bucket not in os.environ:
             raise RuntimeError(f"{Influx.bucket} env var not defined")
 
+    @staticmethod
+    def influx_host():
+        url = os.environ[Influx.host]
+        return url if url.startswith('https://') else 'https://' + url
+
+
     def client(self):
         Influx.check_envs()
         return influxdb_client.InfluxDBClient(
-            url=os.environ[Influx.host],
+            url=Influx.influx_host(),
             token=os.environ[Influx.token],
             org=os.environ[Influx.org],
             bucket=os.environ[Influx.bucket])
-        
+
     def __init__(self, moving_average_size=10):
         self.moving_average_size = moving_average_size
 
@@ -151,13 +157,15 @@ class Influx:
             )
 
         process = subprocess.Popen([
-            "influx", "write", "--http-debug", "--format=csv", f"--file={file}"
+            "influx", "write", f"--host={Influx.influx_host()}", "--http-debug", "--format=csv", f"--file={file}"
         ],
-            stderr=subprocess.PIPE)
-
+            stderr=subprocess.PIPE )
+        
         timeout = time.time() + 60  # 1  minute
         while True:
             line = process.stderr.readline()
+            logger.info(f"influx write output - stderr: {line}")
+            
             if b"HTTP/2.0 204 No Content" in line or time.time() > timeout:
                 process.kill()
                 break
