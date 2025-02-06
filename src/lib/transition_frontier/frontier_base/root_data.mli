@@ -129,9 +129,9 @@ module Minimal : sig
     -> pending_coinbase:Pending_coinbase.t
     -> t
 
-  val generate : Stable.Latest.t -> t
+  val write_all_proofs_to_disk : Stable.Latest.t -> t
 
-  val unwrap : t -> Stable.Latest.t
+  val read_all_proofs_from_disk : t -> Stable.Latest.t
 end
 
 type t =
