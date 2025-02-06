@@ -656,13 +656,8 @@ let test_zkapp_with_genesis_ledger =
          Param.flag "--zkapp-account-key"
            ~doc:"KEYFILE Private key file to create a new zkApp account"
            Param.(required string)
-       and config_file =
-         Param.flag "--config-file" ~aliases:[ "config-file" ]
-           ~doc:
-             "PATH path to a configuration file consisting the genesis ledger"
-           Param.(required string)
-       in
-       test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file ))
+       and config_files = Cli_lib.Flag.config_files in
+       test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_files ))
 
 let txn_commands =
   [ ("create-zkapp-account", create_zkapp_account)

@@ -1054,9 +1054,7 @@ module Proof_keys = struct
               - At least 3 ensures a transaction per block and the staged-ledger
                 unit tests pass.
           *)
-          1
-          + Core_kernel.Int.ceil_log2
-              (max_user_commands_per_block + max_coinbases)
+          1 + Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
   end
 
   type t =
@@ -1817,7 +1815,7 @@ end
 module type Constants_intf = sig
   type constants
 
-  val load_constants :
+  val load_constants_exn :
        ?conf_dir:string
     -> ?commit_id_short:string
     -> ?itn_features:bool
@@ -1832,9 +1830,18 @@ module type Constants_intf = sig
     -> ?cli_proof_level:Genesis_constants.Proof_level.t
     -> logger:Logger.t
     -> string list
+    -> constants Deferred.Or_error.t
+
+  val load_constants_with_logging_exn :
+       ?conf_dir:string
+    -> ?commit_id_short:string
+    -> ?itn_features:bool
+    -> ?cli_proof_level:Genesis_constants.Proof_level.t
+    -> logger:Logger.t
+    -> string list
     -> constants Deferred.t
 
-  val load_constants' :
+  val constants_of_config :
        ?itn_features:bool
     -> ?cli_proof_level:Genesis_constants.Proof_level.t
     -> t
@@ -1950,8 +1957,7 @@ let make_constraint_constants (a : Genesis_constants.Constraint_constants.t)
   ; block_window_duration_ms
   ; transaction_capacity_log_2
   ; pending_coinbase_depth =
-      Core_kernel.Int.ceil_log2
-        (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
+      Int.ceil_log2 (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
   ; coinbase_amount =
       Option.value ~default:a.coinbase_amount
         Option.(b.proof >>= fun p -> p.coinbase_amount)
@@ -2018,7 +2024,9 @@ module Constants : Constants_intf = struct
     in
     { genesis_constants; constraint_constants; proof_level; compile_config }
 
-  let load_constants' ?itn_features ?cli_proof_level runtime_config =
+  (** Combine a runtime config with the compile-time config and return
+      a constants record *)
+  let constants_of_config ?itn_features ?cli_proof_level runtime_config =
     let compile_constants =
       { genesis_constants = Genesis_constants.Compiled.genesis_constants
       ; constraint_constants = Genesis_constants.Compiled.constraint_constants
@@ -2036,16 +2044,22 @@ module Constants : Constants_intf = struct
         }
     }
 
-  (* Use this function if you don't need/want the ledger configuration *)
+  (** Use this function if you don't need/want the ledger configuration *)
   let load_constants_with_logging ?conf_dir ?commit_id_short ?itn_features
       ?cli_proof_level ~logger config_files =
     Deferred.Or_error.(
-      ok_exn
-        ( Json_loader.load_config_files ?conf_dir ?commit_id_short ~logger
-            config_files
-        >>| load_constants' ?itn_features ?cli_proof_level ))
+      Json_loader.load_config_files ?conf_dir ?commit_id_short ~logger
+        config_files
+      >>| constants_of_config ?itn_features ?cli_proof_level)
 
-  let load_constants = load_constants_with_logging ~logger:(Logger.null ())
+  let load_constants_with_logging_exn ?conf_dir ?commit_id_short ?itn_features
+      ?cli_proof_level ~logger config_files =
+    Deferred.Or_error.ok_exn
+      (load_constants_with_logging ?conf_dir ?commit_id_short ?itn_features
+         ?cli_proof_level ~logger config_files )
+
+  let load_constants_exn =
+    load_constants_with_logging_exn ~logger:(Logger.null ())
 
   let magic_for_unit_tests t =
     let compile_constants =

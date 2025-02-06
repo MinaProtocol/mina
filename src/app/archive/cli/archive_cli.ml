@@ -28,6 +28,7 @@ let command_run =
               Archive_lib.Metrics.default_missing_blocks_width )
          (optional int)
      and postgres = Flag.Uri.Archive.postgres
+     (* TODO: use Flag.config_files_legacy, the difference is that here the parameter is optional *)
      and runtime_config_file =
        flag "--config-file" ~aliases:[ "-config-file" ] (optional string)
          ~doc:"PATH to the configuration file containing the genesis ledger"
@@ -46,7 +47,7 @@ let command_run =
            (Option.to_list runtime_config_file)
          |> Deferred.Or_error.ok_exn
        in
-       let constants = Runtime_config.Constants.load_constants' config in
+       let constants = Runtime_config.Constants.constants_of_config config in
        let%bind precomputed_values_opt =
          match runtime_config_file with
          | None ->

@@ -24,6 +24,7 @@
    coda_genesis_ledger
    consensus
    mina_base
+   cli_lib
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_let ppx_deriving_yojson)))

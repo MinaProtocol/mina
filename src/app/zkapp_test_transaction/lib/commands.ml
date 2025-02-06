@@ -320,7 +320,7 @@ module Util = struct
         failwith (sprintf "Invalid authorization: %s" s)
 end
 
-let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
+let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_files () =
   let constraint_constants = Genesis_constants.Compiled.constraint_constants in
   let genesis_constants = Genesis_constants.Compiled.genesis_constants in
   let open Deferred.Let_syntax in
@@ -329,7 +329,7 @@ let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
   let logger = Logger.create () in
   let%bind ledger =
     let%map config_json =
-      Runtime_config.Json_loader.load_config_files ~logger [ config_file ]
+      Runtime_config.Json_loader.load_config_files ~logger config_files
     in
     let runtime_config = Or_error.ok_exn config_json in
     let accounts =

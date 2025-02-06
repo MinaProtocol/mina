@@ -372,13 +372,7 @@ let setup_daemon logger ~itn_features =
       ~aliases:[ "proposed-protocol-version" ]
       (optional string)
       ~doc:"NN.NN.NN Proposed protocol version to signal other nodes"
-  and config_files =
-    flag "--config-file" ~aliases:[ "config-file" ]
-      ~doc:
-        "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
-         default: <config_dir>/daemon.json). Pass multiple times to override \
-         fields from earlier config files"
-      (listed string)
+  and config_files = Cli_lib.Flag.config_files_legacy
   and _may_generate =
     flag "--generate-genesis-proof"
       ~aliases:[ "generate-genesis-proof" ]
@@ -1566,7 +1560,7 @@ let internal_commands ~itn_features logger =
           let open Deferred.Let_syntax in
           let%bind constraint_constants, proof_level, compile_config =
             let%map conf =
-              Runtime_config.Constants.load_constants_with_logging ~logger
+              Runtime_config.Constants.load_constants_with_logging_exn ~logger
                 config_file
             in
             Runtime_config.Constants.
@@ -1593,14 +1587,14 @@ let internal_commands ~itn_features logger =
         let%map_open filename =
           flag "--file" (required string)
             ~doc:"File containing the s-expression of the snark work to execute"
-        and config_file = Cli_lib.Flag.config_files in
+        and config_files = Cli_lib.Flag.config_files in
 
         fun () ->
           let open Deferred.Let_syntax in
           let%bind constraint_constants, proof_level, compile_config =
             let%map conf =
-              Runtime_config.Constants.load_constants_with_logging ~logger
-                config_file
+              Runtime_config.Constants.load_constants_with_logging_exn ~logger
+                config_files
             in
             Runtime_config.Constants.
               (constraint_constants conf, proof_level conf, compile_config conf)
@@ -1652,13 +1646,13 @@ let internal_commands ~itn_features logger =
         and limit =
           flag "--limit" ~aliases:[ "-limit" ] (optional int)
             ~doc:"limit the number of proofs taken from the file"
-        and config_file = Cli_lib.Flag.config_files in
+        and config_files = Cli_lib.Flag.config_files in
         fun () ->
           let open Async in
           let%bind constraint_constants, proof_level, compile_config =
             let%map conf =
-              Runtime_config.Constants.load_constants_with_logging ~logger
-                config_file
+              Runtime_config.Constants.load_constants_with_logging_exn ~logger
+                config_files
             in
             Runtime_config.Constants.
               (constraint_constants conf, proof_level conf, compile_config conf)
