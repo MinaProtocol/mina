@@ -12,6 +12,6 @@
 
 ; Copy the Neon-compiled .node file to the local directory.
 (rule
- (targets index.node)
+ (targets plonk_native.node)
  (deps ../../native_prover/index.node) 
- (action (copy ../../native_prover/index.node index.node)))
+ (action (copy ../../native_prover/index.node plonk_native.node)))
