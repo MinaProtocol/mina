@@ -82,6 +82,8 @@ val display : t -> display
 
 val name : t -> string
 
+val staged_ledger_hash : t -> Staged_ledger_hash.t
+
 module For_tests : sig
   val gen :
        ?logger:Logger.t

@@ -22,3 +22,12 @@ struct
 
   let count (counter : t) = !counter
 end
+
+let%test_module "disk_cache identity" =
+  ( module struct
+    include Disk_cache_test_lib.Make (Make)
+
+    let%test_unit "remove data on gc" = remove_data_on_gc ()
+
+    let%test_unit "simple read/write" = simple_write ()
+  end )
