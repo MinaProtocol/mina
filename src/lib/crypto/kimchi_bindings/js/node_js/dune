@@ -34,3 +34,9 @@
     "%{read:../../dune-build-root}/cargo_kimchi_wasm"
     (run bash build.sh))
    (write-file flags.sexp "()"))))
+
+; Copy the Neon-compiled
+(rule
+ (targets index.node)
+ (deps ../../native_prover/index.node) 
+ (action (copy ../../native_prover/index.node index.node)))
