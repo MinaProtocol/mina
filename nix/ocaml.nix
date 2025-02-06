@@ -208,8 +208,8 @@ let
         makefileTest "__src-lib-ppx_version-test__" super;
       tested.child_processes = super.tested.child_processes.overrideAttrs
         (s: { buildInputs = s.buildInputs ++ [ childProcessesTester ]; });
-      tested.block_storage =
-        super.tested.block_storage.overrideAttrs withLibp2pHelper;
+      tested.mina_lmdb_storage =
+        super.tested.mina_lmdb_storage.overrideAttrs withLibp2pHelper;
       tested.mina_lib = super.tested.mina_lib.overrideAttrs withLibp2pHelper;
       tested.mina_lib_tests =
         super.tested.mina_lib_tests.overrideAttrs withLibp2pHelper;
