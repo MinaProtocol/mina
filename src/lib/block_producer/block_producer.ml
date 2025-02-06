@@ -312,8 +312,8 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                         , `String
                             (Staged_ledger.Staged_ledger_error.to_string e) )
                       ; ( "diff"
-                        , Staged_ledger_diff.With_valid_signatures_and_proofs
-                          .to_yojson diff )
+                        , Staged_ledger_diff.Stable.Latest.to_yojson
+                          @@ Staged_ledger_diff.forget diff )
                       ]
                     "Error applying the diff $diff: $error"
               | Error e ->
@@ -523,7 +523,7 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
       in
       let metadata =
         [ ("error", Error_json.error_to_yojson e)
-        ; ("diff", Staged_ledger_diff.to_yojson staged_ledger_diff)
+        ; ("diff", Staged_ledger_diff.Stable.Latest.to_yojson staged_ledger_diff)
         ]
       in
       [%log error] ~metadata msg ;
