@@ -249,7 +249,7 @@ let check t ~genesis_state_hash =
         let%bind root =
           get t.db ~key:Root ~error:(`Corrupt (`Not_found `Root))
         in
-        let root_hash = Root_data.Minimal.hash root in
+        let root_hash = Root_data.Minimal.Stable.Latest.hash root in
         let%bind best_tip =
           get t.db ~key:Best_tip ~error:(`Corrupt (`Not_found `Best_tip))
         in
@@ -301,9 +301,10 @@ let check t ~genesis_state_hash =
   |> Result.join
 
 let initialize t ~root_data =
-  let open Root_data.Limited in
   let root_state_hash, root_transition =
-    let t = Mina_block.Validated.forget (transition root_data) in
+    let t =
+      Mina_block.Validated.forget (Root_data.Limited.transition root_data)
+    in
     ( State_hash.With_state_hashes.state_hash t
     , State_hash.With_state_hashes.data t )
   in
@@ -314,10 +315,17 @@ let initialize t ~root_data =
       Batch.set batch ~key:Db_version ~data:version ;
       Batch.set batch ~key:(Transition root_state_hash) ~data:root_transition ;
       Batch.set batch ~key:(Arcs root_state_hash) ~data:[] ;
-      Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited root_data) ;
+      Batch.set batch ~key:Root
+        ~data:
+          ( Root_data.Minimal.of_limited
+              ~common:(Root_data.Limited.common root_data)
+              root_state_hash
+          |> Root_data.Minimal.unwrap ) ;
       Batch.set batch ~key:Best_tip ~data:root_state_hash ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
-        ~data:(protocol_states root_data |> List.map ~f:With_hash.data) )
+        ~data:
+          ( Root_data.Limited.protocol_states root_data
+          |> List.map ~f:With_hash.data ) )
 
 let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
     ~parent_hashes =
@@ -340,7 +348,7 @@ let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
       let%map.Result () =
         List.fold2_exn ~init:(Result.return ()) ~f:populate parent_hashes arcs
       in
-      old_root
+      Root_data.Minimal.Stable.Latest.hash old_root
   | _ ->
       Error (`Not_found `Old_root_transition)
 
@@ -359,13 +367,20 @@ let add ~arcs_cache ~transition =
     Batch.set batch ~key:(Arcs hash) ~data:[] ;
     Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs)
 
-let move_root ~old_root ~new_root ~garbage =
-  let open Root_data.Limited in
-  let old_root_hash = Root_data.Minimal.hash old_root in
+let move_root ~old_root_hash ~new_root ~garbage =
+  let new_root_hash =
+    (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
+  in
   fun batch ->
-    Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited new_root) ;
+    Batch.set batch ~key:Root
+      ~data:
+        (Root_data.Minimal.Stable.Latest.of_limited
+           ~common:(Root_data.Limited.Stable.Latest.common new_root)
+           new_root_hash ) ;
     Batch.set batch ~key:Protocol_states_for_root_scan_state
-      ~data:(List.map ~f:With_hash.data (protocol_states new_root)) ;
+      ~data:
+        (List.map ~f:With_hash.data
+           (Root_data.Limited.Stable.Latest.protocol_states new_root) ) ;
     List.iter (old_root_hash :: garbage) ~f:(fun node_hash ->
         (* because we are removing entire forks of the tree, there is
          * no need to have extra logic to any remove arcs to the node
@@ -397,15 +412,17 @@ let get_transition t hash =
 
 let get_arcs t hash = get t.db ~key:(Arcs hash) ~error:(`Not_found (`Arcs hash))
 
-let get_root t = get t.db ~key:Root ~error:(`Not_found `Root)
+let get_root_impl t = get t.db ~key:Root ~error:(`Not_found `Root)
+
+let get_root t = get_root_impl t |> Result.map ~f:Root_data.Minimal.generate
 
 let get_protocol_states_for_root_scan_state t =
   get t.db ~key:Protocol_states_for_root_scan_state
     ~error:(`Not_found `Protocol_states_for_root_scan_state)
 
 let get_root_hash t =
-  let%map root = get_root t in
-  Root_data.Minimal.hash root
+  let%map root = get_root_impl t in
+  Root_data.Minimal.Stable.Latest.hash root
 
 let get_best_tip t = get t.db ~key:Best_tip ~error:(`Not_found `Best_tip)
 

@@ -226,7 +226,8 @@ module type Sync_handler_intf = sig
     -> Mina_ledger.Sync_ledger.Answer.t Or_error.t Deferred.t
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
-       frontier:transition_frontier
+       logger:Logger.t
+    -> frontier:transition_frontier
     -> State_hash.t
     -> ( Staged_ledger.Scan_state.t
        * Ledger_hash.t

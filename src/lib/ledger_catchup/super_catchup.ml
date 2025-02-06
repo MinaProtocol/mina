@@ -1250,14 +1250,13 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                       | Remote peer ->
                           Downloader.add_knowledge downloader peer
                             [ (target_parent_hash, target_length) ] ) ;
-                      let%bind.Option { proof = path, root; _ } =
+                      let%bind.Option { proof = path, root_header; _ } =
                         Best_tip_lru.get h
                       in
                       let%bind.Option p =
                         Transition_chain_verifier.verify ~target_hash:h
                           ~transition_chain_proof:
-                            ( ( Mina_block.header root
-                              |> Mina_block.Header.protocol_state
+                            ( ( Mina_block.Header.protocol_state root_header
                               |> Mina_state.Protocol_state.hashes )
                                 .state_hash
                             , path )
@@ -1638,7 +1637,7 @@ let%test_module "Ledger_catchup tests" =
             (* We force evaluation of state body hash for both blocks for further equality check *)
             let _hash1 = Mina_block.Validated.state_body_hash b1 in
             let _hash2 = Mina_block.Validated.state_body_hash b2 in
-            Mina_block.Validated.equal b1 b2 )
+            Mina_block.Validated.(Stable.Latest.equal (unwrap b1) (unwrap b2)) )
       in
       if not catchup_breadcrumbs_are_best_tip_path then
         failwith

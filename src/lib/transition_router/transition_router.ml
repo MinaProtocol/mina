@@ -324,9 +324,15 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
       @@ Mina_block.Validation.to_header best_tip ) ;
   Option.map res
     ~f:
-      (Envelope.Incoming.map ~f:(fun (x : _ Proof_carrying_data.t) ->
-           Ledger_catchup.Best_tip_lru.add x ;
-           x.data ) )
+      (Envelope.Incoming.map
+         ~f:(fun { Proof_carrying_data.data; proof = path, root } ->
+           Ledger_catchup.Best_tip_lru.add
+             { Proof_carrying_data.data =
+                 Mina_block.Validation.block_with_hash data
+                 |> Mina_base.State_hash.With_state_hashes.state_hash
+             ; proof = (path, Mina_block.header root)
+             } ;
+           data ) )
 
 let load_frontier ~context:(module Context : CONTEXT) ~verifier
     ~persistent_frontier ~persistent_root ~consensus_local_state ~catchup_mode =
