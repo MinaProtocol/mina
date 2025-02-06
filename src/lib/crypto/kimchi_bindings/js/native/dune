@@ -1,0 +1,11 @@
+(library
+ (name native_backend)
+ (public_name bindings_js.native_backend)
+ (js_of_ocaml
+  (flags
+   (:include flags.sexp))
+  (javascript_files native_backend.js))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version js_of_ocaml-ppx)))
