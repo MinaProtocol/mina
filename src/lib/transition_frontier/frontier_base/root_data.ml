@@ -168,16 +168,6 @@ module Minimal = struct
 
   let pending_coinbase t = Common.pending_coinbase t.common
 
-  let generate ~proof_cache_db
-      { Stable.Latest.hash; common = { scan_state; pending_coinbase } } =
-    { hash
-    ; common =
-        { pending_coinbase
-        ; scan_state =
-            Staged_ledger.Scan_state.generate ~proof_cache_db scan_state
-        }
-    }
-
   let unwrap { hash; common = { scan_state; pending_coinbase } } =
     { Stable.Latest.hash
     ; common =
