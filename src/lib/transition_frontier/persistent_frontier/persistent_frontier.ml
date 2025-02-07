@@ -161,10 +161,10 @@ module Instance = struct
 
   let check_database t = Database.check t.db
 
-  let get_root_transition t =
+  let get_root_transition ~proof_cache_db t =
     let open Result.Let_syntax in
     Database.get_root_hash t.db
-    >>= Database.get_transition t.db
+    >>= Database.get_transition t.db ~proof_cache_db
     |> Result.map_error ~f:Database.Error.message
 
   let fast_forward t target_root :
@@ -218,7 +218,9 @@ module Instance = struct
       (let open Result.Let_syntax in
       let%bind root = Database.get_root t.db in
       let root_hash = Root_data.Minimal.Stable.Latest.hash root in
-      let%bind root_transition = Database.get_transition t.db root_hash in
+      let%bind root_transition =
+        Database.get_transition t.db ~proof_cache_db root_hash
+      in
       let%bind best_tip = Database.get_best_tip t.db in
       let%map protocol_states =
         Database.get_protocol_states_for_root_scan_state t.db
@@ -288,7 +290,7 @@ module Instance = struct
     (* crawl through persistent frontier and load transitions into in memory frontier *)
     let%bind () =
       Deferred.map
-        (Database.crawl_successors t.db root_hash
+        (Database.crawl_successors ~proof_cache_db t.db root_hash
            ~init:(Full_frontier.root frontier) ~f:(fun parent transition ->
              let%bind transition =
                match
@@ -321,7 +323,7 @@ module Instance = struct
              let transition_receipt_time = None in
              let%bind breadcrumb =
                Breadcrumb.build ~skip_staged_ledger_verification:`All
-                 ~proof_cache_db ~logger:t.factory.logger ~precomputed_values
+                 ~logger:t.factory.logger ~precomputed_values
                  ~verifier:t.factory.verifier
                  ~trust_system:(Trust_system.null ()) ~parent ~transition
                  ~get_completed_work:(Fn.const None) ~sender:None

@@ -34,9 +34,11 @@ let%test_module "network pool test" =
       Snark_pool.Make (Mocks.Base_ledger) (Mocks.Staged_ledger)
         (Mocks.Transition_frontier)
 
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
     let config =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
-        ~disk_location:"/tmp/snark-pool"
+        ~disk_location:"/tmp/snark-pool" ~proof_cache_db
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
@@ -67,9 +69,13 @@ let%test_module "network pool test" =
           let%bind () =
             Mocks.Transition_frontier.refer_statements tf [ work ]
           in
+          let read_proofs =
+            One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk
+          in
           let command =
-            Mock_snark_pool.Resource_pool.Diff.Add_solved_work
-              (work, priced_proof)
+            Mock_snark_pool.Resource_pool.Diff.Cached.write_all_proofs_to_disk
+              ~proof_cache_db
+              (Add_solved_work (work, priced_proof))
           in
           Mock_snark_pool.apply_and_broadcast network_pool
             (Envelope.Incoming.local command)
@@ -81,7 +87,8 @@ let%test_module "network pool test" =
           match Mock_snark_pool.Resource_pool.request_proof pool work with
           | Some { proof; fee = _ } ->
               assert (
-                [%equal: Ledger_proof.t One_or_two.t] proof priced_proof.proof )
+                [%equal: Ledger_proof.t One_or_two.t] (read_proofs proof)
+                  priced_proof.proof )
           | None ->
               failwith "There should have been a proof here" )
 

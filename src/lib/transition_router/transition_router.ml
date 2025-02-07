@@ -281,6 +281,7 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
                 let body =
                   Mina_block.Stable.Latest.body peer_best_tip.data
                   |> Staged_ledger_diff.Body.write_all_proofs_to_disk
+                       ~proof_cache_db
                 in
                 return
                   (Some
@@ -448,7 +449,8 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
       [%log info] "Unable to load frontier; starting bootstrap" ;
       let%map initial_root_transition =
         Persistent_frontier.(
-          with_instance_exn persistent_frontier ~f:Instance.get_root_transition)
+          with_instance_exn persistent_frontier
+            ~f:(Instance.get_root_transition ~proof_cache_db))
         >>| Result.ok_or_failwith
       in
       start_bootstrap_controller
@@ -650,8 +652,8 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
       let () =
         let initial_validate =
           unstage
-            (Initial_validator.validate ~logger ~trust_system ~verifier
-               ~initialization_finish_signal ~precomputed_values )
+            (Initial_validator.validate ~proof_cache_db ~logger ~trust_system
+               ~verifier ~initialization_finish_signal ~precomputed_values )
         in
         O1trace.background_thread "initially_validate_blocks" (fun () ->
             Pipe_lib.Strict_pipe.Reader.iter network_transition_reader

@@ -273,7 +273,6 @@ val reset_frontier_dependencies_validation :
 
 val validate_staged_ledger_diff :
      ?skip_staged_ledger_verification:[ `All | `Proofs ]
-  -> proof_cache_db:Proof_cache_tag.cache_db
   -> logger:Logger.t
   -> get_completed_work:
        (   Transaction_snark_work.Statement.t

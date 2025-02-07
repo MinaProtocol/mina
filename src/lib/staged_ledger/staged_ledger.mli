@@ -195,7 +195,6 @@ val hash : t -> Staged_ledger_hash.t
 
 val apply :
      ?skip_verification:[ `Proofs | `All ]
-  -> proof_cache_db:Proof_cache_tag.cache_db
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> t
@@ -225,8 +224,7 @@ val apply :
      Deferred.Result.t
 
 val apply_diff_unchecked :
-     proof_cache_db:Proof_cache_tag.cache_db
-  -> constraint_constants:Genesis_constants.Constraint_constants.t
+     constraint_constants:Genesis_constants.Constraint_constants.t
   -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t

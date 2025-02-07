@@ -239,7 +239,9 @@ val get_completed_checked_snarks :
 val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
 
 val broadcast_state :
-  t -> Mina_block.t State_hash.With_state_hashes.t -> unit Deferred.t
+     t
+  -> Mina_block.Stable.Latest.t State_hash.With_state_hashes.t
+  -> unit Deferred.t
 
 val broadcast_snark_pool_diff :
   ?nonce:int -> t -> Snark_pool.Resource_pool.Diff.t -> unit Deferred.t
