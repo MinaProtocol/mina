@@ -1642,13 +1642,13 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
       Deferred.unit )
     limited_peers
 
-let initialization_error_to_exn (`Initialization_error e) =
-  Error.to_exn @@ Error.tag ~tag:"proof cache initialization error" e
+let raise_on_initialization_error (`Initialization_error e) =
+  Error.raise @@ Error.tag ~tag:"proof cache initialization error" e
 
 let initialize_proof_cache_db (config : Config.t) =
   Proof_cache_tag.create_db ~logger:config.logger
     (config.conf_dir ^/ "proof_cache")
-  >>| function Error e -> raise (initialization_error_to_exn e) | Ok db -> db
+  >>| function Error e -> raise_on_initialization_error e | Ok db -> db
 
 let create ~commit_id ?wallets (config : Config.t) =
   let commit_id_short = String.sub ~pos:0 ~len:8 commit_id in
