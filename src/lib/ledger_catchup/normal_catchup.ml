@@ -610,9 +610,9 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
   in
   let open Deferred.Let_syntax in
   match%bind
-    Transition_handler.Breadcrumb_builder.build_subtrees_of_breadcrumbs
-      ~proof_cache_db ~logger ~precomputed_values ~verifier ~trust_system
-      ~frontier ~initial_hash trees_of_transitions
+    Transition_handler.Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
+      ~precomputed_values ~verifier ~trust_system ~frontier ~initial_hash
+      trees_of_transitions
   with
   | Ok result ->
       [%log debug]
@@ -827,7 +827,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                            (Envelope.Incoming.map
                               ~f:
                                 (With_hash.map
-                                   ~f:Mina_block.write_all_proofs_to_disk ) )
+                                   ~f:
+                                     (Mina_block.write_all_proofs_to_disk
+                                        ~proof_cache_db ) ) )
                in
                [%log debug]
                  ~metadata:[ ("target_hash", State_hash.to_yojson target_hash) ]
