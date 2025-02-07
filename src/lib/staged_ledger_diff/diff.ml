@@ -216,6 +216,31 @@ module Make_str (A : Wire_types.Concrete) = struct
   end
 
   module Diff = struct
+    let coinbase_amount
+        ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+        ~supercharge_coinbase =
+      if supercharge_coinbase then
+        Currency.Amount.scale constraint_constants.coinbase_amount
+          constraint_constants.supercharged_coinbase_factor
+      else Some constraint_constants.coinbase_amount
+
+    let coinbase
+        ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+        ~supercharge_coinbase diff =
+      let first_pre_diff, second_pre_diff_opt = diff in
+      let coinbase_amount =
+        coinbase_amount ~constraint_constants ~supercharge_coinbase
+      in
+      match
+        ( first_pre_diff.Pre_diff_two.coinbase
+        , Option.value_map second_pre_diff_opt ~default:At_most_one.Zero
+            ~f:(fun d -> d.Pre_diff_one.coinbase) )
+      with
+      | At_most_two.Zero, At_most_one.Zero ->
+          Some Currency.Amount.zero
+      | _ ->
+          coinbase_amount
+
     [%%versioned
     module Stable = struct
       [@@@no_toplevel_latest_type]
@@ -227,6 +252,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         [@@deriving equal, sexp, yojson]
 
         let to_latest = Fn.id
+
+        let coinbase = coinbase
       end
     end]
 
@@ -251,31 +278,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           pre_diff_with_at_most_two_coinbase
       , Option.map pre_diff_with_at_most_one_coinbase_opt
           ~f:Pre_diff_with_at_most_one_coinbase.read_all_proofs_from_disk )
-
-    let coinbase_amount
-        ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-        ~supercharge_coinbase =
-      if supercharge_coinbase then
-        Currency.Amount.scale constraint_constants.coinbase_amount
-          constraint_constants.supercharged_coinbase_factor
-      else Some constraint_constants.coinbase_amount
-
-    let coinbase
-        ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-        ~supercharge_coinbase (diff : t) =
-      let first_pre_diff, second_pre_diff_opt = diff in
-      let coinbase_amount =
-        coinbase_amount ~constraint_constants ~supercharge_coinbase
-      in
-      match
-        ( first_pre_diff.coinbase
-        , Option.value_map second_pre_diff_opt ~default:At_most_one.Zero
-            ~f:(fun d -> d.coinbase) )
-      with
-      | At_most_two.Zero, At_most_one.Zero ->
-          Some Currency.Amount.zero
-      | _ ->
-          coinbase_amount
   end
 
   [%%versioned
