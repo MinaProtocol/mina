@@ -48,7 +48,7 @@ The container includes 3 scripts in `/etc/mina/rosetta/scripts` that run a diffe
   and Rosetta node), but for a demo network with all operations occurring inside
   this container and no external network activity.
 * `docker-start.sh` connects the Mina node to a network (by default,
-  [Mainnet](https://docs.minaprotocol.com/node-operators/connecting-to-the-network))
+  [Mainnet](https://docs.minaprotocol.com/node-operators/block-producer-node/connecting-to-the-network))
   and initializes the archive database from publicly available nightly
   O(1) Labs backups. As with `docker-demo-start.sh`, this script runs a Mina
   node, a Mina archive, a PostgreSQL DB, and Rosetta. The script also
