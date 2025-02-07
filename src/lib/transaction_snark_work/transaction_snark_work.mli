@@ -57,8 +57,6 @@ module type S = sig
   val fee : t -> Fee.t
 
   val prover : t -> Public_key.Compressed.t
-
-  val proofs : t -> Ledger_proof.t One_or_two.t
 end
 
 type t =
@@ -69,6 +67,8 @@ type t =
 
 include S with type t := t
 
+val proofs : t -> Ledger_proof.t One_or_two.t
+
 val info : t -> Info.t
 
 val statement : t -> Statement.t
@@ -78,6 +78,10 @@ module Stable : sig
     type t [@@deriving bin_io, equal, sexp, version, yojson]
 
     val statement : t -> Statement.Stable.V2.t
+
+    val fee : t -> Fee.Stable.V1.t
+
+    val prover : t -> Public_key.Compressed.Stable.V1.t
 
     val to_latest : t -> t
   end
@@ -90,6 +94,10 @@ type unchecked = t
 
 module Checked : sig
   include S
+
+  module Stable : module type of Stable
+
+  val proofs : t -> Ledger_proof.t One_or_two.t
 
   val create_unsafe : unchecked -> t
 

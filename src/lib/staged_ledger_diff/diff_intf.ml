@@ -104,6 +104,12 @@ module type Full = sig
         type t
 
         val to_latest : t -> t
+
+        val coinbase :
+             constraint_constants:Genesis_constants.Constraint_constants.t
+          -> supercharge_coinbase:bool
+          -> t
+          -> Currency.Amount.t option
       end
 
       module Latest = V2
