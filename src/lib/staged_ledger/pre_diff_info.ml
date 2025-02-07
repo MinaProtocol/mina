@@ -315,13 +315,14 @@ let get_individual_info (type c) ~constraint_constants coinbase_parts ~receiver
       List.map coinbase_parts ~f:(fun Coinbase.{ amount; _ } -> amount)
   }
 
-open Staged_ledger_diff
-
-let check_coinbase (diff : _ Pre_diff_two.t * _ Pre_diff_one.t option) =
+let check_coinbase
+    (diff :
+      _ Staged_ledger_diff.Pre_diff_two.t
+      * _ Staged_ledger_diff.Pre_diff_one.t option ) =
   match
     ( (fst diff).coinbase
-    , Option.value_map ~default:At_most_one.Zero (snd diff) ~f:(fun d ->
-          d.coinbase ) )
+    , Option.value_map ~default:Staged_ledger_diff.At_most_one.Zero (snd diff)
+        ~f:(fun d -> d.coinbase) )
   with
   | Zero, Zero | Zero, One _ | One _, Zero | Two _, Zero ->
       Ok ()
@@ -330,14 +331,16 @@ let check_coinbase (diff : _ Pre_diff_two.t * _ Pre_diff_one.t option) =
         (Error.Coinbase_error
            (sprintf
               !"Invalid coinbase value in staged ledger prediffs \
-                %{sexp:Coinbase.Fee_transfer.t At_most_two.t} and \
-                %{sexp:Coinbase.Fee_transfer.t At_most_one.t}"
+                %{sexp:Coinbase.Fee_transfer.t \
+                Staged_ledger_diff.At_most_two.t} and \
+                %{sexp:Coinbase.Fee_transfer.t \
+                Staged_ledger_diff.At_most_one.t}"
               x y ) )
 
 let compute_statuses
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~diff
     ~coinbase_receiver ~coinbase_amount ~global_slot ~txn_state_view ~ledger :
-    (With_valid_signatures_and_proofs.diff, _) result =
+    (Staged_ledger_diff.With_valid_signatures_and_proofs.diff, _) result =
   let open Result.Let_syntax in
   (* project transactions into a sequence of transactions *)
   let project_transactions ~coinbase_parts ~commands ~completed_works =
@@ -353,7 +356,9 @@ let compute_statuses
     @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
   in
   let project_transactions_pre_diff_two
-      (p : (Transaction_snark_work.Checked.t, _) Pre_diff_two.t) =
+      (p :
+        (Transaction_snark_work.Checked.t, _) Staged_ledger_diff.Pre_diff_two.t
+        ) =
     let coinbase_parts =
       match p.coinbase with Zero -> `Zero | One x -> `One x | Two x -> `Two x
     in
@@ -361,7 +366,9 @@ let compute_statuses
       ~completed_works:p.completed_works
   in
   let project_transactions_pre_diff_one
-      (p : (Transaction_snark_work.Checked.t, _) Pre_diff_one.t) =
+      (p :
+        (Transaction_snark_work.Checked.t, _) Staged_ledger_diff.Pre_diff_one.t
+        ) =
     let coinbase_parts =
       match p.coinbase with Zero -> `Zero | One x -> `One x
     in
@@ -433,7 +440,8 @@ let get' (type c)
                  constraint_constants.coinbase_amount ) ) )
       ~f:(fun x -> Ok x)
   in
-  let apply_pre_diff_with_at_most_two (t1 : _ Pre_diff_two.t) =
+  let apply_pre_diff_with_at_most_two (t1 : _ Staged_ledger_diff.Pre_diff_two.t)
+      =
     let coinbase_parts =
       match t1.coinbase with Zero -> `Zero | One x -> `One x | Two x -> `Two x
     in
@@ -441,7 +449,8 @@ let get' (type c)
       t1.completed_works ~coinbase_amount
       ~internal_command_statuses:t1.internal_command_statuses ~to_user_command
   in
-  let apply_pre_diff_with_at_most_one (t2 : _ Pre_diff_one.t) =
+  let apply_pre_diff_with_at_most_one (t2 : _ Staged_ledger_diff.Pre_diff_one.t)
+      =
     let coinbase_added =
       match t2.coinbase with Zero -> `Zero | One x -> `One x
     in
@@ -469,7 +478,7 @@ let get' (type c)
 let get ~check ~constraint_constants ~coinbase_receiver ~supercharge_coinbase t
     =
   let open Async in
-  match%map validate_commands t ~check with
+  match%map Staged_ledger_diff.validate_commands t ~check with
   | Error e ->
       Error (Error.Unexpected e)
   | Ok (Error e) ->
@@ -483,8 +492,8 @@ let get ~check ~constraint_constants ~coinbase_receiver ~supercharge_coinbase t
              ~constraint_constants ~supercharge_coinbase diff )
 
 let get_unchecked ~constraint_constants ~coinbase_receiver ~supercharge_coinbase
-    (t : With_valid_signatures_and_proofs.t) =
-  let t = forget_proof_checks t in
+    (t : Staged_ledger_diff.With_valid_signatures_and_proofs.t) =
+  let t = Staged_ledger_diff.forget_proof_checks t in
   get' ~constraint_constants ~diff:t.diff ~coinbase_receiver
     ~to_user_command:(Fn.compose User_command.forget_check With_status.data)
     ~coinbase_amount:
@@ -492,7 +501,7 @@ let get_unchecked ~constraint_constants ~coinbase_receiver ~supercharge_coinbase
          ~supercharge_coinbase t )
 
 let get_transactions ~constraint_constants ~coinbase_receiver
-    ~supercharge_coinbase (sl_diff : t) =
+    ~supercharge_coinbase (sl_diff : Staged_ledger_diff.t) =
   let open Result.Let_syntax in
   let%map transactions, _, _, _ =
     get' ~constraint_constants ~to_user_command:With_status.data
