@@ -13,7 +13,9 @@
   mina_base
   mina_state
   mina_transaction_logic
-  ppx_version.runtime)
+  ppx_version.runtime
+  proof_cache_tag
+  proof_carrying_data)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

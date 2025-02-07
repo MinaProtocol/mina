@@ -231,7 +231,7 @@ let scan_state_base_node_zkapp ~constraint_constants ~zkapp_command =
   in
   mk_scan_state_base_node varying ~constraint_constants
 
-let scan_state_merge_node :
+let scan_state_merge_node ~proof_cache_db :
     Transaction_snark_scan_state.Ledger_proof_with_sok_message.t
     Parallel_scan.Merge.t =
   let weight1 : Parallel_scan.Weight.t = { base = 42; merge = 99 } in
@@ -252,7 +252,8 @@ let scan_state_merge_node :
         { without_sok with sok_digest = Mina_base.Sok_message.digest sok_msg }
       in
       let ledger_proof = Transaction_snark.create ~statement ~proof in
-      (ledger_proof, sok_msg)
+      ( Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db ledger_proof
+      , sok_msg )
     in
     let right =
       let sok_msg : Mina_base.Sok_message.t =
@@ -268,7 +269,8 @@ let scan_state_merge_node :
         { without_sok with sok_digest = Mina_base.Sok_message.digest sok_msg }
       in
       let ledger_proof = Transaction_snark.create ~statement ~proof in
-      (ledger_proof, sok_msg)
+      ( Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db ledger_proof
+      , sok_msg )
     in
     Full { left; right; seq_no = 1; status = Todo }
   in

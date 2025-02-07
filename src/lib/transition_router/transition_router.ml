@@ -12,6 +12,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 type Structured_log_events.t += Starting_transition_frontier_controller

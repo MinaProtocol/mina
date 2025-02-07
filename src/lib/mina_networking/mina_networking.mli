@@ -31,6 +31,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val compile_config : Mina_compile_config.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 module Node_status = Node_status
@@ -49,7 +51,7 @@ module Rpcs : sig
     type query = State_hash.t
 
     type response =
-      ( Staged_ledger.Scan_state.t
+      ( Staged_ledger.Scan_state.Stable.Latest.t
       * Ledger_hash.t
       * Pending_coinbase.t
       * Mina_state.Protocol_state.value list )
@@ -219,7 +221,7 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      t
   -> Peer.Id.t
   -> State_hash.t
-  -> ( Staged_ledger.Scan_state.t
+  -> ( Staged_ledger.Scan_state.Stable.Latest.t
      * Ledger_hash.t
      * Pending_coinbase.t
      * Mina_state.Protocol_state.value list )

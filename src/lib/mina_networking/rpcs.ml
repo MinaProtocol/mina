@@ -39,6 +39,8 @@ module type CONTEXT = sig
   val snark_job_state : unit -> Work_selector.State.t option
 
   val compile_config : Mina_compile_config.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 type ctx = (module CONTEXT)
@@ -211,7 +213,7 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       type query = State_hash.t
 
       type response =
-        ( Staged_ledger.Scan_state.t
+        ( Staged_ledger.Scan_state.Stable.Latest.t
         * Ledger_hash.t
         * Pending_coinbase.t
         * Mina_state.Protocol_state.value list )
@@ -304,8 +306,14 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
             Actions.
               (Requested_unknown_item, Some (receipt_trust_action_message hash)))
         >>| const None
-    | _ ->
-        return result
+    | Some (scan_state, expected_merkle_root, pending_coinbases, protocol_states)
+      ->
+        return
+          (Some
+             ( Staged_ledger.Scan_state.read_all_proofs_from_disk scan_state
+             , expected_merkle_root
+             , pending_coinbases
+             , protocol_states ) )
 
   let rate_limit_budget = (4, `Per Time.Span.minute)
 

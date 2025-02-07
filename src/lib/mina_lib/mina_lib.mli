@@ -44,6 +44,8 @@ module type CONTEXT = sig
   val compaction_interval : Time.Span.t option
 
   val compile_config : Mina_compile_config.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 exception Snark_worker_error of int
@@ -204,7 +206,7 @@ val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 val create :
   commit_id:string -> ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
 
-val staged_ledger_ledger_proof : t -> Ledger_proof.t option
+val staged_ledger_ledger_proof : t -> Ledger_proof.Cached.t option
 
 val transition_frontier :
   t -> Transition_frontier.t option Broadcast_pipe.Reader.t

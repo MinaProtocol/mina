@@ -332,11 +332,15 @@ let calculate_root_transition_diff t heir =
       ~old_root_state:(Breadcrumb.protocol_state_with_hashes root)
   in
   let heir_transition =
-    Breadcrumb.validated_transition heir |> Mina_block.Validated.unwrap
+    Breadcrumb.validated_transition heir
+    |> Mina_block.Validated.read_all_proofs_from_disk
+  in
+  let new_scan_state_unwrapped =
+    Staged_ledger.Scan_state.read_all_proofs_from_disk new_scan_state
   in
   let new_root_data =
     Root_data.Limited.Stable.Latest.create ~transition:heir_transition
-      ~scan_state:new_scan_state
+      ~scan_state:new_scan_state_unwrapped
       ~pending_coinbase:
         (Staged_ledger.pending_coinbase_collection heir_staged_ledger)
       ~protocol_states

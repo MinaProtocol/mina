@@ -8,13 +8,13 @@ type t =
   | Lmdb of { cache_id : Cache.id; cache_db : Cache.t }
   | Identity of Mina_base.Proof.t
 
-let unwrap = function
+let read_proof_from_disk = function
   | Lmdb t ->
       Cache.get t.cache_db t.cache_id
   | Identity proof ->
       proof
 
-let generate db proof =
+let write_proof_to_disk db proof =
   match db with
   | Lmdb_cache cache_db ->
       Lmdb { cache_id = Cache.put cache_db proof; cache_db }
@@ -30,11 +30,11 @@ module For_tests = struct
 
   let blockchain_dummy =
     Lazy.map
-      ~f:(fun dummy -> generate (create_db ()) dummy)
+      ~f:(fun dummy -> write_proof_to_disk (create_db ()) dummy)
       Mina_base.Proof.blockchain_dummy
 
   let transaction_dummy =
     Lazy.map
-      ~f:(fun dummy -> generate (create_db ()) dummy)
+      ~f:(fun dummy -> write_proof_to_disk (create_db ()) dummy)
       Mina_base.Proof.transaction_dummy
 end
