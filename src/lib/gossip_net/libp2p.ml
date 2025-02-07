@@ -485,22 +485,18 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                 ~fn:(fun (env, vc) ->
                   match Envelope.Incoming.data env with
                   | Message.Latest.T.New_state state ->
-                      let state_cached =
-                        Mina_block.write_all_proofs_to_disk state
-                      in
                       Sinks.Block_sink.push sink_block
-                        ( `Block
-                            (Envelope.Incoming.map ~f:(const state_cached) env)
+                        ( `Block (Envelope.Incoming.map ~f:(const state) env)
                         , `Time_received (Block_time.now config.time_controller)
                         , `Valid_cb vc )
                   | Message.Latest.T.Transaction_pool_diff
                       Network_pool.With_nonce.{ message = diff; _ } ->
                       Sinks.Tx_sink.push sink_tx
-                        (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc)
+                        (Envelope.Incoming.map ~f:(const diff) env, vc)
                   | Message.Latest.T.Snark_pool_diff
                       Network_pool.With_nonce.{ message = diff; _ } ->
                       Sinks.Snark_sink.push sink_snark_work
-                        (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc) )
+                        (Envelope.Incoming.map ~f:(const diff) env, vc) )
                 v0_topic Message.Latest.T.bin_msg
             in
             let%bind publish_v0 =
@@ -953,11 +949,9 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       let pfs = !(t.publish_functions) in
       let%bind () =
         guard_topic ?origin_topic v1_topic_block pfs.publish_v1_block
-          (Mina_block.header state)
+          (Mina_block.Stable.Latest.header state)
       in
-      let state_unwrapped = Mina_block.read_all_proofs_from_disk state in
-      guard_topic ?origin_topic v0_topic pfs.publish_v0
-        (Message.New_state state_unwrapped)
+      guard_topic ?origin_topic v0_topic pfs.publish_v0 (Message.New_state state)
 
     let broadcast_transaction_pool_diff ?origin_topic ?(nonce = 0) t diff =
       let pfs = !(t.publish_functions) in

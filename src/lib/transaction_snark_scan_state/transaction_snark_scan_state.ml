@@ -308,15 +308,14 @@ let create_expected_statement ~constraint_constants
   ; sok_digest = ()
   }
 
-let completed_work_to_scanable_work ~proof_cache_db (job : job)
-    (fee, current_proof, prover) : Ledger_proof_with_sok_message.t Or_error.t =
-  let sok_digest = Ledger_proof.sok_digest current_proof
-  and proof = Ledger_proof.underlying_proof current_proof in
+let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
+    Ledger_proof_with_sok_message.t Or_error.t =
+  let sok_digest = Ledger_proof.Cached.sok_digest current_proof
+  and proof = Ledger_proof.Cached.underlying_proof current_proof in
   match job with
   | Base { statement; _ } ->
       let ledger_proof =
-        Ledger_proof.create ~statement ~sok_digest ~proof
-        |> Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db
+        Ledger_proof.Cached.create ~statement ~sok_digest ~proof
       in
       Ok (ledger_proof, Sok_message.create ~fee ~prover)
   | Merge ((p, _), (p', _)) ->
@@ -324,8 +323,7 @@ let completed_work_to_scanable_work ~proof_cache_db (job : job)
       let s = Ledger_proof.Cached.statement p
       and s' = Ledger_proof.Cached.statement p' in
       let%map statement = Transaction_snark.Statement.merge s s' in
-      ( Ledger_proof.create ~statement ~sok_digest ~proof
-        |> Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db
+      ( Ledger_proof.Cached.create ~statement ~sok_digest ~proof
       , Sok_message.create ~fee ~prover )
 
 let total_proofs (works : Transaction_snark_work.t list) =
@@ -1349,8 +1347,7 @@ let all_work_pairs t
 
 let update_metrics t = Parallel_scan.update_metrics t.scan_state
 
-let fill_work_and_enqueue_transactions t ~proof_cache_db ~logger transactions
-    work =
+let fill_work_and_enqueue_transactions t ~logger transactions work =
   let open Or_error.Let_syntax in
   let fill_in_transaction_snark_work tree (works : Transaction_snark_work.t list)
       : Ledger_proof_with_sok_message.t list Or_error.t =
@@ -1367,7 +1364,7 @@ let fill_work_and_enqueue_transactions t ~proof_cache_db ~logger transactions
            One_or_two.map (Transaction_snark_work.proofs w) ~f:(fun proof ->
                (fee, proof, prover) )
            |> One_or_two.to_list ) )
-      ~f:(completed_work_to_scanable_work ~proof_cache_db)
+      ~f:completed_work_to_scanable_work
   in
   (*get incomplete transactions from previous proof which will be completed in
      the new proof, if there's one*)

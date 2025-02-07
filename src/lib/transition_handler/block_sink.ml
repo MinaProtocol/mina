@@ -6,8 +6,8 @@ open Mina_base
 open Mina_state
 
 type block_or_header =
-  [ `Block of Mina_block.t Envelope.Incoming.t
-  | `Header of Mina_block.Header.t Envelope.Incoming.t ]
+  [ `Block of Mina_block.Stable.Latest.t Envelope.Incoming.t
+  | `Header of Mina_block.Header.Stable.Latest.t Envelope.Incoming.t ]
 
 type stream_msg =
   block_or_header
@@ -67,14 +67,13 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
       in
       let sender, header, txs_opt =
         match b_or_h with
-        | `Block b_env ->
-            ( Envelope.Incoming.sender b_env
-            , Mina_block.header (Envelope.Incoming.data b_env)
-            , Some
-                ( Envelope.Incoming.data b_env
-                |> Mina_block.transactions ~constraint_constants ) )
-        | `Header h_env ->
-            (Envelope.Incoming.sender h_env, Envelope.Incoming.data h_env, None)
+        | `Block { Envelope.Incoming.data = block; sender; _ } ->
+            let transactions =
+              Mina_block.Stable.Latest.transactions ~constraint_constants block
+            in
+            (sender, Mina_block.Stable.Latest.header block, Some transactions)
+        | `Header { Envelope.Incoming.data = header; sender; _ } ->
+            (sender, header, None)
       in
       let state_hash =
         (Mina_block.Header.protocol_state header |> Protocol_state.hashes)
@@ -128,13 +127,13 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
       ( if log_gossip_heard then
         let metadata =
           match b_or_h with
-          | `Block b_env ->
-              [ ("block", Mina_block.to_yojson @@ Envelope.Incoming.data b_env)
+          | `Block { Envelope.Incoming.data = block; _ } ->
+              [ ( "block"
+                , Mina_block.to_logging_yojson
+                  @@ Mina_block.Stable.Latest.header block )
               ]
-          | `Header h_env ->
-              [ ( "header"
-                , Mina_block.Header.to_yojson @@ Envelope.Incoming.data h_env )
-              ]
+          | `Header { Envelope.Incoming.data = header; _ } ->
+              [ ("header", Mina_block.Header.to_yojson header) ]
         in
         [%str_log info] ~metadata (Block_received { state_hash; sender }) ) ;
       Mina_net2.Validation_callback.set_message_type cb `Block ;
@@ -157,16 +156,12 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
             Writer.write writer (b_or_h, `Time_received tm, `Valid_cb cb)
       in
       let exists_well_formedness_errors =
-        match b_or_h with
-        | `Header _ ->
+        match txs_opt with
+        | None ->
+            (* It's a header *)
             (* TODO make sure this check is executed at a later point when body is received *)
             false
-        | `Block block_env ->
-            let transactions =
-              Mina_block.transactions
-                (Envelope.Incoming.data block_env)
-                ~constraint_constants
-            in
+        | Some transactions ->
             List.exists transactions ~f:(fun txn ->
                 match
                   Mina_transaction.Transaction.check_well_formedness

@@ -168,12 +168,11 @@ let report_transaction_inclusion_failures ~commit_id ~logger failed_txns =
       let leftover_bytes = available_bytes - base_error_size - 2 in
       wrap_error (`List (generate_errors failed_txns leftover_bytes)) )
 
-let generate_next_state ~proof_cache_db ~commit_id ~zkapp_cmd_limit
-    ~constraint_constants ~previous_protocol_state ~time_controller
-    ~staged_ledger ~transactions ~get_completed_work ~logger
-    ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
-    ~log_block_creation ~block_reward_threshold ~zkapp_cmd_limit_hardcap
-    ~slot_tx_end ~slot_chain_end =
+let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
+    ~previous_protocol_state ~time_controller ~staged_ledger ~transactions
+    ~get_completed_work ~logger ~(block_data : Consensus.Data.Block_data.t)
+    ~winner_pk ~scheduled_time ~log_block_creation ~block_reward_threshold
+    ~zkapp_cmd_limit_hardcap ~slot_tx_end ~slot_chain_end =
   let open Interruptible.Let_syntax in
   let global_slot_since_hard_fork =
     Consensus.Data.Block_data.global_slot block_data
@@ -279,7 +278,7 @@ let generate_next_state ~proof_cache_db ~commit_id ~zkapp_cmd_limit
           [%log internal] "Apply_staged_ledger_diff" ;
           match%map
             let%bind.Deferred.Result diff = return diff in
-            Staged_ledger.apply_diff_unchecked staged_ledger ~proof_cache_db
+            Staged_ledger.apply_diff_unchecked staged_ledger
               ~constraint_constants ~global_slot diff ~logger
               ~current_state_view:previous_state_view
               ~state_and_body_hash:
@@ -776,8 +775,8 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
       let%bind () = Interruptible.lift (Deferred.return ()) (Ivar.read ivar) in
       [%log internal] "Generate_next_state" ;
       let%bind next_state_opt =
-        generate_next_state ~proof_cache_db ~commit_id ~constraint_constants
-          ~scheduled_time ~block_data ~previous_protocol_state ~time_controller
+        generate_next_state ~commit_id ~constraint_constants ~scheduled_time
+          ~block_data ~previous_protocol_state ~time_controller
           ~staged_ledger:(Breadcrumb.staged_ledger crumb)
           ~transactions ~get_completed_work ~logger ~log_block_creation
           ~winner_pk:winner_pubkey ~block_reward_threshold
@@ -908,9 +907,9 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
               let%bind breadcrumb =
                 time ~logger ~time_controller
                   "Build breadcrumb on produced block" (fun () ->
-                    Breadcrumb.build ~proof_cache_db ~logger ~precomputed_values
-                      ~verifier ~get_completed_work:(Fn.const None)
-                      ~trust_system ~parent:crumb ~transition
+                    Breadcrumb.build ~logger ~precomputed_values ~verifier
+                      ~get_completed_work:(Fn.const None) ~trust_system
+                      ~parent:crumb ~transition
                       ~sender:None (* Consider skipping `All here *)
                       ~skip_staged_ledger_verification:`Proofs
                       ~transition_receipt_time () )
@@ -994,7 +993,9 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                      transition frontier" ;
                   Deferred.map ~f:Result.return
                     (Mina_networking.broadcast_state net
-                       (Breadcrumb.block_with_hash breadcrumb) )
+                       ( Breadcrumb.block_with_hash breadcrumb
+                       |> With_hash.map ~f:Mina_block.read_all_proofs_from_disk
+                       ) )
               | `Timed_out ->
                   (* FIXME #3167: this should be fatal, and more
                      importantly, shouldn't happen.
@@ -1438,7 +1439,8 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
           in
           let body =
             Body.create
-              (Staged_ledger_diff.write_all_proofs_to_disk staged_ledger_diff)
+              (Staged_ledger_diff.write_all_proofs_to_disk ~proof_cache_db
+                 staged_ledger_diff )
           in
           let%bind transition =
             let open Result.Let_syntax in
@@ -1473,8 +1475,8 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
           let%bind breadcrumb =
             time ~logger ~time_controller
               "Build breadcrumb on produced block (precomputed)" (fun () ->
-                Breadcrumb.build ~proof_cache_db ~logger ~precomputed_values
-                  ~verifier ~get_completed_work:(Fn.const None) ~trust_system
+                Breadcrumb.build ~logger ~precomputed_values ~verifier
+                  ~get_completed_work:(Fn.const None) ~trust_system
                   ~parent:crumb ~transition ~sender:None
                   ~skip_staged_ledger_verification:`Proofs
                   ~transition_receipt_time ()

@@ -176,9 +176,12 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
     | Ok peer_root_with_proof -> (
         let pcd =
           peer_root_with_proof.data
-          |> Proof_carrying_data.map ~f:Mina_block.write_all_proofs_to_disk
+          |> Proof_carrying_data.map
+               ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db)
           |> Proof_carrying_data.map_proof
-               ~f:(Tuple2.map_snd ~f:Mina_block.write_all_proofs_to_disk)
+               ~f:
+                 (Tuple2.map_snd
+                    ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db) )
         in
         match%bind
           Best_tip_prover.Wrap_for_block.map

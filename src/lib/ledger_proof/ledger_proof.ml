@@ -54,6 +54,14 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
         ~proof:(Proof_cache_tag.read_proof_from_disk proof)
 
     let statement (t : t) = { t.data with sok_digest = () }
+
+    let sok_digest (t : t) = t.data.sok_digest
+
+    let underlying_proof (t : t) = t.proof
+
+    let create ~(statement : Mina_state.Snarked_ledger_state.t) ~sok_digest
+        ~proof : t =
+      { Proof_carrying_data.proof; data = { statement with sok_digest } }
   end
 end
 
@@ -63,4 +71,10 @@ module For_tests = struct
   let mk_dummy_proof statement =
     create ~statement ~sok_digest:Sok_message.Digest.default
       ~proof:(Lazy.force Proof.transaction_dummy)
+
+  module Cached = struct
+    let mk_dummy_proof statement =
+      Cached.create ~statement ~sok_digest:Sok_message.Digest.default
+        ~proof:(Lazy.force Proof_cache_tag.For_tests.transaction_dummy)
+  end
 end

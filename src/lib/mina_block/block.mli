@@ -19,7 +19,9 @@ module Stable : sig
   end
 end]
 
-type t [@@deriving to_yojson]
+type t
+
+val to_logging_yojson : Header.t -> Yojson.Safe.t
 
 type with_hash = t State_hash.With_state_hashes.t
 
@@ -49,6 +51,7 @@ val account_ids_accessed :
   -> t
   -> (Account_id.t * [ `Accessed | `Not_accessed ]) list
 
-val write_all_proofs_to_disk : Stable.Latest.t -> t
+val write_all_proofs_to_disk :
+  proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
 
 val read_all_proofs_from_disk : t -> Stable.Latest.t

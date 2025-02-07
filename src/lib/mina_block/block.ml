@@ -70,21 +70,21 @@ type t = { header : Header.t; body : Staged_ledger_diff.Body.t }
 
 type with_hash = t State_hash.With_state_hashes.t
 
-let to_yojson t =
+let to_logging_yojson header : Yojson.Safe.t =
   `Assoc
     [ ( "protocol_state"
-      , Protocol_state.value_to_yojson (Header.protocol_state t.header) )
+      , Protocol_state.value_to_yojson (Header.protocol_state header) )
     ; ("protocol_state_proof", `String "<opaque>")
     ; ("staged_ledger_diff", `String "<opaque>")
     ; ("delta_transition_chain_proof", `String "<opaque>")
     ; ( "current_protocol_version"
       , `String
-          (Protocol_version.to_string
-             (Header.current_protocol_version t.header) ) )
+          (Protocol_version.to_string (Header.current_protocol_version header))
+      )
     ; ( "proposed_protocol_version"
       , `String
           (Option.value_map
-             (Header.proposed_protocol_version_opt t.header)
+             (Header.proposed_protocol_version_opt header)
              ~default:"<None>" ~f:Protocol_version.to_string ) )
     ]
 
@@ -114,8 +114,10 @@ let account_ids_accessed ~constraint_constants t =
   |> List.dedup_and_sort
        ~compare:[%compare: Account_id.t * [ `Accessed | `Not_accessed ]]
 
-let write_all_proofs_to_disk { Stable.Latest.header; body } =
-  { header; body = Staged_ledger_diff.Body.write_all_proofs_to_disk body }
+let write_all_proofs_to_disk ~proof_cache_db { Stable.Latest.header; body } =
+  { header
+  ; body = Staged_ledger_diff.Body.write_all_proofs_to_disk ~proof_cache_db body
+  }
 
 let read_all_proofs_from_disk { header; body } =
   { Stable.Latest.header

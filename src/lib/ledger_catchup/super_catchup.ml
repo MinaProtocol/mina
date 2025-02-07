@@ -584,7 +584,8 @@ module Verify_work_batcher = struct
             |> List.concat_map ~f:(fun { fee; prover; proofs } ->
                    let msg = Sok_message.create ~fee ~prover in
                    One_or_two.to_list
-                     (One_or_two.map proofs ~f:(fun p -> (p, msg))) ) )
+                     (One_or_two.map proofs ~f:(fun p ->
+                          (Ledger_proof.Cached.read_proof_from_disk p, msg) ) ) ) )
         |> Verifier.verify_transaction_snarks verifier
         >>| function
         | Ok (Ok ()) ->
@@ -1165,7 +1166,9 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
           ~heartbeat_timeout:(Time_ns.Span.of_sec sec)
           ~timeout:(Time.Span.of_sec sec) network peer (List.map hs ~f:fst)
         |> Deferred.Or_error.map
-             ~f:(List.map ~f:Mina_block.write_all_proofs_to_disk) )
+             ~f:
+               (List.map
+                  ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db) ) )
       ~peers:(fun () -> Mina_networking.peers network)
       ~knowledge_context:
         (Broadcast_pipe.map best_tip_r
@@ -1412,7 +1415,6 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
         ~build_func:
           (Transition_frontier.Breadcrumb.build
-             ~proof_cache_db:Context.proof_cache_db
              ~get_completed_work:(Fn.const None) ) )
 
 (* Unit tests *)
