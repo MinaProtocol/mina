@@ -218,7 +218,7 @@ To test the Construction API, for every kind of transaction supported in the Min
 
 Finally, we then take the signed transaction submit it to the network and go through the same flow as the Data API checks for this transaction. Ensuring its behavior is the same as if it had gone through the submit path via GraphQL directly.
 
-The signer library used by the test agent can be used as a reference for further signer implementations. An executable interface is also provided via the [`signer.exe` binary](https://github.com/MinaProtocol/mina/blob/src/app/rosetta/ocaml-signer/signer.ml).
+The signer library used by the test agent can be used as a reference for further signer implementations. An executable interface is also provided via the [`signer.exe` binary](https://github.com/MinaProtocol/mina/blob/develop/src/app/rosetta/ocaml-signer/signer.ml).
 
 #### Rosetta CLI Validation
 
