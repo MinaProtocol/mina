@@ -169,7 +169,7 @@ If the data in PostgreSQL is really stale (>24 hours), it would likely be better
 
 ### Operation Statuses
 
-Operations are always `Pending` if retrieved from the mempool. `Success` if they are in a block and fully applied. A transaction status of `Failed` occurs for transactions within a block whenever certain invariants are not met such as not sending enough to cover the account creation fee. Other reasons include misconfiguring new tokens or zkapps. See [this section of the code](https://github.com/MinaProtocol/mina/blob/03e11970387b05dd970c6ab0d1a0b01f18e3a8db/src/lib/coda_base/user_command_status.ml#L8-L21) for an exhaustive list.
+Operations are always `Pending` if retrieved from the mempool. `Success` if they are in a block and fully applied. A transaction status of `Failed` occurs for transactions within a block whenever certain invariants are not met such as not sending enough to cover the account creation fee. Other reasons include misconfiguring new tokens or zkapps. See [this section of the code](https://github.com/MinaProtocol/mina/blob/03e11970387b05dd970c6ab0d1a0b01f18e3a8db/src/lib/mina_base/transaction_status.ml#L10-L50) for an exhaustive list.
 
 ### Operations Types
 
