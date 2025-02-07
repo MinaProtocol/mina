@@ -138,7 +138,8 @@ module type Full = sig
     module Latest = V2
   end
 
-  val write_all_proofs_to_disk : Stable.Latest.t -> t
+  val write_all_proofs_to_disk :
+    proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
 
   val read_all_proofs_from_disk : t -> Stable.Latest.t
 

@@ -61,7 +61,7 @@ end
 
 type t =
   { fee : Currency.Fee.t
-  ; proofs : Ledger_proof.t One_or_two.t
+  ; proofs : Ledger_proof.Cached.t One_or_two.t
   ; prover : Public_key.Compressed.t
   }
 
@@ -71,7 +71,7 @@ val info : t -> Info.t
 
 val statement : t -> Statement.t
 
-val proofs : t -> Ledger_proof.t One_or_two.t
+val proofs : t -> Ledger_proof.Cached.t One_or_two.t
 
 module Stable : sig
   module V2 : sig
@@ -101,11 +101,12 @@ module Checked : sig
 
   val statement : t -> Statement.t
 
-  val proofs : t -> Ledger_proof.t One_or_two.t
+  val proofs : t -> Ledger_proof.Cached.t One_or_two.t
 end
 
 val forget : Checked.t -> t
 
-val write_all_proofs_to_disk : Stable.Latest.t -> t
+val write_all_proofs_to_disk :
+  proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
 
 val read_all_proofs_from_disk : t -> Stable.Latest.t
