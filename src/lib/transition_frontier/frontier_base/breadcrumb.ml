@@ -10,11 +10,12 @@ module T = struct
 
   type t =
     { validated_transition : Mina_block.Validated.t
-    ; staged_ledger : (Staged_ledger.t[@sexp.opaque])
+    ; staged_ledger : Staged_ledger.t
     ; just_emitted_a_proof : bool
     ; transition_receipt_time : Time.t option
+    ; staged_ledger_hash : Staged_ledger_hash.t
     }
-  [@@deriving sexp, fields]
+  [@@deriving fields]
 
   type 'a creator =
        validated_transition:Mina_block.Validated.t
@@ -31,10 +32,22 @@ module T = struct
 
   let create ~validated_transition ~staged_ledger ~just_emitted_a_proof
       ~transition_receipt_time =
+    (* TODO This looks terrible, consider removing this in the hardfork by either
+       removing staged_ledger_hash from the header or computing it consistently
+       for the genesis block *)
+    let staged_ledger_hash =
+      if Mina_block.Validated.is_genesis validated_transition then
+        Staged_ledger.hash staged_ledger
+      else
+        Mina_block.Validated.header validated_transition
+        |> Mina_block.Header.protocol_state |> Protocol_state.blockchain_state
+        |> Blockchain_state.staged_ledger_hash
+    in
     { validated_transition
     ; staged_ledger
     ; just_emitted_a_proof
     ; transition_receipt_time
+    ; staged_ledger_hash
     }
 
   let to_yojson
@@ -42,6 +55,7 @@ module T = struct
       ; staged_ledger = _
       ; just_emitted_a_proof
       ; transition_receipt_time
+      ; staged_ledger_hash = _
       } =
     `Assoc
       [ ( "validated_transition"
@@ -61,9 +75,10 @@ T.
   , staged_ledger
   , just_emitted_a_proof
   , transition_receipt_time
-  , to_yojson )]
+  , to_yojson
+  , staged_ledger_hash )]
 
-include Allocation_functor.Make.Sexp (T)
+include Allocation_functor.Make.Basic (T)
 
 let compute_block_trace_metadata transition_with_validation =
   (* No need to compute anything if internal tracing is disabled, will be dropped anyway *)
@@ -398,7 +413,7 @@ module For_tests = struct
       let body =
         Mina_block.Body.create @@ Staged_ledger_diff.forget staged_ledger_diff
       in
-      let%bind ( `Hash_after_applying next_staged_ledger_hash
+      let%bind ( `Hash_after_applying staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
                , `Staged_ledger _
                , `Pending_coinbase_update _ ) =
@@ -436,7 +451,7 @@ module For_tests = struct
       let next_blockchain_state =
         Blockchain_state.create_value
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
-          ~staged_ledger_hash:next_staged_ledger_hash ~genesis_ledger_hash
+          ~staged_ledger_hash ~genesis_ledger_hash
           ~body_reference:
             (Body.compute_reference
                ~tag:Mina_net2.Bitswap_tag.(to_enum Body)

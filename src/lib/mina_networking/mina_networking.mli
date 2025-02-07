@@ -49,7 +49,7 @@ module Rpcs : sig
     type query = State_hash.t
 
     type response =
-      ( Staged_ledger.Scan_state.t
+      ( Staged_ledger.Scan_state.Stable.Latest.t
       * Ledger_hash.t
       * Pending_coinbase.t
       * Mina_state.Protocol_state.value list )
@@ -219,7 +219,7 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      t
   -> Peer.Id.t
   -> State_hash.t
-  -> ( Staged_ledger.Scan_state.t
+  -> ( Staged_ledger.Scan_state.Stable.Latest.t
      * Ledger_hash.t
      * Pending_coinbase.t
      * Mina_state.Protocol_state.value list )

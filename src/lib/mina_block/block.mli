@@ -10,9 +10,9 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+type t = Stable.Latest.t [@@deriving to_yojson]
 
-type with_hash = t State_hash.With_state_hashes.t [@@deriving sexp]
+type with_hash = t State_hash.With_state_hashes.t
 
 (* TODO: interface for both unchecked and checked construction of blocks *)
 (* check version needs to run following checks:

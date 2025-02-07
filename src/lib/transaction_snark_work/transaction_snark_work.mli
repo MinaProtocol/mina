@@ -52,7 +52,7 @@ end
 *)
 
 module type S = sig
-  type t [@@deriving compare, sexp, yojson]
+  type t
 
   val fee : t -> Fee.t
 
@@ -75,7 +75,7 @@ val statement : t -> Statement.t
 
 module Stable : sig
   module V2 : sig
-    type t [@@deriving equal, sexp, compare, bin_io, yojson, version]
+    type t [@@deriving bin_io, equal, sexp, version, yojson]
   end
 end
 with type V2.t = t
@@ -84,8 +84,6 @@ type unchecked = t
 
 module Checked : sig
   include S
-
-  module Stable : module type of Stable
 
   val create_unsafe : unchecked -> t
 

@@ -421,7 +421,7 @@ module T = struct
       ; pending_coinbase_collection
       } : Staged_ledger_hash.t =
     Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-      (Scan_state.hash scan_state)
+      Scan_state.(Stable.Latest.hash @@ read_all_proofs_from_disk scan_state)
       (Ledger.merkle_root ledger)
       pending_coinbase_collection
 
@@ -1323,7 +1323,6 @@ module T = struct
         { commands_rev : User_command.Valid.t Sequence.t
         ; completed_work : Transaction_snark_work.Checked.t Sequence.t
         }
-      [@@deriving sexp_of]
 
       let add_user_command t uc =
         { t with
@@ -1353,7 +1352,6 @@ module T = struct
       ; is_coinbase_receiver_new : bool
       ; logger : (Logger.t[@sexp.opaque])
       }
-    [@@deriving sexp_of]
 
     let coinbase_ft (cw : Transaction_snark_work.Checked.t) =
       let fee = Transaction_snark_work.Checked.fee cw in
@@ -2221,19 +2219,7 @@ module T = struct
             in
             [%log internal] "Generate_staged_ledger_diff" ;
             let diff, log =
-              O1trace.sync_thread "generate_staged_ledger_diff"
-                (fun
-                  ()
-                  :
-                  (( ( Transaction_snark_work.Checked.t
-                     , User_command.Valid.t )
-                     Staged_ledger_diff.Pre_diff_two.t
-                   * ( Transaction_snark_work.Checked.t
-                     , User_command.Valid.t )
-                     Staged_ledger_diff.Pre_diff_one.t
-                     option )
-                  * _)
-                ->
+              O1trace.sync_thread "generate_staged_ledger_diff" (fun () ->
                   generate ~constraint_constants logger completed_works_seq
                     valid_on_this_ledger ~receiver:coinbase_receiver
                     ~is_coinbase_receiver_new ~supercharge_coinbase partitions )
@@ -3779,11 +3765,9 @@ let%test_module "staged ledger tests" =
                       let work = List.hd_exn (List.drop work_done 1) in
                       assert_same_fee single work.fee )
               | _ ->
-                  failwith
-                    (sprintf
-                       !"Incorrect coinbase in the diff %{sexp: \
-                         Staged_ledger_diff.t}"
-                       diff )
+                  failwith @@ "Incorrect coinbase in the diff "
+                  ^ ( Staged_ledger_diff.Stable.Latest.to_yojson diff
+                    |> Yojson.Safe.to_string )
             in
             (diff, List.tl_exn proofs_available_left) )
       in
@@ -4388,10 +4372,6 @@ let%test_module "staged ledger tests" =
                        .commands diff )
                     = 1 ) ;
                   let f, s = diff.diff in
-                  [%log info] "Diff %s"
-                    ( Staged_ledger_diff.With_valid_signatures_and_proofs
-                      .to_yojson diff
-                    |> Yojson.Safe.to_string ) ;
                   let failed_command =
                     With_status.
                       { data = invalid_command

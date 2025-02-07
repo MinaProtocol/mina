@@ -61,6 +61,8 @@ end
 module Ledger_proof_with_sok_message = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t = Ledger_proof.Stable.V2.t * Sok_message.Stable.V1.t
       [@@deriving sexp]
@@ -68,6 +70,8 @@ module Ledger_proof_with_sok_message = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Ledger_proof.t * Sok_message.t
 end
 
 module Available_job = struct
@@ -155,6 +159,8 @@ type job = Available_job.t
    the snarked ledger*)
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       { scan_state :
@@ -195,7 +201,15 @@ module Stable = struct
   end
 end]
 
-[%%define_locally Stable.Latest.(hash)]
+type t =
+  { scan_state :
+      ( Ledger_proof_with_sok_message.t
+      , Transaction_with_witness.t )
+      Parallel_scan.State.t
+  ; previous_incomplete_zkapp_updates :
+      Transaction_with_witness.t list
+      * [ `Border_block_continued_in_the_next_tree of bool ]
+  }
 
 (**********Helpers*************)
 
@@ -314,14 +328,13 @@ let total_proofs (works : Transaction_snark_work.t list) =
 
 (*************exposed functions*****************)
 
-module P = struct
-  type t = Ledger_proof_with_sok_message.t
-end
-
 module Make_statement_scanner (Verifier : sig
   type t
 
-  val verify : verifier:t -> P.t list -> unit Or_error.t Deferred.Or_error.t
+  val verify :
+       verifier:t
+    -> Ledger_proof_with_sok_message.t list
+    -> unit Or_error.t Deferred.Or_error.t
 end) =
 struct
   module Fold = Parallel_scan.State.Make_foldable (Deferred)
@@ -376,12 +389,8 @@ struct
   end
 
   (*TODO: fold over the pending_coinbase tree and validate the statements?*)
-  let scan_statement ~constraint_constants ~logger
-      ({ scan_state = tree; previous_incomplete_zkapp_updates = _ } : t)
-      ~statement_check ~verifier :
-      ( Transaction_snark.Statement.t
-      , [ `Error of Error.t | `Empty ] )
-      Deferred.Result.t =
+  let scan_statement (type merge) ~constraint_constants ~logger
+      ~merge_to_statement tree ~statement_check ~verify =
     let open Deferred.Or_error.Let_syntax in
     let timer = Timer.create ~logger () in
     let yield_occasionally =
@@ -392,7 +401,7 @@ struct
       Async.Scheduler.yield () |> Deferred.map ~f:Or_error.return
     in
     let module Acc = struct
-      type t = (Transaction_snark.Statement.t * P.t list) option
+      type t = (Transaction_snark.Statement.t * merge list) option
     end in
     let write_error description =
       sprintf !"Staged_ledger.scan_statement: %s\n" description
@@ -440,24 +449,23 @@ struct
     in
     let fold_step_a (acc_statement, acc_pc) job =
       match job with
-      | Parallel_scan.Merge.Job.Part (proof, message) ->
-          let statement = Ledger_proof.statement proof in
+      | Parallel_scan.Merge.Job.Part merge ->
+          let statement = merge_to_statement merge in
           let%map acc_stmt =
-            merge_acc ~proofs:[ (proof, message) ] acc_statement statement
+            merge_acc ~proofs:[ merge ] acc_statement statement
           in
           (acc_stmt, acc_pc)
       | Empty | Full { status = Parallel_scan.Job_status.Done; _ } ->
           return (acc_statement, acc_pc)
-      | Full { left = proof_1, message_1; right = proof_2, message_2; _ } ->
-          let stmt1 = Ledger_proof.statement proof_1 in
-          let stmt2 = Ledger_proof.statement proof_2 in
+      | Full { left; right; _ } ->
+          let stmt1 = merge_to_statement left in
+          let stmt2 = merge_to_statement right in
           let%bind merged_statement =
             Timer.time timer (sprintf "merge:%s" __LOC__) (fun () ->
                 Deferred.return (Transaction_snark.Statement.merge stmt1 stmt2) )
           in
           let%map acc_stmt =
-            merge_acc acc_statement merged_statement
-              ~proofs:[ (proof_1, message_1); (proof_2, message_2) ]
+            merge_acc acc_statement merged_statement ~proofs:[ left; right ]
           in
           (acc_stmt, acc_pc)
     in
@@ -541,7 +549,7 @@ struct
     | Ok (None, _) ->
         Deferred.return (Error `Empty)
     | Ok (Some (res, proofs), _) -> (
-        match%map.Deferred Verifier.verify ~verifier proofs with
+        match%map.Deferred verify proofs with
         | Ok (Ok ()) ->
             Ok res
         | Ok (Error err) ->
@@ -551,8 +559,8 @@ struct
     | Error e ->
         Deferred.return (Error (`Error e))
 
-  let check_invariants t ~constraint_constants ~logger ~statement_check
-      ~verifier ~error_prefix
+  let check_invariants_impl parallel_scan_state ~merge_to_statement
+      ~constraint_constants ~logger ~statement_check ~verify ~error_prefix
       ~(last_proof_statement : Transaction_snark.Statement.t option)
       ~(registers_end :
          ( Frozen_ledger_hash.t
@@ -590,8 +598,8 @@ struct
     in
     match%map
       O1trace.sync_thread "validate_transaction_snark_scan_state" (fun () ->
-          scan_statement t ~constraint_constants ~logger ~statement_check
-            ~verifier )
+          scan_statement parallel_scan_state ~constraint_constants ~logger
+            ~statement_check ~verify ~merge_to_statement )
     with
     | Error (`Error e) ->
         Error e
@@ -631,6 +639,11 @@ struct
             "nondefault fee token"
         in
         ()
+
+  let check_invariants (t : t) ~verifier =
+    check_invariants_impl t.scan_state
+      ~merge_to_statement:(Fn.compose Ledger_proof.statement fst)
+      ~verify:(Verifier.verify ~verifier)
 end
 
 let statement_of_job : job -> Transaction_snark.Statement.t option = function
@@ -1332,7 +1345,7 @@ let update_metrics t = Parallel_scan.update_metrics t.scan_state
 let fill_work_and_enqueue_transactions t ~logger transactions work =
   let open Or_error.Let_syntax in
   let fill_in_transaction_snark_work tree (works : Transaction_snark_work.t list)
-      : (Ledger_proof.t * Sok_message.t) list Or_error.t =
+      : Ledger_proof_with_sok_message.t list Or_error.t =
     let next_jobs =
       List.(
         take
@@ -1454,3 +1467,11 @@ let check_required_protocol_states t ~protocol_states =
   in
   let%map () = check_length protocol_states_assoc in
   protocol_states_assoc
+
+let write_all_proofs_to_disk
+    { Stable.Latest.scan_state; previous_incomplete_zkapp_updates } =
+  { scan_state; previous_incomplete_zkapp_updates }
+
+let read_all_proofs_from_disk { scan_state; previous_incomplete_zkapp_updates }
+    =
+  { Stable.Latest.scan_state; previous_incomplete_zkapp_updates }

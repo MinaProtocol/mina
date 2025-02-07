@@ -10,12 +10,16 @@ type t
 module Scan_state : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V2 : sig
       type t
 
       val hash : t -> Staged_ledger_hash.Aux_hash.t
     end
   end]
+
+  type t
 
   module Job_view : sig
     type t [@@deriving sexp, to_yojson]
@@ -45,8 +49,6 @@ module Scan_state : sig
     type t = Transaction_snark_scan_state.Transaction_with_witness.t Poly.t
     [@@deriving sexp, to_yojson]
   end
-
-  val hash : t -> Staged_ledger_hash.Aux_hash.t
 
   val empty :
     constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
@@ -131,6 +133,10 @@ module Scan_state : sig
              Or_error.t )
     -> t
     -> unit Deferred.Or_error.t
+
+  val write_all_proofs_to_disk : Stable.Latest.t -> t
+
+  val read_all_proofs_from_disk : t -> Stable.Latest.t
 end
 
 module Pre_diff_info : Pre_diff_info.S

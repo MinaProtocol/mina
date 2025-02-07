@@ -20,5 +20,5 @@
    mina_version
    mina_caqti
  )
- (instrumentation (backend bisect_ppx))
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
  (preprocess (pps ppx_version ppx_jane ppx_mina)))
