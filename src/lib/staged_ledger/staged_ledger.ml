@@ -352,6 +352,7 @@ module T = struct
     let open Deferred.Or_error.Let_syntax in
     let apply_first_pass =
       Ledger.apply_transaction_first_pass ~constraint_constants
+        ?precomputed:None
     in
     let apply_second_pass = Ledger.apply_transaction_second_pass in
     let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
@@ -505,7 +506,8 @@ module T = struct
     else Ok constraint_constants.coinbase_amount
 
   let apply_single_transaction_first_pass ~constraint_constants ~global_slot
-      ledger (pending_coinbase_stack_state : Stack_state_with_init_stack.t)
+      ?precomputed ledger
+      (pending_coinbase_stack_state : Stack_state_with_init_stack.t)
       txn_with_status (txn_state_view : Zkapp_precondition.Protocol_state.View.t)
       :
       ( Pre_statement.t * Stack_state_with_init_stack.t
@@ -532,8 +534,8 @@ module T = struct
     in
     let%map partially_applied_transaction =
       to_staged_ledger_or_error
-        (Ledger.apply_transaction_first_pass ~constraint_constants ~global_slot
-           ~txn_state_view ledger txn )
+        (Ledger.apply_transaction_first_pass ?precomputed ~constraint_constants
+           ~global_slot ~txn_state_view ledger txn )
     in
     let target_ledger_hash = Ledger.merkle_root ledger in
     ( { Pre_statement.partially_applied_transaction
@@ -555,7 +557,7 @@ module T = struct
       } )
 
   let apply_single_transaction_second_pass ~constraint_constants
-      ~connecting_ledger ledger state_and_body_hash ~global_slot
+      ~connecting_ledger ?precomputed ledger state_and_body_hash ~global_slot
       (pre_stmt : Pre_statement.t) =
     let open Result.Let_syntax in
     let empty_local_state = Mina_state.Local_state.empty () in
@@ -567,7 +569,7 @@ module T = struct
     in
     let%bind applied_txn =
       to_staged_ledger_or_error
-        (Ledger.apply_transaction_second_pass ledger
+        (Ledger.apply_transaction_second_pass ?precomputed ledger
            pre_stmt.partially_applied_transaction )
     in
     let second_pass_ledger_target_hash = Ledger.merkle_root ledger in
@@ -623,7 +625,7 @@ module T = struct
   let apply_transactions_first_pass ~yield ~constraint_constants ~global_slot
       ledger init_pending_coinbase_stack_state ts current_state_view =
     let open Deferred.Result.Let_syntax in
-    let apply pending_coinbase_stack_state txn =
+    let apply pending_coinbase_stack_state (txn, precomputed) =
       match
         List.find (Transaction.public_keys txn.With_status.data) ~f:(fun pk ->
             Option.is_none (Signature_lib.Public_key.decompress pk) )
@@ -631,8 +633,9 @@ module T = struct
       | Some pk ->
           Error (Staged_ledger_error.Invalid_public_key pk)
       | None ->
-          apply_single_transaction_first_pass ~constraint_constants ~global_slot
-            ledger pending_coinbase_stack_state txn current_state_view
+          apply_single_transaction_first_pass ?precomputed ~constraint_constants
+            ~global_slot ledger pending_coinbase_stack_state txn
+            current_state_view
     in
     let%map res_rev, pending_coinbase_stack_state =
       Mina_stdlib.Deferred.Result.List.fold ts
@@ -650,10 +653,12 @@ module T = struct
       ledger state_and_body_hash pre_stmts =
     let open Deferred.Result.Let_syntax in
     let connecting_ledger = Ledger.merkle_root ledger in
-    Mina_stdlib.Deferred.Result.List.map pre_stmts ~f:(fun pre_stmt ->
+    Mina_stdlib.Deferred.Result.List.map pre_stmts
+      ~f:(fun (pre_stmt, precomputed) ->
         let%bind result =
           apply_single_transaction_second_pass ~constraint_constants
-            ~connecting_ledger ~global_slot ledger state_and_body_hash pre_stmt
+            ~connecting_ledger ~global_slot ?precomputed ledger
+            state_and_body_hash pre_stmt
           |> Deferred.return
         in
         let%map () = yield () in
@@ -692,10 +697,17 @@ module T = struct
           in
           apply_first_pass ~yield current_stack2 ts
     in
+    let all_precomputed =
+      List.map ~f:snd ts
+      @ Option.value_map ~default:[] ~f:(List.map ~f:snd) ts_opt
+    in
+    let pre_stmts_with_precomputed =
+      List.zip_exn (pre_stmts1 @ pre_stmts2) all_precomputed
+    in
     let first_pass_ledger_end = Ledger.merkle_root ledger in
     let%map txns_with_witnesses =
       apply_transactions_second_pass ~constraint_constants ~yield ~global_slot
-        ledger state_and_body_hash (pre_stmts1 @ pre_stmts2)
+        ledger state_and_body_hash pre_stmts_with_precomputed
     in
     (txns_with_witnesses, updated_stack1, updated_stack2, first_pass_ledger_end)
 
@@ -825,7 +837,7 @@ module T = struct
     let open Deferred.Result.Let_syntax in
     let coinbase_exists txns =
       List.fold_until ~init:false txns
-        ~f:(fun acc t ->
+        ~f:(fun acc (t, _) ->
           match t.With_status.data with
           | Transaction.Coinbase _ ->
               Stop true
@@ -1020,13 +1032,26 @@ module T = struct
     let new_ledger = Ledger.register_mask t.ledger new_mask in
     let transactions, works, commands_count, coinbases = pre_diff_info in
     let accounts_accessed =
-      List.fold_left ~init:Account_id.Set.empty transactions ~f:(fun set txn ->
+      List.fold_left ~init:Account_id.Set.empty transactions
+        ~f:(fun set (txn, _) ->
           Account_id.Set.(
             union set
               (of_list (Transaction.accounts_referenced txn.With_status.data))) )
       |> Set.to_list
     in
-    Ledger.unsafe_preload_accounts_from_parent new_ledger accounts_accessed ;
+    let derived_token_ids =
+      List.fold transactions ~init:Account_id.Map.empty
+        ~f:(fun acc (_, cache_opt) ->
+          let combine ~key:_ _ v = v in
+          Option.value_map ~default:acc
+            ~f:
+              (Fn.compose
+                 (Map.merge_skewed ~combine acc)
+                 Ledger.precomputed_token_ids )
+            cache_opt )
+    in
+    Ledger.unsafe_preload_accounts_from_parent new_ledger ~derived_token_ids
+      accounts_accessed ;
     let%bind () =
       (* Check number of zkApps in a block does not exceed hardcap *)
       O1trace.thread "zkapp_hardcap_check" (fun () ->
@@ -1039,7 +1064,9 @@ module T = struct
             | _ ->
                 false
           in
-          let zk_app_count = List.count ~f:is_zkapp transactions in
+          let zk_app_count =
+            List.count ~f:(Fn.compose is_zkapp fst) transactions
+          in
           if zk_app_count > zkapp_cmd_limit_hardcap then
             Deferred.Result.fail
               (Staged_ledger_error.ZkApps_exceed_limit
@@ -1210,9 +1237,20 @@ module T = struct
           (Float.of_int
              (List.length (Scan_state.all_work_statements_exn t.scan_state)) ) )
 
-  let forget_prediff_info ((a : Transaction.Valid.t With_status.t list), b, c, d)
-      =
-    (List.map ~f:(With_status.map ~f:Transaction.forget) a, b, c, d)
+  let transform_prediff_info ?precomputed
+      ((a : Transaction.Valid.t With_status.t list), b, c, d) =
+    let a' =
+      match precomputed with
+      | None ->
+          List.map
+            ~f:(fun tx -> (With_status.map tx ~f:Transaction.forget, None))
+            a
+      | Some pc_list ->
+          List.map2_exn
+            ~f:(fun tx pc -> (With_status.map tx ~f:Transaction.forget, Some pc))
+            a pc_list
+    in
+    (a', b, c, d)
 
   let check_commands ledger ~verifier (cs : User_command.t With_status.t list) =
     let open Deferred.Or_error.Let_syntax in
@@ -1246,8 +1284,8 @@ module T = struct
                  (Error.of_string "batch verification failed") ) ) )
 
   let apply ?skip_verification ~constraint_constants ~global_slot t
-      ~get_completed_work (witness : Staged_ledger_diff.t) ~logger ~verifier
-      ~current_state_view ~state_and_body_hash ~coinbase_receiver
+      ~get_completed_work ?precomputed (witness : Staged_ledger_diff.t) ~logger
+      ~verifier ~current_state_view ~state_and_body_hash ~coinbase_receiver
       ~supercharge_coinbase ~zkapp_cmd_limit_hardcap =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
@@ -1279,7 +1317,7 @@ module T = struct
         ~skip_verification:
           ([%equal: [ `All | `Proofs ] option] skip_verification (Some `All))
         ~constraint_constants ~global_slot t
-        (forget_prediff_info prediff)
+        (transform_prediff_info ?precomputed prediff)
         ~logger ~current_state_view ~state_and_body_hash
         ~log_prefix:"apply_diff" ~zkapp_cmd_limit_hardcap
     in
@@ -1300,7 +1338,7 @@ module T = struct
     in
     res
 
-  let apply_diff_unchecked ~constraint_constants ~global_slot t
+  let apply_diff_unchecked ~constraint_constants ~global_slot t ?precomputed
       (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) ~logger
       ~current_state_view ~state_and_body_hash ~coinbase_receiver
       ~supercharge_coinbase ~zkapp_cmd_limit_hardcap =
@@ -1312,7 +1350,7 @@ module T = struct
       |> Deferred.return
     in
     apply_diff t
-      (forget_prediff_info prediff)
+      (transform_prediff_info ?precomputed prediff)
       ~constraint_constants ~global_slot ~logger ~current_state_view
       ~state_and_body_hash ~log_prefix:"apply_diff_unchecked"
       ~zkapp_cmd_limit_hardcap
@@ -2800,6 +2838,7 @@ let%test_module "staged ledger tests" =
             let do_snarked_ledger_transition proof_opt =
               let apply_first_pass =
                 Ledger.apply_transaction_first_pass ~constraint_constants
+                  ?precomputed:None
               in
               let apply_second_pass = Ledger.apply_transaction_second_pass in
               let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view

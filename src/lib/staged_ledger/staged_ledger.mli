@@ -200,6 +200,7 @@ val apply :
   -> get_completed_work:
        (   Transaction_snark_work.Statement.t
         -> Transaction_snark_work.Checked.t option )
+  -> ?precomputed:Ledger.precomputed_t list
   -> Staged_ledger_diff.t
   -> logger:Logger.t
   -> verifier:Verifier.t
@@ -226,6 +227,7 @@ val apply_diff_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> t
+  -> ?precomputed:Ledger.precomputed_t list
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
   -> logger:Logger.t
   -> current_state_view:Zkapp_precondition.Protocol_state.View.t
@@ -373,7 +375,7 @@ module Test_helpers : sig
     -> is_new_stack:bool
     -> Ledger.t
     -> Pending_coinbase.t
-    -> Transaction.t With_status.t list
+    -> (Transaction.t With_status.t * Ledger.precomputed_t option) list
     -> Zkapp_precondition.Protocol_state.View.t
     -> Frozen_ledger_hash.t * Frozen_ledger_hash.t
     -> ( bool

@@ -870,7 +870,9 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           let is_empty x = run_checked (Account_update.Actions.is_empty_var x)
 
-          let push_events = Account_update.Actions.push_events_checked
+          let push_events_hash = Account_update.Actions.push_events_hash_checked
+
+          let hash = Data_as_hash.hash
         end
 
         module Zkapp_uri = struct
