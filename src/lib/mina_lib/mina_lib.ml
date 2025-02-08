@@ -1509,42 +1509,56 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
   let%bind all_peers = Mina_networking.peers network in
   let peer_limit = 5 in
   let limited_peers = List.take all_peers peer_limit in
+  let check_every = Time.Span.of_ms 20. in
+  let log_every = Time.Span.of_sec 10. in
+  let log_rate = Time.Span.( // ) log_every check_every |> Float.to_int in
 
   (* Keep reading from the transition frontier until it has caught up to the most valid block from the network.
      * This is to ensure that the snarks are verified and added to the pool in the correct order
   *)
-  let rec wait_for_new_top_block received_block =
+  let rec wait_for_new_top_block received_block iteration_count =
     let frontier = get_current_frontier () in
     match frontier with
     | None ->
-        [%log error]
-          "Transition frontier is not available after sync something has gone \
-           terribly wrong" ;
-        let%bind () = after (Time.Span.of_ms 20.) in
-        wait_for_new_top_block received_block
+        let iteration_count =
+          if iteration_count >= log_rate then (
+            [%log error]
+              "Transition frontier is not available after sync something has \
+               gone terribly wrong" ;
+            0 )
+          else iteration_count + 1
+        in
+        let%bind () = after check_every in
+        wait_for_new_top_block received_block iteration_count
     | Some frontier ->
         let tip = Transition_frontier.best_tip frontier in
         let top_block =
           Transition_frontier.Breadcrumb.validated_transition tip
           |> Mina_block.Validated.header |> Mina_block.Header.blockchain_length
         in
-        [%log debug]
-          ~metadata:
-            [ ("old_top_block", `Int (received_block |> Unsigned.UInt32.to_int))
-            ; ("new_top_block", `Int (top_block |> Unsigned.UInt32.to_int))
-            ]
-          "WAITING  old top block: $old_top_block, new top block: \
-           $new_top_block" ;
         let delta =
           Unsigned.UInt32.(Infix.(received_block - top_block) |> to_int)
         in
         (* if delta is less than or equal to zero the transition frontier has caught up with the network *)
         if delta <= 0 then Deferred.unit
         else
-          let%bind () = after (Time.Span.of_ms 20.) in
-          wait_for_new_top_block received_block
+          let iteration_count =
+            if iteration_count >= log_rate then (
+              [%log debug]
+                ~metadata:
+                  [ ( "old_top_block"
+                    , `Int (received_block |> Unsigned.UInt32.to_int) )
+                  ; ("new_top_block", `Int (top_block |> Unsigned.UInt32.to_int))
+                  ]
+                "WAITING  old top block: $old_top_block, new top block: \
+                 $new_top_block" ;
+              0 )
+            else iteration_count + 1
+          in
+          let%bind () = after check_every in
+          wait_for_new_top_block received_block iteration_count
   in
-  let%bind () = wait_for_new_top_block received_block in
+  let%bind () = wait_for_new_top_block received_block log_rate in
 
   Deferred.List.iter
     ~f:(fun peer ->
