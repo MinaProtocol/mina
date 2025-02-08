@@ -10,8 +10,8 @@
  (preprocess
   (pps ppx_version js_of_ocaml-ppx)))
 
-; Copy the Neon-compiled .node file to the local directory.
+; Rule that calls build.sh to compile the Neon project and produce plonk.node
 (rule
- (targets plonk_native.node)
- (deps ../../native_prover/index.node) 
- (action (copy ../../native_prover/index.node plonk_native.node)))
+ (targets plonk.node)
+ (deps build.sh)
+ (action (run bash build.sh)))
