@@ -173,23 +173,25 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
   in
   let send_outgoing_messages_task =
     Pipe.iter outgoing_r ~f:(fun msg ->
-        let parts = split_string msg ~every:max_chunk_size in
-        match%map
-          Deferred.Or_error.List.iter parts ~f:(fun data ->
-              Deferred.Or_error.ignore_m
-              @@ Libp2p_helper.do_rpc helper
-                   (module Libp2p_ipc.Rpcs.SendStream)
-                   (Libp2p_ipc.Rpcs.SendStream.create_request ~stream_id ~data) )
-        with
-        | Ok _ ->
-            ()
-        | Error e ->
-            [%log error] "error sending message on stream $idx: $error"
-              ~metadata:
-                [ ("idx", `String (Libp2p_ipc.stream_id_to_string stream_id))
-                ; ("error", Error_json.error_to_yojson e)
-                ] ;
-            Pipe.close outgoing_w )
+        if Pipe.is_closed outgoing_w then Deferred.unit
+        else
+          let parts = split_string msg ~every:max_chunk_size in
+          match%map
+            Deferred.Or_error.List.iter parts ~f:(fun data ->
+                Deferred.Or_error.ignore_m
+                @@ Libp2p_helper.do_rpc helper
+                     (module Libp2p_ipc.Rpcs.SendStream)
+                     (Libp2p_ipc.Rpcs.SendStream.create_request ~stream_id ~data) )
+          with
+          | Ok _ ->
+              ()
+          | Error e ->
+              [%log error] "error sending message on stream $idx: $error"
+                ~metadata:
+                  [ ("idx", `String (Libp2p_ipc.stream_id_to_string stream_id))
+                  ; ("error", Error_json.error_to_yojson e)
+                  ] ;
+              Pipe.close outgoing_w )
     (* TODO implement proper stream closing *)
     (* >>= ( fun () ->
        match%map Libp2p_helper.do_rpc helper
