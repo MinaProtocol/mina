@@ -2163,6 +2163,57 @@ module Queries = struct
             return
             @@ Error "Could not obtain best chain from transition frontier" )
 
+  let account_actions =
+      field "accountActions" ~doc:"find all the actions associated to an account from the current best tip"
+        ~typ:( non_null @@ list @@ non_null @@ Types.Input.Field.arg_typ)
+        ~args:
+          Arg.
+            [ arg "publicKey" ~doc:"Public key of account being retrieved"
+                ~typ:(non_null Types.Input.PublicKey.arg_typ)
+            ; arg' "token"
+                ~doc:"Token of account being retrieved (defaults to MINA)"
+                ~typ:Types.Input.TokenId.arg_typ ~default:Token_id.default
+            ]
+        ~resolve:(fun { ctx = mina; _ } () pk token ->
+          let best_chain = Mina_lib.best_chain mina in
+          match best_chain with
+          | Some best_chain ->
+            let actions = 
+              List.map ~f:(fun bc -> 
+                let transactions = (
+                  let block = Transition_frontier.Breadcrumb.block bc in
+                  Mina_block.transactions
+                    ~constraint_constants:
+                      (Mina_lib.config mina).precomputed_values.constraint_constants block
+                ) in
+                let zkapp_transactions = List.filter_map transactions ~f:(fun txn ->
+                  let tx = txn.data in 
+                  match tx with 
+                    | Command uc ->
+                      let user_cmd = User_command.Signed_command uc in
+                      begin
+                      match user_cmd with 
+                      | Zkapp_command c -> 
+                        let updates = Zkapp_command.account_updates c in 
+                        let ls = Zkapp_command.Call_forest.to_list updates in 
+                        let actions = List.map ~f:(fun au ->
+                          let actions = au.body.actions in 
+                          let a = Account_update.Body.Events'.deriver actions in 
+                          failwith "idk"
+                        ) ls in 
+                        failwith "idk"
+                      | _ -> None
+                      end
+                    | _ -> None
+                ) in 
+                zkapp_transactions
+              ) best_chain 
+            in
+            Some 1
+          | None ->
+            None
+          )
+
   let block =
     result_field2 "block"
       ~doc:
