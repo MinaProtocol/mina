@@ -68,7 +68,7 @@ module T = struct
         (* TODO: send full diffs to extensions to avoid extra lookups in frontier *)
         | E (Root_transitioned { new_root; _ }, _) ->
             Full_frontier.find_exn frontier
-              (Root_data.Limited.hashes new_root).state_hash
+              (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
             |> Root_data.Historical.of_breadcrumb |> enqueue root_history ;
             true
         | E _ ->

@@ -10,7 +10,7 @@ open Mina_base
 open Mina_state
 open Network_peer
 
-type t [@@deriving sexp, equal, compare, to_yojson]
+type t [@@deriving equal, compare, to_yojson]
 
 type display =
   { state_hash : string
@@ -81,6 +81,8 @@ val mask : t -> Mina_ledger.Ledger.Mask.Attached.t
 val display : t -> display
 
 val name : t -> string
+
+val staged_ledger_hash : t -> Staged_ledger_hash.t
 
 module For_tests : sig
   val gen :

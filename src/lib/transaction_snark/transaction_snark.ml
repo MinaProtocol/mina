@@ -77,27 +77,33 @@ module Make_str (A : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type t = A.V2.t =
-        { statement : Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
-        ; proof : Proof.Stable.V2.t
-        }
-      [@@deriving compare, equal, fields, sexp, version, yojson, hash]
+      type t =
+        ( Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
+        , Proof.Stable.V2.t )
+        Proof_carrying_data.Stable.V1.t
+      [@@deriving compare, equal, sexp, version, yojson, hash]
 
       let to_latest = Fn.id
     end
   end]
 
-  let proof t = t.proof
+  let proof t = t.Proof_carrying_data.proof
 
-  let statement t = { t.statement with sok_digest = () }
+  let statement
+      (t :
+        ( Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
+        , _ )
+        Proof_carrying_data.t ) =
+    { t.data with sok_digest = () }
 
-  let statement_with_sok t = t.statement
+  let statement_with_sok t = t.Proof_carrying_data.data
 
-  let sok_digest t = t.statement.sok_digest
+  let sok_digest t =
+    t.Proof_carrying_data.data.Mina_state.Snarked_ledger_state.Poly.sok_digest
 
   let to_yojson = Stable.Latest.to_yojson
 
-  let create ~statement ~proof = { statement; proof }
+  let create ~statement ~proof = { Proof_carrying_data.data = statement; proof }
 
   open Tick
   open Let_syntax
@@ -3518,9 +3524,12 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let verify_impl ~f ts =
     if
-      List.for_all ts ~f:(fun (p, m) ->
-          Sok_message.Digest.equal (Sok_message.digest m) p.statement.sok_digest )
-    then f (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
+      List.for_all ts ~f:(fun ((p : Stable.Latest.t), m) ->
+          Sok_message.Digest.equal (Sok_message.digest m) p.data.sok_digest )
+    then
+      f
+        (List.map ts ~f:(fun ({ Proof_carrying_data.data; proof }, _) ->
+             (data, proof) ) )
     else
       Async.return
         (Or_error.error_string
@@ -3965,8 +3974,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let verification_key = Proof.verification_key
 
-    let verify_against_digest { statement; proof } =
-      Proof.verify [ (statement, proof) ]
+    let verify_against_digest { Proof_carrying_data.data; proof } =
+      Proof.verify [ (data, proof) ]
 
     let verify = verify_impl ~f:Proof.verify
 
@@ -4035,7 +4044,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let open Async in
       let%map (), (), proof = res in
       Base.Zkapp_command_snark.witness := None ;
-      { proof; statement }
+      { Proof_carrying_data.proof; data = statement }
 
     let of_transaction_union ~statement ~init_stack transaction state_body
         global_slot handler =
@@ -4047,7 +4056,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                global_slot init_stack )
           statement
       in
-      { statement; proof }
+      { Proof_carrying_data.data = statement; proof }
 
     let of_non_zkapp_command_transaction ~statement ~init_stack
         transaction_in_block handler =
@@ -4091,8 +4100,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
         handler
 
-    let merge ({ statement = t12; _ } as x12) ({ statement = t23; _ } as x23)
-        ~sok_digest =
+    let merge ({ Proof_carrying_data.data = t12; _ } as x12)
+        ({ Proof_carrying_data.data = t23; _ } as x23) ~sok_digest =
       let open Async.Deferred.Or_error.Let_syntax in
       let%bind s =
         Async.return
@@ -4103,12 +4112,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       let s = { s with sok_digest } in
       let open Async in
       let%map (), (), proof =
-        merge
-          ~handler:
-            (Merge.handle (x12.statement, x23.statement) (x12.proof, x23.proof))
-          s
+        merge ~handler:(Merge.handle (t12, t23) (x12.proof, x23.proof)) s
       in
-      Ok { statement = s; proof }
+      Ok { Proof_carrying_data.data = s; proof }
 
     let constraint_system_digests =
       lazy (constraint_system_digests ~constraint_constants ())

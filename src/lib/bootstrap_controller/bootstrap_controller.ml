@@ -376,7 +376,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
           | Error err ->
               Deferred.return (staged_ledger_data_download_time, None, Error err)
           | Ok
-              ( scan_state
+              ( scan_state_uncached
               , expected_merkle_root
               , pending_coinbases
               , protocol_states ) -> (
@@ -385,7 +385,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                     let open Deferred.Or_error.Let_syntax in
                     let received_staged_ledger_hash =
                       Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-                        (Staged_ledger.Scan_state.hash scan_state)
+                        (Staged_ledger.Scan_state.Stable.Latest.hash
+                           scan_state_uncached )
                         expected_merkle_root pending_coinbases
                     in
                     [%log debug]
@@ -415,6 +416,10 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                     let protocol_states =
                       List.map protocol_states
                         ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
+                    in
+                    let scan_state =
+                      Staged_ledger.Scan_state.write_all_proofs_to_disk
+                        scan_state_uncached
                     in
                     let%bind protocol_states =
                       Staged_ledger.Scan_state.check_required_protocol_states
@@ -1031,10 +1036,16 @@ let%test_module "Bootstrap_controller tests" =
                   ~pending_coinbases ~get_state
                 |> Deferred.Or_error.ok_exn
               in
-              assert (
-                Staged_ledger_hash.equal
-                  (Staged_ledger.hash staged_ledger)
-                  (Staged_ledger.hash actual_staged_ledger) ) ) )
+              let height =
+                Transition_frontier.Breadcrumb.consensus_state breadcrumb
+                |> Consensus.Data.Consensus_state.blockchain_length
+                |> Mina_numbers.Length.to_int
+              in
+              [%test_eq: Staged_ledger_hash.t]
+                ~message:
+                  (sprintf "mismatch of staged ledger hash height %d" height)
+                (Transition_frontier.Breadcrumb.staged_ledger_hash breadcrumb)
+                (Staged_ledger.hash actual_staged_ledger) ) )
 
     (*
     let%test_unit "if we see a new transition that is better than the \

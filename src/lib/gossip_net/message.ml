@@ -11,7 +11,7 @@ module Master = struct
           Snark_pool.Resource_pool.Diff.t Network_pool.With_nonce.t
       | Transaction_pool_diff of
           Transaction_pool.Resource_pool.Diff.t Network_pool.With_nonce.t
-    [@@deriving sexp, to_yojson]
+    [@@deriving to_yojson]
 
     type snark_pool_diff_msg = Snark_pool.Resource_pool.Diff.t
 
@@ -37,7 +37,7 @@ module V2 = struct
       | Transaction_pool_diff of
           Transaction_pool.Diff_versioned.Stable.V2.t
           Network_pool.With_nonce.Stable.V1.t
-    [@@deriving bin_io, sexp, version { rpc }]
+    [@@deriving bin_io, version { rpc }]
 
     type snark_pool_diff_msg = Snark_pool.Diff_versioned.Stable.V2.t
 

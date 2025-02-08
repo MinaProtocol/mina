@@ -10,7 +10,7 @@ EXTRA_ARGS=""
 
 source buildkite/scripts/bench/install.sh
 
-MAINLINE_BRANCHES="-m develop -m compatible -m master -m dkijania/fix_benchmark_upload"
+MAINLINE_BRANCHES="-m develop -m compatible -m master -m dkijania/enhance_benchmarks"
 while [[ "$#" -gt 0 ]]; do case $1 in
   heap-usage) BENCHMARK="heap-usage"; ;;
   mina-base) BENCHMARK="mina-base"; ;;

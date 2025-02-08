@@ -20,7 +20,7 @@ module Node = struct
     ; successor_hashes : State_hash.t list
     ; length : int
     }
-  [@@deriving sexp, fields]
+  [@@deriving fields]
 
   type display =
     { length : int
@@ -306,7 +306,6 @@ let visualize_to_string t =
 let calculate_root_transition_diff t heir =
   let root = root t in
   let heir_hash = Breadcrumb.state_hash heir in
-  let heir_transition = Breadcrumb.validated_transition heir in
   let heir_staged_ledger = Breadcrumb.staged_ledger heir in
   let heir_siblings =
     List.filter (successors t root) ~f:(fun breadcrumb ->
@@ -326,15 +325,22 @@ let calculate_root_transition_diff t heir =
         in
         { transition; scan_state } )
   in
+  let new_scan_state = Staged_ledger.scan_state heir_staged_ledger in
   let protocol_states =
     Protocol_states_for_root_scan_state.protocol_states_for_next_root_scan_state
-      t.protocol_states_for_root_scan_state
-      ~new_scan_state:(Staged_ledger.scan_state heir_staged_ledger)
+      t.protocol_states_for_root_scan_state ~new_scan_state
       ~old_root_state:(Breadcrumb.protocol_state_with_hashes root)
   in
+  let heir_transition =
+    Breadcrumb.validated_transition heir
+    |> Mina_block.Validated.read_all_proofs_from_disk
+  in
+  let new_scan_state_unwrapped =
+    Staged_ledger.Scan_state.read_all_proofs_from_disk new_scan_state
+  in
   let new_root_data =
-    Root_data.Limited.create ~transition:heir_transition
-      ~scan_state:(Staged_ledger.scan_state heir_staged_ledger)
+    Root_data.Limited.Stable.Latest.create ~transition:heir_transition
+      ~scan_state:new_scan_state_unwrapped
       ~pending_coinbase:
         (Staged_ledger.pending_coinbase_collection heir_staged_ledger)
       ~protocol_states
@@ -633,10 +639,12 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       t.best_tip <- new_best_tip ;
       (old_best_tip, None)
   | Root_transitioned { new_root; garbage = Full garbage; _ } ->
-      let new_root_hash = (Root_data.Limited.hashes new_root).state_hash in
+      let new_root_hash =
+        (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
+      in
       let old_root_hash = t.root in
       let new_root_protocol_states =
-        Root_data.Limited.protocol_states new_root
+        Root_data.Limited.Stable.Latest.protocol_states new_root
       in
       [%log' internal t.logger] "Move_frontier_root" ;
       move_root t ~new_root_hash ~new_root_protocol_states ~garbage
@@ -1010,12 +1018,14 @@ module For_tests = struct
            ~src:(Lazy.force Genesis_ledger.t)
            ~dest:(Mina_ledger.Ledger.create ~depth:ledger_depth ()) )
     in
+    let staged_ledger =
+      Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
+    in
     let root_data =
       let open Root_data in
       { transition =
           Mina_block.Validated.lift @@ Mina_block.genesis ~precomputed_values
-      ; staged_ledger =
-          Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
+      ; staged_ledger
       ; protocol_states = []
       }
     in
