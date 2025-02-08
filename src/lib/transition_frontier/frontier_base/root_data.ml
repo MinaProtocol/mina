@@ -16,7 +16,7 @@ module Common = struct
     end
   end]
 
-  type t = Stable.Latest.t =
+  type t =
     { scan_state : Staged_ledger.Scan_state.t
     ; pending_coinbase : Pending_coinbase.t
     }
@@ -133,8 +133,7 @@ module Minimal = struct
     end
   end]
 
-  type t = Stable.Latest.t = { hash : State_hash.t; common : Common.t }
-  [@@deriving fields]
+  type t = { hash : State_hash.t; common : Common.t } [@@deriving fields]
 
   let of_limited ~common hash = { hash; common }
 
@@ -165,9 +164,25 @@ module Minimal = struct
 
   let pending_coinbase t = Common.pending_coinbase t.common
 
-  let generate = Fn.id
+  let write_all_proofs_to_disk
+      { Stable.Latest.hash; common = { scan_state; pending_coinbase } } =
+    { hash
+    ; common =
+        { pending_coinbase
+        ; scan_state =
+            Staged_ledger.Scan_state.write_all_proofs_to_disk scan_state
+        }
+    }
 
-  let unwrap = Fn.id
+  let read_all_proofs_from_disk
+      { hash; common = { scan_state; pending_coinbase } } =
+    { Stable.Latest.hash
+    ; common =
+        { pending_coinbase
+        ; scan_state =
+            Staged_ledger.Scan_state.read_all_proofs_from_disk scan_state
+        }
+    }
 end
 
 type t =

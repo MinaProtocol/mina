@@ -6,12 +6,16 @@ module Ledger = Mina_ledger.Ledger
 
 [%%versioned:
 module Stable : sig
+  [@@@no_toplevel_latest_type]
+
   module V2 : sig
     type t
 
     val hash : t -> Staged_ledger_hash.Aux_hash.t
   end
 end]
+
+type t
 
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
@@ -51,26 +55,14 @@ module Make_statement_scanner (Verifier : sig
     -> Ledger_proof_with_sok_message.t list
     -> unit Or_error.t Deferred.Or_error.t
 end) : sig
-  val scan_statement :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> logger:Logger.t
-    -> t
-    -> statement_check:
-         [ `Full of State_hash.t -> Mina_state.Protocol_state.value Or_error.t
-         | `Partial ]
-    -> verifier:Verifier.t
-    -> ( Transaction_snark.Statement.t
-       , [ `Empty | `Error of Error.t ] )
-       Deferred.Result.t
-
   val check_invariants :
        t
+    -> verifier:Verifier.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> logger:Logger.t
     -> statement_check:
          [ `Full of State_hash.t -> Mina_state.Protocol_state.value Or_error.t
          | `Partial ]
-    -> verifier:Verifier.t
     -> error_prefix:string
     -> last_proof_statement:Transaction_snark.Statement.t option
     -> registers_end:Mina_state.Registers.Value.t
@@ -215,8 +207,6 @@ val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
 val base_jobs_on_earlier_tree :
   t -> index:int -> Transaction_with_witness.t list
 
-val hash : t -> Staged_ledger_hash.Aux_hash.t
-
 (** All the transactions with hash of the parent block in which they were included in the order in which they were applied*)
 val staged_transactions_with_state_hash :
      t
@@ -272,3 +262,7 @@ val all_work_pairs :
      One_or_two.t
      list
      Or_error.t
+
+val write_all_proofs_to_disk : Stable.Latest.t -> t
+
+val read_all_proofs_from_disk : t -> Stable.Latest.t

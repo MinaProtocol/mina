@@ -75,4 +75,4 @@ let is_genesis t =
   header t |> Header.protocol_state |> Mina_state.Protocol_state.consensus_state
   |> Consensus.Data.Consensus_state.is_genesis_state
 
-let unwrap = Fn.id
+let read_all_proofs_from_disk = Fn.id
