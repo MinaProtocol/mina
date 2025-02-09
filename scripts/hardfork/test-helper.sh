@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 graphql()
 { curl --location "http://localhost:$1/graphql" \
 --header "Content-Type: application/json" \
@@ -68,17 +70,17 @@ blocks_filter='.data.bestChain[] |
   , .protocolState.consensusState.epoch
   ] | join(",")'
 
-IX_STATE_HASH=0
-IX_HEIGHT=1
-IX_SLOT=2
-IX_NON_EMPTY=3
-IX_CUR_EPOCH_HASH=4
-IX_CUR_EPOCH_SEED=5
-IX_NEXT_EPOCH_HASH=6
-IX_NEXT_EPOCH_SEED=7
-IX_STAGED_HASH=8
-IX_SNARKED_HASH=9
-IX_EPOCH=10
+export IX_STATE_HASH=0
+export IX_HEIGHT=1
+export IX_SLOT=2
+export IX_NON_EMPTY=3
+export IX_CUR_EPOCH_HASH=4
+export IX_CUR_EPOCH_SEED=5
+export IX_NEXT_EPOCH_HASH=6
+export IX_NEXT_EPOCH_SEED=7
+export IX_STAGED_HASH=8
+export IX_SNARKED_HASH=9
+export IX_EPOCH=10
 
 blocks()
 { graphql "$1" "$blocks_query" | jq -r "$blocks_filter"
@@ -118,7 +120,7 @@ latest_nonempty_block(){
     fi
   done
   latest_str="${latest[*]}"
-  epochs="${!slot_pe[@]}"
+  epochs="${!slot_pe[*]}"
   epoch_str="${epochs[*]}"
   snarked_hash_pe_str="${snarked_hash_pe[*]}"
   echo "$max_slot,${epoch_str//${IFS:0:1}/:},${snarked_hash_pe_str//${IFS:0:1}/:},${latest_str//${IFS:0:1}/,}"
