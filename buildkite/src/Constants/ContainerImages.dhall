@@ -4,7 +4,7 @@
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
 { toolchainBase = "codaprotocol/ci-toolchain-base:v3"
 , minaToolchainBullseye =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:sha256:52360da15d548e34fde9460dc5381c4c21276280ed09a2bb097d1bb177941912"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:52360da15d548e34fde9460dc5381c4c21276280ed09a2bb097d1bb177941912"
 , minaToolchainBookworm =
     "gcr.io/o1labs-192920/mina-toolchain@sha256:52360da15d548e34fde9460dc5381c4c21276280ed09a2bb097d1bb177941912"
 , minaToolchain =
