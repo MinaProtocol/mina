@@ -5,17 +5,16 @@ open Network_peer
 
 module Master = struct
   module T = struct
+    type snark_pool_diff_msg = Snark_pool.Diff_versioned.Stable.Latest.t
+
+    type transaction_pool_diff_msg =
+      Transaction_pool.Diff_versioned.Stable.Latest.t
+
     type msg =
-      | New_state of Mina_block.t
-      | Snark_pool_diff of
-          Snark_pool.Resource_pool.Diff.t Network_pool.With_nonce.t
+      | New_state of Mina_block.Stable.Latest.t
+      | Snark_pool_diff of snark_pool_diff_msg Network_pool.With_nonce.t
       | Transaction_pool_diff of
-          Transaction_pool.Resource_pool.Diff.t Network_pool.With_nonce.t
-    [@@deriving to_yojson]
-
-    type snark_pool_diff_msg = Snark_pool.Resource_pool.Diff.t
-
-    type transaction_pool_diff_msg = Transaction_pool.Resource_pool.Diff.t
+          transaction_pool_diff_msg Network_pool.With_nonce.t
   end
 
   let name = "message"
@@ -78,8 +77,8 @@ module Latest = V2
 [%%define_locally Latest.(summary)]
 
 type block_sink_msg =
-  [ `Block of Mina_block.t Envelope.Incoming.t
-  | `Header of Mina_block.Header.t Envelope.Incoming.t ]
+  [ `Block of Mina_block.Stable.Latest.t Envelope.Incoming.t
+  | `Header of Mina_block.Header.Stable.Latest.t Envelope.Incoming.t ]
   * [ `Time_received of Block_time.t ]
   * [ `Valid_cb of Mina_net2.Validation_callback.t ]
 

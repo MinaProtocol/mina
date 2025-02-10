@@ -57,17 +57,17 @@ module type S = sig
   val fee : t -> Fee.t
 
   val prover : t -> Public_key.Compressed.t
-
-  val proofs : t -> Ledger_proof.t One_or_two.t
 end
 
-type t = Mina_wire_types.Transaction_snark_work.V2.t =
+type t =
   { fee : Currency.Fee.t
-  ; proofs : Ledger_proof.t One_or_two.t
+  ; proofs : Ledger_proof.Cached.t One_or_two.t
   ; prover : Public_key.Compressed.t
   }
 
 include S with type t := t
+
+val proofs : t -> Ledger_proof.Cached.t One_or_two.t
 
 val info : t -> Info.t
 
@@ -76,14 +76,28 @@ val statement : t -> Statement.t
 module Stable : sig
   module V2 : sig
     type t [@@deriving bin_io, equal, sexp, version, yojson]
+
+    val statement : t -> Statement.Stable.V2.t
+
+    val fee : t -> Fee.Stable.V1.t
+
+    val prover : t -> Public_key.Compressed.Stable.V1.t
+
+    val to_latest : t -> t
   end
+
+  module Latest = V2
 end
-with type V2.t = t
+with type V2.t = Mina_wire_types.Transaction_snark_work.V2.t
 
 type unchecked = t
 
 module Checked : sig
   include S
+
+  module Stable : module type of Stable
+
+  val proofs : t -> Ledger_proof.Cached.t One_or_two.t
 
   val create_unsafe : unchecked -> t
 
@@ -91,3 +105,8 @@ module Checked : sig
 end
 
 val forget : Checked.t -> t
+
+val write_all_proofs_to_disk :
+  proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
+
+val read_all_proofs_from_disk : t -> Stable.Latest.t

@@ -504,7 +504,7 @@ module Get_transition_chain = struct
     module T = struct
       type query = State_hash.t list [@@deriving sexp, to_yojson]
 
-      type response = Mina_block.t list option
+      type response = Mina_block.Stable.Latest.t list option
     end
 
     module Caller = T
@@ -582,7 +582,8 @@ module Get_transition_chain = struct
             ~sender:(Envelope.Incoming.sender request)
             blocks
         in
-        Option.some_if valid_versions blocks
+        Option.some_if valid_versions
+        @@ List.map ~f:Mina_block.read_all_proofs_from_disk blocks
     | None ->
         let%map () =
           Trust_system.(
@@ -867,7 +868,10 @@ module Get_completed_snarks = struct
     | Some snark_pool, Some snark_state ->
         Work_selector.completed_work_statements ~snark_pool snark_state
         |> Fn.flip List.take limit
-        |> List.map ~f:Transaction_snark_work.forget
+        |> List.map
+             ~f:
+               Transaction_snark_work.(
+                 Fn.compose read_all_proofs_from_disk forget)
         |> Option.some |> return
     | _, _ ->
         return None
@@ -891,8 +895,8 @@ module Get_ancestry = struct
       [@@deriving sexp, to_yojson]
 
       type response =
-        ( Mina_block.t
-        , State_body_hash.t list * Mina_block.t )
+        ( Mina_block.Stable.Latest.t
+        , State_body_hash.t list * Mina_block.Stable.Latest.t )
         Proof_carrying_data.t
         option
     end
@@ -987,14 +991,18 @@ module Get_ancestry = struct
                 ))
         in
         None
-    | Some { proof = _, block; _ } ->
+    | Some { proof = chain, base_block; data = block } ->
         let%map valid_versions =
           validate_protocol_versions ~logger ~trust_system
             ~rpc_name:"Get_ancestry"
             ~sender:(Envelope.Incoming.sender request)
-            [ block ]
+            [ base_block ]
         in
-        if valid_versions then result else None
+        Option.some_if valid_versions
+          { Proof_carrying_data.proof =
+              (chain, Mina_block.read_all_proofs_from_disk base_block)
+          ; data = Mina_block.read_all_proofs_from_disk block
+          }
 
   let rate_limit_budget = (5, `Per Time.Span.minute)
 
@@ -1096,8 +1104,8 @@ module Get_best_tip = struct
       type query = unit [@@deriving sexp, to_yojson]
 
       type response =
-        ( Mina_block.t
-        , State_body_hash.t list * Mina_block.t )
+        ( Mina_block.Stable.Latest.t
+        , State_body_hash.t list * Mina_block.Stable.Latest.t )
         Proof_carrying_data.t
         option
     end
@@ -1186,7 +1194,7 @@ module Get_best_tip = struct
                 (Requested_unknown_item, Some (receipt_trust_action_message ())))
         in
         None
-    | Some { data = data_block; proof = _, proof_block } ->
+    | Some { data = data_block; proof = chain, proof_block } ->
         let%map data_valid_versions =
           validate_protocol_versions ~logger ~trust_system
             ~rpc_name:"Get_best_tip (data)"
@@ -1198,7 +1206,12 @@ module Get_best_tip = struct
             ~sender:(Envelope.Incoming.sender request)
             [ proof_block ]
         in
-        if data_valid_versions && proof_valid_versions then result else None
+        Option.some_if
+          (data_valid_versions && proof_valid_versions)
+          { Proof_carrying_data.data =
+              Mina_block.read_all_proofs_from_disk data_block
+          ; proof = (chain, Mina_block.read_all_proofs_from_disk proof_block)
+          }
 
   let rate_limit_budget = (3, `Per Time.Span.minute)
 
