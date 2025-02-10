@@ -35,7 +35,8 @@ module InputConfig = struct
     in
     { target_epoch_ledgers_state_hash
     ; start_slot_since_genesis = 0L
-    ; genesis_ledger = Option.value_exn runtime_config.ledger
+    ; genesis_ledger =
+        Runtime_config.Existing_config.value_exn runtime_config.ledger
     ; first_pass_ledger_hashes = []
     ; last_snarked_ledger_hash = None
     }

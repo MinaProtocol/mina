@@ -1877,9 +1877,9 @@ let compile_time_constants =
            Runtime_config.of_json_layout
              { Runtime_config.Json_layout.default with
                ledger =
-                 Some
+                 Existing
                    { Runtime_config.Json_layout.Ledger.default with
-                     accounts = Some []
+                     accounts = Existing []
                    }
              }
            |> Result.ok_or_failwith

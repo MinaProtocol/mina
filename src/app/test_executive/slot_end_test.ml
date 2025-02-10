@@ -56,9 +56,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; num_archive_nodes = 0
     ; proof_config =
         { proof_config_default with
-          work_delay = Some 1
+          work_delay = Existing 1
         ; transaction_capacity =
-            Some Runtime_config.Proof_keys.Transaction_capacity.small
+            Existing Runtime_config.Proof_keys.Transaction_capacity.small
         }
     ; slot_tx_end = Some slot_tx_end
     ; slot_chain_end = Some slot_chain_end

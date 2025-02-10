@@ -108,7 +108,8 @@ module Ledger = struct
     let str =
       String.concat
         [ Int.to_string constraint_constants.ledger_depth
-        ; Int.to_string (Option.value ~default:0 num_accounts)
+        ; Int.to_string
+            (Runtime_config.Existing_config.value ~default:0 num_accounts)
         ; List.to_string balances ~f:(fun (i, balance) ->
               sprintf "%i %s" i (Currency.Balance.to_string balance) )
         ; (* Distinguish ledgers when the hash function is different. *)
@@ -149,7 +150,7 @@ module Ledger = struct
     in
     let load_from_s3 filename =
       match config.s3_data_hash with
-      | Some s3_hash -> (
+      | Existing s3_hash -> (
           let s3_path = Cache_dir.s3_keys_bucket_prefix ^/ filename in
           let local_path = Cache_dir.s3_install_path ^/ filename in
           match%bind Cache_dir.load_from_s3 s3_path local_path ~logger with
@@ -168,13 +169,15 @@ module Ledger = struct
                   ; ("error", `String (Error.to_string_hum e))
                   ] ;
               return None )
-      | None ->
+      | Unset ->
           [%log warn]
             "Need S3 hash specified in runtime config to verify download for \
              $ledger (root hash $root_hash), not attempting"
             ~metadata:
               [ ( "root_hash"
-                , `String (Option.value ~default:"not specified" config.hash) )
+                , `String
+                    (Runtime_config.Existing_config.value
+                       ~default:"not specified" config.hash ) )
               ; ("ledger", `String ledger_name_prefix)
               ] ;
           return None
@@ -191,10 +194,10 @@ module Ledger = struct
     in
     let%bind hash_filename =
       match config.hash with
-      | Some hash ->
+      | Existing hash ->
           let hash_filename = hash_filename hash ~ledger_name_prefix in
           search_local_and_s3 hash_filename
-      | None ->
+      | Unset ->
           return None
     in
     match hash_filename with
@@ -219,10 +222,10 @@ module Ledger = struct
             search_local named_filename
         | Accounts accounts, _ ->
             search_local_and_s3 ~other_data:(accounts_hash accounts) "accounts"
-        | Hash, None ->
-            assert (Option.is_some config.hash) ;
+        | Hash, Unset ->
+            assert (Runtime_config.Existing_config.is_existing config.hash) ;
             return None
-        | _, Some name ->
+        | _, Existing name ->
             search_local_and_s3 name )
 
   let load_from_tar ?(genesis_dir = Cache_dir.autogen_path) ~logger
@@ -347,9 +350,9 @@ module Ledger = struct
       *)
       let add_genesis_winner_account =
         match config.add_genesis_winner with
-        | Some add_genesis_winner ->
+        | Existing add_genesis_winner ->
             add_genesis_winner
-        | None ->
+        | Unset ->
             Genesis_constants.Proof_level.equal Full proof_level
       in
       if add_genesis_winner_account then
@@ -403,7 +406,10 @@ module Ledger = struct
     Option.map padded_accounts_with_balances_opt
       ~f:
         (Lazy.map
-           ~f:(Accounts.pad_to (Option.value ~default:0 config.num_accounts)) )
+           ~f:
+             (Accounts.pad_to
+                (Runtime_config.Existing_config.value ~default:0
+                   config.num_accounts ) ) )
 
   let packed_genesis_ledger_of_accounts ~depth accounts :
       Genesis_ledger.Packed.t =
@@ -433,7 +439,9 @@ module Ledger = struct
             match%map
               load_from_tar ~genesis_dir ~logger ~constraint_constants
                 ~expected_merkle_root:
-                  (Option.map config.hash ~f:Ledger_hash.of_base58_check_exn)
+                  Runtime_config.Existing_config.(
+                    map config.hash ~f:Ledger_hash.of_base58_check_exn
+                    |> to_option)
                 ?accounts:padded_accounts_opt ~ledger_name_prefix tar_path
             with
             | Ok ledger ->
@@ -453,7 +461,8 @@ module Ledger = struct
                     assert false
                 | Hash ->
                     let missing_hash =
-                      Option.value ~default:"not specified" config.hash
+                      Runtime_config.Existing_config.value
+                        ~default:"not specified" config.hash
                     in
                     [%log error]
                       "Could not find or generate a $ledger for $root_hash"
@@ -495,7 +504,7 @@ module Ledger = struct
                 let config =
                   { config with
                     hash =
-                      Some
+                      Existing
                         ( Ledger_hash.to_base58_check
                         @@ Mina_ledger.Ledger.merkle_root ledger )
                   }
@@ -506,9 +515,9 @@ module Ledger = struct
                       (Some name, None)
                   | Accounts accounts, _ ->
                       (Some "accounts", Some (accounts_hash accounts))
-                  | Hash, None ->
+                  | Hash, Unset ->
                       (None, None)
-                  | _, Some name ->
+                  | _, Existing name ->
                       (Some name, None)
                 in
                 match (tar_path, name) with
@@ -557,12 +566,13 @@ end
 
 module Epoch_data = struct
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      (config : Runtime_config.Epoch_data.t option) =
+      (config :
+        Runtime_config.Epoch_data.t option Runtime_config.Existing_config.t ) =
     let open Deferred.Or_error.Let_syntax in
     match config with
-    | None ->
+    | Unset | Existing None ->
         Deferred.Or_error.return (None, None)
-    | Some config ->
+    | Existing (Some config) ->
         let ledger_name_prefix = "epoch_ledger" in
         let load_ledger ledger =
           Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
@@ -735,10 +745,11 @@ end
 
 let print_config ~logger (config : Runtime_config.t) =
   let ledger_name_json =
-    Option.value ~default:`Null
-    @@ let%bind.Option ledger = config.Runtime_config.ledger in
-       let%map.Option name = ledger.name in
-       `String name
+    Runtime_config.Existing_config.(
+      value ~default:`Null
+      @@ ( config.Runtime_config.ledger
+         >>= (fun ledger -> ledger.name)
+         >>| fun name -> `String name ))
   in
   let ( json_config
       , `Accounts_omitted
@@ -748,7 +759,7 @@ let print_config ~logger (config : Runtime_config.t) =
     Runtime_config.to_yojson_without_accounts config
   in
   let append_accounts_omitted s =
-    Option.value_map
+    Runtime_config.Existing_config.value_map
       ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
       ~default:Fn.id
   in
@@ -798,10 +809,10 @@ module Config_loader : Config_loader_intf = struct
     in
     let%bind genesis_ledger, ledger_config, ledger_file =
       match config.ledger with
-      | Some ledger ->
+      | Existing ledger ->
           Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
             ?overwrite_version ledger
-      | None ->
+      | Unset ->
           [%log fatal] "No ledger was provided in the runtime configuration" ;
           Deferred.Or_error.errorf
             "No ledger was provided in the runtime configuration"
@@ -810,12 +821,15 @@ module Config_loader : Config_loader_intf = struct
       ~metadata:[ ("ledger_file", `String ledger_file) ] ;
     let%map genesis_epoch_data, genesis_epoch_data_config =
       Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-        (Option.join config.epoch_data)
+        config.epoch_data
     in
     let c1 =
       { config with
-        ledger = Option.map config.ledger ~f:(fun _ -> ledger_config)
-      ; epoch_data = Option.map ~f:Option.some genesis_epoch_data_config
+        ledger =
+          Runtime_config.Existing_config.map config.ledger ~f:(fun _ ->
+              ledger_config )
+      ; epoch_data =
+          Runtime_config.Existing_config.existing genesis_epoch_data_config
       }
     in
     let c2 = Runtime_config.of_constants constants in
@@ -870,7 +884,7 @@ module Config_loader : Config_loader_intf = struct
           Runtime_config.to_yojson_without_accounts config
         in
         let append_accounts_omitted s =
-          Option.value_map
+          Runtime_config.Existing_config.value_map
             ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
             ~default:Fn.id
         in
@@ -881,9 +895,11 @@ module Config_loader : Config_loader_intf = struct
           @ [ ("config", json_config)
             ; ( "name"
               , `String
-                  (Option.value ~default:"not provided"
-                     (let%bind.Option ledger = config.ledger in
-                      Option.first_some ledger.name ledger.hash ) ) )
+                  Runtime_config.Existing_config.(
+                    value ~default:"not provided"
+                      ( config.ledger
+                      >>= fun ledger -> first_existing ledger.name ledger.hash
+                      )) )
             ; ("error", Error_json.error_to_yojson err)
             ]
         in
