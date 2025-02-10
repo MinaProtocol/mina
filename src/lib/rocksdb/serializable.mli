@@ -6,5 +6,6 @@ module Make (Key : Binable.S) (Value : Binable.S) :
      and type config := string
 
 module GADT : sig
-  module Make (Key : Intf.Key.S) : Intf.Database.S with type 'a g := 'a Key.t
+  module Make (Key : Intf.Key.S) :
+    Intf.Database.S with type 'a g := 'a Key.t and type raw_db_t := Database.t
 end

@@ -437,3 +437,6 @@ let rec crawl_successors t hash ~init ~f =
       crawl_successors t succ_hash ~init:init' ~f )
 
 let with_batch t = Batch.with_batch t.db
+
+let make_checkpoint t ~location =
+  Rocksdb.Database.make_checkpoint (Rocks.to_raw_db t.db) location

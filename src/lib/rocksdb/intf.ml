@@ -48,6 +48,8 @@ module Database = struct
       type nonrec t = t
     end
 
+    type raw_db_t
+
     val create : string -> t
 
     val close : t -> unit
@@ -57,6 +59,8 @@ module Database = struct
     val get_raw : t -> key:'a g -> Bigstring.t option
 
     val get_batch : t -> keys:Key.t list -> Key.with_value option list
+
+    val to_raw_db : t -> raw_db_t
 
     module Batch : sig
       include Intf with type 'a g := 'a g
