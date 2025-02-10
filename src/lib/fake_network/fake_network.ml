@@ -79,6 +79,8 @@ let setup (type n) ~context:(module Context : CONTEXT)
       let consensus_local_state = consensus_local_state
 
       let compile_config = precomputed_values.compile_config
+
+      let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
     end )
   in
   let config rpc_mocks peer =

@@ -412,18 +412,14 @@ let get_transition t hash =
 
 let get_arcs t hash = get t.db ~key:(Arcs hash) ~error:(`Not_found (`Arcs hash))
 
-let get_root_impl t = get t.db ~key:Root ~error:(`Not_found `Root)
-
-let get_root t =
-  get_root_impl t |> Result.map ~f:Root_data.Minimal.write_all_proofs_to_disk
+let get_root t = get t.db ~key:Root ~error:(`Not_found `Root)
 
 let get_protocol_states_for_root_scan_state t =
   get t.db ~key:Protocol_states_for_root_scan_state
     ~error:(`Not_found `Protocol_states_for_root_scan_state)
 
 let get_root_hash t =
-  let%map root = get_root_impl t in
-  Root_data.Minimal.Stable.Latest.hash root
+  Result.map ~f:Root_data.Minimal.Stable.Latest.hash (get_root t)
 
 let get_best_tip t = get t.db ~key:Best_tip ~error:(`Not_found `Best_tip)
 

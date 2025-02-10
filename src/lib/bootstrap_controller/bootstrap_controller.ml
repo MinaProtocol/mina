@@ -17,6 +17,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 type Structured_log_events.t += Bootstrap_complete
@@ -419,7 +421,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                     in
                     let scan_state =
                       Staged_ledger.Scan_state.write_all_proofs_to_disk
-                        scan_state_uncached
+                        ~proof_cache_db scan_state_uncached
                     in
                     let%bind protocol_states =
                       Staged_ledger.Scan_state.check_required_protocol_states
@@ -764,6 +766,8 @@ let%test_module "Bootstrap_controller tests" =
         Genesis_constants.For_unit_tests.Constraint_constants.t
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
     end
 
     let verifier =
