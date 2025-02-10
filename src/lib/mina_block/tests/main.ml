@@ -18,14 +18,7 @@ let sexp_serialization_roundtrips () =
   if Sexp.equal sexp sexp_roundtrip then ()
   else failwith "sexp roundtrip failed"
 
-(* NOTE: This serialization is used externally and MUST NOT change.
-    If the underlying types change, you should write a conversion, or add
-    optional fields and handle them appropriately.
-*)
-(* But if you really need to update it, see output of CLI command:
-   `dune exec dump_blocks 1> block.txt` *)
-let json_serialization_is_stable () =
-  let serialized_block = Sample_precomputed_block.sample_block_json in
+let json_serialization_is_stable_impl serialized_block =
   match
     Mina_block.Precomputed.of_yojson @@ Yojson.Safe.from_string serialized_block
   with
@@ -34,8 +27,17 @@ let json_serialization_is_stable () =
   | Error err ->
       failwith err
 
-let json_serialization_roundtrips () =
-  let serialized_block = Sample_precomputed_block.sample_block_json in
+(* NOTE: This serialization is used externally and MUST NOT change.
+    If the underlying types change, you should write a conversion, or add
+    optional fields and handle them appropriately.
+*)
+(* But if you really need to update it, see output of CLI command:
+   `dune exec dump_blocks 1> block.txt` *)
+let json_serialization_is_stable () =
+  json_serialization_is_stable_impl
+  @@ Sample_precomputed_block.sample_block_json
+
+let json_serialization_roundtrips_impl serialized_block =
   let json = Yojson.Safe.from_string serialized_block in
   let json_roundtrip =
     match
@@ -47,6 +49,20 @@ let json_serialization_roundtrips () =
         failwith err
   in
   assert (Yojson.Safe.equal json json_roundtrip)
+
+let json_serialization_roundtrips () =
+  json_serialization_roundtrips_impl
+  @@ Sample_precomputed_block.sample_block_json
+
+let large_precomputed_json_file = "hetzner-itn-1-1795.json"
+
+let json_serialization_is_stable_from_file () =
+  json_serialization_is_stable_impl
+  @@ In_channel.read_all large_precomputed_json_file
+
+let json_serialization_roundtrips_from_file () =
+  json_serialization_roundtrips_impl
+  @@ In_channel.read_all large_precomputed_json_file
 
 let () =
   run "Precomputed block serialization tests"
@@ -61,5 +77,9 @@ let () =
             json_serialization_is_stable
         ; test_case "serialization roundtrips" `Quick
             json_serialization_roundtrips
+        ; test_case "serialization is stable from file" `Quick
+            json_serialization_is_stable_from_file
+        ; test_case "serialization roundtrips from file" `Quick
+            json_serialization_roundtrips_from_file
         ] )
     ]
