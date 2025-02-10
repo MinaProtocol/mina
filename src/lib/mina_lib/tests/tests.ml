@@ -56,22 +56,24 @@ let%test_module "Epoch ledger sync tests" =
     let make_context () : (module CONTEXT) Deferred.t =
       let%bind precomputed_values =
         let runtime_config : Runtime_config.t =
-          { daemon = None
-          ; genesis = None
+          { daemon = Unset
+          ; genesis = Unset
           ; proof =
-              Some
-                { Runtime_config.Proof_keys.default with level = Some No_check }
-          ; ledger =
-              Some
-                { base = Named "test"
-                ; num_accounts = None
-                ; balances = []
-                ; hash = None
-                ; s3_data_hash = None
-                ; name = None
-                ; add_genesis_winner = None
+              Existing
+                { Runtime_config.Proof_keys.default with
+                  level = Existing No_check
                 }
-          ; epoch_data = None
+          ; ledger =
+              Existing
+                { base = Named "test"
+                ; num_accounts = Unset
+                ; balances = []
+                ; hash = Unset
+                ; s3_data_hash = Unset
+                ; name = Unset
+                ; add_genesis_winner = Unset
+                }
+          ; epoch_data = Unset
           }
         in
         match%map

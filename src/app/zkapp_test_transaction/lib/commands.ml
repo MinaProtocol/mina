@@ -333,7 +333,9 @@ let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
     in
     let runtime_config = Or_error.ok_exn config_json in
     let accounts =
-      let config = Option.value_exn runtime_config.Runtime_config.ledger in
+      let config =
+        Runtime_config.(Existing_config.value_exn runtime_config.ledger)
+      in
       match config.base with
       | Accounts accounts ->
           lazy (Genesis_ledger_helper.Accounts.to_full accounts)

@@ -151,39 +151,41 @@ module Network_config = struct
     in
     let runtime_config =
       { Runtime_config.daemon =
-          Some
+          Existing
             { Runtime_config.Daemon.default with
-              txpool_max_size = Some txpool_max_size
-            ; slot_tx_end
-            ; slot_chain_end
-            ; network_id
+              txpool_max_size = Existing txpool_max_size
+            ; slot_tx_end = Runtime_config.Existing_config.of_option slot_tx_end
+            ; slot_chain_end =
+                Runtime_config.Existing_config.of_option slot_chain_end
+            ; network_id = Runtime_config.Existing_config.of_option network_id
             }
       ; genesis =
-          Some
-            { k = Some k
-            ; delta = Some delta
-            ; slots_per_epoch = Some slots_per_epoch
-            ; slots_per_sub_window = Some slots_per_sub_window
-            ; grace_period_slots = Some grace_period_slots
+          Existing
+            { k = Existing k
+            ; delta = Existing delta
+            ; slots_per_epoch = Existing slots_per_epoch
+            ; slots_per_sub_window = Existing slots_per_sub_window
+            ; grace_period_slots = Existing grace_period_slots
             ; genesis_state_timestamp =
-                Some (Core.Time.(now ()) |> Genesis_constants.of_time)
+                Existing (Core.Time.(now ()) |> Genesis_constants.of_time)
             }
-      ; proof = Some proof_config (* TODO: prebake ledger and only set hash *)
+      ; proof =
+          Existing proof_config (* TODO: prebake ledger and only set hash *)
       ; ledger =
-          Some
+          Existing
             { base =
                 Accounts
                   (List.map genesis_ledger_accounts ~f:(fun (_name, acct) ->
                        acct ) )
-            ; add_genesis_winner = None
-            ; num_accounts = None
+            ; add_genesis_winner = Unset
+            ; num_accounts = Unset
             ; balances = []
-            ; hash = None
-            ; s3_data_hash = None
-            ; name = None
+            ; hash = Unset
+            ; s3_data_hash = Unset
+            ; name = Unset
             }
       ; epoch_data =
-          Some
+          Existing
             (Option.map epoch_data ~f:(fun { staking = staking_ledger; next } ->
                  let genesis_winner_account : Runtime_config.Accounts.single =
                    Runtime_config.Accounts.Single.of_account
@@ -234,12 +236,12 @@ module Network_config = struct
                    ( { base =
                          Accounts
                            (genesis_winner_account :: epoch_ledger_accounts)
-                     ; add_genesis_winner = None (* no effect *)
-                     ; num_accounts = None
+                     ; add_genesis_winner = Unset (* no effect *)
+                     ; num_accounts = Unset
                      ; balances = []
-                     ; hash = None
-                     ; s3_data_hash = None
-                     ; name = None
+                     ; hash = Unset
+                     ; s3_data_hash = Unset
+                     ; name = Unset
                      }
                      : Runtime_config.Ledger.t )
                  in

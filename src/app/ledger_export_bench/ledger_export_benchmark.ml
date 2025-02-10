@@ -26,9 +26,9 @@ let () =
   let cfg = load_daemon_cfg runtime_config () in
   let accounts =
     match cfg.ledger with
-    | None | Some { base = Named _; _ } | Some { base = Hash; _ } ->
+    | Unset | Existing { base = Named _; _ } | Existing { base = Hash; _ } ->
         []
-    | Some { base = Accounts accs; _ } ->
+    | Existing { base = Accounts accs; _ } ->
         List.map ~f:Runtime_config.Accounts.Single.to_account accs
   in
   Command.run

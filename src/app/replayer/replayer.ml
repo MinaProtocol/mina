@@ -135,12 +135,12 @@ let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
   let%map accounts = create_ledger_as_list ledger in
   let genesis_ledger : Runtime_config.Ledger.t =
     { base = Accounts accounts
-    ; num_accounts = None
+    ; num_accounts = Unset
     ; balances = []
-    ; hash = Some (Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
-    ; s3_data_hash = None
-    ; name = None
-    ; add_genesis_winner = Some true
+    ; hash = Existing (Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
+    ; s3_data_hash = Unset
+    ; name = Unset
+    ; add_genesis_winner = Existing true
     }
   in
   let first_pass_ledger_hashes =

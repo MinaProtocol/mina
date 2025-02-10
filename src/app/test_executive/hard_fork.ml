@@ -203,10 +203,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; num_archive_nodes = 1
     ; proof_config =
         { proof_config_default with
-          work_delay = Some 1
+          work_delay = Existing 1
         ; transaction_capacity =
-            Some Runtime_config.Proof_keys.Transaction_capacity.small
-        ; fork = Some (Some fork_config)
+            Existing Runtime_config.Proof_keys.Transaction_capacity.small
+        ; fork = Existing (Some fork_config)
         }
     }
 

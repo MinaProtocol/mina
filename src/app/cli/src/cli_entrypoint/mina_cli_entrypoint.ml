@@ -495,11 +495,11 @@ let setup_daemon logger ~itn_features =
     let open Gossip_net.Libp2p in
     function
     | "ro" ->
-        Some RO
+        Runtime_config.Existing_config.Existing RO
     | "rw" ->
-        Some RW
+        Existing RW
     | "none" ->
-        Some N
+        Existing N
     | _ ->
         raise (Error.to_exn (Error.of_string "Invalid pubsub topic mode"))
   in
@@ -664,22 +664,27 @@ let setup_daemon logger ~itn_features =
           |> Float.of_int64 |> Time.Span.of_ms |> Mina_metrics.initialize_all ;
 
           let module DC = Runtime_config.Daemon in
+          let module Conf = Runtime_config.Existing_config in
           (* The explicit typing here is necessary to prevent type inference from specializing according
              to the first usage.
           *)
           let maybe_from_config (type a) :
-              getter:(DC.t -> a option) -> preferred_value:a option -> a option
+              getter:(DC.t -> a Conf.t) -> preferred_value:a option -> a option
               =
            fun ~getter ~preferred_value ->
-            Option.first_some preferred_value Option.(config.daemon >>= getter)
+            Conf.(
+              first_option_and_existing_as_option preferred_value
+                (config.daemon >>= getter))
           in
           let or_from_config (type a) :
-                 getter:(DC.t -> a option)
+                 getter:(DC.t -> a Conf.t)
               -> preferred_value:a option
               -> default:a
               -> a =
            fun ~getter ~preferred_value ~default ->
-            Option.first_some preferred_value Option.(config.daemon >>= getter)
+            Conf.(
+              first_option_and_existing_as_option preferred_value
+                (config.daemon >>= getter))
             |> Option.value ~default
           in
 
@@ -704,7 +709,7 @@ let setup_daemon logger ~itn_features =
             or_from_config
               ~getter:(fun x ->
                 DC.snark_worker_fee x
-                |> Option.map ~f:Currency.Fee.of_nanomina_int_exn )
+                |> Conf.map ~f:Currency.Fee.of_nanomina_int_exn )
               ~preferred_value:snark_work_fee
               ~default:compile_config.default_snark_worker_fee
           in
@@ -725,7 +730,7 @@ let setup_daemon logger ~itn_features =
             or_from_config
               ~getter:(fun x ->
                 DC.work_selection x
-                |> Option.map ~f:Cli_lib.Arg_type.work_selection_method_val )
+                |> Conf.map ~f:Cli_lib.Arg_type.work_selection_method_val )
               ~preferred_value:work_selection_method_flag
               ~default:Cli_lib.Arg_type.Work_selection_method.Random
           in
@@ -762,7 +767,7 @@ let setup_daemon logger ~itn_features =
                       "The %s public key %s could not be decompressed." which
                       pk_str
                 | Some _ ->
-                    Some key )
+                    Conf.Existing key )
             | Error _e ->
                 Mina_user_error.raisef ~where:"decoding a public key"
                   "The %s public key %s could not be decoded." which pk_str
@@ -770,7 +775,7 @@ let setup_daemon logger ~itn_features =
           let run_snark_worker_flag =
             maybe_from_config
               ~getter:
-                Option.(
+                Conf.(
                   fun x ->
                     DC.run_snark_worker x
                     >>= to_publickey_compressed_option "snark_worker")
@@ -779,7 +784,7 @@ let setup_daemon logger ~itn_features =
           let run_snark_coordinator_flag =
             maybe_from_config
               ~getter:
-                Option.(
+                Conf.(
                   fun x ->
                     DC.run_snark_coordinator x
                     >>= to_publickey_compressed_option "snark_coordinator")
@@ -792,7 +797,7 @@ let setup_daemon logger ~itn_features =
           let coinbase_receiver_flag =
             maybe_from_config
               ~getter:
-                Option.(
+                Conf.(
                   fun x ->
                     DC.coinbase_receiver x
                     >>= to_publickey_compressed_option "coinbase_receiver")
@@ -819,7 +824,7 @@ let setup_daemon logger ~itn_features =
           let block_production_pubkey =
             maybe_from_config
               ~getter:
-                Option.(
+                Conf.(
                   fun x ->
                     DC.block_producer_pubkey x
                     >>= to_publickey_compressed_option "block_producer")
@@ -1085,7 +1090,7 @@ let setup_daemon logger ~itn_features =
           let pubsub_v0 =
             or_from_config
               ~getter:
-                Option.(fun x -> DC.pubsub_v0 x >>= to_pubsub_topic_mode_option)
+                Conf.(fun x -> DC.pubsub_v0 x >>= to_pubsub_topic_mode_option)
               ~preferred_value:None ~default:Cli_lib.Default.pubsub_v0
           in
 
@@ -1108,9 +1113,9 @@ let setup_daemon logger ~itn_features =
           let seed_peer_list_url =
             Option.value_map seed_peer_list_url ~f:Option.some
               ~default:
-                (Option.bind config.daemon
+                (Option.bind (Conf.to_option config.daemon)
                    ~f:(fun { Runtime_config.Daemon.peer_list_url; _ } ->
-                     peer_list_url ) )
+                     Conf.to_option peer_list_url ) )
           in
           if is_seed then [%log info] "Starting node as a seed node"
           else if demo_mode then [%log info] "Starting node in demo mode"

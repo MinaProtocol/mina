@@ -2760,9 +2760,9 @@ module Queries = struct
         let cfg = Mina_lib.config mina in
         let runtime_cfg = Mina_lib.runtime_config mina in
         let network_id =
-          Option.value ~default:cfg.compile_config.network_id
-          @@ let%bind.Option daemon = runtime_cfg.daemon in
-             daemon.network_id
+          Runtime_config.Existing_config.(
+            value ~default:cfg.compile_config.network_id
+            @@ (runtime_cfg.daemon >>= fun daemon -> daemon.network_id))
         in
         "mina:" ^ network_id )
 
