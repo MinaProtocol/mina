@@ -30,8 +30,9 @@ SCRIPT=' set -x \
     && export DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
     && echo installing mina \
     && apt-get update > /dev/null \
-    && apt-get install -y lsb-release ca-certificates > /dev/null \
-    && echo "deb [trusted=yes] https://'$REPO' '$CODENAME' '$CHANNEL'" > /etc/apt/sources.list.d/mina.list \
+    && apt-get install -y lsb-release ca-certificates wget gnupg > /dev/null \
+    && (wget -q https://'$BUCKET'/key.pgp -O- | apt-key add) \
+    && echo "deb [trusted=yes] https://'$BUCKET' '$CODENAME' '$CHANNEL'" > /etc/apt/sources.list.d/mina.list \
     && apt-get update > /dev/null \
     && apt list -a '$PACKAGE' \
     && apt-get install -y --allow-downgrades '$PACKAGE'='$VERSION' \
