@@ -1,0 +1,9 @@
+(test
+ (name main)
+ (flags
+  (:standard -warn-error +a))
+ (libraries alcotest mina_block)
+ (action
+  (run %{test}))
+ (instrumentation
+  (backend bisect_ppx)))
