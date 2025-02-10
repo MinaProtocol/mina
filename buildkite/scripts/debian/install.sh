@@ -8,7 +8,7 @@ fi
 
 if [ -z $MINA_DEB_CODENAME ]; then 
     echo "MINA_DEB_CODENAME env var is not defined"
-    exit -1
+    exit 1
 fi
 
 DEBS=$1
@@ -29,9 +29,9 @@ source ./buildkite/scripts/export-git-env-vars.sh
 # Download required debians from bucket locally
 if [ -z "$DEBS" ]; then 
     echo "DEBS env var is empty. It should contains comma delimitered names of debians to install"
-    exit -1
+    exit 1
 else
-  debs=(${DEBS//,/ })
+  IFS=',' read -r -a debs <<< "${DEBS}"
   for i in "${debs[@]}"; do
     case $i in
       mina-devnet*|mina-mainnet)

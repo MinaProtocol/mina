@@ -19,20 +19,25 @@ function find_most_recent_numeric_tag() {
     echo $TAG
 }
 
-export GITHASH=$(git rev-parse --short=7 HEAD)
-export THIS_COMMIT_TAG=$(git tag --points-at HEAD)
+GITHASH=$(git rev-parse --short=7 HEAD)
+THIS_COMMIT_TAG=$(git tag --points-at HEAD)
 
 if [[ -n "$BRANCH_NAME" ]]; then
-   export GITBRANCH=$(echo "$BRANCH_NAME" | sed 's!/!-!g; s!_!-!g; s!#!-!g')
+   GITBRANCH=$(echo "$BRANCH_NAME" | sed 's!/!-!g; s!_!-!g; s!#!-!g')
 else
-   export GITBRANCH=$(git name-rev --name-only $GITHASH | sed "s/remotes\/origin\///g" | sed 's!/!-!g; s!_!-!g; s!#!-!g' )
+   GITBRANCH=$(git name-rev --name-only $GITHASH | sed "s/remotes\/origin\///g" | sed 's!/!-!g; s!_!-!g; s!#!-!g' )
 fi
 
-export GITTAG=$(find_most_recent_numeric_tag HEAD)
+GITTAG=$(find_most_recent_numeric_tag HEAD)
 
-export MINA_DEB_VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
-export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g')"
+MINA_DEB_VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
+MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g')"
 
-[[ -n ${THIS_COMMIT_TAG} ]] && export MINA_COMMIT_TAG="${THIS_COMMIT_TAG}"
+[[ -n ${THIS_COMMIT_TAG} ]] && MINA_COMMIT_TAG="${THIS_COMMIT_TAG}"
 
-echo "after commit tag"
+export GITHASH
+export GITBRANCH
+export GITTAG
+export MINA_COMMIT_TAG
+export THIS_COMMIT_TAG
+export MINA_DOCKER_TAG
