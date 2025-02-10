@@ -1,3 +1,4 @@
+open Util
 open Core
 open Currency
 open Mina_base
@@ -10,7 +11,6 @@ module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 module Statement = Transaction_snark.Statement
 open Snark_params.Tick
 open Snark_params.Tick.Let_syntax
-open Transaction_snark_tests.Util
 
 (* check a signature on msg against a public key *)
 let check_sig pk msg sigma : Boolean.var Checked.t =
