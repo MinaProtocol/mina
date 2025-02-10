@@ -25,6 +25,12 @@ module Single = struct
       | Merge of Transaction_snark.Statement.t * 'ledger_proof * 'ledger_proof
     [@@deriving sexp, yojson]
 
+    let map ~f_witness ~f_proof = function
+      | Transition (s, w) ->
+          Transition (s, f_witness w)
+      | Merge (s, p1, p2) ->
+          Merge (s, f_proof p1, f_proof p2)
+
     let witness (t : (_, _) t) =
       match t with Transition (_, witness) -> Some witness | Merge _ -> None
 
