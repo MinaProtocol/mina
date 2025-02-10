@@ -126,11 +126,14 @@ module Instance = struct
   let start_sync ~constraint_constants t ~persistent_root_instance =
     let open Result.Let_syntax in
     let%map () = assert_no_sync t in
+    let dequeue_snarked_ledger () =
+      Persistent_root.Instance.dequeue_snarked_ledger persistent_root_instance
+    in
     t.sync <-
       Some
         (Sync.create ~constraint_constants ~logger:t.factory.logger
            ~time_controller:t.factory.time_controller ~db:t.db
-           ~persistent_root_instance )
+           ~dequeue_snarked_ledger )
 
   let stop_sync t =
     let open Deferred.Let_syntax in
