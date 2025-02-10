@@ -1324,7 +1324,6 @@ module T = struct
         { commands_rev : User_command.Valid.t Sequence.t
         ; completed_work : Transaction_snark_work.Checked.t Sequence.t
         }
-      [@@deriving sexp_of]
 
       let add_user_command t uc =
         { t with
@@ -1354,7 +1353,6 @@ module T = struct
       ; is_coinbase_receiver_new : bool
       ; logger : (Logger.t[@sexp.opaque])
       }
-    [@@deriving sexp_of]
 
     let coinbase_ft (cw : Transaction_snark_work.Checked.t) =
       let fee = Transaction_snark_work.Checked.fee cw in
@@ -3772,11 +3770,9 @@ let%test_module "staged ledger tests" =
                       let work = List.hd_exn (List.drop work_done 1) in
                       assert_same_fee single work.fee )
               | _ ->
-                  failwith
-                    (sprintf
-                       !"Incorrect coinbase in the diff %{sexp: \
-                         Staged_ledger_diff.t}"
-                       diff )
+                  failwith @@ "Incorrect coinbase in the diff "
+                  ^ ( Staged_ledger_diff.Stable.Latest.to_yojson diff
+                    |> Yojson.Safe.to_string )
             in
             (diff, List.tl_exn proofs_available_left) )
       in
@@ -4381,10 +4377,6 @@ let%test_module "staged ledger tests" =
                        .commands diff )
                     = 1 ) ;
                   let f, s = diff.diff in
-                  [%log info] "Diff %s"
-                    ( Staged_ledger_diff.With_valid_signatures_and_proofs
-                      .to_yojson diff
-                    |> Yojson.Safe.to_string ) ;
                   let failed_command =
                     With_status.
                       { data = invalid_command

@@ -75,7 +75,7 @@ module Info = struct
 end
 
 module type S = sig
-  type t [@@deriving compare, sexp, yojson]
+  type t
 
   val fee : t -> Fee.t
 
@@ -95,7 +95,7 @@ module T = struct
         ; proofs : Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
         ; prover : Public_key.Compressed.Stable.V1.t
         }
-      [@@deriving equal, compare, sexp, yojson]
+      [@@deriving equal, sexp, yojson]
 
       let to_latest = Fn.id
     end
@@ -106,7 +106,7 @@ module T = struct
     ; proofs : Ledger_proof.t One_or_two.t
     ; prover : Public_key.Compressed.t
     }
-  [@@deriving compare, fields, yojson, sexp]
+  [@@deriving fields]
 
   let statement t = One_or_two.map t.proofs ~f:Ledger_proof.statement
 
