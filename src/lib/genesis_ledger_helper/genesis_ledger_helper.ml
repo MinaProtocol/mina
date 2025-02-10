@@ -679,19 +679,23 @@ module Genesis_proof = struct
         ~genesis_epoch_data ~constraint_constants ~consensus_constants
         ~genesis_body_reference
     in
-    { Genesis_proof.Inputs.runtime_config
-    ; constraint_constants
-    ; proof_level
-    ; compile_config
-    ; blockchain_proof_system_id
-    ; genesis_ledger = ledger
-    ; genesis_epoch_data
-    ; consensus_constants
-    ; protocol_state_with_hashes
-    ; constraint_system_digests = None
-    ; genesis_constants
-    ; genesis_body_reference
-    }
+    let inputs =
+      { Genesis_proof.Inputs.runtime_config
+      ; constraint_constants
+      ; proof_level
+      ; compile_config
+      ; blockchain_proof_system_id
+      ; genesis_ledger = ledger
+      ; genesis_epoch_data
+      ; consensus_constants
+      ; protocol_state_with_hashes
+      ; constraint_system_digests = None
+      ; genesis_constants
+      ; genesis_body_reference
+      }
+    in
+    let%map.Or_error () = Genesis_proof.valid_inputs inputs in
+    inputs
 
   let generate (inputs : Genesis_proof.Inputs.t) =
     match inputs.proof_level with
@@ -808,7 +812,7 @@ module Config_loader : Config_loader_intf = struct
     in
     [%log info] "Loaded genesis ledger from $ledger_file"
       ~metadata:[ ("ledger_file", `String ledger_file) ] ;
-    let%map genesis_epoch_data, genesis_epoch_data_config =
+    let%bind genesis_epoch_data, genesis_epoch_data_config =
       Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
         config.epoch_data
     in
@@ -821,10 +825,11 @@ module Config_loader : Config_loader_intf = struct
     let c2 = Runtime_config.of_constants constants in
     (* This should give us the entire configuration object, including the implied constants *)
     let runtime_config = Runtime_config.combine c1 c2 in
-    let proof_inputs =
+    let%map proof_inputs =
       Genesis_proof.generate_inputs ~runtime_config ~proof_level
         ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
         ~compile_config ~blockchain_proof_system_id:None ~genesis_epoch_data
+      |> Deferred.return
     in
     (proof_inputs, runtime_config)
 

@@ -282,7 +282,7 @@ end = struct
 
   type query = Addr.t Query.t
 
-  (* Provides addresses at an specific depth from this address *)
+  (* Provides addresses at a specific depth from this address *)
   let intermediate_range ledger_depth addr i =
     Array.init (1 lsl i) ~f:(fun idx ->
         Addr.extend_exn ~ledger_depth addr ~num_bits:i (Int64.of_int idx) )
@@ -555,10 +555,12 @@ end = struct
     let open (val t.context) in
     let len = Array.length nodes in
     let is_power = Int.is_pow2 len in
-    let is_more_than_two = len >= 2 in
+    let is_equal_or_more_than_two = len >= 2 in
     let subtree_depth = Int.ceil_log2 len in
-    let less_than_requested = subtree_depth <= requested_depth in
-    let valid_length = is_power && is_more_than_two && less_than_requested in
+    let equal_or_less_than_requested = subtree_depth <= requested_depth in
+    let valid_length =
+      is_power && is_equal_or_more_than_two && equal_or_less_than_requested
+    in
     if valid_length then
       let ledger_depth = MT.depth t.tree in
       let expected =

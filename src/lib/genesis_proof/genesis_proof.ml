@@ -192,6 +192,20 @@ let create_values_no_proof (t : Inputs.t) =
   ; proof_data = None
   }
 
+let valid_inputs (t : Inputs.t) =
+  let validate_depth ~label =
+    Option.value_map ~default:(Ok ()) ~f:(fun v ->
+        if v > 0 then Ok ()
+        else Or_error.errorf "Invalid value configured for %s" label )
+  in
+  Option.value_map ~default:(Ok ()) t.runtime_config.daemon ~f:(fun v ->
+      Or_error.combine_errors_unit
+        [ validate_depth ~label:"sync_ledger_default_subtree_depth"
+            v.sync_ledger_default_subtree_depth
+        ; validate_depth ~label:"sync_ledger_max_subtree_depth"
+            v.sync_ledger_max_subtree_depth
+        ] )
+
 let to_inputs (t : t) : Inputs.t =
   { runtime_config = t.runtime_config
   ; constraint_constants = t.constraint_constants
