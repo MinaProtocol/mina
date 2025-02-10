@@ -56,8 +56,9 @@ module Worker = struct
   let debug_dump_impl ~dump_dir t input =
     let input = List.map input ~f:Diff.Lite.read_all_proofs_from_disk in
     let snapshot_name = snapshot_name_from_time () in
+    let input_file = dump_dir ^/ snapshot_name ^/ "input.bin" in
+    [%log' info t.logger] "Dumping debug persistent frontier db: %s" input_file ;
     Database.make_checkpoint t.db ~location:(dump_dir ^/ snapshot_name) ;
-    let input_file = dump_dir ^/ snapshot_name ^ "input.bin" in
     let bin_class =
       Bin_prot.Type_class.bin_list Diff.Lite.Stable.Latest.bin_t
     in
