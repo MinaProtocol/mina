@@ -17,7 +17,8 @@
   cli_lib
   logger
   block_time
-  mina_version)
+  mina_version
+  mina_caqti)
  (instrumentation
   (backend bisect_ppx --bisect-sigterm))
  (preprocess

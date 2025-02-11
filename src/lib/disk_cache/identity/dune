@@ -6,7 +6,10 @@
    ;; opam libraries
    async_kernel
    core_kernel
+   ;; local libraries
+   disk_cache.test_lib
    )
- (preprocess (pps ppx_version))
+ (preprocess (pps ppx_version ppx_jane))
+ (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
  )

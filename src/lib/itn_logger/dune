@@ -13,7 +13,9 @@
   async_unix
   core
   core_kernel
-  yojson)
+  yojson
+  ;; local libraries
+  mina_node_config.unconfigurable_constants)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

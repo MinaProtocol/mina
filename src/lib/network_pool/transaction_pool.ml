@@ -287,20 +287,18 @@ struct
         ; verifier : (Verifier.t[@sexp.opaque])
         ; genesis_constants : Genesis_constants.t
         ; slot_tx_end : Mina_numbers.Global_slot_since_hard_fork.t option
-        ; compile_config : Mina_compile_config.t
         }
       [@@deriving sexp_of]
 
       (* remove next line if there's a way to force [@@deriving make] write a
          named parameter instead of an optional parameter *)
       let make ~trust_system ~pool_max_size ~verifier ~genesis_constants
-          ~slot_tx_end ~compile_config =
+          ~slot_tx_end =
         { trust_system
         ; pool_max_size
         ; verifier
         ; genesis_constants
         ; slot_tx_end
-        ; compile_config
         }
     end
 
@@ -1095,8 +1093,7 @@ struct
               ~f:(fun acc user_cmd ->
                 match
                   User_command.check_well_formedness
-                    ~genesis_constants:t.config.genesis_constants
-                    ~compile_config:t.config.compile_config user_cmd
+                    ~genesis_constants:t.config.genesis_constants user_cmd
                 with
                 | Ok () ->
                     acc
@@ -1648,10 +1645,7 @@ let%test_module _ =
     let num_extra_keys = 30
 
     let block_window_duration =
-      Float.of_int
-        Genesis_constants.For_unit_tests.Constraint_constants.t
-          .block_window_duration_ms
-      |> Time.Span.of_ms
+      Mina_compile_config.For_unit_tests.t.block_window_duration
 
     (* keys that can be used when generating new accounts *)
     let extra_keys =
@@ -1666,8 +1660,6 @@ let%test_module _ =
     let proof_level = precomputed_values.proof_level
 
     let genesis_constants = precomputed_values.genesis_constants
-
-    let compile_config = precomputed_values.compile_config
 
     let minimum_fee =
       Currency.Fee.to_nanomina_int genesis_constants.minimum_user_command_fee
@@ -1937,7 +1929,7 @@ let%test_module _ =
       let trust_system = Trust_system.null () in
       let config =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
-          ~genesis_constants ~slot_tx_end ~compile_config
+          ~genesis_constants ~slot_tx_end
       in
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
