@@ -40,7 +40,19 @@ module Failure = struct
       | Account_app_state_precondition_unsatisfied of int
       | Account_proved_state_precondition_unsatisfied
       | Account_is_new_precondition_unsatisfied
-      | Permissions_precondition_unsatisfied
+      | Permissions_precondition_edit_state_unsatisfied
+      | Permissions_precondition_send_unsatisfied
+      | Permissions_precondition_receive_unsatisfied
+      | Permissions_precondition_access_unsatisfied
+      | Permissions_precondition_set_delegate_unsatisfied
+      | Permissions_precondition_set_permissions_unsatisfied
+      | Permissions_precondition_set_verification_key_unsatisfied
+      | Permissions_precondition_set_zkapp_uri_unsatisfied
+      | Permissions_precondition_edit_action_state_unsatisfied
+      | Permissions_precondition_set_token_symbol_unsatisfied
+      | Permissions_precondition_increment_nonce_unsatisfied
+      | Permissions_precondition_set_voting_for_unsatisfied
+      | Permissions_precondition_set_timing_unsatisfied
       | Protocol_state_precondition_unsatisfied
       | Unexpected_verification_key_hash
       | Valid_while_precondition_unsatisfied

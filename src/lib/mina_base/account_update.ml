@@ -970,10 +970,6 @@ module Account_precondition = struct
          | `C () ->
              Zkapp_precondition.Account.accept )
 
-  module Tag = struct
-    type t = Full | Nonce | Accept [@@deriving equal, compare, sexp, yojson]
-  end
-
   let deriver obj = Zkapp_precondition.Account.deriver obj
 
   let digest (t : t) =

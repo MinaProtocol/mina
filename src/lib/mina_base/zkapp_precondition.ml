@@ -690,43 +690,43 @@ module Permissions = struct
         ; set_voting_for
         ; set_timing
         } (a : Permissions.Checked.t) =
-      [ ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+      [ ( Transaction_status.Failure.Permissions_precondition_edit_state_unsatisfied
         , Eq_data.(check_checked Tc.auth_required edit_state a.edit_state) )
-      ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+      ; ( Transaction_status.Failure.Permissions_precondition_access_unsatisfied
         , Eq_data.(check_checked Tc.auth_required access a.access) )
-      ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+      ; ( Transaction_status.Failure.Permissions_precondition_send_unsatisfied
         , Eq_data.(check_checked Tc.auth_required send a.send) )
-      ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+      ; ( Transaction_status.Failure.Permissions_precondition_receive_unsatisfied
         , Eq_data.(check_checked Tc.auth_required receive a.receive) )
-      ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+      ; ( Transaction_status.Failure.Permissions_precondition_set_delegate_unsatisfied
         , Eq_data.(check_checked Tc.auth_required set_delegate a.set_delegate)
         )
-      ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+      ; ( Transaction_status.Failure.Permissions_precondition_set_permissions_unsatisfied
         , Eq_data.(
             check_checked Tc.auth_required set_permissions a.set_permissions) )
-      ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+      ; ( Transaction_status.Failure.Permissions_precondition_set_verification_key_unsatisfied
         , Eq_data.(
             check_checked Tc.auth_required set_verification_key
               (fst a.set_verification_key)) )
         (* TODO should we check that the txn version is current when this is not ignored? *)
-      ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+      ; ( Transaction_status.Failure.Permissions_precondition_set_zkapp_uri_unsatisfied
         , Eq_data.(check_checked Tc.auth_required set_zkapp_uri a.set_zkapp_uri)
         )
-      ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+      ; ( Transaction_status.Failure.Permissions_precondition_edit_action_state_unsatisfied
         , Eq_data.(
             check_checked Tc.auth_required edit_action_state a.edit_action_state)
         )
-      ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+      ; ( Transaction_status.Failure.Permissions_precondition_set_token_symbol_unsatisfied
         , Eq_data.(
             check_checked Tc.auth_required set_token_symbol a.set_token_symbol)
         )
-      ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+      ; ( Transaction_status.Failure.Permissions_precondition_increment_nonce_unsatisfied
         , Eq_data.(
             check_checked Tc.auth_required increment_nonce a.increment_nonce) )
-      ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+      ; ( Transaction_status.Failure.Permissions_precondition_set_voting_for_unsatisfied
         , Eq_data.(
             check_checked Tc.auth_required set_voting_for a.set_voting_for) )
-      ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+      ; ( Transaction_status.Failure.Permissions_precondition_set_timing_unsatisfied
         , Eq_data.(check_checked Tc.auth_required set_timing a.set_timing) )
       ]
 
@@ -786,49 +786,49 @@ module Permissions = struct
       ; set_voting_for
       ; set_timing
       } (a : Permissions.t) =
-    [ ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+    [ ( Transaction_status.Failure.Permissions_precondition_edit_state_unsatisfied
       , Eq_data.(
           check ~label:"edit_state" Tc.auth_required edit_state a.edit_state) )
-    ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+    ; ( Transaction_status.Failure.Permissions_precondition_receive_unsatisfied
       , Eq_data.(check ~label:"send" Tc.auth_required send a.send) )
-    ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+    ; ( Transaction_status.Failure.Permissions_precondition_receive_unsatisfied
       , Eq_data.(check ~label:"receive" Tc.auth_required receive a.receive) )
-    ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+    ; ( Transaction_status.Failure.Permissions_precondition_access_unsatisfied
       , Eq_data.(check ~label:"access" Tc.auth_required access a.access) )
-    ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+    ; ( Transaction_status.Failure.Permissions_precondition_set_delegate_unsatisfied
       , Eq_data.(
           check ~label:"set_delegate" Tc.auth_required set_delegate
             a.set_delegate) )
-    ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+    ; ( Transaction_status.Failure.Permissions_precondition_set_permissions_unsatisfied
       , Eq_data.(
           check ~label:"set_permissions" Tc.auth_required set_permissions
             a.set_permissions) )
-    ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+    ; ( Transaction_status.Failure.Permissions_precondition_set_verification_key_unsatisfied
       , Eq_data.(
           check ~label:"set_verification_key_auth" Tc.auth_required
             set_verification_key
             (fst a.set_verification_key)) )
-    ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+    ; ( Transaction_status.Failure.Permissions_precondition_set_zkapp_uri_unsatisfied
       , Eq_data.(
           check ~label:"set_zkapp_uri" Tc.auth_required set_zkapp_uri
             a.set_zkapp_uri) )
-    ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+    ; ( Transaction_status.Failure.Permissions_precondition_edit_action_state_unsatisfied
       , Eq_data.(
           check ~label:"edit_action_state" Tc.auth_required edit_action_state
             a.edit_action_state) )
-    ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+    ; ( Transaction_status.Failure.Permissions_precondition_set_token_symbol_unsatisfied
       , Eq_data.(
           check ~label:"set_token_symbol" Tc.auth_required set_token_symbol
             a.set_token_symbol) )
-    ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+    ; ( Transaction_status.Failure.Permissions_precondition_increment_nonce_unsatisfied
       , Eq_data.(
           check ~label:"increment_nonce" Tc.auth_required increment_nonce
             a.increment_nonce) )
-    ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+    ; ( Transaction_status.Failure.Permissions_precondition_set_voting_for_unsatisfied
       , Eq_data.(
           check ~label:"set_voting_for" Tc.auth_required set_voting_for
             a.set_voting_for) )
-    ; ( Transaction_status.Failure.Permissions_precondition_unsatisfied
+    ; ( Transaction_status.Failure.Permissions_precondition_set_timing_unsatisfied
       , Eq_data.(
           check ~label:"set_timing" Tc.auth_required set_timing a.set_timing) )
     ]
