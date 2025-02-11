@@ -4,6 +4,16 @@ open Async
 module Existing_config = struct
   type 'a t = Existing of 'a | Unset [@@deriving yojson, bin_io_unversioned]
 
+  (* Custom deserialization *)
+  let of_yojson (of_a : Yojson.Safe.t -> ('a, string) result) = function
+    | `Null -> Ok Unset
+    | json -> Result.map (of_a json) ~f:(fun v -> Existing v)
+
+  (* Custom serialization *)
+  let to_yojson (to_a : 'a -> Yojson.Safe.t) = function
+    | Unset -> `Null
+    | Existing v -> to_a v
+
   let merge ~combine t1 t2 =
     match (t1, t2) with
     | Existing t1, Existing t2 ->
