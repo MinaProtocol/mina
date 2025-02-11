@@ -62,15 +62,15 @@ let generate_hash_json ~genesis_dir ledger staking_ledger next_ledger =
 
 let is_dirty_proof = function
   | Runtime_config.Proof_keys.
-      { level = None
-      ; sub_windows_per_window = None
-      ; ledger_depth = None
-      ; work_delay = None
-      ; block_window_duration_ms = None
-      ; transaction_capacity = None
-      ; coinbase_amount = None
-      ; supercharged_coinbase_factor = None
-      ; account_creation_fee = None
+      { level = Unset
+      ; sub_windows_per_window = Unset
+      ; ledger_depth = Unset
+      ; work_delay = Unset
+      ; block_window_duration_ms = Unset
+      ; transaction_capacity = Unset
+      ; coinbase_amount = Unset
+      ; supercharged_coinbase_factor = Unset
+      ; account_creation_fee = Unset
       ; fork = _
       } ->
       false
@@ -79,11 +79,11 @@ let is_dirty_proof = function
 
 let extract_accounts_exn = function
   | { Runtime_config.Ledger.base = Accounts accounts
-    ; num_accounts = None
+    ; num_accounts = Unset
     ; balances = []
     ; hash = _
-    ; name = None
-    ; add_genesis_winner = Some false
+    ; name = Unset
+    ; add_genesis_winner = Existing false
     ; s3_data_hash = _
     } ->
       accounts
@@ -96,23 +96,34 @@ let load_config_exn ~logger config_file =
     @@ Runtime_config.Json_loader.load_config_files ~logger [ config_file ]
   in
   if
-    Option.(
-      is_some config.daemon || is_some config.genesis
-      || Option.value_map ~default:false ~f:is_dirty_proof config.proof)
+    Runtime_config.Existing_config.(
+      is_existing config.daemon || is_existing config.genesis
+      || value_map ~default:false ~f:is_dirty_proof config.proof)
   then failwith "Runtime config has unexpected fields" ;
-  let ledger = Option.value_exn ~message:"No ledger provided" config.ledger in
+  let ledger =
+    Runtime_config.Existing_config.value_exn ~message:"No ledger provided"
+      config.ledger
+  in
   let staking_ledger =
-    let%map.Option { staking; _ } = config.epoch_data in
-    staking.ledger
+    Runtime_config.Existing_config.(
+      map config.epoch_data
+        ~f:(fun (epoch_data : Runtime_config.Epoch_data.t option) ->
+          let%bind.Option { staking; _ } = epoch_data in
+          Some staking.ledger )
+      |> flatten_opt)
   in
   let next_ledger =
-    let%bind.Option { next; _ } = config.epoch_data in
-    let%map.Option { ledger; _ } = next in
-    ledger
+    Runtime_config.Existing_config.(
+      map config.epoch_data
+        ~f:(fun (epoch_data : Runtime_config.Epoch_data.t option) ->
+          let%bind.Option { next; _ } = epoch_data in
+          let%bind.Option { ledger; _ } = next in
+          Some ledger )
+      |> flatten_opt)
   in
   ( extract_accounts_exn ledger
-  , Option.map ~f:extract_accounts_exn staking_ledger
-  , Option.map ~f:extract_accounts_exn next_ledger )
+  , Runtime_config.Existing_config.map ~f:extract_accounts_exn staking_ledger
+  , Runtime_config.Existing_config.map ~f:extract_accounts_exn next_ledger )
 
 let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields () =
@@ -123,12 +134,12 @@ let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     load_ledger ~ignore_missing_fields ~constraint_constants accounts
   in
   let staking_ledger : Ledger.t =
-    Option.value_map ~default:ledger
+    Runtime_config.Existing_config.value_map ~default:ledger
       ~f:(load_ledger ~ignore_missing_fields ~constraint_constants)
       staking_accounts_opt
   in
   let next_ledger =
-    Option.value_map ~default:staking_ledger
+    Runtime_config.Existing_config.value_map ~default:staking_ledger
       ~f:(load_ledger ~ignore_missing_fields ~constraint_constants)
       next_accounts_opt
   in

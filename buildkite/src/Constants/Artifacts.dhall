@@ -18,6 +18,9 @@ let Artifact
       | Rosetta
       | ZkappTestTransaction
       | FunctionalTestSuite
+      | Toolchain
+      | ItnOrchestrator
+      | Leaderboard
       >
 
 let AllButTests =
@@ -33,7 +36,13 @@ let AllButTests =
 let Main =
       [ Artifact.Daemon, Artifact.LogProc, Artifact.Archive, Artifact.Rosetta ]
 
-let All = AllButTests # [ Artifact.FunctionalTestSuite ]
+let All =
+        AllButTests
+      # [ Artifact.FunctionalTestSuite
+        , Artifact.Toolchain
+        , Artifact.ItnOrchestrator
+        , Artifact.Leaderboard
+        ]
 
 let capitalName =
           \(artifact : Artifact)
@@ -46,6 +55,9 @@ let capitalName =
             , Rosetta = "Rosetta"
             , ZkappTestTransaction = "ZkappTestTransaction"
             , FunctionalTestSuite = "FunctionalTestSuite"
+            , Toolchain = "Toolchain"
+            , ItnOrchestrator = "ItnOrchestrator"
+            , Leaderboard = "Leaderboard"
             }
             artifact
 
@@ -60,6 +72,9 @@ let lowerName =
             , Rosetta = "rosetta"
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
+            , Toolchain = "toolchain"
+            , ItnOrchestrator = "itnOrchestrator"
+            , Leaderboard = "leaderboard"
             }
             artifact
 
@@ -74,6 +89,9 @@ let dockerName =
             , Rosetta = "mina-rosetta"
             , ZkappTestTransaction = "mina-zkapp-test-transaction"
             , FunctionalTestSuite = "mina-test-suite"
+            , Toolchain = "mina-toolchain"
+            , ItnOrchestrator = "itn-orchestrator"
+            , Leaderboard = "leaderboard"
             }
             artifact
 
@@ -89,38 +107,32 @@ let toDebianName =
             , Rosetta = "rosetta_${Network.lowerName network}"
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
+            , Toolchain = ""
+            , ItnOrchestrator = ""
+            , Leaderboard = ""
             }
             artifact
 
 let toDebianNames =
           \(artifacts : List Artifact)
-      ->  \(networks : List Network.Type)
+      ->  \(network : Network.Type)
       ->  let list_of_list_of_debians =
                 Prelude.List.map
                   Artifact
                   (List Text)
                   (     \(a : Artifact)
                     ->  merge
-                          { Daemon =
-                              Prelude.List.map
-                                Network.Type
-                                Text
-                                (\(n : Network.Type) -> toDebianName a n)
-                                networks
+                          { Daemon = [ toDebianName a network ]
                           , Archive = [ "archive" ]
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
                           , BatchTxn = [ "batch_txn" ]
-                          , Rosetta =
-                              Prelude.List.map
-                                Network.Type
-                                Text
-                                (     \(n : Network.Type)
-                                  ->  "rosetta_${Network.lowerName n}"
-                                )
-                                networks
+                          , Rosetta = [ toDebianName a network ]
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]
+                          , Toolchain = [] : List Text
+                          , ItnOrchestrator = [] : List Text
+                          , Leaderboard = [] : List Text
                           }
                           a
                   )
@@ -165,6 +177,9 @@ let dockerTag =
                     "${version_and_codename}-${Network.lowerName network}"
                 , ZkappTestTransaction = "${version_and_codename}"
                 , FunctionalTestSuite = "${version_and_codename}"
+                , Toolchain = "${version_and_codename}"
+                , ItnOrchestrator = "${version_and_codename}"
+                , Leaderboard = "${version_and_codename}"
                 }
                 artifact
 

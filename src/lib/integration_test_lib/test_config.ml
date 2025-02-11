@@ -87,23 +87,24 @@ type t =
   }
 
 let proof_config_default : Runtime_config.Proof_keys.t =
-  { level = Some Full
-  ; sub_windows_per_window = None
-  ; ledger_depth = None
-  ; work_delay = None
-  ; block_window_duration_ms = Some 120000
-  ; transaction_capacity = None
-  ; coinbase_amount = None
-  ; supercharged_coinbase_factor = None
-  ; account_creation_fee = None
+  { level = Existing Full
+  ; sub_windows_per_window = Existing 11
+  ; ledger_depth = Existing 35
+  ; work_delay = Existing 2
+  ; block_window_duration_ms = Existing 120000
+  ; transaction_capacity = Existing (Log_2 7)
+  ; coinbase_amount = Existing (Currency.Amount.of_mina_int_exn 720)
+  ; supercharged_coinbase_factor = Existing 1
+  ; account_creation_fee = Existing (Currency.Fee.of_mina_string_exn "1")
   ; fork =
-      Some
-        { blockchain_length = 0
-        ; global_slot_since_genesis = 0
-        ; state_hash =
-            "3NKSvjaGSKiQuAt8BP1b1VCpLbJc9RcEFjYCaBYsJJFdrtd6tpaV"
-            (*any state hash would do*)
-        }
+      Existing
+        (Some
+           { blockchain_length = 0
+           ; global_slot_since_genesis = 0
+           ; state_hash =
+               "3NKSvjaGSKiQuAt8BP1b1VCpLbJc9RcEFjYCaBYsJJFdrtd6tpaV"
+               (*any state hash would do*)
+           } )
   }
 
 let log_filter_of_event_type ev_existential =
@@ -149,14 +150,15 @@ let default ~(constants : constants) =
 
 let transaction_capacity_log_2 (config : t) =
   match config.proof_config.transaction_capacity with
-  | None ->
+  | Unset ->
       config.transaction_capacity_log_2
-  | Some (Log_2 i) ->
+  | Existing (Log_2 i) ->
       i
-  | Some (Txns_per_second_x10 tps_goal_x10) ->
+  | Existing (Txns_per_second_x10 tps_goal_x10) ->
       let max_coinbases = 2 in
       let block_window_duration_ms =
-        Option.value ~default:config.block_window_duration_ms
+        Runtime_config.Existing_config.value
+          ~default:config.block_window_duration_ms
           config.proof_config.block_window_duration_ms
       in
       let max_user_commands_per_block =
@@ -180,8 +182,8 @@ let transaction_capacity config =
 
 let blocks_for_first_ledger_proof (config : t) =
   let work_delay =
-    Option.value ~default:config.block_window_duration_ms
-      config.proof_config.work_delay
+    Runtime_config.Existing_config.value
+      ~default:config.block_window_duration_ms config.proof_config.work_delay
   in
   let transaction_capacity_log_2 = transaction_capacity_log_2 config in
   ((work_delay + 1) * (transaction_capacity_log_2 + 1)) + 1

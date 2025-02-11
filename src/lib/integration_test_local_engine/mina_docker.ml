@@ -151,119 +151,141 @@ module Network_config = struct
     in
     let runtime_config =
       { Runtime_config.daemon =
-          Some
+          Existing
             { Runtime_config.Daemon.default with
-              txpool_max_size = Some txpool_max_size
-            ; slot_tx_end
-            ; slot_chain_end
-            ; network_id
+              txpool_max_size = Existing txpool_max_size
+            ; peer_list_url = Unset
+            ; zkapp_proof_update_cost = Existing 10.26
+            ; zkapp_signed_single_update_cost = Existing 9.140000000000001
+            ; zkapp_signed_pair_update_cost = Existing 10.08
+            ; zkapp_transaction_cost_limit = Existing 69.45
+            ; max_event_elements = Existing 100
+            ; max_action_elements = Existing 100
+            ; zkapp_cmd_limit_hardcap = Existing 128
+            ; slot_tx_end = Runtime_config.Existing_config.of_option slot_tx_end
+            ; slot_chain_end =
+                Runtime_config.Existing_config.of_option slot_chain_end
+            ; minimum_user_command_fee =
+                Existing (Currency.Fee.of_string "1000000")
+            ; network_id = Runtime_config.Existing_config.of_option network_id
             }
       ; genesis =
-          Some
-            { k = Some k
-            ; delta = Some delta
-            ; slots_per_epoch = Some slots_per_epoch
-            ; slots_per_sub_window = Some slots_per_sub_window
-            ; grace_period_slots = Some grace_period_slots
+          Existing
+            { k = Existing k
+            ; delta = Existing delta
+            ; slots_per_epoch = Existing slots_per_epoch
+            ; slots_per_sub_window = Existing slots_per_sub_window
+            ; grace_period_slots = Existing grace_period_slots
             ; genesis_state_timestamp =
-                Some (Core.Time.(now ()) |> Genesis_constants.of_time)
+                Existing (Core.Time.(now ()) |> Genesis_constants.of_time)
             }
-      ; proof = Some proof_config (* TODO: prebake ledger and only set hash *)
+      ; proof =
+          Existing proof_config (* TODO: prebake ledger and only set hash *)
       ; ledger =
-          Some
+          Existing
             { base =
                 Accounts
                   (List.map genesis_ledger_accounts ~f:(fun (_name, acct) ->
                        acct ) )
-            ; add_genesis_winner = None
-            ; num_accounts = None
+            ; add_genesis_winner = Unset
+            ; num_accounts = Unset
             ; balances = []
-            ; hash = None
-            ; s3_data_hash = None
-            ; name = None
+            ; hash = Unset
+            ; s3_data_hash = Unset
+            ; name = Unset
             }
       ; epoch_data =
-          Option.map epoch_data ~f:(fun { staking = staking_ledger; next } ->
-              let genesis_winner_account : Runtime_config.Accounts.single =
-                Runtime_config.Accounts.Single.of_account
-                  Mina_state.Consensus_state_hooks.genesis_winner_account
-                |> Result.ok_or_failwith
-              in
-              let ledger_of_epoch_accounts
-                  (epoch_accounts : Test_config.Test_account.t list) =
-                let epoch_ledger_accounts =
-                  List.map epoch_accounts
-                    ~f:(fun
-                         { account_name; balance; timing; permissions; zkapp }
-                       ->
-                      let balance = Balance.of_mina_string_exn balance in
-                      let timing = runtime_timing_of_timing timing in
-                      let genesis_account =
-                        match
-                          List.Assoc.find genesis_ledger_accounts account_name
-                            ~equal:String.equal
-                        with
-                        | Some acct ->
-                            acct
-                        | None ->
-                            failwithf
-                              "Epoch ledger account %s not in genesis ledger"
-                              account_name ()
-                      in
-                      { genesis_account with
-                        balance
-                      ; timing
-                      ; permissions =
-                          Option.map
-                            ~f:
-                              Runtime_config.Accounts.Single.Permissions
-                              .of_permissions permissions
-                      ; zkapp =
-                          Option.map
-                            ~f:
-                              Runtime_config.Accounts.Single.Zkapp_account
-                              .of_zkapp zkapp
-                      } )
-                in
-                ( { base =
-                      Accounts (genesis_winner_account :: epoch_ledger_accounts)
-                  ; add_genesis_winner = None (* no effect *)
-                  ; num_accounts = None
-                  ; balances = []
-                  ; hash = None
-                  ; s3_data_hash = None
-                  ; name = None
-                  }
-                  : Runtime_config.Ledger.t )
-              in
-              let staking =
-                let ({ epoch_ledger; epoch_seed }
-                      : Test_config.Epoch_data.Data.t ) =
-                  staking_ledger
-                in
-                if not (ledger_is_prefix epoch_ledger genesis_ledger) then
-                  failwith "Staking epoch ledger not a prefix of genesis ledger" ;
-                let ledger = ledger_of_epoch_accounts epoch_ledger in
-                let seed = epoch_seed in
-                ({ ledger; seed } : Runtime_config.Epoch_data.Data.t)
-              in
-              let next =
-                Option.map next ~f:(fun { epoch_ledger; epoch_seed } ->
-                    if
-                      not
-                        (ledger_is_prefix staking_ledger.epoch_ledger
-                           epoch_ledger )
-                    then
-                      failwith
-                        "Staking epoch ledger not a prefix of next epoch ledger" ;
-                    if not (ledger_is_prefix epoch_ledger genesis_ledger) then
-                      failwith
-                        "Next epoch ledger not a prefix of genesis ledger" ;
-                    let ledger = ledger_of_epoch_accounts epoch_ledger in
-                    let seed = epoch_seed in
-                    ({ ledger; seed } : Runtime_config.Epoch_data.Data.t) )
-              in
-              ({ staking; next } : Runtime_config.Epoch_data.t) )
+          Existing
+            (Option.map epoch_data ~f:(fun { staking = staking_ledger; next } ->
+                 let genesis_winner_account : Runtime_config.Accounts.single =
+                   Runtime_config.Accounts.Single.of_account
+                     Mina_state.Consensus_state_hooks.genesis_winner_account
+                   |> Result.ok_or_failwith
+                 in
+                 let ledger_of_epoch_accounts
+                     (epoch_accounts : Test_config.Test_account.t list) =
+                   let epoch_ledger_accounts =
+                     List.map epoch_accounts
+                       ~f:(fun
+                            { account_name
+                            ; balance
+                            ; timing
+                            ; permissions
+                            ; zkapp
+                            }
+                          ->
+                         let balance = Balance.of_mina_string_exn balance in
+                         let timing = runtime_timing_of_timing timing in
+                         let genesis_account =
+                           match
+                             List.Assoc.find genesis_ledger_accounts
+                               account_name ~equal:String.equal
+                           with
+                           | Some acct ->
+                               acct
+                           | None ->
+                               failwithf
+                                 "Epoch ledger account %s not in genesis ledger"
+                                 account_name ()
+                         in
+                         { genesis_account with
+                           balance
+                         ; timing
+                         ; permissions =
+                             Option.map
+                               ~f:
+                                 Runtime_config.Accounts.Single.Permissions
+                                 .of_permissions permissions
+                         ; zkapp =
+                             Option.map
+                               ~f:
+                                 Runtime_config.Accounts.Single.Zkapp_account
+                                 .of_zkapp zkapp
+                         } )
+                   in
+                   ( { base =
+                         Accounts
+                           (genesis_winner_account :: epoch_ledger_accounts)
+                     ; add_genesis_winner = Unset (* no effect *)
+                     ; num_accounts = Unset
+                     ; balances = []
+                     ; hash = Unset
+                     ; s3_data_hash = Unset
+                     ; name = Unset
+                     }
+                     : Runtime_config.Ledger.t )
+                 in
+                 let staking =
+                   let ({ epoch_ledger; epoch_seed }
+                         : Test_config.Epoch_data.Data.t ) =
+                     staking_ledger
+                   in
+                   if not (ledger_is_prefix epoch_ledger genesis_ledger) then
+                     failwith
+                       "Staking epoch ledger not a prefix of genesis ledger" ;
+                   let ledger = ledger_of_epoch_accounts epoch_ledger in
+                   let seed = epoch_seed in
+                   ({ ledger; seed } : Runtime_config.Epoch_data.Data.t)
+                 in
+                 let next =
+                   Option.map next ~f:(fun { epoch_ledger; epoch_seed } ->
+                       if
+                         not
+                           (ledger_is_prefix staking_ledger.epoch_ledger
+                              epoch_ledger )
+                       then
+                         failwith
+                           "Staking epoch ledger not a prefix of next epoch \
+                            ledger" ;
+                       if not (ledger_is_prefix epoch_ledger genesis_ledger)
+                       then
+                         failwith
+                           "Next epoch ledger not a prefix of genesis ledger" ;
+                       let ledger = ledger_of_epoch_accounts epoch_ledger in
+                       let seed = epoch_seed in
+                       ({ ledger; seed } : Runtime_config.Epoch_data.Data.t) )
+                 in
+                 ({ staking; next } : Runtime_config.Epoch_data.t) ) )
       }
     in
     let constraint_constants =

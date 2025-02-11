@@ -45,7 +45,7 @@ num_status_retries=24
 for ((i=1;i<=$num_status_retries;i++)); do
   sleep $WAIT_BETWEEN_POLLING_GRAPHQL
   set +e
-  mina client status
+  sudo mina client status
   status_exit_code=$?
   set -e
   if [ $status_exit_code -eq 0 ]; then
@@ -80,4 +80,3 @@ else
     echo "Network id incorrect (expected: $EXPECTED_NETWORK got: $NETWORK_ID)"
     exit 1
 fi
-

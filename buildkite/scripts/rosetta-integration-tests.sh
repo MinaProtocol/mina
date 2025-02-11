@@ -92,7 +92,7 @@ CURRENT_TIME=$(date +"%Y-%m-%dT%H:%M:%S%z")
 cat <<EOF >"$MINA_CONFIG_FILE"
 {
   "genesis": { "genesis_state_timestamp": "$CURRENT_TIME" },
-  "proof": { "block_window_duration_ms": 20000 },
+  "proof": { "block_window_duration_ms": 20000, "fork": {} },
   "daemon": { "network_id": "${MINA_NETWORK}" },
   "ledger": {
     "accounts": [
@@ -105,7 +105,8 @@ cat <<EOF >"$MINA_CONFIG_FILE"
       { "pk": "${TIME_VESTING_ACCOUNT_1_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null, "timing": { "initial_minimum_balance": "1000000", "cliff_time": "10", "cliff_amount": "1000000", "vesting_period": "1", "vesting_increment": "0" } },
       { "pk": "${TIME_VESTING_ACCOUNT_2_PUB_KEY}", "balance": "2000000", "delegate": null, "sk": null, "timing": { "initial_minimum_balance": "1000000", "cliff_time": "5", "cliff_amount": "1000000", "vesting_period": "1", "vesting_increment": "200000" } }
     ]
-  }
+  },
+  "epoch_data": {}
 }
 EOF
 
@@ -249,6 +250,8 @@ send_zkapp_transactions() {
 if [[ "$MODE" == "full" ]]; then
   send_zkapp_transactions &
 fi
+
+mina client status --json
 
 next_block_time=$(mina client status --json | jq '.next_block_production.timing[1].time' | tr -d '"') curr_time=$(date +%s%N | cut -b1-13)
 sleep_time=$((($next_block_time - $curr_time) / 1000))

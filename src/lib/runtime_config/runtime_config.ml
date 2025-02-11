@@ -1,6 +1,93 @@
 open Core_kernel
 open Async
 
+module Existing_config = struct
+  type 'a t = Existing of 'a | Unset [@@deriving yojson, bin_io_unversioned]
+
+  let merge ~combine t1 t2 =
+    match (t1, t2) with
+    | Existing t1, Existing t2 ->
+        Existing (combine t1 t2)
+    | Existing t, Unset | Unset, Existing t ->
+        Existing t
+    | Unset, Unset ->
+        Unset
+
+  let of_option = function Some config -> Existing config | None -> Unset
+
+  let to_option = function Existing config -> Some config | Unset -> None
+
+  let bind config f = match config with Existing c -> f c | Unset -> Unset
+
+  let value ~default = function Existing x -> x | Unset -> default
+
+  let value_map ~default ~f = function Existing x -> f x | Unset -> default
+
+  let value_exn ?message = function
+    | Existing x ->
+        x
+    | Unset ->
+        let error =
+          match message with
+          | None ->
+              Error.of_string "Runtime_config.Existing_config.value_exn"
+          | Some message ->
+              Error.of_string message
+        in
+        Error.raise error
+
+  let map_aux config f = bind config (fun x -> Existing (f x))
+
+  let map ~f config = map_aux config f
+
+  let bind_opt config f =
+    bind config (fun x ->
+        match f x with None -> Unset | Some y -> Existing y )
+
+  let ( >>= ) = bind
+
+  let ( >>| ) = map_aux
+
+  let ( >>? ) = bind_opt
+
+  let existing x = Existing x
+
+  let is_existing = function Existing _ -> true | Unset -> false
+
+  let result ~f x =
+    match x with
+    | Existing x ->
+        Result.map ~f:existing (f x)
+    | Unset ->
+        Result.return Unset
+
+  let pick_config ~default = function
+    | Existing x2 ->
+        Existing x2
+    | Unset ->
+        default
+
+  let first_existing a b = match a with Existing _ -> a | Unset -> b
+
+  let first_existing_and_option_as_option a b =
+    match (a, b) with Existing a, _ -> Some a | Unset, _ -> b
+
+  let first_option_and_existing_as_option a b =
+    match (a, b) with
+    | Some a, _ ->
+        Some a
+    | None, Existing b ->
+        Some b
+    | None, Unset ->
+        None
+
+  let flatten_opt = function
+    | Existing (Some x) ->
+        Existing x
+    | Existing None | Unset ->
+        Unset
+end
+
 module Fork_config = struct
   (* Note that length might be smaller than the gernesis_slot
      or equal if a block was produced in every slot possible. *)
@@ -10,6 +97,24 @@ module Fork_config = struct
     ; global_slot_since_genesis : int (* global slot since genesis *)
     }
   [@@deriving yojson, bin_io_unversioned]
+end
+
+module Fork_config_opt = struct
+  (* Note that length might be smaller than the gernesis_slot
+     or equal if a block was produced in every slot possible. *)
+  type t = Fork_config.t option [@@deriving yojson, bin_io_unversioned]
+
+  let to_yojson = function
+    | None ->
+        `Assoc []
+    | Some x ->
+        Fork_config.to_yojson x
+
+  let of_yojson = function
+    | `Assoc [] ->
+        Ok None
+    | json ->
+        Result.map ~f:Option.some (Fork_config.of_yojson json)
 end
 
 let yojson_strip_fields ~keep_fields = function
@@ -32,9 +137,6 @@ let yojson_rename_fields ~alternates = function
              (fld, json) ) )
   | json ->
       json
-
-let opt_fallthrough ~default x2 =
-  Option.value_map ~default x2 ~f:(fun x -> Some x)
 
 let result_opt ~f x =
   match x with
@@ -381,13 +483,13 @@ module Json_layout = struct
     end
 
     type t =
-      { accounts : Accounts.t option [@default None]
-      ; num_accounts : int option [@default None]
+      { accounts : Accounts.t Existing_config.t [@default Unset]
+      ; num_accounts : int Existing_config.t [@default Unset]
       ; balances : Balance_spec.t list [@default []]
-      ; hash : string option [@default None]
-      ; s3_data_hash : string option [@default None]
-      ; name : string option [@default None]
-      ; add_genesis_winner : bool option [@default None]
+      ; hash : string Existing_config.t [@default Unset]
+      ; s3_data_hash : string Existing_config.t [@default Unset]
+      ; name : string Existing_config.t [@default Unset]
+      ; add_genesis_winner : bool Existing_config.t [@default Unset]
       }
     [@@deriving yojson, fields]
 
@@ -396,13 +498,13 @@ module Json_layout = struct
     let of_yojson json = of_yojson_generic ~fields of_yojson json
 
     let default : t =
-      { accounts = None
-      ; num_accounts = None
+      { accounts = Unset
+      ; num_accounts = Unset
       ; balances = []
-      ; hash = None
-      ; s3_data_hash = None
-      ; name = None
-      ; add_genesis_winner = None
+      ; hash = Unset
+      ; s3_data_hash = Unset
+      ; name = Unset
+      ; add_genesis_winner = Unset
       }
   end
 
@@ -429,16 +531,17 @@ module Json_layout = struct
     end
 
     type t =
-      { level : string option [@default None]
-      ; sub_windows_per_window : int option [@default None]
-      ; ledger_depth : int option [@default None]
-      ; work_delay : int option [@default None]
-      ; block_window_duration_ms : int option [@default None]
-      ; transaction_capacity : Transaction_capacity.t option [@default None]
-      ; coinbase_amount : Currency.Amount.t option [@default None]
-      ; supercharged_coinbase_factor : int option [@default None]
-      ; account_creation_fee : Currency.Fee.t option [@default None]
-      ; fork : Fork_config.t option [@default None]
+      { level : string Existing_config.t [@default Unset]
+      ; sub_windows_per_window : int Existing_config.t [@default Unset]
+      ; ledger_depth : int Existing_config.t [@default Unset]
+      ; work_delay : int Existing_config.t [@default Unset]
+      ; block_window_duration_ms : int Existing_config.t [@default Unset]
+      ; transaction_capacity : Transaction_capacity.t Existing_config.t
+            [@default Unset]
+      ; coinbase_amount : Currency.Amount.t Existing_config.t [@default Unset]
+      ; supercharged_coinbase_factor : int Existing_config.t [@default Unset]
+      ; account_creation_fee : Currency.Fee.t Existing_config.t [@default Unset]
+      ; fork : Fork_config_opt.t Existing_config.t [@default Unset]
       }
     [@@deriving yojson, fields]
 
@@ -449,12 +552,12 @@ module Json_layout = struct
 
   module Genesis = struct
     type t =
-      { k : int option [@default None]
-      ; delta : int option [@default None]
-      ; slots_per_epoch : int option [@default None]
-      ; slots_per_sub_window : int option [@default None]
-      ; grace_period_slots : int option [@default None]
-      ; genesis_state_timestamp : string option [@default None]
+      { k : int Existing_config.t [@default Unset]
+      ; delta : int Existing_config.t [@default Unset]
+      ; slots_per_epoch : int Existing_config.t [@default Unset]
+      ; slots_per_sub_window : int Existing_config.t [@default Unset]
+      ; grace_period_slots : int Existing_config.t [@default Unset]
+      ; genesis_state_timestamp : string Existing_config.t [@default Unset]
       }
     [@@deriving yojson, fields]
 
@@ -465,57 +568,68 @@ module Json_layout = struct
 
   module Daemon = struct
     type t =
-      { txpool_max_size : int option [@default None]
-      ; peer_list_url : string option [@default None]
-      ; zkapp_proof_update_cost : float option [@default None]
-      ; zkapp_signed_single_update_cost : float option [@default None]
-      ; zkapp_signed_pair_update_cost : float option [@default None]
-      ; zkapp_transaction_cost_limit : float option [@default None]
-      ; max_event_elements : int option [@default None]
-      ; max_action_elements : int option [@default None]
-      ; zkapp_cmd_limit_hardcap : int option [@default None]
-      ; slot_tx_end : int option [@default None]
-      ; slot_chain_end : int option [@default None]
-      ; minimum_user_command_fee : Currency.Fee.t option [@default None]
-      ; network_id : string option [@default None]
-      ; client_port : int option [@default None] [@key "client-port"]
-      ; libp2p_port : int option [@default None] [@key "libp2p-port"]
-      ; rest_port : int option [@default None] [@key "rest-port"]
-      ; graphql_port : int option [@default None] [@key "limited-graphql-port"]
-      ; node_status_url : string option [@default None] [@key "node-status-url"]
-      ; block_producer_key : string option
-            [@default None] [@key "block-producer-key"]
-      ; block_producer_pubkey : string option
-            [@default None] [@key "block-producer-pubkey"]
-      ; block_producer_password : string option
-            [@default None] [@key "block-producer-password"]
-      ; coinbase_receiver : string option
-            [@default None] [@key "coinbase-receiver"]
-      ; run_snark_worker : string option
-            [@default None] [@key "run-snark-worker"]
-      ; run_snark_coordinator : string option
-            [@default None] [@key "run-snark-coordinator"]
-      ; snark_worker_fee : int option [@default None] [@key "snark-worker-fee"]
-      ; snark_worker_parallelism : int option
-            [@default None] [@key "snark-worker-parallelism"]
-      ; work_selection : string option [@default None] [@key "work-selection"]
-      ; work_reassignment_wait : int option
-            [@default None] [@key "work-reassignment-wait"]
-      ; log_txn_pool_gossip : bool option
-            [@default None] [@key "log-txn-pool-gossip"]
-      ; log_snark_work_gossip : bool option
-            [@default None] [@key "log-snark-work-gossip"]
-      ; log_block_creation : bool option
-            [@default None] [@key "log-block-creation"]
-      ; min_connections : int option [@default None] [@key "min-connections"]
-      ; max_connections : int option [@default None] [@key "max-connections"]
-      ; pubsub_v0 : string option [@default None] [@key "pubsub-v0"]
-      ; validation_queue_size : int option
-            [@default None] [@key "validation-queue-size"]
-      ; stop_time : int option [@default None] [@key "stop-time"]
-      ; peers : string list option [@default None] [@key "peers"]
-      ; sync_ledger_max_subtree_depth : int option [@default None]
-      ; sync_ledger_default_subtree_depth : int option [@default None]
+      { txpool_max_size : int Existing_config.t [@default Unset]
+      ; peer_list_url : string Existing_config.t [@default Unset]
+      ; zkapp_proof_update_cost : float Existing_config.t [@default Unset]
+      ; zkapp_signed_single_update_cost : float Existing_config.t
+            [@default Unset]
+      ; zkapp_signed_pair_update_cost : float Existing_config.t [@default Unset]
+      ; zkapp_transaction_cost_limit : float Existing_config.t [@default Unset]
+      ; max_event_elements : int Existing_config.t [@default Unset]
+      ; max_action_elements : int Existing_config.t [@default Unset]
+      ; zkapp_cmd_limit_hardcap : int Existing_config.t [@default Unset]
+      ; slot_tx_end : int Existing_config.t [@default Unset]
+      ; slot_chain_end : int Existing_config.t [@default Unset]
+      ; minimum_user_command_fee : Currency.Fee.t Existing_config.t
+            [@default Unset]
+      ; network_id : string Existing_config.t [@default Unset]
+      ; client_port : int Existing_config.t
+            [@default Unset] [@key "client-port"]
+      ; libp2p_port : int Existing_config.t
+            [@default Unset] [@key "libp2p-port"]
+      ; rest_port : int Existing_config.t [@default Unset] [@key "rest-port"]
+      ; graphql_port : int Existing_config.t
+            [@default Unset] [@key "limited-graphql-port"]
+      ; node_status_url : string Existing_config.t
+            [@default Unset] [@key "node-status-url"]
+      ; block_producer_key : string Existing_config.t
+            [@default Unset] [@key "block-producer-key"]
+      ; block_producer_pubkey : string Existing_config.t
+            [@default Unset] [@key "block-producer-pubkey"]
+      ; block_producer_password : string Existing_config.t
+            [@default Unset] [@key "block-producer-password"]
+      ; coinbase_receiver : string Existing_config.t
+            [@default Unset] [@key "coinbase-receiver"]
+      ; run_snark_worker : string Existing_config.t
+            [@default Unset] [@key "run-snark-worker"]
+      ; run_snark_coordinator : string Existing_config.t
+            [@default Unset] [@key "run-snark-coordinator"]
+      ; snark_worker_fee : int Existing_config.t
+            [@default Unset] [@key "snark-worker-fee"]
+      ; snark_worker_parallelism : int Existing_config.t
+            [@default Unset] [@key "snark-worker-parallelism"]
+      ; work_selection : string Existing_config.t
+            [@default Unset] [@key "work-selection"]
+      ; work_reassignment_wait : int Existing_config.t
+            [@default Unset] [@key "work-reassignment-wait"]
+      ; log_txn_pool_gossip : bool Existing_config.t
+            [@default Unset] [@key "log-txn-pool-gossip"]
+      ; log_snark_work_gossip : bool Existing_config.t
+            [@default Unset] [@key "log-snark-work-gossip"]
+      ; log_block_creation : bool Existing_config.t
+            [@default Unset] [@key "log-block-creation"]
+      ; min_connections : int Existing_config.t
+            [@default Unset] [@key "min-connections"]
+      ; max_connections : int Existing_config.t
+            [@default Unset] [@key "max-connections"]
+      ; pubsub_v0 : string Existing_config.t [@default Unset] [@key "pubsub-v0"]
+      ; validation_queue_size : int Existing_config.t
+            [@default Unset] [@key "validation-queue-size"]
+      ; stop_time : int Existing_config.t [@default Unset] [@key "stop-time"]
+      ; peers : string list Existing_config.t [@default Unset] [@key "peers"]
+      ; sync_ledger_max_subtree_depth : int Existing_config.t [@default Unset]
+      ; sync_ledger_default_subtree_depth : int Existing_config.t
+            [@default Unset]
       }
     [@@deriving yojson, fields]
 
@@ -527,10 +641,10 @@ module Json_layout = struct
   module Epoch_data = struct
     module Data = struct
       type t =
-        { accounts : Accounts.t option [@default None]
+        { accounts : Accounts.t Existing_config.t [@default Unset]
         ; seed : string
-        ; s3_data_hash : string option [@default None]
-        ; hash : string option [@default None]
+        ; s3_data_hash : string Existing_config.t [@default Unset]
+        ; hash : string Existing_config.t [@default Unset]
         }
       [@@deriving yojson, fields]
 
@@ -550,12 +664,28 @@ module Json_layout = struct
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
 
+  module Epoch_data_opt = struct
+    type t = Epoch_data.t option
+
+    let to_yojson = function
+      | None ->
+          `Assoc []
+      | Some x ->
+          Epoch_data.to_yojson x
+
+    let of_yojson = function
+      | `Assoc [] ->
+          Ok None
+      | json ->
+          Result.map ~f:Option.some (Epoch_data.of_yojson json)
+  end
+
   type t =
-    { daemon : Daemon.t option [@default None]
-    ; genesis : Genesis.t option [@default None]
-    ; proof : Proof_keys.t option [@default None]
-    ; ledger : Ledger.t option [@default None]
-    ; epoch_data : Epoch_data.t option [@default None]
+    { daemon : Daemon.t Existing_config.t [@default Unset]
+    ; genesis : Genesis.t Existing_config.t [@default Unset]
+    ; proof : Proof_keys.t Existing_config.t [@default Unset]
+    ; ledger : Ledger.t Existing_config.t [@default Unset]
+    ; epoch_data : Epoch_data_opt.t Existing_config.t [@default Unset]
     }
   [@@deriving yojson, fields]
 
@@ -564,11 +694,11 @@ module Json_layout = struct
   let of_yojson json = of_yojson_generic ~fields of_yojson json
 
   let default : t =
-    { daemon = None
-    ; genesis = None
-    ; proof = None
-    ; ledger = None
-    ; epoch_data = None
+    { daemon = Unset
+    ; genesis = Unset
+    ; proof = Unset
+    ; ledger = Unset
+    ; epoch_data = Unset
     }
 end
 
@@ -869,12 +999,12 @@ module Ledger = struct
 
   type t =
     { base : base
-    ; num_accounts : int option
+    ; num_accounts : int Existing_config.t
     ; balances : (int * Currency.Balance.Stable.Latest.t) list
-    ; hash : string option
-    ; s3_data_hash : string option
-    ; name : string option
-    ; add_genesis_winner : bool option
+    ; hash : string Existing_config.t
+    ; s3_data_hash : string Existing_config.t
+    ; name : string Existing_config.t
+    ; add_genesis_winner : bool Existing_config.t
     }
   [@@deriving bin_io_unversioned]
 
@@ -892,7 +1022,7 @@ module Ledger = struct
           { Json_layout.Ledger.Balance_spec.number; balance } )
     in
     let without_base : Json_layout.Ledger.t =
-      { accounts = None
+      { accounts = Unset
       ; num_accounts
       ; balances
       ; hash
@@ -903,9 +1033,11 @@ module Ledger = struct
     in
     match base with
     | Named name ->
-        { without_base with name = Some name }
+        { without_base with name = Existing name }
     | Accounts accounts ->
-        { without_base with accounts = Some (Accounts.to_json_layout accounts) }
+        { without_base with
+          accounts = Existing (Accounts.to_json_layout accounts)
+        }
     | Hash ->
         without_base
 
@@ -922,18 +1054,18 @@ module Ledger = struct
     let open Result.Let_syntax in
     let%map base =
       match accounts with
-      | Some accounts ->
+      | Existing accounts ->
           let%map accounts = Accounts.of_json_layout accounts in
           Accounts accounts
-      | None -> (
+      | Unset -> (
           match name with
-          | Some name ->
+          | Existing name ->
               return (Named name)
-          | None -> (
+          | Unset -> (
               match hash with
-              | Some _ ->
+              | Existing _ ->
                   return Hash
-              | None ->
+              | Unset ->
                   Error
                     "Runtime_config.Ledger.of_json_layout: Expected a field \
                      'accounts', 'name' or 'hash'" ) )
@@ -1060,45 +1192,46 @@ module Proof_keys = struct
   end
 
   type t =
-    { level : Level.t option
-    ; sub_windows_per_window : int option
-    ; ledger_depth : int option
-    ; work_delay : int option
-    ; block_window_duration_ms : int option
-    ; transaction_capacity : Transaction_capacity.t option
-    ; coinbase_amount : Currency.Amount.Stable.Latest.t option
-    ; supercharged_coinbase_factor : int option
-    ; account_creation_fee : Currency.Fee.Stable.Latest.t option
-    ; fork : Fork_config.t option
+    { level : Level.t Existing_config.t
+    ; sub_windows_per_window : int Existing_config.t
+    ; ledger_depth : int Existing_config.t
+    ; work_delay : int Existing_config.t
+    ; block_window_duration_ms : int Existing_config.t
+    ; transaction_capacity : Transaction_capacity.t Existing_config.t
+    ; coinbase_amount : Currency.Amount.Stable.Latest.t Existing_config.t
+    ; supercharged_coinbase_factor : int Existing_config.t
+    ; account_creation_fee : Currency.Fee.Stable.Latest.t Existing_config.t
+    ; fork : Fork_config_opt.t Existing_config.t
     }
   [@@deriving bin_io_unversioned]
 
   let make ?level ?sub_windows_per_window ?ledger_depth ?work_delay
       ?block_window_duration_ms ?transaction_capacity ?coinbase_amount
       ?supercharged_coinbase_factor ?account_creation_fee ?fork () =
-    { level
-    ; sub_windows_per_window
-    ; ledger_depth
-    ; work_delay
-    ; block_window_duration_ms
-    ; transaction_capacity
-    ; coinbase_amount
-    ; supercharged_coinbase_factor
-    ; account_creation_fee
-    ; fork
+    let open Existing_config in
+    { level = of_option level
+    ; sub_windows_per_window = of_option sub_windows_per_window
+    ; ledger_depth = of_option ledger_depth
+    ; work_delay = of_option work_delay
+    ; block_window_duration_ms = of_option block_window_duration_ms
+    ; transaction_capacity = of_option transaction_capacity
+    ; coinbase_amount = of_option coinbase_amount
+    ; supercharged_coinbase_factor = of_option supercharged_coinbase_factor
+    ; account_creation_fee = of_option account_creation_fee
+    ; fork = of_option fork
     }
 
   let default =
-    { level = None
-    ; sub_windows_per_window = None
-    ; ledger_depth = None
-    ; work_delay = None
-    ; block_window_duration_ms = None
-    ; transaction_capacity = None
-    ; coinbase_amount = None
-    ; supercharged_coinbase_factor = None
-    ; account_creation_fee = None
-    ; fork = None
+    { level = Unset
+    ; sub_windows_per_window = Unset
+    ; ledger_depth = Unset
+    ; work_delay = Unset
+    ; block_window_duration_ms = Unset
+    ; transaction_capacity = Unset
+    ; coinbase_amount = Unset
+    ; supercharged_coinbase_factor = Unset
+    ; account_creation_fee = Unset
+    ; fork = Unset
     }
 
   let to_json_layout
@@ -1113,13 +1246,15 @@ module Proof_keys = struct
       ; account_creation_fee
       ; fork
       } =
-    { Json_layout.Proof_keys.level = Option.map ~f:Level.to_json_layout level
+    { Json_layout.Proof_keys.level =
+        Existing_config.map ~f:Level.to_json_layout level
     ; sub_windows_per_window
     ; ledger_depth
     ; work_delay
     ; block_window_duration_ms
     ; transaction_capacity =
-        Option.map ~f:Transaction_capacity.to_json_layout transaction_capacity
+        Existing_config.map ~f:Transaction_capacity.to_json_layout
+          transaction_capacity
     ; coinbase_amount
     ; supercharged_coinbase_factor
     ; account_creation_fee
@@ -1139,9 +1274,10 @@ module Proof_keys = struct
       ; fork
       } =
     let open Result.Let_syntax in
-    let%map level = result_opt ~f:Level.of_json_layout level
+    let%map level = Existing_config.result ~f:Level.of_json_layout level
     and transaction_capacity =
-      result_opt ~f:Transaction_capacity.of_json_layout transaction_capacity
+      Existing_config.result ~f:Transaction_capacity.of_json_layout
+        transaction_capacity
     in
     { level
     ; sub_windows_per_window
@@ -1161,36 +1297,37 @@ module Proof_keys = struct
     Result.bind ~f:of_json_layout (Json_layout.Proof_keys.of_yojson json)
 
   let combine t1 t2 =
-    { level = opt_fallthrough ~default:t1.level t2.level
+    let open Existing_config in
+    { level = pick_config ~default:t1.level t2.level
     ; sub_windows_per_window =
-        opt_fallthrough ~default:t1.sub_windows_per_window
-          t2.sub_windows_per_window
-    ; ledger_depth = opt_fallthrough ~default:t1.ledger_depth t2.ledger_depth
-    ; work_delay = opt_fallthrough ~default:t1.work_delay t2.work_delay
+        pick_config ~default:t1.sub_windows_per_window t2.sub_windows_per_window
+    ; ledger_depth = pick_config ~default:t1.ledger_depth t2.ledger_depth
+    ; work_delay = pick_config ~default:t1.work_delay t2.work_delay
     ; block_window_duration_ms =
-        opt_fallthrough ~default:t1.block_window_duration_ms
+        pick_config ~default:t1.block_window_duration_ms
           t2.block_window_duration_ms
     ; transaction_capacity =
-        opt_fallthrough ~default:t1.transaction_capacity t2.transaction_capacity
+        pick_config ~default:t1.transaction_capacity t2.transaction_capacity
     ; coinbase_amount =
-        opt_fallthrough ~default:t1.coinbase_amount t2.coinbase_amount
+        pick_config ~default:t1.coinbase_amount t2.coinbase_amount
     ; supercharged_coinbase_factor =
-        opt_fallthrough ~default:t1.supercharged_coinbase_factor
+        pick_config ~default:t1.supercharged_coinbase_factor
           t2.supercharged_coinbase_factor
     ; account_creation_fee =
-        opt_fallthrough ~default:t1.account_creation_fee t2.account_creation_fee
-    ; fork = opt_fallthrough ~default:t1.fork t2.fork
+        pick_config ~default:t1.account_creation_fee t2.account_creation_fee
+    ; fork = pick_config ~default:t1.fork t2.fork
     }
 end
 
 module Genesis = struct
   type t =
-    { k : int option (* the depth of finality constant (in slots) *)
-    ; delta : int option (* max permissible delay of packets (in slots) *)
-    ; slots_per_epoch : int option
-    ; slots_per_sub_window : int option
-    ; grace_period_slots : int option
-    ; genesis_state_timestamp : int64 option
+    { k : int Existing_config.t (* the depth of finality constant (in slots) *)
+    ; delta : int Existing_config.t
+          (* max permissible delay of packets (in slots) *)
+    ; slots_per_epoch : int Existing_config.t
+    ; slots_per_sub_window : int Existing_config.t
+    ; grace_period_slots : int Existing_config.t
+    ; genesis_state_timestamp : int64 Existing_config.t
     }
   [@@deriving bin_io_unversioned]
 
@@ -1202,30 +1339,30 @@ module Genesis = struct
     ; slots_per_sub_window = a.slots_per_sub_window
     ; grace_period_slots = a.grace_period_slots
     ; genesis_state_timestamp =
-        Option.map a.genesis_state_timestamp
+        Existing_config.map a.genesis_state_timestamp
           ~f:Genesis_constants.genesis_timestamp_to_string
     }
 
   let of_json_layout : Json_layout.Genesis.t -> (t, string) Result.t =
    fun a ->
     match a.genesis_state_timestamp with
-    | None ->
+    | Unset ->
         Ok
           { k = a.k
           ; delta = a.delta
           ; slots_per_epoch = a.slots_per_epoch
           ; slots_per_sub_window = a.slots_per_sub_window
           ; grace_period_slots = a.grace_period_slots
-          ; genesis_state_timestamp = None
+          ; genesis_state_timestamp = Unset
           }
-    | Some ts ->
+    | Existing ts ->
         let%map.Result ts = Genesis_constants.validate_time (Some ts) in
         { k = a.k
         ; delta = a.delta
         ; slots_per_epoch = a.slots_per_epoch
         ; slots_per_sub_window = a.slots_per_sub_window
         ; grace_period_slots = a.grace_period_slots
-        ; genesis_state_timestamp = Some ts
+        ; genesis_state_timestamp = Existing ts
         }
 
   let to_yojson x = Json_layout.Genesis.to_yojson (to_json_layout x)
@@ -1234,16 +1371,17 @@ module Genesis = struct
     Result.bind ~f:of_json_layout (Json_layout.Genesis.of_yojson json)
 
   let combine t1 t2 =
-    { k = opt_fallthrough ~default:t1.k t2.k
-    ; delta = opt_fallthrough ~default:t1.delta t2.delta
+    let open Existing_config in
+    { k = pick_config ~default:t1.k t2.k
+    ; delta = pick_config ~default:t1.delta t2.delta
     ; slots_per_epoch =
-        opt_fallthrough ~default:t1.slots_per_epoch t2.slots_per_epoch
+        pick_config ~default:t1.slots_per_epoch t2.slots_per_epoch
     ; slots_per_sub_window =
-        opt_fallthrough ~default:t1.slots_per_sub_window t2.slots_per_sub_window
+        pick_config ~default:t1.slots_per_sub_window t2.slots_per_sub_window
     ; grace_period_slots =
-        opt_fallthrough ~default:t1.grace_period_slots t2.grace_period_slots
+        pick_config ~default:t1.grace_period_slots t2.grace_period_slots
     ; genesis_state_timestamp =
-        opt_fallthrough ~default:t1.genesis_state_timestamp
+        pick_config ~default:t1.genesis_state_timestamp
           t2.genesis_state_timestamp
     }
 end
@@ -1253,89 +1391,89 @@ module Daemon = struct
      a command line argument. Putting it in the config makes the network explicitly
      rely on a certain number of nodes, reducing decentralisation. See #14766 *)
   type t = Json_layout.Daemon.t =
-    { txpool_max_size : int option
-    ; peer_list_url : string option
-    ; zkapp_proof_update_cost : float option [@default None]
-    ; zkapp_signed_single_update_cost : float option [@default None]
-    ; zkapp_signed_pair_update_cost : float option [@default None]
-    ; zkapp_transaction_cost_limit : float option [@default None]
-    ; max_event_elements : int option [@default None]
-    ; max_action_elements : int option [@default None]
-    ; zkapp_cmd_limit_hardcap : int option [@default None]
-    ; slot_tx_end : int option [@default None]
-    ; slot_chain_end : int option [@default None]
-    ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t option
-          [@default None]
-    ; network_id : string option [@default None]
-    ; client_port : int option [@default None]
-    ; libp2p_port : int option [@default None]
-    ; rest_port : int option [@default None]
-    ; graphql_port : int option [@default None]
-    ; node_status_url : string option [@default None]
-    ; block_producer_key : string option [@default None]
-    ; block_producer_pubkey : string option [@default None]
-    ; block_producer_password : string option [@default None]
-    ; coinbase_receiver : string option [@default None]
-    ; run_snark_worker : string option [@default None]
-    ; run_snark_coordinator : string option [@default None]
-    ; snark_worker_fee : int option [@default None]
-    ; snark_worker_parallelism : int option [@default None]
-    ; work_selection : string option [@default None]
-    ; work_reassignment_wait : int option [@default None]
-    ; log_txn_pool_gossip : bool option [@default None]
-    ; log_snark_work_gossip : bool option [@default None]
-    ; log_block_creation : bool option [@default None]
-    ; min_connections : int option [@default None]
-    ; max_connections : int option [@default None]
-    ; pubsub_v0 : string option [@default None]
-    ; validation_queue_size : int option [@default None]
-    ; stop_time : int option [@default None]
-    ; peers : string list option [@default None]
-    ; sync_ledger_max_subtree_depth : int option [@default None]
-    ; sync_ledger_default_subtree_depth : int option [@default None]
+    { txpool_max_size : int Existing_config.t
+    ; peer_list_url : string Existing_config.t
+    ; zkapp_proof_update_cost : float Existing_config.t [@default Unset]
+    ; zkapp_signed_single_update_cost : float Existing_config.t [@default Unset]
+    ; zkapp_signed_pair_update_cost : float Existing_config.t [@default Unset]
+    ; zkapp_transaction_cost_limit : float Existing_config.t [@default Unset]
+    ; max_event_elements : int Existing_config.t [@default Unset]
+    ; max_action_elements : int Existing_config.t [@default Unset]
+    ; zkapp_cmd_limit_hardcap : int Existing_config.t [@default Unset]
+    ; slot_tx_end : int Existing_config.t [@default Unset]
+    ; slot_chain_end : int Existing_config.t [@default Unset]
+    ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t Existing_config.t
+          [@default Unset]
+    ; network_id : string Existing_config.t [@default Unset]
+    ; client_port : int Existing_config.t [@default Unset]
+    ; libp2p_port : int Existing_config.t [@default Unset]
+    ; rest_port : int Existing_config.t [@default Unset]
+    ; graphql_port : int Existing_config.t [@default Unset]
+    ; node_status_url : string Existing_config.t [@default Unset]
+    ; block_producer_key : string Existing_config.t [@default Unset]
+    ; block_producer_pubkey : string Existing_config.t [@default Unset]
+    ; block_producer_password : string Existing_config.t [@default Unset]
+    ; coinbase_receiver : string Existing_config.t [@default Unset]
+    ; run_snark_worker : string Existing_config.t [@default Unset]
+    ; run_snark_coordinator : string Existing_config.t [@default Unset]
+    ; snark_worker_fee : int Existing_config.t [@default Unset]
+    ; snark_worker_parallelism : int Existing_config.t [@default Unset]
+    ; work_selection : string Existing_config.t [@default Unset]
+    ; work_reassignment_wait : int Existing_config.t [@default Unset]
+    ; log_txn_pool_gossip : bool Existing_config.t [@default Unset]
+    ; log_snark_work_gossip : bool Existing_config.t [@default Unset]
+    ; log_block_creation : bool Existing_config.t [@default Unset]
+    ; min_connections : int Existing_config.t [@default Unset]
+    ; max_connections : int Existing_config.t [@default Unset]
+    ; pubsub_v0 : string Existing_config.t [@default Unset]
+    ; validation_queue_size : int Existing_config.t [@default Unset]
+    ; stop_time : int Existing_config.t [@default Unset]
+    ; peers : string list Existing_config.t [@default Unset]
+    ; sync_ledger_max_subtree_depth : int Existing_config.t [@default Unset]
+    ; sync_ledger_default_subtree_depth : int Existing_config.t [@default Unset]
     }
   [@@deriving bin_io_unversioned, fields]
 
   let default : t =
-    { txpool_max_size = None
-    ; peer_list_url = None
-    ; zkapp_proof_update_cost = None
-    ; zkapp_signed_single_update_cost = None
-    ; zkapp_signed_pair_update_cost = None
-    ; zkapp_transaction_cost_limit = None
-    ; max_event_elements = None
-    ; max_action_elements = None
-    ; zkapp_cmd_limit_hardcap = None
-    ; slot_tx_end = None
-    ; slot_chain_end = None
-    ; minimum_user_command_fee = None
-    ; network_id = None
-    ; client_port = None
-    ; libp2p_port = None
-    ; rest_port = None
-    ; graphql_port = None
-    ; node_status_url = None
-    ; block_producer_key = None
-    ; block_producer_pubkey = None
-    ; block_producer_password = None
-    ; coinbase_receiver = None
-    ; run_snark_worker = None
-    ; run_snark_coordinator = None
-    ; snark_worker_fee = None
-    ; snark_worker_parallelism = None
-    ; work_selection = None
-    ; work_reassignment_wait = None
-    ; log_txn_pool_gossip = None
-    ; log_snark_work_gossip = None
-    ; log_block_creation = None
-    ; min_connections = None
-    ; max_connections = None
-    ; pubsub_v0 = None
-    ; validation_queue_size = None
-    ; stop_time = None
-    ; peers = None
-    ; sync_ledger_max_subtree_depth = None
-    ; sync_ledger_default_subtree_depth = None
+    { txpool_max_size = Unset
+    ; peer_list_url = Unset
+    ; zkapp_proof_update_cost = Unset
+    ; zkapp_signed_single_update_cost = Unset
+    ; zkapp_signed_pair_update_cost = Unset
+    ; zkapp_transaction_cost_limit = Unset
+    ; max_event_elements = Unset
+    ; max_action_elements = Unset
+    ; zkapp_cmd_limit_hardcap = Unset
+    ; slot_tx_end = Unset
+    ; slot_chain_end = Unset
+    ; minimum_user_command_fee = Unset
+    ; network_id = Unset
+    ; client_port = Unset
+    ; libp2p_port = Unset
+    ; rest_port = Unset
+    ; graphql_port = Unset
+    ; node_status_url = Unset
+    ; block_producer_key = Unset
+    ; block_producer_pubkey = Unset
+    ; block_producer_password = Unset
+    ; coinbase_receiver = Unset
+    ; run_snark_worker = Unset
+    ; run_snark_coordinator = Unset
+    ; snark_worker_fee = Unset
+    ; snark_worker_parallelism = Unset
+    ; work_selection = Unset
+    ; work_reassignment_wait = Unset
+    ; log_txn_pool_gossip = Unset
+    ; log_snark_work_gossip = Unset
+    ; log_block_creation = Unset
+    ; min_connections = Unset
+    ; max_connections = Unset
+    ; pubsub_v0 = Unset
+    ; validation_queue_size = Unset
+    ; stop_time = Unset
+    ; peers = Unset
+    ; sync_ledger_max_subtree_depth = Unset
+    ; sync_ledger_default_subtree_depth = Unset
     }
 
   let to_json_layout : t -> Json_layout.Daemon.t = Fn.id
@@ -1349,88 +1487,82 @@ module Daemon = struct
     Result.bind ~f:of_json_layout (Json_layout.Daemon.of_yojson json)
 
   let combine t1 t2 =
+    let open Existing_config in
     { txpool_max_size =
-        opt_fallthrough ~default:t1.txpool_max_size t2.txpool_max_size
-    ; peer_list_url = opt_fallthrough ~default:t1.peer_list_url t2.peer_list_url
+        pick_config ~default:t1.txpool_max_size t2.txpool_max_size
+    ; peer_list_url = pick_config ~default:t1.peer_list_url t2.peer_list_url
     ; zkapp_proof_update_cost =
-        opt_fallthrough ~default:t1.zkapp_proof_update_cost
+        pick_config ~default:t1.zkapp_proof_update_cost
           t2.zkapp_proof_update_cost
     ; zkapp_signed_single_update_cost =
-        opt_fallthrough ~default:t1.zkapp_signed_single_update_cost
+        pick_config ~default:t1.zkapp_signed_single_update_cost
           t2.zkapp_signed_single_update_cost
     ; zkapp_signed_pair_update_cost =
-        opt_fallthrough ~default:t1.zkapp_signed_pair_update_cost
+        pick_config ~default:t1.zkapp_signed_pair_update_cost
           t2.zkapp_signed_pair_update_cost
     ; zkapp_transaction_cost_limit =
-        opt_fallthrough ~default:t1.zkapp_transaction_cost_limit
+        pick_config ~default:t1.zkapp_transaction_cost_limit
           t2.zkapp_transaction_cost_limit
     ; max_event_elements =
-        opt_fallthrough ~default:t1.max_event_elements t2.max_event_elements
+        pick_config ~default:t1.max_event_elements t2.max_event_elements
     ; max_action_elements =
-        opt_fallthrough ~default:t1.max_action_elements t2.max_action_elements
+        pick_config ~default:t1.max_action_elements t2.max_action_elements
     ; zkapp_cmd_limit_hardcap =
-        opt_fallthrough ~default:t1.zkapp_cmd_limit_hardcap
+        pick_config ~default:t1.zkapp_cmd_limit_hardcap
           t2.zkapp_cmd_limit_hardcap
-    ; slot_tx_end = opt_fallthrough ~default:t1.slot_tx_end t2.slot_tx_end
-    ; slot_chain_end =
-        opt_fallthrough ~default:t1.slot_chain_end t2.slot_chain_end
+    ; slot_tx_end = pick_config ~default:t1.slot_tx_end t2.slot_tx_end
+    ; slot_chain_end = pick_config ~default:t1.slot_chain_end t2.slot_chain_end
     ; minimum_user_command_fee =
-        opt_fallthrough ~default:t1.minimum_user_command_fee
+        pick_config ~default:t1.minimum_user_command_fee
           t2.minimum_user_command_fee
-    ; network_id = opt_fallthrough ~default:t1.network_id t2.network_id
-    ; client_port = opt_fallthrough ~default:t1.client_port t2.client_port
-    ; libp2p_port = opt_fallthrough ~default:t1.libp2p_port t2.libp2p_port
-    ; rest_port = opt_fallthrough ~default:t1.rest_port t2.rest_port
-    ; graphql_port = opt_fallthrough ~default:t1.graphql_port t2.graphql_port
+    ; network_id = pick_config ~default:t1.network_id t2.network_id
+    ; client_port = pick_config ~default:t1.client_port t2.client_port
+    ; libp2p_port = pick_config ~default:t1.libp2p_port t2.libp2p_port
+    ; rest_port = pick_config ~default:t1.rest_port t2.rest_port
+    ; graphql_port = pick_config ~default:t1.graphql_port t2.graphql_port
     ; node_status_url =
-        opt_fallthrough ~default:t1.node_status_url t2.node_status_url
+        pick_config ~default:t1.node_status_url t2.node_status_url
     ; block_producer_key =
-        opt_fallthrough ~default:t1.block_producer_key t2.block_producer_key
+        pick_config ~default:t1.block_producer_key t2.block_producer_key
     ; block_producer_pubkey =
-        opt_fallthrough ~default:t1.block_producer_pubkey
-          t2.block_producer_pubkey
+        pick_config ~default:t1.block_producer_pubkey t2.block_producer_pubkey
     ; block_producer_password =
-        opt_fallthrough ~default:t1.block_producer_password
+        pick_config ~default:t1.block_producer_password
           t2.block_producer_password
     ; coinbase_receiver =
-        opt_fallthrough ~default:t1.coinbase_receiver t2.coinbase_receiver
+        pick_config ~default:t1.coinbase_receiver t2.coinbase_receiver
     ; run_snark_worker =
-        opt_fallthrough ~default:t1.run_snark_worker t2.run_snark_worker
+        pick_config ~default:t1.run_snark_worker t2.run_snark_worker
     ; run_snark_coordinator =
-        opt_fallthrough ~default:t1.run_snark_coordinator
-          t2.run_snark_coordinator
+        pick_config ~default:t1.run_snark_coordinator t2.run_snark_coordinator
     ; snark_worker_fee =
-        opt_fallthrough ~default:t1.snark_worker_fee t2.snark_worker_fee
+        pick_config ~default:t1.snark_worker_fee t2.snark_worker_fee
     ; snark_worker_parallelism =
-        opt_fallthrough ~default:t1.snark_worker_parallelism
+        pick_config ~default:t1.snark_worker_parallelism
           t2.snark_worker_parallelism
-    ; work_selection =
-        opt_fallthrough ~default:t1.work_selection t2.work_selection
+    ; work_selection = pick_config ~default:t1.work_selection t2.work_selection
     ; work_reassignment_wait =
-        opt_fallthrough ~default:t1.work_reassignment_wait
-          t2.work_reassignment_wait
+        pick_config ~default:t1.work_reassignment_wait t2.work_reassignment_wait
     ; log_txn_pool_gossip =
-        opt_fallthrough ~default:t1.log_txn_pool_gossip t2.log_txn_pool_gossip
+        pick_config ~default:t1.log_txn_pool_gossip t2.log_txn_pool_gossip
     ; log_snark_work_gossip =
-        opt_fallthrough ~default:t1.log_snark_work_gossip
-          t2.log_snark_work_gossip
+        pick_config ~default:t1.log_snark_work_gossip t2.log_snark_work_gossip
     ; log_block_creation =
-        opt_fallthrough ~default:t1.log_block_creation t2.log_block_creation
+        pick_config ~default:t1.log_block_creation t2.log_block_creation
     ; min_connections =
-        opt_fallthrough ~default:t1.min_connections t2.min_connections
+        pick_config ~default:t1.min_connections t2.min_connections
     ; max_connections =
-        opt_fallthrough ~default:t1.max_connections t2.max_connections
-    ; pubsub_v0 = opt_fallthrough ~default:t1.pubsub_v0 t2.pubsub_v0
+        pick_config ~default:t1.max_connections t2.max_connections
+    ; pubsub_v0 = pick_config ~default:t1.pubsub_v0 t2.pubsub_v0
     ; validation_queue_size =
-        opt_fallthrough ~default:t1.validation_queue_size
-          t2.validation_queue_size
-    ; stop_time = opt_fallthrough ~default:t1.stop_time t2.stop_time
-    ; peers = opt_fallthrough ~default:t1.peers t2.peers
+        pick_config ~default:t1.validation_queue_size t2.validation_queue_size
+    ; stop_time = pick_config ~default:t1.stop_time t2.stop_time
+    ; peers = pick_config ~default:t1.peers t2.peers
     ; sync_ledger_max_subtree_depth =
-        opt_fallthrough ~default:t1.sync_ledger_max_subtree_depth
+        pick_config ~default:t1.sync_ledger_max_subtree_depth
           t2.sync_ledger_max_subtree_depth
     ; sync_ledger_default_subtree_depth =
-        opt_fallthrough ~default:t1.sync_ledger_default_subtree_depth
+        pick_config ~default:t1.sync_ledger_default_subtree_depth
           t2.sync_ledger_default_subtree_depth
     }
 end
@@ -1448,7 +1580,11 @@ module Epoch_data = struct
   let to_json_layout : t -> Json_layout.Epoch_data.t =
    fun { staking; next } ->
     let accounts (ledger : Ledger.t) =
-      match ledger.base with Accounts acc -> Some acc | _ -> None
+      match ledger.base with
+      | Accounts acc ->
+          Existing_config.Existing acc
+      | _ ->
+          Unset
     in
     let staking =
       { Json_layout.Epoch_data.Data.accounts = accounts staking.ledger
@@ -1474,13 +1610,13 @@ module Epoch_data = struct
         { Json_layout.Epoch_data.Data.accounts; seed; hash; s3_data_hash } =
       let%map base =
         match accounts with
-        | Some accounts ->
+        | Existing accounts ->
             return @@ Ledger.Accounts accounts
-        | None -> (
+        | Unset -> (
             match hash with
-            | Some _ ->
+            | Existing _ ->
                 return @@ Ledger.Hash
-            | None ->
+            | Unset ->
                 let ledger_name =
                   match t with `Staking -> "staking" | `Next -> "next"
                 in
@@ -1492,12 +1628,12 @@ module Epoch_data = struct
       in
       let ledger =
         { Ledger.base
-        ; num_accounts = None
+        ; num_accounts = Unset
         ; balances = []
         ; hash
         ; s3_data_hash
-        ; name = None
-        ; add_genesis_winner = Some false
+        ; name = Unset
+        ; add_genesis_winner = Existing false
         }
       in
       { Data.ledger; seed }
@@ -1516,60 +1652,91 @@ module Epoch_data = struct
 end
 
 type t =
-  { daemon : Daemon.t option
-  ; genesis : Genesis.t option
-  ; proof : Proof_keys.t option
-  ; ledger : Ledger.t option
-  ; epoch_data : Epoch_data.t option
+  { daemon : Daemon.t Existing_config.t
+  ; genesis : Genesis.t Existing_config.t
+  ; proof : Proof_keys.t Existing_config.t
+  ; ledger : Ledger.t Existing_config.t
+  ; epoch_data : Epoch_data.t option Existing_config.t
   }
 [@@deriving bin_io_unversioned, fields]
 
 let make ?daemon ?genesis ?proof ?ledger ?epoch_data () =
-  { daemon; genesis; proof; ledger; epoch_data }
+  { daemon = Existing_config.of_option daemon
+  ; genesis = Existing_config.of_option genesis
+  ; proof = Existing_config.of_option proof
+  ; ledger = Existing_config.of_option ledger
+  ; epoch_data = Existing_config.of_option epoch_data
+  }
 
 let to_json_layout { daemon; genesis; proof; ledger; epoch_data } =
-  { Json_layout.daemon = Option.map ~f:Daemon.to_json_layout daemon
-  ; genesis = Option.map ~f:Genesis.to_json_layout genesis
-  ; proof = Option.map ~f:Proof_keys.to_json_layout proof
-  ; ledger = Option.map ~f:Ledger.to_json_layout ledger
-  ; epoch_data = Option.map ~f:Epoch_data.to_json_layout epoch_data
+  { Json_layout.daemon = Existing_config.map ~f:Daemon.to_json_layout daemon
+  ; genesis = Existing_config.map ~f:Genesis.to_json_layout genesis
+  ; proof = Existing_config.map ~f:Proof_keys.to_json_layout proof
+  ; ledger = Existing_config.map ~f:Ledger.to_json_layout ledger
+  ; epoch_data =
+      Existing_config.map
+        ~f:(Option.map ~f:Epoch_data.to_json_layout)
+        epoch_data
   }
 
 let of_json_layout { Json_layout.daemon; genesis; proof; ledger; epoch_data } =
   let open Result.Let_syntax in
-  let%map daemon = result_opt ~f:Daemon.of_json_layout daemon
-  and genesis = result_opt ~f:Genesis.of_json_layout genesis
-  and proof = result_opt ~f:Proof_keys.of_json_layout proof
-  and ledger = result_opt ~f:Ledger.of_json_layout ledger
-  and epoch_data = result_opt ~f:Epoch_data.of_json_layout epoch_data in
+  let%map daemon = Existing_config.result ~f:Daemon.of_json_layout daemon
+  and genesis = Existing_config.result ~f:Genesis.of_json_layout genesis
+  and proof = Existing_config.result ~f:Proof_keys.of_json_layout proof
+  and ledger = Existing_config.result ~f:Ledger.of_json_layout ledger
+  and epoch_data =
+    Existing_config.result
+      ~f:(result_opt ~f:Epoch_data.of_json_layout)
+      epoch_data
+  in
   { daemon; genesis; proof; ledger; epoch_data }
 
 let to_yojson x = Json_layout.to_yojson (to_json_layout x)
 
 let to_yojson_without_accounts x =
+  let open Existing_config in
   let layout = to_json_layout x in
+  let accounts_config_length = function
+    | Unset ->
+        None
+    | Existing accounts ->
+        Some (List.length accounts)
+  in
   let genesis_accounts =
-    let%bind.Option { accounts; _ } = layout.ledger in
-    Option.map ~f:List.length accounts
+    layout.ledger
+    >>= fun ({ accounts; _ } : Json_layout.Ledger.t) -> accounts >>| List.length
   in
   let staking_accounts =
-    let%bind.Option { staking; _ } = layout.epoch_data in
-    Option.map ~f:List.length staking.accounts
+    map
+      ~f:(fun (epoch_data : Json_layout.Epoch_data_opt.t) ->
+        let%bind.Option { staking; _ } = epoch_data in
+        accounts_config_length staking.accounts )
+      layout.epoch_data
+    |> flatten_opt
   in
   let next_accounts =
-    let%bind.Option { next; _ } = layout.epoch_data in
-    let%bind.Option { accounts; _ } = next in
-    Option.map ~f:List.length accounts
+    map
+      ~f:(fun (epoch_data : Json_layout.Epoch_data_opt.t) ->
+        let%bind.Option { next; _ } = epoch_data in
+        let%bind.Option { accounts; _ } = next in
+        accounts_config_length accounts )
+      layout.epoch_data
+    |> flatten_opt
   in
   let layout =
-    let f ledger = { ledger with Json_layout.Ledger.accounts = None } in
+    let f ledger = { ledger with Json_layout.Ledger.accounts = Unset } in
     { layout with
-      ledger = Option.map ~f layout.ledger
+      ledger = Existing_config.map ~f layout.ledger
     ; epoch_data =
-        Option.map layout.epoch_data ~f:(fun { staking; next } ->
-            { Json_layout.Epoch_data.staking = { staking with accounts = None }
-            ; next = Option.map next ~f:(fun n -> { n with accounts = None })
-            } )
+        Existing_config.map layout.epoch_data
+          ~f:
+            (Option.map ~f:(fun { Json_layout.Epoch_data.staking; next } ->
+                 { Json_layout.Epoch_data.staking =
+                     { staking with accounts = Unset }
+                 ; next =
+                     Option.map next ~f:(fun n -> { n with accounts = Unset })
+                 } ) )
     }
   in
   ( Json_layout.to_yojson layout
@@ -1580,28 +1747,20 @@ let to_yojson_without_accounts x =
 let of_yojson json = Result.bind ~f:of_json_layout (Json_layout.of_yojson json)
 
 let default =
-  { daemon = None
-  ; genesis = None
-  ; proof = None
-  ; ledger = None
-  ; epoch_data = None
+  { daemon = Unset
+  ; genesis = Unset
+  ; proof = Unset
+  ; ledger = Unset
+  ; epoch_data = Unset
   }
 
 let combine t1 t2 =
-  let merge ~combine t1 t2 =
-    match (t1, t2) with
-    | Some t1, Some t2 ->
-        Some (combine t1 t2)
-    | Some t, None | None, Some t ->
-        Some t
-    | None, None ->
-        None
-  in
+  let open Existing_config in
   { daemon = merge ~combine:Daemon.combine t1.daemon t2.daemon
   ; genesis = merge ~combine:Genesis.combine t1.genesis t2.genesis
   ; proof = merge ~combine:Proof_keys.combine t1.proof t2.proof
-  ; ledger = opt_fallthrough ~default:t1.ledger t2.ledger
-  ; epoch_data = opt_fallthrough ~default:t1.epoch_data t2.epoch_data
+  ; ledger = pick_config ~default:t1.ledger t2.ledger
+  ; epoch_data = pick_config ~default:t1.epoch_data t2.epoch_data
   }
 
 let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
@@ -1625,12 +1784,12 @@ let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
 let ledger_of_accounts accounts =
   Ledger.
     { base = Accounts accounts
-    ; num_accounts = None
+    ; num_accounts = Unset
     ; balances = []
-    ; hash = None
-    ; s3_data_hash = None
-    ; name = None
-    ; add_genesis_winner = Some false
+    ; hash = Unset
+    ; s3_data_hash = Unset
+    ; name = Unset
+    ; add_genesis_winner = Existing false
     }
 
 let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
@@ -1651,15 +1810,16 @@ let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
     |> ledger_accounts
   in
   let hash =
-    Option.some @@ Mina_base.Ledger_hash.to_base58_check
+    Existing_config.existing @@ Mina_base.Ledger_hash.to_base58_check
     @@ Mina_ledger.Ledger.merkle_root staged_ledger
   in
   let fork =
-    Fork_config.
-      { state_hash = Mina_base.State_hash.to_base58_check state_hash
-      ; blockchain_length
-      ; global_slot_since_genesis
-      }
+    Some
+      Fork_config.
+        { state_hash = Mina_base.State_hash.to_base58_check state_hash
+        ; blockchain_length
+        ; global_slot_since_genesis
+        }
   in
   let%bind () = yield () in
   let%bind staking_ledger_accounts = ledger_accounts staking_ledger in
@@ -1674,14 +1834,15 @@ let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
   let epoch_data =
     let open Epoch_data in
     let open Data in
-    { staking =
-        { ledger = ledger_of_accounts staking_ledger_accounts
-        ; seed = staking_epoch_seed
-        }
-    ; next =
-        Option.map next_epoch_ledger_accounts ~f:(fun accounts ->
-            { ledger = ledger_of_accounts accounts; seed = next_epoch_seed } )
-    }
+    Some
+      { staking =
+          { ledger = ledger_of_accounts staking_ledger_accounts
+          ; seed = staking_epoch_seed
+          }
+      ; next =
+          Option.map next_epoch_ledger_accounts ~f:(fun accounts ->
+              { ledger = ledger_of_accounts accounts; seed = next_epoch_seed } )
+      }
   in
   make
   (* add_genesis_winner must be set to false, because this
@@ -1694,19 +1855,20 @@ let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
     ~epoch_data
     ~ledger:
       { base = Accounts accounts
-      ; num_accounts = None
+      ; num_accounts = Unset
       ; balances = []
       ; hash
-      ; s3_data_hash = None
-      ; name = None
-      ; add_genesis_winner = Some false
+      ; s3_data_hash = Unset
+      ; name = Unset
+      ; add_genesis_winner = Existing false
       }
     ~proof:(Proof_keys.make ~fork ()) ()
 
 let slot_tx_end, slot_chain_end =
   let f get_runtime t =
-    let open Option.Let_syntax in
+    let open Existing_config in
     t.daemon >>= get_runtime >>| Mina_numbers.Global_slot_since_hard_fork.of_int
+    |> to_option
   in
   (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))
 
@@ -1856,54 +2018,56 @@ let make_genesis_constants (a : Genesis_constants.t) (b : t) :
     Genesis_constants.t =
   { Genesis_constants.protocol =
       { k =
-          Option.value ~default:a.protocol.k Option.(b.genesis >>= fun g -> g.k)
+          Existing_config.value ~default:a.protocol.k
+            Existing_config.(b.genesis >>= fun g -> g.k)
       ; delta =
-          Option.value ~default:a.protocol.delta
-            Option.(b.genesis >>= fun g -> g.delta)
+          Existing_config.value ~default:a.protocol.delta
+            Existing_config.(b.genesis >>= fun g -> g.delta)
       ; slots_per_epoch =
-          Option.value ~default:a.protocol.slots_per_epoch
-            Option.(b.genesis >>= fun g -> g.slots_per_epoch)
+          Existing_config.value ~default:a.protocol.slots_per_epoch
+            Existing_config.(b.genesis >>= fun g -> g.slots_per_epoch)
       ; slots_per_sub_window =
-          Option.value ~default:a.protocol.slots_per_sub_window
-            Option.(b.genesis >>= fun g -> g.slots_per_sub_window)
+          Existing_config.value ~default:a.protocol.slots_per_sub_window
+            Existing_config.(b.genesis >>= fun g -> g.slots_per_sub_window)
       ; grace_period_slots =
-          Option.value ~default:a.protocol.grace_period_slots
-            Option.(b.genesis >>= fun g -> g.grace_period_slots)
+          Existing_config.value ~default:a.protocol.grace_period_slots
+            Existing_config.(b.genesis >>= fun g -> g.grace_period_slots)
       ; genesis_state_timestamp =
-          Option.value ~default:a.protocol.genesis_state_timestamp
-            Option.(b.genesis >>= fun g -> g.genesis_state_timestamp)
+          Existing_config.value ~default:a.protocol.genesis_state_timestamp
+            Existing_config.(b.genesis >>= fun g -> g.genesis_state_timestamp)
       }
   ; txpool_max_size =
-      Option.value ~default:a.txpool_max_size
-        Option.(b.daemon >>= fun d -> d.txpool_max_size)
+      Existing_config.value ~default:a.txpool_max_size
+        Existing_config.(b.daemon >>= fun d -> d.txpool_max_size)
   ; num_accounts =
-      Option.first_some
-        Option.(b.ledger >>= fun l -> l.num_accounts)
+      Existing_config.first_existing_and_option_as_option
+        Existing_config.(b.ledger >>= fun l -> l.num_accounts)
         a.num_accounts
   ; zkapp_proof_update_cost =
-      Option.value ~default:a.zkapp_proof_update_cost
-        Option.(b.daemon >>= fun d -> d.zkapp_proof_update_cost)
+      Existing_config.value ~default:a.zkapp_proof_update_cost
+        Existing_config.(b.daemon >>= fun d -> d.zkapp_proof_update_cost)
   ; zkapp_signed_single_update_cost =
-      Option.value ~default:a.zkapp_signed_single_update_cost
-        Option.(b.daemon >>= fun d -> d.zkapp_signed_single_update_cost)
+      Existing_config.value ~default:a.zkapp_signed_single_update_cost
+        Existing_config.(
+          b.daemon >>= fun d -> d.zkapp_signed_single_update_cost)
   ; zkapp_signed_pair_update_cost =
-      Option.value ~default:a.zkapp_signed_pair_update_cost
-        Option.(b.daemon >>= fun d -> d.zkapp_signed_pair_update_cost)
+      Existing_config.value ~default:a.zkapp_signed_pair_update_cost
+        Existing_config.(b.daemon >>= fun d -> d.zkapp_signed_pair_update_cost)
   ; zkapp_transaction_cost_limit =
-      Option.value ~default:a.zkapp_transaction_cost_limit
-        Option.(b.daemon >>= fun d -> d.zkapp_transaction_cost_limit)
+      Existing_config.value ~default:a.zkapp_transaction_cost_limit
+        Existing_config.(b.daemon >>= fun d -> d.zkapp_transaction_cost_limit)
   ; max_event_elements =
-      Option.value ~default:a.max_event_elements
-        Option.(b.daemon >>= fun d -> d.max_event_elements)
+      Existing_config.value ~default:a.max_event_elements
+        Existing_config.(b.daemon >>= fun d -> d.max_event_elements)
   ; max_action_elements =
-      Option.value ~default:a.max_action_elements
-        Option.(b.daemon >>= fun d -> d.max_action_elements)
+      Existing_config.value ~default:a.max_action_elements
+        Existing_config.(b.daemon >>= fun d -> d.max_action_elements)
   ; zkapp_cmd_limit_hardcap =
-      Option.value ~default:a.zkapp_cmd_limit_hardcap
-        Option.(b.daemon >>= fun d -> d.zkapp_cmd_limit_hardcap)
+      Existing_config.value ~default:a.zkapp_cmd_limit_hardcap
+        Existing_config.(b.daemon >>= fun d -> d.zkapp_cmd_limit_hardcap)
   ; minimum_user_command_fee =
-      Option.value ~default:a.minimum_user_command_fee
-        Option.(b.daemon >>= fun d -> d.minimum_user_command_fee)
+      Existing_config.value ~default:a.minimum_user_command_fee
+        Existing_config.(b.daemon >>= fun d -> d.minimum_user_command_fee)
   }
 
 let make_constraint_constants (a : Genesis_constants.Constraint_constants.t)
@@ -1911,24 +2075,31 @@ let make_constraint_constants (a : Genesis_constants.Constraint_constants.t)
   let fork =
     let a = a.fork in
     let b =
-      let%map.Option f = Option.(b.proof >>= fun x -> x.fork) in
-      { Genesis_constants.Fork_constants.state_hash =
-          Mina_base.State_hash.of_base58_check_exn f.state_hash
-      ; blockchain_length = Mina_numbers.Length.of_int f.blockchain_length
-      ; global_slot_since_genesis =
-          Mina_numbers.Global_slot_since_genesis.of_int
-            f.global_slot_since_genesis
-      }
+      let convert_fork (fork : Fork_config_opt.t) =
+        Option.map fork ~f:(fun fork ->
+            { Genesis_constants.Fork_constants.state_hash =
+                Mina_base.State_hash.of_base58_check_exn fork.state_hash
+            ; blockchain_length =
+                Mina_numbers.Length.of_int fork.blockchain_length
+            ; global_slot_since_genesis =
+                Mina_numbers.Global_slot_since_genesis.of_int
+                  fork.global_slot_since_genesis
+            } )
+      in
+      Existing_config.(
+        b.proof
+        >>| (fun { fork; _ } -> fork >>| convert_fork)
+        |> value ~default:Unset |> value ~default:None)
     in
     Option.first_some b a
   in
   let block_window_duration_ms =
-    Option.value ~default:a.block_window_duration_ms
-      Option.(b.proof >>= fun p -> p.block_window_duration_ms)
+    Existing_config.value ~default:a.block_window_duration_ms
+      Existing_config.(b.proof >>= fun p -> p.block_window_duration_ms)
   in
   let transaction_capacity_log_2 =
-    Option.value ~default:a.transaction_capacity_log_2
-      Option.(
+    Existing_config.value ~default:a.transaction_capacity_log_2
+      Existing_config.(
         b.proof
         >>= fun p ->
         p.transaction_capacity
@@ -1937,15 +2108,15 @@ let make_constraint_constants (a : Genesis_constants.Constraint_constants.t)
           ~block_window_duration_ms ~transaction_capacity)
   in
   let work_delay =
-    Option.value ~default:a.work_delay
-      Option.(b.proof >>= fun p -> p.work_delay)
+    Existing_config.value ~default:a.work_delay
+      Existing_config.(b.proof >>= fun p -> p.work_delay)
   in
   { Genesis_constants.Constraint_constants.sub_windows_per_window =
-      Option.value ~default:a.sub_windows_per_window
-        Option.(b.proof >>= fun p -> p.sub_windows_per_window)
+      Existing_config.value ~default:a.sub_windows_per_window
+        Existing_config.(b.proof >>= fun p -> p.sub_windows_per_window)
   ; ledger_depth =
-      Option.value ~default:a.ledger_depth
-        Option.(b.proof >>= fun p -> p.ledger_depth)
+      Existing_config.value ~default:a.ledger_depth
+        Existing_config.(b.proof >>= fun p -> p.ledger_depth)
   ; work_delay
   ; block_window_duration_ms
   ; transaction_capacity_log_2
@@ -1953,14 +2124,14 @@ let make_constraint_constants (a : Genesis_constants.Constraint_constants.t)
       Core_kernel.Int.ceil_log2
         (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
   ; coinbase_amount =
-      Option.value ~default:a.coinbase_amount
-        Option.(b.proof >>= fun p -> p.coinbase_amount)
+      Existing_config.value ~default:a.coinbase_amount
+        Existing_config.(b.proof >>= fun p -> p.coinbase_amount)
   ; supercharged_coinbase_factor =
-      Option.value ~default:a.supercharged_coinbase_factor
-        Option.(b.proof >>= fun p -> p.supercharged_coinbase_factor)
+      Existing_config.value ~default:a.supercharged_coinbase_factor
+        Existing_config.(b.proof >>= fun p -> p.supercharged_coinbase_factor)
   ; account_creation_fee =
-      Option.value ~default:a.account_creation_fee
-        Option.(b.proof >>= fun p -> p.account_creation_fee)
+      Existing_config.value ~default:a.account_creation_fee
+        Existing_config.(b.proof >>= fun p -> p.account_creation_fee)
   ; fork
   }
 
@@ -1994,26 +2165,30 @@ module Constants : Constants_intf = struct
         | No_check ->
             Genesis_constants.Proof_level.No_check
       in
-      Option.value ~default:a.proof_level
-        Option.(b.proof >>= fun p -> p.level >>| coerce_proof_level)
+      Existing_config.value ~default:a.proof_level
+        Existing_config.(b.proof >>= fun p -> p.level >>| coerce_proof_level)
     in
     let compile_config =
       { a.compile_config with
         network_id =
-          Option.value ~default:a.compile_config.network_id
-            Option.(b.daemon >>= fun d -> d.network_id)
+          Existing_config.value ~default:a.compile_config.network_id
+            Existing_config.(b.daemon >>= fun d -> d.network_id)
       ; sync_ledger_max_subtree_depth =
-          Option.value ~default:a.compile_config.sync_ledger_max_subtree_depth
-            Option.(b.daemon >>= fun d -> d.sync_ledger_max_subtree_depth)
+          Existing_config.value
+            ~default:a.compile_config.sync_ledger_max_subtree_depth
+            Existing_config.(
+              b.daemon >>= fun d -> d.sync_ledger_max_subtree_depth)
       ; sync_ledger_default_subtree_depth =
-          Option.value
+          Existing_config.value
             ~default:a.compile_config.sync_ledger_default_subtree_depth
-            Option.(b.daemon >>= fun d -> d.sync_ledger_default_subtree_depth)
+            Existing_config.(
+              b.daemon >>= fun d -> d.sync_ledger_default_subtree_depth)
       ; default_snark_worker_fee =
-          Option.value ~default:a.compile_config.default_snark_worker_fee
-            Option.(
+          Existing_config.value
+            ~default:a.compile_config.default_snark_worker_fee
+            Existing_config.(
               b.daemon
-              >>= fun d -> d.snark_worker_fee >>= Currency.Fee.of_mina_int)
+              >>= fun d -> d.snark_worker_fee >>? Currency.Fee.of_mina_int)
       }
     in
     { genesis_constants; constraint_constants; proof_level; compile_config }
@@ -2027,12 +2202,16 @@ module Constants : Constants_intf = struct
       }
     in
     let cs = combine compile_constants runtime_config in
+    let cli_proof_level = Existing_config.of_option cli_proof_level in
+    let itn_features = Existing_config.of_option itn_features in
     { cs with
-      proof_level = Option.value ~default:cs.proof_level cli_proof_level
+      proof_level =
+        Existing_config.value ~default:cs.proof_level cli_proof_level
     ; compile_config =
         { cs.compile_config with
           itn_features =
-            Option.value ~default:cs.compile_config.itn_features itn_features
+            Existing_config.value ~default:cs.compile_config.itn_features
+              itn_features
         }
     }
 
@@ -2071,66 +2250,75 @@ let of_constants (constants : Constants.constants) : t =
     { Proof_keys.level =
         ( match proof_level with
         | Full ->
-            Some Full
+            Existing Full
         | Check ->
-            Some Check
+            Existing Check
         | No_check ->
-            Some No_check )
-    ; sub_windows_per_window = Some constraint_constants.sub_windows_per_window
-    ; ledger_depth = Some constraint_constants.ledger_depth
-    ; work_delay = Some constraint_constants.work_delay
+            Existing No_check )
+    ; sub_windows_per_window =
+        Existing constraint_constants.sub_windows_per_window
+    ; ledger_depth = Existing constraint_constants.ledger_depth
+    ; work_delay = Existing constraint_constants.work_delay
     ; block_window_duration_ms =
-        Some constraint_constants.block_window_duration_ms
+        Existing constraint_constants.block_window_duration_ms
     ; transaction_capacity =
-        Some (Log_2 constraint_constants.transaction_capacity_log_2)
-    ; coinbase_amount = Some constraint_constants.coinbase_amount
+        Existing (Log_2 constraint_constants.transaction_capacity_log_2)
+    ; coinbase_amount = Existing constraint_constants.coinbase_amount
     ; supercharged_coinbase_factor =
-        Some constraint_constants.supercharged_coinbase_factor
-    ; account_creation_fee = Some constraint_constants.account_creation_fee
+        Existing constraint_constants.supercharged_coinbase_factor
+    ; account_creation_fee = Existing constraint_constants.account_creation_fee
     ; fork =
-        Option.map constraint_constants.fork
-          ~f:(fun { state_hash; blockchain_length; global_slot_since_genesis }
-             ->
-            { Fork_config.state_hash =
-                Mina_base.State_hash.to_base58_check state_hash
-            ; blockchain_length = Mina_numbers.Length.to_int blockchain_length
-            ; global_slot_since_genesis =
-                Mina_numbers.Global_slot_since_genesis.to_int
-                  global_slot_since_genesis
-            } )
+        Existing
+          (Option.map constraint_constants.fork
+             ~f:(fun
+                  { state_hash; blockchain_length; global_slot_since_genesis }
+                ->
+               { Fork_config.state_hash =
+                   Mina_base.State_hash.to_base58_check state_hash
+               ; blockchain_length =
+                   Mina_numbers.Length.to_int blockchain_length
+               ; global_slot_since_genesis =
+                   Mina_numbers.Global_slot_since_genesis.to_int
+                     global_slot_since_genesis
+               } ) )
     }
   in
   let genesis =
-    { Genesis.k = Some genesis_constants.protocol.k
-    ; delta = Some genesis_constants.protocol.delta
-    ; slots_per_epoch = Some genesis_constants.protocol.slots_per_epoch
+    { Genesis.k = Existing genesis_constants.protocol.k
+    ; delta = Existing genesis_constants.protocol.delta
+    ; slots_per_epoch = Existing genesis_constants.protocol.slots_per_epoch
     ; slots_per_sub_window =
-        Some genesis_constants.protocol.slots_per_sub_window
-    ; grace_period_slots = Some genesis_constants.protocol.grace_period_slots
+        Existing genesis_constants.protocol.slots_per_sub_window
+    ; grace_period_slots =
+        Existing genesis_constants.protocol.grace_period_slots
     ; genesis_state_timestamp =
-        Some genesis_constants.protocol.genesis_state_timestamp
+        Existing genesis_constants.protocol.genesis_state_timestamp
     }
   in
   let daemon =
     { Daemon.default with
-      txpool_max_size = Some genesis_constants.txpool_max_size
-    ; zkapp_proof_update_cost = Some genesis_constants.zkapp_proof_update_cost
+      txpool_max_size = Existing genesis_constants.txpool_max_size
+    ; zkapp_proof_update_cost =
+        Existing genesis_constants.zkapp_proof_update_cost
     ; zkapp_signed_single_update_cost =
-        Some genesis_constants.zkapp_signed_single_update_cost
+        Existing genesis_constants.zkapp_signed_single_update_cost
     ; zkapp_signed_pair_update_cost =
-        Some genesis_constants.zkapp_signed_pair_update_cost
+        Existing genesis_constants.zkapp_signed_pair_update_cost
     ; zkapp_transaction_cost_limit =
-        Some genesis_constants.zkapp_transaction_cost_limit
-    ; max_event_elements = Some genesis_constants.max_event_elements
-    ; max_action_elements = Some genesis_constants.max_action_elements
-    ; zkapp_cmd_limit_hardcap = Some genesis_constants.zkapp_cmd_limit_hardcap
-    ; minimum_user_command_fee = Some genesis_constants.minimum_user_command_fee
+        Existing genesis_constants.zkapp_transaction_cost_limit
+    ; max_event_elements = Existing genesis_constants.max_event_elements
+    ; max_action_elements = Existing genesis_constants.max_action_elements
+    ; zkapp_cmd_limit_hardcap =
+        Existing genesis_constants.zkapp_cmd_limit_hardcap
+    ; minimum_user_command_fee =
+        Existing genesis_constants.minimum_user_command_fee
     ; snark_worker_fee =
-        Some (Currency.Fee.to_mina_int compile_config.default_snark_worker_fee)
+        Existing
+          (Currency.Fee.to_mina_int compile_config.default_snark_worker_fee)
     }
   in
   { default with
-    genesis = Some genesis
-  ; proof = Some proof
-  ; daemon = Some daemon
+    genesis = Existing genesis
+  ; proof = Existing proof
+  ; daemon = Existing daemon
   }
