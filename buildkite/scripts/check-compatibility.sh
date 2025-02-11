@@ -4,6 +4,8 @@
 
 set -eox pipefail
 
+CURR_BRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
+
 function get_shas {
   SHAS=$(git log -n 10 --format="%h" --abbrev=7 --first-parent)
 }
@@ -155,8 +157,6 @@ else
 fi
 
 MAIN_BRANCH_IMAGE_TAG=$IMAGE_TAG
-
-CURR_BRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
 
 echo "Checking out PR branch"
 git checkout $CURR_BRANCH
