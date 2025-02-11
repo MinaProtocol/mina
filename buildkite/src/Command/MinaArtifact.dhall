@@ -88,7 +88,7 @@ let build_artifacts
                                                               spec.networks}"
                 # [ Cmd.run
                       "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
-                                                                      spec.debVersion}"
+                                                                        spec.debVersion}"
                   ]
             , label =
                 "Build Mina for ${DebianVersions.capitalName
