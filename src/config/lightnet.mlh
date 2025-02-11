@@ -78,3 +78,7 @@
 [%%define compaction_interval 360000]
 [%%define vrf_poll_interval 5000]
 [%%undef zkapp_cmd_limit]
+
+(* Constants determining sync ledger query/response size*)
+[%%define sync_ledger_max_subtree_depth 8]
+[%%define sync_ledger_default_subtree_depth 6]

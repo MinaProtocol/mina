@@ -98,7 +98,7 @@ struct
           ; verifier : (Verifier.t[@sexp.opaque])
           ; disk_location : string
           }
-        [@@deriving sexp, make]
+        [@@deriving make]
       end
 
       type transition_frontier_diff =
@@ -113,7 +113,6 @@ struct
         ; account_creation_fee : Currency.Fee.t
         ; batcher : Batcher.Snark_pool.t
         }
-      [@@deriving sexp]
 
       let make_config = Config.make
 
@@ -256,7 +255,7 @@ struct
                 }
           ; frontier =
               (fun () -> Broadcast_pipe.Reader.peek frontier_broadcast_pipe)
-          ; batcher = Batcher.Snark_pool.create config.verifier
+          ; batcher = Batcher.Snark_pool.create ~logger config.verifier
           ; logger
           ; config
           ; account_creation_fee =
@@ -375,6 +374,7 @@ struct
                 Account_id.create prover Token_id.default
                 |> Base_ledger.location_of_account ledger
               in
+
               Base_ledger.get ledger loc
           in
           let prover_account_exists = Option.is_some account_opt in
@@ -545,7 +545,7 @@ module Diff_versioned = struct
             * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
-      [@@deriving compare, sexp, to_yojson, hash]
+      [@@deriving compare, to_yojson, hash]
 
       let to_latest = Fn.id
     end
@@ -556,15 +556,15 @@ module Diff_versioned = struct
         Transaction_snark_work.Statement.t
         * Ledger_proof.t One_or_two.t Priced_proof.t
     | Empty
-  [@@deriving compare, sexp, to_yojson, hash]
+  [@@deriving compare, to_yojson, hash]
 end
-
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 
 let%test_module "random set test" =
   ( module struct
     open Mina_base
+    module Mock_snark_pool =
+      Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
+    open Ledger_proof.For_tests
 
     let trust_system = Mocks.trust_system
 
@@ -591,14 +591,8 @@ let%test_module "random set test" =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            ~commit_id:"not specified for unit tests" () )
-
-    module Mock_snark_pool =
-      Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
-    open Ledger_proof.For_tests
+          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
+            () )
 
     let apply_diff resource_pool work
         ?(proof = One_or_two.map ~f:mk_dummy_proof)
@@ -690,15 +684,6 @@ let%test_module "random set test" =
                 @@ Signature_lib.Public_key.Compressed.equal mal_pk fee.prover ) )
       in
       Quickcheck.test ~trials:5
-        ~sexp_of:
-          [%sexp_of:
-            (Mock_snark_pool.Resource_pool.t * Mocks.Transition_frontier.t)
-            Deferred.t
-            * ( Transaction_snark_work.Statement.t
-              * Ledger_proof.t One_or_two.t
-              * Fee_with_prover.t
-              * Signature_lib.Public_key.Compressed.t )
-              list]
         (Quickcheck.Generator.tuple2 (gen ()) invalid_work_gen)
         ~f:(fun (t, invalid_work_lst) ->
           Async.Thread_safe.block_on_async_exn (fun () ->
@@ -733,13 +718,6 @@ let%test_module "random set test" =
                    the snark pool, the fee of the work is at most the minimum \
                    of those fees" =
       Quickcheck.test ~trials:5
-        ~sexp_of:
-          [%sexp_of:
-            (Mock_snark_pool.Resource_pool.t * Mocks.Transition_frontier.t)
-            Deferred.t
-            * Mocks.Transaction_snark_work.Statement.t
-            * Fee_with_prover.t
-            * Fee_with_prover.t]
         (Async.Quickcheck.Generator.tuple4 (gen ())
            Mocks.Transaction_snark_work.Statement.gen Fee_with_prover.gen
            Fee_with_prover.gen )
@@ -763,13 +741,6 @@ let%test_module "random set test" =
                    proof of the same work only if it's fee is smaller than the \
                    existing priced proof" =
       Quickcheck.test ~trials:5
-        ~sexp_of:
-          [%sexp_of:
-            (Mock_snark_pool.Resource_pool.t * Mocks.Transition_frontier.t)
-            Deferred.t
-            * Mocks.Transaction_snark_work.Statement.t
-            * Fee_with_prover.t
-            * Fee_with_prover.t]
         (Quickcheck.Generator.tuple4 (gen ())
            Mocks.Transaction_snark_work.Statement.gen Fee_with_prover.gen
            Fee_with_prover.gen )
@@ -957,8 +928,11 @@ let%test_module "random set test" =
       in
       let check_work ~expected ~got =
         let sort = List.sort ~compare:compare_work in
-        [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list] (sort got)
-          (sort expected)
+        if
+          [%compare: Mock_snark_pool.Resource_pool.Diff.t list] (sort got)
+            (sort expected)
+          <> 0
+        then failwith "diffs don't match"
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in

@@ -96,7 +96,7 @@ cat <<EOF >"$MINA_CONFIG_FILE"
   "daemon": { "network_id": "${MINA_NETWORK}" },
   "ledger": {
     "accounts": [
-      { "pk": "${BLOCK_PRODUCER_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
+      { "pk": "${BLOCK_PRODUCER_PUB_KEY}", "balance": "600000000", "delegate": null, "sk": null },
       { "pk": "${SNARK_PRODUCER_PK}", "balance": "2000000", "delegate": "${BLOCK_PRODUCER_PUB_KEY}", "sk": null },
       { "pk": "${ZKAPP_FEE_PAYER_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
       { "pk": "${ZKAPP_SENDER_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
@@ -249,6 +249,8 @@ send_zkapp_transactions() {
 if [[ "$MODE" == "full" ]]; then
   send_zkapp_transactions &
 fi
+
+mina client status --json
 
 next_block_time=$(mina client status --json | jq '.next_block_production.timing[1].time' | tr -d '"') curr_time=$(date +%s%N | cut -b1-13)
 sleep_time=$((($next_block_time - $curr_time) / 1000))

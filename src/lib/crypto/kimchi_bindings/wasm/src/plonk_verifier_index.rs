@@ -603,7 +603,7 @@ macro_rules! impl_verification_key {
                         evals: evals.clone(),
                         shifts: shifts.clone(),
                         lookup_index: lookup_index.clone(),
-                        zk_rows: zk_rows,
+                        zk_rows,
                     }
                 }
 
@@ -729,14 +729,15 @@ macro_rules! impl_verification_key {
                     .lookup_index.as_ref()
                     .map_or(false, |li| li.lookup_info.features.patterns.lookup);
 
-                // TODO
-                let runtime_tables = false;
-
+                let runtime_tables = index
+                    .lookup_index.as_ref()
+                    .map_or(false, |li| li.runtime_tables_selector.is_some());
+                
                 let patterns = LookupPatterns {
                     xor,
                     lookup,
                     range_check: range_check0 || range_check1 || rot,
-                    foreign_field_mul: foreign_field_mul,
+                    foreign_field_mul,
                 };
 
                 FeatureFlags {
@@ -779,7 +780,9 @@ macro_rules! impl_verification_key {
                 let feature_flags = compute_feature_flags(&index);
                 let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
 
-                let index =
+                let index = {
+                    let zk_rows = index.zk_rows as u64;
+
                     DlogVerifierIndex {
                         domain,
 
@@ -803,7 +806,7 @@ macro_rules! impl_verification_key {
 
                         w: {
                             let res = once_cell::sync::OnceCell::new();
-                            res.set(zk_w(domain, 3)).unwrap();
+                            res.set(zk_w(domain, zk_rows)).unwrap();
                             res
                         },
                         endo: endo_q,
@@ -812,7 +815,7 @@ macro_rules! impl_verification_key {
                         prev_challenges: prev_challenges as usize,
                         permutation_vanishing_polynomial_m: {
                             let res = once_cell::sync::OnceCell::new();
-                            res.set(permutation_vanishing_polynomial(domain, 3)).unwrap();
+                            res.set(permutation_vanishing_polynomial(domain, zk_rows)).unwrap();
                             res
                         },
                         shift: [
@@ -828,12 +831,13 @@ macro_rules! impl_verification_key {
                           Arc::clone(&srs.0)
                         },
 
-                        zk_rows: index.zk_rows as u64,
+                        zk_rows,
 
                         linearization,
                         powers_of_alpha,
                         lookup_index: index.lookup_index.map(Into::into),
-                    };
+                    }
+                };
                 (index, srs.0.clone())
             }
 
@@ -926,11 +930,7 @@ macro_rules! impl_verification_key {
             pub fn [<$name:snake _create>](
                 index: &$WasmIndex,
             ) -> WasmPlonkVerifierIndex {
-                {
-                    let ptr: &mut poly_commitment::srs::SRS<GAffine> =
-                        unsafe { &mut *(std::sync::Arc::as_ptr(&index.0.as_ref().srs) as *mut _) };
-                    ptr.add_lagrange_basis(index.0.as_ref().cs.domain.d1);
-                }
+                index.0.srs.get_lagrange_basis(index.0.as_ref().cs.domain.d1);
                 let verifier_index = index.0.as_ref().verifier_index();
                 to_wasm(&index.0.as_ref().srs, verifier_index)
             }

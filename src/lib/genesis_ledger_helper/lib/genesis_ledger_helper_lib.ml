@@ -1,7 +1,6 @@
 open Core
 open Signature_lib
 open Mina_base
-open Inline_test_quiet_logs
 
 let () = Key_cache_native.linkme (* Ensure that we use the native key cache. *)
 
@@ -492,8 +491,8 @@ let runtime_config_of_constraint_constants
           Some Full
       | Check ->
           Some Check
-      | None ->
-          Some None )
+      | No_check ->
+          Some No_check )
   ; sub_windows_per_window = Some constraint_constants.sub_windows_per_window
   ; ledger_depth = Some constraint_constants.ledger_depth
   ; work_delay = Some constraint_constants.work_delay

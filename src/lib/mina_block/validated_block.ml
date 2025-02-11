@@ -3,23 +3,26 @@ open Mina_base
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       Block.Stable.V2.t State_hash.With_state_hashes.Stable.V1.t
       * State_hash.Stable.V1.t Mina_stdlib.Nonempty_list.Stable.V1.t
-    [@@deriving sexp, equal]
-
-    let to_yojson (block_with_hashes, _) =
-      State_hash.With_state_hashes.Stable.V1.to_yojson Block.Stable.V2.to_yojson
-        block_with_hashes
+    [@@deriving equal]
 
     let to_latest = ident
+
+    let hashes (t, _) = With_hash.hash t
   end
 end]
 
-type t = Stable.Latest.t
+type t =
+  Block.t State_hash.With_state_hashes.t
+  * State_hash.t Mina_stdlib.Nonempty_list.t
 
-[%%define_locally Stable.Latest.(t_of_sexp, sexp_of_t, equal, to_yojson)]
+let to_yojson (block_with_hashes, _) =
+  State_hash.With_state_hashes.to_yojson Block.to_yojson block_with_hashes
 
 let lift (b, v) =
   match v with
@@ -67,3 +70,9 @@ let state_body_hash (t, _) =
 let header t = t |> forget |> With_hash.data |> Block.header
 
 let body t = t |> forget |> With_hash.data |> Block.body
+
+let is_genesis t =
+  header t |> Header.protocol_state |> Mina_state.Protocol_state.consensus_state
+  |> Consensus.Data.Consensus_state.is_genesis_state
+
+let read_all_proofs_from_disk = Fn.id

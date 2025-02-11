@@ -133,6 +133,18 @@ let child ~ledger_depth (path : t) dir : t Or_error.t =
 let child_exn ~ledger_depth (path : t) dir : t =
   child ~ledger_depth path dir |> Or_error.ok_exn
 
+let extend ~ledger_depth (path : t) ~num_bits (child_idx : int64) =
+  let final_len = bitstring_length path + num_bits in
+  if Int.(final_len > ledger_depth) then
+    Or_error.errorf "The address length cannot be greater than depth (%i > %i)"
+      final_len ledger_depth
+  else
+    let%bitstring path = {| path: -1: bitstring; child_idx: num_bits: int |} in
+    Or_error.return path
+
+let extend_exn ~ledger_depth path ~num_bits child_idx =
+  extend ~ledger_depth path ~num_bits child_idx |> Or_error.ok_exn
+
 let to_int (path : t) : int =
   Sequence.range 0 (depth path)
   |> Sequence.fold ~init:0 ~f:(fun acc i ->

@@ -45,7 +45,7 @@ end
 let of_context context =
   Executor.of_context ~context
     ~dune_name:"scripts/archive/missing-blocks-guardian.sh"
-    ~official_name:"/etc/mina/archive/missing-blocks-guardian.sh"
+    ~official_name:"mina-missing-blocks-guardian"
 
 let run t ~config =
   run t ~args:(Config.to_args config) ~env:(Config.to_envs config) ()

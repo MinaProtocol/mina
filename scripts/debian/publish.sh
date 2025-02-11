@@ -5,12 +5,15 @@ CLEAR='\033[0m'
 RED='\033[0;31m'
 
 ARCH=amd64
+BUCKET=packages.o1test.net
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -n|--names) DEB_NAMES="$2"; shift;;
   -r|--release) DEB_RELEASE="$2"; shift;;
   -v|--version) DEB_VERSION="$2"; shift;;
   -c|--codename) DEB_CODENAME="$2"; shift;;
+  -b|--bucket) BUCKET="$2"; shift;;
+  -s|--sign) SIGN="$2"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
@@ -21,8 +24,10 @@ function usage() {
   echo "Usage: $0 -n names -r release -v version -c codename"
   echo "  -n, --names         The Debians archive names"
   echo "  -r, --release       The Debian release"
+  echo "  -b, --bucket        The Bucket which holds debian repo"
   echo "  -v, --version       The Debian version"
   echo "  -c, --codename      The Debian codename"
+  echo "  -s, --sign          The Debian key id used for sign"
   echo ""
   echo "Example: $0 --name mina-archive --release unstable --version 2.0.0-rc1-48efea4 --codename bullseye "
   exit 1
@@ -34,7 +39,13 @@ if [[ -z "$DEB_CODENAME" ]]; then usage "Codename is not set!"; fi;
 if [[ -z "$DEB_RELEASE" ]]; then usage "Release is not set!"; fi;
 
 
-BUCKET_ARG="--bucket=packages.o1test.net"
+if [[ -z "${SIGN:-}" ]]; then 
+  SIGN_ARG=""
+else
+  SIGN_ARG="--sign=$SIGN"
+fi
+
+BUCKET_ARG="--bucket=$BUCKET"
 S3_REGION_ARG="--s3-region=us-west-2"
 # utility for publishing deb repo with commons options
 # deb-s3 https://github.com/krobertson/deb-s3
@@ -47,19 +58,23 @@ DEBS3_UPLOAD="deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
   --fail-if-exists \
   --lock \
   --preserve-versions \
-  --cache-control=max-age=120"
+  --cache-control=max-age=120 \
+  $SIGN_ARG"
+
+if [[ -z "${PASSPHRASE:-}" ]]; then
+  GPG_OPTS=()
+else
+  GPG_OPTS=("--gpg-options=\"--batch" "--pinentry-mode=loopback" "--yes")
+fi
+
+
 
 echo "Publishing debs: ${DEB_NAMES} to Release: ${DEB_RELEASE} and Codename: ${DEB_CODENAME}"
 # Upload the deb files to s3.
 # If this fails, attempt to remove the lockfile and retry.
 for _ in {1..10}; do (
-  ${DEBS3_UPLOAD} \
-    --component "${DEB_RELEASE}" \
-    --codename "${DEB_CODENAME}" \
-    "${DEB_NAMES}"
-) && break || scripts/debian/clear-s3-lockfile.sh; done
-
-debs=()
+  ${DEBS3_UPLOAD} --component "${DEB_RELEASE}" --codename "${DEB_CODENAME}" "${GPG_OPTS[@]}" "${DEB_NAMES}"
+) && break || (MINA_DEB_BUCKET=${BUCKET} scripts/debian/clear-s3-lockfile.sh); done
 
 for deb in $DEB_NAMES
 do

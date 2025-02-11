@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 open Mina_base
 open Mina_transaction
@@ -64,7 +64,7 @@ type components =
   ; snark_pool : Network_pool.Snark_pool.t
   ; transition_frontier : Transition_frontier.t option Broadcast_pipe.Reader.t
   ; most_recent_valid_block :
-      Mina_block.initial_valid_block Broadcast_pipe.Reader.t
+      Mina_block.initial_valid_header Broadcast_pipe.Reader.t
   ; block_produced_bvar : (Transition_frontier.Breadcrumb.t, read_write) Bvar.t
   }
 
@@ -120,6 +120,7 @@ type t =
       (int * string list * bool) ref
   ; vrf_evaluation_state : Block_producer.Vrf_evaluation_state.t
   ; commit_id : string
+  ; proof_cache_db : Proof_cache_tag.cache_db
   }
 [@@deriving fields]
 
@@ -876,14 +877,13 @@ let request_work t =
 let work_selection_method t = t.config.work_selection_method
 
 let add_work t (work : Snark_worker_lib.Work.Result.t) =
-  let (module Work_selection_method) = t.config.work_selection_method in
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =
       Option.map (snark_worker_key t) ~f:(fun _ -> snark_work_fee t)
     in
     let pending_work =
-      Work_selection_method.pending_work_statements ~snark_pool ~fee_opt
+      Work_selector.pending_work_statements ~snark_pool ~fee_opt
         t.snark_job_state
       |> List.length
     in
@@ -895,12 +895,19 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
      * If the diff is accepted then remove it from the seen jobs.
      * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
-    Work_selection_method.remove t.snark_job_state spec
+    Work_selector.remove t.snark_job_state spec
   in
   ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
   Network_pool.Snark_pool.Local_sink.push t.pipes.snark_local_sink
     (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
   |> Deferred.don't_wait_for
+
+let add_work_graphql t diff =
+  let results_ivar = Ivar.create () in
+  Network_pool.Snark_pool.Local_sink.push t.pipes.snark_local_sink
+    (diff, Ivar.fill results_ivar)
+  |> Deferred.don't_wait_for ;
+  Ivar.read results_ivar
 
 let get_current_nonce t aid =
   match
@@ -1241,10 +1248,12 @@ module type CONTEXT = sig
 
   val compaction_interval : Time.Span.t option
 
-  val compile_config : Mina_compile_config.t
+  val ledger_sync_config : Syncable_ledger.daemon_config
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
-let context ~commit_id (config : Config.t) : (module CONTEXT) =
+let context ~commit_id ~proof_cache_db (config : Config.t) : (module CONTEXT) =
   ( module struct
     let logger = config.logger
 
@@ -1268,7 +1277,20 @@ let context ~commit_id (config : Config.t) : (module CONTEXT) =
 
     let compaction_interval = config.compile_config.compaction_interval
 
-    let compile_config = config.compile_config
+    let ledger_sync_config =
+      let open Option.Let_syntax in
+      let max_subtree_depth =
+        let%bind daemon = precomputed_values.runtime_config.daemon in
+        daemon.sync_ledger_max_subtree_depth
+      in
+      let default_subtree_depth =
+        let%bind daemon = precomputed_values.runtime_config.daemon in
+        daemon.sync_ledger_default_subtree_depth
+      in
+      Syncable_ledger.create_config ~compile_config:config.compile_config
+        ~max_subtree_depth ~default_subtree_depth ()
+
+    let proof_cache_db = proof_cache_db
   end )
 
 let start t =
@@ -1335,7 +1357,10 @@ let start t =
     not
       (Keypair.And_compressed_pk.Set.is_empty t.config.block_production_keypairs)
   then
-    let module Context = (val context ~commit_id:t.commit_id t.config) in
+    let module Context =
+    ( val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id
+            t.config )
+    in
     Block_producer.run
       ~context:(module Context)
       ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
@@ -1410,7 +1435,9 @@ let start t =
   Snark_worker.start t
 
 let start_with_precomputed_blocks t blocks =
-  let module Context = (val context ~commit_id:t.commit_id t.config) in
+  let module Context =
+  (val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id t.config)
+  in
   let%bind () =
     Block_producer.run_precomputed
       ~context:(module Context)
@@ -1492,8 +1519,145 @@ let start_filtered_log ~commit_id
       () ;
     Ok () )
 
+let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
+    received_block get_current_frontier =
+  let open Context in
+  let open Network_peer in
+  let%bind all_peers = Mina_networking.peers network in
+  let peer_limit = 5 in
+  let limited_peers = List.take all_peers peer_limit in
+
+  (* Keep reading from the transition frontier until it has caught up to the most valid block from the network.
+     * This is to ensure that the snarks are verified and added to the pool in the correct order
+  *)
+  let rec wait_for_new_top_block received_block =
+    let frontier = get_current_frontier () in
+    match frontier with
+    | None ->
+        [%log error]
+          "Transition frontier is not available after sync something has gone \
+           terribly wrong" ;
+        let%bind () = after (Time.Span.of_ms 20.) in
+        wait_for_new_top_block received_block
+    | Some frontier ->
+        let tip = Transition_frontier.best_tip frontier in
+        let top_block =
+          Transition_frontier.Breadcrumb.validated_transition tip
+          |> Mina_block.Validated.header |> Mina_block.Header.blockchain_length
+        in
+        [%log debug]
+          ~metadata:
+            [ ("old_top_block", `Int (received_block |> Unsigned.UInt32.to_int))
+            ; ("new_top_block", `Int (top_block |> Unsigned.UInt32.to_int))
+            ]
+          "WAITING  old top block: $old_top_block, new top block: \
+           $new_top_block" ;
+        let delta =
+          Unsigned.UInt32.(Infix.(received_block - top_block) |> to_int)
+        in
+        (* if delta is less than or equal to zero the transition frontier has caught up with the network *)
+        if delta <= 0 then Deferred.unit
+        else
+          let%bind () = after (Time.Span.of_ms 20.) in
+          wait_for_new_top_block received_block
+  in
+  let%bind () = wait_for_new_top_block received_block in
+
+  Deferred.List.iter
+    ~f:(fun peer ->
+      [%log debug] "PEER IS: Fetching completed snarks from peer: $peer"
+        ~metadata:[ ("peer", Network_peer.Peer.to_yojson peer) ] ;
+      let completed_works =
+        Mina_networking.get_completed_checked_snarks network peer
+      in
+      let%bind completed_works = completed_works in
+      let completed_works =
+        match completed_works with
+        | Error e ->
+            [%log debug]
+              ~metadata:
+                [ ("peer", Network_peer.Peer.to_yojson peer)
+                ; ("error", Error_json.error_to_yojson e)
+                ]
+              "Failed to fetch completed snarks from peer: $error" ;
+            []
+        | Ok completed_works ->
+            completed_works
+      in
+
+      [%log debug]
+        ~metadata:
+          [ ("peer", Network_peer.Peer.to_yojson peer)
+          ; ("completed_works", `Int (List.length completed_works))
+          ]
+        "Fetched $completed_works completed snarks from peer: $peer" ;
+
+      (* verify the snarks and add them to the pool *)
+      let%bind () =
+        Deferred.List.iter completed_works ~f:(fun work ->
+            (* proofs should be verified in apply and broadcast *)
+            let statement = Transaction_snark_work.statement work in
+            let snark =
+              Network_pool.Priced_proof.
+                { proof = work.proofs
+                ; fee = { fee = work.fee; prover = work.prover }
+                }
+            in
+            let msg =
+              let diff =
+                Network_pool.Snark_pool.Diff_versioned.Add_solved_work
+                  (statement, snark)
+              in
+              Envelope.Incoming.wrap_peer ~data:diff ~sender:peer
+            in
+            (* verify the snarks to be added *)
+            let resource_pool =
+              Network_pool.Snark_pool.resource_pool snark_pool
+            in
+            let%bind err =
+              Network_pool.Snark_pool.Resource_pool.verify_and_act resource_pool
+                ~work:(statement, snark) ~sender:msg.sender
+            in
+            match err with
+            | Ok () ->
+                [%log info]
+                  ~metadata:
+                    [ ("peer", Network_peer.Peer.to_yojson peer)
+                    ; ( "work_ids"
+                      , Transaction_snark_work.Statement.compact_json statement
+                      )
+                    ]
+                  "Successfully verified snark work from peer: $peer" ;
+
+                (* does an empty check for the snark, then an unsafe apply, and finally adds it to the pool *)
+                Network_pool.Snark_pool.apply_no_broadcast snark_pool msg
+                |> Deferred.return
+            | Error e ->
+                [%log info]
+                  ~metadata:
+                    [ ("peer", Network_peer.Peer.to_yojson peer)
+                    ; ( "work_ids"
+                      , Transaction_snark_work.Statement.compact_json statement
+                      )
+                    ; ( "error"
+                      , Network_pool.Intf.Verification_error.to_error e
+                        |> Error_json.error_to_yojson )
+                    ]
+                  "Failed to verify snark work from peer: $peer" ;
+                Deferred.unit )
+      in
+      Deferred.unit )
+    limited_peers
+
+let raise_on_initialization_error (`Initialization_error e) =
+  Error.raise @@ Error.tag ~tag:"proof cache initialization error" e
+
+let initialize_proof_cache_db (config : Config.t) =
+  Proof_cache_tag.create_db ~logger:config.logger
+    (config.conf_dir ^/ "proof_cache")
+  >>| function Error e -> raise_on_initialization_error e | Ok db -> db
+
 let create ~commit_id ?wallets (config : Config.t) =
-  let module Context = (val context ~commit_id config) in
   let commit_id_short = String.sub ~pos:0 ~len:8 commit_id in
   let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
@@ -1526,6 +1690,10 @@ let create ~commit_id ?wallets (config : Config.t) =
             @@ start_filtered_log ~commit_id
                  in_memory_reverse_structured_log_messages_for_integration_test
                  config.start_filtered_logs ;
+          let%bind proof_cache_db = initialize_proof_cache_db config in
+          let module Context =
+          (val context ~proof_cache_db ~commit_id config)
+          in
           let%bind prover =
             Monitor.try_with ~here:[%here]
               ~rest:
@@ -1562,15 +1730,23 @@ let create ~commit_id ?wallets (config : Config.t) =
                       ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
               (fun () ->
                 O1trace.thread "manage_verifier_subprocess" (fun () ->
+                    let%bind blockchain_verification_key =
+                      Prover.get_blockchain_verification_key prover
+                      >>| Or_error.ok_exn
+                    in
+                    let%bind transaction_verification_key =
+                      Prover.get_transaction_verification_key prover
+                      >>| Or_error.ok_exn
+                    in
                     let%bind verifier =
                       Verifier.create ~commit_id ~logger:config.logger
                         ~enable_internal_tracing:
                           (Internal_tracing.is_enabled ())
                         ~internal_trace_filename:"verifier-internal-trace.jsonl"
                         ~proof_level:config.precomputed_values.proof_level
-                        ~constraint_constants:
-                          config.precomputed_values.constraint_constants
-                        ~pids:config.pids ~conf_dir:(Some config.conf_dir) ()
+                        ~pids:config.pids ~conf_dir:(Some config.conf_dir)
+                        ~blockchain_verification_key
+                        ~transaction_verification_key ()
                     in
                     let%map () = set_itn_data (module Verifier) verifier in
                     verifier ) )
@@ -1867,8 +2043,13 @@ let create ~commit_id ?wallets (config : Config.t) =
               ; consensus_constants
               ; genesis_constants = config.precomputed_values.genesis_constants
               ; constraint_constants
-              ; block_window_duration
               }
+          in
+          let snark_jobs_state =
+            Work_selector.State.init
+              ~reassignment_wait:config.work_reassignment_wait
+              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+              ~logger:config.logger
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
           let%bind net =
@@ -1878,6 +2059,8 @@ let create ~commit_id ?wallets (config : Config.t) =
                   config.net_config ~sinks
                   ~get_transition_frontier:(fun () ->
                     Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r )
+                  ~get_snark_pool:(fun () -> Some snark_pool)
+                  ~snark_job_state:(fun () -> Some snark_jobs_state)
                   ~get_node_status )
           in
           (* tie the first knot *)
@@ -1927,7 +2110,8 @@ let create ~commit_id ?wallets (config : Config.t) =
           |> Deferred.don't_wait_for ;
           let most_recent_valid_block_reader, most_recent_valid_block_writer =
             Broadcast_pipe.create
-              ( Mina_block.genesis ~precomputed_values:config.precomputed_values
+              ( Mina_block.genesis_header
+                  ~precomputed_values:config.precomputed_values
               |> Validation.reset_frontier_dependencies_validation
               |> Validation.reset_staged_ledger_diff_validation )
           in
@@ -2090,13 +2274,8 @@ let create ~commit_id ?wallets (config : Config.t) =
             (Linear_pipe.iter
                (Mina_networking.ban_notification_reader net)
                ~f:(Fn.const Deferred.unit) ) ;
-          let snark_jobs_state =
-            Work_selector.State.init
-              ~reassignment_wait:config.work_reassignment_wait
-              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-              ~logger:config.logger
-          in
-          let%bind wallets =
+
+          let%map wallets =
             match wallets with
             | Some wallets ->
                 return wallets
@@ -2104,6 +2283,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                 Secrets.Wallets.load ~logger:config.logger
                   ~disk_location:config.wallets_disk_location
           in
+
           O1trace.background_thread "broadcast_snark_pool_diffs" (fun () ->
               let rl = Network_pool.Snark_pool.create_rate_limiter () in
               log_rate_limiter_occasionally rl ~label:"broadcast_snark_work" ;
@@ -2177,44 +2357,130 @@ let create ~commit_id ?wallets (config : Config.t) =
           in
           (* tie other knot *)
           sync_status_ref := Some sync_status ;
-          Deferred.return
-            { config
-            ; next_producer_timing = None
-            ; processes =
-                { prover
-                ; verifier
-                ; snark_worker
-                ; uptime_snark_worker_opt
-                ; vrf_evaluator
-                }
-            ; initialization_finish_signal
-            ; components =
-                { net
-                ; transaction_pool
-                ; snark_pool
-                ; transition_frontier = frontier_broadcast_pipe_r
-                ; most_recent_valid_block = most_recent_valid_block_reader
-                ; block_produced_bvar
-                }
-            ; pipes =
-                { validated_transitions_reader = valid_transitions_for_api
-                ; producer_transition_writer
-                ; user_command_input_writer
-                ; tx_local_sink
-                ; snark_local_sink
-                }
-            ; wallets
-            ; coinbase_receiver = ref config.coinbase_receiver
-            ; snark_job_state = snark_jobs_state
-            ; subscriptions
-            ; sync_status
-            ; precomputed_block_writer
-            ; block_production_status = ref `Free
-            ; in_memory_reverse_structured_log_messages_for_integration_test
-            ; vrf_evaluation_state =
-                Block_producer.Vrf_evaluation_state.create ()
-            ; commit_id
-            } ) )
+          O1trace.background_thread "fetch_completed_snarks" (fun () ->
+              let open Deferred.Let_syntax in
+              let last_sync_status = ref `Offline in
+              let equal_status
+                  (s1 :
+                    [> `Catchup
+                    | `Connecting
+                    | `Listening
+                    | `Offline
+                    | `Synced
+                    | `Bootstrap ] )
+                  (s2 :
+                    [> `Catchup
+                    | `Connecting
+                    | `Listening
+                    | `Offline
+                    | `Synced
+                    | `Bootstrap ] ) =
+                match (s1, s2) with
+                | `Catchup, `Catchup ->
+                    true
+                | `Connecting, `Connecting ->
+                    true
+                | `Listening, `Listening ->
+                    true
+                | `Offline, `Offline ->
+                    true
+                | `Synced, `Synced ->
+                    true
+                | `Bootstrap, `Bootstrap ->
+                    true
+                | _ ->
+                    false
+              in
+              let to_yojson_status = function
+                | `Catchup ->
+                    `String "Catchup"
+                | `Connecting ->
+                    `String "Connecting"
+                | `Listening ->
+                    `String "Listening"
+                | `Offline ->
+                    `String "Offline"
+                | `Synced ->
+                    `String "Synced"
+                | `Bootstrap ->
+                    `String "Bootstrap"
+              in
+              let rec loop () =
+                let status = !last_sync_status in
+                (* log the status with info *)
+                [%log' debug config.logger] "Current sync status: $status"
+                  ~metadata:[ ("status", to_yojson_status status) ] ;
+                if Option.is_none !sync_status_ref then loop ()
+                else
+                  match
+                    Mina_incremental.Status.Observer.value
+                      (Option.value_exn !sync_status_ref)
+                  with
+                  | Ok (`Offline as s) | Ok (`Bootstrap as s) ->
+                      let%bind () = after (Time.Span.of_sec 1.) in
+                      last_sync_status := s ;
+                      loop ()
+                  | Ok `Synced
+                    when equal_status !last_sync_status `Catchup
+                         || equal_status !last_sync_status `Bootstrap ->
+                      [%log' debug config.logger]
+                        "Synced, fetching completed snarks" ;
+                      let received_block =
+                        get_most_recent_valid_block ()
+                        |> Validation.header
+                        |> Mina_block.Header.blockchain_length
+                      in
+                      fetch_completed_snarks
+                        (module Context)
+                        snark_pool net received_block get_current_frontier
+                  | Ok (`Catchup as s)
+                  | Ok (`Listening as s)
+                  | Ok (`Connecting as s)
+                  | Ok (`Synced as s) ->
+                      let%bind () = after (Time.Span.of_sec 1.) in
+                      last_sync_status := s ;
+                      loop ()
+                  | Error _e ->
+                      loop ()
+              in
+              loop () ) ;
+          { config
+          ; next_producer_timing = None
+          ; processes =
+              { prover
+              ; verifier
+              ; snark_worker
+              ; uptime_snark_worker_opt
+              ; vrf_evaluator
+              }
+          ; initialization_finish_signal
+          ; components =
+              { net
+              ; transaction_pool
+              ; snark_pool
+              ; transition_frontier = frontier_broadcast_pipe_r
+              ; most_recent_valid_block = most_recent_valid_block_reader
+              ; block_produced_bvar
+              }
+          ; pipes =
+              { validated_transitions_reader = valid_transitions_for_api
+              ; producer_transition_writer
+              ; user_command_input_writer
+              ; tx_local_sink
+              ; snark_local_sink
+              }
+          ; wallets
+          ; coinbase_receiver = ref config.coinbase_receiver
+          ; snark_job_state = snark_jobs_state
+          ; subscriptions
+          ; sync_status
+          ; precomputed_block_writer
+          ; block_production_status = ref `Free
+          ; in_memory_reverse_structured_log_messages_for_integration_test
+          ; vrf_evaluation_state = Block_producer.Vrf_evaluation_state.create ()
+          ; commit_id
+          ; proof_cache_db
+          } ) )
 
 let net { components = { net; _ }; _ } = net
 
@@ -2247,7 +2513,7 @@ let get_filtered_log_entries
   in
   (get_from_idx curr_idx messages [], is_started)
 
-let verifier { processes = { verifier; _ }; _ } = verifier
+let prover { processes = { prover; _ }; _ } = prover
 
 let vrf_evaluator { processes = { vrf_evaluator; _ }; _ } = vrf_evaluator
 
