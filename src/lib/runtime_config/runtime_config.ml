@@ -1769,7 +1769,7 @@ module Json_loader : Json_loader_intf = struct
     let open Deferred.Or_error.Let_syntax in
     let config_files = List.map ~f:(fun a -> (a, `Must_exist)) config_files in
     let config_files =
-      get_magic_config_files ?conf_dir ?commit_id_short () @ config_files
+      config_files @ get_magic_config_files ?conf_dir ?commit_id_short ()
     in
     let%map config_jsons =
       let config_files_paths =
