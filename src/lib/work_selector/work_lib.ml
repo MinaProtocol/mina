@@ -81,7 +81,20 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                                 ( Time.diff end_time start_time
                                 |> Time.Span.to_ms ) )
                           ] ;
-                      t.available_jobs <- new_available_jobs ) ;
+                      let new_available_jobs_unwrapped :
+                          ( Inputs.Transaction_witness.t
+                          , Inputs.Ledger_proof.t )
+                          Work_spec.t
+                          One_or_two.t
+                          list =
+                        let f =
+                          Snark_work_lib.Work.Single.Spec.map ~f_witness:ident
+                            ~f_proof:
+                              Inputs.Ledger_proof.Cached.read_proof_from_disk
+                        in
+                        List.map new_available_jobs ~f:(One_or_two.map ~f)
+                      in
+                      t.available_jobs <- new_available_jobs_unwrapped ) ;
                   Deferred.unit )
               |> Deferred.don't_wait_for ) ;
           Deferred.unit )
@@ -128,7 +141,9 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     Option.value_map ~default:true
       (Inputs.Snark_pool.get_completed_work snark_pool statements)
       ~f:(fun priced_proof ->
-        let competing_fee = Inputs.Transaction_snark_work.fee priced_proof in
+        let competing_fee =
+          Inputs.Transaction_snark_work.Checked.fee priced_proof
+        in
         Fee.compare fee competing_fee < 0 )
 
   module For_tests = struct
@@ -154,9 +169,9 @@ module Make (Inputs : Intf.Inputs_intf) = struct
             let fee_prover_opt =
               Option.map
                 (Inputs.Snark_pool.get_completed_work snark_pool statement)
-                ~f:(fun (p : Inputs.Transaction_snark_work.t) ->
-                  ( Inputs.Transaction_snark_work.fee p
-                  , Inputs.Transaction_snark_work.prover p ) )
+                ~f:(fun (p : Inputs.Transaction_snark_work.Checked.t) ->
+                  ( Inputs.Transaction_snark_work.Checked.fee p
+                  , Inputs.Transaction_snark_work.Checked.prover p ) )
             in
             (job, fee_prover_opt) ) )
 

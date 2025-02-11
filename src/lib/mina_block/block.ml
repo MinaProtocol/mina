@@ -4,6 +4,8 @@ open Mina_state
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       { header : Header.Stable.V2.t
@@ -11,34 +13,12 @@ module Stable = struct
       }
     [@@deriving fields, sexp]
 
-    let to_yojson t =
-      `Assoc
-        [ ( "protocol_state"
-          , Protocol_state.value_to_yojson (Header.protocol_state t.header) )
-        ; ("protocol_state_proof", `String "<opaque>")
-        ; ("staged_ledger_diff", `String "<opaque>")
-        ; ("delta_transition_chain_proof", `String "<opaque>")
-        ; ( "current_protocol_version"
-          , `String
-              (Protocol_version.to_string
-                 (Header.current_protocol_version t.header) ) )
-        ; ( "proposed_protocol_version"
-          , `String
-              (Option.value_map
-                 (Header.proposed_protocol_version_opt t.header)
-                 ~default:"<None>" ~f:Protocol_version.to_string ) )
-        ]
-
     let to_latest = Fn.id
 
     module Creatable = struct
       let id = "block"
 
       type nonrec t = t
-
-      let sexp_of_t = sexp_of_t
-
-      let t_of_sexp = t_of_sexp
 
       type 'a creator = header:Header.t -> body:Staged_ledger_diff.Body.t -> 'a
 
@@ -59,20 +39,33 @@ module Stable = struct
           Allocation_functor.Intf.Output.Basic_intf
             with type t := t
              and type 'a creator := 'a Creatable.creator )
-
-    include (
-      Allocation_functor.Make.Sexp
-        (Creatable) :
-          Allocation_functor.Intf.Output.Sexp_intf
-            with type t := t
-             and type 'a creator := 'a Creatable.creator )
   end
 end]
 
-type with_hash = t State_hash.With_state_hashes.t [@@deriving sexp]
+type t = Stable.Latest.t =
+  { header : Header.t; body : Staged_ledger_diff.Body.t }
 
-[%%define_locally
-Stable.Latest.(create, header, body, t_of_sexp, sexp_of_t, to_yojson, equal)]
+type with_hash = t State_hash.With_state_hashes.t
+
+let to_yojson t =
+  `Assoc
+    [ ( "protocol_state"
+      , Protocol_state.value_to_yojson (Header.protocol_state t.header) )
+    ; ("protocol_state_proof", `String "<opaque>")
+    ; ("staged_ledger_diff", `String "<opaque>")
+    ; ("delta_transition_chain_proof", `String "<opaque>")
+    ; ( "current_protocol_version"
+      , `String
+          (Protocol_version.to_string
+             (Header.current_protocol_version t.header) ) )
+    ; ( "proposed_protocol_version"
+      , `String
+          (Option.value_map
+             (Header.proposed_protocol_version_opt t.header)
+             ~default:"<None>" ~f:Protocol_version.to_string ) )
+    ]
+
+[%%define_locally Stable.Latest.(create, header, body)]
 
 let wrap_with_hash block =
   With_hash.of_data block

@@ -115,9 +115,9 @@ class Benchmark(abc.ABC):
                     result = self.influx_client.query_moving_average(
                         name, branch, str(field), self.branch_header())
 
-                    if not any(result):
+                    if len(result) < self.influx_client.moving_average_size :
                         logger.warning(
-                            f"Skipping comparison for {name} as there are no historical data available yet"
+                            f"Skipping comparison for {name} as there are no enough ({self.influx_client.moving_average_size}) historical data available yet"
                         )
                     else:
                         average = float(result[-1].records[-1]["_value"])
@@ -161,7 +161,7 @@ class BenchmarkType(Enum):
 
 class JaneStreetBenchmark(Benchmark, ABC):
     """
-        Abstract class for native ocaml benchmarks which has the same format
+        Abstract class for native ocaml benchmarks with unified format
 
     """
     name = MeasurementColumn("Name", 0)
@@ -170,9 +170,11 @@ class JaneStreetBenchmark(Benchmark, ABC):
     minor_words_per_runs = FieldColumn("mWd/Run", 3, "w")
     major_words_per_runs = FieldColumn("mjWd/Run", 4, "w")
     promotions_per_runs = FieldColumn("Prom/Run", 5, "w")
-    branch = TagColumn("gitbranch", 6)
+    category = TagColumn("category", 6)
+    branch = TagColumn("gitbranch", 7)
 
     def __init__(self, kind):
+        self.kind = kind
         Benchmark.__init__(self, kind)
 
     def headers(self):
@@ -181,7 +183,9 @@ class JaneStreetBenchmark(Benchmark, ABC):
             MinaBaseBenchmark.cycles_per_runs,
             MinaBaseBenchmark.minor_words_per_runs,
             MinaBaseBenchmark.major_words_per_runs,
-            MinaBaseBenchmark.promotions_per_runs, MinaBaseBenchmark.branch
+            MinaBaseBenchmark.promotions_per_runs, 
+            MinaBaseBenchmark.category, 
+            MinaBaseBenchmark.branch
         ]
 
     def fields(self):
@@ -242,6 +246,7 @@ class JaneStreetBenchmark(Benchmark, ABC):
                         rows[
                             5] += " " + MinaBaseBenchmark.promotions_per_runs.format_unit(
                             )
+                        rows.append(MinaBaseBenchmark.category.name)
                         rows.append("gitbranch")
 
                     else:
@@ -256,18 +261,25 @@ class JaneStreetBenchmark(Benchmark, ABC):
                             else:
                                 raise Exception(
                                     "Time can be expressed only in us or ns")
+
                         else:
                             # us
                             rows[1] = time[:-2]
-                            # kc
+
+                        if rows[2].endswith("kc"):
                             rows[2] = rows[2][:-2]
-                            # w
-                            rows[3] = rows[3][:-1]
-                            # w
-                            rows[4] = rows[4][:-1]
-                            # w
-                            rows[5] = rows[5][:-1]
-                            rows.append(branch)
+                        else:
+                            #c
+                            rows[2] = rows[2][:-1]
+                        # w
+                        rows[3] = rows[3][:-1]
+                        # w
+                        rows[4] = rows[4][:-1]
+                        # w
+                        rows[5] = rows[5][:-1]
+
+                        rows.append(str(self.kind))
+                        rows.append(branch)
 
                     csvwriter.writerow(rows[:])
 
@@ -288,11 +300,12 @@ class JaneStreetBenchmark(Benchmark, ABC):
         ends = []
         files = []
         for i, e in enumerate(lines):
-            if "Running" in e:
+            if "Estimated testing" in e:
                 starts.append(i)
 
         if not any(starts):
             self.export_to_csv(lines, output_filename, influxdb, branch)
+            files.append(output_filename)
         else:
             for start in starts[1:]:
                 ends.append(start)
@@ -301,7 +314,7 @@ class JaneStreetBenchmark(Benchmark, ABC):
 
             for start, end in zip(starts, ends):
                 name = parse.parse('Running inline tests in library "{}"',
-                                   lines[start].strip())[0]
+                                   lines[start-1].strip())[0]
                 file = f'{name}_{output_filename}'
                 logger.info(f"exporting {file}..")
                 self.export_to_csv(lines[start:end], f'{file}', influxdb,
