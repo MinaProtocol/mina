@@ -5,6 +5,10 @@ module Scalars = Scalars
 module Domain = Domain
 module Opt = Opt
 
+let num_chunks_by_default = 1
+
+let zk_rows_by_default = 3
+
 type 'field plonk_domain =
   < vanishing_polynomial : 'field -> 'field
   ; shifts : 'field Plonk_types.Shifts.t
@@ -248,7 +252,7 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
       let next_term = ref omega_to_minus_2 in
       let omega_to_intermediate_powers =
         Array.init
-          Stdlib.(zk_rows - 3)
+          Stdlib.(zk_rows - zk_rows_by_default)
           ~f:(fun _ ->
             let term = !next_term in
             next_term := term * omega_to_minus_1 ;
@@ -443,9 +447,11 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     but we deferred the arithmetic checks until here
     so that we have the efficiency of the native field.
   *)
-  let checked (type t)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
-      ~shift ~env (plonk : (_, _, _, _ Opt.t, _ Opt.t, _) In_circuit.t) evals =
+  let checked (type field field_var)
+      (module Impl : Snarky_backendless.Snark_intf.Run
+        with type field = field
+         and type field_var = field_var ) ~shift ~env
+      (plonk : (_, _, _, _ Opt.t, _ Opt.t, _) In_circuit.t) evals =
     let actual =
       derive_plonk ~with_label:Impl.with_label
         (module Impl.Field)

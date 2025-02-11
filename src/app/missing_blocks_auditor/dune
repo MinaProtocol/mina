@@ -18,6 +18,7 @@
    ;; local libraries
    logger
    bounded_types
+   mina_caqti
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_let)))

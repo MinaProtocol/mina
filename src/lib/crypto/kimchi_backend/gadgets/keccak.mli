@@ -1,3 +1,5 @@
+module Circuit := Kimchi_pasta_snarky_backend.Step_impl
+
 (* Endianness type *)
 type endianness = Big | Little
 
@@ -12,13 +14,12 @@ type endianness = Big | Little
  * - List of `int` Cvars representing the output of the hash function where each of them is a byte
  *)
 val nist_sha3 :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> ?inp_endian:endianness
+     ?inp_endian:endianness
   -> ?out_endian:endianness
   -> ?byte_checks:bool
   -> int
-  -> 'f Snarky_backendless.Cvar.t list
-  -> 'f Snarky_backendless.Cvar.t list
+  -> Circuit.Field.t list
+  -> Circuit.Field.t list
 
 (** Gadget for Keccak hash function for the parameters used in Ethereum 
  * Input:
@@ -30,12 +31,11 @@ val nist_sha3 :
  * - List of 256 Cvars representing the output of the hash function where each of them is a byte 
  *)
 val ethereum :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> ?inp_endian:endianness
+     ?inp_endian:endianness
   -> ?out_endian:endianness
   -> ?byte_checks:bool
-  -> 'f Snarky_backendless.Cvar.t list
-  -> 'f Snarky_backendless.Cvar.t list
+  -> Circuit.Field.t list
+  -> Circuit.Field.t list
 
 (*** Gagdet for pre-NIST SHA-3 function for output lengths 224/256/384/512.
  * Note that when calling with output length 256 this is equivalent to the ethereum function 
@@ -49,10 +49,9 @@ val ethereum :
  * - List of `int` Cvars representing the output of the hash function where each of them is a byte
  *)
 val pre_nist :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> ?inp_endian:endianness
+     ?inp_endian:endianness
   -> ?out_endian:endianness
   -> ?byte_checks:bool
   -> int
-  -> 'f Snarky_backendless.Cvar.t list
-  -> 'f Snarky_backendless.Cvar.t list
+  -> Circuit.Field.t list
+  -> Circuit.Field.t list

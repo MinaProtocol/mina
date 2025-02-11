@@ -22,5 +22,6 @@
    random_oracle_input
    pickles_types
    pickles_base.one_hot_vector
+   plonkish_prelude
    ppx_version.runtime
 ))

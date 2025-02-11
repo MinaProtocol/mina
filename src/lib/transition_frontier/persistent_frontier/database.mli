@@ -73,7 +73,7 @@ val find_arcs_and_root :
      t
   -> arcs_cache:State_hash.t list State_hash.Table.t
   -> parent_hashes:State_hash.t list
-  -> ( Root_data.Minimal.t
+  -> ( State_hash.t
      , [> `Not_found of [> `Arcs of State_hash.t | `Old_root_transition ] ] )
      result
 
@@ -84,8 +84,8 @@ val add :
   -> unit
 
 val move_root :
-     old_root:Root_data.Minimal.t
-  -> new_root:Root_data.Limited.t
+     old_root_hash:State_hash.t
+  -> new_root:Root_data.Limited.Stable.Latest.t
   -> garbage:State_hash.t list
   -> batch_t
   -> unit
@@ -103,7 +103,8 @@ val get_arcs :
   -> (State_hash.t list, [> `Not_found of [> `Arcs of State_hash.t ] ]) Result.t
 
 val get_root :
-  t -> (Root_data.Minimal.t, [> `Not_found of [> `Root ] ]) Result.t
+     t
+  -> (Root_data.Minimal.Stable.Latest.t, [> `Not_found of [> `Root ] ]) Result.t
 
 val get_protocol_states_for_root_scan_state :
      t

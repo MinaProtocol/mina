@@ -1,5 +1,4 @@
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Core
 open Async
 open Cache_lib
@@ -16,7 +15,7 @@ module type CONTEXT = sig
 
   val consensus_constants : Consensus.Constants.t
 
-  val compile_config : Mina_compile_config.t
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -57,6 +56,25 @@ end
     After building the breadcrumb path, [Ledger_catchup] will then send it to
     the [Processor] via writing them to catchup_breadcrumbs_writer. *)
 
+let validate_block ~genesis_state_hash (b, v) =
+  let open Mina_block.Validation in
+  let open Result.Let_syntax in
+  let h = (With_hash.map ~f:Mina_block.header b, v) in
+  validate_genesis_protocol_state ~genesis_state_hash h
+  >>= validate_protocol_versions >>= validate_delta_block_chain
+  >>| Fn.flip with_body (Mina_block.body @@ With_hash.data b)
+
+let validate_proofs_block ~verifier ~genesis_state_hash blocks =
+  let open Mina_block.Validation in
+  let open Deferred.Result.Let_syntax in
+  let f ((b, _), h) = with_body h (Mina_block.body @@ With_hash.data b) in
+  let hs =
+    List.map blocks ~f:(fun (b, v) ->
+        (With_hash.map ~f:Mina_block.header b, v) )
+  in
+  validate_proofs ~verifier ~genesis_state_hash hs
+  >>| List.zip_exn blocks >>| List.map ~f
+
 let verify_transition ~context:(module Context : CONTEXT) ~trust_system
     ~frontier ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
     enveloped_transition =
@@ -70,10 +88,7 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
       transition_with_hash
       |> Mina_block.Validation.skip_time_received_validation
            `This_block_was_not_received_via_gossip
-      |> Mina_block.Validation.validate_genesis_protocol_state
-           ~genesis_state_hash
-      >>= Mina_block.Validation.validate_protocol_versions
-      >>= Mina_block.Validation.validate_delta_block_chain
+      |> validate_block ~genesis_state_hash
     in
     let enveloped_initially_validated_transition =
       Envelope.Incoming.map enveloped_transition
@@ -495,7 +510,7 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
         |> State_hash.With_state_hashes.state_hash
       in
       match%bind
-        Mina_block.Validation.validate_proofs ~verifier ~genesis_state_hash
+        validate_proofs_block ~verifier ~genesis_state_hash
           (List.map transitions ~f:(fun t ->
                Mina_block.Validation.wrap (Envelope.Incoming.data t) ) )
       with
@@ -596,9 +611,9 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
   in
   let open Deferred.Let_syntax in
   match%bind
-    Transition_handler.Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
-      ~precomputed_values ~verifier ~trust_system ~frontier ~initial_hash
-      trees_of_transitions
+    Transition_handler.Breadcrumb_builder.build_subtrees_of_breadcrumbs
+      ~proof_cache_db ~logger ~precomputed_values ~verifier ~trust_system
+      ~frontier ~initial_hash trees_of_transitions
   with
   | Ok result ->
       [%log debug]
@@ -876,13 +891,25 @@ let%test_module "Ledger_catchup tests" =
 
     let logger = Logger.null ()
 
+    let () =
+      (* Disable log messages from best_tip_diff logger. *)
+      Logger.Consumer_registry.register ~commit_id:""
+        ~id:Logger.Logger_id.best_tip_diff ~processor:(Logger.Processor.raw ())
+        ~transport:
+          (Logger.Transport.create
+             ( module struct
+               type t = unit
+
+               let transport () _ = ()
+             end )
+             () )
+        ()
+
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     let proof_level = precomputed_values.proof_level
 
     let constraint_constants = precomputed_values.constraint_constants
-
-    let compile_config = Mina_compile_config.For_unit_tests.t
 
     let trust_system = Trust_system.null ()
 
@@ -892,10 +919,13 @@ let%test_module "Ledger_catchup tests" =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            ~commit_id:"not specified for unit tests" () )
+          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
+            () )
+
+    let ledger_sync_config =
+      Syncable_ledger.create_config
+        ~compile_config:Mina_compile_config.For_unit_tests.t
+        ~max_subtree_depth:None ~default_subtree_depth:None ()
 
     module Context = struct
       let logger = logger
@@ -906,7 +936,7 @@ let%test_module "Ledger_catchup tests" =
 
       let consensus_constants = precomputed_values.consensus_constants
 
-      let compile_config = compile_config
+      let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
     end
 
     let downcast_transition transition =
@@ -1011,11 +1041,17 @@ let%test_module "Ledger_catchup tests" =
       let catchup_breadcrumbs_are_best_tip_path =
         Rose_tree.equal (Rose_tree.of_list_exn target_best_tip_path)
           catchup_breadcrumbs ~f:(fun breadcrumb_tree1 breadcrumb_tree2 ->
-            Mina_block.Validated.equal
-              (Transition_frontier.Breadcrumb.validated_transition
-                 breadcrumb_tree1 )
-              (Transition_frontier.Breadcrumb.validated_transition
-                 breadcrumb_tree2 ) )
+            let b1 =
+              Mina_block.Validated.read_all_proofs_from_disk
+                (Transition_frontier.Breadcrumb.validated_transition
+                   breadcrumb_tree1 )
+            in
+            let b2 =
+              Mina_block.Validated.read_all_proofs_from_disk
+                (Transition_frontier.Breadcrumb.validated_transition
+                   breadcrumb_tree2 )
+            in
+            Mina_block.Validated.Stable.Latest.equal b1 b2 )
       in
       if not catchup_breadcrumbs_are_best_tip_path then
         failwith
@@ -1030,8 +1066,7 @@ let%test_module "Ledger_catchup tests" =
             Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
-            ~compile_config:Mina_compile_config.For_unit_tests.t
+            ~use_super_catchup ~ledger_sync_config
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size
             ])
@@ -1052,8 +1087,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
-            ~compile_config:Mina_compile_config.For_unit_tests.t
+            ~use_super_catchup ~ledger_sync_config
             [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
         ~f:(fun network ->
           let open Fake_network in
@@ -1068,8 +1102,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
-            ~compile_config:Mina_compile_config.For_unit_tests.t
+            ~use_super_catchup ~ledger_sync_config
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:(max_frontier_length * 2)
             ])

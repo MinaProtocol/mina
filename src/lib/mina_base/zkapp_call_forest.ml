@@ -25,11 +25,6 @@ let pop_exn : t -> (Account_update.t * t) * t = function
   | _ ->
       failwith "pop_exn"
 
-let push ~account_update ~calls t =
-  Zkapp_command.Call_forest.cons ~calls account_update t
-
-let hash (t : t) = Zkapp_command.Call_forest.hash t
-
 open Snark_params.Tick.Run
 
 module Checked = struct
@@ -210,6 +205,7 @@ module Checked = struct
             } )
           : (account_update * t) * t ) )
 
+  (* TODO Consider moving out of mina_base *)
   let push
       ~account_update:
         { account_update = { hash = account_update_hash; data = account_update }

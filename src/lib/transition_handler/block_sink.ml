@@ -5,8 +5,12 @@ open Pipe_lib.Strict_pipe
 open Mina_base
 open Mina_state
 
+type block_or_header =
+  [ `Block of Mina_block.t Envelope.Incoming.t
+  | `Header of Mina_block.Header.t Envelope.Incoming.t ]
+
 type stream_msg =
-  [ `Transition of Mina_block.t Envelope.Incoming.t ]
+  block_or_header
   * [ `Time_received of Block_time.t ]
   * [ `Valid_cb of Mina_net2.Validation_callback.t ]
 
@@ -19,7 +23,6 @@ type block_sink_config =
   ; consensus_constants : Consensus.Constants.t
   ; genesis_constants : Genesis_constants.t
   ; constraint_constants : Genesis_constants.Constraint_constants.t
-  ; block_window_duration : Time.Span.t
   }
 
 type t =
@@ -33,7 +36,6 @@ type t =
       ; consensus_constants : Consensus.Constants.t
       ; genesis_constants : Genesis_constants.t
       ; constraint_constants : Genesis_constants.Constraint_constants.t
-      ; block_window_duration : Time.Span.t
       }
   | Void
 
@@ -41,7 +43,7 @@ type Structured_log_events.t +=
   | Block_received of { state_hash : State_hash.t; sender : Envelope.Sender.t }
   [@@deriving register_event { msg = "Received a block from $sender" }]
 
-let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
+let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
   match sink with
   | Void ->
       Deferred.unit
@@ -55,16 +57,27 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       ; consensus_constants
       ; genesis_constants
       ; constraint_constants
-      ; block_window_duration
       } ->
       O1trace.sync_thread "handle_block_gossip"
       @@ fun () ->
       let%bind () = on_push () in
       Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
-      let state = Envelope.Incoming.data e in
+      let processing_start_time =
+        Block_time.(now time_controller |> to_time_exn)
+      in
+      let sender, header, txs_opt =
+        match b_or_h with
+        | `Block b_env ->
+            ( Envelope.Incoming.sender b_env
+            , Mina_block.header (Envelope.Incoming.data b_env)
+            , Some
+                ( Envelope.Incoming.data b_env
+                |> Mina_block.transactions ~constraint_constants ) )
+        | `Header h_env ->
+            (Envelope.Incoming.sender h_env, Envelope.Incoming.data h_env, None)
+      in
       let state_hash =
-        Mina_block.(
-          state |> header |> Header.protocol_state |> Protocol_state.hashes)
+        (Mina_block.Header.protocol_state header |> Protocol_state.hashes)
           .state_hash
       in
       Internal_tracing.Context_call.with_call_id ~tag:"block_received"
@@ -72,25 +85,24 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       Internal_tracing.with_state_hash state_hash
       @@ fun () ->
       let open Mina_transaction in
-      let txs =
-        Mina_block.transactions ~constraint_constants state
-        |> List.map ~f:Transaction.yojson_summary_with_status
+      let txs_meta =
+        Option.value_map ~default:[]
+          ~f:(fun txs ->
+            [ ( "transactions"
+              , `List (List.map ~f:Transaction.yojson_summary_with_status txs)
+              )
+            ] )
+          txs_opt
       in
       [%log internal] "@block_metadata"
         ~metadata:
-          [ ( "blockchain_length"
-            , Mina_numbers.Length.to_yojson (Mina_block.blockchain_length state)
-            )
-          ; ("transactions", `List txs)
-          ] ;
+          ( ( "blockchain_length"
+            , Mina_numbers.Length.to_yojson
+                (Mina_block.Header.blockchain_length header) )
+          :: txs_meta ) ;
       [%log internal] "External_block_received" ;
-      let processing_start_time =
-        Block_time.(now time_controller |> to_time_exn)
-      in
       don't_wait_for
-        ( match%map
-            Mina_net2.Validation_callback.await ~block_window_duration cb
-          with
+        ( match%map Mina_net2.Validation_callback.await cb with
         | Some `Accept ->
             let processing_time_span =
               Time.diff
@@ -109,25 +121,24 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       Perf_histograms.add_span ~name:"external_transition_latency"
         (Core.Time.abs_diff
            Block_time.(now time_controller |> to_time_exn)
-           Mina_block.(
-             header state |> Header.protocol_state
-             |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
-             |> Block_time.to_time_exn) ) ;
+           ( Mina_block.Header.protocol_state header
+           |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
+           |> Block_time.to_time_exn ) ) ;
       Mina_metrics.(Gauge.inc_one Network.new_state_received) ;
-      if log_gossip_heard then
-        [%str_log info]
-          ~metadata:[ ("external_transition", Mina_block.to_yojson state) ]
-          (Block_received
-             { state_hash =
-                 Mina_block.(
-                   header state |> Header.protocol_state
-                   |> Protocol_state.hashes)
-                   .state_hash
-             ; sender = Envelope.Incoming.sender e
-             } ) ;
+      ( if log_gossip_heard then
+        let metadata =
+          match b_or_h with
+          | `Block b_env ->
+              [ ("block", Mina_block.to_yojson @@ Envelope.Incoming.data b_env)
+              ]
+          | `Header h_env ->
+              [ ( "header"
+                , Mina_block.Header.to_yojson @@ Envelope.Incoming.data h_env )
+              ]
+        in
+        [%str_log info] ~metadata (Block_received { state_hash; sender }) ) ;
       Mina_net2.Validation_callback.set_message_type cb `Block ;
       Mina_metrics.(Counter.inc_one Network.Block.received) ;
-      let sender = Envelope.Incoming.sender e in
       let%bind () =
         match
           Network_pool.Rate_limiter.add rate_limiter sender ~now:(Time.now ())
@@ -143,28 +154,38 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
             Mina_net2.Validation_callback.fire_if_not_already_fired cb `Reject ;
             Deferred.unit
         | `Within_capacity ->
-            Writer.write writer (`Transition e, `Time_received tm, `Valid_cb cb)
+            Writer.write writer (b_or_h, `Time_received tm, `Valid_cb cb)
       in
-      let transactions = Mina_block.transactions state ~constraint_constants in
       let exists_well_formedness_errors =
-        List.exists transactions ~f:(fun txn ->
-            match
-              Mina_transaction.Transaction.check_well_formedness
-                ~genesis_constants txn.data
-            with
-            | Ok () ->
-                false
-            | Error errs ->
-                [%log warn]
-                  "Rejecting block due to one or more errors in a transaction"
-                  ~metadata:
-                    [ ( "errors"
-                      , `List
-                          (List.map errs
-                             ~f:User_command.Well_formedness_error.to_yojson )
-                      )
-                    ] ;
-                true )
+        match b_or_h with
+        | `Header _ ->
+            (* TODO make sure this check is executed at a later point when body is received *)
+            false
+        | `Block block_env ->
+            let transactions =
+              Mina_block.transactions
+                (Envelope.Incoming.data block_env)
+                ~constraint_constants
+            in
+            List.exists transactions ~f:(fun txn ->
+                match
+                  Mina_transaction.Transaction.check_well_formedness
+                    ~genesis_constants txn.data
+                with
+                | Ok () ->
+                    false
+                | Error errs ->
+                    [%log warn]
+                      "Rejecting block due to one or more errors in a \
+                       transaction"
+                      ~metadata:
+                        [ ( "errors"
+                          , `List
+                              (List.map errs
+                                 ~f:User_command.Well_formedness_error.to_yojson )
+                          )
+                        ] ;
+                    true )
       in
       if exists_well_formedness_errors then
         Mina_net2.Validation_callback.fire_if_not_already_fired cb `Reject ;
@@ -174,8 +195,8 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       in
       let tn_production_consensus_time =
         Consensus.Data.Consensus_state.consensus_time
-        @@ Protocol_state.consensus_state @@ Mina_block.Header.protocol_state
-        @@ Mina_block.header (Envelope.Incoming.data e)
+        @@ Protocol_state.consensus_state
+        @@ Mina_block.Header.protocol_state header
       in
       let tn_production_slot =
         lift_consensus_time tn_production_consensus_time
@@ -212,7 +233,6 @@ let create
     ; consensus_constants
     ; genesis_constants
     ; constraint_constants
-    ; block_window_duration
     } =
   let rate_limiter =
     Network_pool.Rate_limiter.create
@@ -234,7 +254,6 @@ let create
       ; consensus_constants
       ; genesis_constants
       ; constraint_constants
-      ; block_window_duration
       } )
 
 let void = Void
