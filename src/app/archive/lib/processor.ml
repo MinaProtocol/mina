@@ -999,7 +999,7 @@ module Zkapp_account_permissions_precondition = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
