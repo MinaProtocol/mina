@@ -2,16 +2,17 @@
  (name native_backend)
  (public_name bindings_js.native_backend)
  (js_of_ocaml
-  (flags
-   (:include flags.sexp))
+  (flags (:include flags.sexp))
   (javascript_files native_backend.js))
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_version js_of_ocaml-ppx)))
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version js_of_ocaml-ppx)))
 
 ; Rule that calls build.sh to compile the Neon project and produce plonk.node
 (rule
  (targets plonk.node)
- (deps build.sh)
- (action (run bash build.sh)))
+ (deps
+   (source_tree ../../native_prover) 
+   build.sh                          
+ )
+ (action
+  (run bash build.sh)))
