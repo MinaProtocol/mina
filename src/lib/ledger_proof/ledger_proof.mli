@@ -6,4 +6,8 @@ include S with type t = Prod.t
 
 module For_tests : sig
   val mk_dummy_proof : Mina_state.Snarked_ledger_state.t -> t
+
+  module Cached : sig
+    val mk_dummy_proof : Mina_state.Snarked_ledger_state.t -> Cached.t
+  end
 end

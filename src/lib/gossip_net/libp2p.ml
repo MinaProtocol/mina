@@ -492,11 +492,11 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                   | Message.Latest.T.Transaction_pool_diff
                       Network_pool.With_nonce.{ message = diff; _ } ->
                       Sinks.Tx_sink.push sink_tx
-                        (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc)
+                        (Envelope.Incoming.map ~f:(const diff) env, vc)
                   | Message.Latest.T.Snark_pool_diff
                       Network_pool.With_nonce.{ message = diff; _ } ->
                       Sinks.Snark_sink.push sink_snark_work
-                        (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc) )
+                        (Envelope.Incoming.map ~f:(const diff) env, vc) )
                 v0_topic Message.Latest.T.bin_msg
             in
             let%bind publish_v0 =
@@ -949,7 +949,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       let pfs = !(t.publish_functions) in
       let%bind () =
         guard_topic ?origin_topic v1_topic_block pfs.publish_v1_block
-          (Mina_block.header state)
+          (Mina_block.Stable.Latest.header state)
       in
       guard_topic ?origin_topic v0_topic pfs.publish_v0 (Message.New_state state)
 

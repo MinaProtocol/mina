@@ -63,8 +63,8 @@ type t =
       Capped_supervisor.t
   }
 
-let create ~proof_cache_db ~logger ~precomputed_values ~verifier ~trust_system
-    ~frontier ~time_controller ~catchup_job_writer
+let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
+    ~time_controller ~catchup_job_writer
     ~(catchup_breadcrumbs_writer :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Validation_callback.t option )
@@ -96,7 +96,7 @@ let create ~proof_cache_db ~logger ~precomputed_values ~verifier ~trust_system
     Capped_supervisor.create ~job_capacity:30
       (fun (initial_hash, transition_branches) ->
         match%map
-          Breadcrumb_builder.build_subtrees_of_breadcrumbs ~proof_cache_db
+          Breadcrumb_builder.build_subtrees_of_breadcrumbs
             ~logger:
               (Logger.extend logger
                  [ ("catchup_scheduler", `String "Called from catchup scheduler")
@@ -219,7 +219,8 @@ let make_timeout t transition_with_hash duration =
           ; ( "duration"
             , `Int (Block_time.Span.to_ms duration |> Int64.to_int_trunc) )
           ; ( "cached_transition"
-            , With_hash.data transition_with_hash |> Mina_block.to_yojson )
+            , With_hash.data transition_with_hash
+              |> Mina_block.header |> Mina_block.to_logging_yojson )
           ]
         "Timed out waiting for the parent of $cached_transition after \
          $duration ms, signalling a catchup job" ;
@@ -382,8 +383,6 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
             ~pids () )
 
-    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
-
     (* cast a breadcrumb into a cached, enveloped, partially validated transition *)
     let downcast_breadcrumb breadcrumb =
       let transition =
@@ -411,9 +410,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let disjoint_breadcrumb = List.last_exn branch in
           let scheduler =
-            create ~proof_cache_db ~frontier ~precomputed_values ~verifier
-              ~catchup_job_writer ~catchup_breadcrumbs_writer
-              ~clean_up_signal:(Ivar.create ())
+            create ~frontier ~precomputed_values ~verifier ~catchup_job_writer
+              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
@@ -472,9 +470,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             List.map ~f:register_breadcrumb branch
           in
           let scheduler =
-            create ~proof_cache_db ~precomputed_values ~frontier ~verifier
-              ~catchup_job_writer ~catchup_breadcrumbs_writer
-              ~clean_up_signal:(Ivar.create ())
+            create ~precomputed_values ~frontier ~verifier ~catchup_job_writer
+              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
@@ -549,9 +546,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               (Buffered (`Capacity 10, `Overflow Crash))
           in
           let scheduler =
-            create ~proof_cache_db ~precomputed_values ~frontier ~verifier
-              ~catchup_job_writer ~catchup_breadcrumbs_writer
-              ~clean_up_signal:(Ivar.create ())
+            create ~precomputed_values ~frontier ~verifier ~catchup_job_writer
+              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
           in
           let[@warning "-8"] (oldest_breadcrumb :: dependent_breadcrumbs) =
             List.rev branch

@@ -37,9 +37,9 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
   end]
 
-  type t = Stable.Latest.t
+  type t = { staged_ledger_diff : Diff.t } [@@deriving fields]
 
-  [%%define_locally Stable.Latest.(create, staged_ledger_diff)]
+  let create staged_ledger_diff = { staged_ledger_diff }
 
   let to_binio_bigstring b =
     let sz = Stable.V1.bin_size_t b in
@@ -60,6 +60,17 @@ module Make_str (A : Wire_types.Concrete) = struct
     @@ Fn.compose
          (Bitswap_block.blocks_of_data ~max_block_size:262144)
          (serialize_with_len_and_tag ~tag)
+
+  let write_all_proofs_to_disk ~proof_cache_db t =
+    { staged_ledger_diff =
+        Diff.write_all_proofs_to_disk ~proof_cache_db
+          t.Stable.Latest.staged_ledger_diff
+    }
+
+  let read_all_proofs_from_disk t =
+    { Stable.Latest.staged_ledger_diff =
+        Diff.read_all_proofs_from_disk t.staged_ledger_diff
+    }
 end
 
 include Wire_types.Make (Make_sig) (Make_str)

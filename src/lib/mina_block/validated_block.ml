@@ -22,7 +22,9 @@ type t =
   * State_hash.t Mina_stdlib.Nonempty_list.t
 
 let to_yojson (block_with_hashes, _) =
-  State_hash.With_state_hashes.to_yojson Block.to_yojson block_with_hashes
+  State_hash.With_state_hashes.to_yojson
+    (Fn.compose Block.to_logging_yojson Block.header)
+    block_with_hashes
 
 let lift (b, v) =
   match v with
@@ -75,4 +77,5 @@ let is_genesis t =
   header t |> Header.protocol_state |> Mina_state.Protocol_state.consensus_state
   |> Consensus.Data.Consensus_state.is_genesis_state
 
-let read_all_proofs_from_disk = Fn.id
+let read_all_proofs_from_disk ((b, v) : t) : Stable.Latest.t =
+  (With_hash.map ~f:Block.read_all_proofs_from_disk b, v)

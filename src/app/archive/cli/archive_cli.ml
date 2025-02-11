@@ -59,9 +59,11 @@ let command_run =
              |> Deferred.Or_error.ok_exn
        in
        Stdout_log.setup log_json log_level ;
+       let proof_cache_db = Proof_cache_tag.create_identity_db () in
        [%log info] "Starting archive process; built with commit $commit"
          ~metadata:[ ("commit", `String Mina_version.commit_id) ] ;
-       Archive_lib.Processor.setup_server ~metrics_server_port ~logger
+       Archive_lib.Processor.setup_server ~proof_cache_db ~metrics_server_port
+         ~logger
          ~genesis_constants:
            (Runtime_config.Constants.genesis_constants constants)
          ~constraint_constants:

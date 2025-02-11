@@ -174,11 +174,22 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
             $error" ;
         Deferred.return `Ignored
     | Ok peer_root_with_proof -> (
+        let pcd =
+          peer_root_with_proof.data
+          |> Proof_carrying_data.map
+               ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db)
+          |> Proof_carrying_data.map_proof
+               ~f:
+                 (Tuple2.map_snd
+                    ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db) )
+        in
         match%bind
-          Sync_handler.Root.verify
-            ~context:(module Context)
-            ~verifier:t.verifier candidate_consensus_state
-            peer_root_with_proof.data
+          Best_tip_prover.Wrap_for_block.map
+            ~f:
+              (Sync_handler.Root.verify
+                 ~context:(module Context)
+                 ~verifier:t.verifier candidate_consensus_state )
+            pcd
         with
         | Ok (`Root root, `Best_tip best_tip) ->
             if done_syncing_root root_sync_ledger then return `Ignored

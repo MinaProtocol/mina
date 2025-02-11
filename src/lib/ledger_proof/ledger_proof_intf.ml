@@ -57,5 +57,15 @@ module type S = sig
     val read_proof_from_disk : t -> Stable.Latest.t
 
     val statement : t -> Mina_state.Snarked_ledger_state.t
+
+    val sok_digest : t -> Sok_message.Digest.t
+
+    val underlying_proof : t -> Proof_cache_tag.t
+
+    val create :
+         statement:Mina_state.Snarked_ledger_state.t
+      -> sok_digest:Sok_message.Digest.t
+      -> proof:Proof_cache_tag.t
+      -> t
   end
 end

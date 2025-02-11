@@ -23,8 +23,6 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
-
-  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 (* TODO: calculate a sensible value from postake consensus arguments *)
@@ -252,8 +250,8 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       let%bind breadcrumb =
         cached_transform_deferred_result cached_initially_validated_transition
           ~transform_cached:(fun _ ->
-            Transition_frontier.Breadcrumb.build ~proof_cache_db ~logger
-              ~precomputed_values ~verifier ~get_completed_work ~trust_system
+            Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
+              ~verifier ~get_completed_work ~trust_system
               ~transition_receipt_time ~sender:(Some sender)
               ~parent:parent_breadcrumb ~transition:mostly_validated_transition
               (* TODO: Can we skip here? *) () )
@@ -325,9 +323,9 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
        Writer.t ) ~processed_transition_writer =
   let open Context in
   let catchup_scheduler =
-    Catchup_scheduler.create ~proof_cache_db ~logger ~precomputed_values
-      ~verifier ~trust_system ~frontier ~time_controller ~catchup_job_writer
-      ~catchup_breadcrumbs_writer ~clean_up_signal:clean_up_catchup_scheduler
+    Catchup_scheduler.create ~logger ~precomputed_values ~verifier ~trust_system
+      ~frontier ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
+      ~clean_up_signal:clean_up_catchup_scheduler
   in
   let add_and_finalize =
     add_and_finalize ~frontier ~catchup_scheduler ~processed_transition_writer
@@ -516,8 +514,6 @@ let%test_module "Transition_handler.Processor tests" =
       let constraint_constants = constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
-
-      let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
     end
 
     let downcast_breadcrumb breadcrumb =

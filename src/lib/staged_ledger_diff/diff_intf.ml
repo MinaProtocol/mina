@@ -71,9 +71,12 @@ module type Full = sig
     module Stable : sig
       module V2 : sig
         type t
+
+        val to_latest : t -> t
       end
+
+      module Latest = V2
     end
-    with type V2.t = t
   end
 
   module Pre_diff_with_at_most_one_coinbase : sig
@@ -83,9 +86,12 @@ module type Full = sig
     module Stable : sig
       module V2 : sig
         type t
+
+        val to_latest : t -> t
       end
+
+      module Latest = V2
     end
-    with type V2.t = t
   end
 
   module Diff : sig
@@ -96,24 +102,44 @@ module type Full = sig
     module Stable : sig
       module V2 : sig
         type t
+
+        val to_latest : t -> t
+
+        val coinbase :
+             constraint_constants:Genesis_constants.Constraint_constants.t
+          -> supercharge_coinbase:bool
+          -> t
+          -> Currency.Amount.t option
       end
+
+      module Latest = V2
     end
-    with type V2.t = t
+
+    val coinbase :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> supercharge_coinbase:bool
+      -> t
+      -> Currency.Amount.t option
   end
 
   type t = { diff : Diff.t } [@@deriving fields]
 
   module Stable : sig
     module V2 : sig
-      type t = { diff : Diff.Stable.V2.t }
-      [@@deriving bin_io, equal, sexp, version, yojson]
+      type t [@@deriving bin_io, equal, sexp, version, yojson]
 
       val to_latest : t -> t
+
+      val empty_diff : t
     end
 
     module Latest = V2
   end
-  with type V2.t = t
+
+  val write_all_proofs_to_disk :
+    proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
+
+  val read_all_proofs_from_disk : t -> Stable.Latest.t
 
   module With_valid_signatures_and_proofs : sig
     type pre_diff_with_at_most_two_coinbase =
@@ -177,12 +203,6 @@ module type Full = sig
   val commands : t -> User_command.t With_status.t list
 
   val completed_works : t -> Transaction_snark_work.t list
-
-  val coinbase :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> supercharge_coinbase:bool
-    -> t
-    -> Currency.Amount.t option
 
   val net_return :
        constraint_constants:Genesis_constants.Constraint_constants.t

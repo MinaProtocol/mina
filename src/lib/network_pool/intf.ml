@@ -74,12 +74,12 @@ module type Resource_pool_diff_intf = sig
 
   val label : string
 
-  type t [@@deriving to_yojson]
+  type t
 
-  type verified [@@deriving to_yojson]
+  type verified
 
   (** Part of the diff that was not added to the resource pool*)
-  type rejected [@@deriving to_yojson]
+  type rejected
 
   val empty : t
 
@@ -258,24 +258,27 @@ end
 module type Snark_resource_pool_intf = sig
   include Resource_pool_base_intf
 
+  val proof_cache_db : t -> Proof_cache_tag.cache_db
+
   val make_config :
        trust_system:Trust_system.t
     -> verifier:Verifier.t
     -> disk_location:string
+    -> proof_cache_db:Proof_cache_tag.cache_db
     -> Config.t
 
   val add_snark :
        ?is_local:bool
     -> t
     -> work:Transaction_snark_work.Statement.t
-    -> proof:Ledger_proof.t One_or_two.t
+    -> proof:Ledger_proof.Cached.t One_or_two.t
     -> fee:Fee_with_prover.t
     -> [ `Added | `Statement_not_referenced ]
 
   val request_proof :
        t
     -> Transaction_snark_work.Statement.t
-    -> Ledger_proof.t One_or_two.t Priced_proof.t option
+    -> Ledger_proof.Cached.t One_or_two.t Priced_proof.t option
 
   val verify_and_act :
        t
@@ -302,9 +305,24 @@ module type Snark_pool_diff_intf = sig
         Transaction_snark_work.Statement.t
         * Ledger_proof.t One_or_two.t Priced_proof.t
     | Empty
-  [@@deriving compare]
 
-  type verified = t [@@deriving compare]
+  module Cached : sig
+    type t =
+      | Add_solved_work of
+          Transaction_snark_work.Statement.t
+          * Ledger_proof.Cached.t One_or_two.t Priced_proof.t
+      | Empty
+
+    val read_all_proofs_from_disk :
+      t -> Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t
+
+    val write_all_proofs_to_disk :
+         proof_cache_db:Proof_cache_tag.cache_db
+      -> Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t
+      -> t
+  end
+
+  type verified = Cached.t
 
   type compact =
     { work_ids : int One_or_two.t
@@ -320,7 +338,7 @@ module type Snark_pool_diff_intf = sig
   include
     Resource_pool_diff_intf
       with type t := t
-       and type verified := t
+       and type verified := Cached.t
        and type pool := resource_pool
 
   val to_compact : t -> compact option

@@ -264,7 +264,11 @@ module Make (Inputs : Inputs_intf) :
           (Consensus.Hooks.select
              ~context:(module Context)
              ~existing:
-               (With_hash.map ~f:Mina_block.consensus_state best_tip_transition)
+               (With_hash.map
+                  ~f:
+                    (Fn.compose Mina_state.Protocol_state.consensus_state
+                       Mina_block.Header.protocol_state )
+                  best_tip_transition )
              ~candidate )
           `Keep
       in
