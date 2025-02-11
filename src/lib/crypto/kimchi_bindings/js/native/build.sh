@@ -4,10 +4,7 @@ set -euo pipefail
 chmod -R +w ../../native_prover
 cd ../../native_prover
 
-
-cd ../../native_prover
-
-# build the Neon addon (produces 'index.node').
+# build the neon project and produces 'index.node').
 npm install --no-audit --ignore-scripts
 npm run build
 
