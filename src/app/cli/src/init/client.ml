@@ -731,10 +731,15 @@ let handle_export_ledger_response ~json = function
       exit 1
   | Ok (Ok accounts) ->
       if json then (
-        Yojson.Safe.pretty_print Format.std_formatter
-          (Runtime_config.Accounts.to_yojson
-             (List.map accounts ~f:(fun a ->
-                  Genesis_ledger_helper.Accounts.Single.of_account a None ) ) ) ;
+        Format.fprintf Format.std_formatter "[\n  " ;
+        let print_comma = ref false in
+        List.iter accounts ~f:(fun a ->
+            if !print_comma then Format.fprintf Format.std_formatter "\n, "
+            else print_comma := true ;
+            Genesis_ledger_helper.Accounts.Single.of_account a None
+            |> Runtime_config.Accounts.Single.to_yojson
+            |> Yojson.Safe.pretty_print Format.std_formatter ) ;
+        Format.fprintf Format.std_formatter "\n]" ;
         printf "\n" )
       else printf !"%{sexp:Account.t list}\n" accounts ;
       return ()
