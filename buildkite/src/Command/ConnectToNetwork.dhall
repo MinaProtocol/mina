@@ -4,12 +4,13 @@ let Command = ./Base.dhall
 
 let Size = ./Size.dhall
 
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+let RunInToolchain = ./RunInToolchain.dhall
 
-let Cmd = ../Lib/Cmds.dhall
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 in  { step =
             \(dependsOn : List Command.TaggedKey.Type)
+        ->  \(mina_suffix : Text)
         ->  \(testnet : Text)
         ->  \(wait_between_graphql_poll : Text)
         ->  \(wait_before_final_check : Text)
@@ -17,12 +18,9 @@ in  { step =
         ->  Command.build
               Command.Config::{
               , commands =
-                [ Cmd.runInDocker
-                    Cmd.Docker::{
-                    , image = (../Constants/ContainerImages.dhall).ubuntu2004
-                    }
-                    "./buildkite/scripts/connect-to-testnet.sh ${testnet} ${wait_between_graphql_poll} ${wait_before_final_check}"
-                ]
+                  RunInToolchain.runInToolchainBullseye
+                    ([] : List Text)
+                    "./buildkite/scripts/connect/connect-to-network.sh ${mina_suffix} ${testnet} ${wait_between_graphql_poll} ${wait_before_final_check} "
               , label = "Connect to ${testnet}"
               , soft_fail = Some soft_fail
               , key = "connect-to-${testnet}"

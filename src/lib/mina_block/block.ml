@@ -4,6 +4,8 @@ open Mina_state
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       { header : Header.Stable.V2.t
@@ -17,10 +19,6 @@ module Stable = struct
       let id = "block"
 
       type nonrec t = t
-
-      let sexp_of_t = sexp_of_t
-
-      let t_of_sexp = t_of_sexp
 
       type 'a creator = header:Header.t -> body:Staged_ledger_diff.Body.t -> 'a
 
@@ -41,17 +39,13 @@ module Stable = struct
           Allocation_functor.Intf.Output.Basic_intf
             with type t := t
              and type 'a creator := 'a Creatable.creator )
-
-    include (
-      Allocation_functor.Make.Sexp
-        (Creatable) :
-          Allocation_functor.Intf.Output.Sexp_intf
-            with type t := t
-             and type 'a creator := 'a Creatable.creator )
   end
 end]
 
-type with_hash = t State_hash.With_state_hashes.t [@@deriving sexp]
+type t = Stable.Latest.t =
+  { header : Header.t; body : Staged_ledger_diff.Body.t }
+
+type with_hash = t State_hash.With_state_hashes.t
 
 let to_yojson t =
   `Assoc
@@ -71,7 +65,7 @@ let to_yojson t =
              ~default:"<None>" ~f:Protocol_version.to_string ) )
     ]
 
-[%%define_locally Stable.Latest.(create, header, body, t_of_sexp, sexp_of_t)]
+[%%define_locally Stable.Latest.(create, header, body)]
 
 let wrap_with_hash block =
   With_hash.of_data block

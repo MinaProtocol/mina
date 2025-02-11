@@ -48,7 +48,7 @@ The container includes 3 scripts in `/etc/mina/rosetta/scripts` that run a diffe
   and Rosetta node), but for a demo network with all operations occurring inside
   this container and no external network activity.
 * `docker-start.sh` connects the Mina node to a network (by default,
-  [Mainnet](https://docs.minaprotocol.com/node-operators/connecting-to-the-network))
+  [Mainnet](https://docs.minaprotocol.com/node-operators/block-producer-node/connecting-to-the-network))
   and initializes the archive database from publicly available nightly
   O(1) Labs backups. As with `docker-demo-start.sh`, this script runs a Mina
   node, a Mina archive, a PostgreSQL DB, and Rosetta. The script also
@@ -169,7 +169,7 @@ If the data in PostgreSQL is really stale (>24 hours), it would likely be better
 
 ### Operation Statuses
 
-Operations are always `Pending` if retrieved from the mempool. `Success` if they are in a block and fully applied. A transaction status of `Failed` occurs for transactions within a block whenever certain invariants are not met such as not sending enough to cover the account creation fee. Other reasons include misconfiguring new tokens or zkapps. See [this section of the code](https://github.com/MinaProtocol/mina/blob/03e11970387b05dd970c6ab0d1a0b01f18e3a8db/src/lib/coda_base/user_command_status.ml#L8-L21) for an exhaustive list.
+Operations are always `Pending` if retrieved from the mempool. `Success` if they are in a block and fully applied. A transaction status of `Failed` occurs for transactions within a block whenever certain invariants are not met such as not sending enough to cover the account creation fee. Other reasons include misconfiguring new tokens or zkapps. See [this section of the code](https://github.com/MinaProtocol/mina/blob/03e11970387b05dd970c6ab0d1a0b01f18e3a8db/src/lib/mina_base/transaction_status.ml#L10-L50) for an exhaustive list.
 
 ### Operations Types
 
@@ -218,7 +218,7 @@ To test the Construction API, for every kind of transaction supported in the Min
 
 Finally, we then take the signed transaction submit it to the network and go through the same flow as the Data API checks for this transaction. Ensuring its behavior is the same as if it had gone through the submit path via GraphQL directly.
 
-The signer library used by the test agent can be used as a reference for further signer implementations. An executable interface is also provided via the [`signer.exe` binary](https://github.com/MinaProtocol/mina/blob/src/app/rosetta/ocaml-signer/signer.ml).
+The signer library used by the test agent can be used as a reference for further signer implementations. An executable interface is also provided via the [`signer.exe` binary](https://github.com/MinaProtocol/mina/blob/develop/src/app/rosetta/ocaml-signer/signer.ml).
 
 #### Rosetta CLI Validation
 
