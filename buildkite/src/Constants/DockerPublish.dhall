@@ -14,7 +14,7 @@ let isEssential =
             , BatchTxn = False
             , Rosetta = True
             , ZkappTestTransaction = False
-            , FunctionalTestSuite = False
+            , FunctionalTestSuite = True
             , Toolchain = True
             , ItnOrchestrator = False
             }
