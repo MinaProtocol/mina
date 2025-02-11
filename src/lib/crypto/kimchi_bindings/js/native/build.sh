@@ -11,8 +11,7 @@ cd ../../native_prover
 npm install --no-audit --ignore-scripts
 npm run build
 
-cp index.node ../js/native/plonk.node
+cp index.node ../js/native/plonk_native.node
+cd ../js/native
 
-echo "Neon project built and 'index.node' copied to the 'native' folder."
-
-+chmod -R +w ../../native_prover
+echo "Neon project built and copied to plonk_native.node"
