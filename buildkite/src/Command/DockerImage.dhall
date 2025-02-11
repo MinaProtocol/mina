@@ -99,7 +99,7 @@ let generateStep =
                       ++  " --deb-build-flags ${BuildFlags.lowerName
                                                   spec.build_flags}"
 
-                else  " echo skipping "
+                else  " echo skipping publishing docker as this is not essential one. This is to ensure storage optimization"
 
           let remoteRepoCmds =
                 [ Cmd.run
