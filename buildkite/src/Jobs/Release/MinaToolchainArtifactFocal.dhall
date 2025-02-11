@@ -8,6 +8,10 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let DockerImage = ../../Command/DockerImage.dhall
 
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
+let Artifacts = ../../Constants/Artifacts.dhall
+
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -25,14 +29,13 @@ in  Pipeline.build
         , tags = [ PipelineTag.Type.Toolchain ]
         }
       , steps =
-        [ let toolchainSpec =
+        [ let toolchainBullseyeSpec =
                 DockerImage.ReleaseSpec::{
-                , service = "mina-toolchain"
-                , deb_codename = "focal"
+                , service = Artifacts.Type.Toolchain
+                , deb_codename = DebianVersions.DebVersion.Focal
                 , no_cache = True
-                , step_key = "toolchain-focal-docker-image"
                 }
 
-          in  DockerImage.generateStep toolchainSpec
+          in  DockerImage.generateStep toolchainBullseyeSpec
         ]
       }

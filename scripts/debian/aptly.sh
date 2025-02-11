@@ -12,7 +12,6 @@ CLEAR='\033[0m'
 RED='\033[0;31m'
 
 # global variables
-declare CLI_VERSION='1.0.0';
 declare CLI_NAME='aptly.sh';
 declare PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
 
@@ -34,28 +33,28 @@ function start_aptly() {
     local __background=$3
     local __clean=$4
     local __component=$5
-    local __repo="$__distribution-$__component"
+    local __repo="${__distribution}"-"${__component}"
     local __port=$6
 
-    if [ $__clean = 1 ]; then
+    if [ "${__clean}" = 1 ]; then
         rm -rf ~/.aptly
     fi
-    
-    aptly repo create -component $__component -distribution $__distribution  $__repo
 
-    aptly repo add $__repo $__debs
+    aptly repo create -component "${__component}" -distribution "${__distribution}"  "${__repo}"
 
-    aptly snapshot create $__component from repo $__repo
+    aptly repo add "${__repo}" "${__debs}"
 
-    aptly publish snapshot -distribution=$__distribution -skip-signing $__component
+    aptly snapshot create "${__component}" from repo "${__repo}"
 
-    if [ $__background = 1 ]; then
-        aptly serve -listen localhost:$__port &
-    else 
-        aptly serve -listen localhost:$__port
+    aptly publish snapshot -distribution="${__distribution}" -skip-signing "${__component}"
+
+    if [ "${__background}" = 1 ]; then
+        aptly serve -listen localhost:"${__port}" &
+    else
+        aptly serve -listen localhost:"${__port}"
     fi
 
-    
+
 }
 
 
@@ -68,7 +67,7 @@ function start_help(){
     echo ""
     echo "Parameters:"
     echo ""
-    echo "  -b, --background  The Docker name (mina-devnet, mina-archive etc.)"
+    echo "  -b, --background  The Docker name (mina, mina-archive etc.)"
     echo "  -c, --codename    The Codename for debian repository"
     echo "  -d, --debians     The Debian(s) to be available in aptly. Supports regular expression"
     echo "  -m, --component   The Component for debian repository. For example: unstable"
@@ -91,7 +90,7 @@ function start(){
     local __clean=0
     local __component="unstable"
     local __port=$PORT
-    
+
 
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
@@ -99,7 +98,7 @@ function start(){
             -h | --help )
                 start_help;
             ;;
-            -b | --background ) 
+            -b | --background )
                 __background=1
                 shift;
             ;;
@@ -130,13 +129,13 @@ function start(){
             ;;
         esac
     done
-    
-    start_aptly $__distribution \
-        $__debs \
-        $__background \
-        $__clean \
-        $__component \
-        $__port
+
+    start_aptly "${__distribution}" \
+        "${__debs}" \
+        "${__background}" \
+        "${__clean}" \
+        "${__component}" \
+        "${__port}"
 
 
 }
@@ -156,9 +155,9 @@ function stop_help(){
 }
 
 function stop(){
-    
+
     local __clean=0
-    
+
     while [ ${#} -gt 0 ]; do
         case $1 in
             -h | --help )
@@ -175,9 +174,9 @@ function stop(){
             ;;
         esac
     done
-    
+
     pkill aptly
-    if [ $__clean = 1 ]; then
+    if [ "${__clean}" = 1 ]; then
         rm -rf ~/.aptly
     fi
 }
