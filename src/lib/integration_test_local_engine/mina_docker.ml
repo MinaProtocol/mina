@@ -154,9 +154,19 @@ module Network_config = struct
           Existing
             { Runtime_config.Daemon.default with
               txpool_max_size = Existing txpool_max_size
+            ; peer_list_url = Unset
+            ; zkapp_proof_update_cost = Existing 10.26
+            ; zkapp_signed_single_update_cost = Existing 9.140000000000001
+            ; zkapp_signed_pair_update_cost = Existing 10.08
+            ; zkapp_transaction_cost_limit = Existing 69.45
+            ; max_event_elements = Existing 100
+            ; max_action_elements = Existing 100
+            ; zkapp_cmd_limit_hardcap = Existing 128
             ; slot_tx_end = Runtime_config.Existing_config.of_option slot_tx_end
             ; slot_chain_end =
                 Runtime_config.Existing_config.of_option slot_chain_end
+            ; minimum_user_command_fee =
+                Existing (Currency.Fee.of_string "1000000")
             ; network_id = Runtime_config.Existing_config.of_option network_id
             }
       ; genesis =

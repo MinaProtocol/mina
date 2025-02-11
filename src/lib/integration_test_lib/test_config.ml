@@ -88,14 +88,14 @@ type t =
 
 let proof_config_default : Runtime_config.Proof_keys.t =
   { level = Existing Full
-  ; sub_windows_per_window = Unset
-  ; ledger_depth = Unset
-  ; work_delay = Unset
+  ; sub_windows_per_window = Existing 11
+  ; ledger_depth = Existing 35
+  ; work_delay = Existing 2
   ; block_window_duration_ms = Existing 120000
-  ; transaction_capacity = Unset
-  ; coinbase_amount = Unset
-  ; supercharged_coinbase_factor = Unset
-  ; account_creation_fee = Unset
+  ; transaction_capacity = Existing (Log_2 7)
+  ; coinbase_amount = Existing (Currency.Amount.of_mina_int_exn 720)
+  ; supercharged_coinbase_factor = Existing 1
+  ; account_creation_fee = Existing (Currency.Fee.of_mina_string_exn "1")
   ; fork =
       Existing
         (Some
