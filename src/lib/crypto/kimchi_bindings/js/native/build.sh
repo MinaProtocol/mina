@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-pushd ../../native_prover
++chmod -R +w ../../native_prover
 
 # build the Neon addon (produces 'index.node').
 npm run build
