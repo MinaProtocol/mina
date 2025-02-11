@@ -951,8 +951,7 @@ let add_full_transactions t user_commands =
     List.find_map user_commands ~f:(fun cmd ->
         match
           User_command.check_well_formedness
-            ~genesis_constants:t.config.precomputed_values.genesis_constants
-            ~compile_config:t.config.precomputed_values.compile_config cmd
+            ~genesis_constants:t.config.precomputed_values.genesis_constants cmd
         with
         | Ok () ->
             None
@@ -984,7 +983,6 @@ let add_zkapp_transactions t (zkapp_commands : Zkapp_command.t list) =
         match
           User_command.check_well_formedness
             ~genesis_constants:t.config.precomputed_values.genesis_constants
-            ~compile_config:t.config.precomputed_values.compile_config
             (Zkapp_command cmd)
         with
         | Ok () ->
@@ -1250,7 +1248,7 @@ module type CONTEXT = sig
 
   val compaction_interval : Time.Span.t option
 
-  val compile_config : Mina_compile_config.t
+  val ledger_sync_config : Syncable_ledger.daemon_config
 
   val proof_cache_db : Proof_cache_tag.cache_db
 end
@@ -1279,9 +1277,18 @@ let context ~commit_id ~proof_cache_db (config : Config.t) : (module CONTEXT) =
 
     let compaction_interval = config.compile_config.compaction_interval
 
-    (*Same as config.precomputed_values.compile_config.
-      TODO: Remove redundant fields *)
-    let compile_config = config.compile_config
+    let ledger_sync_config =
+      let open Option.Let_syntax in
+      let max_subtree_depth =
+        let%bind daemon = precomputed_values.runtime_config.daemon in
+        daemon.sync_ledger_max_subtree_depth
+      in
+      let default_subtree_depth =
+        let%bind daemon = precomputed_values.runtime_config.daemon in
+        daemon.sync_ledger_default_subtree_depth
+      in
+      Syncable_ledger.create_config ~compile_config:config.compile_config
+        ~max_subtree_depth ~default_subtree_depth ()
 
     let proof_cache_db = proof_cache_db
   end )
@@ -1655,12 +1662,7 @@ let create ~commit_id ?wallets (config : Config.t) =
   let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
-  let compile_config = config.precomputed_values.compile_config in
-  let block_window_duration =
-    Float.of_int
-      config.precomputed_values.constraint_constants.block_window_duration_ms
-    |> Time.Span.of_ms
-  in
+  let block_window_duration = config.compile_config.block_window_duration in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
@@ -1781,9 +1783,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                     Vrf_evaluator.create ~commit_id ~constraint_constants
                       ~pids:config.pids ~logger:config.logger
                       ~conf_dir:config.conf_dir ~consensus_constants
-                      ~keypairs:config.block_production_keypairs
-                      ~compile_config:config.precomputed_values.compile_config )
-                )
+                      ~keypairs:config.block_production_keypairs ) )
             >>| Result.ok_exn
           in
           let snark_worker =
@@ -1987,7 +1987,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
               ~genesis_constants:config.precomputed_values.genesis_constants
-              ~slot_tx_end ~compile_config
+              ~slot_tx_end
           in
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =
@@ -2043,7 +2043,6 @@ let create ~commit_id ?wallets (config : Config.t) =
               ; consensus_constants
               ; genesis_constants = config.precomputed_values.genesis_constants
               ; constraint_constants
-              ; compile_config
               }
           in
           let snark_jobs_state =

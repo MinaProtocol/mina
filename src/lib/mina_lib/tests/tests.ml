@@ -32,7 +32,7 @@ let%test_module "Epoch ledger sync tests" =
 
     let () =
       (* Disable log messages from best_tip_diff logger. *)
-      Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+      Logger.Consumer_registry.register ~commit_id:""
         ~id:Logger.Logger_id.best_tip_diff ~processor:(Logger.Processor.raw ())
         ~transport:
           (Logger.Transport.create
@@ -48,6 +48,11 @@ let%test_module "Epoch ledger sync tests" =
 
     let dir_prefix = "sync_test_data"
 
+    let genesis_constants = Genesis_constants.For_unit_tests.t
+
+    let constraint_constants =
+      Genesis_constants.For_unit_tests.Constraint_constants.t
+
     let make_dirname s =
       let open Core in
       let uuid = Uuid_unix.create () |> Uuid.to_string in
@@ -58,9 +63,7 @@ let%test_module "Epoch ledger sync tests" =
         let runtime_config : Runtime_config.t =
           { daemon = None
           ; genesis = None
-          ; proof =
-              Some
-                { Runtime_config.Proof_keys.default with level = Some No_check }
+          ; proof = None
           ; ledger =
               Some
                 { base = Named "test"
@@ -75,11 +78,10 @@ let%test_module "Epoch ledger sync tests" =
           }
         in
         match%map
-          Genesis_ledger_helper.Config_loader.init_from_config_file
+          Genesis_ledger_helper.init_from_config_file
             ~genesis_dir:(make_dirname "genesis_dir")
-            ~constants:
-              (Runtime_config.Constants.magic_for_unit_tests runtime_config)
-            ~logger runtime_config
+            ~constraint_constants ~genesis_constants ~logger
+            ~proof_level:No_check runtime_config ~cli_proof_level:None
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
@@ -110,8 +112,6 @@ let%test_module "Epoch ledger sync tests" =
 
         let time_controller = time_controller
 
-        let compile_config = Mina_compile_config.For_unit_tests.t
-
         let commit_id = "not specified for unit test"
 
         let vrf_poll_interval =
@@ -122,6 +122,11 @@ let%test_module "Epoch ledger sync tests" =
 
         let compaction_interval =
           Mina_compile_config.For_unit_tests.t.compaction_interval
+
+        let ledger_sync_config =
+          Syncable_ledger.create_config
+            ~compile_config:Mina_compile_config.For_unit_tests.t
+            ~max_subtree_depth:None ~default_subtree_depth:None ()
       end in
       let genesis_ledger =
         lazy
@@ -197,7 +202,6 @@ let%test_module "Epoch ledger sync tests" =
           ; consensus_constants
           ; genesis_constants = precomputed_values.genesis_constants
           ; constraint_constants
-          ; compile_config
           }
       in
       let _transaction_pool, tx_remote_sink, _tx_local_sink =
@@ -206,16 +210,15 @@ let%test_module "Epoch ledger sync tests" =
             ~trust_system
             ~pool_max_size:precomputed_values.genesis_constants.txpool_max_size
             ~genesis_constants:precomputed_values.genesis_constants
-            ~slot_tx_end:None ~compile_config
+            ~slot_tx_end:None
         in
         Network_pool.Transaction_pool.create ~config ~constraint_constants
           ~consensus_constants ~time_controller ~logger
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r ~on_remote_push
           ~log_gossip_heard:false
           ~block_window_duration:
-            ( Float.of_int
-                precomputed_values.constraint_constants.block_window_duration_ms
-            |> Time.Span.of_ms )
+            ( Time.Span.of_ms
+            @@ Float.of_int constraint_constants.block_window_duration_ms )
       in
       let snark_remote_sink, snark_pool =
         let config =
@@ -229,10 +232,8 @@ let%test_module "Epoch ledger sync tests" =
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r ~on_remote_push
             ~log_gossip_heard:false
             ~block_window_duration:
-              ( Float.of_int
-                  precomputed_values.constraint_constants
-                    .block_window_duration_ms
-              |> Time.Span.of_ms )
+              ( Time.Span.of_ms
+              @@ Float.of_int constraint_constants.block_window_duration_ms )
         in
         (snark_remote_sink, snark_pool)
       in

@@ -21,7 +21,8 @@
   base.caml
   ;; local libraries
   logger
-  o1trace)
+  o1trace
+  mina_node_config)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

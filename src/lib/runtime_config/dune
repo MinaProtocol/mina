@@ -53,5 +53,6 @@
    ppx_fields_conv
    ppx_version
    ppx_compare
+   ppx_here
    ppx_jane
    ppx_mina)))
