@@ -98,7 +98,7 @@ struct
           ; verifier : (Verifier.t[@sexp.opaque])
           ; disk_location : string
           }
-        [@@deriving sexp, make]
+        [@@deriving make]
       end
 
       type transition_frontier_diff =
@@ -113,7 +113,6 @@ struct
         ; account_creation_fee : Currency.Fee.t
         ; batcher : Batcher.Snark_pool.t
         }
-      [@@deriving sexp]
 
       let make_config = Config.make
 
@@ -546,7 +545,7 @@ module Diff_versioned = struct
             * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
-      [@@deriving compare, sexp, to_yojson, hash]
+      [@@deriving compare, to_yojson, hash]
 
       let to_latest = Fn.id
     end
@@ -557,7 +556,7 @@ module Diff_versioned = struct
         Transaction_snark_work.Statement.t
         * Ledger_proof.t One_or_two.t Priced_proof.t
     | Empty
-  [@@deriving compare, sexp, to_yojson, hash]
+  [@@deriving compare, to_yojson, hash]
 end
 
 let%test_module "random set test" =
@@ -685,15 +684,6 @@ let%test_module "random set test" =
                 @@ Signature_lib.Public_key.Compressed.equal mal_pk fee.prover ) )
       in
       Quickcheck.test ~trials:5
-        ~sexp_of:
-          [%sexp_of:
-            (Mock_snark_pool.Resource_pool.t * Mocks.Transition_frontier.t)
-            Deferred.t
-            * ( Transaction_snark_work.Statement.t
-              * Ledger_proof.t One_or_two.t
-              * Fee_with_prover.t
-              * Signature_lib.Public_key.Compressed.t )
-              list]
         (Quickcheck.Generator.tuple2 (gen ()) invalid_work_gen)
         ~f:(fun (t, invalid_work_lst) ->
           Async.Thread_safe.block_on_async_exn (fun () ->
@@ -728,13 +718,6 @@ let%test_module "random set test" =
                    the snark pool, the fee of the work is at most the minimum \
                    of those fees" =
       Quickcheck.test ~trials:5
-        ~sexp_of:
-          [%sexp_of:
-            (Mock_snark_pool.Resource_pool.t * Mocks.Transition_frontier.t)
-            Deferred.t
-            * Mocks.Transaction_snark_work.Statement.t
-            * Fee_with_prover.t
-            * Fee_with_prover.t]
         (Async.Quickcheck.Generator.tuple4 (gen ())
            Mocks.Transaction_snark_work.Statement.gen Fee_with_prover.gen
            Fee_with_prover.gen )
@@ -758,13 +741,6 @@ let%test_module "random set test" =
                    proof of the same work only if it's fee is smaller than the \
                    existing priced proof" =
       Quickcheck.test ~trials:5
-        ~sexp_of:
-          [%sexp_of:
-            (Mock_snark_pool.Resource_pool.t * Mocks.Transition_frontier.t)
-            Deferred.t
-            * Mocks.Transaction_snark_work.Statement.t
-            * Fee_with_prover.t
-            * Fee_with_prover.t]
         (Quickcheck.Generator.tuple4 (gen ())
            Mocks.Transaction_snark_work.Statement.gen Fee_with_prover.gen
            Fee_with_prover.gen )
@@ -952,8 +928,11 @@ let%test_module "random set test" =
       in
       let check_work ~expected ~got =
         let sort = List.sort ~compare:compare_work in
-        [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list] (sort got)
-          (sort expected)
+        if
+          [%compare: Mock_snark_pool.Resource_pool.Diff.t list] (sort got)
+            (sort expected)
+          <> 0
+        then failwith "diffs don't match"
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in

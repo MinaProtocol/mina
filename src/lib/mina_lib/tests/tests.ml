@@ -150,6 +150,8 @@ let%test_module "Epoch ledger sync tests" =
         let genesis_ledger = genesis_ledger
 
         let consensus_local_state = consensus_local_state
+
+        let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
       end in
       return (module Context : CONTEXT)
 

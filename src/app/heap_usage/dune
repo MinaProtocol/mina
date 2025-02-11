@@ -53,7 +53,8 @@
   pasta_bindings
   zkapp_command_builder
   transaction_snark_tests
-  snark_profiler_lib)
+  snark_profiler_lib
+  proof_cache_tag)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

@@ -79,6 +79,8 @@ let setup (type n) ~context:(module Context : CONTEXT)
       let time_controller = time_controller
 
       let consensus_local_state = consensus_local_state
+
+      let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
     end )
   in
   let config rpc_mocks peer =
