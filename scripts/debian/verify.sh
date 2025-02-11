@@ -15,7 +15,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
-if [ -z $PACKAGE ]; then
+if [ -z "${PACKAGE}" ]; then
   echo "No package defined. exiting.."; exit 1;
 fi
 

@@ -19,7 +19,7 @@ let Artifacts = ../../Constants/Artifacts.dhall
 let dependsOn =
       Dockers.dependsOn
         Dockers.Type.Bullseye
-        (None Network.Type)
+        Network.Type.Devnet
         Profiles.Type.Standard
         Artifacts.Type.FunctionalTestSuite
 
