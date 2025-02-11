@@ -10,6 +10,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val ledger_sync_config : Syncable_ledger.daemon_config
 end
 
 (* There must be at least 2 peers to create a network *)
@@ -102,6 +104,7 @@ module Generator : sig
     -> verifier:Verifier.t
     -> max_frontier_length:int
     -> use_super_catchup:bool
+    -> ledger_sync_config:Syncable_ledger.daemon_config
     -> (peer_config, 'n num_peers) Vect.t
     -> 'n num_peers t Generator.t
 end

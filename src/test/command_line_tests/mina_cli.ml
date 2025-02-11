@@ -34,9 +34,10 @@ module MinaCli = struct
     Process.run ~prog:t.mina_exe ~args:[ "advanced"; "print-signature-kind" ] ()
 
   let advanced_compile_time_constants t ~config_file =
-    Process.run ~prog:t.mina_exe
-      ~args:
-        [ "advanced"; "compile-time-constants"; "--config-file"; config_file ]
+    Process.run
+      ~env:(`Extend [ ("MINA_CONFIG_FILE", config_file) ])
+      ~prog:t.mina_exe
+      ~args:[ "advanced"; "compile-time-constants" ]
       ()
 
   let advanced_constraint_system_digests t =

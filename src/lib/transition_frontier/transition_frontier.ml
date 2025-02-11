@@ -723,8 +723,6 @@ module For_tests = struct
 
       let consensus_constants = precomputed_values.consensus_constants
 
-      let compile_config = precomputed_values.compile_config
-
       let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
     end in
     let open Context in
