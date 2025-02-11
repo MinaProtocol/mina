@@ -12,6 +12,24 @@ module Fork_config = struct
   [@@deriving yojson, bin_io_unversioned]
 end
 
+module Fork_config_opt = struct
+  (* Note that length might be smaller than the gernesis_slot
+     or equal if a block was produced in every slot possible. *)
+  type t = Fork_config.t option [@@deriving yojson, bin_io_unversioned]
+
+  let to_yojson = function
+    | None ->
+        `Assoc []
+    | Some x ->
+        Fork_config.to_yojson x
+
+  let of_yojson = function
+    | `Assoc [] ->
+        Ok None
+    | json ->
+        Result.map ~f:Option.some (Fork_config.of_yojson json)
+end
+
 let yojson_strip_fields ~keep_fields = function
   | `Assoc l ->
       `Assoc
@@ -438,7 +456,7 @@ module Json_layout = struct
       ; coinbase_amount : Currency.Amount.t option [@default None]
       ; supercharged_coinbase_factor : int option [@default None]
       ; account_creation_fee : Currency.Fee.t option [@default None]
-      ; fork : Fork_config.t option [@default None]
+      ; fork : Fork_config_opt.t option [@default None]
       }
     [@@deriving yojson, fields]
 
@@ -550,12 +568,28 @@ module Json_layout = struct
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
 
+  module Epoch_data_opt = struct
+    type t = Epoch_data.t option
+
+    let to_yojson = function
+      | None ->
+          `Assoc []
+      | Some x ->
+          Epoch_data.to_yojson x
+
+    let of_yojson = function
+      | `Assoc [] ->
+          Ok None
+      | json ->
+          Result.map ~f:Option.some (Epoch_data.of_yojson json)
+  end
+
   type t =
     { daemon : Daemon.t option [@default None]
     ; genesis : Genesis.t option [@default None]
     ; proof : Proof_keys.t option [@default None]
     ; ledger : Ledger.t option [@default None]
-    ; epoch_data : Epoch_data.t option [@default None]
+    ; epoch_data : Epoch_data_opt.t option [@default None]
     }
   [@@deriving yojson, fields]
 
@@ -1069,7 +1103,7 @@ module Proof_keys = struct
     ; coinbase_amount : Currency.Amount.Stable.Latest.t option
     ; supercharged_coinbase_factor : int option
     ; account_creation_fee : Currency.Fee.Stable.Latest.t option
-    ; fork : Fork_config.t option
+    ; fork : Fork_config.t option option
     }
   [@@deriving bin_io_unversioned]
 
@@ -1520,7 +1554,7 @@ type t =
   ; genesis : Genesis.t option
   ; proof : Proof_keys.t option
   ; ledger : Ledger.t option
-  ; epoch_data : Epoch_data.t option
+  ; epoch_data : Epoch_data.t option option
   }
 [@@deriving bin_io_unversioned, fields]
 
@@ -1532,7 +1566,8 @@ let to_json_layout { daemon; genesis; proof; ledger; epoch_data } =
   ; genesis = Option.map ~f:Genesis.to_json_layout genesis
   ; proof = Option.map ~f:Proof_keys.to_json_layout proof
   ; ledger = Option.map ~f:Ledger.to_json_layout ledger
-  ; epoch_data = Option.map ~f:Epoch_data.to_json_layout epoch_data
+  ; epoch_data =
+      Option.map ~f:(Option.map ~f:Epoch_data.to_json_layout) epoch_data
   }
 
 let of_json_layout { Json_layout.daemon; genesis; proof; ledger; epoch_data } =
@@ -1541,7 +1576,9 @@ let of_json_layout { Json_layout.daemon; genesis; proof; ledger; epoch_data } =
   and genesis = result_opt ~f:Genesis.of_json_layout genesis
   and proof = result_opt ~f:Proof_keys.of_json_layout proof
   and ledger = result_opt ~f:Ledger.of_json_layout ledger
-  and epoch_data = result_opt ~f:Epoch_data.of_json_layout epoch_data in
+  and epoch_data =
+    result_opt ~f:(result_opt ~f:Epoch_data.of_json_layout) epoch_data
+  in
   { daemon; genesis; proof; ledger; epoch_data }
 
 let to_yojson x = Json_layout.to_yojson (to_json_layout x)
@@ -1553,11 +1590,13 @@ let to_yojson_without_accounts x =
     Option.map ~f:List.length accounts
   in
   let staking_accounts =
-    let%bind.Option { staking; _ } = layout.epoch_data in
+    let%bind.Option epoch_data = layout.epoch_data in
+    let%bind.Option { staking; _ } = epoch_data in
     Option.map ~f:List.length staking.accounts
   in
   let next_accounts =
-    let%bind.Option { next; _ } = layout.epoch_data in
+    let%bind.Option epoch_data = layout.epoch_data in
+    let%bind.Option { next; _ } = epoch_data in
     let%bind.Option { accounts; _ } = next in
     Option.map ~f:List.length accounts
   in
@@ -1566,10 +1605,14 @@ let to_yojson_without_accounts x =
     { layout with
       ledger = Option.map ~f layout.ledger
     ; epoch_data =
-        Option.map layout.epoch_data ~f:(fun { staking; next } ->
-            { Json_layout.Epoch_data.staking = { staking with accounts = None }
-            ; next = Option.map next ~f:(fun n -> { n with accounts = None })
-            } )
+        Option.map layout.epoch_data
+          ~f:
+            (Option.map ~f:(fun { Json_layout.Epoch_data.staking; next } ->
+                 { Json_layout.Epoch_data.staking =
+                     { staking with accounts = None }
+                 ; next =
+                     Option.map next ~f:(fun n -> { n with accounts = None })
+                 } ) )
     }
   in
   ( Json_layout.to_yojson layout
@@ -1655,11 +1698,12 @@ let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
     @@ Mina_ledger.Ledger.merkle_root staged_ledger
   in
   let fork =
-    Fork_config.
-      { state_hash = Mina_base.State_hash.to_base58_check state_hash
-      ; blockchain_length
-      ; global_slot_since_genesis
-      }
+    Some
+      Fork_config.
+        { state_hash = Mina_base.State_hash.to_base58_check state_hash
+        ; blockchain_length
+        ; global_slot_since_genesis
+        }
   in
   let%bind () = yield () in
   let%bind staking_ledger_accounts = ledger_accounts staking_ledger in
@@ -1674,14 +1718,15 @@ let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
   let epoch_data =
     let open Epoch_data in
     let open Data in
-    { staking =
-        { ledger = ledger_of_accounts staking_ledger_accounts
-        ; seed = staking_epoch_seed
-        }
-    ; next =
-        Option.map next_epoch_ledger_accounts ~f:(fun accounts ->
-            { ledger = ledger_of_accounts accounts; seed = next_epoch_seed } )
-    }
+    Some
+      { staking =
+          { ledger = ledger_of_accounts staking_ledger_accounts
+          ; seed = staking_epoch_seed
+          }
+      ; next =
+          Option.map next_epoch_ledger_accounts ~f:(fun accounts ->
+              { ledger = ledger_of_accounts accounts; seed = next_epoch_seed } )
+      }
   in
   make
   (* add_genesis_winner must be set to false, because this
@@ -1911,7 +1956,7 @@ let make_constraint_constants (a : Genesis_constants.Constraint_constants.t)
   let fork =
     let a = a.fork in
     let b =
-      let%map.Option f = Option.(b.proof >>= fun x -> x.fork) in
+      let%map.Option f = Option.(b.proof >>= fun x -> x.fork >>= Fn.id) in
       { Genesis_constants.Fork_constants.state_hash =
           Mina_base.State_hash.of_base58_check_exn f.state_hash
       ; blockchain_length = Mina_numbers.Length.of_int f.blockchain_length
@@ -2091,13 +2136,14 @@ let of_constants (constants : Constants.constants) : t =
         Option.map constraint_constants.fork
           ~f:(fun { state_hash; blockchain_length; global_slot_since_genesis }
              ->
-            { Fork_config.state_hash =
-                Mina_base.State_hash.to_base58_check state_hash
-            ; blockchain_length = Mina_numbers.Length.to_int blockchain_length
-            ; global_slot_since_genesis =
-                Mina_numbers.Global_slot_since_genesis.to_int
-                  global_slot_since_genesis
-            } )
+            Some
+              { Fork_config.state_hash =
+                  Mina_base.State_hash.to_base58_check state_hash
+              ; blockchain_length = Mina_numbers.Length.to_int blockchain_length
+              ; global_slot_since_genesis =
+                  Mina_numbers.Global_slot_since_genesis.to_int
+                    global_slot_since_genesis
+              } )
     }
   in
   let genesis =
