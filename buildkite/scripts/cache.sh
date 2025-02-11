@@ -18,8 +18,8 @@ RED='\033[0;31m'
 ################################################################################
 
 function check_buildkite_vars() {
-    if [ ! -v "BUILDKITE_JOB_ID" ]; then
-        echo -e "${RED} !! Script is executed outside buildkite context.. BUILDKITE_JOB_ID env var not find ${CLEAR}\n";
+    if [ ! -v "BUILDKITE_BUILD_ID" ]; then
+        echo -e "${RED} !! Script is executed outside buildkite context.. BUILDKITE_BUILD_ID env var not find ${CLEAR}\n";
         exit 1
     fi
 }
@@ -40,7 +40,7 @@ CLI_VERSION='1.0.0';
 CLI_NAME="$0";
 PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
 CACHE_MOUNTPOINT="/var/storagebox"
-CACHE_ROOT_FOLDER="buildkite/${BUILDKITE_JOB_ID}"
+CACHE_ROOT_FOLDER="buildkite/${BUILDKITE_BUILD_ID}"
 
 ################################################################################
 # functions
@@ -50,7 +50,7 @@ check_cache_exists
 
 function main_help(){
     echo Read/Write file or files from/to CI cache which is supposed to be mounted to buildkite-agent 
-    echo "at '$CACHE_MOUNTPOINT'. Script requires to be executed in buildkite context. e.g (BUILDKITE_JOB_ID env var to be defined)".
+    echo "at '$CACHE_MOUNTPOINT'. Script requires to be executed in buildkite context. e.g (BUILDKITE_BUILD_ID env var to be defined)".
     echo ""
     echo "     $CLI_NAME [operation]"
     echo ""
@@ -73,7 +73,7 @@ function version(){
 
 function read_help(){
     echo Read file or files from CI cache which is supposed to be mounted to buildkite-agent 
-    echo "at '$CACHE_MOUNTPOINT'. Script requires to be executed in buildkite context. e.g (BUILDKITE_JOB_ID env var to be defined)".
+    echo "at '$CACHE_MOUNTPOINT'. Script requires to be executed in buildkite context. e.g (BUILDKITE_BUILD_ID env var to be defined)".
     echo ""
     echo "     $CLI_NAME read [-options] INPUT_CACHE_LOCATION OUTPUT_LOCAL_LOCATION"
     echo ""
@@ -92,7 +92,7 @@ function read_help(){
     echo ""
     echo "  " $CLI_NAME read  /workdir  debians/mina-devnet*.deb
     echo ""
-    echo " Above command will copy 'debians/mina-devnet*.deb' files from CACHE_MOUNTPOINT/BUILDKITE_JOB_ID/debians to /workdir"
+    echo " Above command will copy 'debians/mina-devnet*.deb' files from CACHE_MOUNTPOINT/BUILDKITE_BUILD_ID/debians to /workdir"
     echo ""
     echo ""
     exit 0
@@ -172,7 +172,7 @@ function read(){
 
 function write_help(){
     echo Writes file to CI cache which is supposed to be mounted to buildkite-agent 
-    echo "at '$CACHE_MOUNTPOINT'. Script requires to be executed in buildkite context. e.g (BUILDKITE_JOB_ID env var to be defined)".  
+    echo "at '$CACHE_MOUNTPOINT'. Script requires to be executed in buildkite context. e.g (BUILDKITE_BUILD_ID env var to be defined)".  
     echo ""
     echo "     $CLI_NAME write [-options] INPUT_LOCAL_LOCATION OUTPUT_CACHE_LOCATION"
     echo ""
@@ -192,7 +192,7 @@ function write_help(){
     echo ""
     echo "  " $CLI_NAME write  mina-devnet*.deb debians/
     echo ""
-    echo " Above command will write mina-devnet*.deb files to CACHE_MOUNTPOINT/BUILDKITE_JOB_ID/debians"
+    echo " Above command will write mina-devnet*.deb files to CACHE_MOUNTPOINT/BUILDKITE_BUILD_ID/debians"
     echo ""
     echo ""
     exit 0
