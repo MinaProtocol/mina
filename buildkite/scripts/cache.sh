@@ -36,11 +36,11 @@ check_buildkite_vars
 ################################################################################
 # global variable
 ################################################################################
-declare -r CLI_VERSION='1.0.0';
-declare -r CLI_NAME="$0";
-declare -r PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
-declare -r CACHE_MOUNTPOINT="/var/storagebox"
-declare -r CACHE_ROOT_FOLDER="buildkite/${BUILDKITE_JOB_ID}"
+CLI_VERSION='1.0.0';
+CLI_NAME="$0";
+PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
+CACHE_MOUNTPOINT="/var/storagebox"
+CACHE_ROOT_FOLDER="buildkite/${BUILDKITE_JOB_ID}"
 
 ################################################################################
 # functions
