@@ -2,6 +2,7 @@
 
 
 # bash strict mode
+set -x
 set -T # inherit DEBUG and RETURN trap for functions
 set -C # prevent file overwrite by > &> <>
 set -E # inherit -e
@@ -245,7 +246,6 @@ function write(){
     if ! test -d "$__to"; then
         echo ".. Cache folder does not exist : '$__to'. Creating ";
         mkdir -p "$__to"
-        exit 1
     fi
 
     echo "..Copying $__from -> $__to"
