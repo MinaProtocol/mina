@@ -44,11 +44,7 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; actions = []
-          ; preconditions =
-              Some Account_update.Preconditions.accept
-              (* TODO this is a placeholder, if it works I need to refactor the test_spec to
-                 allow disabling only the permissions part of the preconditions *)
-              (* None *)
+          ; preconditions = None
           }
         in
         U.test_snapp_update ?expected_failure:failure_expected
