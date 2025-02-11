@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-+chmod -R +w ../../native_prover
+chmod -R +w ../../native_prover
 cd ../../native_prover
 
 
