@@ -2178,7 +2178,7 @@ module Queries = struct
               ~doc:"Token of account being retrieved (defaults to MINA)"
               ~typ:Types.Input.TokenId.arg_typ ~default:Token_id.default
           ]
-      ~resolve:(fun { ctx = mina; _ } () _pk _token ->
+      ~resolve:(fun { ctx = mina; _ } () pk token ->
         let best_chain = Mina_lib.best_chain mina in
         match best_chain with
         | Some best_chain ->
@@ -2196,13 +2196,19 @@ module Queries = struct
                     List.filter_map transactions ~f:(fun txn ->
                         let tx = txn.data in
                         match tx with
-                        | Command uc -> (
-                            let user_cmd = User_command.Signed_command uc in
+                        | Command user_cmd -> (
                             match user_cmd with
                             | Zkapp_command c ->
                                 let updates =
                                   c |> Zkapp_command.account_updates
                                   |> Zkapp_command.Call_forest.to_list
+                                  |> List.filter ~f:(fun au ->
+                                         let account_id =
+                                           Account_id.create au.body.public_key
+                                             token
+                                         in
+                                         Account_id.equal account_id
+                                           (Account_id.create pk token) )
                                 in
                                 let actions =
                                   List.concat_map
