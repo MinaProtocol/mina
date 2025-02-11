@@ -9,7 +9,7 @@
 
 ; Rule that calls build.sh to compile the Neon project and produce plonk.node
 (rule
- (targets plonk.node)
+ (targets plonk_native.node)
  (deps
    (source_tree ../../native_prover) 
    build.sh                          
