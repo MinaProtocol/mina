@@ -237,7 +237,7 @@ build_batch_txn_deb() {
 
 ##################################### GENERATE TEST SUITE PACKAGE #######################################
 build_functional_test_suite_deb() {
-  create_control_file mina-test-suite "${SHARED_DEPS}" 'Test suite apps for mina.'
+  create_control_file mina-test-suite "${SHARED_DEPS}, mina-berkeley-instrumented, mina-archive-instrumented" 'Test suite apps for mina.'
 
   # Binaries
   cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
@@ -247,6 +247,9 @@ build_functional_test_suite_deb() {
   cp ./default/src/app/heap_usage/heap_usage.exe "${BUILDDIR}/usr/local/bin/mina-heap-usage"
   cp ./default/src/app/zkapp_limits/zkapp_limits.exe "${BUILDDIR}/usr/local/bin/mina-zkapp-limits"
   cp ./default/src/test/archive/patch_archive_test/patch_archive_test.exe "${BUILDDIR}/usr/local/bin/mina-patch-archive-test"
+  
+  # Test files
+  cp -r ./default/src/test/archive/sample_db "${BUILDDIR}/etc/mina/test/archive/sample_db"
 
   build_deb mina-test-suite
 

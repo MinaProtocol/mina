@@ -8,27 +8,22 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let ReplayerTest = ../../Command/ReplayerTest.dhall
 
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
 let Profiles = ../../Constants/Profiles.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
-
-let Network = ../../Constants/Network.dhall
-
-let Artifacts = ../../Constants/Artifacts.dhall
-
 let dependsOn =
-      Dockers.dependsOn
-        Dockers.Type.Bullseye
-        (None Network.Type)
+      DebianVersions.dependsOn
+        DebianVersions.DebVersion.Bullseye
         Profiles.Type.Standard
-        Artifacts.Type.FunctionalTestSuite
 
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
-          , S.exactly "buildkite/scripts/replayer-test" "sh"
+          , S.exactly "scripts/tests/archive_replayer_test" "sh"
+          , S.exactly "buildkite/scripts/tests/archive_replayer_test" "sh"
           , S.exactly "buildkite/src/Jobs/Test/ReplayerTest" "dhall"
           , S.exactly "buildkite/src/Command/ReplayerTest" "dhall"
           ]
