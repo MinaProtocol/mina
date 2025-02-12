@@ -2,7 +2,7 @@
 
 function test_single_terraform_config {
 
-    cd $1
+    cd $1 || exit
 
     terraform init
     terraform plan -var="create_libp2p_files=true"
@@ -19,5 +19,5 @@ function test_single_terraform_config {
     cd ../
 }
 
-cd automation/terraform/testnets
+cd automation/terraform/testnets || exit
 test_single_terraform_config "ci-net"

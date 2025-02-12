@@ -111,7 +111,7 @@ do
 
   counter=$((counter+1))
   if [[ $((counter)) == $((tries)) ]]; then
-    echo "Error: Some Debians are still not correctly published : "$(join_by " " "${debs[@]}")
+    echo "Error: Some Debians are still not correctly published : ""$(join_by " " "${debs[@]}")"
     echo "You may still try to rerun job as debian repository is known from imperfect performance"
     exit 1
   fi 

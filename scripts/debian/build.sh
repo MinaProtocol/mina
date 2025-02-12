@@ -8,16 +8,17 @@ SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 
 # In case of running this script on detached head, script has difficulties in finding out
 # what is the current branch.
-if [[ -n "${BRANCH_NAME}" ]]; then
-  BRANCH_NAME="${BRANCH_NAME}" source "${SCRIPTPATH}"/../export-git-env-vars.sh
+if [[ -n "$BRANCH_NAME" ]]; then 
+  # shellcheck disable=SC1090
+  BRANCH_NAME="$BRANCH_NAME" source "${SCRIPTPATH}/../export-git-env-vars.sh"
 else
-  source "${SCRIPTPATH}"/../export-git-env-vars.sh
-fi
+# shellcheck disable=SC1090
+  source "${SCRIPTPATH}/../export-git-env-vars.sh"
+fi 
 
-echo "after export"
-
-source "${SCRIPTPATH}"/builder-helpers.sh
-
+# shellcheck disable=SC1090
+source "${SCRIPTPATH}/builder-helpers.sh"
+  
 if [ $# -eq 0 ]
   then
     echo "No arguments supplied. Building all known debian packages"

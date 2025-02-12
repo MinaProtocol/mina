@@ -76,6 +76,6 @@ else
     --new-suite $TO_COMPONENT \
     --new-name $NEW_NAME \
     --repo $REPO \
-    --new-repo $NEW_REPO
+    --new-repo $NEW_REPO \
     --sign $REPO_KEY
 fi
