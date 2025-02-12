@@ -48,7 +48,7 @@ Whenever a hard fork happens, the code in the corresponding release branch, e.g.
 - The intention is then to again have `compatible` as a next soft-fork branch.
   - The transition will be gradual: right after HF, `berkeley` will be copied into both `master` *and* `compatible`, and `develop` will remain as is for a while. PRs from `develop` will be gradually picked based on release scope and included in `compatible` for subsequent soft-fork releases.
   - The pre-Berkeley `compatible` is entirely discarded. The pre-Berkeley branch `berkeley` is completely removed from both `mina` and `proof-systems`.
-- `release/1.X.X` branches are made off of `compatible` and tagged with alpha and beta tags until the code is deemed stable, then the `release/1.X.X` branch is merged into `master` and given a stable tag. Whenever code is tagged, if anything is missing in in the downstream branches (compatible, develop) then the tagged branch is also merged back for consistency.
+- `release/1.X.X` branches are made off of `compatible` and tagged with alpha and beta tags until the code is deemed stable, then the `release/1.X.X` branch is merged into `master` and given a stable tag. Whenever code is tagged, if anything is missing in the downstream branches (compatible, develop) then the tagged branch is also merged back for consistency.
 
 ## Day to day: which branch should I use?
 
