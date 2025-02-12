@@ -178,7 +178,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
             ~metadata:[ ("reason", `String "Already_in_frontier") ] ;
           [%log warn] ~metadata
             "Refusing to process the transition with hash $state_hash because \
-             is is already in the transition frontier" ;
+             it is already in the transition frontier" ;
           return () )
   | `Block cached_initially_validated_transition ->
       Deferred.ignore_m
