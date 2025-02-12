@@ -57,7 +57,7 @@ let ReleaseSpec =
           , deb_version = "\\\${MINA_DEB_VERSION}"
           , deb_profile = Profiles.Type.Standard
           , build_flags = BuildFlags.Type.None
-          , docker_publish = DockerPublish.Type.Disabled
+          , docker_publish = DockerPublish.Type.Essential
           , deb_repo = DebianRepo.Type.PackagesO1Test
           , no_cache = False
           , step_key_suffix = "-docker-image"
@@ -122,7 +122,8 @@ let generateStep =
                       ++  " --deb-build-flags ${BuildFlags.lowerName
                                                   spec.build_flags}"
 
-                else  " echo skipping publishing docker as this is not essential one. This is to ensure storage optimization"
+                else  " echo skipping publishing docker as this is not essential one or publishing is disabled (Docker publish setting is ${DockerPublish.show
+                                                                                                                                              spec.docker_publish}). This is to ensure storage optimization"
 
           let remoteRepoCmds =
                 [ Cmd.run
