@@ -35,8 +35,8 @@ export ERROR_ON_PROOF=true
 # skip running all of the tests that have already succeeded, since dune will
 # only retry those tests that failed.
 echo "--- Run unit tests"
-time dune runtest "${path}" --profile="${profile}" || \
+time dune runtest -j 1 "${path}" --profile="${profile}" || \
 (./scripts/link-coredumps.sh && \
  echo "--- Retrying failed unit tests" && \
- time dune runtest "${path}" --profile="${profile}" || \
+ time dune runtest -j 1 "${path}" --profile="${profile}" || \
  (./scripts/link-coredumps.sh && false))
