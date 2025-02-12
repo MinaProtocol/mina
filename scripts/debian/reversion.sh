@@ -3,7 +3,6 @@ set -eox pipefail
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
-BUCKET=packages.o1test.net
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -d|--deb) DEB="$2"; shift;;
@@ -52,7 +51,7 @@ if [[ -z "$RELEASE" ]]; then NEW_RELEASE=$RELEASE; fi;
 if [[ -z "$VERSION" ]]; then NEW_VERSION=$VERSION; fi;
 if [[ -z "$SUITE" ]]; then NEW_SUITE=$SUITE; fi;
 if [[ -z "$REPO" ]]; then echo "No repository specified"; echo ""; usage "$0" "$1" ; fi
-if [[ -z "$SIGN" ]]; then 
+if [ -z "${SIGN:-}" ]; then 
   SIGN_ARG=""
 else 
   SIGN_ARG="--sign $SIGN"
@@ -62,7 +61,7 @@ function rebuild_deb() {
   rm -f "${DEB}_${VERSION}.deb"
   rm -rf "${NEW_NAME}_${NEW_VERSION}"
     
-  wget https://s3.us-west-2.amazonaws.com/${BUCKET}/pool/${CODENAME}/m/mi/${DEB}_${VERSION}.deb
+  wget https://s3.us-west-2.amazonaws.com/${REPO}/pool/${CODENAME}/m/mi/${DEB}_${VERSION}.deb
   dpkg-deb -R "${DEB}_${VERSION}.deb" "${NEW_NAME}_${NEW_VERSION}"
   sed -i 's/Version: '"${VERSION}"'/Version: '"${NEW_VERSION}"'/g' "${NEW_NAME}_${NEW_VERSION}/DEBIAN/control"
   sed -i 's/Package: '"${DEB}"'/Package: '"${NEW_NAME}"'/g' "${NEW_NAME}_${NEW_VERSION}/DEBIAN/control"
