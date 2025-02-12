@@ -8,6 +8,7 @@ BUCKET=packages.o1test.net
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -c|--channel) CHANNEL="$2"; shift;;
+  -r|--repo) BUCKET="$2"; shift;;
   -v|--version) VERSION="$2"; shift;;
   -p|--package) PACKAGE="$2"; shift;;
   -m|--codename) CODENAME="$2"; shift;;

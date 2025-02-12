@@ -14,6 +14,8 @@ let Network = ../Constants/Network.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
 
+let DebianRepo = ../Constants/DebianRepo.dhall
+
 let Pipeline = ../Pipeline/Dsl.dhall
 
 let PipelineMode = ../Pipeline/Mode.dhall
@@ -29,6 +31,8 @@ let promote_artifacts =
       ->  \(codenames : List DebianVersions.DebVersion)
       ->  \(from_channel : DebianChannel.Type)
       ->  \(to_channel : DebianChannel.Type)
+      ->  \(from_repo : DebianRepo.Type)
+      ->  \(to_repo : DebianRepo.Type)
       ->  \(tag : Text)
       ->  \(remove_profile_from_name : Bool)
       ->  \(publish : Bool)
@@ -39,6 +43,8 @@ let promote_artifacts =
                 , version = version
                 , architecture = architecture
                 , new_debian_version = new_version
+                , source_debian_repo = from_repo
+                , target_debian_repo = to_repo
                 , profile = profile
                 , network = network
                 , codenames = codenames

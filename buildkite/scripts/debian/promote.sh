@@ -48,7 +48,13 @@ if [[ -z "$FROM_COMPONENT" ]]; then usage "Source component is not set!"; fi;
 if [[ -z "$TO_COMPONENT" ]]; then usage "Target component is not set!"; fi;
 if [[ -z "$REPO" ]]; then usage "Repository is not set!"; fi;
 if [[ -z "$NEW_REPO" ]]; then NEW_REPO=$REPO; fi;
-if [[ -z "$REPO_KEY" ]]; then usage "Target repository key is not set!"; fi;
+if [ -z "${REPO_KEY:-}" ]; then
+  SIGN_ARG=""
+else
+  sudo chown -R opam ~/.gnupg/
+  gpg --batch --yes --import /var/secrets/debian/key.gpg
+  SIGN_ARG="--sign $REPO_KEY"
+fi
 
 # check for AWS Creds
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
@@ -76,6 +82,6 @@ else
     --new-suite $TO_COMPONENT \
     --new-name $NEW_NAME \
     --repo $REPO \
-    --new-repo $NEW_REPO
-    --sign $REPO_KEY
+    --new-repo $NEW_REPO \
+    $SIGN_ARG
 fi
