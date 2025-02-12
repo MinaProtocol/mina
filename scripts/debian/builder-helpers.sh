@@ -249,7 +249,7 @@ build_functional_test_suite_deb() {
   cp ./default/src/test/archive/patch_archive_test/patch_archive_test.exe "${BUILDDIR}/usr/local/bin/mina-patch-archive-test"
   
   # Test files
-  cp -r ./default/src/test/archive/sample_db "${BUILDDIR}/etc/mina/test/archive/sample_db"
+  cp -r ../src/test/archive/sample_db "${BUILDDIR}/etc/mina/test/archive/sample_db"
 
   build_deb mina-test-suite
 
