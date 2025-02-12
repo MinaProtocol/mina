@@ -7,7 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version js_of_ocaml-ppx)))
 
-; Rule that calls build.sh to compile the Neon project and produce plonk.node
+; Rule that calls build.sh to compile the Neon project and produce plonk_native.node
 (rule
  (targets plonk_native.node)
  (deps
