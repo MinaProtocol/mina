@@ -151,12 +151,7 @@ let docker_step
                   spec.buildFlags
                   step_dep_name
 
-          let docker_publish =
-                      if PipelineMode.isStable spec.mode
-
-                then  DockerPublish.Type.Essential
-
-                else  DockerPublish.Type.Disabled
+          let docker_publish = DockerPublish.Type.Essential
 
           in  merge
                 { Daemon =
