@@ -63,6 +63,10 @@ mina ${INPUT_ARGS} ${EXTRA_FLAGS} ${APPENDED_FLAGS} 2>mina-stderr.log
 export MINA_EXIT_CODE="$?"
 echo "Mina process exited with status code ${MINA_EXIT_CODE}"
 
+if [ "$MINA_EXIT_CODE" != 0 ];then
+  tail mina-stderr.log
+fi
+
 # Don't export variables to exitpoint scripts
 export -n MINA_PRIVKEY_PASS MINA_LIBP2P_PASS UPTIME_PRIVKEY_PASS
 
