@@ -9,7 +9,7 @@ use mina_poseidon::{
 };
 use paste::paste;
 use poly_commitment::commitment::{shift_scalar, PolyComm};
-use poly_commitment::evaluation_proof::OpeningProof;
+use poly_commitment::ipa::OpeningProof;
 use poly_commitment::SRS;
 use wasm_bindgen::prelude::*;
 // use wasm_bindgen::convert::{IntoWasmAbi, FromWasmAbi};
