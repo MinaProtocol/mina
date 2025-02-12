@@ -80,6 +80,7 @@ let verify_artifacts =
       ->  \(network : Network.Type)
       ->  \(codenames : List DebianVersions.DebVersion)
       ->  \(to_channel : DebianChannel.Type)
+      ->  \(repo : DebianRepo.Type)
       ->  \(tag : Text)
       ->  \(remove_profile_from_name : Bool)
       ->  \(publish : Bool)
@@ -89,6 +90,7 @@ let verify_artifacts =
                 , debians = debians
                 , dockers = dockers
                 , new_debian_version = new_version
+                , debian_repo = repo
                 , profile = profile
                 , network = network
                 , codenames = codenames

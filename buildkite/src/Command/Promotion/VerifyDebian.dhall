@@ -33,9 +33,9 @@ let promoteDebianVerificationStep =
                 , commands =
                   [ Cmd.run
                       "source buildkite/scripts/export-git-env-vars.sh && ./scripts/debian/verify.sh --repo ${DebianRepo.bucket_or_default
-                                                                                                                spec.target_repo}--package ${name} --version ${spec.new_version} --codename ${DebianVersions.lowerName
-                                                                                                                                                                                                spec.codename}  --channel ${DebianChannel.lowerName
-                                                                                                                                                                                                                              spec.to_channel}"
+                                                                                                                spec.target_repo} --package ${name} --version ${spec.new_version} --codename ${DebianVersions.lowerName
+                                                                                                                                                                                                 spec.codename}  --channel ${DebianChannel.lowerName
+                                                                                                                                                                                                                               spec.to_channel}"
                   ]
                 , label = "Debian: ${spec.step_key}"
                 , key = spec.step_key
