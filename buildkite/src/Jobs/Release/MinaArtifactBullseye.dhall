@@ -17,6 +17,7 @@ in  Pipeline.build
             , Artifacts.Type.TestExecutive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
+            , Artifacts.Type.FunctionalTestSuite
             ]
           , tags =
             [ PipelineTag.Type.Long
