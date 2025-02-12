@@ -144,6 +144,7 @@ let
       mv _build/default/src/test/command_line_tests/command_line_tests.exe tests.exe
       chmod +x tests.exe
       export TMPDIR=tmp # to align with janestreet core library
+      export HOME=tmp # some commands rely on home directory
       mkdir -p $TMPDIR
       export MINA_LIBP2P_PASS="naughty blue worm"
       export MINA_PRIVKEY_PASS="naughty blue worm"
