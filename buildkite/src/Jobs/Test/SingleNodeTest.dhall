@@ -12,6 +12,8 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
 let Profiles = ../../Constants/Profiles.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
@@ -22,9 +24,12 @@ let dependsOn =
         DebianVersions.dependsOn
           DebianVersions.DebVersion.Bullseye
           Profiles.Type.Lightnet
-      # DebianVersions.dependsOn
+      # DebianVersions.dependsOnStep
+          (None Text)
           DebianVersions.DebVersion.Bullseye
           Profiles.Type.Standard
+          BuildFlags.Type.Instrumented
+          "build"
 
 let buildTestCmd
     : Size -> Command.Type
