@@ -1080,8 +1080,39 @@ struct
         | _ ->
             ()
 
+      let load_vk_cache ~t ~ledger account_ids =
+        let account_ids = Set.to_list account_ids in
+        let ledger_vks =
+          Zkapp_command.Verifiable.load_vks_from_ledger
+            ~location_of_account_batch:
+              (Base_ledger.location_of_account_batch ledger)
+            ~get_batch:(Base_ledger.get_batch ledger)
+            account_ids
+        in
+        let ledger_vks =
+          Map.map ledger_vks ~f:(fun vk ->
+              Zkapp_basic.F_map.Map.singleton vk.hash vk )
+        in
+        let mempool_vks =
+          List.map account_ids ~f:(fun account_id ->
+              let vks =
+                Vk_refcount_table.find_vks_by_account_id
+                  t.verification_key_table account_id
+              in
+              let vks =
+                vks
+                |> List.map ~f:(fun vk -> (vk.hash, vk))
+                |> Zkapp_basic.F_map.Map.of_alist_exn
+              in
+              (account_id, vks) )
+          |> Account_id.Map.of_alist_exn
+        in
+        Map.merge_skewed ledger_vks mempool_vks ~combine:(fun ~key:_ ->
+            Map.merge_skewed ~combine:(fun ~key:_ _ x -> x) )
+
       (** DO NOT mutate any transaction pool state in this function, you may only mutate in the synchronous `apply` function. *)
-      let verify (t : pool) (diff : t Envelope.Incoming.t) :
+      let verify (t : pool)
+          Envelope.Incoming.{ data = diff; sender; received_at } :
           ( verified Envelope.Incoming.t
           , Intf.Verification_error.t )
           Deferred.Result.t =
@@ -1089,8 +1120,7 @@ struct
         let open Intf.Verification_error in
         let%bind () =
           let well_formedness_errors =
-            List.fold (Envelope.Incoming.data diff) ~init:[]
-              ~f:(fun acc user_cmd ->
+            List.fold diff ~init:[] ~f:(fun acc user_cmd ->
                 match
                   User_command.check_well_formedness
                     ~genesis_constants:t.config.genesis_constants user_cmd
@@ -1103,9 +1133,7 @@ struct
                        well-formedness errors."
                       ~metadata:
                         [ ("cmd", User_command.to_yojson user_cmd)
-                        ; ( "sender"
-                          , Envelope.(Sender.to_yojson (Incoming.sender diff))
-                          )
+                        ; ("sender", Envelope.(Sender.to_yojson sender))
                         ; ( "errors"
                           , `List
                               (List.map errs
@@ -1146,45 +1174,15 @@ struct
 
         let%bind diff' =
           O1trace.sync_thread "convert_transactions_to_verifiable" (fun () ->
-              Envelope.Incoming.map diff ~f:(fun diff ->
-                  User_command.Unapplied_sequence.to_all_verifiable diff
-                    ~load_vk_cache:(fun account_ids ->
-                      let account_ids = Set.to_list account_ids in
-                      let ledger_vks =
-                        Zkapp_command.Verifiable.load_vks_from_ledger
-                          ~location_of_account_batch:
-                            (Base_ledger.location_of_account_batch ledger)
-                          ~get_batch:(Base_ledger.get_batch ledger)
-                          account_ids
-                      in
-                      let ledger_vks =
-                        Map.map ledger_vks ~f:(fun vk ->
-                            Zkapp_basic.F_map.Map.singleton vk.hash vk )
-                      in
-                      let mempool_vks =
-                        List.map account_ids ~f:(fun account_id ->
-                            let vks =
-                              Vk_refcount_table.find_vks_by_account_id
-                                t.verification_key_table account_id
-                            in
-                            let vks =
-                              vks
-                              |> List.map ~f:(fun vk -> (vk.hash, vk))
-                              |> Zkapp_basic.F_map.Map.of_alist_exn
-                            in
-                            (account_id, vks) )
-                        |> Account_id.Map.of_alist_exn
-                      in
-                      Map.merge_skewed ledger_vks mempool_vks
-                        ~combine:(fun ~key:_ ->
-                          Map.merge_skewed ~combine:(fun ~key:_ _ x -> x) ) ) ) )
-          |> Envelope.Incoming.lift_error
+              User_command.Unapplied_sequence.to_all_verifiable diff
+                ~load_vk_cache:(load_vk_cache ~t ~ledger) )
           |> Result.map_error ~f:(fun e -> Invalid e)
           |> Deferred.return
         in
         match%bind.Deferred
           O1trace.thread "batching_transaction_verification" (fun () ->
-              Batcher.verify t.batcher diff' )
+              Batcher.verify t.batcher
+                { Envelope.Incoming.received_at; sender; data = diff' } )
         with
         | Error e ->
             [%log' error t.logger] "Transaction verification error: $error"
@@ -1192,9 +1190,7 @@ struct
             [%log' debug t.logger]
               "Failed to batch verify $transaction_pool_diff"
               ~metadata:
-                [ ( "transaction_pool_diff"
-                  , Diff_versioned.to_yojson (Envelope.Incoming.data diff) )
-                ] ;
+                [ ("transaction_pool_diff", Diff_versioned.to_yojson diff) ] ;
             Deferred.Result.fail (Failure e)
         | Ok (Error invalid) ->
             let err = Verifier.invalid_to_error invalid in
@@ -1203,7 +1199,7 @@ struct
               ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
             let%map.Deferred () =
               Trust_system.record_envelope_sender t.config.trust_system t.logger
-                (Envelope.Incoming.sender diff)
+                sender
                 ( Trust_system.Actions.Sent_useless_gossip
                 , Some
                     ( "rejecting command because had invalid signature or proof"
@@ -1215,8 +1211,9 @@ struct
             O1trace.sync_thread "hashing_transactions_after_verification"
               (fun () ->
                 return
-                  { diff with
-                    data =
+                  { Envelope.Incoming.received_at
+                  ; sender
+                  ; data =
                       List.map commands
                         ~f:
                           Transaction_hash.User_command_with_valid_signature
@@ -1562,37 +1559,34 @@ struct
           | `Ok ->
               true ) ;
       (* Important to maintain ordering here *)
-      let rebroadcastable_txs =
-        Hashtbl.to_alist t.locally_generated_uncommitted
-        |> List.sort
-             ~compare:(fun (txn1, (_, `Batch batch1)) (txn2, (_, `Batch batch2))
-                      ->
-               let cmp = compare batch1 batch2 in
-               let get_hash =
-                 Transaction_hash.User_command_with_valid_signature.hash
-               in
-               let get_nonce txn =
-                 Transaction_hash.User_command_with_valid_signature.command txn
-                 |> User_command.applicable_at_nonce
+      Hashtbl.to_alist t.locally_generated_uncommitted
+      |> List.sort
+           ~compare:(fun (txn1, (_, `Batch batch1)) (txn2, (_, `Batch batch2))
+                    ->
+             let cmp = compare batch1 batch2 in
+             let get_hash =
+               Transaction_hash.User_command_with_valid_signature.hash
+             in
+             let get_nonce txn =
+               Transaction_hash.User_command_with_valid_signature.command txn
+               |> User_command.applicable_at_nonce
+             in
+             if cmp <> 0 then cmp
+             else
+               let cmp =
+                 Mina_numbers.Account_nonce.compare (get_nonce txn1)
+                   (get_nonce txn2)
                in
                if cmp <> 0 then cmp
-               else
-                 let cmp =
-                   Mina_numbers.Account_nonce.compare (get_nonce txn1)
-                     (get_nonce txn2)
-                 in
-                 if cmp <> 0 then cmp
-                 else Transaction_hash.compare (get_hash txn1) (get_hash txn2) )
-        |> List.group
-             ~break:(fun (_, (_, `Batch batch1)) (_, (_, `Batch batch2)) ->
-               batch1 <> batch2 )
-        |> List.map
-             ~f:
-               (List.map ~f:(fun (txn, _) ->
-                    Transaction_hash.User_command_with_valid_signature.command
-                      txn ) )
-      in
-      rebroadcastable_txs
+               else Transaction_hash.compare (get_hash txn1) (get_hash txn2) )
+      |> List.group
+           ~break:(fun (_, (_, `Batch batch1)) (_, (_, `Batch batch2)) ->
+             batch1 <> batch2 )
+      |> List.map
+           ~f:
+             (List.map ~f:(fun (txn, _) ->
+                  Transaction_hash.User_command_with_valid_signature.command txn )
+             )
   end
 
   include Network_pool_base.Make (Transition_frontier) (Resource_pool)
@@ -3406,7 +3400,7 @@ let%test_module _ =
               ~receiver_idx ~amount ()
     end
 
-    (** appends a and b to the end of c, taking an element of a or b at random, 
+    (** appends a and b to the end of c, taking an element of a or b at random,
        continuing until both a and b run out of elements
     *)
     let rec gen_merge (a : 'a list) (b : 'a list) (c : 'a list) =
