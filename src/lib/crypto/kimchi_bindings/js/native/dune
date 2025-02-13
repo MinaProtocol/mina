@@ -16,3 +16,11 @@
  )
  (action
   (run bash build.sh)))
+
+; Rule to create a plonk_native.cjs that imports and exports the .node file
+(rule
+ (targets plonk_native.cjs)
+ (deps plonk_native.node)
+ (action
+  (write-file plonk_native.cjs
+   "const plonk_native = require('./plonk_native.node');\nmodule.exports = plonk_native;\n")))  
