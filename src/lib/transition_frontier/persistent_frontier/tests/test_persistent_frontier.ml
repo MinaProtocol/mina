@@ -1,4 +1,5 @@
 open Async_kernel
+open Core_kernel
 open Persistent_frontier
 
 (* NOTE:
