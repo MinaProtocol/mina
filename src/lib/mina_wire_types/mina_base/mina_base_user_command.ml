@@ -13,7 +13,7 @@ module Valid = struct
   module V2 = struct
     type t =
       ( Mina_base_signed_command.With_valid_signature.V2.t
-      , Mina_base_zkapp_command.Valid.V1.t )
+      , Mina_base_zkapp_command.Valid.V2.t )
       Poly.V2.t
   end
 end

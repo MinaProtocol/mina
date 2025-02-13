@@ -1,5 +1,5 @@
 module Diff_versioned = struct
-  module V2 = struct
+  module V3 = struct
     type t =
       | Add_solved_work of
           Transaction_snark_work.Statement.V2.t

@@ -22,7 +22,7 @@ module Authorization_kind = struct
     module V1 = struct
       (* TODO: yojson for Field.t in snarky (#12591) *)
       type t =
-            Mina_wire_types.Mina_base.Account_update.Authorization_kind.V1.t =
+            Mina_wire_types.Mina_base.Account_update.Authorization_kind.V2.t =
         | Signature
         | Proof of (Field.t[@version_asserted])
         | None_given
@@ -936,7 +936,7 @@ module Account_precondition = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Zkapp_precondition.Account.Stable.V2.t
+      type t = Zkapp_precondition.Account.Stable.V3.t
       [@@deriving sexp, yojson, hash]
 
       let (_ :
@@ -1220,7 +1220,7 @@ module Body = struct
   module Simple = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
           ; token_id : Token_id.Stable.V2.t
@@ -1247,8 +1247,8 @@ module Body = struct
 
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Mina_wire_types.Mina_base.Account_update.Body.V1.t =
+    module V2 = struct
+      type t = Mina_wire_types.Mina_base.Account_update.Body.V2.t =
         { public_key : Public_key.Compressed.Stable.V1.t
         ; token_id : Token_id.Stable.V2.t
         ; update : Update.Stable.V1.t
@@ -1698,7 +1698,7 @@ module T = struct
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V3 = struct
         (** An account update in a zkApp transaction *)
         type t =
           { body : Body.Graphql_repr.Stable.V1.t
@@ -1722,9 +1722,9 @@ module T = struct
   module Simple = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
-          { body : Body.Simple.Stable.V1.t
+          { body : Body.Simple.Stable.V2.t
           ; authorization : Control.Stable.V2.t
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
@@ -1736,10 +1736,10 @@ module T = struct
 
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       (** A account_update to a zkApp transaction *)
-      type t = Mina_wire_types.Mina_base.Account_update.V1.t =
-        { body : Body.Stable.V1.t; authorization : Control.Stable.V2.t }
+      type t = Mina_wire_types.Mina_base.Account_update.V2.t =
+        { body : Body.Stable.V2.t; authorization : Control.Stable.V2.t }
       [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
       let to_latest = Fn.id

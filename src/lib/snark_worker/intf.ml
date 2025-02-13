@@ -112,7 +112,7 @@ module type Rpcs_versioned_S = sig
   end
 
   module Failed_to_generate_snark : sig
-    module V2 : sig
+    module V3 : sig
       type query = Error.t * Work.Spec.t * Signature_lib.Public_key.Compressed.t
       [@@deriving bin_io]
 
@@ -121,7 +121,7 @@ module type Rpcs_versioned_S = sig
       val rpc : (query, response) Rpc.Rpc.t
     end
 
-    module Latest = V2
+    module Latest = V3
   end
 end
 

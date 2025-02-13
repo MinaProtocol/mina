@@ -27,7 +27,7 @@ module Worker = struct
           type query = unit
 
           type response =
-            ( ( Transaction_witness.Stable.V2.t
+            ( ( Transaction_witness.Stable.V3.t
               , Inputs.Ledger_proof.Stable.V2.t )
               Snark_work_lib.Work.Single.Spec.Stable.V2.t
               Snark_work_lib.Work.Spec.Stable.V1.t
@@ -57,7 +57,7 @@ module Worker = struct
       module V2 = struct
         module T = struct
           type query =
-            ( ( Transaction_witness.Stable.V2.t
+            ( ( Transaction_witness.Stable.V3.t
               , Ledger_proof.Stable.V2.t )
               Snark_work_lib.Work.Single.Spec.Stable.V2.t
               Snark_work_lib.Work.Spec.Stable.V1.t
@@ -84,11 +84,11 @@ module Worker = struct
 
     [%%versioned_rpc
     module Failed_to_generate_snark = struct
-      module V2 = struct
+      module V3 = struct
         module T = struct
           type query =
             Bounded_types.Wrapped_error.Stable.V1.t
-            * ( Transaction_witness.Stable.V2.t
+            * ( Transaction_witness.Stable.V3.t
               , Inputs.Ledger_proof.Stable.V2.t )
               Snark_work_lib.Work.Single.Spec.Stable.V2.t
               Snark_work_lib.Work.Spec.Stable.V1.t
@@ -109,7 +109,7 @@ module Worker = struct
         include Rpcs.Failed_to_generate_snark.Register (T)
       end
 
-      module Latest = V2
+      module Latest = V3
     end]
   end
 

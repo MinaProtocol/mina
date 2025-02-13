@@ -38,11 +38,11 @@ module Info : sig
   [@@deriving to_yojson, sexp, compare]
 
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type t [@@deriving compare, to_yojson, version, sexp, bin_io]
     end
   end
-  with type V2.t = t
+  with type V3.t = t
 end
 
 (* TODO: The SOK message actually should bind the SNARK to

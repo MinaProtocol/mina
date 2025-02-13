@@ -10,9 +10,9 @@ module Single = struct
 
       module V2 = struct
         type ('witness, 'ledger_proof) t =
-          | Transition of Transaction_snark.Statement.Stable.V2.t * 'witness
+          | Transition of Transaction_snark.Statement.Stable.V3.t * 'witness
           | Merge of
-              Transaction_snark.Statement.Stable.V2.t
+              Transaction_snark.Statement.Stable.V3.t
               * 'ledger_proof
               * 'ledger_proof
         [@@deriving sexp, to_yojson]

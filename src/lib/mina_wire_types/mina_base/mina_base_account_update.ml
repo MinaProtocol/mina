@@ -1,5 +1,5 @@
 module Authorization_kind = struct
-  module V1 = struct
+  module V2 = struct
     (* field for Proof is a verification key hash *)
     type t = Signature | Proof of Snark_params.Tick.Field.t | None_given
   end
@@ -49,7 +49,7 @@ end
 
 module Account_precondition = struct
   module V1 = struct
-    type t = Mina_base_zkapp_precondition.Account.V2.t
+    type t = Mina_base_zkapp_precondition.Account.V3.t
   end
 end
 
@@ -87,7 +87,7 @@ module Body = struct
     end
   end
 
-  module V1 = struct
+  module V2 = struct
     type t =
       { public_key : Public_key.Compressed.V1.t
       ; token_id : Mina_base_token_id.V2.t
@@ -102,7 +102,7 @@ module Body = struct
       ; use_full_commitment : bool
       ; implicit_account_creation_fee : bool
       ; may_use_token : May_use_token.V1.t
-      ; authorization_kind : Authorization_kind.V1.t
+      ; authorization_kind : Authorization_kind.V2.t
       }
   end
 end
@@ -114,6 +114,6 @@ module Fee_payer = struct
   end
 end
 
-module V1 = struct
-  type t = { body : Body.V1.t; authorization : Mina_base_control.V2.t }
+module V2 = struct
+  type t = { body : Body.V2.t; authorization : Mina_base_control.V2.t }
 end

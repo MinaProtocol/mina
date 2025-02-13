@@ -103,7 +103,7 @@ module Permissions = struct
 end
 
 module Account = struct
-  module V2 = struct
+  module V3 = struct
     type t =
       { balance : Currency.Balance.V1.t Numeric.V1.t
       ; nonce : Mina_numbers.Account_nonce.V1.t Numeric.V1.t

@@ -50,7 +50,7 @@ end
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
+  module V3 = struct
     type t =
       { transaction : Mina_transaction.Transaction.Stable.V2.t
       ; first_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t

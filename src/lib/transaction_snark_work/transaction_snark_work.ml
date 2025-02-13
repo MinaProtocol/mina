@@ -6,8 +6,8 @@ module Statement = struct
   module Arg = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
+      module V3 = struct
+        type t = Transaction_snark.Statement.Stable.V3.t One_or_two.Stable.V1.t
         [@@deriving hash, sexp, compare]
 
         let to_latest = Fn.id
@@ -20,15 +20,15 @@ module Statement = struct
     [@@@no_toplevel_latest_type]
 
     module V2 = struct
-      type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
+      type t = Transaction_snark.Statement.Stable.V3.t One_or_two.Stable.V1.t
       [@@deriving equal, compare, hash, sexp, yojson]
 
       let to_latest = Fn.id
 
-      let (_ : (t, Arg.Stable.V2.t) Type_equal.t) = Type_equal.T
+      let (_ : (t, Arg.Stable.V3.t) Type_equal.t) = Type_equal.T
 
-      include Comparable.Make_binable (Arg.Stable.V2)
-      include Hashable.Make_binable (Arg.Stable.V2)
+      include Comparable.Make_binable (Arg.Stable.V3)
+      include Hashable.Make_binable (Arg.Stable.V3)
     end
   end]
 
@@ -52,7 +52,7 @@ module Info = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type t =
         { statements : Statement.Stable.V2.t
         ; work_ids : int One_or_two.Stable.V1.t

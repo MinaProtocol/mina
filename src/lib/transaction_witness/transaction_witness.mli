@@ -47,7 +47,7 @@ end
 
 [%%versioned:
 module Stable : sig
-  module V2 : sig
+  module V3 : sig
     type t =
       { transaction : Mina_transaction.Transaction.Stable.V2.t
       ; first_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t

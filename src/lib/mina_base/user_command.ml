@@ -306,7 +306,7 @@ module Valid = struct
     module V2 = struct
       type t =
         ( Signed_command.With_valid_signature.Stable.V2.t
-        , Zkapp_command.Valid.Stable.V1.t )
+        , Zkapp_command.Valid.Stable.V2.t )
         Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
 

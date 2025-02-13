@@ -83,7 +83,7 @@ module Root_transition = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V4 = struct
+      module V5 = struct
         type t =
           { new_root : Root_data.Limited.Stable.V3.t
           ; garbage : Node_list.Lite.Stable.V1.t
@@ -102,7 +102,7 @@ module Root_transition = struct
         [@@@no_toplevel_latest_type]
 
         module V4 = struct
-          type t = Lite_binable.Stable.V4.t
+          type t = Lite_binable.Stable.V5.t
 
           let to_latest = Fn.id
         end
@@ -111,7 +111,7 @@ module Root_transition = struct
 
     [%%versioned_binable
     module Stable = struct
-      module V4 = struct
+      module V5 = struct
         type t = lite root_transition
 
         module T_nonbinable = struct

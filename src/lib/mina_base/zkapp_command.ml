@@ -4,10 +4,10 @@ open Signature_lib
 module Graphql_repr = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
-        ; account_updates : Account_update.Graphql_repr.Stable.V1.t list
+        ; account_updates : Account_update.Graphql_repr.Stable.V3.t list
         ; memo : Signed_command_memo.Stable.V1.t
         }
       [@@deriving sexp, compare, equal, hash, yojson]
@@ -21,10 +21,10 @@ module Simple = struct
   (* For easily constructing values *)
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
-        ; account_updates : Account_update.Simple.Stable.V1.t list
+        ; account_updates : Account_update.Simple.Stable.V2.t list
         ; memo : Signed_command_memo.Stable.V1.t
         }
       [@@deriving sexp, compare, equal, hash, yojson]
@@ -55,7 +55,7 @@ module T = struct
       type t = Mina_wire_types.Mina_base.Zkapp_command.V1.t =
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
         ; account_updates :
-            ( Account_update.Stable.V1.t
+            ( Account_update.Stable.V2.t
             , Digest.Account_update.Stable.V1.t
             , Digest.Forest.Stable.V1.t )
             Call_forest.Stable.V1.t
@@ -72,7 +72,7 @@ module T = struct
             type t =
               { fee_payer : Account_update.Fee_payer.Stable.V1.t
               ; account_updates :
-                  ( Account_update.Stable.V1.t
+                  ( Account_update.Stable.V2.t
                   , unit
                   , unit )
                   Call_forest.Stable.V1.t
@@ -824,7 +824,7 @@ let weight (zkapp_command : t) : int =
 module type Valid_intf = sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t = private { zkapp_command : T.Stable.V1.t }
       [@@deriving sexp, compare, equal, hash, yojson]
     end
@@ -849,7 +849,7 @@ end
 
 module Valid :
   Valid_intf
-    with type Stable.V1.t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V1.t =
+    with type Stable.V2.t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V2.t =
 struct
   module S = Stable
 
@@ -867,8 +867,8 @@ struct
 
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V1.t =
+    module V2 = struct
+      type t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V2.t =
         { zkapp_command : S.V1.t }
       [@@deriving sexp, compare, equal, hash, yojson]
 

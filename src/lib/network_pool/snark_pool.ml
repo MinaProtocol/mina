@@ -538,7 +538,7 @@ module Diff_versioned = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type t = Resource_pool.Diff.t =
         | Add_solved_work of
             Transaction_snark_work.Statement.Stable.V2.t

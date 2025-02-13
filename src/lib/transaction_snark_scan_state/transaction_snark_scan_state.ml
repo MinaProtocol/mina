@@ -41,7 +41,7 @@ module Transaction_with_witness = struct
         { transaction_with_info :
             Mina_transaction_logic.Transaction_applied.Stable.V2.t
         ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
-        ; statement : Transaction_snark.Statement.Stable.V2.t
+        ; statement : Transaction_snark.Statement.Stable.V3.t
         ; init_stack :
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t

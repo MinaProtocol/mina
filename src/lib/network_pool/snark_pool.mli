@@ -80,7 +80,7 @@ include S with type transition_frontier := Transition_frontier.t
 module Diff_versioned : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type t = Resource_pool.Diff.t =
         | Add_solved_work of
             Transaction_snark_work.Statement.Stable.V2.t

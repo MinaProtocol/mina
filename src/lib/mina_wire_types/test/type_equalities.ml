@@ -29,6 +29,8 @@ module Assert_equal0V1 (O : V1S0) (W : V1S0 with type V1.t = O.V1.t) = struct en
 
 module Assert_equal0V2 (O : V2S0) (W : V2S0 with type V2.t = O.V2.t) = struct end
 
+module Assert_equal0V3 (O : V3S0) (W : V3S0 with type V3.t = O.V3.t) = struct end
+
 module Assert_equal1V1 (O : V1S1) (W : V1S1 with type 'a V1.t = 'a O.V1.t) =
 struct end
 
@@ -220,7 +222,7 @@ module Mina_base = struct
       (O.Zkapp_precondition.Protocol_state.Stable)
       (W.Zkapp_precondition.Protocol_state)
   include
-    Assert_equal0V2
+    Assert_equal0V3
       (O.Zkapp_precondition.Account.Stable)
       (W.Zkapp_precondition.Account)
   include
@@ -231,7 +233,7 @@ module Mina_base = struct
     Assert_equal0V1
       (O.Account_update.Preconditions.Stable)
       (W.Account_update.Preconditions)
-  include Assert_equal0V1 (O.Account_update.Body.Stable) (W.Account_update.Body)
+  include Assert_equal0V2 (O.Account_update.Body.Stable) (W.Account_update.Body)
   include Assert_equal0V2 (O.Fee_transfer.Single.Stable) (W.Fee_transfer.Single)
   include Assert_equal0V2 (O.Fee_transfer.Stable) (W.Fee_transfer)
   include
@@ -247,9 +249,9 @@ module Mina_base = struct
       (O.Zkapp_command.Call_forest.Stable)
       (W.Zkapp_command.Call_forest)
   include Assert_equal0V2 (O.Control.Stable) (W.Control)
-  include Assert_equal0V1 (O.Account_update.Stable) (W.Account_update)
+  include Assert_equal0V2 (O.Account_update.Stable) (W.Account_update)
   include Assert_equal0V1 (O.Zkapp_command.Stable) (W.Zkapp_command)
-  include Assert_equal0V1 (O.Zkapp_command.Valid.Stable) (W.Zkapp_command.Valid)
+  include Assert_equal0V2 (O.Zkapp_command.Valid.Stable) (W.Zkapp_command.Valid)
   include Assert_equal0V2 (O.User_command.Stable) (W.User_command)
   include Assert_equal0V2 (O.User_command.Valid.Stable) (W.User_command.Valid)
   include
@@ -325,7 +327,7 @@ module Mina_state = struct
   module O = Mina_state
   module W = WT.Mina_state
   include Assert_equal3V1 (O.Registers.Stable) (W.Registers)
-  include Assert_equal0V1 (O.Local_state.Stable) (W.Local_state)
+  include Assert_equal0V2 (O.Local_state.Stable) (W.Local_state)
   include
     Assert_equal0V2 (O.Blockchain_state.Value.Stable) (W.Blockchain_state.Value)
   include Assert_equal0 (O.Blockchain_state.Value) (W.Blockchain_state.Value.V2)
@@ -340,9 +342,9 @@ module Mina_state = struct
   include
     Assert_equal0V2 (O.Protocol_state.Value.Stable) (W.Protocol_state.Value)
   include
-    Assert_equal0V2 (O.Snarked_ledger_state.Stable) (W.Snarked_ledger_state)
+    Assert_equal0V3 (O.Snarked_ledger_state.Stable) (W.Snarked_ledger_state)
   include
-    Assert_equal0V2
+    Assert_equal0V3
       (O.Snarked_ledger_state.With_sok.Stable)
       (W.Snarked_ledger_state.With_sok)
 end
@@ -355,7 +357,7 @@ module Mina_transaction_logic = struct
       (O.Zkapp_command_logic.Local_state.Stable)
       (W.Zkapp_command_logic.Local_state)
   include
-    Assert_equal0V1
+    Assert_equal0V2
       (O.Zkapp_command_logic.Local_state.Value.Stable)
       (W.Zkapp_command_logic.Local_state.Value)
 end
@@ -363,7 +365,7 @@ end
 module Transaction_snark = struct
   module O = Transaction_snark
   module W = WT.Transaction_snark
-  include Assert_equal0V2 (O.Stable) (W)
+  include Assert_equal0V3 (O.Stable) (W)
 end
 
 module Transaction_snark_work = struct
@@ -390,7 +392,7 @@ module Network_pool = struct
   module W = WT.Network_pool
   include Assert_equal1V1 (O.Priced_proof.Stable) (W.Priced_proof)
   include
-    Assert_equal0V2
+    Assert_equal0V3
       (O.Snark_pool.Diff_versioned.Stable)
       (W.Snark_pool.Diff_versioned)
   include
