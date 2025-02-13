@@ -14,6 +14,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -609,9 +611,9 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
   in
   let open Deferred.Let_syntax in
   match%bind
-    Transition_handler.Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
-      ~precomputed_values ~verifier ~trust_system ~frontier ~initial_hash
-      trees_of_transitions
+    Transition_handler.Breadcrumb_builder.build_subtrees_of_breadcrumbs
+      ~proof_cache_db ~logger ~precomputed_values ~verifier ~trust_system
+      ~frontier ~initial_hash trees_of_transitions
   with
   | Ok result ->
       [%log debug]
@@ -891,7 +893,7 @@ let%test_module "Ledger_catchup tests" =
 
     let () =
       (* Disable log messages from best_tip_diff logger. *)
-      Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+      Logger.Consumer_registry.register ~commit_id:""
         ~id:Logger.Logger_id.best_tip_diff ~processor:(Logger.Processor.raw ())
         ~transport:
           (Logger.Transport.create
@@ -920,6 +922,11 @@ let%test_module "Ledger_catchup tests" =
           Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
             () )
 
+    let ledger_sync_config =
+      Syncable_ledger.create_config
+        ~compile_config:Mina_compile_config.For_unit_tests.t
+        ~max_subtree_depth:None ~default_subtree_depth:None ()
+
     module Context = struct
       let logger = logger
 
@@ -928,6 +935,8 @@ let%test_module "Ledger_catchup tests" =
       let constraint_constants = constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
     end
 
     let downcast_transition transition =
@@ -1032,11 +1041,17 @@ let%test_module "Ledger_catchup tests" =
       let catchup_breadcrumbs_are_best_tip_path =
         Rose_tree.equal (Rose_tree.of_list_exn target_best_tip_path)
           catchup_breadcrumbs ~f:(fun breadcrumb_tree1 breadcrumb_tree2 ->
-            Mina_block.Validated.equal
-              (Transition_frontier.Breadcrumb.validated_transition
-                 breadcrumb_tree1 )
-              (Transition_frontier.Breadcrumb.validated_transition
-                 breadcrumb_tree2 ) )
+            let b1 =
+              Mina_block.Validated.read_all_proofs_from_disk
+                (Transition_frontier.Breadcrumb.validated_transition
+                   breadcrumb_tree1 )
+            in
+            let b2 =
+              Mina_block.Validated.read_all_proofs_from_disk
+                (Transition_frontier.Breadcrumb.validated_transition
+                   breadcrumb_tree2 )
+            in
+            Mina_block.Validated.Stable.Latest.equal b1 b2 )
       in
       if not catchup_breadcrumbs_are_best_tip_path then
         failwith
@@ -1051,7 +1066,7 @@ let%test_module "Ledger_catchup tests" =
             Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
+            ~use_super_catchup ~ledger_sync_config
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size
             ])
@@ -1072,7 +1087,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
+            ~use_super_catchup ~ledger_sync_config
             [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
         ~f:(fun network ->
           let open Fake_network in
@@ -1087,7 +1102,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
+            ~use_super_catchup ~ledger_sync_config
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:(max_frontier_length * 2)
             ])

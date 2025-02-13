@@ -437,9 +437,7 @@ module Values (S : Sample) = struct
   let sok_message () : Mina_base.Sok_message.t =
     Mina_base.Sok_message.create ~fee:(fee ()) ~prover:(public_key ())
 
-  let merge_work () :
-      Transaction_snark_scan_state.Ledger_proof_with_sok_message.t =
-    (ledger_proof (), sok_message ())
+  let merge_work () = (ledger_proof (), sok_message ())
 end
 
 type size_params =

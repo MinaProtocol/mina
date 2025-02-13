@@ -22,7 +22,7 @@ let add_error, get_exit_code =
 let main ~archive_uri () =
   let logger = Logger.create () in
   let archive_uri = Uri.of_string archive_uri in
-  match Caqti_async.connect_pool ~max_size:128 archive_uri with
+  match Mina_caqti.connect_pool ~max_size:128 archive_uri with
   | Error e ->
       [%log fatal]
         ~metadata:[ ("error", `String (Caqti_error.show e)) ]
@@ -33,7 +33,7 @@ let main ~archive_uri () =
       [%log info] "Querying missing blocks" ;
       let%bind missing_blocks_raw =
         match%bind
-          Caqti_async.Pool.use (fun db -> Sql.Unparented_blocks.run db ()) pool
+          Mina_caqti.Pool.use (fun db -> Sql.Unparented_blocks.run db ()) pool
         with
         | Ok blocks ->
             return blocks
@@ -54,7 +54,7 @@ let main ~archive_uri () =
           Deferred.List.iter missing_blocks
             ~f:(fun (block_id, state_hash, height, parent_hash) ->
               match%map
-                Caqti_async.Pool.use
+                Mina_caqti.Pool.use
                   (fun db -> Sql.Missing_blocks_gap.run db height)
                   pool
               with
@@ -76,7 +76,7 @@ let main ~archive_uri () =
       [%log info] "Querying for gaps in chain statuses" ;
       let%bind highest_canonical =
         match%bind
-          Caqti_async.Pool.use
+          Mina_caqti.Pool.use
             (fun db -> Sql.Chain_status.run_highest_canonical db ())
             pool
         with
@@ -89,7 +89,7 @@ let main ~archive_uri () =
       in
       let%bind pending_below =
         match%bind
-          Caqti_async.Pool.use
+          Mina_caqti.Pool.use
             (fun db ->
               Sql.Chain_status.run_count_pending_below db highest_canonical )
             pool
@@ -118,7 +118,7 @@ let main ~archive_uri () =
             ] ) ;
       let%bind canonical_chain =
         match%bind
-          Caqti_async.Pool.use
+          Mina_caqti.Pool.use
             (fun db -> Sql.Chain_status.run_canonical_chain db highest_canonical)
             pool
         with

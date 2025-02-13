@@ -14,6 +14,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val ledger_sync_config : Syncable_ledger.daemon_config
 end
 
 (* There must be at least 2 peers to create a network *)
@@ -78,7 +80,7 @@ let setup (type n) ~context:(module Context : CONTEXT)
 
       let consensus_local_state = consensus_local_state
 
-      let compile_config = precomputed_values.compile_config
+      let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
     end )
   in
   let config rpc_mocks peer =
@@ -224,11 +226,6 @@ module Generator = struct
       ?get_transition_chain_proof ?get_ancestry ?get_best_tip
       ?get_completed_snarks ~context:(module Context : CONTEXT) ~verifier
       ~max_frontier_length ~use_super_catchup =
-    let module Consensus_context = struct
-      include Context
-
-      let compile_config = precomputed_values.compile_config
-    end in
     let open Context in
     let epoch_ledger_location =
       Filename.temp_dir_name ^/ "epoch_ledger"
@@ -237,7 +234,7 @@ module Generator = struct
     let genesis_ledger = Precomputed_values.genesis_ledger precomputed_values in
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-        ~context:(module Consensus_context)
+        ~context:(module Context)
         ~genesis_ledger
         ~genesis_epoch_data:precomputed_values.genesis_epoch_data
         ~epoch_ledger_location
@@ -273,11 +270,6 @@ module Generator = struct
       ?get_transition_chain_proof ?get_ancestry ?get_best_tip
       ?get_completed_snarks ~context:(module Context : CONTEXT) ~verifier
       ~max_frontier_length ~use_super_catchup =
-    let module Consensus_context = struct
-      include Context
-
-      let compile_config = precomputed_values.compile_config
-    end in
     let open Context in
     let epoch_ledger_location =
       Filename.temp_dir_name ^/ "epoch_ledger"
@@ -286,7 +278,7 @@ module Generator = struct
     let genesis_ledger = Precomputed_values.genesis_ledger precomputed_values in
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-        ~context:(module Consensus_context)
+        ~context:(module Context)
         ~genesis_ledger
         ~genesis_epoch_data:precomputed_values.genesis_epoch_data
         ~epoch_ledger_location
@@ -321,7 +313,7 @@ module Generator = struct
       ~verifier ~max_frontier_length ~use_super_catchup
 
   let gen ?(logger = Logger.null ()) ~precomputed_values ~verifier
-      ~max_frontier_length ~use_super_catchup
+      ~max_frontier_length ~use_super_catchup ~ledger_sync_config
       (configs : (peer_config, 'n num_peers) Gadt_lib.Vect.t) =
     (* TODO: Pass in *)
     let module Context = struct
@@ -334,6 +326,8 @@ module Generator = struct
 
       let consensus_constants =
         precomputed_values.Precomputed_values.consensus_constants
+
+      let ledger_sync_config = ledger_sync_config
     end in
     let open Quickcheck.Generator.Let_syntax in
     let%map states =

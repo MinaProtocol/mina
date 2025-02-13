@@ -50,9 +50,10 @@ module Sexp_block : S with type t = Mina_block.t = struct
 
   let of_breadcrumb = block_of_breadcrumb
 
-  let to_string b = Mina_block.sexp_of_t b |> Sexp.to_string |> append_newline
+  let to_string b =
+    Mina_block.Stable.Latest.sexp_of_t b |> Sexp.to_string |> append_newline
 
-  let of_string s = Sexp.of_string s |> Mina_block.t_of_sexp
+  let of_string s = Sexp.of_string s |> Mina_block.Stable.Latest.t_of_sexp
 end
 
 module Binary_block : S with type t = Mina_block.t = struct

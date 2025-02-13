@@ -15,6 +15,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -761,11 +763,6 @@ let pick ~context:(module Context : CONTEXT)
     (x : Mina_state.Protocol_state.Value.t State_hash.With_state_hashes.t)
     (y : Mina_state.Protocol_state.Value.t State_hash.With_state_hashes.t) =
   let f = With_hash.map ~f:Mina_state.Protocol_state.consensus_state in
-  let module Context = struct
-    include Context
-
-    let compile_config = precomputed_values.compile_config
-  end in
   match
     Consensus.Hooks.select
       ~context:(module Context)
@@ -1250,14 +1247,13 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                       | Remote peer ->
                           Downloader.add_knowledge downloader peer
                             [ (target_parent_hash, target_length) ] ) ;
-                      let%bind.Option { proof = path, root; _ } =
+                      let%bind.Option { proof = path, root_header; _ } =
                         Best_tip_lru.get h
                       in
                       let%bind.Option p =
                         Transition_chain_verifier.verify ~target_hash:h
                           ~transition_chain_proof:
-                            ( ( Mina_block.header root
-                              |> Mina_block.Header.protocol_state
+                            ( ( Mina_block.Header.protocol_state root_header
                               |> Mina_state.Protocol_state.hashes )
                                 .state_hash
                             , path )
@@ -1414,6 +1410,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
         ~build_func:
           (Transition_frontier.Breadcrumb.build
+             ~proof_cache_db:Context.proof_cache_db
              ~get_completed_work:(Fn.const None) ) )
 
 (* Unit tests *)
@@ -1438,7 +1435,7 @@ let%test_module "Ledger_catchup tests" =
 
     let () =
       (* Disable log messages from best_tip_diff logger. *)
-      Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+      Logger.Consumer_registry.register ~commit_id:""
         ~id:Logger.Logger_id.best_tip_diff ~processor:(Logger.Processor.raw ())
         ~transport:
           (Logger.Transport.create
@@ -1467,6 +1464,11 @@ let%test_module "Ledger_catchup tests" =
           Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
             () )
 
+    let ledger_sync_config =
+      Syncable_ledger.create_config
+        ~compile_config:Mina_compile_config.For_unit_tests.t
+        ~max_subtree_depth:None ~default_subtree_depth:None ()
+
     module Context = struct
       let logger = logger
 
@@ -1475,6 +1477,8 @@ let%test_module "Ledger_catchup tests" =
       let constraint_constants = constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
     end
 
     (* let mock_verifier =
@@ -1638,7 +1642,10 @@ let%test_module "Ledger_catchup tests" =
             (* We force evaluation of state body hash for both blocks for further equality check *)
             let _hash1 = Mina_block.Validated.state_body_hash b1 in
             let _hash2 = Mina_block.Validated.state_body_hash b2 in
-            Mina_block.Validated.equal b1 b2 )
+            Mina_block.Validated.(
+              Stable.Latest.equal
+                (read_all_proofs_from_disk b1)
+                (read_all_proofs_from_disk b2)) )
       in
       if not catchup_breadcrumbs_are_best_tip_path then
         failwith
@@ -1653,7 +1660,7 @@ let%test_module "Ledger_catchup tests" =
             Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
+            ~use_super_catchup ~ledger_sync_config
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size
             ])
@@ -1673,7 +1680,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
+            ~use_super_catchup ~ledger_sync_config
             [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
         ~f:(fun network ->
           let open Fake_network in
@@ -1689,7 +1696,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
+            ~use_super_catchup ~ledger_sync_config
             [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
         ~f:(fun network ->
           let open Fake_network in
@@ -1706,7 +1713,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
+            ~use_super_catchup ~ledger_sync_config
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 3) + 1)
@@ -1784,7 +1791,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
+            ~use_super_catchup ~ledger_sync_config
             [ fresh_peer
               (* ; peer_with_branch ~frontier_branch_size:(max_frontier_length / 2) *)
             ; peer_with_branch_custom_rpc

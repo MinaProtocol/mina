@@ -10,7 +10,7 @@ open Network_peer
  *  can only be initialized, and any interaction with it must go through
  *  its [Resource_pool_diff_intf] *)
 module type Resource_pool_base_intf = sig
-  type t [@@deriving sexp_of]
+  type t
 
   val label : string
 
@@ -19,7 +19,7 @@ module type Resource_pool_base_intf = sig
   type transition_frontier
 
   module Config : sig
-    type t [@@deriving sexp_of]
+    type t
   end
 
   (** Diff from a transition frontier extension that would update the resource pool*)
@@ -74,12 +74,12 @@ module type Resource_pool_diff_intf = sig
 
   val label : string
 
-  type t [@@deriving sexp, to_yojson]
+  type t [@@deriving to_yojson]
 
-  type verified [@@deriving sexp, to_yojson]
+  type verified [@@deriving to_yojson]
 
   (** Part of the diff that was not added to the resource pool*)
-  type rejected [@@deriving sexp, to_yojson]
+  type rejected [@@deriving to_yojson]
 
   val empty : t
 
@@ -302,9 +302,9 @@ module type Snark_pool_diff_intf = sig
         Transaction_snark_work.Statement.t
         * Ledger_proof.t One_or_two.t Priced_proof.t
     | Empty
-  [@@deriving compare, sexp]
+  [@@deriving compare]
 
-  type verified = t [@@deriving compare, sexp]
+  type verified = t [@@deriving compare]
 
   type compact =
     { work_ids : int One_or_two.t
@@ -337,7 +337,7 @@ end
 module type Transaction_pool_diff_intf = sig
   type resource_pool
 
-  type t = User_command.t list [@@deriving sexp, of_yojson]
+  type t = User_command.t list [@@deriving of_yojson]
 
   module Diff_error : sig
     type t =
@@ -353,13 +353,13 @@ module type Transaction_pool_diff_intf = sig
       | Fee_payer_account_not_found
       | Fee_payer_not_permitted_to_send
       | After_slot_tx_end
-    [@@deriving sexp, yojson]
+    [@@deriving yojson]
 
     val to_string_hum : t -> string
   end
 
   module Rejected : sig
-    type t = (User_command.t * Diff_error.t) list [@@deriving sexp, yojson]
+    type t = (User_command.t * Diff_error.t) list [@@deriving yojson]
   end
 
   type Structured_log_events.t +=
@@ -387,7 +387,6 @@ module type Transaction_resource_pool_intf = sig
     -> verifier:Verifier.t
     -> genesis_constants:Genesis_constants.t
     -> slot_tx_end:Mina_numbers.Global_slot_since_hard_fork.t option
-    -> compile_config:Mina_compile_config.t
     -> Config.t
 
   val member : t -> Transaction_hash.User_command_with_valid_signature.t -> bool
