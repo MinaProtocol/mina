@@ -34,7 +34,7 @@ let fail_on_long_async_jobs () =
 let sleep_async seconds = Deferred.create (fun _ -> Core.Unix.sleep seconds)
 
 (* WARN:
-   Async_Kernel has a hardcoded limit of 2000ms, nothing we can do,
+   Async_Kernel has a hardcoded limit of 2000ms this is a expected invariant,
    as that number is private and hardcoded:
 
    if Float.(Time_ns.Span.to_ms this_job_time >= 2000.) then scheduler.long_jobs_last_cycle <- (execution_context, this_job_time) :: scheduler.long_jobs_last_cycle;
