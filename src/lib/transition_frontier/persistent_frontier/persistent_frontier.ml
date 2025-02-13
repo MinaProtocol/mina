@@ -5,6 +5,7 @@ open Mina_state
 open Mina_block
 open Frontier_base
 module Database = Database
+module Worker = Worker
 
 module type CONTEXT = sig
   val logger : Logger.t

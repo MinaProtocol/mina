@@ -1,0 +1,19 @@
+; REF: src/lib/pickles_base/test/dune
+
+(tests
+ (names test_persistent_frontier)
+ (flags
+  (:standard -warn-error +a)
+  -open Core_kernel)
+ (libraries
+   ; Opam
+  alcotest
+  core_kernel
+  async
+  async_kernel
+  ; Mina
+  persistent_frontier)
+
+ (preprocess (pps ppx_mina ppx_version ppx_jane ppx_compare ppx_bin_prot ppx_deriving_yojson))
+  
+ (action (run %{test})))
