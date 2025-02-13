@@ -8,14 +8,19 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let ReplayerTest = ../../Command/ReplayerTest.dhall
 
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
 let dependsOn =
-      DebianVersions.dependsOn
+      DebianVersions.dependsOnStep
+        (None Text)
         DebianVersions.DebVersion.Bullseye
         Profiles.Type.Standard
+        BuildFlags.Type.Instrumented
+        "build"
 
 in  Pipeline.build
       Pipeline.Config::{
