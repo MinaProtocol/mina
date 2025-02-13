@@ -26,6 +26,8 @@ let Artifact = ../../Constants/Artifacts.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
+let DebianRepo = ../../Constants/DebianRepo.dhall
+
 let Command = ../Base.dhall
 
 let VerifyDebian = ./VerifyDebian.dhall
@@ -42,11 +44,17 @@ let VerifyPackagesSpec =
           , debians : List Package.Type
           , dockers : List Artifact.Type
           , new_debian_version : Text
+          , debian_repo : DebianRepo.Type
           , profile : Profiles.Type
           , network : Network.Type
+          , repo : DebianRepo.Type
           , codenames : List DebianVersions.DebVersion
           , channel : DebianChannel.Type
-          , new_tags : List Text
+          , tags :
+                  DebianVersions.DebVersion
+              ->  DebianChannel.Type
+              ->  DebianRepo.Type
+              ->  List Text
           , remove_profile_from_name : Bool
           , published : Bool
           }
@@ -54,12 +62,13 @@ let VerifyPackagesSpec =
           { promote_step_name = None
           , debians = [] : List Package.Type
           , dockers = [] : List Artifact.Type
+          , repo = DebianRepo.Type.PackagesO1Test
           , new_debian_version = "\\\\\$MINA_DEB_VERSION"
+          , debian_repo = DebianRepo.Type.PackagesO1Test
           , profile = Profiles.Type.Standard
           , network = Network.Type.Mainnet
           , codenames = [] : List DebianVersions.DebVersion
           , channel = DebianChannel.Type.Compatible
-          , new_tags = [] : List Text
           , remove_profile_from_name = False
           , published = False
           }
@@ -81,7 +90,11 @@ let verifyPackagesToDockerSpecs
                                 , profile = verify_packages.profile
                                 , name = docker
                                 , codename = codename
-                                , new_tags = verify_packages.new_tags
+                                , new_tags =
+                                    verify_packages.tags
+                                      codename
+                                      verify_packages.channel
+                                      verify_packages.repo
                                 , network = verify_packages.network
                                 , publish = verify_packages.published
                                 , remove_profile_from_name =
@@ -139,6 +152,7 @@ let verifyPackagesToDebianSpecs
                                 , package = debian
                                 , new_version =
                                     verify_packages.new_debian_version
+                                , target_repo = verify_packages.debian_repo
                                 , network = verify_packages.network
                                 , codename = codename
                                 , to_channel = verify_packages.channel
