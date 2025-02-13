@@ -69,7 +69,7 @@ echo "Promoting debs: ${PACKAGE}_${VERSION} to Release: ${TO_COMPONENT} and Code
 # If this fails, attempt to remove the lockfile and retry.
 
 if [[ -z "$NEW_VERSION" ]] || [[ "$NEW_VERSION" == "$VERSION" ]]; then
-  deb-s3 copy --s3-region=us-west-2 --lock --bucket packages.o1test.net --preserve-versions --cache-control=max-age=120  $PACKAGE $CODENAME $TO_COMPONENT --versions $VERSION --arch $ARCH --component ${FROM_COMPONENT} --codename ${CODENAME}
+  deb-s3 copy --s3-region=us-west-2 --lock --bucket $REPO --preserve-versions --cache-control=max-age=120  $PACKAGE $CODENAME $TO_COMPONENT --versions $VERSION --arch $ARCH --component ${FROM_COMPONENT} --codename ${CODENAME}
 else
   source scripts/debian/reversion.sh \
     --deb $PACKAGE  \
@@ -84,4 +84,4 @@ else
     --repo $REPO \
     --new-repo $NEW_REPO \
     $SIGN_ARG
-fi
+fi    

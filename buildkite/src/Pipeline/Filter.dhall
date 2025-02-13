@@ -10,6 +10,7 @@ let Filter
       | Long
       | LongAndVeryLong
       | TearDownOnly
+      | TearDownAndPromote
       | ToolchainsOnly
       | AllTests
       | Release
@@ -27,6 +28,7 @@ let tags
             , LongAndVeryLong = [ Tag.Type.Long, Tag.Type.VeryLong ]
             , Long = [ Tag.Type.Long ]
             , TearDownOnly = [ Tag.Type.TearDown ]
+            , TearDownAndPromote = [ Tag.Type.TearDown, Tag.Type.Promote ]
             , ToolchainsOnly = [ Tag.Type.Toolchain ]
             , DebianBuild = [ Tag.Type.Debian ]
             , DockerBuild = [ Tag.Type.Docker ]
@@ -51,6 +53,7 @@ let show
             , Long = "Long"
             , ToolchainsOnly = "Toolchain"
             , TearDownOnly = "TearDownOnly"
+            , TearDownAndPromote = "TearDownAndPromote"
             , AllTests = "AllTests"
             , Release = "Release"
             , Promote = "Promote"

@@ -12,6 +12,8 @@ let DebianChannel = ../Constants/DebianChannel.dhall
 
 let Network = ../Constants/Network.dhall
 
+let Command = ../Command/Base.dhall
+
 let DebianVersions = ../Constants/DebianVersions.dhall
 
 let DebianRepo = ../Constants/DebianRepo.dhall
@@ -50,7 +52,11 @@ let promote_artifacts =
                 , codenames = codenames
                 , from_channel = from_channel
                 , to_channel = to_channel
-                , new_tags = [ tag ]
+                , new_tags =
+                        \(codename : DebianVersions.DebVersion)
+                    ->  \(channel : DebianChannel.Type)
+                    ->  \(repo : DebianRepo.Type)
+                    ->  [ tag ]
                 , remove_profile_from_name = remove_profile_from_name
                 , publish = publish
                 }
@@ -68,6 +74,7 @@ let promote_artifacts =
                       dockersSpecs
                       DebianVersions.DebVersion.Bullseye
                       PipelineMode.Type.Stable
+                      ([] : List Command.TaggedKey.Type)
                   )
 
           in  pipelineType.pipeline
@@ -78,6 +85,7 @@ let verify_artifacts =
       ->  \(new_version : Text)
       ->  \(profile : Profile.Type)
       ->  \(network : Network.Type)
+      ->  \(repo : DebianRepo.Type)
       ->  \(codenames : List DebianVersions.DebVersion)
       ->  \(to_channel : DebianChannel.Type)
       ->  \(repo : DebianRepo.Type)
@@ -95,7 +103,12 @@ let verify_artifacts =
                 , network = network
                 , codenames = codenames
                 , channel = to_channel
-                , new_tags = [ tag ]
+                , repo = repo
+                , tags =
+                        \(codename : DebianVersions.DebVersion)
+                    ->  \(channel : DebianChannel.Type)
+                    ->  \(repo : DebianRepo.Type)
+                    ->  [ tag ]
                 , remove_profile_from_name = remove_profile_from_name
                 , published = publish
                 }

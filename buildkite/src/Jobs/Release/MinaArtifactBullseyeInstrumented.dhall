@@ -6,6 +6,8 @@ let BuildFlags = ../../Constants/BuildFlags.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
+let PipelineTag = ../../Pipeline/Tag.dhall
+
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
@@ -15,5 +17,10 @@ in  Pipeline.build
             , Artifacts.Type.Archive
             ]
           , buildFlags = BuildFlags.Type.Instrumented
+          , tags =
+            [ PipelineTag.Type.Long
+            , PipelineTag.Type.Release
+            , PipelineTag.Type.Docker
+            ]
           }
       )
