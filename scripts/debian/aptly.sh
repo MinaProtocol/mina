@@ -12,7 +12,6 @@ CLEAR='\033[0m'
 RED='\033[0;31m'
 
 # global variables
-declare CLI_VERSION='1.0.0';
 declare CLI_NAME='aptly.sh';
 declare PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
 

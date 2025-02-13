@@ -2,7 +2,7 @@
 
 if [ -z $MINA_DEB_CODENAME ]; then 
     echo "MINA_DEB_CODENAME env var is not defined"
-    exit -1
+    exit 1
 fi
 
 LOCAL_DEB_FOLDER=_build
