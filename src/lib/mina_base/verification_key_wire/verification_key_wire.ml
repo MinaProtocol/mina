@@ -7,19 +7,19 @@ open Zkapp_basic
    this module; the definitions here avoid a cyclic dependency
 *)
 
-let digest_vk (t : Side_loaded_verification_key.t) =
+let digest_vk (t : Pickles.Side_loaded.Verification_key.t) =
   Random_oracle.(
     hash ~init:Hash_prefix_states.side_loaded_vk
-      (pack_input (Side_loaded_verification_key.to_input t)))
+      (pack_input (Pickles.Side_loaded.Verification_key.to_input t)))
 
 let dummy_vk_hash =
-  Memo.unit (fun () -> digest_vk Side_loaded_verification_key.dummy)
+  Memo.unit (fun () -> digest_vk Pickles.Side_loaded.Verification_key.dummy)
 
 [%%versioned_binable
 module Stable = struct
   module V1 = struct
     module T = struct
-      type t = (Side_loaded_verification_key.t, F.t) With_hash.t
+      type t = (Pickles.Side_loaded.Verification_key.t, F.t) With_hash.t
       [@@deriving sexp, yojson, equal, compare, hash]
     end
 
@@ -42,7 +42,7 @@ module Stable = struct
 
     include
       Binable.Of_binable_without_uuid
-        (Side_loaded_verification_key.Stable.V2)
+        (Pickles.Side_loaded.Verification_key.Stable.V2)
         (M)
   end
 end]
