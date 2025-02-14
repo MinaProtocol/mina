@@ -76,3 +76,5 @@ let is_genesis t =
   |> Consensus.Data.Consensus_state.is_genesis_state
 
 let read_all_proofs_from_disk = Fn.id
+
+let write_all_proofs_to_disk = Fn.id

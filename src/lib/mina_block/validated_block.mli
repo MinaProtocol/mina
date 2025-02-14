@@ -39,3 +39,5 @@ val body : t -> Staged_ledger_diff.Body.t
 val is_genesis : t -> bool
 
 val read_all_proofs_from_disk : t -> Stable.Latest.t
+
+val write_all_proofs_to_disk : Stable.Latest.t -> t
