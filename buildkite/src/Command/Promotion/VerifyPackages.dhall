@@ -8,6 +8,8 @@ let List/map = Prelude.List.map
 
 let Package = ../../Constants/DebianPackage.dhall
 
+let DebianRepo = ../../Constants/DebianRepo.dhall
+
 let Network = ../../Constants/Network.dhall
 
 let PipelineMode = ../../Pipeline/Mode.dhall
