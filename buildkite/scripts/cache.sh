@@ -232,7 +232,7 @@ function write(){
                 fi
 
                 if [ ! -v __to ]; then
-                   __to=$__root/$__to
+                   __to=$__root/"$1"
                    shift 1;
                    continue
                 fi
