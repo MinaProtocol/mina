@@ -232,8 +232,7 @@ function write(){
                 fi
 
                 if [ ! -v __to ]; then
-                   __basename=$(basename "${1}")
-                   __to=$__root/$__basename
+                   __to=$__root/$__to
                    shift 1;
                    continue
                 fi
