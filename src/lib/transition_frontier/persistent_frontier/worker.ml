@@ -44,7 +44,39 @@ module Worker = struct
     | Best_tip_changed best_tip_hash ->
         Database.set_best_tip best_tip_hash
 
+  let snapshot_name_from_time () =
+    let time = Unix.gmtime (Unix.time ()) in
+    let year = 1900 + time.Unix.tm_year in
+    Printf.sprintf "%04d_%02d-%02d-%02d-%02d-%02d" year (time.Unix.tm_mon + 1)
+      time.Unix.tm_mday time.Unix.tm_hour time.Unix.tm_min time.Unix.tm_sec
+
+  let debug_dump_impl ~dump_dir t input =
+    let input = List.map input ~f:Diff.Lite.read_all_proofs_from_disk in
+    let snapshot_name = snapshot_name_from_time () in
+    let input_file = dump_dir ^/ snapshot_name ^/ "input.bin" in
+    [%log' info t.logger] "Dumping debug persistent frontier db: %s" input_file ;
+    Database.make_checkpoint t.db ~location:(dump_dir ^/ snapshot_name) ;
+    let bin_class =
+      Bin_prot.Type_class.bin_list Diff.Lite.Stable.Latest.bin_t
+    in
+    let sz = bin_class.writer.size input in
+    let buf = Bin_prot.Common.create_buf sz in
+    let written = bin_class.writer.write ~pos:0 buf input in
+    assert (written = sz) ;
+    let bytes = Bytes.create sz in
+    Bin_prot.Common.blit_buf_string buf ~len:sz bytes ;
+    Out_channel.with_file ~binary:true input_file
+      ~f:(Fn.flip Out_channel.output_bytes bytes)
+
+  let debug_dump =
+    match Sys.getenv "DEBUG_DUMP_PERSISTENT_FRONTIER_SYNC" with
+    | None ->
+        fun _ _ -> ()
+    | Some dump_dir ->
+        debug_dump_impl ~dump_dir
+
   let perform t input =
+    debug_dump t input ;
     let arcs_cache = State_hash.Table.create () in
     O1trace.thread "persistent_frontier_write_to_disk" (fun () ->
         [%log' trace t.logger] "Applying %d diffs to the persistent frontier"
