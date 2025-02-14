@@ -24,12 +24,14 @@ exception LongJobDetected of Execution_context.t * Time_ns.Span.t
 
 let fail_on_long_async_jobs () =
   let open Async_kernel_scheduler in
-  let raise_long_job (context, span) =
-    raise (LongJobDetected (context, span))
+  let hook () =
+    match (t ()).long_jobs_last_cycle with
+    | (context, span) :: _ ->
+        raise (LongJobDetected (context, span))
+    | _ ->
+        ()
   in
-  Expert.run_every_cycle_end (fun _ ->
-      let t = t () in
-      List.iter t.long_jobs_last_cycle ~f:raise_long_job )
+  Expert.run_every_cycle_end hook
 
 let sleep_async seconds = Deferred.create (fun _ -> Core.Unix.sleep seconds)
 
