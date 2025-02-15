@@ -45,7 +45,7 @@ if [[ -z "$NEW_NAME" ]]; then NEW_NAME=$DEB; fi;
 if [[ -z "$NEW_RELEASE" ]]; then NEW_RELEASE=$RELEASE; fi;
 if [[ -z "$NEW_VERSION" ]]; then NEW_VERSION=$VERSION; fi;
 if [[ -z "$NEW_SUITE" ]]; then NEW_SUITE=$SUITE; fi;
-if [[ -z "$NEW_REPO" ]]; then NEW_REPO=$SUITE; fi;
+if [[ -z "$NEW_REPO" ]]; then NEW_REPO=$REPO; fi;
 if [[ -z "$DEB" ]]; then NEW_NAME=$DEB; fi;
 if [[ -z "$RELEASE" ]]; then NEW_RELEASE=$RELEASE; fi;
 if [[ -z "$VERSION" ]]; then NEW_VERSION=$VERSION; fi;
@@ -70,4 +70,4 @@ function rebuild_deb() {
 }
 
 rebuild_deb
-source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}.deb" --version ${NEW_VERSION} --codename ${CODENAME} --release ${NEW_RELEASE} --bucket ${NEW_REPO}
+source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}.deb" --version ${NEW_VERSION} --codename ${CODENAME} --release ${NEW_RELEASE} --bucket ${NEW_REPO} $SIGN_ARG
