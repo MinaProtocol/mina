@@ -52,7 +52,11 @@ let promote_artifacts =
                 , codenames = codenames
                 , from_channel = from_channel
                 , to_channel = to_channel
-                , new_tags = [ tag ]
+                , new_tags =
+                        \(codename : DebianVersions.DebVersion)
+                    ->  \(channel : DebianChannel.Type)
+                    ->  \(repo : DebianRepo.Type)
+                    ->  [ tag ]
                 , remove_profile_from_name = remove_profile_from_name
                 , publish = publish
                 }
@@ -98,7 +102,11 @@ let verify_artifacts =
                 , network = network
                 , codenames = codenames
                 , channel = to_channel
-                , new_tags = [ tag ]
+                , tags =
+                        \(codename : DebianVersions.DebVersion)
+                    ->  \(channel : DebianChannel.Type)
+                    ->  \(repo : DebianRepo.Type)
+                    ->  [ tag ]
                 , remove_profile_from_name = remove_profile_from_name
                 , published = publish
                 }
