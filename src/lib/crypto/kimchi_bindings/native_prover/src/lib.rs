@@ -5,7 +5,7 @@ use neon::prelude::*;
 //     "hello from native rust this is Yoni".into()
 // }
 
-// // Neon-friendly entry point
+// Neon-friendly entry point
 // fn caml_do_cool_thingies_js(mut cx: FunctionContext) -> JsResult<JsString> {
 //     // call the pure Rust function
 //     let result: String = caml_do_cool_thingies();
