@@ -1,9 +1,12 @@
-(test
+(executable
  (name test_persistent_frontier)
  (flags
   (:standard -warn-error +a))
  (libraries alcotest transition_frontier_persistent_frontier transition_frontier_base)
- (action (run %{test}))
  (modes native)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version)))
+
+(rule
+ (alias runtest)
+ (action (run %{dep:test_persistent_frontier.exe})))
