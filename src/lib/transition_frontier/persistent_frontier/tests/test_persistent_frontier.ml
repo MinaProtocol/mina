@@ -114,7 +114,9 @@ let () =
             (is_long_job short_job false)
         ; test_case "long jobs will be catched" `Quick
             (is_long_job long_job true)
-        ; test_case "testcase 2025_02-13-07-54-53" `Quick
+        ] )
+    ; ( "Reproduce persistent frontier bottleneck"
+      , [ test_case "testcase 2025_02-13-07-54-53" `Quick
             (is_long_job (test_case_2025_02_13 logger) true)
         ] )
     ]
