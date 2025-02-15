@@ -145,6 +145,8 @@ module Lite : sig
   end]
 
   val read_all_proofs_from_disk : E.t -> Stable.Latest.t
+
+  val write_all_proofs_to_disk : Stable.Latest.t -> E.t
 end
 
 module Full : sig

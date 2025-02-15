@@ -236,6 +236,19 @@ module Lite = struct
         Root_transitioned t
     | Best_tip_changed b ->
         Best_tip_changed b
+
+  let write_all_proofs_to_disk (diff : Stable.Latest.t) : E.t =
+    match diff with
+    | New_node validated_block ->
+        E.E
+          (New_node
+             (Node.Lite
+                (Mina_block.Validated.write_all_proofs_to_disk validated_block)
+             ) )
+    | Root_transitioned t ->
+        E.E (Root_transitioned t)
+    | Best_tip_changed b ->
+        E.E (Best_tip_changed b)
 end
 
 module Full = struct

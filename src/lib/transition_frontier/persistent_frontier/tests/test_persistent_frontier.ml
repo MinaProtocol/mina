@@ -78,6 +78,7 @@ let read_channel_to_bin_prot_buf (chan : In_channel.t) =
 
 let persistent_frontier_worker_long_job logger dump_path snapshot_name =
   let working_directory = dump_path ^/ snapshot_name in
+  [%log info] "Current working directory: %s" working_directory ;
   [%log info] "Deserializing diff list from input.bin" ;
   let bin_class = Bin_prot.Type_class.bin_list Diff.Lite.Stable.Latest.bin_t in
   let input =
@@ -85,6 +86,7 @@ let persistent_frontier_worker_long_job logger dump_path snapshot_name =
     |> In_channel.create ~binary:true
     |> read_channel_to_bin_prot_buf
     |> bin_class.reader.read ~pos_ref:(ref 0)
+    |> List.map ~f:Diff.Lite.write_all_proofs_to_disk
   in
   [%log info] "Loading database" ;
   let db = Database.create ~logger ~directory:working_directory in
