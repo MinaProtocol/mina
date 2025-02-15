@@ -1,5 +1,7 @@
+open Core
 open Async_kernel
 open Persistent_frontier
+open Frontier_base
 
 (* NOTE:
     Here's the implementation of "long_jobs_with_context" found in Async_kernel's
@@ -56,11 +58,53 @@ let long_job () = sleep_async (long_job_limit_seconds + 1)
 
 let short_job () = return ()
 
-let worker_job (worker : Worker.t) input () = Worker.dispatch worker input
+let read_channel_to_bin_prot_buf (chan : In_channel.t) =
+  let open Bin_prot in
+  let file_size =
+    In_channel.length chan |> Int64.to_int
+    |> Option.value_exn ?message:(Some "input size to big to fit in `int`")
+  in
+  let result = Common.create_buf file_size in
+  let offset = ref 0 in
+  while !offset < file_size do
+    let byte =
+      In_channel.input_char chan
+      |> Option.value_exn ?message:(Some "Early EOF when reading input")
+    in
+    Bigarray.Array1.set result !offset byte ;
+    offset := !offset + 1
+  done ;
+  result
 
-(* Define the test suite *)
+let persistent_frontier_worker_long_job logger dump_path snapshot_name =
+  let working_directory = dump_path ^/ snapshot_name in
+  [%log info] "Deserializing diff list from input.bin" ;
+  let bin_class = Bin_prot.Type_class.bin_list Diff.Lite.Stable.Latest.bin_t in
+  let input =
+    working_directory ^/ "input.bin"
+    |> In_channel.create ~binary:true
+    |> read_channel_to_bin_prot_buf
+    |> bin_class.reader.read ~pos_ref:(ref 0)
+  in
+  [%log info] "Loading database" ;
+  let db = Database.create ~logger ~directory:working_directory in
+  let worker =
+    Worker.create { db; logger; dequeue_snarked_ledger = const () }
+  in
+  ignore Diff.Full.E.to_lite ;
+  [%log info] "Dispatching the worker" ;
+  Worker.dispatch worker input
+
+(* TODO: fix data retrival so it works on CI *)
+let dump_path () = Sys.getenv_exn "TEST_DUMP_PERSISTENT_FRONTIER_SYNC"
+
+let test_case_2025_02_13 logger () =
+  persistent_frontier_worker_long_job logger (dump_path ())
+    "2025_02-13-07-54-53"
+
 let () =
   fail_on_long_async_jobs () ;
+  let logger = Logger.create () in
   let open Alcotest in
   run "Persistent Frontier"
     [ ( "Catch long async jobs"
@@ -68,7 +112,7 @@ let () =
             (is_long_job short_job false)
         ; test_case "long jobs will be catched" `Quick
             (is_long_job long_job true)
-          (*; test_case "worker job that's too slow will be catched" `Quick*)
-          (*    (is_long_job (worker_job worker input) true)*)
+        ; test_case "testcase 2025_02-13-07-54-53" `Quick
+            (is_long_job (test_case_2025_02_13 logger) true)
         ] )
     ]
