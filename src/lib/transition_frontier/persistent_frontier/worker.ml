@@ -82,6 +82,8 @@ module Worker = struct
         [%log' trace t.logger] "Applying %d diffs to the persistent frontier"
           (List.length input) ;
         (* OPTIMIZATION: Compress the best tip diffs and root transition diffs in order avoid unnecessary intermediate writes. *)
+        [%log' info t.logger]
+          "Calculating best tip diffs, root transition diffs and other diffs" ;
         let best_tip_diffs, root_transition_diffs, other_diffs =
           List.partition3_map input ~f:(function
             | Diff.Lite.E.E (Best_tip_changed diff) ->
@@ -92,9 +94,12 @@ module Worker = struct
                 `Trd diff )
         in
         (* We only care about the final best tip diff in the sequence, as all other best tip diffs get overwritten *)
+        [%log' info t.logger]
+          "Calculating final best tip diff and final root transition diff" ;
         let final_best_tip_diff = List.last best_tip_diffs in
         (* We only care about the final root transition diff in the sequence, but we do want to retain garbage that is removed from prior root transitions. We do this by compressing all garbage into the final root transition. *)
         let final_root_transition_diff = List.last root_transition_diffs in
+        [%log' info t.logger] "Collect garbage into total root transition diff" ;
         let extra_garbage =
           List.drop_last root_transition_diffs
           |> Option.value ~default:[]
@@ -107,6 +112,7 @@ module Worker = struct
             ~f:(fun ({ garbage = Lite garbage; _ } as r) ->
               { r with garbage = Lite (extra_garbage @ garbage) } )
         in
+        [%log' info t.logger] "Calculating diffs to apply" ;
         let diffs_to_apply =
           List.concat
             [ other_diffs
@@ -116,7 +122,9 @@ module Worker = struct
                   [ Diff.Lite.E.E (Best_tip_changed diff) ] )
             ]
         in
+        [%log' info t.logger] "Calculating apply funcs" ;
         let apply_funcs =
+          [%log' info t.logger] "> Calculate state hashes" ;
           let state_hashes =
             List.filter_map input ~f:(function
               | E (New_node (Lite transition)) ->
@@ -125,6 +133,7 @@ module Worker = struct
                   None )
             |> State_hash.Set.of_list
           in
+          [%log' info t.logger] "> Calculate parent hashes" ;
           let parent_hashes =
             List.filter_map input ~f:(function
               | E (New_node (Lite transition)) ->
@@ -139,9 +148,11 @@ module Worker = struct
               | _ ->
                   None )
           in
+          [%log' info t.logger] "> Find old root hash" ;
           let%map.Result old_root_hash =
             Database.find_arcs_and_root t.db ~arcs_cache ~parent_hashes
           in
+          [%log' info t.logger] "> Apply the diffs" ;
           List.map diffs_to_apply ~f:(fun (Diff.Lite.E.E diff) ->
               apply_diff ~old_root_hash ~arcs_cache diff )
         in
@@ -152,6 +163,7 @@ module Worker = struct
           | _ ->
               ()
         in
+        [%log' info t.logger] "Match on apply funcs" ;
         match apply_funcs with
         | Ok fs ->
             let%map () = Scheduler.yield () in
