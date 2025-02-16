@@ -59,22 +59,12 @@ let long_job () = sleep_async (long_job_limit_seconds + 1)
 let short_job () = return ()
 
 let read_channel_to_bin_prot_buf (chan : In_channel.t) =
-  let open Bin_prot in
-  let file_size =
-    In_channel.length chan |> Int64.to_int
-    |> Option.value_exn ?message:(Some "input size to big to fit in `int`")
+  let open Bigarray in
+  let result =
+    In_channel.input_all chan |> String.to_array
+    |> Array1.of_array char c_layout
   in
-  let result = Common.create_buf file_size in
-  let offset = ref 0 in
-  while !offset < file_size do
-    let byte =
-      In_channel.input_char chan
-      |> Option.value_exn ?message:(Some "Early EOF when reading input")
-    in
-    Bigarray.Array1.set result !offset byte ;
-    offset := !offset + 1
-  done ;
-  result
+  In_channel.close chan ; result
 
 let persistent_frontier_worker_long_job logger dump_path snapshot_name =
   let working_directory = dump_path ^/ snapshot_name in
@@ -95,7 +85,7 @@ let persistent_frontier_worker_long_job logger dump_path snapshot_name =
   in
   ignore Diff.Full.E.to_lite ;
   [%log info] "Dispatching the worker" ;
-  Worker.dispatch worker input
+  Worker.dispatch worker input >>| fun () -> [%log info] "Worker task done"
 
 (* TODO: fix data retrival so it works on CI *)
 let dump_path () = Sys.getenv_exn "TEST_DUMP_PERSISTENT_FRONTIER_SYNC"
