@@ -65,14 +65,14 @@ let short_job () = return ()
 let mmap_input_to_bin_prot_buf (name : string) =
   let open Unix in
   let open Bigarray in
-  let fd = Unix.openfile name ~mode:[ O_RDONLY ] in
+  let fd = openfile name ~mode:[ O_RDONLY ] in
   let file_size =
     (fstat fd).st_size |> Int.of_int64
     |> Option.value_exn ?message:(Some "file size won't fit in `int`")
   in
   let buf =
     Unix.map_file fd char c_layout ~shared:false [| file_size |]
-    |> Bigarray.array1_of_genarray
+    |> array1_of_genarray
   in
   (fd, buf)
 
@@ -81,13 +81,13 @@ let persistent_frontier_worker_long_job logger dump_path snapshot_name =
   [%log info] "Current working directory: %s" working_directory ;
   [%log info] "Deserializing diff list from input.bin" ;
   let bin_class = Bin_prot.Type_class.bin_list Diff.Lite.Stable.Latest.bin_t in
-  let fd, buf =
-    working_directory ^/ "input.bin" |> mmap_input_to_bin_prot_buf
-  in
+  [%log info] "> Creating mmap for diff list" ;
+  let fd, buf = mmap_input_to_bin_prot_buf (working_directory ^/ "input.bin") in
+  [%log info] "> Deserialize in memory diff list" ;
+  let input_deserialized = bin_class.reader.read ~pos_ref:(ref 0) buf in
+  [%log info] "> Convert list from Diff.Lite.{Stable.V1.t -> E.t}" ;
   let input =
-    buf
-    |> bin_class.reader.read ~pos_ref:(ref 0)
-    |> List.map ~f:Diff.Lite.write_all_proofs_to_disk
+    List.map ~f:Diff.Lite.write_all_proofs_to_disk input_deserialized
   in
   [%log info] "Loading database" ;
   let db = Database.create ~logger ~directory:working_directory in
