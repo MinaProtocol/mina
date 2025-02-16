@@ -15,12 +15,15 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 let Profiles = ../../Constants/Profiles.dhall
 
 let dependsOn =
-      DebianVersions.dependsOnStep
-        (None Text)
-        DebianVersions.DebVersion.Bullseye
-        Profiles.Type.Standard
-        BuildFlags.Type.Instrumented
-        "build"
+        DebianVersions.dependsOnStep
+          (None Text)
+          DebianVersions.DebVersion.Bullseye
+          Profiles.Type.Standard
+          BuildFlags.Type.Instrumented
+          "build"
+      # DebianVersions.dependsOn
+          DebianVersions.DebVersion.Bullseye
+          Profiles.Type.Standard
 
 in  Pipeline.build
       Pipeline.Config::{
