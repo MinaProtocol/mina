@@ -46,12 +46,15 @@ let Spec =
           { mode = PipelineMode.Type.PullRequest
           , size = Size.Medium
           , dependsOn =
-              DebianVersions.dependsOnStep
-                (None Text)
-                DebianVersions.DebVersion.Bullseye
-                Profiles.Type.Standard
-                BuildFlags.Type.Instrumented
-                "build"
+                DebianVersions.dependsOnStep
+                  (None Text)
+                  DebianVersions.DebVersion.Bullseye
+                  Profiles.Type.Standard
+                  BuildFlags.Type.Instrumented
+                  "build"
+              # DebianVersions.dependsOn
+                  DebianVersions.DebVersion.Bullseye
+                  Profiles.Type.Standard
           , additionalDirtyWhen = [] : List SelectFiles.Type
           , yellowThreshold = 0.1
           , redThreshold = 0.2
