@@ -330,9 +330,11 @@ let initialize t ~root_data =
 let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
     ~parent_hashes =
   let f h = Rocks.Key.Some_key (Arcs h) in
+  [%log' info t.logger] ">> Calculating values" ;
   let values =
     get_batch t.db ~keys:(Some_key Root :: List.map parent_hashes ~f)
   in
+  [%log' info t.logger] ">> Populating the hash table" ;
   let populate res parent_hash arc_opt =
     let%bind.Result () = res in
     match arc_opt with
