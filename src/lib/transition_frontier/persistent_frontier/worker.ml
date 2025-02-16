@@ -148,7 +148,8 @@ module Worker = struct
               | _ ->
                   None )
           in
-          [%log' info t.logger] "> Find old root hash" ;
+          [%log' info t.logger] "> Find old root hash for %d parent hashes"
+            (List.length parent_hashes) ;
           let%map.Result old_root_hash =
             Database.find_arcs_and_root t.db ~arcs_cache ~parent_hashes
           in
