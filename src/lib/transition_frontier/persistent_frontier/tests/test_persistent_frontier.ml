@@ -58,23 +58,34 @@ let long_job () = sleep_async (long_job_limit_seconds + 1)
 
 let short_job () = return ()
 
-let read_channel_to_bin_prot_buf (chan : In_channel.t) =
+(* NOTE: Using a mmaped version to read input:
+   - Iterating with In_channel.input_char is painfully slow
+   - In_channel.read_all seems to cause OOM
+*)
+let mmap_input_to_bin_prot_buf (name : string) =
+  let open Unix in
   let open Bigarray in
-  let result =
-    In_channel.input_all chan |> String.to_array
-    |> Array1.of_array char c_layout
+  let fd = Unix.openfile name ~mode:[ O_RDONLY ] in
+  let file_size =
+    (fstat fd).st_size |> Int.of_int64
+    |> Option.value_exn ?message:(Some "file size won't fit in `int`")
   in
-  In_channel.close chan ; result
+  let buf =
+    Unix.map_file fd char c_layout ~shared:false [| file_size |]
+    |> Bigarray.array1_of_genarray
+  in
+  (fd, buf)
 
 let persistent_frontier_worker_long_job logger dump_path snapshot_name =
   let working_directory = dump_path ^/ snapshot_name in
   [%log info] "Current working directory: %s" working_directory ;
   [%log info] "Deserializing diff list from input.bin" ;
   let bin_class = Bin_prot.Type_class.bin_list Diff.Lite.Stable.Latest.bin_t in
+  let fd, buf =
+    working_directory ^/ "input.bin" |> mmap_input_to_bin_prot_buf
+  in
   let input =
-    working_directory ^/ "input.bin"
-    |> In_channel.create ~binary:true
-    |> read_channel_to_bin_prot_buf
+    buf
     |> bin_class.reader.read ~pos_ref:(ref 0)
     |> List.map ~f:Diff.Lite.write_all_proofs_to_disk
   in
@@ -83,9 +94,11 @@ let persistent_frontier_worker_long_job logger dump_path snapshot_name =
   let worker =
     Worker.create { db; logger; dequeue_snarked_ledger = const () }
   in
-  ignore Diff.Full.E.to_lite ;
   [%log info] "Dispatching the worker" ;
-  Worker.dispatch worker input >>| fun () -> [%log info] "Worker task done"
+  Worker.dispatch worker input
+  >>| fun () ->
+  Unix.close fd ;
+  [%log info] "Worker task done"
 
 (* TODO: fix data retrival so it works on CI *)
 let dump_path () = Sys.getenv_exn "TEST_DUMP_PERSISTENT_FRONTIER_SYNC"
