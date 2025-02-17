@@ -1,0 +1,19 @@
+(library
+ (name verification_key_wire)
+ (public_name mina_base.verification_key_wire)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   ;; local libraries
+   zkapp_basic
+   pickles pickles_types pickles.backend snark_params crypto_params
+            signature_lib one_or_two currency random_oracle random_oracle_input kimchi_pasta.basic data_hash_lib with_hash
+            kimchi_pasta
+            
+)
+ (preprocess
+  (pps ppx_snarky ppx_mina ppx_version ppx_compare ppx_deriving.enum ppx_deriving.ord ppx_deriving.make
+       ppx_base ppx_let ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson ppx_inline_test h_list.ppx
+       ppx_variants_conv ppx_pipebang
+ ))
+ (instrumentation (backend bisect_ppx)))
