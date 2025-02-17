@@ -18,6 +18,6 @@ apt-get install -y aptly
 
 mkdir -p $LOCAL_DEB_FOLDER
 source ./buildkite/scripts/export-git-env-vars.sh
-source ./buildkite/scripts/cache.sh read --root shared/debs/ "$MINA_DEB_CODENAME/*" _build
+source ./buildkite/scripts/cache.sh read --root shared/debs "$MINA_DEB_CODENAME/*" _build
 source ./buildkite/scripts/cache.sh read debians/$MINA_DEB_CODENAME/* _build
 source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --clean --background

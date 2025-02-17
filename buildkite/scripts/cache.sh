@@ -2,7 +2,6 @@
 
 
 # bash strict mode
-set -x
 set -T # inherit DEBUG and RETURN trap for functions
 set -C # prevent file overwrite by > &> <>
 set -E # inherit -e
@@ -81,7 +80,7 @@ function read_help(){
     echo ""
     printf "  %-25s %s\n" "-h  | --help" "show help";
     printf "  %-25s %s\n" "-o  | --override" "[bool] override existing cached files";
-    printf "  %-25s %s\n" "-r  | --root" "[path] override cache root folder. WARNING it does not override cache mount point";
+    printf "  %-25s %s\n" "-r  | --root" "[path] override cache root folder. WARNING it does not override cache mount point. Do not add leading slash at the beginning or end"; 
     echo ""
     echo "Values:"
     echo ""
@@ -181,7 +180,7 @@ function write_help(){
     echo ""
     printf "  %-25s %s\n" "-h  | --help" "show help";
     printf "  %-25s %s\n" "-g  | --override" "[bool] override existing files";
-    printf "  %-25s %s\n" "-g  | --root" "[path] override cache root folder. WARNING it does not override cache mount point";
+    printf "  %-25s %s\n" "-g  | --root" "[path] override cache root folder. WARNING it does not override cache mount point. Do not add leading slash at the beginning or end.";
     echo ""
     echo "Values:"
     echo ""
