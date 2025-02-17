@@ -237,7 +237,7 @@ build_batch_txn_deb() {
 
 ##################################### GENERATE TEST SUITE PACKAGE #######################################
 build_functional_test_suite_deb() {
-  create_control_file mina-test-suite "${SHARED_DEPS}, mina-berkeley-instrumented, mina-archive-instrumented" 'Test suite apps for mina.'
+  create_control_file mina-test-suite "${SHARED_DEPS}" 'Test suite apps for mina.'
 
   # Binaries
   cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
