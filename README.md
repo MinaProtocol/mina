@@ -4,9 +4,9 @@
 
 <div align="center">
 
-  ![GitHub stars](https://img.shields.io/github/stars/minaprotocol/mina)&nbsp;&nbsp;![GitHub forks](https://img.shields.io/github/forks/minaprotocol/mina)
+  [![GitHub stars](https://img.shields.io/github/stars/minaprotocol/mina)](https://github.com/MinaProtocol/mina/stargazers)&nbsp;&nbsp;[![GitHub forks](https://img.shields.io/github/forks/minaprotocol/mina)](https://github.com/MinaProtocol/mina/forks)
 
-![GitHub contributors](https://img.shields.io/github/contributors/minaprotocol/mina)&nbsp;&nbsp;![GitHub commit activity](https://img.shields.io/github/commit-activity/m/minaprotocol/mina)&nbsp;&nbsp;![GitHub last commit](https://img.shields.io/github/last-commit/minaprotocol/mina)
+[![GitHub contributors](https://img.shields.io/github/contributors/minaprotocol/mina)](https://github.com/MinaProtocol/mina/graphs/contributors)&nbsp;&nbsp;![GitHub commit activity](https://img.shields.io/github/commit-activity/m/minaprotocol/mina)&nbsp;&nbsp;![GitHub last commit](https://img.shields.io/github/last-commit/minaprotocol/mina)
 
 | Develop[^1] | Compatible[^2] | Master[^3] | 
 | ------- | ---------- | ---------- |
