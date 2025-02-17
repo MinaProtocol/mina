@@ -24,12 +24,9 @@ let dependsOn =
         DebianVersions.dependsOn
           DebianVersions.DebVersion.Bullseye
           Profiles.Type.Lightnet
-      # DebianVersions.dependsOnStep
-          (None Text)
+      # DebianVersions.dependsOn
           DebianVersions.DebVersion.Bullseye
           Profiles.Type.Standard
-          BuildFlags.Type.Instrumented
-          "build"
 
 let buildTestCmd
     : Size -> Command.Type
