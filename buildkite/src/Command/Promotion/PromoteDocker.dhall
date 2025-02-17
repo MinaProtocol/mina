@@ -85,7 +85,7 @@ let promoteDockerStep =
           in  Command.build
                 Command.Config::{
                 , commands = commands
-                , label = "Promote Docker: ${spec.step_key}"
+                , label = "Docker: ${spec.step_key}"
                 , key = spec.step_key
                 , target = Size.XLarge
                 , depends_on = spec.deps
