@@ -359,10 +359,6 @@
           '';
           buildInputs = [
             self.packages.${system}.test_executive
-            pkgs.kubectl
-            pkgs.google-cloud-sdk
-            pkgs.terraform
-            pkgs.curl
           ];
         };
         packages.impure-shell =
