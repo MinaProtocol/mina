@@ -229,7 +229,6 @@ let promoteSteps
                             , remove_profile_from_name =
                                 spec.remove_profile_from_name
                             , step_key = spec.step_key
-                            , allow_signing = spec.allow_signing
                             , if = spec.if
                             }
                   )
