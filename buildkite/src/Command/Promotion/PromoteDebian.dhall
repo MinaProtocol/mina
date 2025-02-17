@@ -36,6 +36,7 @@ let PromoteDebianSpec =
           , profile : Profiles.Type
           , remove_profile_from_name : Bool
           , step_key : Text
+          , allow_signing : Bool
           , if : Optional B/If
           }
       , default =
@@ -53,6 +54,7 @@ let PromoteDebianSpec =
           , profile = Profiles.Type.Standard
           , remove_profile_from_name = False
           , step_key = "promote-debian-package"
+          , allow_signing = True
           , if = None B/If
           }
       }
