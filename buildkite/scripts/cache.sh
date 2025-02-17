@@ -103,7 +103,7 @@ function read(){
     fi
 
     local __override='-n'
-    local __root="$CACHE_MOUNTPOINT/$CACHE_ROOT_FOLDER"
+    local __root="$CACHE_ROOT_FOLDER"
     local __skip_dirs_creation=0
       
     while [ ${#} -gt 0 ]; do
@@ -126,7 +126,7 @@ function read(){
             ;;
             * )
                 if [ ! -v __from ]; then
-                   __from="$__root/$1"
+                   __from="$CACHE_MOUNTPOINT/$__root/$1"
                    shift 1;
                    continue
                 fi
@@ -207,7 +207,7 @@ function write(){
 
     
     local __override='-n'
-    local __root="$CACHE_MOUNTPOINT/$CACHE_ROOT_FOLDER"
+    local __root="$CACHE_ROOT_FOLDER"
       
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
@@ -231,7 +231,7 @@ function write(){
                 fi
 
                 if [ ! -v __to ]; then
-                   __to=$__root/"$1"
+                   __to=$CACHE_MOUNTPOINT/$__root/"$1"
                    shift 1;
                    continue
                 fi
