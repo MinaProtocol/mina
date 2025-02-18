@@ -2147,8 +2147,8 @@ module Queries = struct
           [ arg "maxLength"
               ~doc:
                 "The maximum number of blocks to return. If there are more \
-                 blocks in the transition frontier from root to tip, the maxLength \
-                 blocks closest to the best tip will be returned"
+                 blocks in the transition frontier from root to tip, the \
+                 maxLength blocks closest to the best tip will be returned"
               ~typ:int
           ]
       ~resolve:(fun { ctx = mina; _ } () max_length ->
@@ -2178,9 +2178,9 @@ module Queries = struct
               ~typ:Types.Input.TokenId.arg_typ ~default:Token_id.default
           ; arg "maxLength"
               ~doc:
-                "The maximum number of blocks to search for actions. If there are more \
-                 blocks in the transition frontier from root to tip, the maxLength \
-                 blocks closest to the best tip will be returned"
+                "The maximum number of blocks to search for actions. If there \
+                 are more blocks in the transition frontier from root to tip, \
+                 the maxLength blocks closest to the best tip will be returned"
               ~typ:int
           ]
       ~resolve:(fun { ctx = mina; _ } () pk token max_length ->
