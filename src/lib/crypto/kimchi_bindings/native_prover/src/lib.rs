@@ -21,6 +21,15 @@ fn caml_do_cool_thingies(mut cx: FunctionContext) -> JsResult<JsString> {
     Ok(cx.string("hello from native rust this is Yoni"))
 }
 
+// This takes a Vec<Fp>, applies the Poseidon permutation in place, returns the mutated Vec
+fn pasta_fp_poseidon_block_cipher(mut state: Vec<Fp>) -> Vec<Fp> {
+    poseidon_block_cipher::<Fp, PlonkSpongeConstantsKimchi>(
+        mina_poseidon::pasta::fp_kimchi::static_params(),
+        &mut state,
+    );
+    state
+}
+
 // The Neon module initialization
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
