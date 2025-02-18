@@ -98,6 +98,7 @@ let persistent_frontier_worker_long_job logger dump_path snapshot_name =
   Worker.dispatch worker input
   >>| fun () ->
   Unix.close fd ;
+  Database.close db ;
   [%log info] "Worker task done"
 
 (* TODO: fix data retrival so it works on CI *)
@@ -120,6 +121,10 @@ let () =
         ] )
     ; ( "Reproduce persistent frontier bottleneck"
       , [ test_case "testcase 2025_02-13-07-54-53" `Quick
+            (* WARN:
+               This very test changes the state of the DB so it's ran in the very last,
+               we're counting on the testcase won't be ran in parallel
+            *)
             (is_long_job (test_case_2025_02_13 logger) true)
         ] )
     ]
