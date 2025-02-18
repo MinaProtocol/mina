@@ -64,7 +64,7 @@ let snarked_local_state (t : _ Poly.t) =
 module Value = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
         ( Staged_ledger_hash.Stable.V1.t
         , Frozen_ledger_hash.Stable.V1.t

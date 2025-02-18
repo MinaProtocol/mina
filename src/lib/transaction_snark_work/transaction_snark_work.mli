@@ -61,7 +61,7 @@ module type S = sig
   val proofs : t -> Ledger_proof.t One_or_two.t
 end
 
-type t = Mina_wire_types.Transaction_snark_work.V2.t =
+type t = Mina_wire_types.Transaction_snark_work.V3.t =
   { fee : Currency.Fee.t
   ; proofs : Ledger_proof.t One_or_two.t
   ; prover : Public_key.Compressed.t
@@ -74,11 +74,11 @@ val info : t -> Info.t
 val statement : t -> Statement.t
 
 module Stable : sig
-  module V2 : sig
+  module V3 : sig
     type t [@@deriving bin_io, equal, sexp, version, yojson]
   end
 end
-with type V2.t = t
+with type V3.t = t
 
 type unchecked = t
 

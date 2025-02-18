@@ -1,5 +1,5 @@
 module Failure = struct
-  module V2 = struct
+  module V3 = struct
     type t =
       | Predicate
       | Source_not_present
@@ -62,12 +62,12 @@ module Failure = struct
   end
 
   module Collection = struct
-    module V1 = struct
-      type t = V2.t list list
+    module V2 = struct
+      type t = V3.t list list
     end
   end
 end
 
-module V2 = struct
-  type t = Applied | Failed of Failure.Collection.V1.t
+module V3 = struct
+  type t = Applied | Failed of Failure.Collection.V2.t
 end

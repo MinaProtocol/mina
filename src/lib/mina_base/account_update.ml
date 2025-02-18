@@ -935,13 +935,13 @@ end
 module Account_precondition = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t = Zkapp_precondition.Account.Stable.V3.t
       [@@deriving sexp, yojson, hash]
 
       let (_ :
             ( t
-            , Mina_wire_types.Mina_base.Account_update.Account_precondition.V1.t
+            , Mina_wire_types.Mina_base.Account_update.Account_precondition.V2.t
             )
             Type_equal.t ) =
         Type_equal.T
@@ -1064,10 +1064,10 @@ end
 module Preconditions = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Mina_wire_types.Mina_base.Account_update.Preconditions.V1.t =
+    module V2 = struct
+      type t = Mina_wire_types.Mina_base.Account_update.Preconditions.V2.t =
         { network : Zkapp_precondition.Protocol_state.Stable.V1.t
-        ; account : Account_precondition.Stable.V1.t
+        ; account : Account_precondition.Stable.V2.t
         ; valid_while :
             Mina_numbers.Global_slot_since_genesis.Stable.V1.t
             Zkapp_precondition.Numeric.Stable.V1.t
@@ -1162,7 +1162,7 @@ module Body = struct
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
           ; token_id : Token_id.Stable.V2.t
@@ -1174,7 +1174,7 @@ module Body = struct
           ; actions : Events'.Stable.V1.t
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
           ; call_depth : int
-          ; preconditions : Preconditions.Stable.V1.t
+          ; preconditions : Preconditions.Stable.V2.t
           ; use_full_commitment : bool
           ; implicit_account_creation_fee : bool
           ; may_use_token : May_use_token.Stable.V1.t
@@ -1232,7 +1232,7 @@ module Body = struct
           ; actions : Events'.Stable.V1.t
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
           ; call_depth : int
-          ; preconditions : Preconditions.Stable.V1.t
+          ; preconditions : Preconditions.Stable.V2.t
           ; use_full_commitment : bool
           ; implicit_account_creation_fee : bool
           ; may_use_token : May_use_token.Stable.V1.t
@@ -1258,7 +1258,7 @@ module Body = struct
         ; events : Events'.Stable.V1.t
         ; actions : Events'.Stable.V1.t
         ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
-        ; preconditions : Preconditions.Stable.V1.t
+        ; preconditions : Preconditions.Stable.V2.t
         ; use_full_commitment : bool
         ; implicit_account_creation_fee : bool
         ; may_use_token : May_use_token.Stable.V1.t
@@ -1701,7 +1701,7 @@ module T = struct
       module V3 = struct
         (** An account update in a zkApp transaction *)
         type t =
-          { body : Body.Graphql_repr.Stable.V1.t
+          { body : Body.Graphql_repr.Stable.V2.t
           ; authorization : Control.Stable.V2.t
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, fields]

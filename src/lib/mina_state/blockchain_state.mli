@@ -48,7 +48,7 @@ end
 module Value : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type t =
         ( Staged_ledger_hash.Stable.V1.t
         , Frozen_ledger_hash.Stable.V1.t

@@ -6,7 +6,7 @@ module type S = Ledger_proof_intf.S
 module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t = Transaction_snark.Stable.V3.t
       [@@deriving compare, equal, sexp, yojson, hash]
 

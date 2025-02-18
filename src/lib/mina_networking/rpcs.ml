@@ -250,15 +250,15 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
     include Master
   end)
 
-  module V2 = struct
+  module V3 = struct
     module T = struct
       type query = State_hash.Stable.V1.t
 
       type response =
-        ( Staged_ledger.Scan_state.Stable.V2.t
+        ( Staged_ledger.Scan_state.Stable.V3.t
         * Ledger_hash.Stable.V1.t
         * Pending_coinbase.Stable.V2.t
-        * Mina_state.Protocol_state.Value.Stable.V2.t list )
+        * Mina_state.Protocol_state.Value.Stable.V3.t list )
         option
 
       let query_of_caller_model = Fn.id
@@ -796,7 +796,7 @@ module Get_completed_snarks = struct
     module T = struct
       type query = unit [@@deriving sexp, to_yojson]
 
-      type response = Transaction_snark_work.Stable.V2.t list option
+      type response = Transaction_snark_work.Stable.V3.t list option
     end
 
     module Caller = T
@@ -827,7 +827,7 @@ module Get_completed_snarks = struct
     module T = struct
       type query = unit [@@deriving sexp]
 
-      type response = Transaction_snark_work.Stable.V2.t list option
+      type response = Transaction_snark_work.Stable.V3.t list option
 
       let query_of_caller_model = Fn.id
 
@@ -921,7 +921,7 @@ module Get_ancestry = struct
     include Master
   end)
 
-  module V2 = struct
+  module V3 = struct
     module T = struct
       type query =
         ( Consensus.Data.Consensus_state.Value.Stable.V2.t
@@ -1126,7 +1126,7 @@ module Get_best_tip = struct
     include Master
   end)
 
-  module V2 = struct
+  module V3 = struct
     module T = struct
       type query = unit [@@deriving sexp]
 

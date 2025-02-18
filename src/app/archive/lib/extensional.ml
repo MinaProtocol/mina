@@ -38,7 +38,7 @@ module User_command = struct
               [@to_yojson Transaction_hash.to_yojson]
               [@of_yojson Transaction_hash.of_yojson]
         ; status : Bounded_types.String.Stable.V1.t
-        ; failure_reason : Transaction_status.Failure.Stable.V2.t option
+        ; failure_reason : Transaction_status.Failure.Stable.V3.t option
         }
       [@@deriving yojson, equal]
 
@@ -56,7 +56,7 @@ end
 module Internal_command = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       (* for `command_type`, a string is enough
          no existing string conversion for the original OCaml type
       *)
@@ -70,7 +70,7 @@ module Internal_command = struct
               [@to_yojson Transaction_hash.to_yojson]
               [@of_yojson Transaction_hash.of_yojson]
         ; status : Bounded_types.String.Stable.V1.t
-        ; failure_reason : Transaction_status.Failure.Stable.V2.t option
+        ; failure_reason : Transaction_status.Failure.Stable.V3.t option
         }
       [@@deriving yojson, equal]
 
@@ -86,7 +86,7 @@ end
 module Zkapp_command = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         { sequence_no : int
         ; fee_payer : Account_update.Body.Fee_payer.Stable.V1.t
@@ -140,8 +140,8 @@ module Block = struct
             Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         ; timestamp : Block_time.Stable.V1.t
         ; user_cmds : User_command.Stable.V3.t list
-        ; internal_cmds : Internal_command.Stable.V2.t list
-        ; zkapp_cmds : Zkapp_command.Stable.V1.t list
+        ; internal_cmds : Internal_command.Stable.V3.t list
+        ; zkapp_cmds : Zkapp_command.Stable.V2.t list
         ; protocol_version : Protocol_version.Stable.V2.t
         ; proposed_protocol_version : Protocol_version.Stable.V2.t option
         ; chain_status : Chain_status.Stable.V1.t

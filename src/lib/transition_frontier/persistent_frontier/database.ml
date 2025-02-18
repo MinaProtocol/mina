@@ -50,10 +50,10 @@ module Schema = struct
     | Db_version : int t
     | Transition : State_hash.Stable.V1.t -> Mina_block.Stable.V3.t t
     | Arcs : State_hash.Stable.V1.t -> State_hash.Stable.V1.t list t
-    | Root : Root_data.Minimal.Stable.V2.t t
+    | Root : Root_data.Minimal.Stable.V3.t t
     | Best_tip : State_hash.Stable.V1.t t
     | Protocol_states_for_root_scan_state
-        : Mina_state.Protocol_state.Value.Stable.V2.t list t
+        : Mina_state.Protocol_state.Value.Stable.V3.t list t
 
   [@@@warning "+22"]
 
@@ -343,7 +343,7 @@ let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
         Error (`Not_found (`Arcs parent_hash))
   in
   match values with
-  | Some (Some_key_value (Root, (old_root : Root_data.Minimal.Stable.V2.t)))
+  | Some (Some_key_value (Root, (old_root : Root_data.Minimal.Stable.V3.t)))
     :: arcs ->
       let%map.Result () =
         List.fold2_exn ~init:(Result.return ()) ~f:populate parent_hashes arcs

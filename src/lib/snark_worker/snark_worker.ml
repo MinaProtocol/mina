@@ -22,13 +22,13 @@ module Worker = struct
 
     [%%versioned_rpc
     module Get_work = struct
-      module V2 = struct
+      module V3 = struct
         module T = struct
           type query = unit
 
           type response =
             ( ( Transaction_witness.Stable.V3.t
-              , Inputs.Ledger_proof.Stable.V2.t )
+              , Inputs.Ledger_proof.Stable.V3.t )
               Snark_work_lib.Work.Single.Spec.Stable.V2.t
               Snark_work_lib.Work.Spec.Stable.V1.t
             * Public_key.Compressed.Stable.V1.t )
@@ -49,19 +49,19 @@ module Worker = struct
         include Rpcs.Get_work.Register (T)
       end
 
-      module Latest = V2
+      module Latest = V3
     end]
 
     [%%versioned_rpc
     module Submit_work = struct
-      module V2 = struct
+      module V3 = struct
         module T = struct
           type query =
             ( ( Transaction_witness.Stable.V3.t
-              , Ledger_proof.Stable.V2.t )
+              , Ledger_proof.Stable.V3.t )
               Snark_work_lib.Work.Single.Spec.Stable.V2.t
               Snark_work_lib.Work.Spec.Stable.V1.t
-            , Ledger_proof.Stable.V2.t )
+            , Ledger_proof.Stable.V3.t )
             Snark_work_lib.Work.Result.Stable.V1.t
 
           type response = unit
@@ -79,7 +79,7 @@ module Worker = struct
         include Rpcs.Submit_work.Register (T)
       end
 
-      module Latest = V2
+      module Latest = V3
     end]
 
     [%%versioned_rpc
@@ -89,7 +89,7 @@ module Worker = struct
           type query =
             Bounded_types.Wrapped_error.Stable.V1.t
             * ( Transaction_witness.Stable.V3.t
-              , Inputs.Ledger_proof.Stable.V2.t )
+              , Inputs.Ledger_proof.Stable.V3.t )
               Snark_work_lib.Work.Single.Spec.Stable.V2.t
               Snark_work_lib.Work.Spec.Stable.V1.t
             * Public_key.Compressed.Stable.V1.t

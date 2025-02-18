@@ -5,7 +5,7 @@ module Common : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V2 : sig
+    module V3 : sig
       type t
     end
   end]
@@ -38,22 +38,22 @@ module Limited : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V3 : sig
+    module V4 : sig
       type t
 
       val hashes : t -> State_hash.State_hashes.Stable.V1.t
 
-      val common : t -> Common.Stable.V2.t
+      val common : t -> Common.Stable.V3.t
 
       val protocol_states :
            t
-        -> Mina_state.Protocol_state.Value.Stable.V2.t
+        -> Mina_state.Protocol_state.Value.Stable.V3.t
            Mina_base.State_hash.With_state_hashes.Stable.V1.t
            list
 
       val create :
-           transition:Mina_block.Validated.Stable.V2.t
-        -> scan_state:Staged_ledger.Scan_state.Stable.V2.t
+           transition:Mina_block.Validated.Stable.V3.t
+        -> scan_state:Staged_ledger.Scan_state.Stable.V3.t
         -> pending_coinbase:Pending_coinbase.Stable.V2.t
         -> protocol_states:
              Mina_state.Protocol_state.value
@@ -97,14 +97,14 @@ module Minimal : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V2 : sig
+    module V3 : sig
       type t
 
       val hash : t -> State_hash.t
 
-      val of_limited : common:Common.Stable.V2.t -> State_hash.Stable.V1.t -> t
+      val of_limited : common:Common.Stable.V3.t -> State_hash.Stable.V1.t -> t
 
-      val scan_state : t -> Staged_ledger.Scan_state.Stable.V2.t
+      val scan_state : t -> Staged_ledger.Scan_state.Stable.V3.t
 
       val pending_coinbase : t -> Pending_coinbase.Stable.V2.t
     end

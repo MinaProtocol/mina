@@ -79,7 +79,7 @@ module Call_forest : sig
   end
 end
 
-module V1 : sig
+module V2 : sig
   type t =
     { fee_payer : Mina_base_account_update.Fee_payer.V1.t
     ; account_updates :
@@ -99,7 +99,7 @@ module Valid : sig
   end
 
   module V2 : sig
-    type t = { zkapp_command : V1.t }
+    type t = { zkapp_command : V2.t }
   end
 end
 

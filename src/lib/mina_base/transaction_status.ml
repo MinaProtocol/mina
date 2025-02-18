@@ -3,8 +3,8 @@ open Core_kernel
 module Failure = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t = Mina_wire_types.Mina_base.Transaction_status.Failure.V2.t =
+    module V3 = struct
+      type t = Mina_wire_types.Mina_base.Transaction_status.Failure.V3.t =
         | Predicate [@value 1]
         | Source_not_present
         | Receiver_not_present
@@ -74,7 +74,7 @@ module Failure = struct
       [%%versioned
       module Stable = struct
         module V1 = struct
-          type t = (int * Stable.V2.t list) list
+          type t = (int * Stable.V3.t list) list
           [@@deriving equal, compare, yojson, sexp, hash]
 
           let to_latest = Fn.id
@@ -84,8 +84,8 @@ module Failure = struct
 
     [%%versioned
     module Stable = struct
-      module V1 = struct
-        type t = Stable.V2.t list list
+      module V2 = struct
+        type t = Stable.V3.t list list
         [@@deriving equal, compare, yojson, sexp, hash]
 
         let to_latest = Fn.id
@@ -574,10 +574,10 @@ end
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
-    type t = Mina_wire_types.Mina_base.Transaction_status.V2.t =
+  module V3 = struct
+    type t = Mina_wire_types.Mina_base.Transaction_status.V3.t =
       | Applied
-      | Failed of Failure.Collection.Stable.V1.t
+      | Failed of Failure.Collection.Stable.V2.t
     [@@deriving sexp, yojson, equal, compare]
 
     let to_latest = Fn.id

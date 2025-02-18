@@ -21,7 +21,7 @@ module Transactions = struct
     module V3 = struct
       type t =
         { commands :
-            ( User_command.Stable.V2.t
+            ( User_command.Stable.V3.t
             , Transaction_hash.Stable.V1.t )
             With_hash.Stable.V1.t
             With_status.Stable.V2.t
@@ -44,7 +44,7 @@ module Protocol_state = struct
     module V3 = struct
       type t =
         { previous_state_hash : State_hash.Stable.V1.t
-        ; blockchain_state : Mina_state.Blockchain_state.Value.Stable.V2.t
+        ; blockchain_state : Mina_state.Blockchain_state.Value.Stable.V3.t
         ; consensus_state : Consensus.Data.Consensus_state.Value.Stable.V2.t
         }
 
@@ -55,7 +55,7 @@ end
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
+  module V3 = struct
     type t =
       { creator : Public_key.Compressed.Stable.V1.t
       ; winner : Public_key.Compressed.Stable.V1.t

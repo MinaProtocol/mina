@@ -51,8 +51,10 @@ module T = struct
        add hash_zkapp_command_vn for that version
     *)
 
-    module V1 = struct
-      type t = Mina_wire_types.Mina_base.Zkapp_command.V1.t =
+    (* TODO restore V1 like the comment says! *)
+
+    module V2 = struct
+      type t = Mina_wire_types.Mina_base.Zkapp_command.V2.t =
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
         ; account_updates :
             ( Account_update.Stable.V2.t
@@ -404,7 +406,7 @@ let check_authorization (p : Account_update.t) : unit Or_error.t =
 module Verifiable : sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t = private
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
         ; account_updates :
@@ -474,7 +476,7 @@ module Verifiable : sig
 end = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
         ; account_updates :
@@ -825,7 +827,7 @@ module type Valid_intf = sig
   [%%versioned:
   module Stable : sig
     module V2 : sig
-      type t = private { zkapp_command : T.Stable.V1.t }
+      type t = private { zkapp_command : T.Stable.V2.t }
       [@@deriving sexp, compare, equal, hash, yojson]
     end
   end]
@@ -869,7 +871,7 @@ struct
   module Stable = struct
     module V2 = struct
       type t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V2.t =
-        { zkapp_command : S.V1.t }
+        { zkapp_command : S.V2.t }
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id

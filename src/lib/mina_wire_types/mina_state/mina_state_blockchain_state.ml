@@ -27,7 +27,7 @@ module Poly = struct
 end
 
 module Value = struct
-  module V2 = struct
+  module V3 = struct
     type t =
       ( Mina_base.Staged_ledger_hash.V1.t
       , Mina_base.Frozen_ledger_hash.V1.t

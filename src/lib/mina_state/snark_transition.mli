@@ -32,7 +32,7 @@ module Value : sig
   module Stable : sig
     module V3 : sig
       type t =
-        ( Blockchain_state.Value.Stable.V2.t
+        ( Blockchain_state.Value.Stable.V3.t
         , Consensus.Data.Consensus_transition.Value.Stable.V1.t
         , Pending_coinbase.Update.Stable.V1.t )
         Poly.Stable.V1.t

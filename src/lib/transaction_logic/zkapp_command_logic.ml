@@ -262,7 +262,7 @@ module Local_state = struct
           , bool
           , Zkapp_command.Transaction_commitment.Stable.V1.t
           , Mina_numbers.Index.Stable.V1.t
-          , Transaction_status.Failure.Collection.Stable.V1.t )
+          , Transaction_status.Failure.Collection.Stable.V2.t )
           Stable.V1.t
         [@@deriving equal, compare, hash, yojson, sexp]
 

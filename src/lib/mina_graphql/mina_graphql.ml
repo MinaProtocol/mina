@@ -2828,7 +2828,7 @@ module Queries = struct
         match encoding_opt with
         | Some `BASE64 ->
             Bin_prot.Writer.to_string
-              Mina_state.Protocol_state.Value.Stable.V2.bin_t.writer
+              Mina_state.Protocol_state.Value.Stable.V3.bin_t.writer
               protocol_state
             |> Base64.encode_exn
         | Some `JSON | None ->
