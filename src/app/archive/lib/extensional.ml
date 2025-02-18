@@ -97,7 +97,7 @@ module Zkapp_command = struct
               [@of_yojson Transaction_hash.of_yojson]
         ; status : Bounded_types.String.Stable.V1.t
         ; failure_reasons :
-            Transaction_status.Failure.Collection.Display.Stable.V1.t option
+            Transaction_status.Failure.Collection.Display.Stable.V2.t option
         }
       [@@deriving yojson, equal]
 

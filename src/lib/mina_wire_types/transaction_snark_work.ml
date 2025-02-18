@@ -1,5 +1,5 @@
 module Statement = struct
-  module V2 = struct
+  module V3 = struct
     type t = Mina_state.Snarked_ledger_state.V3.t One_or_two.V1.t
   end
 end

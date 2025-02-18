@@ -19,7 +19,7 @@ module Statement = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type t = Transaction_snark.Statement.Stable.V3.t One_or_two.Stable.V1.t
       [@@deriving equal, compare, hash, sexp, yojson]
 
@@ -54,7 +54,7 @@ module Info = struct
 
     module V3 = struct
       type t =
-        { statements : Statement.Stable.V2.t
+        { statements : Statement.Stable.V3.t
         ; work_ids : int One_or_two.Stable.V1.t
         ; fee : Fee.Stable.V1.t
         ; prover : Public_key.Compressed.Stable.V1.t

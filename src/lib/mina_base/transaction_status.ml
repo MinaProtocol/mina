@@ -73,7 +73,7 @@ module Failure = struct
     module Display = struct
       [%%versioned
       module Stable = struct
-        module V1 = struct
+        module V2 = struct
           type t = (int * Stable.V3.t list) list
           [@@deriving equal, compare, yojson, sexp, hash]
 

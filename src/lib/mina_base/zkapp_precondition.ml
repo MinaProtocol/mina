@@ -1997,7 +1997,7 @@ end
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
+  module V3 = struct
     type t =
       ( Account.Stable.V3.t
       , Protocol_state.Stable.V1.t

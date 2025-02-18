@@ -541,7 +541,7 @@ module Diff_versioned = struct
     module V3 = struct
       type t = Resource_pool.Diff.t =
         | Add_solved_work of
-            Transaction_snark_work.Statement.Stable.V2.t
+            Transaction_snark_work.Statement.Stable.V3.t
             * Ledger_proof.Stable.V3.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty

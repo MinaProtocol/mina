@@ -11,7 +11,7 @@ module Statement : sig
   include Hashable.S with type t := t
 
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type t [@@deriving bin_io, compare, sexp, version, yojson, equal]
 
       include Comparable.S with type t := t
@@ -19,7 +19,7 @@ module Statement : sig
       include Hashable.S_binable with type t := t
     end
   end
-  with type V2.t = t
+  with type V3.t = t
 
   val gen : t Quickcheck.Generator.t
 
@@ -30,7 +30,7 @@ end
 
 module Info : sig
   type t =
-    { statements : Statement.Stable.V2.t
+    { statements : Statement.Stable.V3.t
     ; work_ids : int One_or_two.Stable.V1.t
     ; fee : Fee.Stable.V1.t
     ; prover : Public_key.Compressed.Stable.V1.t
