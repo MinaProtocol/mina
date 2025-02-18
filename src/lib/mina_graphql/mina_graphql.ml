@@ -2198,7 +2198,6 @@ module Queries = struct
                         (Mina_lib.config mina).precomputed_values
                           .constraint_constants block
                   in
-                  (* log the number of actions that were obtained  by using the size of transactions*)
                   Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                     "number of transactions obtained %d"
                     (List.length transactions) ;
@@ -2210,11 +2209,6 @@ module Queries = struct
                         | Command user_cmd -> (
                             match user_cmd with
                             | Zkapp_command c ->
-                              (* log that a zkapp transaction was found*)
-                                Logger.info logger ~module_:__MODULE__
-                                  ~location:__LOC__
-                                  "zkapp transaction was found" ;
-                                (* log that we are trying to get the account updates *)
                                 let updates =
                                   c |> Zkapp_command.account_updates
                                   |> Zkapp_command.Call_forest.to_list
@@ -2252,7 +2246,6 @@ module Queries = struct
                   zkapp_transactions |> List.concat )
                 best_chain
             in
-            (* log the size of actions *)
             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
               "number of actions found %d"
               (List.length actions) ;
