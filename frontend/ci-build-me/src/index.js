@@ -128,8 +128,8 @@ const handler = async (event, req) => {
       } else {
         // NB: Users that are 'privately' a member of the org will not be able to trigger CI jobs
         return [
-          "comment author is not (publically) a member of the core team",
-          "comment author is not (publically) a member of the core team",
+          "comment author is not (publicly) a member of the core team",
+          "comment author is not (publicly) a member of the core team",
         ];
       }
     }
@@ -165,8 +165,8 @@ const handler = async (event, req) => {
       } else {
         // NB: Users that are 'privately' a member of the org will not be able to trigger CI jobs
         return [
-          "comment author is not (publically) a member of the core team",
-          "comment author is not (publically) a member of the core team",
+          "comment author is not (publicly) a member of the core team",
+          "comment author is not (publicly) a member of the core team",
         ];
       }
     }
@@ -199,8 +199,8 @@ const handler = async (event, req) => {
       } else {
         // NB: Users that are 'privately' a member of the org will not be able to trigger CI jobs
         return [
-          "comment author is not (publically) a member of the core team",
-          "comment author is not (publically) a member of the core team",
+          "comment author is not (publicly) a member of the core team",
+          "comment author is not (publicly) a member of the core team",
         ];
       }
     }
@@ -232,8 +232,8 @@ const handler = async (event, req) => {
       } else {
         // NB: Users that are 'privately' a member of the org will not be able to trigger CI jobs
         return [
-          "comment author is not (publically) a member of the core team",
-          "comment author is not (publically) a member of the core team",
+          "comment author is not (publicly) a member of the core team",
+          "comment author is not (publicly) a member of the core team",
         ];
       }
     }
