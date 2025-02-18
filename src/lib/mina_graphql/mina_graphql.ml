@@ -2147,7 +2147,7 @@ module Queries = struct
           [ arg "maxLength"
               ~doc:
                 "The maximum number of blocks to return. If there are more \
-                 blocks in the transition frontier from root to tip, the n \
+                 blocks in the transition frontier from root to tip, the maxLength \
                  blocks closest to the best tip will be returned"
               ~typ:int
           ]
@@ -2166,8 +2166,8 @@ module Queries = struct
   let account_actions =
     field "accountActions"
       ~doc:
-        "find all the actions associated to an account from the current best \
-         tip"
+        "Find all the actions associated to an account from the current best \
+         tip."
       ~typ:(non_null (list (non_null (list (non_null Types.field_elem)))))
       ~args:
         Arg.
@@ -2178,8 +2178,8 @@ module Queries = struct
               ~typ:Types.Input.TokenId.arg_typ ~default:Token_id.default
           ; arg "maxLength"
               ~doc:
-                "The maximum number of blocks to return. If there are more \
-                 blocks in the transition frontier from root to tip, the n \
+                "The maximum number of blocks to search for actions. If there are more \
+                 blocks in the transition frontier from root to tip, the maxLength \
                  blocks closest to the best tip will be returned"
               ~typ:int
           ]
