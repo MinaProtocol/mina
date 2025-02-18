@@ -2169,7 +2169,6 @@ module Queries = struct
         "find all the actions associated to an account from the current best \
          tip"
       ~typ:(non_null (list (non_null (list (non_null Types.field_elem)))))
-        (* (non_null (list (non_null (list (non_null field_elem)))) *)
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key of account being retrieved"
@@ -2186,15 +2185,7 @@ module Queries = struct
           ]
       ~resolve:(fun { ctx = mina; _ } () pk token max_length ->
         let logger = (Mina_lib.config mina).logger in
-
-        (* simply sprintf that we hit the account actions business logic *)
-
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "account_actions was hit" ;
-        (* log that we are trying to get the best chain *)
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "trying to get best chain" ;
-
         let best_chain = Mina_lib.best_chain ?max_length mina in
-        (* log that we successfully got best chain with the length *)
         match best_chain with
         | Some best_chain ->
             let actions =
@@ -2208,13 +2199,9 @@ module Queries = struct
                           .constraint_constants block
                   in
                   (* log the number of actions that were obtained  by using the size of transactions*)
-                  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                     "number of transactions obtained %d"
                     (List.length transactions) ;
-                  (* log that we are trying to get the zkapp transactions *)
-                  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                    "trying to get zkapp transactions" ;
-
 
                   let zkapp_transactions =
                     List.filter_map transactions ~f:(fun txn ->
@@ -2232,12 +2219,6 @@ module Queries = struct
                                   c |> Zkapp_command.account_updates
                                   |> Zkapp_command.Call_forest.to_list
                                   |> List.filter ~f:(fun au ->
-                                    (* log the public key*)
-                                    Logger.info logger ~module_:__MODULE__
-                                      ~location:__LOC__
-                                      "PUBLIC KEY: %s"
-                                      (Public_key.Compressed.to_base58_check
-                                          au.body.public_key) ;
                                          let account_id =
                                            Account_id.create au.body.public_key
                                              token
@@ -2245,12 +2226,10 @@ module Queries = struct
                                          Account_id.equal account_id
                                            (Account_id.create pk token) )
                                 in
-                                (* log the size of the updates list *)
-                                Logger.info logger ~module_:__MODULE__
+                                Logger.debug logger ~module_:__MODULE__
                                   ~location:__LOC__
                                   "number of updates found %d"
                                   (List.length updates) ;
-                                (* log that we are trying to get the actions *)
                                 let actions =
                                   List.concat_map
                                     ~f:(fun au ->
@@ -2258,14 +2237,7 @@ module Queries = struct
                                       let field_elems =
                                         List.map
                                           ~f:(fun e -> 
-                                            (* log the size of the array *)
-                                            let ls = Array.to_list e in
-                                            (* log the size of the ls *)
-                                            Logger.info logger ~module_:__MODULE__
-                                              ~location:__LOC__
-                                              "number of field_elems found %d"
-                                              (List.length ls) ;
-                                            ls)
+                                            Array.to_list e )
                                           action_body
                                       in
                                       field_elems )
@@ -2275,25 +2247,17 @@ module Queries = struct
                             | Signed_command _ ->
                                 None )
                         | Fee_transfer _ | Coinbase _ ->
-                          (* log the fee transfer of coinbase *)
-                            Logger.info logger ~module_:__MODULE__
-                              ~location:__LOC__
-                              "fee transfer or coinbase was found" ;
                             None )
                   in
                   zkapp_transactions |> List.concat )
                 best_chain
             in
             (* log the size of actions *)
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
               "number of actions found %d"
               (List.length actions) ;
-            (* log that we are returning the actions *)
             actions
         | None ->
-          (* log that no best chain was found *)
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              "no best chain was found" ;
             [] )
 
   let block =
