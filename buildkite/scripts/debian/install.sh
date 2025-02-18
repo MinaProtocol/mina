@@ -36,14 +36,14 @@ else
     case $i in
       mina-berkeley*|mina-devnet|mina-mainnet)
         # Downaload mina-logproc too
-        source ./buildkite/scripts/cache.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
+        source ./buildkite/scripts/cache.sh read debians/$MINA_DEB_CODENAME/mina-logproc* $LOCAL_DEB_FOLDER
       ;;
       mina-create-legacy-genesis)
         # Download locally static debians (for example mina-legacy-create-genesis )
         source ./buildkite/scripts/cache.sh read --root buildkite/shared/debs "$MINA_DEB_CODENAME/$i*" _build
       ;;
     esac
-    source ./buildkite/scripts/cache.sh "debians/$MINA_DEB_CODENAME/${i}_*" $LOCAL_DEB_FOLDER
+    source ./buildkite/scripts/cache.sh debians/$MINA_DEB_CODENAME/${i}_* $LOCAL_DEB_FOLDER
   done
 fi
 
