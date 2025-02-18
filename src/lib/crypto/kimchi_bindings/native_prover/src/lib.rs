@@ -1,4 +1,6 @@
 use neon::prelude::*;
+use mina_curves::pasta::Fp;
+use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, permutation::poseidon_block_cipher};
 
 // // 
 // fn caml_do_cool_thingies() -> String {
