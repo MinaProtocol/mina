@@ -2221,8 +2221,7 @@ module Queries = struct
                                            (Account_id.create pk token) )
                                 in
                                 Logger.debug logger ~module_:__MODULE__
-                                  ~location:__LOC__
-                                  "number of updates found %d"
+                                  ~location:__LOC__ "number of updates found %d"
                                   (List.length updates) ;
                                 let actions =
                                   List.concat_map
@@ -2230,8 +2229,7 @@ module Queries = struct
                                       let action_body = au.body.actions in
                                       let field_elems =
                                         List.map
-                                          ~f:(fun e -> 
-                                            Array.to_list e )
+                                          ~f:(fun e -> Array.to_list e)
                                           action_body
                                       in
                                       field_elems )
@@ -2247,8 +2245,7 @@ module Queries = struct
                 best_chain
             in
             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              "number of actions found %d"
-              (List.length actions) ;
+              "number of actions found %d" (List.length actions) ;
             actions
         | None ->
             [] )
