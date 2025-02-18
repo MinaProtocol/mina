@@ -15932,6 +15932,13 @@
                 "find all the actions associated to an account from the current best tip",
               "args": [
                 {
+                  "name": "maxLength",
+                  "description":
+                    "The maximum number of blocks to return. If there are more blocks in the transition frontier from root to tip, the n blocks closest to the best tip will be returned",
+                  "type": { "kind": "SCALAR", "name": "Int", "ofType": null },
+                  "defaultValue": null
+                },
+                {
                   "name": "token",
                   "description":
                     "Token of account being retrieved (defaults to MINA)",
