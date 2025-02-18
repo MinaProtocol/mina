@@ -38,7 +38,7 @@ in  Pipeline.build
             DebianVersions.dirtyWhen DebianVersions.DebVersion.Bullseye
         , path = "TearDown"
         , name = name
-        , tags = [ PipelineTag.Type.TearDown ]
+        , tags = [] : List PipelineTag.Type
         , mode = PipelineMode.Type.Stable
         }
       , steps =

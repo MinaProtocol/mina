@@ -1,8 +1,6 @@
 (library
  (name mina_block)
  (public_name mina_block)
- (inline_tests
-  (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
   integers
@@ -13,7 +11,6 @@
   sexplib0
   base64
   result
-  ppx_inline_test.config
   base
   core
   ;; local libraries
