@@ -329,8 +329,16 @@ let initialize t ~root_data =
 
 let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
     ~parent_hashes =
+  let rec debug_parent_hashes hashes =
+    match hashes with
+    | [] ->
+        ""
+    | hash :: rest ->
+        State_hash.to_base58_check hash ^ ", " ^ debug_parent_hashes rest
+  in
+  [%log' info t.logger] ">> Calculating values for parent hashes %s"
+    (debug_parent_hashes parent_hashes) ;
   let f h = Rocks.Key.Some_key (Arcs h) in
-  [%log' info t.logger] ">> Calculating values" ;
   let values =
     get_batch t.db ~keys:(Some_key Root :: List.map parent_hashes ~f)
   in

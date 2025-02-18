@@ -101,8 +101,12 @@ module GADT = struct
     module K = Intf.Key.Some (Key)
 
     let get_batch t ~keys =
+      Printf.printf ">>> [%f] Getting batch and deserializing with %d keys\n"
+        (Sys.time ()) (List.length keys) ;
+      Printf.printf ">>> [%f] Accessing the database\n" (Sys.time ()) ;
       let skeys = List.map keys ~f:(fun (K.Some_key k) -> bin_key_dump k) in
       let serialized_value_opts = Database.get_batch ~keys:skeys t in
+      Printf.printf ">>> [%f] Deserializing the data\n" (Sys.time ()) ;
       let f (K.Some_key k) =
         Option.map ~f:(fun serialized_value ->
             let bin_data = Key.binable_data_type k in
@@ -111,7 +115,9 @@ module GADT = struct
             in
             K.Some_key_value (k, value) )
       in
-      List.map2_exn keys serialized_value_opts ~f
+      let result = List.map2_exn keys serialized_value_opts ~f in
+      Printf.printf ">>> [%f] Done with getting batch\n" (Sys.time ()) ;
+      result
 
     module Batch = struct
       include Make_Serializer (Database.Batch)
