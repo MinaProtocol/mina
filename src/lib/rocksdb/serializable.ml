@@ -106,7 +106,18 @@ module GADT = struct
       Printf.printf ">>> [%f] Accessing the database\n" (Sys.time ()) ;
       let skeys = List.map keys ~f:(fun (K.Some_key k) -> bin_key_dump k) in
       let serialized_value_opts = Database.get_batch ~keys:skeys t in
-      Printf.printf ">>> [%f] Deserializing the data\n" (Sys.time ()) ;
+      let rec value_sizes result =
+        match result with
+        | [] ->
+            ""
+        | None :: rest ->
+            "none, " ^ value_sizes rest
+        | Some s :: rest ->
+            Printf.sprintf "bigstring(%d), %s" (Bigstring.length s)
+              (value_sizes rest)
+      in
+      Printf.printf ">>> [%f] Deserializing the data of size %s\n" (Sys.time ())
+        (value_sizes serialized_value_opts) ;
       let f (K.Some_key k) =
         Option.map ~f:(fun serialized_value ->
             let bin_data = Key.binable_data_type k in
