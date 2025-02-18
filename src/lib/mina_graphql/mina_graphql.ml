@@ -2204,8 +2204,7 @@ module Queries = struct
 
                   let zkapp_transactions =
                     List.filter_map transactions ~f:(fun txn ->
-                        let tx = txn.data in
-                        match tx with
+                        match txn.data with
                         | Command user_cmd -> (
                             match user_cmd with
                             | Zkapp_command c ->
