@@ -22,7 +22,8 @@ export MINA_NETWORK=${MINA_NETWORK:=testnet}
 export LOG_LEVEL="${LOG_LEVEL:=Info}"
 
 # Postgres database connection string and related variables
-export POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g')
+POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g')
+export POSTGRES_VERSION
 export POSTGRES_USERNAME=${POSTGRES_USERNAME:=pguser}
 export POSTGRES_DBNAME=${POSTGRES_DBNAME:=archive}
 export POSTGRES_DATA_DIR=${POSTGRES_DATA_DIR:=/data/postgresql}
@@ -73,8 +74,8 @@ ZKAPP_SENDER_KEY=$MINA_KEYS_PATH/zkapp-sender.key
 ZKAPP_ACCOUNT_KEY=$MINA_KEYS_PATH/zkapp-account.key
 TIME_VESTING_ACCOUNT_1_KEY=$MINA_KEYS_PATH/time-vesting-account-1.key
 TIME_VESTING_ACCOUNT_2_KEY=$MINA_KEYS_PATH/time-vesting-account-2.key
-keys=($BLOCK_PRODUCER_KEY $SNARK_PRODUCER_KEY $ZKAPP_FEE_PAYER_KEY $ZKAPP_SENDER_KEY $ZKAPP_ACCOUNT_KEY $TIME_VESTING_ACCOUNT_1_KEY $TIME_VESTING_ACCOUNT_2_KEY)
-for key in ${keys[*]}; do
+keys=("$BLOCK_PRODUCER_KEY" "$SNARK_PRODUCER_KEY" "$ZKAPP_FEE_PAYER_KEY" "$ZKAPP_SENDER_KEY" "$ZKAPP_ACCOUNT_KEY" "$TIME_VESTING_ACCOUNT_1_KEY" "$TIME_VESTING_ACCOUNT_2_KEY")
+for key in "${keys[@]}"; do
   mina advanced generate-keypair --privkey-path $key
 done
 chmod -R 0700 $MINA_KEYS_PATH
@@ -152,8 +153,8 @@ psql -f "${MINA_ARCHIVE_SQL_SCHEMA_PATH}" "${PG_CONN}"
 
 # Mina Rosetta
 echo "=========================== STARTING ROSETTA API ONLINE AND OFFLINE INSTANCES ==========================="
-ports=($MINA_ROSETTA_ONLINE_PORT $MINA_ROSETTA_OFFLINE_PORT)
-for port in ${ports[*]}; do
+ports=("$MINA_ROSETTA_ONLINE_PORT" "$MINA_ROSETTA_OFFLINE_PORT")
+for port in "${ports[@]}"; do
   mina-rosetta \
     --archive-uri "${PG_CONN}" \
     --graphql-uri http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql \
