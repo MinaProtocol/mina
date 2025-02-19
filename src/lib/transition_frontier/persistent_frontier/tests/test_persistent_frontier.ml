@@ -1,7 +1,6 @@
 open Core
 open Async_kernel
 open Persistent_frontier
-open Frontier_base
 
 (* NOTE:
     Here's the implementation of "long_jobs_with_context" found in Async_kernel's
@@ -58,59 +57,33 @@ let long_job () = sleep_async (long_job_limit_seconds + 1)
 
 let short_job () = return ()
 
-(* NOTE: Using a mmaped version to read input:
-   - Iterating with In_channel.input_char is painfully slow
-   - In_channel.read_all seems to cause OOM
-*)
-let mmap_input_to_bin_prot_buf (name : string) =
-  let open Unix in
-  let open Bigarray in
-  let fd = openfile name ~mode:[ O_RDONLY ] in
-  let file_size =
-    (fstat fd).st_size |> Int.of_int64
-    |> Option.value_exn ?message:(Some "file size won't fit in `int`")
-  in
-  let buf =
-    Unix.map_file fd char c_layout ~shared:false [| file_size |]
-    |> array1_of_genarray
-  in
-  (fd, buf)
+let wrap_as_deferred f = Deferred.create (fun ivar -> Ivar.fill ivar (f ()))
 
-let persistent_frontier_worker_long_job logger dump_path snapshot_name =
+let deserializae_root_value_from_db logger dump_path snapshot_name () =
   let working_directory = dump_path ^/ snapshot_name in
-  [%log info] "Current working directory: %s" working_directory ;
-  [%log info] "Deserializing diff list from input.bin" ;
-  let bin_class = Bin_prot.Type_class.bin_list Diff.Lite.Stable.Latest.bin_t in
-  [%log info] "> Creating mmap for diff list" ;
-  let fd, buf = mmap_input_to_bin_prot_buf (working_directory ^/ "input.bin") in
-  [%log info] "> Deserialize in memory diff list" ;
-  let input_deserialized = bin_class.reader.read ~pos_ref:(ref 0) buf in
-  [%log info] "> Convert list from Diff.Lite.{Stable.V1.t -> E.t}" ;
-  let input =
-    List.map ~f:Diff.Lite.write_all_proofs_to_disk input_deserialized
-  in
+  [%log info]
+    "Start `deserializae_root_value_from_db`, Current working directory: %s"
+    working_directory ;
   [%log info] "Loading database" ;
   let db = Database.create ~logger ~directory:working_directory in
-  let worker =
-    Worker.create { db; logger; dequeue_snarked_ledger = const () }
-  in
-  [%log info] "Dispatching the worker" ;
-  Worker.dispatch worker input
-  >>| fun () ->
-  Unix.close fd ;
-  Database.close db ;
-  [%log info] "Worker task done"
+  [%log info] "Querying root from database and attempt to deserialize it" ;
+  let root = Database.get_root db in
+  ( match root with
+  | Ok _ ->
+      [%log info] "Successfully found the root"
+  | Error _ ->
+      [%log info] "No root found" ) ;
+  [%log info] "Done `deserializae_root_value_from_db`" ;
+  Database.close db
 
-(* TODO: fix data retrival so it works on CI *)
-let dump_path () = Sys.getenv_exn "TEST_DUMP_PERSISTENT_FRONTIER_SYNC"
-
-let test_case_2025_02_13 logger () =
-  persistent_frontier_worker_long_job logger (dump_path ())
-    "2025_02-13-07-54-53"
+let testcase_deserialize logger dump_path snapshot_name () =
+  wrap_as_deferred
+    (deserializae_root_value_from_db logger dump_path snapshot_name)
 
 let () =
   fail_on_long_async_jobs () ;
   let logger = Logger.create () in
+  let dump_path = Sys.getenv_exn "TEST_DUMP_PERSISTENT_FRONTIER_SYNC" in
   let open Alcotest in
   run "Persistent Frontier"
     [ ( "Catch long async jobs"
@@ -121,10 +94,8 @@ let () =
         ] )
     ; ( "Reproduce persistent frontier bottleneck"
       , [ test_case "testcase 2025_02-13-07-54-53" `Quick
-            (* WARN:
-               This very test changes the state of the DB so it's ran in the very last,
-               we're counting on the testcase won't be ran in parallel
-            *)
-            (is_long_job (test_case_2025_02_13 logger) true)
+            (is_long_job
+               (testcase_deserialize logger dump_path "2025_02-13-07-54-53")
+               true )
         ] )
     ]
