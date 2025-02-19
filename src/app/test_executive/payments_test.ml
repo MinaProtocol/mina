@@ -69,11 +69,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (Wait_condition.nodes_to_initialize
            (Core.String.Map.data all_mina_nodes) )
     in
-    let untimed_node_a = Network.block_producer network "untimed-node-a" in
-    let untimed_node_b = Network.block_producer network "untimed-node-b" in
-    let timed_node_c = Network.block_producer network "timed-node-c" in
-    let fish1 = Network.genesis_keypair network "fish1" in
-    let fish2 = Network.genesis_keypair network "fish2" in
+    let untimed_node_a = Network.block_producer_exn network "untimed-node-a" in
+    let untimed_node_b = Network.block_producer_exn network "untimed-node-b" in
+    let timed_node_c = Network.block_producer_exn network "timed-node-c" in
+    let fish1 = Network.genesis_keypair_exn network "fish1" in
+    let fish2 = Network.genesis_keypair_exn network "fish2" in
     (* hardcoded values of the balances of fish1 (receiver) and fish2 (sender), update here if they change in the config *)
     (* TODO undo the harcoding, don't be lazy and just make the graphql commands to fetch the balances *)
     let receiver_original_balance = Currency.Amount.of_mina_string_exn "100" in
@@ -85,9 +85,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          ~f:(fun { Signature_lib.Keypair.public_key; _ } ->
            public_key |> Signature_lib.Public_key.to_bigstring
            |> Bigstring.to_string ) ) ;
-    let snark_coordinator = Network.node network "snark-node" in
-    let snark_node_key1 = Network.genesis_keypair network "snark-node-key1" in
-    let snark_node_key2 = Network.genesis_keypair network "snark-node-key2" in
+    let snark_coordinator = Network.node_exn network "snark-node" in
+    let snark_node_key1 =
+      Network.genesis_keypair_exn network "snark-node-key1"
+    in
+    let snark_node_key2 =
+      Network.genesis_keypair_exn network "snark-node-key2"
+    in
 
     [%log info] "snark node keypairs: %s"
       (List.to_string [ snark_node_key1.keypair; snark_node_key2.keypair ]
