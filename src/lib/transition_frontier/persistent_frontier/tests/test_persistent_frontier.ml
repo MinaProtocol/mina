@@ -67,10 +67,20 @@ let deserializae_root_value_from_db logger dump_path snapshot_name () =
   [%log info] "Loading database" ;
   let db = Database.create ~logger ~directory:working_directory in
   [%log info] "Querying root from database and attempt to deserialize it" ;
-  let root = Database.get_root db in
-  ( match root with
-  | Ok _ ->
-      [%log info] "Successfully found the root"
+  ( match Database.get_root db with
+  | Ok root ->
+      [%log info] "Successfully found the root" ;
+      let open Frontier_base.Root_data.Minimal.Stable.V2 in
+      let root_scan_state = scan_state root in
+      let root_scan_state_size =
+        Staged_ledger.Scan_state.Stable.V2.bin_size_t root_scan_state
+      in
+      [%log info] "Scan state has size %d" root_scan_state_size ;
+      let root_pending_coinbase = pending_coinbase root in
+      let root_pending_coinbase_size =
+        Mina_base.Pending_coinbase.Stable.V2.bin_size_t root_pending_coinbase
+      in
+      [%log info] "Pending coinbase has size %d" root_pending_coinbase_size
   | Error _ ->
       [%log info] "No root found" ) ;
   [%log info] "Done `deserializae_root_value_from_db`" ;
