@@ -7,6 +7,8 @@ var caml_do_cool_thingies = function () {
   return plonk_native.caml_do_cool_thingies();
 };
 
-var fp_poseidon_block_cipher = function () {
-  return plonk_native.fp_poseidon_block_cipher();
+// Provides: fp_poseidon_block_cipher_native
+// Requires: plonk_native
+var fp_poseidon_block_cipher_native = function () {
+  return plonk_native.fp_poseidon_block_cipher_native();
 };
