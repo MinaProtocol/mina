@@ -29,9 +29,9 @@ fn fp_poseidon_block_cipher_native(mut cx: FunctionContext) -> JsResult<JsString
 
     // hard-coded vector: [1, 2, 3] in the Fp field
     let mut state = vec![
-        Fp::from(1u64),
-        Fp::from(2u64),
-        Fp::from(3u64),
+        Fp::from(n1),
+        Fp::from(n2),
+        Fp::from(n3),
     ];
 
 
