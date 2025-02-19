@@ -18,6 +18,11 @@ use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, permutation::poseidon
 // }
 
 fn fp_poseidon_block_cipher_native(mut cx: FunctionContext) -> JsResult<JsString> {
+  
+    let arg1 = cx.argument::<JsNumber>(0)?.value(&mut cx);
+    let arg2 = cx.argument::<JsNumber>(1)?.value(&mut cx);
+    let arg3 = cx.argument::<JsNumber>(2)?.value(&mut cx);
+
     // hard-coded vector: [1, 2, 3] in the Fp field
     let mut state = vec![
         Fp::from(1u64),
