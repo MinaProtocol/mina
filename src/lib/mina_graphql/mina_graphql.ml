@@ -2168,7 +2168,7 @@ module Queries = struct
       ~doc:
         "Find all the actions associated to an account from the current best \
          tip."
-      ~typ:(non_null (list (non_null (list (non_null Types.field_elem)))))
+      ~typ:(non_null @@ list @@ non_null Types.Action_state.spec)
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key of account being retrieved"
@@ -2196,14 +2196,17 @@ module Queries = struct
                     |> Staged_ledger_diff.Body.staged_ledger_diff
                     |> Staged_ledger_diff.commands
                   in
+                  let transaction_seq = ref 0 in
                   let action_list_list =
                     List.filter_map user_cmds ~f:(fun user_cmd ->
+                        transaction_seq := !transaction_seq + 1 ;
                         match user_cmd.data with
                         | Zkapp_command c ->
                             let actions =
                               c |> Zkapp_command.account_updates
-                              |> Zkapp_command.Call_forest.fold ~init:[]
+                              |> Zkapp_command.Call_forest.fold ~init:(0, [])
                                    ~f:(fun acc au ->
+                                     let action_seq, acc = acc in
                                      let account_id =
                                        Account_id.create au.body.public_key
                                          token
@@ -2218,13 +2221,23 @@ module Queries = struct
                                            ~f:(fun e -> Array.to_list e)
                                            action_body
                                        in
-                                       field_elems @ acc
-                                     else acc )
+                                       let action_state =
+                                         { Types.Action_state.action =
+                                             field_elems
+                                         ; action_sequence_no = action_seq
+                                         ; transaction_sequence_no =
+                                             !transaction_seq
+                                         }
+                                       in
+                                       (action_seq + 1, action_state :: acc)
+                                     else (action_seq + 1, acc) )
                             in
+                            let _, actions = actions in
                             Some actions
                         | Signed_command _ ->
                             None )
                   in
+                  let action_list_list = action_list_list in
                   action_list_list |> List.concat )
                 best_chain
             in

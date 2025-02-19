@@ -5540,6 +5540,73 @@
           "possibleTypes": null
         },
         {
+          "kind": "OBJECT",
+          "name": "ActionState",
+          "description": "",
+          "fields": [
+            {
+              "name": "action",
+              "description": "",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "FieldElem",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "transactionSequenceNo",
+              "description": "",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "actionSequenceNo",
+              "description": "",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "ENUM",
           "name": "Encoding",
           "description": null,
@@ -15974,17 +16041,9 @@
                     "kind": "NON_NULL",
                     "name": null,
                     "ofType": {
-                      "kind": "LIST",
-                      "name": null,
-                      "ofType": {
-                        "kind": "NON_NULL",
-                        "name": null,
-                        "ofType": {
-                          "kind": "SCALAR",
-                          "name": "FieldElem",
-                          "ofType": null
-                        }
-                      }
+                      "kind": "OBJECT",
+                      "name": "ActionState",
+                      "ofType": null
                     }
                   }
                 }
