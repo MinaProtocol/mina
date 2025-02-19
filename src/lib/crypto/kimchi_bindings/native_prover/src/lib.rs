@@ -18,12 +18,20 @@ use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, permutation::poseidon
 // }
 
 fn caml_pasta_fp_poseidon_block_cipher_js(mut cx: FunctionContext) -> JsResult<JsString> {
-    // 1) Hard-coded vector: [1, 2, 3] in the Fp field
+    // hard-coded vector: [1, 2, 3] in the Fp field
     let mut state = vec![
         Fp::from(1u64),
         Fp::from(2u64),
         Fp::from(3u64),
     ];
+
+
+    // apply the Poseidon permutation
+    poseidon_block_cipher::<Fp, PlonkSpongeConstantsKimchi>(
+        &fp_kimchi::static_params(),
+        &mut state,
+    );
+
 
 }
 
