@@ -2184,67 +2184,50 @@ module Queries = struct
               ~typ:int
           ]
       ~resolve:(fun { ctx = mina; _ } () pk token max_length ->
-        let logger = (Mina_lib.config mina).logger in
         let best_chain = Mina_lib.best_chain ?max_length mina in
         match best_chain with
         | Some best_chain ->
             let actions =
               List.concat_map
                 ~f:(fun bc ->
-                  let transactions =
-                    let block = Transition_frontier.Breadcrumb.block bc in
-                    Mina_block.transactions
-                      ~constraint_constants:
-                        (Mina_lib.config mina).precomputed_values
-                          .constraint_constants block
+                  let user_cmds =
+                    bc |> Transition_frontier.Breadcrumb.block
+                    |> Mina_block.body
+                    |> Staged_ledger_diff.Body.staged_ledger_diff
+                    |> Staged_ledger_diff.commands
                   in
-                  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-                    "number of transactions obtained %d"
-                    (List.length transactions) ;
-
-                  let zkapp_transactions =
-                    List.filter_map transactions ~f:(fun txn ->
-                        match txn.data with
-                        | Command user_cmd -> (
-                            match user_cmd with
-                            | Zkapp_command c ->
-                                let updates =
-                                  c |> Zkapp_command.account_updates
-                                  |> Zkapp_command.Call_forest.to_list
-                                  |> List.filter ~f:(fun au ->
-                                         let account_id =
-                                           Account_id.create au.body.public_key
-                                             token
-                                         in
-                                         Account_id.equal account_id
-                                           (Account_id.create pk token) )
-                                in
-                                Logger.debug logger ~module_:__MODULE__
-                                  ~location:__LOC__ "number of updates found %d"
-                                  (List.length updates) ;
-                                let actions =
-                                  List.concat_map
-                                    ~f:(fun au ->
-                                      let action_body = au.body.actions in
-                                      let field_elems =
-                                        List.map
-                                          ~f:(fun e -> Array.to_list e)
-                                          action_body
-                                      in
-                                      field_elems )
-                                    updates
-                                in
-                                Some actions
-                            | Signed_command _ ->
-                                None )
-                        | Fee_transfer _ | Coinbase _ ->
+                  let action_list_list =
+                    List.filter_map user_cmds ~f:(fun user_cmd ->
+                        match user_cmd.data with
+                        | Zkapp_command c ->
+                            let actions =
+                              c |> Zkapp_command.account_updates
+                              |> Zkapp_command.Call_forest.fold ~init:[]
+                                   ~f:(fun acc au ->
+                                     let account_id =
+                                       Account_id.create au.body.public_key
+                                         token
+                                     in
+                                     if
+                                       Account_id.equal account_id
+                                         (Account_id.create pk token)
+                                     then
+                                       let action_body = au.body.actions in
+                                       let field_elems =
+                                         List.map
+                                           ~f:(fun e -> Array.to_list e)
+                                           action_body
+                                       in
+                                       field_elems @ acc
+                                     else acc )
+                            in
+                            Some actions
+                        | Signed_command _ ->
                             None )
                   in
-                  zkapp_transactions |> List.concat )
+                  action_list_list |> List.concat )
                 best_chain
             in
-            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              "number of actions found %d" (List.length actions) ;
             actions
         | None ->
             [] )

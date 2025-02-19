@@ -2169,6 +2169,14 @@ let snark_worker =
           ~resolve:(fun (_ : Mina_lib.t resolve_info) (_, fee) -> fee)
       ] )
 
+let events =
+  obj "Events" ~fields:(fun _ ->
+      [ field "events"
+          ~typ:(non_null @@ list @@ non_null string)
+          ~args:Arg.[]
+          ~resolve:(fun (_ : Mina_lib.t resolve_info) events -> events)
+      ] )
+
 module Payload = struct
   let peer : (Mina_lib.t, Network_peer.Peer.t option) typ =
     obj "NetworkPeerPayload" ~fields:(fun _ ->
