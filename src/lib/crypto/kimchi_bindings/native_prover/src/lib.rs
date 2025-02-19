@@ -1,7 +1,7 @@
 use neon::prelude::*;
 use mina_curves::pasta::Fp;
 // Import the Poseidon function and constants
-use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, permutation::poseidon_block_cipher};
+use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, permutation::poseidon_block_cipher, pasta::fp_kimchi};
 
 // // 
 // fn caml_do_cool_thingies() -> String {
@@ -33,7 +33,7 @@ fn caml_pasta_fp_poseidon_block_cipher_js(mut cx: FunctionContext) -> JsResult<J
     );
 
     // convert to a string to return something visible to Node.js
-    Ok(cx.string(format!("Poseidon Fp permutation result: {:?}", state)))
+    Ok(cx.string(format!("Poseidon Fp permutation native result: {:?}", state)))
 }
 
 fn caml_do_cool_thingies(mut cx: FunctionContext) -> JsResult<JsString> {
