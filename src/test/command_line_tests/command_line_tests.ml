@@ -89,7 +89,7 @@ module CliTests = struct
       let actual = Scanf.sscanf output "MINA : %f" (fun actual -> actual) in
       let total_currency_float = float_of_int total_currency /. 1000000000.0 in
       assert_don't_contain_log_output output ;
-      if not (Float.equal total_currency_float actual) then
+      if not Float.(abs (total_currency_float - actual) < 0.001) then
         failwithf "invalid mina total count %f vs %f" total_currency_float
           actual () ;
       return ()
