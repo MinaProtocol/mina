@@ -1,5 +1,6 @@
 use neon::prelude::*;
 use mina_curves::pasta::Fp;
+// Import the Poseidon function and constants
 use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, permutation::poseidon_block_cipher};
 
 // // 
@@ -16,18 +17,19 @@ use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, permutation::poseidon
 //     Ok(cx.string(result))
 // }
 
+fn caml_pasta_fp_poseidon_block_cipher_js(mut cx: FunctionContext) -> JsResult<JsString> {
+    // 1) Hard-coded vector: [1, 2, 3] in the Fp field
+    let mut state = vec![
+        Fp::from(1u64),
+        Fp::from(2u64),
+        Fp::from(3u64),
+    ];
+
+}
+
 fn caml_do_cool_thingies(mut cx: FunctionContext) -> JsResult<JsString> {
     // Directly create a `JsString` 
     Ok(cx.string("hello from native rust this is Yoni"))
-}
-
-// This takes a Vec<Fp>, applies the Poseidon permutation in place, returns the mutated Vec
-fn pasta_fp_poseidon_block_cipher(mut state: Vec<Fp>) -> Vec<Fp> {
-    poseidon_block_cipher::<Fp, PlonkSpongeConstantsKimchi>(
-        mina_poseidon::pasta::fp_kimchi::static_params(),
-        &mut state,
-    );
-    state
 }
 
 // The Neon module initialization
