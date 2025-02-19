@@ -134,6 +134,17 @@ module Lite : sig
   module E : sig
     type t = E : (lite, 'mutant) diff -> t [@@unboxed]
   end
+
+  [%%versioned:
+  module Stable : sig
+    [@@@no_toplevel_latest_type]
+
+    module V1 : sig
+      type t
+    end
+  end]
+
+  val read_all_proofs_from_disk : E.t -> Stable.Latest.t
 end
 
 module Full : sig

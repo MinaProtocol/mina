@@ -50,7 +50,8 @@ end
 (** Database Interface for storing heterogeneous key-value pairs. Similar to
     Janestreet's Core.Univ_map *)
 module GADT = struct
-  module Make (Key : Intf.Key.S) : Intf.Database.S with type 'a g := 'a Key.t =
+  module Make (Key : Intf.Key.S) :
+    Intf.Database.S with type 'a g := 'a Key.t and type raw_db_t := Database.t =
   struct
     let bin_key_dump (key : 'a Key.t) =
       Bin_prot.Utils.bin_dump (Key.binable_key_type key).writer key
@@ -80,6 +81,8 @@ module GADT = struct
     let create directory = Database.create directory
 
     let close = Database.close
+
+    let to_raw_db t = t
 
     module T = Make_Serializer (Database)
     include T
