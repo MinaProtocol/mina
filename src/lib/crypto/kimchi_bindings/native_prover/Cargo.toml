@@ -12,3 +12,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 neon = "1"
+
+# proof-systems
+mina-curves = { path = "../../proof-systems/curves" }
+mina-poseidon = { path = "../../proof-systems/poseidon" }
