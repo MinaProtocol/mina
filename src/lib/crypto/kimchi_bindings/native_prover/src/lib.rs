@@ -47,5 +47,8 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     // Export the JS function name ("caml_do_cool_thingies") 
     // and map it to our Rust function
     cx.export_function("caml_do_cool_thingies", caml_do_cool_thingies)?;
+
+    cx.export_function("fp_poseidon_block_cipher", caml_pasta_fp_poseidon_block_cipher_js
+    )?;
     Ok(())
 }
