@@ -1,7 +1,6 @@
 open Core
 open Async_kernel
 open Persistent_frontier
-open Frontier_base
 
 (* NOTE:
     Here's the implementation of "long_jobs_with_context" found in Async_kernel's
@@ -58,55 +57,33 @@ let long_job () = sleep_async (long_job_limit_seconds + 1)
 
 let short_job () = return ()
 
-let read_channel_to_bin_prot_buf (chan : In_channel.t) =
-  let open Bin_prot in
-  let file_size =
-    In_channel.length chan |> Int64.to_int
-    |> Option.value_exn ?message:(Some "input size to big to fit in `int`")
-  in
-  let result = Common.create_buf file_size in
-  let offset = ref 0 in
-  while !offset < file_size do
-    let byte =
-      In_channel.input_char chan
-      |> Option.value_exn ?message:(Some "Early EOF when reading input")
-    in
-    Bigarray.Array1.set result !offset byte ;
-    offset := !offset + 1
-  done ;
-  result
+let wrap_as_deferred f = Deferred.create (fun ivar -> Ivar.fill ivar (f ()))
 
-let persistent_frontier_worker_long_job logger dump_path snapshot_name =
+let deserializae_root_value_from_db logger dump_path snapshot_name () =
   let working_directory = dump_path ^/ snapshot_name in
-  [%log info] "Current working directory: %s" working_directory ;
-  [%log info] "Deserializing diff list from input.bin" ;
-  let bin_class = Bin_prot.Type_class.bin_list Diff.Lite.Stable.Latest.bin_t in
-  let input =
-    working_directory ^/ "input.bin"
-    |> In_channel.create ~binary:true
-    |> read_channel_to_bin_prot_buf
-    |> bin_class.reader.read ~pos_ref:(ref 0)
-    |> List.map ~f:Diff.Lite.write_all_proofs_to_disk
-  in
+  [%log info]
+    "Start `deserializae_root_value_from_db`, Current working directory: %s"
+    working_directory ;
   [%log info] "Loading database" ;
   let db = Database.create ~logger ~directory:working_directory in
-  let worker =
-    Worker.create { db; logger; dequeue_snarked_ledger = const () }
-  in
-  ignore Diff.Full.E.to_lite ;
-  [%log info] "Dispatching the worker" ;
-  Worker.dispatch worker input
+  [%log info] "Querying root from database and attempt to deserialize it" ;
+  let root = Database.get_root db in
+  ( match root with
+  | Ok _ ->
+      [%log info] "Successfully found the root"
+  | Error _ ->
+      [%log info] "No root found" ) ;
+  [%log info] "Done `deserializae_root_value_from_db`" ;
+  Database.close db
 
-(* TODO: fix data retrival so it works on CI *)
-let dump_path () = Sys.getenv_exn "TEST_DUMP_PERSISTENT_FRONTIER_SYNC"
-
-let test_case_2025_02_13 logger () =
-  persistent_frontier_worker_long_job logger (dump_path ())
-    "2025_02-13-07-54-53"
+let testcase_deserialize logger dump_path snapshot_name () =
+  wrap_as_deferred
+    (deserializae_root_value_from_db logger dump_path snapshot_name)
 
 let () =
   fail_on_long_async_jobs () ;
   let logger = Logger.create () in
+  let dump_path = Sys.getenv_exn "TEST_DUMP_PERSISTENT_FRONTIER_SYNC" in
   let open Alcotest in
   run "Persistent Frontier"
     [ ( "Catch long async jobs"
@@ -117,6 +94,8 @@ let () =
         ] )
     ; ( "Reproduce persistent frontier bottleneck"
       , [ test_case "testcase 2025_02-13-07-54-53" `Quick
-            (is_long_job (test_case_2025_02_13 logger) true)
+            (is_long_job
+               (testcase_deserialize logger dump_path "2025_02-13-07-54-53")
+               true )
         ] )
     ]
