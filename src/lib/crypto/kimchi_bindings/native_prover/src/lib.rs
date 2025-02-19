@@ -17,7 +17,7 @@ use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, permutation::poseidon
 //     Ok(cx.string(result))
 // }
 
-fn caml_pasta_fp_poseidon_block_cipher_js(mut cx: FunctionContext) -> JsResult<JsString> {
+fn fp_poseidon_block_cipher_native(mut cx: FunctionContext) -> JsResult<JsString> {
     // hard-coded vector: [1, 2, 3] in the Fp field
     let mut state = vec![
         Fp::from(1u64),
@@ -48,7 +48,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     // and map it to our Rust function
     cx.export_function("caml_do_cool_thingies", caml_do_cool_thingies)?;
 
-    cx.export_function("fp_poseidon_block_cipher", caml_pasta_fp_poseidon_block_cipher_js
+    cx.export_function("fp_poseidon_block_cipher_native", fp_poseidon_block_cipher_native
     )?;
     Ok(())
 }
