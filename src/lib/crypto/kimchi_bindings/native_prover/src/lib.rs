@@ -32,7 +32,8 @@ fn caml_pasta_fp_poseidon_block_cipher_js(mut cx: FunctionContext) -> JsResult<J
         &mut state,
     );
 
-
+    // convert to a string to return something visible to Node.js
+    Ok(cx.string(format!("Poseidon Fp permutation result: {:?}", state)))
 }
 
 fn caml_do_cool_thingies(mut cx: FunctionContext) -> JsResult<JsString> {
