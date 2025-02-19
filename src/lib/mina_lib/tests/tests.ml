@@ -225,6 +225,7 @@ let%test_module "Epoch ledger sync tests" =
           Network_pool.Snark_pool.Resource_pool.make_config ~verifier
             ~trust_system
             ~disk_location:(make_dirname "snark_pool_config")
+            ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
         in
         let snark_pool, snark_remote_sink, _snark_local_sink =
           Network_pool.Snark_pool.create ~config ~constraint_constants
