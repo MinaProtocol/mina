@@ -23,6 +23,10 @@ fn fp_poseidon_block_cipher_native(mut cx: FunctionContext) -> JsResult<JsString
     let arg2 = cx.argument::<JsNumber>(1)?.value(&mut cx);
     let arg3 = cx.argument::<JsNumber>(2)?.value(&mut cx);
 
+    let n1 = arg1 as u64;
+    let n2 = arg2 as u64;
+    let n3 = arg3 as u64;
+
     // hard-coded vector: [1, 2, 3] in the Fp field
     let mut state = vec![
         Fp::from(1u64),
