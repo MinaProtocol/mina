@@ -24,12 +24,6 @@ function isDaemonSynced() {
             jq '.data.syncStatus'
     )
     case ${status} in
-      \"BOOTSTRAP\")
-        ;&
-      \"CATCHUP\")
-        ;&
-      \"CONNECTING\")
-        ;&
       \"SYNCED\")
         return 0
         ;;
