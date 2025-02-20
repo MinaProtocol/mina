@@ -96,7 +96,15 @@ module type Full = sig
     module Stable : sig
       module V2 : sig
         type t
+
+        val coinbase :
+             constraint_constants:Genesis_constants.Constraint_constants.t
+          -> supercharge_coinbase:bool
+          -> t
+          -> Currency.Amount.t option
       end
+
+      module Latest = V2
     end
     with type V2.t = t
 

@@ -233,6 +233,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         [@@deriving equal, sexp, yojson]
 
         let to_latest = Fn.id
+
+        let coinbase = coinbase
       end
     end]
 

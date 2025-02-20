@@ -7,6 +7,11 @@ module Stable : sig
 
   module V2 : sig
     type t [@@deriving sexp, equal]
+
+    val transactions :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> t
+      -> Transaction.Stable.V2.t With_status.t list
   end
 end]
 
