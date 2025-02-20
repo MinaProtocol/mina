@@ -893,10 +893,26 @@ module Account = struct
       [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
 
       let to_latest
-          ({balance;nonce;receipt_chain_hash;delegate;state;action_state;proved_state;is_new} : t) : Latest.t
-        = {balance;nonce;receipt_chain_hash;delegate;state;action_state;proved_state;is_new
-          ;permissions = Permissions.accept
-          }
+          ({ balance
+           ; nonce
+           ; receipt_chain_hash
+           ; delegate
+           ; state
+           ; action_state
+           ; proved_state
+           ; is_new
+           } :
+            t ) : Latest.t =
+        { balance
+        ; nonce
+        ; receipt_chain_hash
+        ; delegate
+        ; state
+        ; action_state
+        ; proved_state
+        ; is_new
+        ; permissions = Permissions.accept
+        }
     end
   end]
 

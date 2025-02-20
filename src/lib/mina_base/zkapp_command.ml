@@ -190,21 +190,20 @@ module T = struct
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
         ; account_updates :
             ( Account_update.Stable.V1.t
-            ,Digest.Account_update.Stable.V1.t
-            ,Digest.Forest.Stable.V1.t)
+            , Digest.Account_update.Stable.V1.t
+            , Digest.Forest.Stable.V1.t )
             Call_forest.Stable.V1.t
         ; memo : Signed_command_memo.Stable.V1.t
         }
       [@@deriving annot, sexp, compare, equal, hash, yojson, fields]
 
-      let to_latest
-        ({fee_payer;account_updates;memo} : t
-        )
-        = ({fee_payer=fee_payer
-          ; account_updates = Call_forest.map
-              ~f:Account_update.Stable.V1.to_latest account_updates
-          ; memo=memo
-          } : V2.t)
+      let to_latest ({ fee_payer; account_updates; memo } : t) : V2.t =
+        { fee_payer
+        ; account_updates =
+            Call_forest.map ~f:Account_update.Stable.V1.to_latest
+              account_updates
+        ; memo
+        }
 
       module Wire = struct
         [%%versioned
@@ -221,7 +220,8 @@ module T = struct
               }
             [@@deriving sexp, compare, equal, hash, yojson]
 
-            let to_latest = Fn.id (* Is this correct? or should it convert to V2.Wire.V2 *)
+            let to_latest = Fn.id
+            (* Is this correct? or should it convert to V2.Wire.V2 *)
           end
         end]
 
@@ -284,7 +284,8 @@ module T = struct
       let of_wire (w : Wire.t) : t =
         { fee_payer = w.fee_payer
         ; memo = w.memo
-        ; account_updates = failwith "TODO"
+        ; account_updates =
+            failwith "TODO"
             (*
             w.account_updates
             |> Call_forest.accumulate_hashes
@@ -315,8 +316,10 @@ module T = struct
         *)
         { fee_payer = t.fee_payer
         ; memo = t.memo
-        ; account_updates = failwith "TODO" (* forget_hashes t.account_updates *)
+        ; account_updates =
+            failwith "TODO" (* forget_hashes t.account_updates *)
         }
+
       include
         Binable.Of_binable_without_uuid
           (Wire.Stable.V1)
@@ -328,7 +331,6 @@ module T = struct
             let to_binable = to_wire
           end)
     end
-
   end]
 end
 

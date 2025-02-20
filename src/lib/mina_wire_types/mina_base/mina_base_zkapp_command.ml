@@ -101,7 +101,6 @@ module V1 = struct
     }
 end
 
-
 module Valid = struct
   module Verification_key_hash = struct
     module V1 = struct

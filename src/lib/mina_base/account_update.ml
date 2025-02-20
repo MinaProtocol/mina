@@ -30,6 +30,7 @@ module Authorization_kind = struct
 
       let to_latest = Fn.id
     end
+
     module V1 = struct
       (* TODO: yojson for Field.t in snarky (#12591) *)
       type t =
@@ -41,9 +42,12 @@ module Authorization_kind = struct
 
       let to_latest (ak : t) : Latest.t =
         match ak with
-        | Signature -> Signature
-        | Proof p -> Proof p
-        | None_given -> None_given
+        | Signature ->
+            Signature
+        | Proof p ->
+            Proof p
+        | None_given ->
+            None_given
     end
   end]
 
@@ -968,7 +972,7 @@ module Account_precondition = struct
 
     module V1 = struct
       type t = Zkapp_precondition.Account.Stable.V2.t
-      [@@deriving sexp, yojson, hash,equal,compare]
+      [@@deriving sexp, yojson, hash, equal, compare]
 
       let (_ :
             ( t
@@ -977,7 +981,8 @@ module Account_precondition = struct
             Type_equal.t ) =
         Type_equal.T
 
-        let to_latest: t -> Latest.t = Zkapp_precondition.Account.Stable.V2.to_latest
+      let to_latest : t -> Latest.t =
+        Zkapp_precondition.Account.Stable.V2.to_latest
     end
   end]
 
@@ -1114,14 +1119,14 @@ module Preconditions = struct
             Mina_numbers.Global_slot_since_genesis.Stable.V1.t
             Zkapp_precondition.Numeric.Stable.V1.t
         }
-        [@@deriving annot, yojson,sexp,hash,hlist,fields,sexp,hlist,equal,compare]
+      [@@deriving
+        annot, yojson, sexp, hash, hlist, fields, sexp, hlist, equal, compare]
 
-      let to_latest
-        ({ network ; account ; valid_while } : t) : Latest.t =
-            {network
-            ;account = Account_precondition.Stable.V1.to_latest account
-            ;valid_while
-            }
+      let to_latest ({ network; account; valid_while } : t) : Latest.t =
+        { network
+        ; account = Account_precondition.Stable.V1.to_latest account
+        ; valid_while
+        }
     end
   end]
 
@@ -1335,19 +1340,37 @@ module Body = struct
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
 
-      let to_latest (
-
-          {public_key;token_id;update;balance_change;increment_nonce;events;actions
-          ;call_data;preconditions ;use_full_commitment;implicit_account_creation_fee
-          ;may_use_token;authorization_kind}
-          : t) : Latest.t =
-          {public_key;token_id;update;balance_change;increment_nonce;events;actions
-          ;call_data
-          ;preconditions = Preconditions.Stable.V1.to_latest preconditions
-          ;use_full_commitment;implicit_account_creation_fee
-          ;may_use_token;
-          authorization_kind = Authorization_kind.Stable.V1.to_latest authorization_kind
-          }
+      let to_latest
+          ({ public_key
+           ; token_id
+           ; update
+           ; balance_change
+           ; increment_nonce
+           ; events
+           ; actions
+           ; call_data
+           ; preconditions
+           ; use_full_commitment
+           ; implicit_account_creation_fee
+           ; may_use_token
+           ; authorization_kind
+           } :
+            t ) : Latest.t =
+        { public_key
+        ; token_id
+        ; update
+        ; balance_change
+        ; increment_nonce
+        ; events
+        ; actions
+        ; call_data
+        ; preconditions = Preconditions.Stable.V1.to_latest preconditions
+        ; use_full_commitment
+        ; implicit_account_creation_fee
+        ; may_use_token
+        ; authorization_kind =
+            Authorization_kind.Stable.V1.to_latest authorization_kind
+        }
     end
   end]
 
@@ -1832,11 +1855,9 @@ module T = struct
         { body : Body.Stable.V1.t; authorization : Control.Stable.V2.t }
       [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
-      let to_latest ({body;authorization} : t) : V2.t =
-        {body= Body.Stable.V1.to_latest body;authorization}
+      let to_latest ({ body; authorization } : t) : V2.t =
+        { body = Body.Stable.V1.to_latest body; authorization }
     end
-
-
   end]
 
   let of_graphql_repr ({ body; authorization } : Graphql_repr.t) : t =

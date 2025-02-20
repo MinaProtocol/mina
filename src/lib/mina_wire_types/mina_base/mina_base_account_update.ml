@@ -138,7 +138,8 @@ module Body = struct
       ; preconditions : Preconditions.V1.t
       ; use_full_commitment : bool
       ; implicit_account_creation_fee : bool
-      ; may_use_token : May_use_token.V1.t ; authorization_kind : Authorization_kind.V1.t
+      ; may_use_token : May_use_token.V1.t
+      ; authorization_kind : Authorization_kind.V1.t
       }
   end
 end
