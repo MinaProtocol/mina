@@ -4,11 +4,11 @@ module type Full = sig
     [@@@no_toplevel_latest_type]
 
     module V1 : sig
-      type t [@@deriving equal, compare, sexp, to_yojson, bin_io]
+      type t [@@deriving equal, sexp]
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving equal, compare, sexp, to_yojson]
+  type t = Stable.Latest.t
 
   val create : Diff.t -> t
 

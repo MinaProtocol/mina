@@ -48,7 +48,13 @@ if [[ -z "$FROM_COMPONENT" ]]; then usage "Source component is not set!"; fi;
 if [[ -z "$TO_COMPONENT" ]]; then usage "Target component is not set!"; fi;
 if [[ -z "$REPO" ]]; then usage "Repository is not set!"; fi;
 if [[ -z "$NEW_REPO" ]]; then NEW_REPO=$REPO; fi;
-if [[ -z "$REPO_KEY" ]]; then usage "Target repository key is not set!"; fi;
+if [ -z "${REPO_KEY:-}" ]; then
+  SIGN_ARG=""
+else
+  sudo chown -R opam ~/.gnupg/
+  gpg --batch --yes --import /var/secrets/debian/key.gpg
+  SIGN_ARG="--sign $REPO_KEY"
+fi
 
 # check for AWS Creds
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
@@ -62,10 +68,7 @@ echo "Promoting debs: ${PACKAGE}_${VERSION} to Release: ${TO_COMPONENT} and Code
 # Promote the deb .
 # If this fails, attempt to remove the lockfile and retry.
 
-if [[ -z "$NEW_VERSION" ]] || [[ "$NEW_VERSION" == "$VERSION" ]]; then
-  deb-s3 copy --s3-region=us-west-2 --lock --bucket packages.o1test.net --preserve-versions --cache-control=max-age=120  $PACKAGE $CODENAME $TO_COMPONENT --versions $VERSION --arch $ARCH --component ${FROM_COMPONENT} --codename ${CODENAME}
-else
-  source scripts/debian/reversion.sh \
+source scripts/debian/reversion.sh \
     --deb $PACKAGE  \
     --codename $CODENAME \
     --new-release $TO_COMPONENT \
@@ -76,6 +79,5 @@ else
     --new-suite $TO_COMPONENT \
     --new-name $NEW_NAME \
     --repo $REPO \
-    --new-repo $NEW_REPO
-    --sign $REPO_KEY
-fi
+    --new-repo $NEW_REPO \
+    $SIGN_ARG

@@ -44,4 +44,18 @@ module type S = sig
   val underlying_proof : t -> Proof.t
 
   val snarked_ledger_hash : t -> Frozen_ledger_hash.t
+
+  module Cached : sig
+    type t =
+      ( Mina_state.Snarked_ledger_state.With_sok.t
+      , Proof_cache_tag.t )
+      Proof_carrying_data.t
+
+    val write_proof_to_disk :
+      proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
+
+    val read_proof_from_disk : t -> Stable.Latest.t
+
+    val statement : t -> Mina_state.Snarked_ledger_state.t
+  end
 end

@@ -8,6 +8,8 @@ let List/map = Prelude.List.map
 
 let Package = ../../Constants/DebianPackage.dhall
 
+let DebianRepo = ../../Constants/DebianRepo.dhall
+
 let Network = ../../Constants/Network.dhall
 
 let PipelineMode = ../../Pipeline/Mode.dhall
@@ -42,6 +44,7 @@ let VerifyPackagesSpec =
           , debians : List Package.Type
           , dockers : List Artifact.Type
           , new_debian_version : Text
+          , debian_repo : DebianRepo.Type
           , profile : Profiles.Type
           , network : Network.Type
           , codenames : List DebianVersions.DebVersion
@@ -55,6 +58,7 @@ let VerifyPackagesSpec =
           , debians = [] : List Package.Type
           , dockers = [] : List Artifact.Type
           , new_debian_version = "\\\\\$MINA_DEB_VERSION"
+          , debian_repo = DebianRepo.Type.PackagesO1Test
           , profile = Profiles.Type.Standard
           , network = Network.Type.Mainnet
           , codenames = [] : List DebianVersions.DebVersion
@@ -139,6 +143,7 @@ let verifyPackagesToDebianSpecs
                                 , package = debian
                                 , new_version =
                                     verify_packages.new_debian_version
+                                , target_repo = verify_packages.debian_repo
                                 , network = verify_packages.network
                                 , codename = codename
                                 , to_channel = verify_packages.channel

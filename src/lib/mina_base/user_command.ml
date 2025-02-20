@@ -230,9 +230,9 @@ let fee : t -> Currency.Fee.t = function
 
 let has_insufficient_fee ~minimum_fee t = Currency.Fee.(fee t < minimum_fee)
 
-let is_disabled ~(compile_config : Mina_compile_config.t) = function
+let is_disabled = function
   | Zkapp_command _ ->
-      compile_config.zkapps_disabled
+      Node_config_unconfigurable_constants.zkapps_disabled
   | _ ->
       false
 
@@ -430,8 +430,7 @@ module Well_formedness_error = struct
         "Transaction type disabled"
 end
 
-let check_well_formedness ~(genesis_constants : Genesis_constants.t)
-    ~(compile_config : Mina_compile_config.t) t :
+let check_well_formedness ~(genesis_constants : Genesis_constants.t) t :
     (unit, Well_formedness_error.t list) result =
   let preds =
     let open Well_formedness_error in
@@ -440,7 +439,7 @@ let check_well_formedness ~(genesis_constants : Genesis_constants.t)
       , Insufficient_fee )
     ; (has_zero_vesting_period, Zero_vesting_period)
     ; (is_incompatible_version, Incompatible_version)
-    ; (is_disabled ~compile_config, Transaction_type_disabled)
+    ; (is_disabled, Transaction_type_disabled)
     ; (has_invalid_call_forest, Zkapp_invalid_call_forest)
     ]
   in
