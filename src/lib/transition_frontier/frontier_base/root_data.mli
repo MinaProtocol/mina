@@ -104,6 +104,8 @@ module Minimal : sig
 
       val hash : t -> State_hash.t
 
+      val common : t -> Common.Stable.V2.t
+
       val of_limited : common:Common.Stable.V2.t -> State_hash.Stable.V1.t -> t
 
       val scan_state : t -> Staged_ledger.Scan_state.Stable.V2.t

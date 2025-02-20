@@ -265,14 +265,28 @@ let get_if_exists db ~default ~key =
 let get db ~key ~error =
   match get db ~key with Some x -> Ok x | None -> Error error
 
+(* PERF:
+   please don't use this, and use get_root_hash whenever possible. This cost ~90s while get_root_hash is fast
+*)
 let get_root t =
   match get_batch t.db ~keys:[ Some_key Root_hash; Some_key Root_common ] with
   | [ Some (Some_key_value (Root_hash, hash))
     ; Some (Some_key_value (Root_common, common))
     ] ->
       Ok (Root_data.Minimal.Stable.V2.of_limited ~common hash)
-  | _ ->
-      get t.db ~key:Root ~error:(`Not_found `Root)
+  | _ -> (
+      match get t.db ~key:Root ~error:(`Not_found `Root) with
+      | Ok root ->
+          (* automatically split Root into (Root_hash, Root_common) *)
+          Batch.with_batch t.db ~f:(fun batch ->
+              let hash = Root_data.Minimal.Stable.Latest.hash root in
+              let common = Root_data.Minimal.Stable.V2.common root in
+              Batch.set batch ~key:Root_hash ~data:hash ;
+              Batch.set batch ~key:Root_common ~data:common ) ;
+
+          Ok root
+      | Error _ as e ->
+          e )
 
 let get_root_hash t =
   match get t.db ~key:Root_hash ~error:(`Not_found `Root_hash) with

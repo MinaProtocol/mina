@@ -1,6 +1,8 @@
 open Core
 open Async_kernel
+module Unix_sync = Unix
 open Persistent_frontier
+open Frontier_base
 
 (* NOTE:
     Here's the implementation of "long_jobs_with_context" found in Async_kernel's
@@ -37,7 +39,7 @@ let fail_on_long_async_jobs () =
 let sleep_async seconds = Deferred.create (fun _ -> Core.Unix.sleep seconds)
 
 (* WARN:
-   Async_Kernel has a hardcoded limit of 2000ms this is a expected invariant,
+   Async_kernel has a hardcoded limit of 2000ms this is a expected invariant,
    as that number is private and hardcoded:
 
    if Float.(Time_ns.Span.to_ms this_job_time >= 2000.) then scheduler.long_jobs_last_cycle <- (execution_context, this_job_time) :: scheduler.long_jobs_last_cycle;
@@ -59,36 +61,82 @@ let short_job () = return ()
 
 let wrap_as_deferred f = Deferred.create (fun ivar -> Ivar.fill ivar (f ()))
 
-let deserializae_root_value_from_db logger dump_path snapshot_name () =
-  let working_directory = dump_path ^/ snapshot_name in
-  [%log info]
-    "Start `deserializae_root_value_from_db`, Current working directory: %s"
-    working_directory ;
-  [%log info] "Loading database" ;
-  let db = Database.create ~logger ~directory:working_directory in
-  [%log info] "Querying root from database and attempt to deserialize it" ;
-  ( match Database.get_root db with
-  | Ok root ->
-      [%log info] "Successfully found the root" ;
-      let open Frontier_base.Root_data.Minimal.Stable.V2 in
-      let root_scan_state = scan_state root in
-      let root_scan_state_size =
-        Staged_ledger.Scan_state.Stable.V2.bin_size_t root_scan_state
-      in
-      [%log info] "Scan state has size %d" root_scan_state_size ;
-      let root_pending_coinbase = pending_coinbase root in
-      let root_pending_coinbase_size =
-        Mina_base.Pending_coinbase.Stable.V2.bin_size_t root_pending_coinbase
-      in
-      [%log info] "Pending coinbase has size %d" root_pending_coinbase_size
-  | Error _ ->
-      [%log info] "No root found" ) ;
-  [%log info] "Done `deserializae_root_value_from_db`" ;
+(* NOTE: Using a mmaped version to read input:
+   - Iterating with In_channel.input_char is painfully slow
+   - In_channel.read_all seems to cause OOM
+*)
+let mmap_input_to_bin_prot_buf (name : string) =
+  let open Unix_sync in
+  let open Bigarray in
+  let fd = openfile name ~mode:[ O_RDONLY ] in
+  let file_size =
+    (fstat fd).st_size |> Int.of_int64
+    |> Option.value_exn ?message:(Some "file size won't fit in `int`")
+  in
+  let buf =
+    map_file fd char c_layout ~shared:false [| file_size |]
+    |> array1_of_genarray
+  in
+  (fd, buf)
+
+let testcase_persistent_frontier_bottleneck logger dump_path snapshot_name () =
+  let prepare_worker =
+    wrap_as_deferred (fun () ->
+        let working_directory = dump_path ^/ snapshot_name in
+        [%log info] "Current working directory: %s" working_directory ;
+        [%log info] "Deserializing diff list from input.bin" ;
+        let bin_class =
+          Bin_prot.Type_class.bin_list Diff.Lite.Stable.Latest.bin_t
+        in
+        [%log info] "> Creating mmap for diff list" ;
+        let fd, buf =
+          mmap_input_to_bin_prot_buf (working_directory ^/ "input.bin")
+        in
+        [%log info] "> Deserialize in memory diff list" ;
+        let input_deserialized = bin_class.reader.read ~pos_ref:(ref 0) buf in
+        [%log info] "> Convert list from Diff.Lite.{Stable.V1.t -> E.t}" ;
+        let input =
+          List.map ~f:Diff.Lite.write_all_proofs_to_disk input_deserialized
+        in
+
+        [%log info] "Loading database" ;
+        let db = Database.create ~logger ~directory:working_directory in
+        let worker =
+          Worker.create { db; logger; dequeue_snarked_ledger = const () }
+        in
+        (worker, fd, db, input) )
+  in
+  prepare_worker
+  >>= fun (worker, fd, db, input) ->
+  [%log info] "Dispatching the worker" ;
+  Worker.dispatch worker input
+  >>| fun _ ->
+  [%log info] "Worker task done" ;
+  Unix_sync.close fd ;
   Database.close db
 
-let testcase_deserialize logger dump_path snapshot_name () =
-  wrap_as_deferred
-    (deserializae_root_value_from_db logger dump_path snapshot_name)
+let testcase_deserialize_root_hash logger dump_path snapshot_name () =
+  let deserialize_root_hash logger dump_path snapshot_name () =
+    let working_directory = dump_path ^/ snapshot_name in
+    [%log info]
+      "Start `deserializae_root_value_from_db`, Current working directory: %s"
+      working_directory ;
+    [%log info] "Loading database" ;
+    (* NOTE:
+       We expect the DB to not have `root_hash` and `root_common` at this moment
+    *)
+    let db = Database.create ~logger ~directory:working_directory in
+    [%log info] "Querying root hash from database and attempt to deserialize it" ;
+    ( match Database.get_root_hash db with
+    | Ok hash ->
+        [%log info] "Got hash %s" (Pasta_bindings.Fp.to_string hash)
+    | Error _ ->
+        [%log info] "No root hash found" ) ;
+    [%log info] "Done deserialize_root_hash" ;
+    Database.close db
+  in
+
+  wrap_as_deferred (deserialize_root_hash logger dump_path snapshot_name)
 
 let () =
   fail_on_long_async_jobs () ;
@@ -103,9 +151,17 @@ let () =
             (is_long_job long_job true)
         ] )
     ; ( "Reproduce persistent frontier bottleneck"
-      , [ test_case "testcase 2025_02-13-07-54-53" `Quick
+      , [ test_case "1-1 reproduce of persistent frontier perform" `Quick
             (is_long_job
-               (testcase_deserialize logger dump_path "2025_02-13-07-54-53")
+               (testcase_persistent_frontier_bottleneck logger dump_path
+                  "2025_02-13-07-54-53" )
                true )
+        ] )
+    ; ( "Deserialization perf test"
+      , [ test_case "derserialize root hash" `Quick
+            (is_long_job
+               (testcase_deserialize_root_hash logger dump_path
+                  "2025_02-13-07-54-53" )
+               false )
         ] )
     ]
