@@ -50,7 +50,11 @@ module Schema = struct
     | Db_version : int t
     | Transition : State_hash.Stable.V1.t -> Mina_block.Stable.V2.t t
     | Arcs : State_hash.Stable.V1.t -> State_hash.Stable.V1.t list t
+    (* TODO:
+       In hard forks, remove Root, it should be replaced by Root_hash and Root_common *)
     | Root : Root_data.Minimal.Stable.V2.t t
+    | Root_hash : State_hash.Stable.V1.t t
+    | Root_common : Root_data.Common.Stable.V2.t t
     | Best_tip : State_hash.Stable.V1.t t
     | Protocol_states_for_root_scan_state
         : Mina_state.Protocol_state.Value.Stable.V2.t list t
@@ -66,6 +70,10 @@ module Schema = struct
         "Arcs _"
     | Root ->
         "Root"
+    | Root_hash ->
+        "Root_hash"
+    | Root_common ->
+        "Root_common"
     | Best_tip ->
         "Best_tip"
     | Protocol_states_for_root_scan_state ->
@@ -80,6 +88,10 @@ module Schema = struct
         [%bin_type_class: State_hash.Stable.Latest.t list]
     | Root ->
         [%bin_type_class: Root_data.Minimal.Stable.Latest.t]
+    | Root_hash ->
+        [%bin_type_class: State_hash.Stable.Latest.t]
+    | Root_common ->
+        [%bin_type_class: Root_data.Common.Stable.Latest.t]
     | Best_tip ->
         [%bin_type_class: State_hash.Stable.Latest.t]
     | Protocol_states_for_root_scan_state ->
