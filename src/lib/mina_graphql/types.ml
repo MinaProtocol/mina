@@ -664,6 +664,7 @@ module Action_state = struct
     { action : Backend.Tick.Field.Stable.V1.t list list
     ; transaction_sequence_no : int
     ; action_sequence_no : int
+    ; block_number : Unsigned.UInt32.t
     }
 
   let spec =
@@ -682,6 +683,10 @@ module Action_state = struct
             ~args:Arg.[]
             ~doc:"" ~typ:(non_null int)
             ~resolve:(fun _ { action_sequence_no; _ } -> action_sequence_no)
+        ; field "blockNumber"
+            ~args:Arg.[]
+            ~doc:"" ~typ:(non_null uint32)
+            ~resolve:(fun _ { block_number; _ } -> block_number)
         ] )
 end
 

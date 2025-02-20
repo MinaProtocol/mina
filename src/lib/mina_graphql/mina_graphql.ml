@@ -2204,6 +2204,10 @@ module Queries = struct
                     |> Staged_ledger_diff.Body.staged_ledger_diff
                     |> Staged_ledger_diff.commands
                   in
+                  let block_number =
+                    bc |> Transition_frontier.Breadcrumb.block
+                    |> Mina_block.header |> Mina_block.Header.blockchain_length
+                  in
                   (* log the length of the user commands *)
                   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                     "user commands length: $length"
@@ -2213,7 +2217,7 @@ module Queries = struct
                     List.filter_map user_cmds ~f:(fun user_cmd ->
                         transaction_seq := !transaction_seq + 1 ;
                         match user_cmd.data with
-                        | Zkapp_command c ->
+                        | Zkapp_command c -> (
                             let actions =
                               c |> Zkapp_command.account_updates
                               |> Zkapp_command.Call_forest.fold ~init:(0, [])
@@ -2239,28 +2243,33 @@ module Queries = struct
                                          (Account_id.create pk token)
                                      then
                                        let action_body = au.body.actions in
-                                       match action_body with
+                                       let field_elems =
+                                         List.map
+                                           ~f:(fun e -> Array.to_list e)
+                                           action_body
+                                       in
+                                       match field_elems with
                                        | [] ->
                                            (action_seq + 1, acc)
-                                       | action_body ->
-                                           let field_elems =
-                                             List.map
-                                               ~f:(fun e -> Array.to_list e)
-                                               action_body
-                                           in
+                                       | field_elems ->
                                            let action_state =
                                              { Types.Action_state.action =
                                                  field_elems
                                              ; action_sequence_no = action_seq
                                              ; transaction_sequence_no =
                                                  !transaction_seq
+                                             ; block_number
                                              }
                                            in
                                            (action_seq + 1, action_state :: acc)
                                      else (action_seq + 1, acc) )
                             in
                             let _, actions = actions in
-                            Some actions
+                            match actions with
+                            | [] ->
+                                None
+                            | actions ->
+                                Some actions )
                         | Signed_command _ ->
                             None )
                   in
