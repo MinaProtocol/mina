@@ -11,6 +11,8 @@ module Common : sig
   end]
 
   type t
+
+  val read_all_proofs_from_disk : t -> Stable.V2.t
 end
 
 (* Historical root data is similar to Limited root data, except that it also

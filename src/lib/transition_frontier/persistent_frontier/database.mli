@@ -21,6 +21,8 @@ val with_batch : t -> f:(batch_t -> 'a) -> 'a
 module Error : sig
   type not_found_member =
     [ `Root
+    | `Root_hash
+    | `Root_common
     | `Best_tip
     | `Frontier_hash
     | `Root_transition

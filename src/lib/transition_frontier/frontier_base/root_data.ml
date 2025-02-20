@@ -33,6 +33,11 @@ module Common = struct
   let scan_state t = t.scan_state
 
   let pending_coinbase t = t.pending_coinbase
+
+  let read_all_proofs_from_disk { scan_state; pending_coinbase } =
+    { Stable.Latest.pending_coinbase
+    ; scan_state = Staged_ledger.Scan_state.read_all_proofs_from_disk scan_state
+    }
 end
 
 module Historical = struct
