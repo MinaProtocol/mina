@@ -1,14 +1,14 @@
 #
 # Determine whether a local daemon is SYNCed with its network
 #
-"${DAEMON_EXTERNAL_PORT:=3085}"
+"${DAEMON_REST_PORT:=3085}"
 
 function updateSyncStatusLabel() {
     status=$(
         curl --silent --show-error \
             --header "Content-Type:application/json" \
             -d'{ "query": "query { syncStatus } " }' \
-            "localhost:${DAEMON_EXTERNAL_PORT}/graphql" | \
+            "localhost:${DAEMON_REST_PORT}/graphql" | \
             jq '.data.syncStatus'
     )
     str=$(echo ${status} | sed 's/"//g' )
@@ -20,7 +20,7 @@ function isDaemonSynced() {
         curl --silent --show-error \
             --header "Content-Type:application/json" \
             -d'{ "query": "query { syncStatus } " }' \
-            "localhost:${DAEMON_EXTERNAL_PORT}/graphql" | \
+            "localhost:${DAEMON_REST_PORT}/graphql" | \
             jq '.data.syncStatus'
     )
     case ${status} in
@@ -39,12 +39,12 @@ function isDaemonSynced() {
 #
 function isChainlengthHighestReceived() {
     chainLength=$(
-        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { blockchainLength } }" }' "localhost:${DAEMON_EXTERNAL_PORT}/graphql" | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { blockchainLength } }" }' "localhost:${DAEMON_REST_PORT}/graphql" | \
             jq '.data.daemonStatus.blockchainLength'
     )
 
     highestReceived=$(
-        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { highestBlockLengthReceived } }" }' "localhost:${DAEMON_EXTERNAL_PORT}/graphql" | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { highestBlockLengthReceived } }" }' "localhost:${DAEMON_REST_PORT}/graphql" | \
             jq '.data.daemonStatus.highestBlockLengthReceived'
     )
     
@@ -58,7 +58,7 @@ function isChainlengthHighestReceived() {
 function peerCountGreaterThan() {
     peerCountMinThreshold=${1:-2}
     peerCount=$(
-        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { peers } }" }' "localhost:${DAEMON_EXTERNAL_PORT}/graphql" | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { peers } }" }' "localhost:${DAEMON_REST_PORT}/graphql" | \
             jq '.data.daemonStatus.peers | length'
     )
     
@@ -71,11 +71,11 @@ function peerCountGreaterThan() {
 #
 function ownsFunds() {
     ownedWalletCount=$(
-        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { ownedWallets }" }' "localhost:${DAEMON_EXTERNAL_PORT}/graphql" | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { ownedWallets }" }' "localhost:${DAEMON_REST_PORT}/graphql" | \
             jq '.data.ownedWallets | length'
     )
     balanceTotal=$(
-        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { ownedWallets { balance { total } } }" }' "localhost:${DAEMON_EXTERNAL_PORT}/graphql" | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { ownedWallets { balance { total } } }" }' "localhost:${DAEMON_REST_PORT}/graphql" | \
             jq '.data.ownedWallets[0].balance.total'
     )
     # remove leading and trailing quotes for integer interpretation
@@ -91,7 +91,7 @@ function ownsFunds() {
 function hasSentUserCommandsGreaterThan() {
     userCmdMinThreshold=${1:-1}
     userCmdSent=$(
-        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { userCommandsSent } }" }' "localhost:${DAEMON_EXTERNAL_PORT}/graphql" | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { userCommandsSent } }" }' "localhost:${DAEMON_REST_PORT}/graphql" | \
             jq '.data.daemonStatus.userCommandsSent'
     )
     
@@ -104,7 +104,7 @@ function hasSentUserCommandsGreaterThan() {
 #
 function hasSnarkWorker() {
     snarkWorker=$(
-        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { snarkWorker } }" }' "localhost:${DAEMON_EXTERNAL_PORT}/graphql" | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { snarkWorker } }" }' "localhost:${DAEMON_REST_PORT}/graphql" | \
             jq '.data.daemonStatus.snarkWorker'
     )
     rc=$?
@@ -132,7 +132,7 @@ function isArchiveSynced() {
             -w -c "SELECT height FROM blocks ORDER BY height DESC LIMIT 1"
     )
     highestReceived=$(
-        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { highestBlockLengthReceived } }" }' "localhost:${DAEMON_EXTERNAL_PORT}/graphql" | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { highestBlockLengthReceived } }" }' "localhost:${DAEMON_REST_PORT}/graphql" | \
             jq '.data.daemonStatus.highestBlockLengthReceived'
     )
     
