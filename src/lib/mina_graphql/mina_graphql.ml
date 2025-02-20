@@ -2185,14 +2185,6 @@ module Queries = struct
           ]
       ~resolve:(fun { ctx = mina; _ } () pk token max_length ->
         let best_chain = Mina_lib.best_chain ?max_length mina in
-        let logger = (Mina_lib.config mina).logger in
-        (* log that we have hit the account actions end point *)
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "account actions endpoint hit"
-          ~metadata:
-            [ ("public_key", `String (Public_key.Compressed.to_base58_check pk))
-            ] ;
-
         match best_chain with
         | Some best_chain ->
             let actions =
@@ -2208,10 +2200,6 @@ module Queries = struct
                     bc |> Transition_frontier.Breadcrumb.block
                     |> Mina_block.header |> Mina_block.Header.blockchain_length
                   in
-                  (* log the length of the user commands *)
-                  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                    "user commands length: $length"
-                    ~metadata:[ ("length", `Int (List.length user_cmds)) ] ;
                   let transaction_seq = ref 0 in
                   let action_list_list =
                     List.filter_map user_cmds ~f:(fun user_cmd ->
@@ -2227,17 +2215,6 @@ module Queries = struct
                                        Account_id.create au.body.public_key
                                          token
                                      in
-                                     (* log the public key *)
-                                     Logger.info logger ~module_:__MODULE__
-                                       ~location:__LOC__
-                                       "public key: $public_key"
-                                       ~metadata:
-                                         [ ( "public_key"
-                                           , `String
-                                               (Public_key.Compressed
-                                                .to_base58_check
-                                                  au.body.public_key ) )
-                                         ] ;
                                      if
                                        Account_id.equal account_id
                                          (Account_id.create pk token)
