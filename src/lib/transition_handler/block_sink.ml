@@ -129,7 +129,9 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
         let metadata =
           match b_or_h with
           | `Block b_env ->
-              [ ("block", Mina_block.to_yojson @@ Envelope.Incoming.data b_env)
+              [ ( "block"
+                , Mina_block.to_logging_yojson @@ Mina_block.header
+                  @@ Envelope.Incoming.data b_env )
               ]
           | `Header h_env ->
               [ ( "header"
