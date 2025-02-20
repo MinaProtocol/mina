@@ -17,11 +17,9 @@ use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, permutation::poseidon
 //     Ok(cx.string(result))
 // }
 
-fn fp_poseidon_block_cipher_native(mut cx: FunctionContext) -> JsResult<JsString> {
+fn fp_poseidon_block_cipher_native(mut cx: FunctionContext) -> JsResult<JsArray> {
   
-    let arg1 = cx.argument::<JsNumber>(0)?.value(&mut cx);
-    let arg2 = cx.argument::<JsNumber>(1)?.value(&mut cx);
-    let arg3 = cx.argument::<JsNumber>(2)?.value(&mut cx);
+    let js_input = cx.argument::<JsArray>(0)?;
 
     let n1 = arg1 as u64;
     let n2 = arg2 as u64;
