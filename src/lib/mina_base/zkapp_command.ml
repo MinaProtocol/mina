@@ -51,8 +51,6 @@ module T = struct
        add hash_zkapp_command_vn for that version
     *)
 
-    (* TODO restore V1 like the comment says! *)
-
     module V2 = struct
       type t = Mina_wire_types.Mina_base.Zkapp_command.V2.t =
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
@@ -70,7 +68,7 @@ module T = struct
       module Wire = struct
         [%%versioned
         module Stable = struct
-          module V1 = struct
+          module V2 = struct
             type t =
               { fee_payer : Account_update.Fee_payer.Stable.V1.t
               ; account_updates :
@@ -177,6 +175,150 @@ module T = struct
 
       include
         Binable.Of_binable_without_uuid
+          (Wire.Stable.V2)
+          (struct
+            type nonrec t = t
+
+            let of_binable t = of_wire t
+
+            let to_binable = to_wire
+          end)
+    end
+
+    module V1 = struct
+      type t = Mina_wire_types.Mina_base.Zkapp_command.V1.t =
+        { fee_payer : Account_update.Fee_payer.Stable.V1.t
+        ; account_updates :
+            ( Account_update.Stable.V1.t
+            ,Digest.Account_update.Stable.V1.t
+            ,Digest.Forest.Stable.V1.t)
+            Call_forest.Stable.V1.t
+        ; memo : Signed_command_memo.Stable.V1.t
+        }
+      [@@deriving annot, sexp, compare, equal, hash, yojson, fields]
+
+      let to_latest
+        ({fee_payer;account_updates;memo} : t
+        )
+        = ({fee_payer=fee_payer
+          ; account_updates = Call_forest.map
+              ~f:Account_update.Stable.V1.to_latest account_updates
+          ; memo=memo
+          } : V2.t)
+
+      module Wire = struct
+        [%%versioned
+        module Stable = struct
+          module V1 = struct
+            type t =
+              { fee_payer : Account_update.Fee_payer.Stable.V1.t
+              ; account_updates :
+                  ( Account_update.Stable.V2.t
+                  , unit
+                  , unit )
+                  Call_forest.Stable.V1.t
+              ; memo : Signed_command_memo.Stable.V1.t
+              }
+            [@@deriving sexp, compare, equal, hash, yojson]
+
+            let to_latest = Fn.id (* Is this correct? or should it convert to V2.Wire.V2 *)
+          end
+        end]
+
+        let of_graphql_repr (t : Graphql_repr.t) : t =
+          { fee_payer = t.fee_payer
+          ; memo = t.memo
+          ; account_updates =
+              Call_forest.of_account_updates_map t.account_updates
+                ~f:Account_update.of_graphql_repr
+                ~account_update_depth:(fun (p : Account_update.Graphql_repr.t)
+                                      -> p.body.call_depth )
+          }
+
+        let to_graphql_repr (t : t) : Graphql_repr.t =
+          { fee_payer = t.fee_payer
+          ; memo = t.memo
+          ; account_updates =
+              t.account_updates
+              |> Call_forest.to_account_updates_map
+                   ~f:(fun ~depth account_update ->
+                     Account_update.to_graphql_repr account_update
+                       ~call_depth:depth )
+          }
+
+        let gen =
+          let open Quickcheck.Generator in
+          let open Let_syntax in
+          let gen_call_forest =
+            fixed_point (fun self ->
+                let%bind calls_length = small_non_negative_int in
+                list_with_length calls_length
+                  (let%map account_update = Account_update.gen
+                   and calls = self in
+                   { With_stack_hash.stack_hash = ()
+                   ; elt =
+                       { Call_forest.Tree.account_update
+                       ; account_update_digest = ()
+                       ; calls
+                       }
+                   } ) )
+          in
+          let open Quickcheck.Let_syntax in
+          let%map fee_payer = Account_update.Fee_payer.gen
+          and account_updates = gen_call_forest
+          and memo = Signed_command_memo.gen in
+          { fee_payer; account_updates; memo }
+
+        let shrinker : t Quickcheck.Shrinker.t =
+          Quickcheck.Shrinker.create (fun t ->
+              let shape = Call_forest.shape t.account_updates in
+              Sequence.map
+                (Quickcheck.Shrinker.shrink
+                   Call_forest.Shape.quickcheck_shrinker shape )
+                ~f:(fun shape' ->
+                  { t with
+                    account_updates = Call_forest.mask t.account_updates shape'
+                  } ) )
+      end
+
+      let of_wire (w : Wire.t) : t =
+        { fee_payer = w.fee_payer
+        ; memo = w.memo
+        ; account_updates = failwith "TODO"
+            (*
+            w.account_updates
+            |> Call_forest.accumulate_hashes
+                 ~hash_account_update:(fun (p : Account_update.Stable.V1.t) ->
+                   Digest.Account_update.create @@ to_latest p )
+                   *)
+        }
+
+      let to_wire (t : t) : Wire.t =
+        (*
+        let rec forget_hashes = List.map ~f:forget_hash
+        and forget_hash = function
+          | { With_stack_hash.stack_hash = _
+            ; elt =
+                { Call_forest.Tree.account_update
+                ; account_update_digest = _
+                ; calls
+                }
+            } ->
+              { With_stack_hash.stack_hash = ()
+              ; elt =
+                  { Call_forest.Tree.account_update
+                  ; account_update_digest = ()
+                  ; calls = forget_hashes calls
+                  }
+              }
+        in
+        *)
+        { fee_payer = t.fee_payer
+        ; memo = t.memo
+        ; account_updates = failwith "TODO" (* forget_hashes t.account_updates *)
+        }
+      include
+        Binable.Of_binable_without_uuid
           (Wire.Stable.V1)
           (struct
             type nonrec t = t
@@ -186,6 +328,7 @@ module T = struct
             let to_binable = to_wire
           end)
     end
+
   end]
 end
 

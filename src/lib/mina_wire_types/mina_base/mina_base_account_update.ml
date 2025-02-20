@@ -3,6 +3,12 @@ module Authorization_kind = struct
     (* field for Proof is a verification key hash *)
     type t = Signature | Proof of Snark_params.Tick.Field.t | None_given
   end
+
+  (* TODO why did I need to increment this if it's the same? *)
+  module V1 = struct
+    (* field for Proof is a verification key hash *)
+    type t = Signature | Proof of Snark_params.Tick.Field.t | None_given
+  end
 end
 
 module May_use_token = struct
@@ -51,6 +57,10 @@ module Account_precondition = struct
   module V2 = struct
     type t = Mina_base_zkapp_precondition.Account.V3.t
   end
+
+  module V1 = struct
+    type t = Mina_base_zkapp_precondition.Account.V2.t
+  end
 end
 
 module Permissions_precondition = struct
@@ -64,6 +74,14 @@ module Preconditions = struct
     type t =
       { network : Mina_base_zkapp_precondition.Protocol_state.V1.t
       ; account : Account_precondition.V2.t
+      ; valid_while : Mina_base_zkapp_precondition.Valid_while.V1.t
+      }
+  end
+
+  module V1 = struct
+    type t =
+      { network : Mina_base_zkapp_precondition.Protocol_state.V1.t
+      ; account : Account_precondition.V1.t
       ; valid_while : Mina_base_zkapp_precondition.Valid_while.V1.t
       }
   end
@@ -105,6 +123,24 @@ module Body = struct
       ; authorization_kind : Authorization_kind.V2.t
       }
   end
+
+  module V1 = struct
+    type t =
+      { public_key : Public_key.Compressed.V1.t
+      ; token_id : Mina_base_token_id.V2.t
+      ; update : Update.V1.t
+      ; balance_change :
+          (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
+      ; increment_nonce : bool
+      ; events : Events'.V1.t
+      ; actions : Events'.V1.t
+      ; call_data : Pickles.Backend.Tick.Field.V1.t
+      ; preconditions : Preconditions.V1.t
+      ; use_full_commitment : bool
+      ; implicit_account_creation_fee : bool
+      ; may_use_token : May_use_token.V1.t ; authorization_kind : Authorization_kind.V1.t
+      }
+  end
 end
 
 module Fee_payer = struct
@@ -116,4 +152,8 @@ end
 
 module V2 = struct
   type t = { body : Body.V2.t; authorization : Mina_base_control.V2.t }
+end
+
+module V1 = struct
+  type t = { body : Body.V1.t; authorization : Mina_base_control.V2.t }
 end

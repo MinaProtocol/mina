@@ -91,6 +91,18 @@ module V2 : sig
     }
 end
 
+module V1 : sig
+  type t =
+    { fee_payer : Mina_base_account_update.Fee_payer.V1.t
+    ; account_updates :
+        ( Mina_base_account_update.V1.t
+        , Call_forest.Digest.Account_update.V1.t
+        , Call_forest.Digest.Forest.V1.t )
+        Call_forest.V1.t
+    ; memo : Mina_base_signed_command_memo.V1.t
+    }
+end
+
 module Valid : sig
   module Verification_key_hash : sig
     module V1 : sig

@@ -878,6 +878,26 @@ module Account = struct
 
       let to_latest = Fn.id
     end
+
+    module V2 = struct
+      type t = Mina_wire_types.Mina_base.Zkapp_precondition.Account.V2.t =
+        { balance : Balance.Stable.V1.t Numeric.Stable.V1.t
+        ; nonce : Account_nonce.Stable.V1.t Numeric.Stable.V1.t
+        ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t Hash.Stable.V1.t
+        ; delegate : Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t
+        ; state : F.Stable.V1.t Eq_data.Stable.V1.t Zkapp_state.V.Stable.V1.t
+        ; action_state : F.Stable.V1.t Eq_data.Stable.V1.t
+        ; proved_state : bool Eq_data.Stable.V1.t
+        ; is_new : bool Eq_data.Stable.V1.t
+        }
+      [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
+
+      let to_latest
+          ({balance;nonce;receipt_chain_hash;delegate;state;action_state;proved_state;is_new} : t) : Latest.t
+        = {balance;nonce;receipt_chain_hash;delegate;state;action_state;proved_state;is_new
+          ;permissions = Permissions.accept
+          }
+    end
   end]
 
   let gen : t Quickcheck.Generator.t =

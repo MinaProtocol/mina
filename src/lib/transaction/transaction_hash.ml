@@ -118,7 +118,7 @@ let hash_signed_command_v2 = hash_signed_command
 let hash_of_transaction_id (transaction_id : string) : t Or_error.t =
   (* A transaction id might be:
      - original Base58Check transaction ids of signed commands (Signed_command.V1.t), or
-     - a Base64 encoding of signed commands and zkApps (Signed_command.Vn.t, for n >= 2,
+     - a Base64 encoding of signed commands and zkApps (Signed_command.Vn.t, for n >= 3,
        or Zkapp_command.Vm.t, for m >= 1)
 
      For the Base64 case, the Bin_prot serialization leads with a version tag
@@ -136,21 +136,29 @@ let hash_of_transaction_id (transaction_id : string) : t Or_error.t =
           let version = Bin_prot.Std.bin_read_int ~pos_ref buf in
           match version with
           | 1 -> (
-              (* must be a zkApp command *)
+              (* must be a zkApp command V1 *)
               try
-                let cmd = Zkapp_command.Stable.Latest.bin_read_t ~pos_ref buf in
-                Ok (hash_zkapp_command cmd)
+                let cmd = Zkapp_command.Stable.V1.bin_read_t ~pos_ref buf in
+                Ok (hash_zkapp_command @@ Zkapp_command.Stable.V1.to_latest cmd)
               with _ ->
                 Or_error.error_string
                   "Could not decode serialized zkApp command (version 1)" )
           | 2 -> (
-              (* must be a signed command, until there's a V2 for zkApp commands *)
+              (* must be a zkApp command V2 *)
+              try
+                let cmd = Zkapp_command.Stable.V2.bin_read_t ~pos_ref buf in
+                Ok (hash_zkapp_command @@ Zkapp_command.Stable.V2.to_latest cmd)
+              with _ ->
+                Or_error.error_string
+                  "Could not decode serialized zkApp command (version 2)" )
+          | 3 -> (
+              (* must be a signed command, until there's a V3 for zkApp commands *)
               try
                 let cmd = Signed_command.Stable.V2.bin_read_t ~pos_ref buf in
                 Ok (hash_signed_command_v2 cmd)
               with _ ->
                 Or_error.error_string
-                  "Could not decode serialized signed command (version 2)" )
+                  "Could not decode serialized signed command (version 3)" )
           | _ ->
               Or_error.error_string
                 (sprintf
