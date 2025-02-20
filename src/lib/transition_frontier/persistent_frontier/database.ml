@@ -52,8 +52,10 @@ module Schema = struct
     | Arcs : State_hash.Stable.V1.t -> State_hash.Stable.V1.t list t
     (* TODO:
        In hard forks, `Root` should be replaced by `(Root_hash, Root_common)`;
-       For now, we only try to replace `Root` with `(Root_hash, Root_common)` when
-       initializing a new DB, or trying to moving the root;
+       For now, we try to replace `Root` with `(Root_hash, Root_common)` when:
+         1. initializing a new DB;
+         2. trying to moving the root;
+         3. trying to query `root` or `root_hash`
        The reason for this is `Root_common` is too big(250MB+), and most of the time
        we just need the hash. Reading the whole Root result in efficiency problems,
        comboing with `bin_prot` being slow results in 90s persistent frontier bottleneck
