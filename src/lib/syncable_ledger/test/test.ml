@@ -13,7 +13,7 @@ end
 
 module type Input_intf = sig
   module Root_hash : sig
-    type t [@@deriving bin_io, compare, hash, sexp, compare, yojson]
+    type t [@@deriving bin_io, compare, sexp, compare, yojson]
 
     val equal : t -> t -> bool
   end

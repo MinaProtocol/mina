@@ -136,7 +136,7 @@ let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
          (Ledger.Addr.of_int_exn ~ledger_depth i, account) ) ) ;
   (* to keep track of account states across transactions *)
   let account_state_tbl =
-    Option.value account_state_tbl ~default:(Account_id.Table.create ())
+    Option.value account_state_tbl ~default:(ref Account_id.Map.empty)
   in
   let%bind zkapp_command =
     Zkapp_command_generators.gen_zkapp_command_from ~max_account_updates
@@ -177,7 +177,7 @@ let sequence_zkapp_command_with_ledger ?ledger_init_state ?max_account_updates
   in
   let num_keypairs = length * max_account_updates * 2 in
   (* Keep track of account states across multiple zkapp_command transaction *)
-  let account_state_tbl = Account_id.Table.create () in
+  let account_state_tbl = ref Account_id.Map.empty in
   let%bind zkapp_command, fee_payer_keypair, keymap, ledger =
     zkapp_command_with_ledger ?ledger_init_state ~num_keypairs
       ~max_account_updates ~max_token_updates ~account_state_tbl ?vk ?failure

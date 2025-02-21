@@ -543,7 +543,7 @@ end = struct
   let create ({ fee_payer; account_updates; memo } : T.t) ~failed ~find_vk :
       t Or_error.t =
     With_return.with_return (fun { return } ->
-        let tbl = Account_id.Table.create () in
+        let tbl = ref Account_id.Map.empty in
         let vks_overridden =
           (* Keep track of the verification keys that have been set so far
              during this transaction.
@@ -604,8 +604,9 @@ end = struct
                   in
                   match prioritized_vk with
                   | Some prioritized_vk ->
-                      Account_id.Table.update tbl account_id ~f:(fun _ ->
-                          With_hash.hash prioritized_vk ) ;
+                      tbl :=
+                        Account_id.Map.update !tbl account_id ~f:(fun _ ->
+                            With_hash.hash prioritized_vk ) ;
                       (* return the updated overrides *)
                       vks_overridden := vks_overriden' ;
                       (p, Some prioritized_vk)

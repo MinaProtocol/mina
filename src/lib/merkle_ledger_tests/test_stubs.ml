@@ -11,10 +11,10 @@ end
 module Account = struct
   (* want bin_io, not available with Account.t *)
   type t = Mina_base.Account.Stable.Latest.t
-  [@@deriving bin_io_unversioned, sexp, equal, compare, hash, yojson]
+  [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
 
   type key = Mina_base.Account.Key.Stable.Latest.t
-  [@@deriving bin_io_unversioned, sexp, equal, compare, hash]
+  [@@deriving bin_io_unversioned, sexp, equal, compare]
 
   (* use Account items needed *)
   let empty = Mina_base.Account.empty
@@ -40,7 +40,7 @@ module Receipt = Mina_base.Receipt
 
 module Hash = struct
   module T = struct
-    type t = Md5.t [@@deriving sexp, hash, compare, bin_io_unversioned, equal]
+    type t = Md5.t [@@deriving sexp, compare, bin_io_unversioned, equal]
   end
 
   include T
@@ -52,8 +52,6 @@ module Hash = struct
 
     let version_byte = Base58_check.Version_bytes.ledger_test_hash
   end)
-
-  include Hashable.Make_binable (T)
 
   (* to prevent pre-image attack,
    * important impossible to create an account such that (merge a b = hash_account account) *)
@@ -151,7 +149,7 @@ module Key = struct
   module Stable = struct
     module V1 = struct
       type t = Mina_base.Account.Key.Stable.V1.t
-      [@@deriving sexp, equal, compare, hash]
+      [@@deriving sexp, equal, compare]
 
       let to_latest = Fn.id
     end
@@ -166,7 +164,6 @@ module Key = struct
   let gen_keys num_keys =
     Quickcheck.random_value (Quickcheck.Generator.list_with_length num_keys gen)
 
-  include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)
 end
 
@@ -177,13 +174,12 @@ module Account_id = struct
   module Stable = struct
     module V2 = struct
       type t = Mina_base.Account_id.Stable.V2.t
-      [@@deriving sexp, equal, compare, hash]
+      [@@deriving sexp, equal, compare]
 
       let to_latest = Fn.id
     end
   end]
 
-  include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)
 
   let create = Mina_base.Account_id.create

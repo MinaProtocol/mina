@@ -70,7 +70,7 @@ val gen_zkapp_command_from :
   -> fee_payer_keypair:Signature_lib.Keypair.t
   -> keymap:
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t
-  -> ?account_state_tbl:(Account.t * role) Account_id.Table.t
+  -> ?account_state_tbl:(Account.t * role) Account_id.Map.t ref
   -> ledger:Mina_ledger.Ledger.t
   -> ?protocol_state_view:Zkapp_precondition.Protocol_state.View.t
   -> ?vk:(Side_loaded_verification_key.t, State_hash.t) With_hash.Stable.V1.t
@@ -90,7 +90,7 @@ val gen_list_of_zkapp_command_from :
   -> fee_payer_keypairs:Signature_lib.Keypair.t list
   -> keymap:
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t
-  -> ?account_state_tbl:(Account.t * role) Account_id.Table.t
+  -> ?account_state_tbl:(Account.t * role) Account_id.Map.t ref
   -> ledger:Mina_ledger.Ledger.t
   -> ?protocol_state_view:Zkapp_precondition.Protocol_state.View.t
   -> ?vk:(Side_loaded_verification_key.t, State_hash.t) With_hash.Stable.V1.t
@@ -105,7 +105,7 @@ val gen_max_cost_zkapp_command_from :
      ?memo:string
   -> ?fee_range:Currency.Fee.t * Currency.Fee.t
   -> fee_payer_keypair:Signature_lib.Keypair.t
-  -> account_state_tbl:(Account.t * role) Account_id.Table.t
+  -> account_state_tbl:(Account.t * role) Account_id.Map.t ref
   -> vk:(Side_loaded_verification_key.t, State_hash.t) With_hash.Stable.V1.t
   -> genesis_constants:Genesis_constants.t
   -> unit
