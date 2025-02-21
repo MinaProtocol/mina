@@ -14,7 +14,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -c|--codename) DEB_CODENAME="$2"; shift;;
   -b|--bucket) BUCKET="$2"; shift;;
   -s|--sign) SIGN="$2"; shift;;
-  *) echo "Unknown parameter passed: $1"; exit 1;;
+  *) echo "❌  Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
 function usage() {
@@ -33,10 +33,10 @@ function usage() {
   exit 1
 }
 
-if [[ -z "$DEB_NAMES" ]]; then usage "Debian(s) to upload are not set!"; fi;
-if [[ -z "$DEB_VERSION" ]]; then usage "Version is not set!"; fi;
-if [[ -z "$DEB_CODENAME" ]]; then usage "Codename is not set!"; fi;
-if [[ -z "$DEB_RELEASE" ]]; then usage "Release is not set!"; fi;
+if [[ -z "$DEB_NAMES" ]]; then usage "❌  Debian(s) to upload are not set!"; fi;
+if [[ -z "$DEB_VERSION" ]]; then usage "❌  Version is not set!"; fi;
+if [[ -z "$DEB_CODENAME" ]]; then usage "❌  Codename is not set!"; fi;
+if [[ -z "$DEB_RELEASE" ]]; then usage "❌  Release is not set!"; fi;
 
 
 if [[ -z "${SIGN:-}" ]]; then 
@@ -105,14 +105,23 @@ do
   done
 
   if [ ${#debs[@]} -eq 0 ]; then
-    echo "All debians are correctly published to our debian repository"
-    exit 0
+    echo "✅  All debians are correctly published to our debian repository"
+    echo "📋  Validating debian repository consistency after push..."
+
+    if deb-s3 verify  $BUCKET_ARG $S3_REGION_ARG -c $DEB_CODENAME -m $DEB_RELEASE; then 
+      echo "✅  Debian repository is consistent"
+    else
+      echo "❌  Error: Debian repository is not consistent. Please run: "
+      echo "💻  deb-s3 verify  $BUCKET_ARG $S3_REGION_ARG -c $DEB_CODENAME -m $DEB_RELEASE --fix-manifests"
+      exit 1
+    fi
+    break
   fi
 
   counter=$((counter+1))
   if [[ $((counter)) == $((tries)) ]]; then
-    echo "Error: Some Debians are still not correctly published : "$(join_by " " "${debs[@]}")
-    echo "You may still try to rerun job as debian repository is known from imperfect performance"
+    echo "❌  Error: Some Debians are still not correctly published : "$(join_by " " "${debs[@]}")
+    echo "ℹ️  You may still try to rerun job as debian repository is known from imperfect performance"
     exit 1
   fi 
 

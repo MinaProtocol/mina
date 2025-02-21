@@ -1,24 +1,8 @@
 #!/bin/bash
-set -eox pipefail
+set -eo pipefail
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
-
-while [[ "$#" -gt 0 ]]; do case $1 in
-  -d|--deb) DEB="$2"; shift;;
-  -c|--codename) CODENAME="$2"; shift;;
-  --new-name) NEW_NAME="$2"; shift;;
-  --new-release) NEW_RELEASE="$2"; shift;;
-  --new-version) NEW_VERSION="$2"; shift;;
-  --new-suite) NEW_SUITE="$2"; shift;;
-  --new-repo) NEW_REPO="$2"; shift;;
-  --suite) SUITE="$2"; shift;;
-  --release) RELEASE="$2"; shift;;
-  --version) VERSION="$2"; shift;;
-  --repo) REPO="$2"; shift;;
-  --sign) SIGN="$2"; shift;;
-  *) echo "Unknown parameter passed: $1"; exit 1;;
-esac; shift; done
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -38,20 +22,37 @@ function usage() {
   echo "  --sign            The Public Key id, which is used to sign package. Key must be stored locally"
   echo ""
   echo "Example: $0 --deb mina-archive --version 2.0.0-rc1-48efea4 --new-version 2.0.0-rc1 --codename bullseye --release unstable --new-release umt"
-  exit 1
 }
 
-if [[ -z "$NEW_NAME" ]]; then NEW_NAME=$DEB; fi;
-if [[ -z "$NEW_RELEASE" ]]; then NEW_RELEASE=$RELEASE; fi;
-if [[ -z "$NEW_VERSION" ]]; then NEW_VERSION=$VERSION; fi;
-if [[ -z "$NEW_SUITE" ]]; then NEW_SUITE=$SUITE; fi;
-if [[ -z "$NEW_REPO" ]]; then NEW_REPO=$REPO; fi;
-if [[ -z "$DEB" ]]; then NEW_NAME=$DEB; fi;
-if [[ -z "$RELEASE" ]]; then NEW_RELEASE=$RELEASE; fi;
-if [[ -z "$VERSION" ]]; then NEW_VERSION=$VERSION; fi;
-if [[ -z "$SUITE" ]]; then NEW_SUITE=$SUITE; fi;
-if [[ -z "$REPO" ]]; then echo "No repository specified"; echo ""; usage "$0" "$1" ; fi
-if [ -z "${SIGN:-}" ]; then 
+while [[ "$#" -gt 0 ]]; do case $1 in
+  -d|--deb) DEB="$2"; shift;;
+  -c|--codename) CODENAME="$2"; shift;;
+  --new-name) NEW_NAME="$2"; shift;;
+  --new-release) NEW_RELEASE="$2"; shift;;
+  --new-version) NEW_VERSION="$2"; shift;;
+  --new-suite) NEW_SUITE="$2"; shift;;
+  --new-repo) NEW_REPO="$2"; shift;;
+  --suite) SUITE="$2"; shift;;
+  --release) RELEASE="$2"; shift;;
+  --version) VERSION="$2"; shift;;
+  --repo) REPO="$2"; shift;;
+  --sign) SIGN="$2"; shift;;
+  *) echo "❌ Unknown parameter passed: $1"; usage exit 1;;
+esac; shift; done
+
+if [[ ! -v RELEASE && ! -v SUITE ]]; then echo "❌ No release nor suite specified"; echo ""; usage "$0" "$1" ; exit 1; fi
+if [[ ! -v VERSION ]]; then echo "❌ No version specified"; echo ""; usage "$0" "$1" ; exit 1; fi
+if [[ ! -v REPO ]]; then echo "❌ No repo specified"; echo ""; usage "$0" "$1" ; exit 1; fi
+if [[ ! -v SUITE ]]; then SUITE=$RELEASE; fi;
+if [[ ! -v RELEASE ]]; then RELEASE=$SUITE; fi;
+if [[ ! -v NEW_NAME ]]; then NEW_NAME=$DEB; fi;
+if [[ ! -v NEW_RELEASE ]]; then NEW_RELEASE=$RELEASE; fi;
+if [[ ! -v NEW_VERSION ]]; then NEW_VERSION=$VERSION; fi;
+if [[ ! -v NEW_SUITE ]]; then NEW_SUITE=$SUITE; fi;
+if [[ ! -v NEW_REPO ]]; then NEW_REPO=$REPO; fi;
+if [[ ! -v DEB ]]; then NEW_NAME=$DEB; fi;
+if [[ ! -v DEB ]]; then NEW_NAME=$DEB; fi;
+if [[ ! -v SIGN ]]; then 
   SIGN_ARG=""
 else 
   SIGN_ARG="--sign $SIGN"

@@ -13,9 +13,9 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
-docker pull $REPO/$PACKAGE:$VERSION-${CODENAME}${SUFFIX}
-
-if [ ?$ != 0 ]; then
-  echo "Docker verification for $CODENAME $PACKAGE failed"
+if ! docker pull $REPO/$PACKAGE:$VERSION-${CODENAME}${SUFFIX} ; then
+  echo "❌ Docker verification for $CODENAME $PACKAGE failed"
   exit 1
+else
+  echo "✅ Docker verification for $CODENAME $PACKAGE passed"
 fi
