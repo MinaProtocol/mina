@@ -208,7 +208,7 @@ module T = struct
       module Wire = struct
         [%%versioned
         module Stable = struct
-          module V1 = struct
+          module V2 = struct
             type t =
               { fee_payer : Account_update.Fee_payer.Stable.V1.t
               ; account_updates :
@@ -221,9 +221,38 @@ module T = struct
             [@@deriving sexp, compare, equal, hash, yojson]
 
             let to_latest = Fn.id
-            (* Is this correct? or should it convert to V2.Wire.V2 *)
+          end
+
+          module V1 = struct
+            type t =
+              { fee_payer : Account_update.Fee_payer.Stable.V1.t
+              ; account_updates :
+                  ( Account_update.Stable.V1.t
+                  , unit
+                  , unit )
+                  Call_forest.Stable.V1.t
+              ; memo : Signed_command_memo.Stable.V1.t
+              }
+            [@@deriving sexp, compare, equal, hash, yojson]
+
+            let to_latest ({ fee_payer; account_updates; memo } : t) : Latest.t
+                =
+              { fee_payer
+              ; account_updates =
+                  Call_forest.map ~f:Account_update.Stable.V1.to_latest
+                    account_updates
+              ; memo
+              }
           end
         end]
+
+        let account_updates_latest :
+               (Account_update.Stable.V1.t, unit, unit) Call_forest.Stable.V1.t
+            -> ( Account_update.Stable.Latest.t
+               , unit
+               , unit )
+               Call_forest.Stable.V1.t =
+          Call_forest.map ~f:Account_update.Stable.V1.to_latest
 
         let of_graphql_repr (t : Graphql_repr.t) : t =
           { fee_payer = t.fee_payer
@@ -281,21 +310,18 @@ module T = struct
                   } ) )
       end
 
-      let of_wire (w : Wire.t) : t =
+      let of_wire (w : Wire.Stable.V1.t) : t =
         { fee_payer = w.fee_payer
         ; memo = w.memo
         ; account_updates =
-            failwith "TODO"
-            (*
             w.account_updates
             |> Call_forest.accumulate_hashes
                  ~hash_account_update:(fun (p : Account_update.Stable.V1.t) ->
-                   Digest.Account_update.create @@ to_latest p )
-                   *)
+                   Digest.Account_update.create
+                   @@ Account_update.Stable.V1.to_latest p )
         }
 
-      let to_wire (t : t) : Wire.t =
-        (*
+      let to_wire (t : t) : Wire.Stable.V1.t =
         let rec forget_hashes = List.map ~f:forget_hash
         and forget_hash = function
           | { With_stack_hash.stack_hash = _
@@ -313,11 +339,9 @@ module T = struct
                   }
               }
         in
-        *)
         { fee_payer = t.fee_payer
         ; memo = t.memo
-        ; account_updates =
-            failwith "TODO" (* forget_hashes t.account_updates *)
+        ; account_updates = forget_hashes t.account_updates
         }
 
       include
@@ -1624,4 +1648,4 @@ let%test "latest zkApp version" =
   (* if this test fails, update `Transaction_hash.hash_of_transaction_id`
      for latest version, then update this test
   *)
-  Stable.Latest.version = 1
+  Stable.Latest.version = 2
