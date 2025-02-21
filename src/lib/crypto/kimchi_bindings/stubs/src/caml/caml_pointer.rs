@@ -1,7 +1,7 @@
 macro_rules! impl_caml_pointer {
     ($name: ident => $typ: ty) => {
         #[derive(std::fmt::Debug, Clone, ::ocaml_gen::CustomType)]
-        pub struct $name(pub ::std::rc::Rc<$typ>);
+        pub struct $name(pub ::std::rc::Rc<std::cell::UnsafeCell<$typ>>);
 
         impl $name {
             extern "C" fn caml_pointer_finalize(v: ocaml::Raw) {
@@ -32,7 +32,7 @@ macro_rules! impl_caml_pointer {
 
         impl $name {
             pub fn create(x: $typ) -> $name {
-                $name(::std::rc::Rc::new(x))
+                $name(::std::rc::Rc::new(std::cell::UnsafeCell::new(x)))
             }
         }
 
@@ -40,7 +40,7 @@ macro_rules! impl_caml_pointer {
             type Target = $typ;
 
             fn deref(&self) -> &Self::Target {
-                &*self.0
+                unsafe { &*self.0.get() }
             }
         }
 
@@ -58,7 +58,7 @@ macro_rules! impl_caml_pointer {
                     //   mutable, since we can call [`get_mut_unchecked`] in
                     //   nightly, or can call [`get_mut`] and unwrap if this is
                     //   the only live reference.
-                    &mut *(((&*self.0) as *const Self::Target) as *mut Self::Target)
+                    &mut *self.0.get()
                 }
             }
         }
