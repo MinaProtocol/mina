@@ -16,6 +16,6 @@ esac; shift; done
 docker pull $REPO/$PACKAGE:$VERSION-${CODENAME}${SUFFIX}
 
 if [ ?$ != 0 ]; then
-  echo "Docker verification for $_codename $_package failed"
+  echo "Docker verification for $CODENAME $PACKAGE failed"
   exit 1
 fi
