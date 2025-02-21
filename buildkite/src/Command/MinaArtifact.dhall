@@ -87,8 +87,8 @@ let build_artifacts
                                                               spec.artifacts
                                                               spec.networks}"
                 # [ Cmd.run
-                      "./buildkite/scripts/debian/upload-to-gs.sh ${DebianVersions.lowerName
-                                                                      spec.debVersion}"
+                      "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
+                                                                        spec.debVersion}"
                   ]
             , label =
                 "Build Mina for ${DebianVersions.capitalName
@@ -96,7 +96,7 @@ let build_artifacts
                                                          spec.profile} ${BuildFlags.toSuffixUppercase
                                                                            spec.buildFlags}"
             , key = "build-deb-pkg"
-            , target = Size.XLarge
+            , target = Size.QA
             , retries =
               [ Command.Retry::{
                 , exit_status = Command.ExitStatus.Code +2
