@@ -14,7 +14,6 @@ type mina_initialization =
   ; itn_graphql_port : int option
   }
 
-
 (* keep this code in sync with Client.chain_id_inputs, Mina_commands.chain_id_inputs, and
    Daemon_rpcs.Chain_id_inputs
 *)
