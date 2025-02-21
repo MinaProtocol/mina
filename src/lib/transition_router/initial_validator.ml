@@ -288,7 +288,10 @@ let validate ~logger ~trust_system ~verifier ~initialization_finish_signal
             with
             | Ok verified_header ->
                 [%log internal] "Initial_validation_done" ;
-                let body b = Mina_block.Stable.Latest.body b in
+                let body b =
+                  Mina_block.Stable.Latest.body b
+                  |> Staged_ledger_diff.Body.write_all_proofs_to_disk
+                in
                 let b_or_h' =
                   match b_or_h with
                   | `Block b_env ->
