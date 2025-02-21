@@ -17,13 +17,18 @@ use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, permutation::poseidon
 //     Ok(cx.string(result))
 // }
 
+fn parse_js_array_to_fp_vec(
+    cx: &mut FunctionContext,
+    js_input: Handle<JsArray>
+) -> Result<Vec<Fp>, Throw> {
+
+}
+
 fn fp_poseidon_block_cipher_native(mut cx: FunctionContext) -> JsResult<JsArray> {
   
     let js_input = cx.argument::<JsArray>(0)?;
 
-    let n1 = arg1 as u64;
-    let n2 = arg2 as u64;
-    let n3 = arg3 as u64;
+
 
     // hard-coded vector: [1, 2, 3] in the Fp field
     let mut state = vec![
