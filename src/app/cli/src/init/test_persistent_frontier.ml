@@ -11,20 +11,17 @@ let deserialize_root_hash ~logger ~db =
 
 let root_hash_deserialization_limit = Time_ns.Span.of_ms 2000.0
 
-let main ~frontier_db_path ~root_compatible () =
+let main ~frontier_db_path ~no_root_compatible () =
   let logger = Logger.create () in
   [%log info] "Current DB path: %s" frontier_db_path ;
   [%log info] "Loading database" ;
   let db = Database.create ~logger ~directory:frontier_db_path in
-  ( match root_compatible with
-  | Some false ->
-      ()
-  | _ ->
-      (*
-         To maintain compatibility, run a deserialization round first,
-         to ensure we have `root_hash` and `root_common` inside the DB
+  if not no_root_compatible then
+    (*
+      To maintain compatibility, run a deserialization round first,
+      to ensure we have `root_hash` and `root_common` inside the DB
       *)
-      deserialize_root_hash ~logger ~db ) ;
+    deserialize_root_hash ~logger ~db ;
   let start_time = Time_ns.now () in
   let () = deserialize_root_hash ~logger ~db in
   let end_time = Time_ns.now () in
@@ -40,10 +37,12 @@ let command =
   Command.basic ~summary:"tests for persistent frontier"
     (let%map_open frontier_db_path =
        flag "--frontier-db" ~aliases:[ "-f" ]
-         ~doc:"Path of frontier DB to perform the test on" (required string)
-     and root_compatible =
-       flag "--root-compatible" ~aliases:[ "-r" ]
-         ~doc:"Whether preserving root compatibility, true by default"
-         (optional bool)
+         ~doc:"Path to frontier DB this app is testing on" (required string)
+     and no_root_compatible =
+       flag "--no-root-compatible" ~aliases:[ "-r" ]
+         ~doc:
+           "Do not perform hash query once to ensure the compatibility with \
+            old frontier database"
+         no_arg
      in
-     main ~frontier_db_path ~root_compatible )
+     main ~frontier_db_path ~no_root_compatible )
