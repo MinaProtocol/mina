@@ -53,12 +53,12 @@ module Schema = struct
     (* TODO:
        In hard forks, `Root` should be replaced by `(Root_hash, Root_common)`;
        For now, we try to replace `Root` with `(Root_hash, Root_common)` when:
-         1. initializing a new DB;
-         2. trying to moving the root;
-         3. trying to query `root` or `root_hash`
-       The reason for this is `Root_common` is too big(250MB+), and most of the time
-       we just need the hash. Reading the whole Root result in efficiency problems,
-       comboing with `bin_prot` being slow results in 90s persistent frontier bottleneck
+         1. initializing a new DB.
+         2. trying to moving the root.
+         3. trying to query `root` or `root_hash`.
+       The reason for this is `Root_common` is too big(250MB+);
+       Most of the time, we just need the hash, but whole `Root` is being read;
+       This combos with `bin_prot` being slow results in 90s bottleneck.
     *)
     | Root : Root_data.Minimal.Stable.V2.t t
     | Root_hash : State_hash.Stable.V1.t t
