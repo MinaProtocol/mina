@@ -14,6 +14,8 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
 let Command = ../../Command/Base.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
@@ -43,10 +45,9 @@ let Spec =
       , default =
           { mode = PipelineMode.Type.PullRequest
           , size = Size.Medium
-          , dependsOn =
-              DebianVersions.dependsOn
-                DebianVersions.DebVersion.Bullseye
-                Profiles.Type.Standard
+          , dependsOn = DebianVersions.dependsOn
+                  DebianVersions.DebVersion.Bullseye
+                  Profiles.Type.Standard
           , additionalDirtyWhen = [] : List SelectFiles.Type
           , yellowThreshold = 0.1
           , redThreshold = 0.2

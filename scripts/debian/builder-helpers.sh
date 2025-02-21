@@ -247,6 +247,12 @@ build_functional_test_suite_deb() {
   cp ./default/src/app/heap_usage/heap_usage.exe "${BUILDDIR}/usr/local/bin/mina-heap-usage"
   cp ./default/src/app/zkapp_limits/zkapp_limits.exe "${BUILDDIR}/usr/local/bin/mina-zkapp-limits"
   cp ./default/src/test/archive/patch_archive_test/patch_archive_test.exe "${BUILDDIR}/usr/local/bin/mina-patch-archive-test"
+  
+
+  mkdir -p "${BUILDDIR}/etc/mina/test/archive/sample_db"
+
+  # Test files
+  cp -r ../src/test/archive/sample_db "${BUILDDIR}/etc/mina/test/archive/sample_db"
 
   build_deb mina-test-suite
 
