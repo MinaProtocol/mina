@@ -1994,6 +1994,7 @@ let mina_commands logger ~itn_features =
     , Command.group ~summary:"Internal commands" (internal_commands logger) )
   ; (Parallel.worker_command_name, Parallel.worker_command)
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
+  ; ("test-persistent-frontier", Test_persistent_frontier.command)
   ]
 
 let print_version_help coda_exe version =
