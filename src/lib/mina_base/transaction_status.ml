@@ -3,8 +3,8 @@ open Core_kernel
 module Failure = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t = Mina_wire_types.Mina_base.Transaction_status.Failure.V2.t =
+    module V3 = struct
+      type t = Mina_wire_types.Mina_base.Transaction_status.Failure.V3.t =
         | Predicate [@value 1]
         | Source_not_present
         | Receiver_not_present
@@ -44,6 +44,19 @@ module Failure = struct
         | Account_app_state_precondition_unsatisfied of int
         | Account_proved_state_precondition_unsatisfied
         | Account_is_new_precondition_unsatisfied
+        | Permissions_precondition_edit_state_unsatisfied
+        | Permissions_precondition_send_unsatisfied
+        | Permissions_precondition_receive_unsatisfied
+        | Permissions_precondition_access_unsatisfied
+        | Permissions_precondition_set_delegate_unsatisfied
+        | Permissions_precondition_set_permissions_unsatisfied
+        | Permissions_precondition_set_verification_key_unsatisfied
+        | Permissions_precondition_set_zkapp_uri_unsatisfied
+        | Permissions_precondition_edit_action_state_unsatisfied
+        | Permissions_precondition_set_token_symbol_unsatisfied
+        | Permissions_precondition_increment_nonce_unsatisfied
+        | Permissions_precondition_set_voting_for_unsatisfied
+        | Permissions_precondition_set_timing_unsatisfied
         | Protocol_state_precondition_unsatisfied
         | Unexpected_verification_key_hash
         | Valid_while_precondition_unsatisfied
@@ -60,8 +73,8 @@ module Failure = struct
     module Display = struct
       [%%versioned
       module Stable = struct
-        module V1 = struct
-          type t = (int * Stable.V2.t list) list
+        module V2 = struct
+          type t = (int * Stable.V3.t list) list
           [@@deriving equal, compare, yojson, sexp, hash]
 
           let to_latest = Fn.id
@@ -71,8 +84,8 @@ module Failure = struct
 
     [%%versioned
     module Stable = struct
-      module V1 = struct
-        type t = Stable.V2.t list list
+      module V2 = struct
+        type t = Stable.V3.t list list
         [@@deriving equal, compare, yojson, sexp, hash]
 
         let to_latest = Fn.id
@@ -128,6 +141,19 @@ module Failure = struct
         List.init 8 ~f:var.constructor @ acc )
       ~account_proved_state_precondition_unsatisfied:add
       ~account_is_new_precondition_unsatisfied:add
+      ~permissions_precondition_edit_state_unsatisfied:add
+      ~permissions_precondition_send_unsatisfied:add
+      ~permissions_precondition_receive_unsatisfied:add
+      ~permissions_precondition_access_unsatisfied:add
+      ~permissions_precondition_set_delegate_unsatisfied:add
+      ~permissions_precondition_set_permissions_unsatisfied:add
+      ~permissions_precondition_set_verification_key_unsatisfied:add
+      ~permissions_precondition_set_zkapp_uri_unsatisfied:add
+      ~permissions_precondition_edit_action_state_unsatisfied:add
+      ~permissions_precondition_set_token_symbol_unsatisfied:add
+      ~permissions_precondition_increment_nonce_unsatisfied:add
+      ~permissions_precondition_set_voting_for_unsatisfied:add
+      ~permissions_precondition_set_timing_unsatisfied:add
       ~protocol_state_precondition_unsatisfied:add
       ~valid_while_precondition_unsatisfied:add
       ~unexpected_verification_key_hash:add ~incorrect_nonce:add
@@ -214,6 +240,32 @@ module Failure = struct
         "Account_proved_state_precondition_unsatisfied"
     | Account_is_new_precondition_unsatisfied ->
         "Account_is_new_precondition_unsatisfied"
+    | Permissions_precondition_edit_state_unsatisfied ->
+        "Permissions_precondition_edit_state_unsatisfied"
+    | Permissions_precondition_send_unsatisfied ->
+        "Permissions_precondition_send_unsatisfied"
+    | Permissions_precondition_receive_unsatisfied ->
+        "Permissions_precondition_receive_unsatisfied"
+    | Permissions_precondition_access_unsatisfied ->
+        "Permissions_precondition_access_unsatisfied"
+    | Permissions_precondition_set_delegate_unsatisfied ->
+        "Permissions_precondition_set_delegate_unsatisfied"
+    | Permissions_precondition_set_permissions_unsatisfied ->
+        "Permissions_precondition_set_permissions_unsatisfied"
+    | Permissions_precondition_set_verification_key_unsatisfied ->
+        "Permissions_precondition_set_verification_key_unsatisfied"
+    | Permissions_precondition_set_zkapp_uri_unsatisfied ->
+        "Permissions_precondition_set_zkapp_uri_unsatisfied"
+    | Permissions_precondition_edit_action_state_unsatisfied ->
+        "Permissions_precondition_edit_action_state_unsatisfied"
+    | Permissions_precondition_set_token_symbol_unsatisfied ->
+        "Permissions_precondition_set_token_symbol_unsatisfied"
+    | Permissions_precondition_increment_nonce_unsatisfied ->
+        "Permissions_precondition_increment_nonce_unsatisfied"
+    | Permissions_precondition_set_voting_for_unsatisfied ->
+        "Permissions_precondition_set_voting_for_unsatisfied"
+    | Permissions_precondition_set_timing_unsatisfied ->
+        "Permissions_precondition_set_timing_unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
         "Protocol_state_precondition_unsatisfied"
     | Valid_while_precondition_unsatisfied ->
@@ -304,6 +356,32 @@ module Failure = struct
         Ok Account_proved_state_precondition_unsatisfied
     | "Account_is_new_precondition_unsatisfied" ->
         Ok Account_is_new_precondition_unsatisfied
+    | "Permissions_precondition_edit_state_unsatisfied" ->
+        Ok Permissions_precondition_edit_state_unsatisfied
+    | "Permissions_precondition_send_unsatisfied" ->
+        Ok Permissions_precondition_send_unsatisfied
+    | "Permissions_precondition_receive_unsatisfied" ->
+        Ok Permissions_precondition_receive_unsatisfied
+    | "Permissions_precondition_access_unsatisfied" ->
+        Ok Permissions_precondition_access_unsatisfied
+    | "Permissions_precondition_set_delegate_unsatisfied" ->
+        Ok Permissions_precondition_set_delegate_unsatisfied
+    | "Permissions_precondition_set_permissions_unsatisfied" ->
+        Ok Permissions_precondition_set_permissions_unsatisfied
+    | "Permissions_precondition_set_verification_key_unsatisfied" ->
+        Ok Permissions_precondition_set_verification_key_unsatisfied
+    | "Permissions_precondition_set_zkapp_uri_unsatisfied" ->
+        Ok Permissions_precondition_set_zkapp_uri_unsatisfied
+    | "Permissions_precondition_edit_action_state_unsatisfied" ->
+        Ok Permissions_precondition_edit_action_state_unsatisfied
+    | "Permissions_precondition_set_token_symbol_unsatisfied" ->
+        Ok Permissions_precondition_set_token_symbol_unsatisfied
+    | "Permissions_precondition_increment_nonce_unsatisfied" ->
+        Ok Permissions_precondition_increment_nonce_unsatisfied
+    | "Permissions_precondition_set_voting_for_unsatisfied" ->
+        Ok Permissions_precondition_set_voting_for_unsatisfied
+    | "Permissions_precondition_set_timing_unsatisfied" ->
+        Ok Permissions_precondition_set_timing_unsatisfied
     | "Protocol_state_precondition_unsatisfied" ->
         Ok Protocol_state_precondition_unsatisfied
     | "Valid_while_precondition_unsatisfied" ->
@@ -451,8 +529,34 @@ module Failure = struct
         "The account update's account proved state precondition was unsatisfied"
     | Account_is_new_precondition_unsatisfied ->
         "The account update's account is-new state precondition was unsatisfied"
+    | Permissions_precondition_edit_state_unsatisfied ->
+        "Permissions_precondition_edit_state_unsatisfied"
+    | Permissions_precondition_send_unsatisfied ->
+        "Permissions_precondition_send_unsatisfied"
+    | Permissions_precondition_receive_unsatisfied ->
+        "Permissions_precondition_receive_unsatisfied"
+    | Permissions_precondition_access_unsatisfied ->
+        "Permissions_precondition_access_unsatisfied"
+    | Permissions_precondition_set_delegate_unsatisfied ->
+        "Permissions_precondition_set_delegate_unsatisfied"
+    | Permissions_precondition_set_permissions_unsatisfied ->
+        "Permissions_precondition_set_permissions_unsatisfied"
+    | Permissions_precondition_set_verification_key_unsatisfied ->
+        "Permissions_precondition_set_verification_key_unsatisfied"
+    | Permissions_precondition_set_zkapp_uri_unsatisfied ->
+        "Permissions_precondition_set_zkapp_uri_unsatisfied"
+    | Permissions_precondition_edit_action_state_unsatisfied ->
+        "Permissions_precondition_edit_action_state_unsatisfied"
+    | Permissions_precondition_set_token_symbol_unsatisfied ->
+        "Permissions_precondition_set_token_symbol_unsatisfied"
+    | Permissions_precondition_increment_nonce_unsatisfied ->
+        "Permissions_precondition_increment_nonce_unsatisfied"
+    | Permissions_precondition_set_voting_for_unsatisfied ->
+        "Permissions_precondition_set_voting_for_unsatisfied"
+    | Permissions_precondition_set_timing_unsatisfied ->
+        "Permissions_precondition_set_timing_unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
-        "The account update's protocol state precondition unsatisfied"
+        "Protocol_state_precondition_unsatisfied"
     | Valid_while_precondition_unsatisfied ->
         "The account update's valid-until precondition was unsatisfied"
     | Unexpected_verification_key_hash ->
@@ -470,10 +574,10 @@ end
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
-    type t = Mina_wire_types.Mina_base.Transaction_status.V2.t =
+  module V3 = struct
+    type t = Mina_wire_types.Mina_base.Transaction_status.V3.t =
       | Applied
-      | Failed of Failure.Collection.Stable.V1.t
+      | Failed of Failure.Collection.Stable.V2.t
     [@@deriving sexp, yojson, equal, compare]
 
     let to_latest = Fn.id

@@ -33,15 +33,15 @@ end
 module Transaction_with_witness = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       (* TODO: The statement is redundant here - it can be computed from the
          witness and the transaction
       *)
       type t =
         { transaction_with_info :
-            Mina_transaction_logic.Transaction_applied.Stable.V2.t
+            Mina_transaction_logic.Transaction_applied.Stable.V3.t
         ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
-        ; statement : Transaction_snark.Statement.Stable.V2.t
+        ; statement : Transaction_snark.Statement.Stable.V3.t
         ; init_stack :
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t
@@ -63,8 +63,8 @@ module Ledger_proof_with_sok_message = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
-      type t = Ledger_proof.Stable.V2.t * Sok_message.Stable.V1.t
+    module V3 = struct
+      type t = Ledger_proof.Stable.V3.t * Sok_message.Stable.V1.t
       [@@deriving sexp]
 
       let to_latest = Fn.id
@@ -161,14 +161,14 @@ type job = Available_job.t
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V3 = struct
     type t =
       { scan_state :
-          ( Ledger_proof_with_sok_message.Stable.V2.t
-          , Transaction_with_witness.Stable.V2.t )
+          ( Ledger_proof_with_sok_message.Stable.V3.t
+          , Transaction_with_witness.Stable.V3.t )
           Parallel_scan.State.Stable.V1.t
       ; previous_incomplete_zkapp_updates :
-          Transaction_with_witness.Stable.V2.t list
+          Transaction_with_witness.Stable.V3.t list
           * [ `Border_block_continued_in_the_next_tree of bool ]
       }
 
@@ -177,8 +177,8 @@ module Stable = struct
     let hash (t : t) =
       let state_hash =
         Parallel_scan.State.hash t.scan_state
-          (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V2))
-          (Binable.to_string (module Transaction_with_witness.Stable.V2))
+          (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V3))
+          (Binable.to_string (module Transaction_with_witness.Stable.V3))
       in
       let ( previous_incomplete_zkapp_updates
           , `Border_block_continued_in_the_next_tree continue_in_next_tree ) =
@@ -188,7 +188,7 @@ module Stable = struct
         List.fold ~init:(Digestif.SHA256.init ())
           previous_incomplete_zkapp_updates ~f:(fun h t ->
             Digestif.SHA256.feed_string h
-            @@ Binable.to_string (module Transaction_with_witness.Stable.V2) t )
+            @@ Binable.to_string (module Transaction_with_witness.Stable.V3) t )
         |> Digestif.SHA256.get
       in
       let continue_in_next_tree =

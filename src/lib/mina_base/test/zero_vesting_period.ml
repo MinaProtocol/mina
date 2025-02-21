@@ -136,7 +136,22 @@ let mk_zkapp_with_vesting_period n =
                 ],
                 "action_state": [ "Ignore" ],
                 "proved_state": [ "Ignore" ],
-                "is_new": [ "Ignore" ]
+                "is_new": [ "Ignore" ],
+                "permissions": {
+                  "edit_state": [ "Ignore" ],
+                  "send": [ "Ignore" ],
+                  "receive": [ "Ignore" ],
+                  "access": [ "Ignore" ],
+                  "set_delegate": [ "Ignore" ],
+                  "set_permissions": [ "Ignore" ],
+                  "set_verification_key": [ "Ignore" ],
+                  "set_zkapp_uri": [ "Ignore" ],
+                  "edit_action_state": [ "Ignore" ],
+                  "set_token_symbol": [ "Ignore" ],
+                  "increment_nonce": [ "Ignore" ],
+                  "set_voting_for": [ "Ignore" ],
+                  "set_timing": [ "Ignore" ]
+                }
               },
               "valid_while": [ "Ignore" ]
             },
@@ -244,7 +259,22 @@ let mk_zkapp_with_vesting_period n =
                 ],
                 "action_state": [ "Ignore" ],
                 "proved_state": [ "Ignore" ],
-                "is_new": [ "Ignore" ]
+                "is_new": [ "Ignore" ],
+                "permissions": {
+                  "edit_state": [ "Ignore" ],
+                  "send": [ "Ignore" ],
+                  "receive": [ "Ignore" ],
+                  "access": [ "Ignore" ],
+                  "set_delegate": [ "Ignore" ],
+                  "set_permissions": [ "Ignore" ],
+                  "set_verification_key": [ "Ignore" ],
+                  "set_zkapp_uri": [ "Ignore" ],
+                  "edit_action_state": [ "Ignore" ],
+                  "set_token_symbol": [ "Ignore" ],
+                  "increment_nonce": [ "Ignore" ],
+                  "set_voting_for": [ "Ignore" ],
+                  "set_timing": [ "Ignore" ]
+                }
               },
               "valid_while": [ "Ignore" ]
             },

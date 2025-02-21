@@ -17,12 +17,12 @@ module Stable : sig
 
   [@@@with_versioned_json]
 
-  module V3 : sig
+  module V4 : sig
     type nonrec t =
       { scheduled_time : Block_time.Stable.V1.t
-      ; protocol_state : Protocol_state.Value.Stable.V2.t
+      ; protocol_state : Protocol_state.Value.Stable.V3.t
       ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
-      ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
+      ; staged_ledger_diff : Staged_ledger_diff.Stable.V3.t
       ; delta_transition_chain_proof :
           Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
       ; protocol_version : Protocol_version.Stable.V2.t

@@ -326,6 +326,16 @@ module Eq_data = struct
             (fun (b : Boolean.var) -> packed ((b :> Field.Var.t), 1))
         }
 
+    let auth_required =
+      Permissions.Auth_required.
+        { typ
+        ; equal
+        ; to_input
+        ; equal_checked = run Checked.equal
+        ; to_input_checked = Checked.to_input
+        ; default = None
+        }
+
     let receipt_chain_hash =
       Receipt.Chain_hash.
         { field with
@@ -450,9 +460,425 @@ module Leaf_typs = struct
   let token_id = Hash.typ token_id
 end
 
+module Permissions = struct
+  [%%versioned
+  module Stable = struct
+    module V2 = struct
+      type t = Mina_wire_types.Mina_base.Zkapp_precondition.Permissions.V2.t =
+        { edit_state : Permissions.Auth_required.Stable.V2.t Eq_data.Stable.V1.t
+        ; access : Permissions.Auth_required.Stable.V2.t Eq_data.Stable.V1.t
+        ; send : Permissions.Auth_required.Stable.V2.t Eq_data.Stable.V1.t
+        ; receive : Permissions.Auth_required.Stable.V2.t Eq_data.Stable.V1.t
+        ; set_delegate :
+            Permissions.Auth_required.Stable.V2.t Eq_data.Stable.V1.t
+        ; set_permissions :
+            Permissions.Auth_required.Stable.V2.t Eq_data.Stable.V1.t
+        ; set_verification_key :
+            Permissions.Auth_required.Stable.V2.t Eq_data.Stable.V1.t
+        ; set_zkapp_uri :
+            Permissions.Auth_required.Stable.V2.t Eq_data.Stable.V1.t
+        ; edit_action_state :
+            Permissions.Auth_required.Stable.V2.t Eq_data.Stable.V1.t
+        ; set_token_symbol :
+            Permissions.Auth_required.Stable.V2.t Eq_data.Stable.V1.t
+        ; increment_nonce :
+            Permissions.Auth_required.Stable.V2.t Eq_data.Stable.V1.t
+        ; set_voting_for :
+            Permissions.Auth_required.Stable.V2.t Eq_data.Stable.V1.t
+        ; set_timing : Permissions.Auth_required.Stable.V2.t Eq_data.Stable.V1.t
+        }
+      [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let accept : t =
+    { edit_state = Ignore
+    ; access = Ignore
+    ; send = Ignore
+    ; receive = Ignore
+    ; set_delegate = Ignore
+    ; set_permissions = Ignore
+    ; set_verification_key = Ignore
+    ; set_zkapp_uri = Ignore
+    ; edit_action_state = Ignore
+    ; set_token_symbol = Ignore
+    ; increment_nonce = Ignore
+    ; set_voting_for = Ignore
+    ; set_timing = Ignore
+    }
+
+  let is_accept : t -> bool = equal accept
+
+  let from_perms (perms : Permissions.t) : t =
+    { edit_state = Or_ignore.Check perms.edit_state
+    ; access = Or_ignore.Check perms.access
+    ; send = Or_ignore.Check perms.send
+    ; receive = Or_ignore.Check perms.receive
+    ; set_delegate = Or_ignore.Check perms.set_delegate
+    ; set_permissions = Or_ignore.Check perms.set_permissions
+    ; set_verification_key = Or_ignore.Check (fst perms.set_verification_key)
+    ; set_zkapp_uri = Or_ignore.Check perms.set_zkapp_uri
+    ; edit_action_state = Or_ignore.Check perms.edit_action_state
+    ; set_token_symbol = Or_ignore.Check perms.set_token_symbol
+    ; increment_nonce = Or_ignore.Check perms.increment_nonce
+    ; set_voting_for = Or_ignore.Check perms.set_voting_for
+    ; set_timing = Or_ignore.Check perms.set_timing
+    }
+
+  let gen_valid (perms : Permissions.t) : t Quickcheck.Generator.t =
+    let open Quickcheck.Let_syntax in
+    let%bind edit_state = Or_ignore.gen @@ return perms.edit_state in
+    let%bind access = Or_ignore.gen @@ return perms.access in
+    let%bind send = Or_ignore.gen @@ return perms.send in
+    let%bind receive = Or_ignore.gen @@ return perms.set_delegate in
+    let%bind set_delegate = Or_ignore.gen @@ return perms.set_delegate in
+    let%bind set_permissions = Or_ignore.gen @@ return perms.set_permissions in
+    let%bind set_verification_key =
+      Or_ignore.gen @@ return @@ fst perms.set_verification_key
+    in
+    let%bind set_zkapp_uri = Or_ignore.gen @@ return perms.set_zkapp_uri in
+    let%bind edit_action_state =
+      Or_ignore.gen @@ return perms.edit_action_state
+    in
+    let%bind set_token_symbol =
+      Or_ignore.gen @@ return perms.set_token_symbol
+    in
+    let%bind increment_nonce = Or_ignore.gen @@ return perms.increment_nonce in
+    let%bind set_voting_for = Or_ignore.gen @@ return perms.set_voting_for in
+    let%bind set_timing = Or_ignore.gen @@ return perms.set_timing in
+    return
+      { edit_state
+      ; access
+      ; send
+      ; receive
+      ; set_delegate
+      ; set_permissions
+      ; set_verification_key
+      ; set_zkapp_uri
+      ; edit_action_state
+      ; set_token_symbol
+      ; increment_nonce
+      ; set_voting_for
+      ; set_timing
+      }
+
+  let deriver obj =
+    let open Fields_derivers_zkapps in
+    let auth_required = Permissions.auth_required () in
+    let ( !. ) = ( !. ) ~t_fields_annots in
+    Fields.make_creator obj
+      ~edit_state:!.(Or_ignore.deriver auth_required)
+      ~access:!.(Or_ignore.deriver auth_required)
+      ~send:!.(Or_ignore.deriver auth_required)
+      ~receive:!.(Or_ignore.deriver auth_required)
+      ~set_delegate:!.(Or_ignore.deriver auth_required)
+      ~set_permissions:!.(Or_ignore.deriver auth_required)
+      ~set_verification_key:!.(Or_ignore.deriver auth_required)
+      ~set_zkapp_uri:!.(Or_ignore.deriver auth_required)
+      ~edit_action_state:!.(Or_ignore.deriver auth_required)
+      ~set_token_symbol:!.(Or_ignore.deriver auth_required)
+      ~increment_nonce:!.(Or_ignore.deriver auth_required)
+      ~set_voting_for:!.(Or_ignore.deriver auth_required)
+      ~set_timing:!.(Or_ignore.deriver auth_required)
+    |> finish "PermissionsPrecondition" ~t_toplevel_annots
+
+  let to_input
+      ({ edit_state
+       ; access
+       ; send
+       ; receive
+       ; set_delegate
+       ; set_permissions
+       ; set_verification_key
+       ; set_zkapp_uri
+       ; edit_action_state
+       ; set_token_symbol
+       ; increment_nonce
+       ; set_voting_for
+       ; set_timing
+       } :
+        t ) =
+    let open Random_oracle_input.Chunked in
+    List.reduce_exn ~f:append
+      [ Eq_data.(to_input Tc.auth_required) edit_state
+      ; Eq_data.(to_input Tc.auth_required) access
+      ; Eq_data.(to_input Tc.auth_required) send
+      ; Eq_data.(to_input Tc.auth_required) receive
+      ; Eq_data.(to_input Tc.auth_required) set_delegate
+      ; Eq_data.(to_input Tc.auth_required) set_permissions
+      ; Eq_data.(to_input Tc.auth_required) set_verification_key
+      ; Eq_data.(to_input Tc.auth_required) set_zkapp_uri
+      ; Eq_data.(to_input Tc.auth_required) edit_action_state
+      ; Eq_data.(to_input Tc.auth_required) set_token_symbol
+      ; Eq_data.(to_input Tc.auth_required) increment_nonce
+      ; Eq_data.(to_input Tc.auth_required) set_voting_for
+      ; Eq_data.(to_input Tc.auth_required) set_timing
+      ]
+
+  let digest t =
+    Random_oracle.(
+      hash ~init:Hash_prefix.zkapp_precondition_account
+        (pack_input (to_input t)))
+
+  module Checked = struct
+    type t =
+      { edit_state : Permissions.Auth_required.Checked.t Eq_data.Checked.t
+      ; access : Permissions.Auth_required.Checked.t Eq_data.Checked.t
+      ; send : Permissions.Auth_required.Checked.t Eq_data.Checked.t
+      ; receive : Permissions.Auth_required.Checked.t Eq_data.Checked.t
+      ; set_delegate : Permissions.Auth_required.Checked.t Eq_data.Checked.t
+      ; set_permissions : Permissions.Auth_required.Checked.t Eq_data.Checked.t
+      ; set_verification_key :
+          Permissions.Auth_required.Checked.t Eq_data.Checked.t
+      ; set_zkapp_uri : Permissions.Auth_required.Checked.t Eq_data.Checked.t
+      ; edit_action_state :
+          Permissions.Auth_required.Checked.t Eq_data.Checked.t
+      ; set_token_symbol : Permissions.Auth_required.Checked.t Eq_data.Checked.t
+      ; increment_nonce : Permissions.Auth_required.Checked.t Eq_data.Checked.t
+      ; set_voting_for : Permissions.Auth_required.Checked.t Eq_data.Checked.t
+      ; set_timing : Permissions.Auth_required.Checked.t Eq_data.Checked.t
+      }
+    [@@deriving hlist]
+
+    let to_input
+        ({ edit_state
+         ; access
+         ; send
+         ; receive
+         ; set_delegate
+         ; set_permissions
+         ; set_verification_key
+         ; set_zkapp_uri
+         ; edit_action_state
+         ; set_token_symbol
+         ; increment_nonce
+         ; set_voting_for
+         ; set_timing
+         } :
+          t ) =
+      let open Random_oracle_input.Chunked in
+      List.reduce_exn ~f:append
+        [ Eq_data.(to_input_checked Tc.auth_required edit_state)
+        ; Eq_data.(to_input_checked Tc.auth_required access)
+        ; Eq_data.(to_input_checked Tc.auth_required send)
+        ; Eq_data.(to_input_checked Tc.auth_required receive)
+        ; Eq_data.(to_input_checked Tc.auth_required set_delegate)
+        ; Eq_data.(to_input_checked Tc.auth_required set_permissions)
+        ; Eq_data.(to_input_checked Tc.auth_required set_verification_key)
+        ; Eq_data.(to_input_checked Tc.auth_required set_zkapp_uri)
+        ; Eq_data.(to_input_checked Tc.auth_required edit_action_state)
+        ; Eq_data.(to_input_checked Tc.auth_required set_token_symbol)
+        ; Eq_data.(to_input_checked Tc.auth_required increment_nonce)
+        ; Eq_data.(to_input_checked Tc.auth_required set_voting_for)
+        ; Eq_data.(to_input_checked Tc.auth_required set_timing)
+        ]
+
+    let checks
+        { edit_state
+        ; access
+        ; send
+        ; receive
+        ; set_delegate
+        ; set_permissions
+        ; set_verification_key
+        ; set_zkapp_uri
+        ; edit_action_state
+        ; set_token_symbol
+        ; increment_nonce
+        ; set_voting_for
+        ; set_timing
+        } (a : Permissions.Checked.t) =
+      [ ( Transaction_status.Failure
+          .Permissions_precondition_edit_state_unsatisfied
+        , Eq_data.(check_checked Tc.auth_required edit_state a.edit_state) )
+      ; ( Transaction_status.Failure.Permissions_precondition_access_unsatisfied
+        , Eq_data.(check_checked Tc.auth_required access a.access) )
+      ; ( Transaction_status.Failure.Permissions_precondition_send_unsatisfied
+        , Eq_data.(check_checked Tc.auth_required send a.send) )
+      ; ( Transaction_status.Failure.Permissions_precondition_receive_unsatisfied
+        , Eq_data.(check_checked Tc.auth_required receive a.receive) )
+      ; ( Transaction_status.Failure
+          .Permissions_precondition_set_delegate_unsatisfied
+        , Eq_data.(check_checked Tc.auth_required set_delegate a.set_delegate)
+        )
+      ; ( Transaction_status.Failure
+          .Permissions_precondition_set_permissions_unsatisfied
+        , Eq_data.(
+            check_checked Tc.auth_required set_permissions a.set_permissions) )
+      ; ( Transaction_status.Failure
+          .Permissions_precondition_set_verification_key_unsatisfied
+        , Eq_data.(
+            check_checked Tc.auth_required set_verification_key
+              (fst a.set_verification_key)) )
+        (* TODO should we check that the txn version is current when this is not ignored? *)
+      ; ( Transaction_status.Failure
+          .Permissions_precondition_set_zkapp_uri_unsatisfied
+        , Eq_data.(check_checked Tc.auth_required set_zkapp_uri a.set_zkapp_uri)
+        )
+      ; ( Transaction_status.Failure
+          .Permissions_precondition_edit_action_state_unsatisfied
+        , Eq_data.(
+            check_checked Tc.auth_required edit_action_state a.edit_action_state)
+        )
+      ; ( Transaction_status.Failure
+          .Permissions_precondition_set_token_symbol_unsatisfied
+        , Eq_data.(
+            check_checked Tc.auth_required set_token_symbol a.set_token_symbol)
+        )
+      ; ( Transaction_status.Failure
+          .Permissions_precondition_increment_nonce_unsatisfied
+        , Eq_data.(
+            check_checked Tc.auth_required increment_nonce a.increment_nonce) )
+      ; ( Transaction_status.Failure
+          .Permissions_precondition_set_voting_for_unsatisfied
+        , Eq_data.(
+            check_checked Tc.auth_required set_voting_for a.set_voting_for) )
+      ; ( Transaction_status.Failure
+          .Permissions_precondition_set_timing_unsatisfied
+        , Eq_data.(check_checked Tc.auth_required set_timing a.set_timing) )
+      ]
+
+    let check ~check t a =
+      List.iter ~f:(fun (failure, passed) -> check failure passed) (checks t a)
+
+    let digest (t : t) =
+      Random_oracle.Checked.(
+        hash ~init:Hash_prefix.zkapp_precondition_account
+          (pack_input (to_input t)))
+  end
+
+  let typ () : (Checked.t, t) Typ.t =
+    Typ.of_hlistable
+      [ Or_ignore.typ Permissions.Auth_required.typ
+          ~ignore:Permissions.Auth_required.None
+      ; Or_ignore.typ Permissions.Auth_required.typ
+          ~ignore:Permissions.Auth_required.None
+      ; Or_ignore.typ Permissions.Auth_required.typ
+          ~ignore:Permissions.Auth_required.None
+      ; Or_ignore.typ Permissions.Auth_required.typ
+          ~ignore:Permissions.Auth_required.None
+      ; Or_ignore.typ Permissions.Auth_required.typ
+          ~ignore:Permissions.Auth_required.None
+      ; Or_ignore.typ Permissions.Auth_required.typ
+          ~ignore:Permissions.Auth_required.None
+      ; Or_ignore.typ Permissions.Auth_required.typ
+          ~ignore:Permissions.Auth_required.None
+      ; Or_ignore.typ Permissions.Auth_required.typ
+          ~ignore:Permissions.Auth_required.None
+      ; Or_ignore.typ Permissions.Auth_required.typ
+          ~ignore:Permissions.Auth_required.None
+      ; Or_ignore.typ Permissions.Auth_required.typ
+          ~ignore:Permissions.Auth_required.None
+      ; Or_ignore.typ Permissions.Auth_required.typ
+          ~ignore:Permissions.Auth_required.None
+      ; Or_ignore.typ Permissions.Auth_required.typ
+          ~ignore:Permissions.Auth_required.None
+      ; Or_ignore.typ Permissions.Auth_required.typ
+          ~ignore:Permissions.Auth_required.None
+      ]
+      ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+  let checks
+      { edit_state
+      ; send
+      ; receive
+      ; access
+      ; set_delegate
+      ; set_permissions
+      ; set_verification_key
+      ; set_zkapp_uri
+      ; edit_action_state
+      ; set_token_symbol
+      ; increment_nonce
+      ; set_voting_for
+      ; set_timing
+      } (a : Permissions.t) =
+    [ ( Transaction_status.Failure
+        .Permissions_precondition_edit_state_unsatisfied
+      , Eq_data.(
+          check ~label:"edit_state" Tc.auth_required edit_state a.edit_state) )
+    ; ( Transaction_status.Failure.Permissions_precondition_receive_unsatisfied
+      , Eq_data.(check ~label:"send" Tc.auth_required send a.send) )
+    ; ( Transaction_status.Failure.Permissions_precondition_receive_unsatisfied
+      , Eq_data.(check ~label:"receive" Tc.auth_required receive a.receive) )
+    ; ( Transaction_status.Failure.Permissions_precondition_access_unsatisfied
+      , Eq_data.(check ~label:"access" Tc.auth_required access a.access) )
+    ; ( Transaction_status.Failure
+        .Permissions_precondition_set_delegate_unsatisfied
+      , Eq_data.(
+          check ~label:"set_delegate" Tc.auth_required set_delegate
+            a.set_delegate) )
+    ; ( Transaction_status.Failure
+        .Permissions_precondition_set_permissions_unsatisfied
+      , Eq_data.(
+          check ~label:"set_permissions" Tc.auth_required set_permissions
+            a.set_permissions) )
+    ; ( Transaction_status.Failure
+        .Permissions_precondition_set_verification_key_unsatisfied
+      , Eq_data.(
+          check ~label:"set_verification_key_auth" Tc.auth_required
+            set_verification_key
+            (fst a.set_verification_key)) )
+    ; ( Transaction_status.Failure
+        .Permissions_precondition_set_zkapp_uri_unsatisfied
+      , Eq_data.(
+          check ~label:"set_zkapp_uri" Tc.auth_required set_zkapp_uri
+            a.set_zkapp_uri) )
+    ; ( Transaction_status.Failure
+        .Permissions_precondition_edit_action_state_unsatisfied
+      , Eq_data.(
+          check ~label:"edit_action_state" Tc.auth_required edit_action_state
+            a.edit_action_state) )
+    ; ( Transaction_status.Failure
+        .Permissions_precondition_set_token_symbol_unsatisfied
+      , Eq_data.(
+          check ~label:"set_token_symbol" Tc.auth_required set_token_symbol
+            a.set_token_symbol) )
+    ; ( Transaction_status.Failure
+        .Permissions_precondition_increment_nonce_unsatisfied
+      , Eq_data.(
+          check ~label:"increment_nonce" Tc.auth_required increment_nonce
+            a.increment_nonce) )
+    ; ( Transaction_status.Failure
+        .Permissions_precondition_set_voting_for_unsatisfied
+      , Eq_data.(
+          check ~label:"set_voting_for" Tc.auth_required set_voting_for
+            a.set_voting_for) )
+    ; ( Transaction_status.Failure
+        .Permissions_precondition_set_timing_unsatisfied
+      , Eq_data.(
+          check ~label:"set_timing" Tc.auth_required set_timing a.set_timing) )
+    ]
+
+  let check ~check t a =
+    List.iter
+      ~f:(fun (failure, res) -> check failure (Result.is_ok res))
+      (checks t a)
+end
+
 module Account = struct
   [%%versioned
   module Stable = struct
+    module V3 = struct
+      type t = Mina_wire_types.Mina_base.Zkapp_precondition.Account.V3.t =
+        { balance : Balance.Stable.V1.t Numeric.Stable.V1.t
+        ; nonce : Account_nonce.Stable.V1.t Numeric.Stable.V1.t
+        ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t Hash.Stable.V1.t
+        ; delegate : Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t
+        ; state : F.Stable.V1.t Eq_data.Stable.V1.t Zkapp_state.V.Stable.V1.t
+        ; action_state : F.Stable.V1.t Eq_data.Stable.V1.t
+        ; proved_state : bool Eq_data.Stable.V1.t
+        ; is_new : bool Eq_data.Stable.V1.t
+        ; permissions : Permissions.Stable.V2.t
+        }
+      [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       type t = Mina_wire_types.Mina_base.Zkapp_precondition.Account.V2.t =
         { balance : Balance.Stable.V1.t Numeric.Stable.V1.t
@@ -466,7 +892,27 @@ module Account = struct
         }
       [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
 
-      let to_latest = Fn.id
+      let to_latest
+          ({ balance
+           ; nonce
+           ; receipt_chain_hash
+           ; delegate
+           ; state
+           ; action_state
+           ; proved_state
+           ; is_new
+           } :
+            t ) : Latest.t =
+        { balance
+        ; nonce
+        ; receipt_chain_hash
+        ; delegate
+        ; state
+        ; action_state
+        ; proved_state
+        ; is_new
+        ; permissions = Permissions.accept
+        }
     end
   end]
 
@@ -490,6 +936,7 @@ module Account = struct
       Or_ignore.gen field_gen
     in
     let%bind proved_state = Or_ignore.gen Quickcheck.Generator.bool in
+    let permissions = Permissions.accept in
     let%map is_new = Or_ignore.gen Quickcheck.Generator.bool in
     { balance
     ; nonce
@@ -499,6 +946,7 @@ module Account = struct
     ; action_state
     ; proved_state
     ; is_new
+    ; permissions
     }
 
   let accept : t =
@@ -511,6 +959,7 @@ module Account = struct
     ; action_state = Ignore
     ; proved_state = Ignore
     ; is_new = Ignore
+    ; permissions = Permissions.accept
     }
 
   let is_accept : t -> bool = equal accept
@@ -542,6 +991,7 @@ module Account = struct
       ~action_state:!.(Or_ignore.deriver action_state)
       ~proved_state:!.(Or_ignore.deriver bool)
       ~is_new:!.(Or_ignore.deriver bool)
+      ~permissions:!.Permissions.deriver
     |> finish "AccountPrecondition" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
@@ -566,6 +1016,7 @@ module Account = struct
        ; action_state
        ; proved_state
        ; is_new
+       ; permissions
        } :
         t ) =
     let open Random_oracle_input.Chunked in
@@ -579,6 +1030,7 @@ module Account = struct
       ; Eq_data.(to_input (Lazy.force Tc.action_state)) action_state
       ; Eq_data.(to_input Tc.boolean) proved_state
       ; Eq_data.(to_input Tc.boolean) is_new
+      ; Permissions.to_input permissions
       ]
 
   let digest t =
@@ -596,6 +1048,7 @@ module Account = struct
       ; action_state : Field.Var.t Eq_data.Checked.t
       ; proved_state : Boolean.var Eq_data.Checked.t
       ; is_new : Boolean.var Eq_data.Checked.t
+      ; permissions : Permissions.Checked.t
       }
     [@@deriving hlist]
 
@@ -608,6 +1061,7 @@ module Account = struct
          ; action_state
          ; proved_state
          ; is_new
+         ; permissions
          } :
           t ) =
       let open Random_oracle_input.Chunked in
@@ -621,6 +1075,7 @@ module Account = struct
         ; Eq_data.(to_input_checked (Lazy.force Tc.action_state)) action_state
         ; Eq_data.(to_input_checked Tc.boolean) proved_state
         ; Eq_data.(to_input_checked Tc.boolean) is_new
+        ; Permissions.Checked.to_input permissions
         ]
 
     open Impl
@@ -634,6 +1089,7 @@ module Account = struct
         ; action_state
         ; proved_state
         ; is_new
+        ; permissions
         } (a : Account.Checked.Unhashed.t) =
       [ ( Transaction_status.Failure.Account_balance_precondition_unsatisfied
         , Numeric.(Checked.check Tc.balance balance a.balance) )
@@ -676,6 +1132,7 @@ module Account = struct
       @ [ ( Transaction_status.Failure.Account_is_new_precondition_unsatisfied
           , Eq_data.(check_checked Tc.boolean is_new new_account) )
         ]
+      @ Permissions.Checked.checks permissions a.permissions
 
     let check ~new_account ~check t a =
       List.iter
@@ -700,6 +1157,7 @@ module Account = struct
           ~ignore:Zkapp_account.Actions.empty_state_element
       ; Or_ignore.typ Boolean.typ ~ignore:false
       ; Or_ignore.typ Boolean.typ ~ignore:false
+      ; Permissions.typ ()
       ]
       ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -713,6 +1171,7 @@ module Account = struct
       ; action_state
       ; proved_state
       ; is_new
+      ; permissions
       } (a : Account.t) =
     [ ( Transaction_status.Failure.Account_balance_precondition_unsatisfied
       , Numeric.(check ~label:"balance" Tc.balance balance a.balance) )
@@ -762,6 +1221,7 @@ module Account = struct
     @ [ ( Transaction_status.Failure.Account_is_new_precondition_unsatisfied
         , Eq_data.(check ~label:"is_new" Tc.boolean is_new new_account) )
       ]
+    @ Permissions.checks permissions a.permissions
 
   let check ~new_account ~check t a =
     List.iter
@@ -1498,9 +1958,9 @@ module Other = struct
 
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
-        ( Account.Stable.V2.t
+        ( Account.Stable.V3.t
         , Account_state.Stable.V1.t Transition.Stable.V1.t
         , F.Stable.V1.t Hash.Stable.V1.t )
         Poly.Stable.V1.t
@@ -1573,11 +2033,11 @@ end
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
+  module V3 = struct
     type t =
-      ( Account.Stable.V2.t
+      ( Account.Stable.V3.t
       , Protocol_state.Stable.V1.t
-      , Other.Stable.V2.t
+      , Other.Stable.V3.t
       , Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t )
       Poly.Stable.V1.t
     [@@deriving sexp, equal, yojson, hash, compare]

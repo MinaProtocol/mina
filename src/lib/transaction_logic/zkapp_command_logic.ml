@@ -251,7 +251,7 @@ module Local_state = struct
   module Value = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
           ( Mina_base.Stack_frame.Digest.Stable.V1.t
           , Mina_base.Call_stack_digest.Stable.V1.t
@@ -262,7 +262,7 @@ module Local_state = struct
           , bool
           , Zkapp_command.Transaction_commitment.Stable.V1.t
           , Mina_numbers.Index.Stable.V1.t
-          , Transaction_status.Failure.Collection.Stable.V1.t )
+          , Transaction_status.Failure.Collection.Stable.V2.t )
           Stable.V1.t
         [@@deriving equal, compare, hash, yojson, sexp]
 

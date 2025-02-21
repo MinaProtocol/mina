@@ -5,7 +5,7 @@ open Mina_state
 
 [%%versioned:
 module Stable : sig
-  module V2 : sig
+  module V3 : sig
     type t [@@deriving sexp, yojson]
   end
 end]

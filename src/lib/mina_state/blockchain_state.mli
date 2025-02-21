@@ -48,11 +48,11 @@ end
 module Value : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type t =
         ( Staged_ledger_hash.Stable.V1.t
         , Frozen_ledger_hash.Stable.V1.t
-        , Local_state.Stable.V1.t
+        , Local_state.Stable.V2.t
         , Block_time.Stable.V1.t
         , Consensus.Body_reference.Stable.V1.t
         , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t

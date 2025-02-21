@@ -44,6 +44,7 @@ module Account_update_under_construction = struct
             ; action_state = Ignore
             ; proved_state = Ignore
             ; is_new = Ignore
+            ; permissions = Account_update.Permissions_precondition.accept
             }
         in
         let proved_state =

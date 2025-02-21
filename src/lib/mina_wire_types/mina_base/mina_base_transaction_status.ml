@@ -1,5 +1,5 @@
 module Failure = struct
-  module V2 = struct
+  module V3 = struct
     type t =
       | Predicate
       | Source_not_present
@@ -40,6 +40,19 @@ module Failure = struct
       | Account_app_state_precondition_unsatisfied of int
       | Account_proved_state_precondition_unsatisfied
       | Account_is_new_precondition_unsatisfied
+      | Permissions_precondition_edit_state_unsatisfied
+      | Permissions_precondition_send_unsatisfied
+      | Permissions_precondition_receive_unsatisfied
+      | Permissions_precondition_access_unsatisfied
+      | Permissions_precondition_set_delegate_unsatisfied
+      | Permissions_precondition_set_permissions_unsatisfied
+      | Permissions_precondition_set_verification_key_unsatisfied
+      | Permissions_precondition_set_zkapp_uri_unsatisfied
+      | Permissions_precondition_edit_action_state_unsatisfied
+      | Permissions_precondition_set_token_symbol_unsatisfied
+      | Permissions_precondition_increment_nonce_unsatisfied
+      | Permissions_precondition_set_voting_for_unsatisfied
+      | Permissions_precondition_set_timing_unsatisfied
       | Protocol_state_precondition_unsatisfied
       | Unexpected_verification_key_hash
       | Valid_while_precondition_unsatisfied
@@ -49,12 +62,12 @@ module Failure = struct
   end
 
   module Collection = struct
-    module V1 = struct
-      type t = V2.t list list
+    module V2 = struct
+      type t = V3.t list list
     end
   end
 end
 
-module V2 = struct
-  type t = Applied | Failed of Failure.Collection.V1.t
+module V3 = struct
+  type t = Applied | Failed of Failure.Collection.V2.t
 end

@@ -101,7 +101,12 @@ let precondition_to_json () =
        nonce: {lower: "34928", upper: "34928"},
        receiptChainHash: null, delegate: null,
        state: [null,null,null,null,null,null,null,null],
-       actionState: null, provedState: null, isNew: null
+       actionState: null, provedState: null, isNew: null,
+       permissions:{editState:null,access:null,send:null,
+       receive:null,setDelegate:null,setPermissions:null,
+       setVerificationKey:null,setZkappUri:null,
+       editActionState:null,setTokenSymbol:null,
+       incrementNonce:null,setVotingFor:null,setTiming:null}
        }|json}
     |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
 

@@ -6,9 +6,9 @@ module Common = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type t =
-        { scan_state : Staged_ledger.Scan_state.Stable.V2.t
+        { scan_state : Staged_ledger.Scan_state.Stable.V3.t
         ; pending_coinbase : Pending_coinbase.Stable.V2.t
         }
 
@@ -69,14 +69,14 @@ module Limited = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V3 = struct
+    module V4 = struct
       type t =
-        { transition : Mina_block.Validated.Stable.V2.t
+        { transition : Mina_block.Validated.Stable.V3.t
         ; protocol_states :
-            Mina_state.Protocol_state.Value.Stable.V2.t
+            Mina_state.Protocol_state.Value.Stable.V3.t
             Mina_base.State_hash.With_state_hashes.Stable.V1.t
             list
-        ; common : Common.Stable.V2.t
+        ; common : Common.Stable.V3.t
         }
       [@@deriving fields]
 
@@ -85,7 +85,7 @@ module Limited = struct
       let hashes t = Mina_block.Validated.Stable.Latest.hashes t.transition
 
       let create ~transition ~scan_state ~pending_coinbase ~protocol_states =
-        let common = { Common.Stable.V2.scan_state; pending_coinbase } in
+        let common = { Common.Stable.V3.scan_state; pending_coinbase } in
         { transition; common; protocol_states }
     end
   end]
@@ -123,8 +123,8 @@ module Minimal = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
-      type t = { hash : State_hash.Stable.V1.t; common : Common.Stable.V2.t }
+    module V3 = struct
+      type t = { hash : State_hash.Stable.V1.t; common : Common.Stable.V3.t }
       [@@deriving fields]
 
       let of_limited ~common hash = { hash; common }

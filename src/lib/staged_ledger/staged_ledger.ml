@@ -4726,7 +4726,7 @@ let%test_module "staged ledger tests" =
               let diff : Staged_ledger_diff.t =
                 let pre_diff :
                     Staged_ledger_diff.Pre_diff_with_at_most_two_coinbase.Stable
-                    .V2
+                    .V3
                     .t =
                   { completed_works = []
                   ; commands = cmds

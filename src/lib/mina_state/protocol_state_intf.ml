@@ -32,10 +32,10 @@ module type Full = sig
     module Value : sig
       [%%versioned:
       module Stable : sig
-        module V2 : sig
+        module V3 : sig
           type t =
             ( State_hash.Stable.V1.t
-            , Blockchain_state.Value.Stable.V2.t
+            , Blockchain_state.Value.Stable.V3.t
             , Consensus.Data.Consensus_state.Value.Stable.V2.t
             , Protocol_constants_checked.Value.Stable.V1.t )
             Poly.Stable.V1.t
@@ -76,9 +76,9 @@ module type Full = sig
   module Value : sig
     [%%versioned:
     module Stable : sig
-      module V2 : sig
+      module V3 : sig
         type t =
-          (State_hash.Stable.V1.t, Body.Value.Stable.V2.t) Poly.Stable.V1.t
+          (State_hash.Stable.V1.t, Body.Value.Stable.V3.t) Poly.Stable.V1.t
         [@@deriving sexp, compare, equal, yojson]
       end
     end]

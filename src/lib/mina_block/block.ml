@@ -6,10 +6,10 @@ open Mina_state
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V3 = struct
     type t =
-      { header : Header.Stable.V2.t
-      ; body : Staged_ledger_diff.Body.Stable.V1.t
+      { header : Header.Stable.V3.t
+      ; body : Staged_ledger_diff.Body.Stable.V2.t
       }
     [@@deriving fields, sexp]
 

@@ -14,16 +14,16 @@ module Types = struct
           { completed_works : 'a list
           ; commands : 'b list
           ; coinbase : Mina_base_coinbase_fee_transfer.V1.t At_most_two.V1.t
-          ; internal_command_statuses : Mina_base_transaction_status.V2.t list
+          ; internal_command_statuses : Mina_base_transaction_status.V3.t list
           }
       end
     end
 
     module Pre_diff_with_at_most_two_coinbase : sig
-      module V2 : sig
+      module V3 : sig
         type t =
-          ( Transaction_snark_work.V2.t
-          , Mina_base_user_command.V2.t Mina_base_with_status.V2.t )
+          ( Transaction_snark_work.V3.t
+          , Mina_base_user_command.V3.t Mina_base_with_status.V2.t )
           Pre_diff_two.V2.t
       end
     end
@@ -40,30 +40,30 @@ module Types = struct
           { completed_works : 'a list
           ; commands : 'b list
           ; coinbase : Mina_base_coinbase_fee_transfer.V1.t At_most_one.V1.t
-          ; internal_command_statuses : Mina_base_transaction_status.V2.t list
+          ; internal_command_statuses : Mina_base_transaction_status.V3.t list
           }
       end
     end
 
     module Pre_diff_with_at_most_one_coinbase : sig
-      module V2 : sig
+      module V3 : sig
         type t =
-          ( Transaction_snark_work.V2.t
-          , Mina_base_user_command.V2.t Mina_base_with_status.V2.t )
+          ( Transaction_snark_work.V3.t
+          , Mina_base_user_command.V3.t Mina_base_with_status.V2.t )
           Pre_diff_one.V2.t
       end
     end
 
     module Diff : sig
-      module V2 : sig
+      module V3 : sig
         type t =
-          Pre_diff_with_at_most_two_coinbase.V2.t
-          * Pre_diff_with_at_most_one_coinbase.V2.t option
+          Pre_diff_with_at_most_two_coinbase.V3.t
+          * Pre_diff_with_at_most_one_coinbase.V3.t option
       end
     end
 
-    module V2 : sig
-      type t = { diff : Diff.V2.t }
+    module V3 : sig
+      type t = { diff : Diff.V3.t }
     end
   end
 end
@@ -89,16 +89,16 @@ module type Concrete = sig
         { completed_works : 'a list
         ; commands : 'b list
         ; coinbase : Mina_base_coinbase_fee_transfer.V1.t At_most_two.V1.t
-        ; internal_command_statuses : Mina_base_transaction_status.V2.t list
+        ; internal_command_statuses : Mina_base_transaction_status.V3.t list
         }
     end
   end
 
   module Pre_diff_with_at_most_two_coinbase : sig
-    module V2 : sig
+    module V3 : sig
       type t =
-        ( Transaction_snark_work.V2.t
-        , Mina_base_user_command.V2.t Mina_base_with_status.V2.t )
+        ( Transaction_snark_work.V3.t
+        , Mina_base_user_command.V3.t Mina_base_with_status.V2.t )
         Pre_diff_two.V2.t
     end
   end
@@ -115,30 +115,30 @@ module type Concrete = sig
         { completed_works : 'a list
         ; commands : 'b list
         ; coinbase : Ft.Stable.V1.t At_most_one.V1.t
-        ; internal_command_statuses : Mina_base_transaction_status.V2.t list
+        ; internal_command_statuses : Mina_base_transaction_status.V3.t list
         }
     end
   end
 
   module Pre_diff_with_at_most_one_coinbase : sig
-    module V2 : sig
+    module V3 : sig
       type t =
-        ( Transaction_snark_work.V2.t
-        , Mina_base_user_command.V2.t Mina_base_with_status.V2.t )
+        ( Transaction_snark_work.V3.t
+        , Mina_base_user_command.V3.t Mina_base_with_status.V2.t )
         Pre_diff_one.V2.t
     end
   end
 
   module Diff : sig
-    module V2 : sig
+    module V3 : sig
       type t =
-        Pre_diff_with_at_most_two_coinbase.V2.t
-        * Pre_diff_with_at_most_one_coinbase.V2.t option
+        Pre_diff_with_at_most_two_coinbase.V3.t
+        * Pre_diff_with_at_most_one_coinbase.V3.t option
     end
   end
 
-  module V2 : sig
-    type t = { diff : Diff.V2.t }
+  module V3 : sig
+    type t = { diff : Diff.V3.t }
   end
 end
 
@@ -163,16 +163,16 @@ module M = struct
         { completed_works : 'a list
         ; commands : 'b list
         ; coinbase : Mina_base_coinbase_fee_transfer.V1.t At_most_two.V1.t
-        ; internal_command_statuses : Mina_base_transaction_status.V2.t list
+        ; internal_command_statuses : Mina_base_transaction_status.V3.t list
         }
     end
   end
 
   module Pre_diff_with_at_most_two_coinbase = struct
-    module V2 = struct
+    module V3 = struct
       type t =
-        ( Transaction_snark_work.V2.t
-        , Mina_base_user_command.V2.t Mina_base_with_status.V2.t )
+        ( Transaction_snark_work.V3.t
+        , Mina_base_user_command.V3.t Mina_base_with_status.V2.t )
         Pre_diff_two.V2.t
     end
   end
@@ -189,30 +189,30 @@ module M = struct
         { completed_works : 'a list
         ; commands : 'b list
         ; coinbase : Ft.Stable.V1.t At_most_one.V1.t
-        ; internal_command_statuses : Mina_base_transaction_status.V2.t list
+        ; internal_command_statuses : Mina_base_transaction_status.V3.t list
         }
     end
   end
 
   module Pre_diff_with_at_most_one_coinbase = struct
-    module V2 = struct
+    module V3 = struct
       type t =
-        ( Transaction_snark_work.V2.t
-        , Mina_base_user_command.V2.t Mina_base_with_status.V2.t )
+        ( Transaction_snark_work.V3.t
+        , Mina_base_user_command.V3.t Mina_base_with_status.V2.t )
         Pre_diff_one.V2.t
     end
   end
 
   module Diff = struct
-    module V2 = struct
+    module V3 = struct
       type t =
-        Pre_diff_with_at_most_two_coinbase.V2.t
-        * Pre_diff_with_at_most_one_coinbase.V2.t option
+        Pre_diff_with_at_most_two_coinbase.V3.t
+        * Pre_diff_with_at_most_one_coinbase.V3.t option
     end
   end
 
-  module V2 = struct
-    type t = { diff : Diff.V2.t }
+  module V3 = struct
+    type t = { diff : Diff.V3.t }
   end
 end
 

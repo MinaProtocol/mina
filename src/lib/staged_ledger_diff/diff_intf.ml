@@ -38,7 +38,7 @@ module type Full = sig
           { completed_works : 'a list
           ; commands : 'b list
           ; coinbase : Coinbase.Fee_transfer.Stable.V1.t At_most_two.Stable.V1.t
-          ; internal_command_statuses : Transaction_status.Stable.V2.t list
+          ; internal_command_statuses : Transaction_status.Stable.V3.t list
           }
         [@@deriving equal, compare, sexp, yojson]
       end
@@ -55,7 +55,7 @@ module type Full = sig
           { completed_works : 'a list
           ; commands : 'b list
           ; coinbase : Coinbase.Fee_transfer.Stable.V1.t At_most_one.Stable.V1.t
-          ; internal_command_statuses : Transaction_status.Stable.V2.t list
+          ; internal_command_statuses : Transaction_status.Stable.V3.t list
           }
         [@@deriving equal, compare, sexp, yojson]
       end
@@ -69,11 +69,11 @@ module type Full = sig
       (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_two.t
 
     module Stable : sig
-      module V2 : sig
+      module V3 : sig
         type t
       end
     end
-    with type V2.t = t
+    with type V3.t = t
   end
 
   module Pre_diff_with_at_most_one_coinbase : sig
@@ -81,11 +81,11 @@ module type Full = sig
       (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_one.t
 
     module Stable : sig
-      module V2 : sig
+      module V3 : sig
         type t
       end
     end
-    with type V2.t = t
+    with type V3.t = t
   end
 
   module Diff : sig
@@ -94,26 +94,26 @@ module type Full = sig
       * Pre_diff_with_at_most_one_coinbase.t option
 
     module Stable : sig
-      module V2 : sig
+      module V3 : sig
         type t
       end
     end
-    with type V2.t = t
+    with type V3.t = t
   end
 
   type t = { diff : Diff.t } [@@deriving fields]
 
   module Stable : sig
-    module V2 : sig
-      type t = { diff : Diff.Stable.V2.t }
+    module V3 : sig
+      type t = { diff : Diff.Stable.V3.t }
       [@@deriving bin_io, equal, sexp, version, yojson]
 
       val to_latest : t -> t
     end
 
-    module Latest = V2
+    module Latest = V3
   end
-  with type V2.t = t
+  with type V3.t = t
 
   module With_valid_signatures_and_proofs : sig
     type pre_diff_with_at_most_two_coinbase =

@@ -502,7 +502,7 @@ module With_hashes_and_data = struct
   module Stable = struct
     module V1 = struct
       type 'data t =
-        ( Account_update.Stable.V1.t * 'data
+        ( Account_update.Stable.V2.t * 'data
         , Digest.Account_update.Stable.V1.t
         , Digest.Forest.Stable.V1.t )
         Stable.V1.t
@@ -550,9 +550,9 @@ end
 module With_hashes = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
-        ( Account_update.Stable.V1.t
+        ( Account_update.Stable.V2.t
         , Digest.Account_update.Stable.V1.t
         , Digest.Forest.Stable.V1.t )
         Stable.V1.t
