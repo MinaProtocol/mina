@@ -73,6 +73,8 @@
    snark_bits
    error_json
    ppx_version.runtime
+   mina_compile_config
+   zkapp_vk_cache_tag
  )
  (preprocess
   (pps ppx_annot ppx_snarky ppx_here ppx_mina ppx_version ppx_compare ppx_deriving.enum ppx_deriving.ord ppx_deriving.make
