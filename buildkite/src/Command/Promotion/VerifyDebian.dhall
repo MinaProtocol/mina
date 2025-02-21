@@ -28,6 +28,8 @@ let promoteDebianVerificationStep =
 
                 else  Package.debianName spec.package spec.profile spec.network
 
+          let signed = if spec.allow_signing then "--signed" else ""
+
           in  Command.build
                 Command.Config::{
                 , commands =
@@ -35,7 +37,7 @@ let promoteDebianVerificationStep =
                       "source buildkite/scripts/export-git-env-vars.sh && ./scripts/debian/verify.sh --repo ${DebianRepo.bucket_or_default
                                                                                                                 spec.target_repo} --package ${name} --version ${spec.new_version} --codename ${DebianVersions.lowerName
                                                                                                                                                                                                  spec.codename}  --channel ${DebianChannel.lowerName
-                                                                                                                                                                                                                               spec.to_channel}"
+                                                                                                                                                                                                                               spec.to_channel} ${signed}"
                   ]
                 , label = "Debian: ${spec.step_key}"
                 , key = spec.step_key
