@@ -2276,6 +2276,7 @@ module Queries = struct
       ~resolve:(fun { ctx = mina; _ } () start_idx end_idx ->
         let snark_job_state = Mina_lib.snark_job_state mina in
         let snark_pool = Mina_lib.snark_pool mina in
+        print_endline "test";
         let all_work = Work_selector.all_work ~snark_pool snark_job_state in
         let work_size = all_work |> List.length |> Unsigned.UInt32.of_int in
         let less_than uint1 uint2 = Unsigned.UInt32.compare uint1 uint2 < 0 in
