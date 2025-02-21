@@ -498,7 +498,7 @@ let get_transactions ~constraint_constants ~coinbase_receiver
     get' ~constraint_constants ~to_user_command:With_status.data
       ~diff:sl_diff.diff ~coinbase_receiver
       ~coinbase_amount:
-        (Staged_ledger_diff.coinbase ~constraint_constants ~supercharge_coinbase
-           sl_diff )
+        (Staged_ledger_diff.Diff.coinbase ~constraint_constants
+           ~supercharge_coinbase sl_diff.diff )
   in
   transactions

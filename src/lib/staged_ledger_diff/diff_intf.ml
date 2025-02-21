@@ -99,6 +99,12 @@ module type Full = sig
       end
     end
     with type V2.t = t
+
+    val coinbase :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> supercharge_coinbase:bool
+      -> t
+      -> Currency.Amount.t option
   end
 
   type t = { diff : Diff.t } [@@deriving fields]
@@ -177,12 +183,6 @@ module type Full = sig
   val commands : t -> User_command.t With_status.t list
 
   val completed_works : t -> Transaction_snark_work.t list
-
-  val coinbase :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> supercharge_coinbase:bool
-    -> t
-    -> Currency.Amount.t option
 
   val net_return :
        constraint_constants:Genesis_constants.Constraint_constants.t
