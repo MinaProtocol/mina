@@ -10,7 +10,9 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t [@@deriving to_yojson]
+type t = Stable.Latest.t
+
+val to_logging_yojson : Header.t -> Yojson.Safe.t
 
 type with_hash = t State_hash.With_state_hashes.t
 
