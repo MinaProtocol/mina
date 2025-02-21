@@ -2201,7 +2201,9 @@ module Queries = struct
                     List.filter_map user_cmds ~f:(fun user_cmd ->
                         transaction_seq := !transaction_seq + 1 ;
                         match user_cmd.data with
-                        | Zkapp_command c -> (
+                        | Zkapp_command c
+                          when Transaction_status.Stable.V2.(
+                                 equal user_cmd.status Applied) -> (
                             let actions =
                               c |> Zkapp_command.account_updates
                               |> Zkapp_command.Call_forest.fold ~init:(0, [])
@@ -2221,9 +2223,10 @@ module Queries = struct
                                            ~f:(fun e -> Array.to_list e)
                                            action_body
                                        in
+                                       let action_seq = action_seq + 1 in
                                        match field_elems with
                                        | [] ->
-                                           (action_seq + 1, acc)
+                                           (action_seq, acc)
                                        | field_elems ->
                                            let action_state =
                                              { Types.Action_state.action =
@@ -2234,8 +2237,8 @@ module Queries = struct
                                              ; block_number
                                              }
                                            in
-                                           (action_seq + 1, action_state :: acc)
-                                     else (action_seq + 1, acc) )
+                                           (action_seq, action_state :: acc)
+                                     else (action_seq, acc) )
                             in
                             let _, actions = actions in
                             match actions with
@@ -2243,7 +2246,7 @@ module Queries = struct
                                 None
                             | actions ->
                                 Some actions )
-                        | Signed_command _ ->
+                        | Signed_command _ | Zkapp_command _ ->
                             None )
                   in
                   action_list_list |> List.concat )
