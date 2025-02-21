@@ -1,1 +1,12 @@
 (lang dune 3.17)
+(package (name logger))
+(package (name bounded_types))
+(package (name ppx_version))
+(package (name logproc_lib))
+(package (name interpolator_lib))
+(package (name ppx_mina))
+(package (name ppx_representatives))
+(package (name ppx_to_enum))
+(package (name ppx_register_event))
+(package (name structured_log_events))
+

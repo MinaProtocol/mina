@@ -1,0 +1,3 @@
+(library
+ (name ppx_representatives_runtime)
+ (public_name ppx_representatives.runtime))

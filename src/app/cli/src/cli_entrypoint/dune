@@ -1,0 +1,26 @@
+(library
+ (name saffron_cli_entrypoint)
+ (public_name cli.saffron_cli_entrypoint)
+ (modes native)
+ (libraries
+  ;;opam libraries
+  stdio
+  async_kernel
+  async_unix
+  base
+  core_kernel
+  core
+  bin_prot
+  bin_prot.shape
+  async
+  base.caml
+  uri
+  async.async_command
+  result
+  sexplib0
+  ;;local libraries
+  logger)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_here ppx_let ppx_sexp_conv ppx_deriving_yojson)))
