@@ -1,66 +1,41 @@
 use neon::prelude::*;
 use mina_curves::pasta::Fp;
-// Import the Poseidon function and constants
-use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, permutation::poseidon_block_cipher, pasta::fp_kimchi};
+use mina_poseidon::{
+    constants::PlonkSpongeConstantsKimchi,
+    permutation::poseidon_block_cipher,
+    pasta::fp_kimchi,
+};
 
-// // 
-// fn caml_do_cool_thingies() -> String {
-//     "hello from native rust this is Yoni".into()
-// }
-
-// Neon-friendly entry point
-// fn caml_do_cool_thingies_js(mut cx: FunctionContext) -> JsResult<JsString> {
-//     // call the pure Rust function
-//     let result: String = caml_do_cool_thingies();
-
-//     // Convert the `String` into a Neon `JsString`
-//     Ok(cx.string(result))
-// }
-
-fn parse_js_array_to_fp_vec(
-    cx: &mut FunctionContext,
-    js_input: Handle<JsArray>
-) -> Result<Vec<Fp>, Throw> {
-
-}
-
-fn fp_poseidon_block_cipher_native(mut cx: FunctionContext) -> JsResult<JsArray> {
-  
+fn fp_poseidon_block_cipher_native(mut cx: FunctionContext) -> JsResult<JsString> {
+    // 1) Grab the JS array argument
     let js_input = cx.argument::<JsArray>(0)?;
 
+    let val1: Handle<JsValue> = js_input.get(&mut cx, 0)?; // Explicit type
+    let n1_f64 = val1.downcast_or_throw::<JsNumber, _>(&mut cx)?.value(&mut cx);
+    let n1 = n1_f64 as u64;
 
+  
+    let mut state = vec![Fp::from(n1)];
 
-    // hard-coded vector: [1, 2, 3] in the Fp field
-    let mut state = vec![
-        Fp::from(n1),
-        Fp::from(n2),
-        Fp::from(n3),
-    ];
-
-
-    // apply the Poseidon permutation
+    // 4) Run Poseidon block cipher
     poseidon_block_cipher::<Fp, PlonkSpongeConstantsKimchi>(
         &fp_kimchi::static_params(),
         &mut state,
     );
 
-    // convert to a string to return something visible to Node.js
-    Ok(cx.string(format!("Poseidon Fp permutation native result: {:?}", state)))
-}
-
-fn caml_do_cool_thingies(mut cx: FunctionContext) -> JsResult<JsString> {
-    // Directly create a `JsString` 
-    Ok(cx.string("hello from native rust this is Yoni"))
+    // 5) Return a single string describing the final permuted state
+    Ok(cx.string(format!(
+        "Poseidon Fp permutation native result: {:?}",
+        state
+    )))
 }
 
 // The Neon module initialization
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
-    // Export the JS function name ("caml_do_cool_thingies") 
-    // and map it to our Rust function
-    cx.export_function("caml_do_cool_thingies", caml_do_cool_thingies)?;
-
-    cx.export_function("fp_poseidon_block_cipher_native", fp_poseidon_block_cipher_native
+    cx.export_function(
+        "fp_poseidon_block_cipher_native",
+        fp_poseidon_block_cipher_native
     )?;
     Ok(())
 }
