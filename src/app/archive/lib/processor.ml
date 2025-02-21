@@ -3304,9 +3304,11 @@ module Block = struct
         (Header.proposed_protocol_version_opt @@ Mina_block.header t)
       ~hash ~v1_transaction_hash:false
 
-  let add_from_precomputed conn ~constraint_constants (t : Precomputed.t) =
+  let add_from_precomputed conn ~proof_cache_db ~constraint_constants
+      (t : Precomputed.t) =
     let staged_ledger_diff =
-      Staged_ledger_diff.write_all_proofs_to_disk t.staged_ledger_diff
+      Staged_ledger_diff.write_all_proofs_to_disk ~proof_cache_db
+        t.staged_ledger_diff
     in
     add_parts_if_doesn't_exist conn ~constraint_constants
       ~protocol_state:t.protocol_state ~staged_ledger_diff
@@ -4666,10 +4668,11 @@ let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
   retry ~f:add ~logger ~error_str:"add_block_aux" retries
 
 (* used by `archive_blocks` app *)
-let add_block_aux_precomputed ~constraint_constants ~logger ?retries ~pool
-    ~delete_older_than block =
+let add_block_aux_precomputed ~proof_cache_db ~constraint_constants ~logger
+    ?retries ~pool ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than
-    ~add_block:(Block.add_from_precomputed ~constraint_constants)
+    ~add_block:
+      (Block.add_from_precomputed ~proof_cache_db ~constraint_constants)
     ~hash:(fun block ->
       (block.Precomputed.protocol_state |> Protocol_state.hashes).state_hash )
     ~accounts_accessed:block.Precomputed.accounts_accessed
@@ -4686,8 +4689,8 @@ let add_block_aux_extensional ~logger ?retries ~pool ~delete_older_than block =
     ~tokens_used:block.Extensional.Block.tokens_used block
 
 (* receive blocks from a daemon, write them to the database *)
-let run pool reader ~genesis_constants ~constraint_constants ~logger
-    ~delete_older_than : unit Deferred.t =
+let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
+    ~logger ~delete_older_than : unit Deferred.t =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier
         (Breadcrumb_added
@@ -4695,7 +4698,9 @@ let run pool reader ~genesis_constants ~constraint_constants ~logger
         let add_block = Block.add_if_doesn't_exist ~constraint_constants in
         let hash = State_hash.With_state_hashes.state_hash in
         let block =
-          With_hash.map ~f:Mina_block.write_all_proofs_to_disk block
+          With_hash.map
+            ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db)
+            block
         in
         match%bind
           add_block_aux ~logger ~genesis_constants ~pool ~delete_older_than
@@ -4860,7 +4865,7 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
       go ()
 
 (* for running the archive process *)
-let setup_server ~(genesis_constants : Genesis_constants.t)
+let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~metrics_server_port ~logger ~postgres_address ~server_port
     ~delete_older_than ~runtime_config_opt ~missing_blocks_width =
@@ -4896,14 +4901,15 @@ let setup_server ~(genesis_constants : Genesis_constants.t)
         add_genesis_accounts pool ~logger ~genesis_constants
           ~constraint_constants ~runtime_config_opt
       in
-      run ~constraint_constants ~genesis_constants pool reader ~logger
-        ~delete_older_than
+      run ~proof_cache_db ~constraint_constants ~genesis_constants pool reader
+        ~logger ~delete_older_than
       |> don't_wait_for ;
       Strict_pipe.Reader.iter precomputed_block_reader
         ~f:(fun precomputed_block ->
           match%map
-            add_block_aux_precomputed ~logger ~pool ~genesis_constants
-              ~constraint_constants ~delete_older_than precomputed_block
+            add_block_aux_precomputed ~proof_cache_db ~logger ~pool
+              ~genesis_constants ~constraint_constants ~delete_older_than
+              precomputed_block
           with
           | Error e ->
               [%log warn]

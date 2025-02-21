@@ -4,9 +4,8 @@ open Async
 open Cache_lib
 open Network_peer
 
-let build_subtrees_of_breadcrumbs ~proof_cache_db ~logger ~precomputed_values
-    ~verifier ~trust_system ~frontier ~initial_hash
-    subtrees_of_enveloped_transitions =
+let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
+    ~trust_system ~frontier ~initial_hash subtrees_of_enveloped_transitions =
   let missing_parent_msg =
     Printf.sprintf
       "Transition frontier already garbage-collected the parent of %s"
@@ -97,9 +96,9 @@ let build_subtrees_of_breadcrumbs ~proof_cache_db ~logger ~precomputed_values
                 let open Deferred.Let_syntax in
                 match%bind
                   Deferred.Or_error.try_with ~here:[%here] (fun () ->
-                      Transition_frontier.Breadcrumb.build ~proof_cache_db
-                        ~logger ~precomputed_values ~verifier ~trust_system
-                        ~parent ~transition:mostly_validated_transition
+                      Transition_frontier.Breadcrumb.build ~logger
+                        ~precomputed_values ~verifier ~trust_system ~parent
+                        ~transition:mostly_validated_transition
                         ~get_completed_work:(Fn.const None)
                         ~sender:(Some sender) ~transition_receipt_time () )
                 with
