@@ -1,0 +1,13 @@
+opam-version: "2.0"
+compiler: ["ocaml-base-compiler.4.14.0"]
+roots: ["dune.3.17.2" "ocaml-base-compiler.4.14.0"]
+installed: [
+  "base-bigarray.base"
+  "base-threads.base"
+  "base-unix.base"
+  "dune.3.17.2"
+  "ocaml.4.14.0"
+  "ocaml-base-compiler.4.14.0"
+  "ocaml-config.2"
+  "ocaml-options-vanilla.1"
+]
