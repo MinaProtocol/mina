@@ -157,8 +157,7 @@ let docker_step
                       (     \(n : Network.Type)
                         ->  DockerImage.ReleaseSpec::{
                             , deps = deps
-                            , service =
-                                Artifacts.dockerName Artifacts.Type.Daemon
+                            , service = Artifacts.Type.Daemon
                             , network = Network.lowerName n
                             , deb_codename =
                                 "${DebianVersions.lowerName spec.debVersion}"
@@ -179,7 +178,7 @@ let docker_step
                 , BatchTxn =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
-                    , service = "mina-batch-txn"
+                    , service = Artifacts.Type.BatchTxn
                     , network = "berkeley"
                     , deb_codename =
                         "${DebianVersions.lowerName spec.debVersion}"
@@ -195,7 +194,7 @@ let docker_step
                 , Archive =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
-                    , service = "mina-archive"
+                    , service = Artifacts.Type.Archive
                     , deb_codename =
                         "${DebianVersions.lowerName spec.debVersion}"
                     , deb_profile = spec.profile
@@ -215,8 +214,7 @@ let docker_step
                       (     \(n : Network.Type)
                         ->  DockerImage.ReleaseSpec::{
                             , deps = deps
-                            , service =
-                                Artifacts.dockerName Artifacts.Type.Rosetta
+                            , service = Artifacts.Type.Rosetta
                             , network = Network.lowerName n
                             , deb_codename =
                                 "${DebianVersions.lowerName spec.debVersion}"
@@ -234,7 +232,7 @@ let docker_step
                 , ZkappTestTransaction =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
-                    , service = "mina-zkapp-test-transaction"
+                    , service = Artifacts.Type.ZkappTestTransaction
                     , build_flags = spec.buildFlags
                     , deb_repo = DebianRepo.Type.Local
                     , deb_profile = spec.profile
@@ -250,7 +248,7 @@ let docker_step
                 , FunctionalTestSuite =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
-                    , service = "mina-test-suite"
+                    , service = Artifacts.Type.FunctionalTestSuite
                     , deb_codename =
                         "${DebianVersions.lowerName spec.debVersion}"
                     , build_flags = spec.buildFlags
@@ -264,6 +262,8 @@ let docker_step
                     , network = "berkeley"
                     }
                   ]
+                , Toolchain = [] : List DockerImage.ReleaseSpec.Type
+                , ItnOrchestrator = [] : List DockerImage.ReleaseSpec.Type
                 }
                 artifact
 

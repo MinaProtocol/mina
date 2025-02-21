@@ -24,7 +24,7 @@ let ReleaseSpec =
       { Type =
           { deps : List Command.TaggedKey.Type
           , network : Text
-          , service : Text
+          , service : Artifacts.Type
           , version : Text
           , branch : Text
           , repo : Text
@@ -42,7 +42,7 @@ let ReleaseSpec =
           { deps = [] : List Command.TaggedKey.Type
           , network = "devnet"
           , version = "\\\${MINA_DOCKER_TAG}"
-          , service = Artifacts.dockerName Artifacts.Type.Daemon
+          , service = Artifacts.Type.Daemon
           , branch = "\\\${BUILDKITE_BRANCH}"
           , repo = "\\\${BUILDKITE_REPO}"
           , deb_codename = "bullseye"
@@ -65,7 +65,7 @@ let generateStep =
 
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
-                ++  " --service ${spec.service}"
+                ++  " --service ${Artifacts.dockerName spec.service}"
                 ++  " --network ${spec.network}"
                 ++  " --version ${spec.version}"
                 ++  " --branch ${spec.branch}"
@@ -81,7 +81,7 @@ let generateStep =
 
           let releaseDockerCmd =
                     "./scripts/docker/release.sh"
-                ++  " --service ${spec.service}"
+                ++  " --service ${Artifacts.dockerName spec.service}"
                 ++  " --version ${spec.version}"
                 ++  " --network ${spec.network}"
                 ++  " --deb-codename ${spec.deb_codename}"
