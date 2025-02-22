@@ -14,6 +14,10 @@ MAINLINE_BRANCHES="-m develop -m compatible -m master -m dkijania/enhance_benchm
 while [[ "$#" -gt 0 ]]; do case $1 in
   heap-usage) BENCHMARK="heap-usage"; ;;
   mina-base) BENCHMARK="mina-base"; ;;
+  persistent-frontier) 
+    BENCHMARK="persistent-frontier"
+    EXTRA_ARGS="--frontier-db-url https://storage.googleapis.com/o1labs-ci-test-data/dump_2025_02-13-07-54-53.tar.gz"
+  ;;
   ledger-export) 
     BENCHMARK="ledger-export"
     EXTRA_ARGS="--genesis-ledger-path ./genesis_ledgers/devnet.json"
