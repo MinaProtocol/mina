@@ -20,6 +20,8 @@ let DockerLogin = ../Command/DockerLogin/Type.dhall
 
 let DebianRepo = ../Constants/DebianRepo.dhall
 
+let DockerPublish = ../Constants/DockerPublish.dhall
+
 let ReleaseSpec =
       { Type =
           { deps : List Command.TaggedKey.Type
@@ -35,6 +37,7 @@ let ReleaseSpec =
           , deb_profile : Profiles.Type
           , deb_repo : DebianRepo.Type
           , build_flags : BuildFlags.Type
+          , docker_publish : DockerPublish.Type
           , step_key : Text
           , if : Optional B/If
           }
@@ -50,6 +53,7 @@ let ReleaseSpec =
           , deb_version = "\\\${MINA_DEB_VERSION}"
           , deb_profile = Profiles.Type.Standard
           , build_flags = BuildFlags.Type.None
+          , docker_publish = DockerPublish.Type.Disabled
           , deb_repo = DebianRepo.Type.PackagesO1Test
           , no_cache = False
           , step_key = "daemon-standard-docker-image"
@@ -80,15 +84,22 @@ let generateStep =
                 ++  " --repo ${spec.repo}"
 
           let releaseDockerCmd =
-                    "./scripts/docker/release.sh"
-                ++  " --service ${Artifacts.dockerName spec.service}"
-                ++  " --version ${spec.version}"
-                ++  " --network ${spec.network}"
-                ++  " --deb-codename ${spec.deb_codename}"
-                ++  " --deb-version ${spec.deb_version}"
-                ++  " --deb-profile ${Profiles.lowerName spec.deb_profile}"
-                ++  " --deb-build-flags ${BuildFlags.lowerName
-                                            spec.build_flags}"
+                      if DockerPublish.shouldPublish
+                           spec.docker_publish
+                           spec.service
+
+                then      "./scripts/docker/release.sh"
+                      ++  " --service ${Artifacts.dockerName spec.service}"
+                      ++  " --version ${spec.version}"
+                      ++  " --network ${spec.network}"
+                      ++  " --deb-codename ${spec.deb_codename}"
+                      ++  " --deb-version ${spec.deb_version}"
+                      ++  " --deb-profile ${Profiles.lowerName
+                                              spec.deb_profile}"
+                      ++  " --deb-build-flags ${BuildFlags.lowerName
+                                                  spec.build_flags}"
+
+                else  " echo skipping "
 
           let remoteRepoCmds =
                 [ Cmd.run
