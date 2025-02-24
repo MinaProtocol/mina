@@ -2,11 +2,11 @@
 
 (executable
  (package cli)
- (name mina)
- (public_name mina)
- (modules mina)
+ (name saffron)
+ (public_name saffron)
+ (modules saffron)
  (modes native)
- (libraries mina_cli_entrypoint)
+ (libraries saffron_cli_entrypoint)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))
  (flags -short-paths -w @a-4-29-40-41-42-44-45-48-58-59-60-66))
