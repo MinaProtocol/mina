@@ -15,9 +15,9 @@ type context =
   | Dune (* application ran from dune exec command *)
   | Local (* application ran from _build/default folder*)
   | Debian (* application installed from mina debian package *)
-  | Docker of DockerContext.t
-  | AutoDetect
-(* application ran inside docker container *)
+  | Docker of DockerContext.t (* application ran inside docker container *)
+  | AutoDetect (* tries to find app with order local -> debian -> dune *)
+
 
 module Executor = struct
   type t = { official_name : string; dune_name : string; context : context }
