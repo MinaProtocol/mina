@@ -28,7 +28,8 @@ let main ~frontier_db_path ~no_root_compatible () =
   let duration = Time_ns.diff end_time start_time in
   [%log info]
     "Querying root hash on patched persistence frontier database takes %s"
-    (Time_ns.Span.to_string duration) ;
+    (Time_ns.Span.to_string duration)
+    ~metadata:[ ("duration", `Float (Time_ns.Span.to_ms duration)) ] ;
   Database.close db ;
   assert (Time_ns.Span.compare duration root_hash_deserialization_limit < 0)
 
