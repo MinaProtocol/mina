@@ -49,21 +49,19 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run
-                  "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
-              , RunWithPostgres.runInDockerWithPostgresConn
-                  ([] : List Text)
-                  "./src/test/archive/sample_db/archive_db.sql"
-                  Artifacts.Type.Rosetta
-                  (Some Network.Type.Berkeley)
-                  "./buildkite/scripts/rosetta-indexer-test.sh"
-              , Cmd.runInDocker
-                  Cmd.Docker::{
-                  , image =
-                      "gcr.io/o1labs-192920/mina-rosetta:\\\${MINA_DOCKER_TAG}-berkeley"
-                  }
-                  "buildkite/scripts/rosetta-integration-tests-fast.sh"
-              ]
+                  RunWithPostgres.runInDockerWithPostgresConn
+                    ([] : List Text)
+                    "./src/test/archive/sample_db/archive_db.sql"
+                    "./buildkite/scripts/tests/rosetta_indexer_test.sh"
+                # [ Cmd.run
+                      "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
+                  , Cmd.runInDocker
+                      Cmd.Docker::{
+                      , image =
+                          "gcr.io/o1labs-192920/mina-rosetta:\\\${MINA_DOCKER_TAG}-berkeley"
+                      }
+                      "buildkite/scripts/rosetta-integration-tests-fast.sh"
+                  ]
             , label = "Rosetta integration tests Bullseye"
             , key = "rosetta-integration-tests-bullseye"
             , soft_fail = Some (B/SoftFail.Boolean True)
