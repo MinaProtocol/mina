@@ -20,10 +20,7 @@ let%test_module "network pool test" =
     let time_controller = Block_time.Controller.basic ~logger
 
     let block_window_duration =
-      Float.of_int
-        Genesis_constants.For_unit_tests.Constraint_constants.t
-          .block_window_duration_ms
-      |> Time.Span.of_ms
+      Mina_compile_config.For_unit_tests.t.block_window_duration
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->

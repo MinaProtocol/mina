@@ -4,6 +4,11 @@
 (*END src/config/ledger_depth/small.mlh*)
 
 
+(*BEGIN src/config/curve/medium.mlh*)
+[%%define curve_size 255]
+(*END src/config/curve/medium.mlh*)
+
+
 (*BEGIN src/config/coinbase/standard.mlh*)
 [%%define coinbase "20"]
 (*END src/config/coinbase/standard.mlh*)
@@ -46,6 +51,7 @@
 
 
 (*BEGIN src/config/amount_defaults/standard.mlh*)
+[%%define default_transaction_fee "5"]
 [%%define default_snark_worker_fee "1"]
 [%%define minimum_user_command_fee "2"]
 (*END src/config/amount_defaults/standard.mlh*)

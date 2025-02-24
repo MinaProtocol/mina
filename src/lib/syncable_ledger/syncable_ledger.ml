@@ -105,10 +105,22 @@ module Answer = struct
   end]
 end
 
+type daemon_config = { max_subtree_depth : int; default_subtree_depth : int }
+
+let create_config ~(compile_config : Mina_compile_config.t) ~max_subtree_depth
+    ~default_subtree_depth () =
+  { max_subtree_depth =
+      Option.value ~default:compile_config.sync_ledger_max_subtree_depth
+        max_subtree_depth
+  ; default_subtree_depth =
+      Option.value ~default:compile_config.sync_ledger_default_subtree_depth
+        default_subtree_depth
+  }
+
 module type CONTEXT = sig
   val logger : Logger.t
 
-  val compile_config : Mina_compile_config.t
+  val ledger_sync_config : daemon_config
 end
 
 module type Inputs_intf = sig
@@ -388,7 +400,7 @@ end = struct
             match subtree_depth with
             | n when n >= 1 -> (
                 let subtree_depth =
-                  min n compile_config.sync_ledger_max_subtree_depth
+                  min n ledger_sync_config.max_subtree_depth
                 in
                 let ledger_depth = MT.depth mt in
                 let addresses =
@@ -627,8 +639,7 @@ end = struct
       expect_children t addr exp_hash ;
       Linear_pipe.write_without_pushback_if_open t.queries
         ( desired_root_exn t
-        , What_child_hashes
-            (addr, compile_config.sync_ledger_default_subtree_depth) ) )
+        , What_child_hashes (addr, ledger_sync_config.default_subtree_depth) ) )
 
   (** Handle the initial Num_accounts message, starting the main syncing
       process. *)
@@ -761,9 +772,7 @@ end = struct
                           ( "hashes sent for subtree on address $address must \
                              be a power of 2 in the range 2-2^$depth"
                           , [ ( "depth"
-                              , `Int
-                                  compile_config.sync_ledger_max_subtree_depth
-                              )
+                              , `Int ledger_sync_config.max_subtree_depth )
                             ] ) )
                   in
                   requeue_query ()

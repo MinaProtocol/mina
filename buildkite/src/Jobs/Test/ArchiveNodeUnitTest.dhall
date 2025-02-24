@@ -24,7 +24,7 @@ let password = "codarules"
 
 let db = "archiver"
 
-let port = "5432"
+let port = "5433"
 
 let command_key = "archive-unit-tests"
 

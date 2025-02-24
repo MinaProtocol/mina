@@ -946,7 +946,7 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
   in
   let apply_previous_incomplete_txns ~k (txns : Previous_incomplete_txns.t) =
     (*Note: Previous incomplete transactions refer to the block's transactions from previous scan state tree that were split between the two trees.
-      The set in the previous tree have gone through the first pass. For the second pass that is to happen after the rest of the set goes through the first pass, we need partially applied state - result of previous tree's transactions' first pass. To generate the partial state, we do a a first pass application of previous tree's transaction on a sparse ledger created from witnesses stored in the scan state and then use it to apply to the ledger here*)
+      The set in the previous tree have gone through the first pass. For the second pass that is to happen after the rest of the set goes through the first pass, we need partially applied state - result of previous tree's transactions' first pass. To generate the partial state, we do a first pass application of previous tree's transaction on a sparse ledger created from witnesses stored in the scan state and then use it to apply to the ledger here*)
     let inject_ledger_info partially_applied_txn =
       let open Sparse_ledger.T.Transaction_partially_applied in
       match partially_applied_txn with

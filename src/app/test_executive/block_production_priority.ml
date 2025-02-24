@@ -71,12 +71,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let receiver =
-      Core.String.Map.find_exn (Network.block_producers network) "receiver"
-    in
-    let observer =
-      Core.String.Map.find_exn (Network.block_producers network) "observer"
-    in
+    let receiver = Network.block_producer_exn network "receiver" in
+    let observer = Network.block_producer_exn network "observer" in
     let%bind receiver_pub_key = pub_key_of_node receiver in
     let empty_bps =
       Core.String.Map.remove

@@ -571,10 +571,7 @@ let%test_module "random set test" =
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     let block_window_duration =
-      Float.of_int
-        Genesis_constants.For_unit_tests.Constraint_constants.t
-          .block_window_duration_ms
-      |> Time.Span.of_ms
+      Mina_compile_config.For_unit_tests.t.block_window_duration
 
     (* SNARK work is rejected if the prover doesn't have an account and the fee
        is below the account creation fee. So, just to make generating valid SNARK

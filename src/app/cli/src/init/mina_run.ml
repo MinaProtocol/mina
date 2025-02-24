@@ -364,15 +364,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             List.map metadata ~f:(fun (s, value) ->
                 (s, Yojson.Safe.from_string value) )
           in
-          let config =
-            { Itn_logger.rpc_handshake_timeout =
-                compile_config.rpc_handshake_timeout
-            ; rpc_heartbeat_timeout = compile_config.rpc_heartbeat_timeout
-            ; rpc_heartbeat_send_every = compile_config.rpc_heartbeat_send_every
-            }
-          in
-          return
-          @@ Itn_logger.log ~process ~timestamp ~message ~metadata ~config () )
+          return @@ Itn_logger.log ~process ~timestamp ~message ~metadata () )
     ]
   in
   let log_snark_work_metrics (work : Snark_worker.Work.Result.t) =
@@ -608,8 +600,15 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                  ~handshake_timeout:compile_config.rpc_handshake_timeout
                  ~heartbeat_config:
                    (Rpc.Connection.Heartbeat_config.create
-                      ~timeout:compile_config.rpc_heartbeat_timeout
-                      ~send_every:compile_config.rpc_heartbeat_send_every () )
+                      ~timeout:
+                        (Time_ns.Span.of_sec
+                           (Time.Span.to_sec
+                              compile_config.rpc_heartbeat_timeout ) )
+                      ~send_every:
+                        (Time_ns.Span.of_sec
+                           (Time.Span.to_sec
+                              compile_config.rpc_heartbeat_send_every ) )
+                      () )
                  reader writer
                  ~implementations:
                    (Rpc.Implementations.create_exn

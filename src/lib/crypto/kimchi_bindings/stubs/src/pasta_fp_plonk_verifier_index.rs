@@ -15,9 +15,11 @@ use kimchi::circuits::polynomials::permutation::{permutation_vanishing_polynomia
 use kimchi::circuits::wires::{COLUMNS, PERMUTS};
 use kimchi::{linearization::expr_linearization, verifier_index::VerifierIndex};
 use mina_curves::pasta::{Fp, Pallas, Vesta};
-use poly_commitment::commitment::caml::CamlPolyComm;
-use poly_commitment::evaluation_proof::OpeningProof;
-use poly_commitment::{commitment::PolyComm, srs::SRS};
+use poly_commitment::{
+    commitment::{caml::CamlPolyComm, PolyComm},
+    ipa::{OpeningProof, SRS},
+    SRS as _,
+};
 use std::convert::TryInto;
 use std::path::Path;
 use std::sync::Arc;
@@ -71,7 +73,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta, OpeningProof<V
         let evals = index.evals;
         let shifts = index.shifts;
 
-        let (endo_q, _endo_r) = poly_commitment::srs::endos::<Pallas>();
+        let (endo_q, _endo_r) = poly_commitment::ipa::endos::<Pallas>();
         let domain = Domain::<Fp>::new(1 << index.domain.log_size_of_group).expect("wrong size");
 
         let coefficients_comm: Vec<PolyComm<Vesta>> =
@@ -171,7 +173,7 @@ pub fn read_raw(
     path: String,
 ) -> Result<VerifierIndex<Vesta, OpeningProof<Vesta>>, ocaml::Error> {
     let path = Path::new(&path);
-    let (endo_q, _endo_r) = poly_commitment::srs::endos::<Pallas>();
+    let (endo_q, _endo_r) = poly_commitment::ipa::endos::<Pallas>();
     VerifierIndex::<Vesta, OpeningProof<Vesta>>::from_file(
         srs.0,
         path,

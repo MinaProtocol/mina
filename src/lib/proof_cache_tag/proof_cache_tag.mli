@@ -14,6 +14,8 @@ val read_proof_from_disk : t -> Mina_base.Proof.t
 
 val write_proof_to_disk : cache_db -> Mina_base.Proof.t -> t
 
+val create_identity_db : unit -> cache_db
+
 module For_tests : sig
   val blockchain_dummy : t lazy_t
 
