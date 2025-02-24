@@ -22,6 +22,8 @@ let Artifact = ../../Constants/Artifacts.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
+let DebianRepo = ../../Constants/DebianRepo.dhall
+
 let PromoteDebian = ./PromoteDebian.dhall
 
 let PromoteDocker = ./PromoteDocker.dhall
@@ -44,6 +46,8 @@ let PromotePackagesSpec =
           , codenames : List DebianVersions.DebVersion
           , from_channel : DebianChannel.Type
           , to_channel : DebianChannel.Type
+          , source_debian_repo : DebianRepo.Type
+          , target_debian_repo : DebianRepo.Type
           , new_tags : List Text
           , remove_profile_from_name : Bool
           , publish : Bool
@@ -53,12 +57,14 @@ let PromotePackagesSpec =
           , dockers = [] : List Artifact.Type
           , version = ""
           , new_debian_version = ""
+          , source_debian_repo = DebianRepo.Type.Unstable
+          , target_debian_repo = DebianRepo.Type.Nightly
           , architecture = "amd64"
           , profile = Profiles.Type.Standard
           , network = Network.Type.Mainnet
           , codenames = [] : List DebianVersions.DebVersion
           , from_channel = DebianChannel.Type.Unstable
-          , to_channel = DebianChannel.Type.NightlyCompatible
+          , to_channel = DebianChannel.Type.Compatible
           , new_tags = [] : List Text
           , remove_profile_from_name = False
           , publish = False
@@ -88,6 +94,10 @@ let promotePackagesToDebianSpecs
                                 , codename = codename
                                 , from_channel = promote_packages.from_channel
                                 , to_channel = promote_packages.to_channel
+                                , source_repo =
+                                    promote_packages.source_debian_repo
+                                , target_repo =
+                                    promote_packages.target_debian_repo
                                 , remove_profile_from_name =
                                     promote_packages.remove_profile_from_name
                                 , step_key =

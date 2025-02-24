@@ -1,9 +1,3 @@
-let Prelude = ../External/Prelude.dhall
-
-let Optional/map = Prelude.Optional.map
-
-let Optional/default = Prelude.Optional.default
-
 let Profiles = ./Profiles.dhall
 
 let Artifacts = ./Artifacts.dhall
@@ -34,56 +28,64 @@ let lowerName =
             }
             docker
 
-let dependsOn =
+let dependsOnStep =
           \(docker : Docker)
-      ->  \(network : Optional Network.Type)
+      ->  \(prefix : Text)
+      ->  \(network : Network.Type)
       ->  \(profile : Profiles.Type)
       ->  \(binary : Artifacts.Type)
-      ->  let profileSuffix = Profiles.toSuffixUppercase profile
+      ->  let network = "${Network.capitalName network}"
 
-          let prefix = "MinaArtifact"
+          let profileSuffix = "${Profiles.toSuffixUppercase profile}"
 
           let suffix = "docker-image"
 
-          let maybeNetwork =
-                Optional/map
-                  Network.Type
-                  Text
-                  (\(network : Network.Type) -> "-${Network.lowerName network}")
-                  network
-
-          let networkOrDefault = Optional/default Text "" maybeNetwork
-
-          let key =
-                "${Artifacts.lowerName
-                     binary}${networkOrDefault}-${lowerName docker}-${suffix}"
+          let key = "${Artifacts.lowerName binary}-${suffix}"
 
           in  merge
                 { Bookworm =
-                  [ { name = "${prefix}${capitalName docker}${profileSuffix}"
+                  [ { name =
+                        "${prefix}${capitalName
+                                      docker}${network}${profileSuffix}"
                     , key = key
                     }
                   ]
                 , Bullseye =
-                  [ { name = "${prefix}${capitalName docker}${profileSuffix}"
+                  [ { name =
+                        "${prefix}${capitalName
+                                      docker}${network}${profileSuffix}"
                     , key = key
                     }
                   ]
                 , Jammy =
-                  [ { name = "${prefix}${capitalName docker}${profileSuffix}"
+                  [ { name =
+                        "${prefix}${capitalName
+                                      docker}${network}${capitalName
+                                                           docker}${profileSuffix}"
                     , key = key
                     }
                   ]
                 , Focal =
-                  [ { name = "${prefix}${capitalName docker}${profileSuffix}"
+                  [ { name =
+                        "${prefix}${capitalName
+                                      docker}${network}${capitalName
+                                                           docker}${profileSuffix}"
                     , key = key
                     }
                   ]
                 }
                 docker
 
+let dependsOn =
+          \(docker : Docker)
+      ->  \(network : Network.Type)
+      ->  \(profile : Profiles.Type)
+      ->  \(binary : Artifacts.Type)
+      ->  dependsOnStep docker "MinaArtifact" network profile binary
+
 in  { Type = Docker
     , capitalName = capitalName
     , lowerName = lowerName
     , dependsOn = dependsOn
+    , dependsOnStep = dependsOnStep
     }

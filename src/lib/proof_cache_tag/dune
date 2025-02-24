@@ -1,0 +1,15 @@
+(library
+ (name proof_cache_tag)
+ (public_name proof_cache_tag)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   async
+   ;; local libraries
+   mina_base
+   logger
+   disk_cache
+   )
+ (preprocess
+  (pps ppx_mina ppx_version))
+ (instrumentation (backend bisect_ppx)))

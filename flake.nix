@@ -305,7 +305,18 @@
 
         # Packages for the development environment that are not needed to build mina-dev.
         # For instance dependencies for tests.
-        devShellPackages = with pkgs; [ rosetta-cli wasm-pack nodejs binaryen ];
+        devShellPackages = with pkgs; [
+          rosetta-cli
+          wasm-pack
+          nodejs
+          binaryen
+          zip
+          (pkgs.python3.withPackages (python-pkgs: [
+              python-pkgs.click
+              python-pkgs.requests
+            ]))
+          jq
+        ];
       in {
         inherit ocamlPackages;
 
@@ -323,8 +334,8 @@
           granular = ocamlPackages.default;
           default = ocamlPackages.mina;
           inherit (pkgs)
-            libp2p_helper kimchi_bindings_stubs snarky_js validation
-            trace-tool zkapp-cli;
+            libp2p_helper kimchi_bindings_stubs snarky_js validation trace-tool
+            zkapp-cli;
           inherit (dockerImages)
             mina-image-slim mina-image-full mina-archive-image-full
             mina-image-instr-full;

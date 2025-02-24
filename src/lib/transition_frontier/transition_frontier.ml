@@ -24,6 +24,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 let max_catchup_chunk_length = 20
@@ -163,7 +165,8 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
   in
   { logger
   ; catchup_state =
-      Catchup_state.create catchup_mode ~root:(Full_frontier.root full_frontier)
+      Catchup_state.create catchup_mode ~logger
+        ~root:(Full_frontier.root full_frontier)
   ; verifier
   ; consensus_local_state
   ; full_frontier
@@ -719,6 +722,8 @@ module For_tests = struct
       let constraint_constants = precomputed_values.constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
     end in
     let open Context in
     let open Quickcheck.Generator.Let_syntax in

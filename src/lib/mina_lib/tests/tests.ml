@@ -1,5 +1,3 @@
-open Inline_test_quiet_logs
-
 let%test_module "Epoch ledger sync tests" =
   ( module struct
     open Core_kernel
@@ -30,7 +28,21 @@ let%test_module "Epoch ledger sync tests" =
 
     exception Sync_timeout
 
-    let logger = Logger.create ()
+    let logger = Logger.null ()
+
+    let () =
+      (* Disable log messages from best_tip_diff logger. *)
+      Logger.Consumer_registry.register ~commit_id:""
+        ~id:Logger.Logger_id.best_tip_diff ~processor:(Logger.Processor.raw ())
+        ~transport:
+          (Logger.Transport.create
+             ( module struct
+               type t = unit
+
+               let transport () _ = ()
+             end )
+             () )
+        ()
 
     let default_timeout_min = 5.0
 
@@ -68,8 +80,8 @@ let%test_module "Epoch ledger sync tests" =
         match%map
           Genesis_ledger_helper.init_from_config_file
             ~genesis_dir:(make_dirname "genesis_dir")
-            ~constraint_constants ~genesis_constants ~logger ~proof_level:None
-            runtime_config ~cli_proof_level:None
+            ~constraint_constants ~genesis_constants ~logger
+            ~proof_level:No_check runtime_config ~cli_proof_level:None
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
@@ -100,8 +112,6 @@ let%test_module "Epoch ledger sync tests" =
 
         let time_controller = time_controller
 
-        let compile_config = Mina_compile_config.For_unit_tests.t
-
         let commit_id = "not specified for unit test"
 
         let vrf_poll_interval =
@@ -112,6 +122,11 @@ let%test_module "Epoch ledger sync tests" =
 
         let compaction_interval =
           Mina_compile_config.For_unit_tests.t.compaction_interval
+
+        let ledger_sync_config =
+          Syncable_ledger.create_config
+            ~compile_config:Mina_compile_config.For_unit_tests.t
+            ~max_subtree_depth:None ~default_subtree_depth:None ()
       end in
       let genesis_ledger =
         lazy
@@ -135,6 +150,8 @@ let%test_module "Epoch ledger sync tests" =
         let genesis_ledger = genesis_ledger
 
         let consensus_local_state = consensus_local_state
+
+        let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
       end in
       return (module Context : CONTEXT)
 
@@ -142,10 +159,10 @@ let%test_module "Epoch ledger sync tests" =
 
     let make_verifier (module Context : CONTEXT) =
       let open Context in
-      Verifier.create ~logger ~proof_level:precomputed_values.proof_level
-        ~constraint_constants:precomputed_values.constraint_constants ~pids
+      Verifier.For_tests.default ~constraint_constants ~logger
+        ~proof_level:precomputed_values.proof_level ~pids
         ~conf_dir:(Some (make_dirname "verifier"))
-        ~commit_id:"not specified for unit tests" ()
+        ()
 
     let make_empty_ledger (module Context : CONTEXT) =
       Mina_ledger.Ledger.create
@@ -185,7 +202,6 @@ let%test_module "Epoch ledger sync tests" =
           ; consensus_constants
           ; genesis_constants = precomputed_values.genesis_constants
           ; constraint_constants
-          ; block_window_duration = compile_config.block_window_duration
           }
       in
       let _transaction_pool, tx_remote_sink, _tx_local_sink =
@@ -200,22 +216,26 @@ let%test_module "Epoch ledger sync tests" =
           ~consensus_constants ~time_controller ~logger
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r ~on_remote_push
           ~log_gossip_heard:false
-          ~block_window_duration:compile_config.block_window_duration
+          ~block_window_duration:
+            ( Time.Span.of_ms
+            @@ Float.of_int constraint_constants.block_window_duration_ms )
       in
-      let snark_remote_sink =
+      let snark_remote_sink, snark_pool =
         let config =
           Network_pool.Snark_pool.Resource_pool.make_config ~verifier
             ~trust_system
             ~disk_location:(make_dirname "snark_pool_config")
         in
-        let _snark_pool, snark_remote_sink, _snark_local_sink =
+        let snark_pool, snark_remote_sink, _snark_local_sink =
           Network_pool.Snark_pool.create ~config ~constraint_constants
             ~consensus_constants ~time_controller ~logger
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r ~on_remote_push
             ~log_gossip_heard:false
-            ~block_window_duration:compile_config.block_window_duration
+            ~block_window_duration:
+              ( Time.Span.of_ms
+              @@ Float.of_int constraint_constants.block_window_duration_ms )
         in
-        snark_remote_sink
+        (snark_remote_sink, snark_pool)
       in
       let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
       let genesis_ledger_hash =
@@ -273,7 +293,6 @@ let%test_module "Epoch ledger sync tests" =
           ; time_controller
           ; pubsub_v1
           ; pubsub_v0
-          ; block_window_duration = compile_config.block_window_duration
           }
         in
         Mina_networking.Gossip_net.(
@@ -301,7 +320,9 @@ let%test_module "Epoch ledger sync tests" =
           config ~sinks
           ~get_transition_frontier:(fun () ->
             Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r )
+          ~get_snark_pool:(fun () -> Some snark_pool)
           ~get_node_status:(rpc_error "get_node_status")
+          ~snark_job_state:(fun () -> None)
       in
       (* create transition frontier *)
       let tr_tm0 = Unix.gettimeofday () in
@@ -309,7 +330,7 @@ let%test_module "Epoch ledger sync tests" =
         let notify_online () = Deferred.unit in
         let most_recent_valid_block_reader, most_recent_valid_block_writer =
           Broadcast_pipe.create
-            ( Mina_block.genesis ~precomputed_values
+            ( Mina_block.genesis_header ~precomputed_values
             |> Mina_block.Validation.reset_frontier_dependencies_validation
             |> Mina_block.Validation.reset_staged_ledger_diff_validation )
         in
@@ -425,7 +446,8 @@ let%test_module "Epoch ledger sync tests" =
             | Error _ ->
                 failwith "Could not add starting account" ) ;
         let sync_ledger =
-          Mina_ledger.Sync_ledger.Db.create ~logger
+          Mina_ledger.Sync_ledger.Db.create
+            ~context:(module Context)
             ~trust_system:Context.trust_system db_ledger
         in
         let query_reader =

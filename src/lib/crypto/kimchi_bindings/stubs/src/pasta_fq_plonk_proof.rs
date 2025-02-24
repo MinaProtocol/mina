@@ -27,7 +27,7 @@ use mina_poseidon::{
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
 use poly_commitment::commitment::{CommitmentCurve, PolyComm};
-use poly_commitment::evaluation_proof::OpeningProof;
+use poly_commitment::ipa::OpeningProof;
 use std::array;
 use std::convert::TryInto;
 
@@ -41,9 +41,11 @@ pub fn caml_pasta_fq_plonk_proof_create(
     prev_sgs: Vec<CamlGPallas>,
 ) -> Result<CamlProofWithPublic<CamlGPallas, CamlFq>, ocaml::Error> {
     {
-        let ptr: &mut poly_commitment::srs::SRS<Pallas> =
-            unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
-        ptr.with_lagrange_basis(index.as_ref().0.cs.domain.d1);
+        index
+            .as_ref()
+            .0
+            .srs
+            .with_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
     let prev = if prev_challenges.is_empty() {
         Vec::new()
@@ -58,7 +60,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
                     .iter()
                     .map(Into::<Fq>::into)
                     .collect();
-                let comm = PolyComm::<Pallas> { elems: vec![sg] };
+                let comm = PolyComm::<Pallas> { chunks: vec![sg] };
                 RecursionChallenge { chals, comm }
             })
             .collect()
@@ -76,18 +78,32 @@ pub fn caml_pasta_fq_plonk_proof_create(
     // public input
     let public_input = witness[0][0..index.cs.public].to_vec();
 
-    // NB: This method is designed only to be used by tests. However, since creating a new reference will cause `drop` to be called on it once we are done with it. Since `drop` calls `caml_shutdown` internally, we *really, really* do not want to do this, but we have no other way to get at the active runtime.
-    // TODO: There's actually a way to get a handle to the runtime as a function argument. Switch
-    // to doing this instead.
+    // NB: This method is designed only to be used by tests. However, since
+    // creating a new reference will cause `drop` to be called on it once we are
+    // done with it. Since `drop` calls `caml_shutdown` internally, we *really,
+    // really* do not want to do this, but we have no other way to get at the
+    // active runtime.
+    // TODO: There's actually a way to get a handle to the runtime as a function
+    // argument. Switch to doing this instead.
     let runtime = unsafe { ocaml::Runtime::recover_handle() };
 
-    // Release the runtime lock so that other threads can run using it while we generate the proof.
+    // Release the runtime lock so that other threads can run using it while we
+    // generate the proof.
     runtime.releasing_runtime(|| {
         let group_map = GroupMap::<Fp>::setup();
         let proof = ProverProof::create_recursive::<
             DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
             DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
-        >(&group_map, witness, &runtime_tables, index, prev, None)
+            _,
+        >(
+            &group_map,
+            witness,
+            &runtime_tables,
+            index,
+            prev,
+            None,
+            &mut rand::rngs::OsRng,
+        )
         .map_err(|e| ocaml::Error::Error(e.into()))?;
         Ok((proof, public_input).into())
     })
@@ -159,7 +175,7 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProofWithPublic<CamlGPallas, Cam
     fn comm() -> PolyComm<Pallas> {
         let g = Pallas::generator();
         PolyComm {
-            elems: vec![g, g, g],
+            chunks: vec![g, g, g],
         }
     }
 

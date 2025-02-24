@@ -15,8 +15,11 @@ use kimchi::circuits::polynomials::permutation::{permutation_vanishing_polynomia
 use kimchi::circuits::wires::{COLUMNS, PERMUTS};
 use kimchi::{linearization::expr_linearization, verifier_index::VerifierIndex};
 use mina_curves::pasta::{Fq, Pallas, Vesta};
-use poly_commitment::{commitment::caml::CamlPolyComm, evaluation_proof::OpeningProof};
-use poly_commitment::{commitment::PolyComm, srs::SRS};
+use poly_commitment::{
+    commitment::{caml::CamlPolyComm, PolyComm},
+    ipa::{OpeningProof, SRS},
+    SRS as _,
+};
 use std::convert::TryInto;
 use std::path::Path;
 use std::sync::Arc;
@@ -70,7 +73,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas, OpeningProof<
         let evals = index.evals;
         let shifts = index.shifts;
 
-        let (endo_q, _endo_r) = poly_commitment::srs::endos::<Vesta>();
+        let (endo_q, _endo_r) = poly_commitment::ipa::endos::<Vesta>();
         let domain = Domain::<Fq>::new(1 << index.domain.log_size_of_group).expect("wrong size");
 
         let coefficients_comm: Vec<PolyComm<Pallas>> =
@@ -170,7 +173,7 @@ pub fn read_raw(
     path: String,
 ) -> Result<VerifierIndex<Pallas, OpeningProof<Pallas>>, ocaml::Error> {
     let path = Path::new(&path);
-    let (endo_q, _endo_r) = poly_commitment::srs::endos::<Vesta>();
+    let (endo_q, _endo_r) = poly_commitment::ipa::endos::<Vesta>();
     VerifierIndex::<Pallas, OpeningProof<Pallas>>::from_file(
         srs.0,
         path,
@@ -220,11 +223,11 @@ pub fn caml_pasta_fq_plonk_verifier_index_write(
 pub fn caml_pasta_fq_plonk_verifier_index_create(
     index: CamlPastaFqPlonkIndexPtr,
 ) -> CamlPastaFqPlonkVerifierIndex {
-    {
-        let ptr: &mut poly_commitment::srs::SRS<Pallas> =
-            unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
-        ptr.with_lagrange_basis(index.as_ref().0.cs.domain.d1);
-    }
+    index
+        .as_ref()
+        .0
+        .srs
+        .with_lagrange_basis(index.as_ref().0.cs.domain.d1);
     let verifier_index = index.as_ref().0.verifier_index();
     verifier_index.into()
 }

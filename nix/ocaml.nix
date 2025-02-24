@@ -144,6 +144,7 @@ let
       mv _build/default/src/test/command_line_tests/command_line_tests.exe tests.exe
       chmod +x tests.exe
       export TMPDIR=tmp # to align with janestreet core library
+      export HOME=tmp # some commands rely on home directory
       mkdir -p $TMPDIR
       export MINA_LIBP2P_PASS="naughty blue worm"
       export MINA_PRIVKEY_PASS="naughty blue worm"
@@ -194,6 +195,24 @@ let
         PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
         PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
       };
+      pkgs.__src-lib-mina_block-tests__ = let
+        gzipped = pkgs.fetchurl {
+          url =
+            "https://storage.googleapis.com/o1labs-ci-test-data/precomputed-blocks/hetzner-itn-1-1795-3NL9Vn7Rg1mz8cS1gVxFkVPsjESG1Zu1XRpMLRQAz3W24hctRoD6.json.gz";
+          sha256 = "sha256-vEmtOe6vKANbKHyAK2n59bjWvwFwVICo7wiBwasRzT0=";
+        };
+        ungzipped = pkgs.stdenv.mkDerivation {
+          name = "unpacked-precomputed-block-json";
+          src = gzipped;
+          buildInputs = [ pkgs.gzip ];
+          phases = [ "installPhase" ];
+          installPhase = ''
+            gunzip -c $src > $out
+          '';
+        };
+      in super.pkgs.__src-lib-mina_block-tests__.overrideAttrs {
+        TEST_PRECOMPUTED_BLOCK_JSON_PATH = "${ungzipped}";
+      };
       files.src-lib-crypto-kimchi_bindings-js-node_js =
         super.files.src-lib-crypto-kimchi_bindings-js-node_js.overrideAttrs {
           PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
@@ -208,8 +227,8 @@ let
         makefileTest "__src-lib-ppx_version-test__" super;
       tested.child_processes = super.tested.child_processes.overrideAttrs
         (s: { buildInputs = s.buildInputs ++ [ childProcessesTester ]; });
-      tested.block_storage =
-        super.tested.block_storage.overrideAttrs withLibp2pHelper;
+      tested.mina_lmdb_storage =
+        super.tested.mina_lmdb_storage.overrideAttrs withLibp2pHelper;
       tested.mina_lib = super.tested.mina_lib.overrideAttrs withLibp2pHelper;
       tested.mina_lib_tests =
         super.tested.mina_lib_tests.overrideAttrs withLibp2pHelper;
@@ -254,7 +273,7 @@ let
         done
       '') package.outputs);
 
-      # Derivation which has all Mina's dependencies in it, and creates an empty output if the command succeds.
+      # Derivation which has all Mina's dependencies in it, and creates an empty output if the command succeeds.
       # Useful for unit tests.
       runMinaCheck = { name ? "check", extraInputs ? [ ], extraArgs ? { }, }:
         check:
