@@ -5,6 +5,8 @@ CHANNEL=umt-mainnet
 VERSION=3.0.0-f872d85
 CODENAME=bullseye
 REPO=packages.o1test.net
+SIGNED=0
+
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -c|--channel) CHANNEL="$2"; shift;;
@@ -12,6 +14,8 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -v|--version) VERSION="$2"; shift;;
   -p|--package) PACKAGE="$2"; shift;;
   -m|--codename) CODENAME="$2"; shift;;
+  -s|--signed) SIGNED=1; shift;;
+  -h|--help) echo "Usage: $0 -p|--package mina-archive|mina-logproc|mina-<package> [-c|--channel umt-mainnet] [-v|--version 3.0.0-f872d85] [-m|--codename bullseye] [-r|--repo packages.o1test.net]"; exit 1;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
@@ -26,12 +30,19 @@ case $PACKAGE in
   *) echo "Unknown package passed: $PACKAGE"; exit 1;;
 esac
 
+if [[ "$SIGNED" ]]; then
+  SIGNED=" (wget -q https://'$REPO'/repo-signing-key.asc -O- | apt-key add) && apt-get update > /dev/null && "
+else 
+  SIGNED=""
+fi
+
+
 SCRIPT=' set -x \
     && export DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
     && echo installing mina \
     && apt-get update > /dev/null \
-    && apt-get install -y lsb-release ca-certificates > /dev/null \
-    && echo "deb [trusted=yes] https://'$REPO' '$CODENAME' '$CHANNEL'" > /etc/apt/sources.list.d/mina.list \
+    && apt-get install -y lsb-release ca-certificates wget gnupg > /dev/null \
+    && '$SIGNED' echo "deb [trusted=yes] https://'$REPO' '$CODENAME' '$CHANNEL'" > /etc/apt/sources.list.d/mina.list \
     && apt-get update > /dev/null \
     && apt list -a '$PACKAGE' \
     && apt-get install -y --allow-downgrades '$PACKAGE'='$VERSION' \
