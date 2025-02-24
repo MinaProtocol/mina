@@ -4,6 +4,7 @@
 /dockerfiles/ @MinaProtocol/infra-eng-reviewers
 /scripts/ @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
 /Makefile @MinaProtocol/infra-eng-reviewers
+/.github/ @MinaProtocol/infra-eng-reviewers
 /src/config/dev.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
 /CODE_OF_CONDUCT.md @bkase
 /CONTRIBUTING.md @MinaProtocol/product-eng-reviewers
