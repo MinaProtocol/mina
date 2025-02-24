@@ -428,11 +428,11 @@ struct
       ; mutable current_batch : int
       ; mutable remaining_in_batch : int
       ; config : Config.t
-      ; logger : (Logger.t[@sexp.opaque])
+      ; logger : Logger.t
       ; batcher : Batcher.t
-      ; mutable best_tip_diff_relay : (unit Deferred.t[@sexp.opaque]) Option.t
-      ; mutable best_tip_ledger : (Base_ledger.t[@sexp.opaque]) Option.t
-      ; verification_key_table : (Vk_refcount_table.t[@sexp.opaque])
+      ; mutable best_tip_diff_relay : unit Deferred.t Option.t
+      ; mutable best_tip_ledger : Base_ledger.t Option.t
+      ; verification_key_table : Vk_refcount_table.t
       }
 
     let member t x =
