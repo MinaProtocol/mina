@@ -24,6 +24,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let open Test_account in
         [ create ~account_name:"node-key" ~balance:"1000" () ])
     ; block_producers = [ { node_name = "node"; account_name = "node-key" } ]
+    ; proof_config =
+        { proof_config_default with block_window_duration_ms = Some 30000 }
     }
 
   let run network t =
