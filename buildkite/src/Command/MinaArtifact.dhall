@@ -184,23 +184,6 @@ let docker_step
                   ]
                 , TestExecutive = [] : List DockerImage.ReleaseSpec.Type
                 , LogProc = [] : List DockerImage.ReleaseSpec.Type
-                , Toolchain =
-                  [ DockerImage.ReleaseSpec::{
-                    , service = Artifacts.Type.Toolchain
-                    , network = Network.lowerName Network.Type.Devnet
-                    , deb_codename = spec.debVersion
-                    , deb_profile = spec.profile
-                    , build_flags = spec.buildFlags
-                    , deb_repo = DebianRepo.Type.Local
-                    }
-                  ]
-                , ItnOrchestrator =
-                  [ DockerImage.ReleaseSpec::{
-                    , service = Artifacts.Type.ItnOrchestrator
-                    , network = Network.lowerName Network.Type.Devnet
-                    , deb_repo = DebianRepo.Type.Local
-                    }
-                  ]
                 , Leaderboard =
                   [ DockerImage.ReleaseSpec::{
                     , service = Artifacts.Type.Leaderboard
@@ -258,6 +241,7 @@ let docker_step
                     , deb_profile = spec.profile
                     }
                   ]
+                , Toolchain = [] : List DockerImage.ReleaseSpec.Type
                 }
                 artifact
 
