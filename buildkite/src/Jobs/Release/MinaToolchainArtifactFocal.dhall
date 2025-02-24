@@ -8,6 +8,8 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let DockerImage = ../../Command/DockerImage.dhall
 
+let Artifacts = ../../Constants/Artifacts.dhall
+
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -27,7 +29,7 @@ in  Pipeline.build
       , steps =
         [ let toolchainSpec =
                 DockerImage.ReleaseSpec::{
-                , service = "mina-toolchain"
+                , service = Artifacts.Type.Toolchain
                 , deb_codename = "focal"
                 , no_cache = True
                 , step_key = "toolchain-focal-docker-image"
