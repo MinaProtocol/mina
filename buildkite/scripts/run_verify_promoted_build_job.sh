@@ -33,6 +33,7 @@ PROMOTE_PACKAGE_DHALL_DEF="(./buildkite/src/Entrypoints/PromotePackage.dhall)"
 PROFILES_DHALL_DEF="(./buildkite/src/Constants/Profiles.dhall)"
 NETWORK_DHALL_DEF="(./buildkite/src/Constants/Network.dhall)"
 DEBIAN_CHANNEL_DHALL_DEF="(./buildkite/src/Constants/DebianChannel.dhall)"
+DEBIAN_REPO_DHALL_DEF="(./buildkite/src/Constants/DebianRepo.dhall)"
 
 
 function usage() {
@@ -45,8 +46,9 @@ function usage() {
   echo "  NEW_VERSION                 The new Debian version or new Docker tag"
   echo "  REMOVE_PROFILE_FROM_NAME    Should we remove profile suffix from debian name"
   echo "  PROFILE                     The Docker and Debian profile (Standard, Lightnet)"
-  echo "  NETWORK                     The Docker and Debian network (Devnet, Mainnet, Berkeley)"
+  echo "  NETWORK                     The Docker and Debian network (Devnet, Mainnet)"
   echo "  TO_CHANNEL                  Target debian channel"
+  echo "  TO_REPO                     Target debian repo"
   echo "  PUBLISH                     The Publish to docker.io flag. If defined, script will publish docker do docker.io. Otherwise it will still resides in gcr.io"
   echo ""
   exit 1
@@ -59,10 +61,11 @@ DHALL_DEBIANS="([] : List $DEBIAN_DHALL_DEF.Type)"
 if [[ -n "$DEBIANS" ]]; then 
     if [[ -z "$CODENAMES" ]]; then usage "Codenames is not set!"; exit 1; fi;
     if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
-    if [[ -z "$NETWORK" ]]; then NETWORK="Berkeley"; fi;
+    if [[ -z "$NETWORK" ]]; then NETWORK="Devnet"; fi;
     if [[ -z "$REMOVE_PROFILE_FROM_NAME" ]]; then REMOVE_PROFILE_FROM_NAME=0; fi;
     if [[ -z "$PUBLISH" ]]; then PUBLISH=0; fi;
     if [[ -z "$TO_CHANNEL" ]]; then TO_CHANNEL="Unstable"; fi;
+    if [[ -z "$TO_REPO" ]]; then TO_REPO="PackagesO1Test"; fi;
     if [[ -z "$NEW_VERSION" ]]; then NEW_VERSION=$FROM_VERSION; fi;
     
 
@@ -107,4 +110,4 @@ if [[ "${REMOVE_PROFILE_FROM_NAME}" -eq 0 ]]; then
 else 
   REMOVE_PROFILE_FROM_NAME="True"
 fi 
-echo $PROMOTE_PACKAGE_DHALL_DEF'.verify_artifacts '"$DHALL_DEBIANS"' '"$DHALL_DOCKERS"' "'"${NEW_VERSION}"'" '$PROFILES_DHALL_DEF'.Type.'"${PROFILE}"' '$NETWORK_DHALL_DEF'.Type.'"${NETWORK}"' '"${DHALL_CODENAMES}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${TO_CHANNEL}"' "'"${NEW_VERSION}"'" '${REMOVE_PROFILE_FROM_NAME}' '${DHALL_PUBLISH}' ' | dhall-to-yaml --quoted 
+echo $PROMOTE_PACKAGE_DHALL_DEF'.verify_artifacts '"$DHALL_DEBIANS"' '"$DHALL_DOCKERS"' "'"${NEW_VERSION}"'" '$PROFILES_DHALL_DEF'.Type.'"${PROFILE}"' '$NETWORK_DHALL_DEF'.Type.'"${NETWORK}"' '"${DHALL_CODENAMES}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${TO_CHANNEL}"' '$DEBIAN_REPO_DHALL_DEF'.Type.'"${TO_REPO}"' "'"${NEW_VERSION}"'" '${REMOVE_PROFILE_FROM_NAME}' '${DHALL_PUBLISH}' ' | dhall-to-yaml --quoted 

@@ -10,7 +10,6 @@
     into the processor as if catchup had successfully completed. *)
 
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
@@ -64,8 +63,8 @@ type t =
       Capped_supervisor.t
   }
 
-let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
-    ~time_controller ~catchup_job_writer
+let create ~proof_cache_db ~logger ~precomputed_values ~verifier ~trust_system
+    ~frontier ~time_controller ~catchup_job_writer
     ~(catchup_breadcrumbs_writer :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Validation_callback.t option )
@@ -97,7 +96,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
     Capped_supervisor.create ~job_capacity:30
       (fun (initial_hash, transition_branches) ->
         match%map
-          Breadcrumb_builder.build_subtrees_of_breadcrumbs
+          Breadcrumb_builder.build_subtrees_of_breadcrumbs ~proof_cache_db
             ~logger:
               (Logger.extend logger
                  [ ("catchup_scheduler", `String "Called from catchup scheduler")
@@ -194,57 +193,66 @@ let rec remove_tree t parent_hash =
       let transition, _ = Envelope.Incoming.data (Cached.peek child) in
       remove_tree t (State_hash.With_state_hashes.state_hash transition) )
 
-let watch t ~timeout_duration ~cached_transition ~valid_cb
-    ~block_window_duration =
-  let transition_with_hash, _ =
-    Envelope.Incoming.data (Cached.peek cached_transition)
-  in
-  let hash = State_hash.With_state_hashes.state_hash transition_with_hash in
-  let parent_hash =
-    With_hash.data transition_with_hash
-    |> Mina_block.header |> Header.protocol_state
-    |> Mina_state.Protocol_state.previous_state_hash
-  in
-  Internal_tracing.with_state_hash hash
+let log_block_metadata ~logger state_hash ~parent_hash =
+  Internal_tracing.with_state_hash state_hash
   @@ fun () ->
-  [%log' internal t.logger] "@block_metadata"
-    ~metadata:[ ("previous_state_hash", State_hash.to_yojson parent_hash) ] ;
+  [%log internal] "@block_metadata"
+    ~metadata:[ ("previous_state_hash", State_hash.to_yojson parent_hash) ]
+
+let get_parent_hash transition_with_hash =
+  With_hash.data transition_with_hash
+  |> Mina_block.header |> Header.protocol_state
+  |> Mina_state.Protocol_state.previous_state_hash
+
+let make_timeout t transition_with_hash duration =
+  let target_hash = get_parent_hash transition_with_hash in
+  Block_time.Timeout.create t.time_controller duration ~f:(fun _ ->
+      let forest = extract_forest t target_hash in
+      Hashtbl.remove t.parent_root_timeouts target_hash ;
+      Mina_metrics.(
+        Gauge.dec_one
+          Transition_frontier_controller.transitions_in_catchup_scheduler) ;
+      remove_tree t target_hash ;
+      [%log' info t.logger]
+        ~metadata:
+          [ ("parent_hash", Mina_base.State_hash.to_yojson target_hash)
+          ; ( "duration"
+            , `Int (Block_time.Span.to_ms duration |> Int64.to_int_trunc) )
+          ; ( "cached_transition"
+            , With_hash.data transition_with_hash |> Mina_block.to_yojson )
+          ]
+        "Timed out waiting for the parent of $cached_transition after \
+         $duration ms, signalling a catchup job" ;
+      (* it's ok to create a new thread here because the thread essentially does no work *)
+      if Writer.is_closed t.catchup_job_writer then
+        [%log' trace t.logger]
+          "catchup job pipe was closed; attempt to write to closed pipe"
+      else Writer.write t.catchup_job_writer forest )
+
+(* TODO handle possibility of receiving two gossips (one for block and another for header).
+   Existing code is safe as long as header-only gossip topic isn't actually used in the code.logger
+   I.e. this TODO has to be resolved before bit-catchup work fully lands.
+*)
+let register_validation_callback ~hash ~valid_cb t =
   Option.value_map valid_cb ~default:() ~f:(fun data ->
       match Hashtbl.add t.validation_callbacks ~key:hash ~data with
       | `Ok ->
           (* Clean up entry upon callback resolution *)
           upon
-            ( Deferred.ignore_m
-            @@ Mina_net2.Validation_callback.await ~block_window_duration data
-            )
+            (Deferred.ignore_m @@ Mina_net2.Validation_callback.await data)
             (fun () -> Hashtbl.remove t.validation_callbacks hash)
       | `Duplicate ->
           [%log' warn t.logger] "Double validation callback for $state_hash"
-            ~metadata:[ ("state_hash", Mina_base.State_hash.to_yojson hash) ] ) ;
-  let make_timeout duration =
-    Block_time.Timeout.create t.time_controller duration ~f:(fun _ ->
-        let forest = extract_forest t parent_hash in
-        Hashtbl.remove t.parent_root_timeouts parent_hash ;
-        Mina_metrics.(
-          Gauge.dec_one
-            Transition_frontier_controller.transitions_in_catchup_scheduler) ;
-        remove_tree t parent_hash ;
-        [%log' info t.logger]
-          ~metadata:
-            [ ("parent_hash", Mina_base.State_hash.to_yojson parent_hash)
-            ; ( "duration"
-              , `Int (Block_time.Span.to_ms duration |> Int64.to_int_trunc) )
-            ; ( "cached_transition"
-              , With_hash.data transition_with_hash |> Mina_block.to_yojson )
-            ]
-          "Timed out waiting for the parent of $cached_transition after \
-           $duration ms, signalling a catchup job" ;
-        (* it's ok to create a new thread here because the thread essentially does no work *)
-        if Writer.is_closed t.catchup_job_writer then
-          [%log' trace t.logger]
-            "catchup job pipe was closed; attempt to write to closed pipe"
-        else Writer.write t.catchup_job_writer forest )
+            ~metadata:[ ("state_hash", Mina_base.State_hash.to_yojson hash) ] )
+
+let watch t ~timeout_duration ~cached_transition ~valid_cb =
+  let transition_with_hash, _ =
+    Envelope.Incoming.data (Cached.peek cached_transition)
   in
+  let hash = State_hash.With_state_hashes.state_hash transition_with_hash in
+  let parent_hash = get_parent_hash transition_with_hash in
+  log_block_metadata ~logger:t.logger ~parent_hash hash ;
+  register_validation_callback ~hash ~valid_cb t ;
   match Hashtbl.find t.collected_transitions parent_hash with
   | None ->
       let remaining_time = cancel_timeout t hash in
@@ -254,7 +262,7 @@ let watch t ~timeout_duration ~cached_transition ~valid_cb
       ignore
         ( Hashtbl.add t.parent_root_timeouts ~key:parent_hash
             ~data:
-              (make_timeout
+              (make_timeout t transition_with_hash
                  (Option.fold remaining_time ~init:timeout_duration
                     ~f:(fun _ remaining_time ->
                       Block_time.Span.min remaining_time timeout_duration ) ) )
@@ -285,6 +293,28 @@ let watch t ~timeout_duration ~cached_transition ~valid_cb
         Mina_metrics.(
           Gauge.inc_one
             Transition_frontier_controller.transitions_in_catchup_scheduler)
+
+(** Handles a header received from gossip.
+    If a block corresponding to the header wasn't received yet, catchup
+    for it is triggered (and validation callback is registered to be
+    resolved when catchup receives corresponding block).
+*)
+let watch_header t ~header_with_hash ~valid_cb =
+  let hash = State_hash.With_state_hashes.state_hash header_with_hash in
+  let parent_hash =
+    With_hash.data header_with_hash
+    |> Header.protocol_state |> Mina_state.Protocol_state.previous_state_hash
+  in
+  log_block_metadata ~logger:t.logger ~parent_hash hash ;
+  match Hashtbl.find t.collected_transitions hash with
+  | None ->
+      register_validation_callback ~hash ~valid_cb t ;
+      if Writer.is_closed t.catchup_job_writer then
+        [%log' trace t.logger]
+          "catchup job pipe was closed; attempt to write to closed pipe"
+      else Writer.write t.catchup_job_writer (hash, [])
+  | _ ->
+      ()
 
 let notify t ~hash =
   if
@@ -317,6 +347,20 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let logger = Logger.null ()
 
+    let () =
+      (* Disable log messages from best_tip_diff logger. *)
+      Logger.Consumer_registry.register ~commit_id:""
+        ~id:Logger.Logger_id.best_tip_diff ~processor:(Logger.Processor.raw ())
+        ~transport:
+          (Logger.Transport.create
+             ( module struct
+               type t = unit
+
+               let transport () _ = ()
+             end )
+             () )
+        ()
+
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     let proof_level = precomputed_values.proof_level
@@ -333,13 +377,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let create = create ~logger ~trust_system ~time_controller
 
-    let block_window_duration =
-      Mina_compile_config.For_unit_tests.t.block_window_duration
-
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None ~pids ~commit_id:"not specified for unit tests" () )
+          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
+            ~pids () )
+
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
 
     (* cast a breadcrumb into a cached, enveloped, partially validated transition *)
     let downcast_breadcrumb breadcrumb =
@@ -368,13 +411,13 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let disjoint_breadcrumb = List.last_exn branch in
           let scheduler =
-            create ~frontier ~precomputed_values ~verifier ~catchup_job_writer
-              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+            create ~proof_cache_db ~frontier ~precomputed_values ~verifier
+              ~catchup_job_writer ~catchup_breadcrumbs_writer
+              ~clean_up_signal:(Ivar.create ())
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
-              (Cached.pure @@ downcast_breadcrumb disjoint_breadcrumb)
-            ~block_window_duration ;
+              (Cached.pure @@ downcast_breadcrumb disjoint_breadcrumb) ;
           Async.Thread_safe.block_on_async_exn (fun () ->
               match%map
                 Block_time.Timeout.await
@@ -429,13 +472,13 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             List.map ~f:register_breadcrumb branch
           in
           let scheduler =
-            create ~precomputed_values ~frontier ~verifier ~catchup_job_writer
-              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+            create ~proof_cache_db ~precomputed_values ~frontier ~verifier
+              ~catchup_job_writer ~catchup_breadcrumbs_writer
+              ~clean_up_signal:(Ivar.create ())
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
-              (Cached.transform ~f:downcast_breadcrumb breadcrumb_2)
-            ~block_window_duration ;
+              (Cached.transform ~f:downcast_breadcrumb breadcrumb_2) ;
           Async.Thread_safe.block_on_async_exn (fun () ->
               Transition_frontier.add_breadcrumb_exn frontier
                 (Cached.peek breadcrumb_1) ) ;
@@ -506,16 +549,16 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               (Buffered (`Capacity 10, `Overflow Crash))
           in
           let scheduler =
-            create ~precomputed_values ~frontier ~verifier ~catchup_job_writer
-              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+            create ~proof_cache_db ~precomputed_values ~frontier ~verifier
+              ~catchup_job_writer ~catchup_breadcrumbs_writer
+              ~clean_up_signal:(Ivar.create ())
           in
           let[@warning "-8"] (oldest_breadcrumb :: dependent_breadcrumbs) =
             List.rev branch
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
-              (Cached.pure @@ downcast_breadcrumb oldest_breadcrumb)
-            ~block_window_duration ;
+              (Cached.pure @@ downcast_breadcrumb oldest_breadcrumb) ;
           assert (
             has_timeout_parent_hash scheduler
               (Transition_frontier.Breadcrumb.parent_hash oldest_breadcrumb) ) ;
@@ -524,8 +567,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                 ~f:(fun prev_breadcrumb curr_breadcrumb ->
                   watch scheduler ~timeout_duration ~valid_cb:None
                     ~cached_transition:
-                      (Cached.pure @@ downcast_breadcrumb curr_breadcrumb)
-                    ~block_window_duration ;
+                      (Cached.pure @@ downcast_breadcrumb curr_breadcrumb) ;
                   assert (
                     not
                     @@ has_timeout_parent_hash scheduler

@@ -72,6 +72,8 @@ let receipt_chain_hash =
 let peer : Host_and_port.t Command.Arg_type.t =
   Command.Arg_type.create (fun s -> Host_and_port.of_string s)
 
+let uri : Uri.t Command.Arg_type.t = Command.Arg_type.create Uri.of_string
+
 let global_slot =
   Command.Arg_type.map Command.Param.int
     ~f:Mina_numbers.Global_slot_since_genesis.of_int

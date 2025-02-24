@@ -16,9 +16,10 @@ module Poly : sig
       [@@deriving hash]
 
       include
-        Pickles_types.Sigs.Binable.S3 with type ('a, 'b, 'c) t := ('a, 'b, 'c) t
+        Plonkish_prelude.Sigs.Binable.S3
+          with type ('a, 'b, 'c) t := ('a, 'b, 'c) t
 
-      include Pickles_types.Sigs.VERSIONED
+      include Plonkish_prelude.Sigs.VERSIONED
     end
 
     module Latest = V2
@@ -63,7 +64,7 @@ module Repr : sig
         }
       [@@deriving sexp, equal, compare, yojson]
 
-      include Pickles_types.Sigs.Binable.S1 with type 'a t := 'a t
+      include Plonkish_prelude.Sigs.Binable.S1 with type 'a t := 'a t
 
       val __versioned__ : unit
     end
@@ -83,7 +84,7 @@ module Width : sig
     module V1 : sig
       type t [@@deriving sexp, equal, compare, hash, yojson]
 
-      include Pickles_types.Sigs.Binable.S with type t := t
+      include Plonkish_prelude.Sigs.Binable.S with type t := t
 
       val __versioned__ : unit
     end
@@ -111,7 +112,7 @@ module Width : sig
         type 'a t = ('a, Max.n) Pickles_types.At_most.t
         [@@deriving sexp, equal, compare, hash, yojson]
 
-        include Pickles_types.Sigs.Binable.S1 with type 'a t := 'a t
+        include Plonkish_prelude.Sigs.Binable.S1 with type 'a t := 'a t
 
         val __versioned__ : unit
       end

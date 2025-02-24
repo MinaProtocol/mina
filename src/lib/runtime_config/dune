@@ -43,4 +43,4 @@
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_custom_printf ppx_sexp_conv ppx_let ppx_deriving_yojson
-                  ppx_fields_conv ppx_version ppx_compare)))
+                  ppx_fields_conv ppx_version ppx_compare ppx_here)))

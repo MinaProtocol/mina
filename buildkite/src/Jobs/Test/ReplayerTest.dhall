@@ -21,7 +21,7 @@ let dependsOn =
         Dockers.Type.Bullseye
         (None Network.Type)
         Profiles.Type.Standard
-        Artifacts.Type.Archive
+        Artifacts.Type.FunctionalTestSuite
 
 in  Pipeline.build
       Pipeline.Config::{

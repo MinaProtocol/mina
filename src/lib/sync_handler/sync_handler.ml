@@ -15,7 +15,9 @@ module type CONTEXT = sig
 
   val consensus_constants : Consensus.Constants.t
 
-  val compile_config : Mina_compile_config.t
+  val ledger_sync_config : Syncable_ledger.daemon_config
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 module type Inputs_intf = sig
@@ -90,21 +92,27 @@ module Make (Inputs : Inputs_intf) :
          frontier:Inputs.Transition_frontier.t
       -> Ledger_hash.t
       -> Sync_ledger.Query.t Envelope.Incoming.t
-      -> logger:Logger.t
+      -> context:(module CONTEXT)
       -> trust_system:Trust_system.t
-      -> Sync_ledger.Answer.t Option.t Deferred.t =
-   fun ~frontier hash query ~logger ~trust_system ->
+      -> Sync_ledger.Answer.t Or_error.t Deferred.t =
+   fun ~frontier hash query ~context:(module Context) ~trust_system ->
     match get_ledger_by_hash ~frontier hash with
     | None ->
-        return None
+        return
+          (Or_error.error_string
+             (sprintf
+                !"Failed to find ledger for hash %{sexp:Ledger_hash.t}"
+                hash ) )
     | Some ledger ->
         let responder =
-          Sync_ledger.Any_ledger.Responder.create ledger ignore ~logger
+          Sync_ledger.Any_ledger.Responder.create ledger ignore
+            ~context:(module Context)
             ~trust_system
         in
         Sync_ledger.Any_ledger.Responder.answer_query responder query
 
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier state_hash =
+  let get_staged_ledger_aux_and_pending_coinbases_at_hash ~logger ~frontier
+      state_hash =
     let open Option.Let_syntax in
     let protocol_states scan_state =
       Staged_ledger.Scan_state.required_state_hashes scan_state
@@ -128,13 +136,18 @@ module Make (Inputs : Inputs_intf) :
         Transition_frontier.Breadcrumb.staged_ledger breadcrumb
       in
       let scan_state = Staged_ledger.scan_state staged_ledger in
-      let merkle_root =
-        Staged_ledger.hash staged_ledger |> Staged_ledger_hash.ledger_hash
-      in
+      let staged_ledger_hash = Breadcrumb.staged_ledger_hash breadcrumb in
+      let merkle_root = Staged_ledger_hash.ledger_hash staged_ledger_hash in
       let%map scan_state_protocol_states = protocol_states scan_state in
       let pending_coinbase =
         Staged_ledger.pending_coinbase_collection staged_ledger
       in
+      [%log debug]
+        ~metadata:
+          [ ( "staged_ledger_hash"
+            , Staged_ledger_hash.to_yojson staged_ledger_hash )
+          ]
+        "sending scan state and pending coinbase" ;
       (scan_state, merkle_root, pending_coinbase, scan_state_protocol_states)
     with
     | Some res ->
@@ -220,8 +233,8 @@ module Make (Inputs : Inputs_intf) :
         data = With_hash.data best_tip_with_witness.data
       }
 
-    let verify ~context:(module Context : CONTEXT) ~verifier ~genesis_constants
-        observed_state peer_root =
+    let verify ~context:(module Context : CONTEXT) ~verifier observed_state
+        peer_root =
       let module Context = struct
         include Context
 
@@ -230,10 +243,12 @@ module Make (Inputs : Inputs_intf) :
       end in
       let open Context in
       let open Deferred.Result.Let_syntax in
+      (*TODO: use precomputed_values.genesis_constants that's already passed*)
       let%bind ( (`Root _, `Best_tip (best_tip_transition, _)) as
                verified_witness ) =
-        Best_tip_prover.verify ~verifier ~genesis_constants ~precomputed_values
-          peer_root
+        Best_tip_prover.verify ~verifier
+          ~genesis_constants:precomputed_values.genesis_constants
+          ~precomputed_values peer_root
       in
       let is_before_best_tip candidate =
         Consensus.Hooks.equal_select_status

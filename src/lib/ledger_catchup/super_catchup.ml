@@ -1,5 +1,4 @@
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Core
 open Async
 open Cache_lib
@@ -17,7 +16,7 @@ module type CONTEXT = sig
 
   val consensus_constants : Consensus.Constants.t
 
-  val compile_config : Mina_compile_config.t
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -130,6 +129,25 @@ let write_graph (_ : t) =
   let _ = G.output_graph in
   ()
 
+let validate_block ~genesis_state_hash (b, v) =
+  let open Mina_block.Validation in
+  let open Result.Let_syntax in
+  let h = (With_hash.map ~f:Mina_block.header b, v) in
+  validate_genesis_protocol_state ~genesis_state_hash h
+  >>= validate_protocol_versions >>= validate_delta_block_chain
+  >>| Fn.flip with_body (Mina_block.body @@ With_hash.data b)
+
+let validate_proofs_block ~verifier ~genesis_state_hash blocks =
+  let open Mina_block.Validation in
+  let open Deferred.Result.Let_syntax in
+  let f ((b, _), h) = with_body h (Mina_block.body @@ With_hash.data b) in
+  let hs =
+    List.map blocks ~f:(fun (b, v) ->
+        (With_hash.map ~f:Mina_block.header b, v) )
+  in
+  validate_proofs ~verifier ~genesis_state_hash hs
+  >>| List.zip_exn blocks >>| List.map ~f
+
 let verify_transition ~context:(module Context : CONTEXT) ~trust_system
     ~frontier ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
     enveloped_transition =
@@ -138,15 +156,10 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
   let transition_with_hash = Envelope.Incoming.data enveloped_transition in
   let cached_initially_validated_transition_result =
-    let open Result.Let_syntax in
-    let open Mina_block in
-    let%bind initially_validated_transition =
-      transition_with_hash
-      |> Validation.skip_time_received_validation
-           `This_block_was_not_received_via_gossip
-      |> Validation.validate_genesis_protocol_state ~genesis_state_hash
-      >>= Validation.validate_protocol_versions
-      >>= Validation.validate_delta_block_chain
+    let%bind.Result initially_validated_transition =
+      Mina_block.Validation.skip_time_received_validation
+        `This_block_was_not_received_via_gossip transition_with_hash
+      |> validate_block ~genesis_state_hash
     in
     let enveloped_initially_validated_transition =
       Envelope.Incoming.map enveloped_transition
@@ -495,12 +508,10 @@ module Initial_validate_batcher = struct
 
   type nonrec 'a t = (input, input, 'a) t
 
-  let create ~verifier ~precomputed_values : _ t =
+  let create ~logger ~verifier ~precomputed_values : _ t =
     create
       ~logger:
-        (Logger.create
-           ~metadata:[ ("name", `String "initial_validate_batcher") ]
-           () )
+        (Logger.extend logger [ ("name", `String "initial_validate_batcher") ])
       ~how_to_add:`Insert ~max_weight_per_call:1000
       ~weight:(fun _ -> 1)
       ~compare_init:(fun e1 e2 ->
@@ -523,7 +534,7 @@ module Initial_validate_batcher = struct
                    ; state_body_hash = None
                    } )
             |> Mina_block.Validation.wrap )
-        |> Mina_block.Validation.validate_proofs ~verifier ~genesis_state_hash
+        |> validate_proofs_block ~verifier ~genesis_state_hash
         >>| function
         | Ok tvs ->
             Ok (List.map tvs ~f:(fun x -> `Valid x))
@@ -542,15 +553,14 @@ module Verify_work_batcher = struct
 
   type nonrec 'a t = (input, input, 'a) t
 
-  let create ~verifier : _ t =
+  let create ~logger ~verifier : _ t =
     let works (x : input) =
       let wh, _ = x.data in
       Mina_block.Body.staged_ledger_diff (Mina_block.body wh.data)
       |> Staged_ledger_diff.completed_works
     in
     create
-      ~logger:
-        (Logger.create ~metadata:[ ("name", `String "verify_work_batcher") ] ())
+      ~logger:(Logger.extend logger [ ("name", `String "verify_work_batcher") ])
       ~weight:(fun (x : input) ->
         List.fold ~init:0 (works x) ~f:(fun acc { proofs; _ } ->
             acc + One_or_two.length proofs ) )
@@ -669,8 +679,7 @@ let check_invariant ~downloader t =
          Node.State.Enum.equal (Node.State.enum node.state) To_download ) )
 
 let download s d ~key ~attempts =
-  let logger = Logger.create () in
-  [%log debug]
+  [%log' debug (Downloader.logger d)]
     ~metadata:[ ("key", Downloader.Key.to_yojson key); ("caller", `String s) ]
     "Download download $key" ;
   Downloader.download d ~key ~attempts
@@ -792,9 +801,9 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
   let open Context in
   (* setup_state_machine_runner returns a fully configured lambda function, which is the state machine runner *)
   let initial_validation_batcher =
-    Initial_validate_batcher.create ~verifier ~precomputed_values
+    Initial_validate_batcher.create ~logger ~verifier ~precomputed_values
   in
-  let verify_work_batcher = Verify_work_batcher.create ~verifier in
+  let verify_work_batcher = Verify_work_batcher.create ~logger ~verifier in
   let set_state t node s =
     set_state t node s ;
     try check_invariant ~downloader t
@@ -1141,7 +1150,8 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
               | None ->
                   `Some [] ) )
     in
-    Downloader.create ~stop ~trust_system ~preferred:[] ~max_batch_size:5
+    Downloader.create ~stop ~trust_system ~logger ~preferred:[]
+      ~max_batch_size:5
       ~get:(fun peer hs ->
         let sec =
           let sec_per_block =
@@ -1237,14 +1247,13 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                       | Remote peer ->
                           Downloader.add_knowledge downloader peer
                             [ (target_parent_hash, target_length) ] ) ;
-                      let%bind.Option { proof = path, root; _ } =
+                      let%bind.Option { proof = path, root_header; _ } =
                         Best_tip_lru.get h
                       in
                       let%bind.Option p =
                         Transition_chain_verifier.verify ~target_hash:h
                           ~transition_chain_proof:
-                            ( ( Mina_block.header root
-                              |> Mina_block.Header.protocol_state
+                            ( ( Mina_block.Header.protocol_state root_header
                               |> Mina_state.Protocol_state.hashes )
                                 .state_hash
                             , path )
@@ -1401,6 +1410,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
         ~build_func:
           (Transition_frontier.Breadcrumb.build
+             ~proof_cache_db:Context.proof_cache_db
              ~get_completed_work:(Fn.const None) ) )
 
 (* Unit tests *)
@@ -1421,7 +1431,21 @@ let%test_module "Ledger_catchup tests" =
 
     let max_frontier_length = 10
 
-    let logger = Logger.create ()
+    let logger = Logger.null ()
+
+    let () =
+      (* Disable log messages from best_tip_diff logger. *)
+      Logger.Consumer_registry.register ~commit_id:""
+        ~id:Logger.Logger_id.best_tip_diff ~processor:(Logger.Processor.raw ())
+        ~transport:
+          (Logger.Transport.create
+             ( module struct
+               type t = unit
+
+               let transport () _ = ()
+             end )
+             () )
+        ()
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
@@ -1435,14 +1459,15 @@ let%test_module "Ledger_catchup tests" =
 
     let use_super_catchup = true
 
-    let compile_config = Mina_compile_config.For_unit_tests.t
-
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            ~commit_id:"not specified for unit tests" () )
+          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
+            () )
+
+    let ledger_sync_config =
+      Syncable_ledger.create_config
+        ~compile_config:Mina_compile_config.For_unit_tests.t
+        ~max_subtree_depth:None ~default_subtree_depth:None ()
 
     module Context = struct
       let logger = logger
@@ -1453,7 +1478,7 @@ let%test_module "Ledger_catchup tests" =
 
       let consensus_constants = precomputed_values.consensus_constants
 
-      let compile_config = compile_config
+      let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
     end
 
     (* let mock_verifier =
@@ -1617,7 +1642,10 @@ let%test_module "Ledger_catchup tests" =
             (* We force evaluation of state body hash for both blocks for further equality check *)
             let _hash1 = Mina_block.Validated.state_body_hash b1 in
             let _hash2 = Mina_block.Validated.state_body_hash b2 in
-            Mina_block.Validated.equal b1 b2 )
+            Mina_block.Validated.(
+              Stable.Latest.equal
+                (read_all_proofs_from_disk b1)
+                (read_all_proofs_from_disk b2)) )
       in
       if not catchup_breadcrumbs_are_best_tip_path then
         failwith
@@ -1632,7 +1660,7 @@ let%test_module "Ledger_catchup tests" =
             Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup ~compile_config
+            ~use_super_catchup ~ledger_sync_config
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size
             ])
@@ -1652,7 +1680,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup ~compile_config
+            ~use_super_catchup ~ledger_sync_config
             [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
         ~f:(fun network ->
           let open Fake_network in
@@ -1668,7 +1696,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup ~compile_config
+            ~use_super_catchup ~ledger_sync_config
             [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
         ~f:(fun network ->
           let open Fake_network in
@@ -1685,7 +1713,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup ~compile_config
+            ~use_super_catchup ~ledger_sync_config
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 3) + 1)
@@ -1763,28 +1791,28 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup ~compile_config
+            ~use_super_catchup ~ledger_sync_config
             [ fresh_peer
               (* ; peer_with_branch ~frontier_branch_size:(max_frontier_length / 2) *)
             ; peer_with_branch_custom_rpc
                 ~frontier_branch_size:(max_frontier_length / 2)
                 ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
                 ?get_some_initial_peers:None ?answer_sync_ledger_query:None
-                ?get_ancestry:None ?get_best_tip:None
+                ?get_ancestry:None ?get_best_tip:None ?get_completed_snarks:None
                 ?get_transition_knowledge:None ?get_transition_chain_proof:None
                 ?get_transition_chain:(Some impl_rpc)
             ; peer_with_branch_custom_rpc
                 ~frontier_branch_size:(max_frontier_length / 2)
                 ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
                 ?get_some_initial_peers:None ?answer_sync_ledger_query:None
-                ?get_ancestry:None ?get_best_tip:None
+                ?get_ancestry:None ?get_best_tip:None ?get_completed_snarks:None
                 ?get_transition_knowledge:None ?get_transition_chain_proof:None
                 ?get_transition_chain:(Some impl_rpc)
             ; peer_with_branch_custom_rpc
                 ~frontier_branch_size:(max_frontier_length / 2)
                 ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
                 ?get_some_initial_peers:None ?answer_sync_ledger_query:None
-                ?get_ancestry:None ?get_best_tip:None
+                ?get_ancestry:None ?get_best_tip:None ?get_completed_snarks:None
                 ?get_transition_knowledge:None ?get_transition_chain_proof:None
                 ?get_transition_chain:(Some impl_rpc)
             ])

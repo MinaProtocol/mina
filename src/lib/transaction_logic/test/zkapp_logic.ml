@@ -27,7 +27,7 @@ let balance_to_fee = Fn.compose Amount.to_fee Balance.to_amount
    validate them. *)
 let%test_module "Test transaction logic." =
   ( module struct
-    open Transaction_logic.Transaction_applied.Zkapp_command_applied
+    open Mina_transaction_logic.Transaction_applied.Zkapp_command_applied
 
     let run_zkapp_cmd ~fee_payer ~fee ~accounts txns =
       let open Result.Let_syntax in

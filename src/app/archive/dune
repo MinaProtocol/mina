@@ -5,7 +5,7 @@
  (modules archive)
  (modes native)
  (libraries archive_cli async async_unix core_kernel base mina_version bounded_types)
- (instrumentation (backend bisect_ppx))
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
  (preprocess (pps ppx_version)))
 
 (executable
@@ -15,7 +15,7 @@
  (modules archive_testnet_signatures)
  (modes native)
  (libraries archive_cli mina_signature_kind.testnet async async_unix core_kernel base mina_version bounded_types)
- (instrumentation (backend bisect_ppx))
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
  (preprocess (pps ppx_version)))
 
 (executable
@@ -25,5 +25,5 @@
  (modules archive_mainnet_signatures)
  (modes native)
  (libraries archive_cli mina_signature_kind.mainnet async async_unix core_kernel base mina_version bounded_types)
- (instrumentation (backend bisect_ppx))
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
  (preprocess (pps ppx_version)))

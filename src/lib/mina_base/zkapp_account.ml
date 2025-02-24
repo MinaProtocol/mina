@@ -297,32 +297,35 @@ end
 (* This preimage cannot be attained by any string, due to the trailing [true]
    added below.
 *)
-let zkapp_uri_non_preimage =
-  lazy (Random_oracle_input.Chunked.field_elements [| Field.zero; Field.zero |])
+let zkapp_uri_non_preimage_hash =
+  lazy
+    ( Random_oracle.pack_input
+        (Random_oracle_input.Chunked.field_elements
+           [| Field.zero; Field.zero |] )
+    |> Random_oracle.hash ~init:Hash_prefix_states.zkapp_uri )
 
-let hash_zkapp_uri_opt (zkapp_uri_opt : string option) =
-  let input =
-    match zkapp_uri_opt with
-    | Some zkapp_uri ->
-        (* We use [length*8 + 1] to pass a final [true] after the end of the
-           string, to ensure that trailing null bytes don't alias in the hash
-           preimage.
-        *)
-        let bits = Array.create ~len:((String.length zkapp_uri * 8) + 1) true in
-        String.foldi zkapp_uri ~init:() ~f:(fun i () c ->
-            let c = Char.to_int c in
-            (* Insert the bits into [bits], LSB order. *)
-            for j = 0 to 7 do
-              (* [Int.test_bit c j] *)
-              bits.((i * 8) + j) <- Int.bit_and c (1 lsl j) <> 0
-            done ) ;
+let hash_zkapp_uri_opt = function
+  | None ->
+      Lazy.force zkapp_uri_non_preimage_hash
+  | Some zkapp_uri ->
+      (* We use [length*8 + 1] to pass a final [true] after the end of the
+         string, to ensure that trailing null bytes don't alias in the hash
+         preimage.
+      *)
+      let bits = Array.create ~len:((String.length zkapp_uri * 8) + 1) true in
+      String.foldi zkapp_uri ~init:() ~f:(fun i () c ->
+          let c = Char.to_int c in
+          (* Insert the bits into [bits], LSB order. *)
+          for j = 0 to 7 do
+            (* [Int.test_bit c j] *)
+            bits.((i * 8) + j) <- Int.bit_and c (1 lsl j) <> 0
+          done ) ;
+      let input =
         Random_oracle_input.Chunked.packeds
           (Array.map ~f:(fun b -> (field_of_bool b, 1)) bits)
-    | None ->
-        Lazy.force zkapp_uri_non_preimage
-  in
-  Random_oracle.pack_input input
-  |> Random_oracle.hash ~init:Hash_prefix_states.zkapp_uri
+      in
+      Random_oracle.pack_input input
+      |> Random_oracle.hash ~init:Hash_prefix_states.zkapp_uri
 
 let hash_zkapp_uri (zkapp_uri : string) = hash_zkapp_uri_opt (Some zkapp_uri)
 
@@ -388,12 +391,6 @@ let digest (t : t) =
     hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)))
 
 let default_digest = lazy (digest default)
-
-let hash_zkapp_account_opt' = function
-  | None ->
-      Lazy.force default_digest
-  | Some (a : t) ->
-      digest a
 
 let action_state_deriver obj =
   let open Fields_derivers_zkapps.Derivers in
