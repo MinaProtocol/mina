@@ -12,6 +12,8 @@ let DebianChannel = ../Constants/DebianChannel.dhall
 
 let Network = ../Constants/Network.dhall
 
+let Command = ../Command/Base.dhall
+
 let DebianVersions = ../Constants/DebianVersions.dhall
 
 let DebianRepo = ../Constants/DebianRepo.dhall
@@ -68,6 +70,7 @@ let promote_artifacts =
                       dockersSpecs
                       DebianVersions.DebVersion.Bullseye
                       PipelineMode.Type.Stable
+                      ([] : List Command.TaggedKey.Type)
                   )
 
           in  pipelineType.pipeline
