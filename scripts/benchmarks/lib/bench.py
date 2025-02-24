@@ -3,12 +3,17 @@ from abc import ABC
 
 import parse
 from pathlib import Path
+import tarfile
+import tempfile
+import requests
 import io
 import os
+import json
 from enum import Enum
 import logging
 from lib.utils import isclose, assert_cmd
 from lib.influx import *
+from urllib.parse import urlparse
 
 import csv
 import abc
@@ -154,6 +159,7 @@ class BenchmarkType(Enum):
     heap_usage = 'heap-usage'
     zkapp = 'zkapp'
     ledger_export = 'ledger-export'
+    persistent_frontier = 'persistent-frontier'
 
     def __str__(self):
         return self.value
@@ -556,6 +562,93 @@ class SnarkBenchmark(Benchmark):
             str(self.min_num_updates)
         ])
 
+
+class PersistentFrontierBenchmark(Benchmark):
+
+    name = MeasurementColumn("name", 0)
+    time = FieldColumn("time", 1, "[ms]")
+    category = TagColumn("category", 2)
+    branch = TagColumn("gitbranch", 3)
+
+    def name_header(self):
+        return self.name
+
+    def branch_header(self):
+        return self.branch
+
+    def __init__(self, frontier_zipped_db):
+        Benchmark.__init__(self, BenchmarkType.persistent_frontier)
+        self.frontier_zipped_db = frontier_zipped_db
+
+    def headers(self):
+        return [
+            PersistentFrontierBenchmark.name, PersistentFrontierBenchmark.time,
+            PersistentFrontierBenchmark.category,  PersistentFrontierBenchmark.branch
+        ]
+
+    def fields(self):
+        return [
+            PersistentFrontierBenchmark.time
+        ]
+
+    def parse(self, content, output_filename, influxdb, branch):
+        buf = io.StringIO(content)
+        lines = buf.readlines()
+        rows = []
+        category = "persistent-frontier"
+        rows.append(list(map(lambda x: x.name, self.headers())))
+
+
+
+        for line in lines:
+            data = json.loads(line)
+            metadata = data["metadata"]
+            if "duration" in metadata:
+                rows.append(("persistent-frontier", str(metadata["duration"]), category, branch))
+                break
+
+        with open(output_filename, 'w') as csvfile:
+            if influxdb:
+                csvfile.write(self.headers_to_influx(self.headers()) + "\n")
+
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerows(rows)
+
+        return [ output_filename ]
+
+    def default_path(self):
+        return "mina"
+
+    def run(self, path=None):
+        path = self.default_path() if path is None else path
+        
+        with tempfile.TemporaryDirectory() as tempdirname:
+
+            url = self.frontier_zipped_db
+            result = urlparse(url)
+            zipped_db_filename = os.path.basename(result.path)
+            full_path_to_zipped_file = os.path.join(tempdirname, zipped_db_filename)
+            full_path_to_unzipped_file = os.path.join(tempdirname, zipped_db_filename.split(".")[0])
+
+            response = requests.get(url, stream=True)
+            if response.status_code == 200:
+                with open(full_path_to_zipped_file, 'wb') as f:
+                    f.write(response.raw.read())
+            else:
+                raise Exception(f"cannot download frontier db from {url}. status code: {response.status_code}")
+
+            if full_path_to_zipped_file.endswith("tar.gz"):
+                tar = tarfile.open(full_path_to_zipped_file, "r:gz")
+                tar.extractall()
+                tar.close()
+            elif full_path_to_zipped_file.endswith("tar"):
+                tar = tarfile.open(full_path_to_zipped_file, "r:")
+                tar.extractall()
+                tar.close()
+
+            return assert_cmd([
+                path, "internal", "test-persistent-frontier", "--frontier-db", full_path_to_unzipped_file
+            ])
 
 class HeapUsageBenchmark(Benchmark):
     """

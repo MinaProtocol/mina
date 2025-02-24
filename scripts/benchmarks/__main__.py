@@ -27,6 +27,7 @@ run_bench.add_argument("--genesis-ledger-path", default="./genesis_ledgers/devne
 run_bench.add_argument("--k", default=1)
 run_bench.add_argument("--max-num-updates", default=4 , type=int)
 run_bench.add_argument("--min-num-updates", default=2, type=int)
+run_bench.add_argument("--frontier-db-url", default="", type=str)
 
 parse_bench = subparsers.add_parser('parse',help="parse textual benchmark output to csv")
 parse_bench.add_argument("--benchmark", type= BenchmarkType, help="benchmark to run")
@@ -71,6 +72,7 @@ test_bench.add_argument('-m','--mainline-branches', action='append', help='Defin
 test_bench.add_argument("--k", default=1)
 test_bench.add_argument("--max-num-updates", default=4 , type=int)
 test_bench.add_argument("--min-num-updates", default=2, type=int)
+test_bench.add_argument("--frontier-db-url", default="", type=str)
 
 
 ls_bench = subparsers.add_parser('ls')
@@ -87,6 +89,8 @@ def select_benchmark(kind):
         return MinaBaseBenchmark()
     elif kind == BenchmarkType.zkapp:
         return ZkappLimitsBenchmark()
+    elif kind == BenchmarkType.persistent_frontier:
+        return PersistentFrontierBenchmark(args.frontier_db_url)
     elif kind == BenchmarkType.heap_usage:
         return HeapUsageBenchmark()
     elif kind == BenchmarkType.snark:

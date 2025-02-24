@@ -1981,6 +1981,7 @@ let internal_commands logger =
               Format.eprintf "Failed to generate block@.%s@."
                 (Yojson.Safe.to_string @@ Error_json.error_to_yojson err) ;
               exit 1) )
+  ; ("test-persistent-frontier", Test_persistent_frontier.command)
   ]
 
 let mina_commands logger ~itn_features =
