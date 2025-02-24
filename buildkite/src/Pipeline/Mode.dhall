@@ -11,4 +11,8 @@ let capitalName =
           \(pipelineMode : Mode)
       ->  merge { PullRequest = "PullRequest", Stable = "Stable" } pipelineMode
 
-in  { Type = Mode, capitalName = capitalName }
+let isStable =
+          \(pipelineMode : Mode)
+      ->  merge { PullRequest = False, Stable = True } pipelineMode
+
+in  { Type = Mode, capitalName = capitalName, isStable = isStable }
