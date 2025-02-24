@@ -77,7 +77,8 @@
   kimchi_pasta.basic
   coda_genesis_ledger
   staged_ledger_diff
-  mina_wire_types)
+  mina_wire_types
+  zkapp_vk_cache_tag)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

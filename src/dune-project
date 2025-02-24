@@ -232,3 +232,4 @@
 (package (name zkapp_command_builder))
 (package (name zkapps_examples))
 (package (name zkapp_limits))
+(package (name zkapp_vk_cache_tag))
