@@ -25,16 +25,32 @@ module Executor = struct
   let of_context ~context ~dune_name ~official_name =
     { context; dune_name; official_name }
 
-  let run_from_debian t ~(args : string list) ?env () =
-    Util.run_cmd_exn ?env "." t.official_name args
+  let check_errors res ?(ignore_failure = false) =
+    match res with
+    | Ok output ->
+        return output
+    | Error error ->
+        if ignore_failure then return (Error.to_string_hum error)
+        else Error.raise error
 
-  let run_from_dune t ~(args : string list) ?env () =
-    Util.run_cmd_exn ?env "." "dune" ([ "exec"; t.dune_name; "--" ] @ args)
+  let run_from_debian t ~(args : string list) ?env ?ignore_failure () =
+    let%bind res = Util.run_cmd_or_error ?env "." t.official_name args in
+    check_errors res ?ignore_failure
 
-  let run_from_local t ~(args : string list) ?env () =
-    Util.run_cmd_exn ?env "."
-      (Printf.sprintf "_build/default/%s" t.dune_name)
-      args
+  let run_from_dune t ~(args : string list) ?env ?ignore_failure () =
+    let%bind res =
+      Util.run_cmd_or_error ?env "." "dune"
+        ([ "exec"; t.dune_name; "--" ] @ args)
+    in
+    check_errors res ?ignore_failure
+
+  let run_from_local t ~(args : string list) ?env ?ignore_failure () =
+    let%bind res =
+      Util.run_cmd_or_error "."
+        (Printf.sprintf "_build/default/%s" t.dune_name)
+        ?env args
+    in
+    check_errors res ?ignore_failure
 
   let built_name t = Printf.sprintf "_build/default/%s" t.dune_name
 
@@ -59,7 +75,7 @@ module Executor = struct
         | _ ->
             Deferred.return t.dune_name )
 
-  let run t ~(args : string list) ?env () =
+  let run t ~(args : string list) ?env ?ignore_failure () =
     let open Deferred.Let_syntax in
     let logger = Logger.create () in
     match t.context with
@@ -68,23 +84,23 @@ module Executor = struct
         | `Yes ->
             [%log debug] "running from _build/default folder"
               ~metadata:[ ("app", `String (built_name t)) ] ;
-            run_from_local t ~args ?env ()
+            run_from_local t ~args ?env ?ignore_failure ()
         | _ -> (
             match%bind Deferred.List.find_map ~f:(exists_at_path t) paths with
             | Some prefix ->
                 [%log debug] "running from %s" prefix
                   ~metadata:[ ("app", `String t.official_name) ] ;
-                run_from_debian t ~args ?env ()
+                run_from_debian t ~args ?env ?ignore_failure ()
             | _ ->
                 [%log debug] "running from src/.. folder"
                   ~metadata:[ ("app", `String t.dune_name) ] ;
-                run_from_dune t ~args ?env () ) )
+                run_from_dune t ~args ?env ?ignore_failure () ) )
     | Dune ->
-        run_from_dune t ~args ?env ()
+        run_from_dune t ~args ?env ?ignore_failure ()
     | Debian ->
-        run_from_debian t ~args ?env ()
+        run_from_debian t ~args ?env ?ignore_failure ()
     | Local ->
-        run_from_local t ~args ?env ()
+        run_from_local t ~args ?env ?ignore_failure ()
     | Docker ctx ->
         let docker = Docker.Client.default in
         let cmd = [ t.official_name ] @ args in
