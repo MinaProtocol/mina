@@ -32,9 +32,6 @@ let%test_module "Access permission tests" =
         ~branches:(module Nat.N1)
         ~max_proofs_verified:(module Nat.N0)
         ~name:"empty_update"
-        ~constraint_constants:
-          (Genesis_constants.Constraint_constants.to_snark_keys_header
-             constraint_constants )
         ~choices:(fun ~self:_ -> [ Zkapps_empty_update.rule pk_compressed ])
 
     module P = (val p_module)

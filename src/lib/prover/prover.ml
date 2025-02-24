@@ -56,6 +56,12 @@ module Worker_state = struct
     val toggle_internal_tracing : bool -> unit
 
     val set_itn_logger_data : daemon_port:int -> unit
+
+    val get_blockchain_verification_key :
+      unit -> Pickles.Verification_key.t Deferred.t
+
+    val get_transaction_verification_key :
+      unit -> Pickles.Verification_key.t Deferred.t
   end
 
   (* bin_io required by rpc_parallel *)
@@ -103,7 +109,6 @@ module Worker_state = struct
           Pickles.Cache_handle.generate_or_load B.cache_handle
           |> Promise.to_deferred
         in
-
         ( module struct
           module T = T
           module B = B
@@ -161,6 +166,12 @@ module Worker_state = struct
 
           let set_itn_logger_data ~daemon_port =
             Itn_logger.set_data ~process_kind:"prover" ~daemon_port
+
+          let get_blockchain_verification_key () =
+            Lazy.force B.Proof.verification_key
+
+          let get_transaction_verification_key () =
+            Lazy.force T.verification_key
         end : S )
     | Check ->
         Deferred.return
@@ -202,8 +213,14 @@ module Worker_state = struct
             let toggle_internal_tracing _ = ()
 
             let set_itn_logger_data ~daemon_port:_ = ()
+
+            let get_blockchain_verification_key () =
+              Deferred.return (Lazy.force Pickles.Verification_key.dummy)
+
+            let get_transaction_verification_key () =
+              Deferred.return (Lazy.force Pickles.Verification_key.dummy)
           end : S )
-    | None ->
+    | No_check ->
         Deferred.return
           ( module struct
             module Transaction_snark = Transaction_snark
@@ -221,6 +238,12 @@ module Worker_state = struct
             let toggle_internal_tracing _ = ()
 
             let set_itn_logger_data ~daemon_port:_ = ()
+
+            let get_blockchain_verification_key () =
+              Deferred.return (Lazy.force Pickles.Verification_key.dummy)
+
+            let get_transaction_verification_key () =
+              Deferred.return (Lazy.force Pickles.Verification_key.dummy)
           end : S )
 
   let get = Fn.id
@@ -275,6 +298,18 @@ module Functions = struct
         let (module M) = Worker_state.get w in
         M.set_itn_logger_data ~daemon_port ;
         Deferred.unit )
+
+  let get_blockchain_verification_key =
+    create bin_unit [%bin_type_class: Pickles.Verification_key.Stable.Latest.t]
+      (fun w () ->
+        let (module M) = Worker_state.get w in
+        M.get_blockchain_verification_key () )
+
+  let get_transaction_verification_key =
+    create bin_unit [%bin_type_class: Pickles.Verification_key.Stable.Latest.t]
+      (fun w () ->
+        let (module M) = Worker_state.get w in
+        M.get_transaction_verification_key () )
 end
 
 module Worker = struct
@@ -288,6 +323,10 @@ module Worker = struct
       ; verify_blockchain : ('w, Blockchain.t, unit Or_error.t) F.t
       ; toggle_internal_tracing : ('w, bool, unit) F.t
       ; set_itn_logger_data : ('w, int, unit) F.t
+      ; get_blockchain_verification_key :
+          ('w, unit, Pickles.Verification_key.t) F.t
+      ; get_transaction_verification_key :
+          ('w, unit, Pickles.Verification_key.t) F.t
       }
 
     module Worker_state = Worker_state
@@ -316,6 +355,8 @@ module Worker = struct
         ; verify_blockchain = f verify_blockchain
         ; toggle_internal_tracing = f toggle_internal_tracing
         ; set_itn_logger_data = f set_itn_logger_data
+        ; get_blockchain_verification_key = f get_blockchain_verification_key
+        ; get_transaction_verification_key = f get_transaction_verification_key
         }
 
       let init_worker_state
@@ -566,3 +607,11 @@ let toggle_internal_tracing { connection; _ } enabled =
 let set_itn_logger_data { connection; _ } ~daemon_port =
   Worker.Connection.run connection ~f:Worker.functions.set_itn_logger_data
     ~arg:daemon_port
+
+let get_blockchain_verification_key { connection; _ } =
+  Worker.Connection.run connection
+    ~f:Worker.functions.get_blockchain_verification_key ~arg:()
+
+let get_transaction_verification_key { connection; _ } =
+  Worker.Connection.run connection
+    ~f:Worker.functions.get_transaction_verification_key ~arg:()

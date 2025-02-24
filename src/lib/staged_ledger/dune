@@ -32,7 +32,6 @@
    transaction_witness
    mina_numbers
    data_hash_lib
-   inline_test_quiet_logs
    transaction_snark_work
    ledger_proof
    logger

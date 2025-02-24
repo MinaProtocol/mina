@@ -68,6 +68,7 @@
    logger
    zkapp_command_builder
    snark_keys_header
+   proof_carrying_data
  )
  (preprocess
   (pps ppx_snarky ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))

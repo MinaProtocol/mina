@@ -29,17 +29,37 @@ end
 module type Full = sig
   type fp
 
+  type field_var
+
   type gates
+
+  module Constraint : sig
+    type t =
+      ( field_var
+      , fp )
+      Kimchi_pasta_snarky_backend.Plonk_constraint_system.Plonk_constraint.basic
+    [@@deriving sexp]
+
+    val boolean : field_var -> t
+
+    val equal : field_var -> field_var -> t
+
+    val r1cs : field_var -> field_var -> field_var -> t
+
+    val square : field_var -> field_var -> t
+
+    val eval : t -> (field_var -> fp) -> bool
+
+    val log_constraint : t -> (field_var -> fp) -> string
+  end
+
+  type constraint_ = Constraint.t
 
   include
     With_accessors
       with type t = (fp, gates) Kimchi_backend_common.Plonk_constraint_system.t
 
-  val add_constraint :
-       ?label:string
-    -> t
-    -> (fp Snarky_backendless.Cvar.t, fp) Snarky_backendless.Constraint.basic
-    -> unit
+  val add_constraint : t -> Constraint.t -> unit
 
   val compute_witness :
     t -> (int -> fp) -> fp array array * fp Kimchi_types.runtime_table array

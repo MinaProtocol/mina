@@ -180,8 +180,9 @@ module Inner_curve = struct
         with module Scaling_precomputation := T.Scaling_precomputation )
 
   module Scaling_precomputation = T.Scaling_precomputation
+  module Curve_add = Plonk_curve_ops.Make_add (Impl)
 
-  let ( + ) t1 t2 = Plonk_curve_ops.add_fast (module Impl) t1 t2
+  let ( + ) t1 t2 = Curve_add.add_fast t1 t2
 
   let double t = t + t
 

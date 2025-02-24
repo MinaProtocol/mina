@@ -1,0 +1,17 @@
+(library
+ (public_name disk_cache.test_lib)
+ (name disk_cache_test_lib)
+ (libraries
+   ;; opam libraries
+   core
+   async
+   bounded_types
+   ;; local libraries
+   logger
+   file_system
+   disk_cache.intf
+   )
+ (preprocess
+  (pps ppx_mina ppx_version ppx_jane))
+ (instrumentation (backend bisect_ppx))
+ )

@@ -10,21 +10,19 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 open Pickles.Impls.Step
 
-let add_constraint c = assert_ { basic = T c; annotation = None }
+let add_constraint c = assert_ c
 
-let add_plonk_constraint c = assert_ { basic = T c; annotation = None }
+let add_plonk_constraint c = add_constraint c
 
 let etyp_unit =
-  Composition_types.Spec.ETyp.T
-    (Snarky_backendless.Typ.unit (), Core_kernel.Fn.id, Core_kernel.Fn.id)
+  Composition_types.Spec.Step_etyp.T
+    (Pickles.Impls.Step.Typ.unit, Core_kernel.Fn.id, Core_kernel.Fn.id)
 
 let log2_size ~feature_flags main =
   let main' () = main () ; Promise.return () in
   let domains =
     Promise.block_on_async_exn (fun () ->
-        Pickles__Fix_domains.domains ~feature_flags
-          (module Pickles.Impls.Step)
-          etyp_unit etyp_unit main' )
+        Pickles__Fix_domains.domains ~feature_flags etyp_unit etyp_unit main' )
   in
   Pickles_base.Domain.log2_size domains.h
 

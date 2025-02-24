@@ -33,6 +33,28 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
 
   let create ~statement ~sok_digest ~proof =
     Transaction_snark.create ~statement:{ statement with sok_digest } ~proof
+
+  module Cached = struct
+    type t =
+      ( Mina_state.Snarked_ledger_state.With_sok.t
+      , Proof_cache_tag.t )
+      Proof_carrying_data.t
+
+    let write_proof_to_disk ~proof_cache_db (t : Stable.Latest.t) : t =
+      { Proof_carrying_data.proof =
+          Proof_cache_tag.write_proof_to_disk proof_cache_db
+            (Transaction_snark.proof t)
+      ; data = Transaction_snark.statement_with_sok t
+      }
+
+    let read_proof_from_disk
+        ({ Proof_carrying_data.data = statement; proof } : t) : Stable.Latest.t
+        =
+      Transaction_snark.create ~statement
+        ~proof:(Proof_cache_tag.read_proof_from_disk proof)
+
+    let statement (t : t) = { t.data with sok_digest = () }
+  end
 end
 
 include Prod

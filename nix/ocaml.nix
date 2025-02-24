@@ -144,6 +144,7 @@ let
       mv _build/default/src/test/command_line_tests/command_line_tests.exe tests.exe
       chmod +x tests.exe
       export TMPDIR=tmp # to align with janestreet core library
+      export HOME=tmp # some commands rely on home directory
       mkdir -p $TMPDIR
       export MINA_LIBP2P_PASS="naughty blue worm"
       export MINA_PRIVKEY_PASS="naughty blue worm"
@@ -208,8 +209,8 @@ let
         makefileTest "__src-lib-ppx_version-test__" super;
       tested.child_processes = super.tested.child_processes.overrideAttrs
         (s: { buildInputs = s.buildInputs ++ [ childProcessesTester ]; });
-      tested.block_storage =
-        super.tested.block_storage.overrideAttrs withLibp2pHelper;
+      tested.mina_lmdb_storage =
+        super.tested.mina_lmdb_storage.overrideAttrs withLibp2pHelper;
       tested.mina_lib = super.tested.mina_lib.overrideAttrs withLibp2pHelper;
       tested.mina_lib_tests =
         super.tested.mina_lib_tests.overrideAttrs withLibp2pHelper;
@@ -254,7 +255,7 @@ let
         done
       '') package.outputs);
 
-      # Derivation which has all Mina's dependencies in it, and creates an empty output if the command succeds.
+      # Derivation which has all Mina's dependencies in it, and creates an empty output if the command succeeds.
       # Useful for unit tests.
       runMinaCheck = { name ? "check", extraInputs ? [ ], extraArgs ? { }, }:
         check:

@@ -15,7 +15,7 @@ module type S = sig
   module Inputs : sig
     include module type of Rounds
 
-    module Field : Kimchi_backend_common.Field.S
+    module Field : Kimchi_backend.Field.S
 
     type field := Field.t
 

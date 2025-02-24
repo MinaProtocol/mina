@@ -68,7 +68,8 @@ macro_rules! impl_projective {
             #[ocaml_gen::func]
             #[ocaml::func]
             pub fn [<caml_ $name:snake _rng>](i: ocaml::Int) -> $GroupProjective {
-                // We only care about entropy here, so we force a conversion i32 -> u32.
+                // We only care about entropy here, so we force a conversion i32
+                // -> u32.
                 let i: u64 = (i as u32).into();
                 let mut rng: StdRng = rand::SeedableRng::seed_from_u64(i);
                 let proj: $Projective = UniformRand::rand(&mut rng);

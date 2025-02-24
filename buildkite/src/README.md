@@ -1,6 +1,6 @@
 # Buildkite CI
 
-This folder contains all dhall code which is an backbone for our CI related code for buildkite.
+This folder contains all dhall code which is a backbone for our CI related code for buildkite.
 
 # Structure
 
@@ -53,7 +53,7 @@ User defined value which describe current pipeline chunk of jobs to be executed.
 - coverage gathering - which gathers coverage artifacts and uploads it to coveralls.io
 
 To reach above pipeline configuration below configuration can be provided:
-(non important attributes where omitted)
+(non-important attributes were omitted)
 ```
 steps:
   - commands:

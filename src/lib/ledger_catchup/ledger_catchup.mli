@@ -14,7 +14,7 @@ module type CONTEXT = sig
 
   val consensus_constants : Consensus.Constants.t
 
-  val compile_config : Mina_compile_config.t
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 module Catchup_jobs : sig

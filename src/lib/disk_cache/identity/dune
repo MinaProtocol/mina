@@ -1,0 +1,15 @@
+(library
+ (public_name disk_cache.identity)
+ (name disk_cache_identity)
+ (implements disk_cache)
+ (libraries
+   ;; opam libraries
+   async_kernel
+   core_kernel
+   ;; local libraries
+   disk_cache.test_lib
+   )
+ (preprocess (pps ppx_version ppx_jane))
+ (inline_tests (flags -verbose -show-counts))
+ (instrumentation (backend bisect_ppx))
+ )

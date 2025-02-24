@@ -7,7 +7,7 @@ open Snarky_taylor
 
 let%test_unit "instantiate" =
   let module M = Snark_params.Tick.Run in
-  let m : M.field m = (module M) in
+  let m : _ m = (module M) in
   let open M in
   let params =
     Exp.params ~field_size_in_bits:Field.Constant.size_in_bits

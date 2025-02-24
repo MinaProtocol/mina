@@ -67,11 +67,10 @@ module type Full = sig
   module Pre_diff_with_at_most_two_coinbase : sig
     type t =
       (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_two.t
-    [@@deriving equal, compare, sexp, yojson]
 
     module Stable : sig
       module V2 : sig
-        type t [@@deriving equal, compare, sexp, yojson, bin_io, version]
+        type t
       end
     end
     with type V2.t = t
@@ -80,11 +79,10 @@ module type Full = sig
   module Pre_diff_with_at_most_one_coinbase : sig
     type t =
       (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_one.t
-    [@@deriving equal, compare, sexp, yojson]
 
     module Stable : sig
       module V2 : sig
-        type t [@@deriving equal, compare, sexp, yojson, bin_io, version]
+        type t
       end
     end
     with type V2.t = t
@@ -94,23 +92,21 @@ module type Full = sig
     type t =
       Pre_diff_with_at_most_two_coinbase.t
       * Pre_diff_with_at_most_one_coinbase.t option
-    [@@deriving equal, compare, sexp, yojson]
 
     module Stable : sig
       module V2 : sig
-        type t [@@deriving equal, compare, sexp, bin_io, yojson, version]
+        type t
       end
     end
     with type V2.t = t
   end
 
-  type t = { diff : Diff.t }
-  [@@deriving equal, compare, sexp, compare, yojson, fields]
+  type t = { diff : Diff.t } [@@deriving fields]
 
   module Stable : sig
     module V2 : sig
       type t = { diff : Diff.Stable.V2.t }
-      [@@deriving equal, compare, sexp, compare, yojson, bin_io, version]
+      [@@deriving bin_io, equal, sexp, version, yojson]
 
       val to_latest : t -> t
     end
@@ -124,20 +120,17 @@ module type Full = sig
       ( Transaction_snark_work.Checked.t
       , User_command.Valid.t With_status.t )
       Pre_diff_two.t
-    [@@deriving compare, sexp, to_yojson]
 
     type pre_diff_with_at_most_one_coinbase =
       ( Transaction_snark_work.Checked.t
       , User_command.Valid.t With_status.t )
       Pre_diff_one.t
-    [@@deriving compare, sexp, to_yojson]
 
     type diff =
       pre_diff_with_at_most_two_coinbase
       * pre_diff_with_at_most_one_coinbase option
-    [@@deriving compare, sexp, to_yojson]
 
-    type t = { diff : diff } [@@deriving compare, sexp, to_yojson]
+    type t = { diff : diff }
 
     val empty_diff : t
 
@@ -149,20 +142,17 @@ module type Full = sig
       ( Transaction_snark_work.t
       , User_command.Valid.t With_status.t )
       Pre_diff_two.t
-    [@@deriving compare, sexp, to_yojson]
 
     type pre_diff_with_at_most_one_coinbase =
       ( Transaction_snark_work.t
       , User_command.Valid.t With_status.t )
       Pre_diff_one.t
-    [@@deriving compare, sexp, to_yojson]
 
     type diff =
       pre_diff_with_at_most_two_coinbase
       * pre_diff_with_at_most_one_coinbase option
-    [@@deriving compare, sexp, to_yojson]
 
-    type t = { diff : diff } [@@deriving compare, sexp, to_yojson]
+    type t = { diff : diff }
 
     val coinbase :
          constraint_constants:Genesis_constants.Constraint_constants.t
@@ -201,4 +191,6 @@ module type Full = sig
     -> Currency.Amount.t option
 
   val empty_diff : t
+
+  val is_empty : t -> bool
 end

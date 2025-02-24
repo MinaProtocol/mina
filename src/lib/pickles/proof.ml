@@ -117,7 +117,10 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
   let g0 = Tock.Curve.(to_affine_exn one) in
   let g len = Array.create ~len g0 in
   let tick_arr len = Array.init len ~f:(fun _ -> tick ()) in
-  let lengths = Commitment_lengths.default ~num_chunks:1 (* TODO *) in
+  let lengths =
+    Commitment_lengths.default ~num_chunks:Plonk_checks.num_chunks_by_default
+    (* TODO *)
+  in
   T
     { statement =
         { proof_state =

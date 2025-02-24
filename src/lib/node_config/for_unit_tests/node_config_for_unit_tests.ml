@@ -64,3 +64,7 @@ let (vrf_poll_interval : int) = (0 : int)
 let zkapp_cmd_limit = None
 
 let scan_state_tps_goal_x10 : int option = None
+
+let sync_ledger_max_subtree_depth = 4
+
+let sync_ledger_default_subtree_depth = 3

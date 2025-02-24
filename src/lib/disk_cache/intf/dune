@@ -1,0 +1,12 @@
+(library
+ (name disk_cache_intf)
+ (public_name disk_cache.intf)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   async_kernel
+   ;; local libraries
+   logger
+   )
+ (preprocess (pps ppx_mina ppx_version))
+ (instrumentation (backend bisect_ppx)))

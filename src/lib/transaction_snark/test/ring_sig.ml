@@ -132,9 +132,6 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N0)
               ~name:"ringsig"
-              ~constraint_constants:
-                (Genesis_constants.Constraint_constants.to_snark_keys_header
-                   constraint_constants )
               ~choices:(fun ~self:_ -> [ ring_sig_rule ring_member_pks ])
           in
           let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in

@@ -26,9 +26,6 @@ let%test_module "Actions test" =
         ~branches:(module Nat.N2)
         ~max_proofs_verified:(module Nat.N0)
         ~name:"no actions"
-        ~constraint_constants:
-          (Genesis_constants.Constraint_constants.to_snark_keys_header
-             constraint_constants )
         ~choices:(fun ~self:_ ->
           [ Zkapps_actions.initialize_rule pk_compressed
           ; Zkapps_actions.update_actions_rule pk_compressed

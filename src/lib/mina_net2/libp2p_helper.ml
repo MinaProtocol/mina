@@ -221,8 +221,7 @@ let handle_incoming_message t msg ~handle_push_message =
               handle_push_message t (DaemonInterface.PushMessage.get push_msg) )
           )
   | Undefined n ->
-      Libp2p_ipc.undefined_union ~context:"DaemonInterface.Message" n ;
-      Deferred.unit
+      Libp2p_ipc.undefined_union ~context:"DaemonInterface.Message" n
 
 let spawn ?(allow_multiple_instances = false) ~logger ~pids ~conf_dir
     ~handle_push_message () =
@@ -362,10 +361,8 @@ let send_validation ~validation_id ~validation_result =
       (Libp2p_ipc.create_validation_push_message ~validation_id
          ~validation_result )
 
-let send_add_resource ~tag ~body =
-  let open Staged_ledger_diff in
-  let tag = Body.Tag.to_enum tag in
-  let data = Body.to_binio_bigstring body |> Bigstring.to_string in
+let send_add_resource ~tag ~data =
+  let tag = Bitswap_tag.to_enum tag in
   send_push ~name:"AddResource"
     ~msg:(Libp2p_ipc.create_add_resource_push_message ~tag ~data)
 

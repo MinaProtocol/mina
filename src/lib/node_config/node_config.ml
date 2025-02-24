@@ -29,6 +29,11 @@ include Node_config_unconfigurable_constants
 
 [%%inject "scan_state_with_tps_goal", scan_state_with_tps_goal]
 
+[%%inject "sync_ledger_max_subtree_depth", sync_ledger_max_subtree_depth]
+
+[%%inject
+"sync_ledger_default_subtree_depth", sync_ledger_default_subtree_depth]
+
 [%%ifndef scan_state_transaction_capacity_log_2]
 
 let scan_state_transaction_capacity_log_2 : int option = None

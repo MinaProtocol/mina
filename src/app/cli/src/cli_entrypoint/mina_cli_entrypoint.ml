@@ -1138,8 +1138,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let module Context = struct
             let logger = logger
 
-            let precomputed_values = precomputed_values
-
             let constraint_constants = precomputed_values.constraint_constants
 
             let consensus_constants = precomputed_values.consensus_constants
@@ -1294,7 +1292,6 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ; time_controller
               ; pubsub_v1
               ; pubsub_v0
-              ; block_window_duration = compile_config.block_window_duration
               }
           in
           let net_config =
@@ -1859,10 +1856,11 @@ let internal_commands logger =
                     | Error err ->
                         failwithf "Could not parse JSON: %s" err () ) )
           in
+
           let%bind verifier =
-            Verifier.create ~commit_id:Mina_version.commit_id ~logger
-              ~proof_level ~constraint_constants ~pids:(Pid.Table.create ())
-              ~conf_dir:(Some conf_dir) ()
+            Verifier.For_tests.default ~constraint_constants ~proof_level
+              ~commit_id:Mina_version.commit_id ~logger
+              ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir) ()
           in
           let%bind result =
             let cap lst =

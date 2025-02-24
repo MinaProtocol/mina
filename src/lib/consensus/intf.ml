@@ -13,6 +13,12 @@ module type CONTEXT = sig
   val consensus_constants : Constants.t
 end
 
+module type CONTEXT_WITH_LEDGER_SYNC = sig
+  include CONTEXT
+
+  val ledger_sync_config : Syncable_ledger.daemon_config
+end
+
 module type Constants = sig
   [%%versioned:
   module Stable : sig
@@ -766,7 +772,7 @@ module type S = sig
        already supplied
      *)
     val sync_local_state :
-         context:(module CONTEXT)
+         context:(module CONTEXT_WITH_LEDGER_SYNC)
       -> trust_system:Trust_system.t
       -> local_state:Local_state.t
       -> glue_sync_ledger:

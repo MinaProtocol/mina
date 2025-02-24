@@ -32,6 +32,12 @@ module Make_str (A : Wire_types.Concrete) = struct
     val consensus_constants : Constants.t
   end
 
+  module type CONTEXT_WITH_LEDGER_SYNC = sig
+    include CONTEXT
+
+    val ledger_sync_config : Syncable_ledger.daemon_config
+  end
+
   let make_checked t = Snark_params.Tick.Run.make_checked t
 
   let name = "proof_of_stake"
@@ -2111,7 +2117,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Global_slot.Checked.of_slot_number ~constants transition_data
         in
         let%bind slot_diff =
-          [%with_label_ "Next global slot is less than previous global slot"]
+          [%with_label_ "Next global slot is larger than previous global slot"]
             (fun () ->
               Global_slot.Checked.diff_slots next_global_slot prev_global_slot )
         in
@@ -2589,8 +2595,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                    ; staking = staking.expected_root
                    } ) )
 
-    let sync_local_state ~context:(module Context : CONTEXT) ~trust_system
-        ~local_state ~glue_sync_ledger requested_syncs =
+    let sync_local_state ~context:(module Context : CONTEXT_WITH_LEDGER_SYNC)
+        ~trust_system ~local_state ~glue_sync_ledger requested_syncs =
       let open Context in
       let open Local_state in
       let open Snapshot in
@@ -2678,8 +2684,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                          (next_epoch_ledger_location local_state)
               in
               let sync_ledger =
-                Mina_ledger.Sync_ledger.Db.create ~logger ~trust_system
-                  db_ledger
+                Mina_ledger.Sync_ledger.Db.create
+                  ~context:(module Context)
+                  ~trust_system db_ledger
               in
               let query_reader =
                 Mina_ledger.Sync_ledger.Db.query_reader sync_ledger

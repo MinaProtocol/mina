@@ -118,7 +118,7 @@ module type S = sig
     module Previous_proof_statement : sig
       type ('prev_var, 'width) t =
         { public_input : 'prev_var
-        ; proof : ('width, 'width) Proof.t Impls.Step.As_prover.Ref.t
+        ; proof : ('width, 'width) Proof.t Impls.Step.Typ.prover_value
         ; proof_must_verify : B.t
         }
 
@@ -414,7 +414,6 @@ module type S = sig
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = 'max_proofs_verified)
     -> name:string
-    -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
     -> choices:
          (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
           -> ( 'prev_varss
@@ -470,7 +469,6 @@ module type S = sig
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = 'max_proofs_verified)
     -> name:string
-    -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
     -> choices:
          (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
           -> ( 'prev_varss
@@ -526,7 +524,6 @@ module type S = sig
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = 'max_proofs_verified)
     -> name:string
-    -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
     -> choices:
          (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
           -> ( 'prev_varss

@@ -26,9 +26,6 @@ let%test_module "Add events test" =
         ~branches:(module Nat.N2)
         ~max_proofs_verified:(module Nat.N0)
         ~name:"no events"
-        ~constraint_constants:
-          (Genesis_constants.Constraint_constants.to_snark_keys_header
-             constraint_constants )
         ~choices:(fun ~self:_ ->
           [ Zkapps_add_events.initialize_rule pk_compressed
           ; Zkapps_add_events.update_events_rule pk_compressed

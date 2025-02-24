@@ -21,7 +21,6 @@
    ppx_jane
    ppx_deriving.std
    h_list.ppx))
- (modules_without_implementation sigs poly_types)
  (instrumentation
   (backend bisect_ppx))
  (libraries
@@ -33,6 +32,9 @@
   bin_prot.shape
   ;; local libraries
   kimchi_types
+  kimchi_backend_common
+  kimchi_pasta_snarky_backend
+  plonkish_prelude
   snarky.backendless
   tuple_lib
   ppx_version.runtime

@@ -55,6 +55,6 @@ end
 let of_context context =
   Executor.of_context ~context
     ~dune_name:"src/app/extract_blocks/extract_blocks.exe"
-    ~official_name:"/usr/local/bin/mina-extract-blocks"
+    ~official_name:"mina-extract-blocks"
 
 let run t ~config = run t ~args:(Config.to_args config) ()

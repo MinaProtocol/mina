@@ -250,6 +250,14 @@ module Network : sig
 
   val get_ancestry_rpc_responses_failed : Counter.t
 
+  val get_completed_snarks_rpcs_sent : Counter.t * Gauge.t
+
+  val get_completed_snarks_rpcs_received : Counter.t * Gauge.t
+
+  val get_completed_snarks_rpc_requests_failed : Counter.t
+
+  val get_completed_snarks_rpc_responses_failed : Counter.t
+
   val ban_notify_rpcs_sent : Counter.t * Gauge.t
 
   val ban_notify_rpcs_received : Counter.t * Gauge.t

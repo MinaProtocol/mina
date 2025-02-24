@@ -10,7 +10,7 @@ module SC = Pickles__Import.Scalar_challenge
 module Scalar_challenge = Pickles__Scalar_challenge
 
 module Test_make
-    (Impl : Snarky_backendless.Snark_intf.Run)
+    (Impl : Kimchi_pasta_snarky_backend.Snark_intf)
     (G : Pickles__Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t)
     (Challenge : Pickles__Import.Challenge.S with module Impl := Impl)
     (Endo : sig

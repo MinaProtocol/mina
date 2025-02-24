@@ -139,14 +139,14 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
                    Opt.t
                  , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
                    , Impls.Wrap.Boolean.var )
-                   Pickles_types__Opt.t
+                   Plonkish_prelude.Opt.t
                  , Impls.Wrap.Boolean.var )
                  Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                  .In_circuit
                  .t
                , Wrap_verifier.Challenge.t Kimchi_types.scalar_challenge
                , Wrap_verifier.Other_field.Packed.t
-                 Pickles_types__Shifted_value.Type1.t
+                 Plonkish_prelude.Shifted_value.Type1.t
                , Impls.Wrap.Field.t
                , Impls.Wrap.Field.t
                , Impls.Wrap.Field.t
@@ -380,7 +380,8 @@ struct
        ~storables:
          { step_storable; step_vk_storable; wrap_storable; wrap_vk_storable }
        ~proof_cache ?disk_keys ?override_wrap_domain ?override_wrap_main
-       ?(num_chunks = 1) ~branches:(module Branches) ~max_proofs_verified ~name
+       ?(num_chunks = Plonk_checks.num_chunks_by_default)
+       ~branches:(module Branches) ~max_proofs_verified ~name
        ?constraint_constants ~public_input ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       let constraint_constants : Snark_keys_header.Constraint_constants.t =
@@ -674,8 +675,7 @@ struct
            let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
            let main x () = wrap_main (conv x) in
            let cs =
-             constraint_system ~input_typ:typ
-               ~return_typ:(Snarky_backendless.Typ.unit ())
+             constraint_system ~input_typ:typ ~return_typ:Impls.Wrap.Typ.unit
                main
            in
            let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
@@ -877,11 +877,11 @@ struct
       ; num_chunks
       ; zk_rows =
           ( match num_chunks with
-          | 1 ->
-              3
+          | 1 (* cannot match with Plonk_checks.num_chunks_by_default *) ->
+              Plonk_checks.zk_rows_by_default
           | num_chunks ->
               let permuts = 7 in
-              ((2 * (permuts + 1) * num_chunks) - 1 + permuts) / permuts )
+              ((2 * (permuts + 1) * num_chunks) - 2 + permuts) / permuts )
       }
     in
     Timer.clock __LOC__ ;
@@ -932,8 +932,8 @@ module Side_loaded = struct
       ; branches = Verification_key.Max_branches.n
       ; feature_flags =
           Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
-      ; num_chunks = 1
-      ; zk_rows = 3
+      ; num_chunks = Plonk_checks.num_chunks_by_default
+      ; zk_rows = Plonk_checks.zk_rows_by_default
       }
 
   module Proof = struct
@@ -1319,7 +1319,7 @@ struct
     ; main =
         (fun { public_input = () } ->
           let dummy_proof =
-            As_prover.Ref.create (fun () ->
+            exists (Typ.prover_value ()) ~compute:(fun () ->
                 Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15 )
           in
           Promise.return
@@ -1396,7 +1396,7 @@ struct
                 ; main =
                     (fun { public_input = () } ->
                       let proof =
-                        exists (Typ.Internal.ref ()) ~request:(fun () -> Proof)
+                        exists (Typ.prover_value ()) ~request:(fun () -> Proof)
                       in
                       Promise.return
                         { Inductive_rule.previous_proof_statements =

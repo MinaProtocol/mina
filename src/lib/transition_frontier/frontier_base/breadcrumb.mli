@@ -10,7 +10,7 @@ open Mina_base
 open Mina_state
 open Network_peer
 
-type t [@@deriving sexp, equal, compare, to_yojson]
+type t [@@deriving equal, compare, to_yojson]
 
 type display =
   { state_hash : string
@@ -29,6 +29,7 @@ val create :
 
 val build :
      ?skip_staged_ledger_verification:[ `All | `Proofs ]
+  -> proof_cache_db:Proof_cache_tag.cache_db
   -> logger:Logger.t
   -> precomputed_values:Precomputed_values.t
   -> verifier:Verifier.t
@@ -81,6 +82,8 @@ val mask : t -> Mina_ledger.Ledger.Mask.Attached.t
 val display : t -> display
 
 val name : t -> string
+
+val staged_ledger_hash : t -> Staged_ledger_hash.t
 
 module For_tests : sig
   val gen :

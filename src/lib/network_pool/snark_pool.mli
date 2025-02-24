@@ -87,7 +87,7 @@ module Diff_versioned : sig
             * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
-      [@@deriving compare, sexp, hash]
+      [@@deriving compare, hash]
     end
   end]
 end

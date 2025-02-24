@@ -264,11 +264,11 @@ There are several public Grafana dashboards available here:
 
 The purpose of a public testnet is to allow end-users to try out the software and learn how to operate it. Thus, we accept sign-ups for stake to be allocated in the genesis, and commit those keys to the compiled genesis ledger.
 
-For context, these keys correspond to the "Fish Keys" in the QA Net deployments, and Online Fish Keys are ommitted in a Public Testnet deployment and "Offline Fish Keys" are instead delegated to the submitted User Keys.
+For context, these keys correspond to the "Fish Keys" in the QA Net deployments, and Online Fish Keys are omitted in a Public Testnet deployment and "Offline Fish Keys" are instead delegated to the submitted User Keys.
 
 ### Generate Genesis Ledger
 
-Once you have the keys for your deploymenet created, and the Staker Keys saved to a CSV, you can use them to generate a genesis ledger with the following command.
+Once you have the keys for your deployment created, and the Staker Keys saved to a CSV, you can use them to generate a genesis ledger with the following command.
 
 ```
 scripts/generate-keys-and-ledger.sh

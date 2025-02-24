@@ -10,7 +10,7 @@ module Inputs = struct
       match proof_level with
       | Genesis_constants.Proof_level.Full ->
           failwith "Unable to handle proof-level=Full"
-      | Check | None ->
+      | Check | No_check ->
           Deferred.unit
 
     let worker_wait_time = 0.5

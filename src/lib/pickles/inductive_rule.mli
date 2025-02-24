@@ -5,7 +5,7 @@ end
 module Previous_proof_statement : sig
   type ('prev_var, 'width) t =
     { public_input : 'prev_var
-    ; proof : ('width, 'width) Proof.t Impls.Step.As_prover.Ref.t
+    ; proof : ('width, 'width) Proof.t Impls.Step.Typ.prover_value
     ; proof_must_verify : B.t
     }
 

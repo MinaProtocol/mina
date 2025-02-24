@@ -1,20 +1,19 @@
-val add_fast :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> ?check_finite:bool
-  -> 'f Snarky_backendless.Cvar.t * 'f Snarky_backendless.Cvar.t
-  -> 'f Snarky_backendless.Cvar.t * 'f Snarky_backendless.Cvar.t
-  -> 'f Snarky_backendless.Cvar.t * 'f Snarky_backendless.Cvar.t
-
-module Make
-    (Impl : Snarky_backendless.Snark_intf.Run)
-    (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t) : sig
-  type var := Impl.field Snarky_backendless.Cvar.t
-
-  type pair := var Tuple_lib.Double.t
+module Make_add (Impl : Kimchi_pasta_snarky_backend.Snark_intf) : sig
+  type pair := Impl.Field.t Tuple_lib.Double.t
 
   val seal : pair -> pair
 
-  val add_fast : ?check_finite:bool -> var * var -> var * var -> var * var
+  val add_fast : ?check_finite:bool -> pair -> pair -> pair
+end
+
+module Make
+    (Impl : Kimchi_pasta_snarky_backend.Snark_intf)
+    (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t) : sig
+  type pair := Impl.Field.t Tuple_lib.Double.t
+
+  val seal : pair -> pair
+
+  val add_fast : ?check_finite:bool -> pair -> pair -> pair
 
   val bits_per_chunk : int
 

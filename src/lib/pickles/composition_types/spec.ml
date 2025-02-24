@@ -4,7 +4,21 @@ open Pickles_types
 open Hlist
 module Sc = Kimchi_backend_common.Scalar_challenge
 
-type 'f impl = (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+type ('f, 'v) impl =
+  (module Snarky_backendless.Snark_intf.Run
+     with type field = 'f
+      and type field_var = 'v )
+
+module type Branch_data_checked = sig
+  type field_var
+
+  type t
+
+  val pack : t -> field_var
+end
+
+type ('branch_data, 'f) branch_data =
+  (module Branch_data_checked with type field_var = 'f and type t = 'branch_data)
 
 type ('a, 'b, 'c) basic =
   | Unit : (unit, unit, < .. >) basic
@@ -35,14 +49,6 @@ type ('a, 'b, 'c) basic =
         )
         basic
 
-module type Bool_intf = sig
-  type var
-
-  val true_ : var
-
-  val false_ : var
-end
-
 module rec T : sig
   type (_, _, _) t =
     | B : ('a, 'b, 'env) basic -> ('a, 'b, 'env) t
@@ -61,7 +67,6 @@ module rec T : sig
         ; flag : Opt.Flag.t
         ; dummy1 : 'a1
         ; dummy2 : 'a2
-        ; bool : (module Bool_intf with type var = 'bool)
         }
         -> ('a1 option, ('a2, 'bool) Opt.t, 'env) t
     | Opt_unflagged :
@@ -120,7 +125,7 @@ let rec pack :
             Option.map t_constant_opt ~f:(fun t_const -> t_const.(i))
           in
           pack ~zero ~one p spec t_constant_opt t )
-  | Opt { inner; dummy1; dummy2; flag = _; bool = _ } -> (
+  | Opt { inner; dummy1; dummy2; flag = _ } -> (
       match t with
       | Nothing ->
           let t_constant_opt = Option.map t_constant_opt ~f:(fun _ -> dummy1) in
@@ -152,181 +157,26 @@ let rec pack :
   | Constant (x, _, inner) ->
       pack ~zero ~one p inner (Some x) t
 
-type ('f, 'env) typ =
-  { typ :
-      'var 'value.
-      ('value, 'var, 'env) basic -> ('var, 'value, 'f) Snarky_backendless.Typ.t
-  }
-
-let rec typ :
-    type f var value env.
-       (f, env) typ
-    -> (value, var, env) T.t
-    -> (var, value, f) Snarky_backendless.Typ.t =
-  let open Snarky_backendless.Typ in
-  fun t spec ->
-    match[@warning "-45"] spec with
-    | B spec ->
-        t.typ spec
-    | Scalar chal ->
-        Sc.typ (t.typ chal)
-    | Vector (spec, n) ->
-        Vector.typ (typ t spec) n
-    | Array (spec, n) ->
-        array ~length:n (typ t spec)
-    | Struct [] ->
-        let open Hlist.HlistId in
-        transport (unit ()) ~there:(fun [] -> ()) ~back:(fun () -> [])
-        |> transport_var ~there:(fun [] -> ()) ~back:(fun () -> [])
-    | Struct (spec :: specs) ->
-        let open Hlist.HlistId in
-        tuple2 (typ t spec) (typ t (Struct specs))
-        |> transport
-             ~there:(fun (x :: xs) -> (x, xs))
-             ~back:(fun (x, xs) -> x :: xs)
-        |> transport_var
-             ~there:(fun (x :: xs) -> (x, xs))
-             ~back:(fun (x, xs) -> x :: xs)
-    | Opt { inner; flag; dummy1; dummy2; bool = (module B) } ->
-        let bool = typ t (B Bool) in
-        let open B in
-        (* Always use the same "maybe" layout which is a boolean and then the value *)
-        Opt.constant_layout_typ bool flag ~dummy:dummy1 ~dummy_var:dummy2 ~true_
-          ~false_ (typ t inner)
-    | Opt_unflagged { inner; flag; dummy1; dummy2 } -> (
-        match flag with
-        | Opt.Flag.No ->
-            let open Snarky_backendless.Typ in
-            unit ()
-            |> Snarky_backendless.Typ.transport
-                 ~there:(function Some _ -> assert false | None -> ())
-                 ~back:(fun () -> None)
-            |> Snarky_backendless.Typ.transport_var
-                 ~there:(function Some _ -> assert false | None -> ())
-                 ~back:(fun _ -> None)
-        | Opt.Flag.(Yes | Maybe) ->
-            typ t inner
-            |> Snarky_backendless.Typ.transport
-                 ~there:(function Some x -> x | None -> dummy1)
-                 ~back:(fun x -> Some x)
-            |> Snarky_backendless.Typ.transport_var
-                 ~there:(function Some x -> x | None -> dummy2)
-                 ~back:(fun x -> Some x) )
-    | Constant (x, assert_eq, spec) ->
-        let (Typ typ) = typ t spec in
-        let constant_var =
-          let fields, aux = typ.value_to_fields x in
-          let fields =
-            Array.map fields ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
-          in
-          typ.var_of_fields (fields, aux)
-        in
-        let open Snarky_backendless.Typ in
-        unit ()
-        |> transport ~there:(fun y -> assert_eq x y) ~back:(fun () -> x)
-        |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant_var)
-
-module ETyp = struct
-  type ('var, 'value, 'f) t =
+module Make_ETyp (Impl : sig
+  module Typ : sig
+    type ('var, 'value) t
+  end
+end) =
+struct
+  type ('var, 'value) t =
     | T :
-        ('inner, 'value, 'f) Snarky_backendless.Typ.t
-        * ('inner -> 'var)
-        * ('var -> 'inner)
-        -> ('var, 'value, 'f) t
+        ('inner, 'value) Impl.Typ.t * ('inner -> 'var) * ('var -> 'inner)
+        -> ('var, 'value) t
 end
 
-type ('f, 'env) etyp =
-  { etyp : 'var 'value. ('value, 'var, 'env) basic -> ('var, 'value, 'f) ETyp.t
-  }
+module Step_etyp = Make_ETyp (Kimchi_pasta_snarky_backend.Step_impl)
+module Wrap_etyp = Make_ETyp (Kimchi_pasta_snarky_backend.Wrap_impl)
 
-let rec etyp :
-    type f var value env.
-    (f, env) etyp -> (value, var, env) T.t -> (var, value, f) ETyp.t =
-  let open Snarky_backendless.Typ in
-  fun e spec ->
-    match[@warning "-45"] spec with
-    | B spec ->
-        e.etyp spec
-    | Scalar chal ->
-        let (T (typ, f, f_inv)) = e.etyp chal in
-        T (Sc.typ typ, Sc.map ~f, Sc.map ~f:f_inv)
-    | Vector (spec, n) ->
-        let (T (typ, f, f_inv)) = etyp e spec in
-        T (Vector.typ typ n, Vector.map ~f, Vector.map ~f:f_inv)
-    | Array (spec, n) ->
-        let (T (typ, f, f_inv)) = etyp e spec in
-        T (array ~length:n typ, Array.map ~f, Array.map ~f:f_inv)
-    | Struct [] ->
-        let open Hlist.HlistId in
-        let there [] = () in
-        let back () = [] in
-        T
-          ( transport (unit ()) ~there ~back |> transport_var ~there ~back
-          , Fn.id
-          , Fn.id )
-    | Struct (spec :: specs) ->
-        let open Hlist.HlistId in
-        let (T (t1, f1, f1_inv)) = etyp e spec in
-        let (T (t2, f2, f2_inv)) = etyp e (Struct specs) in
-        T
-          ( tuple2 t1 t2
-            |> transport
-                 ~there:(fun (x :: xs) -> (x, xs))
-                 ~back:(fun (x, xs) -> x :: xs)
-          , (fun (x, xs) -> f1 x :: f2 xs)
-          , fun (x :: xs) -> (f1_inv x, f2_inv xs) )
-    | Opt { inner; flag; dummy1; dummy2; bool = (module B) } ->
-        let (T (bool, f_bool, f_bool')) = etyp e (B Bool) in
-        let (T (a, f_a, f_a')) = etyp e inner in
-        let opt_map ~f1 ~f2 (x : _ Opt.t) : _ Opt.t =
-          match x with
-          | Nothing ->
-              Opt.nothing
-          | Just x ->
-              Opt.just (f1 x)
-          | Maybe (b, x) ->
-              Maybe (f2 b, f1 x)
-        in
-        let f = opt_map ~f1:f_a ~f2:f_bool in
-        let f' = opt_map ~f1:f_a' ~f2:f_bool' in
-        T
-          ( Opt.constant_layout_typ ~dummy:dummy1 ~dummy_var:(f_a' dummy2)
-              ~true_:(f_bool' B.true_) ~false_:(f_bool' B.false_) bool flag a
-          , f
-          , f' )
-    | Opt_unflagged { inner; dummy1; dummy2; flag = _ } ->
-        let (T (typ, f, f_inv)) = etyp e inner in
-        let f x = Some (f x) in
-        let f_inv = function None -> f_inv dummy2 | Some x -> f_inv x in
-        let typ =
-          typ
-          |> Snarky_backendless.Typ.transport
-               ~there:(Option.value ~default:dummy1) ~back:(fun x -> Some x)
-        in
-        T (typ, f, f_inv)
-    | Constant (x, _assert_eq, spec) ->
-        let (T (Typ typ, f, f')) = etyp e spec in
-        let constant_var =
-          let fields, aux = typ.value_to_fields x in
-          let fields =
-            Array.map fields ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
-          in
-          typ.var_of_fields (fields, aux)
-        in
-        (* We skip any constraints that would be added here, but we *do* use
-           the underlying [Typ.t] to make sure that we allocate public inputs
-           correctly.
-        *)
-        T
-          ( Typ
-              { typ with
-                check =
-                  (fun _ -> Snarky_backendless.Checked_runner.Simple.return ())
-              }
-          , (fun _ -> f constant_var)
-          , f' )
-
-module Common (Impl : Snarky_backendless.Snark_intf.Run) = struct
+module Common
+    (Impl : Snarky_backendless.Snark_intf.Run)
+    (Branch_data_checked : Branch_data_checked
+                             with type field_var := Impl.Field.t) =
+struct
   module Digest = D.Make (Impl)
   module Challenge = Limb_vector.Challenge.Make (Impl)
   open Impl
@@ -345,17 +195,20 @@ module Common (Impl : Snarky_backendless.Snark_intf.Run) = struct
           Challenge.Constant.t Sc.t Bulletproof_challenge.t
       ; bulletproof_challenge2 : Challenge.t Sc.t Bulletproof_challenge.t
       ; branch_data1 : Branch_data.t
-      ; branch_data2 : Impl.field Branch_data.Checked.t
+      ; branch_data2 : Branch_data_checked.t
       ; .. >
       as
       'a
   end
 end
 
-let pack_basic (type field other_field other_field_var)
-    ((module Impl) : field impl) =
+let pack_basic
+    (type field field_var other_field other_field_var branch_data_var)
+    ((module Impl) : (field, field_var) impl)
+    ((module Branch_data_checked) : (branch_data_var, Impl.Field.t) branch_data)
+    =
   let open Impl in
-  let module C = Common (Impl) in
+  let module C = Common (Impl) (Branch_data_checked) in
   let open C in
   let pack :
       type a b.
@@ -378,9 +231,7 @@ let pack_basic (type field other_field other_field_var)
     | Challenge ->
         [| `Packed_bits (x, Challenge.length) |]
     | Branch_data ->
-        [| `Packed_bits
-             ( Branch_data.Checked.pack (module Impl) x
-             , Branch_data.length_in_bits )
+        [| `Packed_bits (Branch_data_checked.pack x, Branch_data.length_in_bits)
         |]
     | Bulletproof_challenge ->
         let { Sc.inner = pre } = Bulletproof_challenge.pack x in
@@ -388,98 +239,459 @@ let pack_basic (type field other_field other_field_var)
   in
   { pack }
 
-let pack (type f) ((module Impl) as impl : f impl) t =
+let pack (type f v) ((module Impl) as impl : (f, v) impl) branch_data t =
   let open Impl in
-  pack (pack_basic impl) t
+  pack
+    (pack_basic impl branch_data)
+    t
     ~zero:(`Packed_bits (Field.zero, 1))
     ~one:(`Packed_bits (Field.one, 1))
     None
 
-let typ_basic (type field other_field other_field_var)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
-    ~assert_16_bits (field : (other_field_var, other_field) Impl.Typ.t) =
-  let open Impl in
-  let module C = Common (Impl) in
-  let open C in
-  let typ :
-      type a b.
-         (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
-      -> (b, a) Impl.Typ.t =
-   fun basic ->
-    match basic with
-    | Unit ->
-        Typ.unit
-    | Field ->
-        field
-    | Bool ->
-        Boolean.typ
-    | Branch_data ->
-        Branch_data.typ (module Impl) ~assert_16_bits
-    | Digest ->
-        Digest.typ
-    | Challenge ->
-        Challenge.typ
-    | Bulletproof_challenge ->
-        Bulletproof_challenge.typ Challenge.typ
-  in
-  { typ }
+module Make
+    (Impl : Snarky_backendless.Snark_intf.Run)
+    (Branch_data_checked : Branch_data_checked
+                             with type field_var := Impl.Field.t)
+    (Basic : sig
+      val typ_basic :
+           assert_16_bits:(Impl.Field.t -> unit)
+        -> ('other_field_var, 'other_field) Impl.Typ.t
+        -> ( 'a
+           , 'b
+           , < bool1 : bool
+             ; bool2 : Impl.Boolean.var
+             ; branch_data1 : Branch_data.t
+             ; branch_data2 : Branch_data_checked.t
+             ; bulletproof_challenge1 :
+                 Common(Impl)(Branch_data_checked).Challenge.Constant.t Sc.t
+                 Bulletproof_challenge.t
+             ; bulletproof_challenge2 :
+                 Common(Impl)(Branch_data_checked).Challenge.t Sc.t
+                 Bulletproof_challenge.t
+             ; challenge1 :
+                 Common(Impl)(Branch_data_checked).Challenge.Constant.t
+             ; challenge2 : Common(Impl)(Branch_data_checked).Challenge.t
+             ; digest1 : Common(Impl)(Branch_data_checked).Digest.Constant.t
+             ; digest2 : Common(Impl)(Branch_data_checked).Digest.t
+             ; field1 : 'other_field
+             ; field2 : 'other_field_var
+             ; .. > )
+           basic
+        -> ('b, 'a) Impl.Typ.t
 
-let typ ~assert_16_bits impl field t =
-  typ (typ_basic ~assert_16_bits impl field) t
+      val packed_typ_basic :
+           ('other_field_var, 'other_field) Make_ETyp(Impl).t
+        -> ( 'a
+           , 'b
+           , < bool1 : bool
+             ; bool2 : Impl.Boolean.var
+             ; branch_data1 : Branch_data.t
+             ; branch_data2 : Common(Impl)(Branch_data_checked).Digest.t
+             ; bulletproof_challenge1 :
+                 Common(Impl)(Branch_data_checked).Challenge.Constant.t Sc.t
+                 Bulletproof_challenge.t
+             ; bulletproof_challenge2 :
+                 Common(Impl)(Branch_data_checked).Digest.t Sc.t
+                 Bulletproof_challenge.t
+             ; challenge1 :
+                 Common(Impl)(Branch_data_checked).Challenge.Constant.t
+             ; challenge2 : Common(Impl)(Branch_data_checked).Digest.t
+             ; digest1 : Common(Impl)(Branch_data_checked).Digest.Constant.t
+             ; digest2 : Common(Impl)(Branch_data_checked).Digest.t
+             ; field1 : 'other_field
+             ; field2 : 'other_field_var
+             ; .. > )
+           basic
+        -> ('b, 'a) Make_ETyp(Impl).t
 
-let packed_typ_basic (type field other_field other_field_var)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
-    (field : (other_field_var, other_field, field) ETyp.t) =
-  let open Impl in
-  let module Digest = D.Make (Impl) in
-  let module Challenge = Limb_vector.Challenge.Make (Impl) in
-  let module Env = struct
-    type ('other_field, 'other_field_var, 'a) t =
-      < field1 : 'other_field
-      ; field2 : 'other_field_var
-      ; bool1 : bool
-      ; bool2 : Boolean.var
-      ; digest1 : Digest.Constant.t
-      ; digest2 : Field.t
-      ; challenge1 : Challenge.Constant.t
-      ; challenge2 : (* Challenge.t *) Field.t
-      ; bulletproof_challenge1 :
-          Challenge.Constant.t Sc.t Bulletproof_challenge.t
-      ; bulletproof_challenge2 : Field.t Sc.t Bulletproof_challenge.t
-      ; branch_data1 : Branch_data.t
-      ; branch_data2 : Field.t
-      ; .. >
-      as
-      'a
-  end in
-  let etyp :
-      type a b.
-         (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
-      -> (b, a, field) ETyp.t = function
-    | Unit ->
-        T (Typ.unit, Fn.id, Fn.id)
-    | Field ->
-        field
-    | Bool ->
-        T (Boolean.typ, Fn.id, Fn.id)
-    | Digest ->
-        T (Digest.typ, Fn.id, Fn.id)
-    | Challenge ->
-        T (Challenge.typ, Fn.id, Fn.id)
-    | Branch_data ->
-        T (Branch_data.packed_typ (module Impl), Fn.id, Fn.id)
-    | Bulletproof_challenge ->
-        let typ =
-          let there bp_challenge =
-            let { Sc.inner = pre } = Bulletproof_challenge.pack bp_challenge in
-            pre
-          in
-          let back pre = Bulletproof_challenge.unpack { Sc.inner = pre } in
-          Typ.transport Challenge.typ ~there ~back
-          |> Typ.transport_var ~there ~back
+      val scalar_typ : ('a, 'b) Impl.Typ.t -> ('a Sc.t, 'b Sc.t) Impl.Typ.t
+
+      val opt_constant_layout_typ :
+           Opt.Flag.t
+        -> ('a_var, 'a) Impl.Typ.t
+        -> dummy:'a
+        -> dummy_var:'a_var
+        -> (('a_var, Impl.Boolean.var) Opt.t, 'a option) Impl.Typ.t
+    end) =
+struct
+  type 'env is_boolean =
+    | Is_boolean : < bool2 : Impl.Boolean.var ; .. > is_boolean
+
+  module Vector_typ = Vector.Make_typ (Impl)
+
+  let typ (type other_field other_field_var) ~assert_16_bits
+      (field : (other_field_var, other_field) Impl.Typ.t) t =
+    let module Typ_record = struct
+      type 'env typ =
+        { typ :
+            'var 'value. ('value, 'var, 'env) basic -> ('var, 'value) Impl.Typ.t
+        }
+    end in
+    let rec typ :
+        type var value env.
+           env Typ_record.typ
+        -> env is_boolean
+        -> (value, var, env) T.t
+        -> (var, value) Impl.Typ.t =
+      let open Impl.Typ in
+      fun t is_boolean spec ->
+        match[@warning "-45"] spec with
+        | B spec ->
+            t.typ spec
+        | Scalar chal ->
+            Basic.scalar_typ (t.typ chal)
+        | Vector (spec, n) ->
+            Vector_typ.typ (typ t is_boolean spec) n
+        | Array (spec, n) ->
+            array ~length:n (typ t is_boolean spec)
+        | Struct [] ->
+            let open Hlist.HlistId in
+            transport unit ~there:(fun [] -> ()) ~back:(fun () -> [])
+            |> transport_var ~there:(fun [] -> ()) ~back:(fun () -> [])
+        | Struct (spec :: specs) ->
+            let open Hlist.HlistId in
+            tuple2 (typ t is_boolean spec) (typ t is_boolean (Struct specs))
+            |> transport
+                 ~there:(fun (x :: xs) -> (x, xs))
+                 ~back:(fun (x, xs) -> x :: xs)
+            |> transport_var
+                 ~there:(fun (x :: xs) -> (x, xs))
+                 ~back:(fun (x, xs) -> x :: xs)
+        | Opt { inner; flag; dummy1; dummy2 } ->
+            (* Always use the same "maybe" layout which is a boolean and then the value *)
+            let Is_boolean = is_boolean in
+            Basic.opt_constant_layout_typ flag ~dummy:dummy1 ~dummy_var:dummy2
+              (typ t is_boolean inner)
+        | Opt_unflagged { inner; flag; dummy1; dummy2 } -> (
+            match flag with
+            | Opt.Flag.No ->
+                let open Impl.Typ in
+                unit
+                |> Impl.Typ.transport
+                     ~there:(function Some _ -> assert false | None -> ())
+                     ~back:(fun () -> None)
+                |> Impl.Typ.transport_var
+                     ~there:(function Some _ -> assert false | None -> ())
+                     ~back:(fun _ -> None)
+            | Opt.Flag.(Yes | Maybe) ->
+                typ t is_boolean inner
+                |> Impl.Typ.transport
+                     ~there:(function Some x -> x | None -> dummy1)
+                     ~back:(fun x -> Some x)
+                |> Impl.Typ.transport_var
+                     ~there:(function Some x -> x | None -> dummy2)
+                     ~back:(fun x -> Some x) )
+        | Constant (x, assert_eq, spec) ->
+            let (Typ typ) = typ t is_boolean spec in
+            let constant_var =
+              let fields, aux = typ.value_to_fields x in
+              let fields = Array.map ~f:Impl.Field.constant fields in
+              typ.var_of_fields (fields, aux)
+            in
+            let open Impl.Typ in
+            unit
+            |> transport ~there:(fun y -> assert_eq x y) ~back:(fun () -> x)
+            |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant_var)
+    in
+    typ
+      { typ = (fun basic -> Basic.typ_basic ~assert_16_bits field basic) }
+      Is_boolean t
+
+  let packed_typ (type other_field other_field_var)
+      (field : (other_field_var, other_field) Make_ETyp(Impl).t) t =
+    let module ETyp_record = struct
+      type ('f, 'env) etyp =
+        { etyp :
+            'var 'value.
+            ('value, 'var, 'env) basic -> ('var, 'value) Make_ETyp(Impl).t
+        }
+    end in
+    let rec etyp :
+        type var value env.
+           (Impl.Field.Constant.t, env) ETyp_record.etyp
+        -> env is_boolean
+        -> (value, var, env) T.t
+        -> (var, value) Make_ETyp(Impl).t =
+      let open Impl.Typ in
+      fun e is_boolean spec ->
+        match[@warning "-45"] spec with
+        | B spec ->
+            e.etyp spec
+        | Scalar chal ->
+            let (T (typ, f, f_inv)) = e.etyp chal in
+            T (Basic.scalar_typ typ, Sc.map ~f, Sc.map ~f:f_inv)
+        | Vector (spec, n) ->
+            let (T (typ, f, f_inv)) = etyp e is_boolean spec in
+            T (Vector_typ.typ typ n, Vector.map ~f, Vector.map ~f:f_inv)
+        | Array (spec, n) ->
+            let (T (typ, f, f_inv)) = etyp e is_boolean spec in
+            T (array ~length:n typ, Array.map ~f, Array.map ~f:f_inv)
+        | Struct [] ->
+            let open Hlist.HlistId in
+            let there [] = () in
+            let back () = [] in
+            T
+              ( transport unit ~there ~back |> transport_var ~there ~back
+              , Fn.id
+              , Fn.id )
+        | Struct (spec :: specs) ->
+            let open Hlist.HlistId in
+            let (T (t1, f1, f1_inv)) = etyp e is_boolean spec in
+            let (T (t2, f2, f2_inv)) = etyp e is_boolean (Struct specs) in
+            T
+              ( tuple2 t1 t2
+                |> transport
+                     ~there:(fun (x :: xs) -> (x, xs))
+                     ~back:(fun (x, xs) -> x :: xs)
+              , (fun (x, xs) -> f1 x :: f2 xs)
+              , fun (x :: xs) -> (f1_inv x, f2_inv xs) )
+        | Opt { inner; flag; dummy1; dummy2 } ->
+            let Is_boolean = is_boolean in
+            let (T (a, f_a, f_a')) = etyp e is_boolean inner in
+            let opt_map ~f1 ~f2 (x : _ Opt.t) : _ Opt.t =
+              match x with
+              | Nothing ->
+                  Opt.nothing
+              | Just x ->
+                  Opt.just (f1 x)
+              | Maybe (b, x) ->
+                  Maybe (f2 b, f1 x)
+            in
+            let f = opt_map ~f1:f_a ~f2:Fn.id in
+            let f' = opt_map ~f1:f_a' ~f2:Fn.id in
+            T
+              ( Basic.opt_constant_layout_typ ~dummy:dummy1
+                  ~dummy_var:(f_a' dummy2) flag a
+              , f
+              , f' )
+        | Opt_unflagged { inner; dummy1; dummy2; flag = _ } ->
+            let (T (typ, f, f_inv)) = etyp e is_boolean inner in
+            let f x = Some (f x) in
+            let f_inv = function None -> f_inv dummy2 | Some x -> f_inv x in
+            let typ =
+              typ
+              |> Impl.Typ.transport ~there:(Option.value ~default:dummy1)
+                   ~back:(fun x -> Some x)
+            in
+            T (typ, f, f_inv)
+        | Constant (x, _assert_eq, spec) ->
+            let (T (Typ typ, f, f')) = etyp e is_boolean spec in
+            let constant_var =
+              let fields, aux = typ.value_to_fields x in
+              let fields = Array.map ~f:Impl.Field.constant fields in
+              typ.var_of_fields (fields, aux)
+            in
+            (* We skip any constraints that would be added here, but we *do* use
+               the underlying [Typ.t] to make sure that we allocate public inputs
+               correctly.
+            *)
+            T
+              ( Typ
+                  { typ with
+                    check = (fun _ -> Impl.Internal_Basic.Checked.return ())
+                  }
+              , (fun _ -> f constant_var)
+              , f' )
+    in
+    etyp
+      { ETyp_record.etyp = (fun basic -> Basic.packed_typ_basic field basic) }
+      Is_boolean t
+end
+
+module Step =
+  Make (Kimchi_pasta_snarky_backend.Step_impl) (Branch_data.Checked.Step)
+    (struct
+      module Impl = Kimchi_pasta_snarky_backend.Step_impl
+      module C = Common (Impl) (Branch_data.Checked.Step)
+
+      let typ_basic (type other_field other_field_var) ~assert_16_bits
+          (field : (other_field_var, other_field) Impl.Typ.t) =
+        let typ_basic :
+            type a b.
+               (a, b, ((other_field, other_field_var, 'e) C.Env.t as 'e)) basic
+            -> (b, a) Impl.Typ.t =
+          let open Impl in
+          let open C in
+          fun basic ->
+            match basic with
+            | Unit ->
+                Typ.unit
+            | Field ->
+                field
+            | Bool ->
+                Boolean.typ
+            | Branch_data ->
+                Branch_data.typ ~assert_16_bits
+            | Digest ->
+                Digest.typ
+            | Challenge ->
+                Challenge.typ
+            | Bulletproof_challenge ->
+                Bulletproof_challenge.typ Challenge.typ
         in
-        T (typ, Fn.id, Fn.id)
-  in
-  { etyp }
+        typ_basic
 
-let packed_typ impl field t = etyp (packed_typ_basic impl field) t
+      let packed_typ_basic (type other_field other_field_var)
+          (field : (other_field_var, other_field) Make_ETyp(Impl).t) =
+        let open Impl in
+        let open C in
+        let module Env = struct
+          type ('other_field, 'other_field_var, 'a) t =
+            < field1 : 'other_field
+            ; field2 : 'other_field_var
+            ; bool1 : bool
+            ; bool2 : Boolean.var
+            ; digest1 : Digest.Constant.t
+            ; digest2 : Field.t
+            ; challenge1 : Challenge.Constant.t
+            ; challenge2 : (* Challenge.t *) Field.t
+            ; bulletproof_challenge1 :
+                Challenge.Constant.t Sc.t Bulletproof_challenge.t
+            ; bulletproof_challenge2 : Field.t Sc.t Bulletproof_challenge.t
+            ; branch_data1 : Branch_data.t
+            ; branch_data2 : Field.t
+            ; .. >
+            as
+            'a
+        end in
+        let etyp :
+            type a b.
+               (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
+            -> (b, a) Make_ETyp(Impl).t = function
+          | Unit ->
+              T (Typ.unit, Fn.id, Fn.id)
+          | Field ->
+              field
+          | Bool ->
+              T (Boolean.typ, Fn.id, Fn.id)
+          | Digest ->
+              T (Digest.typ, Fn.id, Fn.id)
+          | Challenge ->
+              T (Challenge.typ, Fn.id, Fn.id)
+          | Branch_data ->
+              T (Branch_data.packed_typ, Fn.id, Fn.id)
+          | Bulletproof_challenge ->
+              let typ =
+                let there bp_challenge =
+                  let { Sc.inner = pre } =
+                    Bulletproof_challenge.pack bp_challenge
+                  in
+                  pre
+                in
+                let back pre =
+                  Bulletproof_challenge.unpack { Sc.inner = pre }
+                in
+                Typ.transport Challenge.typ ~there ~back
+                |> Typ.transport_var ~there ~back
+              in
+              T (typ, Fn.id, Fn.id)
+        in
+        etyp
+
+      let scalar_typ = Sc.typ
+
+      let opt_constant_layout_typ = Opt.constant_layout_typ
+    end)
+
+module Wrap =
+  Make (Kimchi_pasta_snarky_backend.Wrap_impl) (Branch_data.Checked.Wrap)
+    (struct
+      module Impl = Kimchi_pasta_snarky_backend.Wrap_impl
+      module C = Common (Impl) (Branch_data.Checked.Wrap)
+
+      let typ_basic (type other_field other_field_var) ~assert_16_bits
+          (field : (other_field_var, other_field) Impl.Typ.t) =
+        let typ_basic :
+            type a b.
+               (a, b, ((other_field, other_field_var, 'e) C.Env.t as 'e)) basic
+            -> (b, a) Impl.Typ.t =
+          let open Impl in
+          let open C in
+          fun basic ->
+            match basic with
+            | Unit ->
+                Typ.unit
+            | Field ->
+                field
+            | Bool ->
+                Boolean.typ
+            | Branch_data ->
+                Branch_data.wrap_typ ~assert_16_bits
+            | Digest ->
+                Digest.typ
+            | Challenge ->
+                Challenge.typ
+            | Bulletproof_challenge ->
+                Bulletproof_challenge.wrap_typ Challenge.typ
+        in
+        typ_basic
+
+      let packed_typ_basic (type other_field other_field_var)
+          (field : (other_field_var, other_field) Make_ETyp(Impl).t) =
+        let open Impl in
+        let open C in
+        let module Env = struct
+          type ('other_field, 'other_field_var, 'a) t =
+            < field1 : 'other_field
+            ; field2 : 'other_field_var
+            ; bool1 : bool
+            ; bool2 : Boolean.var
+            ; digest1 : Digest.Constant.t
+            ; digest2 : Field.t
+            ; challenge1 : Challenge.Constant.t
+            ; challenge2 : (* Challenge.t *) Field.t
+            ; bulletproof_challenge1 :
+                Challenge.Constant.t Sc.t Bulletproof_challenge.t
+            ; bulletproof_challenge2 : Field.t Sc.t Bulletproof_challenge.t
+            ; branch_data1 : Branch_data.t
+            ; branch_data2 : Field.t
+            ; .. >
+            as
+            'a
+        end in
+        let etyp :
+            type a b.
+               (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
+            -> (b, a) Make_ETyp(Impl).t = function
+          | Unit ->
+              T (Typ.unit, Fn.id, Fn.id)
+          | Field ->
+              field
+          | Bool ->
+              T (Boolean.typ, Fn.id, Fn.id)
+          | Digest ->
+              T (Digest.typ, Fn.id, Fn.id)
+          | Challenge ->
+              T (Challenge.typ, Fn.id, Fn.id)
+          | Branch_data ->
+              T (Branch_data.wrap_packed_typ, Fn.id, Fn.id)
+          | Bulletproof_challenge ->
+              let typ =
+                let there bp_challenge =
+                  let { Sc.inner = pre } =
+                    Bulletproof_challenge.pack bp_challenge
+                  in
+                  pre
+                in
+                let back pre =
+                  Bulletproof_challenge.unpack { Sc.inner = pre }
+                in
+                Typ.transport Challenge.typ ~there ~back
+                |> Typ.transport_var ~there ~back
+              in
+              T (typ, Fn.id, Fn.id)
+        in
+        etyp
+
+      let scalar_typ = Sc.wrap_typ
+
+      let opt_constant_layout_typ = Opt.wrap_constant_layout_typ
+    end)
+
+let typ = Step.typ
+
+let packed_typ = Step.packed_typ
+
+let wrap_typ = Wrap.typ
+
+let wrap_packed_typ = Wrap.packed_typ

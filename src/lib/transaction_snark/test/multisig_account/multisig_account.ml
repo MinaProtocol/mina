@@ -16,8 +16,6 @@ let%test_module "multisig_account" =
 
     let () = Transaction_snark.For_tests.set_proof_cache proof_cache
 
-    let constraint_constants = U.constraint_constants
-
     module M_of_n_predicate = struct
       type _witness = (Schnorr.Chunked.Signature.t * Public_key.t) list
 
@@ -227,9 +225,6 @@ let%test_module "multisig_account" =
                   ~max_proofs_verified:(module Nat.N2)
                     (* You have to put 2 here... *)
                   ~name:"multisig"
-                  ~constraint_constants:
-                    (Genesis_constants.Constraint_constants.to_snark_keys_header
-                       constraint_constants )
                   ~choices:(fun ~self ->
                     [ multisig_rule
                     ; { identifier = "dummy"
@@ -245,7 +240,7 @@ let%test_module "multisig_account" =
                                   assert false )
                             in
                             let proof =
-                              Run.exists (Typ.Internal.ref ())
+                              Run.exists (Typ.prover_value ())
                                 ~compute:(fun () -> assert false)
                             in
                             Impl.run_checked

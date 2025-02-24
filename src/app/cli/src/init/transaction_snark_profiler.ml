@@ -17,10 +17,8 @@ let run ~genesis_constants ~constraint_constants ~proof_level
     Parallel.init_master () ;
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~commit_id:Mina_version.commit_id ~logger ~proof_level
-            ~constraint_constants ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            () )
+          Verifier.For_tests.default ~commit_id:Mina_version.commit_id ~logger
+            ~proof_level ~constraint_constants () )
     in
     let rec go n =
       if n <= 0 then ()

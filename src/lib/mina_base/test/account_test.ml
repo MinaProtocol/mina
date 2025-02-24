@@ -274,8 +274,7 @@ let minimum_balance_checked_equal_to_unchecked () =
           ~vesting_increment:Amount.(var_of_t timing.vesting_increment)
           ~vesting_period:(global_slot_span_var timing.vesting_period)
           ~global_slot:(global_slot_since_genesis_var global_slot)
-        |> Snarky_backendless.(
-             Checked_runner.Simple.map ~f:(As_prover0.read Balance.typ))
+        |> Snark_params.Tick.(Checked.map ~f:(As_prover.read Balance.typ))
         |> Snark_params.Tick.run_and_check
       in
       [%test_eq: Balance.t Or_error.t] (Ok min_balance) min_balance_checked )

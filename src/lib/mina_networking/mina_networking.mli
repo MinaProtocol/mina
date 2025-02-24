@@ -30,7 +30,9 @@ module type CONTEXT = sig
 
   val consensus_constants : Consensus.Constants.t
 
-  val compile_config : Mina_compile_config.t
+  val ledger_sync_config : Syncable_ledger.daemon_config
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 module Node_status = Node_status
@@ -49,7 +51,7 @@ module Rpcs : sig
     type query = State_hash.t
 
     type response =
-      ( Staged_ledger.Scan_state.t
+      ( Staged_ledger.Scan_state.Stable.Latest.t
       * Ledger_hash.t
       * Pending_coinbase.t
       * Mina_state.Protocol_state.value list )
@@ -109,6 +111,12 @@ module Rpcs : sig
       option
   end
 
+  module Get_completed_snarks : sig
+    type query = unit
+
+    type response = Transaction_snark_work.unchecked list option
+  end
+
   type ('query, 'response) rpc = ('query, 'response) Rpcs.rpc =
     | Get_some_initial_peers
         : (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
@@ -133,6 +141,8 @@ module Rpcs : sig
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
+    | Get_completed_snarks
+        : (Get_completed_snarks.query, Get_completed_snarks.response) rpc
 end
 
 module Config : sig
@@ -211,11 +221,16 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      t
   -> Peer.Id.t
   -> State_hash.t
-  -> ( Staged_ledger.Scan_state.t
+  -> ( Staged_ledger.Scan_state.Stable.Latest.t
      * Ledger_hash.t
      * Pending_coinbase.t
      * Mina_state.Protocol_state.value list )
      Deferred.Or_error.t
+
+val get_completed_checked_snarks :
+     t
+  -> Peer.t
+  -> (Transaction_snark_work.Stable.V2.t list, Error.t) result Deferred.t
 
 val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
 
@@ -267,5 +282,7 @@ val create :
   -> Config.t
   -> sinks:Sinks.t
   -> get_transition_frontier:(unit -> Transition_frontier.t option)
+  -> get_snark_pool:(unit -> Snark_pool.t option)
   -> get_node_status:(unit -> Node_status.t Deferred.Or_error.t)
+  -> snark_job_state:(unit -> Work_selector.State.t option)
   -> t Deferred.t

@@ -34,113 +34,66 @@ module Sponge : sig
 end
 
 module Inner_curve : sig
-  module Inputs : sig
-    module Impl = Impl.Impl
+  module Params : sig
+    val a : Impl.Field.Constant.t
 
-    module Params : sig
-      val a : Kimchi_pasta.Basic.Fp.t
+    val b : Impl.Field.Constant.t
 
-      val b : Kimchi_pasta.Basic.Fp.t
+    val one : Impl.Field.Constant.t * Impl.Field.Constant.t
 
-      val one : Kimchi_pasta.Basic.Fp.t * Kimchi_pasta.Basic.Fp.t
-
-      val group_size_in_bits : int
-    end
-
-    module F : sig
-      type t = Impl.Field.t
-
-      val ( * ) : t -> t -> t
-
-      val ( + ) : t -> t -> t
-
-      val ( - ) : t -> t -> t
-
-      val inv_exn : t -> t
-
-      val square : t -> t
-
-      val negate : t -> t
-
-      module Constant : sig
-        type t = Impl.Field.Constant.t
-
-        val ( * ) : t -> t -> t
-
-        val ( + ) : t -> t -> t
-
-        val ( - ) : t -> t -> t
-
-        val inv_exn : t -> t
-
-        val square : t -> t
-
-        val negate : t -> t
-      end
-
-      val assert_square : t -> t -> unit
-
-      val assert_r1cs : t -> t -> t -> unit
-    end
-
-    module Constant : sig
-      include module type of Kimchi_pasta.Pasta.Pallas.Affine
-
-      module Scalar = Impls.Wrap.Field.Constant
-
-      val scale : t -> Scalar.t -> t
-
-      val random : unit -> t
-
-      val zero : Impl.Field.Constant.t * Impl.Field.Constant.t
-
-      val ( + ) : t -> t -> t
-
-      val negate : t -> t
-
-      val to_affine_exn : 'a -> 'a
-
-      val of_affine : 'a -> 'a
-    end
+    val group_size_in_bits : int
   end
 
-  module Params = Inputs.Params
-  module Constant = Inputs.Constant
+  module Constant : sig
+    include module type of Kimchi_pasta.Pasta.Pallas.Affine
 
-  type t = Inputs.F.t * Inputs.F.t
+    module Scalar = Impls.Wrap.Field.Constant
 
-  (* val double : t -> t *)
+    val scale : t -> Scalar.t -> t
 
-  val add' :
-       div:(Inputs.F.t -> Inputs.F.t -> Inputs.F.t)
-    -> Inputs.F.t * Inputs.F.t
-    -> Inputs.F.t * Inputs.F.t
-    -> t
+    val random : unit -> t
+
+    val zero : Impl.Field.Constant.t * Impl.Field.Constant.t
+
+    val ( + ) : t -> t -> t
+
+    val negate : t -> t
+
+    val to_affine_exn : 'a -> 'a
+
+    val of_affine : 'a -> 'a
+  end
+
+  type t = Impl.Field.t * Impl.Field.t
+
+  val double : t -> t
+
+  val add' : div:(Impl.Field.t -> Impl.Field.t -> Impl.Field.t) -> t -> t -> t
 
   val add_exn : t -> t -> t
 
   val to_affine_exn : 'a -> 'a
 
-  val constant : Inputs.Constant.t -> t
+  val constant : Constant.t -> t
 
-  (* val negate : t -> t *)
+  val negate : t -> t
 
-  (* val one : t *)
+  val one : t
 
   val assert_on_curve : t -> unit
 
-  val typ_unchecked : (t, Inputs.Constant.t) Inputs.Impl.Typ.t
+  val typ_unchecked : (t, Constant.t) Impl.Typ.t
 
-  val typ : (t, Inputs.Constant.t) Inputs.Impl.Typ.t
+  val typ : (t, Constant.t) Impl.Typ.t
 
-  (* val if_ : Inputs.Impl.Boolean.var -> then_:t -> else_:t -> t *)
+  val if_ : Impl.Boolean.var -> then_:t -> else_:t -> t
 
   module Scalar : sig
-    type t = Inputs.Impl.Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
+    type t = Impl.Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
 
-    val of_field : Inputs.Impl.Field.t -> t
+    val of_field : Impl.Field.t -> t
 
-    val to_field : t -> Inputs.Impl.Field.t
+    val to_field : t -> Impl.Field.t
   end
 
   module type Shifted_intf = sig
@@ -154,7 +107,7 @@ module Inner_curve : sig
 
     val add : t -> inputs -> t
 
-    val if_ : Inputs.Impl.Boolean.var -> then_:t -> else_:t -> t
+    val if_ : Impl.Boolean.var -> then_:t -> else_:t -> t
   end
 
   module Shifted : functor
@@ -169,110 +122,73 @@ module Inner_curve : sig
   (* val scale : ?init:t -> t -> Scalar.t -> t *)
 
   module Window_table : sig
-    type t = Inputs.Constant.t Tuple_lib.Quadruple.t array
+    type t = Constant.t Tuple_lib.Quadruple.t array
 
     val window_size : int
 
     val windows : int
 
-    val shift_left_by_window_size : Inputs.Constant.t -> Inputs.Constant.t
+    val shift_left_by_window_size : Constant.t -> Constant.t
 
-    val create :
-      shifts:Inputs.Constant.t Core_kernel.Array.t -> Inputs.Constant.t -> t
+    val create : shifts:Constant.t Core_kernel.Array.t -> Constant.t -> t
   end
 
-  val pow2s : Inputs.Constant.t -> Inputs.Constant.t Core_kernel.Array.t
+  val pow2s : Constant.t -> Constant.t Core_kernel.Array.t
 
   module Scaling_precomputation : sig
     type t =
-      { base : Inputs.Constant.t
-      ; shifts : Inputs.Constant.t array
-      ; table : Window_table.t
-      }
+      { base : Constant.t; shifts : Constant.t array; table : Window_table.t }
 
     val group_map :
-      (   Inputs.Impl.Field.Constant.t
-       -> Inputs.Impl.Field.Constant.t * Inputs.Impl.Field.Constant.t )
+      (Impl.Field.Constant.t -> Impl.Field.Constant.t * Impl.Field.Constant.t)
       lazy_t
 
     val string_to_bits : string -> bool list
 
-    val create : Inputs.Constant.t -> t
+    val create : Constant.t -> t
   end
 
   val add_unsafe : t -> t -> t
 
   val lookup_point :
-       Inputs.Impl.Boolean.var * Inputs.Impl.Boolean.var
-    -> Inputs.Constant.t
-       * Inputs.Constant.t
-       * Inputs.Constant.t
-       * Inputs.Constant.t
-    -> Inputs.Impl.Field.t * Inputs.Impl.Field.t
+       Impl.Boolean.var * Impl.Boolean.var
+    -> Constant.t * Constant.t * Constant.t * Constant.t
+    -> t
 
   val pairs :
-       Inputs.Impl.Boolean.var list
-    -> (Inputs.Impl.Boolean.var * Inputs.Impl.Boolean.var) list
+    Impl.Boolean.var list -> (Impl.Boolean.var * Impl.Boolean.var) list
 
-  type shifted = { value : t; shift : Inputs.Constant.t }
+  type shifted = { value : t; shift : Constant.t }
 
   val unshift : shifted -> t
 
   val multiscale_known :
-       (Inputs.Impl.Boolean.var list * Scaling_precomputation.t)
-       Core_kernel.Array.t
-    -> t
+    (Impl.Boolean.var list * Scaling_precomputation.t) Core_kernel.Array.t -> t
 
-  val scale_known :
-    Scaling_precomputation.t -> Inputs.Impl.Boolean.var list -> t
+  val scale_known : Scaling_precomputation.t -> Impl.Boolean.var list -> t
 
-  val conditional_negation :
-       Inputs.Impl.Boolean.var
-    -> 'a * Inputs.Impl.Field.t
-    -> 'a * Inputs.Impl.Field.t
+  val conditional_negation : Impl.Boolean.var -> t -> t
 
-  val p_plus_q_plus_p : t -> t -> Inputs.Impl.Field.t * Inputs.Impl.Field.t
+  val p_plus_q_plus_p : t -> t -> t
 
   val scale_fast :
-       Inputs.Impl.Field.t * Inputs.F.t
-    -> [< `Plus_two_to_len_minus_1 of
-          Inputs.Impl.Boolean.var Core_kernel.Array.t ]
-    -> Inputs.F.t * Inputs.F.t
+       t
+    -> [< `Plus_two_to_len_minus_1 of Impl.Boolean.var Core_kernel.Array.t ]
+    -> t
 
-  val ( + ) :
-       Impls.Step.field Snarky_backendless.Cvar.t
-       * Impls.Step.field Snarky_backendless.Cvar.t
-    -> Impls.Step.field Snarky_backendless.Cvar.t
-       * Impls.Step.field Snarky_backendless.Cvar.t
-    -> Impls.Step.field Snarky_backendless.Cvar.t
-       * Impls.Step.field Snarky_backendless.Cvar.t
+  val ( + ) : t -> t -> t
 
-  val double :
-       Impls.Step.field Snarky_backendless.Cvar.t
-       * Impls.Step.field Snarky_backendless.Cvar.t
-    -> Impls.Step.field Snarky_backendless.Cvar.t
-       * Impls.Step.field Snarky_backendless.Cvar.t
-
-  val scale : t -> Inputs.Impl.Boolean.var list -> Inputs.F.t * Inputs.F.t
+  val scale : t -> Impl.Boolean.var list -> t
 
   val to_field_elements : 'a * 'a -> 'a list
 
-  val assert_equal :
-       Impls.Step.Field.t * Impls.Step.Field.t
-    -> Impls.Step.Field.t * Impls.Step.Field.t
-    -> unit
+  val assert_equal : t -> t -> unit
 
-  val scale_inv : t -> Inputs.Impl.Boolean.var list -> t
-
-  val negate : t -> t
-
-  val one : t
-
-  val if_ : Inputs.Impl.Boolean.var -> then_:t -> else_:t -> t
+  val scale_inv : t -> Impl.Boolean.var list -> t
 end
 
 module Ops : module type of Plonk_curve_ops.Make (Impls.Step) (Inner_curve)
 
 module Generators : sig
-  val h : (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t) lazy_t
+  val h : (Impl.Field.Constant.t * Impl.Field.Constant.t) lazy_t
 end

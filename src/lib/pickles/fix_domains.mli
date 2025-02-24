@@ -5,15 +5,15 @@
 
 val domains :
      ?feature_flags:bool Pickles_types.Plonk_types.Features.t
-  -> (module Snarky_backendless.Snark_intf.Run
-        with type field = 'field
-         and type R1CS_constraint_system.t = ( 'field
-                                             , 'gates )
-                                             Kimchi_backend_common
-                                             .Plonk_constraint_system
-                                             .t )
-  -> ('a, 'b, 'field) Import.Spec.ETyp.t
-  -> ('c, 'd, 'field) Import.Spec.ETyp.t
+  -> ('a, 'b) Import.Spec.Step_etyp.t
+  -> ('c, 'd) Import.Spec.Step_etyp.t
+  -> ('a -> 'c Promise.t)
+  -> Import.Domains.t Promise.t
+
+val wrap_domains :
+     ?feature_flags:bool Pickles_types.Plonk_types.Features.t
+  -> ('a, 'b) Import.Spec.Wrap_etyp.t
+  -> ('c, 'd) Import.Spec.Wrap_etyp.t
   -> ('a -> 'c Promise.t)
   -> Import.Domains.t Promise.t
 

@@ -19,19 +19,6 @@ struct
   open Pickles.Impls.Step
   open Pickles_types
 
-  let constraint_constants =
-    { Snark_keys_header.Constraint_constants.sub_windows_per_window = 0
-    ; ledger_depth = 0
-    ; work_delay = 0
-    ; block_window_duration_ms = 0
-    ; transaction_capacity = Log_2 0
-    ; pending_coinbase_depth = 0
-    ; coinbase_amount = Unsigned.UInt64.of_int 0
-    ; supercharged_coinbase_factor = 0
-    ; account_creation_fee = Unsigned.UInt64.of_int 0
-    ; fork = None
-    }
-
   let feature_flags =
     { Plonk_types.Features.none_bool with
       rot = true
@@ -46,7 +33,7 @@ struct
     Zkapps_examples.compile ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N0)
-      ~name:"custom gates" ~constraint_constants
+      ~name:"custom gates"
       ~choices:(fun ~self:_ ->
         [ { identifier = "main"
           ; prevs = []

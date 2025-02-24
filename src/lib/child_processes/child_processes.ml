@@ -1,6 +1,5 @@
 (* child_processes.ml -- management of starting, tracking, and killing child processes. *)
 
-open Inline_test_quiet_logs
 open Core
 open Async
 open Pipe_lib
@@ -329,7 +328,7 @@ let register_process (termination : Termination.t) (process : t) kind =
 
 let%test_module _ =
   ( module struct
-    let logger = Logger.create ()
+    let logger = Logger.null ()
 
     let async_with_temp_dir f =
       Async.Thread_safe.block_on_async_exn (fun () ->

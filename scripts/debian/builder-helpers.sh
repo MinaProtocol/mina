@@ -146,7 +146,7 @@ copy_common_daemon_configs() {
   cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/mina-create-genesis"
   cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
   cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
-
+  cp ./default/src/lib/snark_worker/standalone/run_snark_worker.exe "${BUILDDIR}/usr/local/bin/mina-standalone-snark-worker"
   # Copy signature-based Binaries (based on signature type $2 passed into the function)
   cp ./default/src/app/cli/src/mina_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
 
@@ -241,7 +241,13 @@ build_functional_test_suite_deb() {
 
   # Binaries
   cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
-  
+  cp ./default/src/app/benchmarks/benchmarks.exe "${BUILDDIR}/usr/local/bin/mina-benchmarks"
+  cp ./default/src/app/ledger_export_bench/ledger_export_benchmark.exe "${BUILDDIR}/usr/local/bin/mina-ledger-export-benchmark"
+  cp ./default/src/app/disk_caching_stats/disk_caching_stats.exe "${BUILDDIR}/usr/local/bin/mina-disk-caching-stats"
+  cp ./default/src/app/heap_usage/heap_usage.exe "${BUILDDIR}/usr/local/bin/mina-heap-usage"
+  cp ./default/src/app/zkapp_limits/zkapp_limits.exe "${BUILDDIR}/usr/local/bin/mina-zkapp-limits"
+  cp ./default/src/test/archive/patch_archive_test/patch_archive_test.exe "${BUILDDIR}/usr/local/bin/mina-patch-archive-test"
+
   build_deb mina-test-suite
 
 }

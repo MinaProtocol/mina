@@ -23,7 +23,6 @@
    bounded_types
    with_hash
    mina_state
-   inline_test_quiet_logs
    transition_frontier_persistent_frontier
    verifier
    data_hash_lib
