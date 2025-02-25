@@ -597,14 +597,15 @@ class PersistentFrontierBenchmark(Benchmark):
         rows = []
         category = "persistent-frontier"
         rows.append(list(map(lambda x: x.name, self.headers())))
+        metadata_key = "avg_duration_ms"
 
-
-
+        # We are parsing output in logproc json format
+        # We look for metadata entry which holds the measurement
         for line in lines:
             data = json.loads(line)
             metadata = data["metadata"]
-            if "duration" in metadata:
-                rows.append(("persistent-frontier", str(metadata["duration"]), category, branch))
+            if metadata_key in metadata:
+                rows.append(("persistent-frontier", str(metadata[metadata_key]), category, branch))
                 break
 
         with open(output_filename, 'w') as csvfile:
