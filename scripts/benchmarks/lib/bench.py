@@ -647,7 +647,8 @@ class PersistentFrontierBenchmark(Benchmark):
                 tar.close()
 
             return assert_cmd([
-                path, "internal", "test-persistent-frontier", "--frontier-db", full_path_to_unzipped_file
+                path, "internal", "test-persistent-frontier", "--frontier-db", full_path_to_unzipped_file,
+                "--samples", "10"
             ])
 
 class HeapUsageBenchmark(Benchmark):

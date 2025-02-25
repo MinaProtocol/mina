@@ -61,14 +61,14 @@ let command =
     (let%map_open frontier_db_path =
        flag "--frontier-db" ~aliases:[ "-f" ]
          ~doc:"Path to frontier DB this app is testing on" (required string)
+     and num_of_samples =
+       flag "--samples" ~aliases:[ "-s" ]
+         ~doc:"Number of rounds of hash query should we run" (required int)
      and no_root_compatible =
        flag "--no-root-compatible" ~aliases:[ "-r" ]
          ~doc:
            "Do not perform hash query once to ensure the compatibility with \
             old frontier database"
          no_arg
-     and num_of_samples =
-       flag "--samples" ~aliases:[ "-s" ]
-         ~doc:"Number of rounds of hash query should we run" (required int)
      in
      main ~frontier_db_path ~no_root_compatible ~num_of_samples )
