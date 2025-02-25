@@ -63,7 +63,8 @@ let command =
          ~doc:"Path to frontier DB this app is testing on" (required string)
      and num_of_samples =
        flag "--samples" ~aliases:[ "-s" ]
-         ~doc:"Number of rounds of hash query should we run" (required int)
+         ~doc:"Number of rounds of hash query should we run. (default 5)"
+         (optional_with_default 5 int)
      and no_root_compatible =
        flag "--no-root-compatible" ~aliases:[ "-r" ]
          ~doc:
