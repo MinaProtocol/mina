@@ -9,9 +9,9 @@ let deserialize_root_hash ~logger ~db =
   | Error _ ->
       [%log error] "No root hash found"
 
-let root_hash_deserialization_limit = Time_ns.Span.of_ms 2000.0
+let root_hash_deserialization_limit_ms = 2000.0
 
-let main ~frontier_db_path ~no_root_compatible () =
+let main ~frontier_db_path ~no_root_compatible ~num_of_samples () =
   let logger = Logger.create () in
   [%log info] "Current DB path: %s" frontier_db_path ;
   [%log info] "Loading database" ;
@@ -22,16 +22,38 @@ let main ~frontier_db_path ~no_root_compatible () =
       to ensure we have `root_hash` and `root_common` inside the DB
       *)
     deserialize_root_hash ~logger ~db ;
-  let start_time = Time_ns.now () in
-  let () = deserialize_root_hash ~logger ~db in
-  let end_time = Time_ns.now () in
-  let duration = Time_ns.diff end_time start_time in
-  [%log info]
-    "Querying root hash on patched persistence frontier database takes %s"
-    (Time_ns.Span.to_string duration)
-    ~metadata:[ ("duration", `Float (Time_ns.Span.to_ms duration)) ] ;
+  let rec sample cnt =
+    match cnt with
+    | 0 ->
+        []
+    | _ ->
+        let start_time = Time_ns.now () in
+        deserialize_root_hash ~logger ~db ;
+        let end_time = Time_ns.now () in
+        let duration = Time_ns.diff end_time start_time in
+        Time_ns.Span.to_ms duration :: sample (cnt - 1)
+  in
+  assert (num_of_samples >= 1) ;
+  let duration_ms_samples = sample num_of_samples in
+  let max_duration_ms =
+    List.max_elt duration_ms_samples ~compare:Float.compare |> Option.value_exn
+  in
+  let min_duration_ms =
+    List.min_elt duration_ms_samples ~compare:Float.compare |> Option.value_exn
+  in
+  let avg_duration_ms =
+    List.sum (module Float) duration_ms_samples ~f:ident
+    /. Float.of_int (List.length duration_ms_samples)
+  in
+
+  [%log info] "Querying root hash on patched persistence frontier database"
+    ~metadata:
+      [ ("min_duration_ms", `Float min_duration_ms)
+      ; ("max_duration_ms", `Float max_duration_ms)
+      ; ("avg_duration_ms", `Float avg_duration_ms)
+      ] ;
   Database.close db ;
-  assert (Time_ns.Span.compare duration root_hash_deserialization_limit < 0)
+  assert (Float.compare max_duration_ms root_hash_deserialization_limit_ms < 0)
 
 let command =
   let open Command.Let_syntax in
@@ -45,5 +67,8 @@ let command =
            "Do not perform hash query once to ensure the compatibility with \
             old frontier database"
          no_arg
+     and num_of_samples =
+       flag "--samples" ~aliases:[ "-s" ]
+         ~doc:"Number of rounds of hash query should we run" (required int)
      in
-     main ~frontier_db_path ~no_root_compatible )
+     main ~frontier_db_path ~no_root_compatible ~num_of_samples )
