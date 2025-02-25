@@ -173,6 +173,16 @@ module Make_str (A : Wire_types.Concrete) = struct
 
         let to_latest = Fn.id
       end
+
+      module V2 = struct
+        type t =
+          ( Transaction_snark_work.Stable.V2.t
+          , User_command.Stable.V2.t With_status.Stable.V2.t )
+          Pre_diff_two.Stable.V2.t
+        [@@deriving equal, sexp, yojson]
+
+        let to_latest = Fn.id
+      end
     end]
 
     type t = Stable.Latest.t
@@ -187,6 +197,16 @@ module Make_str (A : Wire_types.Concrete) = struct
         type t =
           ( Transaction_snark_work.Stable.V3.t
           , User_command.Stable.V3.t With_status.Stable.V2.t )
+          Pre_diff_one.Stable.V2.t
+        [@@deriving equal, sexp, yojson]
+
+        let to_latest = Fn.id
+      end
+
+      module V2 = struct
+        type t =
+          ( Transaction_snark_work.Stable.V2.t
+          , User_command.Stable.V2.t With_status.Stable.V2.t )
           Pre_diff_one.Stable.V2.t
         [@@deriving equal, sexp, yojson]
 
@@ -210,6 +230,15 @@ module Make_str (A : Wire_types.Concrete) = struct
 
         let to_latest = Fn.id
       end
+
+      module V2 = struct
+        type t =
+          Pre_diff_with_at_most_two_coinbase.Stable.V2.t
+          * Pre_diff_with_at_most_one_coinbase.Stable.V2.t option
+        [@@deriving equal, sexp, yojson]
+
+        let to_latest = Fn.id
+      end
     end]
 
     type t = Stable.Latest.t
@@ -221,6 +250,13 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     module V3 = struct
       type t = A.V3.t = { diff : Diff.Stable.V3.t }
+      [@@deriving equal, sexp, yojson]
+
+      let to_latest = Fn.id
+    end
+
+    module V2 = struct
+      type t = A.V2.t = { diff : Diff.Stable.V2.t }
       [@@deriving equal, sexp, yojson]
 
       let to_latest = Fn.id

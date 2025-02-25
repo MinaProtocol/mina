@@ -111,6 +111,10 @@ module Valid = struct
   module V2 = struct
     type t = { zkapp_command : V2.t }
   end
+
+  module V1 = struct
+    type t = { zkapp_command : V1.t }
+  end
 end
 
 module Transaction_commitment = struct

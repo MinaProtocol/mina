@@ -3,6 +3,8 @@ open Utils
 module Types = struct
   module type S = sig
     module V3 : S0
+
+    module V2 : S0
   end
 end
 
@@ -19,6 +21,13 @@ module type Concrete = sig
       , Proof.V2.t )
       Proof_carrying_data.V1.t
   end
+
+  module V2 : sig
+    type t =
+      ( Mina_state.Snarked_ledger_state.With_sok.V2.t
+      , Proof.V2.t )
+      Proof_carrying_data.V1.t
+  end
 end
 
 module M = struct
@@ -31,6 +40,13 @@ module M = struct
   module V3 = struct
     type t =
       ( Mina_state.Snarked_ledger_state.With_sok.V3.t
+      , Proof.V2.t )
+      Proof_carrying_data.V1.t
+  end
+
+  module V2 = struct
+    type t =
+      ( Mina_state.Snarked_ledger_state.With_sok.V2.t
       , Proof.V2.t )
       Proof_carrying_data.V1.t
   end

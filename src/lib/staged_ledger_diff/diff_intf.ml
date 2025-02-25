@@ -65,12 +65,20 @@ module type Full = sig
   end
 
   module Pre_diff_with_at_most_two_coinbase : sig
-    type t =
-      (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_two.t
+    type t
+      (* = Mina_wire_types.Staged_ledger_diff.Pre_diff_with_at_most_two_coinbase.V3.t *)
+      = (Transaction_snark_work.t , User_command.Stable.V3.t With_status.Stable.V2.t) Pre_diff_two.Stable.V2.t
 
     module Stable : sig
       module V3 : sig
         type t
+      end
+
+      module V2 : sig
+        type t =
+          ( Transaction_snark_work.Stable.V2.t
+          , User_command.Stable.V2.t With_status.t )
+          Pre_diff_two.t
       end
     end
     with type V3.t = t
@@ -84,18 +92,29 @@ module type Full = sig
       module V3 : sig
         type t
       end
+
+      module V2 : sig
+        type t = (Transaction_snark_work.Stable.V2.t, User_command.Stable.V2.t With_status.Stable.V2.t)
+          Pre_diff_one.Stable.V2.t
+      end
     end
     with type V3.t = t
   end
 
   module Diff : sig
     type t =
-      Pre_diff_with_at_most_two_coinbase.t
-      * Pre_diff_with_at_most_one_coinbase.t option
+      Pre_diff_with_at_most_two_coinbase.Stable.V3.t
+      * Pre_diff_with_at_most_one_coinbase.Stable.V3.t option
 
     module Stable : sig
       module V3 : sig
         type t
+      end
+
+      module V2 : sig
+        type t =
+          Pre_diff_with_at_most_two_coinbase.Stable.V2.t
+          * Pre_diff_with_at_most_one_coinbase.Stable.V2.t
       end
     end
     with type V3.t = t
@@ -112,6 +131,13 @@ module type Full = sig
     end
 
     module Latest = V3
+
+    module V2 : sig
+      type t = { diff : Diff.Stable.V2.t }
+      [@@deriving bin_io, equal, sexp, version, yojson]
+
+      val to_latest : t -> Latest.t
+    end
   end
   with type V3.t = t
 

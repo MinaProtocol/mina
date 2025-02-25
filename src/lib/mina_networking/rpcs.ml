@@ -956,6 +956,41 @@ module Get_ancestry = struct
     include Register (T')
   end
 
+  module V2 = struct
+    module T = struct
+      type query =
+        ( Consensus.Data.Consensus_state.Value.Stable.V2.t
+        , State_hash.Stable.V1.t )
+        With_hash.Stable.V1.t
+      [@@deriving sexp]
+
+      type response =
+        ( Mina_block.Stable.V2.t
+        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
+        Proof_carrying_data.Stable.V1.t
+        option
+
+      let query_of_caller_model = Fn.id
+
+      let callee_model_of_query = Fn.id
+
+      let response_of_callee_model = ident
+
+      let caller_model_of_response = ident
+    end
+
+    module T' =
+      Perf_histograms.Rpc.Plain.Decorate_bin_io
+        (struct
+          include M
+          include Master
+        end)
+        (T)
+
+    include T'
+    include Register (T')
+  end
+
   let receipt_trust_action_message query =
     ("Get_ancestry query: $query", [ ("query", query_to_yojson query) ])
 

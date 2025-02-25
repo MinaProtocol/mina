@@ -8,6 +8,10 @@ module Stable : sig
   module V3 : sig
     type t [@@deriving sexp, equal]
   end
+
+  module V2 : sig
+    type t [@@deriving sexp, equal]
+  end
 end]
 
 type t = Stable.Latest.t [@@deriving to_yojson]

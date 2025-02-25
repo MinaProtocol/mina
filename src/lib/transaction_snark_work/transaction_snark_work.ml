@@ -12,6 +12,13 @@ module Statement = struct
 
         let to_latest = Fn.id
       end
+
+      module V2 = struct
+        type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
+        [@@deriving hash, sexp, compare]
+
+        let to_latest = Fn.id
+      end
     end]
   end
 
@@ -93,6 +100,19 @@ module T = struct
       type t = Mina_wire_types.Transaction_snark_work.V3.t =
         { fee : Fee.Stable.V1.t
         ; proofs : Ledger_proof.Stable.V3.t One_or_two.Stable.V1.t
+        ; prover : Public_key.Compressed.Stable.V1.t
+        }
+      [@@deriving equal, sexp, yojson]
+
+      let to_latest = Fn.id
+    end
+
+    module V2 = struct
+      type t = Mina_wire_types.Transaction_snark_work.V2.t =
+        { fee : Fee.Stable.V1.t
+        ; proofs :
+            Ledger_proof.Stable.V2.t
+            One_or_two.Stable.V1.t
         ; prover : Public_key.Compressed.Stable.V1.t
         }
       [@@deriving equal, sexp, yojson]

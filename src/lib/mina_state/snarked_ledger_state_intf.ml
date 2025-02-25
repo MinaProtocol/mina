@@ -157,6 +157,18 @@ module type Full = sig
         Poly.Stable.V2.t
       [@@deriving compare, equal, hash, sexp, yojson]
     end
+
+    module V2 : sig
+      type t =
+        ( Frozen_ledger_hash.Stable.V1.t
+        , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+        , Pending_coinbase.Stack_versioned.Stable.V1.t
+        , Fee_excess.Stable.V1.t
+        , unit
+        , Local_state.Stable.V1.t )
+        Poly.Stable.V2.t
+      [@@deriving compare, equal, hash, sexp, yojson]
+    end
   end]
 
   type var =
@@ -202,6 +214,18 @@ module type Full = sig
           , Fee_excess.Stable.V1.t
           , Sok_message.Digest.Stable.V1.t
           , Local_state.Stable.V2.t )
+          Poly.Stable.V2.t
+        [@@deriving compare, equal, hash, sexp, yojson]
+      end
+
+      module V2 : sig
+        type t =
+          ( Frozen_ledger_hash.Stable.V1.t
+          , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+          , Pending_coinbase.Stack_versioned.Stable.V1.t
+          , Fee_excess.Stable.V1.t
+          , Sok_message.Digest.Stable.V1.t
+          , Local_state.Stable.V1.t )
           Poly.Stable.V2.t
         [@@deriving compare, equal, hash, sexp, yojson]
       end

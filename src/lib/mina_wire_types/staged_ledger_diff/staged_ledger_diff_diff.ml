@@ -26,6 +26,13 @@ module Types = struct
           , Mina_base_user_command.V3.t Mina_base_with_status.V2.t )
           Pre_diff_two.V2.t
       end
+
+      module V2 : sig
+        type t =
+          ( Transaction_snark_work.V2.t
+          , Mina_base_user_command.V2.t Mina_base_with_status.V2.t )
+          Pre_diff_two.V2.t
+      end
     end
 
     module At_most_one : sig
@@ -52,6 +59,13 @@ module Types = struct
           , Mina_base_user_command.V3.t Mina_base_with_status.V2.t )
           Pre_diff_one.V2.t
       end
+
+      module V2 : sig
+        type t =
+          ( Transaction_snark_work.V2.t
+          , Mina_base_user_command.V2.t Mina_base_with_status.V2.t )
+          Pre_diff_one.V2.t
+      end
     end
 
     module Diff : sig
@@ -60,10 +74,20 @@ module Types = struct
           Pre_diff_with_at_most_two_coinbase.V3.t
           * Pre_diff_with_at_most_one_coinbase.V3.t option
       end
+
+      module V2 : sig
+        type t =
+          Pre_diff_with_at_most_two_coinbase.V2.t
+          * Pre_diff_with_at_most_one_coinbase.V2.t option
+      end
     end
 
     module V3 : sig
       type t = { diff : Diff.V3.t }
+    end
+
+    module V2 : sig
+      type t = { diff : Diff.V2.t }
     end
   end
 end
@@ -101,6 +125,13 @@ module type Concrete = sig
         , Mina_base_user_command.V3.t Mina_base_with_status.V2.t )
         Pre_diff_two.V2.t
     end
+
+    module V2 : sig
+      type t =
+        ( Transaction_snark_work.V2.t
+        , Mina_base_user_command.V2.t Mina_base_with_status.V2.t )
+        Pre_diff_two.V2.t
+    end
   end
 
   module At_most_one : sig
@@ -127,6 +158,13 @@ module type Concrete = sig
         , Mina_base_user_command.V3.t Mina_base_with_status.V2.t )
         Pre_diff_one.V2.t
     end
+
+    module V2 : sig
+      type t =
+        ( Transaction_snark_work.V2.t
+        , Mina_base_user_command.V2.t Mina_base_with_status.V2.t )
+        Pre_diff_one.V2.t
+    end
   end
 
   module Diff : sig
@@ -135,10 +173,20 @@ module type Concrete = sig
         Pre_diff_with_at_most_two_coinbase.V3.t
         * Pre_diff_with_at_most_one_coinbase.V3.t option
     end
+
+    module V2 : sig
+      type t =
+        Pre_diff_with_at_most_two_coinbase.V2.t
+        * Pre_diff_with_at_most_one_coinbase.V2.t option
+    end
   end
 
   module V3 : sig
     type t = { diff : Diff.V3.t }
+  end
+
+  module V2 : sig
+    type t = { diff : Diff.V2.t }
   end
 end
 
@@ -175,6 +223,13 @@ module M = struct
         , Mina_base_user_command.V3.t Mina_base_with_status.V2.t )
         Pre_diff_two.V2.t
     end
+
+    module V2 = struct
+      type t =
+        ( Transaction_snark_work.V2.t
+        , Mina_base_user_command.V2.t Mina_base_with_status.V2.t )
+        Pre_diff_two.V2.t
+    end
   end
 
   module At_most_one = struct
@@ -201,6 +256,13 @@ module M = struct
         , Mina_base_user_command.V3.t Mina_base_with_status.V2.t )
         Pre_diff_one.V2.t
     end
+
+    module V2 = struct
+      type t =
+        ( Transaction_snark_work.V2.t
+        , Mina_base_user_command.V2.t Mina_base_with_status.V2.t )
+        Pre_diff_one.V2.t
+    end
   end
 
   module Diff = struct
@@ -209,10 +271,20 @@ module M = struct
         Pre_diff_with_at_most_two_coinbase.V3.t
         * Pre_diff_with_at_most_one_coinbase.V3.t option
     end
+
+    module V2 = struct
+      type t =
+        Pre_diff_with_at_most_two_coinbase.V2.t
+        * Pre_diff_with_at_most_one_coinbase.V2.t option
+    end
   end
 
   module V3 = struct
-    type t = { diff : Diff.V3.t }
+    type t = { diff : Diff.V3.t } (*THIS*)
+  end
+
+  module V2 = struct
+    type t = { diff : Diff.V2.t }
   end
 end
 

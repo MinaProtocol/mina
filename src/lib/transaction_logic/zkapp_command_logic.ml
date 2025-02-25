@@ -268,6 +268,24 @@ module Local_state = struct
 
         let to_latest = Fn.id
       end
+
+      module V1 = struct
+        type t =
+          ( Mina_base.Stack_frame.Digest.Stable.V1.t
+          , Mina_base.Call_stack_digest.Stable.V1.t
+          , ( Currency.Amount.Stable.V1.t
+            , Sgn.Stable.V1.t )
+            Currency.Signed_poly.Stable.V1.t
+          , Ledger_hash.Stable.V1.t
+          , bool
+          , Zkapp_command.Transaction_commitment.Stable.V1.t
+          , Mina_numbers.Index.Stable.V1.t
+          , Transaction_status.Failure.Collection.Stable.V1.t )
+          Stable.V1.t
+        [@@deriving equal, compare, hash, yojson, sexp]
+
+        let to_latest = Fn.id
+      end
     end]
   end
 

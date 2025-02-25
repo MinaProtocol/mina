@@ -113,6 +113,10 @@ module Valid : sig
   module V2 : sig
     type t = { zkapp_command : V2.t }
   end
+
+  module V1 : sig
+    type t = { zkapp_command : V1.t }
+  end
 end
 
 module Transaction_commitment : sig

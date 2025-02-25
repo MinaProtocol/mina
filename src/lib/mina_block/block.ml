@@ -40,6 +40,41 @@ module Stable = struct
             with type t := t
              and type 'a creator := 'a Creatable.creator )
   end
+
+  module V2 = struct
+    type t =
+      { header : Header.Stable.V2.t
+      ; body : Staged_ledger_diff.Body.Stable.V1.t
+      }
+    [@@deriving fields, sexp]
+
+    let to_latest = Fn.id
+
+    module Creatable = struct
+      let id = "block"
+
+      type nonrec t = t
+
+      type 'a creator = header:Header.t -> body:Staged_ledger_diff.Body.t -> 'a
+
+      let map_creator c ~f ~header ~body = f (c ~header ~body)
+
+      let create ~header ~body = { header; body }
+    end
+
+    let equal : V2.t -> V2.t -> bool =
+      Comparable.lift Consensus.Data.Consensus_state.Value.equal
+        ~f:
+          (Fn.compose Mina_state.Protocol_state.consensus_state
+             (Fn.compose Header.protocol_state @@ Header.Stable.V2.to_latest header) )
+
+    include (
+      Allocation_functor.Make.Basic
+        (Creatable) :
+          Allocation_functor.Intf.Output.Basic_intf
+            with type t := t
+             and type 'a creator := 'a Creatable.creator )
+  end
 end]
 
 type t = Stable.Latest.t =

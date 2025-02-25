@@ -9,6 +9,12 @@ module type Full = sig
     module V3 : sig
       type t [@@deriving sexp, to_yojson]
     end
+
+    module V2 : sig
+      type t [@@deriving sexp, to_yojson]
+
+      val to_latest : t -> Latest.t
+    end
   end]
 
   type t = Stable.Latest.t [@@deriving sexp, to_yojson]

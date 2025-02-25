@@ -77,6 +77,17 @@ module Stable : sig
   module V3 : sig
     type t [@@deriving bin_io, equal, sexp, version, yojson]
   end
+
+  module V2 : sig
+    type t  = Mina_wire_types.Transaction_snark_work.V2.t =
+      { fee : Fee.Stable.V1.t
+      ; proofs :
+        Ledger_proof.Stable.V2.t
+        One_or_two.t
+      ; prover : Public_key.Compressed.Stable.V1.t
+      }
+    [@@deriving bin_io, equal, sexp, version, yojson]
+  end
 end
 with type V3.t = t
 

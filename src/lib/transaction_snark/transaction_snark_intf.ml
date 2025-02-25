@@ -19,6 +19,10 @@ module type Full = sig
     module V3 : sig
       type t [@@deriving compare, equal, sexp, yojson, hash]
     end
+
+    module V2 : sig
+      type t [@@deriving compare, equal, sexp, yojson, hash]
+    end
   end]
 
   val create : statement:Statement.With_sok.t -> proof:Mina_base.Proof.t -> t

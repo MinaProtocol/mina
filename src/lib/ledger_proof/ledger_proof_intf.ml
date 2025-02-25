@@ -3,6 +3,7 @@ open Mina_base
 
 module type S = sig
   type t [@@deriving compare, equal, sexp, yojson, hash]
+  (* type t2 [@@deriving compare, equal, sexp, yojson, hash] *)
 
   [%%versioned:
   module Stable : sig
@@ -12,6 +13,12 @@ module type S = sig
       type nonrec t = t [@@deriving compare, equal, sexp, yojson, hash]
 
       val to_latest : t -> t
+    end
+
+    module V2 : sig
+      type t [@@deriving compare, equal, sexp, yojson, hash]
+
+      val to_latest : t -> V3.t
     end
   end]
 

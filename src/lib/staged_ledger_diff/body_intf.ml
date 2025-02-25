@@ -6,6 +6,10 @@ module type Full = sig
     module V2 : sig
       type t [@@deriving equal, sexp]
     end
+
+    module V1 : sig
+      type t [@@deriving equal, sexp]
+    end
   end]
 
   type t = Stable.Latest.t
