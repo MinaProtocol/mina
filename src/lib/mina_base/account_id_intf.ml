@@ -61,7 +61,7 @@ module type S = sig
   [%%versioned:
   module Stable : sig
     module V2 : sig
-      type t [@@deriving sexp, equal, compare, hash, yojson]
+      type t [@@deriving sexp, equal, compare, yojson]
     end
   end]
 
@@ -84,8 +84,6 @@ module type S = sig
   val gen : t Quickcheck.Generator.t
 
   include Comparable.S with type t := t
-
-  include Hashable.S_binable with type t := t
 
   type var
 

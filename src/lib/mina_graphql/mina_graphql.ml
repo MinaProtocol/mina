@@ -1364,9 +1364,11 @@ module Mutations = struct
                       List.map ids ~f:(fun id ->
                           (id, (Utils.account_of_id id ledger, role)) )
                     in
-                    Account_id.Table.of_alist_exn
-                      ( get_account fee_payer_ids `Fee_payer
-                      @ get_account zkapp_account_ids `Ordinary_participant )
+                    ref
+                    @@ Account_id.Map.of_alist_exn
+                         ( get_account fee_payer_ids `Fee_payer
+                         @ get_account zkapp_account_ids `Ordinary_participant
+                         )
                   in
                   let tm_next = Time.add (Time.now ()) wait_span in
                   don't_wait_for

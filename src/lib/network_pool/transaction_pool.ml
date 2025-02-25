@@ -330,22 +330,24 @@ struct
 
     module Vk_refcount_table = struct
       type t =
-        { verification_keys :
-            (int * Verification_key_wire.t) Zkapp_basic.F_map.Table.t
-        ; account_id_to_vks : int Zkapp_basic.F_map.Map.t Account_id.Table.t
-        ; vk_to_account_ids : int Account_id.Map.t Zkapp_basic.F_map.Table.t
+        { mutable verification_keys :
+            (int * Verification_key_wire.t) Zkapp_basic.F_map.Map.t
+        ; mutable account_id_to_vks :
+            int Zkapp_basic.F_map.Map.t Account_id.Map.t
+        ; mutable vk_to_account_ids :
+            int Account_id.Map.t Zkapp_basic.F_map.Map.t
         }
 
       let create () =
-        { verification_keys = Zkapp_basic.F_map.Table.create ()
-        ; account_id_to_vks = Account_id.Table.create ()
-        ; vk_to_account_ids = Zkapp_basic.F_map.Table.create ()
+        { verification_keys = Zkapp_basic.F_map.Map.empty
+        ; account_id_to_vks = Account_id.Map.empty
+        ; vk_to_account_ids = Zkapp_basic.F_map.Map.empty
         }
 
-      let find_vk (t : t) = Hashtbl.find t.verification_keys
+      let find_vk (t : t) = Map.find t.verification_keys
 
       let find_vks_by_account_id (t : t) account_id =
-        match Hashtbl.find t.account_id_to_vks account_id with
+        match Map.find t.account_id_to_vks account_id with
         | None ->
             []
         | Some vks ->
@@ -363,18 +365,21 @@ struct
             | Some count ->
                 count + 1 )
         in
-        Hashtbl.update t.verification_keys vk.hash ~f:(function
-          | None ->
-              (1, vk)
-          | Some (count, vk) ->
-              (count + 1, vk) ) ;
-        Hashtbl.update t.account_id_to_vks account_id
-          ~f:(inc_map ~default_map:Zkapp_basic.F_map.Map.empty vk.hash) ;
-        Hashtbl.update t.vk_to_account_ids vk.hash
-          ~f:(inc_map ~default_map:Account_id.Map.empty account_id) ;
+        t.verification_keys <-
+          Map.update t.verification_keys vk.hash ~f:(function
+            | None ->
+                (1, vk)
+            | Some (count, vk) ->
+                (count + 1, vk) ) ;
+        t.account_id_to_vks <-
+          Map.update t.account_id_to_vks account_id
+            ~f:(inc_map ~default_map:Zkapp_basic.F_map.Map.empty vk.hash) ;
+        t.vk_to_account_ids <-
+          Map.update t.vk_to_account_ids vk.hash
+            ~f:(inc_map ~default_map:Account_id.Map.empty account_id) ;
         Mina_metrics.(
           Gauge.set Transaction_pool.vk_refcount_table_size
-            (Float.of_int (Zkapp_basic.F_map.Table.length t.verification_keys)))
+            (Float.of_int (Zkapp_basic.F_map.Map.length t.verification_keys)))
 
       let dec (t : t) ~account_id ~vk_hash =
         let open Option.Let_syntax in
@@ -383,18 +388,21 @@ struct
           let map' = Map.change map key ~f:(Option.bind ~f:dec) in
           if Map.is_empty map' then None else Some map'
         in
-        Hashtbl.change t.verification_keys vk_hash
-          ~f:
-            (Option.bind ~f:(fun (count, value) ->
-                 let%map count' = dec count in
-                 (count', value) ) ) ;
-        Hashtbl.change t.account_id_to_vks account_id
-          ~f:(Option.bind ~f:(dec_map vk_hash)) ;
-        Hashtbl.change t.vk_to_account_ids vk_hash
-          ~f:(Option.bind ~f:(dec_map account_id)) ;
+        t.verification_keys <-
+          Map.change t.verification_keys vk_hash
+            ~f:
+              (Option.bind ~f:(fun (count, value) ->
+                   let%map count' = dec count in
+                   (count', value) ) ) ;
+        t.account_id_to_vks <-
+          Map.change t.account_id_to_vks account_id
+            ~f:(Option.bind ~f:(dec_map vk_hash)) ;
+        t.vk_to_account_ids <-
+          Map.change t.vk_to_account_ids vk_hash
+            ~f:(Option.bind ~f:(dec_map account_id)) ;
         Mina_metrics.(
           Gauge.set Transaction_pool.vk_refcount_table_size
-            (Float.of_int (Zkapp_basic.F_map.Table.length t.verification_keys)))
+            (Float.of_int (Zkapp_basic.F_map.Map.length t.verification_keys)))
 
       let lift_common (t : t) table_modify cmd =
         User_command.extract_vks cmd
@@ -2107,7 +2115,7 @@ let%test_module _ =
                     Mina_ledger.Ledger.get best_tip_ledger loc )
                in
                (id, (state, `Fee_payer)) )
-        |> Account_id.Table.of_alist_exn
+        |> Account_id.Map.of_alist_exn |> ref
       in
       let rec go n cmds =
         let open Quickcheck.Generator.Let_syntax in

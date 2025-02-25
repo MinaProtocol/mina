@@ -1,8 +1,6 @@
 module type Inputs_intf = sig
   module Location : Location_intf.S
 
-  module Location_binable : Hashable.S_binable with type t := Location.t
-
   module Key : Intf.Key
 
   module Token_id : Intf.Token_id

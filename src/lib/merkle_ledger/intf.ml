@@ -65,8 +65,6 @@ module type Key = sig
 
   val to_string : t -> string
 
-  include Hashable.S_binable with type t := t
-
   include Comparable.S with type t := t
 end
 
@@ -81,8 +79,6 @@ module type Token_id = sig
   with type Latest.t = t
 
   val default : t
-
-  include Hashable.S_binable with type t := t
 
   include Comparable.S_binable with type t := t
 end
@@ -106,8 +102,6 @@ module type Account_id = sig
   val create : key -> token_id -> t
 
   val derive_token_id : owner:t -> token_id
-
-  include Hashable.S_binable with type t := t
 
   include Comparable.S with type t := t
 end
@@ -142,8 +136,6 @@ module type Hash = sig
   type t [@@deriving bin_io, compare, equal, sexp, yojson]
 
   val to_base58_check : t -> string
-
-  include Hashable.S_binable with type t := t
 
   type account
 
@@ -265,8 +257,6 @@ module Inputs = struct
 
   module type DATABASE = sig
     include Intf
-
-    module Location_binable : Hashable.S_binable with type t := Location.t
 
     module Kvdb : Key_value_database with type config := string
 

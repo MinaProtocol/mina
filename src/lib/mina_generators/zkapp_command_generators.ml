@@ -754,7 +754,7 @@ let gen_account_update_body_components (type a b c d) ?global_slot
             let%map zkapp_account_id =
               Quickcheck.Generator.of_list zkapp_account_ids
             in
-            match Account_id.Table.find account_state_tbl zkapp_account_id with
+            match Account_id.Map.find !account_state_tbl zkapp_account_id with
             | None ->
                 failwith "gen_account_update_body: fail to find zkapp account"
             | Some (_, `Fee_payer)
@@ -767,7 +767,7 @@ let gen_account_update_body_components (type a b c d) ?global_slot
                 acct
           else
             let accts =
-              Account_id.Table.filteri account_state_tbl
+              Account_id.Map.filteri !account_state_tbl
                 ~f:(fun ~key:_ ~data:(_, role) ->
                   match (authorization_tag, role) with
                   | _, `Fee_payer ->
@@ -782,13 +782,13 @@ let gen_account_update_body_components (type a b c d) ?global_slot
                       Option.is_none required_balance_change
                   | _, `Ordinary_participant ->
                       true )
-              |> Account_id.Table.data
+              |> Account_id.Map.data
             in
             Quickcheck.Generator.of_list accts >>| fst
       | Some account_id ->
           (*get the latest state of the account*)
           let acct =
-            Account_id.Table.find_exn account_state_tbl account_id |> fst
+            Account_id.Map.find_exn !account_state_tbl account_id |> fst
           in
           if zkapp_account && Option.is_none acct.zkapp then
             failwith
@@ -827,7 +827,7 @@ let gen_account_update_body_components (type a b c d) ?global_slot
         true
     | Some hash_set ->
         (* other account_updates *)
-        not @@ Hash_set.mem hash_set account_id
+        not @@ Set.mem !hash_set account_id
   in
   let%bind account_precondition =
     f_account_precondition ~first_use_of_account account
@@ -971,29 +971,30 @@ let gen_account_update_body_components (type a b c d) ?global_slot
            in
            Some { zk with app_state; action_state; proved_state }
    in
-   Account_id.Table.update account_state_tbl (Account.identifier account)
-     ~f:(function
-     | None ->
-         (* new entry in table *)
-         ( { account with
-             balance =
-               add_balance_and_balance_change account.balance balance_change
-           ; nonce = nonce_incr account.nonce
-           ; delegate = delegate account
-           ; zkapp = zkapp account
-           }
-         , if token_account then `New_token_account else `New_account )
-     | Some (updated_account, role) ->
-         (* update entry in table *)
-         ( { updated_account with
-             balance =
-               add_balance_and_balance_change updated_account.balance
-                 balance_change
-           ; nonce = nonce_incr updated_account.nonce
-           ; delegate = delegate updated_account
-           ; zkapp = zkapp updated_account
-           }
-         , role ) ) ) ;
+   account_state_tbl :=
+     Account_id.Map.update !account_state_tbl (Account.identifier account)
+       ~f:(function
+       | None ->
+           (* new entry in table *)
+           ( { account with
+               balance =
+                 add_balance_and_balance_change account.balance balance_change
+             ; nonce = nonce_incr account.nonce
+             ; delegate = delegate account
+             ; zkapp = zkapp account
+             }
+           , if token_account then `New_token_account else `New_account )
+       | Some (updated_account, role) ->
+           (* update entry in table *)
+           ( { updated_account with
+               balance =
+                 add_balance_and_balance_change updated_account.balance
+                   balance_change
+             ; nonce = nonce_incr updated_account.nonce
+             ; delegate = delegate updated_account
+             ; zkapp = zkapp updated_account
+             }
+           , role ) ) ) ;
   { Account_update_body_components.public_key
   ; update =
       ( if new_account then
@@ -1061,7 +1062,7 @@ let gen_account_update_from ?(no_account_precondition = false)
     Account_update_body_components.to_typical_account_update body_components
   in
   let account_id = Account_id.create body.public_key body.token_id in
-  Hash_set.add account_ids_seen account_id ;
+  account_ids_seen := Set.add !account_ids_seen account_id ;
   return { Account_update.Simple.body; authorization }
 
 (* takes an account id, if we want to sign this data *)
@@ -1131,8 +1132,8 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
-    ?account_state_tbl ~ledger ?protocol_state_view ?vk ?available_public_keys
-    ~genesis_constants
+    ?(account_state_tbl = ref Account_id.Map.empty) ~ledger ?protocol_state_view
+    ?vk ?available_public_keys ~genesis_constants
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) () =
   let open Quickcheck.Let_syntax in
   let fee_payer_pk =
@@ -1140,27 +1141,20 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
   in
   let fee_payer_acct_id = Account_id.create fee_payer_pk Token_id.default in
   let ledger_accounts = lazy (Ledger.to_list_sequential ledger) in
-  (* table of public keys to accounts, updated when generating each account_update
-
-     a Map would be more principled, but threading that map through the code
-     adds complexity
-  *)
-  let account_state_tbl =
-    Option.value account_state_tbl ~default:(Account_id.Table.create ())
-  in
   if not limited then
     (* make sure all ledger keys are in the keymap *)
     List.iter (Lazy.force ledger_accounts) ~f:(fun acct ->
         let acct_id = Account.identifier acct in
         (*Initialize account states*)
-        Account_id.Table.update account_state_tbl acct_id ~f:(function
-          | None ->
-              if Account_id.equal acct_id fee_payer_acct_id then
-                (acct, `Fee_payer)
-              else (acct, `Ordinary_participant)
-          | Some a ->
-              a ) ) ;
-  List.iter (Account_id.Table.keys account_state_tbl) ~f:(fun id ->
+        account_state_tbl :=
+          Account_id.Map.update !account_state_tbl acct_id ~f:(function
+            | None ->
+                if Account_id.equal acct_id fee_payer_acct_id then
+                  (acct, `Fee_payer)
+                else (acct, `Ordinary_participant)
+            | Some a ->
+                a ) ) ;
+  List.iter (Account_id.Map.keys !account_state_tbl) ~f:(fun id ->
       let pk = Account_id.public_key id in
       if Option.is_none (Signature_lib.Public_key.Compressed.Map.find keymap pk)
       then
@@ -1183,7 +1177,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
         let ledger_account_list =
           Account_id.Set.union_list
             [ ledger_account_ids
-            ; Account_id.Set.of_hashtbl_keys account_state_tbl
+            ; Account_id.Set.of_map_keys !account_state_tbl
             ]
           |> Account_id.Set.to_list
         in
@@ -1204,7 +1198,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
   (* account ids seen, to generate receipt chain hash precondition only if
      a account_update with a given account id has not been encountered before
   *)
-  let account_ids_seen = Account_id.Hash_set.create () in
+  let account_ids_seen = ref Account_id.Set.empty in
   let%bind num_zkapp_command = Int.gen_uniform_incl 1 max_account_updates in
   let%bind fee_payer =
     gen_fee_payer ?global_slot ?fee_range ?failure
@@ -1213,15 +1207,15 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
       ~genesis_constants ()
   in
   let zkapp_account_ids =
-    Account_id.Table.filteri account_state_tbl ~f:(fun ~key:_ ~data:(a, role) ->
+    Account_id.Map.filteri !account_state_tbl ~f:(fun ~key:_ ~data:(a, role) ->
         match role with
         | `Fee_payer | `New_account | `New_token_account ->
             false
         | `Ordinary_participant ->
             Option.is_some a.zkapp )
-    |> Account_id.Table.keys
+    |> Account_id.Map.keys
   in
-  Hash_set.add account_ids_seen fee_payer_acct_id ;
+  account_ids_seen := Set.add !account_ids_seen fee_payer_acct_id ;
   let mk_forest ps =
     List.map ps ~f:(fun p -> { With_stack_hash.elt = p; stack_hash = () })
   in
@@ -1551,16 +1545,17 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
     in
     Receipt.Zkapp_command_elt.Zkapp_command_commitment full_txn_commitment
   in
-  Account_id.Table.update account_state_tbl fee_payer_acct_id ~f:(function
-    | None ->
-        failwith "Expected fee payer account id to be in table"
-    | Some (account, _) ->
-        let receipt_chain_hash =
-          Receipt.Chain_hash.cons_zkapp_command_commitment
-            Mina_numbers.Index.zero receipt_elt
-            account.Account.receipt_chain_hash
-        in
-        ({ account with receipt_chain_hash }, `Fee_payer) ) ;
+  account_state_tbl :=
+    Account_id.Map.update !account_state_tbl fee_payer_acct_id ~f:(function
+      | None ->
+          failwith "Expected fee payer account id to be in table"
+      | Some (account, _) ->
+          let receipt_chain_hash =
+            Receipt.Chain_hash.cons_zkapp_command_commitment
+              Mina_numbers.Index.zero receipt_elt
+              account.Account.receipt_chain_hash
+          in
+          ({ account with receipt_chain_hash }, `Fee_payer) ) ;
   let account_updates =
     Zkapp_command.Call_forest.to_account_updates
       zkapp_command_dummy_authorizations.account_updates
@@ -1570,20 +1565,21 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
       match Account_update.authorization account_update with
       | Control.Proof _ | Control.Signature _ ->
           let acct_id = Account_update.account_id account_update in
-          Account_id.Table.update account_state_tbl acct_id ~f:(function
-            | None ->
-                failwith
-                  "Expected other account_update account id to be in table"
-            | Some (account, role) ->
-                let receipt_chain_hash =
-                  let account_update_index =
-                    Mina_numbers.Index.of_int (ndx + 1)
+          account_state_tbl :=
+            Account_id.Map.update !account_state_tbl acct_id ~f:(function
+              | None ->
+                  failwith
+                    "Expected other account_update account id to be in table"
+              | Some (account, role) ->
+                  let receipt_chain_hash =
+                    let account_update_index =
+                      Mina_numbers.Index.of_int (ndx + 1)
+                    in
+                    Receipt.Chain_hash.cons_zkapp_command_commitment
+                      account_update_index receipt_elt
+                      account.Account.receipt_chain_hash
                   in
-                  Receipt.Chain_hash.cons_zkapp_command_commitment
-                    account_update_index receipt_elt
-                    account.Account.receipt_chain_hash
-                in
-                ({ account with receipt_chain_hash }, role) )
+                  ({ account with receipt_chain_hash }, role) )
       | Control.None_given ->
           () ) ;
   zkapp_command_dummy_authorizations
@@ -1599,26 +1595,28 @@ let gen_list_of_zkapp_command_from ?global_slot ?failure ?max_account_updates
   let account_state_tbl =
     match account_state_tbl with
     | None ->
-        let tbl = Account_id.Table.create () in
+        let tbl = ref Account_id.Map.empty in
         let accounts = Ledger.to_list_sequential ledger in
         List.iter accounts ~f:(fun acct ->
             let acct_id = Account.identifier acct in
-            Account_id.Table.update tbl acct_id ~f:(function
-              | None ->
-                  (acct, `Ordinary_participant)
-              | Some a ->
-                  a ) ) ;
+            tbl :=
+              Account_id.Map.update !tbl acct_id ~f:(function
+                | None ->
+                    (acct, `Ordinary_participant)
+                | Some a ->
+                    a ) ) ;
         List.iter fee_payer_keypairs ~f:(fun fee_payer_keypair ->
             let acct_id =
               Account_id.create
                 (Signature_lib.Public_key.compress fee_payer_keypair.public_key)
                 Token_id.default
             in
-            Account_id.Table.update tbl acct_id ~f:(function
-              | None ->
-                  failwith "fee_payer not in ledger"
-              | Some (a, _) ->
-                  (a, `Fee_payer) ) ) ;
+            tbl :=
+              Account_id.Map.update !tbl acct_id ~f:(function
+                | None ->
+                    failwith "fee_payer not in ledger"
+                | Some (a, _) ->
+                    (a, `Fee_payer) ) ) ;
         tbl
     | Some tbl ->
         tbl
@@ -1677,7 +1675,7 @@ let mk_fee_payer ~fee ~pk ~nonce : Account_update.Fee_payer.t =
 
 let gen_max_cost_zkapp_command_from ?memo ?fee_range
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
-    ~(account_state_tbl : (Account.t * role) Account_id.Table.t) ~vk
+    ~(account_state_tbl : (Account.t * role) Account_id.Map.t ref) ~vk
     ~(genesis_constants : Genesis_constants.t) () =
   let open Quickcheck.Generator.Let_syntax in
   let%bind memo =
@@ -1688,7 +1686,7 @@ let gen_max_cost_zkapp_command_from ?memo ?fee_range
         Signed_command_memo.gen
   in
   let zkapp_accounts =
-    Account_id.Table.data account_state_tbl
+    Account_id.Map.data !account_state_tbl
     |> List.filter_map ~f:(fun ((a, role) : Account.t * role) ->
            match role with
            | `Ordinary_participant ->
@@ -1723,7 +1721,7 @@ let gen_max_cost_zkapp_command_from ?memo ?fee_range
   in
   let fee_payer_id = Account_id.create fee_payer_pk Token_id.default in
   let fee_payer_account, _ =
-    Account_id.Table.find_exn account_state_tbl fee_payer_id
+    Account_id.Map.find_exn !account_state_tbl fee_payer_id
   in
   let%map fee =
     Option.value_map fee_range
@@ -1733,11 +1731,12 @@ let gen_max_cost_zkapp_command_from ?memo ?fee_range
   let fee_payer =
     mk_fee_payer ~fee ~pk:fee_payer_pk ~nonce:fee_payer_account.nonce
   in
-  Account_id.Table.change account_state_tbl fee_payer_id ~f:(function
-    | None ->
-        None
-    | Some (a, role) ->
-        Some ({ a with nonce = Account.Nonce.succ a.nonce }, role) ) ;
+  account_state_tbl :=
+    Account_id.Map.change !account_state_tbl fee_payer_id ~f:(function
+      | None ->
+          None
+      | Some (a, role) ->
+          Some ({ a with nonce = Account.Nonce.succ a.nonce }, role) ) ;
   Zkapp_command.of_simple { fee_payer; account_updates; memo }
 
 let%test_module _ =
@@ -1808,7 +1807,6 @@ let%test_module _ =
             (list_with_length 100
                (gen_zkapp_command_from ~genesis_constants ~constraint_constants
                   ~fee_payer_keypair ~keymap ~no_token_accounts:true
-                  ~account_state_tbl:(Account_id.Table.create ())
                   ~generate_new_accounts:false ~ledger () ) )
             ~size:100
             ~random:(Splittable_random.State.create Random.State.default))
@@ -1835,7 +1833,6 @@ let%test_module _ =
                       ; min_new_zkapp_balance = of_mina_string_exn "50"
                       ; max_new_zkapp_balance = of_mina_string_exn "100"
                       }
-                  ~account_state_tbl:(Account_id.Table.create ())
                   ~generate_new_accounts:false ~ledger () ) )
             ~size:100
             ~random:(Splittable_random.State.create Random.State.default))
