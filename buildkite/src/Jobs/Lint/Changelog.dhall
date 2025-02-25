@@ -32,7 +32,8 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run "./buildkite/scripts/changelog.sh ${trigger} ${reqFile}"
+              [ Cmd.run
+                  "./buildkite/scripts/changelog.sh --trigger ${trigger} --required-change ${reqFile}"
               ]
             , label = "Lint: Changelog"
             , key = "lint-changelog"
