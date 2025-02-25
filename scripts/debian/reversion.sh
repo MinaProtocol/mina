@@ -51,7 +51,6 @@ if [[ ! -v NEW_VERSION ]]; then NEW_VERSION=$VERSION; fi;
 if [[ ! -v NEW_SUITE ]]; then NEW_SUITE=$SUITE; fi;
 if [[ ! -v NEW_REPO ]]; then NEW_REPO=$REPO; fi;
 if [[ ! -v DEB ]]; then NEW_NAME=$DEB; fi;
-if [[ ! -v DEB ]]; then NEW_NAME=$DEB; fi;
 if [[ ! -v SIGN ]]; then 
   SIGN_ARG=""
 else 
@@ -59,15 +58,18 @@ else
 fi
 
 function rebuild_deb() {
-  rm -f "${DEB}_${VERSION}.deb"
-  rm -rf "${NEW_NAME}_${NEW_VERSION}"
-    
+  source scripts/debian/reversion-helper.sh
+
   wget https://s3.us-west-2.amazonaws.com/${REPO}/pool/${CODENAME}/m/mi/${DEB}_${VERSION}.deb
-  dpkg-deb -R "${DEB}_${VERSION}.deb" "${NEW_NAME}_${NEW_VERSION}"
-  sed -i 's/Version: '"${VERSION}"'/Version: '"${NEW_VERSION}"'/g' "${NEW_NAME}_${NEW_VERSION}/DEBIAN/control"
-  sed -i 's/Package: '"${DEB}"'/Package: '"${NEW_NAME}"'/g' "${NEW_NAME}_${NEW_VERSION}/DEBIAN/control"
-  sed -i 's/Suite: '"${SUITE}"'/Suite: '"${NEW_SUITE}"'/g' "${NEW_NAME}_${NEW_VERSION}/DEBIAN/control"
-  dpkg-deb --build "${NEW_NAME}_${NEW_VERSION}" "${NEW_NAME}_${NEW_VERSION}.deb"
+  reversion --deb ${DEB} \
+            --package ${DEB} \
+            --source-version ${VERSION} \
+            --new-version ${NEW_VERSION} \
+            --suite ${SUITE} \
+            --new-suite ${NEW_SUITE} \
+            --new-name ${NEW_NAME} \
+            --new-release ${NEW_RELEASE} \
+            --codename ${CODENAME}
 }
 
 rebuild_deb
