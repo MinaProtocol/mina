@@ -14,6 +14,8 @@ let DebianPackage = ../../Constants/DebianPackage.dhall
 
 let DebianChannel = ../../Constants/DebianChannel.dhall
 
+let DebianRepo = ../../Constants/DebianRepo.dhall
+
 let Network = ../../Constants/Network.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
@@ -27,6 +29,14 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 let PromotePackages = ../../Command/Promotion/PromotePackages.dhall
 
 let VerifyPackages = ../../Command/Promotion/VerifyPackages.dhall
+
+let new_tags =
+          \(codename : DebianVersions.DebVersion)
+      ->  \(channel : DebianChannel.Type)
+      ->  \(repo : DebianRepo.Type)
+      ->  [ "latest-${DebianChannel.lowerName channel}-${DebianRepo.shortName
+                                                           repo}"
+          ]
 
 let promotePackages =
       PromotePackages.PromotePackagesSpec::{
@@ -45,10 +55,7 @@ let promotePackages =
         [ DebianVersions.DebVersion.Bullseye, DebianVersions.DebVersion.Focal ]
       , from_channel = DebianChannel.Type.Unstable
       , to_channel = DebianChannel.Type.Compatible
-      , new_tags =
-        [ "latest-compatible-nightly"
-        , "compatible-nightly-\\\$(date \"+%Y%m%d\")"
-        ]
+      , new_tags = new_tags
       , remove_profile_from_name = False
       , publish = False
       }
@@ -68,10 +75,7 @@ let verifyPackages =
       , codenames =
         [ DebianVersions.DebVersion.Bullseye, DebianVersions.DebVersion.Focal ]
       , channel = DebianChannel.Type.Compatible
-      , new_tags =
-        [ "latest-compatible-nightly"
-        , "compatible-nightly-\\\$(date \"+%Y%m%d\")"
-        ]
+      , tags = new_tags
       , remove_profile_from_name = False
       , published = False
       }
