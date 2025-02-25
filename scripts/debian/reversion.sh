@@ -4,9 +4,6 @@ set -eo pipefail
 CLEAR='\033[0m'
 RED='\033[0;31m'
 
-SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
-source $SCRIPTPATH/reversion-helper.sh
-
 function usage() {
   if [[ -n "$1" ]]; then
     echo -e "${RED}☞  $1${CLEAR}\n";
@@ -61,6 +58,7 @@ else
 fi
 
 function rebuild_deb() {
+  source scripts/debian/reversion-helper.sh
 
   wget https://s3.us-west-2.amazonaws.com/${REPO}/pool/${CODENAME}/m/mi/${DEB}_${VERSION}.deb
   reversion --deb ${DEB} \
