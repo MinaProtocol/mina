@@ -82,7 +82,7 @@ module Base
           Counter.inc_one Pipe.Drop_on_overflow.verified_network_pool_diffs) ;
         let diff = Envelope.Incoming.data env in
         [%log' warn logger] "Dropping verified diff $diff due to pipe overflow"
-          ~metadata:[ ("diff", Diff.verified_to_yojson diff) ] ;
+          ~metadata:[ ("diff", `String Diff.(t_of_verified diff |> summary)) ] ;
         BC.drop Diff.empty (Diff.reject_overloaded_diff diff) cb ;
         Deferred.unit
 
