@@ -20,7 +20,11 @@ TRIGGER=""
 REQUIRED_CHANGE=""
 # List of users who can bypass the changelog check by commenting !ci-bypass-changelog
 # separated by space
-GITHUB_USERS_ELIGIBLE_FOR_BYPASS="amc mrmr1993"
+GITHUB_USERS_ELIGIBLE_FOR_BYPASS="amc-ie mrmr1993"
+
+BYPASS_PHRASE="!ci-bypass-changelog"
+
+PIPELINE_SLUG="mina-o-1-labs"
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in
@@ -54,13 +58,13 @@ fi
 
 set -eou pipefail
 
-source "./buildkite/scripts/refresh-code.sh"
+source "./buildkite/scripts/refresh_code.sh"
 
 # make sure we cleaned git
 git clean -fd
 
 
-if [[ $BUILDKITE_PIPELINE_SLUG != "mina-o-1-labs" ]]; then
+if [[ $BUILDKITE_PIPELINE_SLUG != "$PIPELINE_SLUG" ]]; then
     echo "⏭️  Skipping run on non PR pipeline"
     exit 0
 fi
@@ -73,7 +77,7 @@ fi
 
 # Check if PR is bypassed by a !ci-bypass-changelog comment
 pip install -r scripts/github/github_info/requirements.txt
-if ! python3 scripts/github/github_info is_pr_commented --comment "!ci-bypass-changelog" --by $GITHUB_USERS_ELIGIBLE_FOR_BYPASS ; then
+if ! python3 scripts/github/github_info is_pr_commented --comment "$BYPASS_PHRASE" --by $GITHUB_USERS_ELIGIBLE_FOR_BYPASS ; then
     echo "⏭️  Skipping run as PR is bypassed"
     exit 0
 else 
