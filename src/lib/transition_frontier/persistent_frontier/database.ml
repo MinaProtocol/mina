@@ -435,6 +435,7 @@ let move_root ~old_root_hash ~new_root ~garbage =
     (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
   in
   fun batch ->
+    Batch.remove batch ~key:Root ;
     Batch.set batch ~key:Root_hash ~data:new_root_hash ;
     Batch.set batch ~key:Root_common
       ~data:(Root_data.Limited.Stable.Latest.common new_root) ;
