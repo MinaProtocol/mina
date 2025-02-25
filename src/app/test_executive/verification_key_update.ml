@@ -105,9 +105,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Wait_condition.nodes_to_initialize
               (Core.String.Map.data (Network.all_mina_nodes network)) ) )
     in
-    let whale1 =
-      Core.String.Map.find_exn (Network.block_producers network) "whale1"
-    in
+    let whale1 = Network.block_producer_exn network "whale1" in
     let%bind whale1_pk = pub_key_of_node whale1 in
     let%bind whale1_sk = priv_key_of_node whale1 in
     let constraint_constants = Network.constraint_constants network in

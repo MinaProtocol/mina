@@ -25,8 +25,10 @@ let create_db path ~logger =
   Cache.initialize ~logger path
   |> Deferred.Result.map ~f:(fun cache -> Lmdb_cache cache)
 
+let create_identity_db () = Identity_cache
+
 module For_tests = struct
-  let create_db () = Identity_cache
+  let create_db = create_identity_db
 
   let blockchain_dummy =
     Lazy.map
