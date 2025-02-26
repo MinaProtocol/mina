@@ -283,6 +283,7 @@ let get_root t =
           Batch.with_batch t.db ~f:(fun batch ->
               let hash = Root_data.Minimal.Stable.Latest.hash root in
               let common = Root_data.Minimal.Stable.V2.common root in
+              Batch.remove batch ~key:Root ;
               Batch.set batch ~key:Root_hash ~data:hash ;
               Batch.set batch ~key:Root_common ~data:common ) ;
 
@@ -444,6 +445,7 @@ let move_root ~old_root_hash ~new_root ~garbage =
     (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
   in
   fun batch ->
+    Batch.remove batch ~key:Root ;
     Batch.set batch ~key:Root_hash ~data:new_root_hash ;
     Batch.set batch ~key:Root_common
       ~data:(Root_data.Limited.Stable.Latest.common new_root) ;
