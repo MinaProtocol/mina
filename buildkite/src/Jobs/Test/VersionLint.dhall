@@ -64,6 +64,9 @@ in  Pipeline.build
                 [ S.strictlyStart (S.contains "src")
                 , S.exactly "buildkite/src/Jobs/Test/VersionLint" "dhall"
                 , S.exactly "buildkite/scripts/version-linter" "sh"
+                , S.exactly
+                    "buildkite/scripts/version-linter-patch-missing-type-shapes"
+                    "sh"
                 ]
 
           in  JobSpec::{
