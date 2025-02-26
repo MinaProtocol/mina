@@ -174,6 +174,9 @@ let docker_step
                       )
                       spec.networks
                 , TestExecutive = [] : List DockerImage.ReleaseSpec.Type
+                , FunctionalTestSuite = [] : List DockerImage.ReleaseSpec.Type
+                , ItnOrchestrator = [] : List DockerImage.ReleaseSpec.Type
+                , Toolchain = [] : List DockerImage.ReleaseSpec.Type
                 , LogProc = [] : List DockerImage.ReleaseSpec.Type
                 , BatchTxn =
                   [ DockerImage.ReleaseSpec::{
@@ -245,25 +248,6 @@ let docker_step
                                                                                          spec.buildFlags}--docker-image"
                     }
                   ]
-                , FunctionalTestSuite =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = Artifacts.Type.FunctionalTestSuite
-                    , deb_codename =
-                        "${DebianVersions.lowerName spec.debVersion}"
-                    , build_flags = spec.buildFlags
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_profile = spec.profile
-                    , step_key =
-                        "functional_test_suite-${DebianVersions.lowerName
-                                                   spec.debVersion}${Profiles.toLabelSegment
-                                                                       spec.profile}${BuildFlags.toLabelSegment
-                                                                                        spec.buildFlags}-docker-image"
-                    , network = "berkeley"
-                    }
-                  ]
-                , Toolchain = [] : List DockerImage.ReleaseSpec.Type
-                , ItnOrchestrator = [] : List DockerImage.ReleaseSpec.Type
                 }
                 artifact
 

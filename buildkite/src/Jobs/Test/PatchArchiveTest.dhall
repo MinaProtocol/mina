@@ -10,25 +10,28 @@ let PatchArchiveTest = ../../Command/PatchArchiveTest.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
-let Network = ../../Constants/Network.dhall
+let BuildFlags = ../../Constants/BuildFlags.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
-
-let Dockers = ../../Constants/DockerVersions.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let dependsOn =
-      Dockers.dependsOn
-        Dockers.Type.Bullseye
-        (None Network.Type)
-        Profiles.Type.Standard
-        Artifacts.Type.FunctionalTestSuite
+        DebianVersions.dependsOnStep
+          (None Text)
+          DebianVersions.DebVersion.Bullseye
+          Profiles.Type.Standard
+          BuildFlags.Type.Instrumented
+          "build"
+      # DebianVersions.dependsOn
+          DebianVersions.DebVersion.Bullseye
+          Profiles.Type.Standard
 
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
-          , S.exactly "scripts/patch-archive-test" "sh"
+          , S.exactly "scripts/tests/archive_patch_test" "sh"
+          , S.exactly "buildkite/scripts/tests/archive_patch_test" "sh"
           , S.exactly "buildkite/src/Jobs/Test/PatchArchiveTest" "dhall"
           , S.exactly "buildkite/src/Command/PatchArchiveTest" "dhall"
           ]
