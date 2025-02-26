@@ -24,7 +24,7 @@ fn fp_poseidon_block_cipher_native(mut cx: FunctionContext) -> JsResult<JsArray>
     );
 
     let len = state.len();
-    let js_array = JsArray::new(&mut cx, len as u32);
+    let js_array = JsArray::new(&mut cx, len);
     
     for (i, fp_element) in state.iter().enumerate() {
         let debug_str = format!("{:?}", fp_element);
