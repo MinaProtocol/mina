@@ -19,7 +19,6 @@ let Artifact
       | ZkappTestTransaction
       | FunctionalTestSuite
       | Toolchain
-      | Leaderboard
       >
 
 let AllButTests =
@@ -36,12 +35,7 @@ let AllButTests =
 let Main =
       [ Artifact.Daemon, Artifact.LogProc, Artifact.Archive, Artifact.Rosetta ]
 
-let All =
-        AllButTests
-      # [ Artifact.FunctionalTestSuite
-        , Artifact.Toolchain
-        , Artifact.Leaderboard
-        ]
+let All = AllButTests # [ Artifact.FunctionalTestSuite, Artifact.Toolchain ]
 
 let capitalName =
           \(artifact : Artifact)
@@ -55,7 +49,6 @@ let capitalName =
             , ZkappTestTransaction = "ZkappTestTransaction"
             , FunctionalTestSuite = "FunctionalTestSuite"
             , Toolchain = "Toolchain"
-            , Leaderboard = "Leaderboard"
             }
             artifact
 
@@ -71,7 +64,6 @@ let lowerName =
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             , Toolchain = "toolchain"
-            , Leaderboard = "leaderboard"
             }
             artifact
 
@@ -87,7 +79,6 @@ let dockerName =
             , ZkappTestTransaction = "mina-zkapp-test-transaction"
             , FunctionalTestSuite = "mina-test-suite"
             , Toolchain = "mina-toolchain"
-            , Leaderboard = "leaderboard"
             }
             artifact
 
@@ -104,7 +95,6 @@ let toDebianName =
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             , Toolchain = ""
-            , Leaderboard = ""
             }
             artifact
 
@@ -126,7 +116,6 @@ let toDebianNames =
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]
                           , Toolchain = [] : List Text
-                          , Leaderboard = [] : List Text
                           }
                           a
                   )
@@ -172,7 +161,6 @@ let dockerTag =
                 , ZkappTestTransaction = "${version_and_codename}"
                 , FunctionalTestSuite = "${version_and_codename}"
                 , Toolchain = "${version_and_codename}"
-                , Leaderboard = "${version_and_codename}"
                 }
                 artifact
 

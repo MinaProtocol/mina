@@ -22,6 +22,8 @@ let DebianVersions = ../Constants/DebianVersions.dhall
 
 let DebianRepo = ../Constants/DebianRepo.dhall
 
+let DockerPublish = ../Constants/DockerPublish.dhall
+
 let DebianChannel = ../Constants/DebianChannel.dhall
 
 let Profiles = ../Constants/Profiles.dhall
@@ -170,6 +172,8 @@ let docker_step
                   spec.buildFlags
                   step_dep_name
 
+          let docker_publish = DockerPublish.Type.Essential
+
           in  merge
                 { Daemon =
                   [ DockerImage.ReleaseSpec::{
@@ -179,16 +183,12 @@ let docker_step
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
+                    , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     }
                   ]
                 , TestExecutive = [] : List DockerImage.ReleaseSpec.Type
                 , LogProc = [] : List DockerImage.ReleaseSpec.Type
-                , Leaderboard =
-                  [ DockerImage.ReleaseSpec::{
-                    , service = Artifacts.Type.Leaderboard
-                    }
-                  ]
                 , BatchTxn =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
@@ -197,6 +197,7 @@ let docker_step
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
+                    , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     }
                   ]
@@ -207,6 +208,7 @@ let docker_step
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
+                    , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     }
                   ]
@@ -217,6 +219,7 @@ let docker_step
                     , network = Network.lowerName spec.network
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
+                    , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     }
                   ]
@@ -225,6 +228,7 @@ let docker_step
                     , deps = deps
                     , service = Artifacts.Type.ZkappTestTransaction
                     , build_flags = spec.buildFlags
+                    , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_profile = spec.profile
                     , deb_codename = spec.debVersion
@@ -237,6 +241,7 @@ let docker_step
                     , network = Network.lowerName Network.Type.Devnet
                     , deb_codename = spec.debVersion
                     , build_flags = spec.buildFlags
+                    , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_profile = spec.profile
                     }
