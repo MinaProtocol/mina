@@ -131,3 +131,5 @@ val crawl_successors :
        | `Not_found of [> `Arcs of State_hash.t | `Transition of State_hash.t ]
        ] )
      Deferred.Result.t
+
+val is_root_replaced_by_common_and_hash : t -> bool
