@@ -6,8 +6,8 @@ use mina_poseidon::{
     pasta::fp_kimchi,
 };
 
-fn fp_poseidon_block_cipher_native(mut cx: FunctionContext) -> JsResult<JsString> {
-    // 1) Grab the JS array argument
+fn fp_poseidon_block_cipher_native(mut cx: FunctionContext) -> JsResult<JsArray> {
+    
     let js_input = cx.argument::<JsArray>(0)?;
 
     let val1: Handle<JsValue> = js_input.get(&mut cx, 0)?; // Explicit type
@@ -17,15 +17,15 @@ fn fp_poseidon_block_cipher_native(mut cx: FunctionContext) -> JsResult<JsString
   
     let mut state = vec![Fp::from(n1)];
 
-    // 4) Run Poseidon block cipher
+
     poseidon_block_cipher::<Fp, PlonkSpongeConstantsKimchi>(
         &fp_kimchi::static_params(),
         &mut state,
     );
 
-    // 5) Return a single string describing the final permuted state
+    
     Ok(cx.string(format!(
-        "Poseidon Fp permutation native result: {:?}",
+        "Poseidon Fp permutation native result 3: {:?}",
         state
     )))
 }
