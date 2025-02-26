@@ -6,7 +6,7 @@ use mina_poseidon::{
     pasta::fp_kimchi,
 };
 
-fn fp_poseidon_block_cipher_native(mut cx: FunctionContext) -> JsResult<JsString> {
+fn fp_poseidon_block_cipher_native(mut cx: FunctionContext) -> JsResult<JsArray> {
     
     let js_input = cx.argument::<JsArray>(0)?;
 
@@ -25,9 +25,11 @@ fn fp_poseidon_block_cipher_native(mut cx: FunctionContext) -> JsResult<JsString
 
     let len = state.len();
     let js_array = JsArray::new(&mut cx, len as u32);
-
+    
     for (i, fp_element) in state.iter().enumerate() {
-
+        let debug_str = format!("{:?}", fp_element);
+        let js_element = cx.string(debug_str);
+        js_array.set(&mut cx, i as u32, js_str)?;
     }
     
     Ok(cx.string(format!(
