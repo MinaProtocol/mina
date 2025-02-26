@@ -290,6 +290,16 @@ let get_root t =
       | Error _ as e ->
           e )
 
+let is_root_replaced_by_common_and_hash t =
+  match
+    get_batch t.db
+      ~keys:[ Some_key Root; Some_key Root_hash; Some_key Root_common ]
+  with
+  | [ None; Some _; Some _ ] ->
+      true
+  | _ ->
+      false
+
 let get_root_hash t =
   match get t.db ~key:Root_hash ~error:(`Not_found `Root_hash) with
   | Ok hash ->
