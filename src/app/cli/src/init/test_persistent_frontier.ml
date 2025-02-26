@@ -22,6 +22,7 @@ let main ~frontier_db_path ~no_root_compatible ~num_of_samples () =
       to ensure we have `root_hash` and `root_common` inside the DB
       *)
     deserialize_root_hash ~logger ~db ;
+  assert (Database.is_root_replaced_by_common_and_hash db) ;
   let rec sample cnt =
     match cnt with
     | 0 ->
