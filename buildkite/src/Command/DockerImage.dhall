@@ -50,7 +50,7 @@ let ReleaseSpec =
           , deb_version = "\\\${MINA_DEB_VERSION}"
           , deb_profile = Profiles.Type.Standard
           , build_flags = BuildFlags.Type.None
-          , deb_repo = DebianRepo.Type.PackagesO1Test
+          , deb_repo = DebianRepo.Type.Local
           , no_cache = False
           , step_key = "daemon-standard-docker-image"
           , if = None B/If
@@ -103,8 +103,7 @@ let generateStep =
 
           let commands =
                 merge
-                  { PackagesO1Test = remoteRepoCmds
-                  , Unstable = remoteRepoCmds
+                  { Unstable = remoteRepoCmds
                   , Nightly = remoteRepoCmds
                   , Stable = remoteRepoCmds
                   , Local =
