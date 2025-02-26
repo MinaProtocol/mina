@@ -23,7 +23,6 @@ in  Pipeline.build
           [ S.strictlyStart (S.contains "src")
           , S.strictlyStart (S.contains "scripts/changelog.sh")
           , S.strictlyStart (S.contains "buildkite/scripts/changelog.sh")
-          , S.strictlyStart (S.contains "scripts/src/Jobs/Lint/Changelog.dhall")
           , S.strictlyStart (S.contains "scripts/github/github_info")
           , S.exactly "buildkite/src/Jobs/Lint/Changelog" "dhall"
           ]
