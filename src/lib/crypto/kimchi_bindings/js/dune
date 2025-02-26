@@ -7,7 +7,8 @@
    bindings-bigint256.js
    bindings-field.js
    bindings-curve.js
-   bindings-vector.js))
+   bindings-vector.js
+   bindings-rusty.js))
  (instrumentation
   (backend bisect_ppx))
  (preprocess
