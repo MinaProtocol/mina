@@ -19,7 +19,14 @@ let reqFile = "^changes/\\\${BUILDKITE_PULL_REQUEST}-.*.md"
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
-        , dirtyWhen = [ S.strictlyStart (S.contains "src") ]
+        , dirtyWhen = [ 
+            S.strictlyStart (S.contains "src") 
+            , S.strictlyStart (S.contains "scripts/changelog.sh") 
+            , S.strictlyStart (S.contains "buildkite/scripts/changelog.sh") 
+            , S.strictlyStart (S.contains "scripts/src/Jobs/Lint/Changelog.dhall") 
+            , S.strictlyStart (S.contains "scripts/github/github_info") 
+            , S.exactly "buildkite/src/Jobs/Lint/Changelog" "dhall"
+          ]
         , path = "Lint"
         , name = "Changelog"
         , tags =
