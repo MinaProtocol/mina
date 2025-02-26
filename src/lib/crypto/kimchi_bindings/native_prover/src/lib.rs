@@ -29,13 +29,10 @@ fn fp_poseidon_block_cipher_native(mut cx: FunctionContext) -> JsResult<JsArray>
     for (i, fp_element) in state.iter().enumerate() {
         let debug_str = format!("{:?}", fp_element);
         let js_element = cx.string(debug_str);
-        js_array.set(&mut cx, i as u32, js_str)?;
+        js_array.set(&mut cx, i as u32, js_element)?;
     }
     
-    Ok(cx.string(format!(
-        "Poseidon Fp permutation native result: {:?}",
-        state
-    )))
+    Ok(js_array)
 }
 
 // The Neon module initialization
