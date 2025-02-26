@@ -8,6 +8,7 @@ if [[ $# -ne 1 ]]; then
   exit 1
 fi
 
+SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
 
 if [[ "$NIX_CACHE_NAR_SECRET" != "" ]]; then
@@ -46,17 +47,6 @@ chown -R "${USER}" /workdir
 nix-env -i git-lfs
 
 git config --global --add safe.directory /workdir
-
-git fetch origin $1:$1
-# Nix has issue when performing operations on detached head
-# On Ci machine it spit out issues like:
-# fatal: reference is not a tree: ....
-# error:
-#       … while fetching the input 'git+file:///workdir'
-#
-#       error: program 'git' failed with exit code 128
-# That is why we checkout branch explicitly
-git checkout $1
 
 git submodule sync
 git submodule update --init --recursive
