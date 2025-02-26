@@ -219,7 +219,8 @@ let make_timeout t transition_with_hash duration =
           ; ( "duration"
             , `Int (Block_time.Span.to_ms duration |> Int64.to_int_trunc) )
           ; ( "cached_transition"
-            , With_hash.data transition_with_hash |> Mina_block.to_yojson )
+            , With_hash.data transition_with_hash
+              |> Mina_block.header |> Mina_block.to_logging_yojson )
           ]
         "Timed out waiting for the parent of $cached_transition after \
          $duration ms, signalling a catchup job" ;
