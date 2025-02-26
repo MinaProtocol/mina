@@ -51,7 +51,9 @@ let create_credential_arg ~connection =
         let host = uri |> Uri.host in
         let port = uri |> Uri.port in
         let db = uri |> Uri.path in
-        let db = if String.is_empty db then None else Some db in
+        let db =
+          if String.is_empty db then None else Some (String.drop_prefix db 1)
+        in
         { Credentials.password; user; host; db; port }
     | Credentials credentials ->
         credentials
@@ -66,7 +68,7 @@ let create_credential_arg ~connection =
 
 let run_command ~connection command =
   let creds = create_credential_arg ~connection in
-  Util.run_cmd_exn "." psql (creds @ [ "-c"; command ])
+  Util.run_cmd_exn "." psql (creds @ [ "-c"; command; "-t" ]) >>| String.strip
 
 let run_script ~connection ~db script =
   let creds = create_credential_arg ~connection in
