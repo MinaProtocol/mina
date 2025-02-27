@@ -134,7 +134,8 @@ module Scan_state : sig
     -> t
     -> unit Deferred.Or_error.t
 
-  val write_all_proofs_to_disk : Stable.Latest.t -> t
+  val write_all_proofs_to_disk :
+    proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
 
   val read_all_proofs_from_disk : t -> Stable.Latest.t
 end
@@ -194,6 +195,7 @@ val hash : t -> Staged_ledger_hash.t
 
 val apply :
      ?skip_verification:[ `Proofs | `All ]
+  -> proof_cache_db:Proof_cache_tag.cache_db
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> t
@@ -210,7 +212,7 @@ val apply :
   -> zkapp_cmd_limit_hardcap:int
   -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
        * [ `Ledger_proof of
-           ( Ledger_proof.t
+           ( Ledger_proof.Cached.t
            * ( Transaction.t With_status.t
              * State_hash.t
              * Mina_numbers.Global_slot_since_genesis.t )
@@ -223,7 +225,8 @@ val apply :
      Deferred.Result.t
 
 val apply_diff_unchecked :
-     constraint_constants:Genesis_constants.Constraint_constants.t
+     proof_cache_db:Proof_cache_tag.cache_db
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
@@ -235,7 +238,7 @@ val apply_diff_unchecked :
   -> zkapp_cmd_limit_hardcap:int
   -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
        * [ `Ledger_proof of
-           ( Ledger_proof.t
+           ( Ledger_proof.Cached.t
            * ( Transaction.t With_status.t
              * State_hash.t
              * Mina_numbers.Global_slot_since_genesis.t )
@@ -248,7 +251,7 @@ val apply_diff_unchecked :
      Deferred.Result.t
 
 (** Most recent ledger proof in t *)
-val current_ledger_proof : t -> Ledger_proof.t option
+val current_ledger_proof : t -> Ledger_proof.Cached.t option
 
 (* Internals of the txn application. This is only exposed to facilitate
    writing unit tests. *)
@@ -331,7 +334,9 @@ val of_scan_state_pending_coinbases_and_snarked_ledger_unchecked :
 val all_work_pairs :
      t
   -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-  -> (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
+  -> ( Transaction_witness.t
+     , Ledger_proof.Cached.t )
+     Snark_work_lib.Work.Single.Spec.t
      One_or_two.t
      list
      Or_error.t

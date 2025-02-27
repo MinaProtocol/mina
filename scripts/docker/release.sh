@@ -6,17 +6,11 @@
 
 set -eo pipefail
 
-CLEAR='\033[0m'
-RED='\033[0;31m'
-
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 # shellcheck disable=SC1090
 source ${SCRIPTPATH}/helper.sh
 
 function usage() {
-  if [[ -n "$1" ]]; then
-    echo -e "${RED}☞  $1${CLEAR}\n";
-  fi
   echo "Usage: $0 [-s service-to-release] [-v service-version] [-n network]"
   echo "  -s, --service             The Service being released to Dockerhub"
   echo "  -v, --version             The version to be used in the docker image tag"
@@ -41,16 +35,16 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-version) export DEB_VERSION="--build-arg deb_version=$2"; shift;;
   --deb-profile) export DEB_PROFILE="$2"; shift;;
   --deb-build-flags) export DEB_BUILD_FLAGS="$2"; shift;;
-  --help) usage "$@"; exit 0;;
-  *) echo "Unknown parameter passed: $1"; usage "$@"; exit 1;;
+  --help) usage; exit 0;;
+  *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
 export_version
 export_base_image
 export_docker_tag
 
-echo tag ${TAG}
-echo hash ${HASHTAG}
+echo tag "${TAG}"
+echo hash "${HASHTAG}"
 
 # push to GCR
 docker push "${TAG}"

@@ -33,6 +33,11 @@ module Common = struct
   let scan_state t = t.scan_state
 
   let pending_coinbase t = t.pending_coinbase
+
+  let read_all_proofs_from_disk { scan_state; pending_coinbase } =
+    { Stable.Latest.pending_coinbase
+    ; scan_state = Staged_ledger.Scan_state.read_all_proofs_from_disk scan_state
+    }
 end
 
 module Historical = struct
@@ -130,6 +135,12 @@ module Minimal = struct
       let of_limited ~common hash = { hash; common }
 
       let to_latest = Fn.id
+
+      let common t = t.common
+
+      let scan_state t = t.common.Common.Stable.Latest.scan_state
+
+      let pending_coinbase t = t.common.Common.Stable.Latest.pending_coinbase
     end
   end]
 
@@ -163,16 +174,6 @@ module Minimal = struct
   let scan_state t = Common.scan_state t.common
 
   let pending_coinbase t = Common.pending_coinbase t.common
-
-  let write_all_proofs_to_disk
-      { Stable.Latest.hash; common = { scan_state; pending_coinbase } } =
-    { hash
-    ; common =
-        { pending_coinbase
-        ; scan_state =
-            Staged_ledger.Scan_state.write_all_proofs_to_disk scan_state
-        }
-    }
 
   let read_all_proofs_from_disk
       { hash; common = { scan_state; pending_coinbase } } =

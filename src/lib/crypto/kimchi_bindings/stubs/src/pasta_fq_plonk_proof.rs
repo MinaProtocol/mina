@@ -27,7 +27,7 @@ use mina_poseidon::{
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
 use poly_commitment::commitment::{CommitmentCurve, PolyComm};
-use poly_commitment::evaluation_proof::OpeningProof;
+use poly_commitment::ipa::OpeningProof;
 use std::array;
 use std::convert::TryInto;
 
@@ -60,13 +60,13 @@ pub fn caml_pasta_fq_plonk_proof_create(
                     .iter()
                     .map(Into::<Fq>::into)
                     .collect();
-                let comm = PolyComm::<Pallas> { elems: vec![sg] };
+                let comm = PolyComm::<Pallas> { chunks: vec![sg] };
                 RecursionChallenge { chals, comm }
             })
             .collect()
     };
 
-    let witness: Vec<Vec<_>> = witness.iter().map(|x| (*x.0).clone()).collect();
+    let witness: Vec<Vec<_>> = witness.iter().map(|x| (**x).clone()).collect();
     let witness: [Vec<_>; COLUMNS] = witness
         .try_into()
         .expect("the witness should be a column of 15 vectors");
@@ -175,7 +175,7 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProofWithPublic<CamlGPallas, Cam
     fn comm() -> PolyComm<Pallas> {
         let g = Pallas::generator();
         PolyComm {
-            elems: vec![g, g, g],
+            chunks: vec![g, g, g],
         }
     }
 

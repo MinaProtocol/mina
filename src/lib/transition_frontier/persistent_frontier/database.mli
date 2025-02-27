@@ -21,6 +21,8 @@ val with_batch : t -> f:(batch_t -> 'a) -> 'a
 module Error : sig
   type not_found_member =
     [ `Root
+    | `Root_hash
+    | `Root_common
     | `Best_tip
     | `Frontier_hash
     | `Root_transition
@@ -103,7 +105,8 @@ val get_arcs :
   -> (State_hash.t list, [> `Not_found of [> `Arcs of State_hash.t ] ]) Result.t
 
 val get_root :
-  t -> (Root_data.Minimal.t, [> `Not_found of [> `Root ] ]) Result.t
+     t
+  -> (Root_data.Minimal.Stable.Latest.t, [> `Not_found of [> `Root ] ]) Result.t
 
 val get_protocol_states_for_root_scan_state :
      t
