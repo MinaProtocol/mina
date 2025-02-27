@@ -75,6 +75,13 @@ let promoteDebianStep =
 
                 else  ""
 
+          let sign =
+                      if spec.allow_signing
+
+                then  DebianRepo.keyArg spec.target_repo
+
+                else  ""
+
           in  Command.build
                 Command.Config::{
                 , commands =
@@ -91,7 +98,7 @@ let promoteDebianStep =
                                                                                                                                                                                                                                                                                                   spec.from_channel}  --new-suite ${DebianChannel.lowerName
                                                                                                                                                                                                                                                                                                                                       spec.to_channel} --release ${DebianChannel.lowerName
                                                                                                                                                                                                                                                                                                                                                                      spec.from_channel} --new-release ${DebianChannel.lowerName
-                                                                                                                                                                                                                                                                                                                                                                                                          spec.to_channel}  ${new_name}"
+                                                                                                                                                                                                                                                                                                                                                                                                          spec.to_channel}  ${new_name} ${sign}"
                 , label = "Debian: ${spec.step_key}"
                 , key = spec.step_key
                 , target = Size.Small
