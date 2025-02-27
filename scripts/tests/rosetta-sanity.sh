@@ -28,7 +28,10 @@ while [[ "$#" -gt 0 ]]; do
         --network) NETWORK="$2"; shift ;;
         --wait-for-sync) WAIT_FOR_SYNC=true ;;
         --timeout) TIMEOUT="$2"; shift ;;
-        --address) mainnet[address]="$2"
+        --address) 
+                   # shellcheck disable=SC2034
+                   mainnet[address]="$2"
+                   # shellcheck disable=SC2034
                    devnet[address]="$2"
                    shift
                    ;;
@@ -62,7 +65,7 @@ function wait_for_sync() {
     declare -n __test_data=$1
 
     echo "⏳  Waiting for rosetta to sync..."
-    local start_time=$(date +%s)
+    local start_time; start_time=$(date +%s)
     local end_time=$((start_time + TIMEOUT))
     local sync_status=""
 
@@ -156,9 +159,9 @@ function run_tests_with_test_data() {
 
 if [[ "$WAIT_FOR_SYNC" == "true" ]]; then
     if [[ "$NETWORK" == "mainnet" ]]; then
-        wait_for_sync "mainnet"
+        wait_for_sync mainnet
     elif [[ "$NETWORK" == "devnet" ]]; then
-        wait_for_sync "devnet"
+        wait_for_sync devnet
     else
         echo "Unknown network: $NETWORK. available networks: mainnet, devnet. Exiting..."
         exit 1
@@ -166,9 +169,9 @@ if [[ "$WAIT_FOR_SYNC" == "true" ]]; then
 fi
 
 if [[ "$NETWORK" == "mainnet" ]]; then
-    run_tests_with_test_data "mainnet"
+    run_tests_with_test_data mainnet
 elif [[ "$NETWORK" == "devnet" ]]; then
-    run_tests_with_test_data "devnet"
+    run_tests_with_test_data devnet
 else
     echo "Unknown network: $NETWORK. available networks: mainnet, devnet. Exiting..."
     exit 1
