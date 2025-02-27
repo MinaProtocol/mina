@@ -20,7 +20,7 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
   if Bool.equal precomputed extensional then
     failwith "Must provide exactly one of -precomputed and -extensional" ;
   let logger = Logger.create () in
-  match Mina_caqti.connect_pool archive_uri with
+  match Caqti_async.connect_pool archive_uri with
   | Error e ->
       [%log fatal]
         ~metadata:[ ("error", `String (Caqti_error.show e)) ]
