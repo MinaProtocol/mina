@@ -38,6 +38,7 @@ let promote_artifacts =
       ->  \(tag : Text)
       ->  \(remove_profile_from_name : Bool)
       ->  \(publish : Bool)
+      ->  \(sign_debians : Bool)
       ->  let promotePackages =
                 PromotePackages.PromotePackagesSpec::{
                 , debians = debians
@@ -62,6 +63,7 @@ let promote_artifacts =
                     ->  [ tag ]
                 , remove_profile_from_name = remove_profile_from_name
                 , publish = publish
+                , allow_debian_signing = sign_debians
                 }
 
           let debiansSpecs =
@@ -94,6 +96,7 @@ let verify_artifacts =
       ->  \(tag : Text)
       ->  \(remove_profile_from_name : Bool)
       ->  \(publish : Bool)
+      ->  \(are_debian_signed : Bool)
       ->  let verify_packages =
                 VerifyPackages.VerifyPackagesSpec::{
                 , promote_step_name = None Text
@@ -115,6 +118,7 @@ let verify_artifacts =
                     ->  [ tag ]
                 , remove_profile_from_name = remove_profile_from_name
                 , published = publish
+                , are_debian_signed = are_debian_signed
                 }
 
           let debiansSpecs =
