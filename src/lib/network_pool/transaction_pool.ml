@@ -287,20 +287,19 @@ struct
         ; verifier : (Verifier.t[@sexp.opaque])
         ; genesis_constants : Genesis_constants.t
         ; slot_tx_end : Mina_numbers.Global_slot_since_hard_fork.t option
-        ; compile_config : Mina_compile_config.t
+        ; vk_cache_db : Zkapp_vk_cache_tag.cache_db
         }
-      [@@deriving sexp_of]
 
       (* remove next line if there's a way to force [@@deriving make] write a
          named parameter instead of an optional parameter *)
       let make ~trust_system ~pool_max_size ~verifier ~genesis_constants
-          ~slot_tx_end ~compile_config =
+          ~slot_tx_end ~vk_cache_db =
         { trust_system
         ; pool_max_size
         ; verifier
         ; genesis_constants
         ; slot_tx_end
-        ; compile_config
+        ; vk_cache_db
         }
     end
 
@@ -333,15 +332,17 @@ struct
     module Vk_refcount_table = struct
       type t =
         { verification_keys :
-            (int * Verification_key_wire.t) Zkapp_basic.F_map.Table.t
+            (int * Zkapp_vk_cache_tag.t) Zkapp_basic.F_map.Table.t
         ; account_id_to_vks : int Zkapp_basic.F_map.Map.t Account_id.Table.t
         ; vk_to_account_ids : int Account_id.Map.t Zkapp_basic.F_map.Table.t
+        ; vk_cache_db : Zkapp_vk_cache_tag.cache_db
         }
 
-      let create () =
+      let create vk_cache_db () =
         { verification_keys = Zkapp_basic.F_map.Table.create ()
         ; account_id_to_vks = Account_id.Table.create ()
         ; vk_to_account_ids = Zkapp_basic.F_map.Table.create ()
+        ; vk_cache_db
         }
 
       let find_vk (t : t) = Hashtbl.find t.verification_keys
@@ -367,7 +368,7 @@ struct
         in
         Hashtbl.update t.verification_keys vk.hash ~f:(function
           | None ->
-              (1, vk)
+              (1, Zkapp_vk_cache_tag.write_key_to_disk t.vk_cache_db vk)
           | Some (count, vk) ->
               (count + 1, vk) ) ;
         Hashtbl.update t.account_id_to_vks account_id
@@ -427,13 +428,12 @@ struct
       ; mutable current_batch : int
       ; mutable remaining_in_batch : int
       ; config : Config.t
-      ; logger : (Logger.t[@sexp.opaque])
+      ; logger : Logger.t
       ; batcher : Batcher.t
-      ; mutable best_tip_diff_relay : (unit Deferred.t[@sexp.opaque]) Option.t
-      ; mutable best_tip_ledger : (Base_ledger.t[@sexp.opaque]) Option.t
-      ; verification_key_table : (Vk_refcount_table.t[@sexp.opaque])
+      ; mutable best_tip_diff_relay : unit Deferred.t Option.t
+      ; mutable best_tip_ledger : Base_ledger.t Option.t
+      ; verification_key_table : Vk_refcount_table.t
       }
-    [@@deriving sexp_of]
 
     let member t x =
       Indexed_pool.member t.pool (Transaction_hash.User_command.of_checked x)
@@ -839,7 +839,8 @@ struct
         ; batcher = Batcher.create ~logger config.verifier
         ; best_tip_diff_relay = None
         ; best_tip_ledger = None
-        ; verification_key_table = Vk_refcount_table.create ()
+        ; verification_key_table =
+            Vk_refcount_table.create config.vk_cache_db ()
         }
       in
       don't_wait_for
@@ -1095,8 +1096,7 @@ struct
               ~f:(fun acc user_cmd ->
                 match
                   User_command.check_well_formedness
-                    ~genesis_constants:t.config.genesis_constants
-                    ~compile_config:t.config.compile_config user_cmd
+                    ~genesis_constants:t.config.genesis_constants user_cmd
                 with
                 | Ok () ->
                     acc
@@ -1172,7 +1172,12 @@ struct
                             in
                             let vks =
                               vks
-                              |> List.map ~f:(fun vk -> (vk.hash, vk))
+                              |> List.map ~f:(fun vk_cached ->
+                                     let vk =
+                                       Zkapp_vk_cache_tag.read_key_from_disk
+                                         vk_cached
+                                     in
+                                     (vk.hash, vk) )
                               |> Zkapp_basic.F_map.Map.of_alist_exn
                             in
                             (account_id, vks) )
@@ -1648,10 +1653,7 @@ let%test_module _ =
     let num_extra_keys = 30
 
     let block_window_duration =
-      Float.of_int
-        Genesis_constants.For_unit_tests.Constraint_constants.t
-          .block_window_duration_ms
-      |> Time.Span.of_ms
+      Mina_compile_config.For_unit_tests.t.block_window_duration
 
     (* keys that can be used when generating new accounts *)
     let extra_keys =
@@ -1666,8 +1668,6 @@ let%test_module _ =
     let proof_level = precomputed_values.proof_level
 
     let genesis_constants = precomputed_values.genesis_constants
-
-    let compile_config = precomputed_values.compile_config
 
     let minimum_fee =
       Currency.Fee.to_nanomina_int genesis_constants.minimum_user_command_fee
@@ -1937,7 +1937,8 @@ let%test_module _ =
       let trust_system = Trust_system.null () in
       let config =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
-          ~genesis_constants ~slot_tx_end ~compile_config
+          ~genesis_constants ~slot_tx_end
+          ~vk_cache_db:(Zkapp_vk_cache_tag.For_tests.create_db ())
       in
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants

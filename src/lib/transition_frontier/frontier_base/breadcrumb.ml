@@ -103,8 +103,8 @@ let compute_block_trace_metadata transition_with_validation =
     ; ("coinbase_receiver", Account.key_to_yojson @@ coinbase_receiver cs)
     ]
 
-let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
-    ~trust_system ~parent
+let build ?skip_staged_ledger_verification ~proof_cache_db ~logger
+    ~precomputed_values ~verifier ~trust_system ~parent
     ~transition:(transition_with_validation : Mina_block.almost_valid_block)
     ~get_completed_work ~sender ~transition_receipt_time () =
   let state_hash =
@@ -121,8 +121,8 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
       let open Deferred.Let_syntax in
       match%bind
         Validation.validate_staged_ledger_diff ?skip_staged_ledger_verification
-          ~get_completed_work ~logger ~precomputed_values ~verifier
-          ~parent_staged_ledger:(staged_ledger parent)
+          ~proof_cache_db ~get_completed_work ~logger ~precomputed_values
+          ~verifier ~parent_staged_ledger:(staged_ledger parent)
           ~parent_protocol_state:
             ( parent.validated_transition |> Mina_block.Validated.header
             |> Mina_block.Header.protocol_state )
@@ -283,6 +283,8 @@ module For_tests = struct
   open Currency
   open Signature_lib
 
+  let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
   (* Generate valid payments for each blockchain state by having
      each user send a payment of one coin to another random
      user if they have at least one coin*)
@@ -419,8 +421,8 @@ module For_tests = struct
                , `Pending_coinbase_update _ ) =
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
-            ~global_slot:current_global_slot ~coinbase_receiver ~logger
-            staged_ledger_diff
+            ~proof_cache_db ~global_slot:current_global_slot ~coinbase_receiver
+            ~logger staged_ledger_diff
             ~constraint_constants:precomputed_values.constraint_constants
             ~current_state_view ~state_and_body_hash ~supercharge_coinbase
             ~zkapp_cmd_limit_hardcap:
@@ -441,7 +443,7 @@ module For_tests = struct
       in
       let ledger_proof_statement =
         Option.value_map ledger_proof_opt
-          ~f:(fun (proof, _) -> Ledger_proof.statement proof)
+          ~f:(fun (proof, _) -> Ledger_proof.Cached.statement proof)
           ~default:previous_ledger_proof_stmt
       in
       let genesis_ledger_hash =
@@ -502,8 +504,9 @@ module For_tests = struct
       in
       let transition_receipt_time = Some (Time.now ()) in
       match%map
-        build ~logger ~precomputed_values ~trust_system ~verifier
-          ~get_completed_work:(Fn.const None) ~parent:parent_breadcrumb
+        build ~proof_cache_db ~logger ~precomputed_values ~trust_system
+          ~verifier ~get_completed_work:(Fn.const None)
+          ~parent:parent_breadcrumb
           ~transition:
             ( next_block |> Mina_block.Validated.remember
             |> Validation.reset_staged_ledger_diff_validation )

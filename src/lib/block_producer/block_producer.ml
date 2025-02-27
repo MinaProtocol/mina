@@ -20,6 +20,8 @@ module type CONTEXT = sig
   val zkapp_cmd_limit : int option ref
 
   val vrf_poll_interval : Time.Span.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 type Structured_log_events.t += Block_produced
@@ -166,11 +168,12 @@ let report_transaction_inclusion_failures ~commit_id ~logger failed_txns =
       let leftover_bytes = available_bytes - base_error_size - 2 in
       wrap_error (`List (generate_errors failed_txns leftover_bytes)) )
 
-let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
-    ~previous_protocol_state ~time_controller ~staged_ledger ~transactions
-    ~get_completed_work ~logger ~(block_data : Consensus.Data.Block_data.t)
-    ~winner_pk ~scheduled_time ~log_block_creation ~block_reward_threshold
-    ~zkapp_cmd_limit_hardcap ~slot_tx_end ~slot_chain_end =
+let generate_next_state ~proof_cache_db ~commit_id ~zkapp_cmd_limit
+    ~constraint_constants ~previous_protocol_state ~time_controller
+    ~staged_ledger ~transactions ~get_completed_work ~logger
+    ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
+    ~log_block_creation ~block_reward_threshold ~zkapp_cmd_limit_hardcap
+    ~slot_tx_end ~slot_chain_end =
   let open Interruptible.Let_syntax in
   let global_slot_since_hard_fork =
     Consensus.Data.Block_data.global_slot block_data
@@ -276,7 +279,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
           [%log internal] "Apply_staged_ledger_diff" ;
           match%map
             let%bind.Deferred.Result diff = return diff in
-            Staged_ledger.apply_diff_unchecked staged_ledger
+            Staged_ledger.apply_diff_unchecked staged_ledger ~proof_cache_db
               ~constraint_constants ~global_slot diff ~logger
               ~current_state_view:previous_state_view
               ~state_and_body_hash:
@@ -344,7 +347,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 let ledger_proof_statement =
                   match ledger_proof_opt with
                   | Some (proof, _) ->
-                      Ledger_proof.statement proof
+                      Ledger_proof.Cached.statement proof
                   | None ->
                       let state =
                         previous_protocol_state
@@ -359,7 +362,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 let supply_increase =
                   Option.value_map ledger_proof_opt
                     ~f:(fun (proof, _) ->
-                      (Ledger_proof.statement proof).supply_increase )
+                      (Ledger_proof.Cached.statement proof).supply_increase )
                     ~default:Currency.Amount.Signed.zero
                 in
                 let body_reference =
@@ -410,7 +413,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                       ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
                       ~ledger_proof:
                         (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
-                             proof ) ) )
+                             Ledger_proof.Cached.read_proof_from_disk proof ) ) )
               in
               let witness =
                 { Pending_coinbase_witness.pending_coinbases =
@@ -768,8 +771,8 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
       let%bind () = Interruptible.lift (Deferred.return ()) (Ivar.read ivar) in
       [%log internal] "Generate_next_state" ;
       let%bind next_state_opt =
-        generate_next_state ~commit_id ~constraint_constants ~scheduled_time
-          ~block_data ~previous_protocol_state ~time_controller
+        generate_next_state ~proof_cache_db ~commit_id ~constraint_constants
+          ~scheduled_time ~block_data ~previous_protocol_state ~time_controller
           ~staged_ledger:(Breadcrumb.staged_ledger crumb)
           ~transactions ~get_completed_work ~logger ~log_block_creation
           ~winner_pk:winner_pubkey ~block_reward_threshold
@@ -799,17 +802,12 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                     (Mina_base.State_hash.to_base58_check
                        protocol_state_hashes.state_hash ) )
               ] ;
-          let module Consensus_context = struct
-            include Context
-
-            let compile_config = precomputed_values.compile_config
-          end in
           Internal_tracing.with_state_hash protocol_state_hashes.state_hash
           @@ fun () ->
           Debug_assert.debug_assert (fun () ->
               [%test_result: [ `Take | `Keep ]]
                 (Consensus.Hooks.select
-                   ~context:(module Consensus_context)
+                   ~context:(module Context)
                    ~existing:
                      (With_hash.map ~f:Mina_block.consensus_state
                         previous_transition )
@@ -824,7 +822,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
               in
               [%test_result: [ `Take | `Keep ]]
                 (Consensus.Hooks.select
-                   ~context:(module Consensus_context)
+                   ~context:(module Context)
                    ~existing:root_consensus_state_with_hashes
                    ~candidate:consensus_state_with_hashes )
                 ~expect:`Take
@@ -893,7 +891,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                       `This_block_was_not_received_via_gossip
                 >>= Validation.validate_frontier_dependencies
                       ~to_header:Mina_block.header
-                      ~context:(module Consensus_context)
+                      ~context:(module Context)
                       ~root_block:
                         ( Transition_frontier.root frontier
                         |> Breadcrumb.block_with_hash )
@@ -906,9 +904,9 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
               let%bind breadcrumb =
                 time ~logger ~time_controller
                   "Build breadcrumb on produced block" (fun () ->
-                    Breadcrumb.build ~logger ~precomputed_values ~verifier
-                      ~get_completed_work:(Fn.const None) ~trust_system
-                      ~parent:crumb ~transition
+                    Breadcrumb.build ~proof_cache_db ~logger ~precomputed_values
+                      ~verifier ~get_completed_work:(Fn.const None)
+                      ~trust_system ~parent:crumb ~transition
                       ~sender:None (* Consider skipping `All here *)
                       ~skip_staged_ledger_verification:`Proofs
                       ~transition_receipt_time () )
@@ -1397,15 +1395,10 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
           Header.protocol_state
           @@ Mina_block.header (With_hash.data previous_transition)
         in
-        let module Consensus_context = struct
-          include Context
-
-          let compile_config = precomputed_values.compile_config
-        end in
         Debug_assert.debug_assert (fun () ->
             [%test_result: [ `Take | `Keep ]]
               (Consensus.Hooks.select
-                 ~context:(module Consensus_context)
+                 ~context:(module Context)
                  ~existing:
                    (With_hash.map ~f:Mina_block.consensus_state
                       previous_transition )
@@ -1420,7 +1413,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
             in
             [%test_result: [ `Take | `Keep ]]
               (Consensus.Hooks.select
-                 ~context:(module Consensus_context)
+                 ~context:(module Context)
                  ~existing:root_consensus_state_with_hashes
                  ~candidate:consensus_state_with_hashes )
               ~expect:`Take
@@ -1458,7 +1451,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                       previous_protocol_state )
             >>= Validation.validate_frontier_dependencies
                   ~to_header:Mina_block.header
-                  ~context:(module Consensus_context)
+                  ~context:(module Context)
                   ~root_block:
                     ( Transition_frontier.root frontier
                     |> Breadcrumb.block_with_hash )
@@ -1471,8 +1464,8 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
           let%bind breadcrumb =
             time ~logger ~time_controller
               "Build breadcrumb on produced block (precomputed)" (fun () ->
-                Breadcrumb.build ~logger ~precomputed_values ~verifier
-                  ~get_completed_work:(Fn.const None) ~trust_system
+                Breadcrumb.build ~proof_cache_db ~logger ~precomputed_values
+                  ~verifier ~get_completed_work:(Fn.const None) ~trust_system
                   ~parent:crumb ~transition ~sender:None
                   ~skip_staged_ledger_verification:`Proofs
                   ~transition_receipt_time ()

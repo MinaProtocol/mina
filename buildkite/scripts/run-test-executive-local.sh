@@ -46,7 +46,7 @@ git config --global --add safe.directory /workdir
 
 echo "deb [trusted=yes] https://apt.releases.hashicorp.com $MINA_DEB_CODENAME main" | tee /etc/apt/sources.list.d/hashicorp.list
 apt-get update
-apt-get install -y "terraform" "docker" "docker-compose-plugin" "docker-ce"
+apt-get install -y "docker" "docker-compose-plugin" "docker-ce"
 
 source buildkite/scripts/debian/install.sh "mina-test-executive"
 

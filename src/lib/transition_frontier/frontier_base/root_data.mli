@@ -11,6 +11,8 @@ module Common : sig
   end]
 
   type t
+
+  val read_all_proofs_from_disk : t -> Stable.V2.t
 end
 
 (* Historical root data is similar to Limited root data, except that it also
@@ -103,6 +105,12 @@ module Minimal : sig
       val hash : t -> State_hash.t
 
       val of_limited : common:Common.Stable.V2.t -> State_hash.Stable.V1.t -> t
+
+      val common : t -> Common.Stable.V2.t
+
+      val scan_state : t -> Staged_ledger.Scan_state.Stable.V2.t
+
+      val pending_coinbase : t -> Pending_coinbase.Stable.V2.t
     end
   end]
 
@@ -128,8 +136,6 @@ module Minimal : sig
     -> scan_state:Staged_ledger.Scan_state.t
     -> pending_coinbase:Pending_coinbase.t
     -> t
-
-  val write_all_proofs_to_disk : Stable.Latest.t -> t
 
   val read_all_proofs_from_disk : t -> Stable.Latest.t
 end

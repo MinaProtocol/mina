@@ -971,10 +971,8 @@ module Mutations = struct
                 "Could not find an archive process to connect to"
         in
         let%map () =
-          Mina_lib.Archive_client.dispatch_precomputed_block
-            ~compile_config:
-              (Mina_lib.config mina).precomputed_values.compile_config
-            archive_location block
+          Mina_lib.Archive_client.dispatch_precomputed_block archive_location
+            block
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
         () )
@@ -1004,10 +1002,8 @@ module Mutations = struct
                 "Could not find an archive process to connect to"
         in
         let%map () =
-          Mina_lib.Archive_client.dispatch_extensional_block
-            ~compile_config:
-              (Mina_lib.config mina).precomputed_values.compile_config
-            archive_location block
+          Mina_lib.Archive_client.dispatch_extensional_block archive_location
+            block
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
         () )

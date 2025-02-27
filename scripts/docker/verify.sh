@@ -14,6 +14,8 @@ while [[ "$#" -gt 0 ]]; do case $1 in
 esac; shift; done
 
 if ! docker pull $REPO/$PACKAGE:$VERSION-${CODENAME}${SUFFIX} ; then
-  echo "Docker verification for $CODENAME $PACKAGE failed"
+  echo "❌ Docker verification for $CODENAME $PACKAGE failed"
   exit 1
+else
+  echo "✅ Docker verification for $CODENAME $PACKAGE passed"
 fi

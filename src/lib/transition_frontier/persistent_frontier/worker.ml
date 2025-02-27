@@ -8,10 +8,7 @@ open Frontier_base
 type input = Diff.Lite.E.t list
 
 type create_args =
-  { db : Database.t
-  ; logger : Logger.t
-  ; persistent_root_instance : Persistent_root.Instance.t
-  }
+  { db : Database.t; logger : Logger.t; dequeue_snarked_ledger : unit -> unit }
 
 module Worker = struct
   (* when this is transitioned to an RPC worker, the db argument
@@ -23,7 +20,7 @@ module Worker = struct
   type t =
     { db : Database.t
     ; logger : Logger.t
-    ; persistent_root_instance : Persistent_root.Instance.t
+    ; dequeue_snarked_ledger : unit -> unit
     }
 
   type nonrec create_args = create_args
@@ -31,8 +28,8 @@ module Worker = struct
   type output = unit
 
   (* worker assumes database has already been checked and initialized *)
-  let create ({ db; logger; persistent_root_instance } : create_args) : t =
-    { db; logger; persistent_root_instance }
+  let create ({ db; logger; dequeue_snarked_ledger } : create_args) : t =
+    { db; logger; dequeue_snarked_ledger }
 
   (* nothing to close *)
   let close _ = Deferred.unit
@@ -59,7 +56,7 @@ module Worker = struct
                 `Fst diff
             | E (Root_transitioned diff) ->
                 `Snd diff
-            | diff ->
+            | E (New_node _) as diff ->
                 `Trd diff )
         in
         (* We only care about the final best tip diff in the sequence, as all other best tip diffs get overwritten *)
@@ -119,8 +116,7 @@ module Worker = struct
         let handle_emitted_proof = function
           | { Diff.Root_transition.just_emitted_a_proof = true; _ } ->
               [%log' info t.logger] "Dequeued a snarked ledger" ;
-              Persistent_root.Instance.dequeue_snarked_ledger
-                t.persistent_root_instance
+              t.dequeue_snarked_ledger ()
           | _ ->
               ()
         in
