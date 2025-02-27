@@ -20,11 +20,13 @@ let DockerLogin = ../Command/DockerLogin/Type.dhall
 
 let DebianRepo = ../Constants/DebianRepo.dhall
 
+let DockerPublish = ../Constants/DockerPublish.dhall
+
 let ReleaseSpec =
       { Type =
           { deps : List Command.TaggedKey.Type
           , network : Text
-          , service : Text
+          , service : Artifacts.Type
           , version : Text
           , branch : Text
           , repo : Text
@@ -35,6 +37,7 @@ let ReleaseSpec =
           , deb_profile : Profiles.Type
           , deb_repo : DebianRepo.Type
           , build_flags : BuildFlags.Type
+          , docker_publish : DockerPublish.Type
           , step_key : Text
           , if : Optional B/If
           }
@@ -42,7 +45,7 @@ let ReleaseSpec =
           { deps = [] : List Command.TaggedKey.Type
           , network = "devnet"
           , version = "\\\${MINA_DOCKER_TAG}"
-          , service = Artifacts.dockerName Artifacts.Type.Daemon
+          , service = Artifacts.Type.Daemon
           , branch = "\\\${BUILDKITE_BRANCH}"
           , repo = "\\\${BUILDKITE_REPO}"
           , deb_codename = "bullseye"
@@ -51,6 +54,7 @@ let ReleaseSpec =
           , deb_profile = Profiles.Type.Standard
           , build_flags = BuildFlags.Type.None
           , deb_repo = DebianRepo.Type.Local
+          , docker_publish = DockerPublish.Type.Essential
           , no_cache = False
           , step_key = "daemon-standard-docker-image"
           , if = None B/If
@@ -65,7 +69,7 @@ let generateStep =
 
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
-                ++  " --service ${spec.service}"
+                ++  " --service ${Artifacts.dockerName spec.service}"
                 ++  " --network ${spec.network}"
                 ++  " --version ${spec.version}"
                 ++  " --branch ${spec.branch}"
@@ -80,15 +84,23 @@ let generateStep =
                 ++  " --repo ${spec.repo}"
 
           let releaseDockerCmd =
-                    "./scripts/docker/release.sh"
-                ++  " --service ${spec.service}"
-                ++  " --version ${spec.version}"
-                ++  " --network ${spec.network}"
-                ++  " --deb-codename ${spec.deb_codename}"
-                ++  " --deb-version ${spec.deb_version}"
-                ++  " --deb-profile ${Profiles.lowerName spec.deb_profile}"
-                ++  " --deb-build-flags ${BuildFlags.lowerName
-                                            spec.build_flags}"
+                      if DockerPublish.shouldPublish
+                           spec.docker_publish
+                           spec.service
+
+                then      "./scripts/docker/release.sh"
+                      ++  " --service ${Artifacts.dockerName spec.service}"
+                      ++  " --version ${spec.version}"
+                      ++  " --network ${spec.network}"
+                      ++  " --deb-codename ${spec.deb_codename}"
+                      ++  " --deb-version ${spec.deb_version}"
+                      ++  " --deb-profile ${Profiles.lowerName
+                                              spec.deb_profile}"
+                      ++  " --deb-build-flags ${BuildFlags.lowerName
+                                                  spec.build_flags}"
+
+                else  " echo In order to ensure storage optimization, skipping publishing docker as this is not essential one or publishing is disabled . Docker publish setting is set to  ${DockerPublish.show
+                                                                                                                                                                                                spec.docker_publish}."
 
           let remoteRepoCmds =
                 [ Cmd.run

@@ -77,6 +77,7 @@
    coda_genesis_ledger
    staged_ledger_diff
    mina_wire_types
+   zkapp_vk_cache_tag
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_base ppx_mina ppx_version ppx_register_event ppx_let ppx_assert ppx_pipebang ppx_deriving.std ppx_sexp_conv ppx_bin_prot ppx_custom_printf ppx_inline_test ppx_snarky ppx_deriving_yojson ppx_fields_conv))
