@@ -52,6 +52,7 @@ function usage() {
   echo "  FROM_REPO                   Source debian repository"
   echo "  TO_REPO                     Target debian repository"
   echo "  PUBLISH                     The Publish to docker.io flag. If defined, script will publish docker do docker.io. Otherwise it will still resides in gcr.io"
+  echo "  SIGN                        The Sign the debian flag. If defined, script will sign debian package"
   echo ""
   exit 1
 }
@@ -72,6 +73,7 @@ if [[ -n "$DEBIANS" ]]; then
     if [[ -z "$TO_REPO" ]]; then TO_REPO="PackagesO1Test"; fi;
     if [[ -z "$FROM_VERSION" ]]; then usage "Version is not set!"; exit 1; fi;
     if [[ -z "$NEW_VERSION" ]]; then NEW_VERSION=$FROM_VERSION; fi;
+    if [[ -z "$SIGN" ]]; then SIGN=0; fi;
     
 
   arr_of_debians=(${DEBIANS//,/ })
@@ -90,6 +92,13 @@ if [[ $PUBLISH -eq 1 ]]; then
   else 
     DHALL_PUBLISH="False"
 fi
+
+if [[ $SIGN -eq 1 ]]; then
+    DHALL_SIGN="True"
+  else 
+    DHALL_SIGN="False"
+fi
+
 
 if [[ -n "$DOCKERS" ]]; then 
     if [[ -z "$NEW_VERSION" ]]; then usage "New Tag is not set!"; fi;
@@ -116,4 +125,4 @@ if [[ "${REMOVE_PROFILE_FROM_NAME}" -eq 0 ]]; then
 else 
   REMOVE_PROFILE_FROM_NAME="True"
 fi 
-echo $PROMOTE_PACKAGE_DHALL_DEF'.promote_artifacts '"$DHALL_DEBIANS"' '"$DHALL_DOCKERS"' "'"${FROM_VERSION}"'" "'"${NEW_VERSION}"'" "amd64" '$PROFILES_DHALL_DEF'.Type.'"${PROFILE}"' '$NETWORK_DHALL_DEF'.Type.'"${NETWORK}"' '"${DHALL_CODENAMES}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${FROM_CHANNEL}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${TO_CHANNEL}"' '$DEBIAN_REPO_DHALL_DEF'.Type.'"${FROM_REPO}"' '$DEBIAN_REPO_DHALL_DEF'.Type.'"${TO_REPO}"' "'"${NEW_VERSION}"'" '${REMOVE_PROFILE_FROM_NAME}' '${DHALL_PUBLISH}' ' | dhall-to-yaml --quoted 
+echo $PROMOTE_PACKAGE_DHALL_DEF'.promote_artifacts '"$DHALL_DEBIANS"' '"$DHALL_DOCKERS"' "'"${FROM_VERSION}"'" "'"${NEW_VERSION}"'" "amd64" '$PROFILES_DHALL_DEF'.Type.'"${PROFILE}"' '$NETWORK_DHALL_DEF'.Type.'"${NETWORK}"' '"${DHALL_CODENAMES}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${FROM_CHANNEL}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${TO_CHANNEL}"' '$DEBIAN_REPO_DHALL_DEF'.Type.'"${FROM_REPO}"' '$DEBIAN_REPO_DHALL_DEF'.Type.'"${TO_REPO}"' "'"${NEW_VERSION}"'" '${REMOVE_PROFILE_FROM_NAME}' '${DHALL_PUBLISH}' '${DHALL_SIGN}' ' | dhall-to-yaml --quoted 
