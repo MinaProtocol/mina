@@ -26,9 +26,9 @@
  (name main)
  (flags
   (:standard -warn-error +a))
- (libraries alcotest mina_block)
+ (libraries alcotest async mina_block disk_cache.lmdb)
  (deps hetzner-itn-1-1795.json)
  (action
   (run %{test}))
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version)))
+ (preprocess (pps ppx_version ppx_jane)))

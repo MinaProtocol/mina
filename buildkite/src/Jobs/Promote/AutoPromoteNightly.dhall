@@ -30,6 +30,10 @@ let PromotePackages = ../../Command/Promotion/PromotePackages.dhall
 
 let VerifyPackages = ../../Command/Promotion/VerifyPackages.dhall
 
+let Command = ../../Command/Base.dhall
+
+let TaggedKey = Command.TaggedKey
+
 let new_tags =
           \(codename : DebianVersions.DebVersion)
       ->  \(channel : DebianChannel.Type)
@@ -101,7 +105,11 @@ in  Pipeline.build
         , name = "AutoPromoteNightly"
         }
       , steps =
-            PromotePackages.promoteSteps promoteDebiansSpecs promoteDockersSpecs
+            PromotePackages.promoteSteps
+              promoteDebiansSpecs
+              promoteDockersSpecs
+              "AutoPromoteNightly"
+              ([] : List TaggedKey.Type)
           # VerifyPackages.verificationSteps
               verifyDebiansSpecs
               verifyDockersSpecs

@@ -82,4 +82,8 @@ let () =
         ; test_case "serialization roundtrips from file" `Quick
             json_serialization_roundtrips_from_file
         ] )
+    ; ( "memory caching"
+      , [ test_case "caching works" `Quick (fun () ->
+              Memory_caching.test large_precomputed_json_file )
+        ] )
     ]

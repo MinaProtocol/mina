@@ -14,9 +14,11 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let DebianRepo = ../../Constants/DebianRepo.dhall
 
+let Artifacts = ../../Constants/Artifacts.dhall
+
 let spec =
       DockerImage.ReleaseSpec::{
-      , service = "itn-orchestrator"
+      , service = Artifacts.Type.ItnOrchestrator
       , step_key = "itn-orchestrator-docker-image"
       , network = "berkeley"
       , deb_repo = DebianRepo.Type.Local

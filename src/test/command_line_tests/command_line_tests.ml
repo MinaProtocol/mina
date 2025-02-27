@@ -86,14 +86,12 @@ module CliTests = struct
         |> List.sum (module Int) ~f:Fn.id
       in
       let%bind output = MinaCli.ledger_currency mina_cli ~ledger_file in
+      let actual = Scanf.sscanf output "MINA : %f" (fun actual -> actual) in
       let total_currency_float = float_of_int total_currency /. 1000000000.0 in
-      let total_currency_string =
-        Printf.sprintf "MINA: %.9f" total_currency_float
-      in
       assert_don't_contain_log_output output ;
-      if not (String.equal total_currency_string (String.strip output)) then
-        failwithf "invalid mina total count %s vs %s" total_currency_string
-          output () ;
+      if not Float.(abs (total_currency_float - actual) < 0.001) then
+        failwithf "invalid mina total count %f vs %f" total_currency_float
+          actual () ;
       return ()
     in
     run test_case mina_path

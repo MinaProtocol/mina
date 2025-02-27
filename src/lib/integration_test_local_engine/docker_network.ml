@@ -320,7 +320,14 @@ let all_non_seed_nodes t =
     ]
   |> Core.String.Map.of_alist_exn
 
+let node_exn t key = Core.String.Map.find_exn (all_nodes t) key
+
+let block_producer_exn t key = Core.String.Map.find_exn (block_producers t) key
+
 let genesis_keypairs { genesis_keypairs; _ } = genesis_keypairs
+
+let genesis_keypair_exn t key =
+  Core.String.Map.find_exn (genesis_keypairs t) key
 
 let all_ids t =
   let deployments = all_nodes t |> Core.Map.to_alist in
