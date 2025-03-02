@@ -54,7 +54,7 @@ if [[ ! -v DEB ]]; then NEW_NAME=$DEB; fi;
 if [[ ! -v SIGN ]]; then 
   SIGN_ARG=""
 else 
-  SIGN_ARG="--sign $SIGN"
+  SIGN_ARG=--sign $SIGN
 fi
 
 function rebuild_deb() {
@@ -73,4 +73,4 @@ function rebuild_deb() {
 }
 
 rebuild_deb
-source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}.deb" --version ${NEW_VERSION} --codename ${CODENAME} --release ${NEW_RELEASE} --bucket ${NEW_REPO} "${SIGN_ARG}"
+source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}.deb" --version ${NEW_VERSION} --codename ${CODENAME} --release ${NEW_RELEASE} --bucket ${NEW_REPO} ${SIGN_ARG}
