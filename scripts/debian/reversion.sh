@@ -54,7 +54,7 @@ if [[ ! -v DEB ]]; then NEW_NAME=$DEB; fi;
 if [[ ! -v SIGN ]]; then 
   SIGN_ARG=""
 else 
-  SIGN_ARG="--sign $SIGN"
+  SIGN_ARG=--sign $SIGN
 fi
 
 function rebuild_deb() {
