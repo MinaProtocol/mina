@@ -201,6 +201,18 @@ module Sql = struct
           ]
       in
       custom_type ~to_hlist ~of_hlist spec
+      
+    (* Make sure each parameter has a specific type hint to avoid PostgreSQL errors *)
+    let get_param_type index param =
+      match index with
+      | 1 -> Option.map param ~f:(fun p -> p, Caqti_type.int64)   (* max_block *)
+      | 2 -> Option.map param ~f:(fun p -> p, Caqti_type.string)  (* txn_hash *)
+      | 3 -> Option.map param ~f:(fun p -> p, Caqti_type.string)  (* account_address *)
+      | 4 -> Option.map param ~f:(fun p -> p, Caqti_type.string)  (* account_token_id *)
+      | 5 -> Option.map param ~f:(fun p -> p, Caqti_type.string)  (* op_status *)
+      | 6 -> Option.map param ~f:(fun p -> p, Caqti_type.string)  (* success *)
+      | 7 -> Option.map param ~f:(fun p -> p, Caqti_type.string)  (* address *)
+      | _ -> Option.map param ~f:(fun p -> p, Caqti_type.string)  (* default *)
 
     let of_query { max_block; Transaction_query.filter; _ } =
       let account_address, account_token_id =
@@ -242,17 +254,17 @@ module Sql = struct
       | `Block_height ->
           ("<=", 1, None)
       | `Txn_hash ->
-          ("=", 2, None)
+          ("=", 2, Some "text") (* Explicitly cast to text type *)
       | `Account_identifier_pk ->
-          ("=", 3, None)
+          ("=", 3, Some "text") (* Explicitly cast to text type *)
       | `Account_identifier_token ->
-          ("=", 4, None)
+          ("=", 4, Some "text") (* Explicitly cast to text type *)
       | `Op_status ->
           ("=", 5, Some "transaction_status")
       | `Success ->
           ("=", 6, Some "transaction_status")
       | `Address ->
-          ("=", 7, None)
+          ("=", 7, Some "text") (* Explicitly cast to text type *)
     in
     let gen_filter (op_1, op_2, null_cmp) l =
       String.concat ~sep:[%string " %{op_1} "]
@@ -508,6 +520,7 @@ module Sql = struct
           input.operator
       in
       let query =
+        (* Use Mina_caqti's type-safe collect request *)
         Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ) query_string
       in
       [%log debug] "Running SQL query $query"
