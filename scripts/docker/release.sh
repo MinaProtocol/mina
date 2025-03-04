@@ -7,6 +7,7 @@
 set -eo pipefail
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+# shellcheck disable=SC1090
 source ${SCRIPTPATH}/helper.sh
 
 function usage() {

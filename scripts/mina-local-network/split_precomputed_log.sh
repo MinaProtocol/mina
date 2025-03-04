@@ -10,7 +10,7 @@ fi
 ARCHIVE_URI=${ARCHIVE_URI:-postgres://postgres@localhost:5432/archive}
 PRECOMPUTED_LOG_FILE=$1
 OUTPUT_FOLDER=${2:precomputed_blocks}
-cd $OUTPUT_FOLDER
+cd $OUTPUT_FOLDER || exit
 
 while IFS= read -r line; do
 	LEDGER_HASH=$(echo $line | jq -r '.data.protocol_state.body.blockchain_state.staged_ledger_hash.non_snark.ledger_hash')
