@@ -494,7 +494,8 @@ let commit_to_pool ledger pool cmd expected_drops =
               (Mina_ledger.Ledger.get ledger loc) )
   in
   let lower =
-    List.map ~f:Transaction_hash.User_command_with_valid_signature.hash
+    List.map
+      ~f:Transaction_hash.User_command_with_valid_signature.transaction_hash
   in
   [%test_eq: Transaction_hash.t list]
     (lower (Sequence.to_list dropped))
@@ -507,7 +508,7 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
   let nonce = Account.Nonce.of_int nonce_int in
   let sender_pk = Public_key.compress sender.public_key in
   let receiver_pk = Public_key.compress receiver.public_key in
-  let zkapp_command_wire : Zkapp_command.Stable.Latest.Wire.t =
+  let zkapp_command_wire : Zkapp_command.Stable.Latest.t =
     { fee_payer =
         { Account_update.Fee_payer.body =
             { public_key = sender_pk; fee; nonce; valid_until = None }
@@ -567,7 +568,7 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
     ; memo = Signed_command_memo.empty
     }
   in
-  let zkapp_command = Zkapp_command.of_wire zkapp_command_wire in
+  let zkapp_command = Zkapp_command.generate zkapp_command_wire in
   (* We skip signing the commitment and updating the authorization as it is not necessary to have a valid transaction for these tests. *)
   let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd) =
     User_command.to_valid_unsafe (User_command.Zkapp_command zkapp_command)
@@ -772,7 +773,8 @@ let apply_transactions txns accounts =
             in
             { a with nonce; balance } ) )
 
-let txn_hash = Transaction_hash.User_command_with_valid_signature.hash
+let txn_hash =
+  Transaction_hash.User_command_with_valid_signature.transaction_hash
 
 let application_invalidates_applied_transactions () =
   Quickcheck.test ~trials:1000

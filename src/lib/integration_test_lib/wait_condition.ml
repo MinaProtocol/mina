@@ -280,9 +280,10 @@ struct
     }
 
   let zkapp_to_be_included_in_frontier ~has_failures ~zkapp_command =
+    (* TODO: do not use unwrap, instead avoid computing hashes on the level above *)
+    let zkapp_command = Zkapp_command.unwrap zkapp_command in
     let txn_hash =
-      Mina_transaction.Transaction_hash.hash_command
-        (Zkapp_command zkapp_command)
+      Mina_transaction.Transaction_hash.hash_zkapp_command zkapp_command
     in
     let check () _node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
       let zkapp_opt =
@@ -298,12 +299,15 @@ struct
         ~metadata:
           [ ("state_hash", State_hash.to_yojson breadcrumb_added.state_hash)
           ; ("txn_hash", Mina_transaction.Transaction_hash.to_yojson txn_hash)
-          ; ("txn", Zkapp_command.to_yojson zkapp_command)
+          ; ("txn", Zkapp_command.Stable.Latest.to_yojson zkapp_command)
           ] ;
       [%log' debug (Logger.create ())]
         "wait_condition check, zkapp_to_be_included_in_frontier, \
          zkapp_command: $zkapp_command "
-        ~metadata:[ ("zkapp_command", Zkapp_command.to_yojson zkapp_command) ] ;
+        ~metadata:
+          [ ( "zkapp_command"
+            , Zkapp_command.Stable.Latest.to_yojson zkapp_command )
+          ] ;
       [%log' debug (Logger.create ())]
         "wait_condition check, zkapp_to_be_included_in_frontier, user_commands \
          from breadcrumb: $tx_hashes state_hash: $state_hash"

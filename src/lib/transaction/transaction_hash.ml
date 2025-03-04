@@ -74,7 +74,7 @@ let ( hash_signed_command_v1
     let cmd_dummy_signature = { cmd with signature = Signature.dummy } in
     signed_cmd_hasher cmd_dummy_signature
   in
-  let hash_zkapp_command (cmd : Zkapp_command.t) =
+  let hash_zkapp_command (cmd : Zkapp_command.Stable.Latest.t) =
     let cmd_dummy_signatures_and_proofs =
       { cmd with
         fee_payer = { cmd.fee_payer with authorization = Signature.dummy }
@@ -106,12 +106,17 @@ let ( hash_signed_command_v1
   , hash_coinbase
   , hash_fee_transfer )
 
+let hash_wrapped_zkapp_command =
+  Fn.compose hash_zkapp_command Zkapp_command.unwrap
+
 let hash_command cmd =
   match cmd with
   | User_command.Signed_command s ->
       hash_signed_command s
   | User_command.Zkapp_command p ->
       hash_zkapp_command p
+
+let hash_wrapped_command = Fn.compose hash_command User_command.unwrap
 
 let hash_signed_command_v2 = hash_signed_command
 
@@ -168,37 +173,35 @@ module User_command_with_valid_signature = struct
 
   let hash_of_yojson = of_yojson
 
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t =
-        ( (User_command.Valid.Stable.V2.t[@hash.ignore])
-        , (T.Stable.V1.t[@to_yojson hash_to_yojson]) )
-        With_hash.Stable.V1.t
-      [@@deriving sexp, hash, to_yojson]
-
-      let to_latest = Fn.id
-
-      (* Compare only on hashes, comparing on the data too would be slower and
-         add no value.
-      *)
-      let compare (x : t) (y : t) = T.compare x.hash y.hash
-    end
-  end]
+  type t = (User_command.Valid.t, hash) With_hash.t
+  [@@deriving hash, sexp, compare, to_yojson]
 
   let create (c : User_command.Valid.t) : t =
-    { data = c; hash = hash_command (User_command.forget_check c) }
+    { data = c
+    ; hash = hash_command (User_command.unwrap @@ User_command.forget_check c)
+    }
 
   let data ({ data; _ } : t) = data
 
   let command ({ data; _ } : t) = User_command.forget_check data
 
-  let hash ({ hash; _ } : t) = hash
+  let transaction_hash ({ hash; _ } : t) = hash
 
   let forget_check ({ data; hash } : t) =
     { With_hash.data = User_command.forget_check data; hash }
 
-  include Comparable.Make (Stable.Latest)
+  include Comparable.Make (struct
+    type nonrec t = t
+
+    let sexp_of_t = sexp_of_t
+
+    let t_of_sexp = t_of_sexp
+
+    (* Compare only on hashes, comparing on the data too would be slower and
+       add no value.
+    *)
+    let compare (x : t) (y : t) = T.compare x.hash y.hash
+  end)
 
   let make data hash : t = { data; hash }
 end
@@ -228,7 +231,8 @@ module User_command = struct
     end
   end]
 
-  let create (c : User_command.t) : t = { data = c; hash = hash_command c }
+  let create (c : User_command.Stable.Latest.t) : t =
+    { data = c; hash = hash_command c }
 
   let data ({ data; _ } : t) = data
 
@@ -237,7 +241,7 @@ module User_command = struct
   let hash ({ hash; _ } : t) = hash
 
   let of_checked ({ data; hash } : User_command_with_valid_signature.t) : t =
-    { With_hash.data = User_command.forget_check data; hash }
+    { With_hash.data = User_command.(unwrap @@ forget_check data); hash }
 
   include Comparable.Make (Stable.Latest)
 end

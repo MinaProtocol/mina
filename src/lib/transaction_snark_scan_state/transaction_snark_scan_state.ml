@@ -33,6 +33,8 @@ end
 module Transaction_with_witness = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       (* TODO: The statement is redundant here - it can be computed from the
          witness and the transaction
@@ -56,6 +58,55 @@ module Transaction_with_witness = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t =
+    { transaction_with_info : Mina_transaction_logic.Transaction_applied.t
+    ; state_hash : State_hash.t * State_body_hash.t
+    ; statement : Transaction_snark.Statement.t
+    ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
+    ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
+    ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
+    ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
+    }
+
+  let generate
+      { Stable.Latest.transaction_with_info
+      ; state_hash
+      ; statement
+      ; init_stack
+      ; first_pass_ledger_witness
+      ; second_pass_ledger_witness
+      ; block_global_slot
+      } =
+    { transaction_with_info =
+        Mina_transaction_logic.Transaction_applied.generate
+          transaction_with_info
+    ; state_hash
+    ; statement
+    ; init_stack
+    ; first_pass_ledger_witness
+    ; second_pass_ledger_witness
+    ; block_global_slot
+    }
+
+  let unwrap
+      { transaction_with_info
+      ; state_hash
+      ; statement
+      ; init_stack
+      ; first_pass_ledger_witness
+      ; second_pass_ledger_witness
+      ; block_global_slot
+      } =
+    { Stable.Latest.transaction_with_info =
+        Mina_transaction_logic.Transaction_applied.unwrap transaction_with_info
+    ; state_hash
+    ; statement
+    ; init_stack
+    ; first_pass_ledger_witness
+    ; second_pass_ledger_witness
+    ; block_global_slot
+    }
 end
 
 module Ledger_proof_with_sok_message = struct
@@ -683,7 +734,7 @@ module Transactions_ordered = struct
     [@@deriving sexp, to_yojson]
   end
 
-  type t = Transaction_with_witness.t Poly.t [@@deriving sexp, to_yojson]
+  type t = Transaction_with_witness.t Poly.t
 
   let map (t : 'a Poly.t) ~f : 'b Poly.t =
     let f = List.map ~f in
@@ -1477,19 +1528,26 @@ let check_required_protocol_states t ~protocol_states =
   protocol_states_assoc
 
 let write_all_proofs_to_disk ~proof_cache_db
-    { Stable.Latest.scan_state; previous_incomplete_zkapp_updates } =
-  let scan_state' =
-    Parallel_scan.State.map ~f2:ident scan_state
-      ~f1:
-        (Tuple2.map_fst
-           ~f:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db) )
-  in
-  { scan_state = scan_state'; previous_incomplete_zkapp_updates }
+    { Stable.Latest.scan_state = uncached
+    ; previous_incomplete_zkapp_updates = tx_list, border_status
+    } =
+  let f1 (p, v) = (Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db p, v) in
+  { scan_state =
+      Parallel_scan.State.map uncached ~f1 ~f2:Transaction_with_witness.generate
+  ; previous_incomplete_zkapp_updates =
+      (List.map ~f:Transaction_with_witness.generate tx_list, border_status)
+  }
 
-let read_all_proofs_from_disk { scan_state; previous_incomplete_zkapp_updates }
-    =
-  let scan_state' =
-    Parallel_scan.State.map ~f2:ident scan_state
-      ~f1:(Tuple2.map_fst ~f:Ledger_proof.Cached.read_proof_from_disk)
+let read_all_proofs_from_disk
+    { scan_state = cached
+    ; previous_incomplete_zkapp_updates = tx_list, border_status
+    } =
+  let f1 (p, v) = (Ledger_proof.Cached.read_proof_from_disk p, v) in
+  let scan_state =
+    Parallel_scan.State.map ~f1 ~f2:Transaction_with_witness.unwrap cached
   in
-  { Stable.Latest.scan_state = scan_state'; previous_incomplete_zkapp_updates }
+  Stable.Latest.
+    { scan_state
+    ; previous_incomplete_zkapp_updates =
+        (List.map ~f:Transaction_with_witness.unwrap tx_list, border_status)
+    }

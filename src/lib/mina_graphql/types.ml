@@ -629,6 +629,11 @@ module Snark_work_bundle = struct
     }
 
   let spec =
+    let work_to_yojson (w : Work_selector.work) =
+      Snark_worker.Work.Single.Spec.to_yojson
+      @@ Snark_work_lib.Work.Single.Spec.map ~f_proof:Ledger_proof.Cached.unwrap
+           ~f_witness:Transaction_witness.unwrap w
+    in
     obj "WorkBundleSpec"
       ~doc:
         "Witnesses and statements for snark work bundles. Includes optional \
@@ -2011,25 +2016,27 @@ module Zkapp_command = struct
 
   let zkapp_command =
     let conv
-        (x : (Mina_lib.t, Zkapp_command.t) Fields_derivers_graphql.Schema.typ) :
-        (Mina_lib.t, Zkapp_command.t) typ =
+        (x :
+          ( Mina_lib.t
+          , Zkapp_command.Stable.Latest.t )
+          Fields_derivers_graphql.Schema.typ ) :
+        (Mina_lib.t, Zkapp_command.Stable.Latest.t) typ =
       Obj.magic x
     in
     obj "ZkappCommandResult" ~fields:(fun _ ->
         [ field_no_status "id"
             ~doc:"A Base64 string representing the zkApp command"
             ~typ:(non_null transaction_id) ~args:[]
-            ~resolve:(fun _ zkapp_command ->
-              Zkapp_command zkapp_command.With_hash.data )
+            ~resolve:(fun _ { With_hash.data; _ } -> Zkapp_command data)
         ; field_no_status "hash"
             ~doc:"A cryptographic hash of the zkApp command"
             ~typ:(non_null transaction_hash) ~args:[]
-            ~resolve:(fun _ zkapp_command -> zkapp_command.With_hash.hash)
+            ~resolve:(fun _ { With_hash.hash; _ } -> hash)
         ; field_no_status "zkappCommand"
             ~typ:(Zkapp_command.typ () |> conv)
             ~args:Arg.[]
             ~doc:"zkApp command representing the transaction"
-            ~resolve:(fun _ zkapp_command -> zkapp_command.With_hash.data)
+            ~resolve:(fun _ { With_hash.data; _ } -> data)
         ; field "failureReason" ~typ:(list @@ Command_status.failure_reasons)
             ~args:[]
             ~doc:
@@ -2047,7 +2054,7 @@ module Zkapp_command = struct
 end
 
 let transactions =
-  let open Filtered_external_transition.Transactions in
+  let open Filtered_external_transition.Transactions.Stable.Latest in
   obj "Transactions" ~doc:"Different types of transactions in a block"
     ~fields:(fun _ ->
       [ field "userCommands"
@@ -2657,7 +2664,7 @@ module Input = struct
   end
 
   module SendTestZkappInput = struct
-    type input = Mina_base.Zkapp_command.t
+    type input = Mina_base.Zkapp_command.Stable.Latest.t
 
     let arg_typ =
       scalar "SendTestZkappInput" ~doc:"zkApp command for a test zkApp"
@@ -3019,8 +3026,10 @@ module Input = struct
     let arg_typ =
       let conv
           (x :
-            Mina_base.Zkapp_command.t Fields_derivers_graphql.Schema.Arg.arg_typ
-            ) : Mina_base.Zkapp_command.t Graphql_async.Schema.Arg.arg_typ =
+            Mina_base.Zkapp_command.Stable.Latest.t
+            Fields_derivers_graphql.Schema.Arg.arg_typ ) :
+          Mina_base.Zkapp_command.Stable.Latest.t
+          Graphql_async.Schema.Arg.arg_typ =
         Obj.magic x
       in
       let arg_typ =

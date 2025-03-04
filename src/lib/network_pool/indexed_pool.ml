@@ -66,7 +66,8 @@ let config t = t.config
 (* Compute the total currency required from the sender to execute a command.
    Returns None in case of overflow.
 *)
-let currency_consumed_unchecked : User_command.t -> Currency.Amount.t option =
+let currency_consumed_unchecked :
+    (_, _) User_command.with_forest -> Currency.Amount.t option =
  fun cmd ->
   let fee_amt = Currency.Amount.of_fee @@ User_command.fee cmd in
   let open Currency.Amount in
@@ -90,7 +91,8 @@ let currency_consumed cmd =
     (Transaction_hash.User_command_with_valid_signature.command cmd)
 
 let currency_consumed' :
-    User_command.t -> (Currency.Amount.t, Command_error.t) Result.t =
+       (_, _) User_command.with_forest
+    -> (Currency.Amount.t, Command_error.t) Result.t =
  fun cmd ->
   cmd |> currency_consumed_unchecked
   |> Result.of_option ~error:Command_error.Overflow
@@ -199,7 +201,8 @@ module For_tests = struct
         Set.iter data ~f:(check_fee key) ) ;
     Transaction_hash.Map.iteri pool.all_by_hash ~f:(fun ~key ~data ->
         [%test_eq: Transaction_hash.t]
-          (Transaction_hash.User_command_with_valid_signature.hash data)
+          (Transaction_hash.User_command_with_valid_signature.transaction_hash
+             data )
           key )
 end
 
@@ -273,7 +276,7 @@ let global_slot_since_genesis conf =
       Mina_numbers.Global_slot_since_hard_fork.to_uint32 current_slot
       |> Mina_numbers.Global_slot_since_genesis.of_uint32
 
-let check_expiry t (cmd : User_command.t) =
+let check_expiry t (cmd : (_, _) User_command.with_forest) =
   let global_slot_since_genesis = global_slot_since_genesis t in
   let valid_until = User_command.valid_until cmd in
   if Global_slot_since_genesis.(valid_until < global_slot_since_genesis) then
@@ -327,7 +330,9 @@ let remove_all_by_fee_and_hash_and_expiration_exn :
     Transaction_hash.User_command_with_valid_signature.command cmd
     |> User_command.fee_per_wu
   in
-  let cmd_hash = Transaction_hash.User_command_with_valid_signature.hash cmd in
+  let cmd_hash =
+    Transaction_hash.User_command_with_valid_signature.transaction_hash cmd
+  in
   { t with
     all_by_fee = Map_set.remove_exn t.all_by_fee fee_per_wu cmd
   ; all_by_hash = Map.remove t.all_by_hash cmd_hash
@@ -412,11 +417,12 @@ module Update = struct
           else acc
         in
         let cmd_hash =
-          Transaction_hash.User_command_with_valid_signature.hash cmd
+          Transaction_hash.User_command_with_valid_signature.transaction_hash
+            cmd
         in
         ( match Transaction_hash.User_command_with_valid_signature.data cmd with
         | Zkapp_command p ->
-            let p = Zkapp_command.Valid.forget p in
+            let p = Zkapp_command.(Valid.forget p |> unwrap) in
             let updates, proof_updates =
               let init =
                 match
@@ -515,8 +521,10 @@ let transactions ~logger t =
           in
           if
             Transaction_hash.equal
-              (Transaction_hash.User_command_with_valid_signature.hash txn)
-              (Transaction_hash.User_command_with_valid_signature.hash head_txn)
+              (Transaction_hash.User_command_with_valid_signature
+               .transaction_hash txn )
+              (Transaction_hash.User_command_with_valid_signature
+               .transaction_hash head_txn )
           then
             match F_sequence.uncons sender_queue' with
             | Some (next_txn, _) ->
@@ -1177,7 +1185,9 @@ let add_from_backtrack :
   let%map () = check_expiry t.config unchecked in
   let fee_payer = User_command.fee_payer unchecked in
   let fee_per_wu = User_command.fee_per_wu unchecked in
-  let cmd_hash = Transaction_hash.User_command_with_valid_signature.hash cmd in
+  let cmd_hash =
+    Transaction_hash.User_command_with_valid_signature.transaction_hash cmd
+  in
   let consumed = Option.value_exn (currency_consumed cmd) in
   match Map.find t.all_by_sender fee_payer with
   | None ->
@@ -1229,7 +1239,9 @@ let add_from_backtrack :
             t'.all_by_fee fee_per_wu cmd
       ; all_by_hash =
           Map.set t.all_by_hash
-            ~key:(Transaction_hash.User_command_with_valid_signature.hash cmd)
+            ~key:
+              (Transaction_hash.User_command_with_valid_signature
+               .transaction_hash cmd )
             ~data:cmd
       ; all_by_sender =
           Map.set t'.all_by_sender ~key:fee_payer

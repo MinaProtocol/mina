@@ -71,7 +71,7 @@ type components =
 (* tag commands so they can share a common pipe, to ensure sequentiality of nonces *)
 type command_inputs =
   | Signed_command_inputs of User_command_input.t list
-  | Zkapp_command_command_inputs of Zkapp_command.t list
+  | Zkapp_command_command_inputs of Zkapp_command.Stable.Latest.t list
 
 type pipes =
   { validated_transitions_reader : Mina_block.Validated.t Strict_pipe.Reader.t
@@ -871,7 +871,12 @@ let request_work t =
     Work_selection_method.work ~logger:t.config.logger ~fee
       ~snark_pool:(snark_pool t) (snark_job_state t)
   in
+  let map_work =
+    Snark_work_lib.Work.Single.Spec.map ~f_proof:Ledger_proof.Cached.unwrap
+      ~f_witness:Transaction_witness.unwrap
+  in
   Option.map instances_opt ~f:(fun instances ->
+      let instances = One_or_two.map instances ~f:map_work in
       { Snark_work_lib.Work.Spec.instances; fee } )
 
 let work_selection_method t = t.config.work_selection_method
@@ -890,7 +895,12 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     Mina_metrics.(
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
-  let spec = work.spec.instances in
+  let map_work =
+    Snark_work_lib.Work.Single.Spec.map ~f_witness:Transaction_witness.generate
+      ~f_proof:
+        (Ledger_proof.Cached.generate ~proof_cache_db:t.config.proof_cache_db)
+  in
+  let spec = One_or_two.map work.spec.instances ~f:map_work in
   let cb _ =
     (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
      * If the diff is accepted then remove it from the seen jobs.
@@ -969,7 +979,8 @@ let add_full_transactions t user_commands =
       in
       Deferred.Result.fail error
 
-let add_zkapp_transactions t (zkapp_commands : Zkapp_command.t list) =
+let add_zkapp_transactions t
+    (zkapp_commands : Zkapp_command.Stable.Latest.t list) =
   let add_all_txns () =
     let result_ivar = Ivar.create () in
     let cmd_inputs = Zkapp_command_command_inputs zkapp_commands in
