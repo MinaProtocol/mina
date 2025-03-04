@@ -20,7 +20,7 @@ create_account(1){
 }
 
 // Workflow used to request funds from a faucet
-request_funds(10){
+request_funds(1){
   request{
     network = {
       "network":"PLACEHOLDER_NETWORK_NAME",
