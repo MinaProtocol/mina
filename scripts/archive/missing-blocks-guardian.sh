@@ -118,7 +118,7 @@ populate_db() {
   jq -rs '"[BOOTSTRAP] Populated database with block: \(.[-1].message)"' < tempfile
   rm "$tempfile"
   rm "${2}"
-  if [ ! $? -ne 0 ]; then
+  if [ $? -ne 0 ]; then
     echo $'[ERROR] Failed to remove block file. The database remains unhealthy.\n Make sure the environment variables PRECOMPUTED_BLOCKS_URL and MINA_NETWORK are set correctly.'
     exit 1
   fi
