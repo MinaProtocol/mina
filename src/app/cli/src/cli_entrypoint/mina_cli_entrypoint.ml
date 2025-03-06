@@ -1749,7 +1749,7 @@ let internal_commands logger =
               in
               let spec =
                 [%of_sexp:
-                  ( Transaction_witness.With_vk_map.t
+                  ( Transaction_witness.t
                   , Ledger_proof.t )
                   Snark_work_lib.Work.Single.Spec.t] sexp
               in

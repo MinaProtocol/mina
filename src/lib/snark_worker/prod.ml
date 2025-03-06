@@ -51,7 +51,7 @@ module Inputs = struct
 
   (* bin_io is for uptime service SNARK worker *)
   type single_spec =
-    ( Transaction_witness.With_vk_map.Stable.Latest.t
+    ( Transaction_witness.Stable.Latest.t
     , Transaction_snark.Stable.Latest.t )
     Snark_work_lib.Work.Single.Spec.Stable.Latest.t
   [@@deriving bin_io_unversioned, sexp]
@@ -99,10 +99,8 @@ module Inputs = struct
               Deferred.Or_error.return (proof, Time.Span.zero)
           | None -> (
               match single with
-              | Work.Single.Spec.Transition
-                  ( input
-                  , ({ witness = w; vk_map } : Transaction_witness.With_vk_map.t)
-                  ) ->
+              | Work.Single.Spec.Transition (input, (w : Transaction_witness.t))
+                ->
                   process (fun () ->
                       match w.transaction with
                       | Command (Zkapp_command zkapp_command) -> (
@@ -199,8 +197,7 @@ module Inputs = struct
                                 log_base_snark
                                   ~statement:{ stmt with sok_digest } ~spec
                                   ~all_inputs:inputs
-                                  (M.of_zkapp_command_segment_exn
-                                     ~witness:(witness, vk_map) )
+                                  (M.of_zkapp_command_segment_exn ~witness)
                               in
 
                               let%bind (p : Ledger_proof.t) =
@@ -213,8 +210,7 @@ module Inputs = struct
                                       log_base_snark
                                         ~statement:{ stmt with sok_digest }
                                         ~spec ~all_inputs:inputs
-                                        (M.of_zkapp_command_segment_exn
-                                           ~witness:(witness, vk_map) )
+                                        (M.of_zkapp_command_segment_exn ~witness)
                                     in
                                     log_merge_snark ~sok_digest prev curr
                                       ~all_inputs:inputs )

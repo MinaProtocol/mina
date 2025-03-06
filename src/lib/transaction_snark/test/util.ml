@@ -235,7 +235,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                             Async.Deferred.Or_error.try_with ~here:[%here]
                               (fun () ->
                                 T.of_zkapp_command_segment_exn ~statement:stmt
-                                  ~witness:(witness, []) ~spec )
+                                  ~witness ~spec )
                           in
                           let%map result =
                             Async.Deferred.List.fold ~init:(Ok p1) rest
@@ -245,8 +245,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                                   Async.Deferred.Or_error.try_with ~here:[%here]
                                     (fun () ->
                                       T.of_zkapp_command_segment_exn
-                                        ~statement:stmt ~witness:(witness, [])
-                                        ~spec )
+                                        ~statement:stmt ~witness ~spec )
                                 in
                                 let sok_digest =
                                   Sok_message.create ~fee:Fee.zero

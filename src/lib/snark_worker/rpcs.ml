@@ -25,9 +25,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         type query = unit
 
         type response =
-          ( ( Transaction_witness.With_vk_map.t
-            , Ledger_proof.t )
-            Work.Single.Spec.t
+          ( (Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t
             Work.Spec.t
           * Public_key.Compressed.t )
           option
@@ -47,9 +45,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
 
       module T = struct
         type query =
-          ( ( Transaction_witness.With_vk_map.t
-            , Ledger_proof.t )
-            Work.Single.Spec.t
+          ( (Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t
             Work.Spec.t
           , Ledger_proof.t )
           Work.Result.t
@@ -72,9 +68,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       module T = struct
         type query =
           Error.t
-          * ( Transaction_witness.With_vk_map.t
-            , Ledger_proof.t )
-            Work.Single.Spec.t
+          * (Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t
             Work.Spec.t
           * Public_key.Compressed.t
 

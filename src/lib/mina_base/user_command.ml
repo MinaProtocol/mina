@@ -272,13 +272,6 @@ let extract_vks : t -> (Account_id.t * Verification_key_wire.t) List.t =
   | Zkapp_command cmd ->
       Zkapp_command.extract_vks cmd
 
-let extract_proof_vk_hashes : t -> (Account_id.t * Zkapp_basic.F.t) List.t =
-  function
-  | Signed_command _ ->
-      []
-  | Zkapp_command cmd ->
-      Zkapp_command.extract_proof_vk_hashes cmd
-
 (** The target nonce is what the nonce of the fee payer will be after a user command is successfully applied. *)
 let target_nonce_on_success (t : t) =
   match t with

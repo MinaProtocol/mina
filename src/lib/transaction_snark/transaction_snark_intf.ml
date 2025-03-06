@@ -154,10 +154,7 @@ module type Full = sig
 
     val of_zkapp_command_segment_exn :
          statement:Statement.With_sok.t
-      -> witness:
-           Zkapp_command_segment.Witness.t
-           * (Mina_base.Account_id.t * Mina_base.Verification_key_wire.t list)
-             list
+      -> witness:Zkapp_command_segment.Witness.t
       -> spec:Zkapp_command_segment.Basic.t
       -> t Async.Deferred.t
 

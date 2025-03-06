@@ -291,21 +291,12 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
               |> Mina_state.Blockchain_state.staged_ledger_hash
             in
             match
-              List.find_map transitions ~f:(fun transition ->
+              List.find transitions ~f:(fun transition ->
                   match transition with
-                  | Snark_work_lib.Work.Single.Spec.Transition
-                      (({ target; _ } as stmt), w) ->
-                      if
-                        Pasta_bindings.Fp.equal target.second_pass_ledger
-                          (Staged_ledger_hash.ledger_hash staged_ledger_hash)
-                        (*TODO: needs fixing*)
-                      then
-                        Some
-                          (Snark_work_lib.Work.Single.Spec.Transition
-                             ( stmt
-                             , Transaction_witness.With_vk_map.
-                                 { witness = w; vk_map = [] } ) )
-                      else None
+                  | Snark_work_lib.Work.Single.Spec.Transition ({ target; _ }, _)
+                    ->
+                      Pasta_bindings.Fp.equal target.second_pass_ledger
+                        (Staged_ledger_hash.ledger_hash staged_ledger_hash)
                   | Merge _ ->
                       (* unreachable *)
                       failwith "Expected Transition work, not Merge" )

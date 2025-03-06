@@ -1786,13 +1786,6 @@ let verification_key_update_to_option (t : t) :
     Verification_key_wire.t option Zkapp_basic.Set_or_keep.t =
   Zkapp_basic.Set_or_keep.map ~f:Option.some t.body.update.verification_key
 
-let proof_vk_hash (t : t) : Zkapp_basic.F.t option =
-  match t.body.authorization_kind with
-  | Proof vk_hash ->
-      Some vk_hash
-  | _ ->
-      None
-
 let of_fee_payer ({ body; authorization } : Fee_payer.t) : t =
   { authorization = Signature authorization; body = Body.of_fee_payer body }
 

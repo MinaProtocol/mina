@@ -2,33 +2,10 @@ open Core_kernel
 open Currency
 
 module Test_inputs = struct
+  module Transaction_witness = Int
   module Ledger_hash = Int
   module Sparse_ledger = Int
-
-  module Transaction = struct
-    type t = int
-
-    let extract_vks _ = []
-
-    let extract_proof_vk_hashes _ = []
-  end
-
-  module Transaction_witness = struct
-    type t = int
-
-    let transaction = Fn.id
-  end
-
-  module Transaction_witness_with_vk_map = struct
-    type t =
-      { witness : Transaction_witness.t
-      ; vk_map :
-          (Mina_base.Account_id.t * Mina_base.Verification_key_wire.t list) list
-      }
-
-    let transaction t = Transaction_witness.transaction t.witness
-  end
-
+  module Transaction = Int
   module Ledger_proof_statement = Fee
 
   module Transaction_protocol_state = struct
@@ -112,30 +89,8 @@ module Implementation_inputs = struct
   open Mina_transaction
   module Ledger_hash = Ledger_hash
   module Sparse_ledger = Mina_ledger.Sparse_ledger
-
-  module Transaction = struct
-    include Transaction
-
-    let extract_vks = function
-      | Transaction.Command uc ->
-          User_command.extract_vks uc
-      | _ ->
-          []
-
-    let extract_proof_vk_hashes = function
-      | Transaction.Command uc ->
-          User_command.extract_proof_vk_hashes uc
-      | _ ->
-          []
-  end
-
-  module Transaction_witness = struct
-    include Transaction_witness
-
-    let transaction (t : t) = t.transaction
-  end
-
-  module Transaction_witness_with_vk_map = Transaction_witness.With_vk_map
+  module Transaction = Transaction
+  module Transaction_witness = Transaction_witness
   module Ledger_proof = Ledger_proof
   module Transaction_snark_work = Transaction_snark_work
   module Snark_pool = Network_pool.Snark_pool
