@@ -48,20 +48,44 @@ module Zkapp_command_segment_witness = struct
   end]
 end
 
-[%%versioned
-module Stable = struct
-  module V2 = struct
-    type t =
-      { transaction : Mina_transaction.Transaction.Stable.V2.t
-      ; first_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
-      ; second_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
-      ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t
-      ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
-      ; status : Mina_base.Transaction_status.Stable.V2.t
-      ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
-      }
-    [@@deriving sexp, yojson]
+module T = struct
+  [%%versioned
+  module Stable = struct
+    module V2 = struct
+      type t =
+        { transaction : Mina_transaction.Transaction.Stable.V2.t
+        ; first_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
+        ; second_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
+        ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t
+        ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
+        ; status : Mina_base.Transaction_status.Stable.V2.t
+        ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+        }
+      [@@deriving sexp, yojson]
 
-    let to_latest = Fn.id
-  end
-end]
+      let to_latest = Fn.id
+    end
+  end]
+end
+
+include T
+
+type witness = T.Stable.V2.t
+
+module With_vk_map = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { witness : T.Stable.V2.t
+        ; vk_map :
+            ( Mina_base.Account_id.Stable.V2.t
+            * Mina_base.Verification_key_wire.Stable.V1.t list )
+            list
+        }
+      [@@deriving sexp, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+end

@@ -3375,7 +3375,10 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     val of_zkapp_command_segment_exn :
          statement:Statement.With_sok.t
-      -> witness:Zkapp_command_segment.Witness.t
+      -> witness:
+           Zkapp_command_segment.Witness.t
+           * (Mina_base.Account_id.t * Mina_base.Verification_key_wire.t list)
+             list
       -> spec:Zkapp_command_segment.Basic.t
       -> t Async.Deferred.t
 
@@ -3998,8 +4001,12 @@ module Make_str (A : Wire_types.Concrete) = struct
           None
 
     let snapp_proof_data
-        ~(witness : Transaction_witness.Zkapp_command_segment_witness.t) =
+        ~(witness :
+           Transaction_witness.Zkapp_command_segment_witness.t
+           * (Mina_base.Account_id.t * Mina_base.Verification_key_wire.t list)
+             list ) =
       let open Option.Let_syntax in
+      let witness, vk_map = witness in
       let%bind p = first_account_update witness in
       let%map pi = account_update_proof p in
       let vk =
@@ -4013,8 +4020,22 @@ module Make_str (A : Wire_types.Concrete) = struct
           Option.value_map ~default:None account.zkapp ~f:(fun s ->
               s.verification_key )
         with
-        | None ->
-            failwith "No verification key found in the account"
+        | None -> (
+            let proof_vk_hash =
+              Account_update.proof_vk_hash p |> Option.value_exn
+            in
+            match
+              List.find vk_map ~f:(fun (aid, _) ->
+                  Mina_base.Account_id.equal aid account_id )
+              |> Option.map ~f:(fun (_, vk_list) ->
+                     List.find vk_list ~f:(fun vk ->
+                         Zkapp_basic.F.equal vk.hash proof_vk_hash ) )
+              |> Option.join
+            with
+            | Some vk ->
+                vk
+            | _ ->
+                failwith "No verification key found in the account" )
         | Some s ->
             s
       in
@@ -4022,7 +4043,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let of_zkapp_command_segment_exn ~(statement : Proof.statement) ~witness
         ~(spec : Zkapp_command_segment.Basic.t) : t Async.Deferred.t =
-      Base.Zkapp_command_snark.witness := Some witness ;
+      Base.Zkapp_command_snark.witness := Some (fst witness) ;
       let res =
         match spec with
         | Opt_signed ->

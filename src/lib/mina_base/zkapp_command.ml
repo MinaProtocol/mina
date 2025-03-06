@@ -909,6 +909,15 @@ let extract_vks (t : t) : (Account_id.t * Verification_key_wire.t) List.t =
          | _ ->
              acc )
 
+let extract_proof_vk_hashes (t : t) : (Account_id.t * Zkapp_basic.F.t) List.t =
+  account_updates t
+  |> Call_forest.fold ~init:[] ~f:(fun acc (p : Account_update.t) ->
+         match Account_update.proof_vk_hash p with
+         | Some vk_hash ->
+             (Account_update.account_id p, vk_hash) :: acc
+         | _ ->
+             acc )
+
 let account_updates_list (t : t) : Account_update.t list =
   Call_forest.fold t.account_updates ~init:[] ~f:(Fn.flip List.cons) |> List.rev
 

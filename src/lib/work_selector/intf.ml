@@ -12,10 +12,26 @@ module type Inputs_intf = sig
 
   module Transaction : sig
     type t
+
+    val extract_vks :
+      t -> (Mina_base.Account_id.t * Mina_base.Verification_key_wire.t) list
+
+    val extract_proof_vk_hashes :
+      t -> (Mina_base.Account_id.t * Mina_base.Zkapp_basic.F.t) list
   end
 
   module Transaction_witness : sig
     type t
+
+    val transaction : t -> Transaction.t
+  end
+
+  module Transaction_witness_with_vk_map : sig
+    type t =
+      { witness : Transaction_witness.t
+      ; vk_map :
+          (Mina_base.Account_id.t * Mina_base.Verification_key_wire.t list) list
+      }
   end
 
   module Ledger_proof : sig
@@ -101,7 +117,7 @@ module type Lib_intf = sig
     (**Jobs that have not been assigned yet*)
     val all_unseen_works :
          t
-      -> ( Transaction_witness.t
+      -> ( Transaction_witness_with_vk_map.t
          , Ledger_proof.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
@@ -109,7 +125,7 @@ module type Lib_intf = sig
 
     val remove :
          t
-      -> ( Transaction_witness.t
+      -> ( Transaction_witness_with_vk_map.t
          , Ledger_proof.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
@@ -117,7 +133,7 @@ module type Lib_intf = sig
 
     val set :
          t
-      -> ( Transaction_witness.t
+      -> ( Transaction_witness_with_vk_map.t
          , Ledger_proof.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
@@ -127,10 +143,14 @@ module type Lib_intf = sig
   val get_expensive_work :
        snark_pool:Snark_pool.t
     -> fee:Fee.t
-    -> (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
+    -> ( Transaction_witness_with_vk_map.t
+       , Ledger_proof.t )
+       Snark_work_lib.Work.Single.Spec.t
        One_or_two.t
        list
-    -> (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
+    -> ( Transaction_witness_with_vk_map.t
+       , Ledger_proof.t )
+       Snark_work_lib.Work.Single.Spec.t
        One_or_two.t
        list
 
@@ -184,7 +204,7 @@ module type Make_selection_method_intf = functor
   Selection_method_intf
     with type staged_ledger := Inputs.Staged_ledger.t
      and type work :=
-      ( Inputs.Transaction_witness.t
+      ( Inputs.Transaction_witness_with_vk_map.t
       , Inputs.Ledger_proof.t )
       Snark_work_lib.Work.Single.Spec.t
      and type snark_pool := Inputs.Snark_pool.t

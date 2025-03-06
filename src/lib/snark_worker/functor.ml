@@ -67,12 +67,15 @@ module Make (Inputs : Intf.Inputs_intf) :
 
     module Single = struct
       module Spec = struct
-        type t = (Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t
+        type t =
+          (Transaction_witness.With_vk_map.t, Ledger_proof.t) Work.Single.Spec.t
         [@@deriving sexp, yojson]
 
         let transaction t =
-          Option.map (Work.Single.Spec.witness t) ~f:(fun w ->
-              w.Transaction_witness.transaction )
+          Option.map (Work.Single.Spec.witness t)
+            ~f:(fun (w : Transaction_witness.With_vk_map.t) ->
+              w.Transaction_witness.With_vk_map.witness
+                .Transaction_witness.transaction )
 
         let statement = Work.Single.Spec.statement
       end

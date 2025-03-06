@@ -60,3 +60,20 @@ module Stable : sig
     [@@deriving sexp, yojson]
   end
 end]
+
+type witness = Stable.V2.t
+
+module With_vk_map : sig
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t =
+        { witness : witness
+        ; vk_map :
+            (Mina_base.Account_id.t * Mina_base.Verification_key_wire.t list)
+            list
+        }
+      [@@deriving sexp, yojson]
+    end
+  end]
+end
