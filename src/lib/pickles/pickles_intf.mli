@@ -316,6 +316,8 @@ module type S = sig
 
       val dummy : t
 
+      val dummy_with_wrap_vk : t Lazy.t
+
       open Impls.Step
 
       val to_input : t -> Field.Constant.t Random_oracle_input.Chunked.t
