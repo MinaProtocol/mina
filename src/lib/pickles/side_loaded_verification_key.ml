@@ -284,6 +284,67 @@ Stable.Latest.
   , equal
   , compare )]
 
+let dummy_wrap_vk :
+    ( Pasta_bindings.Fq.t
+    , Kimchi_bindings.Protocol.SRS.Fq.t
+    , Pasta_bindings.Fp.t Kimchi_types.or_infinity Kimchi_types.poly_comm )
+    Kimchi_types.VerifierIndex.verifier_index
+    option
+    Lazy.t =
+  lazy
+    (let d =
+       (Common.wrap_domains
+          ~proofs_verified:(Pickles_base.Proofs_verified.to_int N2) )
+         .h
+     in
+     let log2_size = Import.Domain.log2_size d in
+     let public =
+       let (T (input, _conv, _conv_inv)) =
+         Impls.Wrap.input ~feature_flags:Plonk_types.Features.Full.maybe ()
+       in
+       let (Typ typ) = input in
+       typ.size_in_field_elements
+     in
+     (* we only compute the wrap_vk if the srs can be loaded *)
+     let srs = try Some (Backend.Tock.Keypair.load_urs ()) with _ -> None in
+     Option.map srs ~f:(fun srs : Impls.Wrap.Verification_key.t ->
+         { domain =
+             { log_size_of_group = log2_size
+             ; group_gen = Backend.Tock.Field.domain_generator ~log2_size
+             }
+         ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
+         ; public
+         ; prev_challenges = 2 (* Due to Wrap_hack *)
+         ; srs
+         ; evals =
+             (let x, y = Backend.Tock.Curve.(to_affine_exn one) in
+              let g =
+                { Kimchi_types.unshifted = [| Kimchi_types.Finite (x, y) |]
+                ; shifted = None
+                }
+              in
+              { sigma_comm =
+                  Array.init (Nat.to_int Plonk_types.Permuts.n) ~f:(Fn.const g)
+              ; coefficients_comm =
+                  Array.init (Nat.to_int Plonk_types.Columns.n) ~f:(Fn.const g)
+              ; generic_comm = g
+              ; mul_comm = g
+              ; psm_comm = g
+              ; emul_comm = g
+              ; complete_add_comm = g
+              ; endomul_scalar_comm = g
+              ; xor_comm = None
+              ; range_check0_comm = None
+              ; range_check1_comm = None
+              ; foreign_field_add_comm = None
+              ; foreign_field_mul_comm = None
+              ; rot_comm = None
+              } )
+         ; shifts = Common.tock_shifts ~log2_size
+         ; lookup_index = None
+         ; zk_rows = 3
+         } ) )
+
 let dummy : t =
   { max_proofs_verified = N2
   ; actual_wrap_domain_size = N2
@@ -300,6 +361,8 @@ let dummy : t =
        } )
   ; wrap_vk = None
   }
+
+let dummy_with_wrap_vk = lazy { dummy with wrap_vk = Lazy.force dummy_wrap_vk }
 
 module Checked = struct
   open Step_main_inputs

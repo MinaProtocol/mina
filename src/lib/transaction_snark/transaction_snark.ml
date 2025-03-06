@@ -1429,10 +1429,15 @@ module Make_str (A : Wire_types.Concrete) = struct
               | Proof ->
                   let vk =
                     exists Side_loaded_verification_key.typ ~compute:(fun () ->
-                        Option.value_exn
+                        match
                           (As_prover.Ref.get
                              (Data_as_hash.ref a.zkapp.verification_key.data) )
-                            .data )
+                            .data
+                        with
+                        | Some vk ->
+                            vk
+                        | None ->
+                            Side_loaded_verification_key.dummy )
                   in
                   let expected_hash =
                     Data_as_hash.hash a.zkapp.verification_key.data
@@ -4014,7 +4019,10 @@ module Make_str (A : Wire_types.Concrete) = struct
               s.verification_key )
         with
         | None ->
-            failwith "No verification key found in the account"
+            { With_hash.data =
+                Lazy.force Side_loaded_verification_key.dummy_with_wrap_vk
+            ; hash = Verification_key_wire.dummy_vk_hash ()
+            }
         | Some s ->
             s
       in

@@ -92,6 +92,8 @@ type t = Stable.Latest.t [@@deriving hash, sexp, compare, equal]
 
 val dummy : t
 
+val dummy_with_wrap_vk : t Lazy.t
+
 include Codable.Base58_check_intf with type t := t
 
 include Codable.Base64_intf with type t := t
