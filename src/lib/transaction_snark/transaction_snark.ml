@@ -1401,12 +1401,16 @@ module Make_str (A : Wire_types.Concrete) = struct
       type _ Snarky_backendless.Request.t +=
         | Zkapp_proof :
             (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Snarky_backendless.Request.t
+        | Zkapp_vk : Side_loaded_verification_key.t Snarky_backendless.Request.t
 
-      let handle_zkapp_proof (proof : _ Pickles.Proof.t)
+      let handle_zkapp_proof (verification_key : Side_loaded_verification_key.t)
+          (proof : _ Pickles.Proof.t)
           (Snarky_backendless.Request.With { request; respond }) =
         match request with
         | Zkapp_proof ->
             respond (Provide proof)
+        | Zkapp_vk ->
+            respond (Provide verification_key)
         | _ ->
             respond Unhandled
 
@@ -1428,11 +1432,8 @@ module Make_str (A : Wire_types.Concrete) = struct
               match spec.auth_type with
               | Proof ->
                   let vk =
-                    exists Side_loaded_verification_key.typ ~compute:(fun () ->
-                        Option.value_exn
-                          (As_prover.Ref.get
-                             (Data_as_hash.ref a.zkapp.verification_key.data) )
-                            .data )
+                    exists Side_loaded_verification_key.typ ~request:(fun () ->
+                        Zkapp_vk )
                   in
                   let expected_hash =
                     Data_as_hash.hash a.zkapp.verification_key.data
@@ -4057,7 +4058,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             | Some (p, v) ->
                 Pickles.Side_loaded.in_prover (Base.side_loaded 0) v.data ;
                 proved
-                  ~handler:(Base.Zkapp_command_snark.handle_zkapp_proof p)
+                  ~handler:
+                    (Base.Zkapp_command_snark.handle_zkapp_proof v.data p)
                   statement )
       in
       let open Async in
