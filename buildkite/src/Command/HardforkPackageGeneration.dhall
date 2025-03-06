@@ -127,8 +127,8 @@ let pipeline
                             )
                             "./buildkite/scripts/build-hardfork-package.sh"
                         # [ Cmd.run
-                              "./buildkite/scripts/debian/upload-to-gs.sh ${DebianVersions.lowerName
-                                                                              debVersion}"
+                              "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
+                                                                                debVersion}"
                           ]
                     , label =
                         "Build Mina Hardfork Package for ${DebianVersions.capitalName
