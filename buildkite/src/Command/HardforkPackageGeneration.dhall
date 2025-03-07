@@ -159,7 +159,7 @@ let pipeline
                     DockerImage.ReleaseSpec::{
                     , deps =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
-                    , service = Artifacts.dockerName Artifacts.Type.Daemon
+                    , service = Artifacts.Type.Daemon
                     , network = network_name
                     , deb_codename = "${DebianVersions.lowerName debVersion}"
                     , deb_profile = profile
@@ -214,7 +214,7 @@ let pipeline
                     DockerImage.ReleaseSpec::{
                     , deps =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
-                    , service = Artifacts.dockerName Artifacts.Type.Archive
+                    , service = Artifacts.Type.Archive
                     , network = network_name
                     , deb_codename = "${DebianVersions.lowerName debVersion}"
                     , deb_profile = profile
@@ -228,7 +228,7 @@ let pipeline
                     DockerImage.ReleaseSpec::{
                     , deps =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
-                    , service = Artifacts.dockerName Artifacts.Type.Rosetta
+                    , service = Artifacts.Type.Rosetta
                     , network = network_name
                     , deb_repo = DebianRepo.Type.Local
                     , deb_codename = "${DebianVersions.lowerName debVersion}"

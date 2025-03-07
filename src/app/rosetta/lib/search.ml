@@ -308,7 +308,7 @@ module Sql = struct
     let ppf = Format.formatter_of_buffer buffer in
     let () =
       Option.value_map params ~default:(Caqti_request.pp ppf req)
-        ~f:(fun params -> Caqti_request.make_pp_with_param () ppf (req, params))
+        ~f:(fun params -> Caqti_request.pp_with_param ppf (req, params))
     in
     let () = Format.pp_print_flush ppf () in
     Buffer.contents buffer
@@ -499,7 +499,8 @@ module Sql = struct
             ORDER BY u.block_id, u.id, u.sequence_no
         |sql}]
 
-    let run (module Conn : Mina_caqti.CONNECTION) ~logger ~offset ~limit input =
+    let run (module Conn : Caqti_async.CONNECTION) ~logger ~offset ~limit input
+        =
       let open Deferred.Result.Let_syntax in
       let params = Params.of_query input in
       let query_string =
@@ -508,7 +509,9 @@ module Sql = struct
           input.operator
       in
       let query =
-        Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ) query_string
+        Caqti_request.collect Params.typ
+          Caqti_type.(tup2 int64 typ)
+          query_string
       in
       [%log debug] "Running SQL query $query"
         ~metadata:[ ("query", `String (request_to_string ~params query)) ] ;
@@ -778,11 +781,12 @@ module Sql = struct
             ORDER BY i.block_id, i.id, i.sequence_no, i.secondary_sequence_no
           |sql}]
 
-    let run (module Conn : Mina_caqti.CONNECTION) ~logger ~offset ~limit input =
+    let run (module Conn : Caqti_async.CONNECTION) ~logger ~offset ~limit input
+        =
       let open Deferred.Result.Let_syntax in
       let params = Params.of_query input in
       let query =
-        Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ)
+        Caqti_request.collect Params.typ Caqti_type.(tup2 int64 typ)
         @@ query_string ~offset ~limit input.filter.op_type input.operator
       in
       [%log debug] "Running SQL query $query"
@@ -924,10 +928,11 @@ module Sql = struct
           ~address_fields:[ "pk_fee_payer.value"; "pk_update_body.value" ]
           ~op_type_filters operator
       in
-      Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ)
+      Caqti_request.collect Params.typ Caqti_type.(tup2 int64 typ)
       @@ query_string ~offset ~limit ~filters
 
-    let run (module Conn : Mina_caqti.CONNECTION) ~logger ~offset ~limit input =
+    let run (module Conn : Caqti_async.CONNECTION) ~logger ~offset ~limit input
+        =
       let open Deferred.Result.Let_syntax in
       let params = Params.of_query input in
       let query = query ~offset ~limit input.filter.op_type input.operator in
@@ -967,7 +972,7 @@ module Sql = struct
     end)
   end
 
-  let run (module Conn : Mina_caqti.CONNECTION) ~logger query =
+  let run (module Conn : Caqti_async.CONNECTION) ~logger query =
     let module Result = struct
       include Result
 
@@ -1050,7 +1055,7 @@ module Specific = struct
     module Mock = T (Result)
 
     let real :
-        logger:Logger.t -> db:(module Mina_caqti.CONNECTION) -> 'gql Real.t =
+        logger:Logger.t -> db:(module Caqti_async.CONNECTION) -> 'gql Real.t =
      fun ~logger ~db ->
       { db_transactions = Sql.run ~logger db
       ; validate_network_choice = Network.Validate_choice.Real.validate

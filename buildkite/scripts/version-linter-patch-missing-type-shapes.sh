@@ -39,13 +39,13 @@ if [[ $FORK == 1 ]]; then
     exit 0
 fi
 
-if ! $(gsutil ls gs://mina-type-shapes/$RELEASE_BRANCH_COMMIT 2>/dev/null); then
+if ! gsutil ls "gs://mina-type-shapes/${RELEASE_BRANCH_COMMIT}*" >/dev/null; then
     checkout_and_dump $RELEASE_BRANCH_COMMIT
 fi
 
 if [[ -n "${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-}" ]]; then 
     BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 ${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH} )
-    if ! $(gsutil ls gs://mina-type-shapes/$BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT 2>/dev/null); then
+    if ! gsutil ls "gs://mina-type-shapes/${BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT}*"; then
         checkout_and_dump $BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT
     fi
 fi
