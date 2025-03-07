@@ -18,9 +18,7 @@ then
 fi
 
 # Fetch a fresh copy of the target branch
-source buildkite/scripts/handle-fork.sh
-
-git fetch ${REMOTE} $BRANCH
+source buildkite/scripts/refresh_code.sh
 
 git config --global user.email "hello@ci.com"
 git config --global user.name "It's me, CI"
