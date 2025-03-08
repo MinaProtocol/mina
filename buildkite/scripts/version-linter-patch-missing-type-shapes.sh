@@ -12,7 +12,7 @@ git config --global --add safe.directory /workdir
 source buildkite/scripts/handle-fork.sh
 source buildkite/scripts/export-git-env-vars.sh
 
-release_branch=${REMOTE}/$1
+release_branch=origin/$1
 
 RELEASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 $release_branch)
 
