@@ -59,7 +59,7 @@ git config --global --add safe.directory /workdir
 #
 #       error: program 'git' failed with exit code 128
 # That is why we checkout branch explicitly
-git checkout refs/pull/$BUILDKITE_PULL_REQUEST/head
+git checkout origin/refs/pull/$BUILDKITE_PULL_REQUEST/head
 
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --no-link
 
