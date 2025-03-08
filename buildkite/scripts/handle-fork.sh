@@ -7,11 +7,15 @@ if [ "${BUILDKITE_PULL_REQUEST_REPO}" ==  ${MINA_REPO} ]; then
     export REMOTE="origin"
     export FORK=0
 else
-    git remote add fork ${BUILDKITE_PULL_REQUEST_REPO} || true
     export REMOTE="fork"
     export FORK=1
-    git fetch fork --recurse-submodules
-    git switch ${BUILDKITE_BRANCH} ${REMOTE}/${BUILDKITE_BRANCH}
-    git submodule sync
-    git submodule update --init --recursive
+    if ! git remote -v | grep "${BUILDKITE_PULL_REQUEST_REPO}"; then
+        git remote add fork ${BUILDKITE_PULL_REQUEST_REPO} || true
+        git switch -c ${BUILDKITE_BRANCH} ${REMOTE}/${BUILDKITE_BRANCH}
+    else
+        git remote set-url fork ${BUILDKITE_PULL_REQUEST_REPO}
+        git fetch fork --recurse-submodules
+        git switch ${REMOTE}/${BUILDKITE_BRANCH}
+    fi
+    
 fi
