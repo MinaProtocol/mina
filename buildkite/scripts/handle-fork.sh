@@ -10,4 +10,8 @@ else
     git remote add fork ${BUILDKITE_PULL_REQUEST_REPO} || true
     export REMOTE="fork"
     export FORK=1
+    git fetch fork --recurse-submodules
+    git switch -c ${BUILDKITE_BRANCH} ${REMOTE}/${BUILDKITE_BRANCH}
+    git submodule sync
+    git submodule update --init --recursive
 fi
