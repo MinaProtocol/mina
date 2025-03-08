@@ -49,7 +49,7 @@ nix-env -i git-lfs
 git config --global --add safe.directory /workdir
 
 # We are in buildkite context so all buildkite related envs are available
-# We can use BUILDKITE_PULL_REQUEST to checkout the PR branch
+# We can use BUILDKITE_BRANCH to checkout the PR branch
 # Checking out the PR branch is necessary to make nix happy as it doesn't like detached head.
 # To be more precise nix has issue when performing operations on detached head
 # On Ci machine it spit out issues like:
@@ -59,7 +59,9 @@ git config --global --add safe.directory /workdir
 #
 #       error: program 'git' failed with exit code 128
 # That is why we checkout branch explicitly
-git checkout origin/refs/pull/$BUILDKITE_PULL_REQUEST/head
+
+./scripts/handle-fork.sh
+git checkout ${REMOTE}/$BUILDKITE_BRANCH
 
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --no-link
 
