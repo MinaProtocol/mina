@@ -61,7 +61,6 @@ git config --global --add safe.directory /workdir
 # That is why we checkout branch explicitly
 
 . buildkite/scripts/handle-fork.sh
-git checkout ${REMOTE}/$BUILDKITE_BRANCH
 
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --no-link
 
