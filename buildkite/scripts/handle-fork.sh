@@ -14,12 +14,12 @@ else
     if ! git remote -v | grep "${BUILDKITE_PULL_REQUEST_REPO}"; then
         git remote add fork ${BUILDKITE_PULL_REQUEST_REPO}
         git fetch fork --recurse-submodules --tags
+        rm .git/hooks/post-checkout
         git switch -c ${BUILDKITE_BRANCH}
     else
         git remote set-url fork ${BUILDKITE_PULL_REQUEST_REPO}
         git fetch fork --recurse-submodules --tags
+        rm .git/hooks/post-checkout
         git switch ${BUILDKITE_BRANCH}
     fi
-
-    
 fi
