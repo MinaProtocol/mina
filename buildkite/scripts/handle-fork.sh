@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -xeo pipefail
+
 export MINA_REPO="https://github.com/MinaProtocol/mina.git"
 
 if [ "${BUILDKITE_PULL_REQUEST_REPO}" ==  ${MINA_REPO} ]; then
@@ -10,12 +12,14 @@ else
     export REMOTE="fork"
     export FORK=1
     if ! git remote -v | grep "${BUILDKITE_PULL_REQUEST_REPO}"; then
-        git remote add fork ${BUILDKITE_PULL_REQUEST_REPO} || true
+        git remote add fork ${BUILDKITE_PULL_REQUEST_REPO}
+        git fetch fork --recurse-submodules --tags
         git switch -c ${BUILDKITE_BRANCH}
     else
         git remote set-url fork ${BUILDKITE_PULL_REQUEST_REPO}
-        git fetch fork --recurse-submodules
+        git fetch fork --recurse-submodules --tags
         git switch ${BUILDKITE_BRANCH}
     fi
+
     
 fi
