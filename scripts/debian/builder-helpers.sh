@@ -23,7 +23,7 @@ SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
 
 SUGGESTED_DEPS="jq, curl, wget"
 
-TEST_EXECUTIVE_DEPS=", mina-logproc, python3, nodejs, yarn, google-cloud-sdk, kubectl, google-cloud-sdk-gke-gcloud-auth-plugin, terraform, helm"
+TEST_EXECUTIVE_DEPS=", mina-logproc, python3, docker"
 
 case "${MINA_DEB_CODENAME}" in
   bookworm|jammy)

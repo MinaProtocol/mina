@@ -22,6 +22,8 @@ let DebianVersions = ../Constants/DebianVersions.dhall
 
 let DebianRepo = ../Constants/DebianRepo.dhall
 
+let DockerPublish = ../Constants/DockerPublish.dhall
+
 let DebianChannel = ../Constants/DebianChannel.dhall
 
 let Profiles = ../Constants/Profiles.dhall
@@ -149,6 +151,8 @@ let docker_step
                   spec.buildFlags
                   step_dep_name
 
+          let docker_publish = DockerPublish.Type.Essential
+
           in  merge
                 { Daemon =
                     Prelude.List.map
@@ -164,6 +168,7 @@ let docker_step
                             , deb_profile = spec.profile
                             , build_flags = spec.buildFlags
                             , deb_repo = DebianRepo.Type.Local
+                            , docker_publish = docker_publish
                             , step_key =
                                 "daemon-${Network.lowerName
                                             n}-${DebianVersions.lowerName
@@ -184,6 +189,7 @@ let docker_step
                         "${DebianVersions.lowerName spec.debVersion}"
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
+                    , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , step_key =
                         "batch-txn-${DebianVersions.lowerName
@@ -199,6 +205,7 @@ let docker_step
                         "${DebianVersions.lowerName spec.debVersion}"
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
+                    , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , step_key =
                         "archive-${DebianVersions.lowerName
@@ -220,6 +227,7 @@ let docker_step
                                 "${DebianVersions.lowerName spec.debVersion}"
                             , deb_profile = spec.profile
                             , build_flags = spec.buildFlags
+                            , docker_publish = docker_publish
                             , deb_repo = DebianRepo.Type.Local
                             , step_key =
                                 "rosetta-${Network.lowerName
@@ -234,6 +242,7 @@ let docker_step
                     , deps = deps
                     , service = Artifacts.Type.ZkappTestTransaction
                     , build_flags = spec.buildFlags
+                    , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_profile = spec.profile
                     , deb_codename =
@@ -252,6 +261,7 @@ let docker_step
                     , deb_codename =
                         "${DebianVersions.lowerName spec.debVersion}"
                     , build_flags = spec.buildFlags
+                    , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_profile = spec.profile
                     , step_key =
