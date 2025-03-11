@@ -14,11 +14,14 @@ else
     if ! git remote -v | grep "${BUILDKITE_PULL_REQUEST_REPO}"; then
         git remote add fork ${BUILDKITE_PULL_REQUEST_REPO}
         git fetch fork --recurse-submodules --tags
-        rm .git/hooks/post-checkout
+        # This is a workaround for missing git-lfs
+        rm -f .git/hooks/post-checkout || true
         git switch -c ${BUILDKITE_BRANCH}
     else
         git remote set-url fork ${BUILDKITE_PULL_REQUEST_REPO}
         git fetch fork --recurse-submodules --tags
+        # This is a workaround for missing git-lfs
+        rm -f .git/hooks/post-checkout || true
         git switch ${BUILDKITE_BRANCH}
     fi
 fi
