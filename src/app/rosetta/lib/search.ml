@@ -240,39 +240,35 @@ module Sql = struct
       ~op_status_field ~address_fields ~op_type_filters operator =
     let values_for_filter = function
       | `Block_height ->
-          ("<=", 1, None)
+          ("<=", 1, "int")
       | `Txn_hash ->
-          ("=", 2, None)
+          ("=", 2, "text")
       | `Account_identifier_pk ->
-          ("=", 3, None)
+          ("=", 3, "text")
       | `Account_identifier_token ->
-          ("=", 4, None)
+          ("=", 4, "text")
       | `Op_status ->
-          ("=", 5, Some "transaction_status")
+          ("=", 5, "transaction_status")
       | `Success ->
-          ("=", 6, Some "transaction_status")
+          ("=", 6, "transaction_status")
       | `Address ->
-          ("=", 7, None)
+          ("=", 7, "text")
     in
     let gen_filter (op_1, op_2, null_cmp) l =
       String.concat ~sep:[%string " %{op_1} "]
       @@ List.map l ~f:(function
-           | ((_, (_, n, _)) :: _) :: _ as field_n_l ->
+           | ((_, (_, n, typ)) :: _) :: _ as field_n_l ->
                let filters =
                  String.concat ~sep:" OR "
                  @@ List.map field_n_l ~f:(fun l ->
                         String.concat ~sep:" AND "
-                        @@ List.map l
-                             ~f:(fun (field', (cmp_op, n', cast_opt)) ->
-                               Option.value_map cast_opt
-                                 ~default:
-                                   [%string "%{field'} %{cmp_op} $%{n'#Int}"]
-                                 ~f:(fun cast ->
-                                   [%string
-                                     "%{field'} %{cmp_op} CAST($%{n'#Int} AS \
-                                      %{cast})"] ) ) )
+                        @@ List.map l ~f:(fun (field', (cmp_op, n', cast)) ->
+                               [%string
+                                 "%{field'} %{cmp_op} CAST($%{n'#Int} AS \
+                                  %{cast})"] ) )
                in
-               [%string "($%{n#Int} %{null_cmp} NULL %{op_2} (%{filters}))"]
+               [%string
+                 "($%{n#Int}::%{typ} %{null_cmp} NULL %{op_2} (%{filters}))"]
            | _ ->
                "" )
     in
