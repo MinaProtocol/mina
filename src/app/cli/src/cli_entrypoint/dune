@@ -76,6 +76,10 @@
    ppx_version.runtime
    internal_tracing
    itn_logger
+   staged_ledger_diff
+   transaction_snark_work
+   one_or_two
+   mina_wire_types
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_here ppx_let ppx_sexp_conv ppx_deriving_yojson)))
