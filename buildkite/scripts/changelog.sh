@@ -6,21 +6,21 @@
 # is present. If not, it exits with an error. Can be bypassed by a !ci-bypass-changelog comment.
 
 # Usage:
-#   ./changelog.sh --trigger <trigger> --required-change <required-change>
+#   ./changelog.sh --path <trigger> --changelog-file <required-change>
 #
 # Options:
-#   --trigger: The trigger to look for in the diff
-#   --required-change: The required change to look for in the diff
+#   --path: The trigger to look for in the diff
+#   --changelog-file: The required change to look for in the diff
 #   -h, --help: Display help message
 #
 # Example:
-#   ./changelog.sh --trigger 'src/daemon' --required-change 'changes/1234-new-feature.md'
+#   ./changelog.sh --path 'src/daemon' --changelog-file 'changes/1234-new-feature.md'
 
-TRIGGER=""
-REQUIRED_CHANGE=""
+BASE_PATH=""
+CHANGELOG_FILE=""
 # List of users who can bypass the changelog check by commenting !ci-bypass-changelog
 # separated by space
-GITHUB_USERS_ELIGIBLE_FOR_BYPASS="amc-ie mrmr1993"
+GITHUB_USERS_ELIGIBLE_FOR_BYPASS="amc-ie mrmr1993 deepthiskumar Trivo25 45930 SanabriaRusso nicc georgeee"
 
 BYPASS_PHRASE="!ci-bypass-changelog"
 
@@ -28,8 +28,8 @@ PIPELINE_SLUG="mina-o-1-labs"
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        --trigger) TRIGGER="$2"; shift ;;
-        --required-change) REQUIRED_CHANGE="$2"; shift ;;
+        --path) BASE_PATH="$2"; shift ;;
+        --changelog-file) CHANGELOG_FILE="$2"; shift ;;
         -h|--help)  echo "Usage: $0 --trigger <trigger> --required-change <required-change>"; 
                     echo "";
                     echo "Options:";
@@ -84,13 +84,13 @@ else
     echo "⚙️  PR is not bypassed. Proceeding with changelog check..."
 fi
 
-COMMIT=$(git log -1 --pretty=format:%H)
+COMMIT=$BUILDKITE_COMMIT
 BASE_COMMIT=$(git log "${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" -1 --pretty=format:%H)
 echo "Diffing current commit: ${COMMIT} against branch: ${BUILDKITE_PULL_REQUEST_BASE_BRANCH} (${BASE_COMMIT})" >&2 
 git diff "${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" --name-only > _computed_diff.txt
 
-if (cat _computed_diff.txt | grep -E -q "$TRIGGER"); then
-    if ! (cat _computed_diff.txt | grep -E -q "$REQUIRED_CHANGE"); then
+if (git diff --quiet "${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" "$BASE_PATH"); then
+    if ! [[ -f "$CHANGELOG_FILE" ]]; then
         echo "❌  Missing changelog entry detected !!"
         echo ""
         echo "This job detected that you modified important part of code and did not update changelog file."

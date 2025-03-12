@@ -12,16 +12,15 @@ let Command = ../../Command/Base.dhall
 
 let Size = ../../Command/Size.dhall
 
-let trigger = S.compile [ S.strictlyStart (S.contains "src") ]
+let path = S.compile [ S.strictlyStart (S.contains "src") ]
 
-let reqFile = "^changes/\\\${BUILDKITE_PULL_REQUEST}-.*.md"
+let changelogFile = "^changes/\\\${BUILDKITE_PULL_REQUEST}-.*.md"
 
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
-          , S.strictlyStart (S.contains "scripts/changelog.sh")
           , S.strictlyStart (S.contains "buildkite/scripts/changelog.sh")
           , S.strictlyStart (S.contains "scripts/github/github_info")
           , S.exactly "buildkite/src/Jobs/Lint/Changelog" "dhall"
@@ -39,7 +38,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run
-                  "./buildkite/scripts/changelog.sh --trigger ${trigger} --required-change ${reqFile}"
+                  "./buildkite/scripts/changelog.sh --path ${path} --changelog-file ${changelogFile}"
               ]
             , label = "Lint: Changelog"
             , key = "lint-changelog"
