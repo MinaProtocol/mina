@@ -26,22 +26,20 @@ module Poly = struct
 end
 
 module Valid = struct
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t = User_command.Valid.Stable.V2.t Poly.Stable.V2.t
-      [@@deriving sexp, compare, equal, hash, yojson]
+  module T = struct
+    type t = User_command.Valid.t Poly.t
+    [@@deriving sexp, compare, equal, hash, yojson]
+  end
 
-      let to_latest = Fn.id
-    end
-  end]
-
-  include Hashable.Make (Stable.Latest)
-  include Comparable.Make (Stable.Latest)
+  include T
+  include Hashable.Make (T)
+  include Comparable.Make (T)
 end
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t = User_command.Stable.V2.t Poly.Stable.V2.t
     [@@deriving sexp, compare, equal, hash, yojson]
@@ -50,8 +48,13 @@ module Stable = struct
   end
 end]
 
-include Hashable.Make (Stable.Latest)
-include Comparable.Make (Stable.Latest)
+type t = User_command.t Poly.t [@@deriving sexp, yojson]
+
+let unwrap : t -> Stable.Latest.t =
+  Poly.Stable.Latest.map ~f:User_command.unwrap
+
+let generate : Stable.Latest.t -> t =
+  Poly.Stable.Latest.map ~f:User_command.generate
 
 type 'command t_ = 'command Poly.t =
   | Command of 'command
@@ -144,10 +147,10 @@ let valid_size ~genesis_constants (t : t) =
   | Fee_transfer _ | Coinbase _ ->
       Ok ()
 
-let check_well_formedness ~genesis_constants (t : t) =
+let check_well_formedness ~genesis_constants ~compile_config (t : t) =
   match t with
   | Command cmd ->
-      User_command.check_well_formedness ~genesis_constants cmd
+      User_command.check_well_formedness ~genesis_constants ~compile_config cmd
   | Fee_transfer _ | Coinbase _ ->
       Ok ()
 
@@ -169,7 +172,7 @@ let yojson_summary_of_command =
   in
   function
   | User_command.Zkapp_command cmd ->
-      mk_record (zkapp_type cmd) (Zkapp_command.memo cmd)
+      mk_record (zkapp_type cmd) cmd.Zkapp_command.Poly.memo
         ( Zkapp_command.fee_payer_account_update cmd
         |> Account_update.Fee_payer.authorization )
   | Signed_command cmd ->

@@ -7,6 +7,9 @@ module Zk_cmd_result = struct
     * Ledger.t
 
   let sexp_of_t (txn, _) =
-    Mina_transaction_logic.Transaction_applied.Zkapp_command_applied.sexp_of_t
-      txn
+    Mina_transaction_logic.Transaction_applied.Zkapp_command_applied.Stable
+    .Latest
+    .sexp_of_t
+      (Mina_transaction_logic.Transaction_applied.Zkapp_command_applied.unwrap
+         txn )
 end

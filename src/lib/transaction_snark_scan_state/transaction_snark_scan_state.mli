@@ -28,7 +28,6 @@ module Transaction_with_witness : sig
     ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
     ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
     }
-  [@@deriving sexp]
 end
 
 module Ledger_proof_with_sok_message : sig
@@ -80,7 +79,7 @@ module Transactions_ordered : sig
     [@@deriving sexp, to_yojson]
   end
 
-  type t = Transaction_with_witness.t Poly.t [@@deriving sexp, to_yojson]
+  type t = Transaction_with_witness.t Poly.t
 end
 
 val empty :
