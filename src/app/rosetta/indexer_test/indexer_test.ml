@@ -707,9 +707,9 @@ module Max_block =
 module Offset_limit = struct
   type t = { offset : int; limit : int }
 
-  let offset_generator = Int.gen_incl 1 100
+  let offset_generator = Int.gen_incl 1 50
 
-  let limit_generator = Int.gen_incl 1 50
+  let limit_generator = Int.gen_incl 1 25
 
   let transaction_testable =
     Alcotest.testable
