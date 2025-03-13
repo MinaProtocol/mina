@@ -60,7 +60,9 @@ git config --global --add safe.directory /workdir
 #       error: program 'git' failed with exit code 128
 # That is why we checkout branch explicitly
 
-. buildkite/scripts/handle-fork.sh
+git branch -D $BUILDKITE_BRANCH 2>/dev/null || true
+git checkout -b $BUILDKITE_BRANCH
+git reset --hard $BUILDKITE_COMMIT
 
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --no-link
 
