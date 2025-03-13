@@ -30,28 +30,28 @@ while [[ "$#" -gt 0 ]]; do
     case $1 in
         --path) BASE_PATH="$2"; shift ;;
         --changelog-file) CHANGELOG_FILE="$2"; shift ;;
-        -h|--help)  echo "Usage: $0 --trigger <trigger> --required-change <required-change>"; 
+        -h|--help)  echo "Usage: $0 --path <path> --required-change <required-change>"; 
                     echo "";
                     echo "Options:";
-                    echo "  --trigger: The trigger to look for in the diff"; 
+                    echo "  --path: The trigger to look for in the diff"; 
                     echo "  --required-change: The required change to look for in the diff";
                     echo "Example:";
-                    echo "  $0 --trigger 'src/daemon' --required-change 'changes/1234-new-feature.md'";
+                    echo "  $0 --path 'src/daemon' --required-change 'changes/1234-new-feature.md'";
                     exit 0 ;;
         *) echo "❌  Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
 done
 
-if [[ -z "$TRIGGER" ]]; then
-    echo "❌  --trigger is not set"
-    echo "❌  Did you forget to pass --trigger ?"
+if [[ -z "$BASE_PATH" ]]; then
+    echo "❌  --path is not set"
+    echo "❌  Did you forget to pass --path ?"
     echo "❌  See --help for more info"
     exit 1
 fi
-if [[ -z "$REQUIRED_CHANGE" ]]; then
-    echo "❌  --required-change is not set"
-    echo "❌  Did you forget to pass --required-change ?"
+if [[ -z "$CHANGELOG_FILE" ]]; then
+    echo "❌  --changelog-file is not set"
+    echo "❌  Did you forget to pass ----changelog-file ?"
     echo "❌  See --help for more info"
     exit 1
 fi
@@ -105,5 +105,5 @@ if (git diff --quiet "${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" "$BASE_PA
         echo "✅  Changelog updated!"
     fi
 else
-    echo "⏭️  No change in ${TRIGGER} detected. Changelog does not need to be updated"
+    echo "⏭️  No change in ${BASE_PATH} detected. Changelog does not need to be updated"
 fi
