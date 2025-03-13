@@ -40,8 +40,9 @@ let runInDockerWithPostgresConn
 
           let dbName = "archive"
 
-          let pg_conn =
-                "postgres://${user}:${password}@localhost:${port}/${dbName}"
+          let pg_uri = "postgres://${user}:${password}@localhost:${port}"
+
+          let pg_conn = "${pg_uri}/${dbName}"
 
           let envVars =
                 Text/concatMap
@@ -51,6 +52,7 @@ let runInDockerWithPostgresConn
                       , "POSTGRES_USER=${user}"
                       , "POSTGRES_PASSWORD=${password}"
                       , "POSTGRES_DB=${dbName}"
+                      , "POSTGRES_URI=${pg_uri}"
                       , "PG_CONN=${pg_conn}"
                       ]
                     # environment
