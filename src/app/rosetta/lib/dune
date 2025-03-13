@@ -51,8 +51,7 @@
   hex
   mina_numbers
   mina_transaction
-  mina_version
- )
+  mina_version)
  (preprocessor_deps
   ../../../graphql-ppx-config.inc
   ../../../../graphql_schema.json)
