@@ -23,7 +23,13 @@ let read_postgres_uri_from_env_var () =
       uri
   | None ->
       failwith "Environment variable MINA_TEST_POSTGRES_URI is not set"
+      
+(** [setup_connection ~network_data] sets up a connection to the PostgreSQL database
+  and creates a configuration for the Archive service.
 
+  @param network_data The network data containing the genesis ledger path.
+  @return A deferred Archive.Config.t value with the configuration for the Archive service.
+*)
 let setup_connection ~network_data ~postgres_uri ?(server_port = 3030)
     ?(prefix = "random_db") () =
   let open Deferred.Let_syntax in
@@ -44,6 +50,15 @@ module Make_FixtureWithBootstrap (M : TestCaseWithBootstrap) :
 
   let test_case = M.test_case
 
+  
+  (** 
+    Sets up the archive by performing the following steps:
+    1. Retrieves the network data folder path from the environment variable "NETWORK_DATA_FOLDER".
+    2. Creates network data using the retrieved folder path.
+    3. Sets up a connection using the created network data.
+
+    @return A record containing the started archive and the network data.
+  *)
   let setup () =
     let open Deferred.Or_error.Let_syntax in
     let network_data = read_network_data_from_env_var () in
@@ -84,6 +99,13 @@ module Make_FixtureWithoutBootstrap (M : TestCaseWithoutBootstrap) :
   (* The test case should handle the connection and any necessary setup. *)
   let test_case = M.test_case
 
+  (** 
+    Sets up the network data and configuration for the archive.
+
+    @return A record containing the configuration and network data.
+
+    @raise Sys_error if the environment variable "NETWORK_DATA_FOLDER" is not set.
+  *)
   let setup () =
     let open Deferred.Or_error.Let_syntax in
     let network_data = read_network_data_from_env_var () in
