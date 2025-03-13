@@ -12,9 +12,9 @@ let Command = ../../Command/Base.dhall
 
 let Size = ../../Command/Size.dhall
 
-let path = S.compile [ S.strictlyStart (S.contains "src") ]
+let path = "src"
 
-let changelogFile = "^changes/\\\${BUILDKITE_PULL_REQUEST}-.*.md"
+let changelogFile = "changes/\\\${BUILDKITE_PULL_REQUEST}.md"
 
 in  Pipeline.build
       Pipeline.Config::{

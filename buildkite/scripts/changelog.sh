@@ -6,11 +6,11 @@
 # is present. If not, it exits with an error. Can be bypassed by a !ci-bypass-changelog comment.
 
 # Usage:
-#   ./changelog.sh --path <trigger> --changelog-file <required-change>
+#   ./changelog.sh --path <path> --changelog-file <changelog-file>
 #
 # Options:
-#   --path: The trigger to look for in the diff
-#   --changelog-file: The required change to look for in the diff
+#   --path: Filepath for which to check the diff
+#   --changelog-file: Location of changelog file (should be present if diff is non-empty)
 #   -h, --help: Display help message
 #
 # Example:
@@ -84,21 +84,16 @@ else
     echo "⚙️  PR is not bypassed. Proceeding with changelog check..."
 fi
 
-COMMIT=$BUILDKITE_COMMIT
 BASE_COMMIT=$(git log "${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" -1 --pretty=format:%H)
-echo "Diffing current commit: ${COMMIT} against branch: ${BUILDKITE_PULL_REQUEST_BASE_BRANCH} (${BASE_COMMIT})" >&2 
-git diff "${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" --name-only > _computed_diff.txt
+echo "Diffing current commit: ${BUILDKITE_COMMIT} against branch: ${BUILDKITE_PULL_REQUEST_BASE_BRANCH} (${BASE_COMMIT})" >&2 
 
 if (git diff --quiet "${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" "$BASE_PATH"); then
     if ! [[ -f "$CHANGELOG_FILE" ]]; then
         echo "❌  Missing changelog entry detected !!"
         echo ""
         echo "This job detected that you modified important part of code and did not update changelog file."
-        echo "Please ensure that you added this change to our changelog file: "
-        echo "'${REQUIRED_CHANGE}'"
-        echo " where syntax is like below: "
-        echo " changes/{PR number}-{description}.md"
-        echo " from example: changes/13523-new-fancy-daemon-feature.md"
+        echo "Please ensure that you added this change to PR's changelog file: "
+        echo "${CHANGELOG_FILE}"
         echo "It will help us to produce Release Notes for upcoming release"
         exit 1
     else
