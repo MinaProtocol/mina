@@ -10,6 +10,12 @@ type after_bootstrap =
 type before_bootstrap =
   { config : Archive.Config.t; network_data : Network_data.t }
 
+(** [setup_connection ~network_data] sets up a connection to the PostgreSQL database
+  and creates a configuration for the Archive service.
+
+  @param network_data The network data containing the genesis ledger path.
+  @return A deferred Archive.Config.t value with the configuration for the Archive service.
+*)
 let setup_connection ~network_data =
   let open Deferred.Let_syntax in
   let postgres_uri = Sys.getenv_exn "POSTGRES_URI" in
@@ -32,6 +38,15 @@ module Make_FixtureWithBootstrap (M : TestCaseWithBootstrap) :
 
   let test_case = M.test_case
 
+  
+  (** 
+    Sets up the archive by performing the following steps:
+    1. Retrieves the network data folder path from the environment variable "NETWORK_DATA_FOLDER".
+    2. Creates network data using the retrieved folder path.
+    3. Sets up a connection using the created network data.
+
+    @return A record containing the started archive and the network data.
+  *)
   let setup () =
     let open Deferred.Or_error.Let_syntax in
     let network_data_folder = Sys.getenv_exn "NETWORK_DATA_FOLDER" in
@@ -61,6 +76,13 @@ module Make_FixtureWithoutBootstrap (M : TestCaseWithoutBootstrap) :
 
   let test_case = M.test_case
 
+  (** 
+    Sets up the network data and configuration for the archive.
+
+    @return A record containing the configuration and network data.
+
+    @raise Sys_error if the environment variable "NETWORK_DATA_FOLDER" is not set.
+  *)
   let setup () =
     let open Deferred.Or_error.Let_syntax in
     let network_data_folder = Sys.getenv_exn "NETWORK_DATA_FOLDER" in
