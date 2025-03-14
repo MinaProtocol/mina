@@ -710,7 +710,7 @@ module Offset_limit = struct
   (* Max value + Max limit value should not exceed valid user_commands count in database
      otherwise quickcheck will become flaky.
   *)
-  let offset_generator = Int.gen_incl 2 30
+  let offset_generator = Int.gen_incl 1 50
 
   let limit_generator = Int.gen_incl 1 20
 
