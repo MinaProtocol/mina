@@ -996,7 +996,7 @@ module Sql = struct
        therefore we need to calculate the real length of user commands.
        The same for internal commands and zkapp commands
     *)
-    let real_user_command_length =
+    let fetched_user_command_length =
       List.length raw_user_commands |> Int64.of_int_exn
     in
 
@@ -1006,13 +1006,13 @@ module Sql = struct
     in
     let limit =
       Option.map limit ~f:(fun limit ->
-          Int64.(max 0L (limit - real_user_command_length)) )
+          Int64.(max 0L (limit - fetched_user_command_length)) )
     in
     let%bind internal_commands_count, raw_internal_commands =
       Internal_commands.run (module Conn) ~logger ~offset ~limit query
       |> Errors.Lift.sql ~context:"Finding internal commands within block"
     in
-    let real_internal_command_length =
+    let fetched_internal_command_length =
       List.length raw_internal_commands |> Int64.of_int_exn
     in
 
@@ -1022,7 +1022,7 @@ module Sql = struct
     in
     let limit =
       Option.map limit ~f:(fun limit ->
-          Int64.(max 0L (limit - real_internal_command_length)) )
+          Int64.(max 0L (limit - fetched_internal_command_length)) )
     in
     let%bind zkapp_commands_count, raw_zkapp_commands =
       Zkapp_commands.run (module Conn) ~logger ~offset ~limit query
