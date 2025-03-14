@@ -765,8 +765,12 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
       let transactions =
         Network_pool.Transaction_pool.Resource_pool.transactions
           transaction_resource_pool
-        |> Sequence.map
-             ~f:Transaction_hash.User_command_with_valid_signature.data
+        |> Sequence.map ~f:(fun cmd_with_valid_sig ->
+               let cmd, _ =
+                 Transaction_hash.User_command_with_valid_signature.data
+                   cmd_with_valid_sig
+               in
+               cmd )
       in
       let%bind () = Interruptible.lift (Deferred.return ()) (Ivar.read ivar) in
       [%log internal] "Generate_next_state" ;

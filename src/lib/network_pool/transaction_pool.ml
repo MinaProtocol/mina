@@ -3788,9 +3788,11 @@ let%test_module _ =
                 Test.Resource_pool.get_all test.txn_pool
                 |> List.map ~f:(fun tx ->
                        let data =
-                         Transaction_hash.User_command_with_valid_signature.data
-                           tx
-                         |> User_command.forget_check
+                         let valid, _ =
+                           Transaction_hash.User_command_with_valid_signature
+                           .data tx
+                         in
+                         valid |> User_command.forget_check
                        in
                        let nonce =
                          data |> User_command.applicable_at_nonce
