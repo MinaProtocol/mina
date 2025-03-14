@@ -168,23 +168,8 @@ module User_command_with_valid_signature = struct
 
   let hash_of_yojson = of_yojson
 
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t =
-        ( (User_command.Valid.Stable.V2.t[@hash.ignore])
-        , (T.Stable.V1.t[@to_yojson hash_to_yojson]) )
-        With_hash.Stable.V1.t
-      [@@deriving sexp, hash, to_yojson]
-
-      let to_latest = Fn.id
-
-      (* Compare only on hashes, comparing on the data too would be slower and
-         add no value.
-      *)
-      let compare (x : t) (y : t) = T.compare x.hash y.hash
-    end
-  end]
+  type t = (User_command.Valid.t, hash) With_hash.t
+  [@@deriving hash, sexp, compare, to_yojson]
 
   let create (c : User_command.Valid.t) : t =
     { data = c; hash = hash_command (User_command.forget_check c) }
@@ -193,12 +178,21 @@ module User_command_with_valid_signature = struct
 
   let command ({ data; _ } : t) = User_command.forget_check data
 
-  let hash ({ hash; _ } : t) = hash
+  (* NOTE: this function has its name conflicted so we have to rename it *)
+  let get_field_hash ({ hash; _ } : t) = hash
 
   let forget_check ({ data; hash } : t) =
     { With_hash.data = User_command.forget_check data; hash }
 
-  include Comparable.Make (Stable.Latest)
+  include Comparable.Make (struct
+    type nonrec t = t
+
+    let sexp_of_t = sexp_of_t
+
+    let t_of_sexp = t_of_sexp
+
+    let compare (x : t) (y : t) = T.compare x.hash y.hash
+  end)
 
   let make data hash : t = { data; hash }
 end
