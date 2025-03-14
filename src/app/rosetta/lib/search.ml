@@ -1002,7 +1002,7 @@ module Sql = struct
 
     let offset =
       Option.map offset ~f:(fun offset ->
-          Int64.(max 0L (offset - real_user_command_length)) )
+          Int64.(max 0L (offset - user_commands_count)) )
     in
     let limit =
       Option.map limit ~f:(fun limit ->
@@ -1018,7 +1018,7 @@ module Sql = struct
 
     let offset =
       Option.map offset ~f:(fun offset ->
-          Int64.(max 0L (offset - real_internal_command_length)) )
+          Int64.(max 0L (offset - internal_commands_count)) )
     in
     let limit =
       Option.map limit ~f:(fun limit ->
