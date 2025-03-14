@@ -48,14 +48,15 @@ val hash_of_transaction_id : string -> t Or_error.t
 
 include Comparable.S with type t := t
 
+module User_command_with_verification_keys : sig
+  type t = User_command.Valid.t * Side_loaded_verification_key.t list
+  [@@deriving hash, sexp, compare, to_yojson]
+end
+
 module User_command_with_valid_signature : sig
   type hash = t [@@deriving sexp, compare, hash, yojson]
 
-  type t =
-    private
-    ( User_command.Valid.t * Side_loaded_verification_key.t list
-    , hash )
-    With_hash.t
+  type t = private (User_command_with_verification_keys.t, hash) With_hash.t
   [@@deriving hash, sexp, compare, to_yojson]
 
   val create : User_command.Valid.t -> t
