@@ -1226,7 +1226,7 @@ module T = struct
             ~get_batch:(Ledger.get_batch ledger) )
       |> Deferred.return
     in
-    let%map xs = Verifier.verify_commands verifier cs in
+    let%map xs, _ = Verifier.verify_commands verifier cs in
     Result.all
       (List.map xs ~f:(function
         | `Valid x ->

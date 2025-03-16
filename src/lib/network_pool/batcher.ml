@@ -325,7 +325,7 @@ module Transaction_pool = struct
                               (* TODO: This rechecks the signatures on zkApp transactions... oh well for now *)
                               Some ((i, j), v) ) )
             in
-            let%map res =
+            let%map res, _ =
               (* Verify the unknowns *)
               Verifier.verify_commands verifier
                 (List.map unknowns ~f:(fun (_, txn) ->

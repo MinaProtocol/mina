@@ -82,14 +82,15 @@ let verify_blockchain_snarks { verify_blockchain_snarks; _ } chains =
 *)
 let verify_commands { proof_level; _ }
     (cs : User_command.Verifiable.t With_status.t list) :
-    [ `Valid of Mina_base.User_command.Valid.t
-    | `Valid_assuming of
-      ( Pickles.Side_loaded.Verification_key.t
-      * Mina_base.Zkapp_statement.t
-      * Pickles.Side_loaded.Proof.t )
+    ( [ `Valid of Mina_base.User_command.Valid.t
+      | `Valid_assuming of
+        ( Pickles.Side_loaded.Verification_key.t
+        * Mina_base.Zkapp_statement.t
+        * Pickles.Side_loaded.Proof.t )
+        list
+      | Common.invalid ]
       list
-    | Common.invalid ]
-    list
+    * Pickles.Side_loaded.Verification_key.t list )
     Deferred.Or_error.t =
   match proof_level with
   | Check | No_check ->
@@ -111,7 +112,7 @@ let verify_commands { proof_level; _ }
               `Unexpected_verification_key keys
           | `Mismatched_authorization_kind keys ->
               `Mismatched_authorization_kind keys )
-      |> Deferred.Or_error.return
+      |> fun ret -> (ret, []) |> Deferred.Or_error.return
   | Full ->
       let cs = List.map cs ~f:Common.check in
       let to_verify =
@@ -131,8 +132,8 @@ let verify_commands { proof_level; _ }
       let%map all_verified =
         Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ to_verify
       in
-      Ok
-        (List.map cs ~f:(function
+      let ret =
+        List.map cs ~f:(function
           | `Valid c ->
               `Valid c
           | `Valid_assuming (c, xs) ->
@@ -149,7 +150,10 @@ let verify_commands { proof_level; _ }
           | `Unexpected_verification_key keys ->
               `Unexpected_verification_key keys
           | `Mismatched_authorization_kind keys ->
-              `Mismatched_authorization_kind keys ) )
+              `Mismatched_authorization_kind keys )
+        |> fun ret -> (ret, [])
+      in
+      Ok ret
 
 let verify_transaction_snarks { verify_transaction_snarks; _ } ts =
   verify_transaction_snarks ts

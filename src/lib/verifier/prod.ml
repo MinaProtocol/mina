@@ -714,11 +714,11 @@ let verify_commands { worker; logger } ts =
           let tagged_commands = With_id_tag.tag_list ts in
           Worker.Connection.run connection ~f:Worker.functions.verify_commands
             ~arg:tagged_commands
-          |> Deferred.Or_error.map ~f:(fun (tagged_results, _) ->
+          |> Deferred.Or_error.map ~f:(fun (tagged_results, hashes) ->
                  let results =
                    finalize_verification_results tagged_commands tagged_results
                  in
-                 `Continue results ) ) )
+                 `Continue (results, hashes) ) ) )
 
 let verify_commands t ts =
   let logger = t.logger in
