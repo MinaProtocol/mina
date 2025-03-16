@@ -39,15 +39,16 @@ module Worker_state = struct
 
     val verify_commands :
          Mina_base.User_command.Verifiable.t With_status.t With_id_tag.t list
-      -> [ `Valid
-         | `Valid_assuming of
-           ( Pickles.Side_loaded.Verification_key.t
-           * Mina_base.Zkapp_statement.t
-           * Pickles.Side_loaded.Proof.t )
+      -> ( [ `Valid
+           | `Valid_assuming of
+             ( Pickles.Side_loaded.Verification_key.t
+             * Mina_base.Zkapp_statement.t
+             * Pickles.Side_loaded.Proof.t )
+             list
+           | invalid ]
+           With_id_tag.t
            list
-         | invalid ]
-         With_id_tag.t
-         list
+         * Pickles.Side_loaded.Verification_key.t list )
          Deferred.t
 
     val verify_transaction_snarks :
@@ -89,7 +90,9 @@ module Worker_state = struct
              let verify_commands
                  (cs :
                    User_command.Verifiable.t With_status.t With_id_tag.t list )
-                 : _ list Deferred.t =
+                 :
+                 (_ list * Pickles.Side_loaded.Verification_key.t list)
+                 Deferred.t =
                let results =
                  List.map cs ~f:(fun (id, c) -> (id, Common.check c))
                in
@@ -111,31 +114,40 @@ module Worker_state = struct
                let%map all_verified =
                  Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ to_verify
                in
-               List.map results ~f:(fun (id, result) ->
-                   let result =
-                     match result with
-                     | `Valid _ ->
-                         (* The command is dropped here to avoid decoding it later in the caller
-                            which would create a duplicate. Results are paired back to their inputs
-                            using the input [id]*)
-                         `Valid
-                     | `Valid_assuming (_, xs) ->
-                         if Or_error.is_ok all_verified then `Valid
-                         else `Valid_assuming xs
-                     | `Invalid_keys keys ->
-                         `Invalid_keys keys
-                     | `Invalid_signature keys ->
-                         `Invalid_signature keys
-                     | `Invalid_proof err ->
-                         `Invalid_proof err
-                     | `Missing_verification_key keys ->
-                         `Missing_verification_key keys
-                     | `Unexpected_verification_key keys ->
-                         `Unexpected_verification_key keys
-                     | `Mismatched_authorization_kind keys ->
-                         `Mismatched_authorization_kind keys
-                   in
-                   (id, result) )
+               (* NOTE:
+                  This is an optimization implemented as specified in https://www.notion.so/o1labs/Verification-of-zkapp-proofs-prior-to-block-creation-196e79b1f910807aa8aef723c135375a
+               *)
+               let encountered_hashes =
+                 List.map ~f:(fun (vk, _, _) -> vk) to_verify
+               in
+               let results =
+                 List.map results ~f:(fun (id, result) ->
+                     let result =
+                       match result with
+                       | `Valid _ ->
+                           (* The command is dropped here to avoid decoding it later in the caller
+                              which would create a duplicate. Results are paired back to their inputs
+                              using the input [id]*)
+                           `Valid
+                       | `Valid_assuming (_, xs) ->
+                           if Or_error.is_ok all_verified then `Valid
+                           else `Valid_assuming xs
+                       | `Invalid_keys keys ->
+                           `Invalid_keys keys
+                       | `Invalid_signature keys ->
+                           `Invalid_signature keys
+                       | `Invalid_proof err ->
+                           `Invalid_proof err
+                       | `Missing_verification_key keys ->
+                           `Missing_verification_key keys
+                       | `Unexpected_verification_key keys ->
+                           `Unexpected_verification_key keys
+                       | `Mismatched_authorization_kind keys ->
+                           `Mismatched_authorization_kind keys
+                     in
+                     (id, result) )
+               in
+               (results, encountered_hashes)
 
              let verify_commands cs =
                Context_logger.with_logger (Some logger)
@@ -219,7 +231,7 @@ module Worker_state = struct
                          `Mismatched_authorization_kind keys
                    in
                    (id, result) )
-               |> Deferred.return
+               |> fun result -> (result, []) |> Deferred.return
 
              let verify_blockchain_snarks _ = Deferred.return (Ok ())
 
@@ -252,7 +264,8 @@ module Worker = struct
               list
             | invalid ]
             With_id_tag.t
-            list )
+            list
+            * Pickles.Side_loaded.Verification_key.t list )
           F.t
       ; toggle_internal_tracing : ('w, bool, unit) F.t
       ; set_itn_logger_data : ('w, int, unit) F.t
@@ -332,7 +345,8 @@ module Worker = struct
                     list
                   | invalid ]
                   With_id_tag.t
-                  list]
+                  list
+                  * Pickles.Side_loaded.Verification_key.Stable.Latest.t list]
               , verify_commands )
         ; toggle_internal_tracing =
             f
@@ -700,7 +714,7 @@ let verify_commands { worker; logger } ts =
           let tagged_commands = With_id_tag.tag_list ts in
           Worker.Connection.run connection ~f:Worker.functions.verify_commands
             ~arg:tagged_commands
-          |> Deferred.Or_error.map ~f:(fun tagged_results ->
+          |> Deferred.Or_error.map ~f:(fun (tagged_results, _) ->
                  let results =
                    finalize_verification_results tagged_commands tagged_results
                  in
