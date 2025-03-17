@@ -4,7 +4,14 @@ set -xeo pipefail
 
 export MINA_REPO="https://github.com/MinaProtocol/mina.git"
 
-if [ "${BUILDKITE_PULL_REQUEST_REPO}" ==  ${MINA_REPO} ]; then
+if [ -z "${BUILDKITE_PULL_REQUEST_REPO}" ]; then
+    echo "This is not a Forked repo, skipping..."
+    export REMOTE="origin"
+    export FORK=0
+    exit 0
+fi
+
+if [[ "${BUILDKITE_PULL_REQUEST_REPO}" ==  "${MINA_REPO}" ]]; then
     echo "This is not a Forked repo, skipping..."
     export REMOTE="origin"
     export FORK=0
