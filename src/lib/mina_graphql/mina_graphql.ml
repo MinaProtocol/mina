@@ -2143,8 +2143,8 @@ module Queries = struct
           [ arg "maxLength"
               ~doc:
                 "The maximum number of blocks to return. If there are more \
-                 blocks in the transition frontier from root to tip, the n \
-                 blocks closest to the best tip will be returned"
+                 blocks in the transition frontier from root to tip, the \
+                 maxLength blocks closest to the best tip will be returned"
               ~typ:int
           ]
       ~resolve:(fun { ctx = mina; _ } () max_length ->
@@ -2158,6 +2158,103 @@ module Queries = struct
         | None ->
             return
             @@ Error "Could not obtain best chain from transition frontier" )
+
+  let account_actions =
+    field "accountActions"
+      ~doc:
+        "Find all the actions associated to an account from the current best \
+         tip."
+      ~typ:(non_null @@ list @@ non_null Types.Action_state.spec)
+      ~args:
+        Arg.
+          [ arg "publicKey" ~doc:"Public key of account being retrieved"
+              ~typ:(non_null Types.Input.PublicKey.arg_typ)
+          ; arg' "token"
+              ~doc:"Token of account being retrieved (defaults to MINA)"
+              ~typ:Types.Input.TokenId.arg_typ ~default:Token_id.default
+          ; arg "maxLength"
+              ~doc:
+                "The maximum number of blocks to search for actions. If there \
+                 are more blocks in the transition frontier from root to tip, \
+                 the maxLength blocks closest to the best tip will be returned"
+              ~typ:int
+          ]
+      ~resolve:(fun { ctx = mina; _ } () pk token max_length ->
+        let best_chain = Mina_lib.best_chain ?max_length mina in
+        match best_chain with
+        | Some best_chain ->
+            let actions =
+              List.concat_map
+                ~f:(fun bc ->
+                  let user_cmds =
+                    bc |> Transition_frontier.Breadcrumb.block
+                    |> Mina_block.body
+                    |> Staged_ledger_diff.Body.staged_ledger_diff
+                    |> Staged_ledger_diff.commands
+                  in
+                  let block_number =
+                    bc |> Transition_frontier.Breadcrumb.block
+                    |> Mina_block.header |> Mina_block.Header.blockchain_length
+                  in
+                  let transaction_seq = ref 0 in
+                  let action_list_list =
+                    List.filter_map user_cmds ~f:(fun user_cmd ->
+                        transaction_seq := !transaction_seq + 1 ;
+                        match user_cmd.data with
+                        | Zkapp_command c
+                          when Transaction_status.Stable.V2.(
+                                 equal user_cmd.status Applied) -> (
+                            let actions =
+                              c |> Zkapp_command.account_updates
+                              |> Zkapp_command.Call_forest.fold ~init:(0, [])
+                                   ~f:(fun acc au ->
+                                     let action_seq, acc = acc in
+                                     let account_id =
+                                       Account_id.create au.body.public_key
+                                         token
+                                     in
+                                     if
+                                       Account_id.equal account_id
+                                         (Account_id.create pk token)
+                                     then
+                                       let action_body = au.body.actions in
+                                       let field_elems =
+                                         List.map
+                                           ~f:(fun e -> Array.to_list e)
+                                           action_body
+                                       in
+                                       let action_seq = action_seq + 1 in
+                                       match field_elems with
+                                       | [] ->
+                                           (action_seq, acc)
+                                       | field_elems ->
+                                           let action_state =
+                                             { Types.Action_state.action =
+                                                 field_elems
+                                             ; action_sequence_no = action_seq
+                                             ; transaction_sequence_no =
+                                                 !transaction_seq
+                                             ; block_number
+                                             }
+                                           in
+                                           (action_seq, action_state :: acc)
+                                     else (action_seq, acc) )
+                            in
+                            let _, actions = actions in
+                            match actions with
+                            | [] ->
+                                None
+                            | actions ->
+                                Some actions )
+                        | Signed_command _ | Zkapp_command _ ->
+                            None )
+                  in
+                  action_list_list |> List.concat )
+                best_chain
+            in
+            actions
+        | None ->
+            [] )
 
   let block =
     result_field2 "block"
@@ -2877,6 +2974,7 @@ module Queries = struct
     ; network_id
     ; signature_kind
     ; protocol_state
+    ; account_actions
     ]
 
   module Itn = struct

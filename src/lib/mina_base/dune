@@ -73,8 +73,7 @@
   hex
   snark_bits
   error_json
-  ppx_version.runtime
-  mina_compile_config)
+  ppx_version.runtime)
  (preprocess
   (pps
    ppx_annot

@@ -22,7 +22,9 @@ type t =
   * State_hash.t Mina_stdlib.Nonempty_list.t
 
 let to_yojson (block_with_hashes, _) =
-  State_hash.With_state_hashes.to_yojson Block.to_yojson block_with_hashes
+  State_hash.With_state_hashes.to_yojson
+    (Fn.compose Block.to_logging_yojson Block.header)
+    block_with_hashes
 
 let lift (b, v) =
   match v with

@@ -11,7 +11,6 @@ module Master = struct
           Snark_pool.Resource_pool.Diff.t Network_pool.With_nonce.t
       | Transaction_pool_diff of
           Transaction_pool.Resource_pool.Diff.t Network_pool.With_nonce.t
-    [@@deriving to_yojson]
 
     type snark_pool_diff_msg = Snark_pool.Resource_pool.Diff.t
 
