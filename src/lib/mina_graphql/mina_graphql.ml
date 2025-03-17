@@ -2032,10 +2032,6 @@ module Queries = struct
                   >>| fun c -> User_command.Zkapp_command c)
           in
           result_of_or_error res ~error:"Invalid transaction provided"
-          |> Result.map ~f:(fun cmd ->
-                 { With_hash.data = cmd
-                 ; hash = Transaction_hash.hash_command cmd
-                 } )
         in
         let%map txn =
           match (serialized_payment, serialized_zkapp) with
@@ -2051,7 +2047,7 @@ module Queries = struct
         let frontier_broadcast_pipe = Mina_lib.transition_frontier mina in
         let transaction_pool = Mina_lib.transaction_pool mina in
         Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
-          ~transaction_pool txn.data )
+          ~transaction_pool txn )
 
   let current_snark_worker =
     field "currentSnarkWorker" ~typ:Types.snark_worker
