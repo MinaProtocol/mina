@@ -91,19 +91,18 @@ module Make_str (A : Wire_types.Concrete) = struct
             Poly.Stable.V1.t
           [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
 
-          let to_latest : t -> V3.t
-            = fun
+          let to_latest : t -> V3.t =
+           fun { genesis_state_hash
+               ; blockchain_state
+               ; consensus_state
+               ; constants
+               } ->
             { genesis_state_hash
-            ; blockchain_state
-            ; consensus_state
-            ; constants
-            } ->
-            { genesis_state_hash
-            ; blockchain_state = Blockchain_state.Value.Stable.V2.to_latest blockchain_state
+            ; blockchain_state =
+                Blockchain_state.Value.Stable.V2.to_latest blockchain_state
             ; consensus_state
             ; constants
             }
-
         end
       end]
     end

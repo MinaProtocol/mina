@@ -71,6 +71,7 @@ module Stable : sig
       ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
       }
     [@@deriving sexp, yojson]
+
     val to_latest : t -> V3.t
   end
 end]

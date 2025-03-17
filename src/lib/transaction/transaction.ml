@@ -55,9 +55,12 @@ module Stable = struct
 
     let to_latest (t : t) : V3.t =
       match t with
-      | Command command -> Command (User_command.Stable.V2.to_latest command)
-      | Fee_transfer fee -> Fee_transfer fee
-      | Coinbase cb -> Coinbase cb
+      | Command command ->
+          Command (User_command.Stable.V2.to_latest command)
+      | Fee_transfer fee ->
+          Fee_transfer fee
+      | Coinbase cb ->
+          Coinbase cb
   end
 end]
 

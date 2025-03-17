@@ -90,8 +90,10 @@ module Stable = struct
 
     let to_latest (t : t) : V3.t =
       match t with
-      | Signed_command u -> Signed_command u
-      | Zkapp_command s -> Zkapp_command (Zkapp_command.Stable.V1.to_latest s)
+      | Signed_command u ->
+          Signed_command u
+      | Zkapp_command s ->
+          Zkapp_command (Zkapp_command.Stable.V1.to_latest s)
   end
 end]
 

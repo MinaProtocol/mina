@@ -284,33 +284,33 @@ module Local_state = struct
           Stable.V1.t
         [@@deriving equal, compare, hash, yojson, sexp]
 
-        let to_latest : t -> V2.t
-          = fun
-            { stack_frame
-            ; call_stack
-            ; transaction_commitment
-            ; full_transaction_commitment
-            ; excess
-            ; supply_increase
-            ; ledger
-            ; success
-            ; account_update_index
-            ; failure_status_tbl
-            ; will_succeed
-            } ->
-            { stack_frame
-            ; call_stack
-            ; transaction_commitment
-            ; full_transaction_commitment
-            ; excess
-            ; supply_increase
-            ; ledger
-            ; success
-            ; account_update_index
-            ; failure_status_tbl = Transaction_status.Failure.Collection.Stable.V1.to_latest failure_status_tbl
-            ; will_succeed
-            }
-
+        let to_latest : t -> V2.t =
+         fun { stack_frame
+             ; call_stack
+             ; transaction_commitment
+             ; full_transaction_commitment
+             ; excess
+             ; supply_increase
+             ; ledger
+             ; success
+             ; account_update_index
+             ; failure_status_tbl
+             ; will_succeed
+             } ->
+          { stack_frame
+          ; call_stack
+          ; transaction_commitment
+          ; full_transaction_commitment
+          ; excess
+          ; supply_increase
+          ; ledger
+          ; success
+          ; account_update_index
+          ; failure_status_tbl =
+              Transaction_status.Failure.Collection.Stable.V1.to_latest
+                failure_status_tbl
+          ; will_succeed
+          }
       end
     end]
   end

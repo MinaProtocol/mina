@@ -94,7 +94,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       [@@deriving compare, equal, sexp, version, yojson, hash]
 
       let to_latest : t -> V3.t =
-        Proof_carrying_data.map ~f:Mina_state.Snarked_ledger_state.With_sok.Stable.V2.to_latest
+        Proof_carrying_data.map
+          ~f:Mina_state.Snarked_ledger_state.With_sok.Stable.V2.to_latest
     end
   end]
 

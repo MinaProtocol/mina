@@ -95,37 +95,35 @@ module Value = struct
         Poly.Stable.V2.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
-      let to_latest : t -> V3.t
-        = fun
-            {staged_ledger_hash
-            ;genesis_ledger_hash
-            ;ledger_proof_statement
-              = {source
-                ;target
-                ; connecting_ledger_left
-                ; connecting_ledger_right
-                ; supply_increase
-                ; fee_excess
-                ; sok_digest
-                }
-            ;timestamp
-            ;body_reference
+      let to_latest : t -> V3.t =
+       fun { staged_ledger_hash
+           ; genesis_ledger_hash
+           ; ledger_proof_statement =
+               { source
+               ; target
+               ; connecting_ledger_left
+               ; connecting_ledger_right
+               ; supply_increase
+               ; fee_excess
+               ; sok_digest
+               }
+           ; timestamp
+           ; body_reference
+           } ->
+        { staged_ledger_hash
+        ; genesis_ledger_hash
+        ; ledger_proof_statement =
+            { source = Registers.to_latest_local_state source
+            ; target = Registers.to_latest_local_state target
+            ; connecting_ledger_left
+            ; connecting_ledger_right
+            ; supply_increase
+            ; fee_excess
+            ; sok_digest
             }
-          ->
-            {staged_ledger_hash
-            ;genesis_ledger_hash
-            ;ledger_proof_statement
-              = {source = Registers.to_latest_local_state source
-                ;target = Registers.to_latest_local_state target
-                ; connecting_ledger_left
-                ; connecting_ledger_right
-                ; supply_increase
-                ; fee_excess
-                ; sok_digest
-                }
-            ;timestamp
-            ;body_reference
-            }
+        ; timestamp
+        ; body_reference
+        }
     end
   end]
 end

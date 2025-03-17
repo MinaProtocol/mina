@@ -22,6 +22,7 @@ module type Full = sig
 
     module V2 : sig
       type t [@@deriving compare, equal, sexp, yojson, hash]
+
       val to_latest : t -> V3.t
     end
   end]

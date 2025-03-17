@@ -366,24 +366,23 @@ module Make_str (A : Wire_types.Concrete) = struct
           Poly.Stable.V2.t
         [@@deriving compare, equal, hash, sexp, yojson]
 
-        let to_latest : t -> V3.t
-          = fun
-            { source
-            ; target
-            ; connecting_ledger_left
-            ; connecting_ledger_right
-            ; supply_increase
-            ; fee_excess
-            ; sok_digest
-            } ->
-            { source = Registers.to_latest_local_state source
-            ; target = Registers.to_latest_local_state target
-            ; connecting_ledger_left
-            ; connecting_ledger_right
-            ; supply_increase
-            ; fee_excess
-            ; sok_digest
-            }
+        let to_latest : t -> V3.t =
+         fun { source
+             ; target
+             ; connecting_ledger_left
+             ; connecting_ledger_right
+             ; supply_increase
+             ; fee_excess
+             ; sok_digest
+             } ->
+          { source = Registers.to_latest_local_state source
+          ; target = Registers.to_latest_local_state target
+          ; connecting_ledger_left
+          ; connecting_ledger_right
+          ; supply_increase
+          ; fee_excess
+          ; sok_digest
+          }
       end
     end]
 

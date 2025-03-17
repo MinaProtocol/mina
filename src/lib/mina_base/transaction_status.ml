@@ -117,53 +117,98 @@ module Failure = struct
         | Cancelled
       [@@deriving sexp, yojson, equal, compare, variants, hash]
 
-      let to_latest (t :t) : V3.t =
+      let to_latest (t : t) : V3.t =
         match t with
-        | Predicate  -> Predicate
-        | Source_not_present -> Source_not_present
-        | Receiver_not_present -> Receiver_not_present
-        | Amount_insufficient_to_create_account -> Amount_insufficient_to_create_account
-        | Cannot_pay_creation_fee_in_token -> Cannot_pay_creation_fee_in_token
-        | Source_insufficient_balance -> Source_insufficient_balance
-        | Source_minimum_balance_violation -> Source_minimum_balance_violation
-        | Receiver_already_exists -> Receiver_already_exists
-        | Token_owner_not_caller -> Token_owner_not_caller
-        | Overflow -> Overflow
-        | Global_excess_overflow -> Global_excess_overflow
-        | Local_excess_overflow -> Local_excess_overflow
-        | Local_supply_increase_overflow -> Local_supply_increase_overflow
-        | Global_supply_increase_overflow -> Global_supply_increase_overflow
-        | Signed_command_on_zkapp_account -> Signed_command_on_zkapp_account
-        | Zkapp_account_not_present -> Zkapp_account_not_present
-        | Update_not_permitted_balance -> Update_not_permitted_balance
-        | Update_not_permitted_access -> Update_not_permitted_access
-        | Update_not_permitted_timing -> Update_not_permitted_timing
-        | Update_not_permitted_delegate -> Update_not_permitted_delegate
-        | Update_not_permitted_app_state -> Update_not_permitted_app_state
-        | Update_not_permitted_verification_key -> Update_not_permitted_verification_key
-        | Update_not_permitted_action_state -> Update_not_permitted_action_state
-        | Update_not_permitted_zkapp_uri -> Update_not_permitted_zkapp_uri
-        | Update_not_permitted_token_symbol -> Update_not_permitted_token_symbol
-        | Update_not_permitted_permissions -> Update_not_permitted_permissions
-        | Update_not_permitted_nonce -> Update_not_permitted_nonce
-        | Update_not_permitted_voting_for -> Update_not_permitted_voting_for
-        | Zkapp_command_replay_check_failed -> Zkapp_command_replay_check_failed
-        | Fee_payer_nonce_must_increase -> Fee_payer_nonce_must_increase
-        | Fee_payer_must_be_signed -> Fee_payer_must_be_signed
-        | Account_balance_precondition_unsatisfied -> Account_balance_precondition_unsatisfied
-        | Account_nonce_precondition_unsatisfied -> Account_nonce_precondition_unsatisfied
-        | Account_receipt_chain_hash_precondition_unsatisfied -> Account_receipt_chain_hash_precondition_unsatisfied
-        | Account_delegate_precondition_unsatisfied -> Account_delegate_precondition_unsatisfied
-        | Account_action_state_precondition_unsatisfied -> Account_action_state_precondition_unsatisfied
-        | Account_app_state_precondition_unsatisfied n -> Account_app_state_precondition_unsatisfied n
-        | Account_proved_state_precondition_unsatisfied -> Account_proved_state_precondition_unsatisfied
-        | Account_is_new_precondition_unsatisfied -> Account_is_new_precondition_unsatisfied
-        | Protocol_state_precondition_unsatisfied -> Protocol_state_precondition_unsatisfied
-        | Unexpected_verification_key_hash -> Unexpected_verification_key_hash
-        | Valid_while_precondition_unsatisfied -> Valid_while_precondition_unsatisfied
-        | Incorrect_nonce -> Incorrect_nonce
-        | Invalid_fee_excess -> Invalid_fee_excess
-        | Cancelled -> Cancelled
+        | Predicate ->
+            Predicate
+        | Source_not_present ->
+            Source_not_present
+        | Receiver_not_present ->
+            Receiver_not_present
+        | Amount_insufficient_to_create_account ->
+            Amount_insufficient_to_create_account
+        | Cannot_pay_creation_fee_in_token ->
+            Cannot_pay_creation_fee_in_token
+        | Source_insufficient_balance ->
+            Source_insufficient_balance
+        | Source_minimum_balance_violation ->
+            Source_minimum_balance_violation
+        | Receiver_already_exists ->
+            Receiver_already_exists
+        | Token_owner_not_caller ->
+            Token_owner_not_caller
+        | Overflow ->
+            Overflow
+        | Global_excess_overflow ->
+            Global_excess_overflow
+        | Local_excess_overflow ->
+            Local_excess_overflow
+        | Local_supply_increase_overflow ->
+            Local_supply_increase_overflow
+        | Global_supply_increase_overflow ->
+            Global_supply_increase_overflow
+        | Signed_command_on_zkapp_account ->
+            Signed_command_on_zkapp_account
+        | Zkapp_account_not_present ->
+            Zkapp_account_not_present
+        | Update_not_permitted_balance ->
+            Update_not_permitted_balance
+        | Update_not_permitted_access ->
+            Update_not_permitted_access
+        | Update_not_permitted_timing ->
+            Update_not_permitted_timing
+        | Update_not_permitted_delegate ->
+            Update_not_permitted_delegate
+        | Update_not_permitted_app_state ->
+            Update_not_permitted_app_state
+        | Update_not_permitted_verification_key ->
+            Update_not_permitted_verification_key
+        | Update_not_permitted_action_state ->
+            Update_not_permitted_action_state
+        | Update_not_permitted_zkapp_uri ->
+            Update_not_permitted_zkapp_uri
+        | Update_not_permitted_token_symbol ->
+            Update_not_permitted_token_symbol
+        | Update_not_permitted_permissions ->
+            Update_not_permitted_permissions
+        | Update_not_permitted_nonce ->
+            Update_not_permitted_nonce
+        | Update_not_permitted_voting_for ->
+            Update_not_permitted_voting_for
+        | Zkapp_command_replay_check_failed ->
+            Zkapp_command_replay_check_failed
+        | Fee_payer_nonce_must_increase ->
+            Fee_payer_nonce_must_increase
+        | Fee_payer_must_be_signed ->
+            Fee_payer_must_be_signed
+        | Account_balance_precondition_unsatisfied ->
+            Account_balance_precondition_unsatisfied
+        | Account_nonce_precondition_unsatisfied ->
+            Account_nonce_precondition_unsatisfied
+        | Account_receipt_chain_hash_precondition_unsatisfied ->
+            Account_receipt_chain_hash_precondition_unsatisfied
+        | Account_delegate_precondition_unsatisfied ->
+            Account_delegate_precondition_unsatisfied
+        | Account_action_state_precondition_unsatisfied ->
+            Account_action_state_precondition_unsatisfied
+        | Account_app_state_precondition_unsatisfied n ->
+            Account_app_state_precondition_unsatisfied n
+        | Account_proved_state_precondition_unsatisfied ->
+            Account_proved_state_precondition_unsatisfied
+        | Account_is_new_precondition_unsatisfied ->
+            Account_is_new_precondition_unsatisfied
+        | Protocol_state_precondition_unsatisfied ->
+            Protocol_state_precondition_unsatisfied
+        | Unexpected_verification_key_hash ->
+            Unexpected_verification_key_hash
+        | Valid_while_precondition_unsatisfied ->
+            Valid_while_precondition_unsatisfied
+        | Incorrect_nonce ->
+            Incorrect_nonce
+        | Invalid_fee_excess ->
+            Invalid_fee_excess
+        | Cancelled ->
+            Cancelled
     end
   end]
 
@@ -695,10 +740,11 @@ module Stable = struct
       | Failed of Failure.Collection.Stable.V1.t
     [@@deriving sexp, yojson, equal, compare]
 
-    let to_latest (t:t) : V3.t
-      = match t with
-      | Applied -> Applied
-      | Failed failure -> Failed (Failure.Collection.Stable.V1.to_latest failure)
-
+    let to_latest (t : t) : V3.t =
+      match t with
+      | Applied ->
+          Applied
+      | Failed failure ->
+          Failed (Failure.Collection.Stable.V1.to_latest failure)
   end
 end]
