@@ -213,8 +213,8 @@ module Protocol = struct
         -> Pasta_bindings.Fp.t Kimchi_types.runtime_table_cfg array
         -> int
         -> SRS.Fp.t
-        -> t
         -> bool
+        -> t
         = "caml_pasta_fp_plonk_index_create_bytecode" "caml_pasta_fp_plonk_index_create"
 
       external max_degree : t -> int = "caml_pasta_fp_plonk_index_max_degree"
@@ -248,8 +248,8 @@ module Protocol = struct
         -> Pasta_bindings.Fq.t Kimchi_types.runtime_table_cfg array
         -> int
         -> SRS.Fq.t
-        -> t
         -> bool
+        -> t
         = "caml_pasta_fq_plonk_index_create_bytecode" "caml_pasta_fq_plonk_index_create"
 
       external max_degree : t -> int = "caml_pasta_fq_plonk_index_max_degree"

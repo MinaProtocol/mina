@@ -68,7 +68,8 @@ module type Inputs_intf = sig
           nb_public
           runtime_tables_cfg
           nb_prev_challanges
-          srs] *)
+          srs
+          lazy_mode] *)
     val create :
          Gate_vector.t
       -> int
@@ -191,7 +192,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let index =
       Inputs.Index.create gates public_input_size fixed_lookup_tables
-        runtime_table_cfgs prev_challenges (load_urs ())
+        runtime_table_cfgs prev_challenges (load_urs ()) cs.lazy_mode
     in
     { index; cs }
 
