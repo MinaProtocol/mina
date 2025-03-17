@@ -275,14 +275,14 @@ let get_root t =
   | [ Some (Some_key_value (Root_hash, hash))
     ; Some (Some_key_value (Root_common, common))
     ] ->
-      Ok (Root_data.Minimal.Stable.V2.of_limited ~common hash)
+      Ok (Root_data.Minimal.Stable.V3.of_limited ~common hash)
   | _ -> (
       match get t.db ~key:Root ~error:(`Not_found `Root) with
       | Ok root ->
           (* automatically split Root into (Root_hash, Root_common) *)
           Batch.with_batch t.db ~f:(fun batch ->
               let hash = Root_data.Minimal.Stable.Latest.hash root in
-              let common = Root_data.Minimal.Stable.V2.common root in
+              let common = Root_data.Minimal.Stable.V3.common root in
               Batch.remove batch ~key:Root ;
               Batch.set batch ~key:Root_hash ~data:hash ;
               Batch.set batch ~key:Root_common ~data:common ) ;

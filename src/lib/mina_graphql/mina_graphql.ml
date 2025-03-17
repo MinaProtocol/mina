@@ -2202,7 +2202,7 @@ module Queries = struct
                         transaction_seq := !transaction_seq + 1 ;
                         match user_cmd.data with
                         | Zkapp_command c
-                          when Transaction_status.Stable.V2.(
+                          when Transaction_status.Stable.V3.(
                                  equal user_cmd.status Applied) -> (
                             let actions =
                               c |> Zkapp_command.account_updates
