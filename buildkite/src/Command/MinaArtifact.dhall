@@ -273,7 +273,6 @@ let docker_step
                     }
                   ]
                 , Toolchain = [] : List DockerImage.ReleaseSpec.Type
-                , ItnOrchestrator = [] : List DockerImage.ReleaseSpec.Type
                 }
                 artifact
 
