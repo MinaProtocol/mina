@@ -85,6 +85,17 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let to_latest = Fn.id
     end
+
+    module V2 = struct
+      type t =
+        ( Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
+        , Proof.Stable.V2.t )
+        Proof_carrying_data.Stable.V1.t
+      [@@deriving compare, equal, sexp, version, yojson, hash]
+
+      let to_latest : t -> V3.t =
+        Proof_carrying_data.map ~f:Mina_state.Snarked_ledger_state.With_sok.Stable.V2.to_latest
+    end
   end]
 
   let proof t = t.Proof_carrying_data.proof

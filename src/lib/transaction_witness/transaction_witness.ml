@@ -64,4 +64,36 @@ module Stable = struct
 
     let to_latest = Fn.id
   end
+
+  module V2 = struct
+    type t =
+      { transaction : Mina_transaction.Transaction.Stable.V2.t
+      ; first_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
+      ; second_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
+      ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t
+      ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
+      ; status : Mina_base.Transaction_status.Stable.V2.t
+      ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+      }
+    [@@deriving sexp, yojson]
+
+    let to_latest : t -> V3.t
+      = fun
+          { transaction : Mina_transaction.Transaction.Stable.V2.t
+          ; first_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
+          ; second_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
+          ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t
+          ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
+          ; status : Mina_base.Transaction_status.Stable.V2.t
+          ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+          } ->
+          { transaction = Mina_transaction.Transaction.Stable.V2.to_latest transaction
+          ; first_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
+          ; second_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
+          ; protocol_state_body = Mina_state.Protocol_state.Body.Value.Stable.V2.to_latest protocol_state_body
+          ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
+          ; status = Mina_base.Transaction_status.Stable.V2.to_latest status
+          ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+          }
+  end
 end]

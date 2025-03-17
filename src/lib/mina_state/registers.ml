@@ -19,6 +19,21 @@ module Stable = struct
   end
 end]
 
+let to_latest_local_state
+  : ('t ,'t2 ,Local_state.Stable.V1.t) Stable.V1.t
+    -> ('t ,'t2 ,Local_state.Stable.V2.t) Stable.V1.t =
+    fun
+    { first_pass_ledger
+    ; second_pass_ledger
+    ; pending_coinbase_stack
+    ; local_state
+    } ->
+    { first_pass_ledger
+    ; second_pass_ledger
+    ; pending_coinbase_stack
+    ; local_state = Local_state.Stable.V1.to_latest local_state
+    }
+
 let gen =
   let open Quickcheck.Generator.Let_syntax in
   let%map first_pass_ledger = Frozen_ledger_hash.gen

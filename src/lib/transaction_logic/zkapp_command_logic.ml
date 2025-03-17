@@ -268,6 +268,50 @@ module Local_state = struct
 
         let to_latest = Fn.id
       end
+
+      module V1 = struct
+        type t =
+          ( Mina_base.Stack_frame.Digest.Stable.V1.t
+          , Mina_base.Call_stack_digest.Stable.V1.t
+          , ( Currency.Amount.Stable.V1.t
+            , Sgn.Stable.V1.t )
+            Currency.Signed_poly.Stable.V1.t
+          , Ledger_hash.Stable.V1.t
+          , bool
+          , Zkapp_command.Transaction_commitment.Stable.V1.t
+          , Mina_numbers.Index.Stable.V1.t
+          , Transaction_status.Failure.Collection.Stable.V1.t )
+          Stable.V1.t
+        [@@deriving equal, compare, hash, yojson, sexp]
+
+        let to_latest : t -> V2.t
+          = fun
+            { stack_frame
+            ; call_stack
+            ; transaction_commitment
+            ; full_transaction_commitment
+            ; excess
+            ; supply_increase
+            ; ledger
+            ; success
+            ; account_update_index
+            ; failure_status_tbl
+            ; will_succeed
+            } ->
+            { stack_frame
+            ; call_stack
+            ; transaction_commitment
+            ; full_transaction_commitment
+            ; excess
+            ; supply_increase
+            ; ledger
+            ; success
+            ; account_update_index
+            ; failure_status_tbl = Transaction_status.Failure.Collection.Stable.V1.to_latest failure_status_tbl
+            ; will_succeed
+            }
+
+      end
     end]
   end
 

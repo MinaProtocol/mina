@@ -82,6 +82,17 @@ module Stable = struct
 
     let to_latest = Fn.id
   end
+
+  module V2 = struct
+    type t =
+      (Signed_command.Stable.V2.t, Zkapp_command.Stable.V1.t) Poly.Stable.V2.t
+    [@@deriving sexp, compare, equal, hash, yojson]
+
+    let to_latest (t : t) : V3.t =
+      match t with
+      | Signed_command u -> Signed_command u
+      | Zkapp_command s -> Zkapp_command (Zkapp_command.Stable.V1.to_latest s)
+  end
 end]
 
 let to_base64 : t -> string = function

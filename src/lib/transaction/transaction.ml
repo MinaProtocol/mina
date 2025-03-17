@@ -48,6 +48,17 @@ module Stable = struct
 
     let to_latest = Fn.id
   end
+
+  module V2 = struct
+    type t = User_command.Stable.V2.t Poly.Stable.V2.t
+    [@@deriving sexp, compare, equal, hash, yojson]
+
+    let to_latest (t : t) : V3.t =
+      match t with
+      | Command command -> Command (User_command.Stable.V2.to_latest command)
+      | Fee_transfer fee -> Fee_transfer fee
+      | Coinbase cb -> Coinbase cb
+  end
 end]
 
 include Hashable.Make (Stable.Latest)
