@@ -109,14 +109,18 @@ do
 
   if [ ${#debs[@]} -eq 0 ]; then
     echo "✅  All debians are correctly published to our debian repository"
-    echo "📋  Validating debian repository consistency after push..."
 
-    if deb-s3 verify  $BUCKET_ARG $S3_REGION_ARG -c $DEB_CODENAME -m $DEB_RELEASE; then 
-      echo "✅  Debian repository is consistent"
-    else
-      echo "❌  Error: Debian repository is not consistent. Please run: "
-      echo "💻  deb-s3 verify  $BUCKET_ARG $S3_REGION_ARG -c $DEB_CODENAME -m $DEB_RELEASE --fix-manifests"
-      exit 1
+    if [[ $DEB_RELEASE == "unstable" ]]; then
+      echo "⏩️  Skipping debian repository consistency check after push to unstable channel as it is taking too long."
+    else 
+      echo "📋  Validating debian repository consistency after push..."
+      if deb-s3 verify  $BUCKET_ARG $S3_REGION_ARG -c $DEB_CODENAME -m $DEB_RELEASE; then 
+        echo "✅  Debian repository is consistent"
+      else
+        echo "❌  Error: Debian repository is not consistent. Please run: "
+        echo "💻  deb-s3 verify  $BUCKET_ARG $S3_REGION_ARG -c $DEB_CODENAME -m $DEB_RELEASE --fix-manifests"
+        exit 1
+      fi
     fi
     break
   fi
