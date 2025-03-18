@@ -77,17 +77,26 @@ fi
 
 # Check if PR is bypassed by a !ci-bypass-changelog comment
 pip install -r scripts/github/github_info/requirements.txt
-if ! python3 scripts/github/github_info is_pr_commented --comment "$BYPASS_PHRASE" --by $GITHUB_USERS_ELIGIBLE_FOR_BYPASS ; then
+
+COMMENTED_CODE=0
+(python3 scripts/github/github_info is_pr_commented --comment "$BYPASS_PHRASE" \
+  --by $GITHUB_USERS_ELIGIBLE_FOR_BYPASS \
+   || COMMENTED_CODE=$?
+
+if [[ "$COMMENTED_CODE" == 0 ]]; then
     echo "⏭️  Skipping run as PR is bypassed"
     exit 0
-else 
+elif [[ "$COMMENTED_CODE" == 1 ]]; then
     echo "⚙️  PR is not bypassed. Proceeding with changelog check..."
+else
+    echo "❌ Failed to check PR for being eligible for changelog check bypass"
+    exit 1
 fi
 
 REMOTE_BRANCH="${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
 
 BASE_COMMIT=$(git log "${REMOTE_BRANCH}" -1 --pretty=format:%H)
-echo "Diffing current commit: ${BUILDKITE_COMMIT} against branch: ${BUILDKITE_PULL_REQUEST_BASE_BRANCH} (${BASE_COMMIT})" >&2 
+echo "Diffing current commit: ${BUILDKITE_COMMIT} against branch: ${BUILDKITE_PULL_REQUEST_BASE_BRANCH} (${BASE_COMMIT})" >&2
 
 if (git diff --quiet "${REMOTE_BRANCH}" "$BASE_PATH"); then
     echo "⏭️  No change in ${BASE_PATH} detected. Changelog does not need to be updated"
