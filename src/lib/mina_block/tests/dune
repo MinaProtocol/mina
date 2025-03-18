@@ -3,12 +3,17 @@
  (target hetzner-itn-1-1795.json)
  (deps
   (env_var TEST_PRECOMPUTED_BLOCK_JSON_PATH))
- (enabled_if (= %{env:TEST_PRECOMPUTED_BLOCK_JSON_PATH=n} n))
+ (enabled_if
+  (= %{env:TEST_PRECOMPUTED_BLOCK_JSON_PATH=n} n))
  (action
   (progn
-   (run curl -L -o %{target}.gz https://storage.googleapis.com/o1labs-ci-test-data/precomputed-blocks/hetzner-itn-1-1795-3NL9Vn7Rg1mz8cS1gVxFkVPsjESG1Zu1XRpMLRQAz3W24hctRoD6.json.gz)
-   (run gzip -d %{target}.gz)
-   )))
+   (run
+    curl
+    -L
+    -o
+    %{target}.gz
+    https://storage.googleapis.com/o1labs-ci-test-data/precomputed-blocks/hetzner-itn-1-1795-3NL9Vn7Rg1mz8cS1gVxFkVPsjESG1Zu1XRpMLRQAz3W24hctRoD6.json.gz)
+   (run gzip -d %{target}.gz))))
 
 (rule
  (enabled_if
@@ -18,9 +23,7 @@
   (env_var TEST_PRECOMPUTED_BLOCK_JSON_PATH))
  (action
   (progn
-   (copy
-    %{env:TEST_PRECOMPUTED_BLOCK_JSON_PATH=n}
-    %{target}))))
+   (copy %{env:TEST_PRECOMPUTED_BLOCK_JSON_PATH=n} %{target}))))
 
 (test
  (name main)
@@ -30,5 +33,7 @@
  (deps hetzner-itn-1-1795.json)
  (action
   (run %{test}))
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane)))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane)))

@@ -1,38 +1,38 @@
 (executable
  (name gen)
  (libraries
-   ;; opam libraries
-   stdio
-   base.caml
-   sexplib0
-   core_kernel
-   compiler-libs
-   ppxlib
-   ppxlib.astlib
-   digestif
-   core
-   async
-   ocaml-migrate-parsetree
-   ppxlib.ast
-   base
-   bin_prot.shape
-   ocaml-compiler-libs.common
-   ;; local libraries
-   kimchi_pasta
-   kimchi_pasta.basic
-   group_map
-   tuple_lib
-   snarky.backendless
-   fold_lib
-   crs
-   pickles
-   pickles.backend
-   kimchi_backend
-   mina_metrics.none
-   logger.fake
- )
+  ;; opam libraries
+  stdio
+  base.caml
+  sexplib0
+  core_kernel
+  compiler-libs
+  ppxlib
+  ppxlib.astlib
+  digestif
+  core
+  async
+  ocaml-migrate-parsetree
+  ppxlib.ast
+  base
+  bin_prot.shape
+  ocaml-compiler-libs.common
+  ;; local libraries
+  kimchi_pasta
+  kimchi_pasta.basic
+  group_map
+  tuple_lib
+  snarky.backendless
+  fold_lib
+  crs
+  pickles
+  pickles.backend
+  kimchi_backend
+  mina_metrics.none
+  logger.fake)
  (forbidden_libraries mina_node_config)
  (preprocess
   (pps ppx_version ppx_bin_prot ppxlib.metaquot))
- (instrumentation (backend bisect_ppx))
+ (instrumentation
+  (backend bisect_ppx))
  (modes native))
