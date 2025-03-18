@@ -61,5 +61,5 @@ in  Pipeline.build
                 , PipelineTag.Type.Stable
                 ]
               }
-      , steps = [ buildTestCmd "dev" "src/lib" Size.QA ]
+      , steps = [ buildTestCmd "dev" "src/lib" Size.XLarge ]
       }
