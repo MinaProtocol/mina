@@ -6,8 +6,7 @@ source "${SCRIPTPATH}/../export-git-env-vars.sh"
 
 DOWNLOAD_FOLDER=_build
 
-source buildkite/scripts/cache sh \
-  debian/$MINA_DEB_CODENAME $DOWNLOAD_FOLDER
+buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/*" $DOWNLOAD_FOLDER
 
 # check for AWS Creds
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
