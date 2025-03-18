@@ -34,12 +34,13 @@ function checkout_and_dump() {
     source buildkite/scripts/gsutil-upload.sh /tmp/${TYPE_SHAPE_FILE} gs://mina-type-shapes
 }
 
+
 if [[ $FORK == 1 ]]; then 
     echo "⏩  Skipping type shape patching on for forked repository" 
     exit 0
 fi
 
-if ! gsutil ls "gs://mina-type-shapes/${RELEASE_BRANCH_COMMIT}*" >/dev/null; then
+if ! $(source buildkite/scripts/cache/manager.sh read mina-type-shapes/"$RELEASE_BRANCH_COMMIT"* . 2>/dev/null); then
     checkout_and_dump $RELEASE_BRANCH_COMMIT
 fi
 
