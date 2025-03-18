@@ -84,11 +84,17 @@ else
     echo "⚙️  PR is not bypassed. Proceeding with changelog check..."
 fi
 
-BASE_COMMIT=$(git log "${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" -1 --pretty=format:%H)
+REMOTE_BRANCH="${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
+
+BASE_COMMIT=$(git log "${REMOTE_BRANCH}" -1 --pretty=format:%H)
 echo "Diffing current commit: ${BUILDKITE_COMMIT} against branch: ${BUILDKITE_PULL_REQUEST_BASE_BRANCH} (${BASE_COMMIT})" >&2 
 
-if (git diff --quiet "${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" "$BASE_PATH"); then
-    if ! [[ -f "$CHANGELOG_FILE" ]]; then
+if (git diff --quiet "${REMOTE_BRANCH}" "$BASE_PATH"); then
+    echo "⏭️  No change in ${BASE_PATH} detected. Changelog does not need to be updated"
+else
+    if [[ -f "$CHANGELOG_FILE" ]]; then
+        echo "✅  Changelog updated!"
+    else
         echo "❌  Missing changelog entry detected !!"
         echo ""
         echo "This job detected that you modified important part of code and did not update changelog file."
@@ -96,9 +102,5 @@ if (git diff --quiet "${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" "$BASE_PA
         echo "${CHANGELOG_FILE}"
         echo "It will help us to produce Release Notes for upcoming release"
         exit 1
-    else
-        echo "✅  Changelog updated!"
     fi
-else
-    echo "⏭️  No change in ${BASE_PATH} detected. Changelog does not need to be updated"
 fi
