@@ -80,7 +80,7 @@ pip install -r scripts/github/github_info/requirements.txt
 
 COMMENTED_CODE=0
 (python3 scripts/github/github_info is_pr_commented --comment "$BYPASS_PHRASE" \
-  --by $GITHUB_USERS_ELIGIBLE_FOR_BYPASS \
+  --by $GITHUB_USERS_ELIGIBLE_FOR_BYPASS ) \
    || COMMENTED_CODE=$?
 
 if [[ "$COMMENTED_CODE" == 0 ]]; then
