@@ -1994,23 +1994,36 @@ module Queries = struct
         Types.AccountObj.get_best_ledger_account mina account_id )
 
   let transaction_status =
-    result_field "transactionStatus" ~doc:"Get the status of a transaction"
+    result_field2 "transactionStatus" ~doc:"Get the status of a transaction"
       ~typ:(non_null Types.transaction_status)
-      ~args:Arg.[ arg "id" ~typ:guid ~doc:"Id of a transaction" ]
-      ~resolve:(fun { ctx = mina; _ } () (id : string option) ->
-        match id with
-        | None ->
+      ~args:
+        Arg.
+          [ arg "hash" ~typ:guid ~doc:"Hash of a transaction"
+          ; arg "id" ~typ:guid ~doc:"Id of a transaction"
+          ]
+      ~resolve:(fun { ctx = mina; _ } () (hash : string option)
+                    (id : string option) ->
+        let transaction_pool = Mina_lib.transaction_pool mina in
+        let frontier_broadcast_pipe = Mina_lib.transition_frontier mina in
+        match (hash, id) with
+        | None, None | Some _, Some _ ->
             Error "Invalid query: Specify a transaction ID"
-        | Some id ->
+        | None, Some id ->
             let open Result.Let_syntax in
-            let transaction_pool = Mina_lib.transaction_pool mina in
-            let frontier_broadcast_pipe = Mina_lib.transition_frontier mina in
             let%bind valid_cmd = command_of_id id in
             Result.return
             @@ Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
                  ~transaction_pool
                  Transaction_hash.(
-                   User_command_with_valid_signature.command valid_cmd) )
+                   User_command_with_valid_signature.command valid_cmd)
+        | Some hash, None -> (
+            match Transaction_hash.of_base58_check hash |> Result.ok with
+            | None ->
+                Result.return @@ Transaction_inclusion_status.State.Unknown
+            | Some cmd ->
+                Result.return
+                @@ Transaction_inclusion_status.get_status_hash
+                     ~frontier_broadcast_pipe ~transaction_pool cmd ) )
 
   let current_snark_worker =
     field "currentSnarkWorker" ~typ:Types.snark_worker

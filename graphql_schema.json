@@ -15380,6 +15380,12 @@
                   "description": "Id of a transaction",
                   "type": { "kind": "SCALAR", "name": "ID", "ofType": null },
                   "defaultValue": null
+                },
+                {
+                  "name": "hash",
+                  "description": "Hash of a transaction",
+                  "type": { "kind": "SCALAR", "name": "ID", "ofType": null },
+                  "defaultValue": null
                 }
               ],
               "type": {
