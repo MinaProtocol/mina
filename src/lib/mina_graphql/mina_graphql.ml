@@ -1651,6 +1651,42 @@ end
 module Queries = struct
   open Schema
 
+  let command_of_id id =
+    (* base64 could be a signed command or zkapp command *)
+    match Signed_command.of_base64 id with
+    | Ok signed_command ->
+        let user_cmd = User_command.Signed_command signed_command in
+        (* The command gets piped through [forget_check]
+           below; this is just to make the types work
+           without extra unnecessary mapping in the other
+           branches above.
+        *)
+        let (`If_this_is_used_it_should_have_a_comment_justifying_it valid_cmd)
+            =
+          User_command.to_valid_unsafe user_cmd
+        in
+        Some
+          (Transaction_hash.User_command_with_valid_signature.create valid_cmd)
+    | Error _ -> (
+        match Zkapp_command.of_base64 id with
+        | Ok zkapp_command ->
+            let user_cmd = User_command.Zkapp_command zkapp_command in
+            (* The command gets piped through [forget_check]
+               below; this is just to make the types work
+               without extra unnecessary mapping in the other
+               branches above.
+            *)
+            let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                  valid_cmd ) =
+              User_command.to_valid_unsafe user_cmd
+            in
+            Some
+              (Transaction_hash.User_command_with_valid_signature.create
+                 valid_cmd )
+        | Error _ ->
+            (* invalid base64 for a transaction *)
+            None )
+
   (* helper for pooledUserCommands, pooledZkappCommands *)
   let get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt =
     match (pk_opt, hashes_opt, txns_opt) with
@@ -1681,46 +1717,7 @@ module Queries = struct
           *)
           match txns_opt with
           | Some txns ->
-              List.filter_map txns ~f:(fun serialized_txn ->
-                  (* base64 could be a signed command or zkapp command *)
-                  match Signed_command.of_base64 serialized_txn with
-                  | Ok signed_command ->
-                      let user_cmd =
-                        User_command.Signed_command signed_command
-                      in
-                      (* The command gets piped through [forget_check]
-                         below; this is just to make the types work
-                         without extra unnecessary mapping in the other
-                         branches above.
-                      *)
-                      let (`If_this_is_used_it_should_have_a_comment_justifying_it
-                            valid_cmd ) =
-                        User_command.to_valid_unsafe user_cmd
-                      in
-                      Some
-                        (Transaction_hash.User_command_with_valid_signature
-                         .create valid_cmd )
-                  | Error _ -> (
-                      match Zkapp_command.of_base64 serialized_txn with
-                      | Ok zkapp_command ->
-                          let user_cmd =
-                            User_command.Zkapp_command zkapp_command
-                          in
-                          (* The command gets piped through [forget_check]
-                             below; this is just to make the types work
-                             without extra unnecessary mapping in the other
-                             branches above.
-                          *)
-                          let (`If_this_is_used_it_should_have_a_comment_justifying_it
-                                valid_cmd ) =
-                            User_command.to_valid_unsafe user_cmd
-                          in
-                          Some
-                            (Transaction_hash.User_command_with_valid_signature
-                             .create valid_cmd )
-                      | Error _ ->
-                          (* invalid base64 for a transaction *)
-                          None ) )
+              List.filter_map txns ~f:command_of_id
           | None ->
               []
         in
