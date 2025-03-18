@@ -12,7 +12,7 @@ git config --global --add safe.directory /workdir
 source buildkite/scripts/handle-fork.sh
 source buildkite/scripts/export-git-env-vars.sh
 
-release_branch=${REMOTE}/$1
+release_branch=origin/$1
 
 RELEASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 $release_branch)
 
@@ -33,6 +33,11 @@ function checkout_and_dump() {
     revert_checkout
     source buildkite/scripts/gsutil-upload.sh /tmp/${TYPE_SHAPE_FILE} gs://mina-type-shapes
 }
+
+if [[ $FORK == 1 ]]; then 
+    echo "⏩  Skipping type shape patching on for forked repository" 
+    exit 0
+fi
 
 if ! gsutil ls "gs://mina-type-shapes/${RELEASE_BRANCH_COMMIT}*" >/dev/null; then
     checkout_and_dump $RELEASE_BRANCH_COMMIT
