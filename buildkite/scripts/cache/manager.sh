@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-# Script for reading and writing files to/from local agent persistent storage.
-# By default it uses /var/storagebox as a mount point.
+# Script for reading and writing files to/from global CI cache.
+# Currently It uses gsutil as a cache manager and google cloud storage as a cache storage.
+# It supports read and write operations.
 # It requires to be executed in buildkite context. e.g (BUILDKITE_BUILD_ID env var to be defined)
 
 # bash strict mode
