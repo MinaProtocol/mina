@@ -61,6 +61,44 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
           then return State.Pending ;
           State.Unknown )
 
+let get_status_hash ~frontier_broadcast_pipe ~transaction_pool hashed_cmd =
+  let resource_pool = Transaction_pool.resource_pool transaction_pool in
+  match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
+  | None ->
+      State.Unknown
+  | Some transition_frontier ->
+      with_return (fun { return } ->
+          let best_tip_path =
+            Transition_frontier.best_tip_path transition_frontier
+          in
+          let in_breadcrumb breadcrumb =
+            breadcrumb |> Transition_frontier.Breadcrumb.validated_transition
+            |> Mina_block.Validated.valid_commands
+            |> List.exists ~f:(fun { data = cmd'; _ } ->
+                   Transaction_hash.equal hashed_cmd
+                     (Transaction_hash.hash_command
+                        (User_command.forget_check cmd') ) )
+          in
+          if List.exists ~f:in_breadcrumb best_tip_path then
+            return State.Included ;
+          if
+            List.exists ~f:in_breadcrumb
+              (Transition_frontier.all_breadcrumbs transition_frontier)
+          then return State.Pending ;
+          (*This is to look for commands in the pool which are valid.
+             Membership check requires only the user command and no other
+             aspect of User_command.Valid.t and so no need to check signatures
+             or extract zkApp verification keys.*)
+          match
+            (Network_pool.Transaction_pool.Resource_pool.find_by_hash
+               resource_pool )
+              hashed_cmd
+          with
+          | None ->
+              State.Unknown
+          | Some _ ->
+              State.Pending )
+
 let%test_module "transaction_status" =
   ( module struct
     open Async
