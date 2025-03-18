@@ -15376,14 +15376,8 @@
               "description": "Get the status of a transaction",
               "args": [
                 {
-                  "name": "zkappTransaction",
-                  "description": "Id of a zkApp transaction",
-                  "type": { "kind": "SCALAR", "name": "ID", "ofType": null },
-                  "defaultValue": null
-                },
-                {
-                  "name": "payment",
-                  "description": "Id of a Payment",
+                  "name": "id",
+                  "description": "Id of a transaction",
                   "type": { "kind": "SCALAR", "name": "ID", "ofType": null },
                   "defaultValue": null
                 }

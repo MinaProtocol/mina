@@ -1994,45 +1994,23 @@ module Queries = struct
         Types.AccountObj.get_best_ledger_account mina account_id )
 
   let transaction_status =
-    result_field2 "transactionStatus" ~doc:"Get the status of a transaction"
+    result_field "transactionStatus" ~doc:"Get the status of a transaction"
       ~typ:(non_null Types.transaction_status)
-      ~args:
-        Arg.
-          [ arg "payment" ~typ:guid ~doc:"Id of a Payment"
-          ; arg "zkappTransaction" ~typ:guid ~doc:"Id of a zkApp transaction"
-          ]
-      ~resolve:(fun { ctx = mina; _ } () (serialized_payment : string option)
-                    (serialized_zkapp : string option) ->
-        let open Result.Let_syntax in
-        let deserialize_txn serialized_txn =
-          let res =
-            match serialized_txn with
-            | `Signed_command cmd ->
-                Or_error.(
-                  Signed_command.of_base64 cmd
-                  >>| fun c -> User_command.Signed_command c)
-            | `Zkapp_command cmd ->
-                Or_error.(
-                  Zkapp_command.of_base64 cmd
-                  >>| fun c -> User_command.Zkapp_command c)
-          in
-          result_of_or_error res ~error:"Invalid transaction provided"
-        in
-        let%map txn =
-          match (serialized_payment, serialized_zkapp) with
-          | None, None | Some _, Some _ ->
-              Error
-                "Invalid query: Specify either a payment ID or a zkApp \
-                 transaction ID"
-          | Some payment, None ->
-              deserialize_txn (`Signed_command payment)
-          | None, Some zkapp_txn ->
-              deserialize_txn (`Zkapp_command zkapp_txn)
-        in
-        let frontier_broadcast_pipe = Mina_lib.transition_frontier mina in
-        let transaction_pool = Mina_lib.transaction_pool mina in
-        Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
-          ~transaction_pool txn )
+      ~args:Arg.[ arg "id" ~typ:guid ~doc:"Id of a transaction" ]
+      ~resolve:(fun { ctx = mina; _ } () (id : string option) ->
+        match id with
+        | None ->
+            Error "Invalid query: Specify a transaction ID"
+        | Some id ->
+            let open Result.Let_syntax in
+            let transaction_pool = Mina_lib.transaction_pool mina in
+            let frontier_broadcast_pipe = Mina_lib.transition_frontier mina in
+            let%bind valid_cmd = command_of_id id in
+            Result.return
+            @@ Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
+                 ~transaction_pool
+                 Transaction_hash.(
+                   User_command_with_valid_signature.command valid_cmd) )
 
   let current_snark_worker =
     field "currentSnarkWorker" ~typ:Types.snark_worker
