@@ -29,6 +29,7 @@ let mk_tx ~event_elements ~action_elements
   let num_acc_updates = 8 in
   let multispec : Transaction_snark.For_tests.Multiple_transfers_spec.t =
     let fee_payer = None in
+    (* change for trigger changelog *)
     let generated_values =
       let open Base_quickcheck.Generator.Let_syntax in
       let%bind receivers =
