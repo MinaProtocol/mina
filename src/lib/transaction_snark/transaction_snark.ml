@@ -12,7 +12,7 @@ module Wire_types = Mina_wire_types.Transaction_snark
 let proof_cache = ref None
 
 module Make_sig (A : Wire_types.Types.S) = struct
-  module type S = Transaction_snark_intf.Full with type Stable.V2.t = A.V2.t
+  module type S = Transaction_snark_intf.Full with type Stable.V3.t = A.V3.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -76,6 +76,16 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
+    module V3 = struct
+      type t =
+        ( Mina_state.Snarked_ledger_state.With_sok.Stable.V3.t
+        , Proof.Stable.V2.t )
+        Proof_carrying_data.Stable.V1.t
+      [@@deriving compare, equal, sexp, version, yojson, hash]
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       type t =
         ( Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
@@ -83,7 +93,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         Proof_carrying_data.Stable.V1.t
       [@@deriving compare, equal, sexp, version, yojson, hash]
 
-      let to_latest = Fn.id
+      let to_latest : t -> V3.t =
+        Proof_carrying_data.map
+          ~f:Mina_state.Snarked_ledger_state.With_sok.Stable.V2.to_latest
     end
   end]
 
@@ -91,7 +103,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let statement
       (t :
-        ( Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
+        ( Mina_state.Snarked_ledger_state.With_sok.Stable.V3.t
         , _ )
         Proof_carrying_data.t ) =
     { t.data with sok_digest = () }
@@ -1129,7 +1141,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           let unhash (h : Stack_frame.Digest.Checked.t)
               (frame :
                 ( Mina_base.Token_id.Stable.V2.t
-                , Mina_base.Zkapp_command.Call_forest.With_hashes.Stable.V1.t
+                , Mina_base.Zkapp_command.Call_forest.With_hashes.Stable.V2.t
                 )
                 Stack_frame.Stable.V1.t
                 V.t ) : t =

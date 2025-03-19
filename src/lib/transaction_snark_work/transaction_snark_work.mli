@@ -11,7 +11,7 @@ module Statement : sig
   include Hashable.S with type t := t
 
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type t [@@deriving bin_io, compare, sexp, version, yojson, equal]
 
       include Comparable.S with type t := t
@@ -19,7 +19,7 @@ module Statement : sig
       include Hashable.S_binable with type t := t
     end
   end
-  with type V2.t = t
+  with type V3.t = t
 
   val gen : t Quickcheck.Generator.t
 
@@ -30,7 +30,7 @@ end
 
 module Info : sig
   type t =
-    { statements : Statement.Stable.V2.t
+    { statements : Statement.Stable.V3.t
     ; work_ids : int One_or_two.Stable.V1.t
     ; fee : Fee.Stable.V1.t
     ; prover : Public_key.Compressed.Stable.V1.t
@@ -38,11 +38,11 @@ module Info : sig
   [@@deriving to_yojson, sexp, compare]
 
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type t [@@deriving compare, to_yojson, version, sexp, bin_io]
     end
   end
-  with type V2.t = t
+  with type V3.t = t
 end
 
 (* TODO: The SOK message actually should bind the SNARK to
@@ -61,7 +61,7 @@ module type S = sig
   val proofs : t -> Ledger_proof.t One_or_two.t
 end
 
-type t = Mina_wire_types.Transaction_snark_work.V2.t =
+type t = Mina_wire_types.Transaction_snark_work.V3.t =
   { fee : Currency.Fee.t
   ; proofs : Ledger_proof.t One_or_two.t
   ; prover : Public_key.Compressed.t
@@ -74,11 +74,11 @@ val info : t -> Info.t
 val statement : t -> Statement.t
 
 module Stable : sig
-  module V2 : sig
+  module V3 : sig
     type t [@@deriving bin_io, equal, sexp, version, yojson]
   end
 end
-with type V2.t = t
+with type V3.t = t
 
 type unchecked = t
 

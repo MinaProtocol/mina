@@ -55,10 +55,10 @@ module User_command_with_valid_signature : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V2 : sig
+    module V3 : sig
       type t =
         private
-        (User_command.Valid.Stable.V2.t, hash) With_hash.Stable.V1.t
+        (User_command.Valid.Stable.V3.t, hash) With_hash.Stable.V1.t
       [@@deriving sexp, compare, hash, to_yojson]
     end
   end]
@@ -87,8 +87,8 @@ module User_command : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V2 : sig
-      type t = private (User_command.Stable.V2.t, hash) With_hash.Stable.V1.t
+    module V3 : sig
+      type t = private (User_command.Stable.V3.t, hash) With_hash.Stable.V1.t
       [@@deriving sexp, compare, hash, to_yojson]
     end
   end]

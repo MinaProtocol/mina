@@ -41,8 +41,8 @@ module Diff_versioned = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
-      type t = User_command.Stable.V2.t list [@@deriving sexp, yojson, hash]
+    module V3 = struct
+      type t = User_command.Stable.V3.t list [@@deriving sexp, yojson, hash]
 
       let to_latest = Fn.id
     end
@@ -164,8 +164,8 @@ module Diff_versioned = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V3 = struct
-        type t = (User_command.Stable.V2.t * Diff_error.Stable.V3.t) list
+      module V4 = struct
+        type t = (User_command.Stable.V3.t * Diff_error.Stable.V3.t) list
         [@@deriving sexp, yojson, compare]
 
         let to_latest = Fn.id
@@ -2390,8 +2390,8 @@ let%test_module _ =
     let%test_unit "invalid transactions are not accepted (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
-          mk_zkapp_commands_single_block 7 test.txn_pool
-          >>= mk_invalid_test test )
+          let%bind commands = mk_zkapp_commands_single_block 7 test.txn_pool in
+          mk_invalid_test test commands )
 
     let current_global_slot () =
       let current_time = Block_time.now time_controller in
@@ -3415,7 +3415,7 @@ let%test_module _ =
               ~receiver_idx ~amount ()
     end
 
-    (** appends a and b to the end of c, taking an element of a or b at random, 
+    (** appends a and b to the end of c, taking an element of a or b at random,
        continuing until both a and b run out of elements
     *)
     let rec gen_merge (a : 'a list) (b : 'a list) (c : 'a list) =

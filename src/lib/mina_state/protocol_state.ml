@@ -16,10 +16,10 @@ module Make_sig (A : Wire_types.Types.S) = struct
         , 'consensus_state
         , 'constants )
         A.Body.Poly.V1.t
-       and type Body.Value.Stable.V2.t = A.Body.Value.V2.t
+       and type Body.Value.Stable.V3.t = A.Body.Value.V3.t
        and type ('state_hash, 'body) Poly.Stable.V1.t =
         ('state_hash, 'body) A.Poly.V1.t
-       and type Value.Stable.V2.t = A.Value.V2.t
+       and type Value.Stable.V3.t = A.Value.V3.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -70,6 +70,18 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Value = struct
       [%%versioned
       module Stable = struct
+        module V3 = struct
+          type t =
+            ( State_hash.Stable.V1.t
+            , Blockchain_state.Value.Stable.V3.t
+            , Consensus.Data.Consensus_state.Value.Stable.V2.t
+            , Protocol_constants_checked.Value.Stable.V1.t )
+            Poly.Stable.V1.t
+          [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
+
+          let to_latest = Fn.id
+        end
+
         module V2 = struct
           type t =
             ( State_hash.Stable.V1.t
@@ -79,7 +91,18 @@ module Make_str (A : Wire_types.Concrete) = struct
             Poly.Stable.V1.t
           [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
 
-          let to_latest = Fn.id
+          let to_latest : t -> V3.t =
+           fun { genesis_state_hash
+               ; blockchain_state
+               ; consensus_state
+               ; constants
+               } ->
+            { genesis_state_hash
+            ; blockchain_state =
+                Blockchain_state.Value.Stable.V2.to_latest blockchain_state
+            ; consensus_state
+            ; constants
+            }
         end
       end]
     end
@@ -187,6 +210,14 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Value = struct
     [%%versioned
     module Stable = struct
+      module V3 = struct
+        type t =
+          (State_hash.Stable.V1.t, Body.Value.Stable.V3.t) Poly.Stable.V1.t
+        [@@deriving sexp, hash, compare, equal, yojson]
+
+        let to_latest = Fn.id
+      end
+
       module V2 = struct
         type t =
           (State_hash.Stable.V1.t, Body.Value.Stable.V2.t) Poly.Stable.V1.t

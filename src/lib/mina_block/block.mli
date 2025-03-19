@@ -5,7 +5,7 @@ open Mina_transaction
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V2 : sig
+  module V3 : sig
     type t [@@deriving sexp, equal]
   end
 end]

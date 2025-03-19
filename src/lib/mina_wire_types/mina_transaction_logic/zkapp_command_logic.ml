@@ -24,7 +24,7 @@ module Local_state = struct
   end
 
   module Value = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         ( Mina_base.Stack_frame.Digest.V1.t
         , Mina_base.Call_stack_digest.V1.t
@@ -33,7 +33,7 @@ module Local_state = struct
         , bool
         , Mina_base.Zkapp_command.Transaction_commitment.V1.t
         , Mina_numbers.Index.V1.t
-        , Mina_base.Transaction_status.Failure.Collection.V1.t )
+        , Mina_base.Transaction_status.Failure.Collection.V2.t )
         V1.t
     end
   end

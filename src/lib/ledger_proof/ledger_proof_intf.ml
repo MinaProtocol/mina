@@ -8,10 +8,16 @@ module type S = sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V2 : sig
+    module V3 : sig
       type nonrec t = t [@@deriving compare, equal, sexp, yojson, hash]
 
       val to_latest : t -> t
+    end
+
+    module V2 : sig
+      type nonrec t [@@deriving compare, equal, sexp, yojson, hash]
+
+      val to_latest : t -> V3.t
     end
   end]
 

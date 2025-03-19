@@ -22,13 +22,13 @@ module Worker = struct
 
     [%%versioned_rpc
     module Get_work = struct
-      module V2 = struct
+      module V3 = struct
         module T = struct
           type query = unit
 
           type response =
-            ( ( Transaction_witness.Stable.V2.t
-              , Inputs.Ledger_proof.Stable.V2.t )
+            ( ( Transaction_witness.Stable.V3.t
+              , Inputs.Ledger_proof.Stable.V3.t )
               Snark_work_lib.Work.Single.Spec.Stable.V2.t
               Snark_work_lib.Work.Spec.Stable.V1.t
             * Public_key.Compressed.Stable.V1.t )
@@ -49,19 +49,19 @@ module Worker = struct
         include Rpcs.Get_work.Register (T)
       end
 
-      module Latest = V2
+      module Latest = V3
     end]
 
     [%%versioned_rpc
     module Submit_work = struct
-      module V2 = struct
+      module V3 = struct
         module T = struct
           type query =
-            ( ( Transaction_witness.Stable.V2.t
-              , Ledger_proof.Stable.V2.t )
+            ( ( Transaction_witness.Stable.V3.t
+              , Ledger_proof.Stable.V3.t )
               Snark_work_lib.Work.Single.Spec.Stable.V2.t
               Snark_work_lib.Work.Spec.Stable.V1.t
-            , Ledger_proof.Stable.V2.t )
+            , Ledger_proof.Stable.V3.t )
             Snark_work_lib.Work.Result.Stable.V1.t
 
           type response = unit
@@ -79,17 +79,17 @@ module Worker = struct
         include Rpcs.Submit_work.Register (T)
       end
 
-      module Latest = V2
+      module Latest = V3
     end]
 
     [%%versioned_rpc
     module Failed_to_generate_snark = struct
-      module V2 = struct
+      module V3 = struct
         module T = struct
           type query =
             Bounded_types.Wrapped_error.Stable.V1.t
-            * ( Transaction_witness.Stable.V2.t
-              , Inputs.Ledger_proof.Stable.V2.t )
+            * ( Transaction_witness.Stable.V3.t
+              , Inputs.Ledger_proof.Stable.V3.t )
               Snark_work_lib.Work.Single.Spec.Stable.V2.t
               Snark_work_lib.Work.Spec.Stable.V1.t
             * Public_key.Compressed.Stable.V1.t
@@ -109,7 +109,53 @@ module Worker = struct
         include Rpcs.Failed_to_generate_snark.Register (T)
       end
 
-      module Latest = V2
+      module V2 = struct
+        module T = struct
+          type query =
+            Bounded_types.Wrapped_error.Stable.V1.t
+            * ( Transaction_witness.Stable.V2.t
+              , Inputs.Ledger_proof.Stable.V2.t )
+              Snark_work_lib.Work.Single.Spec.Stable.V2.t
+              Snark_work_lib.Work.Spec.Stable.V1.t
+            * Public_key.Compressed.Stable.V1.t
+
+          type response = unit
+
+          let query_of_caller_model ((a, b, c) : V3.query) : query =
+            ( a
+            , Snark_work_lib.Work.Spec.Stable.V1.to_latest
+                (Snark_work_lib.Work.Single.Spec.map
+                 (* TODO do you have to be able to downgrade types too?! *)
+                   ~f_witness:
+                     ( failwith "TODO"
+                       :    Transaction_witness.Stable.V3.t
+                         -> Transaction_witness.Stable.V2.t )
+                   ~f_proof:
+                     ( failwith "TODO"
+                       :    Inputs.Ledger_proof.Stable.V3.t
+                         -> Inputs.Ledger_proof.Stable.V2.t ) )
+                b
+            , c )
+
+          let callee_model_of_query ((a, b, c) : query) : V3.query =
+            ( a
+            , Snark_work_lib.Work.Spec.Stable.V1.to_latest
+                (Snark_work_lib.Work.Single.Spec.map
+                   ~f_witness:Transaction_witness.Stable.V2.to_latest
+                   ~f_proof:Inputs.Ledger_proof.Stable.V2.to_latest )
+                b
+            , c )
+
+          let response_of_callee_model = Fn.id
+
+          let caller_model_of_response = Fn.id
+        end
+
+        include T
+        include Rpcs.Failed_to_generate_snark.Register (T)
+      end
+
+      module Latest = V3
     end]
   end
 

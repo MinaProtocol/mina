@@ -48,6 +48,23 @@ end
 module Value : sig
   [%%versioned:
   module Stable : sig
+    module V3 : sig
+      type t =
+        ( Staged_ledger_hash.Stable.V1.t
+        , Frozen_ledger_hash.Stable.V1.t
+        , Local_state.Stable.V2.t
+        , Block_time.Stable.V1.t
+        , Consensus.Body_reference.Stable.V1.t
+        , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+        , Pending_coinbase.Stack_versioned.Stable.V1.t
+        , Fee_excess.Stable.V1.t
+        , unit )
+        Poly.Stable.V2.t
+      [@@deriving sexp, equal, compare, hash, yojson]
+
+      val to_latest : t -> t
+    end
+
     module V2 : sig
       type t =
         ( Staged_ledger_hash.Stable.V1.t
@@ -62,7 +79,7 @@ module Value : sig
         Poly.Stable.V2.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
-      val to_latest : t -> t
+      val to_latest : t -> V3.t
     end
   end]
 end

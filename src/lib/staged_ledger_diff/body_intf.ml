@@ -3,7 +3,7 @@ module type Full = sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V1 : sig
+    module V2 : sig
       type t [@@deriving equal, sexp]
     end
   end]

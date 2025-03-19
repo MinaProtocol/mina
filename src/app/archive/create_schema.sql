@@ -256,6 +256,26 @@ CREATE TABLE zkapp_nonce_bounds
 , nonce_upper_bound        bigint           NOT NULL
 );
 
+
+/* NULL convention */
+CREATE TABLE zkapp_account_permissions_precondition
+( id                       serial                PRIMARY KEY
+, edit_state                       zkapp_auth_required_type
+, send                             zkapp_auth_required_type
+, receive                          zkapp_auth_required_type
+, access                           zkapp_auth_required_type
+, set_delegate                     zkapp_auth_required_type
+, set_permissions                  zkapp_auth_required_type
+, set_verification_key             zkapp_auth_required_type
+, set_zkapp_uri                    zkapp_auth_required_type
+, edit_action_state                zkapp_auth_required_type
+, set_token_symbol                 zkapp_auth_required_type
+, increment_nonce                  zkapp_auth_required_type
+, set_voting_for                   zkapp_auth_required_type
+, set_timing                       zkapp_auth_required_type
+);
+
+
 /* NULL convention */
 CREATE TABLE zkapp_account_precondition
 ( id                       serial     PRIMARY KEY
@@ -267,6 +287,7 @@ CREATE TABLE zkapp_account_precondition
 , action_state_id          int                     REFERENCES zkapp_field(id)
 , proved_state             boolean
 , is_new                   boolean
+, permissions_id int REFERENCES zkapp_account_permissions_precondition(id)
 , UNIQUE(balance_id, receipt_chain_hash, delegate_id, state_id, action_state_id, proved_state, is_new, nonce_id)
 );
 

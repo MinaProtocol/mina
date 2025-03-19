@@ -29,18 +29,18 @@ include Versioned_rpc.Both_convert.One_way.Make (Master)
 module V2 = struct
   module T = struct
     type msg =
-      | New_state of Mina_block.Stable.V2.t
+      | New_state of Mina_block.Stable.V3.t
       | Snark_pool_diff of
-          Snark_pool.Diff_versioned.Stable.V2.t
+          Snark_pool.Diff_versioned.Stable.V3.t
           Network_pool.With_nonce.Stable.V1.t
       | Transaction_pool_diff of
-          Transaction_pool.Diff_versioned.Stable.V2.t
+          Transaction_pool.Diff_versioned.Stable.V3.t
           Network_pool.With_nonce.Stable.V1.t
     [@@deriving bin_io, version { rpc }]
 
-    type snark_pool_diff_msg = Snark_pool.Diff_versioned.Stable.V2.t
+    type snark_pool_diff_msg = Snark_pool.Diff_versioned.Stable.V3.t
 
-    type transaction_pool_diff_msg = Transaction_pool.Diff_versioned.Stable.V2.t
+    type transaction_pool_diff_msg = Transaction_pool.Diff_versioned.Stable.V3.t
 
     let callee_model_of_msg msg =
       match msg with

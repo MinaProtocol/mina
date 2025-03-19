@@ -24,7 +24,7 @@ trap "pkill -f mina-local-network" EXIT
 
 # stop mina-local-network once enough blocks have been produced
 while true; do
-  sleep 10s
+  sleep 5s
   # psql outputs "    " until there are blocks in the db, the +0 defaults that to 0
   BLOCKS="$(( $(psql -U postgres archive -t -c  "select MAX(global_slot_since_genesis) from blocks" 2> /dev/null) +0))"
   echo Generated $BLOCKS/$TOTAL_BLOCKS blocks

@@ -1,4 +1,66 @@
 module Failure = struct
+  module V3 = struct
+    type t =
+      | Predicate
+      | Source_not_present
+      | Receiver_not_present
+      | Amount_insufficient_to_create_account
+      | Cannot_pay_creation_fee_in_token
+      | Source_insufficient_balance
+      | Source_minimum_balance_violation
+      | Receiver_already_exists
+      | Token_owner_not_caller
+      | Overflow
+      | Global_excess_overflow
+      | Local_excess_overflow
+      | Local_supply_increase_overflow
+      | Global_supply_increase_overflow
+      | Signed_command_on_zkapp_account
+      | Zkapp_account_not_present
+      | Update_not_permitted_balance
+      | Update_not_permitted_access
+      | Update_not_permitted_timing
+      | Update_not_permitted_delegate
+      | Update_not_permitted_app_state
+      | Update_not_permitted_verification_key
+      | Update_not_permitted_action_state
+      | Update_not_permitted_zkapp_uri
+      | Update_not_permitted_token_symbol
+      | Update_not_permitted_permissions
+      | Update_not_permitted_nonce
+      | Update_not_permitted_voting_for
+      | Zkapp_command_replay_check_failed
+      | Fee_payer_nonce_must_increase
+      | Fee_payer_must_be_signed
+      | Account_balance_precondition_unsatisfied
+      | Account_nonce_precondition_unsatisfied
+      | Account_receipt_chain_hash_precondition_unsatisfied
+      | Account_delegate_precondition_unsatisfied
+      | Account_action_state_precondition_unsatisfied
+      | Account_app_state_precondition_unsatisfied of int
+      | Account_proved_state_precondition_unsatisfied
+      | Account_is_new_precondition_unsatisfied
+      | Permissions_precondition_edit_state_unsatisfied
+      | Permissions_precondition_send_unsatisfied
+      | Permissions_precondition_receive_unsatisfied
+      | Permissions_precondition_access_unsatisfied
+      | Permissions_precondition_set_delegate_unsatisfied
+      | Permissions_precondition_set_permissions_unsatisfied
+      | Permissions_precondition_set_verification_key_unsatisfied
+      | Permissions_precondition_set_zkapp_uri_unsatisfied
+      | Permissions_precondition_edit_action_state_unsatisfied
+      | Permissions_precondition_set_token_symbol_unsatisfied
+      | Permissions_precondition_increment_nonce_unsatisfied
+      | Permissions_precondition_set_voting_for_unsatisfied
+      | Permissions_precondition_set_timing_unsatisfied
+      | Protocol_state_precondition_unsatisfied
+      | Unexpected_verification_key_hash
+      | Valid_while_precondition_unsatisfied
+      | Incorrect_nonce
+      | Invalid_fee_excess
+      | Cancelled
+  end
+
   module V2 = struct
     type t =
       | Predicate
@@ -48,11 +110,21 @@ module Failure = struct
       | Cancelled
   end
 
+  module FailureV2 = V2
+
   module Collection = struct
+    module V2 = struct
+      type t = V3.t list list
+    end
+
     module V1 = struct
-      type t = V2.t list list
+      type t = FailureV2.t list list
     end
   end
+end
+
+module V3 = struct
+  type t = Applied | Failed of Failure.Collection.V2.t
 end
 
 module V2 = struct

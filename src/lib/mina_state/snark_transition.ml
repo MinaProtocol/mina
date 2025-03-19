@@ -21,9 +21,9 @@ end
 module Value = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
-        ( Blockchain_state.Value.Stable.V2.t
+        ( Blockchain_state.Value.Stable.V3.t
         , Consensus.Data.Consensus_transition.Value.Stable.V1.t
         , Pending_coinbase.Update.Stable.V1.t )
         Poly.Stable.V1.t

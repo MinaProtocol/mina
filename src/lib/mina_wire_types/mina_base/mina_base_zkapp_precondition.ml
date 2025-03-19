@@ -56,7 +56,72 @@ module Valid_while = struct
   end
 end
 
+module Permissions = struct
+  module V2 = struct
+    type t =
+      { edit_state :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; access :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; send :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; receive :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; set_delegate :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; set_permissions :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; set_verification_key :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; set_zkapp_uri :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; edit_action_state :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; set_token_symbol :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; increment_nonce :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; set_voting_for :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; set_timing :
+          Mina_base_permissions.Auth_required.V2.t
+          Mina_base_zkapp_basic.Or_ignore.V1.t
+      }
+  end
+end
+
 module Account = struct
+  module V3 = struct
+    type t =
+      { balance : Currency.Balance.V1.t Numeric.V1.t
+      ; nonce : Mina_numbers.Account_nonce.V1.t Numeric.V1.t
+      ; receipt_chain_hash :
+          Snark_params.Tick.Field.t Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; delegate :
+          Public_key.Compressed.V1.t Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; state :
+          Snark_params.Tick.Field.t Mina_base_zkapp_basic.Or_ignore.V1.t
+          Mina_base_zkapp_state.V.V1.t
+      ; action_state :
+          Snark_params.Tick.Field.t Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; proved_state : bool Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; is_new : bool Mina_base_zkapp_basic.Or_ignore.V1.t
+      ; permissions : Permissions.V2.t
+      }
+  end
+
   module V2 = struct
     type t =
       { balance : Currency.Balance.V1.t Numeric.V1.t

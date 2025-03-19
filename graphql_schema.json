@@ -2474,6 +2474,304 @@
         },
         {
           "kind": "INPUT_OBJECT",
+          "name": "PermissionsPreconditionInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "editState",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "access",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "send",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "receive",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setDelegate",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setPermissions",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setVerificationKey",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setZkappUri",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "editActionState",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setTokenSymbol",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "incrementNonce",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setVotingFor",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setTiming",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "editState",
+              "description": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "access",
+              "description": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "send",
+              "description": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "receive",
+              "description": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "setDelegate",
+              "description": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "setPermissions",
+              "description": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "setVerificationKey",
+              "description": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "setZkappUri",
+              "description": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "editActionState",
+              "description": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "setTokenSymbol",
+              "description": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "incrementNonce",
+              "description": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "setVotingFor",
+              "description": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "setTiming",
+              "description": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
           "name": "AccountPreconditionInput",
           "description": null,
           "fields": [
@@ -2564,6 +2862,22 @@
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "permissions",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "PermissionsPreconditionInput",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": [
@@ -2637,6 +2951,20 @@
               "name": "isNew",
               "description": null,
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "defaultValue": null
+            },
+            {
+              "name": "permissions",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "PermissionsPreconditionInput",
+                  "ofType": null
+                }
+              },
               "defaultValue": null
             }
           ],
@@ -7524,6 +7852,173 @@
         },
         {
           "kind": "OBJECT",
+          "name": "PermissionsPrecondition",
+          "description": null,
+          "fields": [
+            {
+              "name": "editState",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "access",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "send",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "receive",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setDelegate",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setPermissions",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setVerificationKey",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setZkappUri",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "editActionState",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setTokenSymbol",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "incrementNonce",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setVotingFor",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setTiming",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "AuthRequired",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
           "name": "NonceInterval",
           "description": null,
           "fields": [
@@ -7698,6 +8193,22 @@
               "description": null,
               "args": [],
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "permissions",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "PermissionsPrecondition",
+                  "ofType": null
+                }
+              },
               "isDeprecated": false,
               "deprecationReason": null
             }
