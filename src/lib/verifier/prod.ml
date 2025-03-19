@@ -39,7 +39,7 @@ module Worker_state = struct
 
     val verify_commands :
          Mina_base.User_command.Verifiable.t With_status.t With_id_tag.t list
-      -> [ `Valid
+      -> [ `Valid of Pickles.Side_loaded.Verification_key.t list
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
            * Mina_base.Zkapp_statement.t
@@ -108,6 +108,7 @@ module Worker_state = struct
                       | `Mismatched_authorization_kind _ ->
                           [] )
                in
+               let vks = List.map ~f:Tuple3.get1 to_verify in
                let%map all_verified =
                  Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ to_verify
                in
@@ -118,9 +119,9 @@ module Worker_state = struct
                          (* The command is dropped here to avoid decoding it later in the caller
                             which would create a duplicate. Results are paired back to their inputs
                             using the input [id]*)
-                         `Valid
+                         `Valid vks
                      | `Valid_assuming (_, xs) ->
-                         if Or_error.is_ok all_verified then `Valid
+                         if Or_error.is_ok all_verified then `Valid vks
                          else `Valid_assuming xs
                      | `Invalid_keys keys ->
                          `Invalid_keys keys
@@ -202,9 +203,9 @@ module Worker_state = struct
                    let result =
                      match Common.check c with
                      | `Valid _ ->
-                         `Valid
-                     | `Valid_assuming (_, _) ->
-                         `Valid
+                         `Valid []
+                     | `Valid_assuming (_, xs) ->
+                         `Valid (List.map ~f:Tuple3.get1 xs)
                      | `Invalid_keys keys ->
                          `Invalid_keys keys
                      | `Invalid_signature keys ->
@@ -244,7 +245,7 @@ module Worker = struct
       ; verify_commands :
           ( 'w
           , User_command.Verifiable.t With_status.t With_id_tag.t list
-          , [ `Valid
+          , [ `Valid of Side_loaded_verification_key.t list
             | `Valid_assuming of
               ( Pickles.Side_loaded.Verification_key.t
               * Mina_base.Zkapp_statement.t
@@ -324,7 +325,7 @@ module Worker = struct
                   With_id_tag.t
                   list]
               , [%bin_type_class:
-                  [ `Valid
+                  [ `Valid of Side_loaded_verification_key.Stable.Latest.t list
                   | `Valid_assuming of
                     ( Pickles.Side_loaded.Verification_key.Stable.Latest.t
                     * Mina_base.Zkapp_statement.Stable.Latest.t
@@ -678,7 +679,7 @@ let reinject_valid_user_command_into_valid_result (command, result) =
       invalid
   | `Valid_assuming x ->
       `Valid_assuming x
-  | `Valid ->
+  | `Valid xs ->
       (* Since we have stripped the transaction from the result, we reconstruct it here.
          The use of [to_valid_unsafe] is justified because a [`Valid] result for this
          command means that it has indeed been validated. *)
@@ -687,7 +688,7 @@ let reinject_valid_user_command_into_valid_result (command, result) =
         User_command.to_valid_unsafe
           (User_command.of_verifiable (With_status.data command))
       in
-      `Valid command_valid
+      `Valid (command_valid, xs)
 
 let finalize_verification_results tagged_commands tagged_results =
   With_id_tag.reassociate_tagged_results tagged_commands tagged_results

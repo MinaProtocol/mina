@@ -25,7 +25,9 @@ module Base = struct
       -> Mina_base.User_command.Verifiable.t Mina_base.With_status.t list
          (* The first level of error represents failure to verify, the second a failure in
             communicating with the verifier. *)
-      -> [ `Valid of Mina_base.User_command.Valid.t
+      -> [ `Valid of
+           Mina_base.User_command.Valid.t
+           * Pickles.Side_loaded.Verification_key.t list
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
            * Mina_base.Zkapp_statement.t
