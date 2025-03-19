@@ -659,6 +659,37 @@ module Snark_work_bundle = struct
         ] )
 end
 
+module Action_state = struct
+  type t =
+    { action : Backend.Tick.Field.Stable.V1.t list list
+    ; transaction_sequence_no : int
+    ; action_sequence_no : int
+    ; block_number : Unsigned.UInt32.t
+    }
+
+  let spec =
+    obj "ActionState" ~doc:"" ~fields:(fun _ ->
+        [ field "action"
+            ~args:Arg.[]
+            ~doc:""
+            ~typ:(non_null (list (non_null (list (non_null field_elem)))))
+            ~resolve:(fun _ { action; _ } -> action)
+        ; field "transactionSequenceNo"
+            ~args:Arg.[]
+            ~doc:"" ~typ:(non_null int)
+            ~resolve:(fun _ { transaction_sequence_no; _ } ->
+              transaction_sequence_no )
+        ; field "actionSequenceNo"
+            ~args:Arg.[]
+            ~doc:"" ~typ:(non_null int)
+            ~resolve:(fun _ { action_sequence_no; _ } -> action_sequence_no)
+        ; field "blockNumber"
+            ~args:Arg.[]
+            ~doc:"" ~typ:(non_null uint32)
+            ~resolve:(fun _ { block_number; _ } -> block_number)
+        ] )
+end
+
 let pending_work_spec =
   obj "PendingSnarkWorkSpec"
     ~doc:
@@ -2167,6 +2198,14 @@ let snark_worker =
           ~doc:"Fee that snark worker is charging to generate a snark proof"
           ~args:Arg.[]
           ~resolve:(fun (_ : Mina_lib.t resolve_info) (_, fee) -> fee)
+      ] )
+
+let events =
+  obj "Events" ~fields:(fun _ ->
+      [ field "events"
+          ~typ:(non_null @@ list @@ non_null string)
+          ~args:Arg.[]
+          ~resolve:(fun (_ : Mina_lib.t resolve_info) events -> events)
       ] )
 
 module Payload = struct

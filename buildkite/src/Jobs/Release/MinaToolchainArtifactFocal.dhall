@@ -1,10 +1,10 @@
-let S = ../../Lib/SelectFiles.dhall
-
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
+
+let S = ../../Lib/SelectFiles.dhall
 
 let DockerImage = ../../Command/DockerImage.dhall
 

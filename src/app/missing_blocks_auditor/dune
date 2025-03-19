@@ -17,8 +17,7 @@
   async.async_command
   ;; local libraries
   logger
-  bounded_types
-  mina_caqti)
+  bounded_types)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
