@@ -39,7 +39,9 @@ module Worker_state = struct
 
     val verify_commands :
          Mina_base.User_command.Verifiable.t With_status.t With_id_tag.t list
-      -> [ `Valid
+      -> [ `Valid of
+           Mina_transaction.Transaction_hash.User_command_with_verification_keys
+           .t
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
            * Mina_base.Zkapp_statement.t
@@ -114,13 +116,20 @@ module Worker_state = struct
                List.map results ~f:(fun (id, result) ->
                    let result =
                      match result with
-                     | `Valid _ ->
+                     | `Valid cmd ->
                          (* The command is dropped here to avoid decoding it later in the caller
                             which would create a duplicate. Results are paired back to their inputs
                             using the input [id]*)
-                         `Valid
-                     | `Valid_assuming (_, xs) ->
-                         if Or_error.is_ok all_verified then `Valid
+                         (* The above is out of date.
+                            for the project `verification of zkapp proofs prior to blockchian`,
+                            the reslut `Valid is replaced by `Valid cmd or something similar, hence,
+                            we kinda have to take the serialization cost in trade of caching the key
+                            verification
+                         *)
+                         `Valid (cmd, [])
+                     | `Valid_assuming (cmd, xs) ->
+                         let keys = List.map xs ~f:(fun (key, _, _) -> key) in
+                         if Or_error.is_ok all_verified then `Valid (cmd, keys)
                          else `Valid_assuming xs
                      | `Invalid_keys keys ->
                          `Invalid_keys keys
@@ -201,10 +210,8 @@ module Worker_state = struct
                List.map tagged_commands ~f:(fun (id, c) ->
                    let result =
                      match Common.check c with
-                     | `Valid _ ->
-                         `Valid
-                     | `Valid_assuming (_, _) ->
-                         `Valid
+                     | `Valid cmd | `Valid_assuming (cmd, _) ->
+                         `Valid (cmd, [])
                      | `Invalid_keys keys ->
                          `Invalid_keys keys
                      | `Invalid_signature keys ->
@@ -244,7 +251,10 @@ module Worker = struct
       ; verify_commands :
           ( 'w
           , User_command.Verifiable.t With_status.t With_id_tag.t list
-          , [ `Valid
+          , [ `Valid of
+              Mina_transaction.Transaction_hash
+              .User_command_with_verification_keys
+              .t
             | `Valid_assuming of
               ( Pickles.Side_loaded.Verification_key.t
               * Mina_base.Zkapp_statement.t
@@ -324,7 +334,9 @@ module Worker = struct
                   With_id_tag.t
                   list]
               , [%bin_type_class:
-                  [ `Valid
+                  [ `Valid of
+                    User_command.Valid.Stable.Latest.t
+                    * Pickles.Side_loaded.Verification_key.Stable.Latest.t list
                   | `Valid_assuming of
                     ( Pickles.Side_loaded.Verification_key.Stable.Latest.t
                     * Mina_base.Zkapp_statement.Stable.Latest.t
@@ -670,28 +682,9 @@ let verify_transaction_snarks =
   wrap_verify_snarks_with_trace ~checkpoint_before:"Verify_transaction_snarks"
     ~checkpoint_after:"Verify_transaction_snarks_done" verify_transaction_snarks
 
-(* Reinjects the original user commands into the validation results.
-   This avoids duplicating proof data by not sending it back from the subprocess. *)
-let reinject_valid_user_command_into_valid_result (command, result) =
-  match result with
-  | #invalid as invalid ->
-      invalid
-  | `Valid_assuming x ->
-      `Valid_assuming x
-  | `Valid ->
-      (* Since we have stripped the transaction from the result, we reconstruct it here.
-         The use of [to_valid_unsafe] is justified because a [`Valid] result for this
-         command means that it has indeed been validated. *)
-      let (`If_this_is_used_it_should_have_a_comment_justifying_it command_valid)
-          =
-        User_command.to_valid_unsafe
-          (User_command.of_verifiable (With_status.data command))
-      in
-      `Valid command_valid
-
 let finalize_verification_results tagged_commands tagged_results =
   With_id_tag.reassociate_tagged_results tagged_commands tagged_results
-  |> List.map ~f:reinject_valid_user_command_into_valid_result
+  |> List.map ~f:snd
 
 let verify_commands { worker; logger } ts =
   O1trace.thread "dispatch_user_command_verification" (fun () ->

@@ -61,6 +61,8 @@ module User_command_with_valid_signature : sig
 
   val create : User_command.Valid.t -> t
 
+  val create_with_keys : User_command_with_verification_keys.t -> t
+
   val data : t -> User_command.Valid.t * Side_loaded_verification_key.t list
 
   val command : t -> User_command.t

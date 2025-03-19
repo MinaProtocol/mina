@@ -179,6 +179,10 @@ module User_command_with_valid_signature = struct
   let create (c : User_command.Valid.t) : t =
     { data = (c, []); hash = hash_command (User_command.forget_check c) }
 
+  let create_with_keys ((cmd, _) as data : User_command_with_verification_keys.t)
+      : t =
+    { data; hash = hash_command (User_command.forget_check cmd) }
+
   let data ({ data; _ } : t) = data
 
   let command ({ data = cmd_valid, _; _ } : t) =

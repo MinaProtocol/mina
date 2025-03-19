@@ -1228,7 +1228,7 @@ struct
                       List.map commands
                         ~f:
                           Transaction_hash.User_command_with_valid_signature
-                          .create
+                          .create_with_keys
                   } )
 
       let register_locally_generated t txn =
