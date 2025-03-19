@@ -791,6 +791,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
        -> transition:Mina_block.almost_valid_block
        -> sender:Envelope.Sender.t option
        -> transition_receipt_time:Time.t option
+       -> ?transaction_pool_proxy:Breadcrumb.transaction_pool_proxy
        -> unit
        -> ( Breadcrumb.t
           , [> `Invalid_staged_ledger_diff of Error.t

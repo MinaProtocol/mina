@@ -103,10 +103,21 @@ let compute_block_trace_metadata transition_with_validation =
     ; ("coinbase_receiver", Account.key_to_yojson @@ coinbase_receiver cs)
     ]
 
+type transaction_pool_proxy =
+  { find_by_hash :
+         Mina_transaction.Transaction_hash.t
+      -> Mina_transaction.Transaction_hash.User_command_with_valid_signature.t
+         option
+  }
+
+let dummy_transcation_pool_proxy : transaction_pool_proxy =
+  { find_by_hash = const None }
+
 let build ?skip_staged_ledger_verification ~proof_cache_db ~logger
     ~precomputed_values ~verifier ~trust_system ~parent
     ~transition:(transition_with_validation : Mina_block.almost_valid_block)
-    ~get_completed_work ~sender ~transition_receipt_time () =
+    ~get_completed_work ~sender ~transition_receipt_time
+    ?(transaction_pool_proxy = dummy_transcation_pool_proxy) () =
   let state_hash =
     ( With_hash.hash
     @@ Mina_block.Validation.block_with_hash transition_with_validation )
