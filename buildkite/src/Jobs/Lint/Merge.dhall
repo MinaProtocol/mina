@@ -63,10 +63,10 @@ in  Pipeline.build
         , Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run "scripts/merged-to-proof-systems.sh compatible" ]
+              [ Cmd.run "scripts/merged-to-proof-systems.sh berkeley" ]
             , label =
-                "[proof-systems] Check merges cleanly into proof-systems compatible branch"
-            , key = "merged-to-proof-systems-compatible"
+                "[proof-systems] Check merges cleanly into proof-systems berkeley branch"
+            , key = "merged-to-proof-systems-berkeley"
             , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Multi
             , docker = Some Docker::{
