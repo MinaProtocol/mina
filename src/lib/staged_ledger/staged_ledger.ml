@@ -1229,8 +1229,8 @@ module T = struct
     let%map xs = Verifier.verify_commands verifier cs in
     Result.all
       (List.map xs ~f:(function
-        | `Valid x ->
-            Ok x
+        | `Valid (cmd, _) ->
+            Ok cmd
         | ( `Invalid_keys _
           | `Invalid_signature _
           | `Invalid_proof _
