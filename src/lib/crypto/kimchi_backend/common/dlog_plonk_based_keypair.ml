@@ -77,8 +77,8 @@ module type Inputs_intf = sig
       -> Scalar_field.t Kimchi_types.runtime_table_cfg array
       -> int
       -> Urs.t
-      -> t
       -> bool
+      -> t
     end
 
   module Curve : sig
