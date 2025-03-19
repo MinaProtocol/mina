@@ -319,8 +319,7 @@ module Worker = struct
         ; verify_commands =
             f
               ( [%bin_type_class:
-                  User_command.Verifiable.Stable.Latest.t
-                  With_status.Stable.Latest.t
+                  User_command.Verifiable.t With_status.Stable.Latest.t
                   With_id_tag.t
                   list]
               , [%bin_type_class:
