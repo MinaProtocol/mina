@@ -192,7 +192,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let index =
       Inputs.Index.create gates public_input_size fixed_lookup_tables
-        runtime_table_cfgs prev_challenges (load_urs ()) cs.lazy_mode
+        runtime_table_cfgs prev_challenges (load_urs ()) false
     in
     { index; cs }
 
