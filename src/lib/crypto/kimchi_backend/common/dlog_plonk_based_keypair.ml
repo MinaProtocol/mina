@@ -79,7 +79,7 @@ module type Inputs_intf = sig
       -> Urs.t
       -> bool
       -> t
-    end
+  end
 
   module Curve : sig
     module Base_field : sig
