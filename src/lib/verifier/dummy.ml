@@ -82,7 +82,8 @@ let verify_blockchain_snarks { verify_blockchain_snarks; _ } chains =
 *)
 let verify_commands { proof_level; _ }
     (cs : User_command.Verifiable.t With_status.t list) :
-    [ `Valid of Mina_base.User_command.Valid.t
+    [ `Valid of
+      Mina_transaction.Transaction_hash.User_command_with_verification_keys.t
     | `Valid_assuming of
       ( Pickles.Side_loaded.Verification_key.t
       * Mina_base.Zkapp_statement.t
@@ -96,9 +97,9 @@ let verify_commands { proof_level; _ }
       List.map cs ~f:(fun c ->
           match Common.check c with
           | `Valid c ->
-              `Valid c
-          | `Valid_assuming (c, _) ->
-              `Valid c
+              `Valid (c, [])
+          | `Valid_assuming (c, xs) ->
+              `Valid (c, List.map ~f:Tuple3.get1 xs)
           | `Invalid_keys keys ->
               `Invalid_keys keys
           | `Invalid_signature keys ->
@@ -134,9 +135,10 @@ let verify_commands { proof_level; _ }
       Ok
         (List.map cs ~f:(function
           | `Valid c ->
-              `Valid c
+              `Valid (c, [])
           | `Valid_assuming (c, xs) ->
-              if Or_error.is_ok all_verified then `Valid c
+              if Or_error.is_ok all_verified then
+                `Valid (c, List.map ~f:Tuple3.get1 xs)
               else `Valid_assuming xs
           | `Invalid_keys keys ->
               `Invalid_keys keys
