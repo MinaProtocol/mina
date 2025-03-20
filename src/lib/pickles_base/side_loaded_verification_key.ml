@@ -151,7 +151,7 @@ module Poly = struct
         ; wrap_index : 'g Plonk_verification_key_evals.Stable.V2.t
         ; wrap_vk : 'vk option
         }
-      [@@deriving hash, equal]
+      [@@deriving hash]
     end
   end]
 end
