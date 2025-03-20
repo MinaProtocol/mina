@@ -402,24 +402,14 @@ let check_authorization (p : Account_update.t) : unit Or_error.t =
       Error err
 
 module Verifiable : sig
-  [%%versioned:
-  module Stable : sig
-    module V1 : sig
-      type t = private
-        { fee_payer : Account_update.Fee_payer.Stable.V1.t
-        ; account_updates :
-            ( Side_loaded_verification_key.Stable.V2.t
-            , Zkapp_basic.F.Stable.V1.t )
-            With_hash.Stable.V1.t
-            option
-            Call_forest.With_hashes_and_data.Stable.V1.t
-        ; memo : Signed_command_memo.Stable.V1.t
-        }
-      [@@deriving sexp, compare, equal, hash, yojson]
-
-      val to_latest : t -> t
-    end
-  end]
+  type t = private
+    { fee_payer : Account_update.Fee_payer.t
+    ; account_updates :
+        (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option
+        Call_forest.With_hashes_and_data.t
+    ; memo : Signed_command_memo.t
+    }
+  [@@deriving sexp, compare, equal, hash, yojson, bin_io]
 
   val load_vk_from_ledger :
        location_of_account:(Account_id.t -> 'loc option)
@@ -472,24 +462,17 @@ module Verifiable : sig
       with type 'a Command_wrapper.t = 'a With_status.t
        and type cache = Verification_key_wire.t Account_id.Map.t
 end = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        { fee_payer : Account_update.Fee_payer.Stable.V1.t
-        ; account_updates :
-            ( Side_loaded_verification_key.Stable.V2.t
-            , Zkapp_basic.F.Stable.V1.t )
-            With_hash.Stable.V1.t
-            option
-            Call_forest.With_hashes_and_data.Stable.V1.t
-        ; memo : Signed_command_memo.Stable.V1.t
-        }
-      [@@deriving sexp, compare, equal, hash, yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
+  type t =
+    { fee_payer : Account_update.Fee_payer.Stable.Latest.t
+    ; account_updates :
+        ( Side_loaded_verification_key.Stable.Latest.t
+        , Zkapp_basic.F.Stable.Latest.t )
+        With_hash.Stable.Latest.t
+        option
+        Call_forest.With_hashes_and_data.Stable.Latest.t
+    ; memo : Signed_command_memo.Stable.Latest.t
+    }
+  [@@deriving sexp, compare, equal, hash, yojson, bin_io_unversioned]
 
   let ok_if_vk_hash_expected ~got ~expected =
     if not @@ Zkapp_basic.F.equal (With_hash.hash got) expected then

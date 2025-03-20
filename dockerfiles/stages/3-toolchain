@@ -20,6 +20,7 @@ USER root
 # afaict this is the last python dependency of any kind in CI
 RUN apt-get update --yes \
   && apt-get install --yes \
+    aptly \
     apt-transport-https \
     apt-utils \
     awscli \

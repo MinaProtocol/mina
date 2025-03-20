@@ -2,12 +2,16 @@ open Mina_base
 
 [%%versioned:
 module Stable : sig
+  [@@@no_toplevel_latest_type]
+
   module V2 : sig
     type t [@@deriving equal]
+
+    val hashes : t -> State_hash.State_hashes.t
   end
 end]
 
-type t = Stable.Latest.t [@@deriving to_yojson, equal]
+type t [@@deriving to_yojson]
 
 val lift : Validation.fully_valid_with_block -> t
 
@@ -31,3 +35,7 @@ val state_body_hash : t -> State_body_hash.t
 val header : t -> Header.t
 
 val body : t -> Staged_ledger_diff.Body.t
+
+val is_genesis : t -> bool
+
+val read_all_proofs_from_disk : t -> Stable.Latest.t

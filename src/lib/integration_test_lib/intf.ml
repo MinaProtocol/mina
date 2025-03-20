@@ -96,6 +96,8 @@ module Engine = struct
 
     val block_producers : t -> Node.t Core.String.Map.t
 
+    val block_producer_exn : t -> String.t -> Node.t
+
     val snark_coordinators : t -> Node.t Core.String.Map.t
 
     val archive_nodes : t -> Node.t Core.String.Map.t
@@ -104,7 +106,11 @@ module Engine = struct
 
     val all_nodes : t -> Node.t Core.String.Map.t
 
+    val node_exn : t -> String.t -> Node.t
+
     val genesis_keypairs : t -> Network_keypair.t Core.String.Map.t
+
+    val genesis_keypair_exn : t -> String.t -> Network_keypair.t
 
     val initialize_infra : logger:Logger.t -> t -> unit Malleable_error.t
   end

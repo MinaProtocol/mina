@@ -12,27 +12,22 @@ let failed_to_get_cache_folder_status ~logger ~(error_msg : string) ~path =
       - if it is not impossible to retrieve the status of the path, fail
 *)
 let initialize_dir path ~logger =
-  let open Deferred.Let_syntax in
+  let fail error_msg =
+    Deferred.Result.fail
+      (failed_to_get_cache_folder_status ~logger ~error_msg ~path)
+  in
   match%bind Sys.is_directory path with
   | `Yes ->
-      let%bind () = File_system.clear_dir path in
-      Deferred.Result.return path
+      let%map () = File_system.clear_dir path in
+      Ok path
   | `No -> (
-      match%bind Sys.is_file path with
+      match%bind Sys.file_exists ~follow_symlinks:false path with
       | `Yes ->
-          Deferred.Result.fail
-            (failed_to_get_cache_folder_status ~logger
-               ~error_msg:
-                 "Invalid path to proof cache folder. Path points to a file"
-               ~path )
+          fail "Path to proof cache folder points to a non-directory"
       | `No ->
-          let%bind () = File_system.create_dir path in
-          Deferred.Result.return path
+          let%map () = File_system.create_dir path in
+          Ok path
       | `Unknown ->
-          Deferred.Result.fail
-            (failed_to_get_cache_folder_status ~logger
-               ~error_msg:"Cannot evaluate existence of cache folder" ~path ) )
+          fail "Cannot evaluate existence of cache folder" )
   | `Unknown ->
-      Deferred.Result.fail
-        (failed_to_get_cache_folder_status ~logger
-           ~error_msg:"Cannot evaluate existence of cache folder" ~path )
+      fail "Cannot evaluate existence of cache folder"

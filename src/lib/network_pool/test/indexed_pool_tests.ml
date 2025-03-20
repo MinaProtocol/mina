@@ -494,7 +494,8 @@ let commit_to_pool ledger pool cmd expected_drops =
               (Mina_ledger.Ledger.get ledger loc) )
   in
   let lower =
-    List.map ~f:Transaction_hash.User_command_with_valid_signature.hash
+    List.map
+      ~f:Transaction_hash.User_command_with_valid_signature.transaction_hash
   in
   [%test_eq: Transaction_hash.t list]
     (lower (Sequence.to_list dropped))
@@ -772,7 +773,8 @@ let apply_transactions txns accounts =
             in
             { a with nonce; balance } ) )
 
-let txn_hash = Transaction_hash.User_command_with_valid_signature.hash
+let txn_hash =
+  Transaction_hash.User_command_with_valid_signature.transaction_hash
 
 let application_invalidates_applied_transactions () =
   Quickcheck.test ~trials:1000

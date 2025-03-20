@@ -138,18 +138,11 @@ module Zero_one_or_two = struct
 end
 
 module Verifiable = struct
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t =
-        ( Signed_command.Stable.V2.t
-        , Zkapp_command.Verifiable.Stable.V1.t )
-        Poly.Stable.V2.t
-      [@@deriving sexp, compare, equal, hash, yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
+  type t =
+    ( Signed_command.Stable.Latest.t
+    , Zkapp_command.Verifiable.t )
+    Poly.Stable.Latest.t
+  [@@deriving sexp, compare, equal, hash, yojson, bin_io_unversioned]
 
   let fee_payer (t : t) =
     match t with
@@ -230,9 +223,9 @@ let fee : t -> Currency.Fee.t = function
 
 let has_insufficient_fee ~minimum_fee t = Currency.Fee.(fee t < minimum_fee)
 
-let is_disabled ~(compile_config : Mina_compile_config.t) = function
+let is_disabled = function
   | Zkapp_command _ ->
-      compile_config.zkapps_disabled
+      Node_config_unconfigurable_constants.zkapps_disabled
   | _ ->
       false
 
@@ -301,18 +294,8 @@ let valid_until (t : t) =
 module Valid = struct
   type t_ = t
 
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t =
-        ( Signed_command.With_valid_signature.Stable.V2.t
-        , Zkapp_command.Valid.Stable.V1.t )
-        Poly.Stable.V2.t
-      [@@deriving sexp, compare, equal, hash, yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
+  type t = (Signed_command.With_valid_signature.t, Zkapp_command.Valid.t) Poly.t
+  [@@deriving sexp, compare, equal, hash, yojson]
 
   module Gen = Gen_make (Signed_command.With_valid_signature)
 end
@@ -430,8 +413,7 @@ module Well_formedness_error = struct
         "Transaction type disabled"
 end
 
-let check_well_formedness ~(genesis_constants : Genesis_constants.t)
-    ~(compile_config : Mina_compile_config.t) t :
+let check_well_formedness ~(genesis_constants : Genesis_constants.t) t :
     (unit, Well_formedness_error.t list) result =
   let preds =
     let open Well_formedness_error in
@@ -440,7 +422,7 @@ let check_well_formedness ~(genesis_constants : Genesis_constants.t)
       , Insufficient_fee )
     ; (has_zero_vesting_period, Zero_vesting_period)
     ; (is_incompatible_version, Incompatible_version)
-    ; (is_disabled ~compile_config, Transaction_type_disabled)
+    ; (is_disabled, Transaction_type_disabled)
     ; (has_invalid_call_forest, Zkapp_invalid_call_forest)
     ]
   in

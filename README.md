@@ -29,7 +29,7 @@ The Mina implementation of the Rosetta API offers a more stable and useful inter
 - [Mina Protocol](https://docs.minaprotocol.com/) documentation
 - [Installing and using a third-party wallet](https://docs.minaprotocol.com/using-mina/install-a-wallet)
 - [Sending a Payment using Mina's CLI](https://docs.minaprotocol.com/node-operators/sending-a-payment)
-- [Become a Node Operator](https://minaprotocol.com/docs/getting-started/)
+- [Become a Node Operator](https://docs.minaprotocol.com/node-operators/block-producer-node/getting-started)
 
 ### Technical Papers
 

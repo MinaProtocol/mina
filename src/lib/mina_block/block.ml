@@ -4,6 +4,8 @@ open Mina_state
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       { header : Header.Stable.V2.t
@@ -40,23 +42,26 @@ module Stable = struct
   end
 end]
 
+type t = Stable.Latest.t =
+  { header : Header.t; body : Staged_ledger_diff.Body.t }
+
 type with_hash = t State_hash.With_state_hashes.t
 
-let to_yojson t =
+let to_logging_yojson header : Yojson.Safe.t =
   `Assoc
     [ ( "protocol_state"
-      , Protocol_state.value_to_yojson (Header.protocol_state t.header) )
+      , Protocol_state.value_to_yojson (Header.protocol_state header) )
     ; ("protocol_state_proof", `String "<opaque>")
     ; ("staged_ledger_diff", `String "<opaque>")
     ; ("delta_transition_chain_proof", `String "<opaque>")
     ; ( "current_protocol_version"
       , `String
-          (Protocol_version.to_string
-             (Header.current_protocol_version t.header) ) )
+          (Protocol_version.to_string (Header.current_protocol_version header))
+      )
     ; ( "proposed_protocol_version"
       , `String
           (Option.value_map
-             (Header.proposed_protocol_version_opt t.header)
+             (Header.proposed_protocol_version_opt header)
              ~default:"<None>" ~f:Protocol_version.to_string ) )
     ]
 

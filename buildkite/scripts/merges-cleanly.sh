@@ -17,10 +17,8 @@ then
     git config --global http.sslCAInfo /etc/ssl/certs/ca-bundle.crt
 fi
 
-# Fetch a fresh copy of the repo
-git fetch origin
-
-source buildkite/scripts/handle-fork.sh
+# Fetch a fresh copy of the target branch
+source buildkite/scripts/refresh_code.sh
 
 git config --global user.email "hello@ci.com"
 git config --global user.name "It's me, CI"

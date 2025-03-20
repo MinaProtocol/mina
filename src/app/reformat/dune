@@ -1,7 +1,14 @@
 (executable
  (name reformat)
  (public_name reformat)
- (libraries core async async_kernel async_unix core_kernel sexplib0 async.async_command)
+ (libraries
+  core
+  async
+  async_kernel
+  async_unix
+  core_kernel
+  sexplib0
+  async.async_command)
  (preprocess
   (pps ppx_jane))
  ; the -w list here should be the same as in src/dune

@@ -14,6 +14,18 @@ module Test_inputs = struct
 
   module Ledger_proof = struct
     type t = Fee.t [@@deriving hash, compare, sexp]
+
+    module Stable = struct
+      module Latest = struct
+        type nonrec t = t
+      end
+    end
+
+    module Cached = struct
+      type nonrec t = t
+
+      let read_proof_from_disk = Fn.id
+    end
   end
 
   module Transaction_snark_work = struct

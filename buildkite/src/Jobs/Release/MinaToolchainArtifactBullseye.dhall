@@ -1,10 +1,12 @@
-let S = ../../Lib/SelectFiles.dhall
-
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let Artifacts = ../../Constants/Artifacts.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
+
+let S = ../../Lib/SelectFiles.dhall
 
 let DockerImage = ../../Command/DockerImage.dhall
 
@@ -27,7 +29,7 @@ in  Pipeline.build
       , steps =
         [ let toolchainBullseyeSpec =
                 DockerImage.ReleaseSpec::{
-                , service = "mina-toolchain"
+                , service = Artifacts.Type.Toolchain
                 , deb_codename = "bullseye"
                 , no_cache = True
                 , step_key = "toolchain-bullseye-docker-image"

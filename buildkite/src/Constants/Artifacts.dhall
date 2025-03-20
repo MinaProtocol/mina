@@ -18,6 +18,7 @@ let Artifact
       | Rosetta
       | ZkappTestTransaction
       | FunctionalTestSuite
+      | Toolchain
       >
 
 let AllButTests =
@@ -28,12 +29,13 @@ let AllButTests =
       , Artifact.TestExecutive
       , Artifact.Rosetta
       , Artifact.ZkappTestTransaction
+      , Artifact.Toolchain
       ]
 
 let Main =
       [ Artifact.Daemon, Artifact.LogProc, Artifact.Archive, Artifact.Rosetta ]
 
-let All = AllButTests # [ Artifact.FunctionalTestSuite ]
+let All = AllButTests # [ Artifact.FunctionalTestSuite, Artifact.Toolchain ]
 
 let capitalName =
           \(artifact : Artifact)
@@ -46,6 +48,7 @@ let capitalName =
             , Rosetta = "Rosetta"
             , ZkappTestTransaction = "ZkappTestTransaction"
             , FunctionalTestSuite = "FunctionalTestSuite"
+            , Toolchain = "Toolchain"
             }
             artifact
 
@@ -60,6 +63,7 @@ let lowerName =
             , Rosetta = "rosetta"
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
+            , Toolchain = "toolchain"
             }
             artifact
 
@@ -74,6 +78,7 @@ let dockerName =
             , Rosetta = "mina-rosetta"
             , ZkappTestTransaction = "mina-zkapp-test-transaction"
             , FunctionalTestSuite = "mina-test-suite"
+            , Toolchain = "mina-toolchain"
             }
             artifact
 
@@ -89,6 +94,7 @@ let toDebianName =
             , Rosetta = "rosetta_${Network.lowerName network}"
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
+            , Toolchain = ""
             }
             artifact
 
@@ -121,6 +127,7 @@ let toDebianNames =
                                 networks
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]
+                          , Toolchain = [] : List Text
                           }
                           a
                   )
@@ -165,6 +172,7 @@ let dockerTag =
                     "${version_and_codename}-${Network.lowerName network}"
                 , ZkappTestTransaction = "${version_and_codename}"
                 , FunctionalTestSuite = "${version_and_codename}"
+                , Toolchain = "${version_and_codename}"
                 }
                 artifact
 

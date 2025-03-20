@@ -14,7 +14,7 @@ val create :
   -> logger:Logger.t
   -> time_controller:Block_time.Controller.t
   -> db:Database.t
-  -> persistent_root_instance:Persistent_root.Instance.t
+  -> dequeue_snarked_ledger:(unit -> unit)
   -> t
 
 val notify : t -> diffs:Diff.Lite.E.t list -> unit

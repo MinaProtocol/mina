@@ -3,5 +3,7 @@
  (public_name ppx_annot)
  (kind ppx_deriver)
  (libraries ppxlib core_kernel base compiler-libs)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppxlib.metaquot)))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppxlib.metaquot)))

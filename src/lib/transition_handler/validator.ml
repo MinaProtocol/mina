@@ -22,8 +22,6 @@ let validate_header_is_relevant ~context:(module Context : CONTEXT) ~frontier
   let module Context = struct
     include Context
 
-    let compile_config = precomputed_values.compile_config
-
     let logger =
       Logger.extend logger
         [ ("selection_context", `String "Transition_handler.Validator") ]
@@ -101,9 +99,7 @@ let validate_transition_is_relevant ~context:(module Context : CONTEXT)
           Body.staged_ledger_diff @@ body transition_data
         in
         Result.ok_if_true
-          ( Staged_ledger_diff.compare Staged_ledger_diff.empty_diff
-              staged_ledger_diff
-          = 0 )
+          (Staged_ledger_diff.is_empty staged_ledger_diff)
           ~error:`Non_empty_staged_ledger_diff_after_stop_slot
     | None | Some _ ->
         Result.(Ok ())

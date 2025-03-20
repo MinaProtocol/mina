@@ -26,18 +26,14 @@ module Poly = struct
 end
 
 module Valid = struct
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t = User_command.Valid.Stable.V2.t Poly.Stable.V2.t
-      [@@deriving sexp, compare, equal, hash, yojson]
+  module T = struct
+    type t = User_command.Valid.t Poly.t
+    [@@deriving sexp, compare, equal, hash, yojson]
+  end
 
-      let to_latest = Fn.id
-    end
-  end]
-
-  include Hashable.Make (Stable.Latest)
-  include Comparable.Make (Stable.Latest)
+  include T
+  include Hashable.Make (T)
+  include Comparable.Make (T)
 end
 
 [%%versioned
@@ -144,10 +140,10 @@ let valid_size ~genesis_constants (t : t) =
   | Fee_transfer _ | Coinbase _ ->
       Ok ()
 
-let check_well_formedness ~genesis_constants ~compile_config (t : t) =
+let check_well_formedness ~genesis_constants (t : t) =
   match t with
   | Command cmd ->
-      User_command.check_well_formedness ~genesis_constants ~compile_config cmd
+      User_command.check_well_formedness ~genesis_constants cmd
   | Fee_transfer _ | Coinbase _ ->
       Ok ()
 

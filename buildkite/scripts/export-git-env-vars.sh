@@ -1,9 +1,5 @@
 #!/bin/bash
 
-echo "Exporting Variables: "
-
-export MINA_REPO="https://github.com/MinaProtocol/mina.git"
-
 function find_most_recent_numeric_tag() {
     # We use the --prune flag because we've had problems with buildkite agents getting conflicting results here
     git fetch --tags --prune --prune-tags --force
@@ -31,29 +27,9 @@ else
    export GITBRANCH=$(git name-rev --name-only $GITHASH | sed "s/remotes\/origin\///g" | sed 's!/!-!g; s!_!-!g; s!#!-!g' )
 fi
 
-
-
 export RELEASE=unstable
-
-if [ "${BUILDKITE_REPO}" != "${MINA_REPO}" ]; then 
-  # Abort if `BUILDKITE_REPO` doesn't have the expected format
-  echo ${BUILDKITE_REPO} | grep -P '^.*github.com[:\/](.*)\.git$' > /dev/null || \
-      (echo "BUILDKITE_REPO does not have the expected format" && false)
-
-  # We don't want to allow some operations on fork repository which should be done on main repo only. 
-  # Publish to docker hub or publish to unstable debian channel should be exclusive to main repo as it can override 
-  # packages from main repo (by using the same commit and the same branch from forked repository)
-
-  # We don't want to use tags (as this can replace our dockers/debian packages). Instead we are using repo name
-  # For example: for given repo 'https://github.com/dkijania/mina.git' we convert it to 'dkijania_mina' 
-  export GITTAG=1.0.0$(echo ${BUILDKITE_REPO} | sed -e 's/^.*github.com[:\/]\(.*\)\.git$/\1/' -e 's/\//-/')
-  export THIS_COMMIT_TAG=""
-
-else
-  # GITTAG is the closest tagged commit to this commit, while THIS_COMMIT_TAG only has a value when the current commit is tagged
-  export GITTAG=$(find_most_recent_numeric_tag HEAD)
-fi
-
+# GITTAG is the closest tagged commit to this commit, while THIS_COMMIT_TAG only has a value when the current commit is tagged
+export GITTAG=$(find_most_recent_numeric_tag HEAD)
 
 export MINA_DEB_VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
 export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g')"

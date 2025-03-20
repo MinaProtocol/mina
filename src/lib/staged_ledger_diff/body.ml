@@ -8,22 +8,18 @@ end
 module Make_str (A : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = A.V1.t = { staged_ledger_diff : Diff.Stable.V2.t }
-      [@@deriving equal, compare, sexp, fields]
+      [@@deriving equal, fields, sexp]
 
       let to_latest = Fn.id
-
-      let to_yojson _ = `String "<opaque>"
 
       module Creatable = struct
         let id = "block_body"
 
         type nonrec t = t
-
-        let sexp_of_t = sexp_of_t
-
-        let t_of_sexp = t_of_sexp
 
         type 'a creator = Diff.Stable.Latest.t -> 'a
 
@@ -38,21 +34,12 @@ module Make_str (A : Wire_types.Concrete) = struct
             Allocation_functor.Intf.Output.Basic_intf
               with type t := t
                and type 'a creator := 'a Creatable.creator )
-
-      include (
-        Allocation_functor.Make.Sexp
-          (Creatable) :
-            Allocation_functor.Intf.Output.Sexp_intf
-              with type t := t
-               and type 'a creator := 'a Creatable.creator )
     end
   end]
 
   type t = Stable.Latest.t
 
-  [%%define_locally
-  Stable.Latest.
-    (create, to_yojson, sexp_of_t, t_of_sexp, equal, compare, staged_ledger_diff)]
+  [%%define_locally Stable.Latest.(create, staged_ledger_diff)]
 
   let to_binio_bigstring b =
     let sz = Stable.V1.bin_size_t b in

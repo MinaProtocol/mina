@@ -5,7 +5,7 @@ set -x
 
 NETWORK_DATA_FOLDER=src/test/archive/sample_db
 PATCH_ARCHIVE_TEST_APP=${PATCH_ARCHIVE_TEST_APP:-_build/default/src/test/archive/patch_archive_test/patch_archive_test.exe}
-PG_PORT=${PG_PORT:-5432}
+PG_PORT=${PG_PORT:-5433}
 POSTGRES_USER=${POSTGRES_USER:-postgres}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
 

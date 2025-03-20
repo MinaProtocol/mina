@@ -41,11 +41,6 @@
   mina_transaction
   with_hash)
  (preprocess
-  (pps
-   ppx_base
-   ppx_let
-   ppx_custom_printf
-   ppx_assert))
+  (pps ppx_base ppx_let ppx_custom_printf ppx_assert))
  (instrumentation
   (backend bisect_ppx)))
-

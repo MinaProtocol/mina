@@ -13,6 +13,10 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val ledger_sync_config : Syncable_ledger.daemon_config
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 module type Transition_handler_validator_intf = sig
@@ -57,7 +61,8 @@ module type Breadcrumb_builder_intf = sig
   type transition_frontier_breadcrumb
 
   val build_subtrees_of_breadcrumbs :
-       logger:Logger.t
+       proof_cache_db:Proof_cache_tag.cache_db
+    -> logger:Logger.t
     -> verifier:Verifier.t
     -> trust_system:Trust_system.t
     -> frontier:transition_frontier
@@ -226,7 +231,8 @@ module type Sync_handler_intf = sig
     -> Mina_ledger.Sync_ledger.Answer.t Or_error.t Deferred.t
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
-       frontier:transition_frontier
+       logger:Logger.t
+    -> frontier:transition_frontier
     -> State_hash.t
     -> ( Staged_ledger.Scan_state.t
        * Ledger_hash.t
@@ -284,34 +290,6 @@ module type Bootstrap_controller_intf = sig
     -> ( transition_frontier
        * Mina_block.initial_valid_block Envelope.Incoming.t list )
        Deferred.t
-end
-
-module type Transition_frontier_controller_intf = sig
-  type transition_frontier
-
-  type breadcrumb
-
-  type network
-
-  val run :
-       logger:Logger.t
-    -> trust_system:Trust_system.t
-    -> verifier:Verifier.t
-    -> network:network
-    -> time_controller:Block_time.Controller.t
-    -> collected_transitions:
-         Mina_block.initial_valid_block Envelope.Incoming.t list
-    -> frontier:transition_frontier
-    -> network_transition_reader:
-         ( [ `Block of Mina_block.t Envelope.Incoming.t
-           | `Header of Mina_block.Header.t Envelope.Incoming.t ]
-         * [ `Time_received of Block_time.t ]
-         * [ `Valid_cb of Mina_net2.Validation_callback.t ] )
-         Strict_pipe.Reader.t
-    -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
-    -> clear_reader:[ `Clear ] Strict_pipe.Reader.t
-    -> unit
-    -> Mina_block.Validated.t Strict_pipe.Reader.t
 end
 
 module type Transition_router_intf = sig
