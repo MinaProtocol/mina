@@ -202,8 +202,11 @@ module Worker_state = struct
                List.map tagged_commands ~f:(fun (id, c) ->
                    let result =
                      match Common.check c with
-                     | `Valid _ | `Valid_assuming _ ->
+                     | `Valid _ ->
                          `Valid []
+                     | `Valid_assuming (_, xs) ->
+                         let keys = List.map xs ~f:Tuple3.get1 in
+                         `Valid keys
                      | `Invalid_keys keys ->
                          `Invalid_keys keys
                      | `Invalid_signature keys ->
