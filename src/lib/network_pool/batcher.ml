@@ -261,7 +261,8 @@ module Transaction_pool = struct
      verify.
   *)
   type partial_item =
-    [ `Valid of User_command.Valid.t
+    [ `Valid of
+      Mina_transaction.Transaction_hash.User_command_with_verification_keys.t
     | `Valid_assuming of
       User_command.Verifiable.t
       * ( Pickles.Side_loaded.Verification_key.t
@@ -272,7 +273,13 @@ module Transaction_pool = struct
 
   type partial = partial_item list [@@deriving sexp]
 
-  type t = (diff, partial, User_command.Valid.t list) batcher [@@deriving sexp]
+  type t =
+    ( diff
+    , partial
+    , Mina_transaction.Transaction_hash.User_command_with_verification_keys.t
+      list )
+    batcher
+  [@@deriving sexp]
 
   type input = [ `Init of diff | `Partially_validated of partial ]
 

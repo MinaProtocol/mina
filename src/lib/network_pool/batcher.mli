@@ -47,6 +47,9 @@ module Transaction_pool : sig
   val verify :
        t
     -> User_command.Verifiable.t list Envelope.Incoming.t
-    -> (User_command.Valid.t list, Verifier.invalid) Result.t
+    -> ( Mina_transaction.Transaction_hash.User_command_with_verification_keys.t
+         list
+       , Verifier.invalid )
+       Result.t
        Deferred.Or_error.t
 end

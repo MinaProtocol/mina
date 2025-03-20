@@ -1225,10 +1225,13 @@ struct
                 return
                   { diff with
                     data =
-                      List.map commands
-                        ~f:
+                      List.map commands ~f:(fun ((cmd, _) as cmd_with_keys) ->
+                          let hash =
+                            Transaction_hash.hash_command
+                              (User_command.forget_check cmd)
+                          in
                           Transaction_hash.User_command_with_valid_signature
-                          .create
+                          .make cmd_with_keys hash )
                   } )
 
       let register_locally_generated t txn =
