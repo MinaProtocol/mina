@@ -791,7 +791,6 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
        -> transition:Mina_block.almost_valid_block
        -> sender:Envelope.Sender.t option
        -> transition_receipt_time:Time.t option
-       -> ?transaction_pool_proxy:Breadcrumb.transaction_pool_proxy
        -> unit
        -> ( Breadcrumb.t
           , [> `Invalid_staged_ledger_diff of Error.t
@@ -1412,7 +1411,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         ~build_func:
           (Transition_frontier.Breadcrumb.build
              ~proof_cache_db:Context.proof_cache_db
-             ~get_completed_work:(Fn.const None) ) )
+             ~get_completed_work:(Fn.const None)
+             ~transaction_pool_proxy:Staged_ledger.dummy_transaction_pool_proxy ) )
 
 (* Unit tests *)
 

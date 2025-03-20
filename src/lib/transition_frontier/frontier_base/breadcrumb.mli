@@ -27,13 +27,6 @@ val create :
   -> transition_receipt_time:Time.t option
   -> t
 
-type transaction_pool_proxy =
-  { find_by_hash :
-         Mina_transaction.Transaction_hash.t
-      -> Mina_transaction.Transaction_hash.User_command_with_valid_signature.t
-         option
-  }
-
 val build :
      ?skip_staged_ledger_verification:[ `All | `Proofs ]
   -> proof_cache_db:Proof_cache_tag.cache_db
@@ -48,7 +41,7 @@ val build :
         -> Transaction_snark_work.Checked.t option )
   -> sender:Envelope.Sender.t option
   -> transition_receipt_time:Time.t option
-  -> ?transaction_pool_proxy:transaction_pool_proxy
+  -> ?transaction_pool_proxy:Staged_ledger.transaction_pool_proxy
   -> unit
   -> ( t
      , [> `Invalid_staged_ledger_diff of Error.t

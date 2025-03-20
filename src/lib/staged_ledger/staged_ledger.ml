@@ -1215,7 +1215,91 @@ module T = struct
       =
     (List.map ~f:(With_status.map ~f:Transaction.forget) a, b, c, d)
 
-  let check_commands ledger ~verifier (cs : User_command.t With_status.t list) =
+  type transaction_pool_proxy =
+    { find_by_hash :
+           Mina_transaction.Transaction_hash.t
+        -> Mina_transaction.Transaction_hash.User_command_with_valid_signature.t
+           option
+    }
+
+  exception ExtractZkappVerificationKeysMissing
+
+  let extract_zkapp_veirfication_keys
+      ({ account_updates; _ } : Zkapp_command.Verifiable.t) : _ Result.t =
+    let f
+        (((p, (vk_opt, _stmt)), _at_account_update) :
+          (Mina_base.Account_update.t * (_ With_hash.t option * _)) * _ ) =
+      match (vk_opt, p.authorization) with
+      | None, Proof _ ->
+          raise ExtractZkappVerificationKeysMissing
+      | Some vk, Proof _ ->
+          Some vk.data
+      | _ ->
+          None
+    in
+    try
+      Ok
+        ( account_updates |> Zkapp_statement.zkapp_statements_of_forest'
+        |> Zkapp_command.Call_forest.With_hashes_and_data
+           .to_zkapp_command_with_hashes_list |> List.filter_map ~f )
+    with ExtractZkappVerificationKeysMissing ->
+      Error `Missing_verification_key
+
+  (* NOTE:
+     If txns are already in the txn pool, we may check if the cmds are already valid
+  *)
+  let precheck_verify_commands (transaction_pool_proxy : transaction_pool_proxy)
+      (cmd_with_status : User_command.Verifiable.t With_status.t) =
+    let coerce_cmd_as_verified cmd =
+      let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd_coerced)
+          =
+        cmd |> User_command.of_verifiable |> User_command.to_valid_unsafe
+      in
+      cmd_coerced
+    in
+    (* TODO:
+       According to project https://www.notion.so/o1labs/Verification-of-zkapp-proofs-prior-to-block-creation-196e79b1f910807aa8aef723c135375a
+       we consider a command in pool verified if either of the following holds:
+         - It's failed
+         - It's a signed command
+         - It's a zkapp command, passing more checks, demonstrate as below
+    *)
+    match cmd_with_status with
+    | { status = Failed _; data = verifiable_cmd }
+    | { data = Signed_command _ as verifiable_cmd; _ } ->
+        `Valid (coerce_cmd_as_verified verifiable_cmd, [])
+    | { data = Zkapp_command verifiable_zkapp_cmd as verifiable_cmd; _ } -> (
+        let cmd_hash =
+          verifiable_cmd |> User_command.of_verifiable
+          |> Transaction_hash.hash_command
+        in
+        match
+          ( extract_zkapp_veirfication_keys verifiable_zkapp_cmd
+          , transaction_pool_proxy.find_by_hash cmd_hash )
+        with
+        | Ok keys_assumed, Some cmd_with_sig ->
+            let _, keys_in_pool =
+              cmd_with_sig
+              |> Transaction_hash.User_command_with_valid_signature.data
+            in
+            if
+              List.equal Side_loaded_verification_key.equal keys_assumed
+                keys_in_pool
+            then `Valid (coerce_cmd_as_verified verifiable_cmd, keys_assumed)
+            else `Unexpected_verification_key keys_assumed
+        | Error `Missing_verification_key, Some cmd_with_sig ->
+            let _, keys_in_pool =
+              cmd_with_sig
+              |> Transaction_hash.User_command_with_valid_signature.data
+            in
+            `Missing_verification_key keys_in_pool
+        | Error `Missing_verification_key, None ->
+            `Missing_verification_key []
+        | _ ->
+            `No_fast_forward )
+
+  let check_commands ledger ~verifier (cs : User_command.t With_status.t list)
+      ~(transaction_pool_proxy : transaction_pool_proxy) =
     let open Deferred.Or_error.Let_syntax in
     let%bind cs =
       User_command.Applied_sequence.to_all_verifiable cs
@@ -1226,9 +1310,30 @@ module T = struct
             ~get_batch:(Ledger.get_batch ledger) )
       |> Deferred.return
     in
-    let%map xs = Verifier.verify_commands verifier cs in
+    (* PERF:
+       We filter on the txns to verifier and clear out already verified cases,
+       hence we waste less time interacting with proof layers.
+       More info check https://www.notion.so/o1labs/Verification-of-zkapp-proofs-prior-to-block-creation-196e79b1f910807aa8aef723c135375a *)
+    let already_verified_result, to_verify =
+      cs
+      |> List.fold_right ~init:([], [])
+           ~f:(fun cmd_with_status (already_verified_result, to_verify) ->
+             match
+               precheck_verify_commands transaction_pool_proxy cmd_with_status
+             with
+             | `No_fast_forward ->
+                 (already_verified_result, cmd_with_status :: to_verify)
+             | ( `Valid _
+               | `Unexpected_verification_key _
+               | `Missing_verification_key _ ) as result ->
+                 (result :: already_verified_result, to_verify) )
+    in
+    (* WARN: although we tried to preserve the order of the commands,
+       here the order it still changed due to we have to batch to do vreify_commands call
+    *)
+    let%map xs = Verifier.verify_commands verifier to_verify in
     Result.all
-      (List.map xs ~f:(function
+      (List.map (already_verified_result @ xs) ~f:(function
         | `Valid (cmd, _) ->
             Ok cmd
         | ( `Invalid_keys _
@@ -1246,10 +1351,14 @@ module T = struct
               (Verifier.Failure.Verification_failed
                  (Error.of_string "batch verification failed") ) ) )
 
+  let dummy_transaction_pool_proxy : transaction_pool_proxy =
+    { find_by_hash = const None }
+
   let apply ?skip_verification ~proof_cache_db ~constraint_constants
       ~global_slot t ~get_completed_work (witness : Staged_ledger_diff.t)
       ~logger ~verifier ~current_state_view ~state_and_body_hash
-      ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap =
+      ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap
+      ?(transaction_pool_proxy = dummy_transaction_pool_proxy) =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () =
@@ -1267,7 +1376,7 @@ module T = struct
     let%bind prediff =
       Pre_diff_info.get witness ~constraint_constants ~coinbase_receiver
         ~supercharge_coinbase
-        ~check:(check_commands t.ledger ~verifier)
+        ~check:(check_commands t.ledger ~verifier ~transaction_pool_proxy)
       |> Deferred.map
            ~f:
              (Result.map_error ~f:(fun error ->

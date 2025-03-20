@@ -193,6 +193,15 @@ val copy : t -> t
 
 val hash : t -> Staged_ledger_hash.t
 
+type transaction_pool_proxy =
+  { find_by_hash :
+         Mina_transaction.Transaction_hash.t
+      -> Mina_transaction.Transaction_hash.User_command_with_valid_signature.t
+         option
+  }
+
+val dummy_transaction_pool_proxy : transaction_pool_proxy
+
 val apply :
      ?skip_verification:[ `Proofs | `All ]
   -> proof_cache_db:Proof_cache_tag.cache_db
@@ -210,6 +219,7 @@ val apply :
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
   -> zkapp_cmd_limit_hardcap:int
+  -> ?transaction_pool_proxy:transaction_pool_proxy
   -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
        * [ `Ledger_proof of
            ( Ledger_proof.Cached.t
