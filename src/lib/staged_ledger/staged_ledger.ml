@@ -1251,13 +1251,14 @@ module T = struct
   let precheck_verify_commands (transaction_pool_proxy : transaction_pool_proxy)
       (cmd_with_status : User_command.Verifiable.t With_status.t) =
     let coerce_cmd_as_verified cmd =
+      (* NOTE: See below notes for explanation*)
       let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd_coerced)
           =
         cmd |> User_command.of_verifiable |> User_command.to_valid_unsafe
       in
       cmd_coerced
     in
-    (* TODO:
+    (* NOTE:
        According to project https://www.notion.so/o1labs/Verification-of-zkapp-proofs-prior-to-block-creation-196e79b1f910807aa8aef723c135375a
        we consider a command in pool verified if either of the following holds:
          - It's failed
