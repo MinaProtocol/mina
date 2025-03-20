@@ -213,6 +213,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ?limited_graphql_port ?itn_graphql_port ?auth_keys
     ?(open_limited_graphql_port = false) ?(insecure_rest_server = false) mina =
   let compile_config = (Mina_lib.config mina).compile_config in
+  let itn_features = (Mina_lib.config mina).itn_features in
   let client_trustlist =
     ref
       (Unix.Cidr.Set.of_list
@@ -552,7 +553,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             ~schema:Mina_graphql.schema_limited
             ~server_description:"GraphQL server with limited queries"
             ~require_auth:false rest_server_port ) ) ;
-  if compile_config.itn_features then
+  if itn_features then
     (* Third graphql server with ITN-particular queries exposed *)
     Option.iter itn_graphql_port ~f:(fun rest_server_port ->
         O1trace.background_thread "serve_itn_graphql" (fun () ->
