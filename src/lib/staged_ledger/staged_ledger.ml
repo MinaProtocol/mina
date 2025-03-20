@@ -1225,6 +1225,87 @@ module T = struct
   let dummy_transaction_pool_proxy : transaction_pool_proxy =
     { find_by_hash = const None }
 
+  let extract_zkapp_veirfication_keys
+      ({ account_updates; _ } : Zkapp_command.Verifiable.t) : _ Result.t =
+    account_updates |> Zkapp_statement.zkapp_statements_of_forest'
+    |> Zkapp_command.Call_forest.With_hashes_and_data
+       .to_zkapp_command_with_hashes_list
+    |> List.fold_result ~init:[]
+         ~f:(fun
+              acc
+              (((p, (vk_opt, _stmt)), _at_account_update) :
+                (Mina_base.Account_update.t * (_ With_hash.t option * _)) * _ )
+            ->
+           match (vk_opt, p.authorization) with
+           | None, Proof _ ->
+               Error `Missing_verification_key
+           | Some vk, Proof _ ->
+               Ok (vk.data :: acc)
+           | _ ->
+               Ok acc )
+    (* NOTE:
+       we're pushing keys in the front, so we need to revert it on finializing
+    *)
+    |> Result.map ~f:List.rev
+
+  (* NOTE:
+     If txns are already in the txn pool, we may check if the cmds are already valid
+  *)
+  let precheck_verify_commands (transaction_pool_proxy : transaction_pool_proxy)
+      (cmd_with_status : User_command.Verifiable.t With_status.t) =
+    let coerce_cmd_as_verified cmd =
+      (* NOTE: See below notes for explanation*)
+      let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd_coerced)
+          =
+        cmd |> User_command.of_verifiable |> User_command.to_valid_unsafe
+      in
+      cmd_coerced
+    in
+    (* NOTE:
+       According to project https://www.notion.so/o1labs/Verification-of-zkapp-proofs-prior-to-block-creation-196e79b1f910807aa8aef723c135375a
+       we consider a command in pool verified if either of the following holds:
+         - It's failed
+         - It's a signed command
+         - It's a zkapp command, passing more checks, demonstrate as below
+    *)
+    match cmd_with_status with
+    | { status = Failed _; data = verifiable_cmd }
+    | { data = Signed_command _ as verifiable_cmd; _ } ->
+        (* BUG: this case might not be what we want, need check *)
+        `Valid (coerce_cmd_as_verified verifiable_cmd, [])
+    | { data = Zkapp_command verifiable_zkapp_cmd as verifiable_cmd; _ } -> (
+        let cmd_hash =
+          verifiable_cmd |> User_command.of_verifiable
+          |> Transaction_hash.hash_command
+        in
+        match
+          ( extract_zkapp_veirfication_keys verifiable_zkapp_cmd
+          , transaction_pool_proxy.find_by_hash cmd_hash )
+        with
+        | Ok keys_assumed, Some cmd_with_sig ->
+            let _, keys_in_pool =
+              cmd_with_sig
+              |> Transaction_hash.User_command_with_valid_signature.data
+            in
+            if
+              List.equal Side_loaded_verification_key.equal keys_assumed
+                keys_in_pool
+            then `Valid (coerce_cmd_as_verified verifiable_cmd, keys_assumed)
+            else
+              (* WARN: we need to figure out what keys should be returned for this case *)
+              `Unexpected_verification_key []
+        | Error `Missing_verification_key, Some cmd_with_sig ->
+            let _, _keys_in_pool =
+              cmd_with_sig
+              |> Transaction_hash.User_command_with_valid_signature.data
+            in
+            (* WARN: we need to figure out what keys should be returned for this case *)
+            `Missing_verification_key []
+        | Error `Missing_verification_key, None ->
+            `Missing_verification_key []
+        | _ ->
+            `No_fast_forward )
+
   let check_commands ledger ~verifier
       ~(transaction_pool_proxy : transaction_pool_proxy)
       (cs : User_command.t With_status.t list) =
@@ -1238,11 +1319,47 @@ module T = struct
             ~get_batch:(Ledger.get_batch ledger) )
       |> Deferred.return
     in
-    let%map xs = Verifier.verify_commands verifier cs in
+    (* PERF:
+         We filter on the txns to verifier and clear out already verified cases,
+         hence we waste less time interacting with proof layers.
+         More info check https://www.notion.so/o1labs/Verification-of-zkapp-proofs-prior-to-block-creation-196e79b1f910807aa8aef723c135375a *)
+    let last_index = List.length cs - 1 in
+    let _, already_verified_result_with_indices, to_verify_with_indices =
+      cs
+      |> List.fold_right ~init:(last_index, [], [])
+           ~f:(fun cmd_with_status (index, already_verified_result, to_verify)
+              ->
+             match
+               precheck_verify_commands transaction_pool_proxy cmd_with_status
+             with
+             | `No_fast_forward ->
+                 ( index - 1
+                 , already_verified_result
+                 , (index, cmd_with_status) :: to_verify )
+             | ( `Valid _
+               | `Unexpected_verification_key _
+               | `Missing_verification_key _ ) as result ->
+                 ( index - 1
+                 , (index, result) :: already_verified_result
+                 , to_verify ) )
+    in
+    let to_verify_indices, to_verify = List.unzip to_verify_with_indices in
+    let%map verified_results = Verifier.verify_commands verifier to_verify in
+    let verified_result_with_indices =
+      (* NOTE: the 2 lists are unziped in the beginning so should be fine if we rezip them *)
+      List.zip_exn to_verify_indices verified_results
+    in
+    let results_merged =
+      List.merge already_verified_result_with_indices
+        verified_result_with_indices
+        ~compare:(fun (index_left, _) (index_right, _) ->
+          compare index_left index_right )
+      |> List.map ~f:snd
+    in
     Result.all
-      (List.map xs ~f:(function
-        | `Valid x ->
-            Ok x
+      (List.map results_merged ~f:(function
+        | `Valid (cmd, _) ->
+            Ok cmd
         | ( `Invalid_keys _
           | `Invalid_signature _
           | `Invalid_proof _
