@@ -161,6 +161,11 @@ let hash_of_transaction_id (transaction_id : string) : t Or_error.t =
           Or_error.error_string
             "Could not decode transaction id as either Base58Check or Base64" )
 
+module User_command_with_verification_keys = struct
+  type t = User_command.Valid.t * Side_loaded_verification_key.t list
+  [@@deriving hash, sexp, compare, to_yojson]
+end
+
 module User_command_with_valid_signature = struct
   type hash = T.t [@@deriving sexp, compare, hash]
 
@@ -168,20 +173,22 @@ module User_command_with_valid_signature = struct
 
   let hash_of_yojson = of_yojson
 
-  type t = (User_command.Valid.t, hash) With_hash.t
+  type t = (User_command_with_verification_keys.t, hash) With_hash.t
   [@@deriving hash, sexp, compare, to_yojson]
 
   let create (c : User_command.Valid.t) : t =
-    { data = c; hash = hash_command (User_command.forget_check c) }
+    { data = (c, []); hash = hash_command (User_command.forget_check c) }
 
   let data ({ data; _ } : t) = data
 
-  let command ({ data; _ } : t) = User_command.forget_check data
+  let command ({ data = cmd_valid, _; _ } : t) =
+    User_command.forget_check cmd_valid
 
+  (* NOTE: this function has its name conflicted so we have to rename it *)
   let transaction_hash ({ hash; _ } : t) = hash
 
-  let forget_check ({ data; hash } : t) =
-    { With_hash.data = User_command.forget_check data; hash }
+  let forget_check ({ data = cmd_valid, _; hash } : t) =
+    { With_hash.data = User_command.forget_check cmd_valid; hash }
 
   include Comparable.Make (struct
     type nonrec t = t
@@ -232,8 +239,10 @@ module User_command = struct
 
   let hash ({ hash; _ } : t) = hash
 
-  let of_checked ({ data; hash } : User_command_with_valid_signature.t) : t =
-    { With_hash.data = User_command.forget_check data; hash }
+  let of_checked
+      ({ data = cmd_valid, _; hash } : User_command_with_valid_signature.t) : t
+      =
+    { With_hash.data = User_command.forget_check cmd_valid; hash }
 
   include Comparable.Make (Stable.Latest)
 end

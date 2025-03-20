@@ -418,7 +418,9 @@ module Update = struct
           Transaction_hash.User_command_with_valid_signature.transaction_hash
             cmd
         in
-        ( match Transaction_hash.User_command_with_valid_signature.data cmd with
+        ( match
+            Transaction_hash.User_command_with_valid_signature.data cmd |> fst
+          with
         | Zkapp_command p ->
             let p = Zkapp_command.Valid.forget p in
             let updates, proof_updates =

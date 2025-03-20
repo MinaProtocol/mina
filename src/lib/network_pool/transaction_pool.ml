@@ -3421,7 +3421,7 @@ let%test_module _ =
               ~receiver_idx ~amount ()
     end
 
-    (** appends a and b to the end of c, taking an element of a or b at random, 
+    (** appends a and b to the end of c, taking an element of a or b at random,
        continuing until both a and b run out of elements
     *)
     let rec gen_merge (a : 'a list) (b : 'a list) (c : 'a list) =
@@ -3794,7 +3794,7 @@ let%test_module _ =
                        let data =
                          Transaction_hash.User_command_with_valid_signature.data
                            tx
-                         |> User_command.forget_check
+                         |> fst |> User_command.forget_check
                        in
                        let nonce =
                          data |> User_command.applicable_at_nonce

@@ -767,6 +767,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
           transaction_resource_pool
         |> Sequence.map
              ~f:Transaction_hash.User_command_with_valid_signature.data
+        |> Sequence.map ~f:fst
       in
       let%bind () = Interruptible.lift (Deferred.return ()) (Ivar.read ivar) in
       [%log internal] "Generate_next_state" ;
