@@ -1287,13 +1287,16 @@ module T = struct
               List.equal Side_loaded_verification_key.equal keys_assumed
                 keys_in_pool
             then `Valid (coerce_cmd_as_verified verifiable_cmd, keys_assumed)
-            else `Unexpected_verification_key keys_assumed
+            else
+              (* WARN: we need to figure out what keys should be returned for this case *)
+              `Unexpected_verification_key []
         | Error `Missing_verification_key, Some cmd_with_sig ->
-            let _, keys_in_pool =
+            let _, _keys_in_pool =
               cmd_with_sig
               |> Transaction_hash.User_command_with_valid_signature.data
             in
-            `Missing_verification_key keys_in_pool
+            (* WARN: we need to figure out what keys should be returned for this case *)
+            `Missing_verification_key []
         | Error `Missing_verification_key, None ->
             `Missing_verification_key []
         | _ ->
