@@ -1114,15 +1114,6 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
       let slot_chain_end =
         Runtime_config.slot_chain_end precomputed_values.runtime_config
       in
-      let produce =
-        produce ~genesis_breadcrumb
-          ~context:(module Context : CONTEXT)
-          ~prover ~verifier ~trust_system ~get_completed_work
-          ~transaction_resource_pool ~frontier_reader ~time_controller
-          ~transition_writer ~log_block_creation ~block_reward_threshold
-          ~block_produced_bvar ~slot_tx_end ~slot_chain_end ~net
-          ~zkapp_cmd_limit_hardcap
-      in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
       let iteration_wrapped (slot, i) =
         (* Begin checking for the ability to produce a block *)
@@ -1190,6 +1181,15 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     ~local_state:consensus_local_state
                    = None ) ; *)
             let next_vrf_check_now () = return (new_global_slot, i') in
+            let produce =
+              produce ~genesis_breadcrumb
+                ~context:(module Context : CONTEXT)
+                ~prover ~verifier ~trust_system ~get_completed_work
+                ~transaction_resource_pool ~frontier_reader ~time_controller
+                ~transition_writer ~log_block_creation ~block_reward_threshold
+                ~block_produced_bvar ~slot_tx_end ~slot_chain_end ~net
+                ~zkapp_cmd_limit_hardcap
+            in
             let produce_block_now data =
               produce data >>| const (new_global_slot, i')
             in
