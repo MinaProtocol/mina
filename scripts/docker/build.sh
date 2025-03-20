@@ -151,10 +151,6 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend-toolchain"
         DOCKER_CONTEXT="src/app/delegation_backend"
         ;;
-    itn-orchestrator)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-itn-orchestrator"
-        DOCKER_CONTEXT="src/app/itn_orchestrator"
-        ;;
     mina-test-suite)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-test-suite"
         DOCKER_CONTEXT="dockerfiles/"
