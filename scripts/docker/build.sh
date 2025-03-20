@@ -163,8 +163,10 @@ export_docker_tag
 
 BUILD_NETWORK="--network=host"
 
-# Prune old docker images (24 hours)
-docker system prune --all  --filter until=24h
+# Prune old docker images (24 hours) from the cache
+# This is a temporary solution to keep the cache from growing too large.
+# We will also need to evaluate the impact of this on the build process and adjust as necessary.
+docker system prune --all --force --filter until=24h
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
