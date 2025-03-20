@@ -1222,28 +1222,28 @@ module T = struct
            option
     }
 
-  exception ExtractZkappVerificationKeysMissing
-
   let extract_zkapp_veirfication_keys
       ({ account_updates; _ } : Zkapp_command.Verifiable.t) : _ Result.t =
-    let f
-        (((p, (vk_opt, _stmt)), _at_account_update) :
-          (Mina_base.Account_update.t * (_ With_hash.t option * _)) * _ ) =
-      match (vk_opt, p.authorization) with
-      | None, Proof _ ->
-          raise ExtractZkappVerificationKeysMissing
-      | Some vk, Proof _ ->
-          Some vk.data
-      | _ ->
-          None
-    in
-    try
-      Ok
-        ( account_updates |> Zkapp_statement.zkapp_statements_of_forest'
-        |> Zkapp_command.Call_forest.With_hashes_and_data
-           .to_zkapp_command_with_hashes_list |> List.filter_map ~f )
-    with ExtractZkappVerificationKeysMissing ->
-      Error `Missing_verification_key
+    account_updates |> Zkapp_statement.zkapp_statements_of_forest'
+    |> Zkapp_command.Call_forest.With_hashes_and_data
+       .to_zkapp_command_with_hashes_list
+    |> List.fold_result ~init:[]
+         ~f:(fun
+              acc
+              (((p, (vk_opt, _stmt)), _at_account_update) :
+                (Mina_base.Account_update.t * (_ With_hash.t option * _)) * _ )
+            ->
+           match (vk_opt, p.authorization) with
+           | None, Proof _ ->
+               Error `Missing_verification_key
+           | Some vk, Proof _ ->
+               Ok (vk.data :: acc)
+           | _ ->
+               Ok acc )
+    (* NOTE:
+       we're pushing keys in the front, so we need to revert it on finializing
+    *)
+    |> Result.map ~f:List.rev
 
   (* NOTE:
      If txns are already in the txn pool, we may check if the cmds are already valid
