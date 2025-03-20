@@ -1215,7 +1215,19 @@ module T = struct
       =
     (List.map ~f:(With_status.map ~f:Transaction.forget) a, b, c, d)
 
-  let check_commands ledger ~verifier (cs : User_command.t With_status.t list) =
+  type transaction_pool_proxy =
+    { find_by_hash :
+           Mina_transaction.Transaction_hash.t
+        -> Mina_transaction.Transaction_hash.User_command_with_valid_signature.t
+           option
+    }
+
+  let dummy_transaction_pool_proxy : transaction_pool_proxy =
+    { find_by_hash = const None }
+
+  let check_commands ledger ~verifier
+      ~(transaction_pool_proxy : transaction_pool_proxy)
+      (cs : User_command.t With_status.t list) =
     let open Deferred.Or_error.Let_syntax in
     let%bind cs =
       User_command.Applied_sequence.to_all_verifiable cs
@@ -1247,9 +1259,11 @@ module T = struct
                  (Error.of_string "batch verification failed") ) ) )
 
   let apply ?skip_verification ~proof_cache_db ~constraint_constants
-      ~global_slot t ~get_completed_work (witness : Staged_ledger_diff.t)
-      ~logger ~verifier ~current_state_view ~state_and_body_hash
-      ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap =
+      ~global_slot ~get_completed_work ~logger ~verifier ~current_state_view
+      ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
+      ~zkapp_cmd_limit_hardcap
+      ?(transaction_pool_proxy = dummy_transaction_pool_proxy) t
+      (witness : Staged_ledger_diff.t) =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () =
@@ -1267,7 +1281,7 @@ module T = struct
     let%bind prediff =
       Pre_diff_info.get witness ~constraint_constants ~coinbase_receiver
         ~supercharge_coinbase
-        ~check:(check_commands t.ledger ~verifier)
+        ~check:(check_commands t.ledger ~verifier ~transaction_pool_proxy)
       |> Deferred.map
            ~f:
              (Result.map_error ~f:(fun error ->
