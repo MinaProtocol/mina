@@ -1318,26 +1318,41 @@ module T = struct
        We filter on the txns to verifier and clear out already verified cases,
        hence we waste less time interacting with proof layers.
        More info check https://www.notion.so/o1labs/Verification-of-zkapp-proofs-prior-to-block-creation-196e79b1f910807aa8aef723c135375a *)
-    let already_verified_result, to_verify =
+    let last_index = List.length cs - 1 in
+    let _, already_verified_result_with_indices, to_verify_with_indices =
       cs
-      |> List.fold_right ~init:([], [])
-           ~f:(fun cmd_with_status (already_verified_result, to_verify) ->
+      |> List.fold_right ~init:(last_index, [], [])
+           ~f:(fun cmd_with_status (index, already_verified_result, to_verify)
+              ->
              match
                precheck_verify_commands transaction_pool_proxy cmd_with_status
              with
              | `No_fast_forward ->
-                 (already_verified_result, cmd_with_status :: to_verify)
+                 ( index - 1
+                 , already_verified_result
+                 , (index, cmd_with_status) :: to_verify )
              | ( `Valid _
                | `Unexpected_verification_key _
                | `Missing_verification_key _ ) as result ->
-                 (result :: already_verified_result, to_verify) )
+                 ( index - 1
+                 , (index, result) :: already_verified_result
+                 , to_verify ) )
     in
-    (* WARN: although we tried to preserve the order of the commands,
-       here the order it still changed due to we have to batch to do vreify_commands call
-    *)
-    let%map xs = Verifier.verify_commands verifier to_verify in
+    let to_verify_indices, to_verify = List.unzip to_verify_with_indices in
+    let%map verified_results = Verifier.verify_commands verifier to_verify in
+    let verified_result_with_indices =
+      (* NOTE: the 2 lists are unziped in the beginning so should be fine if we rezip them *)
+      List.zip_exn to_verify_indices verified_results
+    in
+    let results_merged =
+      List.merge already_verified_result_with_indices
+        verified_result_with_indices
+        ~compare:(fun (index_left, _) (index_right, _) ->
+          compare index_left index_right )
+      |> List.map ~f:snd
+    in
     Result.all
-      (List.map (already_verified_result @ xs) ~f:(function
+      (List.map results_merged ~f:(function
         | `Valid (cmd, _) ->
             Ok cmd
         | ( `Invalid_keys _
