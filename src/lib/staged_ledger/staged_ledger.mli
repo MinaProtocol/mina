@@ -344,6 +344,15 @@ val all_work_pairs :
 (** Statements of all the pending work in t*)
 val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
 
+type transaction_pool_proxy =
+  { find_by_hash :
+         Mina_transaction.Transaction_hash.t
+      -> Mina_transaction.Transaction_hash.User_command_with_valid_signature.t
+         option
+  }
+
+val dummy_transaction_pool_proxy : transaction_pool_proxy
+
 val check_commands :
      Ledger.t
   -> verifier:Verifier.t
