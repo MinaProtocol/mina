@@ -41,6 +41,7 @@ val build :
         -> Transaction_snark_work.Checked.t option )
   -> sender:Envelope.Sender.t option
   -> transition_receipt_time:Time.t option
+  -> ?transaction_pool_proxy:Staged_ledger.transaction_pool_proxy
   -> unit
   -> ( t
      , [> `Invalid_staged_ledger_diff of Error.t
