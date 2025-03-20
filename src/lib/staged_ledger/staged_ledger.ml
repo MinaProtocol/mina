@@ -1225,7 +1225,9 @@ module T = struct
   let dummy_transaction_pool_proxy : transaction_pool_proxy =
     { find_by_hash = const None }
 
-  let check_commands ledger ~verifier (cs : User_command.t With_status.t list) =
+  let check_commands ledger ~verifier
+      ~(transaction_pool_proxy : transaction_pool_proxy)
+      (cs : User_command.t With_status.t list) =
     let open Deferred.Or_error.Let_syntax in
     let%bind cs =
       User_command.Applied_sequence.to_all_verifiable cs
@@ -1277,7 +1279,9 @@ module T = struct
     let%bind prediff =
       Pre_diff_info.get witness ~constraint_constants ~coinbase_receiver
         ~supercharge_coinbase
-        ~check:(check_commands t.ledger ~verifier)
+        ~check:
+          (check_commands t.ledger ~verifier
+             ~transaction_pool_proxy:dummy_transaction_pool_proxy )
       |> Deferred.map
            ~f:
              (Result.map_error ~f:(fun error ->

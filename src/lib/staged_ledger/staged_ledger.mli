@@ -356,6 +356,7 @@ val dummy_transaction_pool_proxy : transaction_pool_proxy
 val check_commands :
      Ledger.t
   -> verifier:Verifier.t
+  -> transaction_pool_proxy:transaction_pool_proxy
   -> User_command.t With_status.t list
   -> (User_command.Valid.t list, Verifier.Failure.t) Result.t
      Deferred.Or_error.t
