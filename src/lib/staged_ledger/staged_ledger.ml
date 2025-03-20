@@ -1359,10 +1359,11 @@ module T = struct
     { find_by_hash = const None }
 
   let apply ?skip_verification ~proof_cache_db ~constraint_constants
-      ~global_slot t ~get_completed_work (witness : Staged_ledger_diff.t)
-      ~logger ~verifier ~current_state_view ~state_and_body_hash
-      ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap
-      ?(transaction_pool_proxy = dummy_transaction_pool_proxy) =
+      ~global_slot ~get_completed_work ~logger ~verifier ~current_state_view
+      ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
+      ~zkapp_cmd_limit_hardcap
+      ?(transaction_pool_proxy = dummy_transaction_pool_proxy) t
+      (witness : Staged_ledger_diff.t) =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () =
@@ -2558,10 +2559,10 @@ let%test_module "staged ledger tests" =
               , `Staged_ledger sl'
               , `Pending_coinbase_update (is_new_stack, pc_update) ) =
         match%map
-          Sl.apply ~proof_cache_db ~constraint_constants ~global_slot !sl diff'
-            ~logger ~verifier ~get_completed_work:(Fn.const None)
-            ~current_state_view ~state_and_body_hash ~coinbase_receiver
-            ~supercharge_coinbase ~zkapp_cmd_limit_hardcap
+          Sl.apply ~proof_cache_db ~constraint_constants ~global_slot ~logger
+            ~verifier ~get_completed_work:(Fn.const None) ~current_state_view
+            ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
+            ~zkapp_cmd_limit_hardcap !sl diff'
         with
         | Ok x ->
             x

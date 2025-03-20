@@ -207,11 +207,9 @@ val apply :
   -> proof_cache_db:Proof_cache_tag.cache_db
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> global_slot:Mina_numbers.Global_slot_since_genesis.t
-  -> t
   -> get_completed_work:
        (   Transaction_snark_work.Statement.t
         -> Transaction_snark_work.Checked.t option )
-  -> Staged_ledger_diff.t
   -> logger:Logger.t
   -> verifier:Verifier.t
   -> current_state_view:Zkapp_precondition.Protocol_state.View.t
@@ -220,6 +218,8 @@ val apply :
   -> supercharge_coinbase:bool
   -> zkapp_cmd_limit_hardcap:int
   -> ?transaction_pool_proxy:transaction_pool_proxy
+  -> t
+  -> Staged_ledger_diff.t
   -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
        * [ `Ledger_proof of
            ( Ledger_proof.Cached.t
@@ -358,6 +358,7 @@ val check_commands :
      Ledger.t
   -> verifier:Verifier.t
   -> User_command.t With_status.t list
+  -> transaction_pool_proxy:transaction_pool_proxy
   -> (User_command.Valid.t list, Verifier.Failure.t) Result.t
      Deferred.Or_error.t
 
