@@ -195,28 +195,7 @@ function get_cached_debian_or_download_from_gs() {
         echo "   🗂️  $__artifact_full_name Debian package already cached. Skipping download."
     else
         echo "   📂  $__artifact_full_name Debian package is not cached. Downloading from google cloud bucket."
-        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../download-artifact-from-cache.sh "${__artifact_full_name}_*" "$__codename/_build"  -r $DEBIAN_CACHE_FOLDER/$__codename
-    fi
-}
-
-function get_cached_debian_or_download_from_gs() {
-    local __artifact=$1
-    local __codename=$2
-    local __network=$3
-
-    local __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network)
-
-    TARGET_HASH=$(gsutil hash -h -m  gs://buildkite_k8s/coda/shared/$__buildkite_build_id/$__codename/_build/${__artifact_full_name}_* | grep "Hash (md5)" | awk '{print $3}')
-    
-    mkdir -p $DEBIAN_CACHE_FOLDER/$__codename
-
-    echo " 🗂️  Checking cache for $__codename/$__artifact_full_name Debian package"
-
-    if md5sum $DEBIAN_CACHE_FOLDER/$__codename/${__artifact_full_name}* | awk '{print $1}' | grep -q $TARGET_HASH > /dev/null; then
-        echo "   🗂️  $__artifact_full_name Debian package already cached. Skipping download."
-    else
-        echo "   📂  $__artifact_full_name Debian package is not cached. Downloading from google cloud bucket."
-        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../download-artifact-from-cache.sh "${__artifact_full_name}_*" "$__codename/_build"  -r $DEBIAN_CACHE_FOLDER/$__codename
+        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../cache/manager.sh read "$__codename/_build/${__artifact_full_name}_*"  $DEBIAN_CACHE_FOLDER/$__codename
     fi
 }
 
