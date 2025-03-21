@@ -259,7 +259,7 @@ let without_public_input gate_example srs =
   let index, proof = gate_example srs false in
   (index, [], proof)
 
-let with_one_public_input gate_example srs  =
+let with_one_public_input gate_example srs =
   let index, public_input, proof = gate_example srs false in
   (index, [ public_input ], proof)
 
