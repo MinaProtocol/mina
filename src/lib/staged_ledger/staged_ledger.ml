@@ -1265,13 +1265,13 @@ module T = struct
        According to project https://www.notion.so/o1labs/Verification-of-zkapp-proofs-prior-to-block-creation-196e79b1f910807aa8aef723c135375a
        we consider a command in pool verified if either of the following holds:
          - It's failed
-         - It's a signed command
+         - It's a signed command, since `Common.check` on a signed command
+           doesn't depend on the state of the ledger
          - It's a zkapp command, passing more checks, demonstrate as below
     *)
     match cmd_with_status with
     | { status = Failed _; data = verifiable_cmd }
     | { data = Signed_command _ as verifiable_cmd; _ } ->
-        (* BUG: this case might not be what we want, need check *)
         `Valid (coerce_cmd_as_verified verifiable_cmd, [])
     | { data = Zkapp_command verifiable_zkapp_cmd as verifiable_cmd; _ } -> (
         let cmd_hash =
