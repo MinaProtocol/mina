@@ -81,12 +81,6 @@ module Make (Inputs : Inputs_intf.S) = struct
     *)
   type unhashed_account_t = Account.t option * Location.t
 
-  let sexp_of_unhashed_account_t =
-    Tuple2.sexp_of_t (Option.sexp_of_t Account.sexp_of_t) Location.sexp_of_t
-
-  let unhashed_account_t_of_sexp =
-    Tuple2.t_of_sexp (Option.t_of_sexp Account.t_of_sexp) Location.t_of_sexp
-
   type t =
     { uuid : Uuid.Stable.V1.t
     ; mutable parent : Parent.t
