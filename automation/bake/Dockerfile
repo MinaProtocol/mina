@@ -10,7 +10,7 @@ COPY ../../genesis_ledgers/${TESTNET_NAME}.json "${CONFIG_FILE}"
 
 RUN head ${CONFIG_FILE}
 
-# Create the defautl config dir and an empty config
+# Create the default config dir and an empty config
 RUN mkdir -p /root/.mina-config
 # && echo "{}" > /root/.mina-config/daemon.json
 

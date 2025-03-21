@@ -29,4 +29,4 @@ elif "handle_payload" in args.operation:
         json_payload = json.dumps(data)
         handle_incoming_commit_push_json(data,config=config)
 else:
-    print("operation no supported", file=sys.stderr)
+    print("operation not supported", file=sys.stderr)
