@@ -2016,7 +2016,8 @@ let print_version_info () = Core.printf "Commit %s\n" Mina_version.commit_id
 
 let () =
   Random.self_init () ;
-  let logger = Logger.create () in
+  let compile_config = Mina_compile_config.Compiled.t in
+  let logger = Logger.create ~itn_features:compile_config.itn_features () in
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky_backendless.Snark.set_eval_constraints true ;
@@ -2030,7 +2031,6 @@ let () =
    | [| _mina_exe; version |] when is_version_cmd version ->
        Mina_version.print_version ()
    | _ ->
-       let compile_config = Mina_compile_config.Compiled.t in
        Command.run
          (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
             (mina_commands logger ~itn_features:compile_config.itn_features) )

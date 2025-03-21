@@ -213,15 +213,7 @@
             { with-archive ? false }: {
               command =
                 runInEnv self.devShells.x86_64-linux.integration-tests ''
-                  export GOOGLE_CLOUD_KEYFILE_JSON=$AUTOMATED_VALIDATION_SERVICE_ACCOUNT
-                  export GCLOUD_API_KEY=$(cat $INTEGRATION_TEST_LOGS_GCLOUD_API_KEY_PATH)
-                  source $INTEGRATION_TEST_CREDENTIALS
-                  export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
-                  export KUBE_CONFIG_PATH=$$HOME/.kube/config
-                  gcloud auth activate-service-account --key-file=$AUTOMATED_VALIDATION_SERVICE_ACCOUNT automated-validation@o1labs-192920.iam.gserviceaccount.com --project o1labs-192920
-                  gcloud container clusters get-credentials --region us-west1 mina-integration-west1
-                  kubectl config use-context gke_o1labs-192920_us-west1_mina-integration-west1
-                  test_executive cloud ${test} \
+                  test_executive local ${test} \
                   --mina-image=${
                     dockerUrl "mina-image-full" "$BUILDKITE_COMMIT"
                   } \
@@ -305,10 +297,21 @@
 
         # Packages for the development environment that are not needed to build mina-dev.
         # For instance dependencies for tests.
-        devShellPackages = with pkgs; [ rosetta-cli wasm-pack nodejs binaryen ];
+        devShellPackages = with pkgs; [
+          rosetta-cli
+          wasm-pack
+          nodejs
+          binaryen
+          zip
+          (pkgs.python3.withPackages (python-pkgs: [
+              python-pkgs.click
+              python-pkgs.requests
+            ]))
+          jq
+        ];
       in {
         inherit ocamlPackages;
-
+        
         # Main user-facing binaries.
         packages = rec {
           inherit (ocamlPackages)
@@ -367,10 +370,6 @@
           '';
           buildInputs = [
             self.packages.${system}.test_executive
-            pkgs.kubectl
-            pkgs.google-cloud-sdk
-            pkgs.terraform
-            pkgs.curl
           ];
         };
         packages.impure-shell =

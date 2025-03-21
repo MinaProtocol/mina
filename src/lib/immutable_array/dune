@@ -1,7 +1,9 @@
 (library
  (name immutable_array)
  (public_name immutable_array)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version))
  (library_flags -linkall)
  (synopsis "Access only array utility"))
