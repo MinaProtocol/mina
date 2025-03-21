@@ -420,7 +420,6 @@ function publish(){
     local __verify=0
     local __dry_run=0
 
-
     while [ ${#} -gt 0 ]; do
         error_message="❌ Error: a value is needed for '$1'";
         case $1 in
@@ -483,6 +482,16 @@ function publish(){
         esac
     done
 
+    if [[ -z ${__target_version+x} ]]; then
+        echo -e "❌ ${RED} !! Target version (--target-version) is required${CLEAR}\n";
+        publish_help; exit 1;
+    fi
+
+    if [[ -z ${__source_version+x} ]]; then
+        echo -e "❌ ${RED} !! Source version (--source-version) is required${CLEAR}\n";
+        publish_help; exit 1;
+    fi
+
     echo ""
     echo " ℹ️  Publishing mina artifacts with following parameters:"
     echo " - Publishing artifacts: $__artifacts"
@@ -505,7 +514,7 @@ function publish(){
     if [[ $__verify == 1 ]]; then
         check_docker
     fi
-
+ 
     export BUILDKITE_BUILD_ID=$__buildkite_build_id
 
     IFS=', '
