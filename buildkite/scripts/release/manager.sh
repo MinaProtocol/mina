@@ -741,18 +741,15 @@ function promote(){
                         mina-logproc)
                             
                             if [[ $__only_dockers == 0 ]]; then
-                                if [[ $__dry_run == 0 ]]; then
-                                    promote_debian $artifact \
-                                        $__codename \
-                                        $__source_version \
-                                        $__target_version \
-                                        $__source_channel \
-                                        $__target_channel \
-                                        "" \
-                                        $__verify \
-                                        $__dry_run
-                                fi
-                                
+                                promote_debian $artifact \
+                                    $__codename \
+                                    $__source_version \
+                                    $__target_version \
+                                    $__source_channel \
+                                    $__target_channel \
+                                    "" \
+                                    $__verify \
+                                    $__dry_run
                             fi
 
                             if [[ $__only_debians == 0 ]]; then
@@ -763,17 +760,15 @@ function promote(){
                         ;;
                         mina-archive)
                                 if [[ $__only_dockers == 0 ]]; then
-                                    if [[ $__dry_run == 0 ]]; then
-                                        promote_debian $artifact \
-                                            $__codename \
-                                            $__source_version \
-                                            $__target_version \
-                                            $__source_channel \
-                                            $__target_channel \
-                                            "" \
-                                            $__verify \
-                                            $__dry_run
-                                    fi
+                                    promote_debian $artifact \
+                                        $__codename \
+                                        $__source_version \
+                                        $__target_version \
+                                        $__source_channel \
+                                        $__target_channel \
+                                        "" \
+                                        $__verify \
+                                        $__dry_run
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
