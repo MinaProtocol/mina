@@ -80,6 +80,9 @@ function main_help(){
     echo ""
     echo " publish - publish build artifact to debian repository and docker registry";
     echo " promote - promote artifacts from one channel (registry) to another";
+    echo " fix - fix debian package repository";
+    echo " verify - verify artifacts in target channel (registry)";
+    echo " version - show version";    
     echo ""
     echo ""
     echo "Defaults: "
@@ -1067,6 +1070,88 @@ function verify(){
 }
 
 
+
+#==============
+# verify
+#==============
+function fix_help(){
+    echo Fixes repository manifests.
+    echo ""
+    echo "     $CLI_NAME fix [-options]"
+    echo ""
+    echo "Parameters:"
+    echo ""
+    printf "  %-25s %s\n" "-h  | --help" "show help";
+    printf "  %-25s %s\n" "--codenames" "[comma separated list] list of debian codenames to publish. e.g bullseye,focal"; 
+    printf "  %-25s %s\n" "--channel" "[string] target debian channel"; 
+    echo ""
+    echo "Example:"
+    echo ""
+    echo "  " $CLI_NAME fix --codenames bullseye,focal --channel nightly
+    echo ""
+    echo " Above command will verify that nightly channel in bullseye and focal codenames are correct eventually fixes manifests "
+    echo ""
+    echo ""
+}
+
+function fix(){
+    if [[ ${#} == 0 ]]; then
+        fix_help; exit 0;
+    fi
+
+    local __codenames="$DEFAULT_CODENAMES"
+    local __channel
+    local __bucket_arg="--bucket=packages.o1test.net"
+    local __s3_region_arg="--s3-region=us-west-2"
+    
+
+    while [ ${#} -gt 0 ]; do
+        error_message="Error: a value is needed for '$1'";
+        case $1 in
+            -h | --help ) 
+                fix_help; exit 0;
+            ;;
+            --codenames )
+                __codenames=${2:?$error_message}
+                shift 2;
+            ;;
+            --channel )
+                __channel=${2:?$error_message}
+                shift 2;
+            ;;
+            * )
+                echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
+                echo "";
+                fix_help; exit 1;
+            ;;
+        esac
+    done
+
+    echo ""
+    echo " ℹ️  Fixing debian repository with following parameters:"
+    echo " - Codenames: $__codenames"
+    echo " - Channel: $__channel"
+    echo ""
+    
+    
+
+    IFS=', '
+    read -r -a __codenames_arr <<< "$__codenames"
+        
+        for __codename in "${__codenames_arr[@]}"; do
+            deb-s3 verify \
+            --fix-manifests \
+            $__bucket_arg \
+            $__s3_region_arg \
+            --codename=${__codename} \
+            --component=${__channel}
+        done
+    
+    echo " ✅  Done."
+    echo ""
+}
+
+
 function main(){
     if (( ${#} == 0 )); then
         main_help 0;
@@ -1076,7 +1161,7 @@ function main(){
         help )
             main_help 0;
         ;;
-        publish | promote | verify )
+        publish | promote | verify | fix )
             $1 "${@:2}";
         ;;
         * )
