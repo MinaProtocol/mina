@@ -335,16 +335,15 @@ function promote_debian() {
                 --new-name ${__artifact_full_name} \
                 --new-release ${__target_channel} \
                 --codename ${__codename} \
-                --path "$SCRIPTPATH/../../../scripts/debian"
 
         if [[ $__verify == 1 ]]; then
-            echo "     📋 Verifying: $__artifact debian to $__channel channel with $__target_version version"
+            echo "     📋 Verifying: $__artifact debian to $__target_channel channel with $__target_version version"
   
             prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
                 -p $__artifact_full_name \
                 --version $__target_version \
                 -m $__codename \
-                -c $__channel 
+                -c $__target_channel 
         fi
     fi
 }
