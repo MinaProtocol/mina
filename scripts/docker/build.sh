@@ -118,10 +118,6 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
         DOCKER_CONTEXT="dockerfiles/"
         ;;
-    bot)
-        DOCKERFILE_PATH="frontend/bot/Dockerfile"
-        DOCKER_CONTEXT="frontend/bot"
-        ;;
     mina-daemon)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
         DOCKER_CONTEXT="dockerfiles/"
