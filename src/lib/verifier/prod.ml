@@ -73,6 +73,11 @@ module Worker_state = struct
 
   type t = (module S)
 
+  (* WARN:
+     If you consider modifying this function, please provide accompanying
+     modification of `Staged_ledger.precheck_verify_commands` as that
+     implementation depends on some assumption of this.
+  *)
   let create
       { logger
       ; proof_level

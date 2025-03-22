@@ -34,6 +34,11 @@ let invalid_to_error (invalid : invalid) : Error.t =
   | `Invalid_proof err ->
       Error.tag ~tag:"Invalid_proof" err
 
+(* WARN:
+   If you consider modifying this function, please provide accompanying
+   modification of `Staged_ledger.precheck_verify_commands` as that
+   implementation depends on some assumption of this.
+*)
 let check :
        User_command.Verifiable.t With_status.t
     -> [ `Valid of User_command.Valid.t
