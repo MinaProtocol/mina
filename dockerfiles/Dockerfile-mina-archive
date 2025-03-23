@@ -56,11 +56,14 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
 
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
+ADD ${MINA_DEB}_${deb_version}.deb ${MINA_DEB}.deb
+ADD mina-logproc_${deb_version}.deb mina-logproc.deb
 
 # archive-node package
-RUN echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
-  && apt-get update --quiet --yes \
-  && apt-get install --quiet --yes "${MINA_DEB}=$deb_version" \
+RUN apt-get update --quiet --yes \
+  && apt-get install --quiet --yes -f "./${MINA_DEB}.deb" "./mina-logproc.deb" \
   && rm -rf /var/lib/apt/lists/*
+
+RUN rm -f ${MINA_DEB}.deb mina-logproc.deb
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]

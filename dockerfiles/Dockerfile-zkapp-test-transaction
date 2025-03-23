@@ -26,10 +26,11 @@ RUN apt-get -y update \
         man \
     && rm -rf /var/lib/apt/lists/*
 
+ADD "mina-zkapp-test-transaction_$deb_version".deb mina-zkapp-test-transaction.deb
+
 # Snapp test transaction package
-RUN echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
-  && apt-get -y update \
-  || sleep 10s && apt-get -y update \
-  || sleep 10s && apt-get -y update \
-  || sleep 10s && apt-get -y update \
-  && apt-get install -y "mina-zkapp-test-transaction=$deb_version"
+RUN  apt-get -y update \
+  && apt-get install -y -f "./mina-zkapp-test-transaction.deb"
+
+# Clean up
+RUN rm -f mina-zkapp-test-transaction.deb

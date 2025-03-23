@@ -14,8 +14,6 @@ else
   source ${SCRIPTPATH}/../export-git-env-vars.sh
 fi 
 
-echo "after export"
-
 source ${SCRIPTPATH}/builder-helpers.sh
   
 if [ $# -eq 0 ]

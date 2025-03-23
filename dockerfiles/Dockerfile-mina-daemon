@@ -57,14 +57,19 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
 
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
+COPY ${MINA_DEB}_${deb_version}.deb mina.deb
+COPY mina-logproc_${deb_version}.deb mina-logproc.deb
+COPY mina-create-legacy-genesis_1.4.0beta2-compatible-97f7d8c.deb mina-legacy.deb
+
+
 # Mina daemon package
 # jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
-  && echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
-  && apt-get update --quiet --yes \
-  && apt-get install --quiet --yes --allow-downgrades "${MINA_DEB}=$deb_version" \
-  && apt-get install --quiet --yes --allow-downgrades "mina-create-legacy-genesis=1.4.0beta2-compatible-97f7d8c" \
+  apt-get update --quiet --yes \
+  && apt-get install --quiet --yes -f "./mina.deb" "./mina-legacy.deb" "./mina-logproc.deb" \
   && rm -rf /var/lib/apt/lists/*
+
+RUN rm -f mina.deb mina-logproc.deb mina-legacy.deb
 
 
 # Move to a non-root UID in the future (specifically 50000, as it is memorable and safely within the bounds of most systems)

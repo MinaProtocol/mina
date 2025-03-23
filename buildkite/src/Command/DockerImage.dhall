@@ -39,6 +39,7 @@ let ReleaseSpec =
           , build_flags : BuildFlags.Type
           , docker_publish : DockerPublish.Type
           , step_key : Text
+          , deb_folder : Text
           , if : Optional B/If
           }
       , default =
@@ -54,6 +55,7 @@ let ReleaseSpec =
           , deb_profile = Profiles.Type.Standard
           , build_flags = BuildFlags.Type.None
           , docker_publish = DockerPublish.Type.Essential
+          , deb_folder = "_build"
           , deb_repo = DebianRepo.Type.PackagesO1Test
           , no_cache = False
           , step_key = "daemon-standard-docker-image"
@@ -82,6 +84,7 @@ let generateStep =
                 ++  " --deb-build-flags ${BuildFlags.lowerName
                                             spec.build_flags}"
                 ++  " --repo ${spec.repo}"
+                ++  " --deb-folder ${spec.deb_folder}"
 
           let releaseDockerCmd =
                       if DockerPublish.shouldPublish
@@ -122,14 +125,13 @@ let generateStep =
                   , Local =
                     [ Cmd.run
                         (     exportMinaDebCmd
-                          ++  " && apt update && apt install -y aptly"
-                          ++  " && ./buildkite/scripts/debian/start_local_repo.sh"
                           ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
+                          ++  " && ./buildkite/scripts/cache/manager.sh read --root debs \"${spec.deb_codename}/*\" _build"
+                          ++  " && ./buildkite/scripts/cache/manager.sh read \"debians/${spec.deb_codename}/*\" _build "
                           ++  " && "
                           ++  buildDockerCmd
                           ++  " && "
                           ++  releaseDockerCmd
-                          ++  " && ./scripts/debian/aptly.sh stop"
                         )
                     ]
                   }
