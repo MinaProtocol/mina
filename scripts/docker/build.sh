@@ -179,9 +179,12 @@ docker system prune --all --force --filter until=24h
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
   # copy all debians to the dockerfiles folder
-  cp -r $DEB_FOLDER/*.deb dockerfiles
+  echo $(pwd)
+  cp -r $DEB_FOLDER/*.deb . 
   cat $DOCKERFILE_PATH | docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO -t "$TAG" -
 else
-  cp -r $DEB_FOLDER/*.deb .
+  echo $(pwd)
+  cp -r $DEB_FOLDER/*.deb . 
+  cp -r $DEB_FOLDER/*.deb dockerfiles
   docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
 fi
