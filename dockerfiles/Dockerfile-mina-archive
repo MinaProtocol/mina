@@ -61,7 +61,7 @@ ADD mina-logproc_${deb_version}.deb mina-logproc.deb
 
 # archive-node package
 RUN apt-get update --quiet --yes \
-  && apt-get install --quiet --yes -allow-downgrades -f "./${MINA_DEB}.deb" "./mina-logproc.deb" \
+  && apt-get install --quiet --yes --allow-downgrades -f "./${MINA_DEB}.deb" "./mina-logproc.deb" \
   && rm -rf /var/lib/apt/lists/*
 
 RUN rm -f ${MINA_DEB}.deb mina-logproc.deb

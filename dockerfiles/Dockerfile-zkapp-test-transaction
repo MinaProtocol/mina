@@ -26,11 +26,9 @@ RUN apt-get -y update \
         man \
     && rm -rf /var/lib/apt/lists/*
 
-ADD "mina-zkapp-test-transaction_$deb_version".deb mina-zkapp-test-transaction.deb
+ADD "mina-zkapp-test-transaction_$deb_version.deb" mina-zkapp-test-transaction.deb
 
-# Snapp test transaction package
-RUN  apt-get -y update \
-  && apt-get install -allow-downgrades -y -f "./mina-zkapp-test-transaction.deb"
+RUN apt-get install --allow-downgrades -y -f "./mina-zkapp-test-transaction.deb"
 
 # Clean up
 RUN rm -f mina-zkapp-test-transaction.deb
