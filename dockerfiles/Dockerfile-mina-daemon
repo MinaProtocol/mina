@@ -66,7 +66,7 @@ COPY mina-create-legacy-genesis_1.4.0beta2-compatible-97f7d8c.deb mina-legacy.de
 # jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
   apt-get update --quiet --yes \
-  && apt-get install --quiet --yes -f "./mina.deb" "./mina-legacy.deb" "./mina-logproc.deb" \
+  && apt-get install --quiet --yes -allow-downgrades -f "./mina.deb" "./mina-legacy.deb" "./mina-logproc.deb" \
   && rm -rf /var/lib/apt/lists/*
 
 RUN rm -f mina.deb mina-logproc.deb mina-legacy.deb
