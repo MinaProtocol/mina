@@ -520,7 +520,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
 
     // Create constraint system
     let cs = ConstraintSystem::<Fp>::create(gates)
-        .lazy_mode()
+        .lazy_mode(lazy_mode)
         .build()
         .unwrap();
 
@@ -596,7 +596,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check0(
 
     // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates)
-        .lazy_mode()
+        .lazy_mode(lazy_mode)
         .build()
         .unwrap();
 
@@ -816,7 +816,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
     // be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates)
         .public(num_public_inputs)
-        .lazy_mode()
+        .lazy_mode(lazy_mode)
         .build()
         .unwrap();
 
