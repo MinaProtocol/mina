@@ -158,11 +158,13 @@ let apply_txs ~action_elements ~event_elements ~constraint_constants
   with
   | Ok (b, _, _, _, _) ->
       let root = Ledger.merkle_root ledger in
+      let time = Time.diff (Time.now ()) start in
       printf
         !"Result of application %d: %B (took %s): new root %s\n%!"
         i b
-        Time.(Span.to_string @@ diff (now ()) start)
-        (Ledger_hash.to_base58_check root)
+        Time.(Span.to_string time)
+        (Ledger_hash.to_base58_check root) ;
+      time
   | Error e ->
       eprintf
         !"Error applying staged ledger: %s\n%!"
@@ -171,7 +173,8 @@ let apply_txs ~action_elements ~event_elements ~constraint_constants
 
 let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
     ~no_new_stack ~has_second_partition ~num_txs_per_round ~rounds ~no_masks
-    ~max_depth ~tracing num_txs_final ~(genesis_constants : Genesis_constants.t)
+    ~max_depth ~tracing num_txs_final ~benchmark
+    ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
   O1trace.thread "mina"
   @@ fun () ->
@@ -218,7 +221,34 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
   let stop_tracing =
     if tracing then (fun x -> Mina_tracing.stop () ; x) else ident
   in
+  let results = ref [] in
   let init_root = Ledger.merkle_root init_ledger in
+  let save_preparation_times time =
+    if Option.is_some benchmark then results := !results @ [ time ]
+  in
+  let save_and_dump_benchmarks final_time =
+    let calculate_mean results =
+      let preparation_steps = List.drop_last_exn results in
+      let sum = Float.of_int (List.length preparation_steps) in
+      printf !"sum: %f\n" sum ;
+      List.fold preparation_steps ~init:Float.zero ~f:(fun acc time ->
+          acc +. (Time.Span.to_ms time /. sum) )
+    in
+    match benchmark with
+    | Some benchmark ->
+        let preparation_steps_mean = calculate_mean !results in
+        let json =
+          `Assoc
+            [ ( "final_time"
+              , `String (Printf.sprintf "%.2f" (Time.Span.to_ms final_time)) )
+            ; ( "preparation_steps_mean"
+              , `String (Printf.sprintf "%.2f" preparation_steps_mean) )
+            ]
+        in
+        Yojson.Safe.to_file benchmark json
+    | None ->
+        ()
+  in
   printf !"Init root %s\n%!" (Ledger_hash.to_base58_check init_root) ;
   Deferred.List.fold (List.init rounds ~f:ident) ~init:(init_ledger, [])
     ~f:(fun (ledger, ledgers) i ->
@@ -229,10 +259,10 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
       |> Option.iter ~f:drop_old_ledger ;
       apply ~action_elements:0 ~event_elements:0 ~num_txs:num_txs_per_round ~i
         ledger
-      >>| mask_handler ledger
+      >>| save_preparation_times >>| mask_handler ledger
       >>| Fn.flip Tuple2.create (ledger :: ledgers) )
   >>| fst
   >>= apply ~num_txs:num_txs_final
         ~action_elements:genesis_constants.max_action_elements
         ~event_elements:genesis_constants.max_event_elements ~i:rounds
-  >>| stop_tracing
+  >>| save_and_dump_benchmarks >>| stop_tracing
