@@ -17,6 +17,7 @@
    bindings/verifier-index.js
    wrap_wasm/wrap.js
    wrap_wasm/wrap_proof.js
+   wrap_wasm/wrap_oracles.js
    ))
  (instrumentation
   (backend bisect_ppx))

@@ -1,18 +1,9 @@
 /* global plonk_intf, tsRustConversion,
-    
  */
 
 // Provides: fp_oracles_create
-// Requires: plonk_intf, tsRustConversion
-var fp_oracles_create = function (lgr_comm, verifier_index, proof) {
-  return tsRustConversion.fp.oraclesFromRust(
-    plonk_intf.fp_oracles_create(
-      tsRustConversion.fp.polyCommsToRust(lgr_comm),
-      tsRustConversion.fp.verifierIndexToRust(verifier_index),
-      tsRustConversion.fp.proofToRust(proof)
-    )
-  );
-};
+// Requires: plonk_intf
+var fp_oracles_create = plonk_intf.fp_oracles_create
 
 // Provides: fp_oracles_create_no_public
 // Requires: fp_oracles_create
@@ -21,30 +12,16 @@ var fp_oracles_create_no_public = function (lgr_comm, verifier_index, proof) {
 };
 
 // Provides: fp_oracles_dummy
-// Requires: plonk_intf, tsRustConversion
-var fp_oracles_dummy = function () {
-  return tsRustConversion.fp.oraclesFromRust(plonk_intf.fp_oracles_dummy());
-};
+// Requires: plonk_intf
+var fp_oracles_dummy = plonk_intf.fp_oracles_dummy;
 
 // Provides: fp_oracles_deep_copy
-// Requires: plonk_intf, tsRustConversion
-var fp_oracles_deep_copy = function (x) {
-  return tsRustConversion.fp.oraclesFromRust(
-    plonk_intf.fp_oracles_deep_copy(tsRustConversion.fp.oraclesToRust(x))
-  );
-};
+// Requires: plonk_intf
+var fp_oracles_deep_copy = plonk_intf.fp_oracles_deep_copy;
 
 // Provides: fq_oracles_create
-// Requires: plonk_intf, tsRustConversion
-var fq_oracles_create = function (lgr_comm, verifier_index, proof) {
-  return tsRustConversion.fq.oraclesFromRust(
-    plonk_intf.fq_oracles_create(
-      tsRustConversion.fq.polyCommsToRust(lgr_comm),
-      tsRustConversion.fq.verifierIndexToRust(verifier_index),
-      tsRustConversion.fq.proofToRust(proof)
-    )
-  );
-};
+// Requires: plonk_intf
+var fq_oracles_create = plonk_intf.fq_oracles_create;
 
 // Provides: fq_oracles_create_no_public
 // Requires: fq_oracles_create
@@ -54,17 +31,11 @@ var fq_oracles_create_no_public = function (lgr_comm, verifier_index, proof) {
 
 // Provides: fq_oracles_dummy
 // Requires: plonk_intf, tsRustConversion
-var fq_oracles_dummy = function () {
-  return tsRustConversion.fq.oraclesFromRust(plonk_intf.fq_oracles_dummy());
-};
+var fq_oracles_dummy = plonk_intf.fq_oracles_dummy;
 
 // Provides: fq_oracles_deep_copy
 // Requires: plonk_intf, tsRustConversion
-var fq_oracles_deep_copy = function (x) {
-  return tsRustConversion.fq.oraclesFromRust(
-    plonk_intf.fq_oracles_deep_copy(tsRustConversion.fq.oraclesToRust(x))
-  );
-};
+var fq_oracles_deep_copy = plonk_intf.fq_oracles_deep_copy;
 
 // This is fake -- parameters are only needed on the Rust side, so no need to return something meaningful
 // Provides: caml_pasta_fp_poseidon_params_create
@@ -77,29 +48,13 @@ function caml_pasta_fq_poseidon_params_create() {
 }
 
 // Provides: caml_pasta_fp_poseidon_block_cipher
-// Requires: plonk_intf, tsRustConversion, tsRustConversion
+// Requires: plonk_intf
 function caml_pasta_fp_poseidon_block_cipher(_fake_params, fp_vector) {
-  // 1. get permuted field vector from rust
-  var wasm_flat_vector = plonk_intf.caml_pasta_fp_poseidon_block_cipher(
-    tsRustConversion.fp.vectorToRust(fp_vector)
-  );
-  var new_fp_vector = tsRustConversion.fp.vectorFromRust(wasm_flat_vector);
-  // 2. write back modified field vector to original one
-  new_fp_vector.forEach(function (a, i) {
-    fp_vector[i] = a;
-  });
+  plonk_intf.caml_pasta_fp_poseidon_block_cipher(_fake_params, fp_vector);
 }
 
 // Provides: caml_pasta_fq_poseidon_block_cipher
-// Requires: plonk_intf, tsRustConversion, tsRustConversion
+// Requires: plonk_intf
 function caml_pasta_fq_poseidon_block_cipher(_fake_params, fq_vector) {
-  // 1. get permuted field vector from rust
-  var wasm_flat_vector = plonk_intf.caml_pasta_fq_poseidon_block_cipher(
-    tsRustConversion.fq.vectorToRust(fq_vector)
-  );
-  var new_fq_vector = tsRustConversion.fq.vectorFromRust(wasm_flat_vector);
-  // 2. write back modified field vector to original one
-  new_fq_vector.forEach(function (a, i) {
-    fq_vector[i] = a;
-  });
+  plonk_intf.caml_pasta_fq_poseidon_block_cipher(_fake_params, fq_vector);
 }
