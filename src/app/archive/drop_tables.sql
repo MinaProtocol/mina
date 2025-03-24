@@ -105,7 +105,3 @@ DROP TABLE zkapp_events;
 DROP TABLE token_symbols;
 
 DROP TABLE voting_for;
-
-DROP TABLE zkapp_field;
-
-DROP TABLE zkapp_verification_key_hashes;
