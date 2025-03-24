@@ -4,17 +4,28 @@ open Async_kernel
 let diff_s a b = Time_ns.(Span.to_string_hum (diff a b))
 
 let time_genesis_creation () =
+  let commit_id = "<skipped for unit test>" in
+  let logger = Logger.create () in
+  Logger.Consumer_registry.register ~id:Logger.Logger_id.mina ~commit_id
+    ~processor:Internal_tracing.For_logger.processor
+    ~transport:
+      (Logger_file_system.dumb_logrotate ~directory:"."
+         ~log_filename:"internal-tracing.log"
+         ~max_size:(1024 * 1024 * 10)
+         ~num_rotate:50 )
+    () ;
+  let%bind () = Internal_tracing.toggle `Enabled ~commit_id ~logger in
   let start = Time_ns.now () in
   let%bind worker_state =
     Prover.Worker_state.create
       { Prover.Worker_state.conf_dir = "<skipped for unit test>"
       ; enable_internal_tracing = false
       ; internal_trace_filename = None
-      ; logger = Logger.create ()
+      ; logger
       ; proof_level = Full
       ; constraint_constants =
           Genesis_constants.For_unit_tests.Constraint_constants.t
-      ; commit_id = "<skipped for unit test>"
+      ; commit_id
       }
   in
   let worker_state_initialized = Time_ns.now () in
