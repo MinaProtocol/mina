@@ -14,7 +14,10 @@
    bindings/prover-index.js
    bindings/util.js
    bindings/srs.js
-   bindings/verifier-index.js))
+   bindings/verifier-index.js
+   wrap_wasm/wrap.js
+   wrap_wasm/wrap_proof.js
+   ))
  (instrumentation
   (backend bisect_ppx))
  (preprocess

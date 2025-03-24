@@ -1,14 +1,14 @@
 /* global UInt64, caml_int64_of_int32, caml_create_bytes,
     caml_bytes_unsafe_set, caml_bytes_unsafe_get, caml_ml_bytes_length,
-    plonk_wasm
+    plonk_intf
  */
 
 // Provides: tsBindings
 var tsBindings = globalThis.__snarkyTsBindings;
 
 // Provides: tsRustConversion
-// Requires: tsBindings, plonk_wasm
-var tsRustConversion = tsBindings.rustConversion(plonk_wasm);
+// Requires: tsBindings, plonk_intf
+var tsRustConversion = tsBindings.rustConversion(plonk_intf);
 
 // Provides: getTsBindings
 // Requires: tsBindings

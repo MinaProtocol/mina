@@ -43,9 +43,9 @@ We then use this WASM object and "inject" it into our proxy in order to use it.
 
 ```js
 // Provides: caml_do_cool_thingies
-// Requires: plonk_wasm
+// Requires: plonk_intf
 function caml_do_cool_thingies() {
-  plonk_wasm.caml_do_cool_thingies();
+  plonk_intf.caml_do_cool_thingies();
 }
 ```
 
@@ -57,7 +57,7 @@ Sometimes, these "proxy" functions actually don't call into WASM directly, but d
 
 ```js
 // Provides: caml_pasta_fp_plonk_proof_create
-// Requires: plonk_wasm, tsRustConversion
+// Requires: plonk_intf, tsRustConversion
 var caml_pasta_fp_plonk_proof_create = function (
   index,
   witness_cols,
@@ -65,7 +65,7 @@ var caml_pasta_fp_plonk_proof_create = function (
   prev_challenges,
   prev_sgs
 ) {
-  var w = new plonk_wasm.WasmVecVecFp(witness_cols.length - 1);
+  var w = new plonk_intf.WasmVecVecFp(witness_cols.length - 1);
   for (var i = 1; i < witness_cols.length; i++) {
     w.push(tsRustConversion.fp.vectorToRust(witness_cols[i]));
   }
@@ -74,7 +74,7 @@ var caml_pasta_fp_plonk_proof_create = function (
   var wasm_runtime_tables =
     tsRustConversion.fp.runtimeTablesToRust(caml_runtime_tables);
   prev_sgs = tsRustConversion.fp.pointsToRust(prev_sgs);
-  var proof = plonk_wasm.caml_pasta_fp_plonk_proof_create(
+  var proof = plonk_intf.caml_pasta_fp_plonk_proof_create(
     index,
     witness_cols,
     wasm_runtime_tables,

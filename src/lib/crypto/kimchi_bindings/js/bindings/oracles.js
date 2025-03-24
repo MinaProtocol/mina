@@ -1,12 +1,12 @@
-/* global plonk_wasm, tsRustConversion,
+/* global plonk_intf, tsRustConversion,
     
  */
 
 // Provides: fp_oracles_create
-// Requires: plonk_wasm, tsRustConversion
+// Requires: plonk_intf, tsRustConversion
 var fp_oracles_create = function (lgr_comm, verifier_index, proof) {
   return tsRustConversion.fp.oraclesFromRust(
-    plonk_wasm.fp_oracles_create(
+    plonk_intf.fp_oracles_create(
       tsRustConversion.fp.polyCommsToRust(lgr_comm),
       tsRustConversion.fp.verifierIndexToRust(verifier_index),
       tsRustConversion.fp.proofToRust(proof)
@@ -21,24 +21,24 @@ var fp_oracles_create_no_public = function (lgr_comm, verifier_index, proof) {
 };
 
 // Provides: fp_oracles_dummy
-// Requires: plonk_wasm, tsRustConversion
+// Requires: plonk_intf, tsRustConversion
 var fp_oracles_dummy = function () {
-  return tsRustConversion.fp.oraclesFromRust(plonk_wasm.fp_oracles_dummy());
+  return tsRustConversion.fp.oraclesFromRust(plonk_intf.fp_oracles_dummy());
 };
 
 // Provides: fp_oracles_deep_copy
-// Requires: plonk_wasm, tsRustConversion
+// Requires: plonk_intf, tsRustConversion
 var fp_oracles_deep_copy = function (x) {
   return tsRustConversion.fp.oraclesFromRust(
-    plonk_wasm.fp_oracles_deep_copy(tsRustConversion.fp.oraclesToRust(x))
+    plonk_intf.fp_oracles_deep_copy(tsRustConversion.fp.oraclesToRust(x))
   );
 };
 
 // Provides: fq_oracles_create
-// Requires: plonk_wasm, tsRustConversion
+// Requires: plonk_intf, tsRustConversion
 var fq_oracles_create = function (lgr_comm, verifier_index, proof) {
   return tsRustConversion.fq.oraclesFromRust(
-    plonk_wasm.fq_oracles_create(
+    plonk_intf.fq_oracles_create(
       tsRustConversion.fq.polyCommsToRust(lgr_comm),
       tsRustConversion.fq.verifierIndexToRust(verifier_index),
       tsRustConversion.fq.proofToRust(proof)
@@ -53,16 +53,16 @@ var fq_oracles_create_no_public = function (lgr_comm, verifier_index, proof) {
 };
 
 // Provides: fq_oracles_dummy
-// Requires: plonk_wasm, tsRustConversion
+// Requires: plonk_intf, tsRustConversion
 var fq_oracles_dummy = function () {
-  return tsRustConversion.fq.oraclesFromRust(plonk_wasm.fq_oracles_dummy());
+  return tsRustConversion.fq.oraclesFromRust(plonk_intf.fq_oracles_dummy());
 };
 
 // Provides: fq_oracles_deep_copy
-// Requires: plonk_wasm, tsRustConversion
+// Requires: plonk_intf, tsRustConversion
 var fq_oracles_deep_copy = function (x) {
   return tsRustConversion.fq.oraclesFromRust(
-    plonk_wasm.fq_oracles_deep_copy(tsRustConversion.fq.oraclesToRust(x))
+    plonk_intf.fq_oracles_deep_copy(tsRustConversion.fq.oraclesToRust(x))
   );
 };
 
@@ -77,10 +77,10 @@ function caml_pasta_fq_poseidon_params_create() {
 }
 
 // Provides: caml_pasta_fp_poseidon_block_cipher
-// Requires: plonk_wasm, tsRustConversion, tsRustConversion
+// Requires: plonk_intf, tsRustConversion, tsRustConversion
 function caml_pasta_fp_poseidon_block_cipher(_fake_params, fp_vector) {
   // 1. get permuted field vector from rust
-  var wasm_flat_vector = plonk_wasm.caml_pasta_fp_poseidon_block_cipher(
+  var wasm_flat_vector = plonk_intf.caml_pasta_fp_poseidon_block_cipher(
     tsRustConversion.fp.vectorToRust(fp_vector)
   );
   var new_fp_vector = tsRustConversion.fp.vectorFromRust(wasm_flat_vector);
@@ -91,10 +91,10 @@ function caml_pasta_fp_poseidon_block_cipher(_fake_params, fp_vector) {
 }
 
 // Provides: caml_pasta_fq_poseidon_block_cipher
-// Requires: plonk_wasm, tsRustConversion, tsRustConversion
+// Requires: plonk_intf, tsRustConversion, tsRustConversion
 function caml_pasta_fq_poseidon_block_cipher(_fake_params, fq_vector) {
   // 1. get permuted field vector from rust
-  var wasm_flat_vector = plonk_wasm.caml_pasta_fq_poseidon_block_cipher(
+  var wasm_flat_vector = plonk_intf.caml_pasta_fq_poseidon_block_cipher(
     tsRustConversion.fq.vectorToRust(fq_vector)
   );
   var new_fq_vector = tsRustConversion.fq.vectorFromRust(wasm_flat_vector);

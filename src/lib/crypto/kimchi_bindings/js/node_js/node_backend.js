@@ -1,2 +1,6 @@
 // Provides: plonk_wasm
 var plonk_wasm = require('./plonk_wasm.js');
+
+// Requires: wrap_wasm,plonk_wasm
+// Provides: plonk_intf
+var plonk_intf = wrap_wasm(plonk_wasm);
