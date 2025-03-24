@@ -143,6 +143,7 @@ case "${SERVICE}" in
         ;;
     mina-rosetta)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
+        DOCKER_CONTEXT="dockerfiles/"
         ;;
     mina-zkapp-test-transaction)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-zkapp-test-transaction"
@@ -180,11 +181,10 @@ docker system prune --all --force --filter until=24h
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
   # copy all debians to the dockerfiles folder
   echo $(pwd)
-  cp -r $DEB_FOLDER/*.deb . 
+  cp -r $DEB_FOLDER/*.deb dockerfiles
   cat $DOCKERFILE_PATH | docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO -t "$TAG" -
 else
   echo $(pwd)
   cp -r $DEB_FOLDER/*.deb . 
-  cp -r $DEB_FOLDER/*.deb dockerfiles
   docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
 fi
