@@ -313,6 +313,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     srs: CamlFpSrs,
+    lazy_mode: bool,
 ) -> (
     CamlPastaFpPlonkIndex,
     CamlProofWithPublic<CamlGVesta, CamlFp>,
@@ -445,12 +446,15 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     }
 
     // Create constraint system
-    let cs = ConstraintSystem::<Fp>::create(gates).build().unwrap();
+    let cs = ConstraintSystem::<Fp>::create(gates)
+        .lazy_mode(lazy_mode)
+        .build()
+        .unwrap();
 
     srs.0.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
-    let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0, false);
+    let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0, lazy_mode);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
         &group_map,
@@ -472,6 +476,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
     srs: CamlFpSrs,
+    lazy_mode: bool,
 ) -> (
     CamlPastaFpPlonkIndex,
     CamlProofWithPublic<CamlGVesta, CamlFp>,
@@ -514,12 +519,15 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
     }
 
     // Create constraint system
-    let cs = ConstraintSystem::<Fp>::create(gates).build().unwrap();
+    let cs = ConstraintSystem::<Fp>::create(gates)
+        .lazy_mode()
+        .build()
+        .unwrap();
 
     srs.0.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
-    let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0, false);
+    let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0, lazy_mode);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
         &group_map,
@@ -541,6 +549,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_example_with_range_check0(
     srs: CamlFpSrs,
+    lazy_mode: bool,
 ) -> (
     CamlPastaFpPlonkIndex,
     CamlProofWithPublic<CamlGVesta, CamlFp>,
@@ -586,12 +595,15 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check0(
     };
 
     // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
-    let cs = ConstraintSystem::<Fp>::create(gates).build().unwrap();
+    let cs = ConstraintSystem::<Fp>::create(gates)
+        .lazy_mode()
+        .build()
+        .unwrap();
 
     srs.0.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
-    let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0, false);
+    let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0, lazy_mode);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
         &group_map,
@@ -613,6 +625,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check0(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
     srs: CamlFpSrs,
+    lazy_mode: bool,
 ) -> (
     CamlPastaFpPlonkIndex,
     CamlFp,
@@ -711,13 +724,14 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
     // be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates)
         .public(num_public_inputs)
+        .lazy_mode(lazy_mode)
         .build()
         .unwrap();
 
     srs.0.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
-    let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0, false);
+    let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0, lazy_mode);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let public_input = witness[0][0];
     let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
@@ -741,6 +755,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_example_with_xor(
     srs: CamlFpSrs,
+    lazy_mode: bool,
 ) -> (
     CamlPastaFpPlonkIndex,
     (CamlFp, CamlFp),
@@ -801,13 +816,14 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
     // be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates)
         .public(num_public_inputs)
+        .lazy_mode()
         .build()
         .unwrap();
 
     srs.0.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
-    let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0, false);
+    let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0, lazy_mode);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let public_input = (witness[0][0], witness[0][1]);
     let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
@@ -831,6 +847,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_example_with_rot(
     srs: CamlFpSrs,
+    lazy_mode: bool,
 ) -> (
     CamlPastaFpPlonkIndex,
     (CamlFp, CamlFp),
@@ -895,13 +912,14 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
     // be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates)
         .public(num_public_inputs)
+        .lazy_mode(lazy_mode)
         .build()
         .unwrap();
 
     srs.0.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
-    let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0, false);
+    let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0, lazy_mode);
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
     let public_input = (witness[0][0], witness[0][1]);
     let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge, _>(
