@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Script for reading and writing files to/from global CI cache.
-# Currently It uses gsutil as a cache manager and google cloud storage as a cache storage.
+# Currently It uses cp as a cache manager and mounted shared hetzner storage.
 # It supports read and write operations.
 # It requires to be executed in buildkite context. e.g (BUILDKITE_BUILD_ID env var to be defined)
 
@@ -26,12 +26,6 @@ if [[ ! -v "BUILDKITE_BUILD_ID" ]]; then
     exit 1
 fi
 
-if ! command -v gsutil &> /dev/null; then
-    echo -e "${RED} gsutil could not be found. Please install gsutil before running this script. ${CLEAR}"
-    echo -e "${RED} You can install gsutil by following the instructions at: https://cloud.google.com/storage/docs/gsutil_install ${CLEAR}"
-    exit 1
-fi
-
 ################################################################################
 # global variable
 ################################################################################
@@ -40,10 +34,7 @@ CLI_VERSION='1.0.0'
 CLI_NAME="cache-manager"
 PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): '
 
-CACHE_BASE_URL="${CACHE_BASE_URL:-gs://buildkite_k8s/coda/shared}"
-
-# The application used for cache operations
-CACHE_APP=gsutil
+CACHE_BASE_URL="${CACHE_BASE_URL:-/var/storagebox}"
 
 ################################################################################
 # functions
@@ -169,10 +160,10 @@ function read(){
     if [[ $__override == 1 ]]; then 
         EXTRA_FLAGS=""
     else 
-        EXTRA_FLAGS="-n"
+        EXTRA_FLAGS="-f"
     fi
 
-    if ! "$CACHE_APP" -m cp "${EXTRA_FLAGS}" "$__from" "$__to"; then
+    if ! cp  -r "${EXTRA_FLAGS}" "$__from" "$__to"; then
         echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
         exit 2
     fi
@@ -261,10 +252,10 @@ function write(){
     if [[ $__override == 1 ]]; then 
         EXTRA_FLAGS=""
     else 
-        EXTRA_FLAGS="-n"
+        EXTRA_FLAGS="-f"
     fi
 
-    if ! "$CACHE_APP" -m cp "${EXTRA_FLAGS}" "$__from" "$__to"; then
+    if ! "$CACHE_APP" -r "${EXTRA_FLAGS}" "$__from" "$__to"; then
         echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
         exit 2
     fi
