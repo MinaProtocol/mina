@@ -4,6 +4,7 @@ from abc import ABC
 import parse
 from pathlib import Path
 import io
+import json
 import os
 from enum import Enum
 import logging
@@ -154,6 +155,7 @@ class BenchmarkType(Enum):
     heap_usage = 'heap-usage'
     zkapp = 'zkapp'
     ledger_export = 'ledger-export'
+    ledger_apply = 'ledger-apply'
 
     def __str__(self):
         return self.value
@@ -373,6 +375,69 @@ class LedgerExportBenchmark(JaneStreetBenchmark):
     def default_path(self):
         return "mina-ledger-export-benchmark"
 
+
+class LedgerApplyBenchmark(Benchmark):
+    """
+     Concrete implementation of Benchmark for ledger test apply benchmark.
+     It requires input json file with benchmark data in format
+     {
+        "final_time":"0.4000" # In ms
+        , "preparation_steps_mean": "0.432"
+     }
+    """
+
+    name = MeasurementColumn("Name", 0)
+    time = FieldColumn("time",  1, "ms")
+    preps_mean = FieldColumn("preps mean",  2, "")
+    category = TagColumn("category", 3)
+    branch = TagColumn("gitbranch", 4)
+
+    def __init__(self, benchmark_input_json):
+        Benchmark.__init__(self, BenchmarkType.ledger_apply)
+        self.benchmark_input_json = benchmark_input_json
+
+    def run(self, path=None):
+        pass
+
+    def fields(self):
+        return [
+            self.time, self.preps_mean
+        ]
+
+    def name_header(self):
+        return self.name
+
+    def branch_header(self):
+        return self.branch
+
+    def default_path(self):
+        return "mina"
+
+    def headers(self):
+        return [
+            LedgerApplyBenchmark.name, LedgerApplyBenchmark.time,
+            LedgerApplyBenchmark.preps_mean, LedgerApplyBenchmark.category,
+            LedgerApplyBenchmark.branch
+        ]
+
+    def parse(self, content, output_filename, influxdb, branch):
+
+        final_time_header = "final_time"
+        preparation_steps_mean_header = "preparation_steps_mean"
+
+        with open(self.benchmark_input_json) as f:
+            data = json.load(f)
+            final_time = data[final_time_header]
+            preparation_steps_mean = data[preparation_steps_mean_header]
+
+            with open(output_filename, 'w') as csvfile:
+                if influxdb:
+                    csvfile.write(
+                        self.headers_to_influx(self.headers()) + "\n")
+                csvwriter = csv.writer(csvfile)
+                csvwriter.writerows(("ledger-apply",final_time, preparation_steps_mean,"ledger-apply", branch))
+
+        return [output_filename]
 
 class ZkappLimitsBenchmark(Benchmark):
     """

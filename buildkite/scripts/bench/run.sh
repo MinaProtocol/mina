@@ -6,7 +6,7 @@ set -eox pipefail
 
 YELLOW_THRESHOLD="0.1"
 RED_THRESHOLD="0.3"
-EXTRA_ARGS=""
+EXTRA_ARGS="${EXTRA_ARGS:-}"
 
 source buildkite/scripts/bench/install.sh
 
@@ -17,6 +17,9 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   ledger-export) 
     BENCHMARK="ledger-export"
     EXTRA_ARGS="--genesis-ledger-path ./genesis_ledgers/devnet.json"
+  ;;
+  ledger-apply) 
+    BENCHMARK="ledger-apply"
   ;;
   snark) 
     BENCHMARK="snark";
