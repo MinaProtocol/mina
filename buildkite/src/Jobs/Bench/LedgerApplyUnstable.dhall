@@ -8,7 +8,7 @@ in  Pipeline.build
       ( LedgerApply.pipeline
           LedgerApply.Spec::{
           , name = "LedgerApplyUnstable"
-          , label = "Ledger Apply Unstable"
+          , label = "Ledger Apply"
           , key = "ledger-apply-unstable"
           , mode = PipelineMode.Type.Stable
           }
