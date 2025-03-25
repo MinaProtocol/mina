@@ -265,6 +265,17 @@ module Make (Inputs : Inputs_intf.S) = struct
           in
           if is_empty then Some (empty_hash height) else None
 
+    let self_merkle_path ~hashes ~current_location =
+      let element height address =
+        let sibling = Addr.sibling address in
+        let dir = Location.last_direction address in
+        let%map.Option sibling_hash =
+          self_path_get_hash ~hashes ~current_location height sibling
+        in
+        Direction.map dir ~left:(`Left sibling_hash) ~right:(`Right sibling_hash)
+      in
+      self_path_impl ~element
+
     let set_inner_hash_at_addr_exn t address hash =
       assert_is_attached t ;
       assert (Addr.depth address <= t.depth) ;
@@ -364,17 +375,6 @@ module Make (Inputs : Inputs_intf.S) = struct
               Some s )
       in
       self_find_or_batch_lookup self_find Base.get_batch t
-
-    let self_merkle_path ~hashes ~current_location =
-      let element height address =
-        let sibling = Addr.sibling address in
-        let dir = Location.last_direction address in
-        let%map.Option sibling_hash =
-          self_path_get_hash ~hashes ~current_location height sibling
-        in
-        Direction.map dir ~left:(`Left sibling_hash) ~right:(`Right sibling_hash)
-      in
-      self_path_impl ~element
 
     let self_wide_merkle_path ~hashes ~current_location =
       let element height address =
