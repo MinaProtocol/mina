@@ -18,6 +18,8 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let BuildFlags = ../../Constants/BuildFlags.dhall
 
+let Network = ../../Constants/Network.dhall
+
 let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
@@ -26,12 +28,14 @@ let dependsOn =
         DebianVersions.dependsOnStep
           (None Text)
           DebianVersions.DebVersion.Bullseye
+          Network.Type.Berkeley
           Profiles.Type.Standard
           BuildFlags.Type.Instrumented
           "build"
       # DebianVersions.dependsOnStep
           (None Text)
           DebianVersions.DebVersion.Bullseye
+          Network.Type.Berkeley
           Profiles.Type.Standard
           BuildFlags.Type.None
           "build"
