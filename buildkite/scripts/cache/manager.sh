@@ -163,7 +163,9 @@ function read(){
         EXTRA_FLAGS="-f"
     fi
 
-    if ! cp  -r "${EXTRA_FLAGS}" "$__from" "$__to"; then
+    mkdir -p "$__to"
+
+    if ! cp -R "${EXTRA_FLAGS}" "$__from" "$__to"; then
         echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
         exit 2
     fi
@@ -255,7 +257,9 @@ function write(){
         EXTRA_FLAGS="-f"
     fi
 
-    if ! cp -r "${EXTRA_FLAGS}" "$__from" "$__to"; then
+    mkdir -p "$__to"
+    
+    if ! cp -R "${EXTRA_FLAGS}" "$__from" "$__to"; then
         echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
         exit 2
     fi
