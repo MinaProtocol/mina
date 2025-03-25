@@ -250,6 +250,21 @@ module Make (Inputs : Inputs_intf.S) = struct
     let empty_hash =
       Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
 
+    let self_path_get_hash ~hashes ~current_location height address =
+      match Map.find hashes address with
+      | Some hash ->
+          Some hash
+      | None ->
+          let is_empty =
+            match current_location with
+            | None ->
+                true
+            | Some current_location ->
+                let current_address = Location.to_path_exn current_location in
+                Addr.is_further_right ~than:current_address address
+          in
+          if is_empty then Some (empty_hash height) else None
+
     let set_inner_hash_at_addr_exn t address hash =
       assert_is_attached t ;
       assert (Addr.depth address <= t.depth) ;
@@ -349,21 +364,6 @@ module Make (Inputs : Inputs_intf.S) = struct
               Some s )
       in
       self_find_or_batch_lookup self_find Base.get_batch t
-
-    let self_path_get_hash ~hashes ~current_location height address =
-      match Map.find hashes address with
-      | Some hash ->
-          Some hash
-      | None ->
-          let is_empty =
-            match current_location with
-            | None ->
-                true
-            | Some current_location ->
-                let current_address = Location.to_path_exn current_location in
-                Addr.is_further_right ~than:current_address address
-          in
-          if is_empty then Some (empty_hash height) else None
 
     let self_merkle_path ~hashes ~current_location =
       let element height address =
