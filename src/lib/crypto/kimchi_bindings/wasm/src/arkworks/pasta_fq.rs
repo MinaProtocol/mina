@@ -19,13 +19,15 @@ pub struct WasmPastaFq(pub Fq);
 
 impl crate::wasm_flat_vector::FlatVectorElem for WasmPastaFq {
     const FLATTENED_SIZE: usize = core::mem::size_of::<Fq>();
+
     fn flatten(self) -> Vec<u8> {
         let mut bytes: Vec<u8> = Vec::with_capacity(Self::FLATTENED_SIZE);
         self.0.serialize_compressed(&mut bytes).unwrap();
         bytes
     }
-    fn unflatten(flat: Vec<u8>) -> Self {
-        WasmPastaFq(Fq::deserialize_compressed(flat.as_slice()).unwrap())
+
+    fn unflatten(flat: &[u8]) -> Self {
+        WasmPastaFq(Fq::deserialize_compressed(flat).unwrap())
     }
 }
 
