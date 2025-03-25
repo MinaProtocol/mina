@@ -172,21 +172,6 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           (t.maps, get_parent t)
 
-    (** Either copies accumulated or initializes it with the parent being used as the [base]. *)
-    let to_accumulated t =
-      actualize_accumulated t ;
-      match (t.accumulated, t.parent) with
-      | Some { base; detached_next_signal; next; current }, _ ->
-          { base; detached_next_signal; next; current }
-      | None, Ok base ->
-          { base
-          ; next = t.maps
-          ; current = t.maps
-          ; detached_next_signal = t.detached_parent_signal
-          }
-      | None, Error loc ->
-          raise (Dangling_parent_reference (t.uuid, loc))
-
     let get_uuid t = assert_is_attached t ; t.uuid
 
     let get_directory t =
@@ -291,6 +276,21 @@ module Make (Inputs : Inputs_intf.S) = struct
             (parent_addr, `Right (value sibling_mask_hash ~default:h))
       in
       Fn.compose snd @@ List.fold_map ~init ~f
+
+    (** Either copies accumulated or initializes it with the parent being used as the [base]. *)
+    let to_accumulated t =
+      actualize_accumulated t ;
+      match (t.accumulated, t.parent) with
+      | Some { base; detached_next_signal; next; current }, _ ->
+          { base; detached_next_signal; next; current }
+      | None, Ok base ->
+          { base
+          ; next = t.maps
+          ; current = t.maps
+          ; detached_next_signal = t.detached_parent_signal
+          }
+      | None, Error loc ->
+          raise (Dangling_parent_reference (t.uuid, loc))
 
     let set_inner_hash_at_addr_exn t address hash =
       assert_is_attached t ;
