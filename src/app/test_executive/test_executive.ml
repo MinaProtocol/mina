@@ -289,7 +289,6 @@ let main inputs =
     ; archive_node =
         Option.value inputs.archive_image ~default:"archive_image_unused"
     ; user_agent = "codaprotocol/coda-user-agent:0.1.5"
-    ; bots = "minaprotocol/mina-bots:latest"
     ; points = "codaprotocol/coda-points-hack:32b.4"
     }
   in

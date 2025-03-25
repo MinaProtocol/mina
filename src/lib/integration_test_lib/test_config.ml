@@ -5,7 +5,6 @@ module Container_images = struct
     { mina : string
     ; archive_node : string
     ; user_agent : string
-    ; bots : string
     ; points : string
     }
 end
