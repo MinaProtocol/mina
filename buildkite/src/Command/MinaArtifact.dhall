@@ -113,8 +113,8 @@ let build_artifacts
                                                               spec.artifacts
                                                               spec.network}"
                 # [ Cmd.run
-                      "./buildkite/scripts/debian/upload-to-gs.sh ${DebianVersions.lowerName
-                                                                      spec.debVersion}"
+                      "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
+                                                                        spec.debVersion}"
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
             , key = "build-deb-pkg"
