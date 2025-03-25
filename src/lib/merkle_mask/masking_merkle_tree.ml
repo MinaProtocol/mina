@@ -238,6 +238,15 @@ module Make (Inputs : Inputs_intf.S) = struct
       in
       snd @@ List.fold_map ~init:all_parent_paths ~f self_paths
 
+    let rec self_path_impl ~element ~depth address =
+      let height = Addr.height ~ledger_depth:depth address in
+      if height >= depth then Some []
+      else
+        let%bind.Option el = element height address in
+        let%bind.Option parent_address = Addr.parent address |> Or_error.ok in
+        let%map.Option rest = self_path_impl ~element ~depth parent_address in
+        el :: rest
+
     let set_inner_hash_at_addr_exn t address hash =
       assert_is_attached t ;
       assert (Addr.depth address <= t.depth) ;
@@ -355,15 +364,6 @@ module Make (Inputs : Inputs_intf.S) = struct
                 Addr.is_further_right ~than:current_address address
           in
           if is_empty then Some (empty_hash height) else None
-
-    let rec self_path_impl ~element ~depth address =
-      let height = Addr.height ~ledger_depth:depth address in
-      if height >= depth then Some []
-      else
-        let%bind.Option el = element height address in
-        let%bind.Option parent_address = Addr.parent address |> Or_error.ok in
-        let%map.Option rest = self_path_impl ~element ~depth parent_address in
-        el :: rest
 
     let self_merkle_path ~hashes ~current_location =
       let element height address =
