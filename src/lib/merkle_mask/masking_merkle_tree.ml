@@ -276,6 +276,22 @@ module Make (Inputs : Inputs_intf.S) = struct
       in
       self_path_impl ~element
 
+    (* fixup_merkle_path patches a Merkle path reported by the parent,
+       overriding with hashes which are stored in the mask *)
+    let fixup_merkle_path ~hashes ~address:init =
+      let f address =
+        (* first element in the path contains hash at sibling of address *)
+        let sibling_mask_hash = Map.find hashes (Addr.sibling address) in
+        let parent_addr = Addr.parent_exn address in
+        let open Option in
+        function
+        | `Left h ->
+            (parent_addr, `Left (value sibling_mask_hash ~default:h))
+        | `Right h ->
+            (parent_addr, `Right (value sibling_mask_hash ~default:h))
+      in
+      Fn.compose snd @@ List.fold_map ~init ~f
+
     let set_inner_hash_at_addr_exn t address hash =
       assert_is_attached t ;
       assert (Addr.depth address <= t.depth) ;
@@ -391,22 +407,6 @@ module Make (Inputs : Inputs_intf.S) = struct
           ~right:(`Right (sibling_hash, self_hash))
       in
       self_path_impl ~element
-
-    (* fixup_merkle_path patches a Merkle path reported by the parent,
-       overriding with hashes which are stored in the mask *)
-    let fixup_merkle_path ~hashes ~address:init =
-      let f address =
-        (* first element in the path contains hash at sibling of address *)
-        let sibling_mask_hash = Map.find hashes (Addr.sibling address) in
-        let parent_addr = Addr.parent_exn address in
-        let open Option in
-        function
-        | `Left h ->
-            (parent_addr, `Left (value sibling_mask_hash ~default:h))
-        | `Right h ->
-            (parent_addr, `Right (value sibling_mask_hash ~default:h))
-      in
-      Fn.compose snd @@ List.fold_map ~init ~f
 
     (* fixup_merkle_path patches a Merkle path reported by the parent,
        overriding with hashes which are stored in the mask *)
