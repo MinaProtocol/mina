@@ -205,6 +205,39 @@ module Make (Inputs : Inputs_intf.S) = struct
       update_maps t ~f:(fun maps ->
           { maps with hashes = Map.set maps.hashes ~key:address ~data:hash } )
 
+    let path_batch_impl ~fixup_path ~self_lookup ~base_lookup t locations =
+      assert_is_attached t ;
+      let maps, ancestor = maps_and_ancestor t in
+      let self_paths =
+        List.map locations ~f:(fun location ->
+            let address = Location.to_path_exn location in
+            self_lookup ~hashes:maps.hashes ~current_location:t.current_location
+              ~depth:t.depth address
+            |> Option.value_map
+                 ~default:(Either.Second (location, address))
+                 ~f:Either.first )
+      in
+      let all_parent_paths =
+        let locs =
+          List.filter_map self_paths ~f:(function
+            | Either.First _ ->
+                None
+            | Either.Second (location, _) ->
+                Some location )
+        in
+        if List.is_empty locs then [] else base_lookup ancestor locs
+      in
+      let f parent_paths = function
+        | Either.First path ->
+            (parent_paths, path)
+        | Either.Second (_, address) ->
+            let path =
+              fixup_path ~hashes:maps.hashes ~address (List.hd_exn parent_paths)
+            in
+            (List.tl_exn parent_paths, path)
+      in
+      snd @@ List.fold_map ~init:all_parent_paths ~f self_paths
+
     let set_inner_hash_at_addr_exn t address hash =
       assert_is_attached t ;
       assert (Addr.depth address <= t.depth) ;
@@ -421,39 +454,6 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let merkle_path t location =
       merkle_path_at_addr_exn t (Location.to_path_exn location)
-
-    let path_batch_impl ~fixup_path ~self_lookup ~base_lookup t locations =
-      assert_is_attached t ;
-      let maps, ancestor = maps_and_ancestor t in
-      let self_paths =
-        List.map locations ~f:(fun location ->
-            let address = Location.to_path_exn location in
-            self_lookup ~hashes:maps.hashes ~current_location:t.current_location
-              ~depth:t.depth address
-            |> Option.value_map
-                 ~default:(Either.Second (location, address))
-                 ~f:Either.first )
-      in
-      let all_parent_paths =
-        let locs =
-          List.filter_map self_paths ~f:(function
-            | Either.First _ ->
-                None
-            | Either.Second (location, _) ->
-                Some location )
-        in
-        if List.is_empty locs then [] else base_lookup ancestor locs
-      in
-      let f parent_paths = function
-        | Either.First path ->
-            (parent_paths, path)
-        | Either.Second (_, address) ->
-            let path =
-              fixup_path ~hashes:maps.hashes ~address (List.hd_exn parent_paths)
-            in
-            (List.tl_exn parent_paths, path)
-      in
-      snd @@ List.fold_map ~init:all_parent_paths ~f self_paths
 
     let merkle_path_batch =
       path_batch_impl ~base_lookup:Base.merkle_path_batch
