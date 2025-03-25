@@ -2,6 +2,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let Artifacts = ../../Constants/Artifacts.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let S = ../../Lib/SelectFiles.dhall
@@ -9,8 +11,6 @@ let S = ../../Lib/SelectFiles.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
-
-let Artifacts = ../../Constants/Artifacts.dhall
 
 in  Pipeline.build
       Pipeline.Config::{

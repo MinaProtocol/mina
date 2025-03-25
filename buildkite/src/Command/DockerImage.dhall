@@ -10,6 +10,8 @@ let Size = ./Size.dhall
 
 let Profiles = ../Constants/Profiles.dhall
 
+let Artifacts = ../Constants/Artifacts.dhall
+
 let BuildFlags = ../Constants/BuildFlags.dhall
 
 let Cmd = ../Lib/Cmds.dhall
@@ -21,8 +23,6 @@ let DebianRepo = ../Constants/DebianRepo.dhall
 let DebianVersions = ../Constants/DebianVersions.dhall
 
 let Network = ../Constants/Network.dhall
-
-let Artifacts = ../Constants/Artifacts.dhall
 
 let DockerPublish = ../Constants/DockerPublish.dhall
 

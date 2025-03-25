@@ -30,13 +30,13 @@ let DebianVersions = ../Constants/DebianVersions.dhall
 
 let DebianRepo = ../Constants/DebianRepo.dhall
 
+let Artifacts = ../Constants/Artifacts.dhall
+
 let Profiles = ../Constants/Profiles.dhall
 
 let Toolchain = ../Constants/Toolchain.dhall
 
 let Network = ../Constants/Network.dhall
-
-let Artifacts = ../Constants/Artifacts.dhall
 
 let Spec =
       { Type =

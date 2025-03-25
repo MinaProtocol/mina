@@ -2,6 +2,8 @@ let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
+let Network = ../../Constants/Network.dhall
+
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -9,8 +11,6 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 let PipelineMode = ../../Pipeline/Mode.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
-
-let Network = ../../Constants/Network.dhall
 
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
