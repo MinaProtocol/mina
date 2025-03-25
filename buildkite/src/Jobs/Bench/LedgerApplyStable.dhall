@@ -6,7 +6,7 @@ in  Pipeline.build
       ( LedgerApply.pipeline
           LedgerApply.Spec::{
           , name = "LedgerApplyStable"
-          , label = "Ledger Apply Stable"
-          , key = "ledger-apply-stable"
+          , label = "Ledger Apply"
+          , key = "ledger-apply"
           }
       )

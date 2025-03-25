@@ -9,7 +9,7 @@ in  Pipeline.build
           LedgerApply.Spec::{
           , name = "LedgerApplyUnstable"
           , label = "Ledger Apply"
-          , key = "ledger-apply-unstable"
+          , key = "ledger-apply"
           , mode = PipelineMode.Type.Stable
           }
       )
