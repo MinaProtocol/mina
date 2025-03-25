@@ -213,6 +213,29 @@ module Lite = struct
   module E = struct
     type t = E : (lite, 'mutant) diff -> t [@@unboxed]
   end
+
+  [%%versioned
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type t =
+        | New_node of Mina_block.Validated.Stable.V2.t
+        | Root_transitioned of Root_transition.Lite.Stable.V4.t
+        | Best_tip_changed of State_hash.Stable.V1.t
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let read_all_proofs_from_disk (E.E diff) : Stable.Latest.t =
+    match diff with
+    | New_node (Node.Lite block) ->
+        New_node (Mina_block.Validated.read_all_proofs_from_disk block)
+    | Root_transitioned t ->
+        Root_transitioned t
+    | Best_tip_changed b ->
+        Best_tip_changed b
 end
 
 module Full = struct
