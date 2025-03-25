@@ -18,6 +18,9 @@
    wrap_wasm/wrap.js
    wrap_wasm/wrap_proof.js
    wrap_wasm/wrap_oracles.js
+   wrap_wasm/wrap_prover_index.js
+   wrap_wasm/wrap_srs.js
+   wrap_wasm/wrap_verifier_index.js
    ))
  (instrumentation
   (backend bisect_ppx))

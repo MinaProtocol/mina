@@ -1,5 +1,5 @@
 // Provides: wrap_wasm_oracles
-function wrap_wasm_oracles(plonk_wasm,plonk_intf){
+function wrap_wasm_oracles(plonk_wasm,plonk_intf,tsRustConversion){
 
   plonk_intf.fp_oracles_create = function (lgr_comm, verifier_index, proof) {
     return tsRustConversion.fp.oraclesFromRust(
@@ -56,7 +56,7 @@ function wrap_wasm_oracles(plonk_wasm,plonk_intf){
 
   plonk_intf.caml_pasta_fq_poseidon_block_cipher = function(_fake_params, fq_vector) {
     // 1. get permuted field vector from rust
-    var wasm_flat_vector = plonk_intf.caml_pasta_fq_poseidon_block_cipher(
+    var wasm_flat_vector = plonk_wasm.caml_pasta_fq_poseidon_block_cipher(
       tsRustConversion.fq.vectorToRust(fq_vector)
     );
     var new_fq_vector = tsRustConversion.fq.vectorFromRust(wasm_flat_vector);

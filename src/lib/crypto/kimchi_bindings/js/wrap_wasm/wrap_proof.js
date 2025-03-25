@@ -1,5 +1,5 @@
 // Provides: wrap_wasm_proof
-function wrap_wasm_proof(plonk_wasm,plonk_intf){
+function wrap_wasm_proof(plonk_wasm,plonk_intf,tsRustConversion){
   plonk_intf.caml_pasta_fp_plonk_proof_create = function (
     index,
     witness_cols,

@@ -1,4 +1,4 @@
-/* global plonk_intf, tsRustConversion,
+/* global plonk_intf
  */
 
 // Provides: fp_oracles_create
@@ -30,11 +30,11 @@ var fq_oracles_create_no_public = function (lgr_comm, verifier_index, proof) {
 };
 
 // Provides: fq_oracles_dummy
-// Requires: plonk_intf, tsRustConversion
+// Requires: plonk_intf
 var fq_oracles_dummy = plonk_intf.fq_oracles_dummy;
 
 // Provides: fq_oracles_deep_copy
-// Requires: plonk_intf, tsRustConversion
+// Requires: plonk_intf
 var fq_oracles_deep_copy = plonk_intf.fq_oracles_deep_copy;
 
 // This is fake -- parameters are only needed on the Rust side, so no need to return something meaningful

@@ -1,4 +1,4 @@
-/* global plonk_intf, tsRustConversion
+/* global plonk_intf
  */
 
 // Requires: plonk_intf

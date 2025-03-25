@@ -1,47 +1,14 @@
-/* global plonk_intf, tsRustConversion, caml_string_of_jsstring,
+/* global plonk_intf, caml_string_of_jsstring,
     free_on_finalize, caml_jsstring_of_string
  */
 
 // Provides: caml_pasta_fq_plonk_circuit_serialize
-// Requires: plonk_intf, caml_string_of_jsstring
-var caml_pasta_fq_plonk_circuit_serialize = function (
-  public_input_size,
-  gate_vector
-) {
-  return caml_string_of_jsstring(
-    plonk_intf.caml_pasta_fq_plonk_circuit_serialize(
-      public_input_size,
-      gate_vector
-    )
-  );
-};
+// Requires: plonk_intf
+var caml_pasta_fq_plonk_circuit_serialize = plonk_intf.caml_pasta_fq_plonk_circuit_serialize;
 
 // Provides: caml_pasta_fp_plonk_index_create
-// Requires: plonk_intf, free_on_finalize, tsRustConversion
-var caml_pasta_fp_plonk_index_create = function (
-  gates,
-  public_inputs,
-  caml_lookup_tables,
-  caml_runtime_table_cfgs,
-  prev_challenges,
-  urs
-) {
-  var wasm_lookup_tables =
-    tsRustConversion.fp.lookupTablesToRust(caml_lookup_tables);
-  var wasm_runtime_table_cfgs = tsRustConversion.fp.runtimeTableCfgsToRust(
-    caml_runtime_table_cfgs
-  );
-
-  var t = plonk_intf.caml_pasta_fp_plonk_index_create(
-    gates,
-    public_inputs,
-    wasm_lookup_tables,
-    wasm_runtime_table_cfgs,
-    prev_challenges,
-    urs
-  );
-  return free_on_finalize(t);
-};
+// Requires: plonk_intf
+var caml_pasta_fp_plonk_index_create = plonk_intf.caml_pasta_fp_plonk_index_create;
 
 // Provides: caml_pasta_fp_plonk_index_create_bytecode
 // Requires: caml_pasta_fp_plonk_index_create
@@ -119,32 +86,8 @@ var caml_pasta_fp_plonk_index_write = function (append, t, path) {
 };
 
 // Provides: caml_pasta_fq_plonk_index_create
-// Requires: plonk_intf, free_on_finalize, tsRustConversion
-var caml_pasta_fq_plonk_index_create = function (
-  gates,
-  public_inputs,
-  caml_lookup_tables,
-  caml_runtime_table_cfgs,
-  prev_challenges,
-  urs
-) {
-  var wasm_lookup_tables =
-    tsRustConversion.fq.lookupTablesToRust(caml_lookup_tables);
-  var wasm_runtime_table_cfgs = tsRustConversion.fq.runtimeTableCfgsToRust(
-    caml_runtime_table_cfgs
-  );
-
-  return free_on_finalize(
-    plonk_intf.caml_pasta_fq_plonk_index_create(
-      gates,
-      public_inputs,
-      wasm_lookup_tables,
-      wasm_runtime_table_cfgs,
-      prev_challenges,
-      urs
-    )
-  );
-};
+// Requires: plonk_intf, free_on_finalize
+var caml_pasta_fq_plonk_index_create = plonk_intf.caml_pasta_fq_plonk_index_create;
 
 // Provides: caml_pasta_fq_plonk_index_create_bytecode
 // Requires: caml_pasta_fq_plonk_index_create
