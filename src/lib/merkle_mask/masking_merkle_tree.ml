@@ -186,10 +186,6 @@ module Make (Inputs : Inputs_intf.S) = struct
           acc.current <- f acc.current ;
           acc.next <- f acc.next )
 
-    let self_set_hash t address hash =
-      update_maps t ~f:(fun maps ->
-          { maps with hashes = Map.set maps.hashes ~key:address ~data:hash } )
-
     let path_batch_impl ~fixup_path ~self_lookup ~base_lookup t locations =
       assert_is_attached t ;
       let maps, ancestor = maps_and_ancestor t in
@@ -291,6 +287,10 @@ module Make (Inputs : Inputs_intf.S) = struct
           }
       | None, Error loc ->
           raise (Dangling_parent_reference (t.uuid, loc))
+
+    let self_set_hash t address hash =
+      update_maps t ~f:(fun maps ->
+          { maps with hashes = Map.set maps.hashes ~key:address ~data:hash } )
 
     let set_inner_hash_at_addr_exn t address hash =
       assert_is_attached t ;
