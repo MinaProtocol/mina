@@ -435,7 +435,8 @@ class LedgerApplyBenchmark(Benchmark):
                     csvfile.write(
                         self.headers_to_influx(self.headers()) + "\n")
                 csvwriter = csv.writer(csvfile)
-                csvwriter.writerows(("ledger-apply",final_time, preparation_steps_mean,"ledger-apply", branch))
+                csvwriter.writerow((self.name.name, self.time.name,self.preps_mean.name, self.category.name, self.branch.name))
+                csvwriter.writerow(("ledger-apply",final_time, preparation_steps_mean,"ledger-apply", branch))
 
         return [output_filename]
 
