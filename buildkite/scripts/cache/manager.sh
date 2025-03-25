@@ -255,7 +255,7 @@ function write(){
         EXTRA_FLAGS="-f"
     fi
 
-    if ! "$CACHE_APP" -r "${EXTRA_FLAGS}" "$__from" "$__to"; then
+    if ! cp -r "${EXTRA_FLAGS}" "$__from" "$__to"; then
         echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
         exit 2
     fi
