@@ -247,6 +247,9 @@ module Make (Inputs : Inputs_intf.S) = struct
         let%map.Option rest = self_path_impl ~element ~depth parent_address in
         el :: rest
 
+    let empty_hash =
+      Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
+
     let set_inner_hash_at_addr_exn t address hash =
       assert_is_attached t ;
       assert (Addr.depth address <= t.depth) ;
@@ -346,9 +349,6 @@ module Make (Inputs : Inputs_intf.S) = struct
               Some s )
       in
       self_find_or_batch_lookup self_find Base.get_batch t
-
-    let empty_hash =
-      Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
 
     let self_path_get_hash ~hashes ~current_location height address =
       match Map.find hashes address with
