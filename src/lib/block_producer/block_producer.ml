@@ -1051,9 +1051,20 @@ let generate_genesis_proof_if_needed ~genesis_breadcrumb ~frontier_reader () =
 
 let iteration ~genesis_breadcrumb ~context:(module Context : CONTEXT)
     ~vrf_evaluator ~time_controller ~coinbase_receiver ~frontier_reader
-    ~set_next_producer_timing ~vrf_evaluation_state ~epoch_data_for_vrf
-    ~ledger_snapshot i slot i' new_global_slot ~scheduler
+    ~set_next_producer_timing ~transition_frontier ~vrf_evaluation_state
+    ~epoch_data_for_vrf ~ledger_snapshot i slot ~scheduler
     ~check_next_block_timing ~production_supervisor =
+  O1trace.thread "block_producer_iteration"
+  @@ fun () ->
+  let consensus_state =
+    Transition_frontier.(
+      best_tip transition_frontier |> Breadcrumb.consensus_state)
+  in
+  let i' =
+    Mina_numbers.Length.succ
+      epoch_data_for_vrf.Consensus.Data.Epoch_data_for_vrf.epoch
+  in
+  let new_global_slot = epoch_data_for_vrf.global_slot in
   let open Context in
   let%bind () =
     if Mina_numbers.Length.(i' > i) then
@@ -1265,8 +1276,6 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     ~constants:consensus_constants (time_to_ms now)
                     consensus_state ~local_state:consensus_local_state ~logger )
             in
-            let i' = Mina_numbers.Length.succ epoch_data_for_vrf.epoch in
-            let new_global_slot = epoch_data_for_vrf.global_slot in
             let log_if_slot_diff_is_less_than =
               let current_global_slot =
                 Consensus.Data.Consensus_time.(
@@ -1311,10 +1320,9 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
               (iteration ~genesis_breadcrumb
                  ~context:(module Context : CONTEXT)
                  ~vrf_evaluator ~time_controller ~coinbase_receiver
-                 ~frontier_reader ~set_next_producer_timing
+                 ~frontier_reader ~set_next_producer_timing ~transition_frontier
                  ~vrf_evaluation_state ~epoch_data_for_vrf ~ledger_snapshot i
-                 slot i' new_global_slot ~scheduler ~check_next_block_timing
-                 ~production_supervisor )
+                 slot ~scheduler ~check_next_block_timing ~production_supervisor )
       in
       let start () =
         check_next_block_timing Mina_numbers.Global_slot_since_hard_fork.zero
