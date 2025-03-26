@@ -19,6 +19,49 @@ create_account(1){
   }
 }
 
+// Workflow used to request funds from a faucet
+request_funds(1){
+  request{
+    network = {
+      "network":"PLACEHOLDER_NETWORK_NAME",
+      "blockchain":"mina"
+    };
+    
+    currency = {
+      "symbol":"MINA",
+      "decimals":9
+    };
+
+    // Find an account with 0 balance
+    account = find_balance({
+      "minimum_balance":{
+        "value": "0",
+        "currency": {{currency}}
+      },
+      "create_limit": 100,
+      "create_probability": 50
+    });
+
+    // Use the prefunded account to fund the account
+    prefunded_account = find_balance({
+      "account_identifier": {
+        "address": "PLACEHOLDER_PREFUNDED_ADDRESS",
+        "metadata": {"token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"}
+      },
+      "minimum_balance":{
+        "value": "200000000000", // 200 MINA
+        "currency": {{currency}}
+      }
+    });
+
+    // Print balances for debugging
+    print_message({
+      "account_balance": {{account.balance.value}},
+      "prefunded_account_balance": {{prefunded_account.balance.value}}
+    });
+  }
+}
+
 // Workflow used to generate payment transactions
 payment(10){
   payment_dry_run{
