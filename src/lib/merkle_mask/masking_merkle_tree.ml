@@ -93,6 +93,7 @@ module Make (Inputs : Inputs_intf.S) = struct
              This is used as a lookup cache. *)
     ; mutable accumulated : accumulated_t option
     ; mutable is_committing : bool
+    ; mutable unhashed_accounts : unhashed_account_t list
     }
 
   type unattached = t
@@ -114,6 +115,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; accumulated = None
     ; maps = empty_maps
     ; is_committing = false
+    ; unhashed_accounts = []
     }
 
   let get_uuid { uuid; _ } = uuid
@@ -651,6 +653,7 @@ module Make (Inputs : Inputs_intf.S) = struct
               ; current = acc.current
               } )
       ; is_committing = false
+      ; unhashed_accounts = t.unhashed_accounts
       }
 
     let last_filled t =
