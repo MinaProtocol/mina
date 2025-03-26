@@ -357,6 +357,18 @@
           '';
         });
 
+        devShells.neovim = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          name = "mina-neovim-dev-shell";
+          buildInputs = oa.buildInputs ++ devShellPackages;
+          nativeBuildInputs = oa.nativeBuildInputs
+            ++ [ ocamlPackages.ocaml-lsp-server ocamlPackages.merlin pkgs.python311Packages.pynvim ];
+          shellHook = ''
+            ${oa.shellHook}
+            unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
+            # TODO: dead code doesn't allow us to have nice things
+          '';
+        });
+
         devShells.operations = pkgs.mkShell {
           name = "mina-operations";
           packages = with pkgs; [ skopeo gzip google-cloud-sdk ];
