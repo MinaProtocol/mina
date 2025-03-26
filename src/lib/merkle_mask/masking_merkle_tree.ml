@@ -358,6 +358,12 @@ module Make (Inputs : Inputs_intf.S) = struct
       |> with_merkle_path_batch |> compute_merge_hashes
       |> List.iter ~f:(Tuple2.uncurry @@ self_set_hash_impl t)
 
+    let finalize_hashes t =
+      let unhashed_accounts = t.unhashed_accounts in
+      if not @@ List.is_empty unhashed_accounts then (
+        t.unhashed_accounts <- [] ;
+        finalize_hashes_do t unhashed_accounts )
+
     (** Either copies accumulated or initializes it with the parent being used as the [base]. *)
     let to_accumulated t =
       actualize_accumulated t ;
