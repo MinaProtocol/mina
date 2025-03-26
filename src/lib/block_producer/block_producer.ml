@@ -183,12 +183,47 @@ let iteration (type result) ~(schedule_next_vrf_check : _ -> result)
 
 (**
  * Some lemmas to prove about `run` function:
+ * - Observation: Scheduler unloads the task before starting its execution
  * - L1: Scheduling happens only when there is no other action running
+ *    1. Scheduling happens only via `iteration` function when one of the two scheduling callbacks is called
+ *    2. When scheduling happens, iteration is continued only from within the scheduled action
+ *    3. As seen in callbacks, scheduling callbacks only call `schedule` with some parameters
+ *    QED
  * - L2: Next task is scheduled only after the previous gets completed
+ *    1. Scheduling happens only via `iteration` function when one of the two scheduling callbacks is called
+ *    2. When scheduling happens, iteration is continued only from within the scheduled action
+ *    3. As seen in callbacks, `schedule` is called at most once and the call happens at the end of previous iteration
+ *    4. First iteration starts with no task being scheduled
+ *    QED
  * - L3: When block is being produced, scheduler doesn't contain a task
- * - L4: When block is being produced, no other action is executing in parallel
- * - L5: When block is being produced, no other action is scheduled via async
+ *    1. Callback to produce a block doesn't contain a `schedule` call
+ *    2. Block production can either be executed when iterations just started (and no task was scheduled yet),
+ *       or as a result of some task being scheduled
+ *    3. In the latter case, from L2 it follows that preceding task must have been completed before the current task started
+ *    4. And the current task was started after the scheduler became empty
+ *    QED
+ * - L4: Task is either executed right away or scheduled via scheduler, i.e. async is not used directly
+ *    1. Technically, `iterate_if_frontier_is_available` spawns async task w/o scheduler,
+ *       but it does so only while the frontier isn't available
+ *    2. If frontier is available, `iterate_if_frontier_is_available` calls iteration straight away
+ *    3. Function `iteration` doesn't contain async code at all, and may schedule tasks only via callbacks
+ *    4. Callbacks start next iteration right away, use scheduler to schedule next task or produce a block
+ *    5. Producing a block uses `Singleton_supervisor.dispatch` which doesn't spawn async task beyond what
+         happens during block production (i.e. a call to prover), but crucially no other code from `run` will
+         be spawned as an async task while block production is in progress
+ * - L5: When block is being produced, no other action is executing in parallel
+ *    1. From L3 it follows that block production starts after scheduler became empty
+ *    2. From 1. and L4 it follows that no other action is spawned while block production is in progress
+ *    3. From L1 it follows that while block production is in progress, no new action is scheduled
+ *    QED
  * - Theorem: `run` functions would work well being written via `Deferred.forever`.
+ *    1. `Singleton_supervisor.cancel` is called only as part of `Singleton_supervisor.dispatch`
+ *    2. From L5 it follows that `Singleton_supervisor.dispatch` is called only after
+ *       previous call to `Singleton_supervisor.dispatch` has completed
+ *    3. `Singleton_supervisor.cancel` is called only when supervisor's `task` is set to None (from 1. and 2.)
+ *    4. Block production will never be interrupted, hence the next block production will be
+ *       started only after the previous finishes
+ *    QED
  *)
 let run ~context:(module Context : CONTEXT) ~time_controller
     ~consensus_local_state ~coinbase_receiver ~frontier_reader =
