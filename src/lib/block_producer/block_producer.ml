@@ -1049,12 +1049,12 @@ let generate_genesis_proof_if_needed ~genesis_breadcrumb ~frontier_reader () =
   | None ->
       Deferred.return ()
 
-let iteration ~genesis_breadcrumb ~schedule_next_vrf_check
+let iteration ~genesis_breadcrumb ~schedule_next_vrf_check ~produce_block_now
     ~schedule_block_production ~next_vrf_check_now
     ~context:(module Context : CONTEXT) ~vrf_evaluator ~time_controller
     ~coinbase_receiver ~frontier_reader ~set_next_producer_timing
     ~transition_frontier ~vrf_evaluation_state ~epoch_data_for_vrf
-    ~ledger_snapshot i slot ~production_supervisor =
+    ~ledger_snapshot i slot =
   O1trace.thread "block_producer_iteration"
   @@ fun () ->
   let consensus_state =
@@ -1146,16 +1146,11 @@ let iteration ~genesis_breadcrumb ~schedule_next_vrf_check
           (`Produce_now (data, winner_pk))
           consensus_state ;
         Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
-        let%map () =
+        let%bind () =
           generate_genesis_proof_if_needed ~genesis_breadcrumb ~frontier_reader
             ()
         in
-        ignore
-          ( Interruptible.finally
-              (Singleton_supervisor.dispatch production_supervisor
-                 (now, data, winner_pk) )
-              ~f:next_vrf_check_now
-            : (_, _) Interruptible.t ) )
+        produce_block_now (now, data, winner_pk) )
       else
         match
           Mina_numbers.Global_slot_since_hard_fork.diff winning_global_slot
@@ -1327,6 +1322,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                    (Fn.compose Deferred.return
                       (Singleton_scheduler.schedule scheduler
                          ~f:next_vrf_check_now ) )
+                 ~produce_block_now:
+                   (Fn.compose Deferred.return produce_block_now)
                  ~schedule_block_production:(fun (time, data, winner) ->
                    Singleton_scheduler.schedule scheduler time ~f:(fun () ->
                        produce_block_now (time, data, winner) ) ;
@@ -1336,7 +1333,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                  ~vrf_evaluator ~time_controller ~coinbase_receiver
                  ~frontier_reader ~set_next_producer_timing ~transition_frontier
                  ~vrf_evaluation_state ~epoch_data_for_vrf ~ledger_snapshot i
-                 slot ~production_supervisor )
+                 slot )
       in
       let start () =
         check_next_block_timing Mina_numbers.Global_slot_since_hard_fork.zero
