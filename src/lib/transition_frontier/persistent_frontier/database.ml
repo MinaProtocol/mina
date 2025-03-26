@@ -291,6 +291,33 @@ let get_root t =
       | Error _ as e ->
           e )
 
+(*
+   Assuming database to be in a dirty state, so either `Root` or `(Root_hash, Root_data)`, or even both of them could be present;
+   This function aims to cleanup the state so only `(Root_hash, Root_data)` is present;
+   In the case of both being present, we discard the tuple and regenerate it from `Root` and then erase `Root`
+ *)
+let update_root_clean t =
+  match
+    get_batch t.db
+      ~keys:[ Some_key Root; Some_key Root_hash; Some_key Root_common ]
+  with
+  | [ None; Some _; Some _ ] ->
+      (* Everything is good *) Ok ()
+  | [ Some (Some_key_value (Root, root)); _; _ ] ->
+      Batch.with_batch t.db ~f:(fun batch ->
+          let hash = Root_data.Minimal.Stable.Latest.hash root in
+          let common = Root_data.Minimal.Stable.V2.common root in
+          Batch.remove batch ~key:Root ;
+          Batch.set batch ~key:Root_hash ~data:hash ;
+          Batch.set batch ~key:Root_common ~data:common ;
+          Ok () )
+  | [ None; None; _ ] ->
+      Error (`Not_found `Root_hash)
+  | [ None; Some _; None ] ->
+      Error (`Not_found `Root_common)
+  | l ->
+      Error (`Wrong_number_of_result (List.length l))
+
 let is_root_replaced_by_common_and_hash t =
   match
     get_batch t.db

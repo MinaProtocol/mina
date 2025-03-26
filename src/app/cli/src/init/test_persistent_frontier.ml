@@ -16,12 +16,15 @@ let main ~frontier_db_path ~no_root_compatible ~num_of_samples () =
   [%log info] "Current DB path: %s" frontier_db_path ;
   [%log info] "Loading database" ;
   let db = Database.create ~logger ~directory:frontier_db_path in
-  if not no_root_compatible then
+  if not no_root_compatible then (
     (*
       To maintain compatibility, run a deserialization round first,
       to ensure we have `root_hash` and `root_common` inside the DB
       *)
-    deserialize_root_hash ~logger ~db ;
+    [%log info] "Updating the database to a clean state" ;
+    Database.update_root_clean db
+    |> Result.ok
+    |> Option.value_exn ~message:"Can't update root to a clean state" ) ;
   assert (Database.is_root_replaced_by_common_and_hash db) ;
   let rec sample cnt =
     match cnt with

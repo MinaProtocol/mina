@@ -108,6 +108,15 @@ val get_root :
      t
   -> (Root_data.Minimal.Stable.Latest.t, [> `Not_found of [> `Root ] ]) Result.t
 
+val update_root_clean :
+     t
+  -> ( unit
+     , [> `Not_found of [> `Root_common | `Root_hash ]
+       | `Wrong_number_of_result of int ] )
+     result
+
+val is_root_replaced_by_common_and_hash : t -> bool
+
 val get_protocol_states_for_root_scan_state :
      t
   -> ( Mina_state.Protocol_state.value list
@@ -131,5 +140,3 @@ val crawl_successors :
        | `Not_found of [> `Arcs of State_hash.t | `Transition of State_hash.t ]
        ] )
      Deferred.Result.t
-
-val is_root_replaced_by_common_and_hash : t -> bool
