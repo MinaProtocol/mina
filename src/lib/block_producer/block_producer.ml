@@ -194,24 +194,26 @@ let run ~context:(module Context : CONTEXT) ~time_controller
         - same as above, but with call to `Singleton_scheduler.schedule`
           with "now" as the time parameter
   *)
-  let iteration ~start_next_iteration =
+  let iteration ~iterate_if_frontier_is_available =
     let produce_block_now triple =
       ignore
         ( Interruptible.finally
             (Singleton_supervisor.dispatch production_supervisor triple)
-            ~f:start_next_iteration
+            ~f:iterate_if_frontier_is_available
           : (_, _) Interruptible.t )
     in
     iteration
       ~schedule_next_vrf_check:
         (Fn.compose Deferred.return
-           (Singleton_scheduler.schedule scheduler ~f:start_next_iteration) )
+           (Singleton_scheduler.schedule scheduler
+              ~f:iterate_if_frontier_is_available ) )
       ~produce_block_now:(Fn.compose Deferred.return produce_block_now)
       ~schedule_block_production:(fun (time, data, winner) ->
         Singleton_scheduler.schedule scheduler time ~f:(fun () ->
             produce_block_now (time, data, winner) ) ;
         Deferred.unit )
-      ~next_vrf_check_now:(Fn.compose Deferred.return start_next_iteration)
+      ~next_vrf_check_now:
+        (Fn.compose Deferred.return iterate_if_frontier_is_available)
       ~context:(module Context)
       ~time_controller ~coinbase_receiver
   in
@@ -239,18 +241,18 @@ let run ~context:(module Context : CONTEXT) ~time_controller
                 ~constants:consensus_constants (time_to_ms now) consensus_state
                 ~local_state:consensus_local_state ~logger )
         in
-        let start_next_iteration = iterate_if_frontier_is_available in
         don't_wait_for
-          (iteration ~start_next_iteration ~ledger_snapshot () : unit Deferred.t)
+          ( iteration ~iterate_if_frontier_is_available ~ledger_snapshot ()
+            : unit Deferred.t )
   in
-  let start = iterate_if_frontier_is_available in
   let genesis_state_timestamp = consensus_constants.genesis_state_timestamp in
   (* if the producer starts before genesis, sleep until genesis *)
   let now = Block_time.now time_controller in
-  if Block_time.( >= ) now genesis_state_timestamp then start ()
+  if Block_time.( >= ) now genesis_state_timestamp then
+    iterate_if_frontier_is_available ()
   else
     let time_till_genesis = Block_time.diff genesis_state_timestamp now in
     ignore
       ( Block_time.Timeout.create time_controller time_till_genesis ~f:(fun _ ->
-            start () )
+            iterate_if_frontier_is_available () )
         : unit Block_time.Timeout.t )
