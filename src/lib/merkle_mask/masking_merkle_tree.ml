@@ -627,16 +627,7 @@ module Make (Inputs : Inputs_intf.S) = struct
                 t.current_location <- Some prev_loc
             | None ->
                 t.current_location <- None ) ;
-      (* update hashes *)
-      let account_address = Location.to_path_exn location in
-      let account_hash = Hash.empty_account in
-      let merkle_path = merkle_path t location in
-      let addresses_and_hashes =
-        addresses_and_hashes_from_merkle_path_exn merkle_path account_address
-          account_hash
-      in
-      List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
-          self_set_hash t addr hash )
+      t.unhashed_accounts <- (None, location) :: t.unhashed_accounts
 
     let set_account_unsafe t location account =
       assert_is_attached t ;
@@ -653,16 +644,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     let set t location account =
       assert_is_attached t ;
       set_account_unsafe t location account ;
-      (* Update merkle path. *)
-      let account_address = Location.to_path_exn location in
-      let account_hash = Hash.hash_account account in
-      let merkle_path = merkle_path t location in
-      let addresses_and_hashes =
-        addresses_and_hashes_from_merkle_path_exn merkle_path account_address
-          account_hash
-      in
-      List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
-          self_set_hash t addr hash )
+      t.unhashed_accounts <- (Some account, location) :: t.unhashed_accounts
 
     (* if the mask's parent sets an account, we can prune an entry in the mask
        if the account in the parent is the same in the mask
