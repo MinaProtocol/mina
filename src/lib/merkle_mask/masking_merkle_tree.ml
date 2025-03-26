@@ -386,6 +386,11 @@ module Make (Inputs : Inputs_intf.S) = struct
               Map.set maps.token_owners ~key:token_id ~data:account_id
           } )
 
+    let hashes_and_ancestor t =
+      (*finalize_hashes t ;*)
+      let { hashes; _ }, ancestor = maps_and_ancestor t in
+      (hashes, ancestor)
+
     (* a read does a lookup in the account_tbl; if that fails, delegate to
        parent *)
     let get t location =
