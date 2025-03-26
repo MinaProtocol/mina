@@ -280,6 +280,64 @@ module Make (Inputs : Inputs_intf.S) = struct
       in
       Fn.compose snd @@ List.fold_map ~init ~f
 
+    let _compute_merge_hashes :
+           ( Account.t option
+           * Addr.t
+           * [ `Left of Hash.t | `Right of Hash.t ] list )
+           list
+        -> (Addr.t * Hash.t) list =
+      let process_pair height = function
+        | (lh, laddr, `Left _ :: lpath), (rh, _, `Right _ :: _rpath) ->
+            (* Assertion: lpath == _rpath *)
+            let parent = Addr.parent_exn laddr in
+            let h = Hash.merge ~height lh rh in
+            (h, parent, lpath)
+        | _ ->
+            failwith "compute_merge_hashes: unexpected match of nodes"
+      in
+      let process_single height (self_hash, addr, path) =
+        let parent = Addr.parent_exn addr in
+        match path with
+        | `Left sibling_hash :: rest ->
+            let new_hash = Hash.merge ~height self_hash sibling_hash in
+            (new_hash, parent, rest)
+        | `Right sibling_hash :: rest ->
+            let new_hash = Hash.merge ~height sibling_hash self_hash in
+            (new_hash, parent, rest)
+        | _ ->
+            failwith "compute_merge_hashes: path is empty"
+      in
+      let converge height task =
+        let reversed, mlast =
+          List.fold task ~init:([], None)
+            ~f:(fun (processed, mprev) ((_, addr, _) as el) ->
+              match mprev with
+              | None ->
+                  (processed, Some el)
+              | Some ((_, prev_addr, _) as prev)
+                when Addr.(equal @@ sibling prev_addr) addr ->
+                  (process_pair height (prev, el) :: processed, None)
+              | Some prev ->
+                  (process_single height prev :: processed, Some el) )
+        in
+        List.rev_append reversed
+        @@ Option.(map ~f:(process_single height) mlast |> to_list)
+      in
+      let rec impl acc height task =
+        let acc' =
+          List.unordered_append (List.map ~f:(fun (a, b, _) -> (b, a)) task) acc
+        in
+        match task with
+        | [] | [ (_, _, []) ] ->
+            acc'
+        | _ ->
+            impl acc' (height + 1) (converge height task)
+      in
+      let hash_account =
+        Option.value_map ~default:Hash.empty_account ~f:Hash.hash_account
+      in
+      Fn.compose (impl [] 0) (List.map ~f:(Tuple3.map_fst ~f:hash_account))
+
     (** Either copies accumulated or initializes it with the parent being used as the [base]. *)
     let to_accumulated t =
       actualize_accumulated t ;
