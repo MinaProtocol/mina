@@ -435,9 +435,9 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let merkle_path_at_addr_exn t address =
       assert_is_attached t ;
-      let maps, ancestor = maps_and_ancestor t in
+      let hashes, ancestor = hashes_and_ancestor t in
       match
-        self_merkle_path ~depth:t.depth ~hashes:maps.hashes
+        self_merkle_path ~depth:t.depth ~hashes
           ~current_location:t.current_location address
       with
       | Some path ->
@@ -446,7 +446,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           let parent_merkle_path =
             Base.merkle_path_at_addr_exn ancestor address
           in
-          fixup_merkle_path ~hashes:maps.hashes parent_merkle_path ~address
+          fixup_merkle_path ~hashes parent_merkle_path ~address
 
     let merkle_path_at_index_exn t index =
       merkle_path_at_addr_exn t (Addr.of_int_exn ~ledger_depth:t.depth index)
@@ -498,8 +498,8 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* use mask Merkle root, if it exists, else get from parent *)
     let merkle_root t =
       assert_is_attached t ;
-      let maps, ancestor = maps_and_ancestor t in
-      match Map.find maps.hashes (Addr.root ()) with
+      let hashes, ancestor = hashes_and_ancestor t in
+      match Map.find hashes (Addr.root ()) with
       | Some hash ->
           hash
       | None ->
@@ -588,8 +588,8 @@ module Make (Inputs : Inputs_intf.S) = struct
        parent *)
     let get_hash t addr =
       assert_is_attached t ;
-      let maps, ancestor = maps_and_ancestor t in
-      match Map.find maps.hashes addr with
+      let hashes, ancestor = hashes_and_ancestor t in
+      match Map.find hashes addr with
       | Some hash ->
           Some hash
       | None -> (
@@ -600,10 +600,10 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let get_hash_batch_exn t locations =
       assert_is_attached t ;
-      let maps, ancestor = maps_and_ancestor t in
+      let hashes, ancestor = hashes_and_ancestor t in
       let self_hashes_rev =
         List.rev_map locations ~f:(fun location ->
-            (location, Map.find maps.hashes (Location.to_path_exn location)) )
+            (location, Map.find hashes (Location.to_path_exn location)) )
       in
       let parent_locations_rev =
         List.filter_map self_hashes_rev ~f:(fun (location, hash) ->
