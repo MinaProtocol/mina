@@ -131,11 +131,16 @@ end
  * - If a slot is won and it happens right now, produce a block with `produce_block_now`
  * - If a slot is won and it happens later, schedule block production with `schedule_block_production`
  * - If a slot is won and it happened in the past, run the next VRF check immediately via `next_vrf_check_now`
+ *
+ * Type of function effectively proves that one of the four callbacks mentioned above will
+ * always be called at the end of function evaluation. Function doesn't have direct access to the scheduler,
+ * so any interaction with the scheduler should be coded in the callbacks.
  *)
-let iteration ~schedule_next_vrf_check ~produce_block_now
-    ~schedule_block_production ~next_vrf_check_now
-    ~context:(module Context : CONTEXT) ~time_controller ~coinbase_receiver
-    ~ledger_snapshot () =
+let iteration (type result) ~(schedule_next_vrf_check : _ -> result)
+    ~(produce_block_now : _ -> result)
+    ~(schedule_block_production : _ -> result)
+    ~(next_vrf_check_now : unit -> result) ~context:(module Context : CONTEXT)
+    ~time_controller ~coinbase_receiver ~ledger_snapshot () : result =
   let open Context in
   match failwith "dequeue from vrf evaluation queue" with
   | None ->
