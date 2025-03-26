@@ -123,6 +123,15 @@ end = struct
     t.timeout <- Some timeout
 end
 
+(** 
+ * Processes a single iteration of the block production cycle.
+ *
+ * It attempts to dequeue from the VRF evaluation queue:
+ * - If no slots are available, schedules the next VRF check "now" via `schedule_next_vrf_check`
+ * - If a slot is won and it happens right now, produce a block with `produce_block_now`
+ * - If a slot is won and it happens later, schedule block production with `schedule_block_production`
+ * - If a slot is won and it happened in the past, run the next VRF check immediately via `next_vrf_check_now`
+ *)
 let iteration ~schedule_next_vrf_check ~produce_block_now
     ~schedule_block_production ~next_vrf_check_now
     ~context:(module Context : CONTEXT) ~time_controller ~coinbase_receiver
@@ -174,22 +183,35 @@ let run ~context:(module Context : CONTEXT) ~time_controller
   let module Breadcrumb = Transition_frontier.Breadcrumb in
   let production_supervisor = Singleton_supervisor.create ~task:produce in
   let scheduler = Singleton_scheduler.create time_controller in
-  let iteration ~next_vrf_check_now ~produce_block_now =
+  (* Iteration attempts to get the next vrf evaluation result (slot won) and makes decision to:
+      - produce a block now
+        - after producing a block, start the next iteration right away
+      - schedule block production
+        - with call to `Singleton_scheduler.schedule` with "slot won" as the time parameter
+      - start the next iteration right away
+        - done through a recursive call to check_next_block_timing
+      - start the next iteration through the scheduler
+        - same as above, but with call to `Singleton_scheduler.schedule`
+          with "now" as the time parameter
+  *)
+  let iteration ~start_next_iteration ~produce_block_now =
     iteration
       ~schedule_next_vrf_check:
         (Fn.compose Deferred.return
-           (Singleton_scheduler.schedule scheduler ~f:next_vrf_check_now) )
+           (Singleton_scheduler.schedule scheduler ~f:start_next_iteration) )
       ~produce_block_now:(Fn.compose Deferred.return produce_block_now)
       ~schedule_block_production:(fun (time, data, winner) ->
         Singleton_scheduler.schedule scheduler time ~f:(fun () ->
             produce_block_now (time, data, winner) ) ;
         Deferred.unit )
-      ~next_vrf_check_now:(Fn.compose Deferred.return next_vrf_check_now)
+      ~next_vrf_check_now:(Fn.compose Deferred.return start_next_iteration)
       ~context:(module Context)
       ~time_controller ~coinbase_receiver
   in
-  let rec check_next_block_timing slot i () =
-    (* Begin checking for the ability to produce a block *)
+  (* A recursive function that iterates over the frontier's broadcast
+     pipe until a transition frontier is available. Once it's available,
+     it calls `iteration` with the current slot and epoch. *)
+  let rec iterate_if_frontier_is_available slot i () =
     match Broadcast_pipe.Reader.peek frontier_reader with
     | None ->
         don't_wait_for
@@ -197,7 +219,7 @@ let run ~context:(module Context : CONTEXT) ~time_controller
              Broadcast_pipe.Reader.iter_until frontier_reader
                ~f:(Fn.compose Deferred.return Option.is_some)
            in
-           check_next_block_timing slot i () )
+           iterate_if_frontier_is_available slot i () )
     | Some transition_frontier ->
         let consensus_state =
           Transition_frontier.best_tip transition_frontier
@@ -212,22 +234,24 @@ let run ~context:(module Context : CONTEXT) ~time_controller
         in
         let i' = Mina_numbers.Length.succ epoch_data_for_vrf.epoch in
         let new_global_slot = epoch_data_for_vrf.global_slot in
-        let next_vrf_check_now = check_next_block_timing new_global_slot i' in
+        let start_next_iteration =
+          iterate_if_frontier_is_available new_global_slot i'
+        in
         let produce_block_now triple =
           ignore
             ( Interruptible.finally
                 (Singleton_supervisor.dispatch production_supervisor triple)
-                ~f:next_vrf_check_now
+                ~f:start_next_iteration
               : (_, _) Interruptible.t )
         in
         don't_wait_for
-          ( iteration ~next_vrf_check_now ~produce_block_now ~ledger_snapshot i
-              slot
+          ( iteration ~start_next_iteration ~produce_block_now ~ledger_snapshot
+              i slot
             : unit Deferred.t )
   in
   let start () =
-    check_next_block_timing Mina_numbers.Global_slot_since_hard_fork.zero
-      Mina_numbers.Length.zero ()
+    iterate_if_frontier_is_available
+      Mina_numbers.Global_slot_since_hard_fork.zero Mina_numbers.Length.zero ()
   in
   let genesis_state_timestamp = consensus_constants.genesis_state_timestamp in
   (* if the producer starts before genesis, sleep until genesis *)
