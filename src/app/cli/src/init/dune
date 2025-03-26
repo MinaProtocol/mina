@@ -23,6 +23,7 @@
   uri
   core_kernel
   core_kernel.uuid
+  core_bench
   core
   core.uuid
   base
