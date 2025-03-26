@@ -366,6 +366,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     (** Either copies accumulated or initializes it with the parent being used as the [base]. *)
     let to_accumulated t =
+      finalize_hashes t ;
       actualize_accumulated t ;
       match (t.accumulated, t.parent) with
       | Some { base; detached_next_signal; next; current }, _ ->
@@ -379,7 +380,9 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None, Error loc ->
           raise (Dangling_parent_reference (t.uuid, loc))
 
-    let self_set_hash t address hash = self_set_hash_impl t address hash
+    let self_set_hash t address hash =
+      finalize_hashes t ;
+      self_set_hash_impl t address hash
 
     let set_inner_hash_at_addr_exn t address hash =
       assert_is_attached t ;
@@ -418,7 +421,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           } )
 
     let hashes_and_ancestor t =
-      (*finalize_hashes t ;*)
+      finalize_hashes t ;
       let { hashes; _ }, ancestor = maps_and_ancestor t in
       (hashes, ancestor)
 
@@ -728,6 +731,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       let parent = get_parent t in
       let old_root_hash = merkle_root t in
       let account_data = Map.to_alist t.maps.accounts in
+      finalize_hashes t ;
       let hash_cache = t.maps.hashes in
       t.maps <- empty_maps ;
       Base.set_batch ~hash_cache parent account_data ;
@@ -1073,6 +1077,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
       let address_in_mask t addr =
         assert_is_attached t ;
+        finalize_hashes t ;
         Option.is_some (Map.find t.maps.hashes addr)
 
       let current_location t = t.current_location
@@ -1129,6 +1134,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     assert (Int.equal t.depth (Base.depth parent)) ;
     t.parent <- Ok parent ;
     t.current_location <- Attached.last_filled t ;
+    Attached.finalize_hashes t ;
     (* If [t.accumulated] isn't empty, then this mask had a parent before
        and now we just reparent it (which may only happen if both old and new parents
         have the same merkle root (and some masks in between may have been removed),
