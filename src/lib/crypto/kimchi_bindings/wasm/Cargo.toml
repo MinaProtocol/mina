@@ -39,8 +39,12 @@ serde-wasm-bindgen = ">=0.4"
 # Strictly enforcing 0.2.100
 # The version must be the same as in Cargo.toml in the repository
 # o1-labs/proof-systems.
+# wasm-bindgen must be updated when web-sys is udpated as they live in the same
+# repository.
 wasm-bindgen = { version = "=0.2.100" }
-web-sys = { version = "0.3.35", features = [
+# web-sys must be updated when wasm-bindgen is udpated as they live in the same
+# repository.
+web-sys = { version = "0.3.77", features = [
   "Window",
   "Document",
   "HtmlElement",
