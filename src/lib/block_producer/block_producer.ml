@@ -1049,11 +1049,12 @@ let generate_genesis_proof_if_needed ~genesis_breadcrumb ~frontier_reader () =
   | None ->
       Deferred.return ()
 
-let iteration ~genesis_breadcrumb ~schedule_next_vrf_check ~next_vrf_check_now
+let iteration ~genesis_breadcrumb ~schedule_next_vrf_check
+    ~schedule_block_production ~next_vrf_check_now
     ~context:(module Context : CONTEXT) ~vrf_evaluator ~time_controller
     ~coinbase_receiver ~frontier_reader ~set_next_producer_timing
     ~transition_frontier ~vrf_evaluation_state ~epoch_data_for_vrf
-    ~ledger_snapshot i slot ~scheduler ~production_supervisor =
+    ~ledger_snapshot i slot ~production_supervisor =
   O1trace.thread "block_producer_iteration"
   @@ fun () ->
   let consensus_state =
@@ -1211,14 +1212,7 @@ let iteration ~genesis_breadcrumb ~schedule_next_vrf_check ~next_vrf_check_now
                let%bind () = after span_till_time in
                generate_genesis_proof_if_needed ~genesis_breadcrumb
                  ~frontier_reader () ) ;
-            Singleton_scheduler.schedule scheduler scheduled_time ~f:(fun () ->
-                ignore
-                  ( Interruptible.finally
-                      (Singleton_supervisor.dispatch production_supervisor
-                         (scheduled_time, data, winner_pk) )
-                      ~f:next_vrf_check_now
-                    : (_, _) Interruptible.t ) ) ;
-            Deferred.return () )
+            schedule_block_production (scheduled_time, data, winner_pk) )
 
 let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~trust_system ~get_completed_work ~transaction_resource_pool
@@ -1326,12 +1320,21 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                    (Fn.compose Deferred.return
                       (Singleton_scheduler.schedule scheduler
                          ~f:next_vrf_check_now ) )
+                 ~schedule_block_production:(fun (time, data, winner) ->
+                   Singleton_scheduler.schedule scheduler time ~f:(fun () ->
+                       ignore
+                         ( Interruptible.finally
+                             (Singleton_supervisor.dispatch
+                                production_supervisor (time, data, winner) )
+                             ~f:next_vrf_check_now
+                           : (_, _) Interruptible.t ) ) ;
+                   Deferred.return () )
                  ~genesis_breadcrumb
                  ~context:(module Context : CONTEXT)
                  ~vrf_evaluator ~time_controller ~coinbase_receiver
                  ~frontier_reader ~set_next_producer_timing ~transition_frontier
                  ~vrf_evaluation_state ~epoch_data_for_vrf ~ledger_snapshot i
-                 slot ~scheduler ~production_supervisor )
+                 slot ~production_supervisor )
       in
       let start () =
         check_next_block_timing Mina_numbers.Global_slot_since_hard_fork.zero
