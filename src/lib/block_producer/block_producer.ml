@@ -152,80 +152,6 @@ let retry ?(max = 3) ~logger ~error_message f =
   in
   go 0
 
-module Vrf_evaluation_state = struct
-  type status =
-    | At of Mina_numbers.Global_slot_since_hard_fork.t
-    | Start
-    | Completed
-
-  type t =
-    { queue : Consensus.Data.Slot_won.t Queue.t
-    ; mutable vrf_evaluator_status : status
-    }
-
-  let poll_vrf_evaluator ~logger vrf_evaluator =
-    let f () =
-      O1trace.thread "query_vrf_evaluator" (fun () ->
-          Vrf_evaluator.slots_won_so_far vrf_evaluator )
-    in
-    retry ~logger ~error_message:"Error fetching slots from the VRF evaluator" f
-
-  let create () = { queue = Core.Queue.create (); vrf_evaluator_status = Start }
-
-  let finished t =
-    match t.vrf_evaluator_status with Completed -> true | _ -> false
-
-  let evaluator_status t = t.vrf_evaluator_status
-
-  let update_status t (vrf_status : Vrf_evaluator.Evaluator_status.t) =
-    match vrf_status with
-    | At global_slot ->
-        t.vrf_evaluator_status <- At global_slot
-    | Completed ->
-        t.vrf_evaluator_status <- Completed
-
-  let poll ~vrf_evaluator ~logger ~vrf_poll_interval t =
-    [%log info] "Polling VRF evaluator process" ;
-    let%bind vrf_result = poll_vrf_evaluator vrf_evaluator ~logger in
-    let%map vrf_result =
-      match (vrf_result.evaluator_status, vrf_result.slots_won) with
-      | At _, [] ->
-          (*try again*)
-          let%bind () = Async.after vrf_poll_interval in
-          poll_vrf_evaluator vrf_evaluator ~logger
-      | _ ->
-          return vrf_result
-    in
-    Queue.enqueue_all t.queue vrf_result.slots_won ;
-    update_status t vrf_result.evaluator_status ;
-    [%log info]
-      !"New global slots won: $slots"
-      ~metadata:
-        [ ( "slots"
-          , `List
-              (List.map vrf_result.slots_won ~f:(fun s ->
-                   Mina_numbers.Global_slot_since_hard_fork.to_yojson
-                     s.global_slot ) ) )
-        ]
-
-  let update_epoch_data ~vrf_evaluator ~logger ~epoch_data_for_vrf
-      ~vrf_poll_interval t =
-    let set_epoch_data () =
-      let f () =
-        O1trace.thread "set_vrf_evaluator_epoch_state" (fun () ->
-            Vrf_evaluator.set_new_epoch_state vrf_evaluator ~epoch_data_for_vrf )
-      in
-      retry ~logger
-        ~error_message:"Error setting epoch state of the VRF evaluator" f
-    in
-    [%log info] "Sending data for VRF evaluations for epoch $epoch"
-      ~metadata:
-        [ ("epoch", Mina_numbers.Length.to_yojson epoch_data_for_vrf.epoch) ] ;
-    t.vrf_evaluator_status <- Start ;
-    let%bind () = set_epoch_data () in
-    poll ~logger ~vrf_evaluator ~vrf_poll_interval t
-end
-
 let validate_genesis_protocol_state_block ~genesis_state_hash (b, v) =
   Validation.validate_genesis_protocol_state ~genesis_state_hash
     (With_hash.map ~f:Mina_block.header b, v)
@@ -592,81 +518,44 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
             let%bind _ = emit_breadcrumb () in
             Deferred.unit) )
 
-let generate_genesis_proof_if_needed ~genesis_breadcrumb ~frontier_reader () =
-  match Broadcast_pipe.Reader.peek frontier_reader with
-  | Some transition_frontier ->
-      let consensus_state =
-        Transition_frontier.best_tip transition_frontier
-        |> Transition_frontier.Breadcrumb.consensus_state
-      in
-      if Consensus.Data.Consensus_state.is_genesis_state consensus_state then
-        genesis_breadcrumb () |> Deferred.ignore_m
-      else Deferred.return ()
-  | None ->
-      Deferred.return ()
-
 let iteration ~schedule_next_vrf_check ~produce_block_now
-    ~schedule_block_production ~next_vrf_check_now ~genesis_breadcrumb
-    ~context:(module Context : CONTEXT) ~vrf_evaluator ~time_controller
-    ~coinbase_receiver ~frontier_reader ~set_next_producer_timing
-    ~transition_frontier ~vrf_evaluation_state ~epoch_data_for_vrf
-    ~ledger_snapshot i slot =
+    ~schedule_block_production ~next_vrf_check_now
+    ~context:(module Context : CONTEXT) ~time_controller ~coinbase_receiver
+    ~set_next_producer_timing ~transition_frontier ~epoch_data_for_vrf
+    ~ledger_snapshot _i _slot =
   O1trace.thread "block_producer_iteration"
   @@ fun () ->
   let consensus_state =
     Transition_frontier.(
       best_tip transition_frontier |> Breadcrumb.consensus_state)
   in
-  let i' =
-    Mina_numbers.Length.succ
-      epoch_data_for_vrf.Consensus.Data.Epoch_data_for_vrf.epoch
+  let new_global_slot =
+    epoch_data_for_vrf.Consensus.Data.Epoch_data_for_vrf.global_slot
   in
-  let new_global_slot = epoch_data_for_vrf.global_slot in
   let open Context in
-  let%bind () =
-    if Mina_numbers.Length.(i' > i) then
-      Vrf_evaluation_state.update_epoch_data ~vrf_evaluator ~epoch_data_for_vrf
-        ~logger vrf_evaluation_state ~vrf_poll_interval
-    else Deferred.unit
-  in
-  let%bind () =
-    (*Poll once every slot if the evaluation for the epoch is not completed or the evaluation is completed*)
-    if
-      Mina_numbers.Global_slot_since_hard_fork.(new_global_slot > slot)
-      && not (Vrf_evaluation_state.finished vrf_evaluation_state)
-    then
-      Vrf_evaluation_state.poll ~vrf_evaluator ~logger vrf_evaluation_state
-        ~vrf_poll_interval
-    else Deferred.unit
-  in
-  match Core.Queue.dequeue vrf_evaluation_state.queue with
+  match failwith "bla" with
   | None -> (
       (*Keep trying until we get some slots*)
-      let poll () =
-        let%bind () = Async.after vrf_poll_interval in
-        let%bind () =
-          Vrf_evaluation_state.poll ~vrf_evaluator ~logger vrf_evaluation_state
-            ~vrf_poll_interval
-        in
-        schedule_next_vrf_check (Block_time.now time_controller)
-      in
-      match Vrf_evaluation_state.evaluator_status vrf_evaluation_state with
-      | Completed ->
+      let poll () = schedule_next_vrf_check (Block_time.now time_controller) in
+      match failwith "bla" with
+      | "Completed" ->
           let epoch_end_time =
             Consensus.Hooks.epoch_end_time ~constants:consensus_constants
               epoch_data_for_vrf.epoch
           in
           set_next_producer_timing (`Check_again epoch_end_time) consensus_state ;
-          [%log info] "No more slots won in this epoch" ;
           schedule_next_vrf_check epoch_end_time
-      | At last_slot ->
+      | "at" ->
+          let last_slot = new_global_slot (*bug of course*) in
           set_next_producer_timing (`Evaluating_vrf last_slot) consensus_state ;
           poll ()
-      | Start ->
+      | "Start" ->
           set_next_producer_timing (`Evaluating_vrf new_global_slot)
             consensus_state ;
-          poll () )
-  | Some slot_won -> (
+          poll ()
+      | _ ->
+          Deferred.unit )
+  | Some (slot_won : Consensus.Data.Slot_won.t) -> (
       let winning_global_slot = slot_won.global_slot in
       let slot, epoch =
         let t =
@@ -702,10 +591,6 @@ let iteration ~schedule_next_vrf_check ~produce_block_now
           (`Produce_now (data, winner_pk))
           consensus_state ;
         Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
-        let%bind () =
-          generate_genesis_proof_if_needed ~genesis_breadcrumb ~frontier_reader
-            ()
-        in
         produce_block_now (now, data, winner_pk) )
       else
         match
@@ -741,34 +626,11 @@ let iteration ~schedule_next_vrf_check ~produce_block_now
               consensus_state ;
             Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
             let scheduled_time = time_of_ms time in
-            don't_wait_for
-              ((* Attempt to generate a genesis proof in the slot
-                  immediately before we'll actually need it, so that
-                  it isn't limiting our block production time in the
-                  won slot.
-                  This also allows non-genesis blocks to be received
-                  in the meantime and alleviate the need to produce
-                  one at all, if this won't have block height 1.
-               *)
-               let scheduled_genesis_time =
-                 time_of_ms
-                   Int64.(
-                     time - of_int constraint_constants.block_window_duration_ms)
-               in
-               let span_till_time =
-                 Block_time.diff scheduled_genesis_time
-                   (Block_time.now time_controller)
-                 |> Block_time.Span.to_time_span
-               in
-               let%bind () = after span_till_time in
-               generate_genesis_proof_if_needed ~genesis_breadcrumb
-                 ~frontier_reader () ) ;
             schedule_block_production (scheduled_time, data, winner_pk) )
 
-let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
-    ~trust_system ~time_controller ~consensus_local_state ~coinbase_receiver
-    ~frontier_reader ~transition_writer ~set_next_producer_timing
-    ~block_produced_bvar ~vrf_evaluation_state ~net =
+let run ~context:(module Context : CONTEXT) ~prover ~verifier ~trust_system
+    ~time_controller ~consensus_local_state ~coinbase_receiver ~frontier_reader
+    ~transition_writer ~set_next_producer_timing ~block_produced_bvar ~net =
   let open Context in
   O1trace.sync_thread "produce_blocks" (fun () ->
       let genesis_breadcrumb =
@@ -878,12 +740,10 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     Deferred.unit )
                   ~next_vrf_check_now:
                     (Fn.compose Deferred.return next_vrf_check_now)
-                  ~genesis_breadcrumb
                   ~context:(module Context)
-                  ~vrf_evaluator ~time_controller ~coinbase_receiver
-                  ~frontier_reader ~set_next_producer_timing
-                  ~transition_frontier ~vrf_evaluation_state ~epoch_data_for_vrf
-                  ~ledger_snapshot i slot
+                  ~time_controller ~coinbase_receiver ~set_next_producer_timing
+                  ~transition_frontier ~epoch_data_for_vrf ~ledger_snapshot i
+                  slot
                 : unit Deferred.t )
       in
       let start () =
