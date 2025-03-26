@@ -1314,6 +1314,13 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     ~constants:consensus_constants ~consensus_state
                     ~local_state:consensus_local_state
                    = None ) ; *)
+            let produce_block_now triple =
+              ignore
+                ( Interruptible.finally
+                    (Singleton_supervisor.dispatch production_supervisor triple)
+                    ~f:next_vrf_check_now
+                  : (_, _) Interruptible.t )
+            in
             don't_wait_for
               (iteration ~next_vrf_check_now
                  ~schedule_next_vrf_check:
@@ -1322,12 +1329,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                          ~f:next_vrf_check_now ) )
                  ~schedule_block_production:(fun (time, data, winner) ->
                    Singleton_scheduler.schedule scheduler time ~f:(fun () ->
-                       ignore
-                         ( Interruptible.finally
-                             (Singleton_supervisor.dispatch
-                                production_supervisor (time, data, winner) )
-                             ~f:next_vrf_check_now
-                           : (_, _) Interruptible.t ) ) ;
+                       produce_block_now (time, data, winner) ) ;
                    Deferred.return () )
                  ~genesis_breadcrumb
                  ~context:(module Context : CONTEXT)
