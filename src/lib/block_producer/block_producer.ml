@@ -1049,7 +1049,7 @@ let generate_genesis_proof_if_needed ~genesis_breadcrumb ~frontier_reader () =
   | None ->
       Deferred.return ()
 
-let iteration ~genesis_breadcrumb ~next_vrf_check_now
+let iteration ~genesis_breadcrumb ~schedule_next_vrf_check ~next_vrf_check_now
     ~context:(module Context : CONTEXT) ~vrf_evaluator ~time_controller
     ~coinbase_receiver ~frontier_reader ~set_next_producer_timing
     ~transition_frontier ~vrf_evaluation_state ~epoch_data_for_vrf
@@ -1087,13 +1087,11 @@ let iteration ~genesis_breadcrumb ~next_vrf_check_now
       (*Keep trying until we get some slots*)
       let poll () =
         let%bind () = Async.after vrf_poll_interval in
-        let%map () =
+        let%bind () =
           Vrf_evaluation_state.poll ~vrf_evaluator ~logger vrf_evaluation_state
             ~vrf_poll_interval
         in
-        Singleton_scheduler.schedule scheduler
-          (Block_time.now time_controller)
-          ~f:next_vrf_check_now
+        schedule_next_vrf_check (Block_time.now time_controller)
       in
       match Vrf_evaluation_state.evaluator_status vrf_evaluation_state with
       | Completed ->
@@ -1103,9 +1101,7 @@ let iteration ~genesis_breadcrumb ~next_vrf_check_now
           in
           set_next_producer_timing (`Check_again epoch_end_time) consensus_state ;
           [%log info] "No more slots won in this epoch" ;
-          return
-            (Singleton_scheduler.schedule scheduler epoch_end_time
-               ~f:next_vrf_check_now )
+          schedule_next_vrf_check epoch_end_time
       | At last_slot ->
           set_next_producer_timing (`Evaluating_vrf last_slot) consensus_state ;
           poll ()
@@ -1325,7 +1321,12 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     ~local_state:consensus_local_state
                    = None ) ; *)
             don't_wait_for
-              (iteration ~next_vrf_check_now ~genesis_breadcrumb
+              (iteration ~next_vrf_check_now
+                 ~schedule_next_vrf_check:
+                   (Fn.compose Deferred.return
+                      (Singleton_scheduler.schedule scheduler
+                         ~f:next_vrf_check_now ) )
+                 ~genesis_breadcrumb
                  ~context:(module Context : CONTEXT)
                  ~vrf_evaluator ~time_controller ~coinbase_receiver
                  ~frontier_reader ~set_next_producer_timing ~transition_frontier
