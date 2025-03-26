@@ -5,24 +5,6 @@ use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 
 use super::{Error, Result};
 
-struct SeqAccess {
-    iter: js_sys::IntoIter,
-}
-
-impl<'de> de::SeqAccess<'de> for SeqAccess {
-    type Error = Error;
-
-    fn next_element_seed<T: de::DeserializeSeed<'de>>(
-        &mut self,
-        seed: T,
-    ) -> Result<Option<T::Value>> {
-        Ok(match self.iter.next().transpose()? {
-            Some(value) => Some(seed.deserialize(Deserializer::from(value))?),
-            None => None,
-        })
-    }
-}
-
 struct ObjectAccess {
     data: Array,
     fields: std::slice::Iter<'static, &'static str>,
