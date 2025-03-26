@@ -228,7 +228,9 @@ let iteration (type result) ~(schedule_next_vrf_check : _ -> result)
 let run ~context:(module Context : CONTEXT) ~time_controller
     ~consensus_local_state ~coinbase_receiver ~frontier_reader =
   let open Context in
-  let produce _ _ = Interruptible.return () in
+  let produce interrupt_ivar (_time, _data, _winner) =
+    Interruptible.lift (Deferred.return ()) (Ivar.read interrupt_ivar)
+  in
   let module Breadcrumb = Transition_frontier.Breadcrumb in
   let production_supervisor = Singleton_supervisor.create ~task:produce in
   let scheduler = Singleton_scheduler.create time_controller in
