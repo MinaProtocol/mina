@@ -1,4 +1,4 @@
-/* global plonk_wasm, caml_jsstring_of_string, tsRustConversion
+/* global plonk_wasm, caml_jsstring_of_string
  */
 
 // Provides: caml_opt_of_rust

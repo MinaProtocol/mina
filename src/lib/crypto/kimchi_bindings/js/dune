@@ -16,11 +16,12 @@
    bindings/srs.js
    bindings/verifier-index.js
    wrap_wasm/wrap.js
-   wrap_wasm/wrap_proof.js
-   wrap_wasm/wrap_oracles.js
-   wrap_wasm/wrap_prover_index.js
-   wrap_wasm/wrap_srs.js
-   wrap_wasm/wrap_verifier_index.js
+   wrap_wasm/proof.js
+   wrap_wasm/oracles.js
+   wrap_wasm/prover_index.js
+   wrap_wasm/srs.js
+   wrap_wasm/verifier_index.js
+   wrap_wasm/gate_vector.js
    ))
  (instrumentation
   (backend bisect_ppx))
