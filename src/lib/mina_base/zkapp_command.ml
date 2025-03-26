@@ -1,15 +1,28 @@
 open Core_kernel
 open Signature_lib
 
+module Poly = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'account_updates t =
+            'account_updates Mina_wire_types.Mina_base.Zkapp_command.V1.T.t =
+        { fee_payer : Account_update.Fee_payer.Stable.V1.t
+        ; account_updates : 'account_updates
+        ; memo : Signed_command_memo.Stable.V1.t
+        }
+      [@@deriving annot, sexp, compare, equal, hash, yojson, fields]
+
+      let to_latest = Fn.id
+    end
+  end]
+end
+
 module Graphql_repr = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
-        { fee_payer : Account_update.Fee_payer.Stable.V1.t
-        ; account_updates : Account_update.Graphql_repr.Stable.V1.t list
-        ; memo : Signed_command_memo.Stable.V1.t
-        }
+      type t = Account_update.Graphql_repr.Stable.V1.t list Poly.Stable.V1.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
@@ -22,11 +35,7 @@ module Simple = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
-        { fee_payer : Account_update.Fee_payer.Stable.V1.t
-        ; account_updates : Account_update.Simple.Stable.V1.t list
-        ; memo : Signed_command_memo.Stable.V1.t
-        }
+      type t = Account_update.Simple.Stable.V1.t list Poly.Stable.V1.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
@@ -52,16 +61,13 @@ module T = struct
     *)
 
     module V1 = struct
-      type t = Mina_wire_types.Mina_base.Zkapp_command.V1.t =
-        { fee_payer : Account_update.Fee_payer.Stable.V1.t
-        ; account_updates :
-            ( Account_update.Stable.V1.t
-            , Digest.Account_update.Stable.V1.t
-            , Digest.Forest.Stable.V1.t )
-            Call_forest.Stable.V1.t
-        ; memo : Signed_command_memo.Stable.V1.t
-        }
-      [@@deriving annot, sexp, compare, equal, hash, yojson, fields]
+      type t =
+        ( Account_update.Stable.V1.t
+        , Digest.Account_update.Stable.V1.t
+        , Digest.Forest.Stable.V1.t )
+        Call_forest.Stable.V1.t
+        Poly.Stable.V1.t
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
 
@@ -70,14 +76,8 @@ module T = struct
         module Stable = struct
           module V1 = struct
             type t =
-              { fee_payer : Account_update.Fee_payer.Stable.V1.t
-              ; account_updates :
-                  ( Account_update.Stable.V1.t
-                  , unit
-                  , unit )
-                  Call_forest.Stable.V1.t
-              ; memo : Signed_command_memo.Stable.V1.t
-              }
+              (Account_update.Stable.V1.t, unit, unit) Call_forest.Stable.V1.t
+              Poly.Stable.V1.t
             [@@deriving sexp, compare, equal, hash, yojson]
 
             let to_latest = Fn.id
@@ -126,11 +126,11 @@ module T = struct
           let%map fee_payer = Account_update.Fee_payer.gen
           and account_updates = gen_call_forest
           and memo = Signed_command_memo.gen in
-          { fee_payer; account_updates; memo }
+          { Poly.fee_payer; account_updates; memo }
 
         let shrinker : t Quickcheck.Shrinker.t =
           Quickcheck.Shrinker.create (fun t ->
-              let shape = Call_forest.shape t.account_updates in
+              let shape = Call_forest.shape t.Poly.account_updates in
               Sequence.map
                 (Quickcheck.Shrinker.shrink
                    Call_forest.Shape.quickcheck_shrinker shape )
@@ -278,13 +278,13 @@ let fee_payer (t : t) =
   Account_id.create t.fee_payer.body.public_key (fee_token t)
 
 let extract_vks (t : t) : (Account_id.t * Verification_key_wire.t) List.t =
-  account_updates t
-  |> Call_forest.fold ~init:[] ~f:(fun acc (p : Account_update.t) ->
-         match Account_update.verification_key_update_to_option p with
-         | Zkapp_basic.Set_or_keep.Set (Some vk) ->
-             (Account_update.account_id p, vk) :: acc
-         | _ ->
-             acc )
+  Call_forest.fold ~init:[] t.Poly.account_updates
+    ~f:(fun acc (p : Account_update.t) ->
+      match Account_update.verification_key_update_to_option p with
+      | Zkapp_basic.Set_or_keep.Set (Some vk) ->
+          (Account_update.account_id p, vk) :: acc
+      | _ ->
+          acc )
 
 let account_updates_list (t : t) : Account_update.t list =
   Call_forest.fold t.account_updates ~init:[] ~f:(Fn.flip List.cons) |> List.rev
@@ -795,7 +795,7 @@ module Weight = struct
 end
 
 let weight (zkapp_command : t) : int =
-  let { fee_payer; account_updates; memo } = zkapp_command in
+  let { Poly.fee_payer; account_updates; memo } = zkapp_command in
   List.sum
     (module Int)
     ~f:Fn.id
@@ -902,6 +902,7 @@ let account_updates_deriver obj =
 
 let deriver obj =
   let open Fields_derivers_zkapps.Derivers in
+  let open Poly in
   let ( !. ) = ( !. ) ~t_fields_annots in
   Fields.make_creator obj
     ~fee_payer:!.Account_update.Fee_payer.deriver
@@ -941,7 +942,7 @@ let dummy =
        ; authorization = Signature.dummy
        }
      in
-     { fee_payer
+     { Poly.fee_payer
      ; account_updates = Call_forest.cons account_update []
      ; memo = Signed_command_memo.empty
      } )
@@ -1390,7 +1391,8 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
     in
     Error (Error.of_string err_msg)
 
-let has_zero_vesting_period t =
+let has_zero_vesting_period (t : (Account_update.t, _, _) Call_forest.t Poly.t)
+    =
   Call_forest.exists t.account_updates ~f:(fun p ->
       match p.body.update.timing with
       | Keep ->
@@ -1398,7 +1400,8 @@ let has_zero_vesting_period t =
       | Set { vesting_period; _ } ->
           Mina_numbers.Global_slot_span.(equal zero) vesting_period )
 
-let is_incompatible_version t =
+let is_incompatible_version (t : (Account_update.t, _, _) Call_forest.t Poly.t)
+    =
   Call_forest.exists t.account_updates ~f:(fun p ->
       match p.body.update.permissions with
       | Keep ->
