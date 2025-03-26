@@ -1,5 +1,6 @@
 open Persistent_frontier
 open Core
+open Core_bench
 
 let deserialize_root_hash ~logger ~db =
   [%log info] "Querying root hash from database and attempt to deserialize it" ;
@@ -11,12 +12,12 @@ let deserialize_root_hash ~logger ~db =
 
 let root_hash_deserialization_limit_ms = 2000.0
 
-let main ~frontier_db_path ~no_root_compatible ~num_of_samples () =
+let main ~frontier_db_path ~no_upgrade_root_clean ~num_of_samples () =
   let logger = Logger.create () in
   [%log info] "Current DB path: %s" frontier_db_path ;
   [%log info] "Loading database" ;
   let db = Database.create ~logger ~directory:frontier_db_path in
-  if not no_root_compatible then (
+  if not no_upgrade_root_clean then (
     (*
       To maintain compatibility, run a deserialization round first,
       to ensure we have `root_hash` and `root_common` inside the DB
@@ -26,38 +27,17 @@ let main ~frontier_db_path ~no_root_compatible ~num_of_samples () =
     |> Result.ok
     |> Option.value_exn ~message:"Can't update root to a clean state" ) ;
   assert (Database.is_root_replaced_by_common_and_hash db) ;
-  let rec sample cnt =
-    match cnt with
-    | 0 ->
-        []
-    | _ ->
-        let start_time = Time_ns.now () in
-        deserialize_root_hash ~logger ~db ;
-        let end_time = Time_ns.now () in
-        let duration = Time_ns.diff end_time start_time in
-        Time_ns.Span.to_ms duration :: sample (cnt - 1)
+  let tests =
+    [ Bench.Test.create ~name:"Test Persistent Frontier Root Hash query"
+        (fun () -> deserialize_root_hash ~logger ~db)
+    ]
   in
-  assert (num_of_samples >= 1) ;
-  let duration_ms_samples = sample num_of_samples in
-  let max_duration_ms =
-    List.max_elt duration_ms_samples ~compare:Float.compare |> Option.value_exn
+  let run_config =
+    Bench.Run_config.create ?quota:(Some (Bench.Quota.Num_calls num_of_samples))
+      ()
   in
-  let min_duration_ms =
-    List.min_elt duration_ms_samples ~compare:Float.compare |> Option.value_exn
-  in
-  let avg_duration_ms =
-    List.sum (module Float) duration_ms_samples ~f:ident
-    /. Float.of_int (List.length duration_ms_samples)
-  in
-
-  [%log info] "Querying root hash on patched persistence frontier database"
-    ~metadata:
-      [ ("min_duration_ms", `Float min_duration_ms)
-      ; ("max_duration_ms", `Float max_duration_ms)
-      ; ("avg_duration_ms", `Float avg_duration_ms)
-      ] ;
-  Database.close db ;
-  assert (Float.compare max_duration_ms root_hash_deserialization_limit_ms < 0)
+  Bench.bench ~run_config tests ;
+  Database.close db
 
 let command =
   let open Command.Let_syntax in
@@ -69,11 +49,8 @@ let command =
        flag "--samples" ~aliases:[ "-s" ]
          ~doc:"Number of rounds of hash query should we run. (default 5)"
          (optional_with_default 5 int)
-     and no_root_compatible =
-       flag "--no-root-compatible" ~aliases:[ "-r" ]
-         ~doc:
-           "Do not perform hash query once to ensure the compatibility with \
-            old frontier database"
-         no_arg
+     and no_upgrade_root_clean =
+       flag "--no-upgrade"
+         ~doc:"Do not perform `upgrade_root_clean` on the database" no_arg
      in
-     main ~frontier_db_path ~no_root_compatible ~num_of_samples )
+     main ~frontier_db_path ~no_upgrade_root_clean ~num_of_samples )

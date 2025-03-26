@@ -24,6 +24,7 @@
   core_kernel
   core_kernel.uuid
   core
+  core_bench
   core.uuid
   base
   async
