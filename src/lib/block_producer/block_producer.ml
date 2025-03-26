@@ -170,76 +170,69 @@ let iteration ~schedule_next_vrf_check ~produce_block_now
 let run ~context:(module Context : CONTEXT) ~time_controller
     ~consensus_local_state ~coinbase_receiver ~frontier_reader =
   let open Context in
-  O1trace.sync_thread "produce_blocks" (fun () ->
-      let produce _ _ = Interruptible.return () in
-      let module Breadcrumb = Transition_frontier.Breadcrumb in
-      let production_supervisor = Singleton_supervisor.create ~task:produce in
-      let scheduler = Singleton_scheduler.create time_controller in
-      let rec check_next_block_timing slot i () =
-        (* Begin checking for the ability to produce a block *)
-        match Broadcast_pipe.Reader.peek frontier_reader with
-        | None ->
-            don't_wait_for
-              (let%map () =
-                 Broadcast_pipe.Reader.iter_until frontier_reader
-                   ~f:(Fn.compose Deferred.return Option.is_some)
-               in
-               check_next_block_timing slot i () )
-        | Some transition_frontier ->
-            let consensus_state =
-              Transition_frontier.best_tip transition_frontier
-              |> Breadcrumb.consensus_state
-            in
-            let now = Block_time.now time_controller in
-            let epoch_data_for_vrf, ledger_snapshot =
-              O1trace.sync_thread "get_epoch_data_for_vrf" (fun () ->
-                  Consensus.Hooks.get_epoch_data_for_vrf
-                    ~constants:consensus_constants (time_to_ms now)
-                    consensus_state ~local_state:consensus_local_state ~logger )
-            in
-            let i' = Mina_numbers.Length.succ epoch_data_for_vrf.epoch in
-            let new_global_slot = epoch_data_for_vrf.global_slot in
-            let next_vrf_check_now =
-              check_next_block_timing new_global_slot i'
-            in
-            let produce_block_now triple =
-              ignore
-                ( Interruptible.finally
-                    (Singleton_supervisor.dispatch production_supervisor triple)
-                    ~f:next_vrf_check_now
-                  : (_, _) Interruptible.t )
-            in
-            don't_wait_for
-              ( iteration
-                  ~schedule_next_vrf_check:
-                    (Fn.compose Deferred.return
-                       (Singleton_scheduler.schedule scheduler
-                          ~f:next_vrf_check_now ) )
-                  ~produce_block_now:
-                    (Fn.compose Deferred.return produce_block_now)
-                  ~schedule_block_production:(fun (time, data, winner) ->
-                    Singleton_scheduler.schedule scheduler time ~f:(fun () ->
-                        produce_block_now (time, data, winner) ) ;
-                    Deferred.unit )
-                  ~next_vrf_check_now:
-                    (Fn.compose Deferred.return next_vrf_check_now)
-                  ~context:(module Context)
-                  ~time_controller ~coinbase_receiver ~ledger_snapshot i slot
-                : unit Deferred.t )
-      in
-      let start () =
-        check_next_block_timing Mina_numbers.Global_slot_since_hard_fork.zero
-          Mina_numbers.Length.zero ()
-      in
-      let genesis_state_timestamp =
-        consensus_constants.genesis_state_timestamp
-      in
-      (* if the producer starts before genesis, sleep until genesis *)
-      let now = Block_time.now time_controller in
-      if Block_time.( >= ) now genesis_state_timestamp then start ()
-      else
-        let time_till_genesis = Block_time.diff genesis_state_timestamp now in
-        ignore
-          ( Block_time.Timeout.create time_controller time_till_genesis
-              ~f:(fun _ -> start ())
-            : unit Block_time.Timeout.t ) )
+  let produce _ _ = Interruptible.return () in
+  let module Breadcrumb = Transition_frontier.Breadcrumb in
+  let production_supervisor = Singleton_supervisor.create ~task:produce in
+  let scheduler = Singleton_scheduler.create time_controller in
+  let rec check_next_block_timing slot i () =
+    (* Begin checking for the ability to produce a block *)
+    match Broadcast_pipe.Reader.peek frontier_reader with
+    | None ->
+        don't_wait_for
+          (let%map () =
+             Broadcast_pipe.Reader.iter_until frontier_reader
+               ~f:(Fn.compose Deferred.return Option.is_some)
+           in
+           check_next_block_timing slot i () )
+    | Some transition_frontier ->
+        let consensus_state =
+          Transition_frontier.best_tip transition_frontier
+          |> Breadcrumb.consensus_state
+        in
+        let now = Block_time.now time_controller in
+        let epoch_data_for_vrf, ledger_snapshot =
+          O1trace.sync_thread "get_epoch_data_for_vrf" (fun () ->
+              Consensus.Hooks.get_epoch_data_for_vrf
+                ~constants:consensus_constants (time_to_ms now) consensus_state
+                ~local_state:consensus_local_state ~logger )
+        in
+        let i' = Mina_numbers.Length.succ epoch_data_for_vrf.epoch in
+        let new_global_slot = epoch_data_for_vrf.global_slot in
+        let next_vrf_check_now = check_next_block_timing new_global_slot i' in
+        let produce_block_now triple =
+          ignore
+            ( Interruptible.finally
+                (Singleton_supervisor.dispatch production_supervisor triple)
+                ~f:next_vrf_check_now
+              : (_, _) Interruptible.t )
+        in
+        don't_wait_for
+          ( iteration
+              ~schedule_next_vrf_check:
+                (Fn.compose Deferred.return
+                   (Singleton_scheduler.schedule scheduler ~f:next_vrf_check_now) )
+              ~produce_block_now:(Fn.compose Deferred.return produce_block_now)
+              ~schedule_block_production:(fun (time, data, winner) ->
+                Singleton_scheduler.schedule scheduler time ~f:(fun () ->
+                    produce_block_now (time, data, winner) ) ;
+                Deferred.unit )
+              ~next_vrf_check_now:
+                (Fn.compose Deferred.return next_vrf_check_now)
+              ~context:(module Context)
+              ~time_controller ~coinbase_receiver ~ledger_snapshot i slot
+            : unit Deferred.t )
+  in
+  let start () =
+    check_next_block_timing Mina_numbers.Global_slot_since_hard_fork.zero
+      Mina_numbers.Length.zero ()
+  in
+  let genesis_state_timestamp = consensus_constants.genesis_state_timestamp in
+  (* if the producer starts before genesis, sleep until genesis *)
+  let now = Block_time.now time_controller in
+  if Block_time.( >= ) now genesis_state_timestamp then start ()
+  else
+    let time_till_genesis = Block_time.diff genesis_state_timestamp now in
+    ignore
+      ( Block_time.Timeout.create time_controller time_till_genesis ~f:(fun _ ->
+            start () )
+        : unit Block_time.Timeout.t )
