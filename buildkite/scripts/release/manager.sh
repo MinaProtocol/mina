@@ -704,6 +704,26 @@ function promote(){
         esac
     done
 
+    if [[ -z ${__target_version+x} ]]; then
+        echo -e "❌ ${RED} !! Target version (--target-version) is required${CLEAR}\n";
+        promote_help; exit 1;
+    fi
+
+    if [[ -z ${__source_version+x} ]]; then
+        echo -e "❌ ${RED} !! Source version (--source-version) is required${CLEAR}\n";
+        promote_help; exit 1;
+    fi
+
+    if [[ -z ${__source_channel+x} ]]; then
+        echo -e "❌ ${RED} !! Source channel (--source-channel) is required${CLEAR}\n";
+        promote_help; exit 1;
+    fi
+
+    if [[ -z ${__target_channel+x} ]]; then
+        echo -e "❌ ${RED} !! Target channel (--target-channel) is required${CLEAR}\n";
+        promote_help; exit 1;
+    fi
+
     echo ""
     echo " ℹ️   Promotion mina artifacts with following parameters:"
     echo " - Promoting artifacts: $__artifacts"
@@ -772,9 +792,7 @@ function promote(){
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
-                                    if [[ $__dry_run == 0 ]]; then
-                                        promote_and_verify_docker $artifact $__source_version $__target_version $__codename "" $__publish_to_docker_io $__verify $__dry_run
-                                    fi
+                                    promote_and_verify_docker $artifact $__source_version $__target_version $__codename "" $__publish_to_docker_io $__verify $__dry_run
                                 fi
                         ;;
                         mina-rosetta)
