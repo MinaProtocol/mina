@@ -194,7 +194,14 @@ let run ~context:(module Context : CONTEXT) ~time_controller
         - same as above, but with call to `Singleton_scheduler.schedule`
           with "now" as the time parameter
   *)
-  let iteration ~start_next_iteration ~produce_block_now =
+  let iteration ~start_next_iteration =
+    let produce_block_now triple =
+      ignore
+        ( Interruptible.finally
+            (Singleton_supervisor.dispatch production_supervisor triple)
+            ~f:start_next_iteration
+          : (_, _) Interruptible.t )
+    in
     iteration
       ~schedule_next_vrf_check:
         (Fn.compose Deferred.return
@@ -210,7 +217,7 @@ let run ~context:(module Context : CONTEXT) ~time_controller
   in
   (* A recursive function that iterates over the frontier's broadcast
      pipe until a transition frontier is available. Once it's available,
-     it calls `iteration` with the current slot and epoch. *)
+     it spawns an async task that calls `iteration` with the current slot and epoch. *)
   let rec iterate_if_frontier_is_available slot i () =
     match Broadcast_pipe.Reader.peek frontier_reader with
     | None ->
@@ -237,16 +244,8 @@ let run ~context:(module Context : CONTEXT) ~time_controller
         let start_next_iteration =
           iterate_if_frontier_is_available new_global_slot i'
         in
-        let produce_block_now triple =
-          ignore
-            ( Interruptible.finally
-                (Singleton_supervisor.dispatch production_supervisor triple)
-                ~f:start_next_iteration
-              : (_, _) Interruptible.t )
-        in
         don't_wait_for
-          ( iteration ~start_next_iteration ~produce_block_now ~ledger_snapshot
-              i slot
+          ( iteration ~start_next_iteration ~ledger_snapshot i slot
             : unit Deferred.t )
   in
   let start () =
