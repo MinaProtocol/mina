@@ -33,7 +33,7 @@ use mina_poseidon::{
 use poly_commitment::{
     commitment::{CommitmentCurve, PolyComm},
     ipa::OpeningProof,
-    SRS as _
+    SRS as _,
 };
 use serde::{Deserialize, Serialize};
 
