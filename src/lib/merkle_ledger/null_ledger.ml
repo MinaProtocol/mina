@@ -16,8 +16,6 @@ end = struct
 
   type t = { uuid : Uuid.t; depth : int } [@@deriving sexp_of]
 
-  let t_of_sexp _ = failwith "t_of_sexp unimplemented"
-
   type index = int
 
   module Location = Location
