@@ -104,7 +104,7 @@ function run_tests_with_test_data() {
     echo "🧪  2/6 Testing network/options endpoint"
     assert "$(curl --no-progress-meter --request POST "${__test_data[address]}/network/options" "${DEFAULT_HEADERS[@]}" --data-raw "{\"network_identifier\":{\"blockchain\":\"$BLOCKCHAIN\",\"network\":\"${__test_data[id]}\"}}" | jq)" \
         '.version.rosetta_version == "1.4.9"' \
-        "   ✅  Rosetta Version is not correct" \
+        "   ✅  Rosetta Version is correct" \
         "   ❌  Invalid Rosetta Version (expected 1.4.9)"
 
     echo "🧪  3/6 Testing network/list endpoint"
