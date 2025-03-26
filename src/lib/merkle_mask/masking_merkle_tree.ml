@@ -186,14 +186,11 @@ module Make (Inputs : Inputs_intf.S) = struct
           acc.current <- f acc.current ;
           acc.next <- f acc.next )
 
-    let path_batch_impl ~fixup_path ~self_lookup ~base_lookup t locations =
-      assert_is_attached t ;
-      let maps, ancestor = maps_and_ancestor t in
+    let path_batch_impl ~fixup_path ~self_lookup ~base_lookup locations =
       let self_paths =
         List.map locations ~f:(fun location ->
             let address = Location.to_path_exn location in
-            self_lookup ~hashes:maps.hashes ~current_location:t.current_location
-              ~depth:t.depth address
+            self_lookup address
             |> Option.value_map
                  ~default:(Either.Second (location, address))
                  ~f:Either.first )
@@ -206,15 +203,13 @@ module Make (Inputs : Inputs_intf.S) = struct
             | Either.Second (location, _) ->
                 Some location )
         in
-        if List.is_empty locs then [] else base_lookup ancestor locs
+        if List.is_empty locs then [] else base_lookup locs
       in
       let f parent_paths = function
         | Either.First path ->
             (parent_paths, path)
         | Either.Second (_, address) ->
-            let path =
-              fixup_path ~hashes:maps.hashes ~address (List.hd_exn parent_paths)
-            in
+            let path = fixup_path ~address (List.hd_exn parent_paths) in
             (List.tl_exn parent_paths, path)
       in
       snd @@ List.fold_map ~init:all_parent_paths ~f self_paths
@@ -460,13 +455,25 @@ module Make (Inputs : Inputs_intf.S) = struct
     let merkle_path t location =
       merkle_path_at_addr_exn t (Location.to_path_exn location)
 
-    let merkle_path_batch =
-      path_batch_impl ~base_lookup:Base.merkle_path_batch
-        ~self_lookup:self_merkle_path ~fixup_path:fixup_merkle_path
+    let merkle_path_batch t =
+      assert_is_attached t ;
+      let hashes, ancestor = hashes_and_ancestor t in
+      path_batch_impl
+        ~base_lookup:(Base.merkle_path_batch ancestor)
+        ~self_lookup:
+          (self_merkle_path ~current_location:t.current_location ~depth:t.depth
+             ~hashes )
+        ~fixup_path:(fixup_merkle_path ~hashes)
 
-    let wide_merkle_path_batch =
-      path_batch_impl ~base_lookup:Base.wide_merkle_path_batch
-        ~self_lookup:self_wide_merkle_path ~fixup_path:fixup_wide_merkle_path
+    let wide_merkle_path_batch t =
+      assert_is_attached t ;
+      let hashes, ancestor = hashes_and_ancestor t in
+      path_batch_impl
+        ~base_lookup:(Base.wide_merkle_path_batch ancestor)
+        ~self_lookup:
+          (self_wide_merkle_path ~current_location:t.current_location
+             ~depth:t.depth ~hashes )
+        ~fixup_path:(fixup_wide_merkle_path ~hashes)
 
     (* use mask Merkle root, if it exists, else get from parent *)
     let merkle_root t =
