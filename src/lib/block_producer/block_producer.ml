@@ -135,7 +135,7 @@ end
 let iteration ~schedule_next_vrf_check ~produce_block_now
     ~schedule_block_production ~next_vrf_check_now
     ~context:(module Context : CONTEXT) ~time_controller ~coinbase_receiver
-    ~ledger_snapshot _i _slot =
+    ~ledger_snapshot () =
   let open Context in
   match failwith "dequeue from vrf evaluation queue" with
   | None ->
@@ -218,7 +218,7 @@ let run ~context:(module Context : CONTEXT) ~time_controller
   (* A recursive function that iterates over the frontier's broadcast
      pipe until a transition frontier is available. Once it's available,
      it spawns an async task that calls `iteration` with the current slot and epoch. *)
-  let rec iterate_if_frontier_is_available slot i () =
+  let rec iterate_if_frontier_is_available () =
     match Broadcast_pipe.Reader.peek frontier_reader with
     | None ->
         don't_wait_for
@@ -226,32 +226,24 @@ let run ~context:(module Context : CONTEXT) ~time_controller
              Broadcast_pipe.Reader.iter_until frontier_reader
                ~f:(Fn.compose Deferred.return Option.is_some)
            in
-           iterate_if_frontier_is_available slot i () )
+           iterate_if_frontier_is_available () )
     | Some transition_frontier ->
         let consensus_state =
           Transition_frontier.best_tip transition_frontier
           |> Breadcrumb.consensus_state
         in
         let now = Block_time.now time_controller in
-        let epoch_data_for_vrf, ledger_snapshot =
+        let _epoch_data_for_vrf, ledger_snapshot =
           O1trace.sync_thread "get_epoch_data_for_vrf" (fun () ->
               Consensus.Hooks.get_epoch_data_for_vrf
                 ~constants:consensus_constants (time_to_ms now) consensus_state
                 ~local_state:consensus_local_state ~logger )
         in
-        let i' = Mina_numbers.Length.succ epoch_data_for_vrf.epoch in
-        let new_global_slot = epoch_data_for_vrf.global_slot in
-        let start_next_iteration =
-          iterate_if_frontier_is_available new_global_slot i'
-        in
+        let start_next_iteration = iterate_if_frontier_is_available in
         don't_wait_for
-          ( iteration ~start_next_iteration ~ledger_snapshot i slot
-            : unit Deferred.t )
+          (iteration ~start_next_iteration ~ledger_snapshot () : unit Deferred.t)
   in
-  let start () =
-    iterate_if_frontier_is_available
-      Mina_numbers.Global_slot_since_hard_fork.zero Mina_numbers.Length.zero ()
-  in
+  let start = iterate_if_frontier_is_available in
   let genesis_state_timestamp = consensus_constants.genesis_state_timestamp in
   (* if the producer starts before genesis, sleep until genesis *)
   let now = Block_time.now time_controller in
