@@ -12,8 +12,7 @@ let deserialize_root_hash ~logger ~db =
 
 let command =
   Bench.make_command
-    [ Bench.Test.create ~name:"hello" (fun () -> ignore (10 : int))
-    ; Bench.Test.create_with_initialization
+    [ Bench.Test.create_with_initialization
         ~name:"Test Persistent Frontier Root Hash query" (fun `init ->
           let frontier_db_path =
             Sys.getenv_exn "TEST_PERSISTENT_FRONTIER_DB_PATH"
@@ -28,5 +27,6 @@ let command =
           |> Result.ok
           |> Option.value_exn ~message:"Can't update root to a clean state" ;
           assert (Database.is_root_replaced_by_common_and_hash db) ;
+          [%log info] "Initialization done" ;
           fun () -> deserialize_root_hash ~logger ~db )
     ]
