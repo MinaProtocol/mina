@@ -93,7 +93,7 @@ module Make (Inputs : Inputs_intf.S) = struct
              This is used as a lookup cache. *)
     ; mutable accumulated : accumulated_t option
     ; mutable is_committing : bool
-    ; unhashed_accounts : unhashed_account_t list
+    ; mutable unhashed_accounts : unhashed_account_t list
     }
 
   type unattached = t
@@ -338,7 +338,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       in
       Fn.compose (impl [] 0) (List.map ~f:(Tuple3.map_fst ~f:hash_account))
 
-    let _finalize_hashes_do t unhashed_accounts =
+    let finalize_hashes_do t unhashed_accounts =
       let with_merkle_path_batch accs =
         let { hashes; _ }, ancestor = maps_and_ancestor t in
         path_batch_impl
@@ -357,6 +357,12 @@ module Make (Inputs : Inputs_intf.S) = struct
            ~equal:(on_snd Location.equal)
       |> with_merkle_path_batch |> compute_merge_hashes
       |> List.iter ~f:(Tuple2.uncurry @@ self_set_hash_impl t)
+
+    let _finalize_hashes t =
+      let unhashed_accounts = t.unhashed_accounts in
+      if not @@ List.is_empty unhashed_accounts then (
+        t.unhashed_accounts <- [] ;
+        finalize_hashes_do t unhashed_accounts )
 
     (** Either copies accumulated or initializes it with the parent being used as the [base]. *)
     let to_accumulated t =
