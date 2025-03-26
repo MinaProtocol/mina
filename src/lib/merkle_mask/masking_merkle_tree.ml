@@ -186,6 +186,10 @@ module Make (Inputs : Inputs_intf.S) = struct
           acc.current <- f acc.current ;
           acc.next <- f acc.next )
 
+    let self_set_hash_impl t address hash =
+      update_maps t ~f:(fun maps ->
+          { maps with hashes = Map.set maps.hashes ~key:address ~data:hash } )
+
     let path_batch_impl ~fixup_path ~self_lookup ~base_lookup locations =
       let self_paths =
         List.map locations ~f:(fun location ->
