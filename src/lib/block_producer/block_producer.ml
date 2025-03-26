@@ -123,7 +123,7 @@ end = struct
     t.timeout <- Some timeout
 end
 
-(** 
+(**
  * Processes a single iteration of the block production cycle.
  *
  * It attempts to dequeue from the VRF evaluation queue:
@@ -181,6 +181,15 @@ let iteration (type result) ~(schedule_next_vrf_check : _ -> result)
             let scheduled_time = time_of_ms time in
             schedule_block_production (scheduled_time, data, winner_pk) )
 
+(**
+ * Some lemmas to prove about `run` function:
+ * - L1: Scheduling happens only when there is no other action running
+ * - L2: Next task is scheduled only after the previous gets completed
+ * - L3: When block is being produced, scheduler doesn't contain a task
+ * - L4: When block is being produced, no other action is executing in parallel
+ * - L5: When block is being produced, no other action is scheduled via async
+ * - Theorem: `run` functions would work well being written via `Deferred.forever`.
+ *)
 let run ~context:(module Context : CONTEXT) ~time_controller
     ~consensus_local_state ~coinbase_receiver ~frontier_reader =
   let open Context in
@@ -208,10 +217,10 @@ let run ~context:(module Context : CONTEXT) ~time_controller
           : (_, _) Interruptible.t )
     in
     iteration
-      ~schedule_next_vrf_check:
-        (Fn.compose Deferred.return
-           (Singleton_scheduler.schedule scheduler
-              ~f:iterate_if_frontier_is_available ) )
+      ~schedule_next_vrf_check:(fun time ->
+        Singleton_scheduler.schedule scheduler
+          ~f:iterate_if_frontier_is_available time ;
+        Deferred.unit )
       ~produce_block_now:(Fn.compose Deferred.return produce_block_now)
       ~schedule_block_production:(fun (time, data, winner) ->
         Singleton_scheduler.schedule scheduler time ~f:(fun () ->
