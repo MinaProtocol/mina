@@ -43,8 +43,6 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
 
   let cast (m : (module Base_intf with type t = 'a)) (t : 'a) = T (m, t)
 
-  let sexp_of_witness (T ((module B), t)) = B.sexp_of_t t
-
   (** M can be used wherever a base ledger is demanded, construct instances
    * by using the witness constructor directly
    *
@@ -53,9 +51,7 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
    * In the future, this should be a `ppx`.
    *)
   module M : Base_intf with type t = witness = struct
-    type t = witness [@@deriving sexp_of]
-
-    let t_of_sexp _ = failwith "t_of_sexp unimplemented"
+    type t = witness
 
     type index = int
 
