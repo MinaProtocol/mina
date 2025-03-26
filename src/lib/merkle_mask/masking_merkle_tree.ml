@@ -338,6 +338,26 @@ module Make (Inputs : Inputs_intf.S) = struct
       in
       Fn.compose (impl [] 0) (List.map ~f:(Tuple3.map_fst ~f:hash_account))
 
+    let finalize_hashes_do t unhashed_accounts =
+      let with_merkle_path_batch accs =
+        let { hashes; _ }, ancestor = maps_and_ancestor t in
+        path_batch_impl
+          ~base_lookup:(Base.merkle_path_batch ancestor)
+          ~self_lookup:
+            (self_merkle_path ~current_location:t.current_location
+               ~depth:t.depth ~hashes )
+          ~fixup_path:(fixup_merkle_path ~hashes)
+          (List.map ~f:snd accs)
+        |> List.map2_exn accs ~f:(fun (a, loc) p ->
+               (a, Location.to_path_exn loc, p) )
+      in
+      let on_snd f (_, a) (_, b) = f a b in
+      List.stable_sort ~compare:(on_snd Location.compare) unhashed_accounts
+      |> List.remove_consecutive_duplicates ~which_to_keep:`First
+           ~equal:(on_snd Location.equal)
+      |> with_merkle_path_batch |> compute_merge_hashes
+      |> List.iter ~f:(Tuple2.uncurry @@ self_set_hash_impl t)
+
     (** Either copies accumulated or initializes it with the parent being used as the [base]. *)
     let to_accumulated t =
       actualize_accumulated t ;
