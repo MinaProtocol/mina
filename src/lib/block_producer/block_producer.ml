@@ -174,6 +174,20 @@ let run ~context:(module Context : CONTEXT) ~time_controller
   let module Breadcrumb = Transition_frontier.Breadcrumb in
   let production_supervisor = Singleton_supervisor.create ~task:produce in
   let scheduler = Singleton_scheduler.create time_controller in
+  let iteration ~next_vrf_check_now ~produce_block_now =
+    iteration
+      ~schedule_next_vrf_check:
+        (Fn.compose Deferred.return
+           (Singleton_scheduler.schedule scheduler ~f:next_vrf_check_now) )
+      ~produce_block_now:(Fn.compose Deferred.return produce_block_now)
+      ~schedule_block_production:(fun (time, data, winner) ->
+        Singleton_scheduler.schedule scheduler time ~f:(fun () ->
+            produce_block_now (time, data, winner) ) ;
+        Deferred.unit )
+      ~next_vrf_check_now:(Fn.compose Deferred.return next_vrf_check_now)
+      ~context:(module Context)
+      ~time_controller ~coinbase_receiver
+  in
   let rec check_next_block_timing slot i () =
     (* Begin checking for the ability to produce a block *)
     match Broadcast_pipe.Reader.peek frontier_reader with
@@ -207,19 +221,8 @@ let run ~context:(module Context : CONTEXT) ~time_controller
               : (_, _) Interruptible.t )
         in
         don't_wait_for
-          ( iteration
-              ~schedule_next_vrf_check:
-                (Fn.compose Deferred.return
-                   (Singleton_scheduler.schedule scheduler ~f:next_vrf_check_now) )
-              ~produce_block_now:(Fn.compose Deferred.return produce_block_now)
-              ~schedule_block_production:(fun (time, data, winner) ->
-                Singleton_scheduler.schedule scheduler time ~f:(fun () ->
-                    produce_block_now (time, data, winner) ) ;
-                Deferred.unit )
-              ~next_vrf_check_now:
-                (Fn.compose Deferred.return next_vrf_check_now)
-              ~context:(module Context)
-              ~time_controller ~coinbase_receiver ~ledger_snapshot i slot
+          ( iteration ~next_vrf_check_now ~produce_block_now ~ledger_snapshot i
+              slot
             : unit Deferred.t )
   in
   let start () =
