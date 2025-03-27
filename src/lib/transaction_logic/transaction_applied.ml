@@ -55,6 +55,8 @@ end
 module Zkapp_command_applied = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         { accounts : (Account_id.Stable.V2.t * Account.Stable.V2.t option) list
@@ -66,11 +68,27 @@ module Zkapp_command_applied = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t =
+    { accounts : (Account_id.t * Account.t option) list
+    ; command : Zkapp_command.t With_status.t
+    ; new_accounts : Account_id.t list
+    }
+
+  let write_all_proofs_to_disk { Stable.Latest.accounts; command; new_accounts }
+      : t =
+    { accounts; command; new_accounts }
+
+  let read_all_proofs_from_disk { accounts; command; new_accounts } :
+      Stable.Latest.t =
+    { Stable.Latest.accounts; command; new_accounts }
 end
 
 module Command_applied = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t =
         | Signed_command of Signed_command_applied.Stable.V2.t
@@ -80,6 +98,22 @@ module Command_applied = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t =
+    | Signed_command of Signed_command_applied.t
+    | Zkapp_command of Zkapp_command_applied.t
+
+  let write_all_proofs_to_disk : Stable.Latest.t -> t = function
+    | Signed_command c ->
+        Signed_command c
+    | Zkapp_command c ->
+        Zkapp_command (Zkapp_command_applied.write_all_proofs_to_disk c)
+
+  let read_all_proofs_from_disk : t -> Stable.Latest.t = function
+    | Signed_command c ->
+        Signed_command c
+    | Zkapp_command c ->
+        Zkapp_command (Zkapp_command_applied.read_all_proofs_from_disk c)
 end
 
 module Fee_transfer_applied = struct
@@ -128,7 +162,6 @@ module Varying : sig
     | Command of Command_applied.t
     | Fee_transfer of Fee_transfer_applied.t
     | Coinbase of Coinbase_applied.t
-  [@@deriving sexp, to_yojson]
 
   val write_all_proofs_to_disk : Stable.Latest.t -> t
 
@@ -136,6 +169,8 @@ module Varying : sig
 end = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t =
         | Command of Command_applied.Stable.V2.t
@@ -147,9 +182,26 @@ end = struct
     end
   end]
 
-  let write_all_proofs_to_disk = Fn.id
+  type t =
+    | Command of Command_applied.t
+    | Fee_transfer of Fee_transfer_applied.t
+    | Coinbase of Coinbase_applied.t
 
-  let read_all_proofs_from_disk = Fn.id
+  let write_all_proofs_to_disk : Stable.Latest.t -> t = function
+    | Command c ->
+        Command (Command_applied.write_all_proofs_to_disk c)
+    | Fee_transfer f ->
+        Fee_transfer f
+    | Coinbase c ->
+        Coinbase c
+
+  let read_all_proofs_from_disk : t -> Stable.Latest.t = function
+    | Command c ->
+        Command (Command_applied.read_all_proofs_from_disk c)
+    | Fee_transfer f ->
+        Fee_transfer f
+    | Coinbase c ->
+        Coinbase c
 end
 
 [%%versioned
@@ -166,7 +218,6 @@ module Stable = struct
 end]
 
 type t = { previous_hash : Ledger_hash.t; varying : Varying.t }
-[@@deriving sexp, to_yojson]
 
 let burned_tokens : t -> Currency.Amount.t =
  fun { varying; _ } ->
