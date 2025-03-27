@@ -90,6 +90,24 @@ function caml_pasta_fp_poseidon_block_cipher(_fake_params, fp_vector) {
   });
 }
 
+
+
+// Provides: caml_pasta_fp_poseidon_block_cipher_new
+// Requires: plonk_wasm, tsRustConversion, tsRustConversion
+function caml_pasta_fp_poseidon_block_cipher_new(_fake_params, fp_vector) {
+  console.log("hello from jsoo")
+  // 1. get permuted field vector from rust
+  var wasm_flat_vector = plonk_wasm.caml_pasta_fp_poseidon_block_cipher(
+    tsRustConversion.fp.vectorToRust(fp_vector)
+  );
+  var new_fp_vector = tsRustConversion.fp.vectorFromRust(wasm_flat_vector);
+  // 2. write back modified field vector to original one
+  new_fp_vector.forEach(function (a, i) {
+    fp_vector[i] = a;
+  });
+}
+
+
 // Provides: caml_pasta_fq_poseidon_block_cipher
 // Requires: plonk_wasm, tsRustConversion, tsRustConversion
 function caml_pasta_fq_poseidon_block_cipher(_fake_params, fq_vector) {
