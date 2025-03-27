@@ -14,4 +14,4 @@
 # that are failing, grep for these hashes and replace them with the new hashes
 
 [toolchain]
-channel = "1.79.0"
+channel = "1.82.0"
