@@ -2965,7 +2965,7 @@ let%test_module "staged ledger tests" =
               in
               let valid_zkapp_command_with_auths : Zkapp_command.Valid.t =
                 match
-                  Zkapp_command.Valid.to_valid ~failed:false
+                  Zkapp_command.Valid.For_tests.to_valid ~failed:false
                     ~find_vk:(find_vk ledger) zkapp_command_with_auths
                 with
                 | Ok ps ->
@@ -4503,7 +4503,7 @@ let%test_module "staged ledger tests" =
                 ~constraint_constants spec
             in
             let valid_zkapp_command =
-              Zkapp_command.Valid.to_valid ~failed:false
+              Zkapp_command.Valid.For_tests.to_valid ~failed:false
                 ~find_vk:(find_vk ledger) zkapp_command
               |> Or_error.ok_exn
             in
@@ -5007,7 +5007,7 @@ let%test_module "staged ledger tests" =
                   in
                   let valid_zkapp_command =
                     Or_error.ok_exn
-                      (Zkapp_command.Valid.to_valid ~failed:false
+                      (Zkapp_command.Valid.For_tests.to_valid ~failed:false
                          ~find_vk:(find_vk valid_against_ledger)
                          zkapp_command )
                   in
@@ -5024,7 +5024,7 @@ let%test_module "staged ledger tests" =
                   in
                   let failed_zkapp_command =
                     Or_error.ok_exn
-                      (Zkapp_command.Valid.to_valid ~failed:true
+                      (Zkapp_command.Valid.For_tests.to_valid ~failed:true
                          ~find_vk:(find_vk ledger) zkapp_command )
                   in
                   let current_state, current_state_view =
@@ -5143,7 +5143,7 @@ let%test_module "staged ledger tests" =
                     ~vk ~ledger zkapp_account_pk ;
                   let invalid_zkapp_command =
                     Or_error.ok_exn
-                      (Zkapp_command.Valid.to_valid ~failed:false
+                      (Zkapp_command.Valid.For_tests.to_valid ~failed:false
                          ~find_vk:(find_vk ledger) zkapp_command )
                   in
                   let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in

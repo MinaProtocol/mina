@@ -815,14 +815,16 @@ module type Valid_intf = sig
   val to_valid_unsafe :
     T.t -> [> `If_this_is_used_it_should_have_a_comment_justifying_it of t ]
 
-  val to_valid :
-       T.t
-    -> failed:bool
-    -> find_vk:
-         (   Zkapp_basic.F.t
-          -> Account_id.t
-          -> (Verification_key_wire.t, Error.t) Result.t )
-    -> t Or_error.t
+  module For_tests : sig
+    val to_valid :
+         T.t
+      -> failed:bool
+      -> find_vk:
+           (   Zkapp_basic.F.t
+            -> Account_id.t
+            -> (Verification_key_wire.t, Error.t) Result.t )
+      -> t Or_error.t
+  end
 
   val of_verifiable : Verifiable.t -> t
 
@@ -868,8 +870,10 @@ struct
 
   let forget (t : t) : T.t = t.zkapp_command
 
-  let to_valid (t : T.t) ~failed ~find_vk : t Or_error.t =
-    Verifiable.create t ~failed ~find_vk |> Or_error.map ~f:of_verifiable
+  module For_tests = struct
+    let to_valid (t : T.t) ~failed ~find_vk : t Or_error.t =
+      Verifiable.create t ~failed ~find_vk |> Or_error.map ~f:of_verifiable
+  end
 end
 
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
