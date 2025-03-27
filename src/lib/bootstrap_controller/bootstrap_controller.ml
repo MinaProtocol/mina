@@ -175,8 +175,8 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
         Deferred.return `Ignored
     | Ok peer_root_with_proof -> (
         match%bind
-          Best_tip_prover.Wrap_for_block.map
-            ~f:
+          Mina_block.verify_on_header
+            ~verify:
               (Sync_handler.Root.verify
                  ~context:(module Context)
                  ~verifier:t.verifier candidate_consensus_state )
