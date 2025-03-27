@@ -114,7 +114,26 @@ module Coinbase_applied = struct
   end]
 end
 
-module Varying = struct
+module Varying : sig
+  [%%versioned:
+  module Stable : sig
+    [@@@no_toplevel_latest_type]
+
+    module V2 : sig
+      type t [@@deriving sexp, to_yojson]
+    end
+  end]
+
+  type t =
+    | Command of Command_applied.t
+    | Fee_transfer of Fee_transfer_applied.t
+    | Coinbase of Coinbase_applied.t
+  [@@deriving sexp, to_yojson]
+
+  val write_all_proofs_to_disk : Stable.Latest.t -> t
+
+  val read_all_proofs_from_disk : t -> Stable.Latest.t
+end = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
@@ -127,10 +146,16 @@ module Varying = struct
       let to_latest = Fn.id
     end
   end]
+
+  let write_all_proofs_to_disk = Fn.id
+
+  let read_all_proofs_from_disk = Fn.id
 end
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       { previous_hash : Ledger_hash.Stable.V1.t; varying : Varying.Stable.V2.t }
@@ -139,6 +164,9 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t = { previous_hash : Ledger_hash.t; varying : Varying.t }
+[@@deriving sexp, to_yojson]
 
 let burned_tokens : t -> Currency.Amount.t =
  fun { varying; _ } ->
@@ -239,3 +267,11 @@ let transaction_status : t -> Transaction_status.t =
       f.fee_transfer.status
   | Coinbase c ->
       c.coinbase.status
+
+let write_all_proofs_to_disk { Stable.Latest.previous_hash; varying } : t =
+  { previous_hash; varying = Varying.write_all_proofs_to_disk varying }
+
+let read_all_proofs_from_disk { previous_hash; varying } =
+  { Stable.Latest.previous_hash
+  ; varying = Varying.read_all_proofs_from_disk varying
+  }
