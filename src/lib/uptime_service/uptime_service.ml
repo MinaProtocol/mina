@@ -194,6 +194,11 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
       send_uptime_data ~logger ~interruptor ~submitter_keypair ~url ~state_hash
         ~produced:true block_data
 
+let read_all_proofs_for_work_single_spec =
+  Snark_work_lib.Work.Single.Spec.map
+    ~f_proof:Ledger_proof.Cached.read_proof_from_disk
+    ~f_witness:Transaction_witness.read_all_proofs_from_disk
+
 let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
     ~url ~snark_worker ~transition_frontier ~peer_id
     ~(submitter_keypair : Keypair.t) ~snark_work_fee ~graphql_control_port
@@ -324,9 +329,7 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                   make_interruptible
                     (Uptime_snark_worker.perform_single snark_worker
                        ( message
-                       , Snark_work_lib.Work.Single.Spec.map ~f_witness:ident
-                           ~f_proof:Ledger_proof.Cached.read_proof_from_disk
-                           single_spec ) )
+                       , read_all_proofs_for_work_single_spec single_spec ) )
                 with
                 | Error e ->
                     (* error in submitting to process *)

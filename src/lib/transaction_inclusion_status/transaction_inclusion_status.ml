@@ -149,8 +149,7 @@ let%test_module "transaction_status" =
                 throughout the 'network'"
                ~metadata:
                  [ ( "transactions"
-                   , Transaction_pool.Resource_pool.Diff.to_yojson transactions
-                   )
+                   , Transaction_pool.Diff_versioned.to_yojson transactions )
                  ] ;
              Deferred.unit ) ;
       (* Need to wait for transaction_pool to see the transition_frontier *)
