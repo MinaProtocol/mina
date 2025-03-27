@@ -14,6 +14,7 @@ export MINA_PRIVKEY_PASS='naughty blue worm'
 MINA_APP=_build/default/src/app/cli/src/mina.exe
 RUNTIME_LEDGER_APP=_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
 
+BENCHMARK_FILE=${BENCHMARK_FILE:-ledger_test_apply_bench.json}
 TEMP_FOLDER=$(mktemp -d)
 ACCOUNTS_FILE=$TEMP_FOLDER/accounts.json
 TEMP_ACCOUNTS_FILE=$TEMP_FOLDER/accounts_tmp.json
@@ -54,5 +55,5 @@ mkdir $TEMP_FOLDER/genesis/ledger
 tar -zxf  $TEMP_FOLDER/genesis/genesis_ledger_*.tar.gz -C $TEMP_FOLDER/genesis/ledger
 
 echo "running test:"
-time $MINA_APP ledger test apply --ledger-path $TEMP_FOLDER/genesis/ledger  --privkey-path $SENDER --num-txs 200
+time $MINA_APP ledger test apply --ledger-path $TEMP_FOLDER/genesis/ledger  --privkey-path $SENDER --num-txs 200 --dump-benchmark $BENCHMARK_FILE
 
