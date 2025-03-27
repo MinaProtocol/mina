@@ -898,8 +898,9 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     Work_selector.remove t.snark_job_state spec
   in
   ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
-  Network_pool.Snark_pool.Local_sink.push t.pipes.snark_local_sink
-    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
+  Network_pool.Snark_pool.(
+    Local_sink.push t.pipes.snark_local_sink
+      (Resource_pool.Diff.of_result work, cb))
   |> Deferred.don't_wait_for
 
 let add_work_graphql t diff =
@@ -1619,7 +1620,8 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
             in
             let msg =
               let diff =
-                Network_pool.Snark_pool.Diff_versioned.Add_solved_work
+                Network_pool.Snark_pool.Diff_versioned.Stable.Latest
+                .Add_solved_work
                   (statement, snark)
               in
               Envelope.Incoming.wrap_peer ~data:diff ~sender:peer
@@ -1644,8 +1646,14 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
                   "Successfully verified snark work from peer: $peer" ;
 
                 (* does an empty check for the snark, then an unsafe apply, and finally adds it to the pool *)
-                Network_pool.Snark_pool.apply_no_broadcast snark_pool msg
-                |> Deferred.return
+                Deferred.return
+                  Network_pool.Snark_pool.(
+                    apply_no_broadcast snark_pool
+                      (Envelope.Incoming.map
+                         ~f:
+                           (Resource_pool.Diff.Cached.write_all_proofs_to_disk
+                              ~proof_cache_db )
+                         msg ))
             | Error e ->
                 [%log info]
                   ~metadata:
@@ -1669,6 +1677,11 @@ let raise_on_initialization_error (`Initialization_error e) =
 let initialize_proof_cache_db (config : Config.t) =
   Proof_cache_tag.create_db ~logger:config.logger
     (config.conf_dir ^/ "proof_cache")
+  >>| function Error e -> raise_on_initialization_error e | Ok db -> db
+
+let initialize_zkapp_vk_cache_db (config : Config.t) =
+  Zkapp_vk_cache_tag.create_db ~logger:config.logger
+    (config.conf_dir ^/ "zkapp_vk_cache")
   >>| function Error e -> raise_on_initialization_error e | Ok db -> db
 
 let create ~commit_id ?wallets (config : Config.t) =
@@ -1705,6 +1718,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                  in_memory_reverse_structured_log_messages_for_integration_test
                  config.start_filtered_logs ;
           let%bind proof_cache_db = initialize_proof_cache_db config in
+          let%bind zkapp_vk_cache_db = initialize_zkapp_vk_cache_db config in
           let module Context =
           (val context ~proof_cache_db ~commit_id config)
           in
@@ -2001,7 +2015,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
               ~genesis_constants:config.precomputed_values.genesis_constants
-              ~slot_tx_end
+              ~slot_tx_end ~vk_cache_db:zkapp_vk_cache_db
           in
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =
@@ -2034,7 +2048,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
-              ~disk_location:config.snark_pool_disk_location
+              ~disk_location:config.snark_pool_disk_location ~proof_cache_db
           in
           let snark_pool, snark_remote_sink, snark_local_sink =
             Network_pool.Snark_pool.create ~config:snark_pool_config

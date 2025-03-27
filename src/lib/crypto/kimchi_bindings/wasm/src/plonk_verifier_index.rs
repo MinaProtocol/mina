@@ -14,7 +14,10 @@ use kimchi::linearization::expr_linearization;
 use kimchi::verifier_index::{LookupVerifierIndex, VerifierIndex as DlogVerifierIndex};
 use paste::paste;
 use poly_commitment::commitment::PolyComm;
-use poly_commitment::{ipa::{OpeningProof, SRS}, SRS as _};
+use poly_commitment::{
+    ipa::{OpeningProof, SRS},
+    SRS as _,
+};
 use std::path::Path;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
@@ -731,7 +734,7 @@ macro_rules! impl_verification_key {
                 let runtime_tables = index
                     .lookup_index.as_ref()
                     .map_or(false, |li| li.runtime_tables_selector.is_some());
-                
+
                 let patterns = LookupPatterns {
                     xor,
                     lookup,

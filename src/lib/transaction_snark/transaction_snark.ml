@@ -1436,11 +1436,16 @@ module Make_str (A : Wire_types.Concrete) = struct
               | Proof ->
                   let vk =
                     exists Side_loaded_verification_key.typ ~compute:(fun () ->
-                        Option.value_exn
+                        match
                           (As_prover.read (Typ.prover_value ())
                              (Data_as_hash.prover_value
                                 a.zkapp.verification_key.data ) )
-                            .data )
+                            .data
+                        with
+                        | Some vk ->
+                            vk
+                        | None ->
+                            Side_loaded_verification_key.dummy )
                   in
                   let expected_hash =
                     Data_as_hash.hash a.zkapp.verification_key.data
@@ -4016,7 +4021,10 @@ module Make_str (A : Wire_types.Concrete) = struct
               s.verification_key )
         with
         | None ->
-            failwith "No verification key found in the account"
+            { With_hash.data =
+                Lazy.force Side_loaded_verification_key.dummy_with_wrap_vk
+            ; hash = Verification_key_wire.dummy_vk_hash ()
+            }
         | Some s ->
             s
       in
@@ -4599,7 +4607,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                      } )
           }
       in
-      let ( `Zkapp_command { Zkapp_command.fee_payer; account_updates; memo }
+      let ( `Zkapp_command
+              { Zkapp_command.Poly.fee_payer; account_updates; memo }
           , `Sender_account_update sender_account_update
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment commitment
@@ -4707,7 +4716,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             create_trivial_snapp ()
       in
       let%bind.Async.Deferred vk = vk in
-      let ( `Zkapp_command { Zkapp_command.fee_payer; memo; _ }
+      let ( `Zkapp_command { Zkapp_command.Poly.fee_payer; memo; _ }
           , `Sender_account_update _
           , `Proof_zkapp_command _
           , `Txn_commitment _
@@ -4859,7 +4868,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             (prover, vk)
       in
       let%bind.Async.Deferred vk = vk in
-      let ( `Zkapp_command ({ Zkapp_command.fee_payer; memo; _ } as p)
+      let ( `Zkapp_command ({ Zkapp_command.Poly.fee_payer; memo; _ } as p)
           , `Sender_account_update sender_account_update
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment commitment

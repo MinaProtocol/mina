@@ -131,6 +131,7 @@ let%test_module "transaction_status" =
         Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size
           ~verifier ~genesis_constants:precomputed_values.genesis_constants
           ~slot_tx_end:None
+          ~vk_cache_db:(Zkapp_vk_cache_tag.For_tests.create_db ())
       in
       let transaction_pool, _, local_sink =
         Transaction_pool.create ~config
@@ -148,8 +149,7 @@ let%test_module "transaction_status" =
                 throughout the 'network'"
                ~metadata:
                  [ ( "transactions"
-                   , Transaction_pool.Resource_pool.Diff.to_yojson transactions
-                   )
+                   , Transaction_pool.Diff_versioned.to_yojson transactions )
                  ] ;
              Deferred.unit ) ;
       (* Need to wait for transaction_pool to see the transition_frontier *)

@@ -292,34 +292,6 @@ module type Bootstrap_controller_intf = sig
        Deferred.t
 end
 
-module type Transition_frontier_controller_intf = sig
-  type transition_frontier
-
-  type breadcrumb
-
-  type network
-
-  val run :
-       logger:Logger.t
-    -> trust_system:Trust_system.t
-    -> verifier:Verifier.t
-    -> network:network
-    -> time_controller:Block_time.Controller.t
-    -> collected_transitions:
-         Mina_block.initial_valid_block Envelope.Incoming.t list
-    -> frontier:transition_frontier
-    -> network_transition_reader:
-         ( [ `Block of Mina_block.t Envelope.Incoming.t
-           | `Header of Mina_block.Header.t Envelope.Incoming.t ]
-         * [ `Time_received of Block_time.t ]
-         * [ `Valid_cb of Mina_net2.Validation_callback.t ] )
-         Strict_pipe.Reader.t
-    -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
-    -> clear_reader:[ `Clear ] Strict_pipe.Reader.t
-    -> unit
-    -> Mina_block.Validated.t Strict_pipe.Reader.t
-end
-
 module type Transition_router_intf = sig
   type transition_frontier
 

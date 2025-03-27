@@ -99,13 +99,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let block_producer_nodes =
       Network.block_producers network |> Core.String.Map.data
     in
-    let node =
-      Core.String.Map.find_exn (Network.block_producers network) "node-a"
-    in
-    let fish1_kp =
-      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1")
-        .keypair
-    in
+    let node = Network.block_producer_exn network "node-a" in
+    let fish1_kp = (Network.genesis_keypair_exn network "fish1").keypair in
     let fish1_pk = Signature_lib.Public_key.compress fish1_kp.public_key in
     let fish1_account_id =
       Mina_base.Account_id.create fish1_pk Mina_base.Token_id.default

@@ -25,8 +25,6 @@ function check_required() {
 }
 check_required aptly
 check_required jq
-check_required gsutil
-
 
 function start_aptly() {
     local __distribution=$1
