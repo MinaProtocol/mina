@@ -19,7 +19,8 @@ ARG GO_VERSION=1.19.11
 # Go Capnp Version (for capnpc dependency)
 ARG GO_CAPNP_VERSION=v3.0.0-alpha.5
 
-# Rust Version passed into rustup-init, can also be "stable", "nightly" or similar
+# Rust Version passed into rustup-init, can also be "stable", "nightly" or
+# similar.
 # This should stay in line with:
 # - src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml
 # - src/lib/crypto/proof-systems/rust-toolchain.toml
@@ -34,7 +35,8 @@ ARG WASM_PACK_VERSION=v0.12.1
 ARG ROCKSDB_VERSION=v5.18.4
 
 # --- OS package dependencies
-# Organized as two alphabetized lists, first libraries and then tools/other packages
+# Organized as two alphabetized lists, first libraries and then tools/other
+# packages
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update --quiet \
   && apt-get upgrade --quiet --yes \
