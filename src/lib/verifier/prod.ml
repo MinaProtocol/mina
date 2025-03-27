@@ -40,16 +40,9 @@ module Processor = struct
     let to_verify =
       results |> List.map ~f:snd
       |> List.concat_map ~f:(function
-           | `Valid _ ->
-               []
-           | `Valid_assuming (_, xs) ->
+           | Ok (_, `Assuming xs) ->
                xs
-           | `Invalid_keys _
-           | `Invalid_signature _
-           | `Invalid_proof _
-           | `Missing_verification_key _
-           | `Unexpected_verification_key _
-           | `Mismatched_authorization_kind _ ->
+           | Error _ ->
                [] )
     in
     let%map all_verified =
@@ -58,24 +51,24 @@ module Processor = struct
     List.map results ~f:(fun (id, result) ->
         let result =
           match result with
-          | `Valid _ ->
+          | Ok (_, `Assuming []) ->
               (* The command is dropped here to avoid decoding it later in the caller
                  which would create a duplicate. Results are paired back to their inputs
                  using the input [id]*)
               `Valid
-          | `Valid_assuming (_, xs) ->
+          | Ok (_, `Assuming xs) ->
               if Or_error.is_ok all_verified then `Valid else `Valid_assuming xs
-          | `Invalid_keys keys ->
+          | Error (`Invalid_keys keys) ->
               `Invalid_keys keys
-          | `Invalid_signature keys ->
+          | Error (`Invalid_signature keys) ->
               `Invalid_signature keys
-          | `Invalid_proof err ->
+          | Error (`Invalid_proof err) ->
               `Invalid_proof err
-          | `Missing_verification_key keys ->
+          | Error (`Missing_verification_key keys) ->
               `Missing_verification_key keys
-          | `Unexpected_verification_key keys ->
+          | Error (`Unexpected_verification_key keys) ->
               `Unexpected_verification_key keys
-          | `Mismatched_authorization_kind keys ->
+          | Error (`Mismatched_authorization_kind keys) ->
               `Mismatched_authorization_kind keys
         in
         (id, result) )
@@ -199,21 +192,19 @@ module Worker_state = struct
                List.map tagged_commands ~f:(fun (id, c) ->
                    let result =
                      match Common.check c with
-                     | `Valid _ ->
+                     | Ok (_, `Assuming _) ->
                          `Valid
-                     | `Valid_assuming (_, _) ->
-                         `Valid
-                     | `Invalid_keys keys ->
+                     | Error (`Invalid_keys keys) ->
                          `Invalid_keys keys
-                     | `Invalid_signature keys ->
+                     | Error (`Invalid_signature keys) ->
                          `Invalid_signature keys
-                     | `Invalid_proof err ->
+                     | Error (`Invalid_proof err) ->
                          `Invalid_proof err
-                     | `Missing_verification_key keys ->
+                     | Error (`Missing_verification_key keys) ->
                          `Missing_verification_key keys
-                     | `Unexpected_verification_key keys ->
+                     | Error (`Unexpected_verification_key keys) ->
                          `Unexpected_verification_key keys
-                     | `Mismatched_authorization_kind keys ->
+                     | Error (`Mismatched_authorization_kind keys) ->
                          `Mismatched_authorization_kind keys
                    in
                    (id, result) )

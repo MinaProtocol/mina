@@ -36,13 +36,13 @@ let invalid_to_error (invalid : invalid) : Error.t =
 
 let check_signed_command c =
   if not (Signed_command.check_valid_keys c) then
-    `Invalid_keys (Signed_command.public_keys c)
+    Result.Error (`Invalid_keys (Signed_command.public_keys c))
   else
     match Signed_command.check_only_for_signature c with
     | Some c ->
-        `Valid (User_command.Signed_command c)
+        Result.Ok (User_command.Signed_command c, `Assuming [])
     | None ->
-        `Invalid_signature (Signed_command.public_keys c)
+        Result.Error (`Invalid_signature (Signed_command.public_keys c))
 
 let collect_vk_assumption ~return
     ( ( (p : Account_update.t)
@@ -68,78 +68,86 @@ let collect_vk_assumption ~return
   | _ ->
       None
 
+let check_signatures_of_zkapp_command (zkapp_command : Zkapp_command.t) =
+  with_return (fun { return } ->
+      let account_updates_hash =
+        Zkapp_command.Call_forest.hash zkapp_command.account_updates
+      in
+      let tx_commitment =
+        Zkapp_command.Transaction_commitment.create ~account_updates_hash
+      in
+      let fee_payer = zkapp_command.fee_payer in
+      let full_tx_commitment =
+        Zkapp_command.Transaction_commitment.create_complete tx_commitment
+          ~memo_hash:(Signed_command_memo.hash zkapp_command.memo)
+          ~fee_payer_hash:
+            (Zkapp_command.Digest.Account_update.create
+               (Account_update.of_fee_payer fee_payer) )
+      in
+      let check_signature s pk msg =
+        match Signature_lib.Public_key.decompress pk with
+        | None ->
+            return (Error (`Invalid_keys [ pk ]))
+        | Some pk ->
+            if
+              not
+                (Signature_lib.Schnorr.Chunked.verify s
+                   (Backend.Tick.Inner_curve.of_affine pk)
+                   (Random_oracle_input.Chunked.field msg) )
+            then
+              return
+                (Error
+                   (`Invalid_signature [ Signature_lib.Public_key.compress pk ])
+                )
+            else ()
+      in
+      check_signature fee_payer.authorization fee_payer.body.public_key
+        full_tx_commitment ;
+      (* Check signatures *)
+      Zkapp_command.Call_forest.iteri zkapp_command.account_updates
+        ~f:(fun _i p ->
+          let commitment =
+            if p.body.use_full_commitment then full_tx_commitment
+            else tx_commitment
+          in
+          match (p.authorization, p.body.authorization_kind) with
+          | Signature s, Signature ->
+              check_signature s p.body.public_key commitment
+          | None_given, None_given ->
+              ()
+          | Proof _, Proof _ ->
+              ()
+          | _ ->
+              return
+                (Error
+                   (`Mismatched_authorization_kind
+                     [ Account_id.public_key @@ Account_update.account_id p ] )
+                ) ) ;
+      Ok () )
+
 let check :
        User_command.Verifiable.t With_status.t
-    -> [ `Valid of User_command.Valid.t
-       | `Valid_assuming of User_command.Valid.t * _ list
-       | invalid ] = function
+    -> (User_command.Valid.t * [ `Assuming of _ list ], invalid) Result.t =
+  function
   | { With_status.data = User_command.Signed_command c; status = _ } ->
       check_signed_command c
-  | { With_status.data =
-        Zkapp_command
-          ({ fee_payer; account_updates; memo } as zkapp_command_with_vk)
-    ; status
-    } ->
+  | { With_status.data = Zkapp_command zkapp_command_with_vk; status } ->
       let zkapp_command = Zkapp_command.of_verifiable zkapp_command_with_vk in
+      let%bind.Result () = check_signatures_of_zkapp_command zkapp_command in
       with_return (fun { return } ->
-          let account_updates_hash =
-            Zkapp_command.Call_forest.hash account_updates
-          in
-          let tx_commitment =
-            Zkapp_command.Transaction_commitment.create ~account_updates_hash
-          in
-          let full_tx_commitment =
-            Zkapp_command.Transaction_commitment.create_complete tx_commitment
-              ~memo_hash:(Signed_command_memo.hash memo)
-              ~fee_payer_hash:
-                (Zkapp_command.Digest.Account_update.create
-                   (Account_update.of_fee_payer fee_payer) )
-          in
-          let check_signature s pk msg =
-            match Signature_lib.Public_key.decompress pk with
-            | None ->
-                return (`Invalid_keys [ pk ])
-            | Some pk ->
-                if
-                  not
-                    (Signature_lib.Schnorr.Chunked.verify s
-                       (Backend.Tick.Inner_curve.of_affine pk)
-                       (Random_oracle_input.Chunked.field msg) )
-                then
-                  return
-                    (`Invalid_signature [ Signature_lib.Public_key.compress pk ])
-                else ()
-          in
-          check_signature fee_payer.authorization fee_payer.body.public_key
-            full_tx_commitment ;
-          (* Check signatures *)
-          Zkapp_command.Call_forest.iteri zkapp_command.account_updates
-            ~f:(fun _i p ->
-              let commitment =
-                if p.body.use_full_commitment then full_tx_commitment
-                else tx_commitment
-              in
-              match (p.authorization, p.body.authorization_kind) with
-              | Signature s, Signature ->
-                  check_signature s p.body.public_key commitment
-              | None_given, None_given ->
-                  ()
-              | Proof _, Proof _ ->
-                  ()
-              | _ ->
-                  return
-                    (`Mismatched_authorization_kind
-                      [ Account_id.public_key @@ Account_update.account_id p ]
-                      ) ) ;
-          let valid_assuming =
+          let assuming =
             match status with
             | Failed _ ->
                 (* Don't verify the proof if it has failed. *) []
             | Applied ->
-                account_updates |> Zkapp_statement.zkapp_statements_of_forest'
+                zkapp_command_with_vk.account_updates
+                |> Zkapp_statement.zkapp_statements_of_forest'
                 |> Zkapp_command.Call_forest.With_hashes_and_data
                    .to_zkapp_command_with_hashes_list
-                |> List.filter_map ~f:(collect_vk_assumption ~return)
+                |> List.filter_map
+                     ~f:
+                       (collect_vk_assumption ~return:(fun x ->
+                            return (Error x) ) )
           in
           let v : User_command.Valid.t =
             (* Verification keys should be present if it reaches here *)
@@ -149,8 +157,4 @@ let check :
             in
             User_command.Poly.Zkapp_command valid_zkapp_command
           in
-          match valid_assuming with
-          | [] ->
-              `Valid v
-          | _ :: _ ->
-              `Valid_assuming (v, valid_assuming) )
+          Ok (v, `Assuming assuming) )
