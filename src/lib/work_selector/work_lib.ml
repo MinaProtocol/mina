@@ -125,9 +125,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                   false )
                 else true ) )
 
-    let remove t x =
-      t.jobs_seen <-
-        Map.remove t.jobs_seen (One_or_two.map ~f:Work_spec.statement x)
+    let remove t statement = t.jobs_seen <- Map.remove t.jobs_seen statement
 
     let set t x =
       t.jobs_seen <-
