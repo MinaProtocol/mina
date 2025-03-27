@@ -2310,6 +2310,22 @@ let test_genesis_creation =
      Cli_lib.Exceptions.handle_nicely
        Test_genesis_creation.time_genesis_creation )
 
+let test_block_command_verification =
+  Command.async ~summary:"Test block comand verification"
+    (let%map_open.Command large_precomputed_json_file =
+       flag "--block-file" ~doc:"FILE file with serialized block"
+         (optional_with_default
+            "_build/default/src/lib/mina_block/tests/hetzner-itn-1-1795.json"
+            string )
+     and log_directory =
+       flag "--log-dir" ~doc:"FILE directory for log output"
+         (optional_with_default "." string)
+     in
+     Cli_lib.Exceptions.handle_nicely
+     @@ fun () ->
+     Test_block_command_verification.time_block_command_verification
+       ~large_precomputed_json_file ~log_directory )
+
 let test_ledger_application =
   Command.async ~summary:"Test ledger application"
     (let%map_open.Command privkey_path = Cli_lib.Flag.privkey_read_path
@@ -2532,7 +2548,9 @@ let advanced ~itn_features =
     ; ("print-signature-kind", signature_kind)
     ; ( "test"
       , Command.group ~summary:"Testing-only commands"
-          [ ("create-genesis", test_genesis_creation) ] )
+          [ ("create-genesis", test_genesis_creation)
+          ; ("verify-block-commands", test_block_command_verification)
+          ] )
     ]
   in
   let cmds =
