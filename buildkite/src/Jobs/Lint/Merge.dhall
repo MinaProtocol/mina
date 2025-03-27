@@ -113,6 +113,19 @@ in  Pipeline.build
             }
         , Command.build
             Command.Config::{
+            , commands =
+              [ Cmd.run "scripts/merged-to-kimchi-stubs-vendors.sh main" ]
+            , label =
+                "[kimchi-stubs-vendors] Check merges cleanly into kimchi-stubs-vendors main branch"
+            , key = "merged-to-kimchi-stubs-vendors-main"
+            , soft_fail = Some (B/SoftFail.Boolean True)
+            , target = Size.Multi
+            , docker = Some Docker::{
+              , image = (../../Constants/ContainerImages.dhall).toolchainBase
+              }
+            }
+        , Command.build
+            Command.Config::{
             , commands = [ Cmd.run "true" ] : List Cmd.Type
             , label = "pr"
             , key = "pr"
