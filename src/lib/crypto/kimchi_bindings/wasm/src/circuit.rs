@@ -31,6 +31,6 @@ where
 
 #[wasm_bindgen]
 pub fn prover_to_json(prover_index: &WasmPastaFpPlonkIndex) -> String {
-    let circuit: Circuit<Fp> = (&prover_index.0.cs).into();
+    let circuit: Circuit<Fp> = (&*prover_index.0.cs).into();
     serde_json::to_string(&circuit).expect("couldn't serialize constraints")
 }
