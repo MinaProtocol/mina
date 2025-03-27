@@ -230,6 +230,10 @@ module Worker_state = struct
              let set_itn_logger_data ~daemon_port:_ = ()
            end : S )
 
+  let verify_commands (t : t) =
+    let module Worker_state = (val t) in
+    Worker_state.verify_commands
+
   let get = Fn.id
 end
 
