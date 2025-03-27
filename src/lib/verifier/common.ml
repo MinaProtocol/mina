@@ -44,29 +44,38 @@ let check_signed_command c =
     | None ->
         Result.Error (`Invalid_signature (Signed_command.public_keys c))
 
-let collect_vk_assumption ~return
-    ( ( (p : Account_update.t)
-      , ( (vk_opt :
-            (Side_loaded_verification_key.t, Pasta_bindings.Fp.t) With_hash.t
-            option )
-        , (stmt : Zkapp_statement.t) ) )
-    , _ ) =
+let collect_vk_assumption
+    ( (p : Account_update.t)
+    , ( (vk_opt :
+          (Side_loaded_verification_key.t, Pasta_bindings.Fp.t) With_hash.t
+          option )
+      , (stmt : Zkapp_statement.t) ) ) =
   match (p.authorization, p.body.authorization_kind, vk_opt) with
   | Proof _, Proof _, None ->
-      return
+      Error
         (`Missing_verification_key
           [ Account_id.public_key @@ Account_update.account_id p ] )
   | Proof pi, Proof vk_hash, Some (vk : _ With_hash.t) ->
       if
         (* check that vk expected for proof is the one being used *)
         Snark_params.Tick.Field.equal vk_hash (With_hash.hash vk)
-      then Some (vk.data, stmt, pi)
+      then Ok (Some (vk.data, stmt, pi))
       else
-        return
+        Error
           (`Unexpected_verification_key
             [ Account_id.public_key @@ Account_update.account_id p ] )
   | _ ->
-      None
+      Ok None
+
+let collect_vk_assumptions (zkapp_command : Zkapp_command.Verifiable.t) =
+  let collect_vk_assumption' collected (element, _) =
+    let%map.Result res_opt = collect_vk_assumption element in
+    Option.value_map ~f:(Fn.flip List.cons collected) ~default:collected res_opt
+  in
+  zkapp_command.account_updates |> Zkapp_statement.zkapp_statements_of_forest'
+  |> Zkapp_command.Call_forest.With_hashes_and_data
+     .to_zkapp_command_with_hashes_list
+  |> List.fold_result ~f:collect_vk_assumption' ~init:[]
 
 let check_signatures_of_zkapp_command (zkapp_command : Zkapp_command.t) :
     (unit, invalid) Result.t =
@@ -124,30 +133,22 @@ let check :
   function
   | { With_status.data = User_command.Signed_command c; status = _ } ->
       check_signed_command c
-  | { With_status.data = Zkapp_command zkapp_command_with_vk; status } ->
-      let zkapp_command = Zkapp_command.of_verifiable zkapp_command_with_vk in
+  | { With_status.data = Zkapp_command zkapp_command_verifable; status } ->
+      let zkapp_command = Zkapp_command.of_verifiable zkapp_command_verifable in
       let%bind.Result () = check_signatures_of_zkapp_command zkapp_command in
-      with_return (fun { return } ->
-          let assuming =
-            match status with
-            | Failed _ ->
-                (* Don't verify the proof if it has failed. *) []
-            | Applied ->
-                zkapp_command_with_vk.account_updates
-                |> Zkapp_statement.zkapp_statements_of_forest'
-                |> Zkapp_command.Call_forest.With_hashes_and_data
-                   .to_zkapp_command_with_hashes_list
-                |> List.filter_map
-                     ~f:
-                       (collect_vk_assumption ~return:(fun x ->
-                            return (Error x) ) )
-          in
-          let v : User_command.Valid.t =
-            (* Verification keys should be present if it reaches here *)
-            let (`If_this_is_used_it_should_have_a_comment_justifying_it
-                  valid_zkapp_command ) =
-              Zkapp_command.Valid.to_valid_unsafe zkapp_command
-            in
-            User_command.Poly.Zkapp_command valid_zkapp_command
-          in
-          Ok (v, `Assuming assuming) )
+      let%map.Result assuming =
+        match status with
+        | Failed _ ->
+            Ok []
+        | Applied ->
+            collect_vk_assumptions zkapp_command_verifable
+      in
+      let v : User_command.Valid.t =
+        (* Verification keys should be present if it reaches here *)
+        let (`If_this_is_used_it_should_have_a_comment_justifying_it
+              valid_zkapp_command ) =
+          Zkapp_command.Valid.to_valid_unsafe zkapp_command
+        in
+        User_command.Poly.Zkapp_command valid_zkapp_command
+      in
+      (v, `Assuming assuming)
