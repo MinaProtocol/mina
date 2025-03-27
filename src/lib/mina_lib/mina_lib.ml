@@ -1679,8 +1679,12 @@ let initialize_proof_cache_db (config : Config.t) =
     (config.conf_dir ^/ "proof_cache")
   >>| function Error e -> raise_on_initialization_error e | Ok db -> db
 
+let initialize_zkapp_vk_cache_db (config : Config.t) =
+  Zkapp_vk_cache_tag.create_db ~logger:config.logger
+    (config.conf_dir ^/ "zkapp_vk_cache")
+  >>| function Error e -> raise_on_initialization_error e | Ok db -> db
+
 let create ~commit_id ?wallets (config : Config.t) =
-  let%bind proof_cache_db = initialize_proof_cache_db config in
   let commit_id_short = String.sub ~pos:0 ~len:8 commit_id in
   let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
@@ -1713,6 +1717,8 @@ let create ~commit_id ?wallets (config : Config.t) =
             @@ start_filtered_log ~commit_id
                  in_memory_reverse_structured_log_messages_for_integration_test
                  config.start_filtered_logs ;
+          let%bind proof_cache_db = initialize_proof_cache_db config in
+          let%bind zkapp_vk_cache_db = initialize_zkapp_vk_cache_db config in
           let module Context =
           (val context ~proof_cache_db ~commit_id config)
           in
@@ -2009,7 +2015,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
               ~genesis_constants:config.precomputed_values.genesis_constants
-              ~slot_tx_end
+              ~slot_tx_end ~vk_cache_db:zkapp_vk_cache_db
           in
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =

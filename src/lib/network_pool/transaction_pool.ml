@@ -287,18 +287,19 @@ struct
         ; verifier : (Verifier.t[@sexp.opaque])
         ; genesis_constants : Genesis_constants.t
         ; slot_tx_end : Mina_numbers.Global_slot_since_hard_fork.t option
+        ; vk_cache_db : Zkapp_vk_cache_tag.cache_db
         }
-      [@@deriving sexp_of]
 
       (* remove next line if there's a way to force [@@deriving make] write a
          named parameter instead of an optional parameter *)
       let make ~trust_system ~pool_max_size ~verifier ~genesis_constants
-          ~slot_tx_end =
+          ~slot_tx_end ~vk_cache_db =
         { trust_system
         ; pool_max_size
         ; verifier
         ; genesis_constants
         ; slot_tx_end
+        ; vk_cache_db
         }
     end
 
@@ -331,15 +332,17 @@ struct
     module Vk_refcount_table = struct
       type t =
         { verification_keys :
-            (int * Verification_key_wire.t) Zkapp_basic.F_map.Table.t
+            (int * Zkapp_vk_cache_tag.t) Zkapp_basic.F_map.Table.t
         ; account_id_to_vks : int Zkapp_basic.F_map.Map.t Account_id.Table.t
         ; vk_to_account_ids : int Account_id.Map.t Zkapp_basic.F_map.Table.t
+        ; vk_cache_db : Zkapp_vk_cache_tag.cache_db
         }
 
-      let create () =
+      let create vk_cache_db () =
         { verification_keys = Zkapp_basic.F_map.Table.create ()
         ; account_id_to_vks = Account_id.Table.create ()
         ; vk_to_account_ids = Zkapp_basic.F_map.Table.create ()
+        ; vk_cache_db
         }
 
       let find_vk (t : t) = Hashtbl.find t.verification_keys
@@ -365,7 +368,7 @@ struct
         in
         Hashtbl.update t.verification_keys vk.hash ~f:(function
           | None ->
-              (1, vk)
+              (1, Zkapp_vk_cache_tag.write_key_to_disk t.vk_cache_db vk)
           | Some (count, vk) ->
               (count + 1, vk) ) ;
         Hashtbl.update t.account_id_to_vks account_id
@@ -425,13 +428,12 @@ struct
       ; mutable current_batch : int
       ; mutable remaining_in_batch : int
       ; config : Config.t
-      ; logger : (Logger.t[@sexp.opaque])
+      ; logger : Logger.t
       ; batcher : Batcher.t
-      ; mutable best_tip_diff_relay : (unit Deferred.t[@sexp.opaque]) Option.t
-      ; mutable best_tip_ledger : (Base_ledger.t[@sexp.opaque]) Option.t
-      ; verification_key_table : (Vk_refcount_table.t[@sexp.opaque])
+      ; mutable best_tip_diff_relay : unit Deferred.t Option.t
+      ; mutable best_tip_ledger : Base_ledger.t Option.t
+      ; verification_key_table : Vk_refcount_table.t
       }
-    [@@deriving sexp_of]
 
     let member t x =
       Indexed_pool.member t.pool (Transaction_hash.User_command.of_checked x)
@@ -679,14 +681,16 @@ struct
               let cmd_hash =
                 With_status.data cmd
                 |> Transaction_hash.User_command_with_valid_signature.create
-                |> Transaction_hash.User_command_with_valid_signature.hash
+                |> Transaction_hash.User_command_with_valid_signature
+                   .transaction_hash
               in
               Set.add set cmd_hash )
         in
         Sequence.to_list dropped_commands
         |> List.partition_tf ~f:(fun cmd ->
                Set.mem command_hashes
-                 (Transaction_hash.User_command_with_valid_signature.hash cmd) )
+                 (Transaction_hash.User_command_with_valid_signature
+                  .transaction_hash cmd ) )
       in
       List.iter committed_commands ~f:(fun cmd ->
           vk_table_lift_hashed vk_table_dec cmd ;
@@ -824,12 +828,10 @@ struct
               ~time_controller ~slot_tx_end:config.Config.slot_tx_end
         ; locally_generated_uncommitted =
             Hashtbl.create
-              ( module Transaction_hash.User_command_with_valid_signature.Stable
-                       .Latest )
+              (module Transaction_hash.User_command_with_valid_signature)
         ; locally_generated_committed =
             Hashtbl.create
-              ( module Transaction_hash.User_command_with_valid_signature.Stable
-                       .Latest )
+              (module Transaction_hash.User_command_with_valid_signature)
         ; current_batch = 0
         ; remaining_in_batch = max_per_15_seconds
         ; config
@@ -837,7 +839,8 @@ struct
         ; batcher = Batcher.create ~logger config.verifier
         ; best_tip_diff_relay = None
         ; best_tip_ledger = None
-        ; verification_key_table = Vk_refcount_table.create ()
+        ; verification_key_table =
+            Vk_refcount_table.create config.vk_cache_db ()
         }
       in
       don't_wait_for
@@ -1169,7 +1172,12 @@ struct
                             in
                             let vks =
                               vks
-                              |> List.map ~f:(fun vk -> (vk.hash, vk))
+                              |> List.map ~f:(fun vk_cached ->
+                                     let vk =
+                                       Zkapp_vk_cache_tag.read_key_from_disk
+                                         vk_cached
+                                     in
+                                     (vk.hash, vk) )
                               |> Zkapp_basic.F_map.Map.of_alist_exn
                             in
                             (account_id, vks) )
@@ -1368,12 +1376,16 @@ struct
         in
         let dropped_for_add_hashes =
           List.map dropped_for_add
-            ~f:Transaction_hash.User_command_with_valid_signature.hash
+            ~f:
+              Transaction_hash.User_command_with_valid_signature
+              .transaction_hash
           |> Transaction_hash.Set.of_list
         in
         let dropped_for_size_hashes =
           List.map dropped_for_size
-            ~f:Transaction_hash.User_command_with_valid_signature.hash
+            ~f:
+              Transaction_hash.User_command_with_valid_signature
+              .transaction_hash
           |> Transaction_hash.Set.of_list
         in
         let all_dropped_cmd_hashes =
@@ -1411,8 +1423,8 @@ struct
                 if
                   not
                     (Set.mem all_dropped_cmd_hashes
-                       (Transaction_hash.User_command_with_valid_signature.hash
-                          cmd ) )
+                       (Transaction_hash.User_command_with_valid_signature
+                        .transaction_hash cmd ) )
                 then register_locally_generated t cmd
             | Error _ ->
                 () ) ;
@@ -1435,7 +1447,8 @@ struct
                 *)
                 if
                   Set.mem all_dropped_cmd_hashes
-                    (Transaction_hash.User_command_with_valid_signature.hash cmd)
+                    (Transaction_hash.User_command_with_valid_signature
+                     .transaction_hash cmd )
                 then `Trd cmd
                 else `Fst cmd
             | Error (cmd, error) ->
@@ -1569,7 +1582,8 @@ struct
                       ->
                let cmp = compare batch1 batch2 in
                let get_hash =
-                 Transaction_hash.User_command_with_valid_signature.hash
+                 Transaction_hash.User_command_with_valid_signature
+                 .transaction_hash
                in
                let get_nonce txn =
                  Transaction_hash.User_command_with_valid_signature.command txn
@@ -1930,6 +1944,7 @@ let%test_module _ =
       let config =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
           ~genesis_constants ~slot_tx_end
+          ~vk_cache_db:(Zkapp_vk_cache_tag.For_tests.create_db ())
       in
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants

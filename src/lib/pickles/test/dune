@@ -2,9 +2,12 @@
  (names main)
  (flags
   (:standard -warn-error +a)
-  -open Core_kernel
-  -open Pickles)
- (preprocess (pps ppx_jane))
+  -open
+  Core_kernel
+  -open
+  Pickles)
+ (preprocess
+  (pps ppx_jane))
  (package pickles)
  (libraries
   ; Opam libraries
@@ -33,6 +36,6 @@
   snark_keys_header
   snarky.backendless
   sponge
-  tuple_lib
-  )
- (action (run %{test})))
+  tuple_lib)
+ (action
+  (run %{test})))
