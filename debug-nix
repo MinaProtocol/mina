@@ -1,0 +1,69 @@
+## With 2024-08-07
+
+➜  mina git:(dw/bump-rust-to-1.82) ✗ nix develop mina                                           
+warning: Git tree '/home/soc/codes/o1-labs/mina' is dirty
+warning: ignoring untrusted substituter 'https://storage.googleapis.com/mina-nix-cache', you are not a trusted user.
+Run `man nix.conf` for more information on the `substituters` configuration option.
+warning: ignoring the client-specified setting 'trusted-public-keys', because it is a restricted setting and you are not a trusted user
+error: builder for '/nix/store/6v683dwqsh1rg5ppcc6mamy9p6dd3k0q-plonk_wasm-0.1.0.drv' failed with exit code 1;
+       last 25 log lines:
+       > Running phase: patchPhase
+       > Executing cargoSetupPostPatchHook
+       > Validating consistency between /build/source/lib/crypto/kimchi_bindings/wasm/Cargo.lock and /build/cargo-vendor-dir/Cargo.lock
+       > Finished cargoSetupPostPatchHook
+       > Running phase: updateAutotoolsGnuConfigScriptsPhase
+       > Running phase: configurePhase
+       > Running phase: buildPhase
+       > ++ export 'RUSTFLAGS=-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features -C link-arg=--max-memory=4294967296'
+       > ++ RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features -C link-arg=--max-memory=4294967296'
+       > ++ wasm-pack build --mode no-install --target nodejs --out-dir /nix/store/q147h6nzvhfia76ik7z1wrzphs50f257-plonk_wasm-0.1.0/nodejs ./. -- --features nodejs
+       > [INFO]: Checking for the Wasm target...
+       > [INFO]: Compiling to Wasm...
+       > warning: `/build/.cargo/config` is deprecated in favor of `config.toml`
+       > note: if you need to support cargo 1.38 or earlier, you can symlink `config` to `config.toml`
+       > warning: `/build/.cargo/config` is deprecated in favor of `config.toml`
+       > note: if you need to support cargo 1.38 or earlier, you can symlink `config` to `config.toml`
+       > warning: unused manifest key: build
+       > warning: unused manifest key: target.wasm32-unknown-unknown.rustflags
+       > error: no matching package named `compiler_builtins` found
+       > location searched: registry `crates-io`
+       > required by package `std v0.0.0 (/nix/store/8815ym98xw8av67dbi28cc6yb5lhavig-rust-1.82.0-nightly-2024-08-06-60d146580/lib/rustlib/src/rust/library/std)`
+       > Error: Compiling your crate to WebAssembly failed
+       > Caused by: Compiling your crate to WebAssembly failed
+       > Caused by: failed to execute `cargo build`: exited with exit status: 101
+       >   full command: cd "./." && "cargo" "build" "--lib" "--release" "--target" "wasm32-unknown-unknown" "--features" "nodejs"
+       For full logs, run 'nix-store -l /nix/store/6v683dwqsh1rg5ppcc6mamy9p6dd3k0q-plonk_wasm-0.1.0.drv'.
+error: 1 dependencies of derivation '/nix/store/k0vcjr3xvhzzh0d0l5h31kknmdqg8d4s-mina-dev-env.drv' failed to build
+
+## With 2024-08-08
+
+➜  mina git:(dw/bump-rust-to-1.82) ✗ nix develop mina                                           
+warning: Git tree '/home/soc/codes/o1-labs/mina' is dirty
+warning: ignoring untrusted substituter 'https://storage.googleapis.com/mina-nix-cache', you are not a trusted user.
+Run `man nix.conf` for more information on the `substituters` configuration option.
+warning: ignoring the client-specified setting 'trusted-public-keys', because it is a restricted setting and you are not a trusted user
+error:
+       … while calling the 'derivationStrict' builtin
+         at <nix/derivation-internal.nix>:34:12:
+           33|
+           34|   strict = derivationStrict drvAttrs;
+             |            ^
+           35|
+
+       … while evaluating derivation 'mina-dev'
+         whose name attribute is located at /nix/store/x38dbpkm6xypf5vg6f8wgi9ndqh8s2j4-source/pkgs/stdenv/generic/make-derivation.nix:348:7
+
+       … while evaluating attribute 'PLONK_WASM_NODEJS' of derivation 'mina-dev'
+         at /nix/store/chq1yncagy2x6n25pryz5qqj2a90srl1-source/nix/ocaml.nix:344:9:
+          343|
+          344|         PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
+             |         ^
+          345|         PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
+
+       (stack trace truncated; use '--show-trace' to show the full, detailed trace)
+
+       error: builder for '/nix/store/47lwpygv45cyg75r68kzhjskglvd97zw-cargo.lock.drv' failed with exit code 1;
+       last 1 log lines:
+       > cp: cannot stat '/nix/store/i88rr4xhz9s4pras9r1sc743jk5jf5hf-rust-src-1.82.0-nightly-2024-08-07-8b3870784/lib/rustlib/src/rust/Cargo.lock': No such file or directory
+       For full logs, run 'nix-store -l /nix/store/47lwpygv45cyg75r68kzhjskglvd97zw-cargo.lock.drv'.
+
