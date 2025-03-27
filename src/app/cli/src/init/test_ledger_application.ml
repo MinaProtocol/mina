@@ -224,7 +224,7 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
   let results = ref [] in
   let init_root = Ledger.merkle_root init_ledger in
   let save_preparation_times time =
-    if Option.is_some benchmark then results := !results @ [ time ]
+    if Option.is_some benchmark then results := time :: !results
   in
   let save_and_dump_benchmarks final_time =
     let calculate_mean preparation_steps =
