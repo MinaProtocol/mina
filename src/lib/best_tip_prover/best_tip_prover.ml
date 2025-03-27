@@ -117,9 +117,7 @@ module Make (Inputs : Inputs_intf) :
             Error (Error.tag ~tag:"verifier proof" e) )
 
   let verify ~verifier ~genesis_constants ~precomputed_values
-      { Proof_carrying_data.data = (best_tip : Mina_block.Header.t)
-      ; proof = merkle_list, (root : Mina_block.Header.t)
-      } =
+      { Proof_carrying_data.data = best_tip; proof = merkle_list, root } =
     let open Deferred.Or_error.Let_syntax in
     let merkle_list_length = List.length merkle_list in
     let max_length = Transition_frontier.global_max_length genesis_constants in
@@ -173,5 +171,3 @@ end
 include Make (struct
   module Transition_frontier = Transition_frontier
 end)
-
-module Wrap_for_block = Wrap_for_block
