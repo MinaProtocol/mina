@@ -68,62 +68,55 @@ let collect_vk_assumption ~return
   | _ ->
       None
 
-let check_signatures_of_zkapp_command (zkapp_command : Zkapp_command.t) =
-  with_return (fun { return } ->
-      let account_updates_hash =
-        Zkapp_command.Call_forest.hash zkapp_command.account_updates
-      in
-      let tx_commitment =
-        Zkapp_command.Transaction_commitment.create ~account_updates_hash
-      in
-      let fee_payer = zkapp_command.fee_payer in
-      let full_tx_commitment =
-        Zkapp_command.Transaction_commitment.create_complete tx_commitment
-          ~memo_hash:(Signed_command_memo.hash zkapp_command.memo)
-          ~fee_payer_hash:
-            (Zkapp_command.Digest.Account_update.create
-               (Account_update.of_fee_payer fee_payer) )
-      in
-      let check_signature s pk msg =
-        match Signature_lib.Public_key.decompress pk with
-        | None ->
-            return (Error (`Invalid_keys [ pk ]))
-        | Some pk ->
-            if
-              not
-                (Signature_lib.Schnorr.Chunked.verify s
-                   (Backend.Tick.Inner_curve.of_affine pk)
-                   (Random_oracle_input.Chunked.field msg) )
-            then
-              return
-                (Error
-                   (`Invalid_signature [ Signature_lib.Public_key.compress pk ])
-                )
-            else ()
-      in
-      check_signature fee_payer.authorization fee_payer.body.public_key
-        full_tx_commitment ;
-      (* Check signatures *)
-      Zkapp_command.Call_forest.iteri zkapp_command.account_updates
-        ~f:(fun _i p ->
-          let commitment =
-            if p.body.use_full_commitment then full_tx_commitment
-            else tx_commitment
-          in
-          match (p.authorization, p.body.authorization_kind) with
-          | Signature s, Signature ->
-              check_signature s p.body.public_key commitment
-          | None_given, None_given ->
-              ()
-          | Proof _, Proof _ ->
-              ()
-          | _ ->
-              return
-                (Error
-                   (`Mismatched_authorization_kind
-                     [ Account_id.public_key @@ Account_update.account_id p ] )
-                ) ) ;
-      Ok () )
+let check_signatures_of_zkapp_command (zkapp_command : Zkapp_command.t) :
+    (unit, invalid) Result.t =
+  let account_updates_hash =
+    Zkapp_command.Call_forest.hash zkapp_command.account_updates
+  in
+  let tx_commitment =
+    Zkapp_command.Transaction_commitment.create ~account_updates_hash
+  in
+  let fee_payer = zkapp_command.fee_payer in
+  let full_tx_commitment =
+    Zkapp_command.Transaction_commitment.create_complete tx_commitment
+      ~memo_hash:(Signed_command_memo.hash zkapp_command.memo)
+      ~fee_payer_hash:
+        (Zkapp_command.Digest.Account_update.create
+           (Account_update.of_fee_payer fee_payer) )
+  in
+  let check_signature s pk msg =
+    match Signature_lib.Public_key.decompress pk with
+    | None ->
+        Error (`Invalid_keys [ pk ])
+    | Some pk ->
+        if
+          not
+            (Signature_lib.Schnorr.Chunked.verify s
+               (Backend.Tick.Inner_curve.of_affine pk)
+               (Random_oracle_input.Chunked.field msg) )
+        then Error (`Invalid_signature [ Signature_lib.Public_key.compress pk ])
+        else Ok ()
+  in
+  let%bind.Result () =
+    check_signature fee_payer.authorization fee_payer.body.public_key
+      full_tx_commitment
+  in
+  (* Check signatures *)
+  Zkapp_command.Call_forest.to_list zkapp_command.account_updates
+  |> List.fold_result ~init:() ~f:(fun () p ->
+         let commitment =
+           if p.Account_update.body.use_full_commitment then full_tx_commitment
+           else tx_commitment
+         in
+         match (p.authorization, p.body.authorization_kind) with
+         | Signature s, Signature ->
+             check_signature s p.body.public_key commitment
+         | None_given, None_given | Proof _, Proof _ ->
+             Ok ()
+         | _ ->
+             Error
+               (`Mismatched_authorization_kind
+                 [ Account_id.public_key @@ Account_update.account_id p ] ) )
 
 let check :
        User_command.Verifiable.t With_status.t
