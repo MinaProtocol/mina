@@ -2273,6 +2273,12 @@ let signature_kind =
        in
        Core.print_endline signature_kind_string )
 
+let test_genesis_creation =
+  Command.async ~summary:"Test genesis creation"
+    (let%map_open.Command () = Command.Param.return () in
+     Cli_lib.Exceptions.handle_nicely
+       Test_genesis_creation.time_genesis_creation )
+
 let test_ledger_application =
   Command.async ~summary:"Test ledger application"
     (let%map_open.Command privkey_path = Cli_lib.Flag.privkey_read_path
@@ -2485,6 +2491,9 @@ let advanced ~itn_features =
     ; ("vrf", Cli_lib.Commands.Vrf.command_group)
     ; ("thread-graph", thread_graph)
     ; ("print-signature-kind", signature_kind)
+    ; ( "test"
+      , Command.group ~summary:"Testing-only commands"
+          [ ("create-genesis", test_genesis_creation) ] )
     ]
   in
   let cmds =
