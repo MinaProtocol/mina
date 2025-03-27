@@ -130,25 +130,23 @@ let check_signatures_of_zkapp_command (zkapp_command : Zkapp_command.t) :
 let check :
        User_command.Verifiable.t With_status.t
     -> (User_command.Valid.t * [ `Assuming of _ list ], invalid) Result.t =
+  let zkapp_command_to_valid zkapp_command : User_command.Valid.t =
+    (* Verification keys should be present if it reaches here *)
+    let (`If_this_is_used_it_should_have_a_comment_justifying_it
+          valid_zkapp_command ) =
+      Zkapp_command.Valid.to_valid_unsafe zkapp_command
+    in
+    User_command.Poly.Zkapp_command valid_zkapp_command
+  in
   function
   | { With_status.data = User_command.Signed_command c; status = _ } ->
       check_signed_command c
-  | { With_status.data = Zkapp_command zkapp_command_verifable; status } ->
-      let zkapp_command = Zkapp_command.of_verifiable zkapp_command_verifable in
-      let%bind.Result () = check_signatures_of_zkapp_command zkapp_command in
-      let%map.Result assuming =
-        match status with
-        | Failed _ ->
-            Ok []
-        | Applied ->
-            collect_vk_assumptions zkapp_command_verifable
-      in
-      let v : User_command.Valid.t =
-        (* Verification keys should be present if it reaches here *)
-        let (`If_this_is_used_it_should_have_a_comment_justifying_it
-              valid_zkapp_command ) =
-          Zkapp_command.Valid.to_valid_unsafe zkapp_command
-        in
-        User_command.Poly.Zkapp_command valid_zkapp_command
-      in
-      (v, `Assuming assuming)
+  | { With_status.data = Zkapp_command verifiable; status = Failed _ } ->
+      let command = Zkapp_command.of_verifiable verifiable in
+      let%map.Result () = check_signatures_of_zkapp_command command in
+      (zkapp_command_to_valid command, `Assuming [])
+  | { With_status.data = Zkapp_command verifiable; status = Applied } ->
+      let command = Zkapp_command.of_verifiable verifiable in
+      let%bind.Result () = check_signatures_of_zkapp_command command in
+      let%map.Result assuming = collect_vk_assumptions verifiable in
+      (zkapp_command_to_valid command, `Assuming assuming)
