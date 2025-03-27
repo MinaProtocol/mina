@@ -129,7 +129,8 @@ let write_graph (_ : t) =
   let _ = G.output_graph in
   ()
 
-let validate_block ~genesis_state_hash (b, v) =
+(** Validates block without time received validation *)
+let validate_block_skipping_time_received ~genesis_state_hash (b, v) =
   let open Mina_block.Validation in
   let open Result.Let_syntax in
   let h = (With_hash.map ~f:Mina_block.header b, v) in
@@ -159,7 +160,8 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
   let transition_with_hash = Envelope.Incoming.data enveloped_transition in
   let cached_initially_validated_transition_result =
     let%bind.Result initially_validated_transition =
-      validate_block ~genesis_state_hash transition_with_hash
+      validate_block_skipping_time_received ~genesis_state_hash
+        transition_with_hash
     in
     let enveloped_initially_validated_transition =
       Envelope.Incoming.map enveloped_transition
