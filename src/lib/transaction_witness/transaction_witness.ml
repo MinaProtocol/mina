@@ -50,6 +50,8 @@ end
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       { transaction : Mina_transaction.Transaction.Stable.V2.t
@@ -65,3 +67,52 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t =
+  { transaction : Mina_transaction.Transaction.t
+  ; first_pass_ledger : Mina_ledger.Sparse_ledger.t
+  ; second_pass_ledger : Mina_ledger.Sparse_ledger.t
+  ; protocol_state_body : Mina_state.Protocol_state.Body.Value.t
+  ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.t
+  ; status : Mina_base.Transaction_status.t
+  ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
+  }
+[@@deriving sexp, yojson]
+
+let read_all_proofs_from_disk
+    { transaction
+    ; first_pass_ledger
+    ; second_pass_ledger
+    ; protocol_state_body
+    ; init_stack
+    ; status
+    ; block_global_slot
+    } =
+  { Stable.Latest.transaction =
+      Mina_transaction.Transaction.read_all_proofs_from_disk transaction
+  ; first_pass_ledger
+  ; second_pass_ledger
+  ; protocol_state_body
+  ; init_stack
+  ; status
+  ; block_global_slot
+  }
+
+let write_all_proofs_to_disk
+    { Stable.Latest.transaction
+    ; first_pass_ledger
+    ; second_pass_ledger
+    ; protocol_state_body
+    ; init_stack
+    ; status
+    ; block_global_slot
+    } =
+  { transaction =
+      Mina_transaction.Transaction.write_all_proofs_to_disk transaction
+  ; first_pass_ledger
+  ; second_pass_ledger
+  ; protocol_state_body
+  ; init_stack
+  ; status
+  ; block_global_slot
+  }
