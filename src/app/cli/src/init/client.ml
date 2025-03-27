@@ -2309,7 +2309,11 @@ let test_ledger_application =
        flag "--has-second-partition"
          ~doc:"Assume there is a second partition (scan state)" no_arg
      and tracing = flag "--tracing" ~doc:"Wrap test into tracing" no_arg
-     and no_masks = flag "--no-masks" ~doc:"Do not create masks" no_arg in
+     and no_masks = flag "--no-masks" ~doc:"Do not create masks" no_arg
+     and benchmark =
+       flag "--dump-benchmark" ~doc:"Dump json file with benchmark data"
+         (optional string)
+     in
      Cli_lib.Exceptions.handle_nicely
      @@ fun () ->
      let first_partition_slots =
@@ -2325,7 +2329,7 @@ let test_ledger_application =
      Test_ledger_application.test ~privkey_path ~ledger_path ?prev_block_path
        ~first_partition_slots ~no_new_stack ~has_second_partition
        ~num_txs_per_round ~rounds ~no_masks ~max_depth ~tracing num_txs
-       ~constraint_constants ~genesis_constants )
+       ~constraint_constants ~genesis_constants ~benchmark )
 
 let itn_create_accounts =
   let compile_config = Mina_compile_config.Compiled.t in
