@@ -20,6 +20,7 @@ in  Pipeline.build
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
+            , Artifacts.Type.ZkappTestTransaction
             ]
           , debVersion = DebianVersions.DebVersion.Focal
           , network = Network.Type.Mainnet

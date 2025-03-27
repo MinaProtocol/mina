@@ -15,8 +15,8 @@ in  Pipeline.build
             [ Artifacts.Type.Daemon
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
-            , Artifacts.Type.TestExecutive
             , Artifacts.Type.Rosetta
+            , Artifacts.Type.ZkappTestTransaction
             ]
           , network = Network.Type.Devnet
           , tags =
