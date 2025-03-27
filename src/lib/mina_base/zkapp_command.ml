@@ -409,13 +409,10 @@ let check_authorization (p : Account_update.t) : unit Or_error.t =
       Error err
 
 module Verifiable : sig
-  type t = private
-    { fee_payer : Account_update.Fee_payer.t
-    ; account_updates :
-        (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option
-        Call_forest.With_hashes_and_data.t
-    ; memo : Signed_command_memo.t
-    }
+  type t =
+    (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option
+    Call_forest.With_hashes_and_data.t
+    Poly.t
   [@@deriving sexp, compare, equal, hash, yojson, bin_io]
 
   val load_vk_from_ledger :
@@ -470,15 +467,12 @@ module Verifiable : sig
        and type cache = Verification_key_wire.t Account_id.Map.t
 end = struct
   type t =
-    { fee_payer : Account_update.Fee_payer.Stable.Latest.t
-    ; account_updates :
-        ( Side_loaded_verification_key.Stable.Latest.t
-        , Zkapp_basic.F.Stable.Latest.t )
-        With_hash.Stable.Latest.t
-        option
-        Call_forest.With_hashes_and_data.Stable.Latest.t
-    ; memo : Signed_command_memo.Stable.Latest.t
-    }
+    ( Side_loaded_verification_key.Stable.Latest.t
+    , Zkapp_basic.F.Stable.Latest.t )
+    With_hash.Stable.Latest.t
+    option
+    Call_forest.With_hashes_and_data.Stable.Latest.t
+    Poly.Stable.Latest.t
   [@@deriving sexp, compare, equal, hash, yojson, bin_io_unversioned]
 
   let ok_if_vk_hash_expected ~got ~expected =
@@ -606,7 +600,7 @@ end = struct
                   vks_overridden := vks_overriden' ;
                   (p, None) )
         in
-        Ok { fee_payer; account_updates; memo } )
+        Ok { Poly.fee_payer; account_updates; memo } )
 
   module type Cache_intf = sig
     type t
@@ -744,11 +738,9 @@ end = struct
   end
 end
 
-let of_verifiable (t : Verifiable.t) : t =
-  { fee_payer = t.fee_payer
-  ; account_updates = Call_forest.map t.account_updates ~f:fst
-  ; memo = t.memo
-  }
+let of_verifiable ({ Poly.fee_payer; account_updates; memo } : Verifiable.t) : t
+    =
+  { fee_payer; account_updates = Call_forest.map account_updates ~f:fst; memo }
 
 module Transaction_commitment = struct
   module Stable = Kimchi_backend.Pasta.Basic.Fp.Stable
