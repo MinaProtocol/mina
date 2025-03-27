@@ -824,9 +824,9 @@ module type Valid_intf = sig
             -> Account_id.t
             -> (Verification_key_wire.t, Error.t) Result.t )
       -> t Or_error.t
-  end
 
-  val of_verifiable : Verifiable.t -> t
+    val of_verifiable : Verifiable.t -> t
+  end
 
   val forget : t -> T.t
 end
@@ -862,8 +862,6 @@ struct
 
   let create zkapp_command : t = { zkapp_command }
 
-  let of_verifiable (t : Verifiable.t) : t = { zkapp_command = of_verifiable t }
-
   let to_valid_unsafe (t : T.t) :
       [> `If_this_is_used_it_should_have_a_comment_justifying_it of t ] =
     `If_this_is_used_it_should_have_a_comment_justifying_it (create t)
@@ -871,6 +869,9 @@ struct
   let forget (t : t) : T.t = t.zkapp_command
 
   module For_tests = struct
+    let of_verifiable (t : Verifiable.t) : t =
+      { zkapp_command = of_verifiable t }
+
     let to_valid (t : T.t) ~failed ~find_vk : t Or_error.t =
       Verifiable.create t ~failed ~find_vk |> Or_error.map ~f:of_verifiable
   end

@@ -80,6 +80,7 @@ let check :
           ({ fee_payer; account_updates; memo } as zkapp_command_with_vk)
     ; status
     } ->
+      let zkapp_command = Zkapp_command.of_verifiable zkapp_command_with_vk in
       with_return (fun { return } ->
           let account_updates_hash =
             Zkapp_command.Call_forest.hash account_updates
@@ -112,7 +113,8 @@ let check :
           check_signature fee_payer.authorization fee_payer.body.public_key
             full_tx_commitment ;
           (* Check signatures *)
-          Zkapp_command.Call_forest.iteri account_updates ~f:(fun _i (p, _) ->
+          Zkapp_command.Call_forest.iteri zkapp_command.account_updates
+            ~f:(fun _i p ->
               let commitment =
                 if p.body.use_full_commitment then full_tx_commitment
                 else tx_commitment
@@ -141,10 +143,11 @@ let check :
           in
           let v : User_command.Valid.t =
             (* Verification keys should be present if it reaches here *)
-            let zkapp_command =
-              Zkapp_command.Valid.of_verifiable zkapp_command_with_vk
+            let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                  valid_zkapp_command ) =
+              Zkapp_command.Valid.to_valid_unsafe zkapp_command
             in
-            User_command.Poly.Zkapp_command zkapp_command
+            User_command.Poly.Zkapp_command valid_zkapp_command
           in
           match valid_assuming with
           | [] ->
