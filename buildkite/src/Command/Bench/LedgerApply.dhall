@@ -21,18 +21,12 @@ let Spec =
       }
 
 let dependsOn =
-        DebianVersions.dependsOnStep
-          (None Text)
-          DebianVersions.DebVersion.Bullseye
-          Profiles.Type.Standard
-          BuildFlags.Type.Instrumented
-          "build"
-      # DebianVersions.dependsOnStep
-          (None Text)
-          DebianVersions.DebVersion.Bullseye
-          Profiles.Type.Standard
-          BuildFlags.Type.None
-          "build"
+      DebianVersions.dependsOnStep
+        (None Text)
+        DebianVersions.DebVersion.Bullseye
+        Profiles.Type.Standard
+        BuildFlags.Type.Instrumented
+        "build"
 
 let pipeline
     : Spec.Type -> Pipeline.Config.Type
