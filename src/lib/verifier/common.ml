@@ -34,20 +34,47 @@ let invalid_to_error (invalid : invalid) : Error.t =
   | `Invalid_proof err ->
       Error.tag ~tag:"Invalid_proof" err
 
+let check_signed_command c =
+  if not (Signed_command.check_valid_keys c) then
+    `Invalid_keys (Signed_command.public_keys c)
+  else
+    match Signed_command.check_only_for_signature c with
+    | Some c ->
+        `Valid (User_command.Signed_command c)
+    | None ->
+        `Invalid_signature (Signed_command.public_keys c)
+
+let collect_vk_assumption ~return
+    ( ( (p : Account_update.t)
+      , ( (vk_opt :
+            (Side_loaded_verification_key.t, Pasta_bindings.Fp.t) With_hash.t
+            option )
+        , (stmt : Zkapp_statement.t) ) )
+    , _ ) =
+  match (p.authorization, p.body.authorization_kind, vk_opt) with
+  | Proof _, Proof _, None ->
+      return
+        (`Missing_verification_key
+          [ Account_id.public_key @@ Account_update.account_id p ] )
+  | Proof pi, Proof vk_hash, Some (vk : _ With_hash.t) ->
+      if
+        (* check that vk expected for proof is the one being used *)
+        Snark_params.Tick.Field.equal vk_hash (With_hash.hash vk)
+      then Some (vk.data, stmt, pi)
+      else
+        return
+          (`Unexpected_verification_key
+            [ Account_id.public_key @@ Account_update.account_id p ] )
+  | _ ->
+      None
+
 let check :
        User_command.Verifiable.t With_status.t
     -> [ `Valid of User_command.Valid.t
        | `Valid_assuming of User_command.Valid.t * _ list
        | invalid ] = function
-  | { With_status.data = User_command.Signed_command c; status = _ } -> (
-      if not (Signed_command.check_valid_keys c) then
-        `Invalid_keys (Signed_command.public_keys c)
-      else
-        match Signed_command.check_only_for_signature c with
-        | Some c ->
-            `Valid (User_command.Signed_command c)
-        | None ->
-            `Invalid_signature (Signed_command.public_keys c) )
+  | { With_status.data = User_command.Signed_command c; status = _ } ->
+      check_signed_command c
   | { With_status.data =
         Zkapp_command
           ({ fee_payer; account_updates; memo } as zkapp_command_with_vk)
@@ -84,54 +111,33 @@ let check :
           in
           check_signature fee_payer.authorization fee_payer.body.public_key
             full_tx_commitment ;
-          let zkapp_command_with_hashes_list =
-            account_updates |> Zkapp_statement.zkapp_statements_of_forest'
-            |> Zkapp_command.Call_forest.With_hashes_and_data
-               .to_zkapp_command_with_hashes_list
-          in
+          (* Check signatures *)
+          Zkapp_command.Call_forest.iteri account_updates ~f:(fun _i (p, _) ->
+              let commitment =
+                if p.body.use_full_commitment then full_tx_commitment
+                else tx_commitment
+              in
+              match (p.authorization, p.body.authorization_kind) with
+              | Signature s, Signature ->
+                  check_signature s p.body.public_key commitment
+              | None_given, None_given ->
+                  ()
+              | Proof _, Proof _ ->
+                  ()
+              | _ ->
+                  return
+                    (`Mismatched_authorization_kind
+                      [ Account_id.public_key @@ Account_update.account_id p ]
+                      ) ) ;
           let valid_assuming =
-            List.filter_map zkapp_command_with_hashes_list
-              ~f:(fun ((p, (vk_opt, stmt)), _at_account_update) ->
-                let commitment =
-                  if p.body.use_full_commitment then full_tx_commitment
-                  else tx_commitment
-                in
-                match (p.authorization, p.body.authorization_kind) with
-                | Signature s, Signature ->
-                    check_signature s p.body.public_key commitment ;
-                    None
-                | None_given, None_given ->
-                    None
-                | Proof pi, Proof vk_hash -> (
-                    match status with
-                    | Applied -> (
-                        match vk_opt with
-                        | None ->
-                            return
-                              (`Missing_verification_key
-                                [ Account_id.public_key
-                                  @@ Account_update.account_id p
-                                ] )
-                        | Some (vk : _ With_hash.t) ->
-                            if
-                              (* check that vk expected for proof is the one being used *)
-                              Snark_params.Tick.Field.equal vk_hash
-                                (With_hash.hash vk)
-                            then Some (vk.data, stmt, pi)
-                            else
-                              return
-                                (`Unexpected_verification_key
-                                  [ Account_id.public_key
-                                    @@ Account_update.account_id p
-                                  ] ) )
-                    | Failed _ ->
-                        (* Don't verify the proof if it has failed. *)
-                        None )
-                | _ ->
-                    return
-                      (`Mismatched_authorization_kind
-                        [ Account_id.public_key @@ Account_update.account_id p ]
-                        ) )
+            match status with
+            | Failed _ ->
+                (* Don't verify the proof if it has failed. *) []
+            | Applied ->
+                account_updates |> Zkapp_statement.zkapp_statements_of_forest'
+                |> Zkapp_command.Call_forest.With_hashes_and_data
+                   .to_zkapp_command_with_hashes_list
+                |> List.filter_map ~f:(collect_vk_assumption ~return)
           in
           let v : User_command.Valid.t =
             (* Verification keys should be present if it reaches here *)
