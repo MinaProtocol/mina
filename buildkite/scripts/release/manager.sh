@@ -188,7 +188,16 @@ function get_cached_debian_or_download_from_gs() {
 
     local __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network)
 
-    TARGET_HASH=$(gsutil hash -h -m  gs://buildkite_k8s/coda/shared/$__buildkite_build_id/$__codename/_build/${__artifact_full_name}_* | grep "Hash (md5)" | awk '{print $3}')
+    local __artifact_gs_url="gs://buildkite_k8s/coda/shared/$__buildkite_build_id/debians/$__codename/${__artifact_full_name}_*"
+
+    local __check=$(gsutil list  "$__artifact_gs_url")
+
+    if [[ "$__check" == "" ]]; then
+        echo -e "❌ ${RED} !! No debian package found using $__artifact_full_name. Are you sure ($__buildkite_build_id) buildkite build it is correct ? Exiting.${CLEAR}\n";
+        exit 1
+    fi
+
+    TARGET_HASH=$(gsutil hash -h -m  $__artifact_gs_url | grep "Hash (md5)" | awk '{print $3}')
     
     mkdir -p $DEBIAN_CACHE_FOLDER/$__codename
 
@@ -198,7 +207,7 @@ function get_cached_debian_or_download_from_gs() {
         echo "   🗂️  $__artifact_full_name Debian package already cached. Skipping download."
     else
         echo "   📂  $__artifact_full_name Debian package is not cached. Downloading from google cloud bucket."
-        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../cache/manager.sh read "$__codename/_build/${__artifact_full_name}_*"  $DEBIAN_CACHE_FOLDER/$__codename
+        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../cache/manager.sh read "debians/$__codename/${__artifact_full_name}_*"  $DEBIAN_CACHE_FOLDER/$__codename
     fi
 }
 
@@ -470,6 +479,16 @@ function publish(){
 
     if [[ -z ${__source_version+x} ]]; then
         echo -e "❌ ${RED} !! Source version (--source-version) is required${CLEAR}\n";
+        publish_help; exit 1;
+    fi
+
+    if [[ -z ${__buildkite_build_id+x} ]]; then
+        echo -e "❌ ${RED} !! Buildkite build id (--buildkite-build-id) is required${CLEAR}\n";
+        publish_help; exit 1;
+    fi
+
+    if [[ -z ${__channel+x} ]]; then
+        echo -e "❌ ${RED} !! Channel (--channel) is required${CLEAR}\n";
         publish_help; exit 1;
     fi
 
