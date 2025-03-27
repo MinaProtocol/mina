@@ -164,7 +164,7 @@ let apply_txs ~action_elements ~event_elements ~constraint_constants
         i b
         Time.(Span.to_string elapsed)
         (Ledger_hash.to_base58_check root) ;
-      time
+      elapsed
   | Error e ->
       eprintf
         !"Error applying staged ledger: %s\n%!"
@@ -229,10 +229,12 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
   let save_and_dump_benchmarks final_time =
     let calculate_mean results =
       let preparation_steps = List.drop_last_exn results in
-      let sum = Float.of_int (List.length preparation_steps) in
-      printf !"sum: %f\n" sum ;
-      List.fold preparation_steps ~init:Float.zero ~f:(fun acc time ->
-          acc +. (Time.Span.to_ms time /. sum) )
+      let prep_steps_len = Float.of_int (List.length preparation_steps) in
+      let prep_steps_total_time =
+        List.fold preparation_steps ~init:Float.zero ~f:(fun acc time ->
+            acc +. Time.Span.to_ms time )
+      in
+      prep_steps_total_time /. prep_steps_len
     in
     match benchmark with
     | Some benchmark ->
