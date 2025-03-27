@@ -9,7 +9,11 @@ let
     };
   toolchainHashes = {
     "1.82.0" = "yMuSb5eQPO/bHv+Bcf/US8LVMbf/G/0MSfiPwBhiPpk=";
-    "nightly-2024-10-18" = "sha256-U/HLeUTHtUkCwwtX7TG0ujC7jjLQvogPY9uuDpUEik4=";
+    "nightly-2024-08-06" = "sha256-vZKKILcaCfkTgxZy72FoZFvMTwYR9Pki5ovA2ksnzsM=";
+    "nightly-2024-08-07" = "sha256-cXk4OiLCJ2LJlHhH1d5/SXUoYsEaTLv/9gUH/ZbrLeE=";
+    "nightly-2024-08-08" = "sha256-IeUO263mdpDxBzWTY7upaZqX+ODkuK1JLTHdR3ItlkY=";
+    "nightly-2024-09-20" = "sha256-efF87P7mtVVzZ6KRvRYLKOk4KrDcCuA0Kv9luRrjBzI=";
+    "nightly-2024-08-10" = "sha256-vyqsR4nUhGVFEacY+GSr/xRmO8YaJ78q/JXOWEZrrNQ=";
     # copy the placeholder line with the correct toolchain name when adding a new toolchain
     # That is,
     # 1. Put the correct version name;
