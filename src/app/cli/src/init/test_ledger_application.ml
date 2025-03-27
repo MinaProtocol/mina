@@ -227,8 +227,7 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
     if Option.is_some benchmark then results := !results @ [ time ]
   in
   let save_and_dump_benchmarks final_time =
-    let calculate_mean results =
-      let preparation_steps = List.drop_last_exn results in
+    let calculate_mean preparation_steps =
       let prep_steps_len = Float.of_int (List.length preparation_steps) in
       let prep_steps_total_time =
         List.fold preparation_steps ~init:Float.zero ~f:(fun acc time ->
