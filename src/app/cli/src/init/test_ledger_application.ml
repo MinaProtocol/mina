@@ -158,11 +158,11 @@ let apply_txs ~action_elements ~event_elements ~constraint_constants
   with
   | Ok (b, _, _, _, _) ->
       let root = Ledger.merkle_root ledger in
-      let time = Time.diff (Time.now ()) start in
+      let elapsed = Time.diff (Time.now ()) start in
       printf
         !"Result of application %d: %B (took %s): new root %s\n%!"
         i b
-        Time.(Span.to_string time)
+        Time.(Span.to_string elapsed)
         (Ledger_hash.to_base58_check root) ;
       time
   | Error e ->
@@ -265,4 +265,4 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
   >>= apply ~num_txs:num_txs_final
         ~action_elements:genesis_constants.max_action_elements
         ~event_elements:genesis_constants.max_event_elements ~i:rounds
-  >>| save_and_dump_benchmarks >>| stop_tracing
+  >>| stop_tracing >>| save_and_dump_benchmarks
