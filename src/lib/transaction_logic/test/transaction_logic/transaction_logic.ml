@@ -97,7 +97,7 @@ let simple_payment () =
         Or_error.(
           Transaction_logic.apply_transactions ~constraint_constants
             ~global_slot ~txn_state_view ledger [ txn ]
-          >>| List.map ~f:Transaction_applied.unwrap) )
+          >>| List.map ~f:Transaction_applied.read_all_proofs_from_disk) )
 
 let simple_payment_signer_different_from_fee_payer () =
   Quickcheck.test ~trials:1000 setup
