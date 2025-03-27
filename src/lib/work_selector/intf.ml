@@ -127,13 +127,7 @@ module type Lib_intf = sig
          One_or_two.t
          list
 
-    val remove :
-         t
-      -> ( Transaction_witness.t
-         , Ledger_proof.t )
-         Snark_work_lib.Work.Single.Spec.t
-         One_or_two.t
-      -> unit
+    val remove : t -> Transaction_snark.Statement.t One_or_two.t -> unit
 
     val set :
          t
