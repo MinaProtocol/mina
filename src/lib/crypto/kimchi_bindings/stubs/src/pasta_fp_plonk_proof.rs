@@ -9,6 +9,7 @@ use crate::{
 use ark_ec::AffineRepr;
 use ark_ff::One;
 use array_init::array_init;
+use core::array;
 use groupmap::GroupMap;
 use kimchi::verifier::verify;
 use kimchi::{
@@ -30,7 +31,6 @@ use mina_poseidon::{
 };
 use poly_commitment::commitment::{CommitmentCurve, PolyComm};
 use poly_commitment::ipa::OpeningProof;
-use std::array;
 use std::convert::TryInto;
 
 type EFqSponge = DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>;
@@ -319,7 +319,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     use kimchi::circuits::{
         constraints::ConstraintSystem,
         gate::{CircuitGate, Connect},
-        polynomials::{foreign_field_mul, foreign_field_common::BigUintForeignFieldHelpers},
+        polynomials::{foreign_field_common::BigUintForeignFieldHelpers, foreign_field_mul},
         wires::Wire,
     };
     use num_bigint::BigUint;
@@ -476,13 +476,14 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
 ) {
     use ark_ff::Zero;
     use kimchi::circuits::{
-        constraints::ConstraintSystem, gate::CircuitGate,
-        polynomials::{range_check, foreign_field_common::BigUintForeignFieldHelpers},
+        constraints::ConstraintSystem,
+        gate::CircuitGate,
+        polynomials::{foreign_field_common::BigUintForeignFieldHelpers, range_check},
         wires::Wire,
     };
     use num_bigint::BigUint;
     use num_bigint::RandBigInt;
-    use o1_utils::{BigUintFieldHelpers};
+    use o1_utils::BigUintFieldHelpers;
     use poly_commitment::ipa::endos;
     use rand::{rngs::StdRng, SeedableRng};
 

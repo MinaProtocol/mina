@@ -2,15 +2,18 @@ use crate::arkworks::CamlBigInteger256;
 use crate::caml::caml_bytes_string::CamlBytesString;
 use ark_ff::{FftField, Field, One, PrimeField, UniformRand, Zero};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
-use mina_curves::pasta::{fields::{fq::FqParameters as Fq_params, fft::FpParameters}, Fq};
-use num_bigint::BigUint;
-use rand::rngs::StdRng;
-use std::{
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use core::{
     cmp::Ordering::{Equal, Greater, Less},
     convert::{TryFrom, TryInto},
     ops::Deref,
 };
+use mina_curves::pasta::{
+    fields::{fft::FpParameters, fq::FqParameters as Fq_params},
+    Fq,
+};
+use num_bigint::BigUint;
+use rand::rngs::StdRng;
 
 //
 // Fq <-> CamlFq
@@ -312,8 +315,8 @@ pub fn caml_pasta_fq_domain_generator(log2_size: ocaml::Int) -> Result<CamlFq, o
 
 #[ocaml_gen::func]
 #[ocaml::func]
-pub fn caml_pasta_fq_to_bytes(x: ocaml::Pointer<CamlFq>) -> [u8; std::mem::size_of::<Fq>()] {
-    let mut res = [0u8; std::mem::size_of::<Fq>()];
+pub fn caml_pasta_fq_to_bytes(x: ocaml::Pointer<CamlFq>) -> [u8; core::mem::size_of::<Fq>()] {
+    let mut res = [0u8; core::mem::size_of::<Fq>()];
     x.as_ref().0.serialize_compressed(&mut res[..]).unwrap();
     res
 }
