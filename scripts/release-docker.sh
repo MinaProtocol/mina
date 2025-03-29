@@ -10,7 +10,7 @@ set -x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot')
+VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -110,10 +110,6 @@ case "${SERVICE}" in
 mina-archive)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
   DOCKER_CONTEXT="dockerfiles/"
-  ;;
-bot)
-  DOCKERFILE_PATH="frontend/bot/Dockerfile"
-  DOCKER_CONTEXT="frontend/bot"
   ;;
 mina-daemon)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"

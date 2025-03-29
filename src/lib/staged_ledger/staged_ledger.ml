@@ -3178,10 +3178,6 @@ let%test_module "staged ledger tests" =
           tuple2
             (gen_zkapps_at_capacity_fixed_blocks expected_proof_count)
             small_positive_int)
-        ~sexp_of:
-          [%sexp_of:
-            (Ledger.t * Mina_base.User_command.Valid.t list * int option list)
-            * int]
         ~trials:1
         ~f:(fun ((ledger, zkapps, iters), global_slot) ->
           async_with_given_ledger ledger (fun ~snarked_ledger sl test_mask ->

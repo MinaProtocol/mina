@@ -67,12 +67,15 @@ module Make (Inputs : Intf.Inputs_intf) :
 
     module Single = struct
       module Spec = struct
-        type t = (Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t
+        type t =
+          ( Transaction_witness.Stable.Latest.t
+          , Ledger_proof.t )
+          Work.Single.Spec.t
         [@@deriving sexp, yojson]
 
         let transaction t =
           Option.map (Work.Single.Spec.witness t) ~f:(fun w ->
-              w.Transaction_witness.transaction )
+              w.Transaction_witness.Stable.Latest.transaction )
 
         let statement = Work.Single.Spec.statement
       end
@@ -171,7 +174,7 @@ module Make (Inputs : Intf.Inputs_intf) :
                   let init =
                     match
                       (Mina_base.Account_update.of_fee_payer
-                         zkapp_command.Mina_base.Zkapp_command.fee_payer )
+                         zkapp_command.Mina_base.Zkapp_command.Poly.fee_payer )
                         .authorization
                     with
                     | Proof _ ->
