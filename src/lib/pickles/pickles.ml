@@ -729,6 +729,136 @@ module Make_str (_ : Wire_types.Concrete) = struct
           (Promise.block_on_async_exn (fun () ->
                Tree_proof.Proof.verify_promise Tree_proof.examples ) )
 
+      module Fib_return = struct
+        (* A left heavy fibonacci tree *)
+        type branch_direction = Left | Right
+
+        type _ Snarky_backendless.Request.t +=
+          | Is_base_case : bool Snarky_backendless.Request.t
+          | Recursive_input :
+              branch_direction
+              -> Field.Constant.t Snarky_backendless.Request.t
+          | Recursive_proof :
+              branch_direction
+              -> (Nat.N2.n, Nat.N2.n) Proof.t Snarky_backendless.Request.t
+
+        let handler (is_base_case : bool)
+            ((recursion_input_left, recursion_proof_left) :
+              Field.Constant.t * _ Proof.t )
+            ((recursion_input_right, recursion_proof_right) :
+              Field.Constant.t * _ Proof.t )
+            (Snarky_backendless.Request.With { request; respond }) =
+          match request with
+          | Is_base_case ->
+              respond (Provide is_base_case)
+          | Recursive_input Left ->
+              respond (Provide recursion_input_left)
+          | Recursive_input Right ->
+              respond (Provide recursion_input_right)
+          | Recursive_proof Left ->
+              respond (Provide recursion_proof_left)
+          | Recursive_proof Right ->
+              respond (Provide recursion_proof_right)
+          | _ ->
+              respond Unhandled
+
+        let _tag, _, p, Provers.[ step ] =
+          Common.time "compile" (fun () ->
+              compile_promise () ~public_input:(Output Field.typ)
+                ~override_wrap_domain:Pickles_base.Proofs_verified.N1
+                ~auxiliary_typ:Typ.unit
+                ~branches:(module Nat.N1)
+                ~max_proofs_verified:(module Nat.N2)
+                ~name:"full-ternary-tree-return"
+                ~choices:(fun ~self ->
+                  [ { identifier = "main"
+                    ; feature_flags = Plonk_types.Features.none_bool
+                    ; prevs = [ self; self ]
+                    ; main =
+                        (fun { public_input = () } ->
+                          let prev direction =
+                            exists Field.typ ~request:(fun () ->
+                                Recursive_input direction )
+                          in
+                          let prev_proof direction =
+                            exists (Typ.prover_value ()) ~request:(fun () ->
+                                Recursive_proof direction )
+                          in
+                          let is_base_case =
+                            exists Boolean.typ ~request:(fun () -> Is_base_case)
+                          in
+                          let proof_must_verify = Boolean.not is_base_case in
+                          let self =
+                            Field.(
+                              if_ is_base_case ~then_:one
+                                ~else_:(prev Left + prev Right))
+                          in
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements =
+                                [ { public_input = prev Left
+                                  ; proof = prev_proof Left
+                                  ; proof_must_verify
+                                  }
+                                ; { public_input = prev Right
+                                  ; proof = prev_proof Right
+                                  ; proof_must_verify
+                                  }
+                                ]
+                            ; public_output = self
+                            ; auxiliary_output = ()
+                            } )
+                    }
+                  ] ) )
+
+        module Proof = (val p)
+
+        let fib5 =
+          let s_neg_one = Field.Constant.(negate one) in
+          let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
+            Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15
+          in
+          let s0, (), b0 =
+            Common.time "tree b0" (fun () ->
+                Promise.block_on_async_exn (fun () ->
+                    step
+                      ~handler:
+                        (handler true (s_neg_one, b_neg_one)
+                           (s_neg_one, b_neg_one) )
+                      () ) )
+          in
+          assert (Field.Constant.(equal one) s0) ;
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (s0, b0) ] ) ) ;
+
+          let rec fib_proof n =
+            if n <= 1 then (s0, b0)
+            else
+              let sn, (), bn =
+                Promise.block_on_async_exn (fun () ->
+                    step
+                      ~handler:
+                        (handler false (fib_proof (n - 1)) (fib_proof (n - 2)))
+                      () )
+              in
+              (sn, bn)
+          in
+
+          let rec fib n = if n <= 1 then 1 else fib (n - 1) + fib (n - 2) in
+
+          let s5, b5 = fib_proof 5 in
+
+          assert (Field.Constant.(equal (of_int (fib 5)) s5)) ;
+          (s5, b5)
+
+        let examples = [ fib5 ]
+      end
+
+      let%test_unit "verify" =
+        Or_error.ok_exn
+          (Promise.block_on_async_exn (fun () ->
+               Fib_return.Proof.verify_promise Fib_return.examples ) )
+
       module Tree_proof_return = struct
         type _ Snarky_backendless.Request.t +=
           | Is_base_case : bool Snarky_backendless.Request.t
