@@ -1240,13 +1240,6 @@ module T = struct
     | None ->
         Ok `No_fast_forward
     | Some With_hash.{ data = cmd_in_pool; _ } -> (
-        (* NOTE:
-           we consider a command in pool verified if either of the following holds:
-             - It's failed
-             - It's a signed command, since `Common.check` on a signed command
-               doesn't depend on the state of the ledger
-             - It's a zkapp command, passing `Common.collect_vk_assumptions`
-        *)
         let coerce_cmd_as_valid cmd =
           (* NOTE: See below notes for explanation*)
           let (`If_this_is_used_it_should_have_a_comment_justifying_it
