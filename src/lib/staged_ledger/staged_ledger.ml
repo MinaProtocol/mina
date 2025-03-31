@@ -1225,6 +1225,73 @@ module T = struct
   let dummy_transaction_pool_proxy : transaction_pool_proxy =
     { find_by_hash = const None }
 
+  (* NOTE: when we have access to txn pool, any txns in pool should be already
+     verified, hence we could utilize this fact to perform a faster version of
+     command verification *)
+  let verify_command_against_pool
+      (transaction_pool_proxy : transaction_pool_proxy)
+      (cmd_with_status : User_command.Verifiable.t With_status.t) =
+    let With_status.{ data = verifiable_cmd; _ } = cmd_with_status in
+    let cmd_hash =
+      verifiable_cmd |> User_command.of_verifiable
+      |> Transaction_hash.hash_command
+    in
+    match transaction_pool_proxy.find_by_hash cmd_hash with
+    | None ->
+        Ok `No_fast_forward
+    | Some With_hash.{ data = cmd_in_pool; _ } -> (
+        (* NOTE:
+           we consider a command in pool verified if either of the following holds:
+             - It's failed
+             - It's a signed command, since `Common.check` on a signed command
+               doesn't depend on the state of the ledger
+             - It's a zkapp command, passing `Common.collect_vk_assumptions`
+        *)
+        let coerce_cmd_as_valid cmd =
+          (* NOTE: See below notes for explanation*)
+          let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                cmd_coerced ) =
+            User_command.(cmd |> of_verifiable |> to_valid_unsafe)
+          in
+          cmd_coerced
+        in
+        (* NOTE:
+           According to project https://www.notion.so/o1labs/Verification-of-zkapp-proofs-prior-to-block-creation-196e79b1f910807aa8aef723c135375a
+           we consider a command in pool verified if either of the following holds:
+             - It's failed
+             - It's a signed command
+             - It's a zkapp command, passing collect_vk_assumptions, and the keys
+               returned is the same as in txn pool
+        *)
+        match cmd_with_status with
+        | { status = Failed _; data = verifiable_cmd }
+        | { data = Signed_command _ as verifiable_cmd; _ } ->
+            Ok (`Valid (coerce_cmd_as_valid verifiable_cmd, []))
+        | { data = Zkapp_command zkapp_cmd as verifiable_cmd; _ } -> (
+            match cmd_in_pool with
+            | Zkapp_command { zkapp_command = zkapp_cmd_in_pool } ->
+                let%bind.Result assumptions =
+                  Verifier.Common.collect_vk_assumptions zkapp_cmd
+                in
+                let keys_assumed = List.map ~f:Tuple3.get1 assumptions in
+                let keys_in_pool =
+                  Zkapp_command.extract_vks zkapp_cmd_in_pool
+                  |> List.map ~f:(fun (_, With_hash.{ data = key; _ }) -> key)
+                in
+                if
+                  List.equal Side_loaded_verification_key.equal keys_assumed
+                    keys_in_pool
+                then
+                  Ok (`Valid (coerce_cmd_as_valid verifiable_cmd, keys_in_pool))
+                else
+                  (* TODO: we need to figure out what keys should be returned for this case *)
+                  Error (`Unexpected_verification_key [])
+            | Signed_command _ ->
+                (* TODO: in this case we either have a bug, or run into hash collision *)
+                failwith
+                  "A transaction in pool has type signed_command, but we're \
+                   checking a zkapp_command with the same hash" ) )
+
   let check_commands ledger ~verifier
       ~(transaction_pool_proxy : transaction_pool_proxy)
       (cs : User_command.t With_status.t list) =
