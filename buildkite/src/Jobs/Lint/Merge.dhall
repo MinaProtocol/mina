@@ -63,36 +63,10 @@ in  Pipeline.build
         , Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run "scripts/merged-to-proof-systems.sh compatible" ]
-            , label =
-                "[proof-systems] Check merges cleanly into proof-systems compatible branch"
-            , key = "merged-to-proof-systems-compatible"
-            , soft_fail = Some (B/SoftFail.Boolean True)
-            , target = Size.Multi
-            , docker = Some Docker::{
-              , image = (../../Constants/ContainerImages.dhall).toolchainBase
-              }
-            }
-        , Command.build
-            Command.Config::{
-            , commands =
               [ Cmd.run "scripts/merged-to-proof-systems.sh berkeley" ]
             , label =
                 "[proof-systems] Check merges cleanly into proof-systems berkeley branch"
             , key = "merged-to-proof-systems-berkeley"
-            , soft_fail = Some (B/SoftFail.Boolean True)
-            , target = Size.Multi
-            , docker = Some Docker::{
-              , image = (../../Constants/ContainerImages.dhall).toolchainBase
-              }
-            }
-        , Command.build
-            Command.Config::{
-            , commands =
-              [ Cmd.run "scripts/merged-to-proof-systems.sh develop" ]
-            , label =
-                "[proof-systems] Check merges cleanly into proof-systems develop branch"
-            , key = "merged-to-proof-systems-develop"
             , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Multi
             , docker = Some Docker::{
