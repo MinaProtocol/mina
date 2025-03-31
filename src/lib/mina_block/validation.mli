@@ -71,8 +71,15 @@ val skip_time_received_validation :
      , 'd
      , 'e
      , 'f )
-     with_block
-  -> ([ `Time_received ] * unit Truth.true_t, 'a, 'b, 'c, 'd, 'e, 'f) with_block
+     with_header
+  -> ( [ `Time_received ] * unit Truth.true_t
+     , 'a
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_header
 
 val validate_genesis_protocol_state :
      genesis_state_hash:State_hash.t
@@ -183,7 +190,7 @@ val skip_delta_block_chain_validation :
      , 'd
      , 'e
      , 'f )
-     with_block
+     with_header
   -> ( 'a
      , 'b
      , 'c
@@ -192,7 +199,7 @@ val skip_delta_block_chain_validation :
      , 'd
      , 'e
      , 'f )
-     with_block
+     with_header
 
 val validate_frontier_dependencies :
      to_header:('a -> Header.t)
