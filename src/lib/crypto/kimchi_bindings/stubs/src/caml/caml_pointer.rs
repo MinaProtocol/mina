@@ -1,6 +1,6 @@
 macro_rules! impl_caml_pointer {
     ($name: ident => $typ: ty) => {
-        #[derive(std::fmt::Debug, Clone, ::ocaml_gen::CustomType)]
+        #[derive(core::fmt::Debug, Clone, ::ocaml_gen::CustomType)]
         pub struct $name(pub ::std::rc::Rc<std::cell::UnsafeCell<$typ>>);
 
         impl $name {
@@ -36,7 +36,7 @@ macro_rules! impl_caml_pointer {
             }
         }
 
-        impl ::std::ops::Deref for $name {
+        impl ::core::ops::Deref for $name {
             type Target = $typ;
 
             fn deref(&self) -> &Self::Target {
@@ -44,7 +44,7 @@ macro_rules! impl_caml_pointer {
             }
         }
 
-        impl ::std::ops::DerefMut for $name {
+        impl ::core::ops::DerefMut for $name {
             fn deref_mut(&mut self) -> &mut Self::Target {
                 unsafe {
                     // Wholely unsafe, Batman!
