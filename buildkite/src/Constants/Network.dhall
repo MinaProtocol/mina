@@ -44,5 +44,4 @@ in  { Type = Network
     , requiresMainnetBuild = requiresMainnetBuild
     , foldMinaBuildMainnetEnv = foldMinaBuildMainnetEnv
     , buildMainnetEnv = buildMainnetEnv
-    , foldNames = foldNames
     }
