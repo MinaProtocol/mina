@@ -1,13 +1,12 @@
+use super::{Error, Result};
 use js_sys::{Array, ArrayBuffer, Number, Uint8Array};
 use serde::de::value::SeqDeserializer;
 use serde::de::{self, Error as _, IntoDeserializer};
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 
-use super::{Error, Result};
-
 struct ObjectAccess {
     data: Array,
-    fields: std::slice::Iter<'static, &'static str>,
+    fields: core::slice::Iter<'static, &'static str>,
     idx: u32,
     next_value: Option<Deserializer>,
 }

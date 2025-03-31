@@ -46,6 +46,10 @@ end
 module Call_forest = Zkapp_call_forest_base
 module Digest = Call_forest.Digest
 
+type ('account_update_digest, 'forest_digest) with_forest =
+  (Account_update.t, 'account_update_digest, 'forest_digest) Call_forest.t
+  Poly.t
+
 module T = struct
   [%%versioned_binable
   module Stable = struct
@@ -243,14 +247,14 @@ let all_account_updates (t : t) : _ Call_forest.t =
   in
   Call_forest.cons fee_payer t.account_updates
 
-let fee (t : t) : Currency.Fee.t = t.fee_payer.body.fee
+let fee (t : (_, _) with_forest) : Currency.Fee.t = t.fee_payer.body.fee
 
-let fee_payer_account_update ({ fee_payer; _ } : t) = fee_payer
+let fee_payer_account_update (t : (_, _) with_forest) = t.fee_payer
 
-let applicable_at_nonce (t : t) : Account.Nonce.t =
-  (fee_payer_account_update t).body.nonce
+let applicable_at_nonce (t : (_, _) with_forest) : Account.Nonce.t =
+  t.fee_payer.body.nonce
 
-let target_nonce_on_success (t : t) : Account.Nonce.t =
+let target_nonce_on_success (t : (_, _) with_forest) : Account.Nonce.t =
   let base_nonce = Account.Nonce.succ (applicable_at_nonce t) in
   let fee_payer_pubkey = t.fee_payer.body.public_key in
   let fee_payer_account_update_increments =
@@ -261,7 +265,8 @@ let target_nonce_on_success (t : t) : Account.Nonce.t =
   Account.Nonce.add base_nonce
     (Account.Nonce.of_int fee_payer_account_update_increments)
 
-let nonce_increments (t : t) : int Public_key.Compressed.Map.t =
+let nonce_increments (t : (_, _) with_forest) : int Public_key.Compressed.Map.t
+    =
   let base_increments =
     Public_key.Compressed.Map.of_alist_exn [ (t.fee_payer.body.public_key, 1) ]
   in
@@ -272,13 +277,14 @@ let nonce_increments (t : t) : int Public_key.Compressed.Map.t =
           ~f:(Option.value_map ~default:1 ~f:(( + ) 1))
       else incr_map )
 
-let fee_token (_t : t) = Token_id.default
+let fee_token (_t : (_, _) with_forest) = Token_id.default
 
-let fee_payer (t : t) =
+let fee_payer (t : (_, _) with_forest) =
   Account_id.create t.fee_payer.body.public_key (fee_token t)
 
-let extract_vks (t : t) : (Account_id.t * Verification_key_wire.t) List.t =
-  Call_forest.fold ~init:[] t.Poly.account_updates
+let extract_vks (t : (_, _) with_forest) :
+    (Account_id.t * Verification_key_wire.t) List.t =
+  Call_forest.fold ~init:[] t.account_updates
     ~f:(fun acc (p : Account_update.t) ->
       match Account_update.verification_key_update_to_option p with
       | Zkapp_basic.Set_or_keep.Set (Some vk) ->
@@ -286,20 +292,21 @@ let extract_vks (t : t) : (Account_id.t * Verification_key_wire.t) List.t =
       | _ ->
           acc )
 
-let account_updates_list (t : t) : Account_update.t list =
+let account_updates_list (t : (_, _) with_forest) : Account_update.t list =
   Call_forest.fold t.account_updates ~init:[] ~f:(Fn.flip List.cons) |> List.rev
 
-let all_account_updates_list (t : t) : Account_update.t list =
+let all_account_updates_list (t : (_, _) with_forest) : Account_update.t list =
   Call_forest.fold t.account_updates
     ~init:[ Account_update.of_fee_payer (fee_payer_account_update t) ]
     ~f:(Fn.flip List.cons)
   |> List.rev
 
-let fee_excess (t : t) =
+let fee_excess (t : (_, _) with_forest) =
   Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
 
 (* always `Accessed` for fee payer *)
-let account_access_statuses (t : t) (status : Transaction_status.t) =
+let account_access_statuses (t : (_, _) with_forest)
+    (status : Transaction_status.t) =
   let init = [ (fee_payer t, `Accessed) ] in
   let status_sym =
     match status with Applied -> `Accessed | Failed _ -> `Not_accessed
@@ -308,11 +315,11 @@ let account_access_statuses (t : t) (status : Transaction_status.t) =
       (Account_update.account_id p, status_sym) :: acc )
   |> List.rev |> List.stable_dedup
 
-let accounts_referenced (t : t) =
+let accounts_referenced (t : (_, _) with_forest) =
   List.map (account_access_statuses t Applied) ~f:(fun (acct_id, _status) ->
       acct_id )
 
-let fee_payer_pk (t : t) = t.fee_payer.body.public_key
+let fee_payer_pk (t : (_, _) with_forest) = t.fee_payer.body.public_key
 
 let value_if b ~then_ ~else_ = if b then then_ else else_
 
@@ -794,7 +801,7 @@ module Weight = struct
   let memo : Signed_command_memo.t -> int = fun _ -> 0
 end
 
-let weight (zkapp_command : t) : int =
+let weight (zkapp_command : (_, _) with_forest) : int =
   let { Poly.fee_payer; account_updates; memo } = zkapp_command in
   List.sum
     (module Int)
@@ -971,7 +978,7 @@ end) : sig
   end
 
   val group_by_zkapp_command_rev :
-       t list
+       (_, _) with_forest list
     -> (Input.global_state * Input.local_state * Input.connecting_ledger_hash)
        list
        list
@@ -1012,7 +1019,7 @@ end = struct
       will need to be passed as part of the snark witness while applying that
       pair.
   *)
-  let group_by_zkapp_command_rev (zkapp_commands : t list)
+  let group_by_zkapp_command_rev (zkapp_commands : (_, _) with_forest list)
       (stmtss : (global_state * local_state * connecting_ledger_hash) list list)
       : Zkapp_command_intermediate_state.t list =
     let intermediate_state ~kind ~spec ~before ~after =
@@ -1027,7 +1034,7 @@ end = struct
     in
     let zkapp_account_updatess =
       []
-      :: List.map zkapp_commands ~f:(fun (zkapp_command : t) ->
+      :: List.map zkapp_commands ~f:(fun zkapp_command ->
              all_account_updates_list zkapp_command )
     in
     let rec group_by_zkapp_command_rev
@@ -1313,8 +1320,8 @@ let zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments
    - when adding to the transaction pool
    - in incoming blocks
 *)
-let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
-    unit Or_error.t =
+let valid_size ~(genesis_constants : Genesis_constants.t)
+    (t : (_, _) with_forest) : unit Or_error.t =
   let events_elements events =
     List.fold events ~init:0 ~f:(fun acc event -> acc + Array.length event)
   in
