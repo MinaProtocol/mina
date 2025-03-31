@@ -14,7 +14,6 @@ crate-type = ["cdylib"]
 ################################# Dependencies ################################
 
 [dependencies]
-array-init = "2.0.0"
 base64 = "0.13.0"
 console_error_panic_hook = { version = "0.1.6" }
 getrandom = { version = "0.2", features = ["js"] }
