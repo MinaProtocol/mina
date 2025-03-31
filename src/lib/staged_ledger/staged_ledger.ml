@@ -866,7 +866,7 @@ module T = struct
         Assumption: Only one of the partition will have coinbase transaction(s)in it.
         1. Get the latest stack for coinbase in the first set of transactions
         2. get the first set of scan_state data[data1]
-        3. get a new stack for the second partion because the second set of transactions would start from the begining of the next tree in the scan_state
+        3. get a new stack for the second partition because the second set of transactions would start from the begining of the next tree in the scan_state
         4. Initialize the new stack with the state from the first stack
         5. get the second set of scan_state data[data2]*)
       let txns_for_partition1 = List.take transactions slots in
@@ -1291,6 +1291,38 @@ module T = struct
                 failwith
                   "A transaction in pool has type signed_command, but we're \
                    checking a zkapp_command with the same hash" ) )
+
+  let process_separately (type input left right output)
+      ~(partitioner : input -> (left, right) Core_kernel.Either.t)
+      ~(process_left : left list -> output list Deferred.Or_error.t)
+      ~(process_right : right list -> output list Deferred.Or_error.t)
+      (input : input list) : output list Deferred.Or_error.t =
+    (* [process_separately] splits the list in two, and applies transformations
+     * to both parts, then it merges the list back in the same order it was originally.
+     * [process_left] and [process_right] are expected to return the same number
+     * of elements processed in the same order.
+     *)
+    let open Deferred.Or_error.Let_syntax in
+    let input_with_indices = List.mapi input ~f:(fun idx ele -> (idx, ele)) in
+    let lefts, rights =
+      List.partition_map input_with_indices ~f:(fun (idx, ele) ->
+          match partitioner ele with
+          | First x ->
+              First (idx, x)
+          | Second y ->
+              Second (idx, y) )
+    in
+    let batch_process_snd (type fst snd snd_processed) (lst : (fst * snd) list)
+        (f : snd list -> snd_processed list Deferred.Or_error.t) =
+      let fsts, snds = List.unzip lst in
+      let%map snds_processed = f snds in
+      List.zip_exn fsts snds_processed
+    in
+    let%bind lefts_processed = batch_process_snd lefts process_left in
+    let%map rights_processed = batch_process_snd rights process_right in
+    List.merge lefts_processed rights_processed
+      ~compare:(fun (ind_left, _) (ind_right, _) -> compare ind_left ind_right)
+    |> List.map ~f:snd
 
   let check_commands ledger ~verifier
       ~(transaction_pool_proxy : transaction_pool_proxy)
