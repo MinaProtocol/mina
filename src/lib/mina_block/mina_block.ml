@@ -72,3 +72,20 @@ let consensus_state =
     (Fn.compose Header.protocol_state Block.header)
 
 include Block
+
+let verify_on_header ~verify
+    { Proof_carrying_data.proof = merkle_list, root_unverified
+    ; data = best_tip_unverified
+    } =
+  let%map.Async_kernel.Deferred.Or_error ( `Root root_header
+                                         , `Best_tip best_tip_header ) =
+    verify
+      { Proof_carrying_data.proof = (merkle_list, header root_unverified)
+      ; data = header best_tip_unverified
+      }
+  in
+  let root = Validation.with_body root_header (body root_unverified) in
+  let best_tip =
+    Validation.with_body best_tip_header (body best_tip_unverified)
+  in
+  (`Root root, `Best_tip best_tip)
