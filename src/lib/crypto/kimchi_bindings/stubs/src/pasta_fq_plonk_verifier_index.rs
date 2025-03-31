@@ -8,6 +8,7 @@ use crate::{
 use ark_ec::AffineRepr;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
+use core::convert::TryInto;
 use kimchi::circuits::constraints::FeatureFlags;
 use kimchi::circuits::lookup::lookups::{LookupFeatures, LookupPatterns};
 use kimchi::circuits::polynomials::permutation::Shifts;
@@ -20,7 +21,6 @@ use poly_commitment::{
     ipa::{OpeningProof, SRS},
     SRS as _,
 };
-use std::convert::TryInto;
 use std::path::Path;
 use std::sync::Arc;
 

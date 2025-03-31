@@ -1,10 +1,10 @@
 use crate::caml::caml_bytes_string::CamlBytesString;
 use ark_ff::{BigInteger as ark_BigInteger, BigInteger256};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use core::cmp::Ordering::{Equal, Greater, Less};
+use core::convert::{TryFrom, TryInto};
+use core::ops::Deref;
 use num_bigint::BigUint;
-use std::cmp::Ordering::{Equal, Greater, Less};
-use std::convert::{TryFrom, TryInto};
-use std::ops::Deref;
 
 //
 // Handy constants
@@ -207,8 +207,8 @@ pub fn caml_bigint_256_test_bit(
 #[ocaml::func]
 pub fn caml_bigint_256_to_bytes(
     x: ocaml::Pointer<CamlBigInteger256>,
-) -> [u8; std::mem::size_of::<BigInteger256>()] {
-    let mut res = [0u8; std::mem::size_of::<BigInteger256>()];
+) -> [u8; core::mem::size_of::<BigInteger256>()] {
+    let mut res = [0u8; core::mem::size_of::<BigInteger256>()];
     x.as_ref().0.serialize_compressed(&mut res[..]).unwrap();
     res
 }
@@ -216,7 +216,7 @@ pub fn caml_bigint_256_to_bytes(
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_bigint_256_of_bytes(x: &[u8]) -> Result<CamlBigInteger256, ocaml::Error> {
-    let len = std::mem::size_of::<BigInteger256>();
+    let len = core::mem::size_of::<BigInteger256>();
     if x.len() != len {
         ocaml::Error::failwith("caml_bigint_256_of_bytes")?;
     };

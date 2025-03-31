@@ -1,5 +1,4 @@
-use std::ops::{Add, Deref, Neg, Sub};
-
+use core::ops::{Add, Deref, Neg, Sub};
 use mina_curves::pasta::curves::{pallas::ProjectivePallas, vesta::ProjectiveVesta};
 
 // Pallas
