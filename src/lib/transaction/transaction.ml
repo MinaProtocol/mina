@@ -38,6 +38,8 @@ end
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t = User_command.Stable.V2.t Poly.Stable.V2.t
     [@@deriving sexp, compare, equal, hash, yojson]
@@ -45,6 +47,12 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t = User_command.t Poly.t [@@deriving sexp, yojson]
+
+let read_all_proofs_from_disk : t -> Stable.Latest.t = Fn.id
+
+let write_all_proofs_to_disk : Stable.Latest.t -> t = Fn.id
 
 include Hashable.Make (Stable.Latest)
 include Comparable.Make (Stable.Latest)

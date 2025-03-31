@@ -449,7 +449,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               : Field.t * Field.t ))
 
       module No_recursion = struct
-        let[@warning "-45"] tag, _, p, Provers.[ step ] =
+        let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -488,7 +488,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
 
       module No_recursion_return = struct
-        let[@warning "-45"] tag, _, p, Provers.[ step ] =
+        let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Output Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -543,7 +543,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           | _ ->
               respond Unhandled
 
-        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
+        let _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -638,7 +638,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           | _ ->
               respond Unhandled
 
-        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
+        let _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~override_wrap_domain:Pickles_base.Proofs_verified.N1
@@ -758,7 +758,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           | _ ->
               respond Unhandled
 
-        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
+        let _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Output Field.typ)
                 ~override_wrap_domain:Pickles_base.Proofs_verified.N1
@@ -858,7 +858,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           )
 
       module Add_one_return = struct
-        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
+        let _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise ()
                 ~public_input:(Input_and_output (Field.typ, Field.typ))
@@ -899,7 +899,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
 
       module Auxiliary_return = struct
-        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
+        let _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise ()
                 ~public_input:(Input_and_output (Field.typ, Field.typ))
@@ -1888,7 +1888,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           | _ ->
               respond Unhandled
 
-        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
+        let _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Typ.unit)
                 ~auxiliary_typ:Typ.unit
@@ -2016,7 +2016,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               : Field.t * Field.t ))
 
       module No_recursion = struct
-        let[@warning "-45"] tag, _, p, Provers.[ step ] =
+        let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -2055,7 +2055,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
 
       module Fake_1_recursion = struct
-        let[@warning "-45"] tag, _, p, Provers.[ step ] =
+        let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -2094,7 +2094,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
 
       module Fake_2_recursion = struct
-        let[@warning "-45"] tag, _, p, Provers.[ step ] =
+        let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~override_wrap_domain:Pickles_base.Proofs_verified.N1
@@ -2160,7 +2160,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
             ~feature_flags:Plonk_types.Features.none ~typ:Field.typ
 
-        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
+        let _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -2328,7 +2328,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               : Field.t * Field.t ))
 
       module No_recursion = struct
-        let[@warning "-45"] tag, _, p, Provers.[ step ] =
+        let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -2367,7 +2367,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
 
       module Fake_1_recursion = struct
-        let[@warning "-45"] tag, _, p, Provers.[ step ] =
+        let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -2406,7 +2406,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
 
       module Fake_2_recursion = struct
-        let[@warning "-45"] tag, _, p, Provers.[ step ] =
+        let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~override_wrap_domain:Pickles_base.Proofs_verified.N1
@@ -2475,7 +2475,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
             ~feature_flags:maybe_features ~typ:Field.typ
 
-        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
+        let _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit

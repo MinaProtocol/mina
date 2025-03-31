@@ -9,6 +9,7 @@ use crate::{
 use ark_ec::AffineRepr;
 use ark_ff::One;
 use array_init::array_init;
+use core::array;
 use groupmap::GroupMap;
 use kimchi::verifier::verify;
 use kimchi::{
@@ -30,7 +31,6 @@ use mina_poseidon::{
 };
 use poly_commitment::commitment::{CommitmentCurve, PolyComm};
 use poly_commitment::ipa::OpeningProof;
-use std::array;
 use std::convert::TryInto;
 
 type EFqSponge = DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>;
