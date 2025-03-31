@@ -49,7 +49,7 @@ let Spec =
           }
       , default =
           { codename = DebianVersions.DebVersion.Bullseye
-          , network = Network.Type.Devnet
+          , network = Network.Type.Berkeley
           , genesis_timestamp = Some "2024-04-07T11:45:00Z"
           , config_json_gz_url =
               "https://storage.googleapis.com/o1labs-gitops-infrastructure/devnet/devnet-state-dump-3NK4eDgbkCjKj9fFUXVkrJXsfpfXzJySoAvrFJVCropPW7LLF14F-676026c4d4d2c18a76b357d6422a06f932c3ef4667a8fd88717f68b53fd6b2d7.json.gz"

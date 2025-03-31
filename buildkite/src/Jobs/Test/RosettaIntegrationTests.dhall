@@ -18,15 +18,15 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
-let RunWithPostgres = ../../Command/RunWithPostgres.dhall
+let Artifacts = ../../Constants/Artifacts.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
-let network = Network.Type.Devnet
+let network = Network.Type.Berkeley
 
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
@@ -57,7 +57,7 @@ in  Pipeline.build
                   ([] : List Text)
                   "./src/test/archive/sample_db/archive_db.sql"
                   Artifacts.Type.Rosetta
-                  (Some Network.Type.Devnet)
+                  (Some network)
                   "./buildkite/scripts/rosetta-indexer-test.sh"
               , Cmd.runInDocker
                   Cmd.Docker::{
