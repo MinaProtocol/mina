@@ -66,7 +66,7 @@ in  Pipeline.build
             , label =
                 "[proof-systems] Check merges cleanly into proof-systems master branch"
             , key = "merged-to-proof-systems-master"
-            , soft_fail = Some (B/SoftFail.Boolean True)
+            , soft_fail = Some (B/SoftFail.Boolean False)
             , target = Size.Multi
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
