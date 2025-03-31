@@ -1,8 +1,8 @@
 use ark_ff::{BigInt, BigInteger as ark_BigInteger, BigInteger256};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Write};
+use core::cmp::Ordering::{Equal, Greater, Less};
+use core::convert::TryInto;
 use num_bigint::BigUint;
-use std::cmp::Ordering::{Equal, Greater, Less};
-use std::convert::TryInto;
 use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi};
 use wasm_bindgen::prelude::*;
 
@@ -45,7 +45,7 @@ impl IntoWasmAbi for WasmBigInteger256 {
 
 pub fn to_biguint(x: &BigInteger256) -> BigUint {
     let x_ = x.0.as_ptr() as *const u8;
-    let x_ = unsafe { std::slice::from_raw_parts(x_, BIGINT256_NUM_BYTES) };
+    let x_ = unsafe { core::slice::from_raw_parts(x_, BIGINT256_NUM_BYTES) };
     num_bigint::BigUint::from_bytes_le(x_)
 }
 
@@ -127,7 +127,7 @@ pub fn caml_bigint_256_to_bytes(x: WasmBigInteger256) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn caml_bigint_256_of_bytes(x: &[u8]) -> WasmBigInteger256 {
-    let len = std::mem::size_of::<WasmBigInteger256>();
+    let len = core::mem::size_of::<WasmBigInteger256>();
     if x.len() != len {
         panic!("caml_bigint_256_of_bytes");
     };
