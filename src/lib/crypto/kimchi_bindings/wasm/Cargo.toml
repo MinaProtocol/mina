@@ -25,7 +25,6 @@ paste = "1.0.5"
 rand = { version = "0.8.0" }
 rayon = { version = "1" }
 rmp-serde = "1.0.0"
-sprs = { version = "0.11.0" }
 spmc = { version = "0.3.0" }
 serde = "1.0.171"
 serde_json = "1.0.103"
