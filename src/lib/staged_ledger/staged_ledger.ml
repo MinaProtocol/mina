@@ -1337,7 +1337,21 @@ module T = struct
             ~get_batch:(Ledger.get_batch ledger) )
       |> Deferred.return
     in
-    let%map xs = Verifier.verify_commands verifier cs in
+    let partitioner cmd =
+      let open Core_kernel.Either in
+      match verify_command_against_pool transaction_pool_proxy cmd with
+      | Ok `No_fast_forward ->
+          Second cmd
+      | Ok (`Valid (cmd, _)) ->
+          First (`Valid cmd)
+      | Error e ->
+          First e
+    in
+    let%map xs =
+      process_separately ~partitioner ~process_left:Deferred.Or_error.return
+        ~process_right:(Verifier.verify_commands verifier)
+        cs
+    in
     Result.all
       (List.map xs ~f:(function
         | `Valid x ->
