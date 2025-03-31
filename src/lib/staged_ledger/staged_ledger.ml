@@ -1238,8 +1238,8 @@ module T = struct
     in
     match transaction_pool_proxy.find_by_hash cmd_hash with
     | None ->
-        Ok `No_fast_forward
-    | Some With_hash.{ data = cmd_in_pool; _ } -> (
+        `No_fast_forward
+    | Some _ -> (
         let coerce_cmd_as_valid cmd =
           (* NOTE: See below notes for explanation*)
           let (`If_this_is_used_it_should_have_a_comment_justifying_it
@@ -1253,37 +1253,18 @@ module T = struct
            we consider a command in pool verified if either of the following holds:
              - It's failed
              - It's a signed command
-             - It's a zkapp command, passing collect_vk_assumptions, and the keys
-               returned is the same as in txn pool
+             - It's a zkapp command, passing `collect_vk_assumptions` check
         *)
         match cmd_with_status with
         | { status = Failed _; data = verifiable_cmd }
         | { data = Signed_command _ as verifiable_cmd; _ } ->
-            Ok (`Valid (coerce_cmd_as_valid verifiable_cmd, []))
+            `Valid (coerce_cmd_as_valid verifiable_cmd)
         | { data = Zkapp_command zkapp_cmd as verifiable_cmd; _ } -> (
-            match cmd_in_pool with
-            | Zkapp_command { zkapp_command = zkapp_cmd_in_pool } ->
-                let%bind.Result assumptions =
-                  Verifier.Common.collect_vk_assumptions zkapp_cmd
-                in
-                let keys_assumed = List.map ~f:Tuple3.get1 assumptions in
-                let keys_in_pool =
-                  Zkapp_command.extract_vks zkapp_cmd_in_pool
-                  |> List.map ~f:(fun (_, With_hash.{ data = key; _ }) -> key)
-                in
-                if
-                  List.equal Side_loaded_verification_key.equal keys_assumed
-                    keys_in_pool
-                then
-                  Ok (`Valid (coerce_cmd_as_valid verifiable_cmd, keys_in_pool))
-                else
-                  (* TODO: we need to figure out what keys should be returned for this case *)
-                  Error (`Unexpected_verification_key [])
-            | Signed_command _ ->
-                (* TODO: in this case we either have a bug, or run into hash collision *)
-                failwith
-                  "A transaction in pool has type signed_command, but we're \
-                   checking a zkapp_command with the same hash" ) )
+            match Verifier.Common.collect_vk_assumptions zkapp_cmd with
+            | Error e ->
+                e
+            | _ ->
+                `Valid (coerce_cmd_as_valid verifiable_cmd) ) )
 
   let process_separately (type input left right output)
       ~(partitioner : input -> (left, right) Core_kernel.Either.t)
@@ -1333,12 +1314,11 @@ module T = struct
     let partitioner cmd =
       let open Core_kernel.Either in
       match verify_command_against_pool transaction_pool_proxy cmd with
-      | Ok `No_fast_forward ->
+      | `No_fast_forward ->
           Second cmd
-      | Ok (`Valid (cmd, _)) ->
-          First (`Valid cmd)
-      | Error e ->
-          First e
+      | (`Valid _ | `Missing_verification_key _ | `Unexpected_verification_key _)
+        as fast_forward ->
+          First fast_forward
     in
     let%map xs =
       process_separately ~partitioner ~process_left:Deferred.Or_error.return
