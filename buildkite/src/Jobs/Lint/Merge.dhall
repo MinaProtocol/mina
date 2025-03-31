@@ -118,7 +118,7 @@ in  Pipeline.build
             , label =
                 "[kimchi-stubs-vendors] Check merges cleanly into kimchi-stubs-vendors main branch"
             , key = "merged-to-kimchi-stubs-vendors-main"
-            , soft_fail = Some (B/SoftFail.Boolean True)
+            , soft_fail = Some (B/SoftFail.Boolean False)
             , target = Size.Multi
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
