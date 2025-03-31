@@ -6,17 +6,20 @@ set -eox pipefail
 
 YELLOW_THRESHOLD="0.1"
 RED_THRESHOLD="0.3"
-EXTRA_ARGS=""
+EXTRA_ARGS="${EXTRA_ARGS:-}"
 
 source buildkite/scripts/bench/install.sh
 
-MAINLINE_BRANCHES="-m develop -m compatible -m master -m dkijania/enhance_benchmarks"
+MAINLINE_BRANCHES="-m develop -m compatible -m master -m dkijania/bench_for_ledger_test"
 while [[ "$#" -gt 0 ]]; do case $1 in
   heap-usage) BENCHMARK="heap-usage"; ;;
   mina-base) BENCHMARK="mina-base"; ;;
   ledger-export) 
     BENCHMARK="ledger-export"
     EXTRA_ARGS="--genesis-ledger-path ./genesis_ledgers/devnet.json"
+  ;;
+  ledger-apply) 
+    BENCHMARK="ledger-apply"
   ;;
   snark) 
     BENCHMARK="snark";
