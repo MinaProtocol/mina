@@ -831,7 +831,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             (Promise.block_on_async_exn (fun () ->
                  Proof.verify_promise [ (s0, b0) ] ) ) ;
 
-          let rec fib_proof n =
+          let rec fib_proof_actual n =
             if n <= 1 then (s0, b0)
             else
               let sn, (), bn =
@@ -842,9 +842,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       () )
               in
               (sn, bn)
+          and fib_proof n =
+            (Memo.of_comparable (module Int) fib_proof_actual) n
           in
 
-          let rec fib n = if n <= 1 then 1 else fib (n - 1) + fib (n - 2) in
+          let rec fib_actual n = if n <= 1 then 1 else fib (n - 1) + fib (n - 2)
+          and fib n = (Memo.of_comparable (module Int) fib_actual) n in
 
           let s5, b5 = fib_proof 5 in
 
