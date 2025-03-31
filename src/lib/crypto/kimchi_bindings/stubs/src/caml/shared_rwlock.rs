@@ -46,7 +46,7 @@ macro_rules! impl_shared_rwlock {
         // useful implementations
         //
 
-        impl ::std::ops::Deref for $name {
+        impl ::core::ops::Deref for $name {
             type Target = ::std::sync::Arc<::std::sync::RwLock<$typ>>;
 
             fn deref(&self) -> &Self::Target {
