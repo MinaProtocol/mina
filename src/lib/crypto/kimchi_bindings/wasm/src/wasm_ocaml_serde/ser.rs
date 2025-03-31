@@ -1,8 +1,7 @@
+use super::{Error, Result};
 use js_sys::{Array, Uint8Array};
 use serde::ser::{self, Error as _, Serialize};
 use wasm_bindgen::prelude::*;
-
-use super::{Error, Result};
 
 pub struct ErrorSerializer;
 

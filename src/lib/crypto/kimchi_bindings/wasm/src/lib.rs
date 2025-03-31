@@ -55,7 +55,7 @@ pub fn set_u32_ptr(ptr: *mut u32, arg: u32) {
     // don't have anything better. As long as it works in practice, we haven't upset the undefined
     // behavior dragons.
     unsafe {
-        std::ptr::write_volatile(ptr, arg);
+        core::ptr::write_volatile(ptr, arg);
     }
 }
 
@@ -66,7 +66,7 @@ pub fn wait_until_non_zero(ptr: *const u32) -> u32 {
     // don't have anything better. As long as it works in practice, we haven't upset the undefined
     // behavior dragons.
     loop {
-        let contents = unsafe { std::ptr::read_volatile(ptr) };
+        let contents = unsafe { core::ptr::read_volatile(ptr) };
         if contents != 0 {
             return contents;
         }
