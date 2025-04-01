@@ -981,10 +981,10 @@ function caml_pasta_fq_poseidon_params_create() {
 }
 
 // Provides: caml_pasta_fp_poseidon_block_cipher
-// Requires: plonk_wasm, tsRustConversion, tsRustConversion
+// Requires: plonk_neon, tsRustConversion, tsRustConversion
 function caml_pasta_fp_poseidon_block_cipher(_fake_params, fp_vector) {
   // 1. get permuted field vector from rust
-  var wasm_flat_vector = plonk_wasm.caml_pasta_fp_poseidon_block_cipher(
+  var wasm_flat_vector = plonk_neon.caml_pasta_fp_poseidon_block_cipher(
     tsRustConversion.fp.vectorToRust(fp_vector)
   );
   var new_fp_vector = tsRustConversion.fp.vectorFromRust(wasm_flat_vector);
@@ -995,10 +995,10 @@ function caml_pasta_fp_poseidon_block_cipher(_fake_params, fp_vector) {
 }
 
 // Provides: caml_pasta_fq_poseidon_block_cipher
-// Requires: plonk_wasm, tsRustConversion, tsRustConversion
+// Requires: plonk_neon, tsRustConversion, tsRustConversion
 function caml_pasta_fq_poseidon_block_cipher(_fake_params, fq_vector) {
   // 1. get permuted field vector from rust
-  var wasm_flat_vector = plonk_wasm.caml_pasta_fq_poseidon_block_cipher(
+  var wasm_flat_vector = plonk_neon.caml_pasta_fq_poseidon_block_cipher(
     tsRustConversion.fq.vectorToRust(fq_vector)
   );
   var new_fq_vector = tsRustConversion.fq.vectorFromRust(wasm_flat_vector);

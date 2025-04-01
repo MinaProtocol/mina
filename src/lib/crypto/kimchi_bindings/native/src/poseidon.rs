@@ -36,21 +36,6 @@ pub fn caml_pasta_fp_poseidon_block_cipher(mut cx: FunctionContext) -> JsResult<
     JsUint8Array::from_slice(&mut cx, &res)
 }
 
-pub fn _caml_pasta_fp_poseidon_block_cipher(
-    state: FlatVector<WasmPastaFp>,
-) -> FlatVector<WasmPastaFp> {
-    let mut state_vec: Vec<Fp> = state.into_iter().map(Into::into).collect();
-    poseidon_block_cipher::<Fp, PlonkSpongeConstantsKimchi>(
-        &mina_poseidon::pasta::fp_kimchi::static_params(),
-        &mut state_vec,
-    );
-    state_vec
-        .iter()
-        .map(|f| WasmPastaFp(*f))
-        .collect::<Vec<WasmPastaFp>>()
-        .into()
-}
-
 // fq
 
 pub fn caml_pasta_fq_poseidon_block_cipher(mut cx: FunctionContext) -> JsResult<JsUint8Array> {
@@ -74,19 +59,4 @@ pub fn caml_pasta_fq_poseidon_block_cipher(mut cx: FunctionContext) -> JsResult<
         .collect::<Vec<u8>>();
 
     JsUint8Array::from_slice(&mut cx, &res)
-}
-
-pub fn _caml_pasta_fq_poseidon_block_cipher(
-    state: FlatVector<WasmPastaFq>,
-) -> FlatVector<WasmPastaFq> {
-    let mut state_vec: Vec<Fq> = state.into_iter().map(Into::into).collect();
-    poseidon_block_cipher::<Fq, PlonkSpongeConstantsKimchi>(
-        &mina_poseidon::pasta::fq_kimchi::static_params(),
-        &mut state_vec,
-    );
-    state_vec
-        .iter()
-        .map(|f| WasmPastaFq(*f))
-        .collect::<Vec<WasmPastaFq>>()
-        .into()
 }
