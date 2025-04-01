@@ -81,6 +81,9 @@ val expand_deferred :
          Step_bp_vec.t
        , Branch_data.t )
        Types.Wrap.Proof_state.Minimal.t
+  -> xi_r_chal:
+       Challenge.Constant.t Kimchi_types.scalar_challenge
+       * Challenge.Constant.t Kimchi_types.scalar_challenge
   -> ( ( Challenge.Constant.t
        , Challenge.Constant.t Kimchi_types.scalar_challenge
        , Pasta_bindings.Fp.t Shifted_value.Type1.t

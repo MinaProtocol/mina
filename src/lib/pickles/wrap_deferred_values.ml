@@ -108,14 +108,13 @@ let expand_deferred (type n most_recent_width) ~zk_rows
        , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
          Step_bp_vec.t
        , Branch_data.t )
-       Composition_types.Wrap.Proof_state.Minimal.Stable.V1.t ) :
+       Composition_types.Wrap.Proof_state.Minimal.Stable.V1.t )
+    ~(xi_r_chal :
+       Challenge.Constant.t Kimchi_types.scalar_challenge
+       * Challenge.Constant.t Kimchi_types.scalar_challenge ) :
     _ Types.Wrap.Proof_state.Deferred_values.t =
   Timer.start __LOC__ ;
-  let sponge_input =
-    compute_sponge_input ~zk_rows ~evals ~old_bulletproof_challenges
-      ~proof_state
-  in
-  let xi_chal, r_chal = compute_xi_r_chal sponge_input in
+  let xi_chal, r_chal = xi_r_chal in
   let old_bulletproof_challenges =
     Vector.map ~f:Ipa.Step.compute_challenges old_bulletproof_challenges
   in

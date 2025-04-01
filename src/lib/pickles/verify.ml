@@ -41,27 +41,27 @@ let verify_heterogenous (ts : Instance.t list) =
   let _computed_bp_chals, deferred_values =
     List.map ts
       ~f:(fun
-           (T
-             ( _max_proofs_verified
-             , _statement
-             , chunking_data
-             , key
-             , _app_state
-             , T
-                 { statement =
-                     { proof_state
-                     ; messages_for_next_step_proof =
-                         { old_bulletproof_challenges; _ }
-                     }
-                 ; prev_evals = evals
-                 ; proof = _
-                 } ) )
-         ->
+          (T
+            ( _max_proofs_verified
+            , _statement
+            , chunking_data
+            , key
+            , _app_state
+            , T
+                { statement =
+                    { proof_state
+                    ; messages_for_next_step_proof =
+                        { old_bulletproof_challenges; _ }
+                    }
+                ; prev_evals = evals
+                ; proof = _
+                } ) )
+        ->
         Timer.start __LOC__ ;
         let non_chunking, expected_num_chunks =
           let expected_num_chunks =
             Option.value_map ~default:Plonk_checks.num_chunks_by_default
-              chunking_data ~f:(fun x -> x.Instance.num_chunks)
+              chunking_data ~f:(fun x -> x.Instance.num_chunks )
           in
           let exception Is_chunked in
           match
@@ -118,10 +118,15 @@ let verify_heterogenous (ts : Instance.t list) =
         let deferred_values =
           let zk_rows =
             Option.value_map ~default:Plonk_checks.zk_rows_by_default
-              chunking_data ~f:(fun x -> x.Instance.zk_rows)
+              chunking_data ~f:(fun x -> x.Instance.zk_rows )
           in
+          let sponge_input =
+            Wrap_deferred_values.compute_sponge_input ~evals ~zk_rows
+              ~old_bulletproof_challenges ~proof_state
+          in
+          let xi_r_chal = Wrap_deferred_values.compute_xi_r_chal sponge_input in
           Wrap_deferred_values.expand_deferred ~evals ~zk_rows
-            ~old_bulletproof_challenges ~proof_state
+            ~old_bulletproof_challenges ~proof_state ~xi_r_chal
         in
         Timer.clock __LOC__ ;
         let deferred_values = { deferred_values with bulletproof_challenges } in
@@ -167,15 +172,15 @@ let verify_heterogenous (ts : Instance.t list) =
   let batch_verify_inputs =
     List.map2_exn ts deferred_values
       ~f:(fun
-           (T
-             ( (module Max_proofs_verified)
-             , (module A_value)
-             , _chunking_data
-             , key
-             , app_state
-             , T t ) )
-           deferred_values
-         ->
+          (T
+            ( (module Max_proofs_verified)
+            , (module A_value)
+            , _chunking_data
+            , key
+            , app_state
+            , T t ) )
+          deferred_values
+        ->
         let prepared_statement : _ Types.Wrap.Statement.In_circuit.t =
           { messages_for_next_step_proof =
               Common.hash_messages_for_next_step_proof
