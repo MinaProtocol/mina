@@ -12,28 +12,40 @@ module Plonk_checks = struct
     Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
 end
 
-let compute_xi_r_chal (type n most_recent_width) ~zk_rows
-    ~(evals :
-       ( Backend.Tick.Field.t
-       , Backend.Tick.Field.t array )
-       Pickles_types.Plonk_types.All_evals.t )
-    ~(old_bulletproof_challenges :
-       ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
-         Bulletproof_challenge.t
-         Step_bp_vec.t
-       , most_recent_width )
-       Pickles_types.Vector.t )
-    ~(proof_state :
-       ( Challenge.Constant.t
-       , Challenge.Constant.t Scalar_challenge.t
-       , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-       , bool
-       , n Pickles__.Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
-       , Digest.Constant.t
-       , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
-         Step_bp_vec.t
-       , Branch_data.t )
-       Composition_types.Wrap.Proof_state.Minimal.Stable.V1.t ) =
+type sponge_input =
+  | Sponge_input :
+      { zk_rows : int
+      ; evals :
+          ( Pasta_bindings.Fp.t
+          , Pasta_bindings.Fp.t array )
+          Plonk_types.All_evals.t
+      ; old_bulletproof_challenges :
+          ( Challenge.Constant.t Kimchi_types.scalar_challenge
+            Bulletproof_challenge.t
+            Step_bp_vec.t
+          , 'most_recent_width )
+          Vector.vec
+      ; proof_state :
+          ( Challenge.Constant.t
+          , Challenge.Constant.t Kimchi_types.scalar_challenge
+          , Pasta_bindings.Fp.t Shifted_value.Type1.t
+          , bool
+          , 'n Reduced_messages_for_next_proof_over_same_field.Wrap.t
+          , Types.Digest.Constant.t
+          , Challenge.Constant.t Kimchi_types.scalar_challenge
+            Bulletproof_challenge.t
+            Step_bp_vec.t
+          , Branch_data.t )
+          Types.Wrap.Proof_state.Minimal.t
+      }
+      -> sponge_input
+
+let compute_sponge_input ~zk_rows ~evals ~old_bulletproof_challenges
+    ~proof_state =
+  Sponge_input { zk_rows; evals; old_bulletproof_challenges; proof_state }
+
+let compute_xi_r_chal
+    (Sponge_input { zk_rows; evals; old_bulletproof_challenges; proof_state }) =
   Timer.start __LOC__ ;
   let old_bulletproof_challenges =
     Vector.map ~f:Ipa.Step.compute_challenges old_bulletproof_challenges
@@ -99,9 +111,11 @@ let expand_deferred (type n most_recent_width) ~zk_rows
        Composition_types.Wrap.Proof_state.Minimal.Stable.V1.t ) :
     _ Types.Wrap.Proof_state.Deferred_values.t =
   Timer.start __LOC__ ;
-  let xi_chal, r_chal =
-    compute_xi_r_chal ~zk_rows ~evals ~old_bulletproof_challenges ~proof_state
+  let sponge_input =
+    compute_sponge_input ~zk_rows ~evals ~old_bulletproof_challenges
+      ~proof_state
   in
+  let xi_chal, r_chal = compute_xi_r_chal sponge_input in
   let old_bulletproof_challenges =
     Vector.map ~f:Ipa.Step.compute_challenges old_bulletproof_challenges
   in
