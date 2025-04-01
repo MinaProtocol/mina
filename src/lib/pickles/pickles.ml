@@ -724,7 +724,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let _example2_input, _example2_proof = example2
       end
 
-      let%test_unit "verify" =
+      let%test_unit "verify tree proof" =
         Or_error.ok_exn
           (Promise.block_on_async_exn (fun () ->
                Tree_proof.Proof.verify_promise Tree_proof.examples ) )
@@ -851,7 +851,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let _example2_input, _example2_proof = example2
       end
 
-      let%test_unit "verify" =
+      let%test_unit "verify tree proof return" =
         Or_error.ok_exn
           (Promise.block_on_async_exn (fun () ->
                Tree_proof_return.Proof.verify_promise Tree_proof_return.examples )
