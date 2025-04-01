@@ -71,20 +71,22 @@
     cp
     %{read:../dune-build-root}/cargo_kimchi_stubs/release/libkimchi_stubs.a
     .)
-   ;; No MacOS
-   (with-accepted-exit-codes
-    (or 0 1)
-    (run
+   (ignore-stderr
+    ;; No MacOS
+    (with-accepted-exit-codes
+     (or 0 1)
+     (run
       cp
-     %{read:../dune-build-root}/cargo_kimchi_stubs/release/libkimchi_stubs.so
-     dllkimchi_stubs.so))
+      %{read:../dune-build-root}/cargo_kimchi_stubs/release/libkimchi_stubs.so
+      dllkimchi_stubs.so)))
    ;; MacOS
-   (with-accepted-exit-codes
-    (or 0 1)
-    (run
-     cp
-     %{read:../dune-build-root}/cargo_kimchi_stubs/release/libkimchi_stubs.dylib
-     dllkimchi_stubs.so)))))
+   (ignore-stderr
+    (with-accepted-exit-codes
+     (or 0 1)
+     (run
+      cp
+      %{read:../dune-build-root}/cargo_kimchi_stubs/release/libkimchi_stubs.dylib
+      dllkimchi_stubs.so))))))
 
 ;; this is used by nix
 
