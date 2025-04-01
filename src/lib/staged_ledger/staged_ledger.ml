@@ -7,8 +7,6 @@ open Signature_lib
 module Ledger = Mina_ledger.Ledger
 module Sparse_ledger = Mina_ledger.Sparse_ledger
 
-type transaction_pool_proxy = Check_commands.transaction_pool_proxy
-
 (* TODO: measure these operations and tune accordingly *)
 let transaction_application_scheduler_batch_size = 10
 
@@ -1216,6 +1214,8 @@ module T = struct
   let forget_prediff_info ((a : Transaction.Valid.t With_status.t list), b, c, d)
       =
     (List.map ~f:(With_status.map ~f:Transaction.forget) a, b, c, d)
+
+  type transaction_pool_proxy = Check_commands.transaction_pool_proxy
 
   let apply ?skip_verification ~proof_cache_db ~constraint_constants
       ~global_slot ~get_completed_work ~logger ~verifier ~current_state_view
