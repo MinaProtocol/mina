@@ -35,32 +35,44 @@ let verify_command_with_transaction_pool_proxy
   * [process_left] and [process_right] are expected to return the same number
   * of elements processed in the same order.
   *)
-let process_separately (type input left right output)
-    ~(partitioner : input -> (left, right) Core_kernel.Either.t)
-    ~(process_left : left list -> output list Deferred.Or_error.t)
-    ~(process_right : right list -> output list Deferred.Or_error.t)
-    (input : input list) : output list Deferred.Or_error.t =
+let process_separately
+    (type input left right left_output right_output output_item final_output)
+    ~(partitioner : input -> (left, right) Either.t)
+    ~(process_left : left list -> left_output)
+    ~(process_right : right list -> right_output)
+    ~(finalizer :
+          left_output
+       -> right_output
+       -> f:(output_item list -> output_item list -> output_item list)
+       -> final_output ) (input : input list) : final_output =
   let open Deferred.Or_error.Let_syntax in
-  let input_with_indices = List.mapi input ~f:(fun idx ele -> (idx, ele)) in
+  let input_with_indices = List.mapi input ~f:(fun idx el -> (idx, el)) in
   let lefts, rights =
-    List.partition_map input_with_indices ~f:(fun (idx, ele) ->
-        match partitioner ele with
+    List.partition_map input_with_indices ~f:(fun (idx, el) ->
+        match partitioner el with
         | First x ->
             First (idx, x)
         | Second y ->
             Second (idx, y) )
   in
-  let batch_process_snd (type fst snd snd_processed) (lst : (fst * snd) list)
-      (f : snd list -> snd_processed list Deferred.Or_error.t) =
-    let fsts, snds = List.unzip lst in
-    let%map snds_processed = f snds in
-    List.zip_exn fsts snds_processed
+  let batch_process_snd ~f = Fn.compose (Tuple2.map_snd ~f) List.unzip in
+  let lefts_idx, lefts_processed = batch_process_snd ~f:process_left lefts in
+  let rights_idx, rights_processed =
+    batch_process_snd ~f:process_right rights
   in
-  let%bind lefts_processed = batch_process_snd lefts process_left in
-  let%map rights_processed = batch_process_snd rights process_right in
-  List.merge lefts_processed rights_processed
-    ~compare:(fun (ind_left, _) (ind_right, _) -> compare ind_left ind_right)
-  |> List.map ~f:snd
+
+  finalizer lefts_processed rights_processed
+    ~f:(fun left_materialized right_materialized ->
+      let left_materialized_indexed =
+        List.zip_exn lefts_idx left_materialized
+      in
+      let right_materialized_indexed =
+        List.zip_exn rights_idx right_materialized
+      in
+      List.merge left_materialized_indexed right_materialized_indexed
+        ~compare:(fun (left_idx, _) (right_idx, _) ->
+          compare left_idx right_idx )
+      |> List.map ~f:snd )
 
 let check_commands ledger ~verifier
     ~(transaction_pool_proxy : transaction_pool_proxy)
@@ -87,8 +99,11 @@ let check_commands ledger ~verifier
         First fast_forward
   in
   let%map xs =
-    process_separately ~partitioner ~process_left:Deferred.Or_error.return
+    process_separately ~partitioner ~process_left:Fn.id
       ~process_right:(Verifier.verify_commands verifier)
+      ~finalizer:(fun left right_m ~f ->
+        let%map.Deferred.Or_error right = right_m in
+        f left right )
       cs
   in
   Result.all
