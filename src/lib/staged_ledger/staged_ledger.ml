@@ -1229,12 +1229,11 @@ module T = struct
      verified, hence we could utilize this fact to perform a faster version of
      command verification *)
   let verify_command_with_transaction_pool_proxy
-      (transaction_pool_proxy : transaction_pool_proxy)
+      ~(transaction_pool_proxy : transaction_pool_proxy)
       (cmd_with_status : User_command.Verifiable.t With_status.t) =
     let With_status.{ data = verifiable_cmd; _ } = cmd_with_status in
     let cmd_hash =
-      verifiable_cmd |> User_command.of_verifiable
-      |> Transaction_hash.hash_command
+      User_command.of_verifiable verifiable_cmd |> Transaction_hash.hash_command
     in
     match transaction_pool_proxy.find_by_hash cmd_hash with
     | None ->
@@ -1242,16 +1241,16 @@ module T = struct
     | Some _ ->
         Verifier.Common.verify_command_from_mempool cmd_with_status
 
+  (** [process_separately] splits the list in two, and applies transformations
+    * to both parts, then it merges the list back in the same order it was originally.
+    * [process_left] and [process_right] are expected to return the same number
+    * of elements processed in the same order.
+    *)
   let process_separately (type input left right output)
       ~(partitioner : input -> (left, right) Core_kernel.Either.t)
       ~(process_left : left list -> output list Deferred.Or_error.t)
       ~(process_right : right list -> output list Deferred.Or_error.t)
       (input : input list) : output list Deferred.Or_error.t =
-    (* [process_separately] splits the list in two, and applies transformations
-     * to both parts, then it merges the list back in the same order it was originally.
-     * [process_left] and [process_right] are expected to return the same number
-     * of elements processed in the same order.
-     *)
     let open Deferred.Or_error.Let_syntax in
     let input_with_indices = List.mapi input ~f:(fun idx ele -> (idx, ele)) in
     let lefts, rights =
@@ -1290,7 +1289,7 @@ module T = struct
     let partitioner cmd =
       let open Core_kernel.Either in
       match
-        verify_command_with_transaction_pool_proxy transaction_pool_proxy cmd
+        verify_command_with_transaction_pool_proxy ~transaction_pool_proxy cmd
       with
       | `No_fast_forward ->
           Second cmd
