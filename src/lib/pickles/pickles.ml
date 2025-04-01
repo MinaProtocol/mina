@@ -857,6 +857,168 @@ module Make_str (_ : Wire_types.Concrete) = struct
                Tree_proof_return.Proof.verify_promise Tree_proof_return.examples )
           )
 
+      module Fib_return = struct
+        (* A left heavy Fibonacci tree *)
+        type branch_direction = Left | Right
+
+        type input = Field.Constant.t
+
+        type output = Field.Constant.t
+
+        type _ Snarky_backendless.Request.t +=
+          | Input : branch_direction -> input Snarky_backendless.Request.t
+          | Output : branch_direction -> output Snarky_backendless.Request.t
+          | Proof :
+              branch_direction
+              -> (Nat.N2.n, Nat.N2.n) Proof.t Snarky_backendless.Request.t
+
+        let handler
+            ( (input_left : input)
+            , (output_left : output)
+            , (proof_left : _ Proof.t) )
+            ( (input_right : input)
+            , (output_right : output)
+            , (proof_right : _ Proof.t) )
+            (Snarky_backendless.Request.With { request; respond }) =
+          match request with
+          | Input Left ->
+              respond (Provide input_left)
+          | Output Left ->
+              respond (Provide output_left)
+          | Proof Left ->
+              respond (Provide proof_left)
+          | Input Right ->
+              respond (Provide input_right)
+          | Output Right ->
+              respond (Provide output_right)
+          | Proof Right ->
+              respond (Provide proof_right)
+          | _ ->
+              respond Unhandled
+
+        let _tag, _, p, Provers.[ step ] =
+          Common.time "compile-fib-return" (fun () ->
+              compile_promise ()
+                ~public_input:(Input_and_output (Field.typ, Field.typ))
+                ~override_wrap_domain:Pickles_base.Proofs_verified.N1
+                ~auxiliary_typ:Typ.unit
+                ~branches:(module Nat.N1)
+                ~max_proofs_verified:(module Nat.N2)
+                ~name:"fib-return"
+                ~choices:(fun ~self ->
+                  [ { identifier = "main"
+                    ; feature_flags = Plonk_types.Features.none_bool
+                    ; prevs = [ self; self ]
+                    ; main =
+                        (fun { public_input = n } ->
+                          let prev_input direction =
+                            exists Field.typ ~request:(const @@ Input direction)
+                          in
+                          let prev_output direction =
+                            exists Field.typ ~request:(const @@ Output direction)
+                          in
+                          let prev_input_output direction =
+                            (prev_input direction, prev_output direction)
+                          in
+                          let prev_proof direction =
+                            exists (Typ.prover_value ())
+                              ~request:(const @@ Proof direction)
+                          in
+                          let is_base_case =
+                            Boolean.any
+                              [ Field.(equal n one); Field.(equal n zero) ]
+                          in
+                          let is_recursive_case =
+                            let n_minus_one = prev_input Left in
+                            let n_minus_two = prev_input Right in
+                            Boolean.all
+                              [ Field.(equal n_minus_one (sub n one))
+                              ; Field.(equal n_minus_two (sub n (of_int 2)))
+                              ]
+                          in
+                          (* ensure precondition holds *)
+                          Boolean.Assert.exactly_one
+                            [ is_base_case; is_recursive_case ] ;
+                          let fib_value =
+                            Field.(
+                              if_ is_base_case ~then_:one
+                                ~else_:
+                                  (add (prev_output Left) (prev_output Right)))
+                          in
+
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements =
+                                [ { public_input = prev_input_output Left
+                                  ; proof = prev_proof Left
+                                  ; proof_must_verify = Boolean.not is_base_case
+                                  }
+                                ; { public_input = prev_input_output Right
+                                  ; proof = prev_proof Right
+                                  ; proof_must_verify = Boolean.not is_base_case
+                                  }
+                                ]
+                            ; public_output = fib_value
+                            ; auxiliary_output = ()
+                            } )
+                    }
+                  ] ) )
+
+        module Proof = (val p)
+
+        let fib =
+          let memo_ref = ref (Memo.of_comparable (module Int) (const 1)) in
+          let fib = function
+            | 0 | 1 ->
+                1
+            | n ->
+                !memo_ref (n - 1) + !memo_ref (n - 2)
+          in
+          fib
+
+        let fib_proof =
+          let dummy_proof =
+            Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15
+          in
+          let memo_ref =
+            ref
+              (Memo.of_comparable
+                 (module Int)
+                 (const (Field.Constant.of_int 0, dummy_proof)) )
+          in
+          let fib_proof = function
+            | 0 | 1 ->
+                (Field.Constant.of_int 1, dummy_proof)
+            | n ->
+                let input = Field.Constant.of_int n in
+                let input_left = Field.Constant.of_int (n - 1) in
+                let input_right = Field.Constant.of_int (n - 2) in
+                let output, _, proof =
+                  Promise.block_on_async_exn (fun () ->
+                      let output_left, proof_left = !memo_ref (n - 1) in
+                      let output_right, proof_right = !memo_ref (n - 2) in
+                      let left = (input_left, output_left, proof_left) in
+                      let right = (input_right, output_right, proof_right) in
+                      step input ~handler:(handler left right) )
+                in
+                (output, proof)
+          in
+          memo_ref := Memo.of_comparable (module Int) fib_proof ;
+          fib_proof
+
+        let fib5_all =
+          let fib5_input = Field.Constant.of_int 5 in
+          let fib5_output, fib5_proof = fib_proof 5 in
+          assert (Field.Constant.(equal fib5_output (of_int (fib 5)))) ;
+          ((fib5_input, fib5_output), fib5_proof)
+
+        let examples = [ fib5_all ]
+      end
+
+      let%test_unit "verify fibs" =
+        Or_error.ok_exn
+          (Promise.block_on_async_exn (fun () ->
+               Fib_return.Proof.verify_promise Fib_return.examples ) )
+
       module Add_one_return = struct
         let _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
