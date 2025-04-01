@@ -1,0 +1,6 @@
+# A nightly is necessary to enable the use of #![feature]
+[toolchain]
+# This should stay in line with the value of the variable NIGHTLY_RUST_VERSION
+# defined in src/lib/crypto/proof-systems/Makefile
+# For now, the file is only used to build with Nix.
+channel = "nightly-2024-06-13"
