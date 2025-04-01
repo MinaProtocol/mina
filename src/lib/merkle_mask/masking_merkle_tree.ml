@@ -280,6 +280,11 @@ module Make (Inputs : Inputs_intf.S) = struct
       in
       Fn.compose snd @@ List.fold_map ~init ~f
 
+    (* `compute_merge_hashes` accepts a list of (account option, addr, path) task,
+       each corresponding to a merkle tree write. It returns a list of nodes whose
+       hashes had been recalculated(i.e. for each task we have a series of nodes
+       from where the write begin till where the write ends).
+    *)
     let _compute_merge_hashes :
            ( Account.t option
            * Addr.t
