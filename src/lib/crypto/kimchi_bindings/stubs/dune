@@ -61,11 +61,9 @@
     (run
      cargo
      build
-     --manifest-path
-     ../../proof-systems/Cargo.toml
-     --release
      -p
      kimchi-stubs
+     --release
      --target-dir
      %{read:../dune-build-root}/cargo_kimchi_stubs
      --offline))
