@@ -1,0 +1,3 @@
+(data_only_dirs src)
+
+(dirs :standard \ target)
