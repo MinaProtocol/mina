@@ -205,11 +205,6 @@ module Make (Inputs : Inputs_intf.S) = struct
       update_maps t ~f:(fun maps ->
           { maps with hashes = Map.set maps.hashes ~key:address ~data:hash } )
 
-    let set_inner_hash_at_addr_exn t address hash =
-      assert_is_attached t ;
-      assert (Addr.depth address <= t.depth) ;
-      self_set_hash t address hash
-
     let self_set_location t account_id location =
       update_maps t ~f:(fun maps ->
           { maps with
