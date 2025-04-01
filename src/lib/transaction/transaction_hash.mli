@@ -51,7 +51,7 @@ include Comparable.S with type t := t
 module User_command_with_valid_signature : sig
   type hash = t [@@deriving sexp, compare, hash, yojson]
 
-  type t = (User_command.Valid.t, hash) With_hash.t
+  type t = private (User_command.Valid.t, hash) With_hash.t
   [@@deriving hash, sexp, compare, to_yojson]
 
   val create : User_command.Valid.t -> t
