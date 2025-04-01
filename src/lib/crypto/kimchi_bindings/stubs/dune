@@ -43,7 +43,7 @@
 (rule
  (enabled_if
   (= %{env:MARLIN_PLONK_STUBS=n} n))
- (targets libwires_15_stubs.a)
+ (targets libkimchi_stubs.a)
  (deps
   Cargo.toml
   rust-toolchain.toml
@@ -56,15 +56,22 @@
  (action
   (progn
    (setenv
-    CARGO_TARGET_DIR
-    "%{read:../dune-build-root}/cargo_kimchi_stubs"
-    (setenv
-     RUSTFLAGS
-     %{read:rustflags.sexp}
-     (run cargo build --release --offline)))
+    RUSTFLAGS
+    %{read:rustflags.sexp}
+    (run
+     cargo
+     build
+     --manifest-path
+     ../../proof-systems/Cargo.toml
+     --release
+     -p
+     kimchi-stubs
+     --target-dir
+     %{read:../dune-build-root}/cargo_kimchi_stubs
+     --offline))
    (run
     cp
-    %{read:../dune-build-root}/cargo_kimchi_stubs/release/libwires_15_stubs.a
+    %{read:../dune-build-root}/cargo_kimchi_stubs/release/libkimchi_stubs.a
     .))))
 
 ;; this is used by nix
@@ -72,14 +79,12 @@
 (rule
  (enabled_if
   (<> %{env:MARLIN_PLONK_STUBS=n} n))
- (targets libwires_15_stubs.a)
+ (targets libkimchi_stubs.a)
  (deps
   (env_var MARLIN_PLONK_STUBS))
  (action
   (progn
-   (copy
-    %{env:MARLIN_PLONK_STUBS=n}/lib/libwires_15_stubs.a
-    libwires_15_stubs.a))))
+   (copy %{env:MARLIN_PLONK_STUBS=n}/lib/libkimchi_stubs.a libkimchi_stubs.a))))
 
 ;;
 ;; declare the libraries we're going to generate to match the bindings
@@ -125,7 +130,7 @@
  (public_name pasta_bindings.backend.native)
  (name pasta_bindings_backend_native)
  (modules pasta_bindings_backend)
- (foreign_archives wires_15_stubs)
+ (foreign_archives kimchi_stubs)
  (no_dynlink)
  ; ^ Required for compilation of this library separately
  ; from libraries that depend on it
