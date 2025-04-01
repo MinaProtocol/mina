@@ -4,7 +4,6 @@ open Mina_base
 open Mina_transaction
 open Signature_lib
 module Ledger = Mina_ledger.Ledger
-module Check_commands = Check_commands
 
 type t
 
@@ -192,6 +191,8 @@ val proof_txns_with_state_hashes :
 val copy : t -> t
 
 val hash : t -> Staged_ledger_hash.t
+
+type transaction_pool_proxy = Check_commands.transaction_pool_proxy
 
 val apply :
      ?skip_verification:[ `Proofs | `All ]

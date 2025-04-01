@@ -45,7 +45,6 @@ let process_separately
        -> right_output
        -> f:(output_item list -> output_item list -> output_item list)
        -> final_output ) (input : input list) : final_output =
-  let open Deferred.Or_error.Let_syntax in
   let input_with_indices = List.mapi input ~f:(fun idx el -> (idx, el)) in
   let lefts, rights =
     List.partition_map input_with_indices ~f:(fun (idx, el) ->

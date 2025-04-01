@@ -6,7 +6,8 @@ open Currency
 open Signature_lib
 module Ledger = Mina_ledger.Ledger
 module Sparse_ledger = Mina_ledger.Sparse_ledger
-module Check_commands = Check_commands
+
+type transaction_pool_proxy = Check_commands.transaction_pool_proxy
 
 (* TODO: measure these operations and tune accordingly *)
 let transaction_application_scheduler_batch_size = 10
