@@ -973,6 +973,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             | n ->
                 !memo_ref (n - 1) + !memo_ref (n - 2)
           in
+          memo_ref := Memo.of_comparable (module Int) fib ;
           fib
 
         let fib_proof =
@@ -986,8 +987,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  (const (Field.Constant.of_int 0, dummy_proof)) )
           in
           let fib_proof = function
-            | 0 | 1 ->
-                (Field.Constant.of_int 1, dummy_proof)
+            | (0 | 1) as n ->
+                let dummy =
+                  (Field.Constant.zero, Field.Constant.zero, dummy_proof)
+                in
+                let input = Field.Constant.of_int n in
+                let output, _, proof =
+                  Promise.block_on_async_exn (fun () ->
+                      step input ~handler:(handler dummy dummy) )
+                in
+                (output, proof)
             | n ->
                 let input = Field.Constant.of_int n in
                 let input_left = Field.Constant.of_int (n - 1) in
