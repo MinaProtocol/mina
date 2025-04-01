@@ -43,7 +43,7 @@
 (rule
  (enabled_if
   (= %{env:MARLIN_PLONK_STUBS=n} n))
- (targets libkimchi_stubs.a)
+ (targets dllkimchi_stubs.so libkimchi_stubs.a)
  (deps
   Cargo.toml
   rust-toolchain.toml
@@ -70,7 +70,21 @@
    (run
     cp
     %{read:../dune-build-root}/cargo_kimchi_stubs/release/libkimchi_stubs.a
-    .))))
+    .)
+   ;; No MacOS
+   (with-accepted-exit-codes
+    (or 0 1)
+    (run
+      cp
+     %{read:../dune-build-root}/cargo_kimchi_stubs/release/libkimchi_stubs.so
+     dllkimchi_stubs.so))
+   ;; MacOS
+   (with-accepted-exit-codes
+    (or 0 1)
+    (run
+     cp
+     %{read:../dune-build-root}/cargo_kimchi_stubs/release/libkimchi_stubs.dylib
+     dllkimchi_stubs.so)))))
 
 ;; this is used by nix
 
