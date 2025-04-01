@@ -91,22 +91,22 @@ pub mod poly_comm;
 pub mod srs;
 
 /// Indexes
-pub mod pasta_fp_plonk_index;
-pub mod pasta_fq_plonk_index;
+// pub mod pasta_fp_plonk_index;
+// pub mod pasta_fq_plonk_index;
 
 /// Verifier indexes/keys
-pub mod plonk_verifier_index;
+// pub mod plonk_verifier_index;
 
 /// Oracles
-pub mod oracles;
+// pub mod oracles;
 
 /// Proofs
-pub mod plonk_proof;
+// pub mod plonk_proof;
 
 /// Poseidon
 pub mod poseidon;
 
 // exposes circuit for inspection
-pub mod circuit;
+// pub mod circuit;
 
 pub mod wasm_ocaml_serde;

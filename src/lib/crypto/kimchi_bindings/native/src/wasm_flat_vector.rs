@@ -28,6 +28,29 @@ use std::ops::Deref;
 #[derive(Clone, Debug)]
 pub struct FlatVector<T>(Vec<T>);
 
+impl<T: FlatVectorElem> FlatVector<T> {
+    pub fn from_bytes(data: Vec<u8>) -> Self {
+        let mut res: Vec<T> = Vec::with_capacity(data.len() / T::FLATTENED_SIZE);
+
+        let mut buf = Vec::with_capacity(T::FLATTENED_SIZE);
+
+        for x in data.into_iter() {
+            assert!(buf.len() < T::FLATTENED_SIZE);
+
+            buf.push(x);
+
+            if buf.len() >= T::FLATTENED_SIZE {
+                res.push(T::unflatten(buf));
+                buf = Vec::with_capacity(T::FLATTENED_SIZE);
+            }
+        }
+
+        assert_eq!(buf.len(), 0);
+
+        FlatVector(res)
+    }
+}
+
 pub trait FlatVectorElem {
     const FLATTENED_SIZE: usize;
     fn flatten(self) -> Vec<u8>;
