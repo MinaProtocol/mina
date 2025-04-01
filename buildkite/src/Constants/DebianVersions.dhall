@@ -119,6 +119,7 @@ let bullseyeDirtyWhen =
         , S.exactly "buildkite/scripts/rosetta-integration-tests" "sh"
         , S.exactly "buildkite/scripts/rosetta-integration-tests-full" "sh"
         , S.exactly "buildkite/scripts/rosetta-integration-tests-fast" "sh"
+        , S.exactly "scripts/patch-archive-test" "sh"
         , S.strictlyStart (S.contains "buildkite/src/Jobs/Test")
         ]
       # minimalDirtyWhen

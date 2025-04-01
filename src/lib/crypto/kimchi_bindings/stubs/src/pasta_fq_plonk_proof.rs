@@ -8,6 +8,8 @@ use crate::{
 use ark_ec::AffineRepr;
 use ark_ff::One;
 use array_init::array_init;
+use core::array;
+use core::convert::TryInto;
 use groupmap::GroupMap;
 use kimchi::{
     circuits::lookup::runtime_tables::{caml::CamlRuntimeTable, RuntimeTable},
@@ -28,8 +30,6 @@ use mina_poseidon::{
 };
 use poly_commitment::commitment::{CommitmentCurve, PolyComm};
 use poly_commitment::ipa::OpeningProof;
-use std::array;
-use std::convert::TryInto;
 
 #[ocaml_gen::func]
 #[ocaml::func]
