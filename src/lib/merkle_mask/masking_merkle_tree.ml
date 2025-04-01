@@ -286,6 +286,12 @@ module Make (Inputs : Inputs_intf.S) = struct
            * [ `Left of Hash.t | `Right of Hash.t ] list )
            list
         -> (Addr.t * Hash.t) list =
+      let open struct
+        type item =
+          Inputs.Hash.t
+          * Addr.t
+          * [ `Left of Inputs.Hash.t | `Right of Inputs.Hash.t ] list
+      end in
       let process_pair height = function
         | (lh, laddr, `Left _ :: lpath), (rh, _, `Right _ :: _rpath) ->
             (* Assertion: lpath == _rpath *)
@@ -304,18 +310,21 @@ module Make (Inputs : Inputs_intf.S) = struct
         | `Right sibling_hash :: rest ->
             let new_hash = Hash.merge ~height sibling_hash self_hash in
             (new_hash, parent, rest)
-        | _ ->
+        | [] ->
             failwith "compute_merge_hashes: path is empty"
       in
       let converge height task =
         let reversed, mlast =
           List.fold task ~init:([], None)
-            ~f:(fun (processed, mprev) ((_, addr, _) as el) ->
+            ~f:(fun
+                 ((processed : item list), (mprev : item option))
+                 ((_, (addr : Addr.t), _) as el : item)
+               ->
               match mprev with
               | None ->
                   (processed, Some el)
               | Some ((_, prev_addr, _) as prev)
-                when Addr.(equal @@ sibling prev_addr) addr ->
+                when Addr.(equal (sibling prev_addr) addr) ->
                   (process_pair height (prev, el) :: processed, None)
               | Some prev ->
                   (process_single height prev :: processed, Some el) )
@@ -323,9 +332,12 @@ module Make (Inputs : Inputs_intf.S) = struct
         List.rev_append reversed
         @@ Option.(map ~f:(process_single height) mlast |> to_list)
       in
-      let rec impl acc height task =
+      let rec impl (acc : (Addr.t * Inputs.Hash.t) list) (height : int)
+          (task : item list) =
         let acc' =
-          List.unordered_append (List.map ~f:(fun (a, b, _) -> (b, a)) task) acc
+          List.unordered_append
+            (List.map ~f:(fun (hash, addr, _) -> (addr, hash)) task)
+            acc
         in
         match task with
         | [] | [ (_, _, []) ] ->
