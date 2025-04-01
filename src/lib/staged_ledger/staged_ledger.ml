@@ -1228,7 +1228,7 @@ module T = struct
   (* NOTE: when we have access to txn pool, any txns in pool should be already
      verified, hence we could utilize this fact to perform a faster version of
      command verification *)
-  let verify_command_against_pool
+  let verify_command_with_transaction_pool_proxy
       (transaction_pool_proxy : transaction_pool_proxy)
       (cmd_with_status : User_command.Verifiable.t With_status.t) =
     let With_status.{ data = verifiable_cmd; _ } = cmd_with_status in
@@ -1239,32 +1239,8 @@ module T = struct
     match transaction_pool_proxy.find_by_hash cmd_hash with
     | None ->
         `No_fast_forward
-    | Some _ -> (
-        let coerce_cmd_as_valid cmd =
-          (* NOTE: See below notes for explanation*)
-          let (`If_this_is_used_it_should_have_a_comment_justifying_it
-                cmd_coerced ) =
-            User_command.(cmd |> of_verifiable |> to_valid_unsafe)
-          in
-          cmd_coerced
-        in
-        (* NOTE:
-           According to project https://www.notion.so/o1labs/Verification-of-zkapp-proofs-prior-to-block-creation-196e79b1f910807aa8aef723c135375a
-           we consider a command in pool verified if either of the following holds:
-             - It's failed
-             - It's a signed command
-             - It's a zkapp command, passing `collect_vk_assumptions` check
-        *)
-        match cmd_with_status with
-        | { status = Failed _; data = verifiable_cmd }
-        | { data = Signed_command _ as verifiable_cmd; _ } ->
-            `Valid (coerce_cmd_as_valid verifiable_cmd)
-        | { data = Zkapp_command zkapp_cmd as verifiable_cmd; _ } -> (
-            match Verifier.Common.collect_vk_assumptions zkapp_cmd with
-            | Error e ->
-                e
-            | _ ->
-                `Valid (coerce_cmd_as_valid verifiable_cmd) ) )
+    | Some _ ->
+        Verifier.Common.verify_command_from_mempool cmd_with_status
 
   let process_separately (type input left right output)
       ~(partitioner : input -> (left, right) Core_kernel.Either.t)
@@ -1313,7 +1289,9 @@ module T = struct
     in
     let partitioner cmd =
       let open Core_kernel.Either in
-      match verify_command_against_pool transaction_pool_proxy cmd with
+      match
+        verify_command_with_transaction_pool_proxy transaction_pool_proxy cmd
+      with
       | `No_fast_forward ->
           Second cmd
       | (`Valid _ | `Missing_verification_key _ | `Unexpected_verification_key _)

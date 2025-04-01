@@ -150,3 +150,30 @@ let check :
       let%bind.Result () = check_signatures_of_zkapp_command command in
       let%map.Result assuming = collect_vk_assumptions verifiable in
       (zkapp_command_to_valid command, `Assuming assuming)
+
+let verify_command_from_mempool
+    (cmd_with_status : User_command.Verifiable.t With_status.t) =
+  let coerce_cmd_as_valid cmd =
+    (* NOTE: See below notes for explanation*)
+    let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd_coerced) =
+      User_command.(cmd |> of_verifiable |> to_valid_unsafe)
+    in
+    cmd_coerced
+  in
+  (* NOTE:
+     According to project https://www.notion.so/o1labs/Verification-of-zkapp-proofs-prior-to-block-creation-196e79b1f910807aa8aef723c135375a
+     we consider a command in pool verified if either of the following holds:
+       - It's failed
+       - It's a signed command
+       - It's a zkapp command, passing `collect_vk_assumptions` check
+  *)
+  match cmd_with_status with
+  | { status = Failed _; data = verifiable_cmd }
+  | { data = Signed_command _ as verifiable_cmd; _ } ->
+      `Valid (coerce_cmd_as_valid verifiable_cmd)
+  | { data = Zkapp_command zkapp_cmd as verifiable_cmd; _ } -> (
+      match collect_vk_assumptions zkapp_cmd with
+      | Error e ->
+          e
+      | _ ->
+          `Valid (coerce_cmd_as_valid verifiable_cmd) )
