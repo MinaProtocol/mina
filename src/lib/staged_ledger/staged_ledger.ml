@@ -6,6 +6,7 @@ open Currency
 open Signature_lib
 module Ledger = Mina_ledger.Ledger
 module Sparse_ledger = Mina_ledger.Sparse_ledger
+module Check_commands = Check_commands
 
 (* TODO: measure these operations and tune accordingly *)
 let transaction_application_scheduler_batch_size = 10
@@ -1215,117 +1216,11 @@ module T = struct
       =
     (List.map ~f:(With_status.map ~f:Transaction.forget) a, b, c, d)
 
-  type transaction_pool_proxy =
-    { find_by_hash :
-           Mina_transaction.Transaction_hash.t
-        -> Mina_transaction.Transaction_hash.User_command_with_valid_signature.t
-           option
-    }
-
-  let dummy_transaction_pool_proxy : transaction_pool_proxy =
-    { find_by_hash = const None }
-
-  (* NOTE: when we have access to txn pool, any txns in pool should be already
-     verified, hence we could utilize this fact to perform a faster version of
-     command verification *)
-  let verify_command_with_transaction_pool_proxy
-      ~(transaction_pool_proxy : transaction_pool_proxy)
-      (cmd_with_status : User_command.Verifiable.t With_status.t) =
-    let With_status.{ data = verifiable_cmd; _ } = cmd_with_status in
-    let cmd_hash =
-      User_command.of_verifiable verifiable_cmd |> Transaction_hash.hash_command
-    in
-    match transaction_pool_proxy.find_by_hash cmd_hash with
-    | None ->
-        `No_fast_forward
-    | Some _ ->
-        Verifier.Common.verify_command_from_mempool cmd_with_status
-
-  (** [process_separately] splits the list in two, and applies transformations
-    * to both parts, then it merges the list back in the same order it was originally.
-    * [process_left] and [process_right] are expected to return the same number
-    * of elements processed in the same order.
-    *)
-  let process_separately (type input left right output)
-      ~(partitioner : input -> (left, right) Core_kernel.Either.t)
-      ~(process_left : left list -> output list Deferred.Or_error.t)
-      ~(process_right : right list -> output list Deferred.Or_error.t)
-      (input : input list) : output list Deferred.Or_error.t =
-    let open Deferred.Or_error.Let_syntax in
-    let input_with_indices = List.mapi input ~f:(fun idx ele -> (idx, ele)) in
-    let lefts, rights =
-      List.partition_map input_with_indices ~f:(fun (idx, ele) ->
-          match partitioner ele with
-          | First x ->
-              First (idx, x)
-          | Second y ->
-              Second (idx, y) )
-    in
-    let batch_process_snd (type fst snd snd_processed) (lst : (fst * snd) list)
-        (f : snd list -> snd_processed list Deferred.Or_error.t) =
-      let fsts, snds = List.unzip lst in
-      let%map snds_processed = f snds in
-      List.zip_exn fsts snds_processed
-    in
-    let%bind lefts_processed = batch_process_snd lefts process_left in
-    let%map rights_processed = batch_process_snd rights process_right in
-    List.merge lefts_processed rights_processed
-      ~compare:(fun (ind_left, _) (ind_right, _) -> compare ind_left ind_right)
-    |> List.map ~f:snd
-
-  let check_commands ledger ~verifier
-      ~(transaction_pool_proxy : transaction_pool_proxy)
-      (cs : User_command.t With_status.t list) =
-    let open Deferred.Or_error.Let_syntax in
-    let%bind cs =
-      User_command.Applied_sequence.to_all_verifiable cs
-        ~load_vk_cache:(fun account_ids ->
-          let account_ids = Set.to_list account_ids in
-          Zkapp_command.Verifiable.load_vks_from_ledger account_ids
-            ~location_of_account_batch:(Ledger.location_of_account_batch ledger)
-            ~get_batch:(Ledger.get_batch ledger) )
-      |> Deferred.return
-    in
-    let partitioner cmd =
-      let open Core_kernel.Either in
-      match
-        verify_command_with_transaction_pool_proxy ~transaction_pool_proxy cmd
-      with
-      | `No_fast_forward ->
-          Second cmd
-      | (`Valid _ | `Missing_verification_key _ | `Unexpected_verification_key _)
-        as fast_forward ->
-          First fast_forward
-    in
-    let%map xs =
-      process_separately ~partitioner ~process_left:Deferred.Or_error.return
-        ~process_right:(Verifier.verify_commands verifier)
-        cs
-    in
-    Result.all
-      (List.map xs ~f:(function
-        | `Valid x ->
-            Ok x
-        | ( `Invalid_keys _
-          | `Invalid_signature _
-          | `Invalid_proof _
-          | `Missing_verification_key _
-          | `Unexpected_verification_key _
-          | `Mismatched_authorization_kind _ ) as invalid ->
-            Error
-              (Verifier.Failure.Verification_failed
-                 (Error.tag ~tag:"verification failed on command"
-                    (Verifier.invalid_to_error invalid) ) )
-        | `Valid_assuming _ ->
-            Error
-              (Verifier.Failure.Verification_failed
-                 (Error.of_string "batch verification failed") ) ) )
-
   let apply ?skip_verification ~proof_cache_db ~constraint_constants
       ~global_slot ~get_completed_work ~logger ~verifier ~current_state_view
       ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
       ~zkapp_cmd_limit_hardcap
-      ?(transaction_pool_proxy = dummy_transaction_pool_proxy) t
+      ?(transaction_pool_proxy = Check_commands.dummy_transaction_pool_proxy) t
       (witness : Staged_ledger_diff.t) =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
@@ -1344,7 +1239,9 @@ module T = struct
     let%bind prediff =
       Pre_diff_info.get witness ~constraint_constants ~coinbase_receiver
         ~supercharge_coinbase
-        ~check:(check_commands t.ledger ~verifier ~transaction_pool_proxy)
+        ~check:
+          (Check_commands.check_commands t.ledger ~verifier
+             ~transaction_pool_proxy )
       |> Deferred.map
            ~f:
              (Result.map_error ~f:(fun error ->

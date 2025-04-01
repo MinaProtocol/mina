@@ -104,8 +104,9 @@ let compute_block_trace_metadata transition_with_validation =
     ]
 
 let build ?skip_staged_ledger_verification
-    ?(transaction_pool_proxy = Staged_ledger.dummy_transaction_pool_proxy)
-    ~proof_cache_db ~logger ~precomputed_values ~verifier ~trust_system ~parent
+    ?(transaction_pool_proxy =
+      Staged_ledger.Check_commands.dummy_transaction_pool_proxy) ~proof_cache_db
+    ~logger ~precomputed_values ~verifier ~trust_system ~parent
     ~transition:(transition_with_validation : Mina_block.almost_valid_block)
     ~get_completed_work ~sender ~transition_receipt_time () =
   let state_hash =

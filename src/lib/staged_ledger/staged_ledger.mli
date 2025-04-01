@@ -4,6 +4,7 @@ open Mina_base
 open Mina_transaction
 open Signature_lib
 module Ledger = Mina_ledger.Ledger
+module Check_commands = Check_commands
 
 type t
 
@@ -192,13 +193,6 @@ val copy : t -> t
 
 val hash : t -> Staged_ledger_hash.t
 
-type transaction_pool_proxy =
-  { find_by_hash :
-         Mina_transaction.Transaction_hash.t
-      -> Mina_transaction.Transaction_hash.User_command_with_valid_signature.t
-         option
-  }
-
 val apply :
      ?skip_verification:[ `Proofs | `All ]
   -> proof_cache_db:Proof_cache_tag.cache_db
@@ -214,7 +208,7 @@ val apply :
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
   -> zkapp_cmd_limit_hardcap:int
-  -> ?transaction_pool_proxy:transaction_pool_proxy
+  -> ?transaction_pool_proxy:Check_commands.transaction_pool_proxy
   -> t
   -> Staged_ledger_diff.t
   -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
@@ -350,16 +344,6 @@ val all_work_pairs :
 
 (** Statements of all the pending work in t*)
 val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
-
-val dummy_transaction_pool_proxy : transaction_pool_proxy
-
-val check_commands :
-     Ledger.t
-  -> verifier:Verifier.t
-  -> transaction_pool_proxy:transaction_pool_proxy
-  -> User_command.t With_status.t list
-  -> (User_command.Valid.t list, Verifier.Failure.t) Result.t
-     Deferred.Or_error.t
 
 (** account ids created in the latest block, taken from the new_accounts
     in the latest and next-to-latest trees of the scan state

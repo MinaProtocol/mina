@@ -280,7 +280,7 @@ val validate_staged_ledger_diff :
   -> verifier:Verifier.t
   -> parent_staged_ledger:Staged_ledger.t
   -> parent_protocol_state:Protocol_state.Value.t
-  -> transaction_pool_proxy:Staged_ledger.transaction_pool_proxy
+  -> transaction_pool_proxy:Staged_ledger.Check_commands.transaction_pool_proxy
   -> ( 'a
      , 'b
      , 'c
