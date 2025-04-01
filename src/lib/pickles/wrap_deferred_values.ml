@@ -12,7 +12,7 @@ module Plonk_checks = struct
     Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
 end
 
-let expand_deferred (type n most_recent_width) ~zk_rows
+let compute_xi_r_chal (type n most_recent_width) ~zk_rows
     ~(evals :
        ( Backend.Tick.Field.t
        , Backend.Tick.Field.t array )
@@ -33,8 +33,7 @@ let expand_deferred (type n most_recent_width) ~zk_rows
        , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
          Step_bp_vec.t
        , Branch_data.t )
-       Composition_types.Wrap.Proof_state.Minimal.Stable.V1.t ) :
-    _ Types.Wrap.Proof_state.Deferred_values.t =
+       Composition_types.Wrap.Proof_state.Minimal.Stable.V1.t ) =
   Timer.start __LOC__ ;
   let old_bulletproof_challenges =
     Vector.map ~f:Ipa.Step.compute_challenges old_bulletproof_challenges
@@ -74,7 +73,38 @@ let expand_deferred (type n most_recent_width) ~zk_rows
        Array.iter ~f:absorb x1 ; Array.iter ~f:absorb x2 ) ) ;
   let xi_chal = squeeze () in
   let r_chal = squeeze () in
-  Timer.clock __LOC__ ;
+  Timer.clock __LOC__ ; (xi_chal, r_chal)
+
+let expand_deferred (type n most_recent_width) ~zk_rows
+    ~(evals :
+       ( Backend.Tick.Field.t
+       , Backend.Tick.Field.t array )
+       Pickles_types.Plonk_types.All_evals.t )
+    ~(old_bulletproof_challenges :
+       ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
+         Bulletproof_challenge.t
+         Step_bp_vec.t
+       , most_recent_width )
+       Pickles_types.Vector.t )
+    ~(proof_state :
+       ( Challenge.Constant.t
+       , Challenge.Constant.t Scalar_challenge.t
+       , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+       , bool
+       , n Pickles__.Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
+       , Digest.Constant.t
+       , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
+         Step_bp_vec.t
+       , Branch_data.t )
+       Composition_types.Wrap.Proof_state.Minimal.Stable.V1.t ) :
+    _ Types.Wrap.Proof_state.Deferred_values.t =
+  Timer.start __LOC__ ;
+  let xi_chal, r_chal =
+    compute_xi_r_chal ~zk_rows ~evals ~old_bulletproof_challenges ~proof_state
+  in
+  let old_bulletproof_challenges =
+    Vector.map ~f:Ipa.Step.compute_challenges old_bulletproof_challenges
+  in
   (* TODO: The deferred values "bulletproof_challenges" should get routed
      into a "batch dlog Tick acc verifier" *)
   let actual_proofs_verified = Vector.length old_bulletproof_challenges in
