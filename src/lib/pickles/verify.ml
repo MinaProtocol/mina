@@ -72,7 +72,7 @@ let verify_heterogenous (ts : Instance.t list) =
   in
   [%log internal] "Compute_xi_r_chals_done" ;
   let _computed_bp_chals, deferred_values =
-    List.map2_exn ts xi_r_chals
+    List.map3_exn ts xi_r_chals sponge_inputs
       ~f:(fun
           (T
             ( _max_proofs_verified
@@ -90,6 +90,7 @@ let verify_heterogenous (ts : Instance.t list) =
                 ; proof = _
                 } ) )
           xi_r_chal
+          (Wrap_deferred_values.Sponge_input sponge_input)
         ->
         Timer.start __LOC__ ;
         let non_chunking, expected_num_chunks =
@@ -150,12 +151,10 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         Timer.clock __LOC__ ;
         let deferred_values =
-          let zk_rows =
-            Option.value_map ~default:Plonk_checks.zk_rows_by_default
-              chunking_data ~f:(fun x -> x.Instance.zk_rows )
-          in
-          Wrap_deferred_values.expand_deferred ~evals ~zk_rows
-            ~old_bulletproof_challenges ~proof_state ~xi_r_chal
+          Wrap_deferred_values.expand_deferred ~evals
+            ~zk_rows:sponge_input.zk_rows
+            ~old_bulletproof_challenges:sponge_input.old_bulletproof_challenges
+            ~proof_state ~xi_r_chal
         in
         Timer.clock __LOC__ ;
         let deferred_values = { deferred_values with bulletproof_challenges } in

@@ -242,10 +242,13 @@ struct
       in
       let xi_r_chal = Wrap_deferred_values.compute_xi_r_chal sponge_input in
       let deferred_values_computed =
-        Wrap_deferred_values.expand_deferred ~evals:t.prev_evals
-          ~old_bulletproof_challenges:
-            statement.messages_for_next_step_proof.old_bulletproof_challenges
-          ~zk_rows:data.zk_rows ~proof_state:statement.proof_state ~xi_r_chal
+        match sponge_input with
+        | Wrap_deferred_values.Sponge_input sponge_input ->
+            Wrap_deferred_values.expand_deferred ~evals:t.prev_evals
+              ~old_bulletproof_challenges:
+                sponge_input.old_bulletproof_challenges
+              ~zk_rows:sponge_input.zk_rows ~proof_state:statement.proof_state
+              ~xi_r_chal
       in
       let prev_statement_with_hashes :
           ( _

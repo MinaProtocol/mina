@@ -10,9 +10,7 @@ type sponge_input =
           , Pasta_bindings.Fp.t array )
           Plonk_types.All_evals.t
       ; old_bulletproof_challenges :
-          ( Challenge.Constant.t Kimchi_types.scalar_challenge
-            Bulletproof_challenge.t
-            Step_bp_vec.t
+          ( (Pasta_bindings.Fp.t, Nat.N16.n) Vector.vec
           , 'most_recent_width )
           Vector.vec
       ; proof_state :
@@ -64,9 +62,7 @@ val expand_deferred :
   -> evals:
        (Pasta_bindings.Fp.t, Pasta_bindings.Fp.t array) Plonk_types.All_evals.t
   -> old_bulletproof_challenges:
-       ( Challenge.Constant.t Kimchi_types.scalar_challenge
-         Bulletproof_challenge.t
-         Step_bp_vec.t
+       ( (Pasta_bindings.Fp.t, Nat.N16.n) Vector.vec
        , 'most_recent_width )
        Vector.vec
   -> proof_state:
