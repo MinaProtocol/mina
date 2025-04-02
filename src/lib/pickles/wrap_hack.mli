@@ -19,15 +19,7 @@ val hash_message_inputs_for_next_wrap_proof :
   -> Backend.Tock.Field.t array
 
 val hash_messages_for_next_wrap_proof :
-     'n Pickles_types.Nat.t
-  -> ( Backend.Tick.Curve.Affine.t
-     , ( ( Backend.Tock.Field.t
-         , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
-         Pickles_types.Vector.t
-       , 'n )
-       Pickles_types.Vector.t )
-     Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
-  -> Import.Types.Digest.Constant.t
+  Backend.Tock.Field.t array -> Import.Types.Digest.Constant.t
 
 val pad_proof : ('mlmb, 'a) Proof.t -> Proof.Proofs_verified_max.t
 

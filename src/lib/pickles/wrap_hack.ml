@@ -57,13 +57,8 @@ let hash_message_inputs_for_next_wrap_proof (type n)
   .to_field_elements t ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ] )
 
 (* Hash the me only, padding first. *)
-let hash_messages_for_next_wrap_proof (type n) (max_proofs_verified : n Nat.t)
-    (t :
-      ( Tick.Curve.Affine.t
-      , (_, n) Vector.t )
-      Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t ) =
-  let input = hash_message_inputs_for_next_wrap_proof max_proofs_verified t in
-  Tock_field_sponge.digest Tock_field_sponge.params input
+let hash_messages_for_next_wrap_proof hash_input =
+  Tock_field_sponge.digest Tock_field_sponge.params hash_input
 
 (* Pad the messages_for_next_wrap_proof of a proof *)
 let pad_proof (type mlmb) (T p : (mlmb, _) Proof.t) :
@@ -117,8 +112,11 @@ module Checked = struct
       let s2 = full_state sponge in
       [| s0; s1; s2 |] )
 
-  let hash_constant_messages_for_next_wrap_proof =
-    hash_messages_for_next_wrap_proof
+  let hash_constant_messages_for_next_wrap_proof max_proofs_verified t =
+    let hash_input =
+      hash_message_inputs_for_next_wrap_proof max_proofs_verified t
+    in
+    hash_messages_for_next_wrap_proof hash_input
 
   (* TODO: No need to hash the entire bulletproof challenges. Could
      just hash the segment of the public input LDE corresponding to them

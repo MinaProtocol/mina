@@ -41,27 +41,27 @@ let verify_heterogenous (ts : Instance.t list) =
   let _computed_bp_chals, deferred_values =
     List.map ts
       ~f:(fun
-           (T
-             ( _max_proofs_verified
-             , _statement
-             , chunking_data
-             , key
-             , _app_state
-             , T
-                 { statement =
-                     { proof_state
-                     ; messages_for_next_step_proof =
-                         { old_bulletproof_challenges; _ }
-                     }
-                 ; prev_evals = evals
-                 ; proof = _
-                 } ) )
-         ->
+          (T
+            ( _max_proofs_verified
+            , _statement
+            , chunking_data
+            , key
+            , _app_state
+            , T
+                { statement =
+                    { proof_state
+                    ; messages_for_next_step_proof =
+                        { old_bulletproof_challenges; _ }
+                    }
+                ; prev_evals = evals
+                ; proof = _
+                } ) )
+        ->
         Timer.start __LOC__ ;
         let non_chunking, expected_num_chunks =
           let expected_num_chunks =
             Option.value_map ~default:Plonk_checks.num_chunks_by_default
-              chunking_data ~f:(fun x -> x.Instance.num_chunks)
+              chunking_data ~f:(fun x -> x.Instance.num_chunks )
           in
           let exception Is_chunked in
           match
@@ -118,7 +118,7 @@ let verify_heterogenous (ts : Instance.t list) =
         let deferred_values =
           let zk_rows =
             Option.value_map ~default:Plonk_checks.zk_rows_by_default
-              chunking_data ~f:(fun x -> x.Instance.zk_rows)
+              chunking_data ~f:(fun x -> x.Instance.zk_rows )
           in
           Wrap_deferred_values.expand_deferred ~evals ~zk_rows
             ~old_bulletproof_challenges ~proof_state
@@ -164,28 +164,65 @@ let verify_heterogenous (ts : Instance.t list) =
   Common.time "batch_step_dlog_check" (fun () ->
       check (lazy "batch_step_dlog_check", accumulator_check) ) ;
   [%log internal] "Compute_batch_verify_inputs" ;
-  let batch_verify_inputs =
-    List.map2_exn ts deferred_values
+  [%log internal] "Compute_hash_inputs" ;
+  let next_hash_inputs =
+    List.map ts
       ~f:(fun
-           (T
-             ( (module Max_proofs_verified)
-             , (module A_value)
-             , _chunking_data
-             , key
-             , app_state
-             , T t ) )
-           deferred_values
-         ->
+          (T
+            ( (module Max_proofs_verified)
+            , (module A_value)
+            , _chunking_data
+            , key
+            , app_state
+            , T t ) )
+        ->
+        let step_proof_hash_input =
+          Common.hash_message_inputs_for_next_step_proof
+            ~app_state:A_value.to_field_elements
+            (Reduced_messages_for_next_proof_over_same_field.Step.prepare
+               ~dlog_plonk_index:
+                 (Plonk_verification_key_evals.map
+                    ~f:(fun x -> [| x |])
+                    key.commitments )
+               { t.statement.messages_for_next_step_proof with app_state } )
+        in
+        let wrap_proof_hash_input =
+          Wrap_hack.hash_message_inputs_for_next_wrap_proof
+            Max_proofs_verified.n
+            (Reduced_messages_for_next_proof_over_same_field.Wrap.prepare
+               t.statement.proof_state.messages_for_next_wrap_proof )
+        in
+        (step_proof_hash_input, wrap_proof_hash_input) )
+  in
+  [%log internal] "Compute_hash_inputs_done" ;
+  [%log internal] "Compute_hashes" ;
+  let next_hashes =
+    List.map next_hash_inputs
+      ~f:(fun (step_proof_hash_input, wrap_proof_hash_input) ->
+        let step_proof_hash =
+          Common.hash_messages_for_next_step_proof step_proof_hash_input
+        in
+        let wrap_proof_hash =
+          Wrap_hack.hash_messages_for_next_wrap_proof wrap_proof_hash_input
+        in
+        (step_proof_hash, wrap_proof_hash) )
+  in
+  [%log internal] "Compute_hashes_done" ;
+  let batch_verify_inputs =
+    List.map3_exn ts deferred_values next_hashes
+      ~f:(fun
+          (T
+            ( (module Max_proofs_verified)
+            , (module A_value)
+            , _chunking_data
+            , key
+            , app_state
+            , T t ) )
+          deferred_values
+          (messages_for_next_step_proof, messages_for_next_wrap_proof)
+        ->
         let prepared_statement : _ Types.Wrap.Statement.In_circuit.t =
-          { messages_for_next_step_proof =
-              Common.hash_messages_for_next_step_proof
-                ~app_state:A_value.to_field_elements
-                (Reduced_messages_for_next_proof_over_same_field.Step.prepare
-                   ~dlog_plonk_index:
-                     (Plonk_verification_key_evals.map
-                        ~f:(fun x -> [| x |])
-                        key.commitments )
-                   { t.statement.messages_for_next_step_proof with app_state } )
+          { messages_for_next_step_proof
           ; proof_state =
               { deferred_values =
                   { plonk = deferred_values.plonk
@@ -199,12 +236,7 @@ let verify_heterogenous (ts : Instance.t list) =
                   }
               ; sponge_digest_before_evaluations =
                   t.statement.proof_state.sponge_digest_before_evaluations
-              ; messages_for_next_wrap_proof =
-                  Wrap_hack.hash_messages_for_next_wrap_proof
-                    Max_proofs_verified.n
-                    (Reduced_messages_for_next_proof_over_same_field.Wrap
-                     .prepare
-                       t.statement.proof_state.messages_for_next_wrap_proof )
+              ; messages_for_next_wrap_proof
               }
           }
         in
