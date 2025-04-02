@@ -7,6 +7,16 @@ val pad_accumulator :
      Backend.Tock.Proof.Challenge_polynomial.t_
      list
 
+val hash_message_inputs_for_next_wrap_proof :
+     ( Backend.Tick.Curve.Affine.t
+     , ( ( Backend.Tock.Field.t
+         , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
+         Pickles_types.Vector.t
+       , 'n )
+       Pickles_types.Vector.t )
+     Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
+  -> Backend.Tock.Field.t array
+
 val hash_messages_for_next_wrap_proof :
      ( Backend.Tick.Curve.Affine.t
      , ( ( Backend.Tock.Field.t

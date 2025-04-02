@@ -42,10 +42,9 @@ let pad_accumulator (xs : (Tock.Proof.Challenge_polynomial.t, _) Vector.t) =
       }
   |> Vector.to_list
 
-(* Hash the me only, padding first. *)
-let hash_messages_for_next_wrap_proof (type n)
+let hash_message_inputs_for_next_wrap_proof (type n)
     (t :
-      ( Tick.Curve.Affine.t
+      ( _
       , (_, n) Vector.t )
       Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t ) =
   let t =
@@ -53,10 +52,17 @@ let hash_messages_for_next_wrap_proof (type n)
       old_bulletproof_challenges = pad_challenges t.old_bulletproof_challenges
     }
   in
-  Tock_field_sponge.digest Tock_field_sponge.params
-    (Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof
-     .to_field_elements t ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ])
-    )
+  Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof
+  .to_field_elements t ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ])
+
+(* Hash the me only, padding first. *)
+let hash_messages_for_next_wrap_proof (type n)
+    (t :
+      ( Tick.Curve.Affine.t
+      , (_, n) Vector.t )
+      Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t ) =
+  let input = hash_message_inputs_for_next_wrap_proof t in
+  Tock_field_sponge.digest Tock_field_sponge.params input
 
 (* Pad the messages_for_next_wrap_proof of a proof *)
 let pad_proof (type mlmb) (T p : (mlmb, _) Proof.t) :
