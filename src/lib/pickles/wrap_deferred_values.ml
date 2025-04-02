@@ -15,6 +15,7 @@ end
 type sponge_input =
   | Sponge_input :
       { zk_rows : int
+      ; initial_sponge_digest : Pasta_bindings.Fp.t
       ; evals :
           ( Pasta_bindings.Fp.t
           , Pasta_bindings.Fp.t array )
@@ -23,32 +24,25 @@ type sponge_input =
           ( (Pasta_bindings.Fp.t, Nat.N16.n) Vector.vec
           , 'most_recent_width )
           Vector.vec
-      ; proof_state :
-          ( Challenge.Constant.t
-          , Challenge.Constant.t Kimchi_types.scalar_challenge
-          , Pasta_bindings.Fp.t Shifted_value.Type1.t
-          , bool
-          , 'n Reduced_messages_for_next_proof_over_same_field.Wrap.t
-          , Types.Digest.Constant.t
-          , Challenge.Constant.t Kimchi_types.scalar_challenge
-            Bulletproof_challenge.t
-            Step_bp_vec.t
-          , Branch_data.t )
-          Types.Wrap.Proof_state.Minimal.t
       }
       -> sponge_input
 
 let compute_sponge_input ~zk_rows ~evals ~old_bulletproof_challenges
-    ~proof_state =
+    ~(proof_state : _ Composition_types.Wrap.Proof_state.Minimal.Stable.V1.t) =
   let old_bulletproof_challenges =
     Vector.map ~f:Ipa.Step.compute_challenges old_bulletproof_challenges
   in
+  let initial_sponge_digest =
+    Digest.Constant.to_tick_field proof_state.sponge_digest_before_evaluations
+  in
   (* TODO: The deferred values "bulletproof_challenges" should get routed
      into a "batch dlog Tick acc verifier" *)
-  Sponge_input { zk_rows; evals; old_bulletproof_challenges; proof_state }
+  Sponge_input
+    { zk_rows; evals; old_bulletproof_challenges; initial_sponge_digest }
 
 let compute_xi_r_chal
-    (Sponge_input { zk_rows; evals; old_bulletproof_challenges; proof_state }) =
+    (Sponge_input
+      { zk_rows; initial_sponge_digest; evals; old_bulletproof_challenges } ) =
   Timer.start __LOC__ ;
   let xs = Plonk_types.Evals.to_absorption_sequence evals.evals.evals in
   let x1, x2 = evals.evals.public_input in
@@ -57,9 +51,7 @@ let compute_xi_r_chal
     let open Tick_field_sponge.Bits in
     let sponge =
       let s = create Tick_field_sponge.params in
-      absorb s
-        (Digest.Constant.to_tick_field
-           proof_state.sponge_digest_before_evaluations ) ;
+      absorb s initial_sponge_digest ;
       s
     in
     let squeeze () =
