@@ -1,41 +1,34 @@
-// use kimchi::circuits::expr::{Linearization, PolishToken, Variable, Column};
-// use kimchi::circuits::gate::{GateType, CurrOrNext};
 use crate::wasm_flat_vector::WasmFlatVector;
 use crate::wasm_vector::fp::WasmVecVecFp;
 use crate::wasm_vector::fq::WasmVecVecFq;
 use crate::wasm_vector::WasmVector;
-use paste::paste;
-use std::convert::TryInto;
-use wasm_bindgen::prelude::*;
-// use std::sync::Arc;
-// use poly_commitment::srs::SRS;
-use kimchi::circuits::lookup::runtime_tables::RuntimeTable;
-// use kimchi::index::{expr_linearization, VerifierIndex as DlogVerifierIndex};
-// use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use ark_ec::AffineRepr;
 use ark_ff::One;
 use array_init::array_init;
-use kimchi::circuits::wires::COLUMNS;
-use kimchi::verifier::Context;
-use std::array;
-// use std::path::Path;
+use core::array;
+use core::convert::TryInto;
 use groupmap::GroupMap;
+use kimchi::circuits::lookup::runtime_tables::RuntimeTable;
+use kimchi::circuits::wires::COLUMNS;
 use kimchi::proof::{
     LookupCommitments, PointEvaluations, ProofEvaluations, ProverCommitments, ProverProof,
     RecursionChallenge,
 };
 use kimchi::prover_index::ProverIndex;
 use kimchi::verifier::batch_verify;
+use kimchi::verifier::Context;
 use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
+use paste::paste;
 use poly_commitment::{
     commitment::{CommitmentCurve, PolyComm},
     ipa::OpeningProof,
     SRS as _,
 };
 use serde::{Deserialize, Serialize};
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 extern "C" {

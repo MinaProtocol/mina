@@ -2,11 +2,11 @@ use crate::wasm_flat_vector::WasmFlatVector;
 use crate::wasm_vector::WasmVector;
 use ark_poly::DenseUVPolynomial;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
+use core::ops::Deref;
 use paste::paste;
 use poly_commitment::SRS as ISRS;
 use poly_commitment::{commitment::b_poly_coefficients, hash_map_cache::HashMapCache, ipa::SRS};
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
 use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
