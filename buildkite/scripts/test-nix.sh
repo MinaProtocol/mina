@@ -8,16 +8,15 @@ if [[ $# -ne 1 ]]; then
   exit 1
 fi
 
-SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
 
-if [[ "$NIX_CACHE_NAR_SECRET" != "" ]]; then
-  echo "$NIX_CACHE_NAR_SECRET" > /tmp/nix-cache-secret
+if [[ "${NIX_CACHE_NAR_SECRET}" != "" ]]; then
+  echo "${NIX_CACHE_NAR_SECRET}" > /tmp/nix-cache-secret
   echo "Configuring the NAR signing secret"
   NIX_SECRET_KEY=/tmp/nix-cache-secret
 fi
 
-if [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
+if [[ "${NIX_CACHE_GCP_ID}" != "" ]] && [[ "${NIX_CACHE_GCP_SECRET}" != "" ]]; then
   echo "GCP uploading configured (for nix binaries)"
   cat <<'EOF'> /tmp/nix-post-build
 #!/bin/sh
@@ -32,11 +31,11 @@ EOF
   NIX_POST_BUILD_HOOK=/tmp/nix-post-build
 fi
 
-if [[ "$NIX_POST_BUILD_HOOK" != "" ]]; then
-  NIX_OPTS+=( --post-build-hook "$NIX_POST_BUILD_HOOK" )
+if [[ "${NIX_POST_BUILD_HOOK}" != "" ]]; then
+  NIX_OPTS+=( --post-build-hook "${NIX_POST_BUILD_HOOK}" )
 fi
-if [[ "$NIX_SECRET_KEY" != "" ]]; then
-  NIX_OPTS+=( --secret-key-files "$NIX_SECRET_KEY" )
+if [[ "${NIX_SECRET_KEY}" != "" ]]; then
+  NIX_OPTS+=( --secret-key-files "${NIX_SECRET_KEY}" )
 fi
 
 # There's an error in CI syncing submodules saying
@@ -60,18 +59,18 @@ git config --global --add safe.directory /workdir
 #       error: program 'git' failed with exit code 128
 # That is why we checkout branch explicitly
 
-git branch -D $BUILDKITE_BRANCH 2>/dev/null || true
-git checkout -b $BUILDKITE_BRANCH
-git reset --hard $BUILDKITE_COMMIT
+git branch -D "${BUILDKITE_BRANCH}" 2>/dev/null || true
+git checkout -b "${BUILDKITE_BRANCH}"
+git reset --hard "${BUILDKITE_COMMIT}"
 
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --no-link
 
 # Test developer terminal with lsp server
 nix "${NIX_OPTS[@]}" develop "$PWD?submodules=1#with-lsp" --command bash -c "echo tested"
 
-if [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
-  mkdir -p $HOME/.aws
-  cat <<EOF> $HOME/.aws/credentials
+if [[ "${NIX_CACHE_GCP_ID}" != "" ]] && [[ "${NIX_CACHE_GCP_SECRET}" != "" ]]; then
+  mkdir -p "${HOME}"/.aws
+  cat <<EOF> "${HOME}"/.aws/credentials
 [default]
 aws_access_key_id=$NIX_CACHE_GCP_ID
 aws_secret_access_key=$NIX_CACHE_GCP_SECRET
