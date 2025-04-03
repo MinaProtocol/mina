@@ -45,7 +45,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
   (** Structure managing cache accumulated since the "base" ledger.
 
-    Its purpose is to optimize lookups through a few consequitive masks
+    Its purpose is to optimize lookups through a few consecutive masks
     (by using just one map lookup instead of [O(number of masks)] map lookups).
 
     With a number of mask around 290, this trick gives a sizeable performance improvement.
