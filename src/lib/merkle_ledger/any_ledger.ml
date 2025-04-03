@@ -140,9 +140,6 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
 
     let set_batch_accounts (T ((module Base), t)) = Base.set_batch_accounts t
 
-    let set_inner_hash_at_addr_exn (T ((module Base), t)) =
-      Base.set_inner_hash_at_addr_exn t
-
     let get_inner_hash_at_addr_exn (T ((module Base), t)) =
       Base.get_inner_hash_at_addr_exn t
 

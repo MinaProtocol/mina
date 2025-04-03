@@ -129,11 +129,14 @@ let write_graph (_ : t) =
   let _ = G.output_graph in
   ()
 
-let validate_block ~genesis_state_hash (b, v) =
+(** Validates block without time received validation *)
+let validate_block_skipping_time_received ~genesis_state_hash (b, v) =
   let open Mina_block.Validation in
   let open Result.Let_syntax in
   let h = (With_hash.map ~f:Mina_block.header b, v) in
-  validate_genesis_protocol_state ~genesis_state_hash h
+  Mina_block.Validation.skip_time_received_validation
+    `This_block_was_not_received_via_gossip h
+  |> validate_genesis_protocol_state ~genesis_state_hash
   >>= validate_protocol_versions >>= validate_delta_block_chain
   >>| Fn.flip with_body (Mina_block.body @@ With_hash.data b)
 
@@ -157,9 +160,8 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
   let transition_with_hash = Envelope.Incoming.data enveloped_transition in
   let cached_initially_validated_transition_result =
     let%bind.Result initially_validated_transition =
-      Mina_block.Validation.skip_time_received_validation
-        `This_block_was_not_received_via_gossip transition_with_hash
-      |> validate_block ~genesis_state_hash
+      validate_block_skipping_time_received ~genesis_state_hash
+        transition_with_hash
     in
     let enveloped_initially_validated_transition =
       Envelope.Incoming.map enveloped_transition
@@ -783,6 +785,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     ~catchup_breadcrumbs_writer
     ~(build_func :
           ?skip_staged_ledger_verification:[ `All | `Proofs ]
+       -> ?transaction_pool_proxy:Staged_ledger.transaction_pool_proxy
        -> logger:Logger.t
        -> precomputed_values:Precomputed_values.t
        -> verifier:Verifier.t

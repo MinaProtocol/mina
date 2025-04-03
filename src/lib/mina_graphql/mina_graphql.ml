@@ -2205,7 +2205,7 @@ module Queries = struct
                           when Transaction_status.Stable.V2.(
                                  equal user_cmd.status Applied) -> (
                             let actions =
-                              c |> Zkapp_command.account_updates
+                              c.Zkapp_command.Poly.account_updates
                               |> Zkapp_command.Call_forest.fold ~init:(0, [])
                                    ~f:(fun acc au ->
                                      let action_seq, acc = acc in

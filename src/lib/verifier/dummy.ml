@@ -95,37 +95,28 @@ let verify_commands { proof_level; _ }
   | Check | No_check ->
       List.map cs ~f:(fun c ->
           match Common.check c with
-          | `Valid c ->
+          | Ok (c, `Assuming _) ->
               `Valid c
-          | `Valid_assuming (c, _) ->
-              `Valid c
-          | `Invalid_keys keys ->
+          | Error (`Invalid_keys keys) ->
               `Invalid_keys keys
-          | `Invalid_signature keys ->
+          | Error (`Invalid_signature keys) ->
               `Invalid_signature keys
-          | `Invalid_proof err ->
+          | Error (`Invalid_proof err) ->
               `Invalid_proof err
-          | `Missing_verification_key keys ->
+          | Error (`Missing_verification_key keys) ->
               `Missing_verification_key keys
-          | `Unexpected_verification_key keys ->
+          | Error (`Unexpected_verification_key keys) ->
               `Unexpected_verification_key keys
-          | `Mismatched_authorization_kind keys ->
+          | Error (`Mismatched_authorization_kind keys) ->
               `Mismatched_authorization_kind keys )
       |> Deferred.Or_error.return
   | Full ->
       let cs = List.map cs ~f:Common.check in
       let to_verify =
         List.concat_map cs ~f:(function
-          | `Valid _ ->
-              []
-          | `Valid_assuming (_, xs) ->
+          | Ok (_, `Assuming xs) ->
               xs
-          | `Invalid_keys _
-          | `Invalid_signature _
-          | `Invalid_proof _
-          | `Missing_verification_key _
-          | `Unexpected_verification_key _
-          | `Mismatched_authorization_kind _ ->
+          | Error _ ->
               [] )
       in
       let%map all_verified =
@@ -133,22 +124,22 @@ let verify_commands { proof_level; _ }
       in
       Ok
         (List.map cs ~f:(function
-          | `Valid c ->
+          | Ok (c, `Assuming []) ->
               `Valid c
-          | `Valid_assuming (c, xs) ->
+          | Ok (c, `Assuming xs) ->
               if Or_error.is_ok all_verified then `Valid c
               else `Valid_assuming xs
-          | `Invalid_keys keys ->
+          | Error (`Invalid_keys keys) ->
               `Invalid_keys keys
-          | `Invalid_signature keys ->
+          | Error (`Invalid_signature keys) ->
               `Invalid_signature keys
-          | `Invalid_proof err ->
+          | Error (`Invalid_proof err) ->
               `Invalid_proof err
-          | `Missing_verification_key keys ->
+          | Error (`Missing_verification_key keys) ->
               `Missing_verification_key keys
-          | `Unexpected_verification_key keys ->
+          | Error (`Unexpected_verification_key keys) ->
               `Unexpected_verification_key keys
-          | `Mismatched_authorization_kind keys ->
+          | Error (`Mismatched_authorization_kind keys) ->
               `Mismatched_authorization_kind keys ) )
 
 let verify_transaction_snarks { verify_transaction_snarks; _ } ts =

@@ -1,7 +1,7 @@
 use crate::wasm_flat_vector::WasmFlatVector;
+use core::convert::From;
+use core::ops::Deref;
 use paste::paste;
-use std::convert::From;
-use std::ops::Deref;
 use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi};
 use wasm_bindgen::prelude::*;
 
@@ -34,38 +34,38 @@ impl<'a, T> From<&'a WasmVector<T>> for &'a Vec<T> {
     }
 }
 
-impl<T> std::iter::IntoIterator for WasmVector<T> {
-    type Item = <Vec<T> as std::iter::IntoIterator>::Item;
-    type IntoIter = <Vec<T> as std::iter::IntoIterator>::IntoIter;
+impl<T> core::iter::IntoIterator for WasmVector<T> {
+    type Item = <Vec<T> as core::iter::IntoIterator>::Item;
+    type IntoIter = <Vec<T> as core::iter::IntoIterator>::IntoIter;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl<'a, T> std::iter::IntoIterator for &'a WasmVector<T> {
-    type Item = <&'a Vec<T> as std::iter::IntoIterator>::Item;
-    type IntoIter = <&'a Vec<T> as std::iter::IntoIterator>::IntoIter;
+impl<'a, T> core::iter::IntoIterator for &'a WasmVector<T> {
+    type Item = <&'a Vec<T> as core::iter::IntoIterator>::Item;
+    type IntoIter = <&'a Vec<T> as core::iter::IntoIterator>::IntoIter;
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
     }
 }
 
-impl<T> std::iter::FromIterator<T> for WasmVector<T> {
+impl<T> core::iter::FromIterator<T> for WasmVector<T> {
     fn from_iter<I>(iter: I) -> WasmVector<T>
     where
         I: IntoIterator<Item = T>,
     {
-        WasmVector(std::iter::FromIterator::from_iter(iter))
+        WasmVector(core::iter::FromIterator::from_iter(iter))
     }
 }
 
-impl<T> std::default::Default for WasmVector<T> {
+impl<T> core::default::Default for WasmVector<T> {
     fn default() -> Self {
-        WasmVector(std::default::Default::default())
+        WasmVector(core::default::Default::default())
     }
 }
 
-impl<T> std::iter::Extend<T> for WasmVector<T> {
+impl<T> core::iter::Extend<T> for WasmVector<T> {
     fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = T>,

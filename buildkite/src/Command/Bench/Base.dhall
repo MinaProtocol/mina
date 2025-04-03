@@ -18,6 +18,8 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let Command = ../../Command/Base.dhall
 
+let Cmd = ../../Lib/Cmds.dhall
+
 let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../Size.dhall
@@ -41,10 +43,11 @@ let Spec =
           , additionalDirtyWhen : List SelectFiles.Type
           , yellowThreshold : Double
           , redThreshold : Double
+          , preCommands : List Cmd.Type
           }
       , default =
           { mode = PipelineMode.Type.PullRequest
-          , size = Size.Medium
+          , size = Size.Perf
           , dependsOn =
               DebianVersions.dependsOn
                 DebianVersions.DebVersion.Bullseye
@@ -53,6 +56,7 @@ let Spec =
           , additionalDirtyWhen = [] : List SelectFiles.Type
           , yellowThreshold = 0.1
           , redThreshold = 0.2
+          , preCommands = [] : List Cmd.Type
           }
       }
 
@@ -62,11 +66,12 @@ let command
       ->  Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchain
-                  (Benchmarks.toEnvList Benchmarks.Type::{=})
-                  "./buildkite/scripts/bench/run.sh  ${spec.bench} --red-threshold ${Double/show
-                                                                                       spec.redThreshold} --yellow-threshold ${Double/show
-                                                                                                                                 spec.yellowThreshold}"
+                  spec.preCommands
+                # RunInToolchain.runInToolchain
+                    (Benchmarks.toEnvList Benchmarks.Type::{=})
+                    "./buildkite/scripts/bench/run.sh  ${spec.bench} --red-threshold ${Double/show
+                                                                                         spec.redThreshold} --yellow-threshold ${Double/show
+                                                                                                                                   spec.yellowThreshold}"
             , label =
                 "Perf: ${spec.label} ${PipelineMode.capitalName spec.mode}"
             , key = spec.key
