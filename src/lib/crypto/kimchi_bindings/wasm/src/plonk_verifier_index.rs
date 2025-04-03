@@ -2,7 +2,6 @@ use crate::wasm_vector::WasmVector;
 use ark_ec::AffineRepr;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-use array_init::array_init;
 use kimchi::circuits::{
     constraints::FeatureFlags,
     lookup::index::LookupSelectors,
@@ -14,7 +13,10 @@ use kimchi::linearization::expr_linearization;
 use kimchi::verifier_index::{LookupVerifierIndex, VerifierIndex as DlogVerifierIndex};
 use paste::paste;
 use poly_commitment::commitment::PolyComm;
-use poly_commitment::{ipa::{OpeningProof, SRS}, SRS as _};
+use poly_commitment::{
+    ipa::{OpeningProof, SRS},
+    SRS as _,
+};
 use std::path::Path;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
@@ -731,7 +733,7 @@ macro_rules! impl_verification_key {
                 let runtime_tables = index
                     .lookup_index.as_ref()
                     .map_or(false, |li| li.runtime_tables_selector.is_some());
-                
+
                 let patterns = LookupPatterns {
                     xor,
                     lookup,
@@ -785,9 +787,9 @@ macro_rules! impl_verification_key {
                     DlogVerifierIndex {
                         domain,
 
-                        sigma_comm: array_init(|i| (&evals.sigma_comm[i]).into()),
+                        sigma_comm: core::array::from_fn(|i| (&evals.sigma_comm[i]).into()),
                         generic_comm: (&evals.generic_comm).into(),
-                        coefficients_comm: array_init(|i| (&evals.coefficients_comm[i]).into()),
+                        coefficients_comm: core::array::from_fn(|i| (&evals.coefficients_comm[i]).into()),
 
                         psm_comm: (&evals.psm_comm).into(),
 

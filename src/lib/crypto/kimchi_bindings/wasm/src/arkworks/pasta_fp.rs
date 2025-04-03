@@ -5,11 +5,11 @@ use ark_ff::{
 };
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use core::cmp::Ordering::{Equal, Greater, Less};
 use mina_curves::pasta::fields::fft::FpParameters;
 use mina_curves::pasta::{fields::fp::FpParameters as Fp_params, Fp};
 use num_bigint::BigUint;
 use rand::rngs::StdRng;
-use std::cmp::Ordering::{Equal, Greater, Less};
 use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi};
 use wasm_bindgen::prelude::*;
 
@@ -18,7 +18,7 @@ use wasm_bindgen::prelude::*;
 pub struct WasmPastaFp(pub Fp);
 
 impl crate::wasm_flat_vector::FlatVectorElem for WasmPastaFp {
-    const FLATTENED_SIZE: usize = std::mem::size_of::<Fp>();
+    const FLATTENED_SIZE: usize = core::mem::size_of::<Fp>();
     fn flatten(self) -> Vec<u8> {
         let mut bytes: Vec<u8> = Vec::with_capacity(Self::FLATTENED_SIZE);
         self.0.serialize_compressed(&mut bytes).unwrap();
@@ -219,7 +219,7 @@ pub fn caml_pasta_fp_domain_generator(log2_size: i32) -> WasmPastaFp {
 
 #[wasm_bindgen]
 pub fn caml_pasta_fp_to_bytes(x: WasmPastaFp) -> Vec<u8> {
-    let len = std::mem::size_of::<Fp>();
+    let len = core::mem::size_of::<Fp>();
     let mut str: Vec<u8> = Vec::with_capacity(len);
     str.resize(len, 0);
     let str_as_fp: *mut Fp = str.as_mut_ptr().cast::<Fp>();
@@ -231,7 +231,7 @@ pub fn caml_pasta_fp_to_bytes(x: WasmPastaFp) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn caml_pasta_fp_of_bytes(x: &[u8]) -> WasmPastaFp {
-    let len = std::mem::size_of::<Fp>();
+    let len = core::mem::size_of::<Fp>();
     if x.len() != len {
         panic!("caml_pasta_fp_of_bytes");
     };

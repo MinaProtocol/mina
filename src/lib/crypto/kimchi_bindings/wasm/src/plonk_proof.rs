@@ -1,41 +1,33 @@
-// use kimchi::circuits::expr::{Linearization, PolishToken, Variable, Column};
-// use kimchi::circuits::gate::{GateType, CurrOrNext};
 use crate::wasm_flat_vector::WasmFlatVector;
 use crate::wasm_vector::fp::WasmVecVecFp;
 use crate::wasm_vector::fq::WasmVecVecFq;
 use crate::wasm_vector::WasmVector;
-use paste::paste;
-use std::convert::TryInto;
-use wasm_bindgen::prelude::*;
-// use std::sync::Arc;
-// use poly_commitment::srs::SRS;
-use kimchi::circuits::lookup::runtime_tables::RuntimeTable;
-// use kimchi::index::{expr_linearization, VerifierIndex as DlogVerifierIndex};
-// use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use ark_ec::AffineRepr;
 use ark_ff::One;
-use array_init::array_init;
-use kimchi::circuits::wires::COLUMNS;
-use kimchi::verifier::Context;
-use std::array;
-// use std::path::Path;
+use core::array;
+use core::convert::TryInto;
 use groupmap::GroupMap;
+use kimchi::circuits::lookup::runtime_tables::RuntimeTable;
+use kimchi::circuits::wires::COLUMNS;
 use kimchi::proof::{
     LookupCommitments, PointEvaluations, ProofEvaluations, ProverCommitments, ProverProof,
     RecursionChallenge,
 };
 use kimchi::prover_index::ProverIndex;
 use kimchi::verifier::batch_verify;
+use kimchi::verifier::Context;
 use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
+use paste::paste;
 use poly_commitment::{
     commitment::{CommitmentCurve, PolyComm},
     ipa::OpeningProof,
-    SRS as _
+    SRS as _,
 };
 use serde::{Deserialize, Serialize};
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 extern "C" {
@@ -307,7 +299,7 @@ macro_rules! impl_proof {
             impl From<&WasmProverCommitments> for ProverCommitments<$G> {
                 fn from(x: &WasmProverCommitments) -> Self {
                     ProverCommitments {
-                        w_comm: array_init(|i| x.w_comm[i].clone().into()),
+                        w_comm: core::array::from_fn(|i| x.w_comm[i].clone().into()),
                         z_comm: x.z_comm.clone().into(),
                         t_comm: x.t_comm.clone().into(),
                         lookup: x.lookup.clone().map(Into::into),
@@ -318,7 +310,7 @@ macro_rules! impl_proof {
             impl From<WasmProverCommitments> for ProverCommitments<$G> {
                 fn from(x: WasmProverCommitments) -> Self {
                     ProverCommitments {
-                        w_comm: array_init(|i| (&x.w_comm[i]).into()),
+                        w_comm: core::array::from_fn(|i| (&x.w_comm[i]).into()),
                         z_comm: x.z_comm.into(),
                         t_comm: x.t_comm.into(),
                         lookup: x.lookup.map(Into::into),
@@ -806,10 +798,10 @@ macro_rules! impl_proof {
                     zeta_omega: vec![$F::one()],
                 };
                 let evals = ProofEvaluations {
-                    w: array_init(|_| eval()),
-                    coefficients: array_init(|_| eval()),
+                    w: core::array::from_fn(|_| eval()),
+                    coefficients: core::array::from_fn(|_| eval()),
                     z: eval(),
-                    s: array_init(|_| eval()),
+                    s: core::array::from_fn(|_| eval()),
                     generic_selector: eval(),
                     poseidon_selector: eval(),
                     complete_add_selector: eval(),
@@ -836,7 +828,7 @@ macro_rules! impl_proof {
 
                 let dlogproof = ProverProof {
                     commitments: ProverCommitments {
-                        w_comm: array_init(|_| comm()),
+                        w_comm: core::array::from_fn(|_| comm()),
                         z_comm: comm(),
                         t_comm: comm(),
                         lookup: None,

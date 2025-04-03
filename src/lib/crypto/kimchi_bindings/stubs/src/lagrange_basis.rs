@@ -51,13 +51,13 @@ fn add_lagrange_basis_with_cache<G: CommitmentCurve, C: LagrangeCache<G>>(
 mod cache {
     use ark_ec::AffineRepr;
     use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as D};
+    use core::marker::PhantomData;
     use mina_curves::pasta::{Pallas, Vesta};
     use once_cell::sync::Lazy;
     use poly_commitment::PolyComm;
     use std::{
         env, fs,
         fs::File,
-        marker::PhantomData,
         path::{Path, PathBuf},
     };
 

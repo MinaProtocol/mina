@@ -45,7 +45,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
   (** Structure managing cache accumulated since the "base" ledger.
 
-    Its purpose is to optimize lookups through a few consequitive masks
+    Its purpose is to optimize lookups through a few consecutive masks
     (by using just one map lookup instead of [O(number of masks)] map lookups).
 
     With a number of mask around 290, this trick gives a sizeable performance improvement.
@@ -391,11 +391,6 @@ module Make (Inputs : Inputs_intf.S) = struct
     let self_set_hash t address hash =
       finalize_hashes t ;
       self_set_hash_impl t address hash
-
-    let set_inner_hash_at_addr_exn t address hash =
-      assert_is_attached t ;
-      assert (Addr.depth address <= t.depth) ;
-      self_set_hash t address hash
 
     let self_set_location t account_id location =
       update_maps t ~f:(fun maps ->

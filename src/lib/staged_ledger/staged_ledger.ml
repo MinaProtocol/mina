@@ -866,7 +866,7 @@ module T = struct
         Assumption: Only one of the partition will have coinbase transaction(s)in it.
         1. Get the latest stack for coinbase in the first set of transactions
         2. get the first set of scan_state data[data1]
-        3. get a new stack for the second partion because the second set of transactions would start from the begining of the next tree in the scan_state
+        3. get a new stack for the second partition because the second set of transactions would start from the begining of the next tree in the scan_state
         4. Initialize the new stack with the state from the first stack
         5. get the second set of scan_state data[data2]*)
       let txns_for_partition1 = List.take transactions slots in
@@ -1215,41 +1215,14 @@ module T = struct
       =
     (List.map ~f:(With_status.map ~f:Transaction.forget) a, b, c, d)
 
-  let check_commands ledger ~verifier (cs : User_command.t With_status.t list) =
-    let open Deferred.Or_error.Let_syntax in
-    let%bind cs =
-      User_command.Applied_sequence.to_all_verifiable cs
-        ~load_vk_cache:(fun account_ids ->
-          let account_ids = Set.to_list account_ids in
-          Zkapp_command.Verifiable.load_vks_from_ledger account_ids
-            ~location_of_account_batch:(Ledger.location_of_account_batch ledger)
-            ~get_batch:(Ledger.get_batch ledger) )
-      |> Deferred.return
-    in
-    let%map xs = Verifier.verify_commands verifier cs in
-    Result.all
-      (List.map xs ~f:(function
-        | `Valid x ->
-            Ok x
-        | ( `Invalid_keys _
-          | `Invalid_signature _
-          | `Invalid_proof _
-          | `Missing_verification_key _
-          | `Unexpected_verification_key _
-          | `Mismatched_authorization_kind _ ) as invalid ->
-            Error
-              (Verifier.Failure.Verification_failed
-                 (Error.tag ~tag:"verification failed on command"
-                    (Verifier.invalid_to_error invalid) ) )
-        | `Valid_assuming _ ->
-            Error
-              (Verifier.Failure.Verification_failed
-                 (Error.of_string "batch verification failed") ) ) )
+  type transaction_pool_proxy = Check_commands.transaction_pool_proxy
 
   let apply ?skip_verification ~proof_cache_db ~constraint_constants
-      ~global_slot t ~get_completed_work (witness : Staged_ledger_diff.t)
-      ~logger ~verifier ~current_state_view ~state_and_body_hash
-      ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap =
+      ~global_slot ~get_completed_work ~logger ~verifier ~current_state_view
+      ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
+      ~zkapp_cmd_limit_hardcap
+      ?(transaction_pool_proxy = Check_commands.dummy_transaction_pool_proxy) t
+      (witness : Staged_ledger_diff.t) =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () =
@@ -1267,7 +1240,9 @@ module T = struct
     let%bind prediff =
       Pre_diff_info.get witness ~constraint_constants ~coinbase_receiver
         ~supercharge_coinbase
-        ~check:(check_commands t.ledger ~verifier)
+        ~check:
+          (Check_commands.check_commands t.ledger ~verifier
+             ~transaction_pool_proxy )
       |> Deferred.map
            ~f:
              (Result.map_error ~f:(fun error ->
@@ -2965,7 +2940,7 @@ let%test_module "staged ledger tests" =
               in
               let valid_zkapp_command_with_auths : Zkapp_command.Valid.t =
                 match
-                  Zkapp_command.Valid.to_valid ~failed:false
+                  Zkapp_command.Valid.For_tests.to_valid ~failed:false
                     ~find_vk:(find_vk ledger) zkapp_command_with_auths
                 with
                 | Ok ps ->
@@ -4503,7 +4478,7 @@ let%test_module "staged ledger tests" =
                 ~constraint_constants spec
             in
             let valid_zkapp_command =
-              Zkapp_command.Valid.to_valid ~failed:false
+              Zkapp_command.Valid.For_tests.to_valid ~failed:false
                 ~find_vk:(find_vk ledger) zkapp_command
               |> Or_error.ok_exn
             in
@@ -5007,7 +4982,7 @@ let%test_module "staged ledger tests" =
                   in
                   let valid_zkapp_command =
                     Or_error.ok_exn
-                      (Zkapp_command.Valid.to_valid ~failed:false
+                      (Zkapp_command.Valid.For_tests.to_valid ~failed:false
                          ~find_vk:(find_vk valid_against_ledger)
                          zkapp_command )
                   in
@@ -5024,7 +4999,7 @@ let%test_module "staged ledger tests" =
                   in
                   let failed_zkapp_command =
                     Or_error.ok_exn
-                      (Zkapp_command.Valid.to_valid ~failed:true
+                      (Zkapp_command.Valid.For_tests.to_valid ~failed:true
                          ~find_vk:(find_vk ledger) zkapp_command )
                   in
                   let current_state, current_state_view =
@@ -5143,7 +5118,7 @@ let%test_module "staged ledger tests" =
                     ~vk ~ledger zkapp_account_pk ;
                   let invalid_zkapp_command =
                     Or_error.ok_exn
-                      (Zkapp_command.Valid.to_valid ~failed:false
+                      (Zkapp_command.Valid.For_tests.to_valid ~failed:false
                          ~find_vk:(find_vk ledger) zkapp_command )
                   in
                   let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in

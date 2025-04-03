@@ -22,8 +22,8 @@
 
 use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi};
 
-use std::convert::From;
-use std::ops::Deref;
+use core::convert::From;
+use core::ops::Deref;
 
 #[derive(Clone, Debug)]
 pub struct WasmFlatVector<T>(Vec<T>);
@@ -60,38 +60,38 @@ impl<'a, T> From<&'a WasmFlatVector<T>> for &'a Vec<T> {
     }
 }
 
-impl<T> std::iter::IntoIterator for WasmFlatVector<T> {
-    type Item = <Vec<T> as std::iter::IntoIterator>::Item;
-    type IntoIter = <Vec<T> as std::iter::IntoIterator>::IntoIter;
+impl<T> core::iter::IntoIterator for WasmFlatVector<T> {
+    type Item = <Vec<T> as core::iter::IntoIterator>::Item;
+    type IntoIter = <Vec<T> as core::iter::IntoIterator>::IntoIter;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl<'a, T> std::iter::IntoIterator for &'a WasmFlatVector<T> {
-    type Item = <&'a Vec<T> as std::iter::IntoIterator>::Item;
-    type IntoIter = <&'a Vec<T> as std::iter::IntoIterator>::IntoIter;
+impl<'a, T> core::iter::IntoIterator for &'a WasmFlatVector<T> {
+    type Item = <&'a Vec<T> as core::iter::IntoIterator>::Item;
+    type IntoIter = <&'a Vec<T> as core::iter::IntoIterator>::IntoIter;
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
     }
 }
 
-impl<T> std::iter::FromIterator<T> for WasmFlatVector<T> {
+impl<T> core::iter::FromIterator<T> for WasmFlatVector<T> {
     fn from_iter<I>(iter: I) -> WasmFlatVector<T>
     where
         I: IntoIterator<Item = T>,
     {
-        WasmFlatVector(std::iter::FromIterator::from_iter(iter))
+        WasmFlatVector(core::iter::FromIterator::from_iter(iter))
     }
 }
 
-impl<T> std::default::Default for WasmFlatVector<T> {
+impl<T> core::default::Default for WasmFlatVector<T> {
     fn default() -> Self {
-        WasmFlatVector(std::default::Default::default())
+        WasmFlatVector(core::default::Default::default())
     }
 }
 
-impl<T> std::iter::Extend<T> for WasmFlatVector<T> {
+impl<T> core::iter::Extend<T> for WasmFlatVector<T> {
     fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = T>,
