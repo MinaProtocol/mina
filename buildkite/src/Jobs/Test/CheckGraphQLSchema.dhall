@@ -17,7 +17,7 @@ let Network = ../../Constants/Network.dhall
 let dependsOn =
       DebianVersions.dependsOn
         DebianVersions.DebVersion.Bullseye
-        Network.Type.Devnet
+        Network.Type.Berkeley
         Profiles.Type.Standard
 
 in  Pipeline.build

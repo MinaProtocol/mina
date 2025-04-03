@@ -56,7 +56,7 @@ let MinaBuildSpec =
           , debVersion = DebianVersions.DebVersion.Bullseye
           , profile = Profiles.Type.Standard
           , buildFlags = BuildFlags.Type.None
-          , network = Network.Type.Devnet
+          , network = Network.Type.Berkeley
           , toolchainSelectMode = Toolchain.SelectionMode.ByDebian
           , mode = PipelineMode.Type.PullRequest
           , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
@@ -238,7 +238,7 @@ let docker_step
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = Artifacts.Type.FunctionalTestSuite
-                    , network = Network.lowerName Network.Type.Devnet
+                    , network = Network.lowerName Network.Type.Berkeley
                     , deb_codename = spec.debVersion
                     , build_flags = spec.buildFlags
                     , docker_publish = docker_publish
