@@ -386,7 +386,7 @@ let validate_delta_block_chain (t, validation) =
 let skip_delta_block_chain_validation `This_block_was_not_received_via_gossip
     (t, validation) =
   let previous_protocol_state_hash =
-    t |> With_hash.data |> Block.header |> Header.protocol_state
+    t |> With_hash.data |> Header.protocol_state
     |> Protocol_state.previous_state_hash
   in
   ( t
@@ -472,7 +472,8 @@ let reset_frontier_dependencies_validation (transition_with_hash, validation) =
 
 let validate_staged_ledger_diff ?skip_staged_ledger_verification ~proof_cache_db
     ~logger ~get_completed_work ~precomputed_values ~verifier
-    ~parent_staged_ledger ~parent_protocol_state (t, validation) =
+    ~parent_staged_ledger ~parent_protocol_state ?transaction_pool_proxy
+    (t, validation) =
   [%log internal] "Validate_staged_ledger_diff" ;
   let block = With_hash.data t in
   let header = Block.header block in
@@ -518,6 +519,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~proof_cache_db
       ~zkapp_cmd_limit_hardcap:
         precomputed_values.Precomputed_values.genesis_constants
           .zkapp_cmd_limit_hardcap
+      ?transaction_pool_proxy
     |> Deferred.Result.map_error ~f:(fun e ->
            `Staged_ledger_application_failed e )
   in
