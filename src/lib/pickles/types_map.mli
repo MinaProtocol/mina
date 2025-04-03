@@ -3,7 +3,7 @@ open Pickles_types
 type inner_curve_var = Impls.Step.Field.t * Impls.Step.Field.t
 
 module Basic : sig
-  type ('var, 'value, 'n1, 'n2) t =
+  type ('var, 'value, 'n1) t =
     { max_proofs_verified : (module Pickles_types.Nat.Add.Intf with type n = 'n1)
     ; public_input : ('var, 'value) Impls.Step.Typ.t
     ; wrap_domains : Import.Domains.t
@@ -30,7 +30,7 @@ module Side_loaded : sig
   end
 
   module Permanent : sig
-    type ('var, 'value, 'n1, 'n2) t =
+    type ('var, 'value, 'n1) t =
       { max_proofs_verified :
           (module Pickles_types.Nat.Add.Intf with type n = 'n1)
       ; public_input : ('var, 'value) Impls.Step.Typ.t
@@ -40,15 +40,15 @@ module Side_loaded : sig
       }
   end
 
-  type ('var, 'value, 'n1, 'n2) t =
+  type ('var, 'value, 'n1) t =
     { ephemeral : Ephemeral.t option
-    ; permanent : ('var, 'value, 'n1, 'n2) Permanent.t
+    ; permanent : ('var, 'value, 'n1) Permanent.t
     }
 
   type packed =
-    | T : ('var, 'value, 'n1, 'n2) Tag.id * ('var, 'value, 'n1, 'n2) t -> packed
+    | T : ('var, 'value, 'n1, 'n2) Tag.id * ('var, 'value, 'n1) t -> packed
 
-  val to_basic : ('a, 'b, 'c, 'd) t -> ('a, 'b, 'c, 'd) Basic.t
+  val to_basic : ('a, 'b, 'c) t -> ('a, 'b, 'c) Basic.t
 end
 
 module Compiled : sig
@@ -105,7 +105,7 @@ module For_step : sig
     ; zk_rows : int
     }
 
-  val of_side_loaded : ('a, 'b, 'c, 'd) Side_loaded.t -> ('a, 'b, 'c, 'd) t
+  val of_side_loaded : ('a, 'b, 'c) Side_loaded.t -> ('a, 'b, 'c, 'd) t
 
   module Optional_wrap_key : sig
     type 'branches known =
@@ -134,15 +134,13 @@ val lookup_compiled :
   ('var, 'value, 'n, 'm) Tag.id -> ('var, 'value, 'n, 'm) Compiled.t
 
 val lookup_side_loaded :
-  ('var, 'value, 'n, 'm) Tag.id -> ('var, 'value, 'n, 'm) Side_loaded.t
+  ('var, 'value, 'n, 'm) Tag.id -> ('var, 'value, 'n) Side_loaded.t
 
 val lookup_basic :
-  ('var, 'value, 'n, 'm) Tag.t -> ('var, 'value, 'n, 'm) Basic.t Promise.t
+  ('var, 'value, 'n, 'm) Tag.t -> ('var, 'value, 'n) Basic.t Promise.t
 
 val add_side_loaded :
-     name:string
-  -> ('a, 'b, 'c, 'd) Side_loaded.Permanent.t
-  -> ('a, 'b, 'c, 'd) Tag.t
+  name:string -> ('a, 'b, 'c) Side_loaded.Permanent.t -> ('a, 'b, 'c, 'd) Tag.t
 
 val max_proofs_verified :
      ('a, 'b, 'n1, 'c) Tag.t

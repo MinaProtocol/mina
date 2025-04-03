@@ -9,7 +9,7 @@ open Backend
 type inner_curve_var = Impls.Step.Field.t * Impls.Step.Field.t
 
 module Basic = struct
-  type ('var, 'value, 'n1, 'n2) t =
+  type ('var, 'value, 'n1) t =
     { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
     ; public_input : ('var, 'value) Impls.Step.Typ.t
     ; wrap_domains : Domains.t
@@ -34,7 +34,7 @@ module Side_loaded = struct
   end
 
   module Permanent = struct
-    type ('var, 'value, 'n1, 'n2) t =
+    type ('var, 'value, 'n1) t =
       { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
       ; public_input : ('var, 'value) Impls.Step.Typ.t
       ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
@@ -43,13 +43,13 @@ module Side_loaded = struct
       }
   end
 
-  type ('var, 'value, 'n1, 'n2) t =
+  type ('var, 'value, 'n1) t =
     { ephemeral : Ephemeral.t option
-    ; permanent : ('var, 'value, 'n1, 'n2) Permanent.t
+    ; permanent : ('var, 'value, 'n1) Permanent.t
     }
 
   type packed =
-    | T : ('var, 'value, 'n1, 'n2) Tag.id * ('var, 'value, 'n1, 'n2) t -> packed
+    | T : ('var, 'value, 'n1, 'n2) Tag.id * ('var, 'value, 'n1) t -> packed
 
   let to_basic
       { permanent =
@@ -161,7 +161,7 @@ module For_step = struct
     ; zk_rows : int
     }
 
-  let of_side_loaded (type a b c d)
+  let of_side_loaded (type a b c)
       ({ ephemeral
        ; permanent =
            { max_proofs_verified
@@ -171,7 +171,7 @@ module For_step = struct
            ; zk_rows
            }
        } :
-        (a, b, c, d) Side_loaded.t ) : (a, b, c, d) t =
+        (a, b, c) Side_loaded.t ) : (a, b, c, _) t =
     let index =
       match ephemeral with
       | Some { index = `In_circuit i | `In_both (_, i) } ->
@@ -269,7 +269,7 @@ let lookup_compiled :
 
 let lookup_side_loaded :
     type var value n m.
-    (var, value, n, m) Tag.id -> (var, value, n, m) Side_loaded.t =
+    (var, value, n, m) Tag.id -> (var, value, n) Side_loaded.t =
  fun t ->
   let (T (other_id, d)) = find univ.side_loaded (Type_equal.Id.uid t) in
   let T = Type_equal.Id.same_witness_exn t other_id in
@@ -277,7 +277,7 @@ let lookup_side_loaded :
 
 let lookup_basic :
     type var value n m.
-    (var, value, n, m) Tag.t -> (var, value, n, m) Basic.t Promise.t =
+    (var, value, n, m) Tag.t -> (var, value, n) Basic.t Promise.t =
  fun t ->
   match t.kind with
   | Compiled ->
@@ -331,7 +331,7 @@ let _lookup_map (type var value c d) (t : (var, value, c, d) Tag.t) ~self
     ~default
     ~(f :
           [ `Compiled of (var, value, c, d) Compiled.t
-          | `Side_loaded of (var, value, c, d) Side_loaded.t ]
+          | `Side_loaded of (var, value, c) Side_loaded.t ]
        -> _ ) =
   match Type_equal.Id.same_witness t.id self with
   | Some _ ->
