@@ -51,7 +51,7 @@ let Spec =
           , dependsOn =
               DebianVersions.dependsOn
                 DebianVersions.DebVersion.Bullseye
-                Network.Type.Devnet
+                Network.Type.Berkeley
                 Profiles.Type.Standard
           , additionalDirtyWhen = [] : List SelectFiles.Type
           , yellowThreshold = 0.1

@@ -4,26 +4,23 @@ let List/any = Prelude.List.any
 
 let Network
     : Type
-    = < Devnet | Mainnet >
+    = < Devnet | Mainnet | Berkeley >
 
 let capitalName =
           \(network : Network)
-      ->  merge { Devnet = "Devnet", Mainnet = "Mainnet" } network
+      ->  merge
+            { Devnet = "Devnet", Mainnet = "Mainnet", Berkeley = "Berkeley" }
+            network
 
 let lowerName =
           \(network : Network)
-      ->  merge { Devnet = "devnet", Mainnet = "mainnet" } network
+      ->  merge
+            { Devnet = "devnet", Mainnet = "mainnet", Berkeley = "berkeley" }
+            network
 
 let requiresMainnetBuild =
-      \(network : Network) -> merge { Devnet = False, Mainnet = True } network
-
-let foldMinaBuildMainnetEnv =
-          \(networks : List Network)
-      ->        if List/any Network requiresMainnetBuild networks
-
-          then  "MINA_BUILD_MAINNET=true"
-
-          else  "MINA_BUILD_MAINNET=false"
+          \(network : Network)
+      ->  merge { Devnet = True, Mainnet = True, Berkeley = False } network
 
 let buildMainnetEnv =
           \(network : Network)
@@ -33,14 +30,13 @@ let buildMainnetEnv =
 
           else  "MINA_BUILD_MAINNET=false"
 
-let foldNames =
+let foldMinaBuildMainnetEnv =
           \(networks : List Network)
-      ->  Prelude.List.fold
-            Network
-            networks
-            Text
-            (\(x : Network) -> \(y : Text) -> "${capitalName x}" ++ y)
-            ""
+      ->        if List/any Network requiresMainnetBuild networks
+
+          then  "MINA_BUILD_MAINNET=true"
+
+          else  "MINA_BUILD_MAINNET=false"
 
 in  { Type = Network
     , capitalName = capitalName
@@ -48,5 +44,4 @@ in  { Type = Network
     , requiresMainnetBuild = requiresMainnetBuild
     , foldMinaBuildMainnetEnv = foldMinaBuildMainnetEnv
     , buildMainnetEnv = buildMainnetEnv
-    , foldNames = foldNames
     }

@@ -26,7 +26,7 @@ let dependsOn =
       DebianVersions.dependsOnStep
         (None Text)
         DebianVersions.DebVersion.Bullseye
-        Network.Type.Devnet
+        Network.Type.Berkeley
         Profiles.Type.Standard
         BuildFlags.Type.Instrumented
         "build"

@@ -27,7 +27,7 @@ let Profiles = ../../Constants/Profiles.dhall
 let dependsOn =
       DebianVersions.dependsOn
         DebianVersions.DebVersion.Bullseye
-        Network.Type.Devnet
+        Network.Type.Berkeley
         Profiles.Type.Standard
 
 let buildTestCmd
