@@ -580,27 +580,6 @@ module Make (Inputs : Inputs_intf.S) = struct
              ~depth:t.depth ~hashes )
         ~fixup_path:(fixup_wide_merkle_path ~hashes)
 
-    (* given a Merkle path corresponding to a starting address, calculate
-       addresses and hashes for each node affected by the starting hash; that is,
-       along the path from the account address to root *)
-    let _addresses_and_hashes_from_merkle_path_exn merkle_path starting_address
-        starting_hash : (Addr.t * Hash.t) list =
-      let get_addresses_hashes height accum node =
-        let last_address, last_hash = List.hd_exn accum in
-        let next_address = Addr.parent_exn last_address in
-        let next_hash =
-          match node with
-          | `Left sibling_hash ->
-              Hash.merge ~height last_hash sibling_hash
-          | `Right sibling_hash ->
-              Hash.merge ~height sibling_hash last_hash
-        in
-        (next_address, next_hash) :: accum
-      in
-      List.foldi merkle_path
-        ~init:[ (starting_address, starting_hash) ]
-        ~f:get_addresses_hashes
-
     (* use mask Merkle root, if it exists, else get from parent *)
     let merkle_root t =
       assert_is_attached t ;
