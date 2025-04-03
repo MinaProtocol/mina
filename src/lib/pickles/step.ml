@@ -286,7 +286,6 @@ struct
                 statement.proof_state.sponge_digest_before_evaluations
             ; messages_for_next_wrap_proof =
                 Wrap_hack.hash_messages_for_next_wrap_proof
-                  Local_max_proofs_verified.n
                   { old_bulletproof_challenges = prev_challenges
                   ; challenge_polynomial_commitment =
                       statement.proof_state.messages_for_next_wrap_proof
@@ -725,8 +724,7 @@ struct
                       Lazy.force Dummy.Ipa.Wrap.challenges_computed )
               }
             in
-            Wrap_hack.hash_messages_for_next_wrap_proof Max_proofs_verified.n t
-            :: pad [] ms n
+            Wrap_hack.hash_messages_for_next_wrap_proof t :: pad [] ms n
       in
       lazy
         (Vector.rev
