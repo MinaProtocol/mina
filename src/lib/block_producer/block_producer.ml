@@ -908,7 +908,13 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                       ~trust_system ~parent:crumb ~transition
                       ~sender:None (* Consider skipping `All here *)
                       ~skip_staged_ledger_verification:`Proofs
-                      ~transition_receipt_time () )
+                      ~transition_receipt_time
+                      ~transaction_pool_proxy:
+                        { find_by_hash =
+                            Network_pool.Transaction_pool.Resource_pool
+                            .find_by_hash transaction_resource_pool
+                        }
+                      () )
                 |> Deferred.Result.map_error ~f:(function
                      | `Invalid_staged_ledger_diff e ->
                          `Invalid_staged_ledger_diff (e, staged_ledger_diff)

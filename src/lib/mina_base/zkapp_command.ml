@@ -409,13 +409,10 @@ let check_authorization (p : Account_update.t) : unit Or_error.t =
       Error err
 
 module Verifiable : sig
-  type t = private
-    { fee_payer : Account_update.Fee_payer.t
-    ; account_updates :
-        (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option
-        Call_forest.With_hashes_and_data.t
-    ; memo : Signed_command_memo.t
-    }
+  type t =
+    (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option
+    Call_forest.With_hashes_and_data.t
+    Poly.t
   [@@deriving sexp, compare, equal, hash, yojson, bin_io]
 
   val load_vk_from_ledger :
@@ -470,15 +467,12 @@ module Verifiable : sig
        and type cache = Verification_key_wire.t Account_id.Map.t
 end = struct
   type t =
-    { fee_payer : Account_update.Fee_payer.Stable.Latest.t
-    ; account_updates :
-        ( Side_loaded_verification_key.Stable.Latest.t
-        , Zkapp_basic.F.Stable.Latest.t )
-        With_hash.Stable.Latest.t
-        option
-        Call_forest.With_hashes_and_data.Stable.Latest.t
-    ; memo : Signed_command_memo.Stable.Latest.t
-    }
+    ( Side_loaded_verification_key.Stable.Latest.t
+    , Zkapp_basic.F.Stable.Latest.t )
+    With_hash.Stable.Latest.t
+    option
+    Call_forest.With_hashes_and_data.Stable.Latest.t
+    Poly.Stable.Latest.t
   [@@deriving sexp, compare, equal, hash, yojson, bin_io_unversioned]
 
   let ok_if_vk_hash_expected ~got ~expected =
@@ -606,7 +600,7 @@ end = struct
                   vks_overridden := vks_overriden' ;
                   (p, None) )
         in
-        Ok { fee_payer; account_updates; memo } )
+        Ok { Poly.fee_payer; account_updates; memo } )
 
   module type Cache_intf = sig
     type t
@@ -744,11 +738,9 @@ end = struct
   end
 end
 
-let of_verifiable (t : Verifiable.t) : t =
-  { fee_payer = t.fee_payer
-  ; account_updates = Call_forest.map t.account_updates ~f:fst
-  ; memo = t.memo
-  }
+let of_verifiable ({ Poly.fee_payer; account_updates; memo } : Verifiable.t) : t
+    =
+  { fee_payer; account_updates = Call_forest.map account_updates ~f:fst; memo }
 
 module Transaction_commitment = struct
   module Stable = Kimchi_backend.Pasta.Basic.Fp.Stable
@@ -823,16 +815,18 @@ module type Valid_intf = sig
   val to_valid_unsafe :
     T.t -> [> `If_this_is_used_it_should_have_a_comment_justifying_it of t ]
 
-  val to_valid :
-       T.t
-    -> failed:bool
-    -> find_vk:
-         (   Zkapp_basic.F.t
-          -> Account_id.t
-          -> (Verification_key_wire.t, Error.t) Result.t )
-    -> t Or_error.t
+  module For_tests : sig
+    val to_valid :
+         T.t
+      -> failed:bool
+      -> find_vk:
+           (   Zkapp_basic.F.t
+            -> Account_id.t
+            -> (Verification_key_wire.t, Error.t) Result.t )
+      -> t Or_error.t
 
-  val of_verifiable : Verifiable.t -> t
+    val of_verifiable : Verifiable.t -> t
+  end
 
   val forget : t -> T.t
 end
@@ -868,16 +862,19 @@ struct
 
   let create zkapp_command : t = { zkapp_command }
 
-  let of_verifiable (t : Verifiable.t) : t = { zkapp_command = of_verifiable t }
-
   let to_valid_unsafe (t : T.t) :
       [> `If_this_is_used_it_should_have_a_comment_justifying_it of t ] =
     `If_this_is_used_it_should_have_a_comment_justifying_it (create t)
 
   let forget (t : t) : T.t = t.zkapp_command
 
-  let to_valid (t : T.t) ~failed ~find_vk : t Or_error.t =
-    Verifiable.create t ~failed ~find_vk |> Or_error.map ~f:of_verifiable
+  module For_tests = struct
+    let of_verifiable (t : Verifiable.t) : t =
+      { zkapp_command = of_verifiable t }
+
+    let to_valid (t : T.t) ~failed ~find_vk : t Or_error.t =
+      Verifiable.create t ~failed ~find_vk |> Or_error.map ~f:of_verifiable
+  end
 end
 
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
