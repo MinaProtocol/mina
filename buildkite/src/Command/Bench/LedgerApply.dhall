@@ -16,8 +16,6 @@ let BuildFlags = ../../Constants/BuildFlags.dhall
 
 let SelectFiles = ../../Lib/SelectFiles.dhall
 
-let Network = ../../Constants/Network.dhall
-
 let Spec =
       { Type =
           { key : Text, name : Text, label : Text, mode : PipelineMode.Type }
