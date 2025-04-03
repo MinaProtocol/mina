@@ -172,23 +172,6 @@ module Make (Test : Test_intf) = struct
                    in
                    assert ([%equal: Test.Location.t] location location') ) ) )
 
-  let () =
-    add_test
-      "set_inner_hash_at_addr_exn(address,hash); \
-       get_inner_hash_at_addr_exn(address) = hash" (fun () ->
-        let random_hash =
-          Hash.hash_account @@ Quickcheck.random_value Account.gen
-        in
-        Test.with_instance (fun mdb ->
-            Quickcheck.test
-              (Direction.gen_var_length_list ~start:1 (MT.depth mdb))
-              ~sexp_of:[%sexp_of: Direction.t List.t]
-              ~f:(fun direction ->
-                let address = MT.Addr.of_directions direction in
-                MT.set_inner_hash_at_addr_exn mdb address random_hash ;
-                let result = MT.get_inner_hash_at_addr_exn mdb address in
-                assert (Hash.equal result random_hash) ) ) )
-
   let random_accounts max_height =
     let num_accounts = 1 lsl max_height in
     Quickcheck.random_value

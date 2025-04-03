@@ -865,19 +865,20 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 |> Option.value_exn
               in
               [%log internal] "Produce_validated_transition" ;
+              let header =
+                Header.create ~protocol_state ~protocol_state_proof
+                  ~delta_block_chain_proof ()
+              in
+              let body = Body.create staged_ledger_diff in
               let%bind transition =
                 let open Result.Let_syntax in
-                Validation.wrap
-                  { With_hash.hash = protocol_state_hashes
-                  ; data =
-                      (let body = Body.create staged_ledger_diff in
-                       Mina_block.create ~body
-                         ~header:
-                           (Header.create ~protocol_state ~protocol_state_proof
-                              ~delta_block_chain_proof () ) )
-                  }
+                Validation.wrap_header
+                  { With_hash.hash = protocol_state_hashes; data = header }
+                |> Validation.skip_delta_block_chain_validation
+                     `This_block_was_not_received_via_gossip
                 |> Validation.skip_time_received_validation
                      `This_block_was_not_received_via_gossip
+                |> Fn.flip Validation.with_body body
                 |> Validation.skip_protocol_versions_validation
                      `This_block_has_valid_protocol_versions
                 |> validate_genesis_protocol_state_block
@@ -887,8 +888,6 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                           previous_protocol_state )
                 >>| Validation.skip_proof_validation
                       `This_block_was_generated_internally
-                >>| Validation.skip_delta_block_chain_validation
-                      `This_block_was_not_received_via_gossip
                 >>= Validation.validate_frontier_dependencies
                       ~to_header:Mina_block.header
                       ~context:(module Context)
@@ -909,7 +908,13 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                       ~trust_system ~parent:crumb ~transition
                       ~sender:None (* Consider skipping `All here *)
                       ~skip_staged_ledger_verification:`Proofs
-                      ~transition_receipt_time () )
+                      ~transition_receipt_time
+                      ~transaction_pool_proxy:
+                        { find_by_hash =
+                            Network_pool.Transaction_pool.Resource_pool
+                            .find_by_hash transaction_resource_pool
+                        }
+                      () )
                 |> Deferred.Result.map_error ~f:(function
                      | `Invalid_staged_ledger_diff e ->
                          `Invalid_staged_ledger_diff (e, staged_ledger_diff)
@@ -1425,25 +1430,24 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
           let previous_protocol_state_hash =
             State_hash.With_state_hashes.state_hash previous_transition
           in
+          let header =
+            Header.create ~protocol_state ~protocol_state_proof
+              ~delta_block_chain_proof ()
+          in
+          let body = Body.create staged_ledger_diff in
           let%bind transition =
             let open Result.Let_syntax in
-            Validation.wrap
-              { With_hash.hash = protocol_state_hashes
-              ; data =
-                  (let body = Body.create staged_ledger_diff in
-                   Mina_block.create ~body
-                     ~header:
-                       (Header.create ~protocol_state ~protocol_state_proof
-                          ~delta_block_chain_proof () ) )
-              }
+            Validation.wrap_header
+              { With_hash.hash = protocol_state_hashes; data = header }
+            |> Validation.skip_delta_block_chain_validation
+                 `This_block_was_not_received_via_gossip
             |> Validation.skip_time_received_validation
                  `This_block_was_not_received_via_gossip
+            |> Fn.flip Validation.with_body body
             |> Validation.skip_protocol_versions_validation
                  `This_block_has_valid_protocol_versions
             |> Validation.skip_proof_validation
                  `This_block_was_generated_internally
-            |> Validation.skip_delta_block_chain_validation
-                 `This_block_was_not_received_via_gossip
             |> validate_genesis_protocol_state_block
                  ~genesis_state_hash:
                    (Protocol_state.genesis_state_hash

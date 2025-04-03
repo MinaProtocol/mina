@@ -56,11 +56,14 @@ end
     After building the breadcrumb path, [Ledger_catchup] will then send it to
     the [Processor] via writing them to catchup_breadcrumbs_writer. *)
 
-let validate_block ~genesis_state_hash (b, v) =
+(** Validates block without time received validation *)
+let validate_block_skipping_time_received ~genesis_state_hash (b, v) =
   let open Mina_block.Validation in
   let open Result.Let_syntax in
   let h = (With_hash.map ~f:Mina_block.header b, v) in
-  validate_genesis_protocol_state ~genesis_state_hash h
+  Mina_block.Validation.skip_time_received_validation
+    `This_block_was_not_received_via_gossip h
+  |> validate_genesis_protocol_state ~genesis_state_hash
   >>= validate_protocol_versions >>= validate_delta_block_chain
   >>| Fn.flip with_body (Mina_block.body @@ With_hash.data b)
 
@@ -85,10 +88,8 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
   let cached_initially_validated_transition_result =
     let open Result.Let_syntax in
     let%bind initially_validated_transition =
-      transition_with_hash
-      |> Mina_block.Validation.skip_time_received_validation
-           `This_block_was_not_received_via_gossip
-      |> validate_block ~genesis_state_hash
+      validate_block_skipping_time_received ~genesis_state_hash
+        transition_with_hash
     in
     let enveloped_initially_validated_transition =
       Envelope.Incoming.map enveloped_transition
