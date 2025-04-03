@@ -12,7 +12,6 @@ module Basic = struct
   type ('var, 'value, 'n1, 'n2) t =
     { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
     ; public_input : ('var, 'value) Impls.Step.Typ.t
-    ; branches : 'n2 Nat.t
     ; wrap_domains : Domains.t
     ; wrap_key : Tick.Inner_curve.Affine.t array Plonk_verification_key_evals.t
     ; wrap_vk : Impls.Wrap.Verification_key.t
@@ -79,7 +78,6 @@ module Side_loaded = struct
     { Basic.max_proofs_verified
     ; wrap_vk
     ; public_input
-    ; branches
     ; wrap_domains = Common.wrap_domains ~proofs_verified
     ; wrap_key
     ; feature_flags
@@ -131,7 +129,7 @@ module Compiled = struct
       ; public_input
       ; wrap_vk
       ; wrap_domains
-      ; step_domains
+      ; step_domains = _
       ; wrap_key
       ; feature_flags
       ; num_chunks
@@ -142,7 +140,6 @@ module Compiled = struct
     { Basic.max_proofs_verified
     ; wrap_domains
     ; public_input
-    ; branches = Vector.length step_domains
     ; wrap_key
     ; wrap_vk
     ; feature_flags

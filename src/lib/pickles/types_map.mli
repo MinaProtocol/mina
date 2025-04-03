@@ -6,7 +6,6 @@ module Basic : sig
   type ('var, 'value, 'n1, 'n2) t =
     { max_proofs_verified : (module Pickles_types.Nat.Add.Intf with type n = 'n1)
     ; public_input : ('var, 'value) Impls.Step.Typ.t
-    ; branches : 'n2 Pickles_types.Nat.t
     ; wrap_domains : Import.Domains.t
     ; wrap_key :
         Backend.Tick.Inner_curve.Affine.t array
