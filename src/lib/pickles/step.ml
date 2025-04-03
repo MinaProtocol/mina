@@ -124,7 +124,7 @@ struct
         -> _ array Plonk_verification_key_evals.t
         -> value
         -> (local_max_proofs_verified, local_max_proofs_verified) Proof.t
-        -> (var, value, local_max_proofs_verified, m) Types_map.Basic.t
+        -> (var, value, local_max_proofs_verified) Types_map.Basic.t
         -> must_verify:bool
         -> [ `Sg of Tock.Curve.Affine.t ]
            * Unfinalized.Constant.t
@@ -550,14 +550,13 @@ struct
         let rec go :
             type vars values ns ms.
                (vars, values, ns, ms) H4.T(Tag).t
-            -> (vars, values, ns, ms) H4.T(Types_map.Basic).t Promise.t =
-          function
+            -> (vars, values, ns) H3.T(Types_map.Basic).t Promise.t = function
           | [] ->
-              Promise.return ([] : _ H4.T(Types_map.Basic).t)
+              Promise.return ([] : _ H3.T(Types_map.Basic).t)
           | tag :: tags ->
               let%bind.Promise data = Types_map.lookup_basic tag in
               let%map.Promise rest = go tags in
-              (data :: rest : _ H4.T(Types_map.Basic).t)
+              (data :: rest : _ H3.T(Types_map.Basic).t)
         in
         go branch_data.rule.prevs
       in
@@ -571,7 +570,7 @@ struct
         let[@warning "-4"] rec go :
             type vars values ns ms k.
                (vars, values, ns, ms) H4.T(Tag).t
-            -> (vars, values, ns, ms) H4.T(Types_map.Basic).t
+            -> (vars, values, ns) H3.T(Types_map.Basic).t
             -> ( values
                , ns )
                H2.T(Inductive_rule.Previous_proof_statement.Constant).t
