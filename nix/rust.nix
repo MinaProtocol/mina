@@ -8,8 +8,8 @@ let
       # override stdenv.targetPlatform here, if necessary
     };
   toolchainHashes = {
-    "1.79.0" = "sha256-Ngiz76YP4HTY75GGdH2P+APE/DEIx2R/Dn+BwwOyzZU=";
-    "nightly-2024-06-13" = "sha256-s5nlYcYG9EuO2HK2BU3PkI928DZBKCTJ4U9bz3RX1t4=";
+    "1.82.0" = "yMuSb5eQPO/bHv+Bcf/US8LVMbf/G/0MSfiPwBhiPpk=";
+    "nightly-2024-10-18" = "sha256-U/HLeUTHtUkCwwtX7TG0ujC7jjLQvogPY9uuDpUEik4=";
     # copy the placeholder line with the correct toolchain name when adding a new toolchain
     # That is,
     # 1. Put the correct version name;
@@ -105,7 +105,7 @@ in {
   # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
   kimchi-rust-std-deps = final.rustPlatform.importCargoLock {
     lockFile = final.runCommand "cargo.lock" { } ''
-      cp ${final.kimchi-rust.rust-src}/lib/rustlib/src/rust/Cargo.lock $out
+      cp ${final.kimchi-rust.rust-src}/lib/rustlib/src/rust/library/Cargo.lock $out
     '';
   };
 
