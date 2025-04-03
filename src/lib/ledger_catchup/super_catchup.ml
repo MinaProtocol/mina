@@ -785,6 +785,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     ~catchup_breadcrumbs_writer
     ~(build_func :
           ?skip_staged_ledger_verification:[ `All | `Proofs ]
+       -> ?transaction_pool_proxy:Staged_ledger.transaction_pool_proxy
        -> logger:Logger.t
        -> precomputed_values:Precomputed_values.t
        -> verifier:Verifier.t
