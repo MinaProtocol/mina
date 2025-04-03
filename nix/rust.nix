@@ -176,7 +176,7 @@ in {
       runHook preBuild
       (
       set -x
-      export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features -C link-arg=--max-memory=4294967296"
+      export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--max-memory=4294967296"
       wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs ./. -- --features nodejs
       wasm-pack build --mode no-install --target web --out-dir $out/web ./.
       )

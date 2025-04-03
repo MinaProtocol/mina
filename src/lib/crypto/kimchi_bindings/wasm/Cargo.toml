@@ -73,14 +73,10 @@ wasm-opt = false
 rustflags = [
   "-C",
   "target-feature=+atomics,+bulk-memory",
-  "-C",
-  "link-arg=--no-check-features",
 ]
 
 [target.wasm32-unknown-unknown]
 rustflags = [
   "-C",
   "target-feature=+atomics,+bulk-memory",
-  "-C",
-  "link-arg=--no-check-features",
 ]
