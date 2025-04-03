@@ -100,8 +100,7 @@ module Compiled = struct
      ['a_var], which has ['branches] many "variants" each of which depends on at most
      ['max_proofs_verified] many previous statements. *)
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
-    { branches : 'branches Nat.t
-    ; max_proofs_verified :
+    { max_proofs_verified :
         (module Nat.Add.Intf with type n = 'max_proofs_verified)
     ; proofs_verifieds : (int, 'branches) Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
@@ -121,8 +120,7 @@ module Compiled = struct
     | T : ('var, 'value, 'n1, 'n2) Tag.id * ('var, 'value, 'n1, 'n2) t -> packed
 
   let to_basic
-      { branches = _
-      ; max_proofs_verified
+      { max_proofs_verified
       ; proofs_verifieds = _
       ; public_input
       ; wrap_vk
@@ -207,8 +205,7 @@ module For_step = struct
 
   let of_compiled_with_known_wrap_key
       ({ wrap_key; step_domains } : _ Optional_wrap_key.known)
-      ({ branches
-       ; max_proofs_verified
+      ({ max_proofs_verified
        ; proofs_verifieds
        ; public_input
        ; wrap_key = _

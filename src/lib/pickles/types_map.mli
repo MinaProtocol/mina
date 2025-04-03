@@ -64,8 +64,7 @@ module Compiled : sig
     }
 
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
-    { branches : 'branches Pickles_types.Nat.t
-    ; max_proofs_verified :
+    { max_proofs_verified :
         (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
     ; proofs_verifieds : (int, 'branches) Pickles_types.Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)

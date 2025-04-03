@@ -1815,8 +1815,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             f step_data step_keypair
           in
           let data : _ Types_map.Compiled.t =
-            { branches = Branches.n
-            ; feature_flags
+            { feature_flags
             ; proofs_verifieds
             ; max_proofs_verified = (module Max_proofs_verified)
             ; public_input = typ
