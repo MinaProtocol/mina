@@ -11,7 +11,8 @@ open Common
 (* This contains the "step" prover *)
 
 module Make
-    (A : T0) (A_value : sig
+    (A : T0)
+    (A_value : sig
       type t
     end)
     (Max_proofs_verified : Nat.Add.Intf_transparent) =
@@ -160,7 +161,7 @@ struct
         let zeta = to_field plonk0.zeta in
         let zetaw =
           Tick.Field.(
-            zeta * domain_generator ~log2_size:(Domain.log2_size domain))
+            zeta * domain_generator ~log2_size:(Domain.log2_size domain) )
         in
         let combined_evals =
           Plonk_checks.evals_of_split_evals
@@ -257,11 +258,14 @@ struct
                fun x -> fst (typ.value_to_fields x)
              in
              (* TODO: Only do this hashing when necessary *)
-             Common.hash_messages_for_next_step_proof
-               (Reduced_messages_for_next_proof_over_same_field.Step.prepare
-                  ~dlog_plonk_index:dlog_index
-                  statement.messages_for_next_step_proof )
-               ~app_state:to_field_elements )
+             let hash_input =
+               Common.hash_message_inputs_for_next_step_proof
+                 (Reduced_messages_for_next_proof_over_same_field.Step.prepare
+                    ~dlog_plonk_index:dlog_index
+                    statement.messages_for_next_step_proof )
+                 ~app_state:to_field_elements
+             in
+             Common.hash_messages_for_next_step_proof hash_input )
         ; proof_state =
             { deferred_values =
                 (let deferred_values = deferred_values_computed in
@@ -286,12 +290,13 @@ struct
                 statement.proof_state.sponge_digest_before_evaluations
             ; messages_for_next_wrap_proof =
                 Wrap_hack.hash_messages_for_next_wrap_proof
-                  Local_max_proofs_verified.n
-                  { old_bulletproof_challenges = prev_challenges
-                  ; challenge_polynomial_commitment =
-                      statement.proof_state.messages_for_next_wrap_proof
-                        .challenge_polynomial_commitment
-                  }
+                  (Wrap_hack.hash_message_inputs_for_next_wrap_proof
+                     Local_max_proofs_verified.n
+                     { old_bulletproof_challenges = prev_challenges
+                     ; challenge_polynomial_commitment =
+                         statement.proof_state.messages_for_next_wrap_proof
+                           .challenge_polynomial_commitment
+                     } )
             }
         }
       in
@@ -725,7 +730,11 @@ struct
                       Lazy.force Dummy.Ipa.Wrap.challenges_computed )
               }
             in
-            Wrap_hack.hash_messages_for_next_wrap_proof Max_proofs_verified.n t
+            let hash_input =
+              Wrap_hack.hash_message_inputs_for_next_wrap_proof
+                Max_proofs_verified.n t
+            in
+            Wrap_hack.hash_messages_for_next_wrap_proof hash_input
             :: pad [] ms n
       in
       lazy
@@ -797,7 +806,7 @@ struct
                { Tick.Proof.Challenge_polynomial.commitment
                ; challenges = Vector.to_array chals
                } )
-           |> to_list) )
+           |> to_list ) )
     in
     let%map.Promise ( (next_proof : Tick.Proof.with_public_evals)
                     , _next_statement_hashed ) =

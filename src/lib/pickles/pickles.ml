@@ -278,7 +278,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       in
       (* TODO: This should be the actual max width on a per proof basis *)
       let max_proofs_verified =
-        (module Verification_key.Max_width : Nat.Intf
+        ( module Verification_key.Max_width : Nat.Intf
           with type n = Verification_key.Max_width.n )
       in
       with_return (fun { return } ->
@@ -446,7 +446,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           ignore
             ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
                 (Kimchi_backend_common.Scalar_challenge.create x)
-              : Field.t * Field.t ))
+              : Field.t * Field.t ) )
 
       module No_recursion = struct
         let tag, _, p, Provers.[ step ] =
@@ -794,7 +794,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           let proof_must_verify = Boolean.not is_base_case in
                           let self =
                             Field.(
-                              if_ is_base_case ~then_:zero ~else_:(one + prev))
+                              if_ is_base_case ~then_:zero ~else_:(one + prev) )
                           in
                           Promise.return
                             { Inductive_rule.previous_proof_statements =
@@ -1374,12 +1374,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                  old_buletproof_challenges inside the messages_for_next_wrap_proof
                                  might not be correct *)
                               Common.hash_messages_for_next_step_proof
-                                ~app_state:to_field_elements
-                                (P.Base.Messages_for_next_proof_over_same_field
-                                 .Step
-                                 .prepare ~dlog_plonk_index
-                                   prev_statement.proof_state
-                                     .messages_for_next_step_proof )
+                                (Common.hash_message_inputs_for_next_step_proof
+                                   ~app_state:to_field_elements
+                                   (P.Base
+                                    .Messages_for_next_proof_over_same_field
+                                    .Step
+                                    .prepare ~dlog_plonk_index
+                                      prev_statement.proof_state
+                                        .messages_for_next_step_proof ) )
                           }
                       ; messages_for_next_wrap_proof =
                           (let module M =
@@ -1402,8 +1404,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                        (Vector.length
                                           m.old_bulletproof_challenges )
                                    in
+                                   let hash_input =
+                                     Wrap_hack
+                                     .hash_message_inputs_for_next_wrap_proof
+                                       max_proofs_verified m
+                                   in
                                    Wrap_hack.hash_messages_for_next_wrap_proof
-                                     max_proofs_verified m
+                                     hash_input
                                end)
                            in
                           let module V = H1.To_vector (Digest.Constant) in
@@ -1459,7 +1466,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               { Tick.Proof.Challenge_polynomial.commitment
                               ; challenges = Vector.to_array cs
                               } )
-                          |> to_list)
+                          |> to_list )
                         public_input proof
                     in
                     let x_hat = O.(p_eval_1 o, p_eval_2 o) in
@@ -1725,9 +1732,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       in
                       Common.time "wrap proof" (fun () ->
                           Impls.Wrap.generate_witness_conv
-                            ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs
-                                    ; public_inputs
-                                    } () ->
+                            ~f:(fun
+                                { Impls.Wrap.Proof_inputs.auxiliary_inputs
+                                ; public_inputs
+                                }
+                                ()
+                              ->
                               Backend.Tock.Proof.create_async
                                 ~primary:public_inputs
                                 ~auxiliary:auxiliary_inputs pk
@@ -1756,8 +1766,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                 { next_statement.proof_state with
                                   messages_for_next_wrap_proof =
                                     Wrap_hack.hash_messages_for_next_wrap_proof
-                                      max_proofs_verified
-                                      messages_for_next_wrap_proof_prepared
+                                      (Wrap_hack
+                                       .hash_message_inputs_for_next_wrap_proof
+                                         max_proofs_verified
+                                         messages_for_next_wrap_proof_prepared )
                                 ; deferred_values =
                                     { next_statement.proof_state.deferred_values with
                                       plonk =
@@ -2013,7 +2025,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           ignore
             ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
                 (Kimchi_backend_common.Scalar_challenge.create x)
-              : Field.t * Field.t ))
+              : Field.t * Field.t ) )
 
       module No_recursion = struct
         let tag, _, p, Provers.[ step ] =
@@ -2325,7 +2337,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           ignore
             ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
                 (Kimchi_backend_common.Scalar_challenge.create x)
-              : Field.t * Field.t ))
+              : Field.t * Field.t ) )
 
       module No_recursion = struct
         let tag, _, p, Provers.[ step ] =

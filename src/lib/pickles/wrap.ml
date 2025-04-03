@@ -113,7 +113,7 @@ module For_tests_only = struct
               { Tick.Proof.Challenge_polynomial.commitment
               ; challenges = Vector.to_array cs
               } )
-          |> to_list)
+          |> to_list )
         public_input proof
     in
     let x_hat =
@@ -253,7 +253,7 @@ module For_tests_only = struct
                   ~r ~xi ~zeta ~zetaw
                   ~old_bulletproof_challenges:prev_challenges ~env:tick_env
                   ~domain:tick_domain ~ft_eval1:proof.proof.openings.ft_eval1
-                  ~plonk:tick_plonk_minimal)
+                  ~plonk:tick_plonk_minimal )
         ; branch_data =
             { proofs_verified =
                 ( match actual_proofs_verified with
@@ -294,8 +294,7 @@ let wrap
     (module Max_local_max_proof_verifieds : Hlist.Maxes.S
       with type ns = max_local_max_proofs_verifieds
        and type length = max_proofs_verified )
-    (( module
-      Req ) :
+    (( module Req ) :
       (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t )
     ~dlog_plonk_index wrap_main ~(typ : _ Impls.Step.Typ.t) ~step_vk
     ~actual_wrap_domains ~step_plonk_indices:_ ~feature_flags
@@ -335,11 +334,14 @@ let wrap
              (* TODO: Careful here... the length of
                 old_buletproof_challenges inside the messages_for_next_step_proof
                 might not be correct *)
-             Common.hash_messages_for_next_step_proof
-               ~app_state:to_field_elements
-               (P.Base.Messages_for_next_proof_over_same_field.Step.prepare
-                  ~dlog_plonk_index
-                  prev_statement.proof_state.messages_for_next_step_proof ) )
+             let hash_input =
+               Common.hash_message_inputs_for_next_step_proof
+                 ~app_state:to_field_elements
+                 (P.Base.Messages_for_next_proof_over_same_field.Step.prepare
+                    ~dlog_plonk_index
+                    prev_statement.proof_state.messages_for_next_step_proof )
+             in
+             Common.hash_messages_for_next_step_proof hash_input )
         }
     ; messages_for_next_wrap_proof =
         (let module M =
@@ -353,9 +355,12 @@ let wrap
                      P.Base.Messages_for_next_proof_over_same_field.Wrap
                      .Prepared
                      .t ) =
-                 Wrap_hack.hash_messages_for_next_wrap_proof
-                   (Vector.length m.old_bulletproof_challenges)
-                   m
+                 let hash_input =
+                   Wrap_hack.hash_message_inputs_for_next_wrap_proof
+                     (Vector.length m.old_bulletproof_challenges)
+                     m
+                 in
+                 Wrap_hack.hash_messages_for_next_wrap_proof hash_input
              end)
          in
         let module V = H1.To_vector (Digest.Constant) in
@@ -524,7 +529,8 @@ let wrap
     Common.time "wrap proof" (fun () ->
         [%log internal] "Wrap_generate_witness_conv" ;
         Impls.Wrap.generate_witness_conv
-          ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->
+          ~f:(fun
+              { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->
             [%log internal] "Backend_tock_proof_create_async" ;
             let create_proof () =
               Backend.Tock.Proof.create_async ~primary:public_inputs
@@ -565,7 +571,8 @@ let wrap
               { next_statement.proof_state with
                 messages_for_next_wrap_proof =
                   Wrap_hack.hash_messages_for_next_wrap_proof
-                    max_proofs_verified messages_for_next_wrap_proof_prepared
+                    (Wrap_hack.hash_message_inputs_for_next_wrap_proof
+                       max_proofs_verified messages_for_next_wrap_proof_prepared )
               ; deferred_values =
                   { next_statement.proof_state.deferred_values with
                     plonk =
