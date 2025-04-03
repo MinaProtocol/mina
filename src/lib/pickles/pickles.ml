@@ -1401,8 +1401,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                        (Vector.length
                                           m.old_bulletproof_challenges )
                                    in
-                                   Wrap_hack.hash_messages_for_next_wrap_proof
-                                     max_proofs_verified m
+                                   Wrap_hack.hash_messages_for_next_wrap_proof m
                                end)
                            in
                           let module V = H1.To_vector (Digest.Constant) in
@@ -1755,7 +1754,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                 { next_statement.proof_state with
                                   messages_for_next_wrap_proof =
                                     Wrap_hack.hash_messages_for_next_wrap_proof
-                                      max_proofs_verified
                                       messages_for_next_wrap_proof_prepared
                                 ; deferred_values =
                                     { next_statement.proof_state.deferred_values with
