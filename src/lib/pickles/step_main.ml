@@ -487,8 +487,7 @@ let step_main :
                       , max_proofs_verified
                       , self_branches )
                       Types_map.For_step.t =
-                    { branches = self_branches
-                    ; proofs_verifieds =
+                    { proofs_verifieds =
                         `Known
                           (Vector.map basic.proofs_verifieds ~f:Field.of_int)
                     ; max_proofs_verified

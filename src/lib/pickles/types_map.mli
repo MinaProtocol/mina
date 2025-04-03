@@ -89,8 +89,7 @@ end
 
 module For_step : sig
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
-    { branches : 'branches Pickles_types.Nat.t
-    ; max_proofs_verified :
+    { max_proofs_verified :
         (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
     ; proofs_verifieds :
         [ `Known of (Impls.Step.Field.t, 'branches) Pickles_types.Vector.t

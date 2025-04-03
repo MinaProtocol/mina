@@ -153,8 +153,7 @@ end
 
 module For_step = struct
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
-    { branches : 'branches Nat.t
-    ; max_proofs_verified :
+    { max_proofs_verified :
         (module Nat.Add.Intf with type n = 'max_proofs_verified)
     ; proofs_verifieds :
         [ `Known of (Impls.Step.Field.t, 'branches) Vector.t | `Side_loaded ]
@@ -192,8 +191,7 @@ module For_step = struct
     let wrap_key =
       Plonk_verification_key_evals.map index.wrap_index ~f:(fun x -> [| x |])
     in
-    { branches
-    ; max_proofs_verified
+    { max_proofs_verified
     ; public_input
     ; proofs_verifieds = `Side_loaded
     ; wrap_key
@@ -229,8 +227,7 @@ module For_step = struct
        ; zk_rows
        } :
         _ Compiled.t ) =
-    { branches
-    ; max_proofs_verified
+    { max_proofs_verified
     ; proofs_verifieds =
         `Known (Vector.map proofs_verifieds ~f:Impls.Step.Field.of_int)
     ; public_input
