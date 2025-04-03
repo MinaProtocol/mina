@@ -35,7 +35,6 @@ module Side_loaded : sig
           (module Pickles_types.Nat.Add.Intf with type n = 'n1)
       ; public_input : ('var, 'value) Impls.Step.Typ.t
       ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
-      ; branches : 'n2 Pickles_types.Nat.t
       ; num_chunks : int
       ; zk_rows : int
       }

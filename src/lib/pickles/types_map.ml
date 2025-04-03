@@ -38,7 +38,6 @@ module Side_loaded = struct
       { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
       ; public_input : ('var, 'value) Impls.Step.Typ.t
       ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
-      ; branches : 'n2 Nat.t
       ; num_chunks : int
       ; zk_rows : int
       }
@@ -56,7 +55,6 @@ module Side_loaded = struct
       { permanent =
           { max_proofs_verified
           ; public_input
-          ; branches
           ; feature_flags
           ; num_chunks
           ; zk_rows
@@ -168,8 +166,7 @@ module For_step = struct
   let of_side_loaded (type a b c d)
       ({ ephemeral
        ; permanent =
-           { branches
-           ; max_proofs_verified
+           { max_proofs_verified
            ; public_input
            ; feature_flags
            ; num_chunks
@@ -184,7 +181,6 @@ module For_step = struct
       | _ ->
           failwithf "For_step.side_loaded: Expected `In_circuit (%s)" __LOC__ ()
     in
-    let T = Nat.eq_exn branches Side_loaded_verification_key.Max_branches.n in
     let wrap_key =
       Plonk_verification_key_evals.map index.wrap_index ~f:(fun x -> [| x |])
     in

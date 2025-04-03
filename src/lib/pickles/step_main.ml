@@ -140,9 +140,6 @@ let step_main :
          (* The specification, for each proof that this step circuit verifies, of the maximum width used
             by that proof system. *)
     -> local_signature_length:(local_signature, proofs_verified) Hlist.Length.t
-    -> local_branches:
-         (* For each inner proof of type T , the number of branches that type T has. *)
-         local_branches H1.T(Nat).t
     -> local_branches_length:(local_branches, proofs_verified) Hlist.Length.t
     -> proofs_verified:(prev_vars, proofs_verified) Hlist.Length.t
     -> lte:(proofs_verified, max_proofs_verified) Nat.Lte.t
@@ -183,9 +180,8 @@ let step_main :
            Promise.t )
        Staged.t =
  fun (module Req) max_proofs_verified ~self_branches ~local_signature
-     ~local_signature_length ~local_branches ~local_branches_length
-     ~proofs_verified ~lte ~public_input ~auxiliary_typ ~basic ~known_wrap_keys
-     ~self rule ->
+     ~local_signature_length ~local_branches_length ~proofs_verified ~lte
+     ~public_input ~auxiliary_typ ~basic ~known_wrap_keys ~self rule ->
   let module Typ_with_max_proofs_verified = struct
     type ('var, 'value, 'local_max_proofs_verified, 'local_branches) t =
       ( ( 'var
@@ -227,21 +223,19 @@ let step_main :
         type pvars pvals ns1 ns2 br.
            (pvars, pvals, ns1, ns2) H4.T(Tag).t
         -> ns1 H1.T(Nat).t
-        -> ns2 H1.T(Nat).t
         -> (pvars, br) Length.t
         -> (ns1, br) Length.t
         -> (ns2, br) Length.t
         -> (Opt.Flag.t Plonk_types.Features.Full.t * int, br) Vector.t
         -> (pvars, pvals, ns1, ns2) H4.T(Typ_with_max_proofs_verified).t =
-     fun ds ns1 ns2 ld ln1 ln2 feature_flags_and_num_chunkss ->
+     fun ds ns1 ld ln1 ln2 feature_flags_and_num_chunkss ->
       match[@warning "-4"]
-        (ds, ns1, ns2, ld, ln1, ln2, feature_flags_and_num_chunkss)
+        (ds, ns1, ld, ln1, ln2, feature_flags_and_num_chunkss)
       with
-      | [], [], [], Z, Z, Z, [] ->
+      | [], [], Z, Z, Z, [] ->
           []
       | ( _d :: ds
         , n1 :: ns1
-        , _n2 :: ns2
         , S ld
         , S ln1
         , S ln2
@@ -249,14 +243,14 @@ let step_main :
           let t =
             Per_proof_witness.typ Typ.unit n1 ~feature_flags ~num_chunks
           in
-          t :: join ds ns1 ns2 ld ln1 ln2 feature_flags_and_num_chunkss
-      | [], _, _, _, _, _, _ ->
+          t :: join ds ns1 ld ln1 ln2 feature_flags_and_num_chunkss
+      | [], _, _, _, _, _ ->
           .
-      | _ :: _, _, _, _, _, _, _ ->
+      | _ :: _, _, _, _, _, _ ->
           .
     in
-    join rule.prevs local_signature local_branches proofs_verified
-      local_signature_length local_branches_length feature_flags_and_num_chunks
+    join rule.prevs local_signature proofs_verified local_signature_length
+      local_branches_length feature_flags_and_num_chunks
   in
   let module Prev_typ =
     H4.Typ (Typ_with_max_proofs_verified) (Per_proof_witness.No_app_state)
