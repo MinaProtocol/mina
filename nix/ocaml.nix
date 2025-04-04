@@ -171,6 +171,7 @@ let
         in dune-nix.makefileTest ./.. pkg src;
       marlinPlonkStubs = {
         MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
+        MARLIN_PLONK_STUBS_STATIC_LIB = "${pkgs.kimchi_stubs_static_lib}";
       };
       childProcessesTester = pkgs.writeShellScriptBin "mina-tester.sh"
         (builtins.readFile ../src/lib/child_processes/tester.sh);
@@ -337,6 +338,7 @@ let
         # and copy it from within a dune rule
         # (see src/lib/crypto/kimchi_bindings/stubs/dune)
         MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
+        MARLIN_PLONK_STUBS_STATIC_LIB = "${pkgs.kimchi_stubs_static_lib}";
         DISABLE_CHECK_OPAM_SWITCH = "true";
 
         MINA_VERSION_IMPLEMENTATION = "mina_version.runtime";
