@@ -102,7 +102,6 @@ pub fn caml_pasta_fq_plonk_index_create(
     prev_challenges: i32,
     srs: &WasmSrs,
 ) -> Result<WasmPastaFqPlonkIndex, JsError> {
-    console_error_panic_hook::set_once();
     let index = crate::rayon::run_in_pool(|| {
         // flatten the permutation information (because OCaml has a different way of keeping track of permutations)
         let gates: Vec<_> = gates

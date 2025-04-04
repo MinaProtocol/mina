@@ -72,6 +72,7 @@ nodejs = []
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false
+#panic = "unwind"
 #wasm-opt = ["-O4", "--detect-features", "--enable-mutable-globals" ]
 #wasm-opt = ["-O4", "--enable-mutable-globals"]
 

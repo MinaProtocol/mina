@@ -663,7 +663,6 @@ macro_rules! impl_proof {
                 prev_challenges: WasmFlatVector<$WasmF>,
                 prev_sgs: WasmVector<$WasmG>,
             ) -> Result<WasmProverProof, JsError> {
-                console_error_panic_hook::set_once();
                 let (maybe_proof, public_input) = crate::rayon::run_in_pool(|| {
                     index.0.srs.get_lagrange_basis(index.0.as_ref().cs.domain.d1);
                     let prev: Vec<RecursionChallenge<$G>> = {

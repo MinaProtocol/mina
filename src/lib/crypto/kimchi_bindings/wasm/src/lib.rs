@@ -74,6 +74,11 @@ pub fn wait_until_non_zero(ptr: *const u32) -> u32 {
     unreachable!();
 }
 
+#[wasm_bindgen(start)]
+pub fn set_panic_hook(){
+    console_error_panic_hook::set_once();
+}
+
 pub mod rayon;
 
 /// Arkworks types
