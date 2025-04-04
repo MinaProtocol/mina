@@ -326,10 +326,31 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let choices ~self =
       let choices = choices ~self in
       let rec go :
-          type a b c d e f g h i j.
-             (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule).t
-          -> (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule.Promise).t =
-        function
+          type length a b c d e f g h i j.
+             ( length
+             , a
+             , b
+             , c
+             , d
+             , e
+             , f
+             , g
+             , h
+             , i
+             , j )
+             H4_6_with_length.T(Inductive_rule).t
+          -> ( length
+             , a
+             , b
+             , c
+             , d
+             , e
+             , f
+             , g
+             , h
+             , i
+             , j )
+             H4_6_with_length.T(Inductive_rule.Promise).t = function
         | [] ->
             []
         | { identifier; prevs; main; feature_flags } :: rest ->
@@ -366,10 +387,31 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let choices ~self =
       let choices = choices ~self in
       let rec go :
-          type a b c d e f g h i j.
-             (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule.Deferred).t
-          -> (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule.Promise).t =
-        function
+          type length a b c d e f g h i j.
+             ( length
+             , a
+             , b
+             , c
+             , d
+             , e
+             , f
+             , g
+             , h
+             , i
+             , j )
+             H4_6_with_length.T(Inductive_rule.Deferred).t
+          -> ( length
+             , a
+             , b
+             , c
+             , d
+             , e
+             , f
+             , g
+             , h
+             , i
+             , j )
+             H4_6_with_length.T(Inductive_rule.Promise).t = function
         | [] ->
             []
         | { identifier; prevs; main; feature_flags } :: rest ->

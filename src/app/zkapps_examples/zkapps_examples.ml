@@ -552,7 +552,8 @@ let compile :
                , max_proofs_verified
                , branches )
                Pickles.Tag.t
-          -> ( prev_varss
+          -> ( branches
+             , prev_varss
              , prev_valuess
              , widthss
              , heightss
@@ -562,7 +563,7 @@ let compile :
              , unit (* TODO: Remove? *)
              , auxiliary_var
              , auxiliary_value )
-             H4_6.T(Pickles.Inductive_rule).t )
+             H4_6_with_length.T(Pickles.Inductive_rule).t )
     -> unit
     -> ( Zkapp_statement.Checked.t
        , Zkapp_statement.t
@@ -591,8 +592,9 @@ let compile :
   let vk_hash = ref None in
   let choices ~self =
     let rec go :
-        type prev_varss prev_valuess widthss heightss.
-           ( prev_varss
+        type branches prev_varss prev_valuess widthss heightss.
+           ( branches
+           , prev_varss
            , prev_valuess
            , widthss
            , heightss
@@ -602,8 +604,9 @@ let compile :
            , unit
            , auxiliary_var
            , auxiliary_value )
-           H4_6.T(Pickles.Inductive_rule).t
-        -> ( prev_varss
+           H4_6_with_length.T(Pickles.Inductive_rule).t
+        -> ( branches
+           , prev_varss
            , prev_valuess
            , widthss
            , heightss
@@ -613,7 +616,7 @@ let compile :
            , Zkapp_statement.t
            , return_type Prover_value.t * auxiliary_var
            , return_type * auxiliary_value )
-           H4_6.T(Pickles.Inductive_rule.Deferred).t = function
+           H4_6_with_length.T(Pickles.Inductive_rule.Deferred).t = function
       | [] ->
           []
       | { identifier; prevs; main; feature_flags } :: choices ->

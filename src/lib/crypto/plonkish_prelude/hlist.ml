@@ -834,17 +834,18 @@ module H4_4 = struct
   end
 end
 
-module H4_6 = struct
+module H4_6_with_length = struct
   module T (F : sig
     type (_, _, _, _, _, _, _, _, _, _) t
   end) =
   struct
-    type (_, _, _, _, 's1, 's2, 's3, 's4, 's5, 's6) t =
-      | [] : (unit, unit, unit, unit, _, _, _, _, _, _) t
+    type ('length, _, _, _, _, 's1, 's2, 's3, 's4, 's5, 's6) t =
+      | [] : (Nat.z, unit, unit, unit, unit, _, _, _, _, _, _) t
       | ( :: ) :
           ('a1, 'a2, 'a3, 'a4, 's1, 's2, 's3, 's4, 's5, 's6) F.t
-          * ('b1, 'b2, 'b3, 'b4, 's1, 's2, 's3, 's4, 's5, 's6) t
-          -> ( 'a1 * 'b1
+          * ('length, 'b1, 'b2, 'b3, 'b4, 's1, 's2, 's3, 's4, 's5, 's6) t
+          -> ( 'length Nat.s
+             , 'a1 * 'b1
              , 'a2 * 'b2
              , 'a3 * 'b3
              , 'a4 * 'b4
@@ -857,13 +858,14 @@ module H4_6 = struct
              t
 
     let rec length :
-        type t1 t2 t3 t4 e1 e2 e3 e4 e5 e6.
-        (t1, t2, t3, t4, e1, e2, e3, e4, e5, e6) t -> t1 Length.n = function
+        type length t1 t2 t3 t4 e1 e2 e3 e4 e5 e6.
+        (length, t1, t2, t3, t4, e1, e2, e3, e4, e5, e6) t -> length Nat.t =
+      function
       | [] ->
-          T (Z, Z)
+          Z
       | _ :: xs ->
-          let (T (n, p)) = length xs in
-          T (S n, S p)
+          let n = length xs in
+          S n
   end
 end
 

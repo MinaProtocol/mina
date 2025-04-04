@@ -1015,7 +1015,8 @@ let compile_with_wrap_main_override_promise :
     -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
     -> choices:
          (   self:(var, value, max_proofs_verified, branches) Tag.t
-          -> ( prev_varss
+          -> ( branches
+             , prev_varss
              , prev_valuess
              , widthss
              , heightss
@@ -1025,7 +1026,7 @@ let compile_with_wrap_main_override_promise :
              , ret_value
              , auxiliary_var
              , auxiliary_value )
-             H4_6.T(Inductive_rule.Promise).t )
+             H4_6_with_length.T(Inductive_rule.Promise).t )
     -> unit
     -> (var, value, max_proofs_verified, branches) Tag.t
        * Cache_handle.t
@@ -1094,8 +1095,9 @@ let compile_with_wrap_main_override_promise :
       (Auxiliary_value)
   in
   let rec conv_irs :
-      type v1ss v2ss wss hss.
-         ( v1ss
+      type branches v1ss v2ss wss hss.
+         ( branches
+         , v1ss
          , v2ss
          , wss
          , hss
@@ -1105,7 +1107,7 @@ let compile_with_wrap_main_override_promise :
          , ret_value
          , auxiliary_var
          , auxiliary_value )
-         H4_6.T(Inductive_rule.Promise).t
+         H4_6_with_length.T(Inductive_rule.Promise).t
       -> (v1ss, v2ss, wss, hss) H4.T(M.IR).t = function
     | [] ->
         []

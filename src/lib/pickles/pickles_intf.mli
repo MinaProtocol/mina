@@ -426,7 +426,8 @@ module type S = sig
     -> name:string
     -> choices:
          (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
-          -> ( 'prev_varss
+          -> ( 'branches
+             , 'prev_varss
              , 'prev_valuess
              , 'widthss
              , 'heightss
@@ -436,7 +437,7 @@ module type S = sig
              , 'ret_value
              , 'auxiliary_var
              , 'auxiliary_value )
-             H4_6.T(Inductive_rule.Promise).t )
+             H4_6_with_length.T(Inductive_rule.Promise).t )
     -> unit
     -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
        * Cache_handle.t
@@ -481,7 +482,8 @@ module type S = sig
     -> name:string
     -> choices:
          (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
-          -> ( 'prev_varss
+          -> ( 'branches
+             , 'prev_varss
              , 'prev_valuess
              , 'widthss
              , 'heightss
@@ -491,7 +493,7 @@ module type S = sig
              , 'ret_value
              , 'auxiliary_var
              , 'auxiliary_value )
-             H4_6.T(Inductive_rule).t )
+             H4_6_with_length.T(Inductive_rule).t )
     -> unit
     -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
        * Cache_handle.t
@@ -536,7 +538,8 @@ module type S = sig
     -> name:string
     -> choices:
          (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
-          -> ( 'prev_varss
+          -> ( 'branches
+             , 'prev_varss
              , 'prev_valuess
              , 'widthss
              , 'heightss
@@ -546,7 +549,7 @@ module type S = sig
              , 'ret_value
              , 'auxiliary_var
              , 'auxiliary_value )
-             H4_6.T(Inductive_rule.Deferred).t )
+             H4_6_with_length.T(Inductive_rule.Deferred).t )
     -> unit
     -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
        * Cache_handle.t
