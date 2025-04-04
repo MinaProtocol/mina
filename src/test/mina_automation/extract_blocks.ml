@@ -2,9 +2,7 @@
 Module to run extract_blocks utility for given archive PostgreSQL database.
 *)
 
-open Executor
 open Core
-include Executor
 
 module Config = struct
   type range = AllBlocks | Range of (String.t * String.t)
@@ -52,9 +50,16 @@ module Config = struct
     @ blocks
 end
 
-let of_context context =
-  Executor.of_context ~context
-    ~dune_name:"src/app/extract_blocks/extract_blocks.exe"
-    ~official_name:"mina-extract-blocks"
+module Paths = struct
+  let dune_name = "src/app/extract_blocks/extract_blocks.exe"
 
-let run t ~config = run t ~args:(Config.to_args config) ()
+  let official_name = "mina-extract-blocks"
+end
+
+module Executor = Executor.Make (Paths)
+
+type t = Executor.t
+
+let default = Executor.AutoDetect
+
+let run t ~config = Executor.run t ~args:(Config.to_args config) ()
