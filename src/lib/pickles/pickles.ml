@@ -1162,13 +1162,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
               , 'm )
               Step_branch_data.t
           end in
-          let proofs_verifieds = Vector.singleton 2 in
           let (T inner_step_data as step_data) =
             Step_branch_data.create ~index:0 ~feature_flags ~num_chunks:1
               ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
               ~branches:Branches.n ~self ~public_input:(Input typ)
               ~auxiliary_typ:typ A.to_field_elements A_value.to_field_elements
-              rule ~wrap_domains ~proofs_verifieds ~chain_to:(Promise.return ())
+              rule ~wrap_domains ~chain_to:(Promise.return ())
             (* TODO? *)
           in
           let step_domains = Vector.singleton inner_step_data.domains in
@@ -1849,7 +1848,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           let data : _ Types_map.Compiled.t =
             { feature_flags
-            ; proofs_verifieds
             ; max_proofs_verified = (module Max_proofs_verified)
             ; public_input = typ
             ; wrap_key =

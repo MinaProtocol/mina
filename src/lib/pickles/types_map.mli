@@ -54,8 +54,6 @@ end
 module Compiled : sig
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) basic =
     { public_input : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; proofs_verifieds : (int, 'branches) Pickles_types.Vector.t
-          (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; wrap_domains : Import.Domains.t
     ; step_domains : (Import.Domains.t, 'branches) Pickles_types.Vector.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
@@ -66,8 +64,6 @@ module Compiled : sig
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
     { max_proofs_verified :
         (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
-    ; proofs_verifieds : (int, 'branches) Pickles_types.Vector.t
-          (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
     ; wrap_key :
         Backend.Tick.Inner_curve.Affine.t array

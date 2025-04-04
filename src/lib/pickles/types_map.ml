@@ -87,8 +87,6 @@ end
 module Compiled = struct
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) basic =
     { public_input : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; proofs_verifieds : (int, 'branches) Vector.t
-          (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
@@ -102,8 +100,6 @@ module Compiled = struct
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
     { max_proofs_verified :
         (module Nat.Add.Intf with type n = 'max_proofs_verified)
-    ; proofs_verifieds : (int, 'branches) Vector.t
-          (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
     ; wrap_key :
         Tick.Inner_curve.Affine.t array Plonk_verification_key_evals.t Promise.t
@@ -121,7 +117,6 @@ module Compiled = struct
 
   let to_basic
       { max_proofs_verified
-      ; proofs_verifieds = _
       ; public_input
       ; wrap_vk
       ; wrap_domains
@@ -203,7 +198,6 @@ module For_step = struct
   let of_compiled_with_known_wrap_key
       ({ wrap_key; step_domains } : _ Optional_wrap_key.known)
       ({ max_proofs_verified
-       ; proofs_verifieds = _
        ; public_input
        ; wrap_key = _
        ; wrap_domains
