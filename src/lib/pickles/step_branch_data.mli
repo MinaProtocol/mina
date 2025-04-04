@@ -91,7 +91,6 @@ val create :
   -> num_chunks:int
   -> actual_feature_flags:bool Plonk_types.Features.t
   -> max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
-  -> proofs_verifieds:(int, 'branches) Pickles_types.Vector.t
   -> branches:'branches Pickles_types.Nat.t
   -> public_input:
        ( 'var
