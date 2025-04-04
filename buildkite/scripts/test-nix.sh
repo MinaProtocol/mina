@@ -64,10 +64,11 @@ git branch -D $BUILDKITE_BRANCH 2>/dev/null || true
 git checkout -b $BUILDKITE_BRANCH
 git reset --hard $BUILDKITE_COMMIT
 
-nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --no-link
-
 # Test developer terminal with lsp server
 nix "${NIX_OPTS[@]}" develop "$PWD?submodules=1#with-lsp" --command bash -c "echo tested"
+nix "${NIX_OPTS[@]}" develop "$PWD?submodules=1#with-lsp" --command bash -c "dune build src" &
+  nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --no-link
+wait
 
 if [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
   mkdir -p $HOME/.aws

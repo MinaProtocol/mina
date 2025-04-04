@@ -464,14 +464,14 @@ If you get an error like this:
 File "src/lib/crypto/kimchi_bindings/stubs/dune", line 77, characters 0-237:
 77 | (rule
 78 |  (enabled_if
-79 |   (<> %{env:MARLIN_PLONK_STUBS=n} n))
+79 |   (<> %{env:KIMCHI_STUBS=n} n))
 80 |  (targets libwires_15_stubs.a)
 81 |  (deps
-82 |   (env_var MARLIN_PLONK_STUBS))
+82 |   (env_var KIMCHI_STUBS))
 83 |  (action
 84 |   (progn
 85 |    (copy
-86 |     %{env:MARLIN_PLONK_STUBS=n}/lib/libwires_15_stubs.a
+86 |     %{env:KIMCHI_STUBS=n}/lib/libwires_15_stubs.a
 87 |     libwires_15_stubs.a))))
 Error: File unavailable:
 /nix/store/2i0iqm48p20mrn69nbgr0pf76vdzjxj6-marlin_plonk_bindings_stubs-0.1.0/lib/lib/libwires_15_stubs.a
