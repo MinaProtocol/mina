@@ -1,4 +1,5 @@
 open Core_kernel
+open Mina_stdlib
 
 module Poly = struct
   [%%versioned
@@ -165,42 +166,42 @@ module Make_to_all_verifiable
 struct
   let to_all_verifiable (ts : t Strategy.Command_wrapper.t list) ~load_vk_cache
       : Verifiable.t Strategy.Command_wrapper.t list Or_error.t =
+    (* TODO: it seems we're just doing noop with the Strategy.Command_wrapper,
+       need double-check.
+    *)
     let open Or_error.Let_syntax in
-    (* First we tag everything with its index *)
-    let its = List.mapi ts ~f:(fun i x -> (i, x)) in
-    (* then we partition out the zkapp commands *)
-    let izk_cmds, is_cmds =
-      List.partition_map its ~f:(fun (i, cmd) ->
-          match Strategy.Command_wrapper.unwrap cmd with
-          | Zkapp_command c ->
-              First (i, Strategy.Command_wrapper.map cmd ~f:(Fn.const c))
-          | Signed_command c ->
-              Second (i, Strategy.Command_wrapper.map cmd ~f:(Fn.const c)) )
+    let partitioner (cmd : t Strategy.Command_wrapper.t) =
+      match Strategy.Command_wrapper.unwrap cmd with
+      | Zkapp_command c ->
+          First (Strategy.Command_wrapper.map cmd ~f:(Fn.const c))
+      | Signed_command c ->
+          Second (Strategy.Command_wrapper.map cmd ~f:(Fn.const c))
     in
-    (* then unzip the indices *)
-    let ixs, zk_cmds = List.unzip izk_cmds in
-    (* then we verify the zkapp commands *)
-    (* TODO: we could optimize this by skipping the fee payer and non-proof authorizations *)
-    let accounts_referenced =
-      List.fold_left zk_cmds ~init:Account_id.Set.empty ~f:(fun set zk_cmd ->
-          Strategy.Command_wrapper.unwrap zk_cmd
-          |> Zkapp_command.accounts_referenced |> Account_id.Set.of_list
-          |> Set.union set )
+    let process_left zk_cmds =
+      (* TODO: we could optimize this by skipping the fee payer and non-proof authorizations *)
+      let accounts_referenced =
+        List.fold_left zk_cmds ~init:Account_id.Set.empty ~f:(fun set zk_cmd ->
+            Strategy.Command_wrapper.unwrap zk_cmd
+            |> Zkapp_command.accounts_referenced |> Account_id.Set.of_list
+            |> Set.union set )
+      in
+      let vk_cache = load_vk_cache accounts_referenced in
+      Strategy.create_all zk_cmds vk_cache
     in
-    let vk_cache = load_vk_cache accounts_referenced in
-    let%map vzk_cmds = Strategy.create_all zk_cmds vk_cache in
-    (* rezip indices *)
-    let ivzk_cmds = List.zip_exn ixs vzk_cmds in
-    (* Put them back in with a sort by index (un-partition) *)
-    let ivs =
-      List.map is_cmds ~f:(fun (i, cmd) ->
-          (i, Strategy.Command_wrapper.map cmd ~f:(fun c -> Signed_command c)) )
-      @ List.map ivzk_cmds ~f:(fun (i, cmd) ->
-            (i, Strategy.Command_wrapper.map cmd ~f:(fun c -> Zkapp_command c)) )
-      |> List.sort ~compare:(fun (i, _) (j, _) -> i - j)
+    let process_right =
+      List.map ~f:(fun cmd ->
+          Strategy.Command_wrapper.map cmd ~f:(fun c -> Signed_command c) )
     in
-    (* Drop the indices *)
-    List.unzip ivs |> snd
+    let finalizer vzk_cmds_m is_cmds_mapped ~f =
+      let%map vzk_cmds = vzk_cmds_m in
+      let vzk_cmds_mapped =
+        List.map vzk_cmds ~f:(fun cmd ->
+            Strategy.Command_wrapper.map cmd ~f:(fun c -> Zkapp_command c) )
+      in
+      f vzk_cmds_mapped is_cmds_mapped
+    in
+    List.process_separately ts ~partitioner ~process_left ~process_right
+      ~finalizer
 end
 
 module Unapplied_sequence =
@@ -300,19 +301,18 @@ module Valid = struct
   module Gen = Gen_make (Signed_command.With_valid_signature)
 end
 
-let check_verifiable (t : Verifiable.t) : Valid.t Or_error.t =
-  match t with
-  | Signed_command x -> (
-      match Signed_command.check x with
-      | Some c ->
-          Ok (Signed_command c)
-      | None ->
-          Or_error.error_string "Invalid signature" )
-  | Zkapp_command p ->
-      Ok (Zkapp_command (Zkapp_command.Valid.of_verifiable p))
-
-let check ~failed ~find_vk (t : t) : Valid.t Or_error.t =
-  to_verifiable ~failed ~find_vk t |> Or_error.bind ~f:check_verifiable
+module For_tests = struct
+  let check_verifiable (t : Verifiable.t) : Valid.t Or_error.t =
+    match t with
+    | Signed_command x -> (
+        match Signed_command.check x with
+        | Some c ->
+            Ok (Signed_command c)
+        | None ->
+            Or_error.error_string "Invalid signature" )
+    | Zkapp_command p ->
+        Ok (Zkapp_command (Zkapp_command.Valid.For_tests.of_verifiable p))
+end
 
 let forget_check (t : Valid.t) : t =
   match t with
