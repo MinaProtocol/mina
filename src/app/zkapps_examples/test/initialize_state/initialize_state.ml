@@ -27,7 +27,6 @@ let%test_module "Initialize state test" =
         , Pickles.Provers.[ initialize_prover; update_state_prover ] ) =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
         ~auxiliary_typ:Impl.Typ.unit
-        ~branches:(module Nat.N2)
         ~max_proofs_verified:(module Nat.N0)
         ~name:"empty_update"
         ~choices:(fun ~self:_ ->

@@ -541,7 +541,6 @@ let compile :
     -> ?disk_keys:(_, branches) Vector.t * _
     -> ?override_wrap_domain:_
     -> auxiliary_typ:(auxiliary_var, auxiliary_value) Typ.t
-    -> branches:(module Nat.Intf with type n = branches)
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = max_proofs_verified)
     -> name:string
@@ -588,7 +587,7 @@ let compile :
            Deferred.t )
          H3_2.T(Pickles.Prover).t =
  fun ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain ~auxiliary_typ
-     ~branches ~max_proofs_verified ~name ~choices () ->
+     ~max_proofs_verified ~name ~choices () ->
   let vk_hash = ref None in
   let choices ~self =
     let rec go :
@@ -651,7 +650,7 @@ let compile :
     Pickles.compile_async () ?self ?cache ?proof_cache ?disk_keys
       ?override_wrap_domain ~public_input:(Output Zkapp_statement.typ)
       ~auxiliary_typ:Typ.(Prover_value.typ () * auxiliary_typ)
-      ~branches ~max_proofs_verified ~name ~choices
+      ~max_proofs_verified ~name ~choices
   in
   let () =
     vk_hash :=

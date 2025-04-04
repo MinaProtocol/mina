@@ -398,7 +398,6 @@ module type S = sig
       @param disk_keys Caches for the individial keys
       @param override_wrap_domain This let you tell pickles that the wrap circuit will be smaller/bigger than it's expecting's. At the moment, we map 0 proofs verified to 2^14, 1 proofs verified to 2^15, and 2 to 2^16. However, you'll usually see this used with 2 proofs, which actually only requires 2^15 (so we set this as N1). This was also part of the inspiration for your project: its existence tells us that we can recurse over more proofs.
       @param num_chunks Configurable parameter enabling circuits larger than maximum
-      @param branches Number of different circuits that Tock(i.e. Wrap) accepts as inputs
       @param max_proofs_verified Number of different circuits that Tick(i.e. Step) accepts as inputs
   *)
   val compile_promise :
@@ -420,7 +419,6 @@ module type S = sig
          , 'ret_value )
          Inductive_rule.public_input
     -> auxiliary_typ:('auxiliary_var, 'auxiliary_value) Impls.Step.Typ.t
-    -> branches:(module Nat.Intf with type n = 'branches)
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = 'max_proofs_verified)
     -> name:string
@@ -476,7 +474,6 @@ module type S = sig
          , 'ret_value )
          Inductive_rule.public_input
     -> auxiliary_typ:('auxiliary_var, 'auxiliary_value) Impls.Step.Typ.t
-    -> branches:(module Nat.Intf with type n = 'branches)
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = 'max_proofs_verified)
     -> name:string
@@ -532,7 +529,6 @@ module type S = sig
          , 'ret_value )
          Inductive_rule.public_input
     -> auxiliary_typ:('auxiliary_var, 'auxiliary_value) Impls.Step.Typ.t
-    -> branches:(module Nat.Intf with type n = 'branches)
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = 'max_proofs_verified)
     -> name:string

@@ -958,7 +958,7 @@ module H4_6_with_length : sig
 
     val length :
          ('length, 't1, 't2, 't3, 't4, 'e1, 'e2, 'e3, 'e4, 'e5, 'e6) t
-      -> 'length Nat.t
+      -> 'length Nat.t * ('t1, 'length) Length.t
   end
 end
 
