@@ -97,6 +97,8 @@ module T = struct
 
       let statement t = One_or_two.map t.proofs ~f:Ledger_proof.statement
 
+      let proofs t = t.proofs
+
       let to_latest = Fn.id
     end
   end]

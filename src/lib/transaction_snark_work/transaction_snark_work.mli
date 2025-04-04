@@ -83,6 +83,8 @@ module Stable : sig
 
     val prover : t -> Public_key.Compressed.Stable.V1.t
 
+    val proofs : t -> Ledger_proof.t One_or_two.t
+
     val to_latest : t -> t
   end
 
