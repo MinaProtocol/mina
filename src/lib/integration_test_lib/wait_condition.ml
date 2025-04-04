@@ -281,8 +281,7 @@ struct
 
   let zkapp_to_be_included_in_frontier ~has_failures ~zkapp_command =
     let txn_hash =
-      Mina_transaction.Transaction_hash.hash_command
-        (Zkapp_command zkapp_command)
+      Mina_transaction.Transaction_hash.hash_zkapp_command zkapp_command
     in
     let check () _node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
       let zkapp_opt =
