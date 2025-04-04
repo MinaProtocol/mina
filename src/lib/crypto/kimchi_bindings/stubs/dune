@@ -43,7 +43,7 @@
 (rule
  (enabled_if
   (= %{env:MARLIN_PLONK_STUBS=n} n))
- (targets libwires_15_stubs.a)
+ (targets dllkimchi_stubs.so libkimchi_stubs.a)
  (deps
   Cargo.toml
   rust-toolchain.toml
@@ -56,30 +56,49 @@
  (action
   (progn
    (setenv
-    CARGO_TARGET_DIR
-    "%{read:../dune-build-root}/cargo_kimchi_stubs"
-    (setenv
-     RUSTFLAGS
-     %{read:rustflags.sexp}
-     (run cargo build --release --offline)))
+    RUSTFLAGS
+    %{read:rustflags.sexp}
+    (run
+     cargo
+     build
+     -p
+     kimchi-stubs
+     --release
+     --target-dir
+     %{read:../dune-build-root}/cargo_kimchi_stubs
+     --offline))
    (run
     cp
-    %{read:../dune-build-root}/cargo_kimchi_stubs/release/libwires_15_stubs.a
-    .))))
+    %{read:../dune-build-root}/cargo_kimchi_stubs/release/libkimchi_stubs.a
+    .)
+   (ignore-stderr
+    ;; No MacOS
+    (with-accepted-exit-codes
+     (or 0 1)
+     (run
+      cp
+      %{read:../dune-build-root}/cargo_kimchi_stubs/release/libkimchi_stubs.so
+      dllkimchi_stubs.so)))
+   ;; MacOS
+   (ignore-stderr
+    (with-accepted-exit-codes
+     (or 0 1)
+     (run
+      cp
+      %{read:../dune-build-root}/cargo_kimchi_stubs/release/libkimchi_stubs.dylib
+      dllkimchi_stubs.so))))))
 
 ;; this is used by nix
 
 (rule
  (enabled_if
-  (<> %{env:MARLIN_PLONK_STUBS=n} n))
- (targets libwires_15_stubs.a)
+  (<> %{env:MARLIN_PLONK_STUBS_STATIC_LIB=n} n))
+ (targets libkimchi_stubs.a)
  (deps
-  (env_var MARLIN_PLONK_STUBS))
+  (env_var MARLIN_PLONK_STUBS_STATIC_LIB))
  (action
   (progn
-   (copy
-    %{env:MARLIN_PLONK_STUBS=n}/lib/libwires_15_stubs.a
-    libwires_15_stubs.a))))
+   (copy %{env:MARLIN_PLONK_STUBS_STATIC_LIB=n}/lib/libkimchi_stubs.a libkimchi_stubs.a))))
 
 ;;
 ;; declare the libraries we're going to generate to match the bindings
@@ -125,7 +144,7 @@
  (public_name pasta_bindings.backend.native)
  (name pasta_bindings_backend_native)
  (modules pasta_bindings_backend)
- (foreign_archives wires_15_stubs)
+ (foreign_archives kimchi_stubs)
  (no_dynlink)
  ; ^ Required for compilation of this library separately
  ; from libraries that depend on it

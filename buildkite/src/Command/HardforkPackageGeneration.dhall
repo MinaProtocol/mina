@@ -49,7 +49,7 @@ let Spec =
           }
       , default =
           { codename = DebianVersions.DebVersion.Bullseye
-          , network = Network.Type.Devnet
+          , network = Network.Type.Berkeley
           , genesis_timestamp = Some "2024-04-07T11:45:00Z"
           , config_json_gz_url =
               "https://storage.googleapis.com/o1labs-gitops-infrastructure/devnet/devnet-state-dump-3NK4eDgbkCjKj9fFUXVkrJXsfpfXzJySoAvrFJVCropPW7LLF14F-676026c4d4d2c18a76b357d6422a06f932c3ef4667a8fd88717f68b53fd6b2d7.json.gz"
@@ -97,6 +97,17 @@ let pipeline
           let image =
                 "gcr.io/o1labs-192920/mina-daemon:\${BUILDKITE_COMMIT:0:7}-${DebianVersions.lowerName
                                                                                debVersion}-${network_name}"
+
+          let dockerSpec =
+                DockerImage.ReleaseSpec::{
+                , deps =
+                  [ { name = pipelineName, key = generateLedgersJobKey } ]
+                , service = Artifacts.Type.Daemon
+                , network = network_name
+                , deb_codename = debVersion
+                , deb_profile = profile
+                , deb_repo = DebianRepo.Type.Local
+                }
 
           in  Pipeline.Config::{
               , spec = JobSpec::{
@@ -155,20 +166,7 @@ let pipeline
                     , key = "publish-hardfork-deb-pkg"
                     , target = Size.Small
                     }
-                , DockerImage.generateStep
-                    DockerImage.ReleaseSpec::{
-                    , deps =
-                      [ { name = pipelineName, key = generateLedgersJobKey } ]
-                    , service = Artifacts.Type.Daemon
-                    , network = network_name
-                    , deb_codename = "${DebianVersions.lowerName debVersion}"
-                    , deb_profile = profile
-                    , deb_repo = DebianRepo.Type.Local
-                    , step_key =
-                        "daemon-berkeley-${DebianVersions.lowerName
-                                             debVersion}${Profiles.toLabelSegment
-                                                            profile}-docker-image"
-                    }
+                , DockerImage.generateStep dockerSpec
                 , Command.build
                     Command.Config::{
                     , commands =
@@ -182,10 +180,7 @@ let pipeline
                     , target = Size.XLarge
                     , depends_on =
                       [ { name = pipelineName
-                        , key =
-                            "daemon-berkeley-${DebianVersions.lowerName
-                                                 debVersion}${Profiles.toLabelSegment
-                                                                profile}-docker-image"
+                        , key = DockerImage.stepKey dockerSpec
                         }
                       ]
                     , if = None B/If
@@ -202,10 +197,7 @@ let pipeline
                     , target = Size.XLarge
                     , depends_on =
                       [ { name = pipelineName
-                        , key =
-                            "daemon-berkeley-${DebianVersions.lowerName
-                                                 debVersion}${Profiles.toLabelSegment
-                                                                profile}-docker-image"
+                        , key = DockerImage.stepKey dockerSpec
                         }
                       ]
                     , if = None B/If
@@ -216,13 +208,9 @@ let pipeline
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
                     , service = Artifacts.Type.Archive
                     , network = network_name
-                    , deb_codename = "${DebianVersions.lowerName debVersion}"
+                    , deb_codename = debVersion
                     , deb_profile = profile
                     , deb_repo = DebianRepo.Type.Local
-                    , step_key =
-                        "archive-${DebianVersions.lowerName
-                                     debVersion}${Profiles.toLabelSegment
-                                                    profile}-docker-image"
                     }
                 , DockerImage.generateStep
                     DockerImage.ReleaseSpec::{
@@ -231,11 +219,7 @@ let pipeline
                     , service = Artifacts.Type.Rosetta
                     , network = network_name
                     , deb_repo = DebianRepo.Type.Local
-                    , deb_codename = "${DebianVersions.lowerName debVersion}"
-                    , step_key =
-                        "rosetta-${DebianVersions.lowerName
-                                     debVersion}${Profiles.toLabelSegment
-                                                    profile}-docker-image"
+                    , deb_codename = debVersion
                     }
                 ]
               }
