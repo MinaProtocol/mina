@@ -73,3 +73,20 @@ let process_separately
         ~compare:(fun (left_idx, _) (right_idx, _) ->
           Int.compare left_idx right_idx )
       |> List.map ~f:snd )
+
+let%test_module "process_separately" =
+  ( module struct
+    let%test "negate negative, div positive by 2" =
+      let partitioner x = if x < 0 then First x else Second x in
+      let process_left = List.map ~f:Int.neg in
+      let process_right lst =
+        let safe_div a b = match b with 0 -> None | x -> Some (a / b) in
+        List.map ~f:(fun e -> safe_div e 2) lst |> Option.all
+      in
+      let finalizer left right_m ~f =
+        match right_m with None -> [] | Some right -> f left right
+      in
+      process_separately ~partitioner ~process_left ~process_right ~finalizer
+        [ -1; -3; -5; 4; -99; 8; 10 ]
+      |> List.equal Int.equal [ 1; 3; 5; 2; 99; 4; 5 ]
+  end )
