@@ -1,7 +1,7 @@
 open Core_kernel
 open Mina_base
-open Async
 open Mina_transaction
+open Mina_stdlib
 module Ledger = Mina_ledger.Ledger
 
 type transaction_pool_proxy =
@@ -32,49 +32,6 @@ let verify_command_with_transaction_pool_proxy
   | Some _ ->
       Verifier.Common.verify_command_from_mempool cmd_with_status
 
-(** [process_separately] splits the list in two, and applies transformations
-  * to both parts, then it merges the list back in the same order it was originally.
-  * [process_left] and [process_right] are expected to return the same number
-  * of elements processed in the same order.
-  *)
-let process_separately
-    (type input left right left_output right_output output_item final_output)
-    ~(partitioner : input -> (left, right) Either.t)
-    ~(process_left : left list -> left_output)
-    ~(process_right : right list -> right_output)
-    ~(finalizer :
-          left_output
-       -> right_output
-       -> f:(output_item list -> output_item list -> output_item list)
-       -> final_output ) (input : input list) : final_output =
-  let input_with_indices = List.mapi input ~f:(fun idx el -> (idx, el)) in
-  let lefts, rights =
-    List.partition_map input_with_indices ~f:(fun (idx, el) ->
-        match partitioner el with
-        | First x ->
-            First (idx, x)
-        | Second y ->
-            Second (idx, y) )
-  in
-  let batch_process_snd ~f = Fn.compose (Tuple2.map_snd ~f) List.unzip in
-  let lefts_idx, lefts_processed = batch_process_snd ~f:process_left lefts in
-  let rights_idx, rights_processed =
-    batch_process_snd ~f:process_right rights
-  in
-
-  finalizer lefts_processed rights_processed
-    ~f:(fun left_materialized right_materialized ->
-      let left_materialized_indexed =
-        List.zip_exn lefts_idx left_materialized
-      in
-      let right_materialized_indexed =
-        List.zip_exn rights_idx right_materialized
-      in
-      List.merge left_materialized_indexed right_materialized_indexed
-        ~compare:(fun (left_idx, _) (right_idx, _) ->
-          compare left_idx right_idx )
-      |> List.map ~f:snd )
-
 let check_commands ledger ~verifier
     ~(transaction_pool_proxy : transaction_pool_proxy)
     (cs : User_command.t With_status.t list) =
@@ -100,7 +57,7 @@ let check_commands ledger ~verifier
         First fast_forward
   in
   let%map xs =
-    process_separately ~partitioner ~process_left:Fn.id
+    List.process_separately ~partitioner ~process_left:Fn.id
       ~process_right:(Verifier.verify_commands verifier)
       ~finalizer:(fun left right_m ~f ->
         let%map.Deferred.Or_error right = right_m in
