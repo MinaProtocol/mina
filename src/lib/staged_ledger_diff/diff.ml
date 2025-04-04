@@ -178,8 +178,9 @@ module Make_str (A : Wire_types.Concrete) = struct
     type t =
       (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_two.t
 
-    let write_all_proofs_to_disk : Stable.Latest.t -> t =
-      Pre_diff_two.map ~f1:Transaction_snark_work.write_all_proofs_to_disk
+    let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
+      Pre_diff_two.map
+        ~f1:(Transaction_snark_work.write_all_proofs_to_disk ~proof_cache_db)
         ~f2:Fn.id
 
     let read_all_proofs_from_disk : t -> Stable.Latest.t =
@@ -206,8 +207,9 @@ module Make_str (A : Wire_types.Concrete) = struct
     type t =
       (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_one.t
 
-    let write_all_proofs_to_disk : Stable.Latest.t -> t =
-      Pre_diff_one.map ~f1:Transaction_snark_work.write_all_proofs_to_disk
+    let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
+      Pre_diff_one.map
+        ~f1:(Transaction_snark_work.write_all_proofs_to_disk ~proof_cache_db)
         ~f2:Fn.id
 
     let read_all_proofs_from_disk : t -> Stable.Latest.t =
@@ -260,14 +262,16 @@ module Make_str (A : Wire_types.Concrete) = struct
       Pre_diff_with_at_most_two_coinbase.t
       * Pre_diff_with_at_most_one_coinbase.t option
 
-    let write_all_proofs_to_disk
+    let write_all_proofs_to_disk ~proof_cache_db
         (( pre_diff_with_at_most_two_coinbase
          , pre_diff_with_at_most_one_coinbase_opt ) :
           Stable.Latest.t ) : t =
       ( Pre_diff_with_at_most_two_coinbase.write_all_proofs_to_disk
-          pre_diff_with_at_most_two_coinbase
+          ~proof_cache_db pre_diff_with_at_most_two_coinbase
       , Option.map pre_diff_with_at_most_one_coinbase_opt
-          ~f:Pre_diff_with_at_most_one_coinbase.write_all_proofs_to_disk )
+          ~f:
+            (Pre_diff_with_at_most_one_coinbase.write_all_proofs_to_disk
+               ~proof_cache_db ) )
 
     let read_all_proofs_from_disk
         (( pre_diff_with_at_most_two_coinbase
@@ -308,8 +312,9 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   type t = { diff : Diff.t } [@@deriving fields]
 
-  let write_all_proofs_to_disk t =
-    { diff = Diff.write_all_proofs_to_disk t.Stable.Latest.diff }
+  let write_all_proofs_to_disk ~proof_cache_db t =
+    { diff = Diff.write_all_proofs_to_disk ~proof_cache_db t.Stable.Latest.diff
+    }
 
   let read_all_proofs_from_disk t =
     { Stable.Latest.diff = Diff.read_all_proofs_from_disk t.diff }

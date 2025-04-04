@@ -6,18 +6,6 @@ open Currency
 module Ledger = Mina_ledger.Ledger
 module Sparse_ledger = Mina_ledger.Sparse_ledger
 
-let map2_or_error xs ys ~f =
-  let rec go xs ys acc =
-    match (xs, ys) with
-    | [], [] ->
-        Ok (List.rev acc)
-    | x :: xs, y :: ys -> (
-        match f x y with Error e -> Error e | Ok z -> go xs ys (z :: acc) )
-    | _, _ ->
-        Or_error.error_string "Length mismatch"
-  in
-  go xs ys []
-
 module type Monad_with_Or_error_intf = sig
   type 'a t
 
@@ -359,26 +347,6 @@ let create_expected_statement ~constraint_constants
   ; supply_increase
   ; sok_digest = ()
   }
-
-let completed_work_to_scanable_work ~proof_cache_db (job : job)
-    (fee, current_proof, prover) : Ledger_proof_with_sok_message.t Or_error.t =
-  let sok_digest = Ledger_proof.sok_digest current_proof
-  and proof = Ledger_proof.underlying_proof current_proof in
-  match job with
-  | Base { statement; _ } ->
-      let ledger_proof =
-        Ledger_proof.create ~statement ~sok_digest ~proof
-        |> Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db
-      in
-      Ok (ledger_proof, Sok_message.create ~fee ~prover)
-  | Merge ((p, _), (p', _)) ->
-      let open Or_error.Let_syntax in
-      let s = Ledger_proof.Cached.statement p
-      and s' = Ledger_proof.Cached.statement p' in
-      let%map statement = Transaction_snark.Statement.merge s s' in
-      ( Ledger_proof.create ~statement ~sok_digest ~proof
-        |> Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db
-      , Sok_message.create ~fee ~prover )
 
 let total_proofs (works : Transaction_snark_work.t list) =
   List.sum (module Int) works ~f:(fun w -> One_or_two.length w.proofs)
@@ -1401,32 +1369,22 @@ let all_work_pairs t
 
 let update_metrics t = Parallel_scan.update_metrics t.scan_state
 
-let fill_work_and_enqueue_transactions t ~proof_cache_db ~logger transactions
-    work =
+let fill_work_and_enqueue_transactions t ~logger transactions work =
   let open Or_error.Let_syntax in
-  let fill_in_transaction_snark_work tree (works : Transaction_snark_work.t list)
-      : Ledger_proof_with_sok_message.t list Or_error.t =
-    let next_jobs =
-      List.(
-        take
-          (concat @@ Parallel_scan.jobs_for_next_update tree)
-          (total_proofs works))
-    in
-    map2_or_error next_jobs
-      (List.concat_map works ~f:(fun w ->
-           let fee = Transaction_snark_work.fee w in
-           let prover = Transaction_snark_work.prover w in
-           One_or_two.map (Transaction_snark_work.proofs w) ~f:(fun proof ->
-               (fee, proof, prover) )
-           |> One_or_two.to_list ) )
-      ~f:(completed_work_to_scanable_work ~proof_cache_db)
+  let deconstruct_work (w : Transaction_snark_work.t) :
+      Ledger_proof_with_sok_message.t list =
+    let fee = Transaction_snark_work.fee w in
+    let prover = Transaction_snark_work.prover w in
+    One_or_two.map (Transaction_snark_work.proofs w) ~f:(fun proof ->
+        (proof, Sok_message.create ~fee ~prover) )
+    |> One_or_two.to_list
   in
   (*get incomplete transactions from previous proof which will be completed in
      the new proof, if there's one*)
   let old_proof_and_incomplete_zkapp_updates =
     incomplete_txns_from_recent_proof_tree t
   in
-  let%bind work_list = fill_in_transaction_snark_work t.scan_state work in
+  let work_list = List.concat_map ~f:deconstruct_work work in
   let%bind proof_opt, updated_scan_state =
     Parallel_scan.update t.scan_state ~completed_jobs:work_list
       ~data:transactions

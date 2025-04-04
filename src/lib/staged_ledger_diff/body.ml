@@ -61,9 +61,10 @@ module Make_str (A : Wire_types.Concrete) = struct
          (Bitswap_block.blocks_of_data ~max_block_size:262144)
          (serialize_with_len_and_tag ~tag)
 
-  let write_all_proofs_to_disk t =
+  let write_all_proofs_to_disk ~proof_cache_db t =
     { staged_ledger_diff =
-        Diff.write_all_proofs_to_disk t.Stable.Latest.staged_ledger_diff
+        Diff.write_all_proofs_to_disk ~proof_cache_db
+          t.Stable.Latest.staged_ledger_diff
     }
 
   let read_all_proofs_from_disk t =

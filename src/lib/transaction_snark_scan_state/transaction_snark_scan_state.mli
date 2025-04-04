@@ -87,7 +87,6 @@ val empty :
 
 val fill_work_and_enqueue_transactions :
      t
-  -> proof_cache_db:Proof_cache_tag.cache_db
   -> logger:Logger.t
   -> Transaction_with_witness.t list
   -> Transaction_snark_work.t list

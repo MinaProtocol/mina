@@ -227,8 +227,8 @@ module Duplicate_block_detector = struct
           [%log error] ~metadata msg )
 end
 
-let validate ~logger ~trust_system ~verifier ~initialization_finish_signal
-    ~precomputed_values =
+let validate ~proof_cache_db ~logger ~trust_system ~verifier
+    ~initialization_finish_signal ~precomputed_values =
   let genesis_state_hash =
     (Precomputed_values.genesis_state_hashes precomputed_values).state_hash
   in
@@ -291,6 +291,7 @@ let validate ~logger ~trust_system ~verifier ~initialization_finish_signal
                 let body b =
                   Mina_block.Stable.Latest.body b
                   |> Staged_ledger_diff.Body.write_all_proofs_to_disk
+                       ~proof_cache_db
                 in
                 let b_or_h' =
                   match b_or_h with
