@@ -10,6 +10,8 @@ let S = ../../Lib/SelectFiles.dhall
 
 let DockerImage = ../../Command/DockerImage.dhall
 
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -30,9 +32,8 @@ in  Pipeline.build
         [ let toolchainBullseyeSpec =
                 DockerImage.ReleaseSpec::{
                 , service = Artifacts.Type.Toolchain
-                , deb_codename = "bullseye"
+                , deb_codename = DebianVersions.DebVersion.Bullseye
                 , no_cache = True
-                , step_key = "toolchain-bullseye-docker-image"
                 }
 
           in  DockerImage.generateStep toolchainBullseyeSpec
