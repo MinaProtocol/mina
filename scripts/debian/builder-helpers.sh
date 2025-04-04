@@ -190,7 +190,7 @@ build_keypair_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building generate keypair deb:"
 
-  create_control_file mina-generate-keypair "${SHARED_DEPS}" 'Utility to regenerate mina private public keys in new format' "${SUGGESTED_DEPS}"
+  create_control_file mina-generate-keypair "${SHARED_DEPS}" 'Utility to regenerate mina private public keys' "${SUGGESTED_DEPS}"
 
   # Binaries
   cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"

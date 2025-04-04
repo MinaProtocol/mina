@@ -40,7 +40,7 @@ export DEBIAN_FRONTEND=noninteractive
 rm -f /etc/apt/sources.list.d/hashicorp.list
 
 apt-get update
-apt-get install -y git apt-transport-https ca-certificates aptly tzdata curl
+apt-get install -y git apt-transport-https ca-certificates tzdata curl
 
 git config --global --add safe.directory /workdir
 

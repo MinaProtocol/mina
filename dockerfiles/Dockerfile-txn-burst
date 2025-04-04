@@ -11,7 +11,6 @@ ARG deb_version
 ARG deb_codename=bullseye
 ARG deb_release=unstable
 ARG network=mainnet
-ARG deb_repo="http://packages.o1test.net"
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $deb_codename $deb_release $deb_version"
@@ -32,11 +31,17 @@ RUN apt-get -y update \
         man \
     && rm -rf /var/lib/apt/lists/*
 
+
+ADD mina-${network}_${deb_version}.deb mina.deb
+ADD mina-batch-txn_${deb_version}.deb mina-batch-txn.deb
+ADD mina-logproc_${deb_version}.deb mina-logproc.deb
+    
 #install mina and txn burst tool
-RUN echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" | tee /etc/apt/sources.list.d/mina.list \
-  && apt-get update\
-  && apt-get install --quiet --yes --allow-downgrades "mina-$network=$deb_version" \
-  && apt-get install --quiet --yes --allow-downgrades "mina-batch-txn=$deb_version" \
+RUN apt-get update\
+  && apt-get install --quiet --yes --allow-downgrades -f \ 
+  "./mina.deb" \
+  "./mina-logproc.deb" \
+  "./mina-batch-txn.deb" \
   && rm -rf /var/lib/apt/lists/*
 
 USER root
@@ -46,4 +51,4 @@ ENV MINA_PRIVKEY_PASS ""
 
 ENTRYPOINT ["sleep", "infinity"]
 
-CMD ["./_build/default/src/app/batch_txn_tool/batch_txn_tool.exe"]
+CMD [mina-batch-txn]

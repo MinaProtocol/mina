@@ -3,7 +3,6 @@ FROM ${image} AS production
 ARG deb_codename=bullseye
 ARG deb_version
 ARG deb_release=unstable
-ARG deb_repo="http://packages.o1test.net"
 ARG network=mainnet
 
 ARG psql_version=13
@@ -61,11 +60,17 @@ RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
 # --- Generate en_US.UTF-8 locale to allow use of O(1) Labs DB dumps
 RUN locale-gen en_US.UTF-8
 
+ADD "mina-logproc_$deb_version.deb" mina-logproc.deb
+ADD "mina-test-suite_$deb_version.deb" mina-test-suite.deb
+ADD "mina-$network-instrumented_$deb_version.deb" mina-instrumented.deb
+ADD "mina-archive-instrumented_$deb_version.deb" mina-archive-instrumented.deb
+
 # jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename " \
-  && echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update --quiet --yes \
-  && apt-get install --quiet --yes --allow-downgrades -o Dpkg::Options::="--force-overwrite" "mina-test-suite=$deb_version" "mina-$network-instrumented=$deb_version" "mina-archive-instrumented=$deb_version" \ 
+  && apt-get install --quiet --yes --allow-downgrades -o Dpkg::Options::="--force-overwrite" -f ./mina-test-suite.deb ./mina-instrumented.deb ./mina-archive-instrumented.deb \
   && rm -rf /var/lib/apt/lists/*
+
+RUN rm -f mina-logproc.deb mina-test-suite.deb mina-instrumented.deb mina-archive-instrumented.deb
 
 ENTRYPOINT ["sleep","infinity"]

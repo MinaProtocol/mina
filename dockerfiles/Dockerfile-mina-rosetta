@@ -85,14 +85,20 @@ RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
     > ${MINA_CONFIG_DIR}/wallets/store/${PK} \
     && chmod go-rwx ${MINA_CONFIG_DIR}/wallets/store/${PK}
 
+ADD "mina-logproc_$deb_version.deb" "mina-logproc.deb"
+ADD "mina-$network_$deb_version.deb" "mina.deb"
+ADD "mina-rosetta-$network_$deb_version.deb" "mina-rosetta.deb"
+ADD "mina-archive_$deb_version.deb" "mina-archive.deb"
 
 # Mina daemon package
 # jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
     && echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
     && apt-get update --quiet --yes \
-    && apt-get install --quiet --yes --allow-downgrades "mina-$network=$deb_version" "mina-rosetta-$network=$deb_version" "mina-archive=$deb_version" "mina-zkapp-test-transaction=$deb_version" \
+    && apt-get install --quiet --yes --allow-downgrades "./mina-logproc.deb" "./mina.deb" "./mina-rosetta.deb" "./mina-archive.deb" \
     && rm -rf /var/lib/apt/lists/*
+
+RUN rm -f mina-logproc.deb mina.deb mina-rosetta.deb mina-archive.deb mina-zkapp-test-transaction.deb
 
 # --- Set up postgres
 USER postgres

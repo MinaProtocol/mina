@@ -271,16 +271,10 @@ make build
 Prerequisites: 
 
 - debian package previously built
-- aptly app
 
 Steps:
 
-1. Start local debian repository
-```
-./scripts/debian/aptly.sh start -b -c focal -d _build/ -m unstable -l -p 8081
-```
-
-IMPORTANT: debians should be placed in _build folder
+1. Move debians to _build folder
 
 2. Build docker:
 ```

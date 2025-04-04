@@ -52,19 +52,9 @@ for i in "${debs[@]}"; do
    debs_with_version+=("${i}=${MINA_DEB_VERSION}")
 done
 
-# Start aptly
-source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --clean --background
-
-# Install debians
-echo "Installing mina packages: $DEBS"
-echo "deb [trusted=yes] http://localhost:8080 $MINA_DEB_CODENAME unstable" | $SUDO tee /etc/apt/sources.list.d/mina.list
-
 # Update apt packages for the new repo, preserving all others
 $SUDO apt-get update --yes -o Dir::Etc::sourcelist="sources.list.d/mina.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"
 $SUDO apt-get remove --yes "${debs[@]}"
-$SUDO apt-get install --yes --allow-downgrades "${debs_with_version[@]}"
+$SUDO apt-get install --yes --allow-downgrades -f "${debs_with_version[@]}"
 
 
-
-# Cleaning up
-source ./scripts/debian/aptly.sh stop  --clean

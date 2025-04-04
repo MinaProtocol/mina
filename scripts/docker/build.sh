@@ -27,6 +27,7 @@ function usage() {
   echo "      --deb-version         The version string for the debian package to install"
   echo "      --deb-profile         The profile string for the debian package to install"
   echo "      --deb-build-flags     The build-flags string for the debian package to install"
+  echo "      --deb-folder          The folder to copy the debian package from"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
@@ -48,6 +49,8 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-repo) INPUT_REPO="$2"; shift;;
   --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
   --deb-repo-key) DEB_REPO_KEY="$2"; shift;;
+  --deb-folder) DEB_FOLDER="$2"; shift;;
+  -h|--help) usage;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
@@ -96,6 +99,11 @@ if [[ -z "$DEB_PROFILE" ]]; then
   DEB_PROFILE="standard"
 fi
 
+if [[ -z "$DEB_FOLDER" ]]; then 
+  echo "Debian folder is not set."
+  exit 1
+fi
+
 if [[ -z "$DEB_BUILD_FLAGS" ]]; then 
   DEB_BUILD_FLAGS=""
 fi
@@ -131,6 +139,7 @@ case "${SERVICE}" in
         ;;
     mina-rosetta)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
+        DOCKER_CONTEXT="dockerfiles/"
         ;;
     mina-zkapp-test-transaction)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-zkapp-test-transaction"
@@ -166,7 +175,12 @@ docker system prune --all --force --filter until=24h
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
+  # copy all debians to the dockerfiles folder
+  echo $(pwd)
+  cp -r $DEB_FOLDER/*.deb . 
   cat $DOCKERFILE_PATH | docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO -t "$TAG" -
 else
+  echo $(pwd)
+  cp -r $DEB_FOLDER/*.deb dockerfiles
   docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
 fi
