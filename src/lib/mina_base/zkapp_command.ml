@@ -193,6 +193,10 @@ end
 
 include T
 
+let write_all_proofs_to_disk : Stable.Latest.t -> t = Fn.id
+
+let read_all_proofs_from_disk : t -> Stable.Latest.t = Fn.id
+
 [%%define_locally Stable.Latest.(of_wire, to_wire)]
 
 [%%define_locally Stable.Latest.Wire.(gen)]
