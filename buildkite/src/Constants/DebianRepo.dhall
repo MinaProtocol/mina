@@ -8,13 +8,12 @@ let Optional/toList = Prelude.Optional.toList
 
 let DebianRepo
     : Type
-    = < Local | PackagesO1Test | Unstable | Nightly | Stable >
+    = < Local | Unstable | Nightly | Stable >
 
 let address =
           \(repo : DebianRepo)
       ->  merge
             { Local = "http://localhost:8080"
-            , PackagesO1Test = "http://packages.o1test.net"
             , Unstable = "https://unstable.apt.packages.minaprotocol.com"
             , Nightly = "https://nightly.apt.packages.minaprotocol.com"
             , Stable = "https://stable.apt.packages.minaprotocol.com"
@@ -25,7 +24,6 @@ let bucket =
           \(repo : DebianRepo)
       ->  merge
             { Local = None Text
-            , PackagesO1Test = Some "packages.o1test.net"
             , Unstable = Some "unstable.apt.packages.minaprotocol.com"
             , Nightly = Some "nightly.apt.packages.minaprotocol.com"
             , Stable = Some "stable.apt.packages.minaprotocol.com"
@@ -58,7 +56,6 @@ let keyId =
           \(repo : DebianRepo)
       ->  merge
             { Local = None Text
-            , PackagesO1Test = None Text
             , Unstable = Some "B40D16B1A4773DE415DAF9DBFE236881C07523DC"
             , Nightly = Some "B40D16B1A4773DE415DAF9DBFE236881C07523DC"
             , Stable = Some "B40D16B1A4773DE415DAF9DBFE236881C07523DC"
@@ -71,7 +68,6 @@ let keyAddress =
 
           in  merge
                 { Local = None Text
-                , PackagesO1Test = None Text
                 , Unstable = Some (address repo ++ keyPath)
                 , Nightly = Some (address repo ++ keyPath)
                 , Stable = Some (address repo ++ keyPath)
