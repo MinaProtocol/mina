@@ -189,7 +189,8 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
     let prev_block =
       Binable.of_string (module Mina_block.Stable.Latest) prev_block_data
     in
-    Mina_block.header prev_block |> Mina_block.Header.protocol_state
+    Mina_block.Stable.Latest.header prev_block
+    |> Mina_block.Header.protocol_state
   in
   let consensus_constants =
     Consensus.Constants.create ~constraint_constants

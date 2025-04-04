@@ -992,7 +992,9 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                      transition frontier" ;
                   Deferred.map ~f:Result.return
                     (Mina_networking.broadcast_state net
-                       (Breadcrumb.block_with_hash breadcrumb) )
+                       ( Breadcrumb.block_with_hash breadcrumb
+                       |> With_hash.map ~f:Mina_block.read_all_proofs_from_disk
+                       ) )
               | `Timed_out ->
                   (* FIXME #3167: this should be fatal, and more
                      importantly, shouldn't happen.

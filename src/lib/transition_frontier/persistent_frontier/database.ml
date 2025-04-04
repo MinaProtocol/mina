@@ -349,7 +349,8 @@ let check t ~genesis_state_hash =
       let%bind () = check_version () in
       let%bind root_hash, root_block = check_base () in
       let root_protocol_state =
-        root_block |> Mina_block.header |> Mina_block.Header.protocol_state
+        root_block |> Mina_block.Stable.Latest.header
+        |> Mina_block.Header.protocol_state
       in
       let%bind () =
         let persisted_genesis_state_hash =
@@ -360,7 +361,7 @@ let check t ~genesis_state_hash =
         else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
       in
       let%map () = check_arcs root_hash in
-      root_block |> Mina_block.header |> Header.protocol_state
+      root_block |> Mina_block.Stable.Latest.header |> Header.protocol_state
       |> Mina_state.Protocol_state.blockchain_state
       |> Mina_state.Blockchain_state.snarked_ledger_hash )
   |> Result.map_error ~f:(fun err -> `Corrupt (`Raised err))
@@ -374,6 +375,7 @@ let initialize t ~root_data =
     ( State_hash.With_state_hashes.state_hash t
     , State_hash.With_state_hashes.data t )
   in
+  let root_transition = Mina_block.read_all_proofs_from_disk root_transition in
   [%log' trace t.logger]
     ~metadata:[ ("root_data", Root_data.Limited.to_yojson root_data) ]
     "Initializing persistent frontier database with $root_data" ;
@@ -425,8 +427,11 @@ let add ~arcs_cache ~transition =
   let parent_arcs = State_hash.Table.find_exn arcs_cache parent_hash in
   State_hash.Table.set arcs_cache ~key:parent_hash ~data:(hash :: parent_arcs) ;
   State_hash.Table.set arcs_cache ~key:hash ~data:[] ;
+  let transition_unwrapped =
+    With_hash.data transition |> Mina_block.read_all_proofs_from_disk
+  in
   fun batch ->
-    Batch.set batch ~key:(Transition hash) ~data:(With_hash.data transition) ;
+    Batch.set batch ~key:(Transition hash) ~data:transition_unwrapped ;
     Batch.set batch ~key:(Arcs hash) ~data:[] ;
     Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs)
 
@@ -463,14 +468,17 @@ let get_transition t hash =
     }
   in
   let parent_hash =
-    block |> With_hash.data |> Mina_block.header
+    block |> With_hash.data |> Mina_block.Stable.Latest.header
     |> Mina_block.Header.protocol_state
     |> Mina_state.Protocol_state.previous_state_hash
+  in
+  let cached_block =
+    With_hash.map ~f:Mina_block.write_all_proofs_to_disk block
   in
   (* TODO: the delta transition chain proof is incorrect (same behavior the daemon used to have, but we should probably fix this?) *)
   Mina_block.Validated.unsafe_of_trusted_block
     ~delta_block_chain_proof:(Mina_stdlib.Nonempty_list.singleton parent_hash)
-    (`This_block_is_trusted_to_be_safe block)
+    (`This_block_is_trusted_to_be_safe cached_block)
 
 let get_arcs t hash = get t.db ~key:(Arcs hash) ~error:(`Not_found (`Arcs hash))
 

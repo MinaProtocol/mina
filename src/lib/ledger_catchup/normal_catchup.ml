@@ -469,7 +469,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                            ~hash_data:
                              (Fn.compose Mina_state.Protocol_state.hashes
                                 (Fn.compose Mina_block.Header.protocol_state
-                                   Mina_block.header ) ) )
+                                   Mina_block.Stable.Latest.header ) ) )
                   in
                   if not @@ verify_against_hashes hashed_transitions hashes then (
                     let error_msg =
@@ -824,6 +824,12 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                  else
                    download_transitions ~logger ~trust_system ~network
                      ~preferred_peer ~hashes_of_missing_transitions ~target_hash
+                   >>| List.map
+                         ~f:
+                           (Envelope.Incoming.map
+                              ~f:
+                                (With_hash.map
+                                   ~f:Mina_block.write_all_proofs_to_disk ) )
                in
                [%log debug]
                  ~metadata:[ ("target_hash", State_hash.to_yojson target_hash) ]
