@@ -30,7 +30,9 @@ DEBIAN_REPO=packages.o1test.net
 
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 SUBCOMMAND_TAB="        "
-
+HETZNER_USER=u434410
+HETZNER_HOST=u434410-sub2.your-storagebox.de
+HETZNER_KEY=${HETZNER_KEY:-$HOME/.ssh/id_rsa}
 ################################################################################
 # pre-setup
 ################################################################################
@@ -181,35 +183,100 @@ function calculate_docker_tag() {
     fi
 }
 
-function get_cached_debian_or_download_from_gs() {
-    local __artifact=$1
-    local __codename=$2
-    local __network=$3
+function storage_list() {
+    local backend=$1
+    local path=$2
 
-    local __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network)
+    case $backend in
+        gs)
+            gsutil list "$path"
+            ;;
 
-    local __artifact_gs_url="gs://buildkite_k8s/coda/shared/$__buildkite_build_id/debians/$__codename/${__artifact_full_name}_*"
+        hetzner)
+            ssh -p23 -i $HETZNER_KEY $HETZNER_USER@$HETZNER_HOST "ls $path"
+            ;;
+        *)
+            echo "❌ Unsupported backend: $backend"
+            exit 1
+            ;;
+    esac
+}
 
-    local __check=$(gsutil list  "$__artifact_gs_url")
+function storage_md5() {
+    local backend=$1
+    local path=$2
 
-    if [[ "$__check" == "" ]]; then
-        echo -e "❌ ${RED} !! No debian package found using $__artifact_full_name. Are you sure ($__buildkite_build_id) buildkite build it is correct ? Exiting.${CLEAR}\n";
+    case $backend in
+        gs)
+            gsutil hash -h -m "$path" | grep "Hash (md5)" | awk '{print $3}'
+            ;;
+        hetzner)
+            ssh -p23 -i $HETZNER_KEY $HETZNER_USER@$HETZNER_HOST  "md5sum $path" | awk '{print $1}'
+            ;;
+        *)
+            echo "❌ Unsupported backend: $backend"
+            exit 1
+            ;;
+    esac
+}
+
+function storage_download() {
+    local backend=$1
+    local remote_path=$2
+    local local_path=$3
+
+    case $backend in
+        gs)
+            gsutil cp "$remote_path" "$local_path"
+            ;;
+        hetzner)
+           ssh -p 23 -i $HETZNER_KEY $HETZNER_USER@$HETZNER_HOST "ls $remote_path" | xargs -I {} rsync -avz --rsh="ssh -p 23 -i $HETZNER_KEY" $HETZNER_USER@$HETZNER_HOST:{} $local_path
+            ;;
+        *)
+            echo "❌ Unsupported backend: $backend"
+            exit 1
+            ;;
+    esac
+}
+
+function get_cached_debian_or_download() {
+    local backend=$1
+    local artifact=$2
+    local codename=$3
+    local network=$4
+
+    local artifact_full_name=$(get_artifact_with_suffix "$artifact" "$network")
+    local remote_path
+    if [[ $backend == "gs" ]]; then
+        remote_path="gs://buildkite_k8s/coda/shared/$BUILDKITE_BUILD_ID/debians/$codename/${artifact_full_name}_*"
+    elif [[ $backend == "hetzner" ]]; then
+        remote_path="/home/o1labs-generic/pvc-4d294645-6466-4260-b933-1b909ff9c3a1/$BUILDKITE_BUILD_ID/debians/$codename/${artifact_full_name}_*"
+    else
+        echo "❌ Unsupported backend: $backend"
         exit 1
     fi
 
-    TARGET_HASH=$(gsutil hash -h -m  $__artifact_gs_url | grep "Hash (md5)" | awk '{print $3}')
-    
-    mkdir -p $DEBIAN_CACHE_FOLDER/$__codename
+    local check=$(storage_list "$backend" "$remote_path")
 
-    echo " 🗂️  Checking cache for $__codename/$__artifact_full_name Debian package"
+    if [[ -z "$check" ]]; then
+        echo -e "❌ ${RED} !! No debian package found using $artifact_full_name. Are you sure ($BUILDKITE_BUILD_ID) buildkite build is correct? Exiting.${CLEAR}\n"
+        exit 1
+    fi
 
-    if md5sum $DEBIAN_CACHE_FOLDER/$__codename/${__artifact_full_name}* | awk '{print $1}' | grep -q $TARGET_HASH > /dev/null; then
-        echo "   🗂️  $__artifact_full_name Debian package already cached. Skipping download."
+    local target_hash=$(storage_md5 "$backend" "$remote_path")
+
+    mkdir -p "$DEBIAN_CACHE_FOLDER/$codename"
+
+    echo " 🗂️  Checking cache for $codename/$artifact_full_name Debian package"
+
+    if md5sum "$DEBIAN_CACHE_FOLDER/$codename/${artifact_full_name}"* | awk '{print $1}' | grep -q "$target_hash" > /dev/null; then
+        echo "   🗂️  $artifact_full_name Debian package already cached. Skipping download."
     else
-        echo "   📂  $__artifact_full_name Debian package is not cached. Downloading from google cloud bucket."
-        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../cache/manager.sh read "debians/$__codename/${__artifact_full_name}_*"  $DEBIAN_CACHE_FOLDER/$__codename
+        echo "   📂  $artifact_full_name Debian package is not cached. Downloading from $backend."
+        storage_download "$backend" "$remote_path" "$DEBIAN_CACHE_FOLDER/$codename"
     fi
 }
+
 
 function publish_debian() {
     local __artifact=$1
@@ -220,8 +287,9 @@ function publish_debian() {
     local __network=$6
     local __verify=$7
     local __dry_run=$8
+    local __backend=$9
 
-    get_cached_debian_or_download_from_gs $__artifact $__codename "$__network"
+    get_cached_debian_or_download $__backend $__artifact $__codename "$__network"
     local __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network)
     local __deb=$DEBIAN_CACHE_FOLDER/$__codename/"${__artifact_full_name}"
 
@@ -382,6 +450,7 @@ function publish_help(){
     printf "  %-25s %s\n" "--only-debians" "[bool] publish only debian packages"; 
     printf "  %-25s %s\n" "--verify" "[bool] verify packages are published correctly. WARINING: it requires docker engine to be installed"; 
     printf "  %-25s %s\n" "--dry-run" "[bool] doesn't publish anything. Just print what would be published"; 
+    printf "  %-25s %s\n" "--backend" "[string] backend to use for storage. e.g gs,hetzner. default: gs";
     echo ""
     echo "Example:"
     echo ""
@@ -409,6 +478,7 @@ function publish(){
     local __only_debians=0
     local __verify=0
     local __dry_run=0
+    local __backend="gs"
 
     while [ ${#} -gt 0 ]; do
         error_message="❌ Error: a value is needed for '$1'";
@@ -464,6 +534,10 @@ function publish(){
                 __dry_run=1
                 shift 1;
             ;;
+            --backend )
+                __backend=${2:?$error_message}
+                shift 2;
+            ;;
             * )     
                 echo -e "❌ ${RED} !! Unknown option: $1${CLEAR}\n";
                 echo "";
@@ -508,9 +582,16 @@ function publish(){
     echo " - Dry run: $__dry_run"
     echo ""
 
-    #check environment setup
-    check_gsutil
+    if [[ $__backend != "gs" && $__backend != "hetzner" ]]; then
+        echo -e "❌ ${RED} !! Backend (--backend) can be only gs or hetzner${CLEAR}\n";
+        publish_help; exit 1;
+    fi
 
+    if [[ $__backend == "gs" ]]; then
+        #check environment setup
+        check_gsutil
+    fi
+   
     if [[ $__verify == 1 ]]; then
         check_docker
     fi
@@ -535,7 +616,8 @@ function publish(){
                                         $__channel \
                                         "" \
                                         $__verify \
-                                        $__dry_run
+                                        $__dry_run \
+                                        $__backend
                             fi
 
                             if [[ $__only_debians == 0 ]]; then
@@ -552,7 +634,8 @@ function publish(){
                                             $__channel \
                                             "" \
                                             $__verify \
-                                            $__dry_run
+                                            $__dry_run \
+                                            $__backend
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -569,7 +652,8 @@ function publish(){
                                             $__channel \
                                             $network \
                                             $__verify \
-                                            $__dry_run
+                                            $__dry_run \
+                                            $__backend
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -587,7 +671,8 @@ function publish(){
                                             $__channel \
                                             $network \
                                             $__verify \
-                                            $__dry_run
+                                            $__dry_run \
+                                            $__backend
                                     
                                 fi
 
