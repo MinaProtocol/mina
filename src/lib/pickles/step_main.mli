@@ -18,8 +18,6 @@ val step_main :
        'local_signature Pickles_types.Hlist.H1.T(Pickles_types.Nat).t
   -> local_signature_length:
        ('local_signature, 'proofs_verified) Pickles_types.Hlist.Length.t
-  -> local_branches:
-       'local_branches Pickles_types.Hlist.H1.T(Pickles_types.Nat).t
   -> local_branches_length:
        ('local_branches, 'proofs_verified) Pickles_types.Hlist.Length.t
   -> proofs_verified:('prev_vars, 'proofs_verified) Pickles_types.Hlist.Length.t

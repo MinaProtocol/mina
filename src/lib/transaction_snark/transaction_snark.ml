@@ -123,8 +123,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
 
     module Basic = struct
-      module N = Side_loaded_verification_key.Max_branches
-
       [%%versioned
       module Stable = struct
         module V1 = struct
@@ -170,7 +168,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             : ( Zkapp_statement.Checked.t * unit
               , Zkapp_statement.t * unit
               , Nat.N2.n * unit
-              , N.n * unit )
+              , Nat.N8.n * unit )
               t_typed
 
       let spec : type a b c d. (a, b, c, d) t_typed -> Spec.single list =

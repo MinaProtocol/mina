@@ -201,7 +201,6 @@ let verify_heterogenous (ts : Instance.t list) =
                   t.statement.proof_state.sponge_digest_before_evaluations
               ; messages_for_next_wrap_proof =
                   Wrap_hack.hash_messages_for_next_wrap_proof
-                    Max_proofs_verified.n
                     (Reduced_messages_for_next_proof_over_same_field.Wrap
                      .prepare
                        t.statement.proof_state.messages_for_next_wrap_proof )

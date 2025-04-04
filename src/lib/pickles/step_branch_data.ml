@@ -95,31 +95,31 @@ let create
       type a b n m k.
          (a, b, n, m) HT.t
       -> (a, k) Length.t
-      -> n H1.T(Nat).t * m H1.T(Nat).t * (n, k) Length.t * (m, k) Length.t =
+      -> n H1.T(Nat).t * (n, k) Length.t * (m, k) Length.t =
    fun ts len ->
     match (ts, len) with
     | [], Z ->
-        ([], [], Z, Z)
+        ([], Z, Z)
     | t :: ts, S len -> (
-        let ns, ms, len_ns, len_ms = extract_lengths ts len in
+        let ns, len_ns, len_ms = extract_lengths ts len in
         match Type_equal.Id.same_witness self.id t.id with
         | Some T ->
-            (max_proofs_verified :: ns, branches :: ms, S len_ns, S len_ms)
+            (max_proofs_verified :: ns, S len_ns, S len_ms)
         | None ->
-            let (module M), branches =
+            let (module M) =
               match t.kind with
               | Compiled ->
                   let d = Types_map.lookup_compiled t.id in
-                  (d.max_proofs_verified, d.branches)
+                  d.max_proofs_verified
               | Side_loaded ->
                   let d = Types_map.lookup_side_loaded t.id in
-                  (d.permanent.max_proofs_verified, d.permanent.branches)
+                  d.permanent.max_proofs_verified
             in
             let T = M.eq in
-            (M.n :: ns, branches :: ms, S len_ns, S len_ms) )
+            (M.n :: ns, S len_ns, S len_ms) )
   in
   Timer.clock __LOC__ ;
-  let widths, heights, local_signature_length, local_branches_length =
+  let widths, local_signature_length, local_branches_length =
     extract_lengths rule.prevs proofs_verified
   in
   let lte = Nat.lte_exn self_width max_proofs_verified in
@@ -200,8 +200,8 @@ let create
                 ((2 * (permuts + 1) * num_chunks) - 2 + permuts) / permuts )
         }
       ~public_input ~auxiliary_typ ~self_branches:branches ~proofs_verified
-      ~local_signature:widths ~local_signature_length ~local_branches:heights
-      ~local_branches_length ~lte ~known_wrap_keys ~self
+      ~local_signature:widths ~local_signature_length ~local_branches_length
+      ~lte ~known_wrap_keys ~self
     |> unstage
   in
   Timer.clock __LOC__ ;

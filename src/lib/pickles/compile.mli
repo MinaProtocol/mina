@@ -97,8 +97,6 @@ module Side_loaded : sig
 
     val of_compiled : _ Tag.t -> t Deferred.t
 
-    module Max_branches : Nat.Add.Intf
-
     module Max_width = Nat.N2
   end
 
@@ -129,7 +127,7 @@ module Side_loaded : sig
     -> max_proofs_verified:(module Nat.Add.Intf with type n = 'n1)
     -> feature_flags:Opt.Flag.t Plonk_types.Features.t
     -> typ:('var, 'value) Impls.Step.Typ.t
-    -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
+    -> ('var, 'value, 'n1, Nat.N8.n) Tag.t
 
   val verify_promise :
        typ:('var, 'value) Impls.Step.Typ.t

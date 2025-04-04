@@ -8,8 +8,7 @@ val pad_accumulator :
      list
 
 val hash_messages_for_next_wrap_proof :
-     'n Pickles_types.Nat.t
-  -> ( Backend.Tick.Curve.Affine.t
+     ( Backend.Tick.Curve.Affine.t
      , ( ( Backend.Tock.Field.t
          , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
          Pickles_types.Vector.t
@@ -58,8 +57,7 @@ module Checked : sig
     lazy_t
 
   val hash_constant_messages_for_next_wrap_proof :
-       'a Pickles_types.Nat.t
-    -> ( Backend.Tick.Curve.Affine.t
+       ( Backend.Tick.Curve.Affine.t
        , ( ( Backend.Tock.Field.t
            , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
            Pickles_types.Vector.t

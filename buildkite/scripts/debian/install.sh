@@ -53,7 +53,7 @@ for i in "${debs[@]}"; do
 done
 
 # Start aptly
-source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --clean --background
+source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --clean --background --wait
 
 # Install debians
 echo "Installing mina packages: $DEBS"
