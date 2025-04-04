@@ -13,20 +13,22 @@
 
 use js_sys::Promise;
 use spmc::{channel, Receiver, Sender};
+use std::{cell::RefCell, thread_local};
 use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "nodejs")]
 use js_sys::JsString;
 
-static mut THREAD_POOL: Option<rayon::ThreadPool> = None;
+thread_local! {
+    static THREAD_POOL: RefCell<Option<rayon::ThreadPool>> = RefCell::new(None);
+}
 
 pub fn run_in_pool<OP, R>(op: OP) -> R
 where
     OP: FnOnce() -> R + Send,
     R: Send,
 {
-    let pool = unsafe { THREAD_POOL.as_ref().unwrap() };
-    pool.install(op)
+    THREAD_POOL.with_borrow(|pool| pool.as_ref().unwrap().install(op))
 }
 
 #[wasm_bindgen]
@@ -79,25 +81,23 @@ impl PoolBuilder {
     // Important: it must take `self` by reference, otherwise
     // `start_worker_thread` will try to receive a message on a moved value.
     pub fn build(&mut self) {
-        unsafe {
-            THREAD_POOL = Some(
-                rayon::ThreadPoolBuilder::new()
-                    .num_threads(self.num_threads)
-                    // We could use postMessage here instead of Rust channels,
-                    // but currently we can't due to a Chrome bug that will cause
-                    // the main thread to lock up before it even sends the message:
-                    // https://bugs.chromium.org/p/chromium/issues/detail?id=1075645
-                    .spawn_handler(move |thread| {
-                        // Note: `send` will return an error if there are no receivers.
-                        // We can use it because all the threads are spawned and ready to accept
-                        // messages by the time we call `build()` to instantiate spawn handler.
-                        self.sender.send(thread).unwrap_throw();
-                        Ok(())
-                    })
-                    .build()
-                    .unwrap_throw(),
-            )
-        }
+        let thread_pool_builder = rayon::ThreadPoolBuilder::new()
+            .num_threads(self.num_threads)
+            // We could use postMessage here instead of Rust channels,
+            // but currently we can't due to a Chrome bug that will cause
+            // the main thread to lock up before it even sends the message:
+            // https://bugs.chromium.org/p/chromium/issues/detail?id=1075645
+            .spawn_handler(move |thread| {
+                // Note: `send` will return an error if there are no receivers.
+                // We can use it because all the threads are spawned and ready to accept
+                // messages by the time we call `build()` to instantiate spawn handler.
+                self.sender.send(thread).unwrap_throw();
+                Ok(())
+            });
+
+        THREAD_POOL.with_borrow_mut(|pool| {
+            *pool = Some(thread_pool_builder.build().unwrap_throw());
+        });
     }
 }
 
@@ -126,11 +126,11 @@ pub fn init_thread_pool(num_threads: usize) -> Promise {
 #[wasm_bindgen(js_name = exitThreadPool)]
 #[doc(hidden)]
 pub fn exit_thread_pool() -> Promise {
-    unsafe {
-        let promise = terminate_workers();
-        THREAD_POOL = None;
-        promise
-    }
+    let promise = terminate_workers();
+    THREAD_POOL.with_borrow_mut(|pool| {
+        *pool = None;
+    });
+    promise
 }
 
 #[wasm_bindgen]
