@@ -88,9 +88,6 @@ module For_step : sig
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
     { max_proofs_verified :
         (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
-    ; proofs_verifieds :
-        [ `Known of (Impls.Step.Field.t, 'branches) Pickles_types.Vector.t
-        | `Side_loaded ]
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
     ; wrap_key :
         inner_curve_var array Pickles_types.Plonk_verification_key_evals.t

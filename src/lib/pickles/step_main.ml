@@ -480,10 +480,7 @@ let step_main :
                       , max_proofs_verified
                       , self_branches )
                       Types_map.For_step.t =
-                    { proofs_verifieds =
-                        `Known
-                          (Vector.map basic.proofs_verifieds ~f:Field.of_int)
-                    ; max_proofs_verified
+                    { max_proofs_verified
                     ; public_input = basic.public_input
                     ; wrap_domain = `Known basic.wrap_domains.h
                     ; step_domains = `Known basic.step_domains

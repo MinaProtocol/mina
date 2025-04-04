@@ -148,8 +148,6 @@ module For_step = struct
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
     { max_proofs_verified :
         (module Nat.Add.Intf with type n = 'max_proofs_verified)
-    ; proofs_verifieds :
-        [ `Known of (Impls.Step.Field.t, 'branches) Vector.t | `Side_loaded ]
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
     ; wrap_key : inner_curve_var array Plonk_verification_key_evals.t
     ; wrap_domain :
@@ -184,7 +182,6 @@ module For_step = struct
     in
     { max_proofs_verified
     ; public_input
-    ; proofs_verifieds = `Side_loaded
     ; wrap_key
     ; wrap_domain = `Side_loaded index.actual_wrap_domain_size
     ; step_domains = `Side_loaded
@@ -206,7 +203,7 @@ module For_step = struct
   let of_compiled_with_known_wrap_key
       ({ wrap_key; step_domains } : _ Optional_wrap_key.known)
       ({ max_proofs_verified
-       ; proofs_verifieds
+       ; proofs_verifieds = _
        ; public_input
        ; wrap_key = _
        ; wrap_domains
@@ -218,8 +215,6 @@ module For_step = struct
        } :
         _ Compiled.t ) =
     { max_proofs_verified
-    ; proofs_verifieds =
-        `Known (Vector.map proofs_verifieds ~f:Impls.Step.Field.of_int)
     ; public_input
     ; wrap_key =
         Plonk_verification_key_evals.map wrap_key
