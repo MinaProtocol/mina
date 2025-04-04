@@ -7,7 +7,8 @@ RUN apt-get -y update && \
   DEBIAN_FRONTEND=noninteractive apt-get -y install \
     python3-pip \
     curl \
-    dumb-init
+    dumb-init && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /prometheus
 # Prometheus Setup
