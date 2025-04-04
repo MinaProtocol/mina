@@ -38,7 +38,7 @@ if [ $RET -eq 0 ]; then
 else
   # exclude branches for which merging cleanly is not a hard requirement
   if [ "${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" == "o1js-main" ]; then
-    echo "Conflicts were found, but the current branch does not have to merge cleanly. Exiting with code 0."
+    echo "Conflicts were found, but the current branch ($CURRENT) does not have to merge cleanly. Exiting with code 0."
     exit 0
   fi
 
