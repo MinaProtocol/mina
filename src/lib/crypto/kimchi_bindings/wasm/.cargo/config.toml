@@ -2,7 +2,7 @@
 target = "wasm32-unknown-unknown"
 
 [target.wasm32-unknown-unknown]
-rustflags = ["-C", "target-feature=+atomics,+bulk-memory", "-C", "link-arg=--no-check-features"]
+rustflags = ["-C", "target-feature=+atomics,+bulk-memory"]
 
 [unstable]
 build-std = ["panic_abort", "std"]
