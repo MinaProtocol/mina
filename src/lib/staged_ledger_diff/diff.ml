@@ -290,6 +290,11 @@ module Make_str (A : Wire_types.Concrete) = struct
               }
             , None )
         }
+
+      let completed_works (t : t) =
+        (fst t.diff).completed_works
+        @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d ->
+              d.completed_works )
     end
   end]
 

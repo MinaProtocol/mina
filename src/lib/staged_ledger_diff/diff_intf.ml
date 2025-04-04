@@ -131,6 +131,8 @@ module type Full = sig
       val to_latest : t -> t
 
       val empty_diff : t
+
+      val completed_works : t -> Transaction_snark_work.Stable.Latest.t list
     end
 
     module Latest = V2
