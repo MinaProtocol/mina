@@ -105,11 +105,6 @@ end = struct
       Char.of_int_exn n
 end
 
-module Max_branches = struct
-  include Nat.N8
-  module Log2 = Nat.N3
-end
-
 (* TODO: remove since it looks very much like the Domains module in the same directory *)
 module Domains = struct
   [@@@warning "-40-42"]

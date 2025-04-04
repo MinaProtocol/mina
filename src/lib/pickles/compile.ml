@@ -860,8 +860,7 @@ struct
     in
     Timer.clock __LOC__ ;
     let data : _ Types_map.Compiled.t =
-      { branches = Branches.n
-      ; proofs_verifieds
+      { proofs_verifieds
       ; max_proofs_verified
       ; public_input = typ
       ; wrap_key =
@@ -929,7 +928,6 @@ module Side_loaded = struct
     Types_map.add_side_loaded ~name
       { max_proofs_verified
       ; public_input = typ
-      ; branches = Verification_key.Max_branches.n
       ; feature_flags =
           Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
       ; num_chunks = Plonk_checks.num_chunks_by_default
