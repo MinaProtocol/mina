@@ -172,6 +172,106 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           (t.maps, get_parent t)
 
+    let get_uuid t = assert_is_attached t ; t.uuid
+
+    let get_directory t =
+      assert_is_attached t ;
+      Base.get_directory (Result.ok_or_failwith t.parent)
+
+    let depth t = assert_is_attached t ; t.depth
+
+    let update_maps ~f t =
+      t.maps <- f t.maps ;
+      Option.iter t.accumulated ~f:(fun acc ->
+          acc.current <- f acc.current ;
+          acc.next <- f acc.next )
+
+    let self_set_hash_impl t address hash =
+      update_maps t ~f:(fun maps ->
+          { maps with hashes = Map.set maps.hashes ~key:address ~data:hash } )
+
+    let path_batch_impl ~fixup_path ~self_lookup ~base_lookup locations =
+      let self_paths =
+        List.map locations ~f:(fun location ->
+            let address = Location.to_path_exn location in
+            self_lookup address
+            |> Option.value_map
+                 ~default:(Either.Second (location, address))
+                 ~f:Either.first )
+      in
+      let all_parent_paths =
+        let locs =
+          List.filter_map self_paths ~f:(function
+            | Either.First _ ->
+                None
+            | Either.Second (location, _) ->
+                Some location )
+        in
+        if List.is_empty locs then [] else base_lookup locs
+      in
+      let f parent_paths = function
+        | Either.First path ->
+            (parent_paths, path)
+        | Either.Second (_, address) ->
+            let path = fixup_path ~address (List.hd_exn parent_paths) in
+            (List.tl_exn parent_paths, path)
+      in
+      snd @@ List.fold_map ~init:all_parent_paths ~f self_paths
+
+    let rec self_path_impl ~element ~depth address =
+      let height = Addr.height ~ledger_depth:depth address in
+      if height >= depth then Some []
+      else
+        let%bind.Option el = element height address in
+        let%bind.Option parent_address = Addr.parent address |> Or_error.ok in
+        let%map.Option rest = self_path_impl ~element ~depth parent_address in
+        el :: rest
+
+    let empty_hash =
+      Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
+
+    let self_path_get_hash ~hashes ~current_location height address =
+      match Map.find hashes address with
+      | Some hash ->
+          Some hash
+      | None ->
+          let is_empty =
+            match current_location with
+            | None ->
+                true
+            | Some current_location ->
+                let current_address = Location.to_path_exn current_location in
+                Addr.is_further_right ~than:current_address address
+          in
+          if is_empty then Some (empty_hash height) else None
+
+    let self_merkle_path ~hashes ~current_location =
+      let element height address =
+        let sibling = Addr.sibling address in
+        let dir = Location.last_direction address in
+        let%map.Option sibling_hash =
+          self_path_get_hash ~hashes ~current_location height sibling
+        in
+        Direction.map dir ~left:(`Left sibling_hash) ~right:(`Right sibling_hash)
+      in
+      self_path_impl ~element
+
+    (* fixup_merkle_path patches a Merkle path reported by the parent,
+       overriding with hashes which are stored in the mask *)
+    let fixup_merkle_path ~hashes ~address:init =
+      let f address =
+        (* first element in the path contains hash at sibling of address *)
+        let sibling_mask_hash = Map.find hashes (Addr.sibling address) in
+        let parent_addr = Addr.parent_exn address in
+        let open Option in
+        function
+        | `Left h ->
+            (parent_addr, `Left (value sibling_mask_hash ~default:h))
+        | `Right h ->
+            (parent_addr, `Right (value sibling_mask_hash ~default:h))
+      in
+      Fn.compose snd @@ List.fold_map ~init ~f
+
     (** Either copies accumulated or initializes it with the parent being used as the [base]. *)
     let to_accumulated t =
       actualize_accumulated t ;
@@ -187,23 +287,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None, Error loc ->
           raise (Dangling_parent_reference (t.uuid, loc))
 
-    let get_uuid t = assert_is_attached t ; t.uuid
-
-    let get_directory t =
-      assert_is_attached t ;
-      Base.get_directory (Result.ok_or_failwith t.parent)
-
-    let depth t = assert_is_attached t ; t.depth
-
-    let update_maps ~f t =
-      t.maps <- f t.maps ;
-      Option.iter t.accumulated ~f:(fun acc ->
-          acc.current <- f acc.current ;
-          acc.next <- f acc.next )
-
-    let self_set_hash t address hash =
-      update_maps t ~f:(fun maps ->
-          { maps with hashes = Map.set maps.hashes ~key:address ~data:hash } )
+    let self_set_hash t address hash = self_set_hash_impl t address hash
 
     let self_set_location t account_id location =
       update_maps t ~f:(fun maps ->
@@ -235,6 +319,10 @@ module Make (Inputs : Inputs_intf.S) = struct
             token_owners =
               Map.set maps.token_owners ~key:token_id ~data:account_id
           } )
+
+    let hashes_and_ancestor t =
+      let { hashes; _ }, ancestor = maps_and_ancestor t in
+      (hashes, ancestor)
 
     (* a read does a lookup in the account_tbl; if that fails, delegate to
        parent *)
@@ -300,44 +388,6 @@ module Make (Inputs : Inputs_intf.S) = struct
       in
       self_find_or_batch_lookup self_find Base.get_batch t
 
-    let empty_hash =
-      Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
-
-    let self_path_get_hash ~hashes ~current_location height address =
-      match Map.find hashes address with
-      | Some hash ->
-          Some hash
-      | None ->
-          let is_empty =
-            match current_location with
-            | None ->
-                true
-            | Some current_location ->
-                let current_address = Location.to_path_exn current_location in
-                Addr.is_further_right ~than:current_address address
-          in
-          if is_empty then Some (empty_hash height) else None
-
-    let rec self_path_impl ~element ~depth address =
-      let height = Addr.height ~ledger_depth:depth address in
-      if height >= depth then Some []
-      else
-        let%bind.Option el = element height address in
-        let%bind.Option parent_address = Addr.parent address |> Or_error.ok in
-        let%map.Option rest = self_path_impl ~element ~depth parent_address in
-        el :: rest
-
-    let self_merkle_path ~hashes ~current_location =
-      let element height address =
-        let sibling = Addr.sibling address in
-        let dir = Location.last_direction address in
-        let%map.Option sibling_hash =
-          self_path_get_hash ~hashes ~current_location height sibling
-        in
-        Direction.map dir ~left:(`Left sibling_hash) ~right:(`Right sibling_hash)
-      in
-      self_path_impl ~element
-
     let self_wide_merkle_path ~hashes ~current_location =
       let element height address =
         let sibling = Addr.sibling address in
@@ -353,22 +403,6 @@ module Make (Inputs : Inputs_intf.S) = struct
           ~right:(`Right (sibling_hash, self_hash))
       in
       self_path_impl ~element
-
-    (* fixup_merkle_path patches a Merkle path reported by the parent,
-       overriding with hashes which are stored in the mask *)
-    let fixup_merkle_path ~hashes ~address:init =
-      let f address =
-        (* first element in the path contains hash at sibling of address *)
-        let sibling_mask_hash = Map.find hashes (Addr.sibling address) in
-        let parent_addr = Addr.parent_exn address in
-        let open Option in
-        function
-        | `Left h ->
-            (parent_addr, `Left (value sibling_mask_hash ~default:h))
-        | `Right h ->
-            (parent_addr, `Right (value sibling_mask_hash ~default:h))
-      in
-      Fn.compose snd @@ List.fold_map ~init ~f
 
     (* fixup_merkle_path patches a Merkle path reported by the parent,
        overriding with hashes which are stored in the mask *)
@@ -398,9 +432,9 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let merkle_path_at_addr_exn t address =
       assert_is_attached t ;
-      let maps, ancestor = maps_and_ancestor t in
+      let hashes, ancestor = hashes_and_ancestor t in
       match
-        self_merkle_path ~depth:t.depth ~hashes:maps.hashes
+        self_merkle_path ~depth:t.depth ~hashes
           ~current_location:t.current_location address
       with
       | Some path ->
@@ -409,7 +443,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           let parent_merkle_path =
             Base.merkle_path_at_addr_exn ancestor address
           in
-          fixup_merkle_path ~hashes:maps.hashes parent_merkle_path ~address
+          fixup_merkle_path ~hashes parent_merkle_path ~address
 
     let merkle_path_at_index_exn t index =
       merkle_path_at_addr_exn t (Addr.of_int_exn ~ledger_depth:t.depth index)
@@ -417,46 +451,25 @@ module Make (Inputs : Inputs_intf.S) = struct
     let merkle_path t location =
       merkle_path_at_addr_exn t (Location.to_path_exn location)
 
-    let path_batch_impl ~fixup_path ~self_lookup ~base_lookup t locations =
+    let merkle_path_batch t =
       assert_is_attached t ;
-      let maps, ancestor = maps_and_ancestor t in
-      let self_paths =
-        List.map locations ~f:(fun location ->
-            let address = Location.to_path_exn location in
-            self_lookup ~hashes:maps.hashes ~current_location:t.current_location
-              ~depth:t.depth address
-            |> Option.value_map
-                 ~default:(Either.Second (location, address))
-                 ~f:Either.first )
-      in
-      let all_parent_paths =
-        let locs =
-          List.filter_map self_paths ~f:(function
-            | Either.First _ ->
-                None
-            | Either.Second (location, _) ->
-                Some location )
-        in
-        if List.is_empty locs then [] else base_lookup ancestor locs
-      in
-      let f parent_paths = function
-        | Either.First path ->
-            (parent_paths, path)
-        | Either.Second (_, address) ->
-            let path =
-              fixup_path ~hashes:maps.hashes ~address (List.hd_exn parent_paths)
-            in
-            (List.tl_exn parent_paths, path)
-      in
-      snd @@ List.fold_map ~init:all_parent_paths ~f self_paths
+      let hashes, ancestor = hashes_and_ancestor t in
+      path_batch_impl
+        ~base_lookup:(Base.merkle_path_batch ancestor)
+        ~self_lookup:
+          (self_merkle_path ~current_location:t.current_location ~depth:t.depth
+             ~hashes )
+        ~fixup_path:(fixup_merkle_path ~hashes)
 
-    let merkle_path_batch =
-      path_batch_impl ~base_lookup:Base.merkle_path_batch
-        ~self_lookup:self_merkle_path ~fixup_path:fixup_merkle_path
-
-    let wide_merkle_path_batch =
-      path_batch_impl ~base_lookup:Base.wide_merkle_path_batch
-        ~self_lookup:self_wide_merkle_path ~fixup_path:fixup_wide_merkle_path
+    let wide_merkle_path_batch t =
+      assert_is_attached t ;
+      let hashes, ancestor = hashes_and_ancestor t in
+      path_batch_impl
+        ~base_lookup:(Base.wide_merkle_path_batch ancestor)
+        ~self_lookup:
+          (self_wide_merkle_path ~current_location:t.current_location
+             ~depth:t.depth ~hashes )
+        ~fixup_path:(fixup_wide_merkle_path ~hashes)
 
     (* given a Merkle path corresponding to a starting address, calculate
        addresses and hashes for each node affected by the starting hash; that is,
@@ -482,8 +495,8 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* use mask Merkle root, if it exists, else get from parent *)
     let merkle_root t =
       assert_is_attached t ;
-      let maps, ancestor = maps_and_ancestor t in
-      match Map.find maps.hashes (Addr.root ()) with
+      let hashes, ancestor = hashes_and_ancestor t in
+      match Map.find hashes (Addr.root ()) with
       | Some hash ->
           hash
       | None ->
@@ -572,8 +585,8 @@ module Make (Inputs : Inputs_intf.S) = struct
        parent *)
     let get_hash t addr =
       assert_is_attached t ;
-      let maps, ancestor = maps_and_ancestor t in
-      match Map.find maps.hashes addr with
+      let hashes, ancestor = hashes_and_ancestor t in
+      match Map.find hashes addr with
       | Some hash ->
           Some hash
       | None -> (
@@ -584,10 +597,10 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let get_hash_batch_exn t locations =
       assert_is_attached t ;
-      let maps, ancestor = maps_and_ancestor t in
+      let hashes, ancestor = hashes_and_ancestor t in
       let self_hashes_rev =
         List.rev_map locations ~f:(fun location ->
-            (location, Map.find maps.hashes (Location.to_path_exn location)) )
+            (location, Map.find hashes (Location.to_path_exn location)) )
       in
       let parent_locations_rev =
         List.filter_map self_hashes_rev ~f:(fun (location, hash) ->
