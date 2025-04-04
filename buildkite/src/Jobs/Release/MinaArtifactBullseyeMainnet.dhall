@@ -17,17 +17,15 @@ in  Pipeline.build
             [ Artifacts.Type.Daemon
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
-            , Artifacts.Type.BatchTxn
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
             ]
-          , networks = [ Network.Type.Devnet, Network.Type.Mainnet ]
+          , network = Network.Type.Mainnet
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Stable
             ]
           , mode = PipelineMode.Type.Stable
-          , prefix = "MinaArtifactMainnet"
           }
       )

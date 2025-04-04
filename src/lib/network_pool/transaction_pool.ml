@@ -1860,7 +1860,7 @@ let%test_module _ =
             |> Map.map ~f:(fun vk ->
                    Zkapp_basic.F_map.Map.singleton vk.hash vk ) )
         |> Or_error.bind ~f:(fun xs ->
-               List.map xs ~f:User_command.check_verifiable
+               List.map xs ~f:User_command.For_tests.check_verifiable
                |> Or_error.combine_errors )
       with
       | Ok cmds ->
@@ -2079,7 +2079,7 @@ let%test_module _ =
       in
       let zkapp_command =
         Or_error.ok_exn
-          (Zkapp_command.Valid.to_valid ~failed:false
+          (Zkapp_command.Valid.For_tests.to_valid ~failed:false
              ~find_vk:
                (Zkapp_command.Verifiable.load_vk_from_ledger
                   ~get:(fun _ -> failwith "Not expecting proof zkapp_command")
@@ -2157,7 +2157,7 @@ let%test_module _ =
             in
             let valid_zkapp_command =
               Or_error.ok_exn
-                (Zkapp_command.Valid.to_valid ~failed:false
+                (Zkapp_command.Valid.For_tests.to_valid ~failed:false
                    ~find_vk:
                      (Zkapp_command.Verifiable.load_vk_from_ledger
                         ~get:(Mina_ledger.Ledger.get best_tip_ledger)
@@ -2895,7 +2895,7 @@ let%test_module _ =
       in
       let zkapp_command =
         Or_error.ok_exn
-          (Zkapp_command.Valid.to_valid ~failed:false
+          (Zkapp_command.Valid.For_tests.to_valid ~failed:false
              ~find_vk:
                (Zkapp_command.Verifiable.load_vk_from_ledger
                   ~get:(Mina_ledger.Ledger.get best_tip_ledger)
@@ -3120,7 +3120,8 @@ let%test_module _ =
                  ~data:
                    [ User_command.forget_check
                      @@ Zkapp_command
-                          (Zkapp_command.Valid.of_verifiable zkapp_command)
+                          (Zkapp_command.Valid.For_tests.of_verifiable
+                             zkapp_command )
                    ]
                  ~sender:Envelope.Sender.Local )
           with
@@ -3408,7 +3409,7 @@ let%test_module _ =
                   }
             in
             Or_error.ok_exn
-              (Zkapp_command.Valid.to_valid ~failed:false
+              (Zkapp_command.Valid.For_tests.to_valid ~failed:false
                  ~find_vk:
                    (Zkapp_command.Verifiable.load_vk_from_ledger
                       ~get:(Mina_ledger.Ledger.get ledger)

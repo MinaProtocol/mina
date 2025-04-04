@@ -334,8 +334,6 @@ module type S = sig
 
       val of_compiled : _ Tag.t -> t Deferred.t
 
-      module Max_branches : Nat.Add.Intf
-
       module Max_width = Nat.N2
     end
 
@@ -366,7 +364,7 @@ module type S = sig
       -> max_proofs_verified:(module Nat.Add.Intf with type n = 'n1)
       -> feature_flags:Opt.Flag.t Plonk_types.Features.t
       -> typ:('var, 'value) Impls.Step.Typ.t
-      -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
+      -> ('var, 'value, 'n1, Nat.N8.n) Tag.t
 
     val verify_promise :
          typ:('var, 'value) Impls.Step.Typ.t
@@ -392,7 +390,17 @@ module type S = sig
 
   (** This compiles a series of inductive rules defining a set into a proof
       system for proving membership in that set, with a prover corresponding
-      to each inductive rule. *)
+      to each inductive rule.
+
+      @param cache A list of paths/locations where the proving/verification keys are stored.
+      @param storables A swappable underlying implementation of the cache.
+      @param proof_cache Cache that allows us to pass in precomputed proofs. Useful for CI.
+      @param disk_keys Caches for the individial keys
+      @param override_wrap_domain This let you tell pickles that the wrap circuit will be smaller/bigger than it's expecting's. At the moment, we map 0 proofs verified to 2^14, 1 proofs verified to 2^15, and 2 to 2^16. However, you'll usually see this used with 2 proofs, which actually only requires 2^15 (so we set this as N1). This was also part of the inspiration for your project: its existence tells us that we can recurse over more proofs.
+      @param num_chunks Configurable parameter enabling circuits larger than maximum
+      @param branches Number of different circuits that Tock(i.e. Wrap) accepts as inputs
+      @param max_proofs_verified Number of different circuits that Tick(i.e. Step) accepts as inputs
+  *)
   val compile_promise :
        ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
     -> ?cache:Key_cache.Spec.t list

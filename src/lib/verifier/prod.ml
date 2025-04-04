@@ -32,6 +32,48 @@ let invalid_to_error = Common.invalid_to_error
 
 type ledger_proof = Ledger_proof.Prod.t
 
+module Processor = struct
+  let verify_commands
+      (cs : User_command.Verifiable.t With_status.t With_id_tag.t list) :
+      _ list Deferred.t =
+    let results = List.map cs ~f:(fun (id, c) -> (id, Common.check c)) in
+    let to_verify =
+      results |> List.map ~f:snd
+      |> List.concat_map ~f:(function
+           | Ok (_, `Assuming xs) ->
+               xs
+           | Error _ ->
+               [] )
+    in
+    let%map all_verified =
+      Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ to_verify
+    in
+    List.map results ~f:(fun (id, result) ->
+        let result =
+          match result with
+          | Ok (_, `Assuming []) ->
+              (* The command is dropped here to avoid decoding it later in the caller
+                 which would create a duplicate. Results are paired back to their inputs
+                 using the input [id]*)
+              `Valid
+          | Ok (_, `Assuming xs) ->
+              if Or_error.is_ok all_verified then `Valid else `Valid_assuming xs
+          | Error (`Invalid_keys keys) ->
+              `Invalid_keys keys
+          | Error (`Invalid_signature keys) ->
+              `Invalid_signature keys
+          | Error (`Invalid_proof err) ->
+              `Invalid_proof err
+          | Error (`Missing_verification_key keys) ->
+              `Missing_verification_key keys
+          | Error (`Unexpected_verification_key keys) ->
+              `Unexpected_verification_key keys
+          | Error (`Mismatched_authorization_kind keys) ->
+              `Mismatched_authorization_kind keys
+        in
+        (id, result) )
+end
+
 module Worker_state = struct
   module type S = sig
     val verify_blockchain_snarks :
@@ -86,64 +128,13 @@ module Worker_state = struct
         Pickles.Side_loaded.srs_precomputation () ;
         Deferred.return
           (let module M = struct
-             let verify_commands
-                 (cs :
-                   User_command.Verifiable.t With_status.t With_id_tag.t list )
-                 : _ list Deferred.t =
-               let results =
-                 List.map cs ~f:(fun (id, c) -> (id, Common.check c))
-               in
-               let to_verify =
-                 results |> List.map ~f:snd
-                 |> List.concat_map ~f:(function
-                      | `Valid _ ->
-                          []
-                      | `Valid_assuming (_, xs) ->
-                          xs
-                      | `Invalid_keys _
-                      | `Invalid_signature _
-                      | `Invalid_proof _
-                      | `Missing_verification_key _
-                      | `Unexpected_verification_key _
-                      | `Mismatched_authorization_kind _ ->
-                          [] )
-               in
-               let%map all_verified =
-                 Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ to_verify
-               in
-               List.map results ~f:(fun (id, result) ->
-                   let result =
-                     match result with
-                     | `Valid _ ->
-                         (* The command is dropped here to avoid decoding it later in the caller
-                            which would create a duplicate. Results are paired back to their inputs
-                            using the input [id]*)
-                         `Valid
-                     | `Valid_assuming (_, xs) ->
-                         if Or_error.is_ok all_verified then `Valid
-                         else `Valid_assuming xs
-                     | `Invalid_keys keys ->
-                         `Invalid_keys keys
-                     | `Invalid_signature keys ->
-                         `Invalid_signature keys
-                     | `Invalid_proof err ->
-                         `Invalid_proof err
-                     | `Missing_verification_key keys ->
-                         `Missing_verification_key keys
-                     | `Unexpected_verification_key keys ->
-                         `Unexpected_verification_key keys
-                     | `Mismatched_authorization_kind keys ->
-                         `Mismatched_authorization_kind keys
-                   in
-                   (id, result) )
-
              let verify_commands cs =
                Context_logger.with_logger (Some logger)
                @@ fun () ->
                Internal_tracing.Context_call.with_call_id
                @@ fun () ->
                [%log internal] "Verifier_verify_commands" ;
-               let%map result = verify_commands cs in
+               let%map result = Processor.verify_commands cs in
                [%log internal] "Verifier_verify_commands_done" ;
                result
 
@@ -201,21 +192,19 @@ module Worker_state = struct
                List.map tagged_commands ~f:(fun (id, c) ->
                    let result =
                      match Common.check c with
-                     | `Valid _ ->
+                     | Ok (_, `Assuming _) ->
                          `Valid
-                     | `Valid_assuming (_, _) ->
-                         `Valid
-                     | `Invalid_keys keys ->
+                     | Error (`Invalid_keys keys) ->
                          `Invalid_keys keys
-                     | `Invalid_signature keys ->
+                     | Error (`Invalid_signature keys) ->
                          `Invalid_signature keys
-                     | `Invalid_proof err ->
+                     | Error (`Invalid_proof err) ->
                          `Invalid_proof err
-                     | `Missing_verification_key keys ->
+                     | Error (`Missing_verification_key keys) ->
                          `Missing_verification_key keys
-                     | `Unexpected_verification_key keys ->
+                     | Error (`Unexpected_verification_key keys) ->
                          `Unexpected_verification_key keys
-                     | `Mismatched_authorization_kind keys ->
+                     | Error (`Mismatched_authorization_kind keys) ->
                          `Mismatched_authorization_kind keys
                    in
                    (id, result) )
