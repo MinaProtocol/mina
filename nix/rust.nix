@@ -87,6 +87,35 @@ in {
     doCheck = false;
   };
 
+  kimchi_stubs_static_lib = let
+    toolchain = rustChannelFromToolchainFileOf
+      # Using the same toolchain which is used by the local stubs crate
+      ../src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml;
+    rust_platform = rustPlatformFor toolchain.rust;
+  in rust_platform.buildRustPackage {
+    pname = "kimchi_stubs_static_lib";
+    version = "0.1.0";
+    src = final.lib.sourceByRegex ../src [
+      "^lib(/crypto(/proof-systems(/.*)?)?)?$"
+    ];
+    sourceRoot = "source/lib/crypto/proof-systems";
+    nativeBuildInputs = [ final.ocamlPackages_mina.ocaml ];
+    buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
+    cargoLock = let fixupLockFile = path: builtins.readFile path;
+    in {
+      lockFileContents =
+        fixupLockFile ../src/lib/crypto/proof-systems/Cargo.lock;
+    };
+    buildPhase = ''
+      cargo build -p kimchi-stubs --release --lib --all-features
+    '';
+    installPhase = ''
+        mkdir -p $out/lib
+        cp target/release/libkimchi_stubs.a $out/lib/
+    '';
+    doCheck = false;
+  };
+
   kimchi-rust = rustChannelFromToolchainFileOf
     ../src/lib/crypto/kimchi_bindings/wasm/rust-toolchain.toml;
 
