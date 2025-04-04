@@ -12,17 +12,82 @@ module Plonk_checks = struct
     Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
 end
 
+type sponge_input =
+  | Sponge_input :
+      { zk_rows : int
+      ; initial_sponge_digest : Pasta_bindings.Fp.t
+      ; evals :
+          ( Pasta_bindings.Fp.t
+          , Pasta_bindings.Fp.t array )
+          Plonk_types.All_evals.t
+      ; old_bulletproof_challenges :
+          ( (Pasta_bindings.Fp.t, Nat.N16.n) Vector.vec
+          , 'most_recent_width )
+          Vector.vec
+      }
+      -> sponge_input
+
+let compute_sponge_input ~zk_rows ~evals ~old_bulletproof_challenges
+    ~(proof_state : _ Composition_types.Wrap.Proof_state.Minimal.Stable.V1.t) =
+  let old_bulletproof_challenges =
+    Vector.map ~f:Ipa.Step.compute_challenges old_bulletproof_challenges
+  in
+  let initial_sponge_digest =
+    Digest.Constant.to_tick_field proof_state.sponge_digest_before_evaluations
+  in
+  (* TODO: The deferred values "bulletproof_challenges" should get routed
+     into a "batch dlog Tick acc verifier" *)
+  Sponge_input
+    { zk_rows; evals; old_bulletproof_challenges; initial_sponge_digest }
+
+let compute_xi_r_chal
+    (Sponge_input
+      { zk_rows; initial_sponge_digest; evals; old_bulletproof_challenges } ) =
+  Timer.start __LOC__ ;
+  let xs = Plonk_types.Evals.to_absorption_sequence evals.evals.evals in
+  let x1, x2 = evals.evals.public_input in
+  Timer.clock __LOC__ ;
+  let absorb, squeeze =
+    let open Tick_field_sponge.Bits in
+    let sponge =
+      let s = create Tick_field_sponge.params in
+      absorb s initial_sponge_digest ;
+      s
+    in
+    let squeeze () =
+      let underlying =
+        Challenge.Constant.of_bits
+          (squeeze sponge ~length:Challenge.Constant.length)
+      in
+      Scalar_challenge.create underlying
+    in
+    (absorb sponge, squeeze)
+  in
+  (let challenges_digest =
+     let open Tick_field_sponge.Field in
+     let sponge = create Tick_field_sponge.params in
+     Vector.iter old_bulletproof_challenges ~f:(Vector.iter ~f:(absorb sponge)) ;
+     squeeze sponge
+   in
+   absorb challenges_digest ;
+   absorb evals.ft_eval1 ;
+   Array.iter ~f:absorb x1 ;
+   Array.iter ~f:absorb x2 ;
+   List.iter xs ~f:(fun (x1, x2) ->
+       Array.iter ~f:absorb x1 ; Array.iter ~f:absorb x2 ) ) ;
+  let xi_chal = squeeze () in
+  let r_chal = squeeze () in
+  Timer.clock __LOC__ ; (xi_chal, r_chal)
+
 let expand_deferred (type n most_recent_width) ~zk_rows
     ~(evals :
        ( Backend.Tick.Field.t
        , Backend.Tick.Field.t array )
        Pickles_types.Plonk_types.All_evals.t )
     ~(old_bulletproof_challenges :
-       ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
-         Bulletproof_challenge.t
-         Step_bp_vec.t
-       , most_recent_width )
-       Pickles_types.Vector.t )
+       ( (Pasta_bindings.Fp.t, Nat.N16.n) Vector.vec
+       , 'most_recent_width )
+       Vector.vec )
     ~(proof_state :
        ( Challenge.Constant.t
        , Challenge.Constant.t Scalar_challenge.t
@@ -33,11 +98,17 @@ let expand_deferred (type n most_recent_width) ~zk_rows
        , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
          Step_bp_vec.t
        , Branch_data.t )
-       Composition_types.Wrap.Proof_state.Minimal.Stable.V1.t ) :
+       Composition_types.Wrap.Proof_state.Minimal.Stable.V1.t )
+    ~(xi_r_chal :
+       Challenge.Constant.t Kimchi_types.scalar_challenge
+       * Challenge.Constant.t Kimchi_types.scalar_challenge ) :
     _ Types.Wrap.Proof_state.Deferred_values.t =
+  Timer.start __LOC__ ;
+  let xi_chal, r_chal = xi_r_chal in
+  let actual_proofs_verified = Vector.length old_bulletproof_challenges in
+  Timer.clock __LOC__ ;
   let module Tick_field = Backend.Tick.Field in
   let tick_field : _ Plonk_checks.field = (module Tick_field) in
-  Timer.start __LOC__ ;
   let open Types.Wrap.Proof_state in
   let sc = SC.to_field_constant tick_field ~endo:Endo.Wrap_inner_curve.scalar in
   Timer.clock __LOC__ ;
@@ -124,51 +195,8 @@ let expand_deferred (type n most_recent_width) ~zk_rows
     ; joint_combiner = plonk0.joint_combiner
     }
   in
-  Timer.clock __LOC__ ;
-  let absorb, squeeze =
-    let open Tick_field_sponge.Bits in
-    let sponge =
-      let s = create Tick_field_sponge.params in
-      absorb s
-        (Digest.Constant.to_tick_field
-           proof_state.sponge_digest_before_evaluations ) ;
-      s
-    in
-    let squeeze () =
-      let underlying =
-        Challenge.Constant.of_bits
-          (squeeze sponge ~length:Challenge.Constant.length)
-      in
-      Scalar_challenge.create underlying
-    in
-    (absorb sponge, squeeze)
-  in
-  let old_bulletproof_challenges =
-    Vector.map ~f:Ipa.Step.compute_challenges old_bulletproof_challenges
-  in
-  (let challenges_digest =
-     let open Tick_field_sponge.Field in
-     let sponge = create Tick_field_sponge.params in
-     Vector.iter old_bulletproof_challenges ~f:(Vector.iter ~f:(absorb sponge)) ;
-     squeeze sponge
-   in
-   absorb challenges_digest ;
-   absorb evals.ft_eval1 ;
-   let xs = Plonk_types.Evals.to_absorption_sequence evals.evals.evals in
-   let x1, x2 = evals.evals.public_input in
-   Array.iter ~f:absorb x1 ;
-   Array.iter ~f:absorb x2 ;
-   List.iter xs ~f:(fun (x1, x2) ->
-       Array.iter ~f:absorb x1 ; Array.iter ~f:absorb x2 ) ) ;
-  let xi_chal = squeeze () in
   let xi = sc xi_chal in
-  let r_chal = squeeze () in
   let r = sc r_chal in
-  Timer.clock __LOC__ ;
-  (* TODO: The deferred values "bulletproof_challenges" should get routed
-     into a "batch dlog Tick acc verifier" *)
-  let actual_proofs_verified = Vector.length old_bulletproof_challenges in
-  Timer.clock __LOC__ ;
   let combined_inner_product_actual =
     Wrap.combined_inner_product ~env:tick_env ~plonk:tick_plonk_minimal
       ~domain:tick_domain ~ft_eval1:evals.ft_eval1
