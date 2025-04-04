@@ -26,7 +26,8 @@ module Step : sig
     val create : pk:Proving_key.t -> vk:Verification_key.t -> t
 
     val generate :
-         prev_challenges:int
+         ?lazy_mode:bool
+      -> prev_challenges:int
       -> Kimchi_pasta_constraint_system.Vesta_constraint_system.t
       -> t
   end

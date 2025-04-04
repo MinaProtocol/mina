@@ -1198,7 +1198,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             Cache.Step.read_or_generate
               ~prev_challenges:
                 (Nat.to_int (fst inner_step_data.proofs_verified))
-              [] k_p k_v
+              [] ~lazy_mode:false k_p k_v
           in
           let step_vks =
             lazy
@@ -1269,7 +1269,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             in
             let r =
               Common.time "wrap read or generate " (fun () ->
-                  Cache.Wrap.read_or_generate ~prev_challenges:2 []
+                  Cache.Wrap.read_or_generate ~prev_challenges:2 [] ~lazy_mode:false
                     (Lazy.map ~f:Promise.return disk_key_prover)
                     (Lazy.map ~f:Promise.return disk_key_verifier) )
             in
