@@ -820,6 +820,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                   ~metadata:
                     [ ("key", `String keyname)
                     ; ("config_file", `String config_file)
+                    ; ("spurious_change", `String "spurious_change_to_trigger_rebuild")
                     ] ;
                 data
           in
