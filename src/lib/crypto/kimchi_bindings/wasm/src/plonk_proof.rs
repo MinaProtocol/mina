@@ -4,7 +4,6 @@ use crate::wasm_vector::fq::WasmVecVecFq;
 use crate::wasm_vector::WasmVector;
 use ark_ec::AffineRepr;
 use ark_ff::One;
-use array_init::array_init;
 use core::array;
 use core::convert::TryInto;
 use groupmap::GroupMap;
@@ -300,7 +299,7 @@ macro_rules! impl_proof {
             impl From<&WasmProverCommitments> for ProverCommitments<$G> {
                 fn from(x: &WasmProverCommitments) -> Self {
                     ProverCommitments {
-                        w_comm: array_init(|i| x.w_comm[i].clone().into()),
+                        w_comm: core::array::from_fn(|i| x.w_comm[i].clone().into()),
                         z_comm: x.z_comm.clone().into(),
                         t_comm: x.t_comm.clone().into(),
                         lookup: x.lookup.clone().map(Into::into),
@@ -311,7 +310,7 @@ macro_rules! impl_proof {
             impl From<WasmProverCommitments> for ProverCommitments<$G> {
                 fn from(x: WasmProverCommitments) -> Self {
                     ProverCommitments {
-                        w_comm: array_init(|i| (&x.w_comm[i]).into()),
+                        w_comm: core::array::from_fn(|i| (&x.w_comm[i]).into()),
                         z_comm: x.z_comm.into(),
                         t_comm: x.t_comm.into(),
                         lookup: x.lookup.map(Into::into),
@@ -799,10 +798,10 @@ macro_rules! impl_proof {
                     zeta_omega: vec![$F::one()],
                 };
                 let evals = ProofEvaluations {
-                    w: array_init(|_| eval()),
-                    coefficients: array_init(|_| eval()),
+                    w: core::array::from_fn(|_| eval()),
+                    coefficients: core::array::from_fn(|_| eval()),
                     z: eval(),
-                    s: array_init(|_| eval()),
+                    s: core::array::from_fn(|_| eval()),
                     generic_selector: eval(),
                     poseidon_selector: eval(),
                     complete_add_selector: eval(),
@@ -829,7 +828,7 @@ macro_rules! impl_proof {
 
                 let dlogproof = ProverProof {
                     commitments: ProverCommitments {
-                        w_comm: array_init(|_| comm()),
+                        w_comm: core::array::from_fn(|_| comm()),
                         z_comm: comm(),
                         t_comm: comm(),
                         lookup: None,

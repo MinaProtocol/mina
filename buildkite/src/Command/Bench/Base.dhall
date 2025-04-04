@@ -47,7 +47,7 @@ let Spec =
           }
       , default =
           { mode = PipelineMode.Type.PullRequest
-          , size = Size.Medium
+          , size = Size.Perf
           , dependsOn =
               DebianVersions.dependsOn
                 DebianVersions.DebVersion.Bullseye

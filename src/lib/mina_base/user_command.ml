@@ -300,19 +300,18 @@ module Valid = struct
   module Gen = Gen_make (Signed_command.With_valid_signature)
 end
 
-let check_verifiable (t : Verifiable.t) : Valid.t Or_error.t =
-  match t with
-  | Signed_command x -> (
-      match Signed_command.check x with
-      | Some c ->
-          Ok (Signed_command c)
-      | None ->
-          Or_error.error_string "Invalid signature" )
-  | Zkapp_command p ->
-      Ok (Zkapp_command (Zkapp_command.Valid.of_verifiable p))
-
-let check ~failed ~find_vk (t : t) : Valid.t Or_error.t =
-  to_verifiable ~failed ~find_vk t |> Or_error.bind ~f:check_verifiable
+module For_tests = struct
+  let check_verifiable (t : Verifiable.t) : Valid.t Or_error.t =
+    match t with
+    | Signed_command x -> (
+        match Signed_command.check x with
+        | Some c ->
+            Ok (Signed_command c)
+        | None ->
+            Or_error.error_string "Invalid signature" )
+    | Zkapp_command p ->
+        Ok (Zkapp_command (Zkapp_command.Valid.For_tests.of_verifiable p))
+end
 
 let forget_check (t : Valid.t) : t =
   match t with

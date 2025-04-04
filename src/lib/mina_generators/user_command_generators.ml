@@ -145,7 +145,7 @@ let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
   in
   let zkapp_command =
     Or_error.ok_exn
-      (Zkapp_command.Valid.to_valid ~failed:false
+      (Zkapp_command.Valid.For_tests.to_valid ~failed:false
          ~find_vk:
            (Zkapp_command.Verifiable.load_vk_from_ledger
               ~get:(Ledger.get ledger)
@@ -198,7 +198,7 @@ let sequence_zkapp_command_with_ledger ?ledger_init_state ?max_account_updates
       in
       let valid_zkapp_command =
         Or_error.ok_exn
-          (Zkapp_command.Valid.to_valid ~failed:false
+          (Zkapp_command.Valid.For_tests.to_valid ~failed:false
              ~find_vk:
                (Zkapp_command.Verifiable.load_vk_from_ledger
                   ~get:(Ledger.get ledger)

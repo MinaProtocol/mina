@@ -55,7 +55,8 @@
   random_oracle_input
   ppx_version.runtime
   mina_wire_types
-  internal_tracing)
+  internal_tracing
+  proof_carrying_data)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
