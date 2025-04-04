@@ -21,10 +21,12 @@ else
    SUDO=""
 fi
 
-
-LOCAL_DEB_FOLDER=debs
-mkdir -p $LOCAL_DEB_FOLDER
 source ./buildkite/scripts/export-git-env-vars.sh
+source ./buildkite/scripts/storage/env.sh
+
+
+mkdir -p $STORAGE_FOLDER
+LOCAL_DEB_FOLDER=$STORAGE_FOLDER/debians
 
 # Download required debians from bucket locally
 if [ -z "$DEBS" ]; then 

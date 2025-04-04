@@ -140,7 +140,7 @@ let generateStep =
                 , commands = commands
                 , label = "Docker: ${spec.step_key}"
                 , key = spec.step_key
-                , target = Size.XLarge
+                , target = Size.QA
                 , docker_login = Some DockerLogin::{=}
                 , depends_on = spec.deps
                 , if = spec.if

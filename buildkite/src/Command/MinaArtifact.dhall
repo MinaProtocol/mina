@@ -98,7 +98,7 @@ let build_artifacts
                                                          spec.profile} ${BuildFlags.toSuffixUppercase
                                                                            spec.buildFlags}"
             , key = "build-deb-pkg"
-            , target = Size.XLarge
+            , target = Size.QA
             , retries =
               [ Command.Retry::{
                 , exit_status = Command.ExitStatus.Code +2
