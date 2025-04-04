@@ -42,7 +42,7 @@ function wrap_wasm_oracles(plonk_wasm,plonk_intf,tsRustConversion){
     );
   };
 
-  plonk_intf.caml_pasta_fp_poseidon_block_cipher = function(_fake_params, fp_vector) {
+  plonk_intf.caml_pasta_fp_poseidon_block_cipher = function(fp_vector) {
     // 1. get permuted field vector from rust
     var wasm_flat_vector = plonk_wasm.caml_pasta_fp_poseidon_block_cipher(
       tsRustConversion.fp.vectorToRust(fp_vector)
@@ -54,7 +54,7 @@ function wrap_wasm_oracles(plonk_wasm,plonk_intf,tsRustConversion){
     });
   };
 
-  plonk_intf.caml_pasta_fq_poseidon_block_cipher = function(_fake_params, fq_vector) {
+  plonk_intf.caml_pasta_fq_poseidon_block_cipher = function(fq_vector) {
     // 1. get permuted field vector from rust
     var wasm_flat_vector = plonk_wasm.caml_pasta_fq_poseidon_block_cipher(
       tsRustConversion.fq.vectorToRust(fq_vector)

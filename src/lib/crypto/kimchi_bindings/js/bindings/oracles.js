@@ -50,11 +50,11 @@ function caml_pasta_fq_poseidon_params_create() {
 // Provides: caml_pasta_fp_poseidon_block_cipher
 // Requires: plonk_intf
 function caml_pasta_fp_poseidon_block_cipher(_fake_params, fp_vector) {
-  plonk_intf.caml_pasta_fp_poseidon_block_cipher(_fake_params, fp_vector);
+  plonk_intf.caml_pasta_fp_poseidon_block_cipher(fp_vector);
 }
 
 // Provides: caml_pasta_fq_poseidon_block_cipher
 // Requires: plonk_intf
 function caml_pasta_fq_poseidon_block_cipher(_fake_params, fq_vector) {
-  plonk_intf.caml_pasta_fq_poseidon_block_cipher(_fake_params, fq_vector);
+  plonk_intf.caml_pasta_fq_poseidon_block_cipher(fq_vector);
 }
