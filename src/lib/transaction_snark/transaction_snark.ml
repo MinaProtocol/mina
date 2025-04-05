@@ -3332,7 +3332,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     Pickles.compile () ~cache:Cache_dir.cache ?proof_cache:!proof_cache
       ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~public_input:(Input Statement.With_sok.typ) ~auxiliary_typ:Typ.unit
-      ~branches:(module Nat.N5)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"transaction-snark"
       ~choices:(fun ~self ->
@@ -4185,7 +4184,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         Pickles.compile () ~cache:Cache_dir.cache ?proof_cache:!proof_cache
           ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
-          ~branches:(module Nat.N1)
           ~max_proofs_verified:(module Nat.N0)
           ~name:"trivial"
           ~choices:(fun ~self:_ -> [ trivial_rule ])

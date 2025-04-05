@@ -629,7 +629,6 @@ module Transfer_recursive = struct
          ~override_wrap_domain:Pickles_base.Proofs_verified.N1
          ~public_input:(Input Rules.Transfer.Recursive.Statement.typ)
          ~auxiliary_typ:Impl.Typ.unit
-         ~branches:(module Nat.N1)
          ~max_proofs_verified:(module Nat.N2)
          ~name:"transfer recurse"
          ~choices:(fun ~self -> [ Rules.Transfer.Recursive.rule self ]) )
@@ -658,7 +657,6 @@ let lazy_compiled =
     (Zkapps_examples.compile () ~cache:Cache_dir.cache
        ~override_wrap_domain:Pickles_base.Proofs_verified.N1
        ~auxiliary_typ:Impl.Typ.unit
-       ~branches:(module Nat.N3)
        ~max_proofs_verified:(module Nat.N2)
        ~name:"tokens"
        ~choices:(fun ~self:_ ->

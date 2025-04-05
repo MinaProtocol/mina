@@ -11,7 +11,6 @@ let test () =
   let _tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
-      ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N0)
       ~num_chunks:8 ~override_wrap_domain:N2 ~name:"chunked_circuits"
       ~choices:(fun ~self:_ ->

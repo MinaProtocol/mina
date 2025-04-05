@@ -31,7 +31,6 @@ struct
 
   let tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
     Zkapps_examples.compile ~auxiliary_typ:Typ.unit
-      ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N0)
       ~name:"custom gates"
       ~choices:(fun ~self:_ ->

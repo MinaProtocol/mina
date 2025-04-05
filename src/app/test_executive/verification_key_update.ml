@@ -118,7 +118,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let tag1, _, _, Pickles.Provers.[ trivial_prover1 ] =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
         ~auxiliary_typ:Impl.Typ.unit
-        ~branches:(module Pickles_types.Nat.N1)
         ~max_proofs_verified:(module Pickles_types.Nat.N0)
         ~name:"trivial1"
         ~choices:(fun ~self:_ -> [ Trivial_rule1.rule ])
@@ -129,7 +128,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let tag2, _, _, Pickles.Provers.[ trivial_prover2 ] =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
         ~auxiliary_typ:Impl.Typ.unit
-        ~branches:(module Pickles_types.Nat.N1)
         ~max_proofs_verified:(module Pickles_types.Nat.N0)
         ~name:"trivial2"
         ~choices:(fun ~self:_ -> [ Trivial_rule2.rule ])
