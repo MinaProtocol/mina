@@ -74,7 +74,7 @@ let ( hash_signed_command_v1
     let cmd_dummy_signature = { cmd with signature = Signature.dummy } in
     signed_cmd_hasher cmd_dummy_signature
   in
-  let hash_zkapp_command (cmd : Zkapp_command.t) =
+  let hash_zkapp_command (cmd : Zkapp_command.Stable.Latest.t) =
     let cmd_dummy_signatures_and_proofs =
       { cmd with
         fee_payer = { cmd.fee_payer with authorization = Signature.dummy }
@@ -106,12 +106,18 @@ let ( hash_signed_command_v1
   , hash_coinbase
   , hash_fee_transfer )
 
+let hash_wrapped_zkapp_command =
+  Fn.compose hash_zkapp_command Zkapp_command.read_all_proofs_from_disk
+
 let hash_command cmd =
   match cmd with
   | User_command.Signed_command s ->
       hash_signed_command s
   | User_command.Zkapp_command p ->
       hash_zkapp_command p
+
+let hash_wrapped_command =
+  Fn.compose hash_command User_command.read_all_proofs_from_disk
 
 let hash_signed_command_v2 = hash_signed_command
 
@@ -172,7 +178,11 @@ module User_command_with_valid_signature = struct
   [@@deriving hash, sexp, compare, to_yojson]
 
   let create (c : User_command.Valid.t) : t =
-    { data = c; hash = hash_command (User_command.forget_check c) }
+    { data = c
+    ; hash =
+        hash_command
+          (User_command.read_all_proofs_from_disk @@ User_command.forget_check c)
+    }
 
   let data ({ data; _ } : t) = data
 
@@ -224,7 +234,8 @@ module User_command = struct
     end
   end]
 
-  let create (c : User_command.t) : t = { data = c; hash = hash_command c }
+  let create (c : User_command.Stable.Latest.t) : t =
+    { data = c; hash = hash_command c }
 
   let data ({ data; _ } : t) = data
 
@@ -233,7 +244,10 @@ module User_command = struct
   let hash ({ hash; _ } : t) = hash
 
   let of_checked ({ data; hash } : User_command_with_valid_signature.t) : t =
-    { With_hash.data = User_command.forget_check data; hash }
+    { With_hash.data =
+        User_command.(read_all_proofs_from_disk @@ forget_check data)
+    ; hash
+    }
 
   include Comparable.Make (Stable.Latest)
 end
