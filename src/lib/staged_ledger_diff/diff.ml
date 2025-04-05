@@ -14,7 +14,7 @@ module Make_sig (A : Wire_types.Types.S) = struct
        and type ('a, 'b) Pre_diff_one.Stable.V2.t = ('a, 'b) A.Pre_diff_one.V2.t
        and type Pre_diff_with_at_most_one_coinbase.Stable.V2.t =
         A.Pre_diff_with_at_most_one_coinbase.V2.t
-       and type t = A.V2.t
+       and type Diff.Stable.V2.t = A.Diff.V2.t
        and type Stable.V2.t = A.V2.t
 end
 
@@ -175,7 +175,17 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
-    type t = Stable.Latest.t
+    type t =
+      (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_two.t
+
+    let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
+      Pre_diff_two.map
+        ~f1:(Transaction_snark_work.write_all_proofs_to_disk ~proof_cache_db)
+        ~f2:Fn.id
+
+    let read_all_proofs_from_disk : t -> Stable.Latest.t =
+      Pre_diff_two.map ~f1:Transaction_snark_work.read_all_proofs_from_disk
+        ~f2:Fn.id
   end
 
   module Pre_diff_with_at_most_one_coinbase = struct
@@ -194,7 +204,17 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
-    type t = Stable.Latest.t
+    type t =
+      (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_one.t
+
+    let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
+      Pre_diff_one.map
+        ~f1:(Transaction_snark_work.write_all_proofs_to_disk ~proof_cache_db)
+        ~f2:Fn.id
+
+    let read_all_proofs_from_disk : t -> Stable.Latest.t =
+      Pre_diff_one.map ~f1:Transaction_snark_work.read_all_proofs_from_disk
+        ~f2:Fn.id
   end
 
   module Diff = struct
@@ -238,7 +258,29 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
-    type t = Stable.Latest.t
+    type t =
+      Pre_diff_with_at_most_two_coinbase.t
+      * Pre_diff_with_at_most_one_coinbase.t option
+
+    let write_all_proofs_to_disk ~proof_cache_db
+        (( pre_diff_with_at_most_two_coinbase
+         , pre_diff_with_at_most_one_coinbase_opt ) :
+          Stable.Latest.t ) : t =
+      ( Pre_diff_with_at_most_two_coinbase.write_all_proofs_to_disk
+          ~proof_cache_db pre_diff_with_at_most_two_coinbase
+      , Option.map pre_diff_with_at_most_one_coinbase_opt
+          ~f:
+            (Pre_diff_with_at_most_one_coinbase.write_all_proofs_to_disk
+               ~proof_cache_db ) )
+
+    let read_all_proofs_from_disk
+        (( pre_diff_with_at_most_two_coinbase
+         , pre_diff_with_at_most_one_coinbase_opt ) :
+          t ) : Stable.Latest.t =
+      ( Pre_diff_with_at_most_two_coinbase.read_all_proofs_from_disk
+          pre_diff_with_at_most_two_coinbase
+      , Option.map pre_diff_with_at_most_one_coinbase_opt
+          ~f:Pre_diff_with_at_most_one_coinbase.read_all_proofs_from_disk )
   end
 
   [%%versioned
@@ -250,10 +292,32 @@ module Make_str (A : Wire_types.Concrete) = struct
       [@@deriving equal, sexp, yojson]
 
       let to_latest = Fn.id
+
+      let empty_diff : t =
+        { diff =
+            ( { completed_works = []
+              ; commands = []
+              ; coinbase = At_most_two.Zero
+              ; internal_command_statuses = []
+              }
+            , None )
+        }
+
+      let completed_works (t : t) =
+        (fst t.diff).completed_works
+        @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d ->
+              d.completed_works )
     end
   end]
 
-  type t = Stable.Latest.t = { diff : Diff.t } [@@deriving fields]
+  type t = { diff : Diff.t } [@@deriving fields]
+
+  let write_all_proofs_to_disk ~proof_cache_db t =
+    { diff = Diff.write_all_proofs_to_disk ~proof_cache_db t.Stable.Latest.diff
+    }
+
+  let read_all_proofs_from_disk t =
+    { Stable.Latest.diff = Diff.read_all_proofs_from_disk t.diff }
 
   module With_valid_signatures_and_proofs = struct
     type pre_diff_with_at_most_two_coinbase =
