@@ -56,7 +56,7 @@ module Diff_versioned = struct
      the checks) and [set_from_gossip_exn] (which just does the mutating the pool),
      and do the same for snapp commands as well.
   *)
-  type t = User_command.t list [@@deriving sexp, yojson]
+  type t = User_command.Stable.Latest.t list [@@deriving sexp, yojson]
 
   module Diff_error = struct
     [%%versioned
@@ -948,7 +948,7 @@ struct
     type pool = t
 
     module Diff = struct
-      type t = User_command.t list [@@deriving sexp, yojson]
+      type t = User_command.Stable.Latest.t list [@@deriving sexp, yojson]
 
       let (_ : (t, Diff_versioned.t) Type_equal.t) = Type_equal.T
 
@@ -999,7 +999,7 @@ struct
       end
 
       module Rejected = struct
-        type t = (User_command.t * Diff_error.t) list
+        type t = (User_command.Stable.Latest.t * Diff_error.t) list
         [@@deriving sexp, yojson, compare]
 
         let (_ : (t, Diff_versioned.Rejected.t) Type_equal.t) = Type_equal.T
@@ -1012,6 +1012,7 @@ struct
       let reject_overloaded_diff (diff : verified) : rejected =
         List.map diff ~f:(fun cmd ->
             ( Transaction_hash.User_command_with_valid_signature.command cmd
+              |> User_command.read_all_proofs_from_disk
             , Diff_error.Overloaded ) )
 
       let empty = []
@@ -1139,8 +1140,8 @@ struct
                       "User command $cmd from $sender has one or more \
                        well-formedness errors."
                       ~metadata:
-                        [ ("cmd", User_command.to_yojson user_cmd)
-                        ; ("sender", Envelope.(Sender.to_yojson sender))
+                        [ ("cmd", User_command.Stable.Latest.to_yojson user_cmd)
+                        ; ("sender", Envelope.Sender.to_yojson sender)
                         ; ( "errors"
                           , `List
                               (List.map errs
@@ -1178,18 +1179,18 @@ struct
                       "We don't have a transition frontier at the moment, so \
                        we're unable to verify any transactions." )
         in
-
-        let%bind diff' =
+        let%bind verified_diff =
           O1trace.sync_thread "convert_transactions_to_verifiable" (fun () ->
-              User_command.Unapplied_sequence.to_all_verifiable diff
-                ~load_vk_cache:(load_vk_cache ~t ~ledger) )
+              List.map ~f:User_command.write_all_proofs_to_disk diff
+              |> User_command.Unapplied_sequence.to_all_verifiable
+                   ~load_vk_cache:(load_vk_cache ~t ~ledger) )
           |> Result.map_error ~f:(fun e -> Invalid e)
           |> Deferred.return
         in
         match%bind.Deferred
           O1trace.thread "batching_transaction_verification" (fun () ->
               Batcher.verify t.batcher
-                { Envelope.Incoming.received_at; sender; data = diff' } )
+                { Envelope.Incoming.data = verified_diff; received_at; sender } )
         with
         | Error e ->
             [%log' error t.logger] "Transaction verification error: $error"
@@ -1471,13 +1472,14 @@ struct
                      Time.(now () |> to_span_since_epoch |> Span.to_sec)
                    in
                    x -. Mina_metrics.time_offset_sec )) ) ;
-            let forget_cmd =
-              Transaction_hash.User_command_with_valid_signature.command
+            let f =
+              Fn.compose User_command.read_all_proofs_from_disk
+                Transaction_hash.User_command_with_valid_signature.command
             in
             Ok
               ( decision
-              , List.map ~f:forget_cmd accepted
-              , List.map ~f:(Tuple2.map_fst ~f:forget_cmd) rejected )
+              , List.map ~f accepted
+              , List.map ~f:(Tuple2.map_fst ~f) rejected )
         | Error e ->
             Error (`Other e)
 
@@ -1535,10 +1537,13 @@ struct
           [%log internal] "%s" ("Transaction_diff_" ^ msg) ~metadata
 
       let t_of_verified =
-        List.map ~f:Transaction_hash.User_command_with_valid_signature.command
+        List.map
+          ~f:
+            (Fn.compose User_command.read_all_proofs_from_disk
+               Transaction_hash.User_command_with_valid_signature.command )
     end
 
-    let get_rebroadcastable (t : t) ~has_timed_out =
+    let get_rebroadcastable (t : t) ~has_timed_out : Diff.t list =
       let metadata ~key ~time =
         [ ( "cmd"
           , Transaction_hash.User_command_with_valid_signature.to_yojson key )
@@ -1598,8 +1603,8 @@ struct
       |> List.map
            ~f:
              (List.map ~f:(fun (txn, _) ->
-                  Transaction_hash.User_command_with_valid_signature.command txn )
-             )
+                  Transaction_hash.User_command_with_valid_signature.command txn
+                  |> User_command.read_all_proofs_from_disk ) )
   end
 
   include Network_pool_base.Make (Transition_frontier) (Resource_pool)
@@ -1818,7 +1823,8 @@ let%test_module _ =
         let report_additional commands a b =
           Core.Printf.printf "%s user commands not in %s:\n" a b ;
           List.iter commands ~f:(fun c ->
-              Core.Printf.printf !"  %{Sexp}\n" (User_command.sexp_of_t c) )
+              Core.Printf.printf !"  %{Sexp}\n"
+                (User_command.Stable.Latest.sexp_of_t c) )
         in
         if List.length additional1 > 0 then
           report_additional additional1 "actual" "expected" ;
@@ -1920,9 +1926,9 @@ let%test_module _ =
         @@ Sequence.map ~f:Transaction_hash.User_command.of_checked
         @@ Test.Resource_pool.transactions test.txn_pool )
         (List.map
-           ~f:
-             (Fn.compose Transaction_hash.User_command.create
-                User_command.forget_check )
+           ~f:(fun tx ->
+             Transaction_hash.User_command.create
+               User_command.(forget_check tx |> read_all_proofs_from_disk) )
            txs )
 
     let setup_test ?(verifier = verifier) ?permissions ?slot_tx_end () =
@@ -2169,11 +2175,12 @@ let%test_module _ =
       replace_valid_zkapp_command_authorizations ~keymap ~ledger:best_tip_ledger
         valid_zkapp_commands
 
-    type pool_apply = (User_command.t list, [ `Other of Error.t ]) Result.t
+    type pool_apply =
+      (User_command.Stable.Latest.t list, [ `Other of Error.t ]) Result.t
     [@@deriving sexp, compare]
 
     let canonicalize t =
-      Result.map t ~f:(List.sort ~compare:User_command.compare)
+      Result.map t ~f:(List.sort ~compare:User_command.Stable.Latest.compare)
 
     let compare_pool_apply (t1 : pool_apply) (t2 : pool_apply) =
       compare_pool_apply (canonicalize t1) (canonicalize t2)
@@ -2183,7 +2190,11 @@ let%test_module _ =
         Result.map result ~f:(fun (_, accepted, _) -> accepted)
       in
       [%test_eq: pool_apply] accepted_commands
-        (Ok (List.map ~f:User_command.forget_check expected_commands))
+        (Ok
+           (List.map
+              ~f:
+                User_command.(Fn.compose read_all_proofs_from_disk forget_check)
+              expected_commands ) )
 
     let mk_with_status (cmd : User_command.Valid.t) =
       { With_status.data = cmd; status = Applied }
@@ -2203,7 +2214,12 @@ let%test_module _ =
       let%map verified =
         Test.Resource_pool.Diff.verify test.txn_pool
           (Envelope.Incoming.wrap
-             ~data:(List.map ~f:User_command.forget_check cs)
+             ~data:
+               (List.map
+                  ~f:
+                    User_command.(
+                      Fn.compose read_all_proofs_from_disk forget_check)
+                  cs )
              ~sender )
         >>| Fn.compose Or_error.ok_exn
               (Result.map_error ~f:Intf.Verification_error.to_error)
@@ -2222,7 +2238,7 @@ let%test_module _ =
                 Core.Printf.printf
                   !"command was rejected because %s: %{Yojson.Safe}\n%!"
                   (Diff_versioned.Diff_error.to_string_name err)
-                  (User_command.to_yojson cmd) )
+                  (User_command.Stable.Latest.to_yojson cmd) )
       | Ok (`Reject, _, _) ->
           failwith "diff was rejected during application"
       | Error (`Other err) ->
@@ -2782,10 +2798,9 @@ let%test_module _ =
       let expected =
         if List.is_empty cmds then []
         else
-          [ List.map cmds
-              ~f:
-                (Fn.compose Transaction_hash.User_command.create
-                   User_command.forget_check )
+          [ List.map cmds ~f:(fun tx ->
+                Transaction_hash.User_command.create
+                  User_command.(forget_check tx |> read_all_proofs_from_disk) )
           ]
       in
       let actual =
@@ -2842,7 +2857,7 @@ let%test_module _ =
       ignore
         ( Test.Resource_pool.get_rebroadcastable t.txn_pool
             ~has_timed_out:(Fn.const `Timed_out)
-          : User_command.t list list ) ;
+          : User_command.Stable.Latest.t list list ) ;
       assert_rebroadcastable t [] ;
       Deferred.unit
 
@@ -3107,14 +3122,15 @@ let%test_module _ =
               ~fee_payer_idx:0 ~fee:minimum_fee ~nonce:0 ~zkapp_account_idx:1
               ~ledger:(Option.value_exn test.txn_pool.best_tip_ledger)
           in
+          let tx =
+            User_command.Zkapp_command
+              (Zkapp_command.Valid.For_tests.of_verifiable zkapp_command)
+          in
           match%map
             Test.Resource_pool.Diff.verify test.txn_pool
               (Envelope.Incoming.wrap
                  ~data:
-                   [ User_command.forget_check
-                     @@ Zkapp_command
-                          (Zkapp_command.Valid.For_tests.of_verifiable
-                             zkapp_command )
+                   [ User_command.(forget_check tx |> read_all_proofs_from_disk)
                    ]
                  ~sender:Envelope.Sender.Local )
           with
