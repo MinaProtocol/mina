@@ -72,7 +72,9 @@ let test large_precomputed_json_file : unit =
     Staged_ledger_diff.Stable.Latest.completed_works
       precomputed.staged_ledger_diff
     |> List.concat_map
-         ~f:(Fn.compose One_or_two.to_list Transaction_snark_work.proofs)
+         ~f:
+           (Fn.compose One_or_two.to_list
+              Transaction_snark_work.Stable.Latest.proofs )
   in
   printf "Read %d ledger proofs\n" (List.length ledger_proofs) ;
   Thread_safe.block_on_async_exn (fun () ->

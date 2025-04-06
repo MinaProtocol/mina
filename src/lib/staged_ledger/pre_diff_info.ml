@@ -284,7 +284,7 @@ module Transaction_data_getter_unchecked =
 module Transaction_data_getter_checked =
   Transaction_data_getter (Transaction_snark_work.Checked)
 module Transaction_data_getter_stable =
-  Transaction_data_getter (Transaction_snark_work)
+  Transaction_data_getter (Transaction_snark_work.Stable.Latest)
 
 let get_individual_info (type c)
     ~(get_transaction_data :

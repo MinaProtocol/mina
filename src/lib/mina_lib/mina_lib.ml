@@ -1614,7 +1614,9 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
       let%bind () =
         Deferred.List.iter completed_works ~f:(fun work ->
             (* proofs should be verified in apply and broadcast *)
-            let statement = Transaction_snark_work.statement work in
+            let statement =
+              Transaction_snark_work.Stable.Latest.statement work
+            in
             let snark =
               Network_pool.Priced_proof.
                 { proof = work.proofs
