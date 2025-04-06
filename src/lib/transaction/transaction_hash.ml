@@ -74,7 +74,7 @@ let ( hash_signed_command_v1
     let cmd_dummy_signature = { cmd with signature = Signature.dummy } in
     signed_cmd_hasher cmd_dummy_signature
   in
-  let hash_zkapp_command (cmd : Zkapp_command.t) =
+  let hash_zkapp_command (cmd : Zkapp_command.Stable.Latest.t) =
     let cmd_dummy_signatures_and_proofs =
       { cmd with
         fee_payer = { cmd.fee_payer with authorization = Signature.dummy }
@@ -172,7 +172,11 @@ module User_command_with_valid_signature = struct
   [@@deriving hash, sexp, compare, to_yojson]
 
   let create (c : User_command.Valid.t) : t =
-    { data = c; hash = hash_command (User_command.forget_check c) }
+    { data = c
+    ; hash =
+        hash_command
+          (User_command.read_all_proofs_from_disk @@ User_command.forget_check c)
+    }
 
   let data ({ data; _ } : t) = data
 
