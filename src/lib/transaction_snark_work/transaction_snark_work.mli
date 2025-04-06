@@ -77,6 +77,8 @@ module Stable : sig
   module V2 : sig
     type t [@@deriving bin_io, equal, sexp, version, yojson]
   end
+
+  module Latest = V2
 end
 with type V2.t = t
 

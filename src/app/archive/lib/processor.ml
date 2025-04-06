@@ -3305,8 +3305,11 @@ module Block = struct
       ~hash ~v1_transaction_hash:false
 
   let add_from_precomputed conn ~constraint_constants (t : Precomputed.t) =
+    let staged_ledger_diff =
+      Staged_ledger_diff.write_all_proofs_to_disk t.staged_ledger_diff
+    in
     add_parts_if_doesn't_exist conn ~constraint_constants
-      ~protocol_state:t.protocol_state ~staged_ledger_diff:t.staged_ledger_diff
+      ~protocol_state:t.protocol_state ~staged_ledger_diff
       ~protocol_version:t.protocol_version
       ~proposed_protocol_version:t.proposed_protocol_version
       ~hash:(Protocol_state.hashes t.protocol_state).state_hash

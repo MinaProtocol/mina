@@ -69,7 +69,8 @@ let test large_precomputed_json_file : unit =
         failwith err
   in
   let ledger_proofs =
-    Staged_ledger_diff.completed_works precomputed.staged_ledger_diff
+    Staged_ledger_diff.Stable.Latest.completed_works
+      precomputed.staged_ledger_diff
     |> List.concat_map
          ~f:(Fn.compose One_or_two.to_list Transaction_snark_work.proofs)
   in
