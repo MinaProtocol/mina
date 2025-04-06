@@ -518,8 +518,7 @@ struct
                       ~actual_feature_flags:rule.feature_flags
                       ~max_proofs_verified:Max_proofs_verified.n ~branches ~self
                       ~public_input ~auxiliary_typ Arg_var.to_field_elements
-                      Arg_value.to_field_elements rule ~wrap_domains
-                      ~proofs_verifieds ~chain_to )
+                      Arg_value.to_field_elements rule ~wrap_domains ~chain_to )
               in
               Timer.clock __LOC__ ; incr i ; res
             in
@@ -856,8 +855,7 @@ struct
     in
     Timer.clock __LOC__ ;
     let data : _ Types_map.Compiled.t =
-      { proofs_verifieds
-      ; max_proofs_verified
+      { max_proofs_verified
       ; public_input = typ
       ; wrap_key =
           Lazy.map wrap_vk
