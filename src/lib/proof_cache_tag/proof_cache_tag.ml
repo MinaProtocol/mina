@@ -1,12 +1,12 @@
-open Async
-open Core
-module Cache = Disk_cache.Make (Mina_base.Proof.Stable.Latest)
+open Async_kernel
+open Core_kernel
+module Cache = Disk_cache.Make (Pickles.Proof.Proofs_verified_2.Stable.Latest)
 
 type cache_db = Lmdb_cache of Cache.t | Identity_cache
 
 type t =
   | Lmdb of { cache_id : Cache.id; cache_db : Cache.t }
-  | Identity of Mina_base.Proof.t
+  | Identity of Pickles.Proof.Proofs_verified_2.Stable.Latest.t
 
 let read_proof_from_disk = function
   | Lmdb t ->
@@ -29,14 +29,4 @@ let create_identity_db () = Identity_cache
 
 module For_tests = struct
   let create_db = create_identity_db
-
-  let blockchain_dummy =
-    Lazy.map
-      ~f:(fun dummy -> write_proof_to_disk (create_db ()) dummy)
-      Mina_base.Proof.blockchain_dummy
-
-  let transaction_dummy =
-    Lazy.map
-      ~f:(fun dummy -> write_proof_to_disk (create_db ()) dummy)
-      Mina_base.Proof.transaction_dummy
 end
