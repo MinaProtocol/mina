@@ -243,7 +243,7 @@ let validate ~logger ~trust_system ~verifier ~initialization_finish_signal
       let header, sender =
         match b_or_h with
         | `Block b_env ->
-            ( Mina_block.header (Envelope.Incoming.data b_env)
+            ( Mina_block.Stable.Latest.header (Envelope.Incoming.data b_env)
             , Envelope.Incoming.sender b_env )
         | `Header h_env ->
             (Envelope.Incoming.data h_env, Envelope.Incoming.sender h_env)
@@ -288,6 +288,7 @@ let validate ~logger ~trust_system ~verifier ~initialization_finish_signal
             with
             | Ok verified_header ->
                 [%log internal] "Initial_validation_done" ;
+                let body b = Mina_block.Stable.Latest.body b in
                 let b_or_h' =
                   match b_or_h with
                   | `Block b_env ->
@@ -296,7 +297,7 @@ let validate ~logger ~trust_system ~verifier ~initialization_finish_signal
                            ~f:
                              (Fn.compose
                                 (Mina_block.Validation.with_body verified_header)
-                                Mina_block.body )
+                                body )
                            b_env )
                   | `Header h_env ->
                       `Header

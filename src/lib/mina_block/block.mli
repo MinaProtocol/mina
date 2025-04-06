@@ -7,10 +7,19 @@ module Stable : sig
 
   module V2 : sig
     type t [@@deriving sexp, equal]
+
+    val header : t -> Header.Stable.V2.t
+
+    val body : t -> Staged_ledger_diff.Body.Stable.V1.t
+
+    val transactions :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> t
+      -> Transaction.Stable.V2.t With_status.t list
   end
 end]
 
-type t = Stable.Latest.t
+type t
 
 val to_logging_yojson : Header.t -> Yojson.Safe.t
 
@@ -41,3 +50,7 @@ val account_ids_accessed :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> t
   -> (Account_id.t * [ `Accessed | `Not_accessed ]) list
+
+val write_all_proofs_to_disk : Stable.Latest.t -> t
+
+val read_all_proofs_from_disk : t -> Stable.Latest.t
