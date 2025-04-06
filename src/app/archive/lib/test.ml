@@ -128,6 +128,8 @@ let%test_module "Archive node unit tests" =
           Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
             ~min_fee:Currency.Fee.zero coinbase_amount )
 
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
     let%test_unit "User_command: read and write signed command" =
       let conn = Lazy.force conn_lazy in
       Thread_safe.block_on_async_exn
@@ -310,7 +312,7 @@ let%test_module "Archive node unit tests" =
           List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
           Strict_pipe.Writer.close writer ;
           let%bind () =
-            Processor.run
+            Processor.run ~proof_cache_db
               ~genesis_constants:precomputed_values.genesis_constants
               ~constraint_constants:precomputed_values.constraint_constants pool
               reader ~logger ~delete_older_than:None

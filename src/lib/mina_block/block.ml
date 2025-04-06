@@ -114,8 +114,10 @@ let account_ids_accessed ~constraint_constants t =
   |> List.dedup_and_sort
        ~compare:[%compare: Account_id.t * [ `Accessed | `Not_accessed ]]
 
-let write_all_proofs_to_disk { Stable.Latest.header; body } =
-  { header; body = Staged_ledger_diff.Body.write_all_proofs_to_disk body }
+let write_all_proofs_to_disk ~proof_cache_db { Stable.Latest.header; body } =
+  { header
+  ; body = Staged_ledger_diff.Body.write_all_proofs_to_disk ~proof_cache_db body
+  }
 
 let read_all_proofs_from_disk { header; body } =
   { Stable.Latest.header

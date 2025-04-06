@@ -718,8 +718,12 @@ module T = struct
       | true, Some (completed_work : Transaction_snark_work.Checked.t) ->
           let verified_proofs =
             Transaction_snark_work.Checked.proofs completed_work
+            |> One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk
           in
-          let block_work_proofs = Transaction_snark_work.proofs work in
+          let block_work_proofs =
+            Transaction_snark_work.proofs work
+            |> One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk
+          in
           if
             not
             @@ Fee.equal
@@ -765,7 +769,9 @@ module T = struct
               One_or_two.(
                 to_list
                   (map (zip_exn jobs work.proofs) ~f:(fun (job, proof) ->
-                       (job, message, proof) ) )) )
+                       ( job
+                       , message
+                       , Ledger_proof.Cached.read_proof_from_disk proof ) ) )) )
     in
     [%log debug]
       ~metadata:
@@ -1005,9 +1011,9 @@ module T = struct
              (Pre_diff_info.Error.Coinbase_error "More than two coinbase parts")
           )
 
-  let apply_diff ?(skip_verification = false) ~proof_cache_db ~logger
-      ~constraint_constants ~global_slot t pre_diff_info ~current_state_view
-      ~state_and_body_hash ~log_prefix ~zkapp_cmd_limit_hardcap =
+  let apply_diff ?(skip_verification = false) ~logger ~constraint_constants
+      ~global_slot t pre_diff_info ~current_state_view ~state_and_body_hash
+      ~log_prefix ~zkapp_cmd_limit_hardcap =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
       Int.pow 2 t.constraint_constants.transaction_capacity_log_2
@@ -1099,8 +1105,8 @@ module T = struct
     let%bind res_opt, scan_state' =
       O1trace.thread "fill_work_and_enqueue_transactions" (fun () ->
           let r =
-            Scan_state.fill_work_and_enqueue_transactions t.scan_state
-              ~proof_cache_db ~logger data works
+            Scan_state.fill_work_and_enqueue_transactions t.scan_state ~logger
+              data works
           in
           Or_error.iter_error r ~f:(fun e ->
               let data_json =
@@ -1217,8 +1223,8 @@ module T = struct
 
   type transaction_pool_proxy = Check_commands.transaction_pool_proxy
 
-  let apply ?skip_verification ~proof_cache_db ~constraint_constants
-      ~global_slot ~get_completed_work ~logger ~verifier ~current_state_view
+  let apply ?skip_verification ~constraint_constants ~global_slot
+      ~get_completed_work ~logger ~verifier ~current_state_view
       ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
       ~zkapp_cmd_limit_hardcap
       ?(transaction_pool_proxy = Check_commands.dummy_transaction_pool_proxy) t
@@ -1251,7 +1257,7 @@ module T = struct
     let apply_diff_start_time = Core.Time.now () in
     [%log internal] "Apply_diff" ;
     let%map ((_, _, `Staged_ledger new_staged_ledger, _) as res) =
-      apply_diff ~proof_cache_db
+      apply_diff
         ~skip_verification:
           ([%equal: [ `All | `Proofs ] option] skip_verification (Some `All))
         ~constraint_constants ~global_slot t
@@ -1276,7 +1282,7 @@ module T = struct
     in
     res
 
-  let apply_diff_unchecked ~proof_cache_db ~constraint_constants ~global_slot t
+  let apply_diff_unchecked ~constraint_constants ~global_slot t
       (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) ~logger
       ~current_state_view ~state_and_body_hash ~coinbase_receiver
       ~supercharge_coinbase ~zkapp_cmd_limit_hardcap =
@@ -1287,7 +1293,7 @@ module T = struct
            ~supercharge_coinbase sl_diff
       |> Deferred.return
     in
-    apply_diff ~proof_cache_db t
+    apply_diff t
       (forget_prediff_info prediff)
       ~constraint_constants ~global_slot ~logger ~current_state_view
       ~state_and_body_hash ~log_prefix:"apply_diff_unchecked"
@@ -2346,8 +2352,6 @@ let%test_module "staged ledger tests" =
       Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true
 
-    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
-
     let self_pk =
       Quickcheck.random_value ~seed:(`Deterministic "self_pk")
         Public_key.Compressed.gen
@@ -2420,10 +2424,10 @@ let%test_module "staged ledger tests" =
               , `Staged_ledger sl'
               , `Pending_coinbase_update (is_new_stack, pc_update) ) =
         match%map
-          Sl.apply ~proof_cache_db ~constraint_constants ~global_slot !sl diff'
-            ~logger ~verifier ~get_completed_work:(Fn.const None)
-            ~current_state_view ~state_and_body_hash ~coinbase_receiver
-            ~supercharge_coinbase ~zkapp_cmd_limit_hardcap
+          Sl.apply ~constraint_constants ~global_slot !sl diff' ~logger
+            ~verifier ~get_completed_work:(Fn.const None) ~current_state_view
+            ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
+            ~zkapp_cmd_limit_hardcap
         with
         | Ok x ->
             x
@@ -2573,11 +2577,11 @@ let%test_module "staged ledger tests" =
       Quickcheck.random_value ~seed:(`Deterministic prover_seed)
         Public_key.Compressed.gen
 
-    let proofs stmts : Ledger_proof.t One_or_two.t =
+    let proofs stmts : Ledger_proof.Cached.t One_or_two.t =
       let sok_digest = Sok_message.Digest.default in
       One_or_two.map stmts ~f:(fun statement ->
-          Ledger_proof.create ~statement ~sok_digest
-            ~proof:(Lazy.force Proof.transaction_dummy) )
+          Ledger_proof.Cached.create ~statement ~sok_digest
+            ~proof:(Lazy.force Proof_cache_tag.For_tests.transaction_dummy) )
 
     let stmt_to_work_random_prover (stmts : Transaction_snark_work.Statement.t)
         : Transaction_snark_work.Checked.t option =
@@ -3348,9 +3352,8 @@ let%test_module "staged ledger tests" =
                       Mina_state.Protocol_state.hashes current_state
                     in
                     let%bind apply_res =
-                      Sl.apply ~proof_cache_db ~constraint_constants
-                        ~global_slot !sl diff ~logger ~verifier
-                        ~get_completed_work:(Fn.const None)
+                      Sl.apply ~constraint_constants ~global_slot !sl diff
+                        ~logger ~verifier ~get_completed_work:(Fn.const None)
                         ~current_state_view:current_view
                         ~state_and_body_hash:
                           ( state_hashes.state_hash
@@ -4366,8 +4369,7 @@ let%test_module "staged ledger tests" =
                     }
                   in
                   match%map
-                    Sl.apply ~proof_cache_db ~constraint_constants ~global_slot
-                      !sl
+                    Sl.apply ~constraint_constants ~global_slot !sl
                       (Staged_ledger_diff.forget diff)
                       ~logger ~verifier ~get_completed_work:(Fn.const None)
                       ~current_state_view ~state_and_body_hash
@@ -4577,7 +4579,7 @@ let%test_module "staged ledger tests" =
                   |> List.map ~f:(fun cmd -> User_command.forget_check cmd) ) ) ;
               assert (List.length invalid_txns = 3) ;
               match%bind
-                Sl.apply ~proof_cache_db ~constraint_constants ~global_slot sl
+                Sl.apply ~constraint_constants ~global_slot sl
                   (Staged_ledger_diff.forget diff)
                   ~logger ~verifier ~get_completed_work:(Fn.const None)
                   ~current_state_view ~state_and_body_hash ~coinbase_receiver
@@ -4623,8 +4625,7 @@ let%test_module "staged ledger tests" =
                     }
                   in
                   match%map
-                    Sl.apply ~proof_cache_db ~constraint_constants ~global_slot
-                      sl
+                    Sl.apply ~constraint_constants ~global_slot sl
                       (Staged_ledger_diff.forget diff)
                       ~logger ~verifier ~get_completed_work:(Fn.const None)
                       ~current_state_view ~state_and_body_hash
@@ -4721,7 +4722,7 @@ let%test_module "staged ledger tests" =
                 , state_hashes.state_body_hash |> Option.value_exn )
               in
               let%map result =
-                apply ~proof_cache_db ~logger ~constraint_constants ~global_slot
+                apply ~logger ~constraint_constants ~global_slot
                   ~get_completed_work:(Fn.const None) ~verifier
                   ~current_state_view ~state_and_body_hash ~coinbase_receiver
                   ~supercharge_coinbase:false sl diff ~zkapp_cmd_limit_hardcap
@@ -5159,8 +5160,7 @@ let%test_module "staged ledger tests" =
                           ~proof_level:Full ()
                       in
                       match%map
-                        Sl.apply ~proof_cache_db ~constraint_constants
-                          ~global_slot !sl
+                        Sl.apply ~constraint_constants ~global_slot !sl
                           (Staged_ledger_diff.forget diff)
                           ~get_completed_work:(Fn.const None) ~logger
                           ~verifier:verifier_full ~current_state_view
