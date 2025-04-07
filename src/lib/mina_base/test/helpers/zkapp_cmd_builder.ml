@@ -14,7 +14,7 @@ type account_update =
 
 type transaction = < updates : (account_update list, nonces) Monad_lib.State.t >
 
-let dummy_auth = Control.Signature Signature.dummy
+let dummy_auth = Control.Poly.Signature Signature.dummy
 
 let get_nonce_exn (pk : Public_key.Compressed.t) :
     ( Account_nonce.t

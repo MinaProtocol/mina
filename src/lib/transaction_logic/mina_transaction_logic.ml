@@ -2527,7 +2527,7 @@ module For_tests = struct
           match account_update.body.authorization_kind with
           | Signature ->
               { account_update with
-                authorization = Control.Signature account_updates_signature
+                authorization = Control.Poly.Signature account_updates_signature
               }
           | _ ->
               account_update )

@@ -135,7 +135,7 @@ module Rules = struct
                      to be able to reconstruct the command outside the circuit
                      when it has finished.
                   *)
-                  Prover_value.create (fun () -> Control.None_given)
+                  Prover_value.create (fun () -> Control.Poly.None_given)
               }
             , calls )
           in
@@ -328,7 +328,7 @@ module Rules = struct
       let dummy : _ Zkapp_command.Call_forest.Tree.t =
         { account_update =
             { Account_update.body = dummy_account_update_body.data
-            ; authorization = Control.None_given
+            ; authorization = Control.Poly.None_given
             }
         ; account_update_digest = dummy_account_update_body.hash
         ; calls = []
