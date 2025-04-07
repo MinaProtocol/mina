@@ -267,7 +267,7 @@ let%test_module "Composability test" =
                 in
                 { account_update with
                   authorization =
-                    Signature
+                    Control.Poly.Signature
                       (Schnorr.Chunked.sign sk
                          (Random_oracle.Input.Chunked.field commitment) )
                 }

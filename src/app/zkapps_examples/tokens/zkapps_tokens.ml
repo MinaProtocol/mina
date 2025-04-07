@@ -327,7 +327,7 @@ module Rules = struct
       let dummy_account_update_body = Lazy.force dummy_account_update_body in
       let dummy : _ Zkapp_command.Call_forest.Tree.t =
         { account_update =
-            { Account_update.body = dummy_account_update_body.data
+            { Account_update.Poly.body = dummy_account_update_body.data
             ; authorization = Control.Poly.None_given
             }
         ; account_update_digest = dummy_account_update_body.hash

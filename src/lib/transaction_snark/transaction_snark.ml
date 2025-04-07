@@ -4520,8 +4520,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                   Signature_lib.Schnorr.Chunked.sign receiver_kp.private_key
                     (Random_oracle.Input.Chunked.field commitment)
                 in
-                { Account_update.Simple.body = s.body
-                ; authorization = Signature receiver_signature_auth
+                { Account_update.Poly.body = s.body
+                ; authorization = Control.Poly.Signature receiver_signature_auth
                 }
             | Control.Poly.Proof _ ->
                 failwith ""
@@ -4730,8 +4730,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let account_update_with_dummy_auth =
         Account_update.
-          { body =
-              { public_key =
+          { Poly.body =
+              { Account_update.Body.public_key =
                   Signature_lib.Public_key.compress
                     spec.zkapp_account_keypair.public_key
               ; update = spec.update
@@ -4745,7 +4745,8 @@ module Make_str (A : Wire_types.Concrete) = struct
               ; use_full_commitment = true
               ; implicit_account_creation_fee = false
               ; may_use_token = No
-              ; authorization_kind = Proof (With_hash.hash vk)
+              ; authorization_kind =
+                  Account_update.Authorization_kind.Proof (With_hash.hash vk)
               }
           ; authorization =
               Control.Poly.Proof (Lazy.force Mina_base.Proof.blockchain_dummy)
@@ -4776,7 +4777,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         { tree_with_dummy_auth with
           account_update =
-            { account_update_with_dummy_auth with authorization = Proof pi }
+            { account_update_with_dummy_auth with
+              authorization = Control.Poly.Proof pi
+            }
         ; account_update_digest = account_update_digest_with_current_chain
         }
       in
