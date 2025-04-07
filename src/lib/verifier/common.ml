@@ -45,7 +45,7 @@ let check_signed_command c =
         Result.Error (`Invalid_signature (Signed_command.public_keys c))
 
 let collect_vk_assumption
-    ( (p : Account_update.t)
+    ( (p : (Account_update.Body.t, _ Control.Poly.t) Account_update.Poly.t)
     , ( (vk_opt :
           (Side_loaded_verification_key.t, Pasta_bindings.Fp.t) With_hash.t
           option )
@@ -116,7 +116,7 @@ let check_signatures_of_zkapp_command (zkapp_command : _ Zkapp_command.Poly.t) :
   Zkapp_command.Call_forest.to_list zkapp_command.account_updates
   |> List.fold_result ~init:() ~f:(fun () p ->
          let commitment =
-           if p.Account_update.body.use_full_commitment then full_tx_commitment
+           if Account_update.use_full_commitment p then full_tx_commitment
            else tx_commitment
          in
          match (p.authorization, p.body.authorization_kind) with
