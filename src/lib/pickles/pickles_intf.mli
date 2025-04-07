@@ -403,6 +403,7 @@ module type S = sig
          * Cache.Wrap.Key.Verification.t
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
     -> ?num_chunks:int
+    -> ?lazy_mode:bool
     -> public_input:
          ( 'var
          , 'value
@@ -458,6 +459,7 @@ module type S = sig
          * Cache.Wrap.Key.Verification.t
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
     -> ?num_chunks:int
+    -> ?lazy_mode:bool
     -> public_input:
          ( 'var
          , 'value
@@ -513,6 +515,7 @@ module type S = sig
          * Cache.Wrap.Key.Verification.t
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
     -> ?num_chunks:int
+    -> ?lazy_mode:bool
     -> public_input:
          ( 'var
          , 'value

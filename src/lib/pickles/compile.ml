@@ -1002,6 +1002,7 @@ let compile_with_wrap_main_override_promise :
     -> ?override_wrap_main:
          (max_proofs_verified, branches, prev_varss) wrap_main_generic
     -> ?num_chunks:int
+    -> ?lazy_mode:bool
     -> public_input:
          ( var
          , value
@@ -1048,7 +1049,7 @@ let compile_with_wrap_main_override_promise :
     and the underlying Make(_).compile function which builds the circuits.
  *)
  fun ?self ?(cache = []) ?(storables = Storables.default) ?proof_cache
-     ?disk_keys ?override_wrap_domain ?override_wrap_main ?num_chunks
+     ?disk_keys ?override_wrap_domain ?override_wrap_main ?num_chunks ?lazy_mode
      ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
      ?constraint_constants ~choices () ->
   let self =
@@ -1117,7 +1118,7 @@ let compile_with_wrap_main_override_promise :
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
     M.compile ~self ~proof_cache ~cache ~storables ?disk_keys
-      ?override_wrap_domain ?override_wrap_main ?num_chunks ~branches
+      ?override_wrap_domain ?override_wrap_main ?num_chunks ?lazy_mode ~branches
       ~max_proofs_verified ~name ~public_input ~auxiliary_typ
       ?constraint_constants
       ~choices:(fun ~self -> conv_irs (choices ~self))
