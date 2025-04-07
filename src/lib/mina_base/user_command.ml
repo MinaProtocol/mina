@@ -1,4 +1,5 @@
 open Core_kernel
+open Mina_stdlib
 
 module Poly = struct
   [%%versioned
@@ -75,6 +76,8 @@ let gen = Gen.to_signed_command gen_signed
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       (Signed_command.Stable.V2.t, Zkapp_command.Stable.V1.t) Poly.Stable.V2.t
@@ -84,13 +87,31 @@ module Stable = struct
   end
 end]
 
-let to_base64 : t -> string = function
+type t = (Signed_command.t, Zkapp_command.t) Poly.t
+[@@deriving sexp, compare, equal, hash, yojson]
+
+let write_all_proofs_to_disk : Stable.Latest.t -> t = function
+  | Signed_command sc ->
+      Signed_command sc
+  | Zkapp_command zc ->
+      Zkapp_command (Zkapp_command.write_all_proofs_to_disk zc)
+
+let read_all_proofs_from_disk : t -> Stable.Latest.t = function
+  | Signed_command sc ->
+      Signed_command sc
+  | Zkapp_command zc ->
+      Zkapp_command (Zkapp_command.read_all_proofs_from_disk zc)
+
+type ('a, 'b) with_forest =
+  (Signed_command.t, ('a, 'b) Zkapp_command.with_forest) Poly.t
+
+let to_base64 : Stable.Latest.t -> string = function
   | Signed_command sc ->
       Signed_command.to_base64 sc
   | Zkapp_command zc ->
       Zkapp_command.to_base64 zc
 
-let of_base64 s : t Or_error.t =
+let of_base64 s : Stable.Latest.t Or_error.t =
   match Signed_command.of_base64 s with
   | Ok sc ->
       Ok (Signed_command sc)
@@ -105,27 +126,6 @@ let of_base64 s : t Or_error.t =
                   "Could decode Base64 neither to signed command (%s), nor to \
                    zkApp (%s)"
                   (Error.to_string_hum err1) (Error.to_string_hum err2) ) ) )
-
-(*
-include Allocation_functor.Make.Versioned_v1.Full_compare_eq_hash (struct
-  let id = "user_command"
-
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        (Signed_command.Stable.V1.t, Snapp_command.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving sexp, compare, equal, hash, yojson]
-
-      let to_latest = Fn.id
-
-      type 'a creator : Signed_command.t -> Snapp_command.t -> 'a
-
-      let create cmd1 cmd2 = (cmd1, cmd2)
-    end
-  end]
-end)
-*)
 
 module Zero_one_or_two = struct
   [%%versioned
@@ -165,42 +165,42 @@ module Make_to_all_verifiable
 struct
   let to_all_verifiable (ts : t Strategy.Command_wrapper.t list) ~load_vk_cache
       : Verifiable.t Strategy.Command_wrapper.t list Or_error.t =
+    (* TODO: it seems we're just doing noop with the Strategy.Command_wrapper,
+       need double-check.
+    *)
     let open Or_error.Let_syntax in
-    (* First we tag everything with its index *)
-    let its = List.mapi ts ~f:(fun i x -> (i, x)) in
-    (* then we partition out the zkapp commands *)
-    let izk_cmds, is_cmds =
-      List.partition_map its ~f:(fun (i, cmd) ->
-          match Strategy.Command_wrapper.unwrap cmd with
-          | Zkapp_command c ->
-              First (i, Strategy.Command_wrapper.map cmd ~f:(Fn.const c))
-          | Signed_command c ->
-              Second (i, Strategy.Command_wrapper.map cmd ~f:(Fn.const c)) )
+    let partitioner (cmd : t Strategy.Command_wrapper.t) =
+      match Strategy.Command_wrapper.unwrap cmd with
+      | Zkapp_command c ->
+          First (Strategy.Command_wrapper.map cmd ~f:(Fn.const c))
+      | Signed_command c ->
+          Second (Strategy.Command_wrapper.map cmd ~f:(Fn.const c))
     in
-    (* then unzip the indices *)
-    let ixs, zk_cmds = List.unzip izk_cmds in
-    (* then we verify the zkapp commands *)
-    (* TODO: we could optimize this by skipping the fee payer and non-proof authorizations *)
-    let accounts_referenced =
-      List.fold_left zk_cmds ~init:Account_id.Set.empty ~f:(fun set zk_cmd ->
-          Strategy.Command_wrapper.unwrap zk_cmd
-          |> Zkapp_command.accounts_referenced |> Account_id.Set.of_list
-          |> Set.union set )
+    let process_left zk_cmds =
+      (* TODO: we could optimize this by skipping the fee payer and non-proof authorizations *)
+      let accounts_referenced =
+        List.fold_left zk_cmds ~init:Account_id.Set.empty ~f:(fun set zk_cmd ->
+            Strategy.Command_wrapper.unwrap zk_cmd
+            |> Zkapp_command.accounts_referenced |> Account_id.Set.of_list
+            |> Set.union set )
+      in
+      let vk_cache = load_vk_cache accounts_referenced in
+      Strategy.create_all zk_cmds vk_cache
     in
-    let vk_cache = load_vk_cache accounts_referenced in
-    let%map vzk_cmds = Strategy.create_all zk_cmds vk_cache in
-    (* rezip indices *)
-    let ivzk_cmds = List.zip_exn ixs vzk_cmds in
-    (* Put them back in with a sort by index (un-partition) *)
-    let ivs =
-      List.map is_cmds ~f:(fun (i, cmd) ->
-          (i, Strategy.Command_wrapper.map cmd ~f:(fun c -> Signed_command c)) )
-      @ List.map ivzk_cmds ~f:(fun (i, cmd) ->
-            (i, Strategy.Command_wrapper.map cmd ~f:(fun c -> Zkapp_command c)) )
-      |> List.sort ~compare:(fun (i, _) (j, _) -> i - j)
+    let process_right =
+      List.map ~f:(fun cmd ->
+          Strategy.Command_wrapper.map cmd ~f:(fun c -> Signed_command c) )
     in
-    (* Drop the indices *)
-    List.unzip ivs |> snd
+    let finalizer vzk_cmds_m is_cmds_mapped ~f =
+      let%map vzk_cmds = vzk_cmds_m in
+      let vzk_cmds_mapped =
+        List.map vzk_cmds ~f:(fun cmd ->
+            Strategy.Command_wrapper.map cmd ~f:(fun c -> Zkapp_command c) )
+      in
+      f vzk_cmds_mapped is_cmds_mapped
+    in
+    List.process_separately ts ~partitioner ~process_left ~process_right
+      ~finalizer
 end
 
 module Unapplied_sequence =
@@ -215,7 +215,7 @@ let of_verifiable (t : Verifiable.t) : t =
   | Zkapp_command p ->
       Zkapp_command (Zkapp_command.of_verifiable p)
 
-let fee : t -> Currency.Fee.t = function
+let fee : (_, _) with_forest -> Currency.Fee.t = function
   | Signed_command x ->
       Signed_command.fee x
   | Zkapp_command p ->
@@ -230,7 +230,7 @@ let is_disabled = function
       false
 
 (* always `Accessed` for fee payer *)
-let accounts_accessed (t : t) (status : Transaction_status.t) :
+let accounts_accessed (t : (_, _) with_forest) (status : Transaction_status.t) :
     (Account_id.t * [ `Accessed | `Not_accessed ]) list =
   match t with
   | Signed_command x ->
@@ -238,10 +238,10 @@ let accounts_accessed (t : t) (status : Transaction_status.t) :
   | Zkapp_command ps ->
       Zkapp_command.account_access_statuses ps status
 
-let accounts_referenced (t : t) =
+let accounts_referenced (t : (_, _) with_forest) =
   List.map (accounts_accessed t Applied) ~f:(fun (acct_id, _status) -> acct_id)
 
-let fee_payer (t : t) =
+let fee_payer (t : (_, _) with_forest) =
   match t with
   | Signed_command x ->
       Signed_command.fee_payer x
@@ -249,7 +249,7 @@ let fee_payer (t : t) =
       Zkapp_command.fee_payer p
 
 (** The application nonce is the nonce of the fee payer at which a user command can be applied. *)
-let applicable_at_nonce (t : t) =
+let applicable_at_nonce (t : (_, _) with_forest) =
   match t with
   | Signed_command x ->
       Signed_command.nonce x
@@ -266,21 +266,21 @@ let extract_vks : t -> (Account_id.t * Verification_key_wire.t) List.t =
       Zkapp_command.extract_vks cmd
 
 (** The target nonce is what the nonce of the fee payer will be after a user command is successfully applied. *)
-let target_nonce_on_success (t : t) =
+let target_nonce_on_success (t : (_, _) with_forest) =
   match t with
   | Signed_command x ->
       Account.Nonce.succ (Signed_command.nonce x)
   | Zkapp_command p ->
       Zkapp_command.target_nonce_on_success p
 
-let fee_token (t : t) =
+let fee_token (t : (_, _) with_forest) =
   match t with
   | Signed_command x ->
       Signed_command.fee_token x
   | Zkapp_command x ->
       Zkapp_command.fee_token x
 
-let valid_until (t : t) =
+let valid_until (t : (_, _) with_forest) =
   match t with
   | Signed_command x ->
       Signed_command.valid_until x
@@ -300,19 +300,18 @@ module Valid = struct
   module Gen = Gen_make (Signed_command.With_valid_signature)
 end
 
-let check_verifiable (t : Verifiable.t) : Valid.t Or_error.t =
-  match t with
-  | Signed_command x -> (
-      match Signed_command.check x with
-      | Some c ->
-          Ok (Signed_command c)
-      | None ->
-          Or_error.error_string "Invalid signature" )
-  | Zkapp_command p ->
-      Ok (Zkapp_command (Zkapp_command.Valid.of_verifiable p))
-
-let check ~failed ~find_vk (t : t) : Valid.t Or_error.t =
-  to_verifiable ~failed ~find_vk t |> Or_error.bind ~f:check_verifiable
+module For_tests = struct
+  let check_verifiable (t : Verifiable.t) : Valid.t Or_error.t =
+    match t with
+    | Signed_command x -> (
+        match Signed_command.check x with
+        | Some c ->
+            Ok (Signed_command c)
+        | None ->
+            Or_error.error_string "Invalid signature" )
+    | Zkapp_command p ->
+        Ok (Zkapp_command (Zkapp_command.Valid.For_tests.of_verifiable p))
+end
 
 let forget_check (t : Valid.t) : t =
   match t with
@@ -347,14 +346,14 @@ let filter_by_participant (commands : t list) public_key =
 
 (* A metric on user commands that should correspond roughly to resource costs
    for validation/application *)
-let weight : t -> int = function
+let weight : (_, _) with_forest -> int = function
   | Signed_command signed_command ->
       Signed_command.payload signed_command |> Signed_command_payload.weight
   | Zkapp_command zkapp_command ->
       Zkapp_command.weight zkapp_command
 
 (* Fee per weight unit *)
-let fee_per_wu (user_command : Stable.Latest.t) : Currency.Fee_rate.t =
+let fee_per_wu (user_command : (_, _) with_forest) : Currency.Fee_rate.t =
   (*TODO: return Or_error*)
   Currency.Fee_rate.make_exn (fee user_command) (weight user_command)
 
@@ -376,7 +375,7 @@ let is_incompatible_version = function
   | Zkapp_command p ->
       Zkapp_command.is_incompatible_version p
 
-let has_invalid_call_forest : t -> bool = function
+let has_invalid_call_forest : (_, _) with_forest -> bool = function
   | Signed_command _ ->
       false
   | Zkapp_command cmd ->
@@ -413,8 +412,8 @@ module Well_formedness_error = struct
         "Transaction type disabled"
 end
 
-let check_well_formedness ~(genesis_constants : Genesis_constants.t) t :
-    (unit, Well_formedness_error.t list) result =
+let check_well_formedness ~(genesis_constants : Genesis_constants.t)
+    (t : (_, _) with_forest) : (unit, Well_formedness_error.t list) result =
   let preds =
     let open Well_formedness_error in
     [ ( has_insufficient_fee
@@ -442,7 +441,7 @@ let check_well_formedness ~(genesis_constants : Genesis_constants.t) t :
 type fee_payer_summary_t = Signature.t * Account.key * int
 [@@deriving yojson, hash]
 
-let fee_payer_summary : t -> fee_payer_summary_t = function
+let fee_payer_summary : (_, _) with_forest -> fee_payer_summary_t = function
   | Zkapp_command cmd ->
       let fp = Zkapp_command.fee_payer_account_update cmd in
       let open Account_update in
@@ -454,14 +453,12 @@ let fee_payer_summary : t -> fee_payer_summary_t = function
       Signed_command.
         (signature cmd, fee_payer_pk cmd, nonce cmd |> Unsigned.UInt32.to_int)
 
-let fee_payer_summary_json =
-  Fn.compose fee_payer_summary_t_to_yojson fee_payer_summary
+let fee_payer_summary_json tx =
+  fee_payer_summary_t_to_yojson (fee_payer_summary tx)
 
-let fee_payer_summary_string =
-  let to_string (signature, pk, nonce) =
-    sprintf "%s (%s %d)"
-      (Signature.to_base58_check signature)
-      (Signature_lib.Public_key.Compressed.to_base58_check pk)
-      nonce
-  in
-  Fn.compose to_string fee_payer_summary
+let fee_payer_summary_string tx =
+  let signature, pk, nonce = fee_payer_summary tx in
+  sprintf "%s (%s %d)"
+    (Signature.to_base58_check signature)
+    (Signature_lib.Public_key.Compressed.to_base58_check pk)
+    nonce

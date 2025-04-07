@@ -890,7 +890,10 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     Mina_metrics.(
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
-  let spec = work.spec.instances in
+  let spec =
+    One_or_two.map work.spec.instances
+      ~f:Snark_work_lib.Work.Single.Spec.statement
+  in
   let cb _ =
     (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
      * If the diff is accepted then remove it from the seen jobs.
@@ -898,8 +901,9 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     Work_selector.remove t.snark_job_state spec
   in
   ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
-  Network_pool.Snark_pool.Local_sink.push t.pipes.snark_local_sink
-    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
+  Network_pool.Snark_pool.(
+    Local_sink.push t.pipes.snark_local_sink
+      (Resource_pool.Diff.of_result work, cb))
   |> Deferred.don't_wait_for
 
 let add_work_graphql t diff =
@@ -1610,7 +1614,9 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
       let%bind () =
         Deferred.List.iter completed_works ~f:(fun work ->
             (* proofs should be verified in apply and broadcast *)
-            let statement = Transaction_snark_work.statement work in
+            let statement =
+              Transaction_snark_work.Stable.Latest.statement work
+            in
             let snark =
               Network_pool.Priced_proof.
                 { proof = work.proofs
@@ -1619,7 +1625,8 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
             in
             let msg =
               let diff =
-                Network_pool.Snark_pool.Diff_versioned.Add_solved_work
+                Network_pool.Snark_pool.Diff_versioned.Stable.Latest
+                .Add_solved_work
                   (statement, snark)
               in
               Envelope.Incoming.wrap_peer ~data:diff ~sender:peer
@@ -1644,8 +1651,14 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
                   "Successfully verified snark work from peer: $peer" ;
 
                 (* does an empty check for the snark, then an unsafe apply, and finally adds it to the pool *)
-                Network_pool.Snark_pool.apply_no_broadcast snark_pool msg
-                |> Deferred.return
+                Deferred.return
+                  Network_pool.Snark_pool.(
+                    apply_no_broadcast snark_pool
+                      (Envelope.Incoming.map
+                         ~f:
+                           (Resource_pool.Diff.Cached.write_all_proofs_to_disk
+                              ~proof_cache_db )
+                         msg ))
             | Error e ->
                 [%log info]
                   ~metadata:
@@ -1686,7 +1699,7 @@ let create ~commit_id ?wallets (config : Config.t) =
   Async.Scheduler.within' ~monitor (fun () ->
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
           =
-        if config.compile_config.itn_features then
+        if config.itn_features then
           let ({ client_port; _ } : Node_addrs_and_ports.t) =
             config.gossip_net_params.addrs_and_ports
           in
@@ -2040,7 +2053,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
-              ~disk_location:config.snark_pool_disk_location
+              ~disk_location:config.snark_pool_disk_location ~proof_cache_db
           in
           let snark_pool, snark_remote_sink, snark_local_sink =
             Network_pool.Snark_pool.create ~config:snark_pool_config

@@ -123,8 +123,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
 
     module Basic = struct
-      module N = Side_loaded_verification_key.Max_branches
-
       [%%versioned
       module Stable = struct
         module V1 = struct
@@ -170,7 +168,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             : ( Zkapp_statement.Checked.t * unit
               , Zkapp_statement.t * unit
               , Nat.N2.n * unit
-              , N.n * unit )
+              , Nat.N8.n * unit )
               t_typed
 
       let spec : type a b c d. (a, b, c, d) t_typed -> Spec.single list =
@@ -3334,7 +3332,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     Pickles.compile () ~cache:Cache_dir.cache ?proof_cache:!proof_cache
       ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~public_input:(Input Statement.With_sok.typ) ~auxiliary_typ:Typ.unit
-      ~branches:(module Nat.N5)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"transaction-snark"
       ~choices:(fun ~self ->
@@ -4187,7 +4184,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         Pickles.compile () ~cache:Cache_dir.cache ?proof_cache:!proof_cache
           ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
-          ~branches:(module Nat.N1)
           ~max_proofs_verified:(module Nat.N0)
           ~name:"trivial"
           ~choices:(fun ~self:_ -> [ trivial_rule ])
@@ -4607,7 +4603,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                      } )
           }
       in
-      let ( `Zkapp_command { Zkapp_command.fee_payer; account_updates; memo }
+      let ( `Zkapp_command
+              { Zkapp_command.Poly.fee_payer; account_updates; memo }
           , `Sender_account_update sender_account_update
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment commitment
@@ -4715,7 +4712,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             create_trivial_snapp ()
       in
       let%bind.Async.Deferred vk = vk in
-      let ( `Zkapp_command { Zkapp_command.fee_payer; memo; _ }
+      let ( `Zkapp_command { Zkapp_command.Poly.fee_payer; memo; _ }
           , `Sender_account_update _
           , `Proof_zkapp_command _
           , `Txn_commitment _
@@ -4867,7 +4864,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             (prover, vk)
       in
       let%bind.Async.Deferred vk = vk in
-      let ( `Zkapp_command ({ Zkapp_command.fee_payer; memo; _ } as p)
+      let ( `Zkapp_command ({ Zkapp_command.Poly.fee_payer; memo; _ } as p)
           , `Sender_account_update sender_account_update
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment commitment

@@ -97,8 +97,6 @@ module Side_loaded : sig
 
     val of_compiled : _ Tag.t -> t Deferred.t
 
-    module Max_branches : Nat.Add.Intf
-
     module Max_width = Nat.N2
   end
 
@@ -129,7 +127,7 @@ module Side_loaded : sig
     -> max_proofs_verified:(module Nat.Add.Intf with type n = 'n1)
     -> feature_flags:Opt.Flag.t Plonk_types.Features.t
     -> typ:('var, 'value) Impls.Step.Typ.t
-    -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
+    -> ('var, 'value, 'n1, Nat.N8.n) Tag.t
 
   val verify_promise :
        typ:('var, 'value) Impls.Step.Typ.t
@@ -308,13 +306,13 @@ val compile_with_wrap_main_override_promise :
        , 'ret_value )
        Inductive_rule.public_input
   -> auxiliary_typ:('auxiliary_var, 'auxiliary_value) Impls.Step.Typ.t
-  -> branches:(module Nat.Intf with type n = 'branches)
   -> max_proofs_verified:(module Nat.Add.Intf with type n = 'max_proofs_verified)
   -> name:string
   -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
   -> choices:
        (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
-        -> ( 'prev_varss
+        -> ( 'branches
+           , 'prev_varss
            , 'prev_valuess
            , 'widthss
            , 'heightss
@@ -324,7 +322,7 @@ val compile_with_wrap_main_override_promise :
            , 'ret_value
            , 'auxiliary_var
            , 'auxiliary_value )
-           H4_6.T(Inductive_rule.Promise).t )
+           H4_6_with_length.T(Inductive_rule.Promise).t )
   -> unit
   -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
      * Cache_handle.t

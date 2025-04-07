@@ -31,9 +31,13 @@ val hash_signed_command : Signed_command.t -> t
 
 val hash_signed_command_v1 : Signed_command.Stable.V1.t -> t
 
-val hash_zkapp_command : Zkapp_command.t -> t
+val hash_zkapp_command : Zkapp_command.Stable.Latest.t -> t
 
-val hash_command : User_command.t -> t
+val hash_command : User_command.Stable.Latest.t -> t
+
+val hash_wrapped_zkapp_command : Zkapp_command.t -> t
+
+val hash_wrapped_command : User_command.t -> t
 
 val hash_fee_transfer : Fee_transfer.Single.t -> t
 
@@ -84,11 +88,11 @@ module User_command : sig
 
   type t = Stable.Latest.t [@@deriving sexp, compare, to_yojson]
 
-  val create : User_command.t -> t
+  val create : User_command.Stable.Latest.t -> t
 
-  val data : t -> User_command.t
+  val data : t -> User_command.Stable.Latest.t
 
-  val command : t -> User_command.t
+  val command : t -> User_command.Stable.Latest.t
 
   val hash : t -> hash
 

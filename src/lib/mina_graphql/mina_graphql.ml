@@ -380,7 +380,7 @@ module Mutations = struct
                   in
                   Types.Zkapp_command.With_status.map cmd ~f:(fun cmd ->
                       { With_hash.data = cmd
-                      ; hash = Transaction_hash.hash_command (Zkapp_command cmd)
+                      ; hash = Transaction_hash.hash_zkapp_command cmd
                       } ) )
             in
             Ok cmds_with_hash
@@ -476,8 +476,7 @@ module Mutations = struct
                         zkapp_command_applied.command
                       in
                       let hash =
-                        Transaction_hash.hash_command
-                          (Zkapp_command zkapp_command)
+                        Transaction_hash.hash_zkapp_command zkapp_command
                       in
                       let (with_hash : _ With_hash.t) =
                         { data = zkapp_command; hash }
@@ -2205,7 +2204,7 @@ module Queries = struct
                           when Transaction_status.Stable.V2.(
                                  equal user_cmd.status Applied) -> (
                             let actions =
-                              c |> Zkapp_command.account_updates
+                              c.Zkapp_command.Poly.account_updates
                               |> Zkapp_command.Call_forest.fold ~init:(0, [])
                                    ~f:(fun acc au ->
                                      let action_seq, acc = acc in

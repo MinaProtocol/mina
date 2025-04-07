@@ -80,15 +80,20 @@ module Call_forest : sig
 end
 
 module V1 : sig
+  module T : sig
+    type 'a t =
+      { fee_payer : Mina_base_account_update.Fee_payer.V1.t
+      ; account_updates : 'a
+      ; memo : Mina_base_signed_command_memo.V1.t
+      }
+  end
+
   type t =
-    { fee_payer : Mina_base_account_update.Fee_payer.V1.t
-    ; account_updates :
-        ( Mina_base_account_update.V1.t
-        , Call_forest.Digest.Account_update.V1.t
-        , Call_forest.Digest.Forest.V1.t )
-        Call_forest.V1.t
-    ; memo : Mina_base_signed_command_memo.V1.t
-    }
+    ( Mina_base_account_update.V1.t
+    , Call_forest.Digest.Account_update.V1.t
+    , Call_forest.Digest.Forest.V1.t )
+    Call_forest.V1.t
+    T.t
 end
 
 module Valid : sig

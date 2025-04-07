@@ -6,13 +6,12 @@ open Network_peer
 module Snark_tables = struct
   type t =
     { all :
-        Ledger_proof.t One_or_two.t Priced_proof.t
+        Ledger_proof.Cached.t One_or_two.t Priced_proof.t
         Transaction_snark_work.Statement.Map.t
     ; rebroadcastable :
-        (Ledger_proof.t One_or_two.t Priced_proof.t * Core.Time.t)
+        (Ledger_proof.Cached.t One_or_two.t Priced_proof.t * Core.Time.t)
         Transaction_snark_work.Statement.Map.t
     }
-  [@@deriving sexp, equal]
 end
 
 module type S = sig
@@ -38,8 +37,9 @@ module type S = sig
   include
     Intf.Network_pool_base_intf
       with type resource_pool := Resource_pool.t
-       and type resource_pool_diff := Resource_pool.Diff.t
-       and type resource_pool_diff_verified := Resource_pool.Diff.t
+       and type resource_pool_diff :=
+        Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t
+       and type resource_pool_diff_verified := Resource_pool.Diff.Cached.t
        and type transition_frontier := transition_frontier
        and type config := Resource_pool.Config.t
        and type transition_frontier_diff :=
@@ -97,6 +97,7 @@ struct
           { trust_system : (Trust_system.t[@sexp.opaque])
           ; verifier : (Verifier.t[@sexp.opaque])
           ; disk_location : string
+          ; proof_cache_db : Proof_cache_tag.cache_db
           }
         [@@deriving make]
       end
@@ -115,6 +116,8 @@ struct
         }
 
       let make_config = Config.make
+
+      let proof_cache_db t = t.config.proof_cache_db
 
       let best_tip_ledger t =
         t.frontier ()
@@ -272,7 +275,7 @@ struct
       let request_proof t = Map.find !(t.snark_tables).all
 
       let add_snark ?(is_local = false) t ~work
-          ~(proof : Ledger_proof.t One_or_two.t) ~fee =
+          ~(proof : Ledger_proof.Cached.t One_or_two.t) ~fee =
         if work_is_referenced t work then (
           (*Note: fee against existing proofs and the new proofs are checked in
             Diff.unsafe_apply which calls this function*)
@@ -425,7 +428,7 @@ struct
             in
             let proof_env =
               Envelope.Incoming.wrap
-                ~data:(One_or_two.map proofs ~f:fst, message)
+                ~data:(One_or_two.map ~f:fst proofs, message)
                 ~sender
             in
             match Signature_lib.Public_key.decompress prover with
@@ -484,7 +487,9 @@ struct
           Map.to_alist !(t.snark_tables).rebroadcastable
           |> List.filter_map ~f:(fun (stmt, (snark, _time)) ->
                  if Set.mem best_tips stmt then
-                   Some (Diff.Add_solved_work (stmt, snark))
+                   Some
+                     (Diff.Cached.read_all_proofs_from_disk
+                        (Diff.Cached.Add_solved_work (stmt, snark)) )
                  else None )
 
     let remove_solved_work t work =
@@ -503,9 +508,9 @@ struct
   let get_completed_work t statement =
     Option.map
       (Resource_pool.request_proof (resource_pool t) statement)
-      ~f:(fun Priced_proof.{ proof; fee = { fee; prover } } ->
+      ~f:(fun Priced_proof.{ proof = proofs; fee = { fee; prover } } ->
         Transaction_snark_work.Checked.create_unsafe
-          { Transaction_snark_work.fee; proofs = proof; prover } )
+          { Transaction_snark_work.fee; proofs; prover } )
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
@@ -539,24 +544,23 @@ module Diff_versioned = struct
     [@@@no_toplevel_latest_type]
 
     module V2 = struct
-      type t = Resource_pool.Diff.t =
+      type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
         | Add_solved_work of
             Transaction_snark_work.Statement.Stable.V2.t
             * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
-      [@@deriving compare, to_yojson, hash]
+      [@@deriving equal]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t =
+  type t = Resource_pool.Diff.Cached.t =
     | Add_solved_work of
         Transaction_snark_work.Statement.t
-        * Ledger_proof.t One_or_two.t Priced_proof.t
+        * Ledger_proof.Cached.t One_or_two.t Priced_proof.t
     | Empty
-  [@@deriving compare, to_yojson, hash]
 end
 
 let%test_module "random set test" =
@@ -564,7 +568,6 @@ let%test_module "random set test" =
     open Mina_base
     module Mock_snark_pool =
       Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
-    open Ledger_proof.For_tests
 
     let trust_system = Mocks.trust_system
 
@@ -594,6 +597,10 @@ let%test_module "random set test" =
           Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
             () )
 
+    let mk_dummy_proof = Ledger_proof.For_tests.mk_dummy_proof
+
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
     let apply_diff resource_pool work
         ?(proof = One_or_two.map ~f:mk_dummy_proof)
         ?(sender = Envelope.Sender.Local) fee =
@@ -605,15 +612,15 @@ let%test_module "random set test" =
       match%map
         Mock_snark_pool.Resource_pool.Diff.verify resource_pool enveloped_diff
       with
-      | Ok _ ->
+      | Ok verified_diff ->
           Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool
-            enveloped_diff
+            verified_diff
       | Error _ ->
           Error (`Other (Error.of_string "Invalid diff"))
 
     let config =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
-        ~disk_location:"/tmp/snark-pool"
+        ~disk_location:"/tmp/snark-pool" ~proof_cache_db
 
     let gen ?length () =
       let open Quickcheck.Generator.Let_syntax in
@@ -785,7 +792,7 @@ let%test_module "random set test" =
           let priced_proof =
             { Priced_proof.proof =
                 `One
-                  (mk_dummy_proof
+                  (Ledger_proof.For_tests.Cached.mk_dummy_proof
                      (Quickcheck.random_value
                         ~seed:(`Deterministic "test proof")
                         Transaction_snark.Statement.gen ) )
@@ -796,7 +803,7 @@ let%test_module "random set test" =
             }
           in
           let command =
-            Mock_snark_pool.Resource_pool.Diff.Add_solved_work
+            Mock_snark_pool.Resource_pool.Diff.Cached.Add_solved_work
               (fake_work, priced_proof)
           in
           don't_wait_for
@@ -808,8 +815,12 @@ let%test_module "random set test" =
                    with
                  | Some { proof; fee = _ } ->
                      assert (
-                       [%equal: Ledger_proof.t One_or_two.t] proof
-                         priced_proof.proof )
+                       [%equal: Ledger_proof.t One_or_two.t]
+                         (One_or_two.map
+                            ~f:Ledger_proof.Cached.read_proof_from_disk proof )
+                         (One_or_two.map
+                            ~f:Ledger_proof.Cached.read_proof_from_disk
+                            priced_proof.proof ) )
                  | None ->
                      failwith "There should have been a proof here" ) ;
                  Deferred.unit ) ;
@@ -918,20 +929,24 @@ let%test_module "random set test" =
              ~peer_id:(Peer.Id.unsafe_of_string "contents should be irrelevant")
              ~libp2p_port:8302 )
       in
-      let compare_work (x : Mock_snark_pool.Resource_pool.Diff.t)
-          (y : Mock_snark_pool.Resource_pool.Diff.t) =
-        match (x, y) with
-        | Add_solved_work (stmt1, _), Add_solved_work (stmt2, _) ->
-            Transaction_snark_work.Statement.compare stmt1 stmt2
-        | _ ->
-            assert false
-      in
       let check_work ~expected ~got =
-        let sort = List.sort ~compare:compare_work in
+        let open Mock_snark_pool.Resource_pool.Diff in
+        let compare a b =
+          match (a, b) with
+          | Empty, Empty ->
+              0
+          | Empty, _ ->
+              -1
+          | _, Empty ->
+              1
+          | Add_solved_work (a, _), Add_solved_work (b, _) ->
+              Transaction_snark_work.Statement.compare a b
+        in
+        let sort = List.sort ~compare in
         if
-          [%compare: Mock_snark_pool.Resource_pool.Diff.t list] (sort got)
-            (sort expected)
-          <> 0
+          not
+          @@ [%equal: Diff_versioned.Stable.V2.t list] (sort got)
+               (sort expected)
         then failwith "diffs don't match"
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -962,7 +977,7 @@ let%test_module "random set test" =
           ignore
             ( ok_exn res1
               : [ `Accept | `Reject ]
-                * Mock_snark_pool.Resource_pool.Diff.verified
+                * Mock_snark_pool.Resource_pool.Diff.t
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable1 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
@@ -974,7 +989,7 @@ let%test_module "random set test" =
           ignore
             ( ok_exn res2
               : [ `Accept | `Reject ]
-                * Mock_snark_pool.Resource_pool.Diff.verified
+                * Mock_snark_pool.Resource_pool.Diff.t
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable2 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
@@ -988,7 +1003,7 @@ let%test_module "random set test" =
           ignore
             ( ok_exn res3
               : [ `Accept | `Reject ]
-                * Mock_snark_pool.Resource_pool.Diff.verified
+                * Mock_snark_pool.Resource_pool.Diff.t
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable3 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
@@ -1016,7 +1031,7 @@ let%test_module "random set test" =
           ignore
             ( ok_exn res6
               : [ `Accept | `Reject ]
-                * Mock_snark_pool.Resource_pool.Diff.verified
+                * Mock_snark_pool.Resource_pool.Diff.t
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           (* Mark best tip as not including stmt3. *)
           let%bind () =

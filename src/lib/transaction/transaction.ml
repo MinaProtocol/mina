@@ -38,6 +38,8 @@ end
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t = User_command.Stable.V2.t Poly.Stable.V2.t
     [@@deriving sexp, compare, equal, hash, yojson]
@@ -46,8 +48,13 @@ module Stable = struct
   end
 end]
 
-include Hashable.Make (Stable.Latest)
-include Comparable.Make (Stable.Latest)
+type t = User_command.t Poly.t [@@deriving sexp, yojson]
+
+let read_all_proofs_from_disk : t -> Stable.Latest.t =
+  Poly.Stable.Latest.map ~f:User_command.read_all_proofs_from_disk
+
+let write_all_proofs_to_disk : Stable.Latest.t -> t =
+  Poly.Stable.Latest.map ~f:User_command.write_all_proofs_to_disk
 
 type 'command t_ = 'command Poly.t =
   | Command of 'command
@@ -165,7 +172,7 @@ let yojson_summary_of_command =
   in
   function
   | User_command.Zkapp_command cmd ->
-      mk_record (zkapp_type cmd) (Zkapp_command.memo cmd)
+      mk_record (zkapp_type cmd) cmd.Zkapp_command.Poly.memo
         ( Zkapp_command.fee_payer_account_update cmd
         |> Account_update.Fee_payer.authorization )
   | Signed_command cmd ->
