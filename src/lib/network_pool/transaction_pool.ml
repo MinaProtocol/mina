@@ -56,7 +56,7 @@ module Diff_versioned = struct
      the checks) and [set_from_gossip_exn] (which just does the mutating the pool),
      and do the same for snapp commands as well.
   *)
-  type t = User_command.Stable.Latest.t list [@@deriving sexp, yojson]
+  type t = User_command.Stable.Latest.t list [@@deriving to_yojson]
 
   module Diff_error = struct
     [%%versioned
@@ -948,7 +948,7 @@ struct
     type pool = t
 
     module Diff = struct
-      type t = User_command.Stable.Latest.t list [@@deriving sexp, yojson]
+      type t = User_command.Stable.Latest.t list
 
       let (_ : (t, Diff_versioned.t) Type_equal.t) = Type_equal.T
 
@@ -1000,12 +1000,11 @@ struct
 
       module Rejected = struct
         type t = (User_command.Stable.Latest.t * Diff_error.t) list
-        [@@deriving sexp, yojson, compare]
 
         let (_ : (t, Diff_versioned.Rejected.t) Type_equal.t) = Type_equal.T
       end
 
-      type rejected = Rejected.t [@@deriving sexp, yojson, compare]
+      type rejected = Rejected.t
 
       type verified = Diff_versioned.verified [@@deriving sexp, to_yojson]
 

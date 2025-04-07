@@ -355,7 +355,7 @@ end
 module type Transaction_pool_diff_intf = sig
   type resource_pool
 
-  type t = User_command.Stable.Latest.t list [@@deriving of_yojson]
+  type t = User_command.Stable.Latest.t list
 
   module Diff_error : sig
     type t =
@@ -378,7 +378,6 @@ module type Transaction_pool_diff_intf = sig
 
   module Rejected : sig
     type t = (User_command.Stable.Latest.t * Diff_error.t) list
-    [@@deriving yojson]
   end
 
   type Structured_log_events.t +=
