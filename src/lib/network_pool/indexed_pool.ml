@@ -76,7 +76,7 @@ let config t = t.config
    Returns None in case of overflow.
 *)
 let currency_consumed_unchecked :
-    (_, _) User_command.with_forest -> Currency.Amount.t option =
+    (_, _, _) User_command.with_forest -> Currency.Amount.t option =
  fun cmd ->
   let fee_amt = Currency.Amount.of_fee @@ User_command.fee cmd in
   let open Currency.Amount in
@@ -100,7 +100,7 @@ let currency_consumed cmd =
     (Transaction_hash.User_command_with_valid_signature.command cmd)
 
 let currency_consumed' :
-       (_, _) User_command.with_forest
+       (_, _, _) User_command.with_forest
     -> (Currency.Amount.t, Command_error.t) Result.t =
  fun cmd ->
   cmd |> currency_consumed_unchecked
@@ -285,7 +285,7 @@ let global_slot_since_genesis conf =
       Mina_numbers.Global_slot_since_hard_fork.to_uint32 current_slot
       |> Mina_numbers.Global_slot_since_genesis.of_uint32
 
-let check_expiry t (cmd : (_, _) User_command.with_forest) =
+let check_expiry t (cmd : (_, _, _) User_command.with_forest) =
   let global_slot_since_genesis = global_slot_since_genesis t in
   let valid_until = User_command.valid_until cmd in
   if Global_slot_since_genesis.(valid_until < global_slot_since_genesis) then
