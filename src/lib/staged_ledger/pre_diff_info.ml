@@ -230,8 +230,8 @@ module Transaction_data_getter (T : Transaction_snark_work.S) = struct
         |> Or_error.all )
     |> Or_error.join |> to_staged_ledger_or_error
 
-  let fee_remainder (type a b c)
-      ~(to_user_command : c -> (a, b) User_command.with_forest)
+  let fee_remainder (type proof a b c)
+      ~(to_user_command : c -> (proof, a, b) User_command.with_forest)
       (commands : c list) completed_works coinbase_fee =
     let open Result.Let_syntax in
     let%bind budget =
@@ -250,9 +250,9 @@ module Transaction_data_getter (T : Transaction_snark_work.S) = struct
       ~f:(fun x -> Ok x)
       (Currency.Fee.sub budget total_work_fee)
 
-  let get_transaction_data (type a b c) ~constraint_constants coinbase_parts
-      ~receiver ~coinbase_amount
-      ~(to_user_command : c -> (a, b) User_command.with_forest)
+  let get_transaction_data (type proof a b c) ~constraint_constants
+      coinbase_parts ~receiver ~coinbase_amount
+      ~(to_user_command : c -> (proof, a, b) User_command.with_forest)
       (commands : c list) (completed_works : T.t list) :
       (c Transaction_data.t, Error.t) Result.t =
     let open Result.Let_syntax in
@@ -297,7 +297,7 @@ let get_individual_info (type c)
           | `Zero ]
        -> receiver:Public_key.Compressed.t
        -> coinbase_amount:Currency.Amount.t
-       -> to_user_command:(c With_status.t -> (_, _) User_command.with_forest)
+       -> to_user_command:(c With_status.t -> (_, _, _) User_command.with_forest)
        -> c With_status.t list
        -> 'work list
        -> (c With_status.t Transaction_data.t, Error.t) result )
@@ -448,7 +448,7 @@ let compute_statuses
 
 let get_impl (type c) ~get_transaction_data
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~(to_user_command : c With_status.t -> (_, _) User_command.with_forest)
+    ~(to_user_command : c With_status.t -> (_, _, _) User_command.with_forest)
     ~diff ~coinbase_receiver ~coinbase_amount =
   let open Result.Let_syntax in
   let%bind coinbase_amount =
