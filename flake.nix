@@ -308,6 +308,7 @@
           (pkgs.python3.withPackages (python-pkgs: [
               python-pkgs.click
               python-pkgs.requests
+              python-pkgs.pynvim
             ]))
           jq
         ];
