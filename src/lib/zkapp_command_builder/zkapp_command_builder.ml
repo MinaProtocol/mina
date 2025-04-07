@@ -68,11 +68,12 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
              let authorization =
                match p.authorization_kind with
                | None_given ->
-                   Control.None_given
+                   Control.Poly.None_given
                | Proof _ ->
-                   Control.Proof (Lazy.force Mina_base.Proof.blockchain_dummy)
+                   Control.Poly.Proof
+                     (Lazy.force Mina_base.Proof.blockchain_dummy)
                | Signature ->
-                   Control.Signature Signature.dummy
+                   Control.Poly.Signature Signature.dummy
              in
              { body = Account_update.Body.of_simple p; authorization } )
       |> Zkapp_command.Call_forest.accumulate_hashes_predicated
@@ -109,7 +110,7 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
       ~f:(fun _ndx ({ body; authorization } : Account_update.t) tree ->
         let%map valid_authorization =
           match authorization with
-          | Control.Signature _dummy ->
+          | Control.Poly.Signature _dummy ->
               let pk = body.public_key in
               let sk =
                 match
@@ -125,7 +126,7 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
               in
               let use_full_commitment = body.use_full_commitment in
               let signature = sign_for_account_update ~use_full_commitment sk in
-              return (Control.Signature signature)
+              return (Control.Poly.Signature signature)
           | Proof _proof -> (
               match prover with
               | None ->
@@ -139,7 +140,7 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
                   let%map (), (), proof =
                     prover ?handler:(Some handler) txn_stmt
                   in
-                  Control.Proof proof )
+                  Control.Poly.Proof proof )
           | None_given ->
               return authorization
         in
