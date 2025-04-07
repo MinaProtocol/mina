@@ -50,12 +50,11 @@ end]
 
 type t = User_command.t Poly.t [@@deriving sexp, yojson]
 
-let read_all_proofs_from_disk : t -> Stable.Latest.t = Fn.id
+let read_all_proofs_from_disk : t -> Stable.Latest.t =
+  Poly.Stable.Latest.map ~f:User_command.read_all_proofs_from_disk
 
-let write_all_proofs_to_disk : Stable.Latest.t -> t = Fn.id
-
-include Hashable.Make (Stable.Latest)
-include Comparable.Make (Stable.Latest)
+let write_all_proofs_to_disk : Stable.Latest.t -> t =
+  Poly.Stable.Latest.map ~f:User_command.write_all_proofs_to_disk
 
 type 'command t_ = 'command Poly.t =
   | Command of 'command

@@ -314,22 +314,43 @@ module Make_str (_ : Wire_types.Concrete) = struct
     Compile.compile_with_wrap_main_override_promise
 
   let compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
-      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
+      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
       ~max_proofs_verified ~name ~choices () =
     compile_with_wrap_main_override_promise ?self ?cache ?storables ?proof_cache
       ?disk_keys ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
-      ~branches ~max_proofs_verified ~name ~choices ()
+      ~max_proofs_verified ~name ~choices ()
 
   let compile ?self ?cache ?storables ?proof_cache ?disk_keys
-      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
+      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
       ~max_proofs_verified ~name ~choices () =
     let choices ~self =
       let choices = choices ~self in
       let rec go :
-          type a b c d e f g h i j.
-             (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule).t
-          -> (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule.Promise).t =
-        function
+          type length a b c d e f g h i j.
+             ( length
+             , a
+             , b
+             , c
+             , d
+             , e
+             , f
+             , g
+             , h
+             , i
+             , j )
+             H4_6_with_length.T(Inductive_rule).t
+          -> ( length
+             , a
+             , b
+             , c
+             , d
+             , e
+             , f
+             , g
+             , h
+             , i
+             , j )
+             H4_6_with_length.T(Inductive_rule.Promise).t = function
         | [] ->
             []
         | { identifier; prevs; main; feature_flags } :: rest ->
@@ -344,7 +365,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     in
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
-        ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
+        ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
         ~max_proofs_verified ~name ~choices ()
     in
     let rec adjust_provers :
@@ -361,15 +382,36 @@ module Make_str (_ : Wire_types.Concrete) = struct
     (self, cache_handle, proof_module, adjust_provers provers)
 
   let compile_async ?self ?cache ?storables ?proof_cache ?disk_keys
-      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
+      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
       ~max_proofs_verified ~name ~choices () =
     let choices ~self =
       let choices = choices ~self in
       let rec go :
-          type a b c d e f g h i j.
-             (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule.Deferred).t
-          -> (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule.Promise).t =
-        function
+          type length a b c d e f g h i j.
+             ( length
+             , a
+             , b
+             , c
+             , d
+             , e
+             , f
+             , g
+             , h
+             , i
+             , j )
+             H4_6_with_length.T(Inductive_rule.Deferred).t
+          -> ( length
+             , a
+             , b
+             , c
+             , d
+             , e
+             , f
+             , g
+             , h
+             , i
+             , j )
+             H4_6_with_length.T(Inductive_rule.Promise).t = function
         | [] ->
             []
         | { identifier; prevs; main; feature_flags } :: rest ->
@@ -389,7 +431,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     in
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
-        ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
+        ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
         ~max_proofs_verified ~name ~choices ()
     in
     let rec adjust_provers :
@@ -452,7 +494,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->
@@ -491,7 +532,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Output Field.typ)
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->
@@ -546,7 +586,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N1)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self ->
@@ -642,7 +681,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
               compile_promise () ~public_input:(Input Field.typ)
                 ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self ->
@@ -762,7 +800,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
               compile_promise () ~public_input:(Output Field.typ)
                 ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self ->
@@ -862,7 +899,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
               compile_promise ()
                 ~public_input:(Input_and_output (Field.typ, Field.typ))
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->
@@ -903,7 +939,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
               compile_promise ()
                 ~public_input:(Input_and_output (Field.typ, Field.typ))
                 ~auxiliary_typ:Field.typ
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->
@@ -1127,13 +1162,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
               , 'm )
               Step_branch_data.t
           end in
-          let proofs_verifieds = Vector.singleton 2 in
           let (T inner_step_data as step_data) =
             Step_branch_data.create ~index:0 ~feature_flags ~num_chunks:1
               ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
               ~branches:Branches.n ~self ~public_input:(Input typ)
               ~auxiliary_typ:typ A.to_field_elements A_value.to_field_elements
-              rule ~wrap_domains ~proofs_verifieds ~chain_to:(Promise.return ())
+              rule ~wrap_domains ~chain_to:(Promise.return ())
             (* TODO? *)
           in
           let step_domains = Vector.singleton inner_step_data.domains in
@@ -1814,7 +1848,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           let data : _ Types_map.Compiled.t =
             { feature_flags
-            ; proofs_verifieds
             ; max_proofs_verified = (module Max_proofs_verified)
             ; public_input = typ
             ; wrap_key =
@@ -1888,7 +1921,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Typ.unit)
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"recurse-on-bad"
                 ~choices:(fun ~self:_ ->
@@ -2016,7 +2048,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->
@@ -2055,7 +2086,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N1)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->
@@ -2095,7 +2125,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
               compile_promise () ~public_input:(Input Field.typ)
                 ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->
@@ -2160,7 +2189,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N1)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->
@@ -2328,7 +2356,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->
@@ -2367,7 +2394,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N1)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->
@@ -2407,7 +2433,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
               compile_promise () ~public_input:(Input Field.typ)
                 ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->
@@ -2475,7 +2500,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N1)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->

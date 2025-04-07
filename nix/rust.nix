@@ -107,11 +107,12 @@ in {
         fixupLockFile ../src/lib/crypto/proof-systems/Cargo.lock;
     };
     buildPhase = ''
-      cargo build -p kimchi-stubs --release --lib --all-features
+      cargo build -p kimchi-stubs --release --lib
     '';
     installPhase = ''
         mkdir -p $out/lib
         cp target/release/libkimchi_stubs.a $out/lib/
+        cp target/release/libkimchi_stubs.so $out/lib/dllkimchi_stubs.so
     '';
     doCheck = false;
   };

@@ -6,8 +6,8 @@ open Mina_base
 open Mina_state
 
 type block_or_header =
-  [ `Block of Mina_block.t Envelope.Incoming.t
-  | `Header of Mina_block.Header.t Envelope.Incoming.t ]
+  [ `Block of Mina_block.Stable.Latest.t Envelope.Incoming.t
+  | `Header of Mina_block.Header.Stable.Latest.t Envelope.Incoming.t ]
 
 type stream_msg =
   block_or_header
@@ -69,9 +69,9 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
         match b_or_h with
         | `Block { Envelope.Incoming.data = block; sender; _ } ->
             let transactions =
-              Mina_block.transactions ~constraint_constants block
+              Mina_block.Stable.Latest.transactions ~constraint_constants block
             in
-            (sender, Mina_block.header block, Some transactions)
+            (sender, Mina_block.Stable.Latest.header block, Some transactions)
         | `Header { Envelope.Incoming.data = header; sender; _ } ->
             (sender, header, None)
       in
@@ -129,7 +129,8 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
           match b_or_h with
           | `Block { Envelope.Incoming.data = block; _ } ->
               [ ( "block"
-                , Mina_block.to_logging_yojson @@ Mina_block.header block )
+                , Mina_block.to_logging_yojson
+                  @@ Mina_block.Stable.Latest.header block )
               ]
           | `Header { Envelope.Incoming.data = header; _ } ->
               [ ("header", Mina_block.Header.to_yojson header) ]

@@ -193,6 +193,10 @@ end
 
 include T
 
+let write_all_proofs_to_disk : Stable.Latest.t -> t = Fn.id
+
+let read_all_proofs_from_disk : t -> Stable.Latest.t = Fn.id
+
 [%%define_locally Stable.Latest.(of_wire, to_wire)]
 
 [%%define_locally Stable.Latest.Wire.(gen)]
@@ -804,13 +808,8 @@ let weight (zkapp_command : (_, _) with_forest) : int =
     ]
 
 module type Valid_intf = sig
-  [%%versioned:
-  module Stable : sig
-    module V1 : sig
-      type t = private { zkapp_command : T.Stable.V1.t }
-      [@@deriving sexp, compare, equal, hash, yojson]
-    end
-  end]
+  type nonrec t = private { zkapp_command : t }
+  [@@deriving sexp, compare, equal, hash, yojson]
 
   val to_valid_unsafe :
     T.t -> [> `If_this_is_used_it_should_have_a_comment_justifying_it of t ]
@@ -831,34 +830,9 @@ module type Valid_intf = sig
   val forget : t -> T.t
 end
 
-module Valid :
-  Valid_intf
-    with type Stable.V1.t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V1.t =
-struct
-  module S = Stable
-
-  module Verification_key_hash = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t = Zkapp_basic.F.Stable.V1.t
-        [@@deriving sexp, compare, equal, hash, yojson]
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
-
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V1.t =
-        { zkapp_command : S.V1.t }
-      [@@deriving sexp, compare, equal, hash, yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
+module Valid : Valid_intf = struct
+  type t = { zkapp_command : T.t }
+  [@@deriving sexp, compare, equal, hash, yojson]
 
   let create zkapp_command : t = { zkapp_command }
 

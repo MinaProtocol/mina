@@ -470,10 +470,9 @@ let reset_frontier_dependencies_validation (transition_with_hash, validation) =
   | _ ->
       failwith "why can't this be refuted?"
 
-let validate_staged_ledger_diff ?skip_staged_ledger_verification ~proof_cache_db
-    ~logger ~get_completed_work ~precomputed_values ~verifier
-    ~parent_staged_ledger ~parent_protocol_state ?transaction_pool_proxy
-    (t, validation) =
+let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
+    ~get_completed_work ~precomputed_values ~verifier ~parent_staged_ledger
+    ~parent_protocol_state ?transaction_pool_proxy (t, validation) =
   [%log internal] "Validate_staged_ledger_diff" ;
   let block = With_hash.data t in
   let header = Block.header block in
@@ -487,7 +486,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~proof_cache_db
   let body_ref_computed =
     Staged_ledger_diff.Body.compute_reference
       ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
-      body
+    @@ Staged_ledger_diff.Body.read_all_proofs_from_disk body
   in
   let%bind.Deferred.Result () =
     if Blake2.equal body_ref_computed body_ref_from_header then
@@ -498,8 +497,8 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~proof_cache_db
                            , `Ledger_proof proof_opt
                            , `Staged_ledger transitioned_staged_ledger
                            , `Pending_coinbase_update _ ) =
-    Staged_ledger.apply ~proof_cache_db
-      ?skip_verification:skip_staged_ledger_verification ~get_completed_work
+    Staged_ledger.apply ?skip_verification:skip_staged_ledger_verification
+      ~get_completed_work
       ~constraint_constants:
         precomputed_values.Precomputed_values.constraint_constants ~global_slot
       ~logger ~verifier parent_staged_ledger
