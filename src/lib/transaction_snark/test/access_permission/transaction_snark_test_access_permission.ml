@@ -160,7 +160,7 @@ let%test_module "Access permission tests" =
                 in
                 { account_update with
                   authorization =
-                    Control.Signature
+                    Control.Poly.Signature
                       (Schnorr.Chunked.sign sk
                          (Random_oracle.Input.Chunked.field commitment) )
                 }
