@@ -144,7 +144,7 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
           | None_given ->
               return authorization
         in
-        { Account_update.body; authorization = valid_authorization } )
+        { Account_update.Poly.body; authorization = valid_authorization } )
   in
   { zkapp_command with
     fee_payer = fee_payer_with_valid_signature

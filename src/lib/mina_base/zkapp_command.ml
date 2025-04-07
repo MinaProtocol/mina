@@ -220,10 +220,11 @@ let to_simple (t : t) : Simple.t =
   ; account_updates =
       t.account_updates
       |> Call_forest.to_account_updates_map
-           ~f:(fun ~depth { Account_update.body = b; authorization } ->
-             { Account_update.Simple.authorization
+           ~f:(fun ~depth { Account_update.Poly.body = b; authorization } ->
+             { Account_update.Poly.authorization
              ; body =
-                 { public_key = b.public_key
+                 { Account_update.Body.Simple.public_key =
+                     b.Account_update.Body.public_key
                  ; token_id = b.token_id
                  ; update = b.update
                  ; balance_change = b.balance_change
