@@ -108,6 +108,13 @@ module Fee_payer = struct
   end
 end
 
+module Poly = struct
+  module V1 = struct
+    type ('body, 'authorization) t =
+      { body : 'body; authorization : 'authorization }
+  end
+end
+
 module V1 = struct
-  type t = { body : Body.V1.t; authorization : Mina_base_control.V2.t }
+  type t = (Body.V1.t, Mina_base_control.V2.t) Poly.V1.t
 end

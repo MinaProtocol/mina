@@ -1635,23 +1635,36 @@ module Body = struct
     }
 end
 
+module Poly = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      (** An account update in a zkApp transaction *)
+      type ('body, 'authorization) t =
+            ( 'body
+            , 'authorization )
+            Mina_wire_types.Mina_base.Account_update.Poly.V1.t =
+        { body : 'body; authorization : 'authorization }
+      [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+    end
+  end]
+end
+
 module T = struct
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        (** An account update in a zkApp transaction *)
         type t =
-          { body : Body.Graphql_repr.Stable.V1.t
-          ; authorization : Control.Stable.V2.t
-          }
-        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+          (Body.Graphql_repr.Stable.V1.t, Control.Stable.V2.t) Poly.Stable.V1.t
+        [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
       end
     end]
 
     let deriver obj =
+      let open Poly in
       let open Fields_derivers_zkapps.Derivers in
       let ( !. ) = ( !. ) ~t_fields_annots in
       Fields.make_creator obj
@@ -1664,11 +1677,8 @@ module T = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t =
-          { body : Body.Simple.Stable.V1.t
-          ; authorization : Control.Stable.V2.t
-          }
-        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+        type t = (Body.Simple.Stable.V1.t, Control.Stable.V2.t) Poly.Stable.V1.t
+        [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
       end
@@ -1679,15 +1689,14 @@ module T = struct
   module Stable = struct
     module V1 = struct
       (** A account_update to a zkApp transaction *)
-      type t = Mina_wire_types.Mina_base.Account_update.V1.t =
-        { body : Body.Stable.V1.t; authorization : Control.Stable.V2.t }
-      [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+      type t = (Body.Stable.V1.t, Control.Stable.V2.t) Poly.Stable.V1.t
+      [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
     end
   end]
 
-  let of_graphql_repr ({ body; authorization } : Graphql_repr.t) : t =
+  let of_graphql_repr ({ Poly.body; authorization } : Graphql_repr.t) : t =
     { authorization; body = Body.of_graphql_repr body }
 
   let to_graphql_repr ({ body; authorization } : t) ~call_depth : Graphql_repr.t
@@ -1697,13 +1706,13 @@ module T = struct
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     let%map body = Body.gen and authorization = Control.gen_with_dummies in
-    { body; authorization }
+    { Poly.body; authorization }
 
   let gen_with_events_and_actions : t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     let%map body = Body.gen_with_events_and_actions
     and authorization = Control.gen_with_dummies in
-    { body; authorization }
+    { Poly.body; authorization }
 
   let quickcheck_generator : t Quickcheck.Generator.t = gen
 

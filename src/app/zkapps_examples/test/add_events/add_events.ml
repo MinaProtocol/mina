@@ -148,7 +148,7 @@ let%test_module "Add events test" =
                 in
                 { account_update with
                   authorization =
-                    Signature
+                    Control.Poly.Signature
                       (Schnorr.Chunked.sign sk
                          (Random_oracle.Input.Chunked.field commitment) )
                 }

@@ -1062,7 +1062,7 @@ let gen_account_update_from ?(no_account_precondition = false)
   in
   let account_id = Account_id.create body.public_key body.token_id in
   Hash_set.add account_ids_seen account_id ;
-  return { Account_update.Simple.body; authorization }
+  return { Account_update.Poly.body; authorization }
 
 (* takes an account id, if we want to sign this data *)
 let gen_account_update_body_fee_payer ?global_slot ?fee_range ?failure
@@ -1567,7 +1567,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
   in
   List.iteri account_updates ~f:(fun ndx account_update ->
       (* update receipt chain hash only for signature, proof authorizations *)
-      match Account_update.authorization account_update with
+      match account_update.Account_update.Poly.authorization with
       | Control.Poly.Proof _ | Control.Poly.Signature _ ->
           let acct_id = Account_update.account_id account_update in
           Account_id.Table.update account_state_tbl acct_id ~f:(function

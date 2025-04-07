@@ -50,7 +50,11 @@ let collect_vk_assumption
           (Side_loaded_verification_key.t, Pasta_bindings.Fp.t) With_hash.t
           option )
       , (stmt : Zkapp_statement.t) ) ) =
-  match (p.authorization, p.body.authorization_kind, vk_opt) with
+  match
+    ( p.Account_update.Poly.authorization
+    , p.Account_update.Poly.body.authorization_kind
+    , vk_opt )
+  with
   | Proof _, Proof _, None ->
       Error
         (`Missing_verification_key
@@ -114,7 +118,7 @@ let check_signatures_of_zkapp_command (zkapp_command : Zkapp_command.t) :
   Zkapp_command.Call_forest.to_list zkapp_command.account_updates
   |> List.fold_result ~init:() ~f:(fun () p ->
          let commitment =
-           if p.Account_update.body.use_full_commitment then full_tx_commitment
+           if Account_update.use_full_commitment p then full_tx_commitment
            else tx_commitment
          in
          match (p.authorization, p.body.authorization_kind) with
