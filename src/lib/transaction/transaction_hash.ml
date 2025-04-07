@@ -83,12 +83,12 @@ let ( hash_signed_command_v1
             ~f:(fun (acct_update : Account_update.t) ->
               let dummy_auth =
                 match acct_update.authorization with
-                | Control.Proof _ ->
-                    Control.Proof (Lazy.force Proof.transaction_dummy)
-                | Control.Signature _ ->
-                    Control.Signature Signature.dummy
-                | Control.None_given ->
-                    Control.None_given
+                | Control.Poly.Proof _ ->
+                    Control.Poly.Proof (Lazy.force Proof.transaction_dummy)
+                | Control.Poly.Signature _ ->
+                    Control.Poly.Signature Signature.dummy
+                | Control.Poly.None_given ->
+                    Control.Poly.None_given
               in
               { acct_update with authorization = dummy_auth } )
       }
