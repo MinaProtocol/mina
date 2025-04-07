@@ -52,9 +52,7 @@ let hash_message_inputs_for_next_step_proof ~app_state
       Array.concat_map x ~f:(fun x -> Array.of_list (g x)) )
     ~app_state
 
-let hash_messages_for_next_step_proof ~app_state
-    (t : _ Types.Step.Proof_state.Messages_for_next_step_proof.t) =
-  let hash_input = hash_message_inputs_for_next_step_proof ~app_state t in
+let hash_messages_for_next_step_proof hash_input =
   Tick_field_sponge.digest Tick_field_sponge.params hash_input
 
 let dlog_pcs_batch (type nat proofs_verified total)

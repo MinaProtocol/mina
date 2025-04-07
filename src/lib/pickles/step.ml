@@ -258,10 +258,11 @@ struct
              in
              (* TODO: Only do this hashing when necessary *)
              Common.hash_messages_for_next_step_proof
-               (Reduced_messages_for_next_proof_over_same_field.Step.prepare
-                  ~dlog_plonk_index:dlog_index
-                  statement.messages_for_next_step_proof )
-               ~app_state:to_field_elements )
+             @@ Common.hash_message_inputs_for_next_step_proof
+                  (Reduced_messages_for_next_proof_over_same_field.Step.prepare
+                     ~dlog_plonk_index:dlog_index
+                     statement.messages_for_next_step_proof )
+                  ~app_state:to_field_elements )
         ; proof_state =
             { deferred_values =
                 (let deferred_values = deferred_values_computed in
@@ -286,11 +287,12 @@ struct
                 statement.proof_state.sponge_digest_before_evaluations
             ; messages_for_next_wrap_proof =
                 Wrap_hack.hash_messages_for_next_wrap_proof
-                  { old_bulletproof_challenges = prev_challenges
-                  ; challenge_polynomial_commitment =
-                      statement.proof_state.messages_for_next_wrap_proof
-                        .challenge_polynomial_commitment
-                  }
+                @@ Wrap_hack.hash_message_inputs_for_next_wrap_proof
+                     { old_bulletproof_challenges = prev_challenges
+                     ; challenge_polynomial_commitment =
+                         statement.proof_state.messages_for_next_wrap_proof
+                           .challenge_polynomial_commitment
+                     }
             }
         }
       in
@@ -723,7 +725,9 @@ struct
                       Lazy.force Dummy.Ipa.Wrap.challenges_computed )
               }
             in
-            Wrap_hack.hash_messages_for_next_wrap_proof t :: pad [] ms n
+            Wrap_hack.hash_messages_for_next_wrap_proof
+              (Wrap_hack.hash_message_inputs_for_next_wrap_proof t)
+            :: pad [] ms n
       in
       lazy
         (Vector.rev
