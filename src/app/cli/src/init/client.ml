@@ -731,10 +731,15 @@ let handle_export_ledger_response ~json = function
       exit 1
   | Ok (Ok accounts) ->
       if json then (
-        Yojson.Safe.pretty_print Format.std_formatter
-          (Runtime_config.Accounts.to_yojson
-             (List.map accounts ~f:(fun a ->
-                  Genesis_ledger_helper.Accounts.Single.of_account a None ) ) ) ;
+        Format.fprintf Format.std_formatter "[\n  " ;
+        let print_comma = ref false in
+        List.iter accounts ~f:(fun a ->
+            if !print_comma then Format.fprintf Format.std_formatter "\n, "
+            else print_comma := true ;
+            Genesis_ledger_helper.Accounts.Single.of_account a None
+            |> Runtime_config.Accounts.Single.to_yojson
+            |> Yojson.Safe.pretty_print Format.std_formatter ) ;
+        Format.fprintf Format.std_formatter "\n]" ;
         printf "\n" )
       else printf !"%{sexp:Account.t list}\n" accounts ;
       return ()
@@ -1612,14 +1617,12 @@ let generate_libp2p_keypair_do privkey_path =
     (let open Deferred.Let_syntax in
     (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
     let logger = Logger.null () in
-    let compile_config = Mina_compile_config.Compiled.t in
     (* Using the helper only for keypair generation requires no state. *)
     File_system.with_temp_dir "mina-generate-libp2p-keypair" ~f:(fun tmpd ->
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~on_peer_connected:ignore ~on_peer_disconnected:ignore
-            ~block_window_duration:compile_config.block_window_duration ()
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
         with
         | Ok net ->
             let%bind me = Mina_net2.generate_random_keypair net in
@@ -1646,14 +1649,12 @@ let dump_libp2p_keypair_do privkey_path =
   Deferred.ignore_m
     (let open Deferred.Let_syntax in
     let logger = Logger.null () in
-    let compile_config = Mina_compile_config.Compiled.t in
     (* Using the helper only for keypair generation requires no state. *)
     File_system.with_temp_dir "mina-dump-libp2p-keypair" ~f:(fun tmpd ->
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~on_peer_connected:ignore ~on_peer_disconnected:ignore
-            ~block_window_duration:compile_config.block_window_duration ()
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
         with
         | Ok net ->
             let%bind () = Mina_net2.shutdown net in

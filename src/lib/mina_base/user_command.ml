@@ -138,18 +138,11 @@ module Zero_one_or_two = struct
 end
 
 module Verifiable = struct
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t =
-        ( Signed_command.Stable.V2.t
-        , Zkapp_command.Verifiable.Stable.V1.t )
-        Poly.Stable.V2.t
-      [@@deriving sexp, compare, equal, hash, yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
+  type t =
+    ( Signed_command.Stable.Latest.t
+    , Zkapp_command.Verifiable.t )
+    Poly.Stable.Latest.t
+  [@@deriving sexp, compare, equal, hash, yojson, bin_io_unversioned]
 
   let fee_payer (t : t) =
     match t with
@@ -301,18 +294,8 @@ let valid_until (t : t) =
 module Valid = struct
   type t_ = t
 
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t =
-        ( Signed_command.With_valid_signature.Stable.V2.t
-        , Zkapp_command.Valid.Stable.V1.t )
-        Poly.Stable.V2.t
-      [@@deriving sexp, compare, equal, hash, yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
+  type t = (Signed_command.With_valid_signature.t, Zkapp_command.Valid.t) Poly.t
+  [@@deriving sexp, compare, equal, hash, yojson]
 
   module Gen = Gen_make (Signed_command.With_valid_signature)
 end

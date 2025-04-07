@@ -35,8 +35,7 @@ let singleton_properties () =
           (Amount.of_nanomina_int_exn 500)
       in
       if
-        Option.value_exn (currency_consumed ~constraint_constants cmd)
-        |> Amount.to_nanomina_int > 500
+        Option.value_exn (currency_consumed cmd) |> Amount.to_nanomina_int > 500
       then
         match add_res with
         | Error (Insufficient_funds _) ->
@@ -214,9 +213,7 @@ let replacement () =
             ~common:(fun c -> { c with fee = Amount.to_fee fee })
             ~body:(fun b -> { b with amount })
         in
-        let consumed =
-          Option.value_exn (currency_consumed ~constraint_constants cmd')
-        in
+        let consumed = Option.value_exn (currency_consumed cmd') in
         let%map rest =
           go
             (Account_nonce.succ current_nonce)
@@ -293,7 +290,7 @@ let replacement () =
           ~f:(fun consumed_so_far cmd ->
             Option.value_exn
               Option.(
-                currency_consumed ~constraint_constants cmd
+                currency_consumed cmd
                 >>= fun consumed -> Amount.(consumed + consumed_so_far)) )
       in
       assert (Amount.(currency_consumed_pre_replace <= init_balance)) ;
@@ -301,12 +298,9 @@ let replacement () =
         Option.value_exn
           (let open Option.Let_syntax in
           let%bind replaced_currency_consumed =
-            currency_consumed ~constraint_constants
-            @@ List.nth_exn setup_cmds replaced_idx
+            currency_consumed @@ List.nth_exn setup_cmds replaced_idx
           in
-          let%bind replacer_currency_consumed =
-            currency_consumed ~constraint_constants replace_cmd
-          in
+          let%bind replacer_currency_consumed = currency_consumed replace_cmd in
           let%bind a =
             Amount.(currency_consumed_pre_replace - replaced_currency_consumed)
           in
@@ -500,7 +494,8 @@ let commit_to_pool ledger pool cmd expected_drops =
               (Mina_ledger.Ledger.get ledger loc) )
   in
   let lower =
-    List.map ~f:Transaction_hash.User_command_with_valid_signature.hash
+    List.map
+      ~f:Transaction_hash.User_command_with_valid_signature.transaction_hash
   in
   [%test_eq: Transaction_hash.t list]
     (lower (Sequence.to_list dropped))
@@ -778,7 +773,8 @@ let apply_transactions txns accounts =
             in
             { a with nonce; balance } ) )
 
-let txn_hash = Transaction_hash.User_command_with_valid_signature.hash
+let txn_hash =
+  Transaction_hash.User_command_with_valid_signature.transaction_hash
 
 let application_invalidates_applied_transactions () =
   Quickcheck.test ~trials:1000

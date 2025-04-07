@@ -216,7 +216,7 @@ module type SYNCABLE = sig
 
   type addr
 
-  type t [@@deriving sexp]
+  type t
 
   type path
 
@@ -450,7 +450,7 @@ module Ledger = struct
 
     (** The type of the witness for a base ledger exposed here so that it can
    * be easily accessed from outside this module *)
-    type witness [@@deriving sexp_of]
+    type witness
 
     module type Base_intf =
       S

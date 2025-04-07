@@ -149,7 +149,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   type var = Public_key.Compressed.var * Digest.Checked.t
 
-  let typ = Snarky_backendless.Typ.(Public_key.Compressed.typ * Digest.typ)
+  let typ = Snark_params.Tick.Typ.(Public_key.Compressed.typ * Digest.typ)
 
   let var_of_t ((key, tid) : t) =
     ( Public_key.Compressed.var_of_t key

@@ -1050,10 +1050,6 @@ module Preconditions = struct
       type t = V.var
     end
 
-    module Int_as_prover_ref = struct
-      type t = int As_prover.Ref.t
-    end
-
     type t =
       { network : Zkapp_precondition.Protocol_state.Checked.t
       ; account : Account_precondition.Checked.t
@@ -1438,10 +1434,6 @@ module Body = struct
     end) =
     struct
       type t = V.var
-    end
-
-    module Int_as_prover_ref = struct
-      type t = int As_prover.Ref.t
     end
 
     type t =

@@ -97,6 +97,16 @@
         },
         {
           "kind": "SCALAR",
+          "name": "ProofBundleInput",
+          "description": "Proof bundle for a given spec in json format",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
           "name": "RosettaTransaction",
           "description": "A transaction encoded in the Rosetta format",
           "fields": null,
@@ -5490,6 +5500,121 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "sendProofBundle",
+              "description": "Transaction SNARKs for a given spec",
+              "args": [
+                {
+                  "name": "input",
+                  "description":
+                    "Proof bundle for a given spec in json format including fees and prover public key",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "ProofBundleInput",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "ActionState",
+          "description": "",
+          "fields": [
+            {
+              "name": "action",
+              "description": "",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "FieldElem",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "transactionSequenceNo",
+              "description": "",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "actionSequenceNo",
+              "description": "",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "blockNumber",
+              "description": "",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -6649,6 +6774,107 @@
                       "ofType": null
                     }
                   }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "WorkBundleSpec",
+          "description":
+            "Witnesses and statements for snark work bundles. Includes optional fees and prover public keys for ones that have proofs in the snark pool",
+          "fields": [
+            {
+              "name": "spec",
+              "description": "Snark work specification in json format",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "snarkFee",
+              "description": "Fee if proof for the spec exists in snark pool",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Fee", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "snarkProverKey",
+              "description":
+                "Prover public key if proof for the spec exists in snark pool",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "workIds",
+              "description": "Unique identifier for a snark work",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "PendingSnarkWorkSpec",
+          "description":
+            "Snark work witnesses and statements that are yet to be proven or included in blocks",
+          "fields": [
+            {
+              "name": "workBundleSpec",
+              "description": "Work bundle spec with one or two snark work",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "WorkBundleSpec",
+                  "ofType": null
                 }
               },
               "isDeprecated": false,
@@ -14876,7 +15102,7 @@
                 {
                   "name": "maxLength",
                   "description":
-                    "The maximum number of blocks to return. If there are more blocks in the transition frontier from root to tip, the n blocks closest to the best tip will be returned",
+                    "The maximum number of blocks to return. If there are more blocks in the transition frontier from root to tip, the maxLength blocks closest to the best tip will be returned",
                   "type": { "kind": "SCALAR", "name": "Int", "ofType": null },
                   "defaultValue": null
                 }
@@ -15274,6 +15500,58 @@
                     "ofType": {
                       "kind": "OBJECT",
                       "name": "PendingSnarkWork",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "snarkWorkRange",
+              "description":
+                "Find any sequence of snark work between two indexes in all available snark work. Returns both completed and uncompleted work.",
+              "args": [
+                {
+                  "name": "endingIndex",
+                  "description":
+                    "The last index to be taken from all available snark work (exclusive). If not specified or greater than the available snark work list,all elements from index [startingIndex] will be returned. An empty list will be returned if startingIndex is not a valid index or if startingIndex >= endingIndex.",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "UInt32",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "startingIndex",
+                  "description":
+                    "The first index to be taken from all available snark work",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "UInt32",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "PendingSnarkWorkSpec",
                       "ofType": null
                     }
                   }
@@ -15726,6 +16004,64 @@
                   "kind": "SCALAR",
                   "name": "String",
                   "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "accountActions",
+              "description":
+                "Find all the actions associated to an account from the current best tip.",
+              "args": [
+                {
+                  "name": "maxLength",
+                  "description":
+                    "The maximum number of blocks to search for actions. If there are more blocks in the transition frontier from root to tip, the maxLength blocks closest to the best tip will be returned",
+                  "type": { "kind": "SCALAR", "name": "Int", "ofType": null },
+                  "defaultValue": null
+                },
+                {
+                  "name": "token",
+                  "description":
+                    "Token of account being retrieved (defaults to MINA)",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "TokenId",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "publicKey",
+                  "description": "Public key of account being retrieved",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "PublicKey",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "ActionState",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,

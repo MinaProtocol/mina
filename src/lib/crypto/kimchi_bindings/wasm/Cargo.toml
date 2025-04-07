@@ -14,40 +14,19 @@ crate-type = ["cdylib"]
 ################################# Dependencies ################################
 
 [dependencies]
-# Strictly enforcing 0.2.87
-wasm-bindgen = { version = "=0.2.87" }
-console_error_panic_hook = { version = "0.1.6" }
-web-sys = { version = "0.3.35", features = [
-  "Window",
-  "Document",
-  "HtmlElement",
-  "Text",
-  "Node",
-  "Element",
-] }
-
-once_cell = "1.10.0"
-libc = "0.2.62"
-
-# arkworks
-ark-ff = { version = "0.4.2", features = ["parallel", "asm"] }
-ark-serialize = "0.4.2"
-ark-ec = { version = "0.4.2", features = ["parallel"] }
-ark-poly = { version = "0.4.2", features = ["parallel"] }
-
-# proof-systems
-poly-commitment = { path = "../../proof-systems/poly-commitment" }
-groupmap = { path = "../../proof-systems/groupmap" }
-mina-curves = { path = "../../proof-systems/curves" }
-o1-utils = { path = "../../proof-systems/utils" }
-mina-poseidon = { path = "../../proof-systems/poseidon" }
-kimchi = { path = "../../proof-systems/kimchi", features = ["wasm_types"] }
-
 array-init = "2.0.0"
 base64 = "0.13.0"
+console_error_panic_hook = { version = "0.1.6" }
 getrandom = { version = "0.2", features = ["js"] }
+js-sys = "0.3"
+libc = "0.2.62"
 num-bigint = { version = "0.4.0" }
+once_cell = "1.10.0"
 paste = "1.0.5"
+# Version for proc-macro2 needs to be 1.0.60+ to be compatible with newer rust versions
+# https://github.com/rust-lang/rust/issues/113152
+proc-macro2 = { version = "=1.0.66", features = ["default", "proc-macro"] }
+quote = "1.0.31"
 rand = { version = "0.8.0" }
 rayon = { version = "1" }
 rmp-serde = "1.0.0"
@@ -57,11 +36,30 @@ serde = "1.0.171"
 serde_json = "1.0.103"
 serde_with = ">=2.1.0"
 serde-wasm-bindgen = ">=0.4"
-js-sys = "0.3"
-# Version for proc-macro2 needs to be 1.0.60+ to be compatible with newer rust versions
-# https://github.com/rust-lang/rust/issues/113152
-proc-macro2 = { version = "=1.0.66", features = ["default", "proc-macro"] }
-quote = "1.0.31"
+# Strictly enforcing 0.2.87
+wasm-bindgen = { version = "=0.2.87" }
+web-sys = { version = "0.3.35", features = [
+  "Window",
+  "Document",
+  "HtmlElement",
+  "Text",
+  "Node",
+  "Element",
+] }
+
+# arkworks
+ark-ec = { version = "0.4.2", features = ["parallel"] }
+ark-ff = { version = "0.4.2", features = ["parallel", "asm"] }
+ark-poly = { version = "0.4.2", features = ["parallel"] }
+ark-serialize = "0.4.2"
+
+# proof-systems
+groupmap = { path = "../../proof-systems/groupmap" }
+kimchi = { path = "../../proof-systems/kimchi", features = ["wasm_types"] }
+mina-curves = { path = "../../proof-systems/curves" }
+mina-poseidon = { path = "../../proof-systems/poseidon" }
+o1-utils = { path = "../../proof-systems/utils" }
+poly-commitment = { path = "../../proof-systems/poly-commitment" }
 
 [dev-dependencies]
 wasm-bindgen-test = ">=0.3.0"

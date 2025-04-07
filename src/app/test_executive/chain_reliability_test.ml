@@ -42,15 +42,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (Wait_condition.nodes_to_initialize
            (Core.String.Map.data all_mina_nodes) )
     in
-    let node_a =
-      Core.String.Map.find_exn (Network.block_producers network) "node-a"
-    in
-    let node_b =
-      Core.String.Map.find_exn (Network.block_producers network) "node-b"
-    in
-    let node_c =
-      Core.String.Map.find_exn (Network.block_producers network) "node-c"
-    in
+    let node_a = Network.block_producer_exn network "node-a" in
+    let node_b = Network.block_producer_exn network "node-b" in
+    let node_c = Network.block_producer_exn network "node-c" in
     let%bind _ =
       section "blocks are produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 2))

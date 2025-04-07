@@ -33,6 +33,7 @@ SNARK_WORKERS_COUNT=1
 ZKAPP_TRANSACTIONS=false
 RESET=false
 UPDATE_GENESIS_TIMESTAMP=false
+OVERRIDE_SLOT_TIME_MS=""
 PROOF_LEVEL="full"
 LOG_PRECOMPUTED_BLOCKS=false
 
@@ -125,6 +126,8 @@ help() {
   echo "                                         |   Default: ${RESET}"
   echo "-u   |--update-genesis-timestamp         | Whether to update the Genesis Ledger timestamp (presence of argument)"
   echo "                                         |   Default: ${UPDATE_GENESIS_TIMESTAMP}"
+  echo "-st  |--override-slot-time <milliseconds>| Override the slot time for block production"
+  echo "                                         |   Default: value from executable"
   echo "-h   |--help                             | Displays this help message"
 
   printf "\n"
@@ -349,6 +352,10 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   -r | --reset) RESET=true ;;
   -u | --update-genesis-timestamp) UPDATE_GENESIS_TIMESTAMP=true ;;
+  -st |--override-slot-time)
+      OVERRIDE_SLOT_TIME_MS="${2}"
+      shift
+      ;;
   *)
     echo "Unknown parameter passed: ${1}"
 
@@ -552,6 +559,18 @@ if ${UPDATE_GENESIS_TIMESTAMP}; then
   else
     reset-genesis-ledger ${LEDGER_FOLDER} ${CONFIG}
   fi
+fi
+
+if [ ! -z "${OVERRIDE_SLOT_TIME_MS}" ]; then
+  echo 'Modifying configuration to override slot time'
+  
+  if [ ! -f "${CONFIG}" ]; then
+    reset-genesis-ledger ${LEDGER_FOLDER} ${CONFIG}
+  fi
+  
+  printf "\n"
+  tmp=$(mktemp)
+  jq ".proof.block_window_duration_ms=${OVERRIDE_SLOT_TIME_MS}" ${CONFIG} >"$tmp" && mv -f "$tmp" ${CONFIG}
 fi
 
 # ================================================

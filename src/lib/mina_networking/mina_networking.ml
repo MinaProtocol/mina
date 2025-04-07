@@ -43,7 +43,9 @@ module type CONTEXT = sig
 
   val consensus_constants : Consensus.Constants.t
 
-  val compile_config : Mina_compile_config.t
+  val ledger_sync_config : Syncable_ledger.daemon_config
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 module Node_status = Node_status
@@ -74,7 +76,9 @@ type t =
 
 let create (module Context : CONTEXT) (config : Config.t) ~sinks
     ~(get_transition_frontier : unit -> Transition_frontier.t option)
-    ~(get_node_status : unit -> Node_status.t Deferred.Or_error.t) =
+    ~(get_snark_pool : unit -> Snark_pool.t option)
+    ~(get_node_status : unit -> Node_status.t Deferred.Or_error.t)
+    ~(snark_job_state : unit -> Work_selector.State.t option) =
   let open Context in
   let gossip_net_ref = ref None in
   let module Rpc_context = struct
@@ -90,6 +94,10 @@ let create (module Context : CONTEXT) (config : Config.t) ~sinks
           Gossip_net.Any.peers gossip_net
 
     let get_transition_frontier = get_transition_frontier
+
+    let get_snark_pool = get_snark_pool
+
+    let snark_job_state = snark_job_state
   end in
   let%map gossip_net =
     O1trace.thread "gossip_net" (fun () ->
@@ -123,7 +131,7 @@ let create (module Context : CONTEXT) (config : Config.t) ~sinks
   (* TODO: Think about buffering:
         I.e., what do we do when too many messages are coming in, or going out.
         For example, some things you really want to not drop (like your outgoing
-        block announcment).
+        block announcement).
   *)
   { gossip_net; logger; trust_system }
 
@@ -257,6 +265,10 @@ let get_transition_chain ?heartbeat_timeout ?timeout t =
 let get_best_tip ?heartbeat_timeout ?timeout t peer =
   make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_best_tip
     ~label:"best tip" t peer ()
+
+let get_completed_checked_snarks t peer =
+  make_rpc_request ~rpc:Rpcs.Get_completed_snarks
+    ~label:"completed checked snarks" t peer ()
 
 let ban_notify t peer banned_until =
   query_peer t peer.Peer.peer_id Rpcs.Ban_notify banned_until
@@ -420,7 +432,7 @@ let glue_sync_ledger :
     Sl_downloader.create ~preferred ~max_batch_size:100
       ~peers:(fun () -> peers t)
       ~knowledge_context:root_hash_r ~knowledge ~stop:global_stop
-      ~trust_system:t.trust_system
+      ~logger:t.logger ~trust_system:t.trust_system
       ~get:(fun (peer : Peer.t) qs ->
         List.iter qs ~f:(fun (h, _) ->
             if

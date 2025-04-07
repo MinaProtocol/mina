@@ -10,7 +10,7 @@ use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::{linearization::expr_linearization, prover_index::ProverIndex};
 use mina_curves::pasta::{Fq, Pallas, PallasParameters, Vesta};
 use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
-use poly_commitment::evaluation_proof::OpeningProof;
+use poly_commitment::{ipa::OpeningProof, SRS as _};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -84,14 +84,9 @@ pub fn caml_pasta_fq_plonk_index_create(
     };
 
     // endo
-    let (endo_q, _endo_r) = poly_commitment::srs::endos::<Vesta>();
+    let (endo_q, _endo_r) = poly_commitment::ipa::endos::<Vesta>();
 
-    // Unsafe if we are in a multi-core ocaml
-    {
-        let ptr: &mut poly_commitment::srs::SRS<Pallas> =
-            unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-        ptr.with_lagrange_basis(cs.domain.d1);
-    }
+    srs.0.with_lagrange_basis(cs.domain.d1);
 
     // create index
     let mut index = ProverIndex::<Pallas, OpeningProof<Pallas>>::create(cs, endo_q, srs.clone());
@@ -104,7 +99,7 @@ pub fn caml_pasta_fq_plonk_index_create(
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_index_max_degree(index: CamlPastaFqPlonkIndexPtr) -> ocaml::Int {
-    index.as_ref().0.srs.max_degree() as isize
+    index.as_ref().0.srs.max_poly_size() as isize
 }
 
 #[ocaml_gen::func]

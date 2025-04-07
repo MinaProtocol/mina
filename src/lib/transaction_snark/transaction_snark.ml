@@ -77,27 +77,33 @@ module Make_str (A : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type t = A.V2.t =
-        { statement : Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
-        ; proof : Proof.Stable.V2.t
-        }
-      [@@deriving compare, equal, fields, sexp, version, yojson, hash]
+      type t =
+        ( Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
+        , Proof.Stable.V2.t )
+        Proof_carrying_data.Stable.V1.t
+      [@@deriving compare, equal, sexp, version, yojson, hash]
 
       let to_latest = Fn.id
     end
   end]
 
-  let proof t = t.proof
+  let proof t = t.Proof_carrying_data.proof
 
-  let statement t = { t.statement with sok_digest = () }
+  let statement
+      (t :
+        ( Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
+        , _ )
+        Proof_carrying_data.t ) =
+    { t.data with sok_digest = () }
 
-  let statement_with_sok t = t.statement
+  let statement_with_sok t = t.Proof_carrying_data.data
 
-  let sok_digest t = t.statement.sok_digest
+  let sok_digest t =
+    t.Proof_carrying_data.data.Mina_state.Snarked_ledger_state.Poly.sok_digest
 
   let to_yojson = Stable.Latest.to_yojson
 
-  let create ~statement ~proof = { statement; proof }
+  let create ~statement ~proof = { Proof_carrying_data.data = statement; proof }
 
   open Tick
   open Let_syntax
@@ -450,7 +456,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%snarkydef_ compute_as_prover ~constraint_constants ~txn_global_slot
           (txn : Transaction_union.var) =
         let%bind data =
-          exists (Typ.Internal.ref ())
+          exists (Typ.prover_value ())
             ~compute:
               As_prover.(
                 let%map txn = read Transaction_union.typ txn in
@@ -468,54 +474,54 @@ module Make_str (A : Wire_types.Concrete) = struct
                 (txn, fee_payer, source, receiver))
         in
         let%bind fee_payer_idx =
-          exists (Typ.Internal.ref ())
+          exists (Typ.prover_value ())
             ~request:
               As_prover.(
                 let%map _txn, fee_payer, _source, _receiver =
-                  read (Typ.Internal.ref ()) data
+                  read (Typ.prover_value ()) data
                 in
                 Ledger_hash.Find_index fee_payer)
         in
         let%bind fee_payer_account =
-          exists (Typ.Internal.ref ())
+          exists (Typ.prover_value ())
             ~request:
               As_prover.(
                 let%map fee_payer_idx =
-                  read (Typ.Internal.ref ()) fee_payer_idx
+                  read (Typ.prover_value ()) fee_payer_idx
                 in
                 Ledger_hash.Get_element fee_payer_idx)
         in
         let%bind source_idx =
-          exists (Typ.Internal.ref ())
+          exists (Typ.prover_value ())
             ~request:
               As_prover.(
                 let%map _txn, _fee_payer, source, _receiver =
-                  read (Typ.Internal.ref ()) data
+                  read (Typ.prover_value ()) data
                 in
                 Ledger_hash.Find_index source)
         in
         let%bind source_account =
-          exists (Typ.Internal.ref ())
+          exists (Typ.prover_value ())
             ~request:
               As_prover.(
-                let%map source_idx = read (Typ.Internal.ref ()) source_idx in
+                let%map source_idx = read (Typ.prover_value ()) source_idx in
                 Ledger_hash.Get_element source_idx)
         in
         let%bind receiver_idx =
-          exists (Typ.Internal.ref ())
+          exists (Typ.prover_value ())
             ~request:
               As_prover.(
                 let%map _txn, _fee_payer, _source, receiver =
-                  read (Typ.Internal.ref ()) data
+                  read (Typ.prover_value ()) data
                 in
                 Ledger_hash.Find_index receiver)
         in
         let%bind receiver_account =
-          exists (Typ.Internal.ref ())
+          exists (Typ.prover_value ())
             ~request:
               As_prover.(
                 let%map receiver_idx =
-                  read (Typ.Internal.ref ()) receiver_idx
+                  read (Typ.prover_value ()) receiver_idx
                 in
                 Ledger_hash.Get_element receiver_idx)
         in
@@ -523,16 +529,16 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~compute:
             As_prover.(
               let%bind txn, _fee_payer, _source, _receiver =
-                read (Typ.Internal.ref ()) data
+                read (Typ.prover_value ()) data
               in
               let%bind fee_payer_account, _path =
-                read (Typ.Internal.ref ()) fee_payer_account
+                read (Typ.prover_value ()) fee_payer_account
               in
               let%bind source_account, _path =
-                read (Typ.Internal.ref ()) source_account
+                read (Typ.prover_value ()) source_account
               in
               let%bind receiver_account, _path =
-                read (Typ.Internal.ref ()) receiver_account
+                read (Typ.prover_value ()) receiver_account
               in
               let%map txn_global_slot =
                 read Mina_numbers.Global_slot_since_genesis.typ txn_global_slot
@@ -939,7 +945,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                      { a with
                        zkapp =
                          ( Zkapp_account.Checked.digest a.zkapp
-                         , As_prover.Ref.create (fun () -> None) )
+                         , exists (Typ.prover_value ()) ~compute:(fun () ->
+                               None ) )
                      }
                    in
                    run_checked (Account.Checked.digest a) ) )
@@ -1429,10 +1436,16 @@ module Make_str (A : Wire_types.Concrete) = struct
               | Proof ->
                   let vk =
                     exists Side_loaded_verification_key.typ ~compute:(fun () ->
-                        Option.value_exn
-                          (As_prover.Ref.get
-                             (Data_as_hash.ref a.zkapp.verification_key.data) )
-                            .data )
+                        match
+                          (As_prover.read (Typ.prover_value ())
+                             (Data_as_hash.prover_value
+                                a.zkapp.verification_key.data ) )
+                            .data
+                        with
+                        | Some vk ->
+                            vk
+                        | None ->
+                            Side_loaded_verification_key.dummy )
                   in
                   let expected_hash =
                     Data_as_hash.hash a.zkapp.verification_key.data
@@ -1854,7 +1867,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   [ correct_coinbase_target_stack; valid_init_state ] ) )
 
       let main ?(witness : Witness.t option) (spec : Spec.t)
-          ~constraint_constants (statement : Statement.With_sok.Checked.t) =
+          ~constraint_constants (statement : Statement.With_sok.var) =
         let open Impl in
         run_checked (dummy_constraints ()) ;
         let ( ! ) x = Option.value_exn x in
@@ -1924,7 +1937,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           (g, l)
         in
         let start_zkapp_command =
-          As_prover.Ref.create (fun () -> !witness.start_zkapp_command)
+          exists (Typ.prover_value ()) ~compute:(fun () ->
+              ref !witness.start_zkapp_command )
         in
         let zkapp_input = ref None in
         let must_verify = ref Boolean.true_ in
@@ -1999,7 +2013,11 @@ module Make_str (A : Wire_types.Concrete) = struct
                     (global_state, local_state)
                 | `Compute_in_circuit ->
                     V.create (fun () ->
-                        match As_prover.Ref.get start_zkapp_command with
+                        let start_zkapp_command =
+                          As_prover.read (Typ.prover_value ())
+                            start_zkapp_command
+                        in
+                        match Stdlib.( ! ) start_zkapp_command with
                         | [] ->
                             `Skip
                         | p :: ps ->
@@ -2008,7 +2026,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                                 (V.get local.stack_frame.data.calls.data)
                             in
                             if should_pop then (
-                              As_prover.Ref.set start_zkapp_command ps ;
+                              start_zkapp_command := ps ;
                               `Start p )
                             else `Skip )
                     |> finish
@@ -2018,11 +2036,15 @@ module Make_str (A : Wire_types.Concrete) = struct
                           Mina_base.Zkapp_command.Call_forest.is_empty
                             (V.get local.stack_frame.data.calls.data) ) ) ;
                     V.create (fun () ->
-                        match As_prover.Ref.get start_zkapp_command with
+                        let start_zkapp_command =
+                          As_prover.read (Typ.prover_value ())
+                            start_zkapp_command
+                        in
+                        match Stdlib.( ! ) start_zkapp_command with
                         | [] ->
                             assert false
                         | p :: ps ->
-                            As_prover.Ref.set start_zkapp_command ps ;
+                            start_zkapp_command := ps ;
                             `Start p )
                     |> finish
               in
@@ -2116,7 +2138,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     main ?witness:!witness s ~constraint_constants stmt
                   in
                   let proof =
-                    Run.exists (Typ.Internal.ref ()) ~request:(fun () ->
+                    Run.exists (Typ.prover_value ()) ~request:(fun () ->
                         Zkapp_proof )
                   in
                   { previous_proof_statements =
@@ -3053,7 +3075,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           pc: Pending_coinbase_stack_state.t
     *)
     let%snarkydef_ main ~constraint_constants
-        (statement : Statement.With_sok.Checked.t) =
+        (statement : Statement.With_sok.var) =
       let%bind () = dummy_constraints () in
       let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
       let%bind t =
@@ -3199,7 +3221,7 @@ module Make_str (A : Wire_types.Concrete) = struct
        verify_transition tock_vk _ s1 s2 pending_coinbase_stack12.source, pending_coinbase_stack12.target is true
        verify_transition tock_vk _ s2 s3 pending_coinbase_stack23.source, pending_coinbase_stack23.target is true
     *)
-    let%snarkydef_ main (s : Statement.With_sok.Checked.t) =
+    let%snarkydef_ main (s : Statement.With_sok.var) =
       let%bind s1, s2 =
         exists
           Typ.(Statement.With_sok.typ * Statement.With_sok.typ)
@@ -3285,7 +3307,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             let s1, s2 = Run.run_checked (main x) in
             let p1, p2 =
               Run.exists
-                Typ.(Internal.ref () * Internal.ref ())
+                Typ.(prover_value () * prover_value ())
                 ~request:(fun () -> Proofs_to_merge)
             in
             { previous_proof_statements =
@@ -3302,7 +3324,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   open Pickles_types
 
   type tag =
-    ( Statement.With_sok.Checked.t
+    ( Statement.With_sok.var
     , Statement.With_sok.t
     , Nat.N2.n
     , Nat.N5.n )
@@ -3315,9 +3337,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~branches:(module Nat.N5)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"transaction-snark"
-      ~constraint_constants:
-        (Genesis_constants.Constraint_constants.to_snark_keys_header
-           constraint_constants )
       ~choices:(fun ~self ->
         let zkapp_command x =
           Base.Zkapp_command_snark.rule ~constraint_constants ~proof_level x
@@ -3484,8 +3503,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let open Tick in
     let main x = handle (fun () -> Base.main ~constraint_constants x) handler in
     generate_auxiliary_input ~input_typ:Statement.With_sok.typ
-      ~return_typ:(Snarky_backendless.Typ.unit ())
-      main statement
+      ~return_typ:Typ.unit main statement
 
   let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
       ~source_first_pass_ledger ~target_first_pass_ledger ~init_stack
@@ -3509,22 +3527,22 @@ module Make_str (A : Wire_types.Concrete) = struct
           }
           init_stack pending_coinbase_stack_state handler
 
-  let verify (ts : (t * _) list) ~key =
+  let verify_impl ~f ts =
     if
-      List.for_all ts ~f:(fun ({ statement; _ }, message) ->
-          Sok_message.Digest.equal
-            (Sok_message.digest message)
-            statement.sok_digest )
+      List.for_all ts ~f:(fun ((p : Stable.Latest.t), m) ->
+          Sok_message.Digest.equal (Sok_message.digest m) p.data.sok_digest )
     then
-      Pickles.verify
-        (module Nat.N2)
-        (module Statement.With_sok)
-        key
-        (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
+      f
+        (List.map ts ~f:(fun ({ Proof_carrying_data.data; proof }, _) ->
+             (data, proof) ) )
     else
       Async.return
         (Or_error.error_string
            "Transaction_snark.verify: Mismatched sok_message" )
+
+  let verify ~key =
+    verify_impl
+      ~f:(Pickles.verify (module Nat.N2) (module Statement.With_sok) key)
 
   let constraint_system_digests ~constraint_constants () =
     let digest = Tick.R1CS_constraint_system.digest in
@@ -3532,14 +3550,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       , digest
           Merge.(
             Tick.constraint_system ~input_typ:Statement.With_sok.typ
-              ~return_typ:(Snarky_backendless.Typ.unit ()) (fun x ->
+              ~return_typ:Tick.Typ.unit (fun x ->
                 let open Tick in
                 Checked.map ~f:ignore @@ main x )) )
     ; ( "transaction-base"
       , digest
           Base.(
             Tick.constraint_system ~input_typ:Statement.With_sok.typ
-              ~return_typ:(Snarky_backendless.Typ.unit ())
+              ~return_typ:Tick.Typ.unit
               (main ~constraint_constants)) )
     ]
 
@@ -3961,21 +3979,10 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let verification_key = Proof.verification_key
 
-    let verify_against_digest { statement; proof } =
-      Proof.verify [ (statement, proof) ]
+    let verify_against_digest { Proof_carrying_data.data; proof } =
+      Proof.verify [ (data, proof) ]
 
-    let verify ts =
-      if
-        List.for_all ts ~f:(fun (p, m) ->
-            Sok_message.Digest.equal (Sok_message.digest m)
-              p.statement.sok_digest )
-      then
-        Proof.verify
-          (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
-      else
-        Async.return
-          (Or_error.error_string
-             "Transaction_snark.verify: Mismatched sok_message" )
+    let verify = verify_impl ~f:Proof.verify
 
     let first_account_update
         (witness : Transaction_witness.Zkapp_command_segment_witness.t) =
@@ -4014,7 +4021,10 @@ module Make_str (A : Wire_types.Concrete) = struct
               s.verification_key )
         with
         | None ->
-            failwith "No verification key found in the account"
+            { With_hash.data =
+                Lazy.force Side_loaded_verification_key.dummy_with_wrap_vk
+            ; hash = Verification_key_wire.dummy_vk_hash ()
+            }
         | Some s ->
             s
       in
@@ -4042,7 +4052,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let open Async in
       let%map (), (), proof = res in
       Base.Zkapp_command_snark.witness := None ;
-      { proof; statement }
+      { Proof_carrying_data.proof; data = statement }
 
     let of_transaction_union ~statement ~init_stack transaction state_body
         global_slot handler =
@@ -4054,7 +4064,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                global_slot init_stack )
           statement
       in
-      { statement; proof }
+      { Proof_carrying_data.data = statement; proof }
 
     let of_non_zkapp_command_transaction ~statement ~init_stack
         transaction_in_block handler =
@@ -4098,8 +4108,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
         handler
 
-    let merge ({ statement = t12; _ } as x12) ({ statement = t23; _ } as x23)
-        ~sok_digest =
+    let merge ({ Proof_carrying_data.data = t12; _ } as x12)
+        ({ Proof_carrying_data.data = t23; _ } as x23) ~sok_digest =
       let open Async.Deferred.Or_error.Let_syntax in
       let%bind s =
         Async.return
@@ -4110,12 +4120,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       let s = { s with sok_digest } in
       let open Async in
       let%map (), (), proof =
-        merge
-          ~handler:
-            (Merge.handle (x12.statement, x23.statement) (x12.proof, x23.proof))
-          s
+        merge ~handler:(Merge.handle (t12, t23) (x12.proof, x23.proof)) s
       in
-      Ok { statement = s; proof }
+      Ok { Proof_carrying_data.data = s; proof }
 
     let constraint_system_digests =
       lazy (constraint_system_digests ~constraint_constants ())
@@ -4149,7 +4156,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let set_proof_cache x = proof_cache := Some x
 
-    let create_trivial_snapp ?unique_id ~constraint_constants () =
+    let create_trivial_snapp ?unique_id () =
       let tag, _, (module P), Pickles.Provers.[ trivial_prover ] =
         let trivial_rule : _ Pickles.Inductive_rule.t =
           let trivial_main () : unit Checked.t =
@@ -4183,9 +4190,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~branches:(module Nat.N1)
           ~max_proofs_verified:(module Nat.N0)
           ~name:"trivial"
-          ~constraint_constants:
-            (Genesis_constants.Constraint_constants.to_snark_keys_header
-               constraint_constants )
           ~choices:(fun ~self:_ -> [ trivial_rule ])
       in
       let trivial_prover ?handler stmt =
@@ -4222,16 +4226,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         assert (Or_error.is_error invalid_verification)
       in
-      let constraint_constants =
-        Genesis_constants.For_unit_tests.Constraint_constants.t
-      in
-      let `VK vk_a, `Prover prover_a =
-        create_trivial_snapp ~unique_id:0 ~constraint_constants ()
-      in
+      let `VK vk_a, `Prover prover_a = create_trivial_snapp ~unique_id:0 () in
       let vk_a = Async.Thread_safe.block_on_async_exn (fun () -> vk_a) in
-      let `VK vk_b, `Prover prover_b =
-        create_trivial_snapp ~unique_id:1 ~constraint_constants ()
-      in
+      let `VK vk_b, `Prover prover_b = create_trivial_snapp ~unique_id:1 () in
       let vk_b = Async.Thread_safe.block_on_async_exn (fun () -> vk_b) in
       assert (
         not
@@ -4585,9 +4582,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let deploy_snapp ?(no_auth = false) ?permissions ~constraint_constants
         (spec : Deploy_snapp_spec.t) =
-      let `VK vk, `Prover _trivial_prover =
-        create_trivial_snapp ~constraint_constants ()
-      in
+      let `VK vk, `Prover _trivial_prover = create_trivial_snapp () in
       let%map.Async.Deferred vk = vk in
       (* only allow timing on a single new snapp account
          balance changes for other new snapp accounts are just the account creation fee
@@ -4717,7 +4712,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         | Some (prover, vk) ->
             (`VK vk, `Prover prover)
         | None ->
-            create_trivial_snapp ~constraint_constants ()
+            create_trivial_snapp ()
       in
       let%bind.Async.Deferred vk = vk in
       let ( `Zkapp_command { Zkapp_command.fee_payer; memo; _ }
@@ -4868,9 +4863,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             (prover, vk)
         | None ->
             (* we don't always need this, but calculate it just once *)
-            let `VK vk, `Prover prover =
-              create_trivial_snapp ~constraint_constants ()
-            in
+            let `VK vk, `Prover prover = create_trivial_snapp () in
             (prover, vk)
       in
       let%bind.Async.Deferred vk = vk in
@@ -5048,7 +5041,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let account : Account.t = trivial_zkapp_account ~permissions ~vk pk in
       create ledger id account
 
-    let create_trivial_predicate_snapp ~constraint_constants
+    let create_trivial_predicate_snapp
         ?(protocol_state_predicate = Zkapp_precondition.Protocol_state.accept)
         ~(snapp_kp : Signature_lib.Keypair.t) spec ledger =
       let { Mina_transaction_logic.For_tests.Transaction_spec.fee
@@ -5061,9 +5054,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let trivial_account_pk =
         Signature_lib.Public_key.compress snapp_kp.public_key
       in
-      let `VK vk, `Prover trivial_prover =
-        create_trivial_snapp ~constraint_constants ()
-      in
+      let `VK vk, `Prover trivial_prover = create_trivial_snapp () in
       let%bind.Async.Deferred vk = vk in
       let _v =
         let id =

@@ -14,7 +14,9 @@ module type CONTEXT = sig
 
   val consensus_constants : Consensus.Constants.t
 
-  val compile_config : Mina_compile_config.t
+  val ledger_sync_config : Syncable_ledger.daemon_config
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 module type Transition_handler_validator_intf = sig
@@ -59,7 +61,8 @@ module type Breadcrumb_builder_intf = sig
   type transition_frontier_breadcrumb
 
   val build_subtrees_of_breadcrumbs :
-       logger:Logger.t
+       proof_cache_db:Proof_cache_tag.cache_db
+    -> logger:Logger.t
     -> verifier:Verifier.t
     -> trust_system:Trust_system.t
     -> frontier:transition_frontier
@@ -207,7 +210,6 @@ module type Consensus_best_tip_prover_intf = sig
   val verify :
        context:(module CONTEXT)
     -> verifier:Verifier.t
-    -> genesis_constants:Genesis_constants.t
     -> Consensus.Data.Consensus_state.Value.t State_hash.With_state_hashes.t
     -> ( Mina_block.t
        , State_body_hash.t list * Mina_block.t )
@@ -224,12 +226,13 @@ module type Sync_handler_intf = sig
        frontier:transition_frontier
     -> Ledger_hash.t
     -> Mina_ledger.Sync_ledger.Query.t Envelope.Incoming.t
-    -> logger:Logger.t
+    -> context:(module CONTEXT)
     -> trust_system:Trust_system.t
-    -> Mina_ledger.Sync_ledger.Answer.t option Deferred.t
+    -> Mina_ledger.Sync_ledger.Answer.t Or_error.t Deferred.t
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
-       frontier:transition_frontier
+       logger:Logger.t
+    -> frontier:transition_frontier
     -> State_hash.t
     -> ( Staged_ledger.Scan_state.t
        * Ledger_hash.t
@@ -289,30 +292,6 @@ module type Bootstrap_controller_intf = sig
        Deferred.t
 end
 
-module type Transition_frontier_controller_intf = sig
-  type transition_frontier
-
-  type breadcrumb
-
-  type network
-
-  val run :
-       logger:Logger.t
-    -> trust_system:Trust_system.t
-    -> verifier:Verifier.t
-    -> network:network
-    -> time_controller:Block_time.Controller.t
-    -> collected_transitions:
-         Mina_block.initial_valid_block Envelope.Incoming.t list
-    -> frontier:transition_frontier
-    -> network_transition_reader:
-         Mina_block.initial_valid_block Envelope.Incoming.t Strict_pipe.Reader.t
-    -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
-    -> clear_reader:[ `Clear ] Strict_pipe.Reader.t
-    -> unit
-    -> Mina_block.Validated.t Strict_pipe.Reader.t
-end
-
 module type Transition_router_intf = sig
   type transition_frontier
 
@@ -342,14 +321,15 @@ module type Transition_router_intf = sig
     -> frontier_broadcast_writer:
          transition_frontier option Pipe_lib.Broadcast_pipe.Writer.t
     -> network_transition_reader:
-         ( [ `Transition of Mina_block.t Envelope.Incoming.t ]
+         ( [ `Block of Mina_block.t Envelope.Incoming.t
+           | `Header of Mina_block.Header.t Envelope.Incoming.t ]
          * [ `Time_received of Block_time.t ]
          * [ `Valid_cb of Mina_net2.Validation_callback.t ] )
          Strict_pipe.Reader.t
     -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
-    -> get_most_recent_valid_block:(unit -> Mina_block.initial_valid_block)
+    -> get_most_recent_valid_block:(unit -> Mina_block.initial_valid_header)
     -> most_recent_valid_block_writer:
-         Mina_block.initial_valid_block Broadcast_pipe.Writer.t
+         Mina_block.initial_valid_header Broadcast_pipe.Writer.t
     -> get_completed_work:
          (   Transaction_snark_work.Statement.t
           -> Transaction_snark_work.Checked.t option )

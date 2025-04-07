@@ -1138,8 +1138,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let module Context = struct
             let logger = logger
 
-            let precomputed_values = precomputed_values
-
             let constraint_constants = precomputed_values.constraint_constants
 
             let consensus_constants = precomputed_values.consensus_constants
@@ -1294,7 +1292,6 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ; time_controller
               ; pubsub_v1
               ; pubsub_v0
-              ; block_window_duration = compile_config.block_window_duration
               }
           in
           let net_config =
@@ -1859,10 +1856,11 @@ let internal_commands logger =
                     | Error err ->
                         failwithf "Could not parse JSON: %s" err () ) )
           in
+
           let%bind verifier =
-            Verifier.create ~commit_id:Mina_version.commit_id ~logger
-              ~proof_level ~constraint_constants ~pids:(Pid.Table.create ())
-              ~conf_dir:(Some conf_dir) ()
+            Verifier.For_tests.default ~constraint_constants ~proof_level
+              ~commit_id:Mina_version.commit_id ~logger
+              ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir) ()
           in
           let%bind result =
             let cap lst =
@@ -2017,7 +2015,8 @@ let print_version_info () = Core.printf "Commit %s\n" Mina_version.commit_id
 
 let () =
   Random.self_init () ;
-  let logger = Logger.create () in
+  let compile_config = Mina_compile_config.Compiled.t in
+  let logger = Logger.create ~itn_features:compile_config.itn_features () in
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky_backendless.Snark.set_eval_constraints true ;
@@ -2031,7 +2030,6 @@ let () =
    | [| _mina_exe; version |] when is_version_cmd version ->
        Mina_version.print_version ()
    | _ ->
-       let compile_config = Mina_compile_config.Compiled.t in
        Command.run
          (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
             (mina_commands logger ~itn_features:compile_config.itn_features) )

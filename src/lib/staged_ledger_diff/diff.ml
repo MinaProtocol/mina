@@ -169,13 +169,13 @@ module Make_str (A : Wire_types.Concrete) = struct
           ( Transaction_snark_work.Stable.V2.t
           , User_command.Stable.V2.t With_status.Stable.V2.t )
           Pre_diff_two.Stable.V2.t
-        [@@deriving equal, compare, sexp, yojson]
+        [@@deriving equal, sexp, yojson]
 
         let to_latest = Fn.id
       end
     end]
 
-    type t = Stable.Latest.t [@@deriving equal, compare, sexp, yojson]
+    type t = Stable.Latest.t
   end
 
   module Pre_diff_with_at_most_one_coinbase = struct
@@ -188,13 +188,13 @@ module Make_str (A : Wire_types.Concrete) = struct
           ( Transaction_snark_work.Stable.V2.t
           , User_command.Stable.V2.t With_status.Stable.V2.t )
           Pre_diff_one.Stable.V2.t
-        [@@deriving equal, compare, sexp, yojson]
+        [@@deriving equal, sexp, yojson]
 
         let to_latest = Fn.id
       end
     end]
 
-    type t = Stable.Latest.t [@@deriving equal, compare, sexp, yojson]
+    type t = Stable.Latest.t
   end
 
   module Diff = struct
@@ -206,13 +206,13 @@ module Make_str (A : Wire_types.Concrete) = struct
         type t =
           Pre_diff_with_at_most_two_coinbase.Stable.V2.t
           * Pre_diff_with_at_most_one_coinbase.Stable.V2.t option
-        [@@deriving equal, compare, sexp, yojson]
+        [@@deriving equal, sexp, yojson]
 
         let to_latest = Fn.id
       end
     end]
 
-    type t = Stable.Latest.t [@@deriving equal, compare, sexp, yojson]
+    type t = Stable.Latest.t
   end
 
   [%%versioned
@@ -221,34 +221,30 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     module V2 = struct
       type t = A.V2.t = { diff : Diff.Stable.V2.t }
-      [@@deriving equal, compare, sexp, yojson]
+      [@@deriving equal, sexp, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t = { diff : Diff.t }
-  [@@deriving equal, compare, sexp, yojson, fields]
+  type t = Stable.Latest.t = { diff : Diff.t } [@@deriving fields]
 
   module With_valid_signatures_and_proofs = struct
     type pre_diff_with_at_most_two_coinbase =
       ( Transaction_snark_work.Checked.t
       , User_command.Valid.t With_status.t )
       Pre_diff_two.t
-    [@@deriving compare, sexp, to_yojson]
 
     type pre_diff_with_at_most_one_coinbase =
       ( Transaction_snark_work.Checked.t
       , User_command.Valid.t With_status.t )
       Pre_diff_one.t
-    [@@deriving compare, sexp, to_yojson]
 
     type diff =
       pre_diff_with_at_most_two_coinbase
       * pre_diff_with_at_most_one_coinbase option
-    [@@deriving compare, sexp, to_yojson]
 
-    type t = { diff : diff } [@@deriving compare, sexp, to_yojson]
+    type t = { diff : diff }
 
     let empty_diff : t =
       { diff =
@@ -297,20 +293,17 @@ module Make_str (A : Wire_types.Concrete) = struct
       ( Transaction_snark_work.t
       , User_command.Valid.t With_status.t )
       Pre_diff_two.t
-    [@@deriving compare, sexp, to_yojson]
 
     type pre_diff_with_at_most_one_coinbase =
       ( Transaction_snark_work.t
       , User_command.Valid.t With_status.t )
       Pre_diff_one.t
-    [@@deriving compare, sexp, to_yojson]
 
     type diff =
       pre_diff_with_at_most_two_coinbase
       * pre_diff_with_at_most_one_coinbase option
-    [@@deriving compare, sexp, to_yojson]
 
-    type t = { diff : diff } [@@deriving compare, sexp, to_yojson]
+    type t = { diff : diff }
 
     let coinbase
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -448,7 +441,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let%bind completed_works_fees =
       List.fold ~init:(Some Fee.zero) (completed_works t) ~f:(fun sum work ->
           let%bind sum = sum in
-          Fee.( + ) sum work.Transaction_snark_work.fee )
+          Fee.(sum + Transaction_snark_work.fee work) )
     in
     Amount.(of_fee total_reward - of_fee completed_works_fees)
 
@@ -461,6 +454,19 @@ module Make_str (A : Wire_types.Concrete) = struct
           }
         , None )
     }
+
+  let is_empty = function
+    | { diff =
+          ( { completed_works = []
+            ; commands = []
+            ; coinbase = At_most_two.Zero
+            ; internal_command_statuses = []
+            }
+          , None )
+      } ->
+        true
+    | _ ->
+        false
 end
 
 include Wire_types.Make (Make_sig) (Make_str)

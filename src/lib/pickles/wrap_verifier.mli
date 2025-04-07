@@ -1,3 +1,5 @@
+module Impl := Impls.Wrap
+
 (** Generic (polymorphic instance of [challenge_polynomial]) *)
 val challenge_polynomial :
      (module Pickles_types.Shifted_value.Field_intf with type t = 'a)
@@ -7,9 +9,9 @@ val challenge_polynomial :
 type ('a, 'a_opt) index' =
   ('a, 'a_opt) Pickles_types.Plonk_verification_key_evals.Step.t
 
-module Challenge : module type of Import.Challenge.Make (Impls.Wrap)
+module Challenge : module type of Import.Challenge.Make (Impl)
 
-module Digest : module type of Import.Digest.Make (Impls.Wrap)
+module Digest : module type of Import.Digest.Make (Impl)
 
 module Scalar_challenge :
     module type of
@@ -21,23 +23,19 @@ module Scalar_challenge :
 
 module Other_field : sig
   module Packed : sig
-    type t = Impls.Wrap.Other_field.t
+    type t = Impl.Other_field.t
 
-    val typ :
-      ( Impls.Wrap.Impl.Field.t
-      , Backend.Tick.Field.t
-      , Impls.Wrap_impl.Internal_Basic.Field.t )
-      Snarky_backendless.Typ.t
+    val typ : (Impl.Impl.Field.t, Backend.Tick.Field.t) Impls.Wrap_impl.Typ.t
   end
 end
 
-module One_hot_vector : module type of One_hot_vector.Make (Impls.Wrap)
+module One_hot_vector : module type of One_hot_vector.Make (Impl)
 
-module Pseudo : module type of Pseudo.Make (Impls.Wrap)
+module Pseudo : module type of Pseudo.Make (Impl)
 
 module Opt : sig
   include module type of
-      Opt_sponge.Make (Impls.Wrap) (Wrap_main_inputs.Sponge.Permutation)
+      Opt_sponge.Make (Impl) (Wrap_main_inputs.Sponge.Permutation)
 end
 
 val all_possible_domains :
@@ -50,8 +48,7 @@ val all_possible_domains :
 val num_possible_domains :
   Wrap_hack.Padded_length.n Pickles_types.Nat.s Pickles_types.Nat.t
 
-val assert_n_bits :
-  n:int -> Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t -> unit
+val assert_n_bits : n:int -> Impl.Field.t -> unit
 
 val incrementally_verify_proof :
      (module Pickles_types.Nat.Add.Intf with type n = 'b)
@@ -64,7 +61,7 @@ val incrementally_verify_proof :
   -> verification_key:
        ( Wrap_main_inputs.Inner_curve.t array
        , ( Wrap_main_inputs.Inner_curve.t array
-         , Impls.Wrap.Boolean.var )
+         , Impl.Boolean.var )
          Pickles_types.Opt.t )
        Pickles_types.Plonk_verification_key_evals.Step.t
   -> xi:Scalar_challenge.t
@@ -112,23 +109,17 @@ val finalize_other_proof :
   -> domain:
        < generator : Wrap_main_inputs.Impl.Field.t
        ; shifts : Wrap_main_inputs.Impl.Field.t array
-       ; vanishing_polynomial :
-              Wrap_main_inputs.Impl.field Snarky_backendless__.Cvar.t
-           -> Wrap_main_inputs.Impl.field Snarky_backendless__.Cvar.t
+       ; vanishing_polynomial : Impl.Field.t -> Impl.Field.t
        ; .. >
   -> sponge:Wrap_main_inputs.Sponge.t
   -> old_bulletproof_challenges:
        ( (Wrap_main_inputs.Impl.Field.t, 'a) Pickles_types.Vector.t
        , 'b )
        Pickles_types.Vector.t
-  -> ( Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-     , Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-       Import.Scalar_challenge.t
-     , Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-       Pickles_types.Shifted_value.Type2.t
-     , ( Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-         Import.Scalar_challenge.t
-         Import.Bulletproof_challenge.t
+  -> ( Impl.Field.t
+     , Impl.Field.t Import.Scalar_challenge.t
+     , Impl.Field.t Pickles_types.Shifted_value.Type2.t
+     , ( Impl.Field.t Import.Scalar_challenge.t Import.Bulletproof_challenge.t
        , 'c )
        Pickles_types.Vector.t )
      Import.Types.Step.Proof_state.Deferred_values.In_circuit.t
@@ -137,22 +128,20 @@ val finalize_other_proof :
      , Wrap_main_inputs.Impl.Boolean.var )
      Pickles_types.Plonk_types.All_evals.In_circuit.t
   -> Wrap_main_inputs.Impl.Boolean.var
-     * ( Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-       , 'c )
-       Pickles_types.Vector.t
+     * (Impl.Field.t, 'c) Pickles_types.Vector.t
 
 val choose_key :
   'n.
      'n One_hot_vector.t
   -> ( ( Wrap_main_inputs.Inner_curve.t array
        , ( Wrap_main_inputs.Inner_curve.t array
-         , Impls.Wrap.Boolean.var )
+         , Impl.Boolean.var )
          Pickles_types.Opt.t )
        index'
      , 'n )
      Pickles_types.Vector.t
   -> ( Wrap_main_inputs.Inner_curve.t array
      , ( Wrap_main_inputs.Inner_curve.t array
-       , Impls.Wrap.Boolean.var )
+       , Impl.Boolean.var )
        Pickles_types.Opt.t )
      index'

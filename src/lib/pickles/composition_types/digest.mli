@@ -25,9 +25,9 @@ module Constant : sig
         Pickles_types.Vector.Vector_4.Stable.V1.t
       [@@deriving compare, sexp, yojson, hash, equal]
 
-      include Pickles_types.Sigs.VERSIONED
+      include Plonkish_prelude.Sigs.VERSIONED
 
-      include Pickles_types.Sigs.Binable.S with type t := t
+      include Plonkish_prelude.Sigs.Binable.S with type t := t
 
       val to_latest : 'a -> 'a
     end

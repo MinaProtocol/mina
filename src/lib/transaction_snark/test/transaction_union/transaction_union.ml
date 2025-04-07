@@ -143,7 +143,7 @@ let%test_module "Transaction union tests" =
             |> Or_error.ok_exn
           in
           let supply_increase =
-            Mina_ledger.Ledger.Transaction_applied.supply_increase
+            Mina_transaction_logic.Transaction_applied.supply_increase
               ~constraint_constants applied_transaction
             |> Or_error.ok_exn
           in
@@ -518,7 +518,9 @@ let%test_module "Transaction union tests" =
                 ( Ledger.apply_user_command ~constraint_constants ledger
                     ~txn_global_slot:current_global_slot t1
                   |> Or_error.ok_exn
-                  : Ledger.Transaction_applied.Signed_command_applied.t ) ;
+                  : Mina_transaction_logic.Transaction_applied
+                    .Signed_command_applied
+                    .t ) ;
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;

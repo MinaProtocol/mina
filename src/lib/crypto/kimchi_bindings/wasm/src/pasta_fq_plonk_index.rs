@@ -9,7 +9,7 @@ use crate::wasm_vector::{fq::*, WasmVector};
 use kimchi::circuits::lookup::tables::LookupTable;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::linearization::expr_linearization;
-use kimchi::poly_commitment::evaluation_proof::OpeningProof;
+use kimchi::poly_commitment::{ipa::OpeningProof, SRS as _};
 use kimchi::prover_index::ProverIndex;
 use mina_curves::pasta::{Fq, Pallas as GAffine, PallasParameters, Vesta as GAffineOther};
 use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
@@ -41,7 +41,7 @@ pub struct WasmPastaFqLookupTable {
 impl From<WasmPastaFqLookupTable> for LookupTable<Fq> {
     fn from(wasm_lt: WasmPastaFqLookupTable) -> LookupTable<Fq> {
         LookupTable {
-            id: wasm_lt.id.into(),
+            id: wasm_lt.id,
             data: wasm_lt.data.0,
         }
     }
@@ -140,14 +140,9 @@ pub fn caml_pasta_fq_plonk_index_create(
         };
 
         // endo
-        let (endo_q, _endo_r) = poly_commitment::srs::endos::<GAffineOther>();
+        let (endo_q, _endo_r) = poly_commitment::ipa::endos::<GAffineOther>();
 
-        // Unsafe if we are in a multi-core ocaml
-        {
-            let ptr: &mut poly_commitment::srs::SRS<GAffine> =
-                unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-            ptr.add_lagrange_basis(cs.domain.d1);
-        }
+        srs.0.get_lagrange_basis(cs.domain.d1);
 
         let mut index =
             ProverIndex::<GAffine, OpeningProof<GAffine>>::create(cs, endo_q, srs.0.clone());
@@ -166,7 +161,7 @@ pub fn caml_pasta_fq_plonk_index_create(
 
 #[wasm_bindgen]
 pub fn caml_pasta_fq_plonk_index_max_degree(index: &WasmPastaFqPlonkIndex) -> i32 {
-    index.0.srs.max_degree() as i32
+    index.0.srs.max_poly_size() as i32
 }
 
 #[wasm_bindgen]
