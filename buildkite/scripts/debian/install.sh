@@ -34,16 +34,16 @@ else
   debs=(${DEBS//,/ })
   for i in "${debs[@]}"; do
     case $i in
-      mina-berkeley|mina-devnet|mina-mainnet|mina-berkeley-lightnet)
+      mina-berkeley*|mina-devnet|mina-mainnet)
         # Downaload mina-logproc too
-        source ./buildkite/scripts/download-artifact-from-cache.sh "mina-logproc*" $MINA_DEB_CODENAME/_build "" $LOCAL_DEB_FOLDER
+        ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
       ;;
       mina-create-legacy-genesis)
-        # DowPnload locally static debians (for example mina-legacy-create-genesis )
-        gsutil -m cp "gs://buildkite_k8s/coda/shared/debs/$MINA_DEB_CODENAME/$i*" $LOCAL_DEB_FOLDER
+        # Download locally static debians (for example mina-legacy-create-genesis )
+        ./buildkite/scripts/cache/manager.sh read --root debs "$MINA_DEB_CODENAME/$i*" _build
       ;;
     esac
-    source ./buildkite/scripts/download-artifact-from-cache.sh "${i}_*" $MINA_DEB_CODENAME/_build "" $LOCAL_DEB_FOLDER
+    ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/${i}_*" $LOCAL_DEB_FOLDER
   done
 fi
 

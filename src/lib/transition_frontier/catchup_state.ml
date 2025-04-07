@@ -23,9 +23,9 @@ let apply_diffs (t : t) (ds : Frontier_base.Diff.Full.E.t list) : unit =
   | Full t ->
       Full_catchup_tree.apply_diffs t ds
 
-let create t ~root =
+let create t ~logger ~root =
   match t with
   | `Normal ->
-      Hash (Catchup_hash_tree.create ~root)
+      Hash (Catchup_hash_tree.create ~logger ~root)
   | `Super ->
-      Full (Full_catchup_tree.create ~root)
+      Full (Full_catchup_tree.create ~logger ~root)

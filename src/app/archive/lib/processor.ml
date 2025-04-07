@@ -4767,7 +4767,8 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
             let%bind.Deferred.Result genesis_block_id =
               Block.add_if_doesn't_exist
                 (module Conn)
-                ~constraint_constants genesis_block
+                ~constraint_constants:precomputed_values.constraint_constants
+                genesis_block
             in
             let%bind.Deferred.Result { ledger_hash; _ } =
               Block.load (module Conn) ~id:genesis_block_id

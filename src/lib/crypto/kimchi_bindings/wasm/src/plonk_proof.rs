@@ -32,7 +32,8 @@ use mina_poseidon::{
 };
 use poly_commitment::{
     commitment::{CommitmentCurve, PolyComm},
-    evaluation_proof::OpeningProof,
+    ipa::OpeningProof,
+    SRS as _
 };
 use serde::{Deserialize, Serialize};
 
@@ -664,11 +665,7 @@ macro_rules! impl_proof {
             ) -> Result<WasmProverProof, JsError> {
                 console_error_panic_hook::set_once();
                 let (maybe_proof, public_input) = crate::rayon::run_in_pool(|| {
-                    {
-                        let ptr: &mut poly_commitment::srs::SRS<$G> =
-                            unsafe { &mut *(std::sync::Arc::as_ptr(&index.0.as_ref().srs) as *mut _) };
-                        ptr.add_lagrange_basis(index.0.as_ref().cs.domain.d1);
-                    }
+                    index.0.srs.get_lagrange_basis(index.0.as_ref().cs.domain.d1);
                     let prev: Vec<RecursionChallenge<$G>> = {
                         if prev_challenges.is_empty() {
                             Vec::new()
@@ -685,7 +682,7 @@ macro_rules! impl_proof {
                                             .map(|a| a.clone().into())
                                             .collect();
                                     let comm = PolyComm::<$G> {
-                                        elems: vec![sg],
+                                        chunks: vec![sg],
                                     };
                                     RecursionChallenge { chals, comm }
                                 })
@@ -708,7 +705,9 @@ macro_rules! impl_proof {
                     let maybe_proof = ProverProof::create_recursive::<
                         DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
                         DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
-                        >(&group_map, witness, &rust_runtime_tables, index, prev, None);
+                        _>(&group_map, witness, &rust_runtime_tables, index, prev, None,
+                           &mut rand::rngs::OsRng
+                    );
                     (maybe_proof, public_input)
                 });
 
@@ -784,7 +783,7 @@ macro_rules! impl_proof {
                 fn comm() -> PolyComm<$G> {
                     let g = $G::generator();
                     PolyComm {
-                        elems: vec![g, g, g],
+                        chunks: vec![g, g, g],
                     }
                 }
 

@@ -43,7 +43,9 @@ module type CONTEXT = sig
 
   val compaction_interval : Time.Span.t option
 
-  val compile_config : Mina_compile_config.t
+  val ledger_sync_config : Syncable_ledger.daemon_config
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 exception Snark_worker_error of int
@@ -110,6 +112,14 @@ val request_work : t -> Snark_worker.Work.Spec.t option
 val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 
 val add_work : t -> Snark_worker.Work.Result.t -> unit
+
+val add_work_graphql :
+     t
+  -> Network_pool.Snark_pool.Resource_pool.Diff.t
+  -> ( [ `Broadcasted | `Not_broadcasted ]
+     * Network_pool.Snark_pool.Resource_pool.Diff.t
+     * Network_pool.Snark_pool.Resource_pool.Diff.rejected )
+     Deferred.Or_error.t
 
 val snark_job_state : t -> Work_selector.State.t
 
@@ -189,14 +199,14 @@ val snark_pool : t -> Network_pool.Snark_pool.t
 val start : t -> unit Deferred.t
 
 val start_with_precomputed_blocks :
-  t -> Block_producer.Precomputed.t Sequence.t -> unit Deferred.t
+  t -> Mina_block.Precomputed.t Sequence.t -> unit Deferred.t
 
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
 val create :
   commit_id:string -> ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
 
-val staged_ledger_ledger_proof : t -> Ledger_proof.t option
+val staged_ledger_ledger_proof : t -> Ledger_proof.Cached.t option
 
 val transition_frontier :
   t -> Transition_frontier.t option Broadcast_pipe.Reader.t
@@ -214,7 +224,7 @@ val wallets : t -> Secrets.Wallets.t
 val subscriptions : t -> Mina_subscriptions.t
 
 val most_recent_valid_transition :
-  t -> Mina_block.initial_valid_block Broadcast_pipe.Reader.t
+  t -> Mina_block.initial_valid_header Broadcast_pipe.Reader.t
 
 val block_produced_bvar :
   t -> (Transition_frontier.Breadcrumb.t, read_write) Bvar.t
@@ -233,7 +243,7 @@ val start_filtered_log : t -> string list -> unit Or_error.t
 
 val get_filtered_log_entries : t -> int -> string list * bool
 
-val verifier : t -> Verifier.t
+val prover : t -> Prover.t
 
 val vrf_evaluator : t -> Vrf_evaluator.t
 

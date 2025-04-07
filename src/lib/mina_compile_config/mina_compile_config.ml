@@ -29,15 +29,17 @@ module Inputs = struct
     ; max_action_elements : int
     ; zkapp_cmd_limit_hardcap : int
     ; zkapps_disabled : bool
+    ; sync_ledger_max_subtree_depth : int
+    ; sync_ledger_default_subtree_depth : int
     }
-  [@@deriving yojson]
+  [@@deriving yojson, bin_io_unversioned]
 end
 
 type t =
   { curve_size : int
-  ; default_transaction_fee : Currency.Fee.t
-  ; default_snark_worker_fee : Currency.Fee.t
-  ; minimum_user_command_fee : Currency.Fee.t
+  ; default_transaction_fee : Currency.Fee.Stable.Latest.t
+  ; default_snark_worker_fee : Currency.Fee.Stable.Latest.t
+  ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t
   ; itn_features : bool
   ; compaction_interval : Time.Span.t option
   ; block_window_duration : Time.Span.t
@@ -55,7 +57,10 @@ type t =
   ; max_action_elements : int
   ; zkapp_cmd_limit_hardcap : int
   ; zkapps_disabled : bool
+  ; sync_ledger_max_subtree_depth : int
+  ; sync_ledger_default_subtree_depth : int
   }
+[@@deriving sexp_of, bin_io_unversioned]
 
 let make (inputs : Inputs.t) =
   { curve_size = inputs.curve_size
@@ -88,6 +93,8 @@ let make (inputs : Inputs.t) =
   ; zkapp_cmd_limit = inputs.zkapp_cmd_limit
   ; zkapp_cmd_limit_hardcap = inputs.zkapp_cmd_limit_hardcap
   ; zkapps_disabled = inputs.zkapps_disabled
+  ; sync_ledger_max_subtree_depth = inputs.sync_ledger_max_subtree_depth
+  ; sync_ledger_default_subtree_depth = inputs.sync_ledger_default_subtree_depth
   }
 
 let to_yojson t =
@@ -125,6 +132,9 @@ let to_yojson t =
       )
     ; ("zkapp_cmd_limit_hardcap", `Int t.zkapp_cmd_limit_hardcap)
     ; ("zkapps_disabled", `Bool t.zkapps_disabled)
+    ; ("sync_ledger_max_subtree_depth", `Int t.sync_ledger_max_subtree_depth)
+    ; ( "sync_ledger_default_subtree_depth"
+      , `Int t.sync_ledger_default_subtree_depth )
     ]
 
 (*TODO: Delete this module and read in a value from the environment*)
@@ -154,6 +164,10 @@ module Compiled = struct
       ; zkapp_cmd_limit = Node_config.zkapp_cmd_limit
       ; zkapp_cmd_limit_hardcap = Node_config.zkapp_cmd_limit_hardcap
       ; zkapps_disabled = Node_config.zkapps_disabled
+      ; sync_ledger_max_subtree_depth =
+          Node_config.sync_ledger_max_subtree_depth
+      ; sync_ledger_default_subtree_depth =
+          Node_config.sync_ledger_default_subtree_depth
       }
     in
     make inputs
@@ -195,6 +209,10 @@ module For_unit_tests = struct
       ; zkapp_cmd_limit_hardcap =
           Node_config_for_unit_tests.zkapp_cmd_limit_hardcap
       ; zkapps_disabled = Node_config_for_unit_tests.zkapps_disabled
+      ; sync_ledger_max_subtree_depth =
+          Node_config_for_unit_tests.sync_ledger_max_subtree_depth
+      ; sync_ledger_default_subtree_depth =
+          Node_config_for_unit_tests.sync_ledger_default_subtree_depth
       }
     in
     make inputs

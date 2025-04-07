@@ -785,6 +785,41 @@ module Mutations = struct
             Error "Internal error: response from transaction pool was malformed"
         )
 
+  let add_snark_work =
+    io_field "sendProofBundle" ~doc:"Transaction SNARKs for a given spec"
+      ~args:
+        Arg.
+          [ arg "input"
+              ~doc:
+                "Proof bundle for a given spec in json format including fees \
+                 and prover public key"
+              ~typ:(non_null Types.Input.ProofBundleInput.arg_typ)
+          ]
+      ~typ:(non_null string)
+      ~resolve:(fun { ctx = mina; _ } ()
+                    (proof_bundle :
+                      Ledger_proof.t
+                      Snark_work_lib.Work.Result_without_metrics.t ) ->
+        let solved_work =
+          Network_pool.Snark_pool.Resource_pool.Diff.Add_solved_work
+            ( proof_bundle.statements
+            , { proof = proof_bundle.proofs
+              ; fee = { fee = proof_bundle.fee; prover = proof_bundle.prover }
+              } )
+        in
+        match%map Mina_lib.add_work_graphql mina solved_work with
+        | Ok
+            ( `Broadcasted
+            , Network_pool.Snark_pool.Resource_pool.Diff.Add_solved_work _
+            , _ ) ->
+            Ok "Accepted"
+        | Error err ->
+            Error (Error.to_string_hum err)
+        | Ok _ ->
+            Error
+              "Internal error: Transaction proofs could not be added to the \
+               pool" )
+
   let export_logs =
     io_field "exportLogs" ~doc:"Export daemon logs to tar archive"
       ~args:Arg.[ arg "basename" ~typ:string ]
@@ -1002,6 +1037,7 @@ module Mutations = struct
     ; archive_precomputed_block
     ; archive_extensional_block
     ; send_rosetta_transaction
+    ; add_snark_work
     ]
 
   module Itn = struct
@@ -2107,8 +2143,8 @@ module Queries = struct
           [ arg "maxLength"
               ~doc:
                 "The maximum number of blocks to return. If there are more \
-                 blocks in the transition frontier from root to tip, the n \
-                 blocks closest to the best tip will be returned"
+                 blocks in the transition frontier from root to tip, the \
+                 maxLength blocks closest to the best tip will be returned"
               ~typ:int
           ]
       ~resolve:(fun { ctx = mina; _ } () max_length ->
@@ -2122,6 +2158,103 @@ module Queries = struct
         | None ->
             return
             @@ Error "Could not obtain best chain from transition frontier" )
+
+  let account_actions =
+    field "accountActions"
+      ~doc:
+        "Find all the actions associated to an account from the current best \
+         tip."
+      ~typ:(non_null @@ list @@ non_null Types.Action_state.spec)
+      ~args:
+        Arg.
+          [ arg "publicKey" ~doc:"Public key of account being retrieved"
+              ~typ:(non_null Types.Input.PublicKey.arg_typ)
+          ; arg' "token"
+              ~doc:"Token of account being retrieved (defaults to MINA)"
+              ~typ:Types.Input.TokenId.arg_typ ~default:Token_id.default
+          ; arg "maxLength"
+              ~doc:
+                "The maximum number of blocks to search for actions. If there \
+                 are more blocks in the transition frontier from root to tip, \
+                 the maxLength blocks closest to the best tip will be returned"
+              ~typ:int
+          ]
+      ~resolve:(fun { ctx = mina; _ } () pk token max_length ->
+        let best_chain = Mina_lib.best_chain ?max_length mina in
+        match best_chain with
+        | Some best_chain ->
+            let actions =
+              List.concat_map
+                ~f:(fun bc ->
+                  let user_cmds =
+                    bc |> Transition_frontier.Breadcrumb.block
+                    |> Mina_block.body
+                    |> Staged_ledger_diff.Body.staged_ledger_diff
+                    |> Staged_ledger_diff.commands
+                  in
+                  let block_number =
+                    bc |> Transition_frontier.Breadcrumb.block
+                    |> Mina_block.header |> Mina_block.Header.blockchain_length
+                  in
+                  let transaction_seq = ref 0 in
+                  let action_list_list =
+                    List.filter_map user_cmds ~f:(fun user_cmd ->
+                        transaction_seq := !transaction_seq + 1 ;
+                        match user_cmd.data with
+                        | Zkapp_command c
+                          when Transaction_status.Stable.V2.(
+                                 equal user_cmd.status Applied) -> (
+                            let actions =
+                              c |> Zkapp_command.account_updates
+                              |> Zkapp_command.Call_forest.fold ~init:(0, [])
+                                   ~f:(fun acc au ->
+                                     let action_seq, acc = acc in
+                                     let account_id =
+                                       Account_id.create au.body.public_key
+                                         token
+                                     in
+                                     if
+                                       Account_id.equal account_id
+                                         (Account_id.create pk token)
+                                     then
+                                       let action_body = au.body.actions in
+                                       let field_elems =
+                                         List.map
+                                           ~f:(fun e -> Array.to_list e)
+                                           action_body
+                                       in
+                                       let action_seq = action_seq + 1 in
+                                       match field_elems with
+                                       | [] ->
+                                           (action_seq, acc)
+                                       | field_elems ->
+                                           let action_state =
+                                             { Types.Action_state.action =
+                                                 field_elems
+                                             ; action_sequence_no = action_seq
+                                             ; transaction_sequence_no =
+                                                 !transaction_seq
+                                             ; block_number
+                                             }
+                                           in
+                                           (action_seq, action_state :: acc)
+                                     else (action_seq, acc) )
+                            in
+                            let _, actions = actions in
+                            match actions with
+                            | [] ->
+                                None
+                            | actions ->
+                                Some actions )
+                        | Signed_command _ | Zkapp_command _ ->
+                            None )
+                  in
+                  action_list_list |> List.concat )
+                best_chain
+            in
+            actions
+        | None ->
+            [] )
 
   let block =
     result_field2 "block"
@@ -2209,8 +2342,54 @@ module Queries = struct
           Mina_lib.(
             Option.map (snark_worker_key mina) ~f:(fun _ -> snark_work_fee mina))
         in
-        let (module S) = Mina_lib.work_selection_method mina in
-        S.pending_work_statements ~snark_pool ~fee_opt snark_job_state )
+        Work_selector.pending_work_statements ~snark_pool ~fee_opt
+          snark_job_state )
+
+  let snark_work_range =
+    field "snarkWorkRange"
+      ~doc:
+        "Find any sequence of snark work between two indexes in all available \
+         snark work. Returns both completed and uncompleted work."
+      ~args:
+        Arg.
+          [ arg "startingIndex"
+              ~doc:"The first index to be taken from all available snark work"
+              ~typ:(non_null Types.Input.UInt32.arg_typ)
+          ; arg "endingIndex"
+              ~doc:
+                "The last index to be taken from all available snark work \
+                 (exclusive). If not specified or greater than the available \
+                 snark work list,all elements from index [startingIndex] will \
+                 be returned. An empty list will be returned if startingIndex \
+                 is not a valid index or if startingIndex >= endingIndex."
+              ~typ:Types.Input.UInt32.arg_typ
+          ]
+      ~typ:(non_null @@ list @@ non_null Types.pending_work_spec)
+      ~resolve:(fun { ctx = mina; _ } () start_idx end_idx ->
+        let snark_job_state = Mina_lib.snark_job_state mina in
+        let snark_pool = Mina_lib.snark_pool mina in
+        let all_work = Work_selector.all_work ~snark_pool snark_job_state in
+        let work_size = all_work |> List.length |> Unsigned.UInt32.of_int in
+        let less_than uint1 uint2 = Unsigned.UInt32.compare uint1 uint2 < 0 in
+        let to_bundle_specs =
+          List.map ~f:(fun (spec, fee_prover) ->
+              { Types.Snark_work_bundle.spec; fee_prover } )
+        in
+        match end_idx with
+        | None when less_than start_idx work_size ->
+            (* drop handles case when start_idx is greater than pending work and is O(start_idx)*)
+            let start = Unsigned.UInt32.to_int start_idx in
+            List.drop all_work start |> to_bundle_specs
+        | Some end_idx
+          when less_than start_idx end_idx && less_than start_idx work_size ->
+            let pos = Unsigned.UInt32.to_int start_idx in
+            let len =
+              Unsigned.UInt32.(
+                min (sub end_idx start_idx) (sub work_size start_idx) |> to_int)
+            in
+            List.sub ~pos ~len all_work |> to_bundle_specs
+        | _ ->
+            [] )
 
   module SnarkedLedgerMembership = struct
     let resolve_membership :
@@ -2659,7 +2838,7 @@ module Queries = struct
       ~args:Arg.[]
       ~resolve:(fun { ctx = mina; _ } () ->
         let open Deferred.Result.Let_syntax in
-        Mina_lib.verifier mina |> Verifier.get_blockchain_verification_key
+        Mina_lib.prover mina |> Prover.get_blockchain_verification_key
         |> Deferred.Result.map_error ~f:Error.to_string_hum
         >>| Pickles.Verification_key.to_yojson >>| Yojson.Safe.to_basic )
 
@@ -2780,6 +2959,7 @@ module Queries = struct
     ; trust_status_all
     ; snark_pool
     ; pending_snark_work
+    ; snark_work_range
     ; SnarkedLedgerMembership.snarked_ledger_account_membership
     ; SnarkedLedgerMembership.encoded_snarked_ledger_account_membership
     ; genesis_constants
@@ -2794,6 +2974,7 @@ module Queries = struct
     ; network_id
     ; signature_kind
     ; protocol_state
+    ; account_actions
     ]
 
   module Itn = struct

@@ -75,15 +75,21 @@ macro_rules! impl_projective {
                 proj.into()
             }
 
+            // improper_ctypes_definitions is allowed here because the CamlBase/ScalarField struct
+            // already has #[repr(C)] in its definition
+            #[allow(improper_ctypes_definitions)]
             #[wasm_bindgen]
             pub extern "C" fn [<caml_ $name:snake _endo_base>]() -> $CamlBaseField {
-                let (endo_q, _endo_r) = poly_commitment::srs::endos::<GAffine>();
+                let (endo_q, _endo_r) = poly_commitment::ipa::endos::<GAffine>();
                 endo_q.into()
             }
 
+            // improper_ctypes_definitions is allowed here because the CamlBase/ScalarField struct
+            // already has #[repr(C)] in its definition
+            #[allow(improper_ctypes_definitions)]
             #[wasm_bindgen]
             pub extern "C" fn [<caml_ $name:snake _endo_scalar>]() -> $CamlScalarField {
-                let (_endo_q, endo_r) = poly_commitment::srs::endos::<GAffine>();
+                let (_endo_q, endo_r) = poly_commitment::ipa::endos::<GAffine>();
                 endo_r.into()
             }
 

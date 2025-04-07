@@ -90,6 +90,11 @@ let minimalDirtyWhen =
       , S.exactly "buildkite/src/Constants/ContainerImages" "dhall"
       , S.exactly "buildkite/src/Command/HardforkPackageGeneration" "dhall"
       , S.exactly "buildkite/src/Command/MinaArtifact" "dhall"
+      , S.exactly "buildkite/src/Command/PatchArchiveTest" "dhall"
+      , S.exactly "buildkite/src/Command/Bench/Base" "dhall"
+      , S.strictlyStart (S.contains "scripts/benchmarks")
+      , S.strictlyStart (S.contains "buildkite/scripts/bench")
+      , S.exactly "buildkite/src/Command/ReplayerTest" "dhall"
       , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact")
       , S.strictlyStart (S.contains "dockerfiles/stages")
       , S.exactly "scripts/debian/build" "sh"
@@ -99,19 +104,18 @@ let minimalDirtyWhen =
       , S.exactly "buildkite/scripts/build-artifact" "sh"
       , S.exactly "buildkite/scripts/build-hardfork-package" "sh"
       , S.exactly "buildkite/scripts/check-compatibility" "sh"
-      , S.exactly "buildkite/src/Jobs/Test/RunSnarkProfiler" "dhall"
-      , S.exactly "buildkite/scripts/run-snark-transaction-profiler" "sh"
-      , S.exactly "scripts/snark_transaction_profiler" "py"
       , S.exactly "buildkite/scripts/version-linter" "sh"
       , S.exactly "scripts/version-linter" "py"
+      , S.exactly
+          "buildkite/scripts/version-linter-patch-missing-type-shapes"
+          "sh"
       ]
 
 let bullseyeDirtyWhen =
         [ S.strictlyStart (S.contains "src")
         , S.strictlyStart (S.contains "automation")
         , S.strictly (S.contains "Makefile")
-        , S.exactly "buildkite/scripts/connect-to-berkeley" "sh"
-        , S.exactly "buildkite/scripts/connect-to-mainnet-on-compatible" "sh"
+        , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
         , S.exactly "buildkite/scripts/rosetta-integration-tests" "sh"
         , S.exactly "buildkite/scripts/rosetta-integration-tests-full" "sh"
         , S.exactly "buildkite/scripts/rosetta-integration-tests-fast" "sh"

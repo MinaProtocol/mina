@@ -2,9 +2,6 @@ open Core_kernel
 open Async_kernel
 open Network_peer
 
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
-
 module Id = Unique_id.Int ()
 
 type ('init, 'result) elt =
@@ -45,7 +42,7 @@ type ('init, 'partially_validated, 'result) t =
   }
 [@@deriving sexp]
 
-let create ?(how_to_add = `Enqueue_back) ?logger ?compare_init
+let create ?(how_to_add = `Enqueue_back) ~logger ?compare_init
     ?(weight = fun _ -> 1) ?max_weight_per_call verifier =
   { state = Waiting
   ; queue = Q.create ()
@@ -54,7 +51,7 @@ let create ?(how_to_add = `Enqueue_back) ?logger ?compare_init
   ; verifier
   ; weight
   ; max_weight_per_call
-  ; logger = Option.value logger ~default:(Logger.create ())
+  ; logger
   }
 
 let call_verifier t (ps : 'proof list) = t.verifier ps
@@ -78,7 +75,7 @@ let rec determine_outcome :
       (* First separate out all the known results. That information will definitely be included
          in the outcome.
       *)
-      let logger = Logger.create () in
+      let logger = v.logger in
       let potentially_invalid =
         List.filter_map (List.zip_exn ps res) ~f:(fun (elt, r) ->
             match r with
@@ -303,8 +300,7 @@ module Transaction_pool = struct
       (Array.to_list
          (Array.map a ~f:(function `Valid c -> Some c | _ -> None)) )
 
-  let create verifier : t =
-    let logger = Logger.create () in
+  let create ~logger verifier : t =
     create ~compare_init:compare_envelope ~logger (fun (ds : input list) ->
         O1trace.thread "dispatching_transaction_pool_batcher_verification"
           (fun () ->
@@ -431,8 +427,7 @@ module Snark_pool = struct
     let open Deferred.Or_error.Let_syntax in
     match%map verify t p with Ok () -> true | Error _ -> false
 
-  let create verifier : t =
-    let logger = Logger.create () in
+  let create ~logger verifier : t =
     create
     (* TODO: Make this a proper config detail once we have data on what a
            good default would be.
@@ -498,10 +493,8 @@ module Snark_pool = struct
 
       let verifier =
         Async.Thread_safe.block_on_async_exn (fun () ->
-            Verifier.create ~logger ~proof_level ~constraint_constants
-              ~conf_dir:None
-              ~pids:(Child_processes.Termination.create_pid_table ())
-              ~commit_id:"not specified for unit tests" () )
+            Verifier.For_tests.default ~constraint_constants ~logger
+              ~proof_level () )
 
       let gen_proofs =
         let open Quickcheck.Generator.Let_syntax in
@@ -539,7 +532,7 @@ module Snark_pool = struct
         Envelope.Incoming.gen data_gen
 
       let run_test proof_lists =
-        let batcher = create verifier in
+        let batcher = create ~logger verifier in
         Deferred.List.iter proof_lists ~f:(fun (invalid_proofs, proof_list) ->
             let%map r = verify' batcher proof_list in
             let (`Invalid ps) = Or_error.ok_exn r in

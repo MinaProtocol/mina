@@ -105,9 +105,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Wait_condition.nodes_to_initialize
               (Core.String.Map.data (Network.all_mina_nodes network)) ) )
     in
-    let whale1 =
-      Core.String.Map.find_exn (Network.block_producers network) "whale1"
-    in
+    let whale1 = Network.block_producer_exn network "whale1" in
     let%bind whale1_pk = pub_key_of_node whale1 in
     let%bind whale1_sk = priv_key_of_node whale1 in
     let constraint_constants = Network.constraint_constants network in
@@ -123,9 +121,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~branches:(module Pickles_types.Nat.N1)
         ~max_proofs_verified:(module Pickles_types.Nat.N0)
         ~name:"trivial1"
-        ~constraint_constants:
-          (Genesis_constants.Constraint_constants.to_snark_keys_header
-             constraint_constants )
         ~choices:(fun ~self:_ -> [ Trivial_rule1.rule ])
     in
     let%bind.Async.Deferred vk1 =
@@ -137,9 +132,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~branches:(module Pickles_types.Nat.N1)
         ~max_proofs_verified:(module Pickles_types.Nat.N0)
         ~name:"trivial2"
-        ~constraint_constants:
-          (Genesis_constants.Constraint_constants.to_snark_keys_header
-             constraint_constants )
         ~choices:(fun ~self:_ -> [ Trivial_rule2.rule ])
     in
     let%bind.Async.Deferred vk2 =
