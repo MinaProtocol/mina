@@ -55,7 +55,7 @@ let singleton_properties () =
             [%test_eq:
               Transaction_hash.User_command_with_valid_signature.t Sequence.t]
               dropped' (Sequence.singleton cmd) ;
-            [%test_eq: t] ~equal pool pool''
+            assert (equal pool pool'')
         | _ ->
             failwith "should've succeeded" )
 
@@ -749,7 +749,7 @@ let revalidation_drops_nothing_unless_ledger_changed () =
       [%test_eq:
         Transaction_hash.User_command_with_valid_signature.t Sequence.t] dropped
         Sequence.empty ;
-      [%test_eq: Indexed_pool.t] pool pool' ;
+      assert (Indexed_pool.equal pool pool') ;
       let to_apply = Indexed_pool.transactions ~logger pool in
       let to_apply' = Indexed_pool.transactions ~logger pool' in
       assert_pool_consistency pool ;

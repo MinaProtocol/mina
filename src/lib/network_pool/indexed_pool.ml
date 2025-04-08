@@ -59,7 +59,7 @@ type t =
   ; size : int
   ; config : Config.t
   }
-[@@deriving sexp_of, equal, compare]
+[@@deriving equal, sexp_of]
 
 let config t = t.config
 
