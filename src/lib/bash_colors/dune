@@ -2,6 +2,4 @@
  (name bash_colors)
  (public_name bash_colors)
  (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_version)))
+  (backend bisect_ppx)))
