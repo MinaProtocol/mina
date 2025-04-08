@@ -1,6 +1,7 @@
 open Core_kernel
 open Mina_base
 
+
 [%%versioned:
 module Stable : sig
   [@@@no_toplevel_latest_type]
@@ -68,7 +69,7 @@ module User_command_with_valid_signature : sig
 
   val forget_check : t -> (User_command.t, hash) With_hash.t
 
-  include Comparable.S with type t := t
+  module Set : Mina_stdlib.Generic_set.S with type el := t
 
   val make : User_command.Valid.t -> hash -> t
 end
