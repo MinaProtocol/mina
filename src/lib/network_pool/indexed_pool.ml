@@ -107,15 +107,15 @@ module For_tests = struct
   let all_by_sender { all_by_sender; _ } = all_by_sender
 
   let assert_pool_consistency (pool : t) =
+    let open Transaction_hash.User_command_with_valid_signature in
     let map_to_set (type k w)
         (module Map : Map.S
           with type Key.t = k
            and type Key.comparator_witness = w ) map =
       List.fold_left (Map.data map)
-        ~init:Transaction_hash.User_command_with_valid_signature.Set.empty
+        ~init:Set.empty
         ~f:Set.union
     in
-    let open Transaction_hash.User_command_with_valid_signature in
     let all_by_sender =
       Set.of_list
         (List.bind
@@ -487,15 +487,16 @@ end
 (* Returns a sequence of commands in the pool in descending fee order *)
 let transactions ~logger t =
   let insert_applicable applicable_by_fee txn =
+    let open Transaction_hash.User_command_with_valid_signature in
     let fee =
       User_command.fee_per_wu
-      @@ Transaction_hash.User_command_with_valid_signature.command txn
+      @@ command txn
     in
     Map.update applicable_by_fee fee ~f:(function
       | Some set ->
           Set.add set txn
       | None ->
-          Transaction_hash.User_command_with_valid_signature.Set.singleton txn )
+          Set.singleton txn )
   in
   Sequence.unfold
     ~init:(t.applicable_by_fee, Map.map ~f:fst t.all_by_sender)
@@ -513,9 +514,10 @@ let transactions ~logger t =
           else Map.set applicable_by_fee ~key:fee ~data:set'
         in
         let applicable_by_fee'', all_by_sender' =
+          let open Transaction_hash.User_command_with_valid_signature in
           let sender =
             User_command.fee_payer
-            @@ Transaction_hash.User_command_with_valid_signature.command txn
+            @@ command txn
           in
           let sender_queue = Map.find_exn all_by_sender sender in
           let head_txn, sender_queue' =
@@ -523,10 +525,8 @@ let transactions ~logger t =
           in
           if
             Transaction_hash.equal
-              (Transaction_hash.User_command_with_valid_signature
-               .transaction_hash txn )
-              (Transaction_hash.User_command_with_valid_signature
-               .transaction_hash head_txn )
+              (transaction_hash txn )
+              (transaction_hash head_txn )
           then
             match F_sequence.uncons sender_queue' with
             | Some (next_txn, _) ->
@@ -544,10 +544,10 @@ let transactions ~logger t =
               ~metadata:
                 [ ("sender", Account_id.to_yojson sender)
                 ; ( "head_applicable_by_fee"
-                  , Transaction_hash.User_command_with_valid_signature.to_yojson
+                  , to_yojson
                       txn )
                 ; ( "head_sender_queue"
-                  , Transaction_hash.User_command_with_valid_signature.to_yojson
+                  , to_yojson
                       head_txn )
                 ] ;
             (applicable_by_fee', Map.remove all_by_sender sender) )

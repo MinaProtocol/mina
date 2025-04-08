@@ -193,18 +193,7 @@ module User_command_with_valid_signature = struct
   let forget_check ({ data; hash } : t) =
     { With_hash.data = User_command.forget_check data; hash }
 
-  include Comparable.Make (struct
-    type nonrec t = t
-
-    let sexp_of_t = sexp_of_t
-
-    let t_of_sexp = t_of_sexp
-
-    (* Compare only on hashes, comparing on the data too would be slower and
-       add no value.
-    *)
-    let compare (x : t) (y : t) = T.compare x.hash y.hash
-  end)
+  module Set = With_hash.Set (T) (User_command.Valid)
 
   let make data hash : t = { data; hash }
 end
