@@ -24,7 +24,7 @@ module Sender_local_state : sig
 end
 
 (** Transaction pool. This is a purely functional data structure. *)
-type t [@@deriving equal, compare, sexp_of]
+type t [@@deriving equal, sexp_of]
 
 val config : t -> Config.t
 
