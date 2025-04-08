@@ -3,7 +3,7 @@
  (public_name mina_stdlib)
  (inline_tests
   (flags -verbose -show-counts))
- (modules_without_implementation sigs)
+ (modules_without_implementation generic_set sigs)
  (flags
   (:standard -w a -warn-error +a)
   -open
