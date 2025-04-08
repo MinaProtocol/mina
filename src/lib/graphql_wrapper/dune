@@ -3,6 +3,4 @@
  (public_name graphql_wrapper)
  (libraries graphql graphql-async graphql_parser)
  (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_deriving.show ppx_deriving_yojson ppx_version)))
+  (backend bisect_ppx)))
