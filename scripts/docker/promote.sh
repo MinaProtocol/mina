@@ -35,6 +35,11 @@ if [[ -z "$NAME" ]]; then usage "Name is not set!"; fi;
 if [[ -z "$VERSION" ]]; then usage "Version is not set!"; fi;
 if [[ -z "$TAG" ]]; then usage "Tag is not set!"; fi;
 
+# Validate Docker tag format
+if ! [[ "$TAG" =~ ^[a-zA-Z0-9._-]{1,128}$ ]]; then
+  usage "Tag '$TAG' is not in a valid Docker tag format!";
+fi;
+
 echo "📎 Adding new tag ($TAG) for docker ${GCR_REPO}/${NAME}:${VERSION}"
 echo "   📥 pulling ${GCR_REPO}/${NAME}:${VERSION}"
 
