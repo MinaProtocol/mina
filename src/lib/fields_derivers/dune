@@ -1,7 +1,7 @@
 (library
  (name fields_derivers)
  (public_name fields_derivers)
- (libraries core_kernel ppx_inline_test.config fieldslib sexplib0 base.caml)
+ (libraries core_kernel ppx_inline_test.config fieldslib)
  (instrumentation
   (backend bisect_ppx))
  (inline_tests
