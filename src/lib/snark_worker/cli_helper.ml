@@ -1,6 +1,9 @@
 open Core
 open Async
 open Inputs
+open Snark_work_lib
+
+let command_name = "snark-worker"
 
 module Time_span_with_json = struct
   type t = Time.Span.t
@@ -58,39 +61,8 @@ type Structured_log_events.t +=
            $proof_zkapp_command_count proof zkapp_command"
       }]
 
-module Work = struct
-  open Snark_work_lib
-
-  module Single = struct
-    module Spec = struct
-      type t =
-        (Transaction_witness.Stable.Latest.t, Ledger_proof.t) Work.Single.Spec.t
-      [@@deriving sexp, yojson]
-
-      let transaction t =
-        Option.map (Work.Single.Spec.witness t) ~f:(fun w ->
-            w.Transaction_witness.Stable.Latest.transaction )
-
-      let statement = Work.Single.Spec.statement
-    end
-  end
-
-  module Spec = struct
-    type t = Single.Spec.t Work.Spec.t [@@deriving sexp, yojson]
-
-    let instances = Work.Spec.instances
-  end
-
-  module Result = struct
-    type t = (Spec.t, Ledger_proof.t) Work.Result.t
-
-    let transactions (t : t) =
-      One_or_two.map t.spec.instances ~f:(fun i -> Single.Spec.transaction i)
-  end
-end
-
 let perform (s : Worker_state.t) public_key
-    ({ instances; fee } as spec : Work.Spec.t) =
+    ({ instances; fee } as spec : Concrete_work.Spec.t) =
   One_or_two.Deferred_result.map instances ~f:(fun w ->
       let open Deferred.Or_error.Let_syntax in
       let%map proof, time =
@@ -218,10 +190,8 @@ let emit_proof_metrics metrics instances logger =
                ; proof_zkapp_command_count
                } ) )
 
-let main
-    (module Rpcs_versioned : Intf.Rpcs_versioned_S
-      with type Work.ledger_proof = Inputs.Ledger_proof.t ) ~logger ~proof_level
-    ~constraint_constants daemon_address shutdown_on_disconnect =
+let main ~logger ~proof_level ~constraint_constants daemon_address
+    shutdown_on_disconnect =
   let%bind state = Worker_state.create ~constraint_constants ~proof_level () in
   let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
   (* retry interval with jitter *)
@@ -306,7 +276,7 @@ let main
             log_and_retry "performing work" e (retry_pause 10.) go
         | Ok result ->
             emit_proof_metrics result.metrics
-              (Work.Result.transactions result)
+              (Concrete_work.Result.transactions result)
               logger ;
             [%log info] "Submitted completed SNARK work $work_ids to $address"
               ~metadata:
@@ -332,9 +302,7 @@ let main
   go ()
 
 let command_from_rpcs ~commit_id ~proof_level:default_proof_level
-    ~constraint_constants
-    (module Rpcs_versioned : Intf.Rpcs_versioned_S
-      with type Work.ledger_proof = Inputs.Ledger_proof.t ) =
+    ~constraint_constants =
   Command.async ~summary:"Snark worker"
     (let open Command.Let_syntax in
     let%map_open daemon_port =
@@ -371,9 +339,7 @@ let command_from_rpcs ~commit_id ~proof_level:default_proof_level
           [%log info]
             !"Received signal to terminate. Aborting snark worker process" ;
           Core.exit 0 ) ;
-      main
-        (module Rpcs_versioned)
-        ~logger ~proof_level ~constraint_constants daemon_port
+      main ~logger ~proof_level ~constraint_constants daemon_port
         (Option.value ~default:true shutdown_on_disconnect))
 
 let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect =

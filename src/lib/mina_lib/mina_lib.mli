@@ -111,7 +111,7 @@ val request_work : t -> Work_selector.work Snark_work_lib.Work.Spec.t option
 
 val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 
-val add_work : t -> Snark_worker.Work.Result.t -> unit
+val add_work : t -> Snark_worker.Concrete_work.Result.t -> unit
 
 val add_work_graphql :
      t
