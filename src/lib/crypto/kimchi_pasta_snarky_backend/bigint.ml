@@ -67,11 +67,15 @@ module Make
   let sexp_of_t t = to_hex_string t |> Sexp.of_string
 
   let of_hex_string ?(reverse = true) s =
-    assert (Char.equal s.[0] '0' && Char.equal s.[1] 'x') ;
-    let s = String.drop_prefix s 2 in
-    Option.try_with (fun () -> Hex.decode ~init:Bytes.init ~reverse s)
-    |> Option.value_exn ~here:[%here]
-    |> of_bytes
+    (* newer PCBs serialize Authorization_kind.Proof as hex string *)
+    if Char.equal s.[0] '0' && Char.equal s.[1] 'x' then
+      let s = String.drop_prefix s 2 in
+      Option.try_with (fun () -> Hex.decode ~init:Bytes.init ~reverse s)
+      |> Option.value_exn ~here:[%here]
+      |> of_bytes
+    else
+      (* older PCBs serialize Authorization_kind.Proof as decimal string *)
+      of_decimal_string s
 
   let%test_unit "hex test" =
     let bytes =
