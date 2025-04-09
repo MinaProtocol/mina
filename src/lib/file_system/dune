@@ -2,7 +2,7 @@
  (name file_system)
  (public_name file_system)
  (library_flags -linkall)
- (libraries core_kernel async_kernel core async async_unix base.caml)
+ (libraries core async async_unix)
  (preprocess
   (pps ppx_version ppx_jane))
  (instrumentation

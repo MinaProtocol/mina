@@ -20,7 +20,7 @@ BASE_PATH=""
 CHANGELOG_FILE=""
 # List of users who can bypass the changelog check by commenting !ci-bypass-changelog
 # separated by space
-GITHUB_USERS_ELIGIBLE_FOR_BYPASS="amc-ie mrmr1993 deepthiskumar Trivo25 45930 SanabriaRusso nicc georgeee"
+GITHUB_USERS_ELIGIBLE_FOR_BYPASS="amc-ie mrmr1993 deepthiskumar Trivo25 45930 SanabriaRusso nicc georgeee dannywillems"
 
 BYPASS_PHRASE="!ci-bypass-changelog"
 
