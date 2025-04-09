@@ -22,6 +22,12 @@ function cleanup () {
 DOCKET_NETWORK=emergency_hf
 docker network create $DOCKET_NETWORK || true
 
+if docker ps -a | grep -q replayer-postgres; then
+    echo "Container already exists, killing it"
+    docker kill replayer-postgres
+    docker rm replayer-postgres
+fi
+
 # -v mounts dir with Unix socket on host
 echo "Starting docker with Postgresql"
 docker run \
