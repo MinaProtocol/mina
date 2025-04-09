@@ -1,4 +1,4 @@
-module Prod = Prod
+module Inputs = Inputs
 
 module Intf : module type of Intf
 

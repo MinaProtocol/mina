@@ -1,6 +1,5 @@
-module Prod = Prod
 module Intf = Intf
-module Inputs = Prod.Inputs
+module Inputs = Inputs
 
 module Worker = struct
   include Functor.Make (Inputs)
