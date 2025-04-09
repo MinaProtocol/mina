@@ -138,11 +138,8 @@ let dockerTag =
       ->  \(profile : Profiles.Type)
       ->  \(network : Network.Type)
       ->  \(remove_profile_from_name : Bool)
-      ->  
-            let sanitizedVersion = Text/concatSep "-" (Text.split "/" version)
-      
-            let version_and_codename =
-                "${sanitizedVersion}-${DebianVersions.lowerName codename}"
+      ->  let version_and_codename =
+                "${version}-${DebianVersions.lowerName codename}"
 
           let profile_part =
                       if remove_profile_from_name
