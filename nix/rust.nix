@@ -112,7 +112,6 @@ in {
     installPhase = ''
         mkdir -p $out/lib
         cp target/release/libkimchi_stubs.a $out/lib/
-        cp target/release/libkimchi_stubs.so $out/lib/dllkimchi_stubs.so
     '';
     doCheck = false;
   };
