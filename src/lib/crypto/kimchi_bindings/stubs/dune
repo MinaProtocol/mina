@@ -83,7 +83,6 @@
  (action
   (progn
    (copy %{env:KIMCHI_STUBS_STATIC_LIB=n}/lib/libkimchi_stubs.a libkimchi_stubs.a)
-   (copy %{env:KIMCHI_STUBS_STATIC_LIB=n}/lib/dllkimchi_stubs.so dllkimchi_stubs.so)
    )))
 
 ;;
