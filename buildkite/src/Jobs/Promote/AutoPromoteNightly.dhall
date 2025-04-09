@@ -41,10 +41,9 @@ let new_tags =
       ->  \(repo : DebianRepo.Type)
       ->  \(latestGitTag : Text)
       ->  \(todayDate : Text)
-      ->  [ "latest-${branch}-${DebianVersions.lowerName codename}"
-          , "${todayDate}-${branch}-${DebianVersions.lowerName codename}"
-          , "${latestGitTag}.${todayDate}-${branch}-${DebianVersions.lowerName
-                                                        codename}"
+      ->  [ "latest-${branch}"
+          , "${todayDate}-${branch}"
+          , "${latestGitTag}.${todayDate}-${branch}"
           ]
 
 let promotePackages =
