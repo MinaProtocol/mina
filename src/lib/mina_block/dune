@@ -4,14 +4,7 @@
  (libraries
   ;; opam libraries
   integers
-  core_kernel
-  async_kernel
-  bin_prot.shape
-  base.caml
-  sexplib0
   base64
-  result
-  base
   core
   ;; local libraries
   mina_ledger
