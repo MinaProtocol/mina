@@ -3,12 +3,15 @@
 open Core_kernel
 open Async
 open Mina_base
-module Inputs = Snark_worker.Inputs
+module Impl = Snark_worker.Impl.Prod
+
+type single_spec = Snark_worker.Concrete_work.Single.Spec.t
+[@@deriving bin_io_unversioned]
 
 module Worker_state = struct
   module type S = sig
     val perform_single :
-         Sok_message.t * Inputs.single_spec
+         Sok_message.t * single_spec
       -> (Ledger_proof.t * Time.Span.t) Deferred.Or_error.t
   end
 
@@ -22,11 +25,10 @@ module Worker_state = struct
     Deferred.return
       (let module M = struct
          let perform_single (message, single_spec) =
-           let%bind (worker_state : Inputs.Worker_state.t) =
-             Inputs.Worker_state.create ~constraint_constants ~proof_level:Full
-               ()
+           let%bind (worker_state : Impl.Worker_state.t) =
+             Impl.Worker_state.create ~constraint_constants ~proof_level:Full ()
            in
-           Inputs.perform_single worker_state ~message single_spec
+           Impl.perform_single worker_state ~message single_spec
        end in
       (module M : S) )
 
@@ -40,7 +42,7 @@ module Worker = struct
     type 'w functions =
       { perform_single :
           ( 'w
-          , Sok_message.t * Inputs.single_spec
+          , Sok_message.t * single_spec
           , (Ledger_proof.t * Time.Span.t) Or_error.t )
           F.t
       }
@@ -71,8 +73,7 @@ module Worker = struct
         in
         { perform_single =
             f
-              ( [%bin_type_class:
-                  Sok_message.Stable.Latest.t * Inputs.single_spec]
+              ( [%bin_type_class: Sok_message.Stable.Latest.t * single_spec]
               , [%bin_type_class:
                   (Ledger_proof.Stable.Latest.t * Time.Span.t) Or_error.t]
               , perform_single )

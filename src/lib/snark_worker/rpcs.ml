@@ -1,6 +1,5 @@
 open Async
 open Core_kernel
-open Inputs
 open Signature_lib
 open Snark_work_lib
 (* For versioning of the types here, see:

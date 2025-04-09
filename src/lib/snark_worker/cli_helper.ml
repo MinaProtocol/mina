@@ -1,6 +1,5 @@
 open Core
 open Async
-open Inputs
 open Snark_work_lib
 
 let command_name = "snark-worker"
@@ -60,6 +59,9 @@ type Structured_log_events.t +=
            with $zkapp_command_count zkapp_command and \
            $proof_zkapp_command_count proof zkapp_command"
       }]
+
+(* NOTE: could swap with Worker_impl_debug.Impl, untested though *)
+include Worker_impl_prod.Impl
 
 let perform (s : Worker_state.t) public_key
     ({ instances; fee } as spec : Concrete_work.Spec.t) =
