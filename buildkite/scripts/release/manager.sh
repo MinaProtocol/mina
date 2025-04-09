@@ -818,12 +818,12 @@ function promote(){
         promote_help; exit 1;
     fi
 
-    if [[ -z ${__source_channel+x} ]]; then
+    if [[ -z ${__source_channel+x} && $__only_dockers == 0 ]]; then
         echo -e "❌ ${RED} !! Source channel (--source-channel) is required${CLEAR}\n";
         promote_help; exit 1;
     fi
 
-    if [[ -z ${__target_channel+x} ]]; then
+    if [[ -z ${__target_channel+x} && $__only_dockers == 0 ]]; then
         echo -e "❌ ${RED} !! Target channel (--target-channel) is required${CLEAR}\n";
         promote_help; exit 1;
     fi
@@ -832,11 +832,21 @@ function promote(){
     echo " ℹ️   Promotion mina artifacts with following parameters:"
     echo " - Promoting artifacts: $__artifacts"
     echo " - Networks: $__networks"
-    echo " - Source version: $__source_version"
-    echo " - Target version: $__target_version"
     echo " - Promoting codenames: $__codenames"
-    echo " - Source channel: $__source_channel"
-    echo " - Target channel: $__target_channel"
+    if [[ $__only_dockers == 1 ]]; then
+        if [[ -n ${__source_channel+x} ]]; then
+            echo " - Source channel: $__source_channel"
+        fi
+        if [[ -n ${__target_channel+x} ]]; then
+            echo " - Target channel: $__target_channel"
+        fi
+        if [[ -n ${__source_version+x} ]]; then
+            echo " - Source version: $__source_version"
+        fi
+        if [[ -n ${__target_version+x} ]]; then
+            echo " - Target version: $__target_version"
+        fi
+    fi
     echo " - Publish to docker.io: $__publish_to_docker_io"
     echo " - Only dockers: $__only_dockers"
     echo " - Only debians: $__only_debians"
@@ -850,8 +860,9 @@ function promote(){
     fi
 
     if [[ $__source_version == "$__target_version" ]]; then
-        echo "❌ Source version and target version can't be same. Exiting.."
-        exit 1
+        echo " ⚠️  Warning: Source version and target version are the same. 
+    Script will do promotion but it won't have an effect at the end unless you are publishing dockers from gcr.io to docker.io ..."
+        echo ""
     fi
 
     IFS=', '
