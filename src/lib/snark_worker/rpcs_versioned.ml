@@ -20,14 +20,14 @@ module Get_work = struct
       let callee_model_of_query = Fn.id
 
       let response_of_callee_model :
-          Rpcs.Get_work.Master.Callee.response -> response =
+          Rpcs_master.Get_work.Master.Callee.response -> response =
         Fn.id
 
       let caller_model_of_response = Fn.id
     end
 
     include T
-    include Rpcs.Get_work.Register (T)
+    include Rpcs_master.Get_work.Register (T)
   end
 
   module Latest = V2
@@ -57,7 +57,7 @@ module Submit_work = struct
     end
 
     include T
-    include Rpcs.Submit_work.Register (T)
+    include Rpcs_master.Submit_work.Register (T)
   end
 
   module Latest = V2
@@ -87,7 +87,7 @@ module Failed_to_generate_snark = struct
     end
 
     include T
-    include Rpcs.Failed_to_generate_snark.Register (T)
+    include Rpcs_master.Failed_to_generate_snark.Register (T)
   end
 
   module Latest = V2
