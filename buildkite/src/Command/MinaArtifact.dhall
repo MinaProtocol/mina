@@ -61,7 +61,7 @@ let MinaBuildSpec =
           , mode = PipelineMode.Type.PullRequest
           , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
           , channel = DebianChannel.Type.Unstable
-          , debianRepo = DebianRepo.Type.PackagesO1Test
+          , debianRepo = DebianRepo.Type.Unstable
           }
       }
 

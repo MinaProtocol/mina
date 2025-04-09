@@ -6,19 +6,10 @@
  (library_flags -linkall)
  (libraries
   ;; opam libraries
-  result
   async_unix
-  base.base_internalhash_types
-  base
   stdio
-  async_kernel
-  core_kernel
   core
   async
-  sexplib0
-  base.caml
-  bin_prot.shape
-  ppx_inline_test.config
   integers
   ;; local libraries
   bounded_types
@@ -66,7 +57,6 @@
   data_hash_lib
   with_hash
   mina_ledger
-  mina_base.import
   snark_params
   zkapp_command_builder
   ppx_version.runtime
