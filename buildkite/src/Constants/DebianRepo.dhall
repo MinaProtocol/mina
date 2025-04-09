@@ -30,17 +30,6 @@ let bucket =
             }
             repo
 
-let shortName =
-          \(repo : DebianRepo)
-      ->  merge
-            { Local = "local"
-            , PackagesO1Test = "packages"
-            , Unstable = "unstable"
-            , Nightly = "nightly"
-            , Stable = "stable"
-            }
-            repo
-
 let bucket_or_default =
           \(repo : DebianRepo)
       ->  let maybeBucket =
@@ -139,5 +128,4 @@ in  { Type = DebianRepo
     , bucketArg = bucketArg
     , keyId = keyId
     , keyArg = keyArg
-    , shortName = shortName
     }

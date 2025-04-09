@@ -52,7 +52,10 @@ let VerifyPackagesSpec =
           , tags :
                   DebianVersions.DebVersion
               ->  DebianChannel.Type
+              ->  Text
               ->  DebianRepo.Type
+              ->  Text
+              ->  Text
               ->  List Text
           , remove_profile_from_name : Bool
           , published : Bool
@@ -92,7 +95,10 @@ let verifyPackagesToDockerSpecs
                                     verify_packages.tags
                                       codename
                                       verify_packages.channel
+                                      "\\\${BUILDKITE_BRANCH}"
                                       verify_packages.debian_repo
+                                      "\\\${GITTAG}"
+                                      "\\\$(date \"+%Y%m%d\")"
                                 , network = verify_packages.network
                                 , publish = verify_packages.published
                                 , remove_profile_from_name =

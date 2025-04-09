@@ -37,18 +37,19 @@ let TaggedKey = Command.TaggedKey
 let new_tags =
           \(codename : DebianVersions.DebVersion)
       ->  \(channel : DebianChannel.Type)
+      ->  \(branch : Text)
       ->  \(repo : DebianRepo.Type)
-      ->  [ "latest-${DebianChannel.lowerName channel}-${DebianRepo.shortName
-                                                           repo}"
+      ->  \(latestGitTag : Text)
+      ->  \(todayDate : Text)
+      ->  [ "latest-${branch}-${DebianVersions.lowerName codename}"
+          , "${todayDate}-${branch}-${DebianVersions.lowerName codename}"
+          , "${latestGitTag}.${todayDate}-${branch}-${DebianVersions.lowerName
+                                                        codename}"
           ]
 
 let promotePackages =
       PromotePackages.PromotePackagesSpec::{
-      , debians =
-        [ DebianPackage.Type.Daemon
-        , DebianPackage.Type.LogProc
-        , DebianPackage.Type.Archive
-        ]
+      , debians = [] : List DebianPackage.Type
       , dockers = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ]
       , version = "\\\${FROM_VERSION_MANUAL:-\\\${MINA_DEB_VERSION}}"
       , architecture = "amd64"
@@ -67,11 +68,7 @@ let promotePackages =
 let verifyPackages =
       VerifyPackages.VerifyPackagesSpec::{
       , promote_step_name = Some "AutoPromoteNightly"
-      , debians =
-        [ DebianPackage.Type.Daemon
-        , DebianPackage.Type.LogProc
-        , DebianPackage.Type.Archive
-        ]
+      , debians = [] : List DebianPackage.Type
       , dockers = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ]
       , new_debian_version = "\\\$(date \"+%Y%m%d\")"
       , profile = Profiles.Type.Standard

@@ -55,7 +55,10 @@ let promote_artifacts =
                 , new_tags =
                         \(codename : DebianVersions.DebVersion)
                     ->  \(channel : DebianChannel.Type)
+                    ->  \(branch : Text)
                     ->  \(repo : DebianRepo.Type)
+                    ->  \(latestGitTag : Text)
+                    ->  \(todayDate : Text)
                     ->  [ tag ]
                 , remove_profile_from_name = remove_profile_from_name
                 , publish = publish
@@ -105,7 +108,10 @@ let verify_artifacts =
                 , tags =
                         \(codename : DebianVersions.DebVersion)
                     ->  \(channel : DebianChannel.Type)
+                    ->  \(branch : Text)
                     ->  \(repo : DebianRepo.Type)
+                    ->  \(latestGitTag : Text)
+                    ->  \(todayDate : Text)
                     ->  [ tag ]
                 , remove_profile_from_name = remove_profile_from_name
                 , published = publish
