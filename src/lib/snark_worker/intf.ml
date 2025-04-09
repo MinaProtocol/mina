@@ -134,27 +134,6 @@ module type S0 = sig
 
   module Work : Work_S with type ledger_proof := ledger_proof
 
-  module Rpcs : sig
-    module Get_work :
-      Rpc_master
-        with type Master.T.query = unit
-         and type Master.T.response =
-          (Work.Spec.t * Signature_lib.Public_key.Compressed.t) option
-
-    module Submit_work :
-      Rpc_master
-        with type Master.T.query = Work.Result.t
-         and type Master.T.response = unit
-
-    module Failed_to_generate_snark :
-      Rpc_master
-        with type Master.T.query =
-          Bounded_types.Wrapped_error.t
-          * Work.Spec.t
-          * Signature_lib.Public_key.Compressed.t
-         and type Master.T.response = unit
-  end
-
   val command_from_rpcs :
        commit_id:string
     -> proof_level:Genesis_constants.Proof_level.t

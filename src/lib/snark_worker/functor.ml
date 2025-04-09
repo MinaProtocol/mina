@@ -57,10 +57,8 @@ type Structured_log_events.t +=
            $proof_zkapp_command_count proof zkapp_command"
       }]
 
-module Make (Inputs : Intf.Inputs_intf) :
-  Intf.S0 with type ledger_proof := Inputs.Ledger_proof.t = struct
+module Make (Inputs : Intf.Inputs_intf) = struct
   open Inputs
-  module Rpcs = Rpcs.Make (Inputs)
 
   module Work = struct
     open Snark_work_lib
