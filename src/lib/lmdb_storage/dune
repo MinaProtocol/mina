@@ -3,6 +3,7 @@
  (public_name lmdb_storage)
  (libraries
   ;; opam libraries
+  core_kernel
   lmdb
   ;; local libraries
   file_system
