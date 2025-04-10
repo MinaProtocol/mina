@@ -192,8 +192,8 @@ module Snark_worker = struct
       let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary ?env
         ~args:
-          ( "internal" :: Snark_worker.Intf.command_name
-          :: Snark_worker.arguments ~proof_level
+          ( "internal" :: Snark_worker.Cli_helper.command_name
+          :: Snark_worker.Cli_helper.arguments ~proof_level
                ~daemon_address:
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
                ~shutdown_on_disconnect:false )
@@ -876,7 +876,7 @@ let request_work t =
 
 let work_selection_method t = t.config.work_selection_method
 
-let add_work t (work : Snark_worker_lib.Work.Result.t) =
+let add_work t (work : Snark_worker_lib.Concrete_work.Result.t) =
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =

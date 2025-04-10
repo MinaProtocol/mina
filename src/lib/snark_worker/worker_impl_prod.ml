@@ -19,9 +19,7 @@ module Cache = struct
   let find (t : t) statement = Option.map ~f:snd (T.find t statement)
 end
 
-module Inputs = struct
-  module Ledger_proof = Ledger_proof.Prod
-
+module Impl : Worker_impl_intf.Worker_impl = struct
   module Worker_state = struct
     module type S = Transaction_snark.S
 
@@ -49,13 +47,6 @@ module Inputs = struct
     let worker_wait_time = 5.
   end
 
-  (* bin_io is for uptime service SNARK worker *)
-  type single_spec =
-    ( Transaction_witness.Stable.Latest.t
-    , Transaction_snark.Stable.Latest.t )
-    Snark_work_lib.Work.Single.Spec.Stable.Latest.t
-  [@@deriving bin_io_unversioned, sexp]
-
   type zkapp_command_inputs =
     ( Transaction_witness.Zkapp_command_segment_witness.t
     * Transaction_snark.Zkapp_command_segment.Basic.t
@@ -68,7 +59,7 @@ module Inputs = struct
     let open Snark_work_lib in
     let sok_digest = Mina_base.Sok_message.digest message in
     let logger = Logger.create () in
-    fun (single : single_spec) ->
+    fun (single : Concrete_work.Single.Spec.t) ->
       match proof_level with
       | Genesis_constants.Proof_level.Full -> (
           let (module M) = Option.value_exn m in
@@ -86,7 +77,9 @@ module Inputs = struct
                         (* the [@sexp.opaque] in Work.Single.Spec.t means we can't derive yojson,
                            so we use the less-desirable sexp here
                         *)
-                      , `String (Sexp.to_string (sexp_of_single_spec single)) )
+                      , `String
+                          (Sexp.to_string
+                             (Concrete_work.Single.Spec.sexp_of_t single) ) )
                     ] ;
                 Error e
             | Ok res ->

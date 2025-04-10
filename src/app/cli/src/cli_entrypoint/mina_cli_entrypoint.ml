@@ -1686,8 +1686,9 @@ let snark_hashes =
       fun () -> if json then Core.printf "[]\n%!"]
 
 let internal_commands logger ~itn_features =
-  [ ( Snark_worker.Intf.command_name
-    , Snark_worker.command ~proof_level:Genesis_constants.Compiled.proof_level
+  [ ( Snark_worker.Cli_helper.command_name
+    , Snark_worker.Cli_helper.command_from_rpcs
+        ~proof_level:Genesis_constants.Compiled.proof_level
         ~constraint_constants:Genesis_constants.Compiled.constraint_constants
         ~commit_id:Mina_version.commit_id )
   ; ("snark-hashes", snark_hashes)
@@ -1723,6 +1724,7 @@ let internal_commands logger ~itn_features =
         in
         fun () ->
           let open Deferred.Let_syntax in
+          let module Impl = Snark_worker.Impl.Prod in
           let logger = Logger.create () in
           let constraint_constants =
             Genesis_constants.Compiled.constraint_constants
@@ -1736,8 +1738,7 @@ let internal_commands logger ~itn_features =
           with
           | `Ok sexp -> (
               let%bind worker_state =
-                Snark_worker.Prod.Inputs.Worker_state.create ~proof_level
-                  ~constraint_constants ()
+                Impl.Worker_state.create ~proof_level ~constraint_constants ()
               in
               let sok_message =
                 { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
@@ -1751,8 +1752,7 @@ let internal_commands logger ~itn_features =
                   Snark_work_lib.Work.Single.Spec.t] sexp
               in
               match%map
-                Snark_worker.Prod.Inputs.perform_single worker_state
-                  ~message:sok_message spec
+                Impl.perform_single worker_state ~message:sok_message spec
               with
               | Ok _ ->
                   [%log info] "Successfully worked"

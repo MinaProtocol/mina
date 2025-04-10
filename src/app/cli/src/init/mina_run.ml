@@ -368,11 +368,11 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return @@ Itn_logger.log ~process ~timestamp ~message ~metadata () )
     ]
   in
-  let log_snark_work_metrics (work : Snark_worker.Work.Result.t) =
+  let log_snark_work_metrics (work : Snark_worker.Concrete_work.Result.t) =
     Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
     One_or_two.iter
       (One_or_two.zip_exn work.metrics
-         (Snark_worker.Work.Result.transactions work) )
+         (Snark_worker.Concrete_work.Result.transactions work) )
       ~f:(fun ((total, tag), transaction_opt) ->
         ( match tag with
         | `Merge ->
@@ -449,15 +449,19 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             in
             [%log trace]
               ~metadata:
-                [ ("work_spec", Snark_worker.Work.Spec.to_yojson work_wire) ]
+                [ ( "work_spec"
+                  , Snark_worker.Concrete_work.Spec.to_yojson work_wire )
+                ]
               "responding to a Get_work request with some new work" ;
             Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
             (work_wire, key)) )
     ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
-        (fun () (work : Snark_worker.Work.Result.t) ->
+        (fun () (work : Snark_worker.Concrete_work.Result.t) ->
           [%log trace] "received completed work from a snark worker"
             ~metadata:
-              [ ("work_spec", Snark_worker.Work.Spec.to_yojson work.spec) ] ;
+              [ ( "work_spec"
+                , Snark_worker.Concrete_work.Spec.to_yojson work.spec )
+              ] ;
           log_snark_work_metrics work ;
           Deferred.return @@ Mina_lib.add_work mina work )
     ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
@@ -465,7 +469,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           ()
           ((error, _work_spec, _prover_public_key) :
             Error.t
-            * Snark_worker.Work.Spec.t
+            * Snark_worker.Concrete_work.Spec.t
             * Signature_lib.Public_key.Compressed.t )
         ->
           [%str_log error]

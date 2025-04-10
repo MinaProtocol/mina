@@ -5,10 +5,8 @@ open Mina_ledger
 open Network_peer
 
 (* For versioning of the types here, see
-
-   RFC 0012, and
-
-   https://ocaml.janestreet.com/ocaml-core/latest/doc/async_rpc_kernel/Async_rpc_kernel/Versioned_rpc/
+   - RFC 0013: https://github.com/MinaProtocol/mina/blob/develop/rfcs/0013-rpc-versioning.md
+   - https://ocaml.org/p/async_rpc_kernel/v0.14.0/doc/Async_rpc_kernel/Versioned_rpc/index.html
 
    The "master" types are the ones used internally in the code base. Each
    version has coercions between their query and response types and the master
