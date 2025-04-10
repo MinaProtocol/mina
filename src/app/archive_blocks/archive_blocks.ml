@@ -75,8 +75,8 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
               Error (Error.to_string_hum err)
         in
         make_add_block of_yojson
-          (Processor.add_block_aux_extensional ~genesis_constants ~logger ~pool
-             ~delete_older_than:None )
+          (Processor.add_block_aux_extensional ~proof_cache_db
+             ~genesis_constants ~logger ~pool ~delete_older_than:None )
       in
       Deferred.List.iter files ~f:(fun file ->
           In_channel.with_file file ~f:(fun in_channel ->

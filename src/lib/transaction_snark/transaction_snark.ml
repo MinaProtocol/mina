@@ -1127,8 +1127,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           let unhash (h : Stack_frame.Digest.Checked.t)
               (frame :
                 ( Mina_base.Token_id.Stable.V2.t
-                , Mina_base.Zkapp_command.Call_forest.With_hashes.Stable.V1.t
-                )
+                , Mina_base.Zkapp_command.Call_forest.With_hashes.t )
                 Stack_frame.Stable.V1.t
                 V.t ) : t =
             with_label "unhash" (fun () ->
@@ -4041,7 +4040,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             | Some (p, v) ->
                 Pickles.Side_loaded.in_prover (Base.side_loaded 0) v.data ;
                 proved
-                  ~handler:(Base.Zkapp_command_snark.handle_zkapp_proof p)
+                  ~handler:
+                    ( Base.Zkapp_command_snark.handle_zkapp_proof
+                    @@ Proof_cache_tag.read_proof_from_disk p )
                   statement )
       in
       let open Async in
@@ -4149,6 +4150,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       [@@deriving sexp]
     end
 
+    (* This is a disk cache stub *)
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
+    (* This is related to proof cache used in proving, not related to disk cache *)
     let set_proof_cache x = proof_cache := Some x
 
     let create_trivial_snapp ?unique_id () =
@@ -4524,7 +4529,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 s )
       in
       ( `Zkapp_command
-          (Zkapp_command.of_simple
+          (Zkapp_command.of_simple ~proof_cache_db
              { fee_payer; account_updates = other_receivers; memo } )
       , `Sender_account_update sender_account_update
       , `Proof_zkapp_command snapp_zkapp_command
@@ -4652,7 +4657,12 @@ module Make_str (A : Wire_types.Concrete) = struct
             Zkapp_command.Call_forest.of_account_updates account_updates
               ~account_update_depth:(fun (p : Account_update.Simple.t) ->
                 p.body.call_depth )
-            |> Zkapp_command.Call_forest.map ~f:Account_update.of_simple
+            |> Zkapp_command.Call_forest.map
+                 ~f:
+                   (Fn.compose
+                      (Account_update.map_proofs
+                         ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) )
+                      Account_update.of_simple )
             |> Zkapp_command.Call_forest.accumulate_hashes
                  ~hash_account_update:(fun (p : Account_update.t) ->
                    Zkapp_command.Digest.Account_update.create p )
@@ -4793,7 +4803,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             }
         ]
       in
-      ({ fee_payer; memo; account_updates = forest } : Zkapp_command.t)
+      Zkapp_command.map_proofs
+        ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db)
+        { fee_payer; memo; account_updates = forest }
 
     module Update_states_spec = struct
       type t =
@@ -4943,7 +4955,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         @ snapp_zkapp_command @ receivers
       in
       let zkapp_command : Zkapp_command.t =
-        Zkapp_command.of_simple { fee_payer; account_updates; memo }
+        Zkapp_command.of_simple ~proof_cache_db
+          { fee_payer; account_updates; memo }
       in
       zkapp_command
 
@@ -5015,7 +5028,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       let account_updates =
         let sender_account_update = Option.value_exn sender_account_update in
         Zkapp_command.Call_forest.cons
-          (Account_update.of_simple sender_account_update)
+          ( Account_update.of_simple sender_account_update
+          |> Account_update.map_proofs
+               ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) )
           zkapp_command.account_updates
       in
       { zkapp_command with account_updates }
@@ -5199,10 +5214,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; { body = snapp_account_update_data.body; authorization = Proof pi }
         ]
       in
-      let zkapp_command : Zkapp_command.t =
-        Zkapp_command.of_simple { fee_payer; account_updates; memo }
-      in
-      zkapp_command
+      Zkapp_command.of_simple ~proof_cache_db
+        { fee_payer; account_updates; memo }
   end
 end
 

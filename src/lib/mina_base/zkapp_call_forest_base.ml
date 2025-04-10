@@ -592,6 +592,15 @@ module With_hashes = struct
     end
   end]
 
+  let read_all_proofs_from_disk : t -> Stable.Latest.t =
+    map ~f:(Account_update.map_proofs ~f:Proof_cache_tag.read_proof_from_disk)
+
+  let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
+    map
+      ~f:
+        (Account_update.map_proofs
+           ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) )
+
   let empty = Digest.Forest.empty
 
   let hash_account_update p = Digest.Account_update.create p
