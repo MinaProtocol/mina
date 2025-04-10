@@ -88,7 +88,7 @@ module Stable = struct
 end]
 
 type t = (Signed_command.t, Zkapp_command.t) Poly.t
-[@@deriving sexp_of, compare, equal, hash, to_yojson]
+[@@deriving sexp_of, compare, equal, to_yojson]
 
 module Legacy : sig
   type nonrec t = t [@@deriving of_yojson]
