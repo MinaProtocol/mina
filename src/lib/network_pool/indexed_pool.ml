@@ -405,9 +405,8 @@ module Update = struct
         { fee_per_wu : Currency.Fee_rate.t
         ; command : Transaction_hash.User_command_with_valid_signature.t
         }
-  [@@deriving sexp]
 
-  type t = single Writer_result.Tree.t (* [@sexp.opaque] *) [@@deriving sexp]
+  type t = single Writer_result.Tree.t
 
   let to_yojson _ = `String "<update>"
 
