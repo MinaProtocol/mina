@@ -2,6 +2,7 @@ open Async
 open Core_kernel
 open Signature_lib
 open Snark_work_lib
+module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 
 module Get_work = struct
   module Master = struct
@@ -11,12 +12,22 @@ module Get_work = struct
       type query = unit
 
       type response =
-        ( ( Transaction_witness.Stable.Latest.t
-          , Ledger_proof.t )
-          Work.Single.Spec.t
-          Work.Spec.t
-        * Public_key.Compressed.t )
-        option
+        | Regular of
+            { work_spec :
+                (* TODO: in RPC master specs we shouldn't use versioned types *)
+                ( Transaction_witness.Stable.Latest.t
+                , Ledger_proof.t )
+                Work.Single.Spec.t
+                Work.Spec.t
+            ; public_key : Public_key.Compressed.t
+            }
+        | Zkapp_command_segment of
+            { id : int
+            ; statement : Transaction_snark.Statement.With_sok.t
+            ; witness : Zkapp_command_segment.Witness.t
+            ; spec : Zkapp_command_segment.Basic.t
+            }
+        | Nothing
     end
 
     module Caller = T

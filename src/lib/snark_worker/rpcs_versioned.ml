@@ -26,10 +26,20 @@ module Get_work = struct
       let callee_model_of_query = Fn.id
 
       let response_of_callee_model :
-          Rpcs_master.Get_work.Master.Callee.response -> response =
-        Fn.id
+          Rpcs_master.Get_work.Master.Callee.response -> response = function
+        | Regular { work_spec; public_key } ->
+            Some (work_spec, public_key)
+        | Nothing ->
+            None
+        | _ ->
+            failwith "TODO: convert Zkapp_command_segment to old spec"
 
-      let caller_model_of_response = Fn.id
+      let caller_model_of_response :
+          response -> Rpcs_master.Get_work.Master.Callee.response = function
+        | None ->
+            Nothing
+        | Some (work_spec, public_key) ->
+            Regular { work_spec; public_key }
     end
 
     include T
