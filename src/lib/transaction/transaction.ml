@@ -26,7 +26,7 @@ module Poly = struct
 end
 
 module Valid = struct
-  type t = User_command.Valid.t Poly.t [@@deriving sexp, equal, yojson]
+  type t = User_command.Valid.t Poly.t [@@deriving sexp, yojson]
 end
 
 [%%versioned
