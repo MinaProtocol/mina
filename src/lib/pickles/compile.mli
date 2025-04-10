@@ -54,7 +54,7 @@ val verify_promise :
   -> (module Nat.Intf with type n = 'n)
   -> (module Statement_value_intf with type t = 'a)
   -> Verification_key.t
-  -> ('a * ('n, 'n) Proof.t) list
+  -> ('a * ('n, 'n) Proof.t_kimchi) list
   -> unit Or_error.t Promise.t
 
 module Prover : sig
@@ -106,7 +106,7 @@ module Side_loaded : sig
       module V2 : sig
         (* TODO: This should really be able to be any width up to the max width... *)
         type t =
-          (Verification_key.Max_width.n, Verification_key.Max_width.n) Proof.t
+          (Verification_key.Max_width.n, Verification_key.Max_width.n) Proof.t_kimchi
         [@@deriving sexp, equal, yojson, hash, compare]
 
         val to_base64 : t -> string
@@ -115,7 +115,7 @@ module Side_loaded : sig
       end
     end]
 
-    val of_proof : _ Proof.t -> t
+    val of_proof : _ Proof.t_kimchi -> t
 
     val to_base64 : t -> string
 
@@ -321,13 +321,16 @@ val compile_with_wrap_main_override_promise :
            , 'ret_var
            , 'ret_value
            , 'auxiliary_var
-           , 'auxiliary_value )
-           H4_6_with_length.T(Inductive_rule.Promise).t )
+           , 'auxiliary_value 
+           , ('max_proofs_verified, 'max_proofs_verified) Proof.t_kimchi
+
+           )
+           H4_7_with_length.T(Inductive_rule.Promise).t )
   -> unit
   -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
      * Cache_handle.t
      * (module Proof_intf
-          with type t = ('max_proofs_verified, 'max_proofs_verified) Proof.t
+          with type t = ('max_proofs_verified, 'max_proofs_verified) Proof.t_kimchi
            and type statement = 'value )
      * ( 'prev_valuess
        , 'widthss
@@ -335,7 +338,7 @@ val compile_with_wrap_main_override_promise :
        , 'a_value
        , ( 'ret_value
          * 'auxiliary_value
-         * ('max_proofs_verified, 'max_proofs_verified) Proof.t )
+         * ('max_proofs_verified, 'max_proofs_verified) Proof.t_kimchi )
          Promise.t )
        H3_2.T(Prover).t
 

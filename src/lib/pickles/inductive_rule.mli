@@ -132,8 +132,10 @@ end) : sig
       (Return_var : Pickles_types.Poly_types.T0)
       (Return_value : Pickles_types.Poly_types.T0)
       (Auxiliary_var : Pickles_types.Poly_types.T0)
-      (Auxiliary_value : Pickles_types.Poly_types.T0) : sig
-    type nonrec ('prev_vars, 'prev_values, 'widths, 'heights, 'proof) t =
+      (Auxiliary_value : Pickles_types.Poly_types.T0) 
+      (Proof : Pickles_types.Poly_types.T0)
+      : sig
+    type nonrec ('prev_vars, 'prev_values, 'widths, 'heights) t =
       ( 'prev_vars
       , 'prev_values
       , 'widths
@@ -144,7 +146,8 @@ end) : sig
       , Return_value.t
       , Auxiliary_var.t
       , Auxiliary_value.t
-      , 'proof )
+      , Proof.t
+      )
       t
   end
 end

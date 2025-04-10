@@ -129,7 +129,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          Lazy.t
       -> (int, 'branches) Pickles_types.Vector.t
       -> (Import.Domains.t, 'branches) Pickles_types.Vector.t Promise.t
-      -> (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
+      -> (module Pickles_types.Nat.Intf with type n = 'max_proofs_verified)
       -> ('max_proofs_verified, 'max_local_max_proofs_verifieds) Requests.Wrap.t
          * (   ( ( Impls.Wrap.Field.t
                  , Wrap_verifier.Challenge.t Kimchi_types.scalar_challenge
@@ -284,18 +284,24 @@ module Make
     (Ret_var : T0)
     (Ret_value : T0)
     (Auxiliary_var : T0)
-    (Auxiliary_value : T0) =
+    (Auxiliary_value : T0)
+    (Max_proofs_verified : Nat.Intf) =
 struct
+  module Proof_type = struct
+    type max_proofs_verified = Max_proofs_verified.n
+    type t = (max_proofs_verified, max_proofs_verified) Proof.t_kimchi
+  end
+
   module IR =
     Inductive_rule.Promise.T (Arg_var) (Arg_value) (Ret_var) (Ret_value)
       (Auxiliary_var)
       (Auxiliary_value)
+      (Proof_type)
   module HIR = H4.T (IR)
 
-  let max_local_max_proofs_verifieds ~self (type n)
-      (module Max_proofs_verified : Nat.Intf with type n = n) branches choices =
+  let max_local_max_proofs_verifieds ~self branches choices =
     let module Local_max_proofs_verifieds = struct
-      type t = (int, Max_proofs_verified.n) Vector.t
+      type t = (int, Proof_type.max_proofs_verified) Vector.t
     end in
     let module M =
       H4.Map (IR) (E04 (Local_max_proofs_verifieds))
@@ -334,8 +340,8 @@ struct
   end
 
   let compile :
-      type var value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
-         self:(var, value, max_proofs_verified, branches) Tag.t
+      type var value prev_varss prev_valuess widthss heightss branches.
+         self:(var, value, Proof_type.max_proofs_verified, branches) Tag.t
       -> cache:Key_cache.Spec.t list
       -> storables:Storables.t
       -> proof_cache:Proof_cache.t option
@@ -344,12 +350,10 @@ struct
            * Cache.Wrap.Key.Verification.t
       -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
       -> ?override_wrap_main:
-           (max_proofs_verified, branches, prev_varss) wrap_main_generic
+           (Proof_type.max_proofs_verified, branches, prev_varss) wrap_main_generic
       -> ?num_chunks:int
       -> branches:branches Nat.t
       -> prev_varss_length:(prev_varss, branches) Length.t
-      -> max_proofs_verified:
-           (module Nat.Add.Intf with type n = max_proofs_verified)
       -> name:string
       -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
       -> public_input:
@@ -369,7 +373,7 @@ struct
          , Arg_value.t
          , ( Ret_value.t
            * Auxiliary_value.t
-           * (max_proofs_verified, max_proofs_verified) Proof.t )
+           * Proof_type.t )
            Promise.t )
          H3_2.T(Prover).t
          * _
@@ -380,7 +384,7 @@ struct
          { step_storable; step_vk_storable; wrap_storable; wrap_vk_storable }
        ~proof_cache ?disk_keys ?override_wrap_domain ?override_wrap_main
        ?(num_chunks = Plonk_checks.num_chunks_by_default) ~branches
-       ~prev_varss_length ~max_proofs_verified ~name ?constraint_constants
+       ~prev_varss_length ~name ?constraint_constants
        ~public_input ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       let constraint_constants : Snark_keys_header.Constraint_constants.t =
@@ -410,17 +414,14 @@ struct
           constraint_system_hash
       }
     in
-    Timer.start __LOC__ ;
-    let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
-                                         with type n = max_proofs_verified )
+    let module Max_proofs_verified_add = ( val (Nat.Add.create Max_proofs_verified.n) : Nat.Add.Intf with type n = Max_proofs_verified.n )
     in
-    let T = Max_proofs_verified.eq in
+    let T = Max_proofs_verified_add.eq in
+
+
+    Timer.start __LOC__ ;
     let padded, (module Maxes) =
-      max_local_max_proofs_verifieds
-        ( module struct
-          include Max_proofs_verified
-        end )
-        prev_varss_length choices ~self:self.id
+      max_local_max_proofs_verifieds prev_varss_length choices ~self:self.id
     in
     let full_signature = { Full_signature.padded; maxes = (module Maxes) } in
     Timer.clock __LOC__ ;
@@ -462,7 +463,7 @@ struct
               (Auxiliary_var)
               (Auxiliary_value)
           in
-          M.f full_signature branches prev_varss_length ~max_proofs_verified
+          M.f full_signature branches prev_varss_length ~max_proofs_verified:(Nat.Add.create Max_proofs_verified.n)
             ~feature_flags ~num_chunks
       | Some override ->
           Common.wrap_domains
@@ -482,7 +483,9 @@ struct
         , 'vars
         , 'vals
         , 'n
-        , 'm )
+        , 'm 
+        , Proof_type.t
+        )
         Step_branch_data.t
     end in
     let proofs_verifieds =
@@ -647,7 +650,7 @@ struct
           let srs = Tick.Keypair.load_urs () in
           Wrap_main.wrap_main ~num_chunks ~feature_flags ~srs full_signature
             prev_varss_length step_vks proofs_verifieds all_step_domains
-            max_proofs_verified
+            (Nat.Add.create Max_proofs_verified.n)
       | Some { wrap_main; tweak_statement = _ } ->
           (* Instead of creating a proof using the pickles wrap circuit, we
              have been asked to create proof in an 'adversarial' way, where
@@ -658,7 +661,7 @@ struct
              testing.
           *)
           wrap_main wrap_domains full_signature prev_varss_length step_vks
-            proofs_verifieds all_step_domains max_proofs_verified
+            proofs_verifieds all_step_domains (module Max_proofs_verified)
     in
     Timer.clock __LOC__ ;
     let (wrap_pk, wrap_vk), disk_key =
@@ -727,10 +730,7 @@ struct
     accum_dirty (Lazy.map wrap_vk ~f:(Promise.map ~f:snd)) ;
     let wrap_vk = Lazy.map wrap_vk ~f:(Promise.map ~f:fst) in
     let module S =
-      Step.Make (Arg_var) (Arg_value)
-        (struct
-          include Max_proofs_verified
-        end)
+      Step.Make (Arg_var) (Arg_value) (struct include Max_proofs_verified_add end)
     in
     let (typ : (var, value) Impls.Step.Typ.t) =
       match public_input with
@@ -752,7 +752,7 @@ struct
           -> Arg_value.t
           -> ( Ret_value.t
              * Auxiliary_value.t
-             * (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t )
+             * Proof_type.t )
              Promise.t =
        fun (T b as branch_data) (step_pk, step_vk) ->
         let _, prev_vars_length = b.proofs_verified in
@@ -841,7 +841,7 @@ struct
              , Arg_value.t
              , ( Ret_value.t
                * Auxiliary_value.t
-               * (max_proofs_verified, max_proofs_verified) Proof.t )
+               * Proof_type.t )
                Promise.t )
              H3_2.T(Prover).t =
        fun bs ks ->
@@ -855,7 +855,7 @@ struct
     in
     Timer.clock __LOC__ ;
     let data : _ Types_map.Compiled.t =
-      { max_proofs_verified
+      { max_proofs_verified = (Nat.Add.create Max_proofs_verified.n)
       ; public_input = typ
       ; wrap_key =
           Lazy.map wrap_vk
@@ -931,7 +931,7 @@ module Side_loaded = struct
   module Proof = struct
     include Proof.Proofs_verified_max
 
-    let of_proof : _ Proof.t -> t = Wrap_hack.pad_proof
+    let of_proof : _ Proof.t_kimchi -> t = Wrap_hack.pad_proof
   end
 
   let verify_promise (type t) ~(typ : (_, t) Impls.Step.Typ.t)
@@ -1018,13 +1018,15 @@ let compile_with_wrap_main_override_promise :
              , ret_var
              , ret_value
              , auxiliary_var
-             , auxiliary_value )
-             H4_6_with_length.T(Inductive_rule.Promise).t )
+             , auxiliary_value 
+             , (max_proofs_verified, max_proofs_verified) Proof.t_kimchi
+             )
+             H4_7_with_length.T(Inductive_rule.Promise).t )
     -> unit
     -> (var, value, max_proofs_verified, branches) Tag.t
        * Cache_handle.t
        * (module Proof_intf
-            with type t = (max_proofs_verified, max_proofs_verified) Proof.t
+            with type t = (max_proofs_verified, max_proofs_verified) Proof.t_kimchi
              and type statement = value )
        * ( prev_valuess
          , widthss
@@ -1032,7 +1034,7 @@ let compile_with_wrap_main_override_promise :
          , a_value
          , ( ret_value
            * auxiliary_value
-           * (max_proofs_verified, max_proofs_verified) Proof.t )
+           * (max_proofs_verified, max_proofs_verified) Proof.t_kimchi )
            Promise.t )
          H3_2.T(Prover).t =
  (* This function is an adapter between the user-facing Pickles.compile API
@@ -1083,9 +1085,13 @@ let compile_with_wrap_main_override_promise :
   let module Auxiliary_value = struct
     type t = auxiliary_value
   end in
+  let module N : Nat.Intf with type n = max_proofs_verified = struct
+    type n = max_proofs_verified
+    let n = failwith "'"
+  end in
   let module M =
     Make (A_var) (A_value) (Ret_var) (Ret_value) (Auxiliary_var)
-      (Auxiliary_value)
+      (Auxiliary_value) (N)
   in
   let rec conv_irs :
       type branches v1ss v2ss wss hss.
@@ -1099,8 +1105,10 @@ let compile_with_wrap_main_override_promise :
          , ret_var
          , ret_value
          , auxiliary_var
-         , auxiliary_value )
-         H4_6_with_length.T(Inductive_rule.Promise).t
+         , auxiliary_value 
+         , M.Proof_type.t
+         )
+         H4_7_with_length.T(Inductive_rule.Promise).t
       -> (v1ss, v2ss, wss, hss) H4.T(M.IR).t = function
     | [] ->
         []
@@ -1109,17 +1117,18 @@ let compile_with_wrap_main_override_promise :
   in
   let choices = choices ~self in
   let branches, prev_varss_length =
-    let module IR_hlist = H4_6_with_length.T (Inductive_rule.Promise) in
+    let module IR_hlist = H4_7_with_length.T (Inductive_rule.Promise) in
     IR_hlist.length choices
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
     M.compile ~self ~proof_cache ~cache ~storables ?disk_keys
       ?override_wrap_domain ?override_wrap_main ?num_chunks ~branches
-      ~prev_varss_length ~max_proofs_verified ~name ~public_input ~auxiliary_typ
+      ~prev_varss_length ~name ~public_input ~auxiliary_typ
       ?constraint_constants ~choices:(conv_irs choices) ()
   in
   let (module Max_proofs_verified) = max_proofs_verified in
   let T = Max_proofs_verified.eq in
+
   let module Value = struct
     type t = value
 

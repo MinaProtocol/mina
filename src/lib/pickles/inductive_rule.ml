@@ -132,9 +132,10 @@ struct
       (Return_var : T0)
       (Return_value : T0)
       (Auxiliary_var : T0)
-      (Auxiliary_value : T0) =
+      (Auxiliary_value : T0) 
+      (Proof : T0) =
   struct
-    type nonrec ('prev_vars, 'prev_values, 'widths, 'heights, 'proof) t =
+    type nonrec ('prev_vars, 'prev_values, 'widths, 'heights) t =
       ( 'prev_vars
       , 'prev_values
       , 'widths
@@ -145,7 +146,8 @@ struct
       , Return_value.t
       , Auxiliary_var.t
       , Auxiliary_value.t
-      , 'proof )
+      , Proof.t 
+      )
       t
   end
 end
