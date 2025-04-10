@@ -32,7 +32,7 @@ module Stable = struct
   end
 end]
 
-type t = (Proof.t, Signature.t) Poly.t [@@deriving sexp_of, to_yojson]
+type t = (Proof_cache_tag.t, Signature.t) Poly.t [@@deriving sexp_of, to_yojson]
 
 (* lazy, to prevent spawning Rust threads at startup, which prevents daemonization *)
 let gen_with_dummies : Stable.Latest.t Quickcheck.Generator.t =

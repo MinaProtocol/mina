@@ -59,9 +59,18 @@ end]
 
 type nonrec t = User_command.t
 
-let proof_to_yojson = Proof.to_yojson
+let proof_cache_db = Proof_cache_tag.create_identity_db ()
 
-let proof_of_yojson = Proof.of_yojson
+let proof_to_yojson proof =
+  Proof_cache_tag.read_proof_from_disk proof |> Proof.to_yojson
+
+let proof_of_yojson json =
+  match Proof.of_yojson json with
+  | Ok proof ->
+      Ppx_deriving_yojson_runtime.Result.Ok
+        (Proof_cache_tag.write_proof_to_disk proof_cache_db proof)
+  | Error e ->
+      Ppx_deriving_yojson_runtime.Result.Error e
 
 let to_yojson = Common.to_yojson ~proof_to_yojson
 

@@ -4065,7 +4065,7 @@ module Block = struct
     in
     return ()
 
-  let add_from_extensional (module Conn : CONNECTION)
+  let add_from_extensional (module Conn : CONNECTION) ~proof_cache_db
       ?(v1_transaction_hash = false) (block : Extensional.Block.t) =
     let open Deferred.Result.Let_syntax in
     let%bind block_id =
@@ -4246,7 +4246,8 @@ module Block = struct
             let%map cmd_id =
               User_command.Zkapp_command.add_if_doesn't_exist
                 (module Conn)
-                (Zkapp_command.of_simple { fee_payer; account_updates; memo })
+                (Zkapp_command.of_simple ~proof_cache_db
+                   { fee_payer; account_updates; memo } )
             in
             (zkapp_cmd, cmd_id) :: acc )
       in
@@ -4697,9 +4698,11 @@ let add_block_aux_precomputed ~proof_cache_db ~constraint_constants ~logger
     ~tokens_used:block.Precomputed.tokens_used block
 
 (* used by `archive_blocks` app *)
-let add_block_aux_extensional ~logger ?retries ~pool ~delete_older_than block =
+let add_block_aux_extensional ~proof_cache_db ~logger ?retries ~pool
+    ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than
-    ~add_block:(Block.add_from_extensional ~v1_transaction_hash:false)
+    ~add_block:
+      (Block.add_from_extensional ~proof_cache_db ~v1_transaction_hash:false)
     ~hash:(fun (block : Extensional.Block.t) -> block.state_hash)
     ~accounts_accessed:block.Extensional.Block.accounts_accessed
     ~accounts_created:block.Extensional.Block.accounts_created
@@ -4944,8 +4947,8 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
       Strict_pipe.Reader.iter extensional_block_reader
         ~f:(fun extensional_block ->
           match%map
-            add_block_aux_extensional ~genesis_constants ~logger ~pool
-              ~delete_older_than extensional_block
+            add_block_aux_extensional ~proof_cache_db ~genesis_constants ~logger
+              ~pool ~delete_older_than extensional_block
           with
           | Error e ->
               [%log warn]

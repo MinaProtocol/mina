@@ -1122,6 +1122,8 @@ let max_account_updates = 2
 
 let max_token_updates = 2
 
+let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
 let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
     ?fee_range ?balance_change_range ?(ignore_sequence_events_precond = false)
     ?(no_token_accounts = false) ?(limited = false)
@@ -1133,7 +1135,8 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
     ?account_state_tbl ~ledger ?protocol_state_view ?vk ?available_public_keys
     ~genesis_constants
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t) () =
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) () :
+    Zkapp_command.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let fee_payer_pk =
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
@@ -1532,8 +1535,8 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
     | None ->
         Signed_command_memo.gen
   in
-  let zkapp_command_dummy_authorizations : Zkapp_command.t =
-    { fee_payer
+  let zkapp_command_dummy_authorizations =
+    { Zkapp_command.Poly.fee_payer
     ; account_updates =
         Zkapp_command.Call_forest.map
           ~f:(Fn.compose map_account_update Account_update.of_simple)
@@ -1586,7 +1589,9 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                 ({ account with receipt_chain_hash }, role) )
       | Control.Poly.None_given ->
           () ) ;
-  zkapp_command_dummy_authorizations
+  Zkapp_command.map_proofs
+    ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db)
+    zkapp_command_dummy_authorizations
 
 let gen_list_of_zkapp_command_from ?global_slot ?failure ?max_account_updates
     ?max_token_updates ~(fee_payer_keypairs : Signature_lib.Keypair.t list)
@@ -1738,7 +1743,7 @@ let gen_max_cost_zkapp_command_from ?memo ?fee_range
         None
     | Some (a, role) ->
         Some ({ a with nonce = Account.Nonce.succ a.nonce }, role) ) ;
-  Zkapp_command.of_simple { fee_payer; account_updates; memo }
+  Zkapp_command.of_simple ~proof_cache_db { fee_payer; account_updates; memo }
 
 let%test_module _ =
   ( module struct
