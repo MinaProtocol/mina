@@ -35,7 +35,7 @@ val set_sender_local_state : t -> Sender_local_state.t -> t
 module rec Update : sig
   val apply : Update.t -> t -> t
 
-  type t [@@deriving to_yojson, sexp]
+  type t [@@deriving to_yojson]
 
   val merge : t -> t -> t
 
