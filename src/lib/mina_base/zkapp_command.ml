@@ -403,7 +403,7 @@ module Verifiable : sig
     , (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option )
     Call_forest.With_hashes_and_data.t
     Poly.t
-  [@@deriving sexp, bin_io]
+  [@@deriving sexp_of, bin_io]
 
   val load_vk_from_ledger :
        location_of_account:(Account_id.t -> 'loc option)
