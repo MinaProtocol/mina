@@ -9,6 +9,7 @@
   ;; local libraries
   logger
   file_system
+  disk_cache.utils
   disk_cache.test_lib)
  (preprocess
   (pps ppx_mina ppx_version ppx_jane))

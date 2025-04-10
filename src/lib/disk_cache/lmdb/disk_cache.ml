@@ -19,7 +19,7 @@ module Make (Data : Binable.S) = struct
   type t = { env : Rw.t; db : Rw.holder; counter : int ref }
 
   let initialize path ~logger =
-    Async.Deferred.Result.map (Utils.initialize_dir path ~logger)
+    Async.Deferred.Result.map (Disk_cache_utils.initialize_dir path ~logger)
       ~f:(fun path ->
         let env, db = Rw.create path in
         { env; db; counter = ref 0 } )

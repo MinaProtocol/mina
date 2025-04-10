@@ -18,3 +18,9 @@ module Stable : sig
 end]
 
 val to_yojson_full : t -> Yojson.Safe.t
+
+module For_tests : sig
+  val blockchain_dummy_tag : Proof_cache_tag.t lazy_t
+
+  val transaction_dummy_tag : Proof_cache_tag.t lazy_t
+end
