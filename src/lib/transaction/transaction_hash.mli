@@ -56,7 +56,7 @@ module User_command_with_valid_signature : sig
   type hash = t [@@deriving sexp, compare, hash, yojson]
 
   type t = private (User_command.Valid.t, hash) With_hash.t
-  [@@deriving equal, hash, sexp, compare, to_yojson]
+  [@@deriving equal, hash, sexp_of, compare, to_yojson]
 
   val create : User_command.Valid.t -> t
 
