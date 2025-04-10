@@ -6,6 +6,8 @@ module type S0 = sig
 
   val empty : t
 
+  val is_empty : t -> bool
+
   val add : t -> el -> t
 
   val union : t -> t -> t
@@ -19,6 +21,12 @@ module type S0 = sig
   val length : t -> int
 
   val singleton : el -> t
+
+  val remove : t -> el -> t
+
+  val min_elt_exn : t -> el
+
+  val to_sequence : t -> el Sequence.t
 end
 
 (** General interface of a Set with one type parameter *)
@@ -28,6 +36,8 @@ module type S1 = sig
   type 'a t
 
   val empty : 'a t
+
+  val is_empty : 'a t -> bool
 
   val add : 'a t -> 'a el -> 'a t
 
@@ -42,4 +52,10 @@ module type S1 = sig
   val length : 'a t -> int
 
   val singleton : 'a el -> 'a t
+
+  val remove : 'a t -> 'a el -> 'a t
+
+  val min_elt_exn : 'a t -> 'a el
+
+  val to_sequence : 'a t -> 'a el Sequence.t
 end
