@@ -13,7 +13,6 @@ module Impl = struct
   module Debug = Worker_impl_debug.Impl
 end
 
-
 (* module contains logic that may be shared across coordinator and worker. This
    is needed for backward compatibility reason. *)
 module Shared = Shared
