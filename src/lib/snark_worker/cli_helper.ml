@@ -233,12 +233,12 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
       !"Snark worker using daemon $addr"
       ~metadata:[ ("addr", `String (Host_and_port.to_string daemon_address)) ] ;
     match%bind
-      dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect ()
+      dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect V3
         daemon_address
     with
     | Error e ->
         log_and_retry "getting work" e (retry_pause 10.) go
-    | Ok None ->
+    | Ok Nothing ->
         let random_delay =
           Worker_state.worker_wait_time
           +. (0.5 *. Random.float Worker_state.worker_wait_time)
@@ -248,7 +248,9 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
           ~metadata:[ ("time", `Float random_delay) ] ;
         let%bind () = wait ~sec:random_delay () in
         go ()
-    | Ok (Some (work, public_key)) -> (
+    | Ok (Zkapp_command_segment _) ->
+        failwith "TODO: implement snark worker logic for zkapp command segment"
+    | Ok (Regular { work_spec; public_key }) -> (
         [%log info]
           "SNARK work $work_ids received from $address. Starting proof \
            generation"
@@ -256,17 +258,19 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
             [ ("address", `String (Host_and_port.to_string daemon_address))
             ; ( "work_ids"
               , Transaction_snark_work.Statement.compact_json
-                  (One_or_two.map (Work.Spec.instances work)
+                  (One_or_two.map
+                     (Work.Spec.instances work_spec)
                      ~f:Work.Single.Spec.statement ) )
             ] ;
         let%bind () = wait () in
         (* Pause to wait for stdout to flush *)
-        match%bind perform state public_key work with
+        match%bind perform state public_key work_spec with
         | Error e ->
             let%bind () =
               match%map
                 dispatch Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
-                  shutdown_on_disconnect (e, work, public_key) daemon_address
+                  shutdown_on_disconnect (e, work_spec, public_key)
+                  daemon_address
               with
               | Error e ->
                   [%log error]
@@ -285,7 +289,8 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
                 [ ("address", `String (Host_and_port.to_string daemon_address))
                 ; ( "work_ids"
                   , Transaction_snark_work.Statement.compact_json
-                      (One_or_two.map (Work.Spec.instances work)
+                      (One_or_two.map
+                         (Work.Spec.instances work_spec)
                          ~f:Work.Single.Spec.statement ) )
                 ] ;
             let rec submit_work () =
