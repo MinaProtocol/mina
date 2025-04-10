@@ -11,7 +11,8 @@ open Common
 (* This contains the "step" prover *)
 
 module Make
-    (A : T0) (A_value : sig
+    (A : T0)
+    (A_value : sig
       type t
     end)
     (Max_proofs_verified : Nat.Add.Intf_transparent) =
@@ -160,7 +161,7 @@ struct
         let zeta = to_field plonk0.zeta in
         let zetaw =
           Tick.Field.(
-            zeta * domain_generator ~log2_size:(Domain.log2_size domain))
+            zeta * domain_generator ~log2_size:(Domain.log2_size domain) )
         in
         let combined_evals =
           Plonk_checks.evals_of_split_evals
@@ -232,11 +233,22 @@ struct
           statement.proof_state.messages_for_next_wrap_proof
             .old_bulletproof_challenges
       in
-      let deferred_values_computed =
-        Wrap_deferred_values.expand_deferred ~evals:t.prev_evals
+      let sponge_input =
+        Wrap_deferred_values.compute_sponge_input ~evals:t.prev_evals
+          ~zk_rows:data.zk_rows
           ~old_bulletproof_challenges:
             statement.messages_for_next_step_proof.old_bulletproof_challenges
-          ~zk_rows:data.zk_rows ~proof_state:statement.proof_state
+          ~proof_state:statement.proof_state
+      in
+      let xi_r_chal = Wrap_deferred_values.compute_xi_r_chal sponge_input in
+      let deferred_values_computed =
+        match sponge_input with
+        | Wrap_deferred_values.Sponge_input sponge_input ->
+            Wrap_deferred_values.expand_deferred ~evals:t.prev_evals
+              ~old_bulletproof_challenges:
+                sponge_input.old_bulletproof_challenges
+              ~zk_rows:sponge_input.zk_rows ~proof_state:statement.proof_state
+              ~xi_r_chal
       in
       let prev_statement_with_hashes :
           ( _
@@ -794,7 +806,7 @@ struct
                { Tick.Proof.Challenge_polynomial.commitment
                ; challenges = Vector.to_array chals
                } )
-           |> to_list) )
+           |> to_list ) )
     in
     let%map.Promise ( (next_proof : Tick.Proof.with_public_evals)
                     , _next_statement_hashed ) =
