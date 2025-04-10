@@ -88,7 +88,7 @@ module Stable = struct
 end]
 
 type t = (Signed_command.t, Zkapp_command.t) Poly.t
-[@@deriving sexp_of, compare, equal, hash, to_yojson]
+[@@deriving sexp_of, compare, equal, to_yojson]
 
 let write_all_proofs_to_disk : Stable.Latest.t -> t = function
   | Signed_command sc ->
