@@ -272,7 +272,8 @@ module Transaction_pool = struct
 
   type partial = partial_item list [@@deriving sexp_of]
 
-  type t = (diff, partial, User_command.Valid.t list) batcher [@@deriving sexp_of]
+  type t = (diff, partial, User_command.Valid.t list) batcher
+  [@@deriving sexp_of]
 
   type input = [ `Init of diff | `Partially_validated of partial ]
 

@@ -782,8 +782,7 @@ let weight (zkapp_command : (_, _, _) with_forest) : int =
     ]
 
 module type Valid_intf = sig
-  type nonrec t = private { zkapp_command : t }
-  [@@deriving sexp, compare, equal, hash, yojson]
+  type nonrec t = private { zkapp_command : t } [@@deriving sexp_of, to_yojson]
 
   val to_valid_unsafe :
     T.t -> [> `If_this_is_used_it_should_have_a_comment_justifying_it of t ]
@@ -805,8 +804,7 @@ module type Valid_intf = sig
 end
 
 module Valid : Valid_intf = struct
-  type t = { zkapp_command : T.t }
-  [@@deriving sexp, compare, equal, hash, yojson]
+  type t = { zkapp_command : T.t } [@@deriving sexp_of, to_yojson]
 
   let create zkapp_command : t = { zkapp_command }
 
