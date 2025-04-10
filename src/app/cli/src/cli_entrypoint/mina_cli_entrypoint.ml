@@ -1686,8 +1686,8 @@ let snark_hashes =
       fun () -> if json then Core.printf "[]\n%!"]
 
 let internal_commands logger ~itn_features =
-  [ ( Snark_worker.Cli_helper.command_name
-    , Snark_worker.Cli_helper.command_from_rpcs
+  [ ( Snark_worker.Entry.command_name
+    , Snark_worker.Entry.command_from_rpcs
         ~proof_level:Genesis_constants.Compiled.proof_level
         ~constraint_constants:Genesis_constants.Compiled.constraint_constants
         ~commit_id:Mina_version.commit_id )

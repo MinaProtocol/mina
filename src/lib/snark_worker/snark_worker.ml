@@ -1,5 +1,5 @@
 (* module interacting with CLIs *)
-module Cli_helper = Cli_helper
+module Entry = Entry
 
 (* module providing versioned RPCs *)
 module Rpcs_versioned = Rpcs_versioned
