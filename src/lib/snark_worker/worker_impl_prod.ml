@@ -140,6 +140,8 @@ module Impl : Worker_impl_intf.Worker_impl = struct
                         Transaction.read_all_proofs_from_disk w.transaction
                       with
                       | Command (Zkapp_command zkapp_command) -> (
+                          (* NOTE: we only go down this path if coordinator is
+                             V2, still this is preserved for compatibility. *)
                           let%bind witnesses_specs_stmts =
                             Shared.extract_zkapp_segment_works
                               (module M)
