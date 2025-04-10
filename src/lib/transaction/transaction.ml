@@ -28,11 +28,10 @@ end
 module Valid = struct
   module T = struct
     type t = User_command.Valid.t Poly.t
-    [@@deriving sexp, compare, equal, hash, yojson]
+    [@@deriving sexp, compare, equal, yojson]
   end
 
   include T
-  include Hashable.Make (T)
   include Comparable.Make (T)
 end
 
