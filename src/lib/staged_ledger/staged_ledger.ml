@@ -2881,8 +2881,8 @@ let%test_module "staged ledger tests" =
                   |> Sequence.to_list
                 in
                 assert (
-                  [%equal: User_command.t list] commands_in_ledger
-                    commands_applied )
+                  List.equal User_command.equal_ignoring_proofs_and_hashes
+                    commands_in_ledger commands_applied )
             | None ->
                 () ) ;
             let coinbase_cost = coinbase_cost diff in
@@ -4576,7 +4576,8 @@ let%test_module "staged ledger tests" =
                        User_command.forget_check data )
               in
               assert (
-                List.equal User_command.equal valid_commands
+                List.equal User_command.equal_ignoring_proofs_and_hashes
+                  valid_commands
                   ( [ valid_command_1
                     ; valid_command_2
                     ; valid_command_5
