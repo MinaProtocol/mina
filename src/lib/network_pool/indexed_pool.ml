@@ -237,10 +237,8 @@ let size : t -> int = fun t -> t.size
 let min_fee : t -> Currency.Fee_rate.t option =
  fun { all_by_fee; _ } -> Option.map ~f:Tuple2.get1 @@ Map.min_elt all_by_fee
 
-let member : t -> Transaction_hash.User_command.t -> bool =
- fun t cmd ->
-  Option.is_some
-    (Map.find t.all_by_hash (Transaction_hash.User_command.hash cmd))
+let member : t -> Transaction_hash.t -> bool =
+ fun t hash -> Option.is_some (Map.find t.all_by_hash hash)
 
 let has_commands_for_fee_payer : t -> Account_id.t -> bool =
  fun t account_id -> Map.mem t.all_by_sender account_id
@@ -835,7 +833,11 @@ let remove_expired t :
   Sequence.fold (expired t) ~init:(Sequence.empty, t) ~f:(fun acc cmd ->
       let dropped_acc, t = acc in
       (*[cmd] would not be in [t] if it depended on an expired transaction already handled*)
-      if member t (Transaction_hash.User_command.of_checked cmd) then
+      if
+        member t
+          (Transaction_hash.User_command_with_valid_signature.transaction_hash
+             cmd )
+      then
         let removed, t' = remove_with_dependents_exn' t cmd in
         (Sequence.append dropped_acc removed, t')
       else acc )
