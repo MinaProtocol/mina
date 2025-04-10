@@ -2871,12 +2871,18 @@ let%test_module "staged ledger tests" =
                 (* There is an edge case where cmds_applied_this_iter = 0, when
                    there is only enough space for coinbase transactions. *)
                 assert (cmds_applied_this_iter <= Sequence.length cmds_this_iter) ;
-                [%test_eq: User_command.t list]
-                  (List.map (Staged_ledger_diff.commands diff)
-                     ~f:(fun { With_status.data; _ } -> data) )
-                  ( Sequence.take cmds_this_iter cmds_applied_this_iter
+                let commands_in_ledger =
+                  List.map (Staged_ledger_diff.commands diff)
+                    ~f:(fun { With_status.data; _ } -> data)
+                in
+                let commands_applied =
+                  Sequence.take cmds_this_iter cmds_applied_this_iter
                   |> Sequence.map ~f:User_command.forget_check
-                  |> Sequence.to_list )
+                  |> Sequence.to_list
+                in
+                assert (
+                  [%equal: User_command.t list] commands_in_ledger
+                    commands_applied )
             | None ->
                 () ) ;
             let coinbase_cost = coinbase_cost diff in
