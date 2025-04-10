@@ -88,7 +88,27 @@ module Stable = struct
 end]
 
 type t = (Signed_command.t, Zkapp_command.t) Poly.t
-[@@deriving sexp, compare, equal, hash, yojson]
+[@@deriving sexp_of, compare, equal, hash, to_yojson]
+
+module Legacy : sig
+  type nonrec t = t [@@deriving of_yojson]
+end = struct
+  type t =
+    ( Signed_command.t
+    , ( Proof.t
+      , Zkapp_command.Digest.Account_update.t
+      , Zkapp_command.Digest.Forest.t )
+      Zkapp_command.with_forest )
+    Poly.t
+
+  let proof_of_yojson = Proof.of_yojson
+
+  let of_yojson =
+    Poly.of_yojson Signed_command.of_yojson
+    @@ Zkapp_command.with_forest_of_yojson proof_of_yojson
+         Zkapp_command.Digest.Account_update.of_yojson
+         Zkapp_command.Digest.Forest.of_yojson
+end
 
 let write_all_proofs_to_disk : Stable.Latest.t -> t = function
   | Signed_command sc ->
