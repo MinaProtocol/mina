@@ -213,13 +213,28 @@ module Failed_to_generate_snark = struct
 
       type response = unit
 
-      let query_of_caller_model = Fn.id
+      let query_of_caller_model :
+          Rpcs_master.Failed_to_generate_snark.query -> query = function
+        | { error; failed_work = Regular { work_spec; public_key } } ->
+            (error, work_spec, public_key)
+        | { failed_work = Zkapp_command_segment _; _ } ->
+            failwith
+              "FATAL: V2 Worker failed on a `Zkapp_command_segment` job where \
+               the coordinator can't aggregate, this shouldn't happen as the \
+               work is issued by the coordinator"
 
-      let callee_model_of_query = Fn.id
+      let callee_model_of_query :
+          query -> Rpcs_master.Failed_to_generate_snark.query =
+       fun (error, work_spec, public_key) ->
+        { error; failed_work = Regular { work_spec; public_key } }
 
-      let response_of_callee_model = Fn.id
+      let response_of_callee_model :
+          Rpcs_master.Failed_to_generate_snark.response -> response =
+        Fn.id
 
-      let caller_model_of_response = Fn.id
+      let caller_model_of_response :
+          response -> Rpcs_master.Failed_to_generate_snark.response =
+        Fn.id
     end
 
     include T
