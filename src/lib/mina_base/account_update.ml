@@ -1687,6 +1687,8 @@ module T = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       (** A account_update to a zkApp transaction *)
       type t = (Body.Stable.V1.t, Control.Stable.V2.t) Poly.Stable.V1.t
@@ -1696,36 +1698,40 @@ module T = struct
     end
   end]
 
-  let of_graphql_repr ({ Poly.body; authorization } : Graphql_repr.t) : t =
+  type t = (Body.t, (Proof_cache_tag.t, Signature.t) Control.Poly.t) Poly.t
+  [@@deriving sexp_of, to_yojson]
+
+  let of_graphql_repr ({ Poly.body; authorization } : Graphql_repr.t) :
+      Stable.Latest.t =
     { authorization; body = Body.of_graphql_repr body }
 
-  let to_graphql_repr ({ body; authorization } : t) ~call_depth : Graphql_repr.t
-      =
+  let to_graphql_repr ({ body; authorization } : Stable.Latest.t) ~call_depth :
+      Graphql_repr.t =
     { authorization; body = Body.to_graphql_repr ~call_depth body }
 
-  let gen : t Quickcheck.Generator.t =
+  let gen : Stable.Latest.t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     let%map body = Body.gen and authorization = Control.gen_with_dummies in
     { Poly.body; authorization }
 
-  let gen_with_events_and_actions : t Quickcheck.Generator.t =
+  let gen_with_events_and_actions : Stable.Latest.t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     let%map body = Body.gen_with_events_and_actions
     and authorization = Control.gen_with_dummies in
     { Poly.body; authorization }
 
-  let quickcheck_generator : t Quickcheck.Generator.t = gen
+  let quickcheck_generator : Stable.Latest.t Quickcheck.Generator.t = gen
 
-  let quickcheck_observer : t Quickcheck.Observer.t =
+  let quickcheck_observer : Stable.Latest.t Quickcheck.Observer.t =
     Quickcheck.Observer.of_hash (module Stable.Latest)
 
   let quickcheck_shrinker : t Quickcheck.Shrinker.t =
     Quickcheck.Shrinker.empty ()
 
-  let of_simple (p : Simple.t) : t =
+  let of_simple (p : Simple.t) : Stable.Latest.t =
     { body = Body.of_simple p.body; authorization = p.authorization }
 
-  let digest ?chain (t : t) = Body.digest ?chain t.body
+  let digest ?chain t = Body.digest ?chain t.Poly.body
 
   module Checked = struct
     type t = Body.Checked.t
@@ -1733,6 +1739,17 @@ module T = struct
     let digest ?chain (t : t) = Body.Checked.digest ?chain t
   end
 end
+
+let map_proofs ~(f : 'p -> 'q) p =
+  let map_auth = function
+    | Control.Poly.Proof p ->
+        Control.Poly.Proof (f p)
+    | Signature s ->
+        Signature s
+    | None_given ->
+        None_given
+  in
+  { Poly.authorization = map_auth p.Poly.authorization; body = p.Poly.body }
 
 module Fee_payer = struct
   [%%versioned
@@ -1780,14 +1797,33 @@ end
 
 include T
 
-let account_id (t : t) : Account_id.t =
+let account_id (t : (Body.t, _) Poly.t) : Account_id.t =
   Account_id.create t.body.public_key t.body.token_id
 
-let verification_key_update_to_option (t : t) :
+let verification_key_update_to_option (t : (Body.t, _) Poly.t) :
     Verification_key_wire.t option Zkapp_basic.Set_or_keep.t =
   Zkapp_basic.Set_or_keep.map ~f:Option.some t.body.update.verification_key
 
-let of_fee_payer ({ body; authorization } : Fee_payer.t) : t =
+let check_authorization (type proof)
+    (p : (Body.t, (proof, Signature.t) Control.Poly.t) Poly.t) : unit Or_error.t
+    =
+  match (p.authorization, p.body.authorization_kind) with
+  | None_given, None_given | Proof _, Proof _ | Signature _, Signature ->
+      Ok ()
+  | _ ->
+      let err =
+        let expected =
+          Authorization_kind.to_control_tag p.body.authorization_kind
+        in
+        let got = Control.tag p.authorization in
+        Error.create "Authorization kind does not match the authorization"
+          [ ("expected", expected); ("got", got) ]
+          [%sexp_of: (string * Control.Tag.t) list]
+      in
+      Error err
+
+let of_fee_payer ({ body; authorization } : Fee_payer.t) :
+    (Body.t, (_, Signature.t) Control.Poly.t) Poly.t =
   { authorization = Signature authorization; body = Body.of_fee_payer body }
 
 (** The change in balance to apply to the target account of this account_update.
@@ -1809,7 +1845,7 @@ let public_key (t : t) : Public_key.Compressed.t = t.body.public_key
 
 let token_id (t : t) : Token_id.t = t.body.token_id
 
-let use_full_commitment (t : t) : bool = t.body.use_full_commitment
+let use_full_commitment t : bool = t.Poly.body.Body.use_full_commitment
 
 let implicit_account_creation_fee (t : t) : bool =
   t.body.implicit_account_creation_fee

@@ -57,7 +57,7 @@ module Transaction_with_witness = struct
     ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
     }
 
-  let write_all_proofs_to_disk
+  let write_all_proofs_to_disk ~proof_cache_db
       { Stable.Latest.transaction_with_info
       ; state_hash
       ; statement
@@ -68,7 +68,7 @@ module Transaction_with_witness = struct
       } =
     { transaction_with_info =
         Mina_transaction_logic.Transaction_applied.write_all_proofs_to_disk
-          transaction_with_info
+          ~proof_cache_db transaction_with_info
     ; state_hash
     ; statement
     ; init_stack
@@ -1496,9 +1496,11 @@ let write_all_proofs_to_disk ~proof_cache_db
   in
   { scan_state =
       Parallel_scan.State.map uncached ~f1
-        ~f2:Transaction_with_witness.write_all_proofs_to_disk
+        ~f2:(Transaction_with_witness.write_all_proofs_to_disk ~proof_cache_db)
   ; previous_incomplete_zkapp_updates =
-      ( List.map ~f:Transaction_with_witness.write_all_proofs_to_disk tx_list
+      ( List.map
+          ~f:(Transaction_with_witness.write_all_proofs_to_disk ~proof_cache_db)
+          tx_list
       , border_status )
   }
 

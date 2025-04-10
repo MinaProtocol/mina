@@ -466,7 +466,9 @@ module Mutations = struct
                       |> Consensus.Data.Consensus_state
                          .global_slot_since_genesis )
                     ~state_view ledger
-                    (Zkapp_command.write_all_proofs_to_disk zkapp_command)
+                    (Zkapp_command.write_all_proofs_to_disk
+                       ~proof_cache_db:(Mina_lib.proof_cache_db mina)
+                       zkapp_command )
                 in
                 (* rearrange data to match result type of `send_zkapp_command` *)
                 let applied_ok =
@@ -1649,7 +1651,8 @@ module Queries = struct
   open Schema
 
   (* helper for pooledUserCommands, pooledZkappCommands *)
-  let get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt =
+  let get_commands ~proof_cache_db ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
+      =
     match (pk_opt, hashes_opt, txns_opt) with
     | None, None, None ->
         Network_pool.Transaction_pool.Resource_pool.get_all resource_pool
@@ -1703,7 +1706,7 @@ module Queries = struct
                           let user_cmd =
                             User_command.Zkapp_command
                               (Zkapp_command.write_all_proofs_to_disk
-                                 zkapp_command )
+                                 ~proof_cache_db zkapp_command )
                           in
                           (* The command gets piped through [forget_check]
                              below; this is just to make the types work
@@ -1755,7 +1758,11 @@ module Queries = struct
         let resource_pool =
           Network_pool.Transaction_pool.resource_pool transaction_pool
         in
-        let cmds = get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt in
+        let cmds =
+          get_commands
+            ~proof_cache_db:(Mina_lib.proof_cache_db mina)
+            ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
+        in
         List.filter_map cmds ~f:(fun txn ->
             let cmd_with_hash =
               Transaction_hash.User_command_with_valid_signature.forget_check
@@ -1791,7 +1798,11 @@ module Queries = struct
         let resource_pool =
           Network_pool.Transaction_pool.resource_pool transaction_pool
         in
-        let cmds = get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt in
+        let cmds =
+          get_commands
+            ~proof_cache_db:(Mina_lib.proof_cache_db mina)
+            ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
+        in
         List.filter_map cmds ~f:(fun txn ->
             let cmd_with_hash =
               Transaction_hash.User_command_with_valid_signature.forget_check

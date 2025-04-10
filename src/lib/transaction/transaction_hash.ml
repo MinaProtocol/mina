@@ -80,9 +80,9 @@ let ( hash_signed_command_v1
         fee_payer = { cmd.fee_payer with authorization = Signature.dummy }
       ; account_updates =
           Zkapp_command.Call_forest.map cmd.account_updates
-            ~f:(fun (acct_update : Account_update.t) ->
+            ~f:(fun acct_update ->
               let dummy_auth =
-                match acct_update.authorization with
+                match acct_update.Account_update.Poly.authorization with
                 | Control.Poly.Proof _ ->
                     Control.Poly.Proof (Lazy.force Proof.transaction_dummy)
                 | Control.Poly.Signature _ ->
