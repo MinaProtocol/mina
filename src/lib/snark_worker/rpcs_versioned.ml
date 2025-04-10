@@ -174,6 +174,38 @@ end]
 
 [%%versioned_rpc
 module Failed_to_generate_snark = struct
+  module V3 = struct
+    module T = struct
+      type query =
+        { error : Bounded_types.Wrapped_error.Stable.V1.t
+        ; failed_work : Failed_work.Stable.V1.t
+        }
+
+      type response = unit
+
+      let query_of_caller_model :
+          Rpcs_master.Failed_to_generate_snark.query -> query = function
+        | { error; failed_work } ->
+            { error; failed_work }
+
+      let callee_model_of_query :
+          query -> Rpcs_master.Failed_to_generate_snark.query = function
+        | { error; failed_work } ->
+            { error; failed_work }
+
+      let response_of_callee_model :
+          Rpcs_master.Failed_to_generate_snark.response -> response =
+        Fn.id
+
+      let caller_model_of_response :
+          response -> Rpcs_master.Failed_to_generate_snark.response =
+        Fn.id
+    end
+
+    include T
+    include Rpcs_master.Failed_to_generate_snark.Register (T)
+  end
+
   module V2 = struct
     module T = struct
       type query =
@@ -211,5 +243,5 @@ module Failed_to_generate_snark = struct
     include Rpcs_master.Failed_to_generate_snark.Register (T)
   end
 
-  module Latest = V2
+  module Latest = V3
 end]

@@ -478,13 +478,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           | Zkapp_command_segment _ ->
               failwith "TODO: implement coordinator submit_work V3 RPC logic" )
     ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
-        (fun
-          ()
-          ((error, _work_spec, _prover_public_key) :
-            Error.t
-            * Snark_worker.Concrete_work.Spec.t
-            * Signature_lib.Public_key.Compressed.t )
-        ->
+        (fun () { error; _ } ->
           [%str_log error]
             (Snark_worker.Generating_snark_work_failed
                { error = Error_json.error_to_yojson error } ) ;

@@ -265,11 +265,12 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
         let%bind () = wait () in
         (* Pause to wait for stdout to flush *)
         match%bind perform state public_key work_spec with
-        | Error e ->
+        | Error error ->
             let%bind () =
               match%map
                 dispatch Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
-                  shutdown_on_disconnect (e, work_spec, public_key)
+                  shutdown_on_disconnect
+                  { error; failed_work = Regular { work_spec; public_key } }
                   daemon_address
               with
               | Error e ->
@@ -279,7 +280,7 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
               | Ok () ->
                   ()
             in
-            log_and_retry "performing work" e (retry_pause 10.) go
+            log_and_retry "performing work" error (retry_pause 10.) go
         | Ok result ->
             emit_proof_metrics result.metrics
               (Concrete_work.Result.transactions result)

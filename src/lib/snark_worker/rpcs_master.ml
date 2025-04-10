@@ -1,5 +1,4 @@
 open Async
-open Core_kernel
 open Rpcs_types
 module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 
@@ -60,7 +59,8 @@ module Failed_to_generate_snark = struct
     let name = "failed_to_generate_snark"
 
     module T = struct
-      type query = { error : Error.t; failed_work : Failed_work.t }
+      type query =
+        { error : Bounded_types.Wrapped_error.t; failed_work : Failed_work.t }
 
       type response = unit
     end
