@@ -158,7 +158,7 @@ module Staged_ledger_error : sig
     | Invalid_public_key of Public_key.Compressed.t
     | ZkApps_exceed_limit of int * int
     | Unexpected of Error.t
-  [@@deriving sexp]
+  [@@deriving sexp_of]
 
   val to_string : t -> string
 
@@ -334,7 +334,7 @@ val of_scan_state_pending_coinbases_and_snarked_ledger_unchecked :
 val all_work_pairs :
      t
   -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-  -> ( Transaction_witness.t
+  -> ( Transaction_witness.Stable.Latest.t
      , Ledger_proof.Cached.t )
      Snark_work_lib.Work.Single.Spec.t
      One_or_two.t
