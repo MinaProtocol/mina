@@ -1,6 +1,12 @@
 open Core_kernel
 open Signature_lib
 
+(* For versioning of the types here, see:
+
+   - RFC 0013: https://github.com/MinaProtocol/mina/blob/develop/rfcs/0013-rpc-versioning.md
+   - https://ocaml.org/p/async_rpc_kernel/v0.14.0/doc/Async_rpc_kernel/Versioned_rpc/index.html
+*)
+
 [%%versioned_rpc
 module Get_work = struct
   module V2 = struct

@@ -2,15 +2,6 @@ open Async
 open Core_kernel
 open Signature_lib
 open Snark_work_lib
-(* For versioning of the types here, see:
-
-   - RFC 0013: https://github.com/MinaProtocol/mina/blob/develop/rfcs/0013-rpc-versioning.md
-   - https://ocaml.org/p/async_rpc_kernel/v0.14.0/doc/Async_rpc_kernel/Versioned_rpc/index.html
-*)
-
-(* for each RPC, return the Master module only, and not the versioned modules, because the functor should not
-   return types with bin_io; the versioned modules are defined in snark_worker.ml
-*)
 
 module Get_work = struct
   module Master = struct
