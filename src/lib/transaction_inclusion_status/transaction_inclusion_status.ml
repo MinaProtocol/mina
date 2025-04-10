@@ -24,7 +24,8 @@ module State = struct
 end
 
 (* TODO: this is extremely expensive as implemented and needs to be replaced with an extension *)
-let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
+let get_status_aux ~find_in_breacrumb ~find_in_pool ~frontier_broadcast_pipe
+    ~transaction_pool =
   let resource_pool = Transaction_pool.resource_pool transaction_pool in
   match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
   | None ->
@@ -38,7 +39,7 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
             breadcrumb |> Transition_frontier.Breadcrumb.validated_transition
             |> Mina_block.Validated.valid_commands
             |> List.exists ~f:(fun { data = cmd'; _ } ->
-                   User_command.equal cmd (User_command.forget_check cmd') )
+                   find_in_breacrumb cmd' )
           in
           if List.exists ~f:in_breadcrumb best_tip_path then
             return State.Included ;
@@ -46,20 +47,34 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
             List.exists ~f:in_breadcrumb
               (Transition_frontier.all_breadcrumbs transition_frontier)
           then return State.Pending ;
-          (*This is to look for commands in the pool which are valid.
-             Membership check requires only the user command and no other
-             aspect of User_command.Valid.t and so no need to check signatures
-             or extract zkApp verification keys.*)
-          let (`If_this_is_used_it_should_have_a_comment_justifying_it
-                checked_cmd ) =
-            User_command.to_valid_unsafe cmd
-          in
-          if
-            Transaction_pool.Resource_pool.member resource_pool
-              (Transaction_hash.User_command_with_valid_signature.create
-                 checked_cmd )
-          then return State.Pending ;
-          State.Unknown )
+          if find_in_pool resource_pool then State.Pending else State.Unknown )
+
+let get_status cmd =
+  get_status_aux
+    ~find_in_breacrumb:(fun cmd' ->
+      User_command.equal cmd (User_command.forget_check cmd') )
+    ~find_in_pool:(fun resource_pool ->
+      (*This is to look for commands in the pool which are valid.
+         Membership check requires only the user command and no other
+         aspect of User_command.Valid.t and so no need to check signatures
+         or extract zkApp verification keys.*)
+      let (`If_this_is_used_it_should_have_a_comment_justifying_it checked_cmd)
+          =
+        User_command.to_valid_unsafe cmd
+      in
+      Transaction_pool.Resource_pool.member resource_pool
+        (Transaction_hash.User_command_with_valid_signature.create checked_cmd)
+      )
+
+let get_status_hash hashed_cmd =
+  get_status_aux
+    ~find_in_breacrumb:(fun cmd' ->
+      Transaction_hash.equal hashed_cmd
+        (Transaction_hash.hash_command (User_command.forget_check cmd')) )
+    ~find_in_pool:(fun resource_pool ->
+      Option.is_some
+      @@ (Network_pool.Transaction_pool.Resource_pool.find_by_hash resource_pool)
+           hashed_cmd )
 
 let%test_module "transaction_status" =
   ( module struct

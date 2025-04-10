@@ -1650,6 +1650,30 @@ end
 module Queries = struct
   open Schema
 
+  let command_of_id id =
+    let open Result.Let_syntax in
+    let%bind cmd =
+      match Signed_command.of_base64 id with
+      | Ok signed_command ->
+          Ok (User_command.Signed_command signed_command)
+      | Error _ -> (
+          match Zkapp_command.of_base64 id with
+          | Ok zkapp_command ->
+              Ok (User_command.Zkapp_command zkapp_command)
+          | Error _ ->
+              (* invalid base64 for a transaction *)
+              Error "Invalid transaction ID provided" )
+    in
+    (* The command gets piped through [forget_check]
+       below; this is just to make the types work
+       without extra unnecessary mapping in the other
+       branches above.
+    *)
+    let (`If_this_is_used_it_should_have_a_comment_justifying_it valid_cmd) =
+      User_command.to_valid_unsafe cmd
+    in
+    Ok (Transaction_hash.User_command_with_valid_signature.create valid_cmd)
+
   (* helper for pooledUserCommands, pooledZkappCommands *)
   let get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt =
     match (pk_opt, hashes_opt, txns_opt) with
@@ -1680,46 +1704,7 @@ module Queries = struct
           *)
           match txns_opt with
           | Some txns ->
-              List.filter_map txns ~f:(fun serialized_txn ->
-                  (* base64 could be a signed command or zkapp command *)
-                  match Signed_command.of_base64 serialized_txn with
-                  | Ok signed_command ->
-                      let user_cmd =
-                        User_command.Signed_command signed_command
-                      in
-                      (* The command gets piped through [forget_check]
-                         below; this is just to make the types work
-                         without extra unnecessary mapping in the other
-                         branches above.
-                      *)
-                      let (`If_this_is_used_it_should_have_a_comment_justifying_it
-                            valid_cmd ) =
-                        User_command.to_valid_unsafe user_cmd
-                      in
-                      Some
-                        (Transaction_hash.User_command_with_valid_signature
-                         .create valid_cmd )
-                  | Error _ -> (
-                      match Zkapp_command.of_base64 serialized_txn with
-                      | Ok zkapp_command ->
-                          let user_cmd =
-                            User_command.Zkapp_command zkapp_command
-                          in
-                          (* The command gets piped through [forget_check]
-                             below; this is just to make the types work
-                             without extra unnecessary mapping in the other
-                             branches above.
-                          *)
-                          let (`If_this_is_used_it_should_have_a_comment_justifying_it
-                                valid_cmd ) =
-                            User_command.to_valid_unsafe user_cmd
-                          in
-                          Some
-                            (Transaction_hash.User_command_with_valid_signature
-                             .create valid_cmd )
-                      | Error _ ->
-                          (* invalid base64 for a transaction *)
-                          None ) )
+              List.filter_map txns ~f:(fun id -> command_of_id id |> Result.ok)
           | None ->
               []
         in
@@ -2012,45 +1997,32 @@ module Queries = struct
       ~typ:(non_null Types.transaction_status)
       ~args:
         Arg.
-          [ arg "payment" ~typ:guid ~doc:"Id of a Payment"
-          ; arg "zkappTransaction" ~typ:guid ~doc:"Id of a zkApp transaction"
+          [ arg "hash" ~typ:guid ~doc:"Hash of a transaction"
+          ; arg "id" ~typ:guid ~doc:"Id of a transaction"
           ]
-      ~resolve:(fun { ctx = mina; _ } () (serialized_payment : string option)
-                    (serialized_zkapp : string option) ->
-        let open Result.Let_syntax in
-        let deserialize_txn serialized_txn =
-          let res =
-            match serialized_txn with
-            | `Signed_command cmd ->
-                Or_error.(
-                  Signed_command.of_base64 cmd
-                  >>| fun c -> User_command.Signed_command c)
-            | `Zkapp_command cmd ->
-                Or_error.(
-                  Zkapp_command.of_base64 cmd
-                  >>| fun c -> User_command.Zkapp_command c)
-          in
-          result_of_or_error res ~error:"Invalid transaction provided"
-          |> Result.map ~f:(fun cmd ->
-                 { With_hash.data = cmd
-                 ; hash = Transaction_hash.hash_command cmd
-                 } )
-        in
-        let%map txn =
-          match (serialized_payment, serialized_zkapp) with
-          | None, None | Some _, Some _ ->
-              Error
-                "Invalid query: Specify either a payment ID or a zkApp \
-                 transaction ID"
-          | Some payment, None ->
-              deserialize_txn (`Signed_command payment)
-          | None, Some zkapp_txn ->
-              deserialize_txn (`Zkapp_command zkapp_txn)
-        in
-        let frontier_broadcast_pipe = Mina_lib.transition_frontier mina in
+      ~resolve:(fun { ctx = mina; _ } () (hash : string option)
+                    (id : string option) ->
         let transaction_pool = Mina_lib.transaction_pool mina in
-        Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
-          ~transaction_pool txn.data )
+        let frontier_broadcast_pipe = Mina_lib.transition_frontier mina in
+        match (hash, id) with
+        | None, None | Some _, Some _ ->
+            Error "Invalid query: Specify a transaction ID"
+        | None, Some id ->
+            let open Result.Let_syntax in
+            let%bind valid_cmd = command_of_id id in
+            Result.return
+            @@ Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
+                 ~transaction_pool
+                 Transaction_hash.(
+                   User_command_with_valid_signature.command valid_cmd)
+        | Some hash, None -> (
+            match Transaction_hash.of_base58_check hash |> Result.ok with
+            | None ->
+                Result.return @@ Transaction_inclusion_status.State.Unknown
+            | Some cmd ->
+                Result.return
+                @@ Transaction_inclusion_status.get_status_hash
+                     ~frontier_broadcast_pipe ~transaction_pool cmd ) )
 
   let current_snark_worker =
     field "currentSnarkWorker" ~typ:Types.snark_worker
