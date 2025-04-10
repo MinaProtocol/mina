@@ -2,9 +2,9 @@ open Core
 open Async
 open Mina_base
 
-module Inputs = struct
+module Impl : Worker_impl_intf.Worker_impl = struct
   module Worker_state = struct
-    include Unit
+    type t = unit
 
     let create ~constraint_constants:_ ~proof_level () =
       match proof_level with

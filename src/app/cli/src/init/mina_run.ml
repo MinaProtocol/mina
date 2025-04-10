@@ -368,11 +368,11 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return @@ Itn_logger.log ~process ~timestamp ~message ~metadata () )
     ]
   in
-  let log_snark_work_metrics (work : Snark_worker.Work.Result.t) =
+  let log_snark_work_metrics (work : Snark_worker.Concrete_work.Result.t) =
     Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
     One_or_two.iter
       (One_or_two.zip_exn work.metrics
-         (Snark_worker.Work.Result.transactions work) )
+         (Snark_worker.Concrete_work.Result.transactions work) )
       ~f:(fun ((total, tag), transaction_opt) ->
         ( match tag with
         | `Merge ->
@@ -426,48 +426,59 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
         Perf_histograms.add_span ~name:"snark_worker_transition_time" total )
   in
   let snark_worker_impls =
-    [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc (fun () () ->
-          Deferred.return
-            (let open Option.Let_syntax in
-            let%bind key =
-              Option.merge
-                (Mina_lib.snark_worker_key mina)
-                (Mina_lib.snark_coordinator_key mina)
-                ~f:Fn.const
-            in
-            let%map work = Mina_lib.request_work mina in
-            let work_wire =
-              { work with
-                instances =
-                  One_or_two.map work.instances
-                    ~f:
-                      (Snark_work_lib.Work.Single.Spec.map
-                         ~f_witness:
-                           Transaction_witness.read_all_proofs_from_disk
-                         ~f_proof:ident )
-              }
-            in
-            [%log trace]
-              ~metadata:
-                [ ("work_spec", Snark_worker.Work.Spec.to_yojson work_wire) ]
-              "responding to a Get_work request with some new work" ;
-            Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
-            (work_wire, key)) )
+    [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc
+        (fun () worker_capability ->
+          match worker_capability with
+          | V2 ->
+              (let open Option.Let_syntax in
+              let%bind key =
+                Option.merge
+                  (Mina_lib.snark_worker_key mina)
+                  (Mina_lib.snark_coordinator_key mina)
+                  ~f:Fn.const
+              in
+              let%map work = Mina_lib.request_work mina in
+              let work_wire =
+                { work with
+                  instances =
+                    One_or_two.map work.instances
+                      ~f:
+                        (Snark_work_lib.Work.Single.Spec.map
+                           ~f_witness:
+                             Transaction_witness.read_all_proofs_from_disk
+                           ~f_proof:ident )
+                }
+              in
+              [%log trace]
+                ~metadata:
+                  [ ( "work_spec"
+                    , Snark_worker.Concrete_work.Spec.Stable.Latest.to_yojson
+                        work_wire )
+                  ]
+                "responding to a Get_work request with some new work" ;
+              Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
+              Snark_worker.Rpcs_versioned.Get_work.V3.Regular
+                { work_spec = work_wire; public_key = key })
+              |> Option.value
+                   ~default:Snark_worker.Rpcs_versioned.Get_work.V3.Nothing
+              |> Deferred.return
+          | V3 ->
+              failwith "TODO: implement coordinator get_work V3 RPC logic" )
     ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
-        (fun () (work : Snark_worker.Work.Result.t) ->
-          [%log trace] "received completed work from a snark worker"
-            ~metadata:
-              [ ("work_spec", Snark_worker.Work.Spec.to_yojson work.spec) ] ;
-          log_snark_work_metrics work ;
-          Deferred.return @@ Mina_lib.add_work mina work )
+        (fun () (work : Snark_worker.Rpcs_versioned.Submit_work.V3.query) ->
+          match work with
+          | Regular work ->
+              [%log trace] "received completed work from a snark worker"
+                ~metadata:
+                  [ ( "work_spec"
+                    , Snark_worker.Concrete_work.Spec.to_yojson work.spec )
+                  ] ;
+              log_snark_work_metrics work ;
+              Deferred.return @@ Mina_lib.add_work mina work
+          | Zkapp_command_segment _ ->
+              failwith "TODO: implement coordinator submit_work V3 RPC logic" )
     ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
-        (fun
-          ()
-          ((error, _work_spec, _prover_public_key) :
-            Error.t
-            * Snark_worker.Work.Spec.t
-            * Signature_lib.Public_key.Compressed.t )
-        ->
+        (fun () { error; _ } ->
           [%str_log error]
             (Snark_worker.Generating_snark_work_failed
                { error = Error_json.error_to_yojson error } ) ;

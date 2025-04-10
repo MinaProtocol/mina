@@ -47,6 +47,8 @@ end
 
 [%%versioned:
 module Stable : sig
+  (* the reason we have this is top level t get overrided,
+     but we override it solely for ppx derivation*)
   [@@@no_toplevel_latest_type]
 
   module V2 : sig
@@ -60,10 +62,12 @@ module Stable : sig
       ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
       }
     [@@deriving sexp, yojson]
+
+    val to_latest : t -> t
   end
 end]
 
-type t =
+type t = Stable.Latest.t =
   { transaction : Mina_transaction.Transaction.t
   ; first_pass_ledger : Mina_ledger.Sparse_ledger.t
   ; second_pass_ledger : Mina_ledger.Sparse_ledger.t
@@ -72,7 +76,7 @@ type t =
   ; status : Mina_base.Transaction_status.t
   ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
   }
-[@@deriving sexp, yojson]
+[@@deriving sexp, yojson, fields]
 
 val read_all_proofs_from_disk : t -> Stable.Latest.t
 

@@ -50,6 +50,8 @@ end
 
 [%%versioned
 module Stable = struct
+  (* the reason we have this is top level t get overrided,
+     but we override it solely for ppx derivation*)
   [@@@no_toplevel_latest_type]
 
   module V2 = struct
@@ -68,7 +70,7 @@ module Stable = struct
   end
 end]
 
-type t =
+type t = Stable.Latest.t =
   { transaction : Mina_transaction.Transaction.t
   ; first_pass_ledger : Mina_ledger.Sparse_ledger.t
   ; second_pass_ledger : Mina_ledger.Sparse_ledger.t
@@ -77,7 +79,7 @@ type t =
   ; status : Mina_base.Transaction_status.t
   ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
   }
-[@@deriving sexp, yojson]
+[@@deriving sexp, yojson, fields]
 
 let read_all_proofs_from_disk
     { transaction

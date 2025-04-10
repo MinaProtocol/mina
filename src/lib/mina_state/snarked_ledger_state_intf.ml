@@ -156,6 +156,8 @@ module type Full = sig
         , Local_state.Stable.V1.t )
         Poly.Stable.V2.t
       [@@deriving compare, equal, hash, sexp, yojson]
+
+      val to_latest : t -> t
     end
   end]
 
