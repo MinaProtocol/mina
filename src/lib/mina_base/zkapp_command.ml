@@ -58,7 +58,7 @@ type ('proof, 'account_update_digest, 'forest_digest) with_forest =
 
 module T = struct
   type t = (Proof.t, Digest.Account_update.t, Digest.Forest.t) with_forest
-  [@@deriving sexp_of, compare, equal, to_yojson]
+  [@@deriving sexp_of, equal, to_yojson]
 
   [%%versioned
   module Stable = struct
