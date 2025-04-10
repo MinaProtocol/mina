@@ -9,7 +9,13 @@ module Get_work = struct
     let name = "get_work"
 
     module T = struct
-      type query = unit
+      (* NOTE: we have to let server to know the version, so we don't issue a
+         `Zkapp_command_segment` to the client if it's old; On the other hand,
+         if the server old and client being new, we can just preserve the old
+         logic dealing with whole zkapp command in the client.
+         We could imagine this query being telling the server what capability the client snark worker have
+      *)
+      type query = V2 | V3
 
       type response =
         | Regular of

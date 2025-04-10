@@ -21,9 +21,13 @@ module Get_work = struct
         * Public_key.Compressed.Stable.V1.t )
         option
 
-      let query_of_caller_model = Fn.id
+      let query_of_caller_model :
+          Rpcs_master.Get_work.Master.Callee.query -> query =
+        const ()
 
-      let callee_model_of_query = Fn.id
+      let callee_model_of_query :
+          query -> Rpcs_master.Get_work.Master.Callee.query =
+        const Rpcs_master.Get_work.Master.Callee.V2
 
       let response_of_callee_model :
           Rpcs_master.Get_work.Master.Callee.response -> response = function
@@ -31,7 +35,7 @@ module Get_work = struct
             Some (work_spec, public_key)
         | Nothing ->
             None
-        | _ ->
+        | Zkapp_command_segment _ ->
             failwith "TODO: convert Zkapp_command_segment to old spec"
 
       let caller_model_of_response :
