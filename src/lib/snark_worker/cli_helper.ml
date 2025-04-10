@@ -296,7 +296,7 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
             let rec submit_work () =
               match%bind
                 dispatch Rpcs_versioned.Submit_work.Latest.rpc
-                  shutdown_on_disconnect result daemon_address
+                  shutdown_on_disconnect (Regular result) daemon_address
               with
               | Error e ->
                   log_and_retry "submitting work" e (retry_pause 10.)

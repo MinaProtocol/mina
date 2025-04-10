@@ -464,14 +464,18 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           | V3 ->
               failwith "TODO: implement coordinator get_work V3 RPC logic" )
     ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
-        (fun () (work : Snark_worker.Concrete_work.Result.t) ->
-          [%log trace] "received completed work from a snark worker"
-            ~metadata:
-              [ ( "work_spec"
-                , Snark_worker.Concrete_work.Spec.to_yojson work.spec )
-              ] ;
-          log_snark_work_metrics work ;
-          Deferred.return @@ Mina_lib.add_work mina work )
+        (fun () (work : Snark_worker.Rpcs_versioned.Submit_work.V3.query) ->
+          match work with
+          | Regular work ->
+              [%log trace] "received completed work from a snark worker"
+                ~metadata:
+                  [ ( "work_spec"
+                    , Snark_worker.Concrete_work.Spec.to_yojson work.spec )
+                  ] ;
+              log_snark_work_metrics work ;
+              Deferred.return @@ Mina_lib.add_work mina work
+          | Zkapp_command_segment _ ->
+              failwith "TODO: implement coordinator submit_work V3 RPC logic" )
     ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
         (fun
           ()

@@ -20,7 +20,10 @@ module Get_work = struct
       type response =
         | Regular of
             { work_spec :
-                (* TODO: in RPC master specs we shouldn't use versioned types *)
+                (* TODO: in RPC master specs we shouldn't use versioned types,
+                   again, it would be nice to extend `ppx_version` so we could
+                   have a runtime type and trivial conversions could be derived.
+                *)
                 ( Transaction_witness.Stable.Latest.t
                 , Ledger_proof.t )
                 Work.Single.Spec.t
@@ -48,14 +51,21 @@ module Submit_work = struct
   module Master = struct
     let name = "submit_work"
 
+    (* NOTE: Here if the submitted work is a completed zkapp command segment, it
+       means the coordinator must have capablity to handle them, since the
+       coordinator issues the task.
+    *)
     module T = struct
       type query =
-        ( ( Transaction_witness.Stable.Latest.t
-          , Ledger_proof.t )
-          Work.Single.Spec.t
-          Work.Spec.t
-        , Ledger_proof.t )
-        Work.Result.t
+        | Regular of
+            ( ( Transaction_witness.Stable.Latest.t
+              , Ledger_proof.t )
+              Work.Single.Spec.t
+              Work.Spec.t
+            , Ledger_proof.t )
+            Work.Result.t
+        | Zkapp_command_segment of
+            Ledger_proof.t Work.Result_zkapp_command_segment.t
 
       type response = unit
     end

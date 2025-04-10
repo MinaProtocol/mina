@@ -106,6 +106,23 @@ module Result = struct
   end]
 end
 
+module Result_zkapp_command_segment = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'proof t =
+        { id : int
+        ; proofs : 'proof One_or_two.Stable.V1.t
+        ; metrics :
+            (Core.Time.Stable.Span.V1.t * [ `Transition | `Merge ])
+            One_or_two.Stable.V1.t
+        ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t
+        }
+      [@@deriving fields]
+    end
+  end]
+end
+
 module Result_without_metrics = struct
   type 'proof t =
     { proofs : 'proof One_or_two.t

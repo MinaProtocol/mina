@@ -93,7 +93,9 @@ module Get_work = struct
             None
         | Zkapp_command_segment _ ->
             (* This path should be a dead code*)
-            failwith "Receving work out of V2 snark worker's capability"
+            failwith
+              "FATAL: V2 Worker receving work `Zkapp_command_segment`, which \
+               is out of its capability"
 
       let caller_model_of_response : response -> Rpcs_master.Get_work.response =
         function
@@ -112,6 +114,49 @@ end]
 
 [%%versioned_rpc
 module Submit_work = struct
+  module V3 = struct
+    module T = struct
+      type query =
+        | Regular of
+            ( ( Transaction_witness.Stable.V2.t
+              , Ledger_proof.Stable.V2.t )
+              Work.Single.Spec.Stable.V2.t
+              Work.Spec.Stable.V1.t
+            , Ledger_proof.Stable.V2.t )
+            Work.Result.Stable.V1.t
+        | Zkapp_command_segment of
+            Ledger_proof.Stable.V2.t
+            Work.Result_zkapp_command_segment.Stable.V1.t
+
+      type response = unit
+
+      let query_of_caller_model : Rpcs_master.Submit_work.query -> query =
+        function
+        | Regular result ->
+            Regular result
+        | Zkapp_command_segment result ->
+            Zkapp_command_segment result
+
+      let callee_model_of_query : query -> Rpcs_master.Submit_work.query =
+        function
+        | Regular result ->
+            Regular result
+        | Zkapp_command_segment result ->
+            Zkapp_command_segment result
+
+      let response_of_callee_model :
+          Rpcs_master.Submit_work.response -> response =
+        Fn.id
+
+      let caller_model_of_response :
+          response -> Rpcs_master.Submit_work.response =
+        Fn.id
+    end
+
+    include T
+    include Rpcs_master.Submit_work.Register (T)
+  end
+
   module V2 = struct
     module T = struct
       type query =
@@ -124,20 +169,34 @@ module Submit_work = struct
 
       type response = unit
 
-      let query_of_caller_model = Fn.id
+      let query_of_caller_model : Rpcs_master.Submit_work.query -> query =
+        function
+        | Regular result ->
+            result
+        | Zkapp_command_segment _ ->
+            failwith
+              "FATAL: V2 Worker completed a `Zkapp_command_segment` job where \
+               the coordinator can't aggregate, this shouldn't happen as the \
+               work is issued by the coordinator"
 
-      let callee_model_of_query = Fn.id
+      let callee_model_of_query (result : query) : Rpcs_master.Submit_work.query
+          =
+        Regular result
 
-      let response_of_callee_model = Fn.id
+      let response_of_callee_model :
+          Rpcs_master.Submit_work.response -> response =
+        Fn.id
 
-      let caller_model_of_response = Fn.id
+      let caller_model_of_response :
+          response -> Rpcs_master.Submit_work.response =
+        Fn.id
     end
 
     include T
     include Rpcs_master.Submit_work.Register (T)
   end
 
-  module Latest = V2
+  module Latest = V3
 end]
 
 [%%versioned_rpc
