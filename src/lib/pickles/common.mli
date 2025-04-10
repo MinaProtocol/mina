@@ -60,7 +60,7 @@ val combined_evaluation :
      (module Snarky_backendless.Snark_intf.Run
         with type field = 'f
          and type field_var = 'v )
-  -> xi:'v
+  -> polyscale:'v
   -> ('v, 'v Snarky_backendless.Boolean.t) Pickles_types.Opt.t array list
   -> 'v
 

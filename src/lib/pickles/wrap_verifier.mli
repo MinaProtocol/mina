@@ -64,7 +64,7 @@ val incrementally_verify_proof :
          , Impl.Boolean.var )
          Pickles_types.Opt.t )
        Pickles_types.Plonk_verification_key_evals.Step.t
-  -> xi:Scalar_challenge.t
+  -> polyscale:Scalar_challenge.t
   -> sponge:Opt.t
   -> public_input:
        [ `Field of

@@ -253,19 +253,19 @@ let ft_comm ~add:( + ) ~scale ~negate
 let combined_evaluation (type f v)
     (module Impl : Snarky_backendless.Snark_intf.Run
       with type field = f
-       and type field_var = v ) ~(xi : Impl.Field.t)
+       and type field_var = v ) ~(polyscale : Impl.Field.t)
     (without_degree_bound : _ list) =
   let open Impl in
   let open Field in
-  let mul_and_add ~(acc : Field.t) ~(xi : Field.t)
+  let mul_and_add ~(acc : Field.t) ~(polyscale : Field.t)
       (fx : (Field.t, Boolean.var) Opt.t) : Field.t =
     match fx with
     | Nothing ->
         acc
     | Just fx ->
-        fx + (xi * acc)
+        fx + (polyscale * acc)
     | Maybe (b, fx) ->
-        Field.if_ b ~then_:(fx + (xi * acc)) ~else_:acc
+        Field.if_ b ~then_:(fx + (polyscale * acc)) ~else_:acc
   in
   with_label __LOC__ (fun () ->
       Pcs_batch.combine_split_evaluations ~mul_and_add
@@ -276,4 +276,4 @@ let combined_evaluation (type f v)
               Field.zero
           | Maybe (b, x) ->
               (b :> Field.t) * x )
-        ~xi without_degree_bound )
+        ~polyscale without_degree_bound )

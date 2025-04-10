@@ -76,7 +76,7 @@ module Wrap = struct
           { plonk : 'plonk
           ; combined_inner_product : 'fp
           ; b : 'fp
-          ; xi : 'scalar_challenge
+          ; polyscale : 'scalar_challenge
           ; bulletproof_challenges : 'bulletproof_challenges
           ; branch_data : 'branch_data
           }

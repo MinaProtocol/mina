@@ -199,12 +199,12 @@ module Wrap = struct
                 .t =
             { plonk : 'plonk
             ; combined_inner_product : 'fp
-                  (** combined_inner_product = sum_{i < num_evaluation_points} sum_{j < num_polys} r^i xi^j f_j(pt_i) *)
+                  (** combined_inner_product = sum_{i < num_evaluation_points} sum_{j < num_polys} evalscale^i polyscale^j f_j(pt_i) *)
             ; b : 'fp
-                  (** b = challenge_poly plonk.zeta + r * challenge_poly (domain_generrator * plonk.zeta)
+                  (** b = challenge_poly plonk.zeta + evalscale * challenge_poly (domain_generator * plonk.zeta)
                 where challenge_poly(x) = \prod_i (1 + bulletproof_challenges.(i) * x^{2^{k - 1 - i}})
             *)
-            ; xi : 'scalar_challenge
+            ; polyscale : 'scalar_challenge
                   (** The challenge used for combining polynomials *)
             ; bulletproof_challenges : 'bulletproof_challenges
                   (** The challenges from the inner-product argument that was partially verified. *)
@@ -232,7 +232,7 @@ module Wrap = struct
         { plonk : 'plonk
         ; combined_inner_product : 'fp
         ; b : 'fp
-        ; xi : 'scalar_challenge
+        ; polyscale : 'scalar_challenge
         ; bulletproof_challenges : 'bulletproof_challenges
         ; branch_data : 'branch_data
         }
@@ -284,11 +284,11 @@ module Wrap = struct
           { plonk
           ; combined_inner_product
           ; b : 'fp
-          ; xi
+          ; polyscale
           ; bulletproof_challenges
           ; branch_data
           } ~f:_ ~scalar =
-        { xi = scalar xi
+        { polyscale = scalar polyscale
         ; combined_inner_product
         ; b
         ; plonk
@@ -343,7 +343,7 @@ module Wrap = struct
           ({ plonk
            ; combined_inner_product = _
            ; b = _
-           ; xi = _
+           ; polyscale = _
            ; bulletproof_challenges
            ; branch_data
            } :
@@ -776,7 +776,7 @@ module Wrap = struct
       let[@warning "-45"] to_data
           ({ proof_state =
                { deferred_values =
-                   { xi
+                   { polyscale
                    ; combined_inner_product
                    ; b
                    ; branch_data
@@ -811,7 +811,7 @@ module Wrap = struct
           ]
         in
         let challenge = [ beta; gamma ] in
-        let scalar_challenge = [ alpha; zeta; xi ] in
+        let scalar_challenge = [ alpha; zeta; polyscale ] in
         let digest =
           [ sponge_digest_before_evaluations
           ; messages_for_next_wrap_proof
@@ -852,7 +852,7 @@ module Wrap = struct
           fp
         in
         let [ beta; gamma ] = challenge in
-        let [ alpha; zeta; xi ] = scalar_challenge in
+        let [ alpha; zeta; polyscale ] = scalar_challenge in
         let [ sponge_digest_before_evaluations
             ; messages_for_next_wrap_proof
             ; messages_for_next_step_proof
@@ -863,7 +863,7 @@ module Wrap = struct
         let feature_flags = Plonk_types.Features.of_data feature_flags in
         { proof_state =
             { deferred_values =
-                { xi
+                { polyscale
                 ; combined_inner_product
                 ; b
                 ; branch_data
@@ -911,7 +911,8 @@ module Step = struct
       *)
       type 'fq t =
         { b : 'fq
-        ; combined_inner_product : 'fq (* sum_i r^i sum_j xi^j f_j(pt_i) *)
+        ; combined_inner_product : 'fq
+              (* sum_i evalscale^i sum_j polyscale^j f_j(pt_i) *)
         }
       [@@deriving hlist]
     end
@@ -1086,13 +1087,13 @@ module Step = struct
       type ('plonk, 'scalar_challenge, 'fq, 'bulletproof_challenges) t_ =
         { plonk : 'plonk
         ; combined_inner_product : 'fq
-              (** combined_inner_product = sum_{i < num_evaluation_points} sum_{j < num_polys} r^i xi^j f_j(pt_i) *)
-        ; xi : 'scalar_challenge
+              (** combined_inner_product = sum_{i < num_evaluation_points} sum_{j < num_polys} evalscale^i polyscale^j f_j(pt_i) *)
+        ; polyscale : 'scalar_challenge
               (** The challenge used for combining polynomials *)
         ; bulletproof_challenges : 'bulletproof_challenges
               (** The challenges from the inner-product argument that was partially verified. *)
         ; b : 'fq
-              (** b = challenge_poly plonk.zeta + r * challenge_poly (domain_generrator * plonk.zeta)
+              (** b = challenge_poly plonk.zeta + evalscale * challenge_poly (domain_generator * plonk.zeta)
                 where challenge_poly(x) = \prod_i (1 + bulletproof_challenges.(i) * x^{2^{k - 1 - i}})
             *)
         }
@@ -1211,7 +1212,7 @@ module Step = struct
 
         let[@warning "-45"] to_data
             ({ deferred_values =
-                 { xi
+                 { polyscale
                  ; bulletproof_challenges
                  ; b
                  ; combined_inner_product
@@ -1239,7 +1240,7 @@ module Step = struct
             ]
           in
           let challenge = [ beta; gamma ] in
-          let scalar_challenge = [ alpha; zeta; xi ] in
+          let scalar_challenge = [ alpha; zeta; polyscale ] in
           let digest = [ sponge_digest_before_evaluations ] in
           let bool = [ should_finalize ] in
           let open Hlist.HlistId in
@@ -1262,12 +1263,12 @@ module Step = struct
                   ]
               ; Vector.[ sponge_digest_before_evaluations ]
               ; Vector.[ beta; gamma ]
-              ; Vector.[ alpha; zeta; xi ]
+              ; Vector.[ alpha; zeta; polyscale ]
               ; bulletproof_challenges
               ; Vector.[ should_finalize ]
               ] : _ t =
           { deferred_values =
-              { xi
+              { polyscale
               ; bulletproof_challenges
               ; b
               ; combined_inner_product
