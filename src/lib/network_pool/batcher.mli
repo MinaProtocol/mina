@@ -40,7 +40,7 @@ val compare_envelope : _ Envelope.Incoming.t -> _ Envelope.Incoming.t -> int
 module Transaction_pool : sig
   open Mina_base
 
-  type t [@@deriving sexp]
+  type t [@@deriving sexp_of]
 
   val create : logger:Logger.t -> Verifier.t -> t
 
