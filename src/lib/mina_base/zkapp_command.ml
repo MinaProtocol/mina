@@ -141,16 +141,6 @@ end
 
 include T
 
-let write_all_proofs_to_disk (w : Stable.Latest.t) : t =
-  { fee_payer = w.fee_payer
-  ; memo = w.memo
-  ; account_updates =
-      w.account_updates
-      |> Call_forest.accumulate_hashes
-           ~hash_account_update:(fun (p : Account_update.t) ->
-             Digest.Account_update.create p )
-  }
-
 let map_proofs ~(f : 'p -> 'q)
     ({ Poly.fee_payer; memo; account_updates } : ('p, 'b, 'c) with_forest) :
     ('q, 'b, 'c) with_forest =
@@ -171,6 +161,16 @@ let map_proofs ~(f : 'p -> 'q)
   { Poly.fee_payer
   ; memo
   ; account_updates = Call_forest.map ~f:map_account_update account_updates
+  }
+
+let write_all_proofs_to_disk (w : Stable.Latest.t) : t =
+  { fee_payer = w.fee_payer
+  ; memo = w.memo
+  ; account_updates =
+      w.account_updates
+      |> Call_forest.accumulate_hashes
+           ~hash_account_update:(fun (p : Account_update.t) ->
+             Digest.Account_update.create p )
   }
 
 let read_all_proofs_from_disk (t : t) : Stable.Latest.t =
