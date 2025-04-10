@@ -66,7 +66,8 @@ let config t = t.config
 (* Compute the total currency required from the sender to execute a command.
    Returns None in case of overflow.
 *)
-let currency_consumed_unchecked : User_command.t -> Currency.Amount.t option =
+let currency_consumed_unchecked :
+    (_, _) User_command.with_forest -> Currency.Amount.t option =
  fun cmd ->
   let fee_amt = Currency.Amount.of_fee @@ User_command.fee cmd in
   let open Currency.Amount in
@@ -90,7 +91,8 @@ let currency_consumed cmd =
     (Transaction_hash.User_command_with_valid_signature.command cmd)
 
 let currency_consumed' :
-    User_command.t -> (Currency.Amount.t, Command_error.t) Result.t =
+       (_, _) User_command.with_forest
+    -> (Currency.Amount.t, Command_error.t) Result.t =
  fun cmd ->
   cmd |> currency_consumed_unchecked
   |> Result.of_option ~error:Command_error.Overflow
@@ -274,7 +276,7 @@ let global_slot_since_genesis conf =
       Mina_numbers.Global_slot_since_hard_fork.to_uint32 current_slot
       |> Mina_numbers.Global_slot_since_genesis.of_uint32
 
-let check_expiry t (cmd : User_command.t) =
+let check_expiry t (cmd : (_, _) User_command.with_forest) =
   let global_slot_since_genesis = global_slot_since_genesis t in
   let valid_until = User_command.valid_until cmd in
   if Global_slot_since_genesis.(valid_until < global_slot_since_genesis) then
@@ -420,7 +422,9 @@ module Update = struct
         in
         ( match Transaction_hash.User_command_with_valid_signature.data cmd with
         | Zkapp_command p ->
-            let p = Zkapp_command.Valid.forget p in
+            let p =
+              Zkapp_command.(Valid.forget p |> read_all_proofs_from_disk)
+            in
             let updates, proof_updates =
               let init =
                 match
