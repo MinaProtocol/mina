@@ -2,7 +2,12 @@ open Core_kernel
 open Currency
 
 module Test_inputs = struct
-  module Transaction_witness = Int
+  module Transaction_witness = struct
+    module Stable = struct
+      module Latest = Int
+    end
+  end
+
   module Ledger_hash = Int
   module Sparse_ledger = Int
   module Transaction = Int

@@ -1298,7 +1298,7 @@ let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
 
 let all_work_pairs t
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t) :
-    ( Transaction_witness.t
+    ( Transaction_witness.Stable.Latest.t
     , Ledger_proof.Cached.t )
     Snark_work_lib.Work.Single.Spec.t
     One_or_two.t
@@ -1333,9 +1333,10 @@ let all_work_pairs t
             | Merge ->
                 Or_error.error_string "init_stack was Merge"
           in
-          { Transaction_witness.first_pass_ledger = first_pass_ledger_witness
+          { Transaction_witness.Stable.Latest.first_pass_ledger =
+              first_pass_ledger_witness
           ; second_pass_ledger = second_pass_ledger_witness
-          ; transaction
+          ; transaction = Transaction.read_all_proofs_from_disk transaction
           ; protocol_state_body
           ; init_stack
           ; status
