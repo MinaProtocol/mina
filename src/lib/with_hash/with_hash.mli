@@ -24,5 +24,8 @@ val of_data : 'a -> hash_data:('a -> 'b) -> ('a, 'b) t
 
 (** Set for [('a, 'h) t] that assumes the hash ['h] is cryptographically sound, and data is ignored
 *)
-module Set (Hash : Comparable.S) :
-  Mina_stdlib.Generic_set.S1 with type 'a el := ('a, Hash.t) t
+module Set (Hash : Comparable.S) : sig
+  include Mina_stdlib.Generic_set.S1 with type 'a el := ('a, Hash.t) t
+
+  val sexp_of_t : ('a -> Sexp.t) -> 'a t -> Sexp.t
+end
