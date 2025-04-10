@@ -6,18 +6,15 @@ module B = struct
 end
 
 module Previous_proof_statement = struct
-  type ('prev_var, 'width) t =
+  type ('prev_var, 'width, 'proof) t =
     { public_input : 'prev_var
-    ; proof : ('width, 'width) Proof.t Impls.Step.Typ.prover_value
+    ; proof : 'proof Impls.Step.Typ.prover_value
     ; proof_must_verify : B.t
     }
 
   module Constant = struct
-    type ('prev_value, 'width) t =
-      { public_input : 'prev_value
-      ; proof : ('width, 'width) Proof.t
-      ; proof_must_verify : bool
-      }
+    type ('prev_value, 'width, 'proof) t =
+      { public_input : 'prev_value; proof : 'proof; proof_must_verify : bool }
   end
 end
 
@@ -49,9 +46,14 @@ type 'public_input main_input =
   }
 
 (** The return type of an inductive rule's main function. *)
-type ('prev_vars, 'widths, 'public_output, 'auxiliary_output) main_return =
+type ( 'prev_vars
+     , 'widths
+     , 'public_output
+     , 'auxiliary_output
+     , 'proof )
+     main_return =
   { previous_proof_statements :
-      ('prev_vars, 'widths) H2.T(Previous_proof_statement).t
+      ('prev_vars, 'widths, 'proof) H3.T(Previous_proof_statement).t
         (** A list of booleans, determining whether each previous proof must
             verify.
         *)
@@ -112,13 +114,15 @@ struct
        , 'ret_var
        , 'ret_value
        , 'auxiliary_var
-       , 'auxiliary_value )
+       , 'auxiliary_value
+       , 'proof )
        t =
     { identifier : string
     ; prevs : ('prev_vars, 'prev_values, 'widths, 'heights) H4.T(Tag).t
     ; main :
            'a_var main_input
-        -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return M.t
+        -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var, 'proof) main_return
+           M.t
     ; feature_flags : bool Pickles_types.Plonk_types.Features.t
     }
 
@@ -130,7 +134,7 @@ struct
       (Auxiliary_var : T0)
       (Auxiliary_value : T0) =
   struct
-    type nonrec ('prev_vars, 'prev_values, 'widths, 'heights) t =
+    type nonrec ('prev_vars, 'prev_values, 'widths, 'heights, 'proof) t =
       ( 'prev_vars
       , 'prev_values
       , 'widths
@@ -140,7 +144,8 @@ struct
       , Return_var.t
       , Return_value.t
       , Auxiliary_var.t
-      , Auxiliary_value.t )
+      , Auxiliary_value.t
+      , 'proof )
       t
   end
 end

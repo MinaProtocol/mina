@@ -109,14 +109,14 @@ type ('s, 'mlmb, 'c) with_data =
       Base.Wrap.t
       -> ('s, 'mlmb, _) with_data
 
-type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) with_data
+type ('max_width, 'mlmb) t_kimchi = (unit, 'mlmb, 'max_width) with_data
 
 val dummy :
      'w Pickles_types.Nat.t
   -> 'h Pickles_types.Nat.t
   -> 'r Pickles_types.Nat.t
   -> domain_log2:int
-  -> ('w, 'h) t
+  -> ('w, 'h) t_kimchi
 
 module Make (W : Pickles_types.Nat.Intf) (MLMB : Pickles_types.Nat.Intf) : sig
   module Max_proofs_verified_at_most :
@@ -142,7 +142,7 @@ module Make (W : Pickles_types.Nat.Intf) (MLMB : Pickles_types.Nat.Intf) : sig
     [@@deriving compare, sexp, yojson, hash, equal]
   end
 
-  type nonrec t = (W.n, MLMB.n) t [@@deriving compare, sexp, hash, equal]
+  type nonrec t = (W.n, MLMB.n) t_kimchi [@@deriving compare, sexp, hash, equal]
 
   val to_base64 : t -> string
 

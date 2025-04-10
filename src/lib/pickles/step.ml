@@ -8,6 +8,18 @@ open Import
 open Types
 open Common
 
+module Kimchi_proof = struct
+  type ('a, 'b) t = ('a, 'b) Proof.t_kimchi
+end
+
+module Kimchi_proof_constant = struct
+  type ('a, 'b) t =
+    ( 'a
+    , 'b
+    , ('b, 'b) Proof.t_kimchi )
+    Inductive_rule.Previous_proof_statement.Constant.t
+end
+
 (* This contains the "step" prover *)
 
 module Make
@@ -39,7 +51,7 @@ struct
             *)
       max_local_max_proof_verifieds self_branches prev_vars prev_values
       local_widths local_heights prevs_length var value ret_var ret_value
-      auxiliary_var auxiliary_value ) ?handler ~proof_cache
+      auxiliary_var auxiliary_value proof) ?handler ~proof_cache
       (T branch_data :
         ( A.t
         , A_value.t
@@ -52,7 +64,10 @@ struct
         , prev_vars
         , prev_values
         , local_widths
-        , local_heights )
+        , local_heights 
+        , proof
+        )
+
         Step_branch_data.t ) (next_state : A_value.t)
       ~maxes:
         (module Maxes : Pickles_types.Hlist.Maxes.S
@@ -123,7 +138,7 @@ struct
            Impls.Wrap.Verification_key.t
         -> _ array Plonk_verification_key_evals.t
         -> value
-        -> (local_max_proofs_verified, local_max_proofs_verified) Proof.t
+        -> (local_max_proofs_verified, local_max_proofs_verified) Proof.t_kimchi
         -> (var, value, local_max_proofs_verified) Types_map.Basic.t
         -> must_verify:bool
         -> [ `Sg of Tock.Curve.Affine.t ]
@@ -567,12 +582,10 @@ struct
           , prev_proofs'
           , actual_wrap_domains' ) =
         let[@warning "-4"] rec go :
-            type vars values ns ms k.
+            type vars values ns ms k proof.
                (vars, values, ns, ms) H4.T(Tag).t
             -> (vars, values, ns) H3.T(Types_map.Basic).t
-            -> ( values
-               , ns )
-               H2.T(Inductive_rule.Previous_proof_statement.Constant).t
+            -> (values, ns) H2.T(Kimchi_proof_constant).t
             -> (vars, k) Length.t
             -> (Tock.Curve.Affine.t, k) Vector.t
                * (Unfinalized.Constant.t, k) Vector.t
@@ -582,7 +595,7 @@ struct
                  , ns
                  , ms )
                  H3.T(Per_proof_witness.Constant.No_app_state).t
-               * (ns, ns) H2.T(Proof).t
+               * (ns, ns) H2.T(Kimchi_proof).t
                * (int, k) Vector.t =
          fun ts datas prev_proof_stmts l ->
           match (ts, datas, prev_proof_stmts, l) with
@@ -641,14 +654,14 @@ struct
       module type S = sig
         type res
 
-        val f : _ Proof.t -> res
+        val f : _ Proof.t_kimchi -> res
       end
     end in
     let extract_from_proofs (type res)
         (module Extract : Extract.S with type res = res) =
       let rec go :
           type vars values ns ms len.
-             (ns, ns) H2.T(Proof).t
+             (ns, ns) H2.T(Kimchi_proof).t
           -> (values, vars, ns, ms) H4.T(Tag).t
           -> (vars, len) Length.t
           -> (res, len) Vector.t =
@@ -673,7 +686,7 @@ struct
                  Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
                  Step_bp_vec.t
 
-               let f (T t : _ Proof.t) =
+               let f (T t : _ Proof.t_kimchi) =
                  t.statement.proof_state.deferred_values.bulletproof_challenges
              end )
          in
@@ -733,11 +746,19 @@ struct
                  ~f:(fun s -> s.proof_state.messages_for_next_wrap_proof) )
               Maxes.maxes Maxes.length ) )
     in
+    let f :
+           ( prev_values
+           , local_widths
+           , Req.proof )
+           H3.T(Inductive_rule.Previous_proof_statement.Constant).t
+        -> (prev_values, local_widths) H2.T(Kimchi_proof_constant).t =
+      failwith "TODO"
+    in
     let handler (Snarky_backendless.Request.With { request; respond } as r) =
       let k x = respond (Provide x) in
       match request with
       | Req.Compute_prev_proof_parts prev_proof_requests ->
-          k (compute_prev_proof_parts prev_proof_requests)
+          k (compute_prev_proof_parts (f prev_proof_requests))
       | Req.Proof_with_datas ->
           k (Option.value_exn !witnesses)
       | Req.Wrap_index ->
@@ -781,7 +802,7 @@ struct
              ( module struct
                type res = Tick.Curve.Affine.t
 
-               let f (T t : _ Proof.t) =
+               let f (T t : _ Proof.t_kimchi) =
                  t.statement.proof_state.messages_for_next_wrap_proof
                    .challenge_polynomial_commitment
              end )
@@ -855,7 +876,7 @@ struct
         ( module struct
           type res = E.t
 
-          let f (T t : _ Proof.t) =
+          let f (T t : _ Proof.t_kimchi) =
             let proof = Wrap_wire_proof.to_kimchi_proof t.proof in
             (proof.openings.evals, proof.openings.ft_eval1)
         end )
@@ -863,7 +884,7 @@ struct
     let messages_for_next_wrap_proof =
       let rec go :
           type a.
-             (a, a) H2.T(Proof).t
+             (a, a) H2.T(Kimchi_proof).t
           -> a H1.T(Proof.Base.Messages_for_next_proof_over_same_field.Wrap).t =
         function
         | [] ->

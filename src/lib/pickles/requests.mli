@@ -22,11 +22,14 @@ module Step : sig
 
     type auxiliary_value
 
+    type proof
+
     type _ Snarky_backendless.Request.t +=
       | Compute_prev_proof_parts :
           ( prev_values
-          , local_signature )
-          Hlist.H2.T(Inductive_rule.Previous_proof_statement.Constant).t
+          , local_signature
+          , proof )
+          Hlist.H3.T(Inductive_rule.Previous_proof_statement.Constant).t
           -> unit Promise.t Snarky_backendless.Request.t
       | Proof_with_datas :
           ( prev_values
@@ -53,7 +56,7 @@ module Step : sig
 
   val create :
     'proofs_verified 'local_signature 'local_branches 'statement 'return_value
-    'auxiliary_value 'prev_values 'max_proofs_verified.
+    'auxiliary_value 'prev_values 'max_proofs_verified 'proof.
        unit
     -> (module S
           with type auxiliary_value = 'auxiliary_value
@@ -63,7 +66,9 @@ module Step : sig
            and type prev_values = 'prev_values
            and type proofs_verified = 'proofs_verified
            and type return_value = 'return_value
-           and type statement = 'statement )
+           and type statement = 'statement 
+           and type proof = 'proof 
+           )
 end
 
 module Wrap : sig

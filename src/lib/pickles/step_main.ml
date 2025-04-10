@@ -122,7 +122,7 @@ let verify_one ~srs
 
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main :
-    type proofs_verified self_branches prev_vars prev_values var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value max_proofs_verified local_branches local_signature.
+    type proofs_verified self_branches prev_vars prev_values var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value max_proofs_verified local_branches local_signature proof.
        (module Requests.Step.S
           with type local_signature = local_signature
            and type local_branches = local_branches
@@ -131,7 +131,9 @@ let step_main :
            and type max_proofs_verified = max_proofs_verified
            and type proofs_verified = proofs_verified
            and type return_value = ret_value
-           and type auxiliary_value = auxiliary_value )
+           and type auxiliary_value = auxiliary_value 
+           and type proof = proof
+           )
     -> (module Nat.Add.Intf with type n = max_proofs_verified)
     -> self_branches:self_branches Nat.t
          (* How many branches does this proof system have *)
@@ -169,7 +171,9 @@ let step_main :
        , ret_var
        , ret_value
        , auxiliary_var
-       , auxiliary_value )
+       , auxiliary_value 
+       , proof
+       )
        Inductive_rule.Promise.t
     -> (   unit
         -> ( (Unfinalized.t, max_proofs_verified) Vector.t
@@ -302,14 +306,18 @@ let step_main :
           Async_promise.unit_request (fun () ->
               let previous_proof_statements =
                 let rec go :
-                    type prev_vars prev_values ns1 ns2.
+                    type prev_vars prev_values ns1 ns2 proof.
                        ( prev_vars
-                       , ns1 )
-                       H2.T(Inductive_rule.Previous_proof_statement).t
+                       , ns1 
+                       , proof 
+                       )
+                       H3.T(Inductive_rule.Previous_proof_statement).t
                     -> (prev_vars, prev_values, ns1, ns2) H4.T(Tag).t
                     -> ( prev_values
-                       , ns1 )
-                       H2.T(Inductive_rule.Previous_proof_statement.Constant).t
+                       , ns1 
+                       , proof
+                       )
+                       H3.T(Inductive_rule.Previous_proof_statement.Constant).t
                     =
                  fun previous_proof_statement tags ->
                   match (previous_proof_statement, tags) with
@@ -370,9 +378,9 @@ let step_main :
         let proof_witnesses =
           (* Inject the app-state values into the per-proof witnesses. *)
           let rec go :
-              type vars ns1 ns2.
+              type vars ns1 ns2 proof.
                  (vars, ns1, ns2) H3.T(Per_proof_witness.No_app_state).t
-              -> (vars, ns1) H2.T(Inductive_rule.Previous_proof_statement).t
+              -> (vars, ns1, proof) H3.T(Inductive_rule.Previous_proof_statement).t
               -> (vars, ns1, ns2) H3.T(Per_proof_witness).t =
            fun proofs stmts ->
             match (proofs, stmts) with
@@ -388,12 +396,12 @@ let step_main :
         let bulletproof_challenges =
           with_label "prevs_verified" (fun () ->
               let rec go :
-                  type vars vals ns1 ns2 n.
+                  type vars vals ns1 ns2 n proof.
                      (vars, ns1, ns2) H3.T(Per_proof_witness).t
                   -> (vars, vals, ns1, ns2) H4.T(Types_map.For_step).t
                   -> vars H1.T(E01(Digest)).t
                   -> vars H1.T(E01(Unfinalized)).t
-                  -> (vars, ns1) H2.T(Inductive_rule.Previous_proof_statement).t
+                  -> (vars, ns1, proof) H3.T(Inductive_rule.Previous_proof_statement).t
                   -> (vars, n) Length.t
                   -> actual_wrap_domains:
                        ( Pickles_base.Proofs_verified.t Typ.prover_value

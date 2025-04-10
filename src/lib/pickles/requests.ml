@@ -117,11 +117,14 @@ module Step = struct
 
     type auxiliary_value
 
+    type proof
+
     type _ t +=
       | Compute_prev_proof_parts :
           ( prev_values
-          , local_signature )
-          H2.T(Inductive_rule.Previous_proof_statement.Constant).t
+          , local_signature
+          , proof )
+          H3.T(Inductive_rule.Previous_proof_statement.Constant).t
           -> unit Promise.t t
       | Proof_with_datas :
           ( prev_values
@@ -142,7 +145,7 @@ module Step = struct
   end
 
   let create :
-      type proofs_verified local_signature local_branches statement return_value auxiliary_value prev_values max_proofs_verified.
+      type proofs_verified local_signature local_branches statement return_value auxiliary_value prev_values max_proofs_verified proof.
          unit
       -> (module S
             with type local_signature = local_signature
@@ -152,7 +155,9 @@ module Step = struct
              and type auxiliary_value = auxiliary_value
              and type prev_values = prev_values
              and type proofs_verified = proofs_verified
-             and type max_proofs_verified = max_proofs_verified ) =
+             and type max_proofs_verified = max_proofs_verified 
+             and type proof = proof
+             ) =
    fun () ->
     let module R = struct
       type nonrec max_proofs_verified = max_proofs_verified
@@ -171,11 +176,14 @@ module Step = struct
 
       type nonrec local_branches = local_branches
 
+      type nonrec proof = proof
+
       type _ t +=
         | Compute_prev_proof_parts :
             ( prev_values
-            , local_signature )
-            H2.T(Inductive_rule.Previous_proof_statement.Constant).t
+            , local_signature
+            , proof )
+            H3.T(Inductive_rule.Previous_proof_statement.Constant).t
             -> unit Promise.t t
         | Proof_with_datas :
             ( prev_values

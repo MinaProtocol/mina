@@ -21,7 +21,9 @@ module Make
        , 'prev_vars
        , 'prev_values
        , 'local_widths
-       , 'local_heights )
+       , 'local_heights 
+       , 'proof
+       )
        Step_branch_data.t
     -> A_value.t
     -> maxes:

@@ -28,6 +28,10 @@ module E04 (T : T0) = struct
   type (_, _, _, _) t = T.t
 end
 
+module E05 (T : T0) = struct
+  type (_, _, _, _, _) t = T.t
+end
+
 module E06 (T : T0) = struct
   type (_, _, _, _, _, _) t = T.t
 end
@@ -685,6 +689,96 @@ module H4 = struct
   end
 end
 
+module H5 = struct
+  module T (F : sig
+    type (_, _, _, _, _) t
+  end) =
+  struct
+    type (_, _, _, _, _) t =
+      | [] : (unit, unit, unit, unit, unit) t
+      | ( :: ) :
+          ('a1, 'a2, 'a3, 'a4, 'a5) F.t * ('b1, 'b2, 'b3, 'b4, 'b5) t
+          -> ('a1 * 'b1, 'a2 * 'b2, 'a3 * 'b3, 'a4 * 'b4, 'a5 * 'b5) t
+
+    let rec length :
+        type tail1 tail2 tail3 tail4 tail5.
+        (tail1, tail2, tail3, tail4, tail5) t -> tail1 Length.n = function
+      | [] ->
+          T (Z, Z)
+      | _ :: xs ->
+          let (T (n, p)) = length xs in
+          T (S n, S p)
+  end
+  (*
+  module Fold
+      (F : T5)
+      (X : T0) (C : sig
+        val f : X.t -> _ F.t -> X.t
+      end) =
+  struct
+    let rec f : type a b c d e. init:X.t -> (a, b, c, d, e) T(F).t -> X.t =
+     fun ~init xs ->
+      match xs with [] -> init | x :: xs -> f ~init:(C.f init x) xs
+  end
+
+  module Iter
+      (F : T5) (C : sig
+        val f : _ F.t -> unit
+      end) =
+  struct
+    let rec f : type a b c d e. (a, b, c, d, e) T(F).t -> unit =
+     fun xs -> match xs with [] -> () | x :: xs -> C.f x ; f xs
+  end
+*)
+  module Map
+      (F : T5)
+      (G : T5) (C : sig
+        val f : ('a, 'b, 'c, 'd, 'e) F.t -> ('a, 'b, 'c, 'd, 'e) G.t
+      end) =
+  struct
+    let rec f : type a b c d e. (a, b, c, d, e) T(F).t -> (a, b, c, d, e) T(G).t =
+      function
+      | [] ->
+          []
+      | x :: xs ->
+          let y = C.f x in
+          y :: f xs
+  end
+
+  module To_vector (X : T0) = struct
+    let rec f :
+        type a b c d e length.
+           (a, length) Length.t
+        -> (a, b, c, d, e) T(E05(X)).t
+        -> (X.t, length) Vector.t =
+     fun l1 v ->
+      match (l1, v) with Z, [] -> [] | S n1, x :: xs -> x :: f n1 xs
+  end
+
+(*
+  module Tuple2 (F : T5) (G : T5) = struct
+    type ('a, 'b, 'c, 'd, 'e) t = ('a, 'b, 'c, 'd, 'e) F.t * ('a, 'b, 'c, 'd, 'e) G.t
+  end
+
+  module Zip (F : T5) (G : T5) = struct
+    let rec f :
+        type a b c d e.
+           (a, b, c, d, e) T(F).t
+        -> (a, b, c, d, e) T(G).t
+        -> (a, b, c, d, e) T(Tuple2(F)(G)).t =
+     fun xs ys ->
+      match (xs, ys) with [], [] -> [] | x :: xs, y :: ys -> (x, y) :: f xs ys
+  end
+
+  module Length_1_to_2 (F : T5) = struct
+    let rec f :
+        type n xs ys a b c.
+        (xs, ys, a, b, c) T(F).t -> (xs, n) Length.t -> (ys, n) Length.t =
+     fun xs n -> match (xs, n) with [], Z -> Z | _ :: xs, S n -> S (f xs n)
+  end
+*)
+end
+
 module H6 = struct
   module T (F : sig
     type (_, _, _, _, _, _) t
@@ -860,6 +954,43 @@ module H4_6_with_length = struct
     let rec length :
         type length t1 t2 t3 t4 e1 e2 e3 e4 e5 e6.
            (length, t1, t2, t3, t4, e1, e2, e3, e4, e5, e6) t
+        -> length Nat.t * (t1, length) Length.t = function
+      | [] ->
+          (Z, Z)
+      | _ :: xs ->
+          let n, p = length xs in
+          (S n, S p)
+  end
+end
+
+module H4_7_with_length = struct
+  module T (F : sig
+    type (_, _, _, _, _, _, _, _, _, _, _) t
+  end) =
+  struct
+    type ('length, _, _, _, _, 's1, 's2, 's3, 's4, 's5, 's6, 's7) t =
+      | [] : (Nat.z, unit, unit, unit, unit, _, _, _, _, _, _, _) t
+      | ( :: ) :
+          ('a1, 'a2, 'a3, 'a4, 's1, 's2, 's3, 's4, 's5, 's6, 's7) F.t
+          * ('length, 'b1, 'b2, 'b3, 'b4, 's1, 's2, 's3, 's4, 's5, 's6, 's7) t
+          -> ( 'length Nat.s
+             , 'a1 * 'b1
+             , 'a2 * 'b2
+             , 'a3 * 'b3
+             , 'a4 * 'b4
+             , 's1
+             , 's2
+             , 's3
+             , 's4
+             , 's5
+             , 's6 
+             , 's7
+             )
+             t
+
+    let rec length :
+        type length t1 t2 t3 t4 e1 e2 e3 e4 e5 e6 e7.
+           (length, t1, t2, t3, t4, e1, e2, e3, e4, e5, e6, e7) t
         -> length Nat.t * (t1, length) Length.t = function
       | [] ->
           (Z, Z)

@@ -57,6 +57,10 @@ module E04 : functor (T : T0) -> sig
   type (_, _, _, _) t = T.t
 end
 
+module E05 : functor (T : T0) -> sig
+  type (_, _, _, _, _) t = T.t
+end
+
 (** Map arity 0 to 6: [let e06 t = fun _ _ _ _ _ _ -> t] *)
 module E06 (T : T0) : sig
   type (_, _, _, _, _, _) t = T.t
@@ -791,6 +795,47 @@ module H4 : sig
   end
 end
 
+module H5 : sig
+  (** Core data type. *)
+  module T : functor
+    (A : sig
+       type (_, _, _, _, _) t
+     end)
+    -> sig
+    type (_, _, _, _, _) t =
+      | [] : (unit, unit, unit, unit, unit) t
+      | ( :: ) :
+          ('a1, 'a2, 'a3, 'a4, 'a5) A.t * ('b1, 'b2, 'b3, 'b4, 'b5) t
+          -> ( 'a1 * 'b1
+             , 'a2 * 'b2
+             , 'a3 * 'b3
+             , 'a4 * 'b4
+             , 'a5 * 'b5
+             )
+             t
+
+    val length :
+      ('tail1, 'tail2, 'tail3, 'tail4, 'tail5) t -> 'tail1 Length.n
+  end
+
+  module Map : functor
+    (A : T5)
+    (B : T5)
+    (_ : sig
+       val f : ('a, 'b, 'c, 'd, 'e) A.t -> ('a, 'b, 'c, 'd, 'e) B.t
+     end)
+    -> sig
+    val f : ('a, 'b, 'c, 'd, 'e) T(A).t -> ('a, 'b, 'c, 'd, 'e) T(B).t
+  end
+
+  module To_vector : functor (X : T0) -> sig
+    val f :
+         ('a, 'length) Length.t
+      -> ('a, 'b, 'c, 'd, 'e) T(E05(X)).t
+      -> (X.t, 'length) Vector.t
+  end
+end
+
 (** Operations on heterogeneous lists whose content type varies over a four
     type parameters.
 
@@ -958,6 +1003,38 @@ module H4_6_with_length : sig
 
     val length :
          ('length, 't1, 't2, 't3, 't4, 'e1, 'e2, 'e3, 'e4, 'e5, 'e6) t
+      -> 'length Nat.t * ('t1, 'length) Length.t
+  end
+end
+
+module H4_7_with_length : sig
+  module T : functor
+    (A : sig
+       type (_, _, _, _, _, _, _, _, _, _, _) t
+     end)
+    -> sig
+    type ('length, _, _, _, _, 's1, 's2, 's3, 's4, 's5, 's6, 's7) t =
+      | [] : (Nat.z, unit, unit, unit, unit, 's1, 's2, 's3, 's4, 's5, 's6, 's7) t
+      | ( :: ) :
+          ('a1, 'a2, 'a3, 'a4, 's1, 's2, 's3, 's4, 's5, 's6, 's7) A.t
+          * ('length, 'b1, 'b2, 'b3, 'b4, 's1, 's2, 's3, 's4, 's5, 's6, 's7) t
+          -> ( 'length Nat.s
+             , 'a1 * 'b1
+             , 'a2 * 'b2
+             , 'a3 * 'b3
+             , 'a4 * 'b4
+             , 's1
+             , 's2
+             , 's3
+             , 's4
+             , 's5
+             , 's6 
+             , 's7
+             )
+             t
+
+    val length :
+         ('length, 't1, 't2, 't3, 't4, 'e1, 'e2, 'e3, 'e4, 'e5, 'e6, 'e7) t
       -> 'length Nat.t * ('t1, 'length) Length.t
   end
 end

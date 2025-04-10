@@ -2,7 +2,7 @@
 val step_main :
   'proofs_verified 'self_branches 'prev_vars 'prev_values 'var 'value 'a_var
   'a_value 'ret_var 'ret_value 'auxiliary_var 'auxiliary_value
-  'max_proofs_verified 'local_branches 'local_signature.
+  'max_proofs_verified 'local_branches 'local_signature 'proof.
      (module Requests.Step.S
         with type auxiliary_value = 'auxiliary_value
          and type local_branches = 'local_branches
@@ -11,7 +11,9 @@ val step_main :
          and type prev_values = 'prev_values
          and type proofs_verified = 'proofs_verified
          and type return_value = 'ret_value
-         and type statement = 'a_value )
+         and type statement = 'a_value 
+         and type proof = 'proof
+         )
   -> (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
   -> self_branches:'self_branches Pickles_types.Nat.t
   -> local_signature:
@@ -50,7 +52,9 @@ val step_main :
      , 'ret_var
      , 'ret_value
      , 'auxiliary_var
-     , 'auxiliary_value )
+     , 'auxiliary_value 
+     , 'proof
+     )
      Inductive_rule.Promise.t
   -> (   unit
       -> ( (Unfinalized.t, 'max_proofs_verified) Pickles_types.Vector.t

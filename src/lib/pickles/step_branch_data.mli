@@ -15,7 +15,9 @@ type ( 'a_var
      (* type level nat *)
      , 'local_widths
      (* type level nat *)
-     , 'local_heights )
+     , 'local_heights 
+     , 'proof 
+     )
      t =
   | T :
       { proofs_verified :
@@ -34,7 +36,8 @@ type ( 'a_var
           , 'ret_var
           , 'ret_value
           , 'auxiliary_var
-          , 'auxiliary_value )
+          , 'auxiliary_value
+          , 'proof )
           Inductive_rule.Promise.t
             (* Main functions to compute *)
       ; main :
@@ -58,7 +61,9 @@ type ( 'a_var
               and type prev_values = 'prev_values
               and type proofs_verified = 'proofs_verified
               and type return_value = 'ret_value
-              and type statement = 'a_value )
+              and type statement = 'a_value 
+              and type proof = 'proof
+              )
       ; feature_flags : bool Plonk_types.Features.t
       }
       -> ( 'a_var
@@ -75,7 +80,9 @@ type ( 'a_var
          (* type level nat *)
          , 'local_widths
          (* type level nat *)
-         , 'local_heights )
+         , 'local_heights 
+         , 'proof
+         )
          t
 
 (** Compile one rule into a value of type [t]
@@ -113,7 +120,8 @@ val create :
      , 'ret_var
      , 'ret_value
      , 'a
-     , 'b )
+     , 'b
+     , 'proof )
      Inductive_rule.Promise.t
   -> ( 'a_var
      , 'a_value
@@ -126,5 +134,7 @@ val create :
      , 'e
      , 'f
      , 'g
-     , 'h )
+     , 'h 
+     , 'proof
+    )
      t

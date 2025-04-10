@@ -15,7 +15,9 @@ type ( 'a_var
      , 'prev_vars
      , 'prev_values
      , 'local_widths
-     , 'local_heights )
+     , 'local_heights 
+     , 'proof 
+     )
      t =
   | T :
       { proofs_verified :
@@ -33,7 +35,9 @@ type ( 'a_var
           , 'ret_var
           , 'ret_value
           , 'auxiliary_var
-          , 'auxiliary_value )
+          , 'auxiliary_value 
+          , 'proof
+          )
           Inductive_rule.Promise.t
       ; main :
              step_domains:(Domains.t, 'branches) Vector.t Promise.t
@@ -53,7 +57,9 @@ type ( 'a_var
               and type local_signature = 'local_widths
               and type local_branches = 'local_heights
               and type return_value = 'ret_value
-              and type auxiliary_value = 'auxiliary_value )
+              and type auxiliary_value = 'auxiliary_value 
+              and type proof = 'proof
+              )
       ; feature_flags : bool Plonk_types.Features.t
       }
       -> ( 'a_var
@@ -67,7 +73,9 @@ type ( 'a_var
          , 'prev_vars
          , 'prev_values
          , 'local_widths
-         , 'local_heights )
+         , 'local_heights 
+         , 'proof
+         )
          t
 
 (* Compile an inductive rule. *)
