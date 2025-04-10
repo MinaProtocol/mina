@@ -175,7 +175,7 @@ module User_command_with_valid_signature = struct
   let hash_of_yojson = of_yojson
 
   type t = (User_command.Valid.t, hash) With_hash.t
-  [@@deriving equal, hash, sexp_of, to_yojson]
+  [@@deriving equal, sexp_of, to_yojson]
 
   let create (c : User_command.Valid.t) : t =
     { data = c
