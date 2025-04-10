@@ -25,9 +25,8 @@ let of_data data ~hash_data = { data; hash = hash_data data }
 
 (** Set for [('a, 'h) t] that assumes the hash ['h] is cryptographically sound, and data is ignored
 *)
-module Set (Hash : Comparable.S) :
-  Mina_stdlib.Generic_set.S1 with type 'a el := ('a, Hash.t) t = struct
-  type 'a t = 'a Hash.Map.t
+module Set (Hash : Comparable.S) = struct
+  type 'a t = 'a Hash.Map.t [@@deriving sexp_of]
 
   let empty = Hash.Map.empty
 
