@@ -1,7 +1,7 @@
 open Core_kernel
 open Async_kernel
 
-type t
+type t [@@deriving sexp_of, to_yojson]
 
 type cache_db
 
