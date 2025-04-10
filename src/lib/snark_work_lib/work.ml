@@ -6,8 +6,6 @@ module Single = struct
   module Spec = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type ('witness, 'ledger_proof) t =
           | Transition of Transaction_snark.Statement.Stable.V2.t * 'witness
@@ -15,14 +13,19 @@ module Single = struct
               Transaction_snark.Statement.Stable.V2.t
               * 'ledger_proof
               * 'ledger_proof
-        [@@deriving sexp, to_yojson]
+        [@@deriving sexp, yojson]
+
+        let to_latest = Fn.id
       end
     end]
 
     type ('witness, 'ledger_proof) t =
           ('witness, 'ledger_proof) Stable.Latest.t =
-      | Transition of Transaction_snark.Statement.t * 'witness
-      | Merge of Transaction_snark.Statement.t * 'ledger_proof * 'ledger_proof
+      | Transition of Transaction_snark.Statement.Stable.Latest.t * 'witness
+      | Merge of
+          Transaction_snark.Statement.Stable.Latest.t
+          * 'ledger_proof
+          * 'ledger_proof
     [@@deriving sexp, yojson]
 
     let map ~f_witness ~f_proof = function
@@ -61,8 +64,6 @@ end
 module Spec = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'single t =
         { instances : 'single One_or_two.Stable.V1.t
@@ -70,23 +71,18 @@ module Spec = struct
         }
       [@@deriving fields, sexp, to_yojson]
 
-      let to_latest single_latest { instances; fee } =
-        { instances = One_or_two.Stable.V1.to_latest single_latest instances
-        ; fee
-        }
-
-      let of_latest single_latest { instances; fee } =
-        let open Result.Let_syntax in
-        let%map instances =
-          One_or_two.Stable.V1.of_latest single_latest instances
-        in
-        { instances; fee }
+      let to_latest = Fn.id
     end
   end]
 
-  type 'single t = 'single Stable.Latest.t =
-    { instances : 'single One_or_two.t; fee : Currency.Fee.t }
-  [@@deriving fields, sexp, yojson]
+  (* type 'single t = 'single Stable.Latest.t = *)
+  (*   { instances : 'single One_or_two.Stable.Latest.t *)
+  (*   ; fee : Currency.Fee.Stable.Latest.t *)
+  (*   } *)
+  (* [@@deriving yojson] *)
+
+  let map ~f_single { instances; fee } =
+    { instances = One_or_two.map ~f:f_single instances; fee }
 end
 
 module Result = struct
@@ -102,8 +98,17 @@ module Result = struct
         ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t
         }
       [@@deriving fields]
+
+      let to_latest = Fn.id
     end
   end]
+
+  let map ~f_spec ~f_single { proofs; metrics; spec; prover } =
+    { proofs = One_or_two.map ~f:f_single proofs
+    ; metrics
+    ; spec = f_spec spec
+    ; prover
+    }
 end
 
 module Result_zkapp_command_segment = struct

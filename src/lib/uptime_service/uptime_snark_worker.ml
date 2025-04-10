@@ -5,13 +5,10 @@ open Async
 open Mina_base
 module Impl = Snark_worker.Impl.Prod
 
-type single_spec = Snark_worker.Concrete_work.Single.Spec.t
-[@@deriving bin_io_unversioned]
-
 module Worker_state = struct
   module type S = sig
     val perform_single :
-         Sok_message.t * single_spec
+         Sok_message.t * Snark_worker.Concrete_work.Single.Spec.t
       -> (Ledger_proof.t * Time.Span.t) Deferred.Or_error.t
   end
 
@@ -42,7 +39,7 @@ module Worker = struct
     type 'w functions =
       { perform_single :
           ( 'w
-          , Sok_message.t * single_spec
+          , Sok_message.t * Snark_worker.Concrete_work.Single.Spec.t
           , (Ledger_proof.t * Time.Span.t) Or_error.t )
           F.t
       }
@@ -73,7 +70,9 @@ module Worker = struct
         in
         { perform_single =
             f
-              ( [%bin_type_class: Sok_message.Stable.Latest.t * single_spec]
+              ( [%bin_type_class:
+                  Sok_message.Stable.Latest.t
+                  * Snark_worker.Concrete_work.Single.Spec.Stable.Latest.t]
               , [%bin_type_class:
                   (Ledger_proof.Stable.Latest.t * Time.Span.t) Or_error.t]
               , perform_single )

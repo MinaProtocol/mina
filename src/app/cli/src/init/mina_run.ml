@@ -452,7 +452,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               [%log trace]
                 ~metadata:
                   [ ( "work_spec"
-                    , Snark_worker.Concrete_work.Spec.to_yojson work_wire )
+                    , Snark_worker.Concrete_work.Spec.Stable.Latest.to_yojson
+                        work_wire )
                   ]
                 "responding to a Get_work request with some new work" ;
               Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;

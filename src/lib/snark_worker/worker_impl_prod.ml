@@ -133,8 +133,8 @@ module Impl : Worker_impl_intf.Worker_impl = struct
               Deferred.Or_error.return (proof, Time.Span.zero)
           | None -> (
               match single with
-              | Work.Single.Spec.Transition
-                  (input, (w : Transaction_witness.Stable.Latest.t)) ->
+              | Work.Single.Spec.Transition (input, (w : Transaction_witness.t))
+                ->
                   process (fun () ->
                       match
                         Transaction.read_all_proofs_from_disk w.transaction

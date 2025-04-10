@@ -1,26 +1,7 @@
 open Async
 open Core_kernel
-open Signature_lib
-open Snark_work_lib
+open Rpcs_types
 module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
-
-type regular_work =
-  { work_spec :
-      (* TODO: in RPC master specs we shouldn't use versioned types,
-         again, it would be nice to extend `ppx_version` so we could
-         have a runtime type and trivial conversions could be derived.
-      *)
-      (Transaction_witness.Stable.Latest.t, Ledger_proof.t) Work.Single.Spec.t
-      Work.Spec.t
-  ; public_key : Public_key.Compressed.t
-  }
-
-type zkapp_command_segment_work =
-  { id : int
-  ; statement : Transaction_snark.Statement.With_sok.t
-  ; witness : Zkapp_command_segment.Witness.t
-  ; spec : Zkapp_command_segment.Basic.t
-  }
 
 module Get_work = struct
   module Master = struct
@@ -36,8 +17,8 @@ module Get_work = struct
       type query = V2 | V3
 
       type response =
-        | Regular of regular_work
-        | Zkapp_command_segment of zkapp_command_segment_work
+        | Regular of Regular_work.t
+        | Zkapp_command_segment of Zkapp_command_segment_work.t
         | Nothing
     end
 
@@ -59,13 +40,7 @@ module Submit_work = struct
     *)
     module T = struct
       type query =
-        | Regular of
-            ( ( Transaction_witness.Stable.Latest.t
-              , Ledger_proof.t )
-              Work.Single.Spec.t
-              Work.Spec.t
-            , Ledger_proof.t )
-            Work.Result.t
+        | Regular of Concrete_work.Result.t
         | Zkapp_command_segment of
             Ledger_proof.t Work.Result_zkapp_command_segment.t
 
@@ -80,16 +55,12 @@ module Submit_work = struct
   include Versioned_rpc.Both_convert.Plain.Make (Master)
 end
 
-type failed_work =
-  | Regular of regular_work
-  | Zkapp_command_segment of zkapp_command_segment_work
-
 module Failed_to_generate_snark = struct
   module Master = struct
     let name = "failed_to_generate_snark"
 
     module T = struct
-      type query = { error : Error.t; failed_work : failed_work }
+      type query = { error : Error.t; failed_work : Failed_work.t }
 
       type response = unit
     end
