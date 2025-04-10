@@ -226,8 +226,12 @@ let chain_id_inputs (t : Mina_lib.t) =
   , protocol_transaction_version
   , protocol_network_version )
 
-let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
-    (init_receipt, proof) =
+let verify_payment t (addr : Account_id.t)
+    (verifying_txn : User_command.Stable.Latest.t)
+    (init_receipt, proof_unwrapped) =
+  let proof =
+    List.map ~f:User_command.write_all_proofs_to_disk proof_unwrapped
+  in
   let open Participating_state.Let_syntax in
   let%map account = get_account t addr in
   let account = Option.value_exn account in
@@ -238,11 +242,14 @@ let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
       (Receipt_chain_verifier.verify ~init:init_receipt proof resulting_receipt)
       ~error:(Error.createf "Merkle list proof of payment is invalid")
   in
-  if List.exists proof ~f:(fun txn -> User_command.equal verifying_txn txn) then
-    Ok ()
+  if
+    List.exists proof_unwrapped ~f:(fun txn ->
+        User_command.Stable.Latest.equal verifying_txn txn )
+  then Ok ()
   else
     Or_error.errorf
-      !"Merkle list proof does not contain payment %{sexp:User_command.t}"
+      !"Merkle list proof does not contain payment \
+        %{sexp:User_command.Stable.Latest.t}"
       verifying_txn
 
 type active_state_fields =
