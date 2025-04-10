@@ -139,10 +139,13 @@ module For_tests : sig
       there is a bug. *)
   val assert_pool_consistency : t -> unit
 
-  val applicable_by_fee :
-       t
-    -> Transaction_hash.User_command_with_valid_signature.Set.t
-       Currency.Fee_rate.Map.t
+  module Applicable_by_fee :
+      module type of
+        Mina_stdlib.Map_set.Make
+          (Currency.Fee_rate)
+          (Transaction_hash.User_command_with_valid_signature.Set)
+
+  val applicable_by_fee : t -> Applicable_by_fee.t
 
   val all_by_sender :
        t

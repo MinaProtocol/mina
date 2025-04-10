@@ -168,14 +168,14 @@ let hash_of_transaction_id (transaction_id : string) : t Or_error.t =
             "Could not decode transaction id as either Base58Check or Base64" )
 
 module User_command_with_valid_signature = struct
-  type hash = T.t [@@deriving sexp, compare, hash]
+  type hash = T.t [@@deriving equal, sexp, compare, hash]
 
   let hash_to_yojson = to_yojson
 
   let hash_of_yojson = of_yojson
 
   type t = (User_command.Valid.t, hash) With_hash.t
-  [@@deriving hash, sexp, compare, to_yojson]
+  [@@deriving equal, hash, sexp, compare, to_yojson]
 
   let create (c : User_command.Valid.t) : t =
     { data = c
@@ -193,7 +193,16 @@ module User_command_with_valid_signature = struct
   let forget_check ({ data; hash } : t) =
     { With_hash.data = User_command.forget_check data; hash }
 
-  module Set = With_hash.Set (T) (User_command.Valid)
+  module Set = struct
+    type el = t
+
+    module Generic_set = With_hash.Set (T)
+    include Generic_set
+
+    type nonrec t = User_command.Valid.t Generic_set.t
+
+    let sexp_of_t = Generic_set.sexp_of_t User_command.Valid.sexp_of_t
+  end
 
   let make data hash : t = { data; hash }
 end

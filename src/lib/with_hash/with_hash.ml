@@ -30,6 +30,8 @@ module Set (Hash : Comparable.S) = struct
 
   let empty = Hash.Map.empty
 
+  let is_empty = Hash.Map.is_empty
+
   let add t { data; hash } =
     match Hash.Map.add t ~key:hash ~data with `Ok t' -> t' | `Duplicate -> t
 
@@ -47,4 +49,14 @@ module Set (Hash : Comparable.S) = struct
   let length = Hash.Map.length
 
   let singleton { data; hash } = Hash.Map.singleton hash data
+
+  let remove t { hash; _ } = Hash.Map.remove t hash
+
+  let min_elt_exn t =
+    let hash, data = Hash.Map.min_elt_exn t in
+    { data; hash }
+
+  let to_sequence t =
+    Hash.Map.to_sequence t
+    |> Sequence.map ~f:(fun (hash, data) -> { data; hash })
 end
