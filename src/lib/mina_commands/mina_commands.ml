@@ -97,7 +97,9 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
                 | `Not_broadcasted ->
                     "not_broadcasted" ) )
           ; ( "valid_commands"
-            , `List (List.map ~f:User_command.to_yojson valid_commands) )
+            , `List
+                (List.map ~f:User_command.Stable.Latest.to_yojson valid_commands)
+            )
           ; ( "invalid_commands"
             , `List
                 (List.map invalid_commands ~f:(fun (_cmd, diff_err) ->
@@ -118,7 +120,8 @@ let setup_and_submit_user_commands t user_command_list =
       [ ("mina_command", `String "scheduling a batch of user transactions") ] ;
   Mina_lib.add_transactions t user_command_list
 
-let setup_and_submit_zkapp_commands t (zkapp_commands : Zkapp_command.t list) =
+let setup_and_submit_zkapp_commands t
+    (zkapp_commands : Zkapp_command.Stable.Latest.t list) =
   let open Participating_state.Let_syntax in
   (* hack to get types to work out *)
   let%map () = return () in
@@ -167,7 +170,8 @@ let setup_and_submit_zkapp_commands t (zkapp_commands : Zkapp_command.t list) =
   | Error e ->
       Error e
 
-let setup_and_submit_zkapp_command t (zkapp_command : Zkapp_command.t) =
+let setup_and_submit_zkapp_command t
+    (zkapp_command : Zkapp_command.Stable.Latest.t) =
   let res = setup_and_submit_zkapp_commands t [ zkapp_command ] in
   let%map.Participating_state res' = res in
   match%map.Deferred res' with
