@@ -141,6 +141,28 @@ end
 
 include T
 
+let map_proofs ~(f : 'p -> 'q)
+    ({ Poly.fee_payer; memo; account_updates } : ('p, 'b, 'c) with_forest) :
+    ('q, 'b, 'c) with_forest =
+  let map_auth = function
+    | Control.Poly.Proof p ->
+        Control.Poly.Proof (f p)
+    | Signature s ->
+        Signature s
+    | None_given ->
+        None_given
+  in
+  let map_account_update p =
+    { Account_update.Poly.authorization =
+        map_auth p.Account_update.Poly.authorization
+    ; body = p.Account_update.Poly.body
+    }
+  in
+  { Poly.fee_payer
+  ; memo
+  ; account_updates = Call_forest.map ~f:map_account_update account_updates
+  }
+
 let write_all_proofs_to_disk (w : Stable.Latest.t) : t =
   { fee_payer = w.fee_payer
   ; memo = w.memo
@@ -167,28 +189,6 @@ let forget_digests =
         }
   in
   impl
-
-let map_proofs ~(f : 'p -> 'q)
-    ({ Poly.fee_payer; memo; account_updates } : ('p, 'b, 'c) with_forest) :
-    ('q, 'b, 'c) with_forest =
-  let map_auth = function
-    | Control.Poly.Proof p ->
-        Control.Poly.Proof (f p)
-    | Signature s ->
-        Signature s
-    | None_given ->
-        None_given
-  in
-  let map_account_update p =
-    { Account_update.Poly.authorization =
-        map_auth p.Account_update.Poly.authorization
-    ; body = p.Account_update.Poly.body
-    }
-  in
-  { Poly.fee_payer
-  ; memo
-  ; account_updates = Call_forest.map ~f:map_account_update account_updates
-  }
 
 let read_all_proofs_from_disk (t : t) : Stable.Latest.t =
   { fee_payer = t.fee_payer
