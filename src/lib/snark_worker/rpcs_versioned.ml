@@ -1,5 +1,7 @@
 open Core_kernel
 open Signature_lib
+module Work = Snark_work_lib.Work
+module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 
 (* For versioning of the types here, see:
 
@@ -9,6 +11,64 @@ open Signature_lib
 
 [%%versioned_rpc
 module Get_work = struct
+  module V3 = struct
+    module T = struct
+      type query = V2 | V3
+
+      type response =
+        | Regular of
+            { work_spec :
+                ( Transaction_witness.Stable.V2.t
+                , Ledger_proof.Stable.V2.t )
+                Work.Single.Spec.Stable.V2.t
+                Work.Spec.Stable.V1.t
+            ; public_key : Public_key.Compressed.Stable.V1.t
+            }
+        | Zkapp_command_segment of
+            { id : int
+            ; statement : Transaction_snark.Statement.With_sok.Stable.V2.t
+            ; witness : Zkapp_command_segment.Witness.Stable.V1.t
+            ; spec : Zkapp_command_segment.Basic.Stable.V1.t
+            }
+        | Nothing
+
+      (* TODO: all these are basically `Fn.id`, maybe there's better way to do it? *)
+
+      let query_of_caller_model = function
+        | Rpcs_master.Get_work.V2 ->
+            V2
+        | V3 ->
+            V3
+
+      let callee_model_of_query = function
+        | V2 ->
+            Rpcs_master.Get_work.V2
+        | V3 ->
+            V3
+
+      let response_of_callee_model : Rpcs_master.Get_work.response -> response =
+        function
+        | Regular { work_spec; public_key } ->
+            Regular { work_spec; public_key }
+        | Zkapp_command_segment { id; statement; witness; spec } ->
+            Zkapp_command_segment { id; statement; witness; spec }
+        | Nothing ->
+            Nothing
+
+      let caller_model_of_response : response -> Rpcs_master.Get_work.response =
+        function
+        | Regular { work_spec; public_key } ->
+            Regular { work_spec; public_key }
+        | Zkapp_command_segment { id; statement; witness; spec } ->
+            Zkapp_command_segment { id; statement; witness; spec }
+        | Nothing ->
+            Nothing
+    end
+
+    include T
+    include Rpcs_master.Get_work.Register (T)
+  end
+
   module V2 = struct
     module T = struct
       type query = unit
@@ -16,30 +76,27 @@ module Get_work = struct
       type response =
         ( ( Transaction_witness.Stable.V2.t
           , Ledger_proof.Stable.V2.t )
-          Snark_work_lib.Work.Single.Spec.Stable.V2.t
-          Snark_work_lib.Work.Spec.Stable.V1.t
+          Work.Single.Spec.Stable.V2.t
+          Work.Spec.Stable.V1.t
         * Public_key.Compressed.Stable.V1.t )
         option
 
-      let query_of_caller_model :
-          Rpcs_master.Get_work.Master.Callee.query -> query =
-        const ()
+      let query_of_caller_model = const ()
 
-      let callee_model_of_query :
-          query -> Rpcs_master.Get_work.Master.Callee.query =
-        const Rpcs_master.Get_work.Master.Callee.V2
+      let callee_model_of_query = const Rpcs_master.Get_work.V2
 
-      let response_of_callee_model :
-          Rpcs_master.Get_work.Master.Callee.response -> response = function
+      let response_of_callee_model : Rpcs_master.Get_work.response -> response =
+        function
         | Regular { work_spec; public_key } ->
             Some (work_spec, public_key)
         | Nothing ->
             None
         | Zkapp_command_segment _ ->
-            failwith "TODO: convert Zkapp_command_segment to old spec"
+            (* This path should be a dead code*)
+            failwith "Receving work out of V2 snark worker's capability"
 
-      let caller_model_of_response :
-          response -> Rpcs_master.Get_work.Master.Callee.response = function
+      let caller_model_of_response : response -> Rpcs_master.Get_work.response =
+        function
         | None ->
             Nothing
         | Some (work_spec, public_key) ->
@@ -50,7 +107,7 @@ module Get_work = struct
     include Rpcs_master.Get_work.Register (T)
   end
 
-  module Latest = V2
+  module Latest = V3
 end]
 
 [%%versioned_rpc
@@ -60,10 +117,10 @@ module Submit_work = struct
       type query =
         ( ( Transaction_witness.Stable.V2.t
           , Ledger_proof.Stable.V2.t )
-          Snark_work_lib.Work.Single.Spec.Stable.V2.t
-          Snark_work_lib.Work.Spec.Stable.V1.t
+          Work.Single.Spec.Stable.V2.t
+          Work.Spec.Stable.V1.t
         , Ledger_proof.Stable.V2.t )
-        Snark_work_lib.Work.Result.Stable.V1.t
+        Work.Result.Stable.V1.t
 
       type response = unit
 
@@ -91,7 +148,7 @@ module Failed_to_generate_snark = struct
         Bounded_types.Wrapped_error.Stable.V1.t
         * ( Transaction_witness.Stable.V2.t
           , Ledger_proof.Stable.V2.t )
-          Snark_work_lib.Work.Single.Spec.Stable.V2.t
+          Work.Single.Spec.Stable.V2.t
           Snark_work_lib.Work.Spec.Stable.V1.t
         * Public_key.Compressed.Stable.V1.t
 
