@@ -42,6 +42,27 @@ let get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
   in
   second_pass_ledger
 
+let print_witnesses ~constraint_constants ~proof_level witnesses =
+  let module T = Transaction_snark.Make (struct
+    let constraint_constants = constraint_constants
+
+    let proof_level = proof_level
+  end) in
+  Async.Deferred.List.iter (List.rev witnesses)
+    ~f:(fun (witness, spec, statement) ->
+      printf "%s"
+        (sprintf
+           !"current witness \
+             %{sexp:(Transaction_witness.Zkapp_command_segment_witness.Stable.Latest.t \
+             * Transaction_snark.Zkapp_command_segment.Basic.t * \
+             Transaction_snark.Statement.With_sok.t) }%!"
+           ( Transaction_witness.Zkapp_command_segment_witness
+             .read_all_proofs_from_disk witness
+           , spec
+           , statement ) ) ;
+      Deferred.ignore_m
+      @@ T.of_zkapp_command_segment_exn ~statement ~witness ~spec )
+
 let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t)
     ~(genesis_constants : Genesis_constants.t)
     ~(proof_level : Genesis_constants.Proof_level.t)
@@ -56,7 +77,6 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t)
       (Account.create id Currency.Balance.(of_mina_int_exn 1_000))
     |> Or_error.ok_exn
   in
-  let open Async.Deferred.Let_syntax in
   let%bind () =
     Option.value_map zkapp_account ~default:(Deferred.return ()) ~f:(fun pk ->
         let `VK vk, `Prover _ = Lazy.force @@ vk_and_prover in
@@ -121,30 +141,11 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t)
         , zkapp_command )
       ]
   in
-  let module T = Transaction_snark.Make (struct
-    let constraint_constants = constraint_constants
-
-    let proof_level = proof_level
-  end) in
-  let%map _ =
-    Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)
-      ~f:(fun _ ((witness, spec, statement) as w) ->
-        printf "%s"
-          (sprintf
-             !"current witness \
-               %{sexp:(Transaction_witness.Zkapp_command_segment_witness.t * \
-               Transaction_snark.Zkapp_command_segment.Basic.t * \
-               Transaction_snark.Statement.With_sok.t) }%!"
-             w ) ;
-        let%map _ = T.of_zkapp_command_segment_exn ~statement ~witness ~spec in
-        ((), ()) )
-  in
-  ()
+  print_witnesses ~constraint_constants ~proof_level witnesses
 
 let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
     ~zkapp_kp ~(genesis_constants : Genesis_constants.t) ~proof_level
     ~constraint_constants =
-  let open Deferred.Let_syntax in
   let receiver =
     Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
   in
@@ -224,26 +225,7 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
         , zkapp_command )
       ]
   in
-  let open Async.Deferred.Let_syntax in
-  let module T = Transaction_snark.Make (struct
-    let constraint_constants = constraint_constants
-
-    let proof_level = proof_level
-  end) in
-  let%map _ =
-    Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)
-      ~f:(fun _ ((witness, spec, statement) as w) ->
-        printf "%s"
-          (sprintf
-             !"current witness \
-               %{sexp:(Transaction_witness.Zkapp_command_segment_witness.t * \
-               Transaction_snark.Zkapp_command_segment.Basic.t * \
-               Transaction_snark.Statement.With_sok.t) }%!"
-             w ) ;
-        let%map _ = T.of_zkapp_command_segment_exn ~statement ~witness ~spec in
-        ((), ()) )
-  in
-  ()
+  print_witnesses ~constraint_constants ~proof_level witnesses
 
 module App_state = struct
   type t = Snark_params.Tick.Field.t
