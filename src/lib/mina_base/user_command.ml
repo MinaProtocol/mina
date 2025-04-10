@@ -88,7 +88,7 @@ module Stable = struct
 end]
 
 type t = (Signed_command.t, Zkapp_command.t) Poly.t
-[@@deriving sexp_of, equal, to_yojson]
+[@@deriving sexp_of, to_yojson]
 
 module Legacy : sig
   type nonrec t = t [@@deriving of_yojson]
@@ -124,6 +124,22 @@ let read_all_proofs_from_disk : t -> Stable.Latest.t = function
 
 type ('p, 'a, 'b) with_forest =
   (Signed_command.t, ('p, 'a, 'b) Zkapp_command.with_forest) Poly.t
+[@@deriving equal]
+
+let forget_digests_and_proofs (t : (_, _, _) with_forest) :
+    (unit, unit, unit) with_forest =
+  match t with
+  | Signed_command sc ->
+      Signed_command sc
+  | Zkapp_command zc ->
+      Zkapp_command (Zkapp_command.forget_digests_and_proofs zc)
+
+let equal_ignoring_proofs_and_hashes (type a b c a' b' c')
+    (t1 : (a, b, c) with_forest) (t2 : (a', b', c') with_forest) =
+  let ignore2 _ _ = true in
+  let t1' = forget_digests_and_proofs t1 in
+  let t2' = forget_digests_and_proofs t2 in
+  equal_with_forest ignore2 ignore2 ignore2 t1' t2'
 
 let to_base64 : Stable.Latest.t -> string = function
   | Signed_command sc ->

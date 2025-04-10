@@ -429,8 +429,7 @@ struct
       ; verification_key_table : Vk_refcount_table.t
       }
 
-    let member t x =
-      Indexed_pool.member t.pool (Transaction_hash.User_command.of_checked x)
+    let member t x = Indexed_pool.member t.pool x
 
     let transactions t = Indexed_pool.transactions ~logger:t.logger t.pool
 
@@ -1282,7 +1281,8 @@ struct
         let check_command pool cmd =
           let already_in_pool =
             Indexed_pool.member pool
-              (Transaction_hash.User_command.of_checked cmd)
+              (Transaction_hash.User_command_with_valid_signature
+               .transaction_hash cmd )
           in
           let%map.Result () =
             if already_in_pool then
@@ -1887,7 +1887,8 @@ let%test_module _ =
         ~f:(fun ~key ~data:_ ->
           assert (
             Indexed_pool.member pool.pool
-              (Transaction_hash.User_command.of_checked key) ) )
+              (Transaction_hash.User_command_with_valid_signature
+               .transaction_hash key ) ) )
 
     let assert_fee_wu_ordering (pool : Test.Resource_pool.t) =
       let txns = Test.Resource_pool.transactions pool |> Sequence.to_list in

@@ -58,7 +58,7 @@ type ('proof, 'account_update_digest, 'forest_digest) with_forest =
 
 module T = struct
   type t = (Proof.t, Digest.Account_update.t, Digest.Forest.t) with_forest
-  [@@deriving sexp_of, equal, to_yojson]
+  [@@deriving sexp_of, to_yojson]
 
   [%%versioned
   module Stable = struct
@@ -151,9 +151,9 @@ let write_all_proofs_to_disk (w : Stable.Latest.t) : t =
              Digest.Account_update.create p )
   }
 
-let read_all_proofs_from_disk (t : t) : Stable.Latest.t =
-  let rec forget_hashes = List.map ~f:forget_hash
-  and forget_hash = function
+let forget_digests =
+  let rec impl = List.map ~f:forget_digest
+  and forget_digest = function
     | { With_stack_hash.stack_hash = _
       ; elt =
           { Call_forest.Tree.account_update; account_update_digest = _; calls }
@@ -162,14 +162,45 @@ let read_all_proofs_from_disk (t : t) : Stable.Latest.t =
         ; elt =
             { Call_forest.Tree.account_update
             ; account_update_digest = ()
-            ; calls = forget_hashes calls
+            ; calls = impl calls
             }
         }
   in
+  impl
+
+let map_proofs ~(f : 'p -> 'q)
+    ({ Poly.fee_payer; memo; account_updates } : ('p, 'b, 'c) with_forest) :
+    ('q, 'b, 'c) with_forest =
+  let map_auth = function
+    | Control.Poly.Proof p ->
+        Control.Poly.Proof (f p)
+    | Signature s ->
+        Signature s
+    | None_given ->
+        None_given
+  in
+  let map_account_update p =
+    { Account_update.Poly.authorization =
+        map_auth p.Account_update.Poly.authorization
+    ; body = p.Account_update.Poly.body
+    }
+  in
+  { Poly.fee_payer
+  ; memo
+  ; account_updates = Call_forest.map ~f:map_account_update account_updates
+  }
+
+let read_all_proofs_from_disk (t : t) : Stable.Latest.t =
   { fee_payer = t.fee_payer
   ; memo = t.memo
-  ; account_updates = forget_hashes t.account_updates
+  ; account_updates = forget_digests t.account_updates
   }
+
+let forget_digests_and_proofs
+    ({ fee_payer; memo; account_updates } : (_, _, _) with_forest) :
+    (unit, unit, unit) with_forest =
+  map_proofs ~f:(const ())
+    { Poly.fee_payer; memo; account_updates = forget_digests account_updates }
 
 [%%define_locally Stable.Latest.(gen)]
 
