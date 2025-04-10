@@ -290,6 +290,9 @@ let read_json filepath ~flag =
         (Error.to_string_hum e)
 
 let verify_receipt =
+  let module Legacy_user_command = User_command.Legacy (struct
+    let proof_cache_db = Proof_cache_tag.create_identity_db ()
+  end) in
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
   let open Command.Param in
@@ -334,7 +337,7 @@ let verify_receipt =
              if use_legacy_json then
                Fn.compose
                  (Result.map ~f:User_command.read_all_proofs_from_disk)
-                 User_command.Legacy.of_yojson
+                 Legacy_user_command.of_yojson
              else User_command.Stable.Latest.of_yojson
            in
            let of_proof_json =
@@ -345,7 +348,7 @@ let verify_receipt =
              if use_legacy_json then
                Fn.compose
                  (Result.map ~f:unwrap_proof)
-                 [%of_yojson: Receipt.Chain_hash.t * User_command.Legacy.t list]
+                 [%of_yojson: Receipt.Chain_hash.t * Legacy_user_command.t list]
              else
                [%of_yojson:
                  Receipt.Chain_hash.t * User_command.Stable.Latest.t list]
@@ -2123,6 +2126,7 @@ let archive_blocks =
                  add_to_failure_file path ) ) )
 
 let receipt_chain_hash =
+  let proof_cache_db = Proof_cache_tag.create_identity_db () in
   let open Command.Let_syntax in
   Command.basic
     ~summary:
@@ -2160,7 +2164,8 @@ let receipt_chain_hash =
              let receipt_elt =
                let _txn_commitment, full_txn_commitment =
                  Zkapp_command.get_transaction_commitments
-                   (Zkapp_command.write_all_proofs_to_disk zkapp_cmd)
+                   (Zkapp_command.write_all_proofs_to_disk ~proof_cache_db
+                      zkapp_cmd )
                in
                Receipt.Zkapp_command_elt.Zkapp_command_commitment
                  full_txn_commitment

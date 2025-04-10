@@ -231,12 +231,23 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
       (Mina_lib.top_level_logger mina)
       [ ("mina_run", `String "Setting up server logs") ]
   in
+  let f err =
+    Or_error.map ~f:(fun (a, b, c) ->
+        ( a
+        , b
+        , List.map
+            ~f:
+              (Tuple2.map_fst
+                 ~f:Mina_base.User_command.read_all_proofs_from_disk )
+            c ) )
+    @@ Or_error.join err
+  in
   let client_impls =
     [ implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
           Deferred.map
             ( Mina_commands.setup_and_submit_user_commands mina ts
             |> Participating_state.to_deferred_or_error )
-            ~f:Or_error.join )
+            ~f )
     ; implement Daemon_rpcs.Send_zkapp_commands.rpc (fun () zkapps ->
           Deferred.map
             ( Mina_commands.setup_and_submit_zkapp_commands mina zkapps

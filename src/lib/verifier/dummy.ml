@@ -91,56 +91,52 @@ let verify_commands { proof_level; _ }
     | Common.invalid ]
     list
     Deferred.Or_error.t =
+  let valid { With_status.data = cmd; _ } =
+    (* Since we have stripped the transaction from the result, we reconstruct it here.
+       The use of [to_valid_unsafe] is justified because a [`Valid] result for this
+       command means that it has indeed been validated. *)
+    let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd') =
+      User_command.(cmd |> of_verifiable |> to_valid_unsafe)
+    in
+    `Valid cmd'
+  in
   match proof_level with
   | Check | No_check ->
-      List.map cs ~f:(fun c ->
-          match Common.check c with
-          | Ok (c, `Assuming _) ->
-              `Valid c
-          | Error (`Invalid_keys keys) ->
-              `Invalid_keys keys
-          | Error (`Invalid_signature keys) ->
-              `Invalid_signature keys
-          | Error (`Invalid_proof err) ->
-              `Invalid_proof err
-          | Error (`Missing_verification_key keys) ->
-              `Missing_verification_key keys
-          | Error (`Unexpected_verification_key keys) ->
-              `Unexpected_verification_key keys
-          | Error (`Mismatched_authorization_kind keys) ->
-              `Mismatched_authorization_kind keys )
-      |> Deferred.Or_error.return
+      let convert_check_res cmd : _ -> [> invalid | `Valid of _ ] = function
+        | Error (#invalid as invalid) ->
+            invalid
+        | Ok (`Assuming _) ->
+            valid cmd
+      in
+      let f cmd = convert_check_res cmd (Common.check cmd) in
+      List.map cs ~f |> Deferred.Or_error.return
   | Full ->
-      let cs = List.map cs ~f:Common.check in
+      let read_proof (vk, stmt, proof) =
+        (vk, stmt, Proof_cache_tag.read_proof_from_disk proof)
+      in
+      let read_proofs (`Assuming ls) = `Assuming (List.map ~f:read_proof ls) in
+      let results =
+        List.map cs ~f:(Fn.compose (Result.map ~f:read_proofs) Common.check)
+      in
       let to_verify =
-        List.concat_map cs ~f:(function
-          | Ok (_, `Assuming xs) ->
-              xs
-          | Error _ ->
-              [] )
+        List.concat_map
+          ~f:(function Ok (`Assuming xs) -> xs | Error _ -> [])
+          results
       in
       let%map all_verified =
         Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ to_verify
       in
-      Ok
-        (List.map cs ~f:(function
-          | Ok (c, `Assuming []) ->
-              `Valid c
-          | Ok (c, `Assuming xs) ->
-              if Or_error.is_ok all_verified then `Valid c
-              else `Valid_assuming xs
-          | Error (`Invalid_keys keys) ->
-              `Invalid_keys keys
-          | Error (`Invalid_signature keys) ->
-              `Invalid_signature keys
-          | Error (`Invalid_proof err) ->
-              `Invalid_proof err
-          | Error (`Missing_verification_key keys) ->
-              `Missing_verification_key keys
-          | Error (`Unexpected_verification_key keys) ->
-              `Unexpected_verification_key keys
-          | Error (`Mismatched_authorization_kind keys) ->
-              `Mismatched_authorization_kind keys ) )
+      let f cmd : _ -> [ invalid | `Valid of _ | `Valid_assuming of _ ] =
+        function
+        | Error (#invalid as invalid) ->
+            invalid
+        | Ok (`Assuming []) ->
+            valid cmd
+        | Ok (`Assuming xs) ->
+            if Or_error.is_ok all_verified then valid cmd
+            else `Valid_assuming xs
+      in
+      Ok (List.map2_exn cs results ~f)
 
 let verify_transaction_snarks { verify_transaction_snarks; _ } ts =
   verify_transaction_snarks ts

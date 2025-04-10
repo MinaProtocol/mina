@@ -56,7 +56,7 @@ module Diff_versioned = struct
      the checks) and [set_from_gossip_exn] (which just does the mutating the pool),
      and do the same for snapp commands as well.
   *)
-  type t = User_command.Stable.Latest.t list [@@deriving sexp, yojson]
+  type t = User_command.Stable.Latest.t list [@@deriving sexp_of, to_yojson]
 
   module Diff_error = struct
     [%%versioned
@@ -166,16 +166,17 @@ module Diff_versioned = struct
 
       module V3 = struct
         type t = (User_command.Stable.V2.t * Diff_error.Stable.V3.t) list
-        [@@deriving sexp, yojson, compare]
+        [@@deriving sexp_of, to_yojson]
 
         let to_latest = Fn.id
       end
     end]
 
-    type t = Stable.Latest.t [@@deriving sexp, yojson, compare]
+    type t = (User_command.t * Diff_error.t) list
+    [@@deriving sexp_of, to_yojson]
   end
 
-  type rejected = Rejected.t [@@deriving sexp, yojson, compare]
+  type rejected = Rejected.t [@@deriving sexp_of, to_yojson]
 
   type verified = Transaction_hash.User_command_with_valid_signature.t list
   [@@deriving to_yojson]
@@ -274,7 +275,7 @@ struct
 
     module Config = struct
       type t =
-        { trust_system : (Trust_system.t[@sexp.opaque])
+        { trust_system : Trust_system.t
         ; pool_max_size : int
               (* note this value needs to be mostly the same across gossipping nodes, so
                  nodes with larger pools don't send nodes with smaller pools lots of
@@ -284,22 +285,24 @@ struct
                  we offer this value separately from the one in genesis_constants, because
                  we may wish a different value for testing
               *)
-        ; verifier : (Verifier.t[@sexp.opaque])
+        ; verifier : Verifier.t
         ; genesis_constants : Genesis_constants.t
         ; slot_tx_end : Mina_numbers.Global_slot_since_hard_fork.t option
         ; vk_cache_db : Zkapp_vk_cache_tag.cache_db
+        ; proof_cache_db : Proof_cache_tag.cache_db
         }
 
       (* remove next line if there's a way to force [@@deriving make] write a
          named parameter instead of an optional parameter *)
       let make ~trust_system ~pool_max_size ~verifier ~genesis_constants
-          ~slot_tx_end ~vk_cache_db =
+          ~slot_tx_end ~vk_cache_db ~proof_cache_db =
         { trust_system
         ; pool_max_size
         ; verifier
         ; genesis_constants
         ; slot_tx_end
         ; vk_cache_db
+        ; proof_cache_db
         }
     end
 
@@ -830,7 +833,9 @@ struct
         ; remaining_in_batch = max_per_15_seconds
         ; config
         ; logger
-        ; batcher = Batcher.create ~logger config.verifier
+        ; batcher =
+            Batcher.create ~proof_cache_db:config.proof_cache_db ~logger
+              config.verifier
         ; best_tip_diff_relay = None
         ; best_tip_ledger = None
         ; verification_key_table =
@@ -943,7 +948,7 @@ struct
     type pool = t
 
     module Diff = struct
-      type t = User_command.Stable.Latest.t list [@@deriving sexp, yojson]
+      type t = User_command.Stable.Latest.t list [@@deriving sexp_of, to_yojson]
 
       let (_ : (t, Diff_versioned.t) Type_equal.t) = Type_equal.T
 
@@ -994,20 +999,19 @@ struct
       end
 
       module Rejected = struct
-        type t = (User_command.Stable.Latest.t * Diff_error.t) list
-        [@@deriving sexp, yojson, compare]
+        type t = (User_command.t * Diff_error.t) list
+        [@@deriving sexp_of, to_yojson]
 
         let (_ : (t, Diff_versioned.Rejected.t) Type_equal.t) = Type_equal.T
       end
 
-      type rejected = Rejected.t [@@deriving sexp, yojson, compare]
+      type rejected = Rejected.t [@@deriving sexp_of, to_yojson]
 
       type verified = Diff_versioned.verified [@@deriving to_yojson]
 
       let reject_overloaded_diff (diff : verified) : rejected =
         List.map diff ~f:(fun cmd ->
             ( Transaction_hash.User_command_with_valid_signature.command cmd
-              |> User_command.read_all_proofs_from_disk
             , Diff_error.Overloaded ) )
 
       let empty = []
@@ -1117,6 +1121,9 @@ struct
         Map.merge_skewed ledger_vks mempool_vks ~combine:(fun ~key:_ ->
             Map.merge_skewed ~combine:(fun ~key:_ _ x -> x) )
 
+      (* TODO: remove the need for conversion *)
+      let verification_proof_cache_db = Proof_cache_tag.create_identity_db ()
+
       (** DO NOT mutate any transaction pool state in this function, you may only mutate in the synchronous `apply` function. *)
       let verify (t : pool)
           Envelope.Incoming.{ data = diff; sender; received_at } :
@@ -1180,9 +1187,13 @@ struct
         in
         let%bind verified_diff =
           O1trace.sync_thread "convert_transactions_to_verifiable" (fun () ->
-              List.map ~f:User_command.write_all_proofs_to_disk diff
-              |> User_command.Unapplied_sequence.to_all_verifiable
-                   ~load_vk_cache:(load_vk_cache ~t ~ledger) )
+              User_command.Unapplied_sequence.to_all_verifiable
+                ~load_vk_cache:(load_vk_cache ~t ~ledger)
+              @@ List.map
+                   ~f:
+                     (User_command.write_all_proofs_to_disk
+                        ~proof_cache_db:verification_proof_cache_db )
+                   diff )
           |> Result.map_error ~f:(fun e -> Invalid e)
           |> Deferred.return
         in
@@ -1197,7 +1208,10 @@ struct
             [%log' debug t.logger]
               "Failed to batch verify $transaction_pool_diff"
               ~metadata:
-                [ ("transaction_pool_diff", Diff_versioned.to_yojson diff) ] ;
+                [ ( "transaction_pool_diff"
+                  , `List
+                      (List.map ~f:User_command.Stable.Latest.to_yojson diff) )
+                ] ;
             Deferred.Result.fail (Failure e)
         | Ok (Error invalid) ->
             let err = Verifier.invalid_to_error invalid in
@@ -1475,12 +1489,13 @@ struct
                    in
                    x -. Mina_metrics.time_offset_sec )) ) ;
             let f =
-              Fn.compose User_command.read_all_proofs_from_disk
-                Transaction_hash.User_command_with_valid_signature.command
+              Transaction_hash.User_command_with_valid_signature.command
             in
             Ok
               ( decision
-              , List.map ~f accepted
+              , List.map
+                  ~f:(Fn.compose User_command.read_all_proofs_from_disk f)
+                  accepted
               , List.map ~f:(Tuple2.map_fst ~f) rejected )
         | Error e ->
             Error (`Other e)
@@ -1691,6 +1706,8 @@ let%test_module _ =
       Transaction_snark.For_tests.create_trivial_snapp ()
 
     let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
+
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
 
     let dummy_state_view =
       let state_body =
@@ -1939,6 +1956,7 @@ let%test_module _ =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
           ~genesis_constants ~slot_tx_end
           ~vk_cache_db:(Zkapp_vk_cache_tag.For_tests.create_db ())
+          ~proof_cache_db
       in
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
@@ -2129,7 +2147,7 @@ let%test_module _ =
                 ~max_token_updates:1 ~keymap ~account_state_tbl
                 ~fee_payer_keypair ~ledger:best_tip_ledger ~constraint_constants
                 ~genesis_constants
-                ~map_account_update:(fun (p : Account_update.t) ->
+                ~map_account_update:(fun (p : Account_update.Stable.Latest.t) ->
                   Zkapp_command.For_tests.replace_vk vk
                     { p with
                       body =
@@ -2233,7 +2251,7 @@ let%test_module _ =
                 Core.Printf.printf
                   !"command was rejected because %s: %{Yojson.Safe}\n%!"
                   (Diff_versioned.Diff_error.to_string_name err)
-                  (User_command.Stable.Latest.to_yojson cmd) )
+                  (User_command.to_yojson cmd) )
       | Ok (`Reject, _, _) ->
           failwith "diff was rejected during application"
       | Error (`Other err) ->
@@ -3125,7 +3143,7 @@ let%test_module _ =
             Test.Resource_pool.Diff.verify test.txn_pool
               (Envelope.Incoming.wrap
                  ~data:
-                   [ User_command.(forget_check tx |> read_all_proofs_from_disk)
+                   [ User_command.(read_all_proofs_from_disk @@ forget_check tx)
                    ]
                  ~sender:Envelope.Sender.Local )
           with

@@ -29,9 +29,11 @@ module Inputs = struct
       { m : (module S) option
       ; cache : Cache.t
       ; proof_level : Genesis_constants.Proof_level.t
+      ; proof_cache_db : Proof_cache_tag.cache_db
       }
 
     let create ~constraint_constants ~proof_level () =
+      let proof_cache_db = Proof_cache_tag.create_identity_db () in
       let m =
         match proof_level with
         | Genesis_constants.Proof_level.Full ->
@@ -44,7 +46,8 @@ module Inputs = struct
         | Check | No_check ->
             None
       in
-      Deferred.return { m; cache = Cache.create (); proof_level }
+      Deferred.return
+        { m; cache = Cache.create (); proof_level; proof_cache_db }
 
     let worker_wait_time = 5.
   end
@@ -78,7 +81,8 @@ module Inputs = struct
     in
     Fn.compose impl convert
 
-  let perform_single ({ m; cache; proof_level } : Worker_state.t) ~message =
+  let perform_single
+      ({ m; cache; proof_level; proof_cache_db } : Worker_state.t) ~message =
     let open Deferred.Or_error.Let_syntax in
     let open Snark_work_lib in
     let sok_digest = Mina_base.Sok_message.digest message in
@@ -140,7 +144,7 @@ module Inputs = struct
                                     , `Connecting_ledger_hash
                                         input.connecting_ledger_left
                                     , Zkapp_command.write_all_proofs_to_disk
-                                        zkapp_command )
+                                        ~proof_cache_db zkapp_command )
                                   ]
                                 |> List.rev )
                             |> Result.map_error ~f:(fun e ->

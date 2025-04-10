@@ -90,18 +90,20 @@ end]
 type t = (Signed_command.t, Zkapp_command.t) Poly.t
 [@@deriving sexp_of, to_yojson]
 
-module Legacy : sig
+module Legacy (Context : sig
+  val proof_cache_db : Proof_cache_tag.cache_db
+end) : sig
   type nonrec t = t [@@deriving of_yojson]
 end = struct
-  type t =
-    ( Signed_command.t
-    , ( Proof.t
-      , Zkapp_command.Digest.Account_update.t
-      , Zkapp_command.Digest.Forest.t )
-      Zkapp_command.with_forest )
-    Poly.t
+  type nonrec t = t
 
-  let proof_of_yojson = Proof.of_yojson
+  let proof_of_yojson json =
+    match Proof.of_yojson json with
+    | Ok proof ->
+        Ppx_deriving_yojson_runtime.Result.Ok
+          (Proof_cache_tag.write_proof_to_disk Context.proof_cache_db proof)
+    | Error e ->
+        Ppx_deriving_yojson_runtime.Result.Error e
 
   let of_yojson =
     Poly.of_yojson Signed_command.of_yojson
@@ -110,11 +112,11 @@ end = struct
          Zkapp_command.Digest.Forest.of_yojson
 end
 
-let write_all_proofs_to_disk : Stable.Latest.t -> t = function
+let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t = function
   | Signed_command sc ->
       Signed_command sc
   | Zkapp_command zc ->
-      Zkapp_command (Zkapp_command.write_all_proofs_to_disk zc)
+      Zkapp_command (Zkapp_command.write_all_proofs_to_disk ~proof_cache_db zc)
 
 let read_all_proofs_from_disk : t -> Stable.Latest.t = function
   | Signed_command sc ->
@@ -178,7 +180,7 @@ module Verifiable = struct
     ( Signed_command.Stable.Latest.t
     , Zkapp_command.Verifiable.t )
     Poly.Stable.Latest.t
-  [@@deriving sexp_of, bin_io_unversioned]
+  [@@deriving sexp_of]
 
   let fee_payer (t : t) =
     match t with
@@ -186,6 +188,29 @@ module Verifiable = struct
         Signed_command.fee_payer x
     | Zkapp_command p ->
         Account_update.Fee_payer.account_id p.fee_payer
+
+  module Serializable = struct
+    type t =
+      ( Signed_command.Stable.Latest.t
+      , Zkapp_command.Verifiable.Serializable.t )
+      Poly.Stable.Latest.t
+    [@@deriving bin_io_unversioned]
+  end
+
+  let to_serializable (t : t) : Serializable.t =
+    match t with
+    | Signed_command c ->
+        Signed_command c
+    | Zkapp_command cmd ->
+        Zkapp_command (Zkapp_command.Verifiable.to_serializable cmd)
+
+  let of_serializable ~proof_cache_db (t : Serializable.t) : t =
+    match t with
+    | Signed_command c ->
+        Signed_command c
+    | Zkapp_command cmd ->
+        Zkapp_command
+          (Zkapp_command.Verifiable.of_serializable ~proof_cache_db cmd)
 end
 
 let to_verifiable (t : t) ~failed ~find_vk : Verifiable.t Or_error.t =

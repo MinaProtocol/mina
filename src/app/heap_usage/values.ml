@@ -33,11 +33,11 @@ let account : Mina_base.Account.t =
   }
 
 (* beefy zkapp command with all proof updates *)
-let zkapp_command ~genesis_constants ~constraint_constants =
+let zkapp_command ~proof_cache_db ~genesis_constants ~constraint_constants =
   let num_updates = 16 in
   let%map.Async.Deferred _, zkapp_commands =
-    Snark_profiler_lib.create_ledger_and_zkapps ~genesis_constants
-      ~constraint_constants ~min_num_updates:num_updates
+    Snark_profiler_lib.create_ledger_and_zkapps ~proof_cache_db
+      ~genesis_constants ~constraint_constants ~min_num_updates:num_updates
       ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
   in
   List.hd_exn zkapp_commands

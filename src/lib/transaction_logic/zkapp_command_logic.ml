@@ -230,6 +230,56 @@ module Local_state = struct
     end
   end]
 
+  let map_with_hashes (type with_hashes with_hashes_modified)
+      ~(f : with_hashes -> with_hashes_modified)
+      (t :
+        ( ('token_id, with_hashes) Stack_frame.t
+        , ( (('token_id, with_hashes) Stack_frame.t, 'frame_digest) With_hash.t
+          , 'call_stack_digest )
+          With_stack_hash.t
+          list
+        , 'c
+        , 'd
+        , 'e
+        , 'f
+        , 'g
+        , 'h )
+        t ) :
+      ( ('token_id, with_hashes_modified) Stack_frame.t
+      , ( ( ('token_id, with_hashes_modified) Stack_frame.t
+          , 'frame_digest )
+          With_hash.t
+        , 'call_stack_digest )
+        With_stack_hash.t
+        list
+      , 'c
+      , 'd
+      , 'e
+      , 'f
+      , 'g
+      , 'h )
+      t =
+    let map_frame frame =
+      { frame with Stack_frame.calls = f frame.Stack_frame.calls }
+    in
+    { stack_frame = map_frame t.stack_frame
+    ; call_stack =
+        List.map t.call_stack
+          ~f:(fun ({ With_stack_hash.elt = { data; _ } as elt; _ } as wsh) ->
+            { wsh with
+              With_stack_hash.elt = { elt with data = map_frame data }
+            } )
+    ; transaction_commitment = t.transaction_commitment
+    ; full_transaction_commitment = t.full_transaction_commitment
+    ; excess = t.excess
+    ; supply_increase = t.supply_increase
+    ; ledger = t.ledger
+    ; success = t.success
+    ; account_update_index = t.account_update_index
+    ; failure_status_tbl = t.failure_status_tbl
+    ; will_succeed = t.will_succeed
+    }
+
   let typ stack_frame call_stack excess supply_increase ledger bool comm length
       failure_status_tbl =
     Pickles.Impls.Step.Typ.of_hlistable

@@ -355,7 +355,7 @@ end
 module type Transaction_pool_diff_intf = sig
   type resource_pool
 
-  type t = User_command.Stable.Latest.t list [@@deriving of_yojson]
+  type t = User_command.Stable.Latest.t list [@@deriving to_yojson]
 
   module Diff_error : sig
     type t =
@@ -371,14 +371,13 @@ module type Transaction_pool_diff_intf = sig
       | Fee_payer_account_not_found
       | Fee_payer_not_permitted_to_send
       | After_slot_tx_end
-    [@@deriving yojson]
+    [@@deriving to_yojson]
 
     val to_string_hum : t -> string
   end
 
   module Rejected : sig
-    type t = (User_command.Stable.Latest.t * Diff_error.t) list
-    [@@deriving yojson]
+    type t = (User_command.t * Diff_error.t) list [@@deriving to_yojson]
   end
 
   type Structured_log_events.t +=
@@ -407,6 +406,7 @@ module type Transaction_resource_pool_intf = sig
     -> genesis_constants:Genesis_constants.t
     -> slot_tx_end:Mina_numbers.Global_slot_since_hard_fork.t option
     -> vk_cache_db:Zkapp_vk_cache_tag.cache_db
+    -> proof_cache_db:Proof_cache_tag.cache_db
     -> Config.t
 
   val member : t -> Transaction_hash.t -> bool

@@ -458,7 +458,7 @@ let%test_module "multisig_account" =
                 }
               in
               let zkapp_command : Zkapp_command.t =
-                Zkapp_command.of_simple
+                Zkapp_command.of_simple ~proof_cache_db
                   { fee_payer
                   ; account_updates =
                       [ sender
