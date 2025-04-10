@@ -56,7 +56,7 @@ let main ~db_uri ~network_data_folder () =
   let source_db = db_uri ^ "/" ^ source_db_name in
   let target_db = db_uri ^ "/" ^ target_db_name in
 
-  let extract_blocks = Extract_blocks.of_context Executor.AutoDetect in
+  let extract_blocks = Extract_blocks.default in
   let config =
     { Extract_blocks.Config.archive_uri = source_db
     ; range = Extract_blocks.Config.AllBlocks
@@ -67,7 +67,7 @@ let main ~db_uri ~network_data_folder () =
   in
   let%bind _ = Extract_blocks.run extract_blocks ~config in
 
-  let archive_blocks = Archive_blocks.of_context Executor.AutoDetect in
+  let archive_blocks = Archive_blocks.default in
 
   let%bind extensional_files =
     Sys.ls_dir output_folder
@@ -105,12 +105,10 @@ let main ~db_uri ~network_data_folder () =
       ~archive_uri:target_db ~format:Extensional
   in
 
-  let%bind missing_blocks_auditor_path =
-    Missing_blocks_auditor.of_context Executor.AutoDetect
-    |> Missing_blocks_auditor.path
+  let%bind missing_blocks_auditor_path = Missing_blocks_auditor.path
   in
 
-  let%bind archive_blocks_path = Archive_blocks.path archive_blocks in
+  let%bind archive_blocks_path = Archive_blocks.path in
 
   let config =
     { Missing_blocks_guardian.Config.archive_uri = Uri.of_string target_db
@@ -124,12 +122,12 @@ let main ~db_uri ~network_data_folder () =
   in
 
   let missing_blocks_guardian =
-    Missing_blocks_guardian.of_context Executor.AutoDetect
+    Missing_blocks_guardian.default
   in
 
   let%bind _ = Missing_blocks_guardian.run missing_blocks_guardian ~config in
 
-  let replayer = Replayer.of_context Executor.AutoDetect in
+  let replayer = Replayer.default in
 
   let%bind _ =
     Replayer.run replayer ~archive_uri:target_db
