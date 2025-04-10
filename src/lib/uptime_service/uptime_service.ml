@@ -197,8 +197,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
 
 let read_all_proofs_for_work_single_spec =
   Snark_work_lib.Work.Single.Spec.map
-    ~f_proof:Ledger_proof.Cached.read_proof_from_disk
-    ~f_witness:Transaction_witness.read_all_proofs_from_disk
+    ~f_proof:Ledger_proof.Cached.read_proof_from_disk ~f_witness:ident
 
 let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
     ~url ~snark_worker ~transition_frontier ~peer_id
