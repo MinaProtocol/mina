@@ -1059,10 +1059,11 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
             |> M.lift
           in
           (* check remove_exn dropped the right things *)
-          [%test_eq:
-            Transaction_hash.User_command_with_valid_signature.t Sequence.t]
-            dropped
-            (F_sequence.to_seq drop_queue) ;
+          assert (
+            [%equal:
+              Transaction_hash.User_command_with_valid_signature.t Sequence.t]
+              dropped
+              (F_sequence.to_seq drop_queue) ) ;
           (* Add the new transaction *)
           let%bind cmd, _ =
             let%map v, dropped' =
