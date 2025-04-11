@@ -4,6 +4,12 @@
 
 open Core_kernel
 
+(* NOTE: For Type_equal.Id, see:
+   https://ocaml.janestreet.com/ocaml-core/v0.13/doc/base/Base__Type_equal/Id/index.html
+   Most notably, 2 calls to Id.create will create 2 different identifiers, even
+   if the type associated are the same.
+*)
+
 type ('var, 'value, 'n1, 'n2) id = ('var * 'value * 'n1 * 'n2) Type_equal.Id.t
 
 type kind = Side_loaded | Compiled

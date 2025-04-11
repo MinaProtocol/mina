@@ -47,6 +47,7 @@ module H1_1 (F : Poly_types.T2) = struct
         T (S n, S p)
 end
 
+(* Type level identity function *)
 module Id = struct
   type 'a t = 'a
 end
