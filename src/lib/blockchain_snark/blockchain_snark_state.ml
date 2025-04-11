@@ -486,7 +486,7 @@ end) : S = struct
       ~auxiliary_typ:Typ.unit
       ~max_proofs_verified:(module Nat.N2)
       ~name:"blockchain-snark"
-      ~choices:(fun ~self ->
+      ~rules:(fun ~self ->
         [ rule ~proof_level ~constraint_constants T.tag self ] )
 
   let step = with_handler step

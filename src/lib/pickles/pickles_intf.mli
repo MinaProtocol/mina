@@ -422,7 +422,7 @@ module type S = sig
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = 'max_proofs_verified)
     -> name:string
-    -> choices:
+    -> rules:
          (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
           -> ( 'branches
              , 'prev_varss
@@ -477,7 +477,7 @@ module type S = sig
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = 'max_proofs_verified)
     -> name:string
-    -> choices:
+    -> rules:
          (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
           -> ( 'branches
              , 'prev_varss
@@ -532,7 +532,7 @@ module type S = sig
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = 'max_proofs_verified)
     -> name:string
-    -> choices:
+    -> rules:
          (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
           -> ( 'branches
              , 'prev_varss

@@ -52,7 +52,7 @@ let test_range_check_lookup () =
       ~auxiliary_typ:Typ.unit
       ~max_proofs_verified:(module Nat.N0)
       ~name:"lookup range-check"
-      ~choices:(fun ~self:_ ->
+      ~rules:(fun ~self:_ ->
         [ { identifier = "main"
           ; prevs = []
           ; main =

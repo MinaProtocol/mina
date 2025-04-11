@@ -237,7 +237,7 @@ let register_test name feature_flags1 feature_flags2 =
       ~auxiliary_typ:Typ.unit
       ~max_proofs_verified:(module Nat.N0)
       ~name:"optional_custom_gates"
-      ~choices:(fun ~self:_ ->
+      ~rules:(fun ~self:_ ->
         [ { identifier = "main1"
           ; prevs = []
           ; main =

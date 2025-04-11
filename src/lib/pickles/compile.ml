@@ -293,7 +293,7 @@ struct
   module HIR = H4.T (IR)
 
   let max_local_max_proofs_verifieds ~self (type n)
-      (module Max_proofs_verified : Nat.Intf with type n = n) branches choices =
+      (module Max_proofs_verified : Nat.Intf with type n = n) branches rules =
     let module Local_max_proofs_verifieds = struct
       type t = (int, Max_proofs_verified.n) Vector.t
     end in
@@ -324,7 +324,7 @@ struct
         end)
     in
     let module V = H4.To_vector (Local_max_proofs_verifieds) in
-    let padded = V.f branches (M.f choices) |> Vector.transpose in
+    let padded = V.f branches (M.f rules) |> Vector.transpose in
     (padded, Maxes.m padded)
 
   module Lazy_keys = struct
@@ -361,7 +361,7 @@ struct
            , Ret_value.t )
            Inductive_rule.public_input
       -> auxiliary_typ:(Auxiliary_var.t, Auxiliary_value.t) Impls.Step.Typ.t
-      -> choices:(prev_varss, prev_valuess, widthss, heightss) H4.T(IR).t
+      -> rules:(prev_varss, prev_valuess, widthss, heightss) H4.T(IR).t
       -> unit
       -> ( prev_valuess
          , widthss
@@ -381,7 +381,7 @@ struct
        ~proof_cache ?disk_keys ?override_wrap_domain ?override_wrap_main
        ?(num_chunks = Plonk_checks.num_chunks_by_default) ~branches
        ~prev_varss_length ~max_proofs_verified ~name ?constraint_constants
-       ~public_input ~auxiliary_typ ~choices () ->
+       ~public_input ~auxiliary_typ ~rules () ->
     let snark_keys_header kind constraint_system_hash =
       let constraint_constants : Snark_keys_header.Constraint_constants.t =
         match constraint_constants with
@@ -420,7 +420,7 @@ struct
         ( module struct
           include Max_proofs_verified
         end )
-        prev_varss_length choices ~self:self.id
+        prev_varss_length rules ~self:self.id
     in
     let full_signature = { Full_signature.padded; maxes = (module Maxes) } in
     Timer.clock __LOC__ ;
@@ -452,7 +452,7 @@ struct
                 | _, Maybe | true, No | false, Yes ->
                     Maybe )
       in
-      go choices
+      go rules
     in
     let wrap_domains =
       match override_wrap_domain with
@@ -498,7 +498,7 @@ struct
           end)
       in
       let module V = H4.To_vector (Int) in
-      V.f prev_varss_length (M.f choices)
+      V.f prev_varss_length (M.f rules)
     in
     let step_data =
       let i = ref 0 in
@@ -526,7 +526,7 @@ struct
             let chain_to = Promise.map b.domains ~f:(fun _ -> ()) in
             first :: f (rules, chain_to)
       in
-      f (choices, Promise.return ())
+      f (rules, Promise.return ())
     in
     Timer.clock __LOC__ ;
     let step_domains =
@@ -1006,7 +1006,7 @@ let compile_with_wrap_main_override_promise :
          (module Nat.Add.Intf with type n = max_proofs_verified)
     -> name:string
     -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
-    -> choices:
+    -> rules:
          (   self:(var, value, max_proofs_verified, branches) Tag.t
           -> ( branches
              , prev_varss
@@ -1041,7 +1041,7 @@ let compile_with_wrap_main_override_promise :
  fun ?self ?(cache = []) ?(storables = Storables.default) ?proof_cache
      ?disk_keys ?override_wrap_domain ?override_wrap_main ?num_chunks
      ~public_input ~auxiliary_typ ~max_proofs_verified ~name
-     ?constraint_constants ~choices () ->
+     ?constraint_constants ~rules () ->
   let self =
     match self with
     | None ->
@@ -1107,16 +1107,16 @@ let compile_with_wrap_main_override_promise :
     | r :: rs ->
         r :: conv_irs rs
   in
-  let choices = choices ~self in
+  let rules = rules ~self in
   let branches, prev_varss_length =
     let module IR_hlist = H4_6_with_length.T (Inductive_rule.Promise) in
-    IR_hlist.length choices
+    IR_hlist.length rules
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
     M.compile ~self ~proof_cache ~cache ~storables ?disk_keys
       ?override_wrap_domain ?override_wrap_main ?num_chunks ~branches
       ~prev_varss_length ~max_proofs_verified ~name ~public_input ~auxiliary_typ
-      ?constraint_constants ~choices:(conv_irs choices) ()
+      ?constraint_constants ~rules:(conv_irs rules) ()
   in
   let (module Max_proofs_verified) = max_proofs_verified in
   let T = Max_proofs_verified.eq in
@@ -1345,7 +1345,7 @@ struct
       ~public_input:(Input Typ.unit) ~auxiliary_typ:Typ.unit
       ~max_proofs_verified:(module Nat.N2)
       ~name:"blockchain-snark"
-      ~choices:(fun ~self -> [ rule self ])
+      ~rules:(fun ~self -> [ rule self ])
 
   module Proof = (val p)
 
@@ -1383,7 +1383,7 @@ struct
             ~public_input:(Input Typ.unit) ~auxiliary_typ:Typ.unit
             ~max_proofs_verified:(module Nat.N2)
             ~name:"recurse-on-bad"
-            ~choices:(fun ~self:_ ->
+            ~rules:(fun ~self:_ ->
               [ { identifier = "main"
                 ; feature_flags = Plonk_types.Features.none_bool
                 ; prevs = [ tag; tag ]

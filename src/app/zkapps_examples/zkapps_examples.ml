@@ -544,7 +544,7 @@ let compile :
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = max_proofs_verified)
     -> name:string
-    -> choices:
+    -> rules:
          (   self:
                ( Zkapp_statement.Checked.t
                , Zkapp_statement.t
@@ -587,9 +587,9 @@ let compile :
            Deferred.t )
          H3_2.T(Pickles.Prover).t =
  fun ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain ~auxiliary_typ
-     ~max_proofs_verified ~name ~choices () ->
+     ~max_proofs_verified ~name ~rules () ->
   let vk_hash = ref None in
-  let choices ~self =
+  let rules ~self =
     let rec go :
         type branches prev_varss prev_valuess widthss heightss.
            ( branches
@@ -618,7 +618,7 @@ let compile :
            H4_6_with_length.T(Pickles.Inductive_rule.Deferred).t = function
       | [] ->
           []
-      | { identifier; prevs; main; feature_flags } :: choices ->
+      | { identifier; prevs; main; feature_flags } :: rules ->
           { identifier
           ; prevs
           ; feature_flags
@@ -642,15 +642,15 @@ let compile :
                 ; auxiliary_output = (account_update_tree, auxiliary_output)
                 } )
           }
-          :: go choices
+          :: go rules
     in
-    go (choices ~self)
+    go (rules ~self)
   in
   let tag, cache_handle, proof, provers =
     Pickles.compile_async () ?self ?cache ?proof_cache ?disk_keys
       ?override_wrap_domain ~public_input:(Output Zkapp_statement.typ)
       ~auxiliary_typ:Typ.(Prover_value.typ () * auxiliary_typ)
-      ~max_proofs_verified ~name ~choices
+      ~max_proofs_verified ~name ~rules
   in
   let () =
     vk_hash :=

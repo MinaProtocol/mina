@@ -3334,7 +3334,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~public_input:(Input Statement.With_sok.typ) ~auxiliary_typ:Typ.unit
       ~max_proofs_verified:(module Nat.N2)
       ~name:"transaction-snark"
-      ~choices:(fun ~self ->
+      ~rules:(fun ~self ->
         let zkapp_command x =
           Base.Zkapp_command_snark.rule ~constraint_constants ~proof_level x
         in
@@ -4186,7 +4186,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
           ~max_proofs_verified:(module Nat.N0)
           ~name:"trivial"
-          ~choices:(fun ~self:_ -> [ trivial_rule ])
+          ~rules:(fun ~self:_ -> [ trivial_rule ])
       in
       let trivial_prover ?handler stmt =
         let open Async.Deferred.Let_syntax in

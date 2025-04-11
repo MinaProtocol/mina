@@ -12,7 +12,7 @@ let test () =
       ~auxiliary_typ:Typ.unit
       ~max_proofs_verified:(module Nat.N0)
       ~num_chunks:2 ~override_wrap_domain:N1 ~name:"chunked_circuits"
-      ~choices:(fun ~self:_ ->
+      ~rules:(fun ~self:_ ->
         [ { identifier = "2^16"
           ; prevs = []
           ; main =
@@ -79,7 +79,7 @@ let test () =
       ~auxiliary_typ:Typ.unit
       ~max_proofs_verified:(module Nat.N1)
       ~name:"recursion over chunks"
-      ~choices:(fun ~self:_ ->
+      ~rules:(fun ~self:_ ->
         [ { identifier = "recurse over 2^17"
           ; prevs = [ tag ]
           ; main =

@@ -13,7 +13,7 @@ let test () =
       ~auxiliary_typ:Typ.unit
       ~max_proofs_verified:(module Nat.N0)
       ~num_chunks:8 ~override_wrap_domain:N2 ~name:"chunked_circuits"
-      ~choices:(fun ~self:_ ->
+      ~rules:(fun ~self:_ ->
         [ { identifier = "2^18"
           ; prevs = []
           ; main =

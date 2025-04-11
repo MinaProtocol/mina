@@ -315,16 +315,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
-      ~max_proofs_verified ~name ~choices () =
+      ~max_proofs_verified ~name ~rules () =
     compile_with_wrap_main_override_promise ?self ?cache ?storables ?proof_cache
       ?disk_keys ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
-      ~max_proofs_verified ~name ~choices ()
+      ~max_proofs_verified ~name ~rules ()
 
   let compile ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
-      ~max_proofs_verified ~name ~choices () =
-    let choices ~self =
-      let choices = choices ~self in
+      ~max_proofs_verified ~name ~rules () =
+    let rules ~self =
+      let rules = rules ~self in
       let rec go :
           type length a b c d e f g h i j.
              ( length
@@ -361,12 +361,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
             }
             :: go rest
       in
-      go choices
+      go rules
     in
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
         ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
-        ~max_proofs_verified ~name ~choices ()
+        ~max_proofs_verified ~name ~rules ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
@@ -383,9 +383,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let compile_async ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
-      ~max_proofs_verified ~name ~choices () =
-    let choices ~self =
-      let choices = choices ~self in
+      ~max_proofs_verified ~name ~rules () =
+    let rules ~self =
+      let rules = rules ~self in
       let rec go :
           type length a b c d e f g h i j.
              ( length
@@ -427,12 +427,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
             }
             :: go rest
       in
-      go choices
+      go rules
     in
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
         ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
-        ~max_proofs_verified ~name ~choices ()
+        ~max_proofs_verified ~name ~rules ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
@@ -496,7 +496,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~auxiliary_typ:Typ.unit
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
-                ~choices:(fun ~self:_ ->
+                ~rules:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -534,7 +534,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~auxiliary_typ:Typ.unit
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
-                ~choices:(fun ~self:_ ->
+                ~rules:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -588,7 +588,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~auxiliary_typ:Typ.unit
                 ~max_proofs_verified:(module Nat.N1)
                 ~name:"blockchain-snark"
-                ~choices:(fun ~self ->
+                ~rules:(fun ~self ->
                   [ { identifier = "main"
                     ; prevs = [ self ]
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -683,7 +683,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~auxiliary_typ:Typ.unit
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"blockchain-snark"
-                ~choices:(fun ~self ->
+                ~rules:(fun ~self ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
                     ; prevs = [ No_recursion.tag; self ]
@@ -802,7 +802,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~auxiliary_typ:Typ.unit
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"blockchain-snark"
-                ~choices:(fun ~self ->
+                ~rules:(fun ~self ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
                     ; prevs = [ No_recursion_return.tag; self ]
@@ -901,7 +901,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~auxiliary_typ:Typ.unit
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
-                ~choices:(fun ~self:_ ->
+                ~rules:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
                     ; prevs = []
@@ -941,7 +941,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~auxiliary_typ:Field.typ
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
-                ~choices:(fun ~self:_ ->
+                ~rules:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
                     ; prevs = []
@@ -1061,7 +1061,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         let max_local_max_proofs_verifieds ~self (type n)
             (module Max_proofs_verified : Nat.Intf with type n = n) branches
-            choices =
+            rules =
           let module Local_max_proofs_verifieds = struct
             type t = (int, Max_proofs_verified.n) Vector.t
           end in
@@ -1093,7 +1093,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               end)
           in
           let module V = H4.To_vector (Local_max_proofs_verifieds) in
-          let padded = V.f branches (M.f choices) |> Vector.transpose in
+          let padded = V.f branches (M.f rules) |> Vector.transpose in
           (padded, Maxes.m padded)
 
         module Lazy_keys = struct
@@ -1923,7 +1923,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~auxiliary_typ:Typ.unit
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"recurse-on-bad"
-                ~choices:(fun ~self:_ ->
+                ~rules:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
                     ; prevs = [ tag; tag ]
@@ -2050,7 +2050,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~auxiliary_typ:Typ.unit
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
-                ~choices:(fun ~self:_ ->
+                ~rules:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -2088,7 +2088,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~auxiliary_typ:Typ.unit
                 ~max_proofs_verified:(module Nat.N1)
                 ~name:"blockchain-snark"
-                ~choices:(fun ~self:_ ->
+                ~rules:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -2127,7 +2127,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~auxiliary_typ:Typ.unit
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"blockchain-snark"
-                ~choices:(fun ~self:_ ->
+                ~rules:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -2191,7 +2191,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~auxiliary_typ:Typ.unit
                 ~max_proofs_verified:(module Nat.N1)
                 ~name:"blockchain-snark"
-                ~choices:(fun ~self:_ ->
+                ~rules:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = [ side_loaded_tag ]
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -2358,7 +2358,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~auxiliary_typ:Typ.unit
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
-                ~choices:(fun ~self:_ ->
+                ~rules:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -2396,7 +2396,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~auxiliary_typ:Typ.unit
                 ~max_proofs_verified:(module Nat.N1)
                 ~name:"blockchain-snark"
-                ~choices:(fun ~self:_ ->
+                ~rules:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -2435,7 +2435,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~auxiliary_typ:Typ.unit
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"blockchain-snark"
-                ~choices:(fun ~self:_ ->
+                ~rules:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -2502,7 +2502,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~auxiliary_typ:Typ.unit
                 ~max_proofs_verified:(module Nat.N1)
                 ~name:"blockchain-snark"
-                ~choices:(fun ~self:_ ->
+                ~rules:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = [ side_loaded_tag ]
                     ; feature_flags = Plonk_types.Features.none_bool

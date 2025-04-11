@@ -14,21 +14,21 @@ module Make
     (Auxiliary_var : T0)
     (Auxiliary_value : T0) =
 struct
-  let f_debug full_signature _num_choices choices_length ~feature_flags
-      ~num_chunks ~max_proofs_verified =
-    let num_choices = Hlist.Length.to_nat choices_length in
+  let f_debug full_signature _num_rules rules_length ~feature_flags ~num_chunks
+      ~max_proofs_verified =
+    let num_rules = Hlist.Length.to_nat rules_length in
     let dummy_step_domains =
       Promise.return
-      @@ Vector.init num_choices ~f:(fun _ -> Fix_domains.rough_domains)
+      @@ Vector.init num_rules ~f:(fun _ -> Fix_domains.rough_domains)
     in
     let dummy_step_widths =
-      Vector.init num_choices ~f:(fun _ ->
+      Vector.init num_rules ~f:(fun _ ->
           Nat.to_int (Nat.Add.n max_proofs_verified) )
     in
     let dummy_step_keys =
       lazy
         (Promise.return
-           (Vector.init num_choices ~f:(fun _ ->
+           (Vector.init num_rules ~f:(fun _ ->
                 let num_chunks =
                   (* TODO *) Plonk_checks.num_chunks_by_default
                 in
@@ -42,7 +42,7 @@ struct
     let srs = Backend.Tick.Keypair.load_urs () in
     let _, main =
       Wrap_main.wrap_main ~feature_flags ~num_chunks ~srs full_signature
-        choices_length dummy_step_keys dummy_step_widths dummy_step_domains
+        rules_length dummy_step_keys dummy_step_widths dummy_step_domains
         max_proofs_verified
     in
     Timer.clock __LOC__ ;
@@ -55,7 +55,7 @@ struct
     in
     Timer.clock __LOC__ ; t
 
-  let f full_signature num_choices choices_length ~feature_flags ~num_chunks
+  let f full_signature num_rules rules_length ~feature_flags ~num_chunks
       ~max_proofs_verified =
     Common.wrap_domains
       ~proofs_verified:(Nat.to_int (Nat.Add.n max_proofs_verified))
