@@ -139,14 +139,16 @@ module Inputs = struct
                                     , `Sparse_ledger w.second_pass_ledger
                                     , `Connecting_ledger_hash
                                         input.connecting_ledger_left
-                                    , zkapp_command )
+                                    , Zkapp_command.write_all_proofs_to_disk
+                                        zkapp_command )
                                   ]
                                 |> List.rev )
                             |> Result.map_error ~f:(fun e ->
                                    Error.createf
                                      !"Failed to generate inputs for \
                                        zkapp_command : %s: %s"
-                                     ( Zkapp_command.to_yojson zkapp_command
+                                     ( Zkapp_command.Stable.Latest.to_yojson
+                                         zkapp_command
                                      |> Yojson.Safe.to_string )
                                      (Error.to_string_hum e) )
                             |> Deferred.return
