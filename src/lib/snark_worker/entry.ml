@@ -64,7 +64,7 @@ type Structured_log_events.t +=
 include Worker_impl_prod.Impl
 
 let perform (s : Worker_state.t) public_key
-    ({ instances; fee } as spec : Concrete_work.Spec.t) =
+    ({ instances; fee } as spec : Rpcs_types.Wire_work.Spec.t) =
   One_or_two.Deferred_result.map instances ~f:(fun w ->
       let open Deferred.Or_error.Let_syntax in
       let%map proof, time =
@@ -283,7 +283,7 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
             log_and_retry "performing work" error (retry_pause 10.) go
         | Ok result ->
             emit_proof_metrics result.metrics
-              (Concrete_work.Result.transactions result)
+              (Rpcs_types.Wire_work.Result.transactions result)
               logger ;
             [%log info] "Submitted completed SNARK work $work_ids to $address"
               ~metadata:

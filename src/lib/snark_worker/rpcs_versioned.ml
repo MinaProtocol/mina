@@ -63,8 +63,7 @@ module Get_work = struct
       type query = unit
 
       type response =
-        (Concrete_work.Spec.Stable.V1.t * Public_key.Compressed.Stable.V1.t)
-        option
+        (Wire_work.Spec.Stable.V1.t * Public_key.Compressed.Stable.V1.t) option
 
       let query_of_caller_model = const ()
 
@@ -104,7 +103,7 @@ module Submit_work = struct
   module V3 = struct
     module T = struct
       type query =
-        | Regular of Concrete_work.Result.Stable.V1.t
+        | Regular of Wire_work.Result.Stable.V1.t
         | Zkapp_command_segment of
             Ledger_proof.Stable.V2.t
             Work.Result_zkapp_command_segment.Stable.V1.t
@@ -140,7 +139,7 @@ module Submit_work = struct
 
   module V2 = struct
     module T = struct
-      type query = Concrete_work.Result.Stable.V1.t
+      type query = Wire_work.Result.Stable.V1.t
 
       type response = unit
 
@@ -212,7 +211,7 @@ module Failed_to_generate_snark = struct
     module T = struct
       type query =
         Bounded_types.Wrapped_error.Stable.V1.t
-        * Concrete_work.Spec.Stable.V1.t
+        * Wire_work.Spec.Stable.V1.t
         * Public_key.Compressed.Stable.V1.t
 
       type response = unit

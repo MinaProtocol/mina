@@ -39,7 +39,7 @@ module Submit_work = struct
     *)
     module T = struct
       type query =
-        | Regular of Concrete_work.Result.t
+        | Regular of Wire_work.Result.t
         | Zkapp_command_segment of
             Ledger_proof.t Work.Result_zkapp_command_segment.t
 

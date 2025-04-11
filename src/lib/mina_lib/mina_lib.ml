@@ -878,7 +878,7 @@ let request_work t =
 let work_selection_method t = t.config.work_selection_method
 
 (* A Snark worker is submitting completed work back to the coordinator *)
-let add_work t (work : Snark_worker_lib.Concrete_work.Result.t) =
+let add_work t (work : Snark_worker_lib.Rpcs_types.Wire_work.Result.t) =
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =

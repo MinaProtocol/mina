@@ -19,7 +19,7 @@ let main (spec_path : string) ~constraint_constants ~proof_level =
   let module Impl = Snark_worker.Impl.Prod in
   let%bind spec =
     Reader.load_sexp_exn spec_path
-      Snark_worker.Concrete_work.Single.Spec.t_of_sexp
+      Snark_worker.Rpcs_types.Wire_work.Single.Spec.t_of_sexp
   in
   let%bind worker =
     Impl.Worker_state.create ~constraint_constants ~proof_level ()

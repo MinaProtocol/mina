@@ -4,8 +4,8 @@ module Entry = Entry
 (* module providing versioned RPCs *)
 module Rpcs_versioned = Rpcs_versioned
 
-(* module containing work type this snark worker could deal with *)
-module Concrete_work = Concrete_work
+(* module containing all types passed around with the RPC *)
+module Rpcs_types = Rpcs_types
 
 (* module providing swappable implementation for worker *)
 module Impl = struct

@@ -100,7 +100,7 @@ module Impl : Worker_impl_intf.Worker_impl = struct
     let open Snark_work_lib in
     let sok_digest = Mina_base.Sok_message.digest message in
     let logger = Logger.create () in
-    fun (single : Concrete_work.Single.Spec.t) ->
+    fun (single : Rpcs_types.Wire_work.Single.Spec.t) ->
       match proof_level with
       | Genesis_constants.Proof_level.Full -> (
           let (module M) = Option.value_exn m in
@@ -120,7 +120,8 @@ module Impl : Worker_impl_intf.Worker_impl = struct
                         *)
                       , `String
                           (Sexp.to_string
-                             (Concrete_work.Single.Spec.sexp_of_t single) ) )
+                             (Rpcs_types.Wire_work.Single.Spec.sexp_of_t single) )
+                      )
                     ] ;
                 Error e
             | Ok res ->

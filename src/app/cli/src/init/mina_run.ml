@@ -368,11 +368,12 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return @@ Itn_logger.log ~process ~timestamp ~message ~metadata () )
     ]
   in
-  let log_snark_work_metrics (work : Snark_worker.Concrete_work.Result.t) =
+  let log_snark_work_metrics (work : Snark_worker.Rpcs_types.Wire_work.Result.t)
+      =
     Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
     One_or_two.iter
       (One_or_two.zip_exn work.metrics
-         (Snark_worker.Concrete_work.Result.transactions work) )
+         (Snark_worker.Rpcs_types.Wire_work.Result.transactions work) )
       ~f:(fun ((total, tag), transaction_opt) ->
         ( match tag with
         | `Merge ->
@@ -452,8 +453,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               [%log trace]
                 ~metadata:
                   [ ( "work_spec"
-                    , Snark_worker.Concrete_work.Spec.Stable.Latest.to_yojson
-                        work_wire )
+                    , Snark_worker.Rpcs_types.Wire_work.Spec.Stable.Latest
+                      .to_yojson work_wire )
                   ]
                 "responding to a Get_work request with some new work" ;
               Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
@@ -471,7 +472,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               [%log trace] "received completed work from a snark worker"
                 ~metadata:
                   [ ( "work_spec"
-                    , Snark_worker.Concrete_work.Spec.to_yojson work.spec )
+                    , Snark_worker.Rpcs_types.Wire_work.Spec.to_yojson work.spec
+                    )
                   ] ;
               log_snark_work_metrics work ;
               Deferred.return @@ Mina_lib.add_work mina work
