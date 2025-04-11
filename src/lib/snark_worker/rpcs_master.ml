@@ -1,5 +1,6 @@
 open Async
 open Rpcs_types
+open Signature_lib
 module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 
 module Get_work = struct
@@ -15,10 +16,7 @@ module Get_work = struct
       *)
       type query = V2 | V3
 
-      type response =
-        | Regular of Regular_work.t
-        | Zkapp_command_segment of Zkapp_command_segment_work.t
-        | Nothing
+      type response = (Wire_work.Spec.t * Public_key.Compressed.t) option
     end
 
     module Caller = T
@@ -38,10 +36,7 @@ module Submit_work = struct
        coordinator issues the task.
     *)
     module T = struct
-      type query =
-        | Regular of Wire_work.Result.t
-        | Zkapp_command_segment of
-            Ledger_proof.t Work.Result_zkapp_command_segment.t
+      type query = Wire_work.Result.t
 
       type response = unit
     end
@@ -60,7 +55,9 @@ module Failed_to_generate_snark = struct
 
     module T = struct
       type query =
-        { error : Bounded_types.Wrapped_error.t; failed_work : Failed_work.t }
+        { error : Bounded_types.Wrapped_error.t
+        ; failed_work : Wire_work.Spec.t
+        }
 
       type response = unit
     end

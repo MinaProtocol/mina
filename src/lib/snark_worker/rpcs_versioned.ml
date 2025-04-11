@@ -17,11 +17,7 @@ module Get_work = struct
       type query = V2 | V3
 
       type response =
-        | Regular of Regular_work.Stable.V1.t
-        | Zkapp_command_segment of Zkapp_command_segment_work.Stable.V1.t
-        | Nothing
-
-      (* TODO: all these are basically `Fn.id`, maybe there's better way to do it? *)
+        (Wire_work.Spec.Stable.V1.t * Public_key.Compressed.Stable.V1.t) option
 
       let query_of_caller_model = function
         | Rpcs_master.Get_work.V2 ->
@@ -36,22 +32,10 @@ module Get_work = struct
             V3
 
       let response_of_callee_model : Rpcs_master.Get_work.response -> response =
-        function
-        | Regular { work_spec; public_key } ->
-            Regular { work_spec; public_key }
-        | Zkapp_command_segment { id; statement; witness; spec } ->
-            Zkapp_command_segment { id; statement; witness; spec }
-        | Nothing ->
-            Nothing
+        Fn.id
 
       let caller_model_of_response : response -> Rpcs_master.Get_work.response =
-        function
-        | Regular { work_spec; public_key } ->
-            Regular { work_spec; public_key }
-        | Zkapp_command_segment { id; statement; witness; spec } ->
-            Zkapp_command_segment { id; statement; witness; spec }
-        | Nothing ->
-            Nothing
+        Fn.id
     end
 
     include T
@@ -63,32 +47,40 @@ module Get_work = struct
       type query = unit
 
       type response =
-        (Wire_work.Spec.Stable.V1.t * Public_key.Compressed.Stable.V1.t) option
+        ( Regular_work_single.Stable.V1.t Work.Spec.Stable.V1.t
+        * Public_key.Compressed.Stable.V1.t )
+        option
 
       let query_of_caller_model = const ()
 
       let callee_model_of_query = const Rpcs_master.Get_work.V2
 
-      let response_of_callee_model : Rpcs_master.Get_work.response -> response =
-        function
-        | Regular { work_spec; public_key } ->
-            Some (work_spec, public_key)
-        | Nothing ->
-            None
-        | Zkapp_command_segment _ ->
-            (* WARN: we'd better report to the coordinator we failed rather than
-               ignoring the work*)
-            Printf.printf
-              "WARN: V2 Worker receving work `Zkapp_command_segment`, which is \
-               out of its capability, work dropped" ;
-            None
+      let response_of_callee_model (resp : Rpcs_master.Get_work.response) :
+          response =
+        let open Option.Let_syntax in
+        let%bind work, key = resp in
+        let regular_opt (work : Wire_work.Single.Spec.Stable.V1.t) :
+            Regular_work_single.t option =
+          match work with
+          | Regular w ->
+              Some w
+          | _ ->
+              (* WARN: we'd better report to the coordinator we failed rather
+                 than ignoring the work*)
+              Printf.printf
+                "WARN: V2 Worker receving work `Zkapp_command_segment`, which \
+                 is out of its capability, work dropped" ;
+              None
+        in
+        let%map work = Work.Spec.map_opt ~f_single:regular_opt work in
+        (work, key)
 
-      let caller_model_of_response : response -> Rpcs_master.Get_work.response =
-        function
-        | None ->
-            Nothing
-        | Some (work_spec, public_key) ->
-            Regular { work_spec; public_key }
+      let caller_model_of_response (resp : response) :
+          Rpcs_master.Get_work.response =
+        let open Option.Let_syntax in
+        let%map work, key = resp in
+        let wrap_work w = Wire_work.Single.Spec.Stable.V1.Regular w in
+        (Work.Spec.map ~f_single:wrap_work work, key)
     end
 
     include T

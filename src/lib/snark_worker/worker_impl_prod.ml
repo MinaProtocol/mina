@@ -95,16 +95,11 @@ module Impl : Worker_impl_intf.Worker_impl = struct
             ] ;
         Error e
 
-  let perform_single ({ m; cache; proof_level } : Worker_state.t) ~message =
-    let open Deferred.Or_error.Let_syntax in
+  let perform_regular_work ~(m: (module Transaction_snark.S) option) ~logger ~regular =
     let open Snark_work_lib in
-    let sok_digest = Mina_base.Sok_message.digest message in
-    let logger = Logger.create () in
-    fun (single : Rpcs_types.Wire_work.Single.Spec.t) ->
-      match proof_level with
-      | Genesis_constants.Proof_level.Full -> (
-          let (module M) = Option.value_exn m in
-          let statement = Work.Single.Spec.statement single in
+    let (module M) = Option.value_exn m in
+
+          let statement = Work.Single.Spec.statement regular in
           let process k =
             let start = Time.now () in
             match%map.Async.Deferred
@@ -120,7 +115,7 @@ module Impl : Worker_impl_intf.Worker_impl = struct
                         *)
                       , `String
                           (Sexp.to_string
-                             (Rpcs_types.Wire_work.Single.Spec.sexp_of_t single) )
+                             (Rpcs_types.Wire_work.Single.Spec.sexp_of_t regular) )
                       )
                     ] ;
                 Error e
@@ -237,7 +232,21 @@ module Impl : Worker_impl_intf.Worker_impl = struct
                                    (Mina_ledger.Sparse_ledger.handler
                                       w.first_pass_ledger ) ) ) )
               | Merge (_, proof1, proof2) ->
-                  process (fun () -> M.merge ~sok_digest proof1 proof2) ) )
+                  process (fun () -> M.merge ~sok_digest proof1 proof2) )
+
+
+  let perform_single ({ m; cache; proof_level } : Worker_state.t) ~message =
+    let open Deferred.Or_error.Let_syntax in
+    let open Snark_work_lib in
+    let sok_digest = Mina_base.Sok_message.digest message in
+    let logger = Logger.create () in
+    fun (single : Rpcs_types.Wire_work.Single.Spec.t) ->
+      match proof_level with
+      | Genesis_constants.Proof_level.Full -> (
+        match single with
+        | Regular of regular -> perform_regular_work ~m ~logger ~regular
+
+        )
       | Check | No_check ->
           (* Use a dummy proof. *)
           let stmt =

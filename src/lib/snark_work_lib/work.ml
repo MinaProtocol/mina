@@ -75,14 +75,13 @@ module Spec = struct
     end
   end]
 
-  (* type 'single t = 'single Stable.Latest.t = *)
-  (*   { instances : 'single One_or_two.Stable.Latest.t *)
-  (*   ; fee : Currency.Fee.Stable.Latest.t *)
-  (*   } *)
-  (* [@@deriving yojson] *)
-
   let map ~f_single { instances; fee } =
     { instances = One_or_two.map ~f:f_single instances; fee }
+
+  let map_opt ~f_single { instances; fee } =
+    let open Option.Let_syntax in
+    let%map instances = One_or_two.Option.map ~f:f_single instances in
+    { instances; fee }
 end
 
 module Result = struct
@@ -109,6 +108,12 @@ module Result = struct
     ; spec = f_spec spec
     ; prover
     }
+
+  let map_opt ~f_spec ~f_single { proofs; metrics; spec; prover } =
+    let open Option.Let_syntax in
+    let%bind proofs = One_or_two.Option.map ~f:f_single proofs in
+    let%map spec = f_spec spec in
+    { proofs; metrics; spec; prover }
 end
 
 module Result_zkapp_command_segment = struct
