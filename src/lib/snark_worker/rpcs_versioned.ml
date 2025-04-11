@@ -77,10 +77,12 @@ module Get_work = struct
         | Nothing ->
             None
         | Zkapp_command_segment _ ->
-            (* This path should be a dead code*)
-            failwith
-              "FATAL: V2 Worker receving work `Zkapp_command_segment`, which \
-               is out of its capability"
+            (* WARN: we'd better report to the coordinator we failed rather than
+               ignoring the work*)
+            Printf.printf
+              "WARN: V2 Worker receving work `Zkapp_command_segment`, which is \
+               out of its capability, work dropped" ;
+            None
 
       let caller_model_of_response : response -> Rpcs_master.Get_work.response =
         function
