@@ -7,10 +7,19 @@ type z = Mina_wire_types.Pickles_types.Nat.z = Z of z
 
 type 'a s = 'a Mina_wire_types.Pickles_types.Nat.s = Z | S of 'a
 
+(* Type level naturals, e.g.
+   type of `Z` is `z t`
+   type of `S (S (S Z))` is `z s s s t`
+   type of `S (S (S (S (S Z))))` is `z s s s s s t`
+   ...
+*)
 type _ t = Z : z t | S : 'n t -> 'n s t
 
 type 'a nat = 'a t
 
+(* a type that can hold any type level naturals, all of below has type 'e'
+   `T Z`, `T (S (S (S Z)))`, `T (S (S (S (S (S Z)))))`, ...
+*)
 type e = T : 'n nat -> e
 
 (** {1 Modules} *)
