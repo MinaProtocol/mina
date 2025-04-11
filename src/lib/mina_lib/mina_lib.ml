@@ -864,6 +864,7 @@ let best_chain ?max_length t =
   | _ ->
       Transition_frontier.root frontier :: best_tip_path
 
+(* A Snark worker is requesting work from coordinator *)
 let request_work t =
   let (module Work_selection_method) = t.config.work_selection_method in
   let fee = snark_work_fee t in
@@ -876,6 +877,7 @@ let request_work t =
 
 let work_selection_method t = t.config.work_selection_method
 
+(* A Snark worker is submitting completed work back to the coordinator *)
 let add_work t (work : Snark_worker_lib.Concrete_work.Result.t) =
   let update_metrics () =
     let snark_pool = snark_pool t in
