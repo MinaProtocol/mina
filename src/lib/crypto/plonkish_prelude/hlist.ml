@@ -4,6 +4,11 @@ module Id = Hlist0.Id
 module HlistId = Hlist0.HlistId
 module H1_1 = Hlist0.H1_1
 
+(* NOTE:
+   E(x,y,T(x)):
+   take first x type params out of a y params typed level tuple, apply them on
+   T.t
+*)
 module E13 (T : T1) = struct
   type ('a, _, _) t = 'a T.t
 end
@@ -32,6 +37,11 @@ module E06 (T : T0) = struct
   type (_, _, _, _, _, _) t = T.t
 end
 
+(* NOTE:
+   Tuple(x, (F, G, ...) of Vector(x, T3)):
+   Take exactly x types (F.t, G.t, ...), Return a 3-parametrized type when
+   applied to (a, b, c), returns (a, b, c) F.t * (a, b, c) G.t * ...
+*)
 module Tuple2 (F : T3) (G : T3) = struct
   type ('a, 'b, 'c) t = ('a, 'b, 'c) F.t * ('a, 'b, 'c) G.t
 end
@@ -54,6 +64,9 @@ module Tuple5 (F : T3) (G : T3) (H : T3) (I : T3) (J : T3) = struct
     * ('a, 'b, 'c) J.t
 end
 
+(* NOTE:
+   Arg(x): extract x'th arg from a type level triple
+*)
 module Arg1 = struct
   type ('a, _, _) t = 'a
 end
@@ -66,6 +79,9 @@ module Apply2 (F : T2) (X : T1) (Y : T1) = struct
   type ('a, 'b) t = ('a X.t, 'b Y.t) F.t
 end
 
+(* NOTE:
+   Dup(F): duplicate the input param and apply to F.t
+*)
 module Dup (F : T2) = struct
   type 'a t = ('a, 'a) F.t
 end
