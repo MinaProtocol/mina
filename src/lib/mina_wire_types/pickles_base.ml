@@ -1,6 +1,6 @@
 module Proofs_verified = struct
   module V1 = struct
-    type t = N0 | N1 | N2
+    type t = N0 | N1 | N2 | N3
   end
 end
 
