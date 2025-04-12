@@ -370,7 +370,7 @@ module Verifiable : sig
     , (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option )
     Call_forest.With_hashes_and_data.t
     Poly.t
-  [@@deriving sexp, bin_io]
+  [@@deriving sexp_of]
 
   val load_vk_from_ledger :
        location_of_account:(Account_id.t -> 'loc option)
@@ -422,6 +422,22 @@ module Verifiable : sig
     Create_all_intf
       with type 'a Command_wrapper.t = 'a With_status.t
        and type cache = Verification_key_wire.t Account_id.Map.t
+
+  module Serializable : sig
+    type t =
+      ( Proof.t
+      , ( Side_loaded_verification_key.Stable.Latest.t
+        , Zkapp_basic.F.Stable.Latest.t )
+        With_hash.Stable.Latest.t
+        option )
+      Call_forest.With_hashes_and_data.Stable.Latest.t
+      Poly.Stable.Latest.t
+    [@@deriving bin_io]
+  end
+
+  val to_serializable : t -> Serializable.t
+
+  val of_serializable : Serializable.t -> t
 end = struct
   type t =
     ( Proof.Stable.Latest.t
@@ -431,7 +447,37 @@ end = struct
       option )
     Call_forest.With_hashes_and_data.Stable.Latest.t
     Poly.Stable.Latest.t
-  [@@deriving sexp, bin_io_unversioned]
+  [@@deriving sexp_of]
+
+  module Serializable = struct
+    type t =
+      ( Proof.Stable.Latest.t
+      , ( Side_loaded_verification_key.Stable.Latest.t
+        , Zkapp_basic.F.Stable.Latest.t )
+        With_hash.Stable.Latest.t
+        option )
+      Call_forest.With_hashes_and_data.Stable.Latest.t
+      Poly.Stable.Latest.t
+    [@@deriving bin_io_unversioned]
+  end
+
+  let to_serializable ({ fee_payer; account_updates; memo } : t) :
+      Serializable.t =
+    { fee_payer
+    ; account_updates =
+        Call_forest.map account_updates ~f:(fun (upd, aux) ->
+            (Account_update.map_proofs ~f:ident upd, aux) )
+    ; memo
+    }
+
+  let of_serializable ({ fee_payer; account_updates; memo } : Serializable.t) :
+      t =
+    { fee_payer
+    ; account_updates =
+        Call_forest.map account_updates ~f:(fun (upd, aux) ->
+            (Account_update.map_proofs ~f:ident upd, aux) )
+    ; memo
+    }
 
   let ok_if_vk_hash_expected ~got ~expected =
     if not @@ Zkapp_basic.F.equal (With_hash.hash got) expected then
