@@ -120,7 +120,7 @@ let check_signatures_of_zkapp_command (zkapp_command : _ Zkapp_command.Poly.t) :
            else tx_commitment
          in
          match (p.authorization, p.body.authorization_kind) with
-         | Control.Signature s, Signature ->
+         | Control.Poly.Signature s, Signature ->
              check_signature s p.body.public_key commitment
          | None_given, None_given | Proof _, Proof _ ->
              Ok ()
