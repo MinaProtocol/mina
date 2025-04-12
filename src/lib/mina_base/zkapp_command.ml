@@ -141,6 +141,15 @@ end
 
 include T
 
+let map_proofs ~(f : 'p -> 'q)
+    ({ Poly.fee_payer; memo; account_updates } : ('p, 'b, 'c) with_forest) :
+    ('q, 'b, 'c) with_forest =
+  { Poly.fee_payer
+  ; memo
+  ; account_updates =
+      Call_forest.map ~f:(Account_update.map_proofs ~f) account_updates
+  }
+
 let write_all_proofs_to_disk (w : Stable.Latest.t) : t =
   { fee_payer = w.fee_payer
   ; memo = w.memo
