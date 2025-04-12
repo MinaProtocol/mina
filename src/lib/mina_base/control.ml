@@ -19,6 +19,8 @@ end
 (* TODO: temporary hack *)
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       ( Pickles.Side_loaded.Proof.Stable.V2.t
@@ -30,8 +32,10 @@ module Stable = struct
   end
 end]
 
+type t = (Proof.t, Signature.t) Poly.t [@@deriving sexp_of, to_yojson]
+
 (* lazy, to prevent spawning Rust threads at startup, which prevents daemonization *)
-let gen_with_dummies : t Quickcheck.Generator.t =
+let gen_with_dummies : Stable.Latest.t Quickcheck.Generator.t =
   let gen =
     lazy
       (Quickcheck.Generator.of_list
@@ -70,7 +74,7 @@ module Tag = struct
         failwithf "String %s does not denote a control tag" s ()
 end
 
-let tag : t -> Tag.t = function
+let tag : ('proof, 'signature) Poly.t -> Tag.t = function
   | Proof _ ->
       Proof
   | Signature _ ->
@@ -78,7 +82,7 @@ let tag : t -> Tag.t = function
   | None_given ->
       None_given
 
-let dummy_of_tag : Tag.t -> t = function
+let dummy_of_tag : Tag.t -> Stable.Latest.t = function
   | Proof ->
       let n2 = Pickles_types.Nat.N2.n in
       let proof = Pickles.Proof.dummy n2 n2 n2 ~domain_log2:15 in
@@ -134,4 +138,5 @@ let%test_unit "json rountrip" =
   let module Fd = Fields_derivers_zkapps.Derivers in
   let full = deriver (Fd.o ()) in
   let control = dummy_of_tag Proof in
-  [%test_eq: t] control (control |> Fd.to_json full |> Fd.of_json full)
+  [%test_eq: Stable.Latest.t] control
+    (control |> Fd.to_json full |> Fd.of_json full)
