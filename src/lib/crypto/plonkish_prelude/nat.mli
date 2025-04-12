@@ -17,7 +17,7 @@ type _ t = Z : z t | S : 'n t -> 'n s t
 
 type 'a nat = 'a t
 
-(* a type that can hold any type level naturals, all of below has type 'e'
+(* An existential type representing _some_ naturals, e.g. all values below have type 'e'.
    `T Z`, `T (S (S (S Z)))`, `T (S (S (S (S (S Z)))))`, ...
 *)
 type e = T : 'n nat -> e
