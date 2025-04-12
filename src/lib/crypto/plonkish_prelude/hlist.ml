@@ -850,6 +850,26 @@ module H4_4 = struct
   end
 end
 
+(* NOTE:
+   H4_6_with_length accepts a type level function F where F.t is a type
+   constructor accepting (1 + 4 + 6) types. The first param 'length is used to
+   track the length of heterogenous list. Every value in this type level function
+   is homogenous over the last 6 types, while heterogenous over the middle 4 types.
+   In the returning type. The 4 middle types track a type level tuple that
+   aggregates over all elements.
+   For example, if we have fixed typed (s1, s2, s3, s4, s5, s6), and say our list
+   has length 5, let us layout all those 4-tuple types provided for each element
+   to form in a matrix:
+     (a1, a2, a3, a4, s1, s2, s3, s4, s5, s6) F.t
+     (b1, b2, b3, b4, s1, s2, s3, s4, s5, s6) F.t
+     (c1, c2, c3, c4, s1, s2, s3, s4, s5, s6) F.t
+     (d1, d2, d3, d4, s1, s2, s3, s4, s5, s6) F.t
+   In the resulting type, the 2nd type param would be
+     (a1 * (b1 * (c1 * (d1 * unit))))
+   While the 4th type param being
+     (a3 * (b3 * (c3 * (d3 * unit))))
+   etc.
+*)
 module H4_6_with_length = struct
   module T (F : sig
     type (_, _, _, _, _, _, _, _, _, _) t
