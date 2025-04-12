@@ -109,11 +109,13 @@ module Simple_txn = struct
             Amount.Signed.(of_unsigned amount)
         in
         [ update
-            Account_update.
-              { body = sender_decrease_body; authorization = dummy_auth }
+            { Account_update.Poly.body = sender_decrease_body
+            ; authorization = dummy_auth
+            }
         ; update
-            Account_update.
-              { body = receiver_increase_body; authorization = dummy_auth }
+            { Account_update.Poly.body = receiver_increase_body
+            ; authorization = dummy_auth
+            }
         ]
     end
 
@@ -170,9 +172,8 @@ module Single = struct
 
       method updates =
         let open Monad_lib.State.Let_syntax in
-        let open Account_update in
         let%map body = update_body ?preconditions ~account amount in
-        [ update { body; authorization = dummy_auth } ]
+        [ update { Account_update.Poly.body; authorization = dummy_auth } ]
     end
 end
 
@@ -187,11 +188,10 @@ module Alter_account = struct
 
       method updates =
         let open Monad_lib.State.Let_syntax in
-        let open Account_update in
         let%map body =
           update_body ?preconditions ~update:state_update ~account amount
         in
-        [ update { body; authorization = dummy_auth } ]
+        [ update { Account_update.Poly.body; authorization = dummy_auth } ]
     end
 end
 
@@ -209,13 +209,13 @@ module Txn_tree = struct
 
       method updates =
         let open Monad_lib.State.Let_syntax in
-        let open Account_update in
         let module State_ext = Monad_lib.Make_ext2 (Monad_lib.State) in
         let%bind body = update_body ~update:state_update ~account amount in
         let%map calls =
           State_ext.concat_map_m children ~f:(fun c -> c#updates)
         in
-        [ update ~calls { body; authorization = dummy_auth } ]
+        [ update ~calls { Account_update.Poly.body; authorization = dummy_auth }
+        ]
     end
 end
 
