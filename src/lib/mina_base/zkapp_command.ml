@@ -395,23 +395,6 @@ module Virtual = struct
   end
 end
 
-let check_authorization (p : Account_update.t) : unit Or_error.t =
-  match (p.authorization, p.body.authorization_kind) with
-  | None_given, None_given | Proof _, Proof _ | Signature _, Signature ->
-      Ok ()
-  | _ ->
-      let err =
-        let expected =
-          Account_update.Authorization_kind.to_control_tag
-            p.body.authorization_kind
-        in
-        let got = Control.tag p.authorization in
-        Error.create "Authorization kind does not match the authorization"
-          [ ("expected", expected); ("got", got) ]
-          [%sexp_of: (string * Control.Tag.t) list]
-      in
-      Error err
-
 module Verifiable : sig
   type t =
     (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option
@@ -550,7 +533,7 @@ end = struct
                     !vks_overridden
               in
               let () =
-                match check_authorization p with
+                match Account_update.check_authorization p with
                 | Ok () ->
                     ()
                 | Error _ as err ->

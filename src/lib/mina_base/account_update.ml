@@ -1778,6 +1778,22 @@ let verification_key_update_to_option (t : t) :
     Verification_key_wire.t option Zkapp_basic.Set_or_keep.t =
   Zkapp_basic.Set_or_keep.map ~f:Option.some t.body.update.verification_key
 
+let check_authorization (p : t) : unit Or_error.t =
+  match (p.authorization, p.body.authorization_kind) with
+  | None_given, None_given | Proof _, Proof _ | Signature _, Signature ->
+      Ok ()
+  | _ ->
+      let err =
+        let expected =
+          Authorization_kind.to_control_tag p.body.authorization_kind
+        in
+        let got = Control.tag p.authorization in
+        Error.create "Authorization kind does not match the authorization"
+          [ ("expected", expected); ("got", got) ]
+          [%sexp_of: (string * Control.Tag.t) list]
+      in
+      Error err
+
 let of_fee_payer ({ body; authorization } : Fee_payer.t) : t =
   { authorization = Signature authorization; body = Body.of_fee_payer body }
 
