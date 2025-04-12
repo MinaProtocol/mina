@@ -144,23 +144,10 @@ include T
 let map_proofs ~(f : 'p -> 'q)
     ({ Poly.fee_payer; memo; account_updates } : ('p, 'b, 'c) with_forest) :
     ('q, 'b, 'c) with_forest =
-  let map_auth = function
-    | Control.Poly.Proof p ->
-        Control.Poly.Proof (f p)
-    | Signature s ->
-        Signature s
-    | None_given ->
-        None_given
-  in
-  let map_account_update p =
-    { Account_update.Poly.authorization =
-        map_auth p.Account_update.Poly.authorization
-    ; body = p.Account_update.Poly.body
-    }
-  in
   { Poly.fee_payer
   ; memo
-  ; account_updates = Call_forest.map ~f:map_account_update account_updates
+  ; account_updates =
+      Call_forest.map ~f:(Account_update.map_proofs ~f) account_updates
   }
 
 let write_all_proofs_to_disk (w : Stable.Latest.t) : t =
