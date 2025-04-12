@@ -409,7 +409,8 @@ end
 
 module Verifiable : sig
   type t =
-    (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option
+    ( Proof.t
+    , (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option )
     Call_forest.With_hashes_and_data.t
     Poly.t
   [@@deriving sexp, compare, equal, hash, yojson, bin_io]
@@ -466,10 +467,11 @@ module Verifiable : sig
        and type cache = Verification_key_wire.t Account_id.Map.t
 end = struct
   type t =
-    ( Side_loaded_verification_key.Stable.Latest.t
-    , Zkapp_basic.F.Stable.Latest.t )
-    With_hash.Stable.Latest.t
-    option
+    ( Proof.Stable.Latest.t
+    , ( Side_loaded_verification_key.Stable.Latest.t
+      , Zkapp_basic.F.Stable.Latest.t )
+      With_hash.Stable.Latest.t
+      option )
     Call_forest.With_hashes_and_data.Stable.Latest.t
     Poly.Stable.Latest.t
   [@@deriving sexp, compare, equal, hash, yojson, bin_io_unversioned]
