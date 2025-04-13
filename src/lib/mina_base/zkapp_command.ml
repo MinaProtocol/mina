@@ -220,10 +220,11 @@ let to_simple (t : t) : Simple.t =
   ; account_updates =
       t.account_updates
       |> Call_forest.to_account_updates_map
-           ~f:(fun ~depth { Account_update.body = b; authorization } ->
-             { Account_update.Simple.authorization
+           ~f:(fun ~depth { Account_update.Poly.body = b; authorization } ->
+             { Account_update.Poly.authorization
              ; body =
-                 { public_key = b.public_key
+                 { Account_update.Body.Simple.public_key =
+                     b.Account_update.Body.public_key
                  ; token_id = b.token_id
                  ; update = b.update
                  ; balance_change = b.balance_change
@@ -247,7 +248,7 @@ let all_account_updates (t : t) : _ Call_forest.t =
   let body = Account_update.Body.of_fee_payer p.body in
   let fee_payer : Account_update.t =
     let p = t.fee_payer in
-    { authorization = Control.Signature p.authorization; body }
+    { authorization = Control.Poly.Signature p.authorization; body }
   in
   Call_forest.cons fee_payer t.account_updates
 
@@ -1267,12 +1268,11 @@ module Update_group = Make_update_group (struct
 
   let zkapp_segment_of_controls controls : spec =
     match controls with
-    | [ Control.Proof _ ] ->
+    | [ Control.Poly.Proof _ ] ->
         Proved
-    | [ (Control.Signature _ | Control.None_given) ] ->
+    | [ (Signature _ | None_given) ] ->
         Signed_single
-    | [ Control.(Signature _ | None_given); Control.(Signature _ | None_given) ]
-      ->
+    | [ (Signature _ | None_given); (Signature _ | None_given) ] ->
         Signed_pair
     | _ ->
         failwith "zkapp_segment_of_controls: Unsupported combination"
