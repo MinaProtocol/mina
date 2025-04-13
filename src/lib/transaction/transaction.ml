@@ -156,7 +156,11 @@ let check_well_formedness ~genesis_constants (t : t) =
 
 let yojson_summary_of_command =
   let is_proof upd =
-    match Account_update.authorization upd with Proof _ -> true | _ -> false
+    match upd.Account_update.Poly.authorization with
+    | Control.Poly.Proof _ ->
+        true
+    | _ ->
+        false
   in
   let zkapp_type cmd =
     let updates = Zkapp_command.account_updates_list cmd in

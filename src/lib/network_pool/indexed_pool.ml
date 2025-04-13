@@ -437,7 +437,7 @@ module Update = struct
                   , if
                       Control.(
                         Tag.equal Proof
-                          (tag (Account_update.authorization account_update)))
+                          (tag account_update.Account_update.Poly.authorization))
                     then proof_updates_count + 1
                     else proof_updates_count ) )
             in
