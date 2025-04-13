@@ -140,7 +140,6 @@ module Make_str (A : Wire_types.Concrete) = struct
             Opt_signed
         | [ Control.Poly.(Signature _ | None_given)
           ; Control.Poly.(Signature _ | None_given)
-          ; Control.Poly.(Signature _ | None_given)
           ] ->
             Opt_signed_opt_signed
         | _ ->
