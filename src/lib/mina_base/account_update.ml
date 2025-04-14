@@ -1757,7 +1757,7 @@ module Fee_payer = struct
     Account_id.create t.body.public_key Token_id.default
 
   let to_account_update (t : t) : T.t =
-    { authorization = Control.Signature t.authorization
+    { authorization = Control.Poly.Signature t.authorization
     ; body = Body.of_fee_payer t.body
     }
 
