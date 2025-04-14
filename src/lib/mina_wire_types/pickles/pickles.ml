@@ -65,7 +65,7 @@ module M = struct
 
   module Proof = struct
     type challenge_constant =
-      Pickles_types.Nat.two Pickles_limb_vector.Constant.t
+      Pickles_types.Nat.three Pickles_limb_vector.Constant.t
 
     type tock_affine = Pasta_bindings.Fp.t * Pasta_bindings.Fp.t
 
@@ -153,7 +153,7 @@ module M = struct
       end
 
       module Max_width = struct
-        type n = Pickles_types.Nat.two
+        type n = Pickles_types.Nat.three
       end
     end
 
@@ -181,7 +181,7 @@ module Types = struct
     module Side_loaded : sig
       module Verification_key : sig
         module Max_width : sig
-          type n = Pickles_types.Nat.two
+          type n = Pickles_types.Nat.three
         end
 
         module V2 : sig
