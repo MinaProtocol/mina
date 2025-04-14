@@ -517,8 +517,8 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
     ; account_updates =
         Zkapp_command.Call_forest.of_account_updates
           ~account_update_depth:(Fn.const 0)
-          [ { Account_update.body =
-                { public_key = sender_pk
+          [ { Account_update.Poly.body =
+                { Account_update.Body.public_key = sender_pk
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.Signed.(negate @@ of_unsigned amount)
@@ -537,11 +537,12 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
                 ; may_use_token = No
                 ; use_full_commitment = not double_increment_sender
                 ; implicit_account_creation_fee = false
-                ; authorization_kind = None_given
+                ; authorization_kind =
+                    Account_update.Authorization_kind.None_given
                 }
-            ; authorization = None_given
+            ; authorization = Control.Poly.None_given
             }
-          ; { Account_update.body =
+          ; { Account_update.Poly.body =
                 { public_key = receiver_pk
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default

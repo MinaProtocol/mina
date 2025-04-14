@@ -404,7 +404,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                           Mina_base.Control.(
                             Tag.equal Proof
                               (tag
-                                 (Mina_base.Account_update.authorization party) ))
+                                 (Mina_base.Account_update.Poly.authorization
+                                    party ) ))
                         then proof_parties_count + 1
                         else proof_parties_count ) )
                 in
