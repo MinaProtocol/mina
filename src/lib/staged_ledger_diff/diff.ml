@@ -181,11 +181,11 @@ module Make_str (A : Wire_types.Concrete) = struct
     let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
       Pre_diff_two.map
         ~f1:(Transaction_snark_work.write_all_proofs_to_disk ~proof_cache_db)
-        ~f2:Fn.id
+        ~f2:(With_status.map ~f:User_command.write_all_proofs_to_disk)
 
     let read_all_proofs_from_disk : t -> Stable.Latest.t =
       Pre_diff_two.map ~f1:Transaction_snark_work.read_all_proofs_from_disk
-        ~f2:Fn.id
+        ~f2:(With_status.map ~f:User_command.read_all_proofs_from_disk)
   end
 
   module Pre_diff_with_at_most_one_coinbase = struct
@@ -210,11 +210,11 @@ module Make_str (A : Wire_types.Concrete) = struct
     let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
       Pre_diff_one.map
         ~f1:(Transaction_snark_work.write_all_proofs_to_disk ~proof_cache_db)
-        ~f2:Fn.id
+        ~f2:(With_status.map ~f:User_command.write_all_proofs_to_disk)
 
     let read_all_proofs_from_disk : t -> Stable.Latest.t =
       Pre_diff_one.map ~f1:Transaction_snark_work.read_all_proofs_from_disk
-        ~f2:Fn.id
+        ~f2:(With_status.map ~f:User_command.read_all_proofs_from_disk)
   end
 
   module Diff = struct
