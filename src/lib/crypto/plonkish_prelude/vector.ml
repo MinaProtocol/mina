@@ -551,6 +551,27 @@ module Vector_2 = struct
   let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
 end
 
+module Vector_3 = struct
+  module T = With_length (Nat.N3)
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N3.n) vec
+
+      include Make.Binable (Nat.N3)
+
+      include (T : module type of T with type 'a t := 'a t)
+    end
+  end]
+
+  include T
+
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
+end
+
 module Vector_4 = struct
   module T = With_length (Nat.N4)
 

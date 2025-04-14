@@ -34,9 +34,9 @@ module Base : sig
         type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
           { statement :
               ( Limb_vector.Constant.Hex64.Stable.V1.t
-                Pickles_types.Vector.Vector_2.Stable.V1.t
+                Pickles_types.Vector.Vector_3.Stable.V1.t
               , Limb_vector.Constant.Hex64.Stable.V1.t
-                Pickles_types.Vector.Vector_2.Stable.V1.t
+                Pickles_types.Vector.Vector_3.Stable.V1.t
                 Import.Scalar_challenge.Stable.V2.t
               , Backend.Tick.Field.Stable.V1.t
                 Pickles_types.Shifted_value.Type1.Stable.V1.t
@@ -45,7 +45,7 @@ module Base : sig
               , Import.Digest.Constant.Stable.V1.t
               , 'messages_for_next_step_proof
               , Limb_vector.Constant.Hex64.Stable.V1.t
-                Pickles_types.Vector.Vector_2.Stable.V1.t
+                Pickles_types.Vector.Vector_3.Stable.V1.t
                 Import.Scalar_challenge.Stable.V2.t
                 Import.Bulletproof_challenge.Stable.V1.t
                 Import.Step_bp_vec.Stable.V1.t
