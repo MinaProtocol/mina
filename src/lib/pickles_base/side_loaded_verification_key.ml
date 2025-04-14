@@ -21,7 +21,7 @@ module Width : sig
 
   val zero : t
 
-  module Max = Nat.N2
+  module Max = Nat.N3
 
   module Max_vector : Vector.With_version(Max).S
 
@@ -48,7 +48,7 @@ end = struct
 
   let zero = Char.of_int_exn 0
 
-  module Max = Nat.N2
+  module Max = Nat.N3
 
   (* Think about versioning here! These vector types *will* change
      serialization if the numbers above change, and so will require a new
@@ -72,7 +72,7 @@ end = struct
 
     let map = Vector.map
 
-    let of_list_exn = Vector.Vector_2.of_list_exn
+    let of_list_exn = Vector.Vector_3.of_list_exn
 
     let to_list = Vector.to_list
   end
