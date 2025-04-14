@@ -57,7 +57,7 @@ module Transaction_with_witness = struct
     ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
     }
 
-  let write_all_proofs_to_disk
+  let write_all_proofs_to_disk ~proof_cache_db
       { Stable.Latest.transaction_with_info
       ; state_hash
       ; statement
@@ -68,7 +68,7 @@ module Transaction_with_witness = struct
       } =
     { transaction_with_info =
         Mina_transaction_logic.Transaction_applied.write_all_proofs_to_disk
-          transaction_with_info
+          ~proof_cache_db transaction_with_info
     ; state_hash
     ; statement
     ; init_stack
@@ -1298,7 +1298,7 @@ let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
 
 let all_work_pairs t
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t) :
-    ( Transaction_witness.t
+    ( Transaction_witness.Stable.Latest.t
     , Ledger_proof.Cached.t )
     Snark_work_lib.Work.Single.Spec.t
     One_or_two.t
@@ -1333,9 +1333,10 @@ let all_work_pairs t
             | Merge ->
                 Or_error.error_string "init_stack was Merge"
           in
-          { Transaction_witness.first_pass_ledger = first_pass_ledger_witness
+          { Transaction_witness.Stable.Latest.first_pass_ledger =
+              first_pass_ledger_witness
           ; second_pass_ledger = second_pass_ledger_witness
-          ; transaction
+          ; transaction = Transaction.read_all_proofs_from_disk transaction
           ; protocol_state_body
           ; init_stack
           ; status
@@ -1495,9 +1496,11 @@ let write_all_proofs_to_disk ~proof_cache_db
   in
   { scan_state =
       Parallel_scan.State.map uncached ~f1
-        ~f2:Transaction_with_witness.write_all_proofs_to_disk
+        ~f2:(Transaction_with_witness.write_all_proofs_to_disk ~proof_cache_db)
   ; previous_incomplete_zkapp_updates =
-      ( List.map ~f:Transaction_with_witness.write_all_proofs_to_disk tx_list
+      ( List.map
+          ~f:(Transaction_with_witness.write_all_proofs_to_disk ~proof_cache_db)
+          tx_list
       , border_status )
   }
 

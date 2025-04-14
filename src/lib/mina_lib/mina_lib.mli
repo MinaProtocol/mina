@@ -258,3 +258,5 @@ val best_chain_block_by_state_hash :
   t -> State_hash.t -> (Transition_frontier.Breadcrumb.t, string) Result.t
 
 val zkapp_cmd_limit : t -> int option ref
+
+val proof_cache_db : t -> Proof_cache_tag.cache_db

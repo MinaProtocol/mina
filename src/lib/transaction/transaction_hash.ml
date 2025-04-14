@@ -80,9 +80,9 @@ let ( hash_signed_command_v1
         fee_payer = { cmd.fee_payer with authorization = Signature.dummy }
       ; account_updates =
           Zkapp_command.Call_forest.map cmd.account_updates
-            ~f:(fun (acct_update : Account_update.t) ->
+            ~f:(fun acct_update ->
               let dummy_auth =
-                match acct_update.authorization with
+                match acct_update.Account_update.Poly.authorization with
                 | Control.Poly.Proof _ ->
                     Control.Poly.Proof (Lazy.force Proof.transaction_dummy)
                 | Control.Poly.Signature _ ->
@@ -175,7 +175,7 @@ module User_command_with_valid_signature = struct
   let hash_of_yojson = of_yojson
 
   type t = (User_command.Valid.t, hash) With_hash.t
-  [@@deriving hash, sexp, compare, to_yojson]
+  [@@deriving sexp_of, to_yojson]
 
   let equal ({ hash = h1; _ } : t) ({ hash = h2; _ } : t) = T.equal h1 h2
 

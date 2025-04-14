@@ -35,7 +35,7 @@ val set_sender_local_state : t -> Sender_local_state.t -> t
 module rec Update : sig
   val apply : Update.t -> t -> t
 
-  type t [@@deriving to_yojson, sexp]
+  type t [@@deriving to_yojson]
 
   val merge : t -> t -> t
 
@@ -104,7 +104,7 @@ val add_from_backtrack :
   -> (t, Command_error.t) Result.t
 
 (** Check whether a command is in the pool *)
-val member : t -> Transaction_hash.User_command.t -> bool
+val member : t -> Transaction_hash.t -> bool
 
 (** Check whether the pool has any commands for a given fee payer *)
 val has_commands_for_fee_payer : t -> Account_id.t -> bool
