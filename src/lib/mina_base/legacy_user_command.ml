@@ -30,7 +30,11 @@ module Stable = struct
             (Zkapp_command
                { Zkapp_command.Poly.fee_payer
                ; memo
-               ; account_updates (* TODO accumulate hashes *)
+               ; account_updates =
+                   Zkapp_command.(
+                     Call_forest.accumulate_hashes
+                       ~hash_account_update:Digest.Account_update.create)
+                     account_updates
                } )
 
     let of_yojson json =
@@ -43,7 +47,8 @@ module Stable = struct
             (Zkapp_command
                { Zkapp_command.Poly.fee_payer
                ; memo
-               ; account_updates (* TODO forget hashes *)
+               ; account_updates =
+                   Zkapp_command.Call_forest.forget_hashes account_updates
                } )
       | Error e ->
           Error e

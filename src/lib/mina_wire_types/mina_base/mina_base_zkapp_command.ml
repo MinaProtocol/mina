@@ -86,12 +86,7 @@ module V1 = struct
       }
   end
 
-  type t =
-    ( Mina_base_account_update.V1.t
-    , Call_forest.Digest.Account_update.V1.t
-    , Call_forest.Digest.Forest.V1.t )
-    Call_forest.V1.t
-    T.t
+  type t = (Mina_base_account_update.V1.t, unit, unit) Call_forest.V1.t T.t
 end
 
 module Valid = struct
