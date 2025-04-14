@@ -361,11 +361,11 @@ module Proofs_verified_2 = struct
               .Stable
               .V2
               .t
-              Vector.Vector_3.Stable.V1.t )
+              Vector.Vector_2.Stable.V1.t )
             Types.Wrap.Proof_state.Messages_for_next_wrap_proof.Stable.V1.t
           , ( unit
             , Tock.Curve.Affine.t At_most.At_most_2.Stable.V1.t
-            , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_3.Stable.V1.t
+            , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
               Scalar_challenge.Stable.V2.t
               Bulletproof_challenge.Stable.V1.t
               Step_bp_vec.Stable.V1.t
