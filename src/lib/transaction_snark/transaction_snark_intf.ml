@@ -36,7 +36,7 @@ module type Full = sig
   type tag =
     ( Statement.With_sok.var
     , Statement.With_sok.t
-    , Nat.N2.n
+    , Nat.N3.n
     , Nat.N5.n )
     Pickles.Tag.t
 
@@ -306,7 +306,7 @@ module type Full = sig
            , unit
            , unit
            , Zkapp_statement.t
-           , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
+           , (unit * unit * (Nat.N3.n, Nat.N3.n) Pickles.Proof.t)
              Async.Deferred.t )
            Pickles.Prover.t
            * ( Pickles.Side_loaded.Verification_key.t
@@ -347,7 +347,7 @@ module type Full = sig
            , unit
            , unit
            , Zkapp_statement.t
-           , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
+           , (unit * unit * (Nat.N3.n, Nat.N3.n) Pickles.Proof.t)
              Async.Deferred.t )
            Pickles.Prover.t
            * ( Pickles.Side_loaded.Verification_key.t
@@ -390,7 +390,7 @@ module type Full = sig
               , unit
               , unit
               , Zkapp_statement.t
-              , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
+              , (unit * unit * (Nat.N3.n, Nat.N3.n) Pickles.Proof.t)
                 Async.Deferred.t )
               Pickles.Prover.t ]
 
