@@ -1,5 +1,5 @@
 open Pickles_types
-module Constant = Constant.Make (Nat.N2)
+module Constant = Constant.Make (Nat.N3)
 
 module type S = sig
   module Impl : Snarky_backendless.Snark_intf.Run
@@ -25,4 +25,4 @@ end
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) :
   S with module Impl := Impl =
-  Make.T (Impl) (Nat.N2)
+  Make.T (Impl) (Nat.N3)
