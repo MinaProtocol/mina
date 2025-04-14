@@ -49,6 +49,7 @@ module Digest = Call_forest.Digest
 type ('account_update_digest, 'forest_digest) with_forest =
   (Account_update.t, 'account_update_digest, 'forest_digest) Call_forest.t
   Poly.t
+[@@deriving yojson]
 
 module T = struct
   [%%versioned_binable
