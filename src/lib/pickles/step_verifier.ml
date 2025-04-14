@@ -535,7 +535,7 @@ struct
                     (Vector.map
                        ~f:(fun proofs_verified ->
                          Common.wrap_domains ~proofs_verified )
-                       [ 0; 1; 2 ] )
+                       [ 0; 1; 2; 3 ] )
                     ~public_input )
         in
         let x_hat =
@@ -884,7 +884,7 @@ struct
         Vector.map2
           ~f:(fun keep f -> (keep, f pt))
           (Vector.trim_front actual_width_mask
-             (Nat.lte_exn Proofs_verified.n Nat.N2.n) )
+             (Nat.lte_exn Proofs_verified.n Nat.N3.n) )
           sg_olds
       in
       (sg_evals plonk.zeta, sg_evals zetaw)
@@ -894,7 +894,7 @@ struct
         let opt_sponge = Opt_sponge.create sponge_params in
         Vector.iter2
           (Vector.trim_front actual_width_mask
-             (Nat.lte_exn Proofs_verified.n Nat.N2.n) )
+             (Nat.lte_exn Proofs_verified.n Nat.N3.n) )
           prev_challenges
           ~f:(fun keep chals ->
             Vector.iter chals ~f:(fun chal ->
