@@ -23,6 +23,7 @@ module Ledger_hash0 = Ledger_hash0
 module Ledger_hash_intf = Ledger_hash_intf
 module Ledger_hash_intf0 = Ledger_hash_intf0
 module Ledger_intf = Ledger_intf
+module Legacy_user_command = Legacy_user_command
 module Account_update = Account_update
 module Payment_payload = Payment_payload
 module Pending_coinbase = Pending_coinbase
