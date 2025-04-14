@@ -142,7 +142,7 @@ module Verifiable = struct
     ( Signed_command.Stable.Latest.t
     , Zkapp_command.Verifiable.t )
     Poly.Stable.Latest.t
-  [@@deriving sexp, compare, equal, hash, yojson, bin_io_unversioned]
+  [@@deriving sexp, bin_io_unversioned]
 
   let fee_payer (t : t) =
     match t with
