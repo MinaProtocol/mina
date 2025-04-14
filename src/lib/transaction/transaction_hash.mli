@@ -56,7 +56,7 @@ module User_command_with_valid_signature : sig
   type hash = t [@@deriving sexp, compare, hash, yojson]
 
   type t = private (User_command.Valid.t, hash) With_hash.t
-  [@@deriving hash, sexp, compare, to_yojson]
+  [@@deriving equal, hash, sexp, compare, to_yojson]
 
   val create : User_command.Valid.t -> t
 
@@ -68,7 +68,11 @@ module User_command_with_valid_signature : sig
 
   val forget_check : t -> (User_command.t, hash) With_hash.t
 
-  include Comparable.S with type t := t
+  module Set : sig
+    include Mina_stdlib.Generic_set.S0 with type el = t
+
+    val sexp_of_t : t -> Sexp.t
+  end
 
   val make : User_command.Valid.t -> hash -> t
 end

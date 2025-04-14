@@ -39,13 +39,13 @@ let check_signed_command c =
     Result.Error (`Invalid_keys (Signed_command.public_keys c))
   else
     match Signed_command.check_only_for_signature c with
-    | Some c ->
-        Result.Ok (User_command.Signed_command c, `Assuming [])
+    | Some _ ->
+        Result.Ok (`Assuming [])
     | None ->
         Result.Error (`Invalid_signature (Signed_command.public_keys c))
 
 let collect_vk_assumption
-    ( (p : Account_update.t)
+    ( (p : (Account_update.Body.t, _ Control.Poly.t) Account_update.Poly.t)
     , ( (vk_opt :
           (Side_loaded_verification_key.t, Pasta_bindings.Fp.t) With_hash.t
           option )
@@ -67,20 +67,22 @@ let collect_vk_assumption
   | _ ->
       Ok None
 
-let collect_vk_assumptions (zkapp_command : Zkapp_command.Verifiable.t) =
+let collect_vk_assumptions zkapp_command =
   let collect_vk_assumption' collected (element, _) =
     let%map.Result res_opt = collect_vk_assumption element in
     Option.value_map ~f:(Fn.flip List.cons collected) ~default:collected res_opt
   in
-  zkapp_command.account_updates |> Zkapp_statement.zkapp_statements_of_forest'
+  zkapp_command.Zkapp_command.Poly.account_updates
+  |> Zkapp_statement.zkapp_statements_of_forest'
   |> Zkapp_command.Call_forest.With_hashes_and_data
      .to_zkapp_command_with_hashes_list
   |> List.fold_result ~f:collect_vk_assumption' ~init:[]
 
-let check_signatures_of_zkapp_command (zkapp_command : Zkapp_command.t) :
+let check_signatures_of_zkapp_command (zkapp_command : _ Zkapp_command.Poly.t) :
     (unit, invalid) Result.t =
   let account_updates_hash =
-    Zkapp_command.Call_forest.hash zkapp_command.account_updates
+    Zkapp_command.Call_forest.hash
+      zkapp_command.Zkapp_command.Poly.account_updates
   in
   let tx_commitment =
     Zkapp_command.Transaction_commitment.create ~account_updates_hash
@@ -114,11 +116,11 @@ let check_signatures_of_zkapp_command (zkapp_command : Zkapp_command.t) :
   Zkapp_command.Call_forest.to_list zkapp_command.account_updates
   |> List.fold_result ~init:() ~f:(fun () p ->
          let commitment =
-           if p.Account_update.body.use_full_commitment then full_tx_commitment
+           if Account_update.use_full_commitment p then full_tx_commitment
            else tx_commitment
          in
          match (p.authorization, p.body.authorization_kind) with
-         | Signature s, Signature ->
+         | Control.Poly.Signature s, Signature ->
              check_signature s p.body.public_key commitment
          | None_given, None_given | Proof _, Proof _ ->
              Ok ()
@@ -127,29 +129,19 @@ let check_signatures_of_zkapp_command (zkapp_command : Zkapp_command.t) :
                (`Mismatched_authorization_kind
                  [ Account_id.public_key @@ Account_update.account_id p ] ) )
 
-let check :
-       User_command.Verifiable.t With_status.t
-    -> (User_command.Valid.t * [ `Assuming of _ list ], invalid) Result.t =
-  let zkapp_command_to_valid zkapp_command : User_command.Valid.t =
-    (* Verification keys should be present if it reaches here *)
-    let (`If_this_is_used_it_should_have_a_comment_justifying_it
-          valid_zkapp_command ) =
-      Zkapp_command.Valid.to_valid_unsafe zkapp_command
-    in
-    User_command.Poly.Zkapp_command valid_zkapp_command
-  in
+let check : _ With_status.t -> ([ `Assuming of _ list ], invalid) Result.t =
   function
   | { With_status.data = User_command.Signed_command c; status = _ } ->
       check_signed_command c
   | { With_status.data = Zkapp_command verifiable; status = Failed _ } ->
       let command = Zkapp_command.of_verifiable verifiable in
       let%map.Result () = check_signatures_of_zkapp_command command in
-      (zkapp_command_to_valid command, `Assuming [])
+      `Assuming []
   | { With_status.data = Zkapp_command verifiable; status = Applied } ->
       let command = Zkapp_command.of_verifiable verifiable in
       let%bind.Result () = check_signatures_of_zkapp_command command in
       let%map.Result assuming = collect_vk_assumptions verifiable in
-      (zkapp_command_to_valid command, `Assuming assuming)
+      `Assuming assuming
 
 (** Verifies a command that is being held in mempool.
   * Function only assumes that `User_command.t` is held in the mempool,

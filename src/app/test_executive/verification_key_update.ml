@@ -260,7 +260,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 in
                 { account_update with
                   authorization =
-                    Signature
+                    Control.Poly.Signature
                       (Schnorr.Chunked.sign account_a_kp.private_key
                          (Random_oracle.Input.Chunked.field commitment) )
                 }
