@@ -414,16 +414,10 @@ struct
 
     type t =
       { mutable pool : Indexed_pool.t
-      ; locally_generated_uncommitted :
-          ( Transaction_hash.User_command_with_valid_signature.t
-          , Time.t * [ `Batch of int ] )
-          Hashtbl.t
+      ; locally_generated_uncommitted : Locally_generated.t
             (** Commands generated on this machine, that are not included in the
           current best tip, along with the time they were added. *)
-      ; locally_generated_committed :
-          ( Transaction_hash.User_command_with_valid_signature.t
-          , Time.t * [ `Batch of int ] )
-          Hashtbl.t
+      ; locally_generated_committed : Locally_generated.t
             (** Ones that are included in the current best tip. *)
       ; mutable current_batch : int
       ; mutable remaining_in_batch : int
@@ -601,7 +595,8 @@ struct
                 unhashed_cmd.data
             in
             ( match
-                Hashtbl.find_and_remove t.locally_generated_committed cmd
+                Locally_generated.find_and_remove t.locally_generated_committed
+                  cmd
               with
             | None ->
                 ()
@@ -613,8 +608,8 @@ struct
                       , With_status.to_yojson User_command.Valid.to_yojson
                           unhashed_cmd )
                     ] ;
-                Hashtbl.add_exn t.locally_generated_uncommitted ~key:cmd
-                  ~data:time_added ) ;
+                Locally_generated.add_exn t.locally_generated_uncommitted
+                  ~key:cmd ~data:time_added ) ;
             let pool', dropped_seq =
               match cmd |> Indexed_pool.add_from_backtrack pool with
               | Error e ->
@@ -631,7 +626,7 @@ struct
          during backtracking due to the max size constraint. *)
       let locally_generated_dropped =
         Sequence.filter dropped_backtrack
-          ~f:(Hashtbl.mem t.locally_generated_uncommitted)
+          ~f:(Locally_generated.mem t.locally_generated_uncommitted)
         |> Sequence.to_list_rev
       in
       if not (List.is_empty locally_generated_dropped) then
@@ -694,12 +689,14 @@ struct
       in
       List.iter committed_commands ~f:(fun cmd ->
           vk_table_lift_hashed vk_table_dec cmd ;
-          Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
+          Locally_generated.find_and_remove t.locally_generated_uncommitted cmd
           |> Option.iter ~f:(fun data ->
-                 Hashtbl.add_exn t.locally_generated_committed ~key:cmd ~data ) ) ;
+                 Locally_generated.add_exn t.locally_generated_committed
+                   ~key:cmd ~data ) ) ;
       let commit_conflicts_locally_generated =
         List.filter dropped_commit_conflicts ~f:(fun cmd ->
-            Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
+            Locally_generated.find_and_remove t.locally_generated_uncommitted
+              cmd
             |> Option.is_some )
       in
       if not (List.is_empty commit_conflicts_locally_generated) then
@@ -731,13 +728,14 @@ struct
             vk_table_lift_hashed vk_table_dec cmd ;
             assert (
               Option.is_some
-              @@ Hashtbl.find_and_remove t.locally_generated_uncommitted cmd )
+              @@ Locally_generated.find_and_remove
+                   t.locally_generated_uncommitted cmd )
           in
           let log_and_remove ?(metadata = []) error_str =
             log_indexed_pool_error error_str ~metadata cmd ;
             remove_cmd ()
           in
-          if not (Hashtbl.mem t.locally_generated_committed cmd) then
+          if not (Locally_generated.mem t.locally_generated_committed cmd) then
             if
               not
                 (has_sufficient_fee t.pool
@@ -806,7 +804,8 @@ struct
               ] ;
           vk_table_lift_hashed vk_table_dec cmd ;
           ignore
-            ( Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
+            ( Locally_generated.find_and_remove t.locally_generated_uncommitted
+                cmd
               : (Time.t * [ `Batch of int ]) option ) ) ;
       Mina_metrics.(
         Gauge.set Transaction_pool.pool_size
@@ -826,12 +825,8 @@ struct
         { pool =
             Indexed_pool.empty ~constraint_constants ~consensus_constants
               ~time_controller ~slot_tx_end:config.Config.slot_tx_end
-        ; locally_generated_uncommitted =
-            Hashtbl.create
-              (module Transaction_hash.User_command_with_valid_signature)
-        ; locally_generated_committed =
-            Hashtbl.create
-              (module Transaction_hash.User_command_with_valid_signature)
+        ; locally_generated_uncommitted = Locally_generated.create ()
+        ; locally_generated_committed = Locally_generated.create ()
         ; current_batch = 0
         ; remaining_in_batch = max_per_15_seconds
         ; config
@@ -895,7 +890,8 @@ struct
                  let dropped_locally_generated =
                    Sequence.filter dropped ~f:(fun cmd ->
                        let find_remove_bool tbl =
-                         Hashtbl.find_and_remove tbl cmd |> Option.is_some
+                         Locally_generated.find_and_remove tbl cmd
+                         |> Option.is_some
                        in
                        let dropped_committed =
                          find_remove_bool t.locally_generated_committed
@@ -1228,7 +1224,8 @@ struct
                   } )
 
       let register_locally_generated t txn =
-        Hashtbl.update t.locally_generated_uncommitted txn ~f:(function
+        Locally_generated.update t.locally_generated_uncommitted txn
+          ~f:(function
           | Some (_, `Batch batch_num) ->
               (* Use the existing [batch_num] on a re-issue, to avoid splitting
                  existing batches.
@@ -1397,7 +1394,8 @@ struct
             ] ;
         let locally_generated_dropped =
           List.filter all_dropped_cmds ~f:(fun cmd ->
-              Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
+              Locally_generated.find_and_remove t.locally_generated_uncommitted
+                cmd
               |> Option.is_some )
         in
         if not (List.is_empty locally_generated_dropped) then
@@ -1553,7 +1551,7 @@ struct
         "it was added at $time and its rebroadcast period is now expired."
       in
       let logger = t.logger in
-      Hashtbl.filteri_inplace t.locally_generated_uncommitted
+      Locally_generated.filteri_inplace t.locally_generated_uncommitted
         ~f:(fun ~key ~data:(time, `Batch _) ->
           match has_timed_out time with
           | `Timed_out ->
@@ -1563,7 +1561,7 @@ struct
               false
           | `Ok ->
               true ) ;
-      Hashtbl.filteri_inplace t.locally_generated_committed
+      Locally_generated.filteri_inplace t.locally_generated_committed
         ~f:(fun ~key ~data:(time, `Batch _) ->
           match has_timed_out time with
           | `Timed_out ->
@@ -1575,7 +1573,7 @@ struct
           | `Ok ->
               true ) ;
       (* Important to maintain ordering here *)
-      Hashtbl.to_alist t.locally_generated_uncommitted
+      Locally_generated.to_alist t.locally_generated_uncommitted
       |> List.sort
            ~compare:(fun (txn1, (_, `Batch batch1)) (txn2, (_, `Batch batch2))
                     ->
@@ -1869,30 +1867,22 @@ let%test_module _ =
 
     (** Assert the invariants of the locally generated command tracking system. *)
     let assert_locally_generated (pool : Test.Resource_pool.t) =
-      ignore
-        ( Hashtbl.merge pool.locally_generated_committed
-            pool.locally_generated_uncommitted ~f:(fun ~key -> function
-            | `Both ((committed, _), (uncommitted, _)) ->
-                failwithf
-                  !"Command \
-                    %{sexp:Transaction_hash.User_command_with_valid_signature.t} \
-                    in both locally generated committed and uncommitted with \
-                    times %s and %s"
-                  key (Time.to_string committed)
-                  (Time.to_string uncommitted)
-                  ()
-            | `Left cmd ->
-                Some cmd
-            | `Right cmd ->
-                (* Locally generated uncommitted transactions should be in the
-                   pool, so long as we're not in the middle of updating it. *)
-                assert (
-                  Indexed_pool.member pool.pool
-                    (Transaction_hash.User_command.of_checked key) ) ;
-                Some cmd )
-          : ( Transaction_hash.User_command_with_valid_signature.t
-            , Time.t * [ `Batch of int ] )
-            Hashtbl.t )
+      Locally_generated.iter_intersection pool.locally_generated_committed
+        pool.locally_generated_uncommitted
+        ~f:(fun ~key (committed, _) (uncommitted, _) ->
+          failwithf
+            !"Command \
+              %{sexp:Transaction_hash.User_command_with_valid_signature.t} in \
+              both locally generated committed and uncommitted with times %s \
+              and %s"
+            key (Time.to_string committed)
+            (Time.to_string uncommitted)
+            () ) ;
+      Locally_generated.iteri pool.locally_generated_uncommitted
+        ~f:(fun ~key ~data:_ ->
+          assert (
+            Indexed_pool.member pool.pool
+              (Transaction_hash.User_command.of_checked key) ) )
 
     let assert_fee_wu_ordering (pool : Test.Resource_pool.t) =
       let txns = Test.Resource_pool.transactions pool |> Sequence.to_list in
