@@ -57,7 +57,7 @@ module Width : sig
 
   val typ : (Checked.t, t) Typ.t
 
-  module Max = Nat.N2
+  module Max = Nat.N3
 
   module Max_vector : Vector.With_version(Max).S
 
@@ -294,7 +294,7 @@ let dummy_wrap_vk :
   lazy
     (let d =
        (Common.wrap_domains
-          ~proofs_verified:(Pickles_base.Proofs_verified.to_int N2) )
+          ~proofs_verified:(Pickles_base.Proofs_verified.to_int N3) )
          .h
      in
      let log2_size = Import.Domain.log2_size d in
@@ -346,8 +346,8 @@ let dummy_wrap_vk :
          } ) )
 
 let dummy : t =
-  { max_proofs_verified = N2
-  ; actual_wrap_domain_size = N2
+  { max_proofs_verified = N3
+  ; actual_wrap_domain_size = N3
   ; wrap_index =
       (let g = Backend.Tock.Curve.(to_affine_exn one) in
        { sigma_comm = Vector.init Plonk_types.Permuts.n ~f:(fun _ -> g)

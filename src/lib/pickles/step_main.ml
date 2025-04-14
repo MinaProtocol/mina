@@ -67,7 +67,7 @@ let verify_one ~srs
               (Vector.trim_front branch_data.proofs_verified_mask
                  (Nat.lte_exn
                     (Vector.length prev_challenge_polynomial_commitments)
-                    Nat.N2.n ) )
+                    Nat.N3.n ) )
             (* Use opt sponge for cutting off the bulletproof challenges early *)
             { app_state
             ; dlog_plonk_index = d.wrap_key

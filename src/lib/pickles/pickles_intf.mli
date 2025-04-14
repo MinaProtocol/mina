@@ -91,11 +91,11 @@ module type S = sig
       val of_base64 : string -> (t, string) Result.t
     end
 
-    module Proofs_verified_2 : sig
+    module Proofs_verified_3 : sig
       [%%versioned:
       module Stable : sig
         module V2 : sig
-          type t = Make(Nat.N2)(Nat.N2).t
+          type t = Make(Nat.N3)(Nat.N3).t
           [@@deriving sexp, compare, equal, yojson, hash]
 
           val to_yojson_full : t -> Yojson.Safe.t
@@ -334,7 +334,7 @@ module type S = sig
 
       val of_compiled : _ Tag.t -> t Deferred.t
 
-      module Max_width = Nat.N2
+      module Max_width = Nat.N3
     end
 
     module Proof : sig

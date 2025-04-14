@@ -24,6 +24,7 @@ let tick_shifts, tock_shifts =
   ( mk Kimchi_bindings.Protocol.VerifierIndex.Fp.shifts
   , mk Kimchi_bindings.Protocol.VerifierIndex.Fq.shifts )
 
+(* TODO: fix wrap domains & actual wrap_domain_size *)
 let wrap_domains ~proofs_verified =
   let h =
     match proofs_verified with 0 -> 13 | 1 -> 14 | 2 -> 15 | _ -> assert false

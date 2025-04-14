@@ -45,6 +45,8 @@ end
 
 module At_most_2 : VERSIONED with type 'a ty = ('a, Nat.N2.n) at_most
 
+module At_most_3 : VERSIONED with type 'a ty = ('a, Nat.N3.n) at_most
+
 module At_most_8 : VERSIONED with type 'a ty = ('a, Nat.N8.n) at_most
 
 module With_length (N : Nat.Intf) : S with type 'a t = ('a, N.n) at_most

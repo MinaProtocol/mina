@@ -10,19 +10,19 @@ include struct
 
   type _ t +=
     | Prev_state : Protocol_state.Value.t t
-    | Prev_state_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t t
+    | Prev_state_proof : (Nat.N3.n, Nat.N3.n) Pickles.Proof.t t
     | Transition : Snark_transition.Value.t t
     | Txn_snark : Transaction_snark.Statement.With_sok.t t
-    | Txn_snark_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t t
+    | Txn_snark_proof : (Nat.N3.n, Nat.N3.n) Pickles.Proof.t t
 end
 
 module Witness = struct
   type t =
     { prev_state : Protocol_state.Value.t
-    ; prev_state_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+    ; prev_state_proof : (Nat.N3.n, Nat.N3.n) Pickles.Proof.t
     ; transition : Snark_transition.Value.t
     ; txn_snark : Transaction_snark.Statement.With_sok.t
-    ; txn_snark_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+    ; txn_snark_proof : (Nat.N3.n, Nat.N3.n) Pickles.Proof.t
     }
 end
 
@@ -395,7 +395,7 @@ end
 type tag =
   ( Protocol_state.Value.t Data_as_hash.t
   , Statement.t
-  , Nat.N2.n
+  , Nat.N3.n
   , Nat.N1.n )
   Pickles.Tag.t
 
@@ -431,7 +431,7 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
 module type S = sig
   module Proof :
     Pickles.Proof_intf
-      with type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+      with type t = (Nat.N3.n, Nat.N3.n) Pickles.Proof.t
        and type statement = Protocol_state.Value.t
 
   val tag : tag
@@ -443,7 +443,7 @@ module type S = sig
   val step :
        Witness.t
     -> ( Protocol_state.Value.t * (Transaction_snark.Statement.With_sok.t * unit)
-       , N2.n * (N2.n * unit)
+       , N3.n * (N3.n * unit)
        , N1.n * (N5.n * unit)
        , Protocol_state.Value.t
        , (unit * unit * Proof.t) Async.Deferred.t )
@@ -452,7 +452,7 @@ module type S = sig
   val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
 end
 
-let verify ts ~key = Pickles.verify (module Nat.N2) (module Statement) key ts
+let verify ts ~key = Pickles.verify (module Nat.N3) (module Statement) key ts
 
 let constraint_system_digests ~proof_level ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
@@ -484,7 +484,7 @@ end) : S = struct
       ~public_input:(Input Statement.typ)
       ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~auxiliary_typ:Typ.unit
-      ~max_proofs_verified:(module Nat.N2)
+      ~max_proofs_verified:(module Nat.N3)
       ~name:"blockchain-snark"
       ~choices:(fun ~self ->
         [ rule ~proof_level ~constraint_constants T.tag self ] )

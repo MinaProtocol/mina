@@ -6,17 +6,17 @@ open Pickles_types
 module Witness : sig
   type t =
     { prev_state : Protocol_state.Value.t
-    ; prev_state_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+    ; prev_state_proof : (Nat.N3.n, Nat.N3.n) Pickles.Proof.t
     ; transition : Snark_transition.Value.t
     ; txn_snark : Transaction_snark.Statement.With_sok.t
-    ; txn_snark_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+    ; txn_snark_proof : (Nat.N3.n, Nat.N3.n) Pickles.Proof.t
     }
 end
 
 type tag =
   ( Protocol_state.value Data_as_hash.t
   , Protocol_state.value
-  , Nat.N2.n
+  , Nat.N3.n
   , Nat.N1.n )
   Pickles.Tag.t
 
@@ -38,7 +38,7 @@ val check :
 module type S = sig
   module Proof :
     Pickles.Proof_intf
-      with type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+      with type t = (Nat.N3.n, Nat.N3.n) Pickles.Proof.t
        and type statement = Protocol_state.Value.t
 
   val tag : tag
@@ -50,7 +50,7 @@ module type S = sig
   val step :
        Witness.t
     -> ( Protocol_state.Value.t * (Transaction_snark.Statement.With_sok.t * unit)
-       , N2.n * (N2.n * unit)
+       , N3.n * (N3.n * unit)
        , N1.n * (N5.n * unit)
        , Protocol_state.Value.t
        , (unit * unit * Proof.t) Async.Deferred.t )

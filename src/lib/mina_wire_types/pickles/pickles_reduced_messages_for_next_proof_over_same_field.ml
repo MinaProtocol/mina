@@ -11,7 +11,7 @@ end
 module Wrap = struct
   module Challenges_vector = struct
     type challenge_constant =
-      Pickles_types.Nat.two Pickles_limb_vector.Constant.t
+      Pickles_types.Nat.three Pickles_limb_vector.Constant.t
 
     type 'a wrap_bp_vec = ('a, Pickles_types.Nat.fifteen) Pickles_types.Vector.t
 

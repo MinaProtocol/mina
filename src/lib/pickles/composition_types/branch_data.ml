@@ -55,17 +55,24 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
   end]
 
-  let length_in_bits = 10
+  let proofs_verified_bits = 3
 
+  let domain_log2_bits = 8
+
+  let length_in_bits = proofs_verified_bits + domain_log2_bits
+
+  (* NOTE: we could use netstring to encode the branches bits,
+     so we can have flexibility to choose the branching factor
+  *)
   let pack (type f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
       ({ proofs_verified; domain_log2 } : t) : f =
     let open Impl.Field.Constant in
     let double x = x + x in
-    let times4 x = double (double x) in
+    let shl f n_bits = f |> Fn.apply_n_times ~n:n_bits double in
     let domain_log2 = of_int (Char.to_int domain_log2) in
-    (* shift domain_log2 over by 2 bits (multiply by 4) *)
-    times4 domain_log2
+    (* shift domain_log2 over by 3 bits (multiply by 8) *)
+    shl domain_log2 proofs_verified_bits
     + project
         (Pickles_types.Vector.to_list
            (Proofs_verified.to_bool_vec proofs_verified) )
@@ -74,8 +81,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
       (x : f) : t =
     match Impl.Field.Constant.unpack x with
-    | x0 :: x1 :: y0 :: y1 :: y2 :: y3 :: y4 :: y5 :: y6 :: y7 :: _ ->
-        { proofs_verified = Proofs_verified.of_bool_vec [ x0; x1 ]
+    | x0 :: x1 :: x2 :: y0 :: y1 :: y2 :: y3 :: y4 :: y5 :: y6 :: y7 :: _ ->
+        { proofs_verified = Proofs_verified.of_bool_vec [ x0; x1; x2 ]
         ; domain_log2 =
             Domain_log2.of_bits_msb [ y7; y6; y5; y4; y3; y2; y1; y0 ]
         }

@@ -143,8 +143,8 @@ module Pickles = struct
   include Assert_equal2 (O.Proof) (W.Proof)
   include
     Assert_equal0V2
-      (O.Proof.Proofs_verified_2.Stable)
-      (W.Proof.Proofs_verified_2)
+      (O.Proof.Proofs_verified_3.Stable)
+      (W.Proof.Proofs_verified_3)
 end
 
 module Mina_base = struct

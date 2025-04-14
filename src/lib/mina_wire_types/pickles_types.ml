@@ -7,6 +7,8 @@ module Nat = struct
 
   type two = z s s
 
+  type three = z s s s
+
   type four = z s s s s
 
   type five = z s s s s s

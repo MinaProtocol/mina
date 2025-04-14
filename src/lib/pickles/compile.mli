@@ -97,7 +97,7 @@ module Side_loaded : sig
 
     val of_compiled : _ Tag.t -> t Deferred.t
 
-    module Max_width = Nat.N2
+    module Max_width = Nat.N3
   end
 
   module Proof : sig

@@ -37,9 +37,9 @@ module Base = struct
         type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
           { statement :
               ( Limb_vector.Constant.Hex64.Stable.V1.t
-                Vector.Vector_2.Stable.V1.t
+                Vector.Vector_3.Stable.V1.t
               , Limb_vector.Constant.Hex64.Stable.V1.t
-                Vector.Vector_2.Stable.V1.t
+                Vector.Vector_3.Stable.V1.t
                 Scalar_challenge.Stable.V2.t
               , Tick.Field.Stable.V1.t Shifted_value.Type1.Stable.V1.t
               , bool
@@ -47,7 +47,7 @@ module Base = struct
               , Digest.Constant.Stable.V1.t
               , 'messages_for_next_step_proof
               , Limb_vector.Constant.Hex64.Stable.V1.t
-                Vector.Vector_2.Stable.V1.t
+                Vector.Vector_3.Stable.V1.t
                 Scalar_challenge.Stable.V2.t
                 Bulletproof_challenge.Stable.V1.t
                 Step_bp_vec.Stable.V1.t
@@ -134,7 +134,9 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                             N1
                         | S (S Z) ->
                             N2
-                        | S _ ->
+                        | S (S (S Z)) ->
+                            N3
+                        | _ ->
                             assert false )
                     ; domain_log2 =
                         Branch_data.Domain_log2.of_int_exn domain_log2
@@ -343,8 +345,8 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
         Error "Invalid json for proof. Expecting base64 encoded string"
 end
 
-module Proofs_verified_2 = struct
-  module T = Make (Nat.N2) (Nat.N2)
+module Proofs_verified_3 = struct
+  module T = Make (Nat.N3) (Nat.N3)
 
   module Repr = struct
     [%%versioned
@@ -359,15 +361,15 @@ module Proofs_verified_2 = struct
               .Stable
               .V2
               .t
-              Vector.Vector_2.Stable.V1.t )
+              Vector.Vector_3.Stable.V1.t )
             Types.Wrap.Proof_state.Messages_for_next_wrap_proof.Stable.V1.t
           , ( unit
-            , Tock.Curve.Affine.t At_most.At_most_2.Stable.V1.t
-            , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
+            , Tock.Curve.Affine.t At_most.At_most_3.Stable.V1.t
+            , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_3.Stable.V1.t
               Scalar_challenge.Stable.V2.t
               Bulletproof_challenge.Stable.V1.t
               Step_bp_vec.Stable.V1.t
-              At_most.At_most_2.Stable.V1.t )
+              At_most.At_most_3.Stable.V1.t )
             Base.Messages_for_next_proof_over_same_field.Step.Stable.V1.t )
           Base.Wrap.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
@@ -430,7 +432,7 @@ module Proofs_verified_max = struct
           , ( unit
             , Tock.Curve.Affine.t
               Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t
-            , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
+            , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_3.Stable.V1.t
               Scalar_challenge.Stable.V2.t
               Bulletproof_challenge.Stable.V1.t
               Step_bp_vec.Stable.V1.t

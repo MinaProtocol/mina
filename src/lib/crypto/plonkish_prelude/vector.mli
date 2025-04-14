@@ -105,6 +105,9 @@ module Vector_4 : VECTOR with type 'a t = ('a, Nat.N4.n) vec
 (** Vector of size 2 *)
 module Vector_2 : VECTOR with type 'a t = ('a, Nat.N2.n) vec
 
+(** Vector of size 3 *)
+module Vector_3 : VECTOR with type 'a t = ('a, Nat.N3.n) vec
+
 (** Functor to build any vector of size [N]. The parameters of the functor is a
     natural encoded at the type level. For instance, {!Vector_2} could be seen
     as the output of [With_length (Nat.N2)]

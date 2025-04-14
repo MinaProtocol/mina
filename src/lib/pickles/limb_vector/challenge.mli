@@ -1,4 +1,4 @@
-module Constant : module type of Constant.Make (Pickles_types.Nat.N2)
+module Constant : module type of Constant.Make (Pickles_types.Nat.N3)
 
 module type S = sig
   module Impl : Snarky_backendless.Snark_intf.Run

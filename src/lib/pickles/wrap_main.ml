@@ -196,7 +196,7 @@ let wrap_main
                 Branch_data.Checked.Wrap.pack
                   { proofs_verified_mask =
                       Vector.extend_front_exn actual_proofs_verified_mask
-                        Nat.N2.n Boolean.false_
+                        Nat.N3.n Boolean.false_
                   ; domain_log2
                   }
                 |> Field.Assert.equal branch_data )
