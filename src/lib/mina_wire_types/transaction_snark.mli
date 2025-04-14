@@ -9,7 +9,7 @@ end
 module type Concrete = sig
   module Proof : sig
     module V2 : sig
-      type t = Pickles.Proof.Proofs_verified_2.V2.t
+      type t = Pickles.Proof.Proofs_verified_3.V2.t
     end
   end
 

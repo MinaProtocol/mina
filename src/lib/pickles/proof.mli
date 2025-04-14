@@ -155,8 +155,8 @@ module Make (W : Pickles_types.Nat.Intf) (MLMB : Pickles_types.Nat.Intf) : sig
   val of_yojson : [> `String of string ] -> (t, string) result
 end
 
-module Proofs_verified_2 : sig
-  module T : module type of Make (Pickles_types.Nat.N2) (Pickles_types.Nat.N2)
+module Proofs_verified_3 : sig
+  module T : module type of Make (Pickles_types.Nat.N3) (Pickles_types.Nat.N3)
 
   [%%versioned:
   module Stable : sig

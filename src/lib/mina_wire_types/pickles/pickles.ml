@@ -123,9 +123,9 @@ module M = struct
 
     type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) with_data
 
-    module Proofs_verified_2 = struct
+    module Proofs_verified_3 = struct
       module V2 = struct
-        type nonrec t = (Pickles_types.Nat.two, Pickles_types.Nat.two) t
+        type nonrec t = (Pickles_types.Nat.three, Pickles_types.Nat.three) t
       end
     end
   end
@@ -171,9 +171,9 @@ module Types = struct
     module Proof : sig
       type ('a, 'b) t
 
-      module Proofs_verified_2 : sig
+      module Proofs_verified_3 : sig
         module V2 : sig
-          type nonrec t = (Pickles_types.Nat.two, Pickles_types.Nat.two) t
+          type nonrec t = (Pickles_types.Nat.three, Pickles_types.Nat.three) t
         end
       end
     end

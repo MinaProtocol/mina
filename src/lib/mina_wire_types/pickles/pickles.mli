@@ -5,9 +5,9 @@ module Types : sig
     module Proof : sig
       type ('a, 'b) t
 
-      module Proofs_verified_2 : sig
+      module Proofs_verified_3 : sig
         module V2 : sig
-          type nonrec t = (Pickles_types.Nat.two, Pickles_types.Nat.two) t
+          type nonrec t = (Pickles_types.Nat.three, Pickles_types.Nat.three) t
         end
       end
     end
@@ -172,9 +172,9 @@ module Concrete_ : sig
 
     type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) with_data
 
-    module Proofs_verified_2 : sig
+    module Proofs_verified_3 : sig
       module V2 : sig
-        type nonrec t = (Pickles_types.Nat.two, Pickles_types.Nat.two) t
+        type nonrec t = (Pickles_types.Nat.three, Pickles_types.Nat.three) t
       end
     end
   end

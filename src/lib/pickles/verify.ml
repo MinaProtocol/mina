@@ -128,6 +128,7 @@ let verify_heterogenous (ts : Instance.t list) =
         let () =
           let [ Pow_2_roots_of_unity greatest_wrap_domain
               ; _
+              ; _
               ; Pow_2_roots_of_unity least_wrap_domain
               ] =
             Wrap_verifier.all_possible_domains ()

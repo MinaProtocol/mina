@@ -345,8 +345,8 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
         Error "Invalid json for proof. Expecting base64 encoded string"
 end
 
-module Proofs_verified_2 = struct
-  module T = Make (Nat.N2) (Nat.N2)
+module Proofs_verified_3 = struct
+  module T = Make (Nat.N3) (Nat.N3)
 
   module Repr = struct
     [%%versioned
@@ -361,15 +361,15 @@ module Proofs_verified_2 = struct
               .Stable
               .V2
               .t
-              Vector.Vector_2.Stable.V1.t )
+              Vector.Vector_3.Stable.V1.t )
             Types.Wrap.Proof_state.Messages_for_next_wrap_proof.Stable.V1.t
           , ( unit
-            , Tock.Curve.Affine.t At_most.At_most_2.Stable.V1.t
-            , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
+            , Tock.Curve.Affine.t At_most.At_most_3.Stable.V1.t
+            , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_3.Stable.V1.t
               Scalar_challenge.Stable.V2.t
               Bulletproof_challenge.Stable.V1.t
               Step_bp_vec.Stable.V1.t
-              At_most.At_most_2.Stable.V1.t )
+              At_most.At_most_3.Stable.V1.t )
             Base.Messages_for_next_proof_over_same_field.Step.Stable.V1.t )
           Base.Wrap.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
