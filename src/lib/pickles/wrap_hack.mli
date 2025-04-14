@@ -1,4 +1,4 @@
-module Padded_length = Pickles_types.Nat.N2
+module Padded_length = Pickles_types.Nat.N3
 
 val pad_accumulator :
      (Backend.Tock.Proof.Challenge_polynomial.t, 'a) Pickles_types.Vector.t
