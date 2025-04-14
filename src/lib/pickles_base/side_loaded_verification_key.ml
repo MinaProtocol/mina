@@ -62,12 +62,12 @@ end = struct
       [@@@no_toplevel_latest_type]
 
       module V1 = struct
-        type 'a t = 'a Vector.Vector_2.Stable.V1.t
+        type 'a t = 'a Vector.Vector_3.Stable.V1.t
         [@@deriving compare, yojson, sexp, hash, equal]
       end
     end]
 
-    type 'a t = 'a Vector.Vector_2.t
+    type 'a t = 'a Vector.Vector_3.t
     [@@deriving compare, yojson, sexp, hash, equal]
 
     let map = Vector.map
@@ -83,12 +83,12 @@ end = struct
       [@@@no_toplevel_latest_type]
 
       module V1 = struct
-        type 'a t = 'a At_most.At_most_2.Stable.V1.t
+        type 'a t = 'a At_most.At_most_3.Stable.V1.t
         [@@deriving compare, yojson, sexp, hash, equal]
       end
     end]
 
-    type 'a t = 'a At_most.At_most_2.t
+    type 'a t = 'a At_most.At_most_3.t
     [@@deriving compare, yojson, sexp, hash, equal]
   end
 

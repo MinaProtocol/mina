@@ -102,7 +102,7 @@ module Width : sig
 
   val zero : t
 
-  module Max = Pickles_types.Nat.N2
+  module Max = Pickles_types.Nat.N3
 
   module Max_vector : Pickles_types.Vector.With_version(Max).S
 

@@ -138,6 +138,37 @@ module At_most_2 = struct
   type 'a ty = 'a t
   end
 
+module At_most_3 = struct
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N3.n) at_most
+
+      include
+        Core_kernel.Binable.Of_binable1_without_uuid
+          (Core_kernel.List.Stable.V1)
+          (struct
+            type nonrec 'a t = 'a t
+
+            let to_binable = to_list
+
+            let of_binable xs = of_list_and_length_exn xs Nat.N3.n
+          end)
+
+      include (
+        With_length
+          (Nat.N3) :
+            module type of With_length (Nat.N3) with type 'a t := 'a t )
+      end
+    end]
+
+  type 'a t = 'a Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
+
+  type 'a ty = 'a t
+  end
+
 module At_most_8 = struct
   [%%versioned_binable
   module Stable = struct
