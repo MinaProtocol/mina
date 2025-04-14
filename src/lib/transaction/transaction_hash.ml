@@ -168,7 +168,7 @@ let hash_of_transaction_id (transaction_id : string) : t Or_error.t =
             "Could not decode transaction id as either Base58Check or Base64" )
 
 module User_command_with_valid_signature = struct
-  type hash = T.t [@@deriving sexp, compare, hash]
+  type hash = T.t [@@deriving equal, sexp, compare, hash]
 
   let hash_to_yojson = to_yojson
 
@@ -176,6 +176,8 @@ module User_command_with_valid_signature = struct
 
   type t = (User_command.Valid.t, hash) With_hash.t
   [@@deriving hash, sexp, compare, to_yojson]
+
+  let equal ({ hash = h1; _ } : t) ({ hash = h2; _ } : t) = T.equal h1 h2
 
   let create (c : User_command.Valid.t) : t =
     { data = c
@@ -193,18 +195,16 @@ module User_command_with_valid_signature = struct
   let forget_check ({ data; hash } : t) =
     { With_hash.data = User_command.forget_check data; hash }
 
-  include Comparable.Make (struct
-    type nonrec t = t
+  module Set = struct
+    type el = t
 
-    let sexp_of_t = sexp_of_t
+    module Generic_set = With_hash.Set (T)
+    include Generic_set
 
-    let t_of_sexp = t_of_sexp
+    type nonrec t = User_command.Valid.t Generic_set.t
 
-    (* Compare only on hashes, comparing on the data too would be slower and
-       add no value.
-    *)
-    let compare (x : t) (y : t) = T.compare x.hash y.hash
-  end)
+    let sexp_of_t = Generic_set.sexp_of_t User_command.Valid.sexp_of_t
+  end
 
   let make data hash : t = { data; hash }
 end
