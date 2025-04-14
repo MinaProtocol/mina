@@ -2581,7 +2581,7 @@ let%test_module "staged ledger tests" =
       let sok_digest = Sok_message.Digest.default in
       One_or_two.map stmts ~f:(fun statement ->
           Ledger_proof.Cached.create ~statement ~sok_digest
-            ~proof:(Lazy.force Proof_cache_tag.For_tests.transaction_dummy) )
+            ~proof:(Lazy.force Proof.For_tests.transaction_dummy_tag) )
 
     let stmt_to_work_random_prover (stmts : Transaction_snark_work.Statement.t)
         : Transaction_snark_work.Checked.t option =
