@@ -134,7 +134,9 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                             N1
                         | S (S Z) ->
                             N2
-                        | S _ ->
+                        | S (S (S Z)) ->
+                            N3
+                        | _ ->
                             assert false )
                     ; domain_log2 =
                         Branch_data.Domain_log2.of_int_exn domain_log2
