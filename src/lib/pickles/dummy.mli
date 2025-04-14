@@ -4,7 +4,7 @@
 module Ipa : sig
   module Wrap : sig
     val challenges :
-      ( (int64, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
+      ( (int64, Pickles_types.Nat.N3.n) Pickles_types.Vector.t
         Import.Scalar_challenge.t
         Composition_types.Bulletproof_challenge.t
       , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
@@ -21,7 +21,7 @@ module Ipa : sig
 
   module Step : sig
     val challenges :
-      ( (int64, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
+      ( (int64, Pickles_types.Nat.N3.n) Pickles_types.Vector.t
         Import.Scalar_challenge.t
         Composition_types.Bulletproof_challenge.t
       , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
