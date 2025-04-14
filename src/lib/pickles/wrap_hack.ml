@@ -9,8 +9,8 @@ open Pickles_types
    amongst all the step branches that that proof is wrapping.
 
    To simplify the implementation when the number of proofs-verified
-   varies across proof systems (being either 0, 1, or 2) we secretly
-   pad the accumulator so that it always has exactly 2 vectors, padding
+   varies across proof systems (being either 0, 1, 2, or 3) we secretly
+   pad the accumulator so that it always has exactly 3 vectors, padding
    with dummy vectors.
 
    We also then pad with the corresponding dummy commitments when proving
@@ -21,9 +21,9 @@ open Pickles_types
    resulting from absorbing the padding challenges
 *)
 
-module Padded_length = Nat.N2
+module Padded_length = Nat.N3
 
-(* Pad up to length 2 by preprending dummy values. *)
+(* Pad up to length 3 by preprending dummy values. *)
 let pad_vector (type a) ~dummy (v : (a, _) Vector.t) =
   Vector.extend_front_exn v Padded_length.n dummy
 
@@ -95,7 +95,7 @@ module Checked = struct
       commitments
 
   (* We precompute the sponge states that would result from absorbing
-     0, 1, or 2 dummy challenge vectors. This is used to speed up hashing
+     0, 1, 2, or 3 dummy challenge vectors. This is used to speed up hashing
      inside the circuit. *)
   let dummy_messages_for_next_wrap_proof_sponge_states =
     lazy
@@ -108,7 +108,9 @@ module Checked = struct
       let s1 = full_state sponge in
       Vector.iter ~f:(S.absorb sponge) chals ;
       let s2 = full_state sponge in
-      [| s0; s1; s2 |] )
+      Vector.iter ~f:(S.absorb sponge) chals ;
+      let s3 = full_state sponge in
+      [| s0; s1; s2; s3 |] )
 
   let hash_constant_messages_for_next_wrap_proof =
     hash_messages_for_next_wrap_proof
@@ -127,7 +129,7 @@ module Checked = struct
       (* The sponge states we would reach if we absorbed the padding challenges *)
       let s = Sponge.create sponge_params in
       let state, sponge_state =
-        (Lazy.force dummy_messages_for_next_wrap_proof_sponge_states).(2
+        (Lazy.force dummy_messages_for_next_wrap_proof_sponge_states).(3
                                                                        - Nat
                                                                          .to_int
                                                                            max_proofs_verified)
