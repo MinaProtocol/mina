@@ -117,9 +117,8 @@ class Benchmark(abc.ABC):
                         name, branch, str(field), self.branch_header())
 
                     print(f"result: {result}")
-                    print(f"last result: {result[-1]}")
-
-                    records = result[-1].records if (result is not None) and (result[-1] is not None) else []
+                    
+                    records = result[-1].records if (result is not None) and (len(result) > 0) else []
 
                     if len(records) < self.influx_client.moving_average_size :
                         logger.warning(
