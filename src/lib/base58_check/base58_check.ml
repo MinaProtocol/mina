@@ -13,6 +13,7 @@ exception Invalid_base58_version_byte of (char * string)
 
 exception Invalid_base58_check_length of string
 
+
 exception Invalid_base58_character of string
 
 (* same as Bitcoin alphabet *)
