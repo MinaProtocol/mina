@@ -116,12 +116,14 @@ class Benchmark(abc.ABC):
                     result = self.influx_client.query_moving_average(
                         name, branch, str(field), self.branch_header())
 
-                    if len(result) < self.influx_client.moving_average_size :
+                    records = result[-1].records if (result is not None) and (result[-1] is not None) else []
+
+                    if len(records) < self.influx_client.moving_average_size :
                         logger.warning(
                             f"Skipping comparison for {name} as there are no enough ({self.influx_client.moving_average_size}) historical data available yet"
                         )
                     else:
-                        average = float(result[-1].records[-1]["_value"])
+                        average = float(records[-1]["_value"])
 
                         current_red_threshold = average * red_threshold
                         current_yellow_threshold = average * yellow_threshold
