@@ -54,7 +54,7 @@ module Impl : Worker_impl_intf.Worker_impl = struct
     list
   [@@deriving sexp, to_yojson]
 
-  let log_base_zkapp_cmd_snark ~logger ~statement ~spec ?all_inputs f =
+  let log_zkapp_cmd_base_snark ~logger ~statement ~spec ?all_inputs f =
     match%map.Deferred
       Deferred.Or_error.try_with ~here:[%here] (fun () -> f ~statement ~spec)
     with
@@ -84,8 +84,8 @@ module Impl : Worker_impl_intf.Worker_impl = struct
             @ all_inputs_meta_data ) ;
         Error e
 
-  let log_merge_snark (module M : Transaction_snark.S) ~logger ~sok_digest prev
-      curr ~all_inputs =
+  let log_zkapp_cmd_merge_snark (module M : Transaction_snark.S) ~logger
+      ~sok_digest prev curr ~all_inputs =
     match%map.Deferred M.merge ~sok_digest prev curr with
     | Ok p ->
         Ok p
@@ -152,7 +152,7 @@ module Impl : Worker_impl_intf.Worker_impl = struct
                 Deferred.Or_error.error_string "no witnesses generated"
             | (witness, spec, stmt) :: rest as inputs ->
                 let%bind (p1 : Ledger_proof.t) =
-                  log_base_zkapp_cmd_snark ~logger
+                  log_zkapp_cmd_base_snark ~logger
                     ~statement:{ stmt with sok_digest } ~spec ~all_inputs:inputs
                     (M.of_zkapp_command_segment_exn ~witness)
                 in
@@ -162,12 +162,12 @@ module Impl : Worker_impl_intf.Worker_impl = struct
                     ~f:(fun acc (witness, spec, stmt) ->
                       let%bind (prev : Ledger_proof.t) = Deferred.return acc in
                       let%bind (curr : Ledger_proof.t) =
-                        log_base_zkapp_cmd_snark ~logger
+                        log_zkapp_cmd_base_snark ~logger
                           ~statement:{ stmt with sok_digest } ~spec
                           ~all_inputs:inputs
                           (M.of_zkapp_command_segment_exn ~witness)
                       in
-                      log_merge_snark
+                      log_zkapp_cmd_merge_snark
                         (module M)
                         ~logger ~sok_digest prev curr ~all_inputs:inputs )
                 in
@@ -237,7 +237,7 @@ module Impl : Worker_impl_intf.Worker_impl = struct
               | Regular regular ->
                   perform_regular ~m:(module M) ~logger ~regular ~sok_digest
               | Zkapp_command_segment { id = _; statement; witness; spec } ->
-                  log_base_zkapp_cmd_snark ~logger ~statement ~spec
+                  log_zkapp_cmd_base_snark ~logger ~statement ~spec
                     (M.of_zkapp_command_segment_exn ~witness) )
       | Check | No_check ->
           (* Use a dummy proof. *)
