@@ -570,7 +570,7 @@ let create_genesis_block_inputs (genesis_inputs : Genesis_proof.Inputs.t) =
   in
   let open Pickles_types in
   let blockchain_dummy =
-    Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:16
+    Pickles.Proof.dummy Nat.N2.n Nat.N2.n ~domain_log2:16
   in
   let snark_transition =
     let open Staged_ledger_diff in
