@@ -10,19 +10,19 @@ include struct
 
   type _ t +=
     | Prev_state : Protocol_state.Value.t t
-    | Prev_state_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t t
+    | Prev_state_proof : Nat.N2.n Pickles.Proof.t t
     | Transition : Snark_transition.Value.t t
     | Txn_snark : Transaction_snark.Statement.With_sok.t t
-    | Txn_snark_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t t
+    | Txn_snark_proof : Nat.N2.n Pickles.Proof.t t
 end
 
 module Witness = struct
   type t =
     { prev_state : Protocol_state.Value.t
-    ; prev_state_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+    ; prev_state_proof : Nat.N2.n Pickles.Proof.t
     ; transition : Snark_transition.Value.t
     ; txn_snark : Transaction_snark.Statement.With_sok.t
-    ; txn_snark_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+    ; txn_snark_proof : Nat.N2.n Pickles.Proof.t
     }
 end
 
@@ -431,7 +431,7 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
 module type S = sig
   module Proof :
     Pickles.Proof_intf
-      with type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+      with type t = Nat.N2.n Pickles.Proof.t
        and type statement = Protocol_state.Value.t
 
   val tag : tag

@@ -59,8 +59,7 @@ let hash_messages_for_next_wrap_proof (type n)
     )
 
 (* Pad the messages_for_next_wrap_proof of a proof *)
-let pad_proof (type mlmb) (T p : (mlmb, _) Proof.t) :
-    Proof.Proofs_verified_max.t =
+let pad_proof (type mlmb) (T p : mlmb Proof.t) : Proof.Proofs_verified_max.t =
   T
     { p with
       statement =
