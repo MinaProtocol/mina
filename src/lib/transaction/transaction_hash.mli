@@ -35,9 +35,9 @@ val hash_zkapp_command : Zkapp_command.Stable.Latest.t -> t
 
 val hash_command : User_command.Stable.Latest.t -> t
 
-val hash_wrapped_zkapp_command : Zkapp_command.t -> t
+val hash_zkapp_command_with_hashes : Zkapp_command.t -> t
 
-val hash_wrapped_command : User_command.t -> t
+val hash_command_with_hashes : User_command.t -> t
 
 val hash_fee_transfer : Fee_transfer.Single.t -> t
 
