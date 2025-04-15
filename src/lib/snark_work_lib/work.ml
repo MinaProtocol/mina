@@ -84,9 +84,31 @@ module Spec = struct
     { instances; fee }
 end
 
+let update_metric :
+       Core.Time.Stable.Span.V1.t * [ `Transition | `Merge ]
+    -> Core.Time.Stable.Span.V1.t
+       * [ `Transition | `Merge | `Zkapp_command_segment ] = function
+  | span, `Transition ->
+      (span, `Transition)
+  | span, `Merge ->
+      (span, `Merge)
+
 module Result = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type ('spec, 'single) t =
+        { proofs : 'single One_or_two.Stable.V1.t
+        ; metrics :
+            ( Core.Time.Stable.Span.V1.t
+            * [ `Transition | `Merge | `Zkapp_command_segment ] )
+            One_or_two.Stable.V1.t
+        ; spec : 'spec
+        ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t
+        }
+      [@@deriving fields]
+    end
+
     module V1 = struct
       type ('spec, 'single) t =
         { proofs : 'single One_or_two.Stable.V1.t
@@ -98,7 +120,13 @@ module Result = struct
         }
       [@@deriving fields]
 
-      let to_latest = Fn.id
+      let to_latest ({ proofs; metrics; spec; prover } : ('spec, 'single) t) :
+          ('spec, 'single) V2.t =
+        { proofs
+        ; metrics = One_or_two.map ~f:update_metric metrics
+        ; spec
+        ; prover
+        }
     end
   end]
 

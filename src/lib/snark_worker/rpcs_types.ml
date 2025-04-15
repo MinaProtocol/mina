@@ -52,6 +52,12 @@ module Wire_work = struct
 
       type t = Stable.Latest.t [@@deriving sexp, yojson]
 
+      let statement : t -> Transaction_snark.Statement.Stable.V2.t = function
+        | Regular regular ->
+            Work.Single.Spec.statement regular
+        | Zkapp_command_segment { statement; _ } ->
+            Transaction_snark.Statement.With_sok.drop_sok statement
+
       let transaction : t -> Mina_transaction.Transaction.Stable.V2.t option =
         function
         | Regular work ->
@@ -80,13 +86,7 @@ module Wire_work = struct
     module Stable = struct
       module V1 = struct
         type t =
-          | Regular of
-              ( Regular_work_single.Stable.V1.t
-                Work.Spec.Stable.V1.t
-              , Ledger_proof.Stable.V2.t )
-              Work.Result.Stable.V1.t
-          | Zkapp_command_segment of
-            ()
+          (Spec.Stable.V1.t, Ledger_proof.Stable.V2.t) Work.Result.Stable.V1.t
 
         let to_latest = Fn.id
       end

@@ -94,27 +94,13 @@ end]
 module Submit_work = struct
   module V3 = struct
     module T = struct
-      type query =
-        | Regular of Wire_work.Result.Stable.V1.t
-        | Zkapp_command_segment of
-            Ledger_proof.Stable.V2.t
-            Work.Result_zkapp_command_segment.Stable.V1.t
+      type query = Wire_work.Result.Stable.V1.t
 
       type response = unit
 
-      let query_of_caller_model : Rpcs_master.Submit_work.query -> query =
-        function
-        | Regular result ->
-            Regular result
-        | Zkapp_command_segment result ->
-            Zkapp_command_segment result
+      let query_of_caller_model : Rpcs_master.Submit_work.query -> query = Fn.id
 
-      let callee_model_of_query : query -> Rpcs_master.Submit_work.query =
-        function
-        | Regular result ->
-            Regular result
-        | Zkapp_command_segment result ->
-            Zkapp_command_segment result
+      let callee_model_of_query : query -> Rpcs_master.Submit_work.query = Fn.id
 
       let response_of_callee_model :
           Rpcs_master.Submit_work.response -> response =
@@ -136,18 +122,20 @@ module Submit_work = struct
       type response = unit
 
       let query_of_caller_model : Rpcs_master.Submit_work.query -> query =
-        function
-        | Regular result ->
-            result
-        | Zkapp_command_segment _ ->
-            failwith
-              "FATAL: V2 Worker completed a `Zkapp_command_segment` job where \
-               the coordinator can't aggregate, this shouldn't happen as the \
-               work is issued by the coordinator"
+        (* function *)
+        (* | Regular result -> *)
+        (*     result *)
+        (* | Zkapp_command_segment _ -> *)
+        (*     failwith *)
+        (* "FATAL: V2 Worker completed a `Zkapp_command_segment` job where \ *)
+           (*        the coordinator can't aggregate, this shouldn't happen as the \ *)
+           (*        work is issued by the coordinator" *)
+        failwith "TODO"
 
-      let callee_model_of_query (result : query) : Rpcs_master.Submit_work.query
-          =
-        Regular result
+      let callee_model_of_query (_result : query) :
+          Rpcs_master.Submit_work.query =
+        (* Regular result *)
+        failwith "TODO"
 
       let response_of_callee_model :
           Rpcs_master.Submit_work.response -> response =
@@ -169,22 +157,20 @@ end]
 module Failed_to_generate_snark = struct
   module V3 = struct
     module T = struct
-      type query =
+      type query = Rpcs_master.Failed_to_generate_snark.query =
         { error : Bounded_types.Wrapped_error.Stable.V1.t
-        ; failed_work : Failed_work.Stable.V1.t
+        ; failed_work : Wire_work.Spec.Stable.V1.t
         }
 
       type response = unit
 
       let query_of_caller_model :
-          Rpcs_master.Failed_to_generate_snark.query -> query = function
-        | { error; failed_work } ->
-            { error; failed_work }
+          Rpcs_master.Failed_to_generate_snark.query -> query =
+        Fn.id
 
       let callee_model_of_query :
-          query -> Rpcs_master.Failed_to_generate_snark.query = function
-        | { error; failed_work } ->
-            { error; failed_work }
+          query -> Rpcs_master.Failed_to_generate_snark.query =
+        Fn.id
 
       let response_of_callee_model :
           Rpcs_master.Failed_to_generate_snark.response -> response =
@@ -209,19 +195,26 @@ module Failed_to_generate_snark = struct
       type response = unit
 
       let query_of_caller_model :
-          Rpcs_master.Failed_to_generate_snark.query -> query = function
-        | { error; failed_work = Regular { work_spec; public_key } } ->
-            (error, work_spec, public_key)
-        | { failed_work = Zkapp_command_segment _; _ } ->
-            failwith
-              "FATAL: V2 Worker failed on a `Zkapp_command_segment` job where \
-               the coordinator can't aggregate, this shouldn't happen as the \
-               work is issued by the coordinator"
+          Rpcs_master.Failed_to_generate_snark.query -> query =
+       fun _ -> failwith "TODO"
 
       let callee_model_of_query :
           query -> Rpcs_master.Failed_to_generate_snark.query =
-       fun (error, work_spec, public_key) ->
-        { error; failed_work = Regular { work_spec; public_key } }
+       fun _ -> failwith "TODO"
+      (* let query_of_caller_model : *)
+      (*     Rpcs_master.Failed_to_generate_snark.query -> query = function *)
+      (*   | { error; failed_work = Regular { work_spec; public_key } } -> *)
+      (*       (error, work_spec, public_key) *)
+      (*   | { failed_work = Zkapp_command_segment _; _ } -> *)
+      (*       failwith *)
+      (* "FATAL: V2 Worker failed on a `Zkapp_command_segment` job where \ *)
+         (*          the coordinator can't aggregate, this shouldn't happen as the \ *)
+         (*          work is issued by the coordinator" *)
+      (***)
+      (* let callee_model_of_query : *)
+      (*     query -> Rpcs_master.Failed_to_generate_snark.query = *)
+      (*  fun (error, work_spec, public_key) -> *)
+      (*   { error; failed_work = Regular { work_spec; public_key } } *)
 
       let response_of_callee_model :
           Rpcs_master.Failed_to_generate_snark.response -> response =

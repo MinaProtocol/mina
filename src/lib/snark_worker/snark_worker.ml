@@ -1,3 +1,7 @@
+(* NOTE: These documentation might be helpful
+   - https://docs.minaprotocol.com/mina-protocol/snark-workers
+*)
+
 (* module interacting with CLIs *)
 module Entry = Entry
 
