@@ -121,16 +121,27 @@ module Submit_work = struct
 
       type response = unit
 
-      let query_of_caller_model : Rpcs_master.Submit_work.query -> query =
-        (* function *)
+      (* { proofs : 'single One_or_two.Stable.V1.t *)
+      (*         ; metrics : *)
+      (*             (Core.Time.Stable.Span.V1.t * [ `Transition | `Merge ]) *)
+      (*             One_or_two.Stable.V1.t *)
+      (*         ; spec : 'spec *)
+      (*         ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t *)
+      (*         } *)
+      let query_of_caller_model
+          ({ proofs; metrics; spec; prover } : Wire_work.Result.t) : query =
+        let fix_proofs =
+          One_or_two.map ~f:(fun (proof : Ledger_proof.Stable.V2.t) -> ())
+        in
+        (* match q with *)
         (* | Regular result -> *)
         (*     result *)
         (* | Zkapp_command_segment _ -> *)
-        (*     failwith *)
-        (* "FATAL: V2 Worker completed a `Zkapp_command_segment` job where \ *)
-           (*        the coordinator can't aggregate, this shouldn't happen as the \ *)
-           (*        work is issued by the coordinator" *)
-        failwith "TODO"
+        failwith
+          "FATAL: V2 Worker completed a `Zkapp_command_segment` job where the \
+           coordinator can't aggregate, this shouldn't happen as the work is \
+           issued by the coordinator"
+      (* failwith "TODO" *)
 
       let callee_model_of_query (_result : query) :
           Rpcs_master.Submit_work.query =

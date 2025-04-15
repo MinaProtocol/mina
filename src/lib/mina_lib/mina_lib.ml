@@ -865,7 +865,7 @@ let best_chain ?max_length t =
       Transition_frontier.root frontier :: best_tip_path
 
 (* A Snark worker is requesting work from coordinator *)
-let request_work t =
+let request_work (t : t) =
   let (module Work_selection_method) = t.config.work_selection_method in
   let fee = snark_work_fee t in
   let instances_opt =
@@ -894,7 +894,7 @@ let add_work t (work : Snark_worker_lib.Rpcs_types.Wire_work.Result.t) =
   in
   let spec =
     One_or_two.map work.spec.instances
-      ~f:Snark_work_lib.Work.Single.Spec.statement
+      ~f:Snark_worker_lib.Rpcs_types.Wire_work.Single.Spec.statement
   in
   let cb _ =
     (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
@@ -905,7 +905,7 @@ let add_work t (work : Snark_worker_lib.Rpcs_types.Wire_work.Result.t) =
   ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
   Network_pool.Snark_pool.(
     Local_sink.push t.pipes.snark_local_sink
-      (Resource_pool.Diff.of_result work, cb))
+      (Resource_pool.Diff.of_result (failwith "TODO `work`"), cb))
   |> Deferred.don't_wait_for
 
 let add_work_graphql t diff =
