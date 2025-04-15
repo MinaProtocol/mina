@@ -1734,6 +1734,17 @@ module T = struct
   end
 end
 
+let map_proofs ~f p =
+  let map_auth = function
+    | Control.Poly.Proof p ->
+        Control.Poly.Proof (f p)
+    | Signature s ->
+        Signature s
+    | None_given ->
+        None_given
+  in
+  { Poly.authorization = map_auth p.Poly.authorization; body = p.Poly.body }
+
 module Fee_payer = struct
   [%%versioned
   module Stable = struct

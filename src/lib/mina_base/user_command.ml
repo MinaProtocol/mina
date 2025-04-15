@@ -142,7 +142,7 @@ module Verifiable = struct
     ( Signed_command.Stable.Latest.t
     , Zkapp_command.Verifiable.t )
     Poly.Stable.Latest.t
-  [@@deriving sexp, bin_io_unversioned]
+  [@@deriving sexp_of]
 
   let fee_payer (t : t) =
     match t with
@@ -150,6 +150,28 @@ module Verifiable = struct
         Signed_command.fee_payer x
     | Zkapp_command p ->
         Account_update.Fee_payer.account_id p.fee_payer
+
+  module Serializable = struct
+    type t =
+      ( Signed_command.Stable.Latest.t
+      , Zkapp_command.Verifiable.Serializable.t )
+      Poly.Stable.Latest.t
+    [@@deriving bin_io_unversioned]
+  end
+
+  let to_serializable (t : t) : Serializable.t =
+    match t with
+    | Signed_command c ->
+        Signed_command c
+    | Zkapp_command cmd ->
+        Zkapp_command (Zkapp_command.Verifiable.to_serializable cmd)
+
+  let of_serializable (t : Serializable.t) : t =
+    match t with
+    | Signed_command c ->
+        Signed_command c
+    | Zkapp_command cmd ->
+        Zkapp_command (Zkapp_command.Verifiable.of_serializable cmd)
 end
 
 let to_verifiable (t : t) ~failed ~find_vk : Verifiable.t Or_error.t =
