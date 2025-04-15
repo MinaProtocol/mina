@@ -75,6 +75,6 @@ module For_tests = struct
   module Cached = struct
     let mk_dummy_proof statement =
       Cached.create ~statement ~sok_digest:Sok_message.Digest.default
-        ~proof:(Lazy.force Proof_cache_tag.For_tests.transaction_dummy)
+        ~proof:(Lazy.force Proof.For_tests.transaction_dummy_tag)
   end
 end

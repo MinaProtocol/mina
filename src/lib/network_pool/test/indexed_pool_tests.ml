@@ -55,7 +55,7 @@ let singleton_properties () =
             [%test_eq:
               Transaction_hash.User_command_with_valid_signature.t Sequence.t]
               dropped' (Sequence.singleton cmd) ;
-            [%test_eq: t] ~equal pool pool''
+            assert (equal pool pool'')
         | _ ->
             failwith "should've succeeded" )
 
@@ -332,10 +332,11 @@ let remove_lowest_fee () =
       (User_command.fee_per_wu @@ command cmd0)
       (User_command.fee_per_wu @@ command cmd1)
   in
+  let module Set = Transaction_hash.User_command_with_valid_signature.Set in
   let cmds_sorted_by_fee_per_wu = List.sort ~compare cmds in
   let cmd_lowest_fee, commands_to_keep =
     ( List.hd_exn cmds_sorted_by_fee_per_wu
-    , List.tl_exn cmds_sorted_by_fee_per_wu )
+    , List.map ~f:Set.singleton @@ List.tl_exn cmds_sorted_by_fee_per_wu )
   in
   let insert_cmd pool cmd =
     add_from_gossip_exn pool cmd Account_nonce.zero (Amount.of_mina_int_exn 5)
@@ -347,21 +348,19 @@ let remove_lowest_fee () =
     List.fold_left cmds ~init:empty ~f:insert_cmd |> remove_lowest_fee
   in
   (* check that the lowest fee per wu command is returned *)
-  assert (Sequence.(equal cmd_equal removed @@ return cmd_lowest_fee))
+  assert (Sequence.(equal cmd_equal removed @@ singleton cmd_lowest_fee))
   |> fun () ->
   (* check that the lowest fee per wu command is removed from
      applicable_by_fee *)
   applicable_by_fee pool |> Map.data
-  |> List.concat_map ~f:Set.to_list
   |> fun applicable_by_fee_cmds ->
-  assert (List.(equal cmd_equal applicable_by_fee_cmds commands_to_keep))
+  assert (List.equal Set.equal applicable_by_fee_cmds commands_to_keep)
   |> fun () ->
   (* check that the lowest fee per wu command is removed from
      all_by_fee *)
   applicable_by_fee pool |> Map.data
-  |> List.concat_map ~f:Set.to_list
   |> fun all_by_fee_cmds ->
-  assert (List.(equal cmd_equal all_by_fee_cmds commands_to_keep))
+  assert (List.equal Set.equal all_by_fee_cmds commands_to_keep)
 
 let insert_cmd pool cmd =
   add_from_gossip_exn pool cmd Account_nonce.zero (Amount.of_mina_int_exn 5)
@@ -747,7 +746,7 @@ let revalidation_drops_nothing_unless_ledger_changed () =
       [%test_eq:
         Transaction_hash.User_command_with_valid_signature.t Sequence.t] dropped
         Sequence.empty ;
-      [%test_eq: Indexed_pool.t] pool pool' ;
+      assert (Indexed_pool.equal pool pool') ;
       let to_apply = Indexed_pool.transactions ~logger pool in
       let to_apply' = Indexed_pool.transactions ~logger pool' in
       assert_pool_consistency pool ;
