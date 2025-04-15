@@ -185,22 +185,26 @@ module Make_str (A : Wire_types.Concrete) = struct
         ~value_of_hlist:of_hlist
   end
 
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t =
-        ( Frozen_ledger_hash.Stable.V1.t
-        , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
-        , Pending_coinbase.Stack_versioned.Stable.V1.t
-        , Fee_excess.Stable.V1.t
-        , unit
-        , Local_state.Stable.V1.t )
-        Poly.Stable.V2.t
-      [@@deriving compare, equal, hash, sexp, yojson]
+  module T = struct
+    [%%versioned
+    module Stable = struct
+      module V2 = struct
+        type t =
+          ( Frozen_ledger_hash.Stable.V1.t
+          , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+          , Pending_coinbase.Stack_versioned.Stable.V1.t
+          , Fee_excess.Stable.V1.t
+          , unit
+          , Local_state.Stable.V1.t )
+          Poly.Stable.V2.t
+        [@@deriving compare, equal, hash, sexp, yojson]
 
-      let to_latest = Fn.id
-    end
-  end]
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
+  include T
 
   type var =
     ( Frozen_ledger_hash.var
@@ -387,6 +391,25 @@ module Make_str (A : Wire_types.Concrete) = struct
     let to_field_elements =
       let (Typ { value_to_fields; _ }) = typ in
       Fn.compose fst value_to_fields
+
+    let drop_sok
+        ({ source
+         ; target
+         ; connecting_ledger_left
+         ; connecting_ledger_right
+         ; supply_increase
+         ; fee_excess
+         ; sok_digest = _
+         } :
+          t ) : T.t =
+      { source
+      ; target
+      ; connecting_ledger_left
+      ; connecting_ledger_right
+      ; supply_increase
+      ; fee_excess
+      ; sok_digest = ()
+      }
   end
 
   let option lab =

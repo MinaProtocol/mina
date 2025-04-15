@@ -144,6 +144,25 @@ module type Full = sig
       -> 'a t
   end
 
+  module T : sig
+    [%%versioned:
+    module Stable : sig
+      module V2 : sig
+        type t =
+          ( Frozen_ledger_hash.Stable.V1.t
+          , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+          , Pending_coinbase.Stack_versioned.Stable.V1.t
+          , Fee_excess.Stable.V1.t
+          , unit
+          , Local_state.Stable.V1.t )
+          Poly.Stable.V2.t
+        [@@deriving compare, equal, hash, sexp, yojson]
+
+        val to_latest : t -> t
+      end
+    end]
+  end
+
   [%%versioned:
   module Stable : sig
     module V2 : sig
@@ -228,6 +247,8 @@ module type Full = sig
     val typ : (var, t) Tick.Typ.t
 
     val to_field_elements : t -> Tick.Field.t array
+
+    val drop_sok : t -> T.t
   end
 
   val gen : t Quickcheck.Generator.t
