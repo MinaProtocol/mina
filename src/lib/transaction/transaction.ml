@@ -26,14 +26,7 @@ module Poly = struct
 end
 
 module Valid = struct
-  module T = struct
-    type t = User_command.Valid.t Poly.t
-    [@@deriving sexp, compare, equal, hash, yojson]
-  end
-
-  include T
-  include Hashable.Make (T)
-  include Comparable.Make (T)
+  type t = User_command.Valid.t Poly.t [@@deriving sexp_of, to_yojson]
 end
 
 [%%versioned

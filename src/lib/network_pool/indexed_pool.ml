@@ -405,9 +405,8 @@ module Update = struct
         { fee_per_wu : Currency.Fee_rate.t
         ; command : Transaction_hash.User_command_with_valid_signature.t
         }
-  [@@deriving sexp]
 
-  type t = single Writer_result.Tree.t (* [@sexp.opaque] *) [@@deriving sexp]
+  type t = single Writer_result.Tree.t
 
   let to_yojson _ = `String "<update>"
 
@@ -1060,10 +1059,11 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
             |> M.lift
           in
           (* check remove_exn dropped the right things *)
-          [%test_eq:
-            Transaction_hash.User_command_with_valid_signature.t Sequence.t]
-            dropped
-            (F_sequence.to_seq drop_queue) ;
+          assert (
+            [%equal:
+              Transaction_hash.User_command_with_valid_signature.t Sequence.t]
+              dropped
+              (F_sequence.to_seq drop_queue) ) ;
           (* Add the new transaction *)
           let%bind cmd, _ =
             let%map v, dropped' =

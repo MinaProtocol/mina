@@ -317,7 +317,7 @@ module Valid = struct
   type t_ = t
 
   type t = (Signed_command.With_valid_signature.t, Zkapp_command.Valid.t) Poly.t
-  [@@deriving sexp, compare, equal, hash, yojson]
+  [@@deriving sexp_of, to_yojson]
 
   module Gen = Gen_make (Signed_command.With_valid_signature)
 end
