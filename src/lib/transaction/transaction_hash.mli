@@ -31,13 +31,13 @@ val hash_signed_command : Signed_command.t -> t
 
 val hash_signed_command_v1 : Signed_command.Stable.V1.t -> t
 
-val hash_zkapp_command : Zkapp_command.Stable.Latest.t -> t
+val hash_zkapp_command : (_, unit, unit) Zkapp_command.with_forest -> t
 
-val hash_command : User_command.Stable.Latest.t -> t
+val hash_command : (_, unit, unit) User_command.with_forest -> t
 
-val hash_wrapped_zkapp_command : Zkapp_command.t -> t
+val hash_zkapp_command_with_hashes : (_, _, _) Zkapp_command.with_forest -> t
 
-val hash_wrapped_command : User_command.t -> t
+val hash_command_with_hashes : (_, _, _) User_command.with_forest -> t
 
 val hash_fee_transfer : Fee_transfer.Single.t -> t
 

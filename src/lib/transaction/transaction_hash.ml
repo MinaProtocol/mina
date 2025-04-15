@@ -45,69 +45,66 @@ let of_yojson = function
   | _ ->
       Error "Transaction_hash.of_yojson: Expected a string"
 
-let ( hash_signed_command_v1
-    , hash_signed_command
-    , hash_zkapp_command
-    , hash_coinbase
-    , hash_fee_transfer ) =
-  let mk_hasher (type a) (module M : Bin_prot.Binable.S with type t = a)
-      (cmd : a) =
-    cmd |> Binable.to_string (module M) |> digest_string
-  in
-  let signed_cmd_hasher_v1 =
-    mk_hasher
-      ( module struct
-        include Signed_command.Stable.V1
-      end )
-  in
-  let signed_cmd_hasher = mk_hasher (module Signed_command.Stable.Latest) in
-  let zkapp_cmd_hasher = mk_hasher (module Zkapp_command.Stable.Latest) in
-  (* replace actual signatures, proofs with dummies for hashing, so we can
-     reproduce the transaction hashes if signatures, proofs omitted in
-     archive db
-  *)
-  let hash_signed_command_v1 (cmd : Signed_command.Stable.V1.t) =
-    let cmd_dummy_signature = { cmd with signature = Signature.dummy } in
-    signed_cmd_hasher_v1 cmd_dummy_signature
-  in
-  let hash_signed_command (cmd : Signed_command.t) =
-    let cmd_dummy_signature = { cmd with signature = Signature.dummy } in
-    signed_cmd_hasher cmd_dummy_signature
-  in
-  let hash_zkapp_command (cmd : Zkapp_command.Stable.Latest.t) =
-    let cmd_dummy_signatures_and_proofs =
-      { cmd with
-        fee_payer = { cmd.fee_payer with authorization = Signature.dummy }
-      ; account_updates =
-          Zkapp_command.Call_forest.map cmd.account_updates
-            ~f:(fun (acct_update : Account_update.t) ->
-              let dummy_auth =
-                match acct_update.authorization with
-                | Control.Poly.Proof _ ->
-                    Control.Poly.Proof (Lazy.force Proof.transaction_dummy)
-                | Control.Poly.Signature _ ->
-                    Control.Poly.Signature Signature.dummy
-                | Control.Poly.None_given ->
-                    Control.Poly.None_given
-              in
-              { acct_update with authorization = dummy_auth } )
-      }
-    in
-    zkapp_cmd_hasher cmd_dummy_signatures_and_proofs
-  in
-  (* no signatures to replace for internal commands *)
-  let hash_coinbase = mk_hasher (module Mina_base.Coinbase.Stable.Latest) in
-  let hash_fee_transfer =
-    mk_hasher (module Fee_transfer.Single.Stable.Latest)
-  in
-  ( hash_signed_command_v1
-  , hash_signed_command
-  , hash_zkapp_command
-  , hash_coinbase
-  , hash_fee_transfer )
+let mk_hasher (type a) (module M : Bin_prot.Binable.S with type t = a) (cmd : a)
+    =
+  cmd |> Binable.to_string (module M) |> digest_string
 
-let hash_wrapped_zkapp_command =
-  Fn.compose hash_zkapp_command Zkapp_command.read_all_proofs_from_disk
+let signed_cmd_hasher_v1 =
+  mk_hasher
+    ( module struct
+      include Signed_command.Stable.V1
+    end )
+
+let signed_cmd_hasher = mk_hasher (module Signed_command.Stable.Latest)
+
+let zkapp_cmd_hasher = mk_hasher (module Zkapp_command.Stable.Latest)
+
+(* replace actual signatures, proofs with dummies for hashing, so we can
+   reproduce the transaction hashes if signatures, proofs omitted in
+   archive db
+*)
+let hash_signed_command_v1 (cmd : Signed_command.Stable.V1.t) =
+  let cmd_dummy_signature = { cmd with signature = Signature.dummy } in
+  signed_cmd_hasher_v1 cmd_dummy_signature
+
+let hash_signed_command (cmd : Signed_command.t) =
+  let cmd_dummy_signature = { cmd with signature = Signature.dummy } in
+  signed_cmd_hasher cmd_dummy_signature
+
+let hash_zkapp_command (type p)
+    ({ fee_payer; account_updates; memo } :
+      (p, unit, unit) Zkapp_command.with_forest ) =
+  let cmd_dummy_signatures_and_proofs =
+    { Zkapp_command.Poly.memo
+    ; fee_payer = { fee_payer with authorization = Signature.dummy }
+    ; account_updates =
+        Zkapp_command.Call_forest.map account_updates
+          ~f:(fun (acct_update : (_, _) Account_update.Poly.t) ->
+            let dummy_auth =
+              match acct_update.authorization with
+              | Control.Poly.Proof _ ->
+                  Control.Poly.Proof (Lazy.force Proof.transaction_dummy)
+              | Control.Poly.Signature _ ->
+                  Control.Poly.Signature Signature.dummy
+              | Control.Poly.None_given ->
+                  Control.Poly.None_given
+            in
+            { acct_update with authorization = dummy_auth } )
+    }
+  in
+  zkapp_cmd_hasher cmd_dummy_signatures_and_proofs
+
+(* no signatures to replace for internal commands *)
+let hash_coinbase = mk_hasher (module Mina_base.Coinbase.Stable.Latest)
+
+let hash_fee_transfer = mk_hasher (module Fee_transfer.Single.Stable.Latest)
+
+let hash_zkapp_command_with_hashes
+    ({ account_updates; _ } as cmd : (_, _, _) Zkapp_command.with_forest) =
+  hash_zkapp_command
+    { cmd with
+      account_updates = Zkapp_command.Call_forest.forget_hashes account_updates
+    }
 
 let hash_command cmd =
   match cmd with
@@ -116,8 +113,12 @@ let hash_command cmd =
   | User_command.Zkapp_command p ->
       hash_zkapp_command p
 
-let hash_wrapped_command =
-  Fn.compose hash_command User_command.read_all_proofs_from_disk
+let hash_command_with_hashes cmd =
+  match cmd with
+  | User_command.Signed_command s ->
+      hash_signed_command s
+  | User_command.Zkapp_command p ->
+      hash_zkapp_command_with_hashes p
 
 let hash_signed_command_v2 = hash_signed_command
 

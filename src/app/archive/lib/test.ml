@@ -137,7 +137,7 @@ let%test_module "Archive node unit tests" =
       Async.Quickcheck.async_test ~sexp_of:[%sexp_of: User_command.t]
         user_command_signed_gen ~f:(fun user_command ->
           let transaction_hash =
-            Transaction_hash.hash_wrapped_command user_command
+            Transaction_hash.hash_command_with_hashes user_command
           in
           match%map
             let open Deferred.Result.Let_syntax in
@@ -169,7 +169,7 @@ let%test_module "Archive node unit tests" =
       Async.Quickcheck.async_test ~trials:20 ~sexp_of:[%sexp_of: User_command.t]
         user_command_zkapp_gen ~f:(fun user_command ->
           let transaction_hash =
-            Transaction_hash.hash_wrapped_command user_command
+            Transaction_hash.hash_command_with_hashes user_command
           in
           match user_command with
           | Signed_command _ ->

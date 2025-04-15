@@ -470,7 +470,7 @@ let add_breadcrumb_exn t breadcrumb =
   in
   let tx_hash_json command =
     User_command.forget_check command
-    |> Mina_transaction.Transaction_hash.hash_wrapped_command
+    |> Mina_transaction.Transaction_hash.hash_command_with_hashes
     |> Mina_transaction.Transaction_hash.to_yojson
   in
   [%str_log' trace t.logger] Added_breadcrumb_user_commands
