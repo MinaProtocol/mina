@@ -11,11 +11,14 @@ open Common
 (* This contains the "step" prover *)
 
 module Make
+    (IR : Inductive_rule.Intf with type 'a proof = 'a Proof.t)
     (A : T0) (A_value : sig
       type t
     end)
     (Max_proofs_verified : Nat.Add.Intf_transparent) =
 struct
+  module Step_branch_data = Step_branch_data.Make (IR)
+
   let _double_zip = Double.map2 ~f:Core_kernel.Tuple2.create
 
   module E = struct
@@ -61,13 +64,7 @@ struct
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
       ~feature_flags ~self_dlog_plonk_index
       ~(public_input :
-         ( var
-         , value
-         , A.t
-         , A_value.t
-         , ret_var
-         , ret_value )
-         Inductive_rule.public_input )
+         (var, value, A.t, A_value.t, ret_var, ret_value) IR.public_input )
       ~(auxiliary_typ : (auxiliary_var, auxiliary_value) Impls.Step.Typ.t) pk
       self_dlog_vk :
       ( ( value
@@ -570,9 +567,7 @@ struct
             type vars values ns ms k.
                (vars, values, ns, ms) H4.T(Tag).t
             -> (vars, values, ns) H3.T(Types_map.Basic).t
-            -> ( values
-               , ns )
-               H2.T(Inductive_rule.Previous_proof_statement.Constant).t
+            -> (values, ns) H2.T(IR.Previous_proof_statement.Constant).t
             -> (vars, k) Length.t
             -> (Tock.Curve.Affine.t, k) Vector.t
                * (Unfinalized.Constant.t, k) Vector.t

@@ -303,7 +303,7 @@ val compile_with_wrap_main_override_promise :
        , 'a_value
        , 'ret_var
        , 'ret_value )
-       Inductive_rule.public_input
+       Inductive_rule.Kimchi.public_input
   -> auxiliary_typ:('auxiliary_var, 'auxiliary_value) Impls.Step.Typ.t
   -> max_proofs_verified:(module Nat.Add.Intf with type n = 'max_proofs_verified)
   -> name:string
@@ -321,7 +321,7 @@ val compile_with_wrap_main_override_promise :
            , 'ret_value
            , 'auxiliary_var
            , 'auxiliary_value )
-           H4_6_with_length.T(Inductive_rule.Promise).t )
+           H4_6_with_length.T(Inductive_rule.Stupid_Kimchi_Promise_Wrapper).t )
   -> unit
   -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
      * Cache_handle.t

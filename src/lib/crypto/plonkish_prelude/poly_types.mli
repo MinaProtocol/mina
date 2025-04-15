@@ -39,3 +39,7 @@ end
 module type T6 = sig
   type (_, _, _, _, _, _) t
 end
+
+module type T12 = sig
+  type (_, _, _, _, _, _, _, _, _, _, _, _) t
+end

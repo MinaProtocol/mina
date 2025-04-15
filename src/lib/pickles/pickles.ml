@@ -3,6 +3,11 @@
 (** See documentation of the {!Mina_wire_types} library *)
 module Wire_types = Mina_wire_types.Pickles
 
+module Stupid_Kimchi_Promise_Wrapper =
+  Inductive_rule.Stupid_Kimchi_Promise_Wrapper
+module Stupid_Kimchi_Deferred_Wrapper =
+  Inductive_rule.Stupid_Kimchi_Deferred_Wrapper
+
 module Make_sig (A : Wire_types.Types.S) = struct
   module type S =
     Pickles_intf.S
@@ -36,7 +41,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Util = Util
   module Tick_field_sponge = Tick_field_sponge
   module Impls = Impls
-  module Inductive_rule = Inductive_rule
+  module Inductive_rule = Inductive_rule.Kimchi
   module Tag = Tag
   module Types_map = Types_map
   module Dirty = Dirty
@@ -47,6 +52,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Cache = Cache
   module Storables = Compile.Storables
   module Ro = Ro
+  module Step_branch_data = Step_branch_data.Make (Inductive_rule)
 
   type chunking_data = Verify.Instance.chunking_data =
     { num_chunks : int; domain_size : int; zk_rows : int }
@@ -338,7 +344,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
              , h
              , i
              , j )
-             H4_6_with_length.T(Inductive_rule).t
+             H4_6_with_length.T(Stupid_Kimchi_Promise_Wrapper).t
           -> ( length
              , a
              , b
@@ -350,13 +356,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
              , h
              , i
              , j )
-             H4_6_with_length.T(Inductive_rule.Promise).t = function
+             H4_6_with_length.T(Stupid_Kimchi_Promise_Wrapper).t = function
         | [] ->
             []
         | { identifier; prevs; main; feature_flags } :: rest ->
             { identifier
             ; prevs
-            ; main = (fun x -> Promise.return (main x))
+              (* TODO: why do we not need the return any more. Why did we ever need it*)
+            ; main = (fun x -> main x)
             ; feature_flags
             }
             :: go rest
@@ -399,7 +406,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
              , h
              , i
              , j )
-             H4_6_with_length.T(Inductive_rule.Deferred).t
+             H4_6_with_length.T(Stupid_Kimchi_Deferred_Wrapper).t
           -> ( length
              , a
              , b
@@ -411,7 +418,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
              , h
              , i
              , j )
-             H4_6_with_length.T(Inductive_rule.Promise).t = function
+             H4_6_with_length.T(Stupid_Kimchi_Promise_Wrapper).t = function
         | [] ->
             []
         | { identifier; prevs; main; feature_flags } :: rest ->
@@ -1024,7 +1031,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let tagname = "" in
         Tag.create ~kind:Compiled tagname
 
-      let rule : _ Inductive_rule.Promise.t =
+      let rule : _ Inductive_rule.Promise.s =
         let open Impls.Step in
         { identifier = "main"
         ; prevs = [ tag; tag ]
@@ -1301,7 +1308,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
             (r, disk_key_verifier)
           in
           let wrap_vk = Lazy.map wrap_vk ~f:(Promise.map ~f:fst) in
-          let module S = Step.Make (A) (A_value) (Max_proofs_verified) in
+          let module S =
+            Step.Make (Inductive_rule) (A) (A_value) (Max_proofs_verified)
+          in
           let prover =
             let f :
                    ( unit * (unit * unit)

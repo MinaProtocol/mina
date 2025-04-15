@@ -1,10 +1,13 @@
 open Pickles_types
 
 module Make
+    (IR : Inductive_rule.Intf with type 'a proof = 'a Proof.t)
     (A : Pickles_types.Poly_types.T0) (A_value : sig
       type t
     end)
     (Max_proofs_verified : Pickles_types.Nat.Add.Intf_transparent) : sig
+  module Step_branch_data : module type of Step_branch_data.Make (IR)
+
   val f :
        ?handler:
          (   Snarky_backendless.Request.request
@@ -37,13 +40,7 @@ module Make
          Backend.Tick.Inner_curve.Affine.t array
          Pickles_types.Plonk_verification_key_evals.t
     -> public_input:
-         ( 'var
-         , 'value
-         , A.t
-         , A_value.t
-         , 'ret_var
-         , 'ret_value )
-         Inductive_rule.public_input
+         ('var, 'value, A.t, A_value.t, 'ret_var, 'ret_value) IR.public_input
     -> auxiliary_typ:('auxiliary_var, 'auxiliary_value) Impls.Step.Typ.t
     -> Kimchi_pasta.Vesta_based_plonk.Keypair.t
     -> Impls.Wrap.Verification_key.t

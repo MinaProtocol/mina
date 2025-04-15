@@ -20,6 +20,7 @@ let verify_promise = Verify.verify
 open Kimchi_backend
 module Proof_ = P.Base
 module Proof = P
+module Step_branch_data = Step_branch_data.Make (Inductive_rule.Kimchi)
 
 type chunking_data = Verify.Instance.chunking_data =
   { num_chunks : int; domain_size : int; zk_rows : int }
@@ -287,7 +288,7 @@ module Make
     (Auxiliary_value : T0) =
 struct
   module IR =
-    Inductive_rule.Promise.T (Arg_var) (Arg_value) (Ret_var) (Ret_value)
+    Inductive_rule.Kimchi.Promise.T (Arg_var) (Arg_value) (Ret_var) (Ret_value)
       (Auxiliary_var)
       (Auxiliary_value)
   module HIR = H4.T (IR)
@@ -359,7 +360,7 @@ struct
            , Arg_value.t
            , Ret_var.t
            , Ret_value.t )
-           Inductive_rule.public_input
+           Inductive_rule.Kimchi.public_input
       -> auxiliary_typ:(Auxiliary_var.t, Auxiliary_value.t) Impls.Step.Typ.t
       -> choices:(prev_varss, prev_valuess, widthss, heightss) H4.T(IR).t
       -> unit
@@ -725,7 +726,7 @@ struct
     accum_dirty (Lazy.map wrap_vk ~f:(Promise.map ~f:snd)) ;
     let wrap_vk = Lazy.map wrap_vk ~f:(Promise.map ~f:fst) in
     let module S =
-      Step.Make (Arg_var) (Arg_value)
+      Step.Make (Inductive_rule.Kimchi) (Arg_var) (Arg_value)
         (struct
           include Max_proofs_verified
         end)
@@ -994,7 +995,7 @@ let compile_with_wrap_main_override_promise :
          , a_value
          , ret_var
          , ret_value )
-         Inductive_rule.public_input
+         Inductive_rule.Kimchi.public_input
     -> auxiliary_typ:(auxiliary_var, auxiliary_value) Impls.Step.Typ.t
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = max_proofs_verified)
@@ -1013,7 +1014,8 @@ let compile_with_wrap_main_override_promise :
              , ret_value
              , auxiliary_var
              , auxiliary_value )
-             H4_6_with_length.T(Inductive_rule.Promise).t )
+             H4_6_with_length.T(Inductive_rule.Stupid_Kimchi_Promise_Wrapper).t
+         )
     -> unit
     -> (var, value, max_proofs_verified, branches) Tag.t
        * Cache_handle.t
@@ -1092,7 +1094,7 @@ let compile_with_wrap_main_override_promise :
          , ret_value
          , auxiliary_var
          , auxiliary_value )
-         H4_6_with_length.T(Inductive_rule.Promise).t
+         H4_6_with_length.T(Inductive_rule.Stupid_Kimchi_Promise_Wrapper).t
       -> (v1ss, v2ss, wss, hss) H4.T(M.IR).t = function
     | [] ->
         []
@@ -1101,7 +1103,8 @@ let compile_with_wrap_main_override_promise :
   in
   let choices = choices ~self in
   let branches, prev_varss_length =
-    let module IR_hlist = H4_6_with_length.T (Inductive_rule.Promise) in
+    let module IR_hlist =
+      H4_6_with_length.T (Inductive_rule.Stupid_Kimchi_Promise_Wrapper) in
     IR_hlist.length choices
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
@@ -1296,7 +1299,7 @@ end) =
 struct
   open Impls.Step
 
-  let rule self : _ Inductive_rule.Promise.t =
+  let rule self : _ Inductive_rule.Stupid_Kimchi_Promise_Wrapper.t =
     { identifier = "main"
     ; prevs = [ self; self ]
     ; main =
@@ -1306,7 +1309,7 @@ struct
                 Proof.dummy Nat.N2.n Nat.N2.n ~domain_log2:15 )
           in
           Promise.return
-            { Inductive_rule.previous_proof_statements =
+            { Inductive_rule.Kimchi.previous_proof_statements =
                 [ { public_input = ()
                   ; proof = dummy_proof
                   ; proof_must_verify = Boolean.false_
@@ -1380,7 +1383,7 @@ struct
                         exists (Typ.prover_value ()) ~request:(fun () -> Proof)
                       in
                       Promise.return
-                        { Inductive_rule.previous_proof_statements =
+                        { Inductive_rule.Kimchi.previous_proof_statements =
                             [ { public_input = ()
                               ; proof
                               ; proof_must_verify = Boolean.true_
