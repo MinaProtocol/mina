@@ -3,16 +3,16 @@ open Core_kernel
 module Helper = struct
   open Mina_base
 
-  let to_yojson tx =
+  let to_yojson ~proof_to_yojson tx =
     User_command.Poly.to_yojson Signed_command.to_yojson
-      (Zkapp_command.with_forest_to_yojson
+      (Zkapp_command.with_forest_to_yojson proof_to_yojson
          Zkapp_command.Digest.Account_update.to_yojson
          Zkapp_command.Digest.Forest.to_yojson )
       tx
 
-  let of_yojson =
+  let of_yojson ~proof_of_yojson =
     User_command.Poly.of_yojson Signed_command.of_yojson
-    @@ Zkapp_command.with_forest_of_yojson
+    @@ Zkapp_command.with_forest_of_yojson proof_of_yojson
          Zkapp_command.Digest.Account_update.of_yojson
          Zkapp_command.Digest.Forest.of_yojson
 end
@@ -29,10 +29,10 @@ module User_command = struct
 
       let to_yojson : t -> Yojson.Safe.t = function
         | User_command.Poly.Signed_command tx ->
-            Helper.to_yojson (Signed_command tx)
+            Helper.to_yojson ~proof_to_yojson:Proof.to_yojson (Signed_command tx)
         | User_command.Poly.Zkapp_command { fee_payer; memo; account_updates }
           ->
-            Helper.to_yojson
+            Helper.to_yojson ~proof_to_yojson:Proof.to_yojson
               (Zkapp_command
                  { Zkapp_command.Poly.fee_payer
                  ; memo
@@ -44,7 +44,7 @@ module User_command = struct
                  } )
 
       let of_yojson json =
-        match Helper.of_yojson json with
+        match Helper.of_yojson ~proof_of_yojson:Proof.of_yojson json with
         | Ok (Signed_command tx) ->
             Ppx_deriving_yojson_runtime.Result.Ok
               (User_command.Poly.Signed_command tx)
@@ -65,9 +65,13 @@ module User_command = struct
 
   type nonrec t = User_command.t
 
-  let to_yojson = Helper.to_yojson
+  let proof_to_yojson = Proof.to_yojson
 
-  let of_yojson = Helper.of_yojson
+  let proof_of_yojson = Proof.of_yojson
+
+  let to_yojson = Helper.to_yojson ~proof_to_yojson
+
+  let of_yojson = Helper.of_yojson ~proof_of_yojson
 end
 
 module Staged_ledger_diff = struct
