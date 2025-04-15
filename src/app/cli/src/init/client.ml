@@ -334,7 +334,7 @@ let verify_receipt =
              if use_legacy_json then
                Fn.compose
                  (Result.map ~f:User_command.read_all_proofs_from_disk)
-                 Legacy_user_command.of_yojson
+                 Mina_block.Legacy_format.User_command.of_yojson
              else User_command.Stable.Latest.of_yojson
            in
            let of_proof_json =
@@ -345,7 +345,9 @@ let verify_receipt =
              if use_legacy_json then
                Fn.compose
                  (Result.map ~f:unwrap_proof)
-                 [%of_yojson: Receipt.Chain_hash.t * Legacy_user_command.t list]
+                 [%of_yojson:
+                   Receipt.Chain_hash.t
+                   * Mina_block.Legacy_format.User_command.t list]
              else
                [%of_yojson:
                  Receipt.Chain_hash.t * User_command.Stable.Latest.t list]

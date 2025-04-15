@@ -1,6 +1,6 @@
 open Pickles_types
 
-type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+type t = Nat.N2.n Pickles.Proof.t
 [@@deriving equal, sexp, compare, hash, yojson]
 
 val blockchain_dummy : t lazy_t

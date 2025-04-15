@@ -1404,8 +1404,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
 
       type _ Snarky_backendless.Request.t +=
-        | Zkapp_proof :
-            (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Snarky_backendless.Request.t
+        | Zkapp_proof : Nat.N2.n Pickles.Proof.t Snarky_backendless.Request.t
 
       let handle_zkapp_proof (proof : _ Pickles.Proof.t)
           (Snarky_backendless.Request.With { request; respond }) =
@@ -3196,8 +3195,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           (Statement.With_sok.t * Statement.With_sok.t)
           Snarky_backendless.Request.t
       | Proofs_to_merge :
-          ( (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
-          * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t )
+          (Nat.N2.n Pickles.Proof.t * Nat.N2.n Pickles.Proof.t)
           Snarky_backendless.Request.t
 
     let handle
