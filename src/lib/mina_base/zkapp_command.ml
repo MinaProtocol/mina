@@ -246,20 +246,16 @@ let to_simple (t : t) : Simple.t =
 let all_account_updates t : _ Call_forest.t =
   let p = t.Poly.fee_payer in
   let body = Account_update.Body.of_fee_payer p.body in
+  let account_update =
+    { Account_update.Poly.authorization = Control.Poly.Signature p.authorization
+    ; body
+    }
+  in
   let fee_payer_digest : Digest.Account_update.t =
-    let p = t.fee_payer in
-    Digest.Account_update.create
-      { authorization = Control.Poly.Signature p.authorization; body }
+    Digest.Account_update.create account_update
   in
   let tree : _ Call_forest.Tree.t =
-    { account_update =
-        { Account_update.Poly.authorization =
-            Control.Poly.Signature p.authorization
-        ; body
-        }
-    ; account_update_digest = fee_payer_digest
-    ; calls = []
-    }
+    { account_update; account_update_digest = fee_payer_digest; calls = [] }
   in
   Call_forest.cons_tree tree t.account_updates
 
