@@ -1,3 +1,9 @@
+module type Proof_intf = sig
+  type 'width t
+end
+
+module Make (P: Proof_intf) : sig
+
 module B : sig
   type t = Impls.Step.Boolean.var
 end
@@ -5,14 +11,14 @@ end
 module Previous_proof_statement : sig
   type ('prev_var, 'width) t =
     { public_input : 'prev_var
-    ; proof : 'width Proof.t Impls.Step.Typ.prover_value
+    ; proof : 'width P.t Impls.Step.Typ.prover_value
     ; proof_must_verify : B.t
     }
 
   module Constant : sig
     type ('prev_value, 'width) t =
       { public_input : 'prev_value
-      ; proof : 'width Proof.t
+      ; proof : 'width P.t
       ; proof_must_verify : bool
       }
   end
@@ -150,3 +156,4 @@ module Deferred : sig
 end
 
 include module type of Make (Pickles_types.Hlist.Id)
+end

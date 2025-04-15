@@ -1,6 +1,12 @@
 open Pickles_types.Poly_types
 open Pickles_types.Hlist
 
+module type Proof_intf = sig
+  type 'width t
+end
+
+module Make (P: Proof_intf) = struct
+
 module B = struct
   type t = Impls.Step.Boolean.var
 end
@@ -8,14 +14,14 @@ end
 module Previous_proof_statement = struct
   type ('prev_var, 'width) t =
     { public_input : 'prev_var
-    ; proof : 'width Proof.t Impls.Step.Typ.prover_value
+    ; proof : 'width P.t Impls.Step.Typ.prover_value
     ; proof_must_verify : B.t
     }
 
   module Constant = struct
     type ('prev_value, 'width) t =
       { public_input : 'prev_value
-      ; proof : 'width Proof.t
+      ; proof : 'width P.t
       ; proof_must_verify : bool
       }
   end
@@ -148,3 +154,4 @@ end
 module Promise = Make (Promise)
 module Deferred = Make (Async_kernel.Deferred)
 include Make (Id)
+end
