@@ -571,9 +571,7 @@ let compile :
        Pickles.Tag.t
        * _
        * (module Pickles.Proof_intf
-            with type t = ( max_proofs_verified
-                          , max_proofs_verified )
-                          Pickles.Proof.t
+            with type t = max_proofs_verified Pickles.Proof.t
              and type statement = Zkapp_statement.t )
        * ( prev_valuess
          , widthss
@@ -668,7 +666,7 @@ let compile :
            , unit
            , ( Zkapp_statement.t
              * (return_type * auxiliary_value)
-             * (max_proofs_verified, max_proofs_verified) Pickles.Proof.t )
+             * max_proofs_verified Pickles.Proof.t )
              Deferred.t )
            H3_2.T(Pickles.Prover).t
         -> ( prev_valuess
@@ -827,7 +825,7 @@ let insert_signatures pk_compressed sk
           in
           { account_update with
             authorization =
-              Signature
+              Control.Poly.Signature
                 (Schnorr.Chunked.sign sk
                    (Random_oracle.Input.Chunked.field commitment) )
           }

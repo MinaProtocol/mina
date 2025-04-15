@@ -1,13 +1,29 @@
 open Core_kernel
 
+module Poly = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('proof, 'signature) t =
+            ('proof, 'signature) Mina_wire_types.Mina_base.Control.Poly.V1.t =
+        | Proof of 'proof
+        | Signature of 'signature
+        | None_given
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+end
+
 (* TODO: temporary hack *)
 [%%versioned
 module Stable = struct
   module V2 = struct
-    type t = Mina_wire_types.Mina_base.Control.V2.t =
-      | Proof of Pickles.Side_loaded.Proof.Stable.V2.t
-      | Signature of Signature.Stable.V1.t
-      | None_given
+    type t =
+      ( Pickles.Side_loaded.Proof.Stable.V2.t
+      , Signature.Stable.V1.t )
+      Poly.Stable.V1.t
     [@@deriving sexp, equal, yojson, hash, compare]
 
     let to_latest = Fn.id
@@ -21,10 +37,10 @@ let gen_with_dummies : t Quickcheck.Generator.t =
       (Quickcheck.Generator.of_list
          (let dummy_proof =
             let n2 = Pickles_types.Nat.N2.n in
-            let proof = Pickles.Proof.dummy n2 n2 n2 ~domain_log2:15 in
-            Proof proof
+            let proof = Pickles.Proof.dummy n2 n2 ~domain_log2:15 in
+            Poly.Proof proof
           in
-          let dummy_signature = Signature Signature.dummy in
+          let dummy_signature = Poly.Signature Signature.dummy in
           [ dummy_proof; dummy_signature; None_given ] ) )
   in
   Quickcheck.Generator.create (fun ~size ~random ->
@@ -65,7 +81,7 @@ let tag : t -> Tag.t = function
 let dummy_of_tag : Tag.t -> t = function
   | Proof ->
       let n2 = Pickles_types.Nat.N2.n in
-      let proof = Pickles.Proof.dummy n2 n2 n2 ~domain_log2:15 in
+      let proof = Pickles.Proof.dummy n2 n2 ~domain_log2:15 in
       Proof proof
   | Signature ->
       Signature Signature.dummy
@@ -95,7 +111,7 @@ module As_record = struct
 end
 
 let to_record = function
-  | Proof p ->
+  | Poly.Proof p ->
       { As_record.proof = Some p; signature = None }
   | Signature s ->
       { proof = None; signature = Some s }
@@ -104,7 +120,7 @@ let to_record = function
 
 let of_record = function
   | { As_record.proof = Some p; _ } ->
-      Proof p
+      Poly.Proof p
   | { signature = Some s; _ } ->
       Signature s
   | _ ->

@@ -220,10 +220,11 @@ let to_simple (t : t) : Simple.t =
   ; account_updates =
       t.account_updates
       |> Call_forest.to_account_updates_map
-           ~f:(fun ~depth { Account_update.body = b; authorization } ->
-             { Account_update.Simple.authorization
+           ~f:(fun ~depth { Account_update.Poly.body = b; authorization } ->
+             { Account_update.Poly.authorization
              ; body =
-                 { public_key = b.public_key
+                 { Account_update.Body.Simple.public_key =
+                     b.Account_update.Body.public_key
                  ; token_id = b.token_id
                  ; update = b.update
                  ; balance_change = b.balance_change
@@ -247,7 +248,7 @@ let all_account_updates (t : t) : _ Call_forest.t =
   let body = Account_update.Body.of_fee_payer p.body in
   let fee_payer : Account_update.t =
     let p = t.fee_payer in
-    { authorization = Control.Signature p.authorization; body }
+    { authorization = Control.Poly.Signature p.authorization; body }
   in
   Call_forest.cons fee_payer t.account_updates
 
@@ -395,29 +396,13 @@ module Virtual = struct
   end
 end
 
-let check_authorization (p : Account_update.t) : unit Or_error.t =
-  match (p.authorization, p.body.authorization_kind) with
-  | None_given, None_given | Proof _, Proof _ | Signature _, Signature ->
-      Ok ()
-  | _ ->
-      let err =
-        let expected =
-          Account_update.Authorization_kind.to_control_tag
-            p.body.authorization_kind
-        in
-        let got = Control.tag p.authorization in
-        Error.create "Authorization kind does not match the authorization"
-          [ ("expected", expected); ("got", got) ]
-          [%sexp_of: (string * Control.Tag.t) list]
-      in
-      Error err
-
 module Verifiable : sig
   type t =
-    (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option
+    ( Proof.t
+    , (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option )
     Call_forest.With_hashes_and_data.t
     Poly.t
-  [@@deriving sexp, compare, equal, hash, yojson, bin_io]
+  [@@deriving sexp, bin_io]
 
   val load_vk_from_ledger :
        location_of_account:(Account_id.t -> 'loc option)
@@ -471,13 +456,14 @@ module Verifiable : sig
        and type cache = Verification_key_wire.t Account_id.Map.t
 end = struct
   type t =
-    ( Side_loaded_verification_key.Stable.Latest.t
-    , Zkapp_basic.F.Stable.Latest.t )
-    With_hash.Stable.Latest.t
-    option
+    ( Proof.Stable.Latest.t
+    , ( Side_loaded_verification_key.Stable.Latest.t
+      , Zkapp_basic.F.Stable.Latest.t )
+      With_hash.Stable.Latest.t
+      option )
     Call_forest.With_hashes_and_data.Stable.Latest.t
     Poly.Stable.Latest.t
-  [@@deriving sexp, compare, equal, hash, yojson, bin_io_unversioned]
+  [@@deriving sexp, bin_io_unversioned]
 
   let ok_if_vk_hash_expected ~got ~expected =
     if not @@ Zkapp_basic.F.equal (With_hash.hash got) expected then
@@ -550,7 +536,7 @@ end = struct
                     !vks_overridden
               in
               let () =
-                match check_authorization p with
+                match Account_update.check_authorization p with
                 | Ok () ->
                     ()
                 | Error _ as err ->
@@ -1265,12 +1251,11 @@ module Update_group = Make_update_group (struct
 
   let zkapp_segment_of_controls controls : spec =
     match controls with
-    | [ Control.Proof _ ] ->
+    | [ Control.Poly.Proof _ ] ->
         Proved
-    | [ (Control.Signature _ | Control.None_given) ] ->
+    | [ (Signature _ | None_given) ] ->
         Signed_single
-    | [ Control.(Signature _ | None_given); Control.(Signature _ | None_given) ]
-      ->
+    | [ (Signature _ | None_given); (Signature _ | None_given) ] ->
         Signed_pair
     | _ ->
         failwith "zkapp_segment_of_controls: Unsupported combination"

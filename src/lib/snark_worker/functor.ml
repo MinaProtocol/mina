@@ -191,8 +191,9 @@ module Make (Inputs : Intf.Inputs_intf) :
                             Mina_base.Control.(
                               Tag.equal Proof
                                 (tag
-                                   (Mina_base.Account_update.authorization
-                                      account_update ) ))
+                                   account_update
+                                     .Mina_base.Account_update.Poly
+                                      .authorization ))
                           then proof_updates_count + 1
                           else proof_updates_count ) )
                   in

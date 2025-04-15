@@ -2,7 +2,7 @@
  (name exit_handlers)
  (public_name exit_handlers)
  (library_flags -linkall)
- (libraries core_kernel async_kernel async_unix logger core base base.caml)
+ (libraries core_kernel async_kernel async_unix logger)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

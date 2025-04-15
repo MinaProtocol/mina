@@ -57,8 +57,7 @@ let test () =
   in
   let module Requests = struct
     type _ Snarky_backendless.Request.t +=
-      | Proof :
-          (Nat.N0.n, Nat.N0.n) Pickles.Proof.t Snarky_backendless.Request.t
+      | Proof : Nat.N0.n Pickles.Proof.t Snarky_backendless.Request.t
 
     let handler (proof : _ Pickles.Proof.t)
         (Snarky_backendless.Request.With { request; respond }) =
