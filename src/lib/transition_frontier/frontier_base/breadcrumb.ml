@@ -378,8 +378,7 @@ module For_tests = struct
                  One_or_two.map stmts ~f:(fun statement ->
                      Ledger_proof.Cached.create ~statement
                        ~sok_digest:Sok_message.Digest.default
-                       ~proof:
-                         (Lazy.force Proof_cache_tag.For_tests.transaction_dummy) )
+                       ~proof:(Lazy.force Proof.For_tests.transaction_dummy_tag) )
              ; prover
              } )
       in

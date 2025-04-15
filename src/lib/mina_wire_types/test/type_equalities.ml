@@ -140,7 +140,7 @@ module Pickles = struct
       (O.Side_loaded.Verification_key.Stable)
       (W.Side_loaded.Verification_key)
   include Assert_equal0V1 (O.Backend.Tick.Field.Stable) (W.Backend.Tick.Field)
-  include Assert_equal2 (O.Proof) (W.Proof)
+  include Assert_equal1 (O.Proof) (W.Proof)
   include
     Assert_equal0V2
       (O.Proof.Proofs_verified_2.Stable)

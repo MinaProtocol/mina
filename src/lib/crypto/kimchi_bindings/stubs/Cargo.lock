@@ -169,7 +169,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85b6598a2f5d564fb7855dc6b06fd1c38cff5a72bd8b863a4d021938497b440a"
 dependencies = [
  "serde",
- "thiserror",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -598,7 +598,7 @@ dependencies = [
  "serde_with",
  "strum",
  "strum_macros",
- "thiserror",
+ "thiserror 2.0.12",
  "turshi",
 ]
 
@@ -724,7 +724,7 @@ dependencies = [
  "serde",
  "serde_with",
  "sha2",
- "thiserror",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -762,9 +762,9 @@ dependencies = [
 
 [[package]]
 name = "ocaml-gen"
-version = "0.1.5"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a82934c07e0c1f76862e09fd654b6f1241a112797f9d9979bacfa084210f8a7"
+checksum = "4914382f332b97208183ef194eaca0bac9f155640719c74d5c7f7bc77511061b"
 dependencies = [
  "const-random",
  "ocaml",
@@ -774,9 +774,9 @@ dependencies = [
 
 [[package]]
 name = "ocaml-gen-derive"
-version = "0.1.5"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1894efdef5c9d83d17932c5f5db16d16eb5c8ae1a625ce44d9d1715e85d9d8dc"
+checksum = "7543703a85e10e5fd49258c8c820bda6e909d0feaf02f6db25197fe4b5f36bac"
 dependencies = [
  "convert_case",
  "proc-macro2",
@@ -839,7 +839,7 @@ dependencies = [
  "rmp-serde",
  "serde",
  "serde_with",
- "thiserror",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -1129,7 +1129,16 @@ version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
 dependencies = [
- "thiserror-impl",
+ "thiserror-impl 1.0.69",
+]
+
+[[package]]
+name = "thiserror"
+version = "2.0.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "567b8a2dae586314f7be2a752ec7474332959c6460e02bde30d702a66d488708"
+dependencies = [
+ "thiserror-impl 2.0.12",
 ]
 
 [[package]]
@@ -1137,6 +1146,17 @@ name = "thiserror-impl"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "2.0.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f7cf42b4507d8ea322120659672cf1b9dbb93f8f2d4ecfd6e51350ff5b17a1d"
 dependencies = [
  "proc-macro2",
  "quote",

@@ -134,12 +134,12 @@ module Make_str (A : Wire_types.Concrete) = struct
       end]
 
       let of_controls = function
-        | [ Control.Proof _ ] ->
+        | [ Control.Poly.Proof _ ] ->
             Proved
-        | [ (Control.Signature _ | Control.None_given) ] ->
+        | [ (Control.Poly.Signature _ | Control.Poly.None_given) ] ->
             Opt_signed
-        | [ Control.(Signature _ | None_given)
-          ; Control.(Signature _ | None_given)
+        | [ Control.Poly.(Signature _ | None_given)
+          ; Control.Poly.(Signature _ | None_given)
           ] ->
             Opt_signed_opt_signed
         | _ ->
@@ -1404,8 +1404,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
 
       type _ Snarky_backendless.Request.t +=
-        | Zkapp_proof :
-            (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Snarky_backendless.Request.t
+        | Zkapp_proof : Nat.N2.n Pickles.Proof.t Snarky_backendless.Request.t
 
       let handle_zkapp_proof (proof : _ Pickles.Proof.t)
           (Snarky_backendless.Request.With { request; respond }) =
@@ -3196,8 +3195,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           (Statement.With_sok.t * Statement.With_sok.t)
           Snarky_backendless.Request.t
       | Proofs_to_merge :
-          ( (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
-          * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t )
+          (Nat.N2.n Pickles.Proof.t * Nat.N2.n Pickles.Proof.t)
           Snarky_backendless.Request.t
 
     let handle
@@ -4340,7 +4338,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ((not (List.is_empty receivers)) || new_zkapp_account || empty_sender)
           ( { body = sender_account_update_body
             ; authorization =
-                Control.Signature Signature.dummy (*To be updated later*)
+                Control.Poly.Signature Signature.dummy (*To be updated later*)
             }
             : Account_update.Simple.t )
       in
@@ -4404,7 +4402,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ; authorization_kind
                   }
               ; authorization =
-                  Control.Signature Signature.dummy (*To be updated later*)
+                  Control.Poly.Signature Signature.dummy (*To be updated later*)
               }
               : Account_update.Simple.t ) )
       in
@@ -4420,7 +4418,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             let receiver_auth, authorization_kind, use_full_commitment =
               match receiver_auth with
               | Some Control.Tag.Signature ->
-                  ( Control.Signature Signature.dummy
+                  ( Control.Poly.Signature Signature.dummy
                   , Account_update.Authorization_kind.Signature
                   , true )
               | Some Proof ->
@@ -4428,7 +4426,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                     "Not implemented. Pickles_types.Nat.N2.n \
                      Pickles_types.Nat.N2.n ~domain_log2:15)"
               | Some None_given | None ->
-                  (None_given, None_given, false)
+                  ( Control.Poly.None_given
+                  , Account_update.Authorization_kind.None_given
+                  , false )
             in
             { body =
                 { public_key = receiver
@@ -4497,7 +4497,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let other_receivers =
         List.map2_exn other_receivers receivers ~f:(fun s (receiver, _amt) ->
             match s.authorization with
-            | Control.Signature _ ->
+            | Control.Poly.Signature _ ->
                 let commitment =
                   if s.body.use_full_commitment then full_commitment
                   else commitment
@@ -4515,12 +4515,12 @@ module Make_str (A : Wire_types.Concrete) = struct
                   Signature_lib.Schnorr.Chunked.sign receiver_kp.private_key
                     (Random_oracle.Input.Chunked.field commitment)
                 in
-                { Account_update.Simple.body = s.body
-                ; authorization = Signature receiver_signature_auth
+                { Account_update.Poly.body = s.body
+                ; authorization = Control.Poly.Signature receiver_signature_auth
                 }
-            | Control.Proof _ ->
+            | Control.Poly.Proof _ ->
                 failwith ""
-            | Control.None_given ->
+            | Control.Poly.None_given ->
                 s )
       in
       ( `Zkapp_command
@@ -4623,7 +4623,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         List.map snapp_zkapp_command_keypairs
           ~f:(fun (snapp_account_update, keypair) ->
             if no_auth then
-              ( { body = snapp_account_update.body; authorization = None_given }
+              ( { body = snapp_account_update.body
+                ; authorization = Control.Poly.None_given
+                }
                 : Account_update.Simple.t )
             else
               let commitment =
@@ -4723,8 +4725,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let account_update_with_dummy_auth =
         Account_update.
-          { body =
-              { public_key =
+          { Poly.body =
+              { Account_update.Body.public_key =
                   Signature_lib.Public_key.compress
                     spec.zkapp_account_keypair.public_key
               ; update = spec.update
@@ -4738,10 +4740,11 @@ module Make_str (A : Wire_types.Concrete) = struct
               ; use_full_commitment = true
               ; implicit_account_creation_fee = false
               ; may_use_token = No
-              ; authorization_kind = Proof (With_hash.hash vk)
+              ; authorization_kind =
+                  Account_update.Authorization_kind.Proof (With_hash.hash vk)
               }
           ; authorization =
-              Control.Proof (Lazy.force Mina_base.Proof.blockchain_dummy)
+              Control.Poly.Proof (Lazy.force Mina_base.Proof.blockchain_dummy)
           }
       in
       let account_update_digest_with_selected_chain =
@@ -4769,7 +4772,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         { tree_with_dummy_auth with
           account_update =
-            { account_update_with_dummy_auth with authorization = Proof pi }
+            { account_update_with_dummy_auth with
+              authorization = Control.Poly.Proof pi
+            }
         ; account_update_digest = account_update_digest_with_current_chain
         }
       in
@@ -4842,7 +4847,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; authorization_kind =
             ( match current_auth with
             | None ->
-                None_given
+                Account_update.Authorization_kind.None_given
             | Signature ->
                 Signature
             | Proof ->
@@ -4926,7 +4931,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             | None ->
                 Async.Deferred.return
                   ( { body = simple_snapp_account_update.body
-                    ; authorization = None_given
+                    ; authorization = Control.Poly.None_given
                     }
                     : Account_update.Simple.t )
             | _ ->

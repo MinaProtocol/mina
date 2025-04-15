@@ -367,9 +367,7 @@ struct
          , widthss
          , heightss
          , Arg_value.t
-         , ( Ret_value.t
-           * Auxiliary_value.t
-           * (max_proofs_verified, max_proofs_verified) Proof.t )
+         , (Ret_value.t * Auxiliary_value.t * max_proofs_verified Proof.t)
            Promise.t )
          H3_2.T(Prover).t
          * _
@@ -750,9 +748,7 @@ struct
                (   Snarky_backendless.Request.request
                 -> Snarky_backendless.Request.response )
           -> Arg_value.t
-          -> ( Ret_value.t
-             * Auxiliary_value.t
-             * (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t )
+          -> (Ret_value.t * Auxiliary_value.t * Max_proofs_verified.n Proof.t)
              Promise.t =
        fun (T b as branch_data) (step_pk, step_vk) ->
         let _, prev_vars_length = b.proofs_verified in
@@ -839,9 +835,7 @@ struct
              , xs3
              , xs4
              , Arg_value.t
-             , ( Ret_value.t
-               * Auxiliary_value.t
-               * (max_proofs_verified, max_proofs_verified) Proof.t )
+             , (Ret_value.t * Auxiliary_value.t * max_proofs_verified Proof.t)
                Promise.t )
              H3_2.T(Prover).t =
        fun bs ks ->
@@ -1024,16 +1018,14 @@ let compile_with_wrap_main_override_promise :
     -> (var, value, max_proofs_verified, branches) Tag.t
        * Cache_handle.t
        * (module Proof_intf
-            with type t = (max_proofs_verified, max_proofs_verified) Proof.t
+            with type t = max_proofs_verified Proof.t
              and type statement = value )
        * ( prev_valuess
          , widthss
          , heightss
          , a_value
-         , ( ret_value
-           * auxiliary_value
-           * (max_proofs_verified, max_proofs_verified) Proof.t )
-           Promise.t )
+         , (ret_value * auxiliary_value * max_proofs_verified Proof.t) Promise.t
+         )
          H3_2.T(Prover).t =
  (* This function is an adapter between the user-facing Pickles.compile API
     and the underlying Make(_).compile function which builds the circuits.
@@ -1162,14 +1154,9 @@ let compile_with_wrap_main_override_promise :
 
     module Max_local_max_proofs_verified = Max_proofs_verified
 
-    include
-      Proof.Make
-        (struct
-          include Max_proofs_verified
-        end)
-        (struct
-          include Max_local_max_proofs_verified
-        end)
+    include Proof.Make (struct
+      include Max_local_max_proofs_verified
+    end)
 
     let id_promise = wrap_disk_key
 
@@ -1316,7 +1303,7 @@ struct
         (fun { public_input = () } ->
           let dummy_proof =
             exists (Typ.prover_value ()) ~compute:(fun () ->
-                Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15 )
+                Proof.dummy Nat.N2.n Nat.N2.n ~domain_log2:15 )
           in
           Promise.return
             { Inductive_rule.previous_proof_statements =
